@@ -3,3 +3,10 @@ activitywatch
 项目介绍
 项目分析
 .trae
+__pycache__
+test
+*.png
+技术文档.md
+docs
+*-info
+*.db
