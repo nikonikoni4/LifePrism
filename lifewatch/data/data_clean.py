@@ -10,7 +10,7 @@ import pandas as pd
 from datetime import datetime
 from typing import Dict, List,Any
 import pytz
-from lifewatch.storage.database_manager import get_app_purpose_category
+from lifewatch.storage.lifewatch_data_manager import get_app_purpose_category
 from lifewatch.data.get_activitywatch_data import get_window_events
 from lifewatch.utils import is_multipurpose_app
 from lifewatch import config
