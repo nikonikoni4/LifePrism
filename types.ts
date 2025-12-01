@@ -49,3 +49,27 @@ export interface TimelineEvent {
   description?: string;
   linkedGoal?: string;
 }
+
+// New types for Categorization Page
+export interface SubCategoryDef {
+  id: string;
+  name: string;
+}
+
+export interface CategoryDef {
+  id: string;
+  name: string;
+  color: string;
+  subCategories: SubCategoryDef[];
+}
+
+export interface ActivityRecord {
+  id: string;
+  appName: string;
+  windowTitle: string;
+  timestamp: string;
+  duration: string;
+  aiDescription?: string;
+  categoryId: string; // e.g., 'work'
+  subCategoryId: string; // e.g., 'programming'
+}

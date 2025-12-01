@@ -7,7 +7,8 @@ import {
   FileBarChart, 
   Settings, 
   Sparkles,
-  User
+  User,
+  Tag
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,6 +21,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, onChatToggle
   const navItems = [
     { id: 'home', icon: Home, label: 'Home' },
     { id: 'timeline', icon: Clock, label: 'Timeline' },
+    { id: 'categorization', icon: Tag, label: 'Categorization' },
     { id: 'goals', icon: Target, label: 'Goals' },
     { id: 'reports', icon: FileBarChart, label: 'Reports' },
     { id: 'settings', icon: Settings, label: 'Settings' },

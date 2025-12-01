@@ -1,5 +1,5 @@
 
-import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent } from "./types";
+import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord } from "./types";
 
 export const COLORS = {
   WORK: '#5B8FF9',
@@ -146,4 +146,50 @@ export const TIMELINE_EVENTS: TimelineEvent[] = [
   { id: '10', title: 'Wrap up', startTime: 17.5, endTime: 18, category: 'work', description: 'Planning for tomorrow' },
   { id: '11', title: 'Gym', startTime: 18.5, endTime: 20, category: 'other', linkedGoal: '4', description: 'Upper body workout' },
   { id: '12', title: 'Gaming', startTime: 20.5, endTime: 22.5, category: 'entertainment', description: 'Cyberpunk 2077' },
+];
+
+// --- Mock Data for Categorization Page ---
+
+export const MOCK_CATEGORIES: CategoryDef[] = [
+  {
+    id: 'work',
+    name: 'Work',
+    color: '#5B8FF9',
+    subCategories: [
+      { id: 'coding', name: 'Coding' },
+      { id: 'meeting', name: 'Meetings' },
+      { id: 'planning', name: 'Planning' },
+      { id: 'research', name: 'Research' }
+    ]
+  },
+  {
+    id: 'entertainment',
+    name: 'Entertainment',
+    color: '#FA8C16',
+    subCategories: [
+      { id: 'video', name: 'Video Streaming' },
+      { id: 'games', name: 'Gaming' },
+      { id: 'social', name: 'Social Media' }
+    ]
+  },
+  {
+    id: 'other',
+    name: 'Other',
+    color: '#BFBFBF',
+    subCategories: [
+      { id: 'utilities', name: 'System Utilities' },
+      { id: 'browsing', name: 'General Browsing' },
+      { id: 'untracked', name: 'Untracked' }
+    ]
+  }
+];
+
+export const MOCK_ACTIVITY_RECORDS: ActivityRecord[] = [
+  { id: '1', appName: 'Code.exe', windowTitle: 'App.tsx - LifeWatch - Visual Studio Code', timestamp: '10:42 AM', duration: '45m', aiDescription: 'AI: Likely active coding session in React', categoryId: 'work', subCategoryId: 'coding' },
+  { id: '2', appName: 'Chrome', windowTitle: 'React Hooks Documentation - Google Chrome', timestamp: '11:15 AM', duration: '12m', aiDescription: 'AI: Researching development documentation', categoryId: 'work', subCategoryId: 'research' },
+  { id: '3', appName: 'Slack', windowTitle: '#engineering - Huddle', timestamp: '09:00 AM', duration: '30m', aiDescription: 'AI: Team communication', categoryId: 'work', subCategoryId: 'meeting' },
+  { id: '4', appName: 'Spotify', windowTitle: 'Daily Mix 1', timestamp: '02:00 PM', duration: '2h', aiDescription: 'AI: Background music application', categoryId: 'entertainment', subCategoryId: 'video' },
+  { id: '5', appName: 'Steam', windowTitle: 'Cyberpunk 2077', timestamp: '08:30 PM', duration: '1h 20m', aiDescription: 'AI: Gaming activity detected', categoryId: 'entertainment', subCategoryId: 'games' },
+  { id: '6', appName: 'Finder', windowTitle: 'Downloads', timestamp: '06:15 PM', duration: '5m', aiDescription: 'AI: File management', categoryId: 'other', subCategoryId: 'utilities' },
+  { id: '7', appName: 'UnknownApp.exe', windowTitle: 'Untitled Window', timestamp: '04:00 PM', duration: '15m', aiDescription: 'AI: Could not determine activity type', categoryId: 'other', subCategoryId: 'untracked' },
 ];

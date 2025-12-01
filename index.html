@@ -1,57 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LifeWatchAI</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-    rel="stylesheet">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          },
-          colors: {
-            morandi: {
-              blue: '#5B8FF9',
-              orange: '#FA8C16',
-              grey: '#BFBFBF',
-              bg: '#F3F4F6',
-              surface: '#FFFFFF',
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LifeWatchAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+            colors: {
+              morandi: {
+                blue: '#5B8FF9',
+                orange: '#FA8C16',
+                grey: '#BFBFBF',
+                bg: '#F3F4F6',
+                surface: '#FFFFFF',
+              }
+            },
+            borderRadius: {
+              'xl': '1rem', // 16px
+              '2xl': '1.25rem', // 20px
             }
-          },
-          borderRadius: {
-            'xl': '1rem', // 16px
-            '2xl': '1.25rem', // 20px
           }
         }
       }
-    }
-  </script>
-  <style>
-    /* Hide scrollbar for Chrome, Safari and Opera */
-    .no-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-
-    /* Hide scrollbar for IE, Edge and Firefox */
-    .no-scrollbar {
-      -ms-overflow-style: none;
-      /* IE and Edge */
-      scrollbar-width: none;
-      /* Firefox */
-    }
-  </style>
-  <!-- 
-  NOTE: This importmap is commented out because it conflicts with Vite's module resolution.
-  Vite will load dependencies from node_modules instead of CDN.
-  
+    </script>
+    <style>
+      /* Hide scrollbar for Chrome, Safari and Opera */
+      .no-scrollbar::-webkit-scrollbar {
+          display: none;
+      }
+      /* Hide scrollbar for IE, Edge and Firefox */
+      .no-scrollbar {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+      }
+    </style>
   <script type="importmap">
 {
   "imports": {
@@ -64,12 +54,8 @@
   }
 }
 </script>
-  -->
 </head>
-
-<body class="bg-[#F3F4F6] text-slate-800 antialiased">
-  <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
-
+  <body class="bg-[#F3F4F6] text-slate-800 antialiased">
+    <div id="root"></div>
+  </body>
 </html>
