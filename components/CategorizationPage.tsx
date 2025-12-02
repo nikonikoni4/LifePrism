@@ -7,16 +7,52 @@ import {
   Edit2, 
   Plus, 
   Check, 
-  ChevronDown, 
+  X as XIcon,
   MoreHorizontal 
 } from 'lucide-react';
 import { MOCK_CATEGORIES, MOCK_ACTIVITY_RECORDS } from '../constants';
 import { CategoryDef, ActivityRecord } from '../types';
 
+/* 
+  === BACKEND API DATA REQUIREMENTS ===
+
+  1. GET /api/categories
+     - Description: Fetch the full hierarchy of categorization rules.
+     - Response: CategoryDef[]
+  
+  2. POST /api/categories
+     - Description: Create a new Level 1 Main Category.
+     - Body: { name: string, color: string }
+     - Response: { id: string, name: string, color: string, subCategories: [] }
+
+  3. PUT /api/categories/:id
+     - Description: Update a Main Category (Rename or Change Color).
+     - Body: { name?: string, color?: string }
+     - Response: Updated Category Object
+
+  4. DELETE /api/categories/:id
+     - Description: Delete a Main Category. 
+     - Warning: Backend should handle reassigning orphaned records to 'Uncategorized' or delete cascadingly.
+
+  5. POST /api/categories/:parentId/sub
+     - Description: Add a Level 2 Sub-category to a parent.
+     - Body: { name: string }
+     - Response: { id: string, name: string }
+
+  6. PUT /api/categories/:parentId/sub/:subId
+     - Description: Rename a Sub-category.
+     - Body: { name: string }
+
+  7. DELETE /api/categories/:parentId/sub/:subId
+     - Description: Delete a Sub-category.
+*/
+
 type Tab = 'settings' | 'review';
 
 const CategorizationPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('settings');
+  // Lifted state to manage categories globally for the page
+  const [categories, setCategories] = useState<CategoryDef[]>(MOCK_CATEGORIES);
 
   return (
     <div className="max-w-7xl mx-auto h-[calc(100vh-100px)] flex flex-col">
@@ -29,7 +65,7 @@ const CategorizationPage: React.FC = () => {
 
         {/* Segmented Control */}
         <div className="bg-gray-100 p-1.5 rounded-xl inline-flex font-semibold text-sm">
-          <button
+           <button
             onClick={() => setActiveTab('settings')}
             className={`px-6 py-2 rounded-lg transition-all ${
               activeTab === 'settings'
@@ -54,7 +90,11 @@ const CategorizationPage: React.FC = () => {
 
       {/* Tab Content */}
       <div className="flex-1 min-h-0 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-        {activeTab === 'review' ? <DataReviewTab /> : <CategorySettingsTab />}
+        {activeTab === 'review' ? (
+            <DataReviewTab categories={categories} />
+        ) : (
+            <CategorySettingsTab categories={categories} setCategories={setCategories} />
+        )}
       </div>
     </div>
   );
@@ -64,7 +104,11 @@ const CategorizationPage: React.FC = () => {
 /*                               Data Review Tab                              */
 /* -------------------------------------------------------------------------- */
 
-const DataReviewTab: React.FC = () => {
+interface DataReviewTabProps {
+    categories: CategoryDef[];
+}
+
+const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
   const [showUncategorized, setShowUncategorized] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [records, setRecords] = useState<ActivityRecord[]>(MOCK_ACTIVITY_RECORDS);
@@ -83,7 +127,7 @@ const DataReviewTab: React.FC = () => {
   });
 
   const getCategoryColor = (catId: string) => {
-    const cat = MOCK_CATEGORIES.find(c => c.id === catId);
+    const cat = categories.find(c => c.id === catId);
     return cat ? cat.color : '#CBD5E1';
   };
 
@@ -177,7 +221,7 @@ const DataReviewTab: React.FC = () => {
                       className="appearance-none w-full pl-3 pr-8 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer hover:bg-gray-50"
                       defaultValue={record.categoryId}
                     >
-                      {MOCK_CATEGORIES.map(cat => (
+                      {categories.map(cat => (
                         <option key={cat.id} value={cat.id}>{cat.name}</option>
                       ))}
                     </select>
@@ -192,7 +236,7 @@ const DataReviewTab: React.FC = () => {
                       className="appearance-none w-full px-3 py-1.5 bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg text-sm text-slate-600 focus:outline-none focus:bg-white focus:border-blue-400 cursor-pointer"
                       defaultValue={record.subCategoryId}
                     >
-                      {MOCK_CATEGORIES.find(c => c.id === record.categoryId)?.subCategories.map(sub => (
+                      {categories.find(c => c.id === record.categoryId)?.subCategories.map(sub => (
                         <option key={sub.id} value={sub.id}>{sub.name}</option>
                       ))}
                     </select>
@@ -225,11 +269,127 @@ const DataReviewTab: React.FC = () => {
 /*                            Category Settings Tab                           */
 /* -------------------------------------------------------------------------- */
 
-const CategorySettingsTab: React.FC = () => {
-  const [categories, setCategories] = useState<CategoryDef[]>(MOCK_CATEGORIES);
-  const [selectedCatId, setSelectedCatId] = useState<string>(MOCK_CATEGORIES[0].id);
+interface CategorySettingsTabProps {
+    categories: CategoryDef[];
+    setCategories: React.Dispatch<React.SetStateAction<CategoryDef[]>>;
+}
+
+const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, setCategories }) => {
+  const [selectedCatId, setSelectedCatId] = useState<string>(categories[0]?.id || '');
+  
+  // Edit State for L1 Category
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editCatName, setEditCatName] = useState('');
+
+  // Edit State for L2 Sub-category
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [editSubName, setEditSubName] = useState('');
+
+  // Add State
+  const [newSubName, setNewSubName] = useState('');
 
   const activeCategory = categories.find(c => c.id === selectedCatId) || categories[0];
+
+  // --- L1 Logic ---
+
+  const handleAddCategory = () => {
+    const newId = `cat-${Date.now()}`;
+    const colors = ['#F87171', '#34D399', '#A78BFA', '#F472B6', '#60A5FA'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    
+    const newCat: CategoryDef = {
+        id: newId,
+        name: 'New Category',
+        color: randomColor,
+        subCategories: []
+    };
+
+    setCategories([...categories, newCat]);
+    setSelectedCatId(newId);
+    // Auto start editing
+    setEditingCatId(newId);
+    setEditCatName('New Category');
+  };
+
+  const handleDeleteCategory = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm('Are you sure? This will delete all sub-categories and associated rules.')) {
+        const newCats = categories.filter(c => c.id !== id);
+        setCategories(newCats);
+        if (selectedCatId === id && newCats.length > 0) {
+            setSelectedCatId(newCats[0].id);
+        }
+    }
+  };
+
+  const startEditCategory = (id: string, name: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setEditingCatId(id);
+      setEditCatName(name);
+  };
+
+  const saveEditCategory = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setCategories(categories.map(c => 
+          c.id === editingCatId ? { ...c, name: editCatName } : c
+      ));
+      setEditingCatId(null);
+  };
+
+  const cancelEditCategory = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setEditingCatId(null);
+  };
+
+  // --- L2 Logic ---
+
+  const handleAddSubCategory = () => {
+      if (!newSubName.trim()) return;
+      const newSubId = `sub-${Date.now()}`;
+      
+      setCategories(categories.map(c => {
+          if (c.id === activeCategory.id) {
+              return {
+                  ...c,
+                  subCategories: [...c.subCategories, { id: newSubId, name: newSubName }]
+              };
+          }
+          return c;
+      }));
+      setNewSubName('');
+  };
+
+  const handleDeleteSubCategory = (subId: string) => {
+    setCategories(categories.map(c => {
+        if (c.id === activeCategory.id) {
+            return {
+                ...c,
+                subCategories: c.subCategories.filter(s => s.id !== subId)
+            };
+        }
+        return c;
+    }));
+  };
+
+  const startEditSub = (subId: string, name: string) => {
+      setEditingSubId(subId);
+      setEditSubName(name);
+  };
+
+  const saveEditSub = () => {
+    setCategories(categories.map(c => {
+        if (c.id === activeCategory.id) {
+            return {
+                ...c,
+                subCategories: c.subCategories.map(s => 
+                    s.id === editingSubId ? { ...s, name: editSubName } : s
+                )
+            };
+        }
+        return c;
+    }));
+    setEditingSubId(null);
+  };
 
   return (
     <div className="flex h-full divide-x divide-gray-100">
@@ -239,31 +399,61 @@ const CategorySettingsTab: React.FC = () => {
         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 px-2">Main Categories</h3>
         
         <div className="flex-1 space-y-2 overflow-y-auto">
-          {categories.map((cat) => (
-            <div 
-              key={cat.id}
-              onClick={() => setSelectedCatId(cat.id)}
-              className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer border transition-all ${
-                selectedCatId === cat.id 
-                  ? 'bg-white border-blue-200 shadow-sm ring-1 ring-blue-100' 
-                  : 'bg-transparent border-transparent hover:bg-white hover:border-gray-200'
-              }`}
-            >
-              <div className="flex items-center gap-3">
+          {categories.map((cat) => {
+            const isEditing = editingCatId === cat.id;
+            const isSelected = selectedCatId === cat.id;
+
+            return (
                 <div 
-                  className="w-5 h-5 rounded-full border border-black/10 shadow-inner flex-shrink-0" 
-                  style={{ backgroundColor: cat.color }}
-                />
-                <span className={`font-semibold ${selectedCatId === cat.id ? 'text-slate-900' : 'text-slate-600'}`}>
-                  {cat.name}
-                </span>
-              </div>
-              {selectedCatId === cat.id && <Edit2 size={14} className="text-gray-400" />}
-            </div>
-          ))}
+                    key={cat.id}
+                    onClick={() => !isEditing && setSelectedCatId(cat.id)}
+                    className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer border transition-all ${
+                        isSelected 
+                        ? 'bg-white border-blue-200 shadow-sm ring-1 ring-blue-100' 
+                        : 'bg-transparent border-transparent hover:bg-white hover:border-gray-200'
+                    }`}
+                >
+                    {isEditing ? (
+                        <div className="flex items-center gap-2 w-full" onClick={e => e.stopPropagation()}>
+                            <input 
+                                value={editCatName}
+                                onChange={(e) => setEditCatName(e.target.value)}
+                                className="w-full bg-white border border-blue-300 rounded px-2 py-1 text-sm focus:outline-none"
+                                autoFocus
+                            />
+                            <button onClick={saveEditCategory} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check size={14} /></button>
+                            <button onClick={cancelEditCategory} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><XIcon size={14} /></button>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex items-center gap-3">
+                                <div 
+                                className="w-5 h-5 rounded-full border border-black/10 shadow-inner flex-shrink-0" 
+                                style={{ backgroundColor: cat.color }}
+                                />
+                                <span className={`font-semibold ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>
+                                {cat.name}
+                                </span>
+                            </div>
+                            <div className={`flex items-center gap-1 opacity-0 ${isSelected ? 'opacity-100' : 'group-hover:opacity-100'} transition-opacity`}>
+                                <button onClick={(e) => startEditCategory(cat.id, cat.name, e)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                                    <Edit2 size={14} />
+                                </button>
+                                <button onClick={(e) => handleDeleteCategory(cat.id, e)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            );
+          })}
         </div>
 
-        <button className="mt-4 flex items-center justify-center gap-2 w-full py-3 bg-white border border-dashed border-gray-300 rounded-xl text-slate-500 font-bold text-sm hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
+        <button 
+            onClick={handleAddCategory}
+            className="mt-4 flex items-center justify-center gap-2 w-full py-3 bg-white border border-dashed border-gray-300 rounded-xl text-slate-500 font-bold text-sm hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+        >
           <Plus size={16} />
           Add New Category
         </button>
@@ -271,53 +461,86 @@ const CategorySettingsTab: React.FC = () => {
 
       {/* Right Column: L2 Sub-categories */}
       <div className="flex-1 p-8 flex flex-col bg-white">
-        <div className="flex justify-between items-end mb-8 border-b border-gray-100 pb-6">
-          <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sub-categories for</span>
-            <div className="flex items-center gap-3 mt-1">
-               <h2 className="text-2xl font-bold text-slate-900" style={{ color: activeCategory.color }}>
-                 {activeCategory.name}
-               </h2>
-               <span className="bg-gray-100 text-gray-500 text-xs font-bold px-2 py-1 rounded-md">
-                 {activeCategory.subCategories.length} items
-               </span>
-            </div>
-          </div>
-          <button className="p-2 text-slate-400 hover:bg-gray-50 rounded-lg">
-             <MoreHorizontal size={20} />
-          </button>
-        </div>
+        {activeCategory ? (
+            <>
+                <div className="flex justify-between items-end mb-8 border-b border-gray-100 pb-6">
+                <div>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sub-categories for</span>
+                    <div className="flex items-center gap-3 mt-1">
+                    <h2 className="text-2xl font-bold text-slate-900" style={{ color: activeCategory.color }}>
+                        {activeCategory.name}
+                    </h2>
+                    <span className="bg-gray-100 text-gray-500 text-xs font-bold px-2 py-1 rounded-md">
+                        {activeCategory.subCategories.length} items
+                    </span>
+                    </div>
+                </div>
+                </div>
 
-        <div className="space-y-3 flex-1 overflow-y-auto">
-          {activeCategory.subCategories.map((sub) => (
-            <div key={sub.id} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:border-gray-300 hover:shadow-sm transition-all group">
-              <span className="font-semibold text-slate-700">{sub.name}</span>
-              
-              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
-                  <Edit2 size={16} />
-                </button>
-                <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                <div className="space-y-3 flex-1 overflow-y-auto pr-2">
+                {activeCategory.subCategories.map((sub) => {
+                    const isEditing = editingSubId === sub.id;
+                    return (
+                        <div key={sub.id} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:border-gray-300 hover:shadow-sm transition-all group">
+                            {isEditing ? (
+                                <div className="flex items-center gap-2 w-full">
+                                    <input 
+                                        value={editSubName}
+                                        onChange={(e) => setEditSubName(e.target.value)}
+                                        className="flex-1 bg-gray-50 border border-blue-300 rounded px-2 py-1 text-sm font-semibold focus:outline-none"
+                                        autoFocus
+                                    />
+                                    <button onClick={saveEditSub} className="p-2 text-green-600 hover:bg-green-50 rounded"><Check size={16} /></button>
+                                    <button onClick={() => setEditingSubId(null)} className="p-2 text-gray-400 hover:bg-gray-100 rounded"><XIcon size={16} /></button>
+                                </div>
+                            ) : (
+                                <>
+                                    <span className="font-semibold text-slate-700">{sub.name}</span>
+                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => startEditSub(sub.id, sub.name)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button onClick={() => handleDeleteSubCategory(sub.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    );
+                })}
+                {activeCategory.subCategories.length === 0 && (
+                    <div className="text-center py-12 text-slate-400 italic">
+                        No sub-categories defined. Add one below.
+                    </div>
+                )}
+                </div>
 
-        <div className="mt-6 pt-6 border-t border-gray-100">
-           <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Create new sub-category</label>
-           <div className="flex gap-3">
-             <input 
-               type="text" 
-               placeholder={`Add to ${activeCategory.name}...`}
-               className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-             />
-             <button className="px-6 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg shadow-slate-200">
-               Add
-             </button>
-           </div>
-        </div>
+                <div className="mt-6 pt-6 border-t border-gray-100">
+                <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Create new sub-category</label>
+                <div className="flex gap-3">
+                    <input 
+                    type="text" 
+                    value={newSubName}
+                    onChange={(e) => setNewSubName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddSubCategory()}
+                    placeholder={`Add to ${activeCategory.name}...`}
+                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
+                    />
+                    <button 
+                        onClick={handleAddSubCategory}
+                        className="px-6 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg shadow-slate-200"
+                    >
+                    Add
+                    </button>
+                </div>
+                </div>
+            </>
+        ) : (
+            <div className="flex items-center justify-center h-full text-slate-400">
+                Select a category to manage details
+            </div>
+        )}
       </div>
 
     </div>

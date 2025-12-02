@@ -103,40 +103,44 @@ const TimeOverviewWidget: React.FC = () => {
         
         {/* Donut Chart */}
         <div className="w-full lg:w-1/3 h-64 lg:h-auto relative flex flex-col items-center justify-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 p-4">
-            <div className="w-full h-48 relative">
-                <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                    <Pie
-                        data={currentPieData}
-                        innerRadius={65}
-                        outerRadius={85}
-                        paddingAngle={4}
-                        dataKey="value"
-                        stroke="none"
-                        cornerRadius={6}
-                        onClick={handlePieClick}
-                        className={!selectedCategory ? "cursor-pointer" : ""}
-                    >
-                        {currentPieData.map((entry, index) => (
-                            <Cell 
-                                key={`cell-${index}`} 
-                                fill={entry.color} 
-                                className={`transition-all duration-300 ${!selectedCategory ? 'hover:opacity-80' : ''}`}
-                            />
-                        ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-                </ResponsiveContainer>
-                {/* Center Text */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <div className="w-full h-48 relative isolate">
+                {/* Center Text - Z-0 (Behind) */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
                     <span className="text-5xl font-bold text-slate-800 font-mono tracking-tighter">{hours}h</span>
                     <span className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Tracked</span>
+                </div>
+
+                {/* Chart - Z-10 (On Top) */}
+                <div className="absolute inset-0 z-10">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={currentPieData}
+                                innerRadius={65}
+                                outerRadius={85}
+                                paddingAngle={4}
+                                dataKey="value"
+                                stroke="none"
+                                cornerRadius={6}
+                                onClick={handlePieClick}
+                                className={!selectedCategory ? "cursor-pointer" : ""}
+                            >
+                                {currentPieData.map((entry, index) => (
+                                    <Cell 
+                                        key={`cell-${index}`} 
+                                        fill={entry.color} 
+                                        className={`transition-all duration-300 ${!selectedCategory ? 'hover:opacity-80' : ''}`}
+                                    />
+                                ))}
+                            </Pie>
+                            <Tooltip content={<CustomTooltip />} />
+                        </PieChart>
+                    </ResponsiveContainer>
                 </div>
             </div>
             
             {/* Legend underneath */}
-            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-4 pb-2">
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-4 pb-2 relative z-20">
                  {currentPieData.map((item, idx) => (
                      <div key={idx} className="text-center min-w-[60px]">
                          <p className="text-lg font-bold text-slate-700">{Math.round((item.value/totalMinutes)*100)}%</p>

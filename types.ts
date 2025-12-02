@@ -46,6 +46,7 @@ export interface TimelineEvent {
   startTime: number; // Hour (0-24, float allowed e.g. 14.5)
   endTime: number;
   category: 'work' | 'entertainment' | 'other' | 'untracked';
+  subCategoryId?: string; // Linked to SubCategoryDef.id
   description?: string;
   linkedGoal?: string;
 }

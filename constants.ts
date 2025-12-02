@@ -40,115 +40,7 @@ export const BAR_DATA: TimeDistribution[] = [
   { timeRange: '22-24', work: 0, entertainment: 60, other: 60 },
 ];
 
-// Sub-category drill-down data
-export const DRILLDOWN_DATA: Record<string, SubCategoryData> = {
-  work: {
-    title: 'Work Details',
-    pieData: [
-      { name: 'Programming', value: 300, color: COLORS.WORK, key: 'programming' },
-      { name: 'Writing', value: 180, color: COLORS.WORK_LIGHT, key: 'writing' },
-    ],
-    barKeys: [
-      { key: 'programming', color: COLORS.WORK, label: 'Programming' },
-      { key: 'writing', color: COLORS.WORK_LIGHT, label: 'Writing' }
-    ],
-    barData: [
-      { timeRange: '0-2', programming: 0, writing: 0 },
-      { timeRange: '2-4', programming: 0, writing: 0 },
-      { timeRange: '4-6', programming: 0, writing: 0 },
-      { timeRange: '6-8', programming: 30, writing: 0 },
-      { timeRange: '8-10', programming: 60, writing: 40 },
-      { timeRange: '10-12', programming: 80, writing: 30 },
-      { timeRange: '12-14', programming: 0, writing: 30 },
-      { timeRange: '14-16', programming: 100, writing: 20 },
-      { timeRange: '16-18', programming: 30, writing: 70 },
-      { timeRange: '18-20', programming: 0, writing: 20 },
-      { timeRange: '20-22', programming: 0, writing: 0 },
-      { timeRange: '22-24', programming: 0, writing: 0 },
-    ]
-  },
-  entertainment: {
-    title: 'Entertainment Details',
-    pieData: [
-      { name: 'Video', value: 120, color: COLORS.ENTERTAINMENT, key: 'video' },
-      { name: 'Games', value: 60, color: COLORS.ENTERTAINMENT_LIGHT, key: 'games' },
-    ],
-    barKeys: [
-      { key: 'video', color: COLORS.ENTERTAINMENT, label: 'Video' },
-      { key: 'games', color: COLORS.ENTERTAINMENT_LIGHT, label: 'Games' }
-    ],
-    barData: [
-      { timeRange: '0-2', video: 30, games: 0 },
-      { timeRange: '2-4', video: 0, games: 0 },
-      { timeRange: '4-6', video: 0, games: 0 },
-      { timeRange: '6-8', video: 0, games: 0 },
-      { timeRange: '8-10', video: 10, games: 0 },
-      { timeRange: '10-12', video: 5, games: 0 },
-      { timeRange: '12-14', video: 40, games: 20 },
-      { timeRange: '14-16', video: 0, games: 0 },
-      { timeRange: '16-18', video: 10, games: 0 },
-      { timeRange: '18-20', video: 40, games: 40 },
-      { timeRange: '20-22', video: 60, games: 40 },
-      { timeRange: '22-24', video: 60, games: 0 },
-    ]
-  },
-  other: {
-    title: 'Other Activity Details',
-    pieData: [
-      { name: 'Email', value: 40, color: COLORS.OTHER, key: 'email' },
-      { name: 'Social', value: 80, color: COLORS.OTHER_LIGHT, key: 'social' },
-    ],
-    barKeys: [
-      { key: 'email', color: COLORS.OTHER, label: 'Email' },
-      { key: 'social', color: COLORS.OTHER_LIGHT, label: 'Social' }
-    ],
-    barData: [
-      { timeRange: '0-2', email: 30, social: 60 },
-      { timeRange: '2-4', email: 0, social: 120 },
-      { timeRange: '4-6', email: 0, social: 120 },
-      { timeRange: '6-8', email: 30, social: 60 },
-      { timeRange: '8-10', email: 10, social: 0 },
-      { timeRange: '10-12', email: 5, social: 0 },
-      { timeRange: '12-14', email: 10, social: 20 },
-      { timeRange: '14-16', email: 0, social: 0 },
-      { timeRange: '16-18', email: 10, social: 0 },
-      { timeRange: '18-20', email: 10, social: 10 },
-      { timeRange: '20-22', email: 10, social: 10 },
-      { timeRange: '22-24', email: 0, social: 60 },
-    ]
-  }
-};
-
-export const TOP_APPS: AppUsage[] = [
-  { name: 'VS Code', duration: '4h 12m', percentage: 65 },
-  { name: 'Google Chrome', duration: '2h 30m', percentage: 38 },
-  { name: 'Figma', duration: '1h 15m', percentage: 20 },
-  { name: 'Spotify', duration: '45m', percentage: 12 },
-];
-
-export const TOP_WINDOWS: AppUsage[] = [
-  { name: 'GitHub - Project Alpha', duration: '1h 45m', percentage: 40 },
-  { name: 'Stack Overflow - React Types', duration: '45m', percentage: 18 },
-  { name: 'Youtube - Lofi Beats', duration: '2h 10m', percentage: 55 },
-  { name: 'Localhost:3000', duration: '1h 10m', percentage: 28 },
-];
-
-export const TIMELINE_EVENTS: TimelineEvent[] = [
-  { id: '1', title: 'Deep Sleep', startTime: 0, endTime: 7, category: 'other', description: 'Restorative sleep' },
-  { id: '2', title: 'Morning Routine', startTime: 7, endTime: 8.5, category: 'other', description: 'Breakfast, Shower' },
-  { id: '3', title: 'Commute', startTime: 8.5, endTime: 9, category: 'other', description: 'Listening to podcast' },
-  { id: '4', title: 'Standup Meeting', startTime: 9, endTime: 9.5, category: 'work', linkedGoal: '2', description: 'Daily sync with engineering team' },
-  { id: '5', title: 'Dashboard Development', startTime: 9.5, endTime: 12, category: 'work', linkedGoal: '1', description: 'Implementing React components' },
-  { id: '6', title: 'Lunch Break', startTime: 12, endTime: 13, category: 'entertainment', description: 'Youtube & Lunch' },
-  { id: '7', title: 'Code Review', startTime: 13, endTime: 14.5, category: 'work', linkedGoal: '2', description: 'Reviewing PRs #342 and #345' },
-  { id: '8', title: 'Deep Focus: Backend', startTime: 14.5, endTime: 17, category: 'work', linkedGoal: '1', description: 'API integration' },
-  { id: '9', title: 'Break / Social', startTime: 17, endTime: 17.5, category: 'other', description: 'Coffee chat' },
-  { id: '10', title: 'Wrap up', startTime: 17.5, endTime: 18, category: 'work', description: 'Planning for tomorrow' },
-  { id: '11', title: 'Gym', startTime: 18.5, endTime: 20, category: 'other', linkedGoal: '4', description: 'Upper body workout' },
-  { id: '12', title: 'Gaming', startTime: 20.5, endTime: 22.5, category: 'entertainment', description: 'Cyberpunk 2077' },
-];
-
-// --- Mock Data for Categorization Page ---
+// --- Mock Data for Categorization Page (Source of Truth) ---
 
 export const MOCK_CATEGORIES: CategoryDef[] = [
   {
@@ -182,6 +74,116 @@ export const MOCK_CATEGORIES: CategoryDef[] = [
       { id: 'untracked', name: 'Untracked' }
     ]
   }
+];
+
+// Sub-category drill-down data (ALIGNED WITH MOCK_CATEGORIES)
+export const DRILLDOWN_DATA: Record<string, SubCategoryData> = {
+  work: {
+    title: 'Work Details',
+    pieData: [
+      { name: 'Coding', value: 300, color: COLORS.WORK, key: 'coding' },
+      { name: 'Meetings', value: 100, color: COLORS.WORK_LIGHT, key: 'meeting' },
+      { name: 'Research', value: 80, color: '#A5C5FF', key: 'research' }, // Custom light blue
+    ],
+    barKeys: [
+      { key: 'coding', color: COLORS.WORK, label: 'Coding' },
+      { key: 'meeting', color: COLORS.WORK_LIGHT, label: 'Meeting' },
+      { key: 'research', color: '#A5C5FF', label: 'Research' }
+    ],
+    barData: [
+      { timeRange: '0-2', coding: 0, meeting: 0, research: 0 },
+      { timeRange: '2-4', coding: 0, meeting: 0, research: 0 },
+      { timeRange: '4-6', coding: 0, meeting: 0, research: 0 },
+      { timeRange: '6-8', coding: 30, meeting: 0, research: 0 },
+      { timeRange: '8-10', coding: 60, meeting: 40, research: 0 },
+      { timeRange: '10-12', coding: 80, meeting: 30, research: 0 },
+      { timeRange: '12-14', coding: 0, meeting: 30, research: 0 },
+      { timeRange: '14-16', coding: 100, meeting: 20, research: 0 },
+      { timeRange: '16-18', coding: 30, meeting: 10, research: 60 },
+      { timeRange: '18-20', coding: 0, meeting: 0, research: 20 },
+      { timeRange: '20-22', coding: 0, meeting: 0, research: 0 },
+      { timeRange: '22-24', coding: 0, meeting: 0, research: 0 },
+    ]
+  },
+  entertainment: {
+    title: 'Entertainment Details',
+    pieData: [
+      { name: 'Video', value: 120, color: COLORS.ENTERTAINMENT, key: 'video' },
+      { name: 'Games', value: 60, color: COLORS.ENTERTAINMENT_LIGHT, key: 'games' },
+    ],
+    barKeys: [
+      { key: 'video', color: COLORS.ENTERTAINMENT, label: 'Video' },
+      { key: 'games', color: COLORS.ENTERTAINMENT_LIGHT, label: 'Games' }
+    ],
+    barData: [
+      { timeRange: '0-2', video: 30, games: 0 },
+      { timeRange: '2-4', video: 0, games: 0 },
+      { timeRange: '4-6', video: 0, games: 0 },
+      { timeRange: '6-8', video: 0, games: 0 },
+      { timeRange: '8-10', video: 10, games: 0 },
+      { timeRange: '10-12', video: 5, games: 0 },
+      { timeRange: '12-14', video: 40, games: 20 },
+      { timeRange: '14-16', video: 0, games: 0 },
+      { timeRange: '16-18', video: 10, games: 0 },
+      { timeRange: '18-20', video: 40, games: 40 },
+      { timeRange: '20-22', video: 60, games: 40 },
+      { timeRange: '22-24', video: 60, games: 0 },
+    ]
+  },
+  other: {
+    title: 'Other Activity Details',
+    pieData: [
+      { name: 'Browsing', value: 40, color: COLORS.OTHER, key: 'browsing' },
+      { name: 'Utilities', value: 80, color: COLORS.OTHER_LIGHT, key: 'utilities' },
+    ],
+    barKeys: [
+      { key: 'browsing', color: COLORS.OTHER, label: 'Browsing' },
+      { key: 'utilities', color: COLORS.OTHER_LIGHT, label: 'System' }
+    ],
+    barData: [
+      { timeRange: '0-2', browsing: 30, utilities: 60 },
+      { timeRange: '2-4', browsing: 0, utilities: 120 },
+      { timeRange: '4-6', browsing: 0, utilities: 120 },
+      { timeRange: '6-8', browsing: 30, utilities: 60 },
+      { timeRange: '8-10', browsing: 10, utilities: 0 },
+      { timeRange: '10-12', browsing: 5, utilities: 0 },
+      { timeRange: '12-14', browsing: 10, utilities: 20 },
+      { timeRange: '14-16', browsing: 0, utilities: 0 },
+      { timeRange: '16-18', browsing: 10, utilities: 0 },
+      { timeRange: '18-20', browsing: 10, utilities: 10 },
+      { timeRange: '20-22', browsing: 10, utilities: 10 },
+      { timeRange: '22-24', browsing: 0, utilities: 60 },
+    ]
+  }
+};
+
+export const TOP_APPS: AppUsage[] = [
+  { name: 'VS Code', duration: '4h 12m', percentage: 65 },
+  { name: 'Google Chrome', duration: '2h 30m', percentage: 38 },
+  { name: 'Figma', duration: '1h 15m', percentage: 20 },
+  { name: 'Spotify', duration: '45m', percentage: 12 },
+];
+
+export const TOP_WINDOWS: AppUsage[] = [
+  { name: 'GitHub - Project Alpha', duration: '1h 45m', percentage: 40 },
+  { name: 'Stack Overflow - React Types', duration: '45m', percentage: 18 },
+  { name: 'Youtube - Lofi Beats', duration: '2h 10m', percentage: 55 },
+  { name: 'Localhost:3000', duration: '1h 10m', percentage: 28 },
+];
+
+export const TIMELINE_EVENTS: TimelineEvent[] = [
+  { id: '1', title: 'Deep Sleep', startTime: 0, endTime: 7, category: 'other', subCategoryId: 'utilities', description: 'Restorative sleep' },
+  { id: '2', title: 'Morning Routine', startTime: 7, endTime: 8.5, category: 'other', subCategoryId: 'utilities', description: 'Breakfast, Shower' },
+  { id: '3', title: 'Commute', startTime: 8.5, endTime: 9, category: 'other', subCategoryId: 'browsing', description: 'Listening to podcast' },
+  { id: '4', title: 'Standup Meeting', startTime: 9, endTime: 9.5, category: 'work', subCategoryId: 'meeting', linkedGoal: '2', description: 'Daily sync with engineering team' },
+  { id: '5', title: 'Dashboard Development', startTime: 9.5, endTime: 12, category: 'work', subCategoryId: 'coding', linkedGoal: '1', description: 'Implementing React components' },
+  { id: '6', title: 'Lunch Break', startTime: 12, endTime: 13, category: 'entertainment', subCategoryId: 'video', description: 'Youtube & Lunch' },
+  { id: '7', title: 'Code Review', startTime: 13, endTime: 14.5, category: 'work', subCategoryId: 'coding', linkedGoal: '2', description: 'Reviewing PRs #342 and #345' },
+  { id: '8', title: 'Deep Focus: Backend', startTime: 14.5, endTime: 17, category: 'work', subCategoryId: 'coding', linkedGoal: '1', description: 'API integration' },
+  { id: '9', title: 'Break / Social', startTime: 17, endTime: 17.5, category: 'other', subCategoryId: 'browsing', description: 'Coffee chat' },
+  { id: '10', title: 'Wrap up', startTime: 17.5, endTime: 18, category: 'work', subCategoryId: 'planning', description: 'Planning for tomorrow' },
+  { id: '11', title: 'Gym', startTime: 18.5, endTime: 20, category: 'other', subCategoryId: 'utilities', linkedGoal: '4', description: 'Upper body workout' },
+  { id: '12', title: 'Gaming', startTime: 20.5, endTime: 22.5, category: 'entertainment', subCategoryId: 'games', description: 'Cyberpunk 2077' },
 ];
 
 export const MOCK_ACTIVITY_RECORDS: ActivityRecord[] = [

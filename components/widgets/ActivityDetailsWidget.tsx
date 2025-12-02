@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { TOP_APPS, TOP_WINDOWS } from '../../constants';
 import { AppUsage } from '../../types';
@@ -45,13 +46,13 @@ const ActivityDetailsWidget: React.FC = () => {
         </div>
       </div>
 
-      {/* Top Window Titles */}
+      {/* Top Title */}
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-3">
             <div className="p-2 bg-orange-50 rounded-xl text-morandi-orange">
                 <Monitor size={20} />
             </div>
-            Active Windows
+            Top Title
         </h3>
         <div className="space-y-1">
           {TOP_WINDOWS.map((win, idx) => (

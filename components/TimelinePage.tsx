@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Smartphone, Monitor, AlertCircle, Clock, Link, Tag } from 'lucide-react';
-import { TIMELINE_EVENTS, COLORS, MOCK_GOALS } from '../constants';
+import { TIMELINE_EVENTS, COLORS, MOCK_GOALS, MOCK_CATEGORIES } from '../constants';
 import { TimelineEvent } from '../types';
 
 const TimelinePage: React.FC = () => {
@@ -64,6 +64,9 @@ const TimelinePage: React.FC = () => {
 
   const formattedDateLabel = new Date(currentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
+  // Helper to get active category definition for dropdowns
+  const activeCategoryDef = selectedEvent ? MOCK_CATEGORIES.find(c => c.id === selectedEvent.category) : null;
+
   return (
     <div className="flex flex-col h-screen -m-6 lg:-m-10">
         {/* Top Filter Bar */}
@@ -119,6 +122,9 @@ const TimelinePage: React.FC = () => {
                     {/* Events */}
                     {TIMELINE_EVENTS.map((event) => {
                         const style = getEventStyle(event);
+                        const catDef = MOCK_CATEGORIES.find(c => c.id === event.category);
+                        const subCatDef = catDef?.subCategories.find(s => s.id === event.subCategoryId);
+                        
                         return (
                             <div 
                                 key={event.id}
@@ -131,6 +137,12 @@ const TimelinePage: React.FC = () => {
                                      <div className="flex items-center justify-between mt-1">
                                         <div className="flex items-center gap-1 opacity-80">
                                             <span className="text-[10px]">{formatTime(event.startTime)} - {formatTime(event.endTime)}</span>
+                                            {subCatDef && (
+                                                <>
+                                                 <span className="mx-0.5">•</span>
+                                                 <span className="text-[10px] font-medium opacity-100 bg-black/5 px-1.5 rounded-sm">{subCatDef.name}</span>
+                                                </>
+                                            )}
                                         </div>
                                         {event.linkedGoal && (
                                             <div className="w-2 h-2 rounded-full bg-current opacity-50"></div>
@@ -169,24 +181,48 @@ const TimelinePage: React.FC = () => {
 
                          {/* Quick Actions Form */}
                          <div className="space-y-6">
+                            {/* Level 1: Category */}
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-2">Category</label>
                                 <div className="grid grid-cols-3 gap-2">
-                                    {['work', 'entertainment', 'other'].map(cat => (
+                                    {MOCK_CATEGORIES.map(cat => (
                                         <button 
-                                            key={cat}
+                                            key={cat.id}
                                             className={`px-3 py-2 rounded-lg text-sm font-medium capitalize border transition-all ${
-                                                selectedEvent.category === cat 
+                                                selectedEvent.category === cat.id 
                                                     ? 'bg-slate-800 text-white border-slate-800' 
                                                     : 'bg-white border-gray-200 text-slate-600 hover:bg-gray-50'
                                             }`}
                                         >
-                                            {cat}
+                                            {cat.name}
                                         </button>
                                     ))}
                                 </div>
                             </div>
 
+                            {/* Level 2: Sub-category (New) */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-2">Sub-category</label>
+                                <div className="relative">
+                                    <select 
+                                        className="w-full appearance-none bg-white border border-gray-200 text-slate-700 rounded-xl px-4 py-3 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-shadow cursor-pointer hover:bg-gray-50"
+                                        defaultValue={selectedEvent.subCategoryId || ''}
+                                    >
+                                        <option value="" disabled>Select a sub-category...</option>
+                                        {activeCategoryDef?.subCategories.map((sub) => (
+                                            <option key={sub.id} value={sub.id}>{sub.name}</option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                        <Tag size={16} />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-2 font-medium">
+                                    Showing sub-categories for <span className="text-slate-600 font-bold">{activeCategoryDef?.name}</span>
+                                </p>
+                            </div>
+
+                            {/* Linked Goal */}
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-2">Linked Goal</label>
                                 <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between group cursor-pointer hover:border-blue-200 hover:bg-blue-50/30 transition-all">
@@ -208,6 +244,7 @@ const TimelinePage: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* Description */}
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-2">Description</label>
                                 <textarea 
