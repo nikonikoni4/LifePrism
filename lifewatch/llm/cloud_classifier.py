@@ -19,17 +19,17 @@ class CloudAPIClassifier(BaseLLMClassifier):
     - 为不同的云端API提供统一接口
     """
     
-    def __init__(self, api_key: str, categoryA: str, categoryB: str, **kwargs):
+    def __init__(self, api_key: str, category: str, sub_category: str, **kwargs):
         """
         初始化云端API分类器
         
         Args:
             api_key (str): API密钥
-            categoryA (str): 大类分类选项
-            categoryB (str): 具体目的分类选项
+            category (str): 大类分类选项
+            sub_category (str): 具体目的分类选项
             **kwargs: 其他配置参数（如base_url、model_name等）
         """
-        super().__init__(categoryA, categoryB)
+        super().__init__(category, sub_category)
         self.api_key = api_key
         self.config = kwargs
     
@@ -54,10 +54,10 @@ class CloudAPIClassifier(BaseLLMClassifier):
         print(f"=" * 60)
         
         # 确保 DataFrame 有必要的列
-        if 'class_by_default' not in df.columns:
-            df['class_by_default'] = None
-        if 'class_by_goals' not in df.columns:
-            df['class_by_goals'] = None
+        if 'category' not in df.columns:
+            df['category'] = None
+        if 'sub_category' not in df.columns:
+            df['sub_category'] = None
         
         # 生成批次
         batches = generate_llm_batches(df, max_chars=max_chars, max_items=max_items)
@@ -81,16 +81,16 @@ class CloudAPIClassifier(BaseLLMClassifier):
                 for res in result_list:
                     idx = res['id']
                     if idx in df.index:
-                        df.at[idx, 'class_by_default'] = res.get('A', '其他')
-                        df.at[idx, 'class_by_goals'] = res.get('B', '其他')
+                        df.at[idx, 'category'] = res.get('A', '其他')
+                        df.at[idx, 'sub_category'] = res.get('B', '其他')
                         
             except Exception as e:
                 print(f"批次 {i+1} 处理出错: {e}")
                 # 使用默认值
                 for item in batch:
                     if item['id'] in df.index:
-                        df.at[item['id'], 'class_by_default'] = '其他'
-                        df.at[item['id'], 'class_by_goals'] = '其他'
+                        df.at[item['id'], 'category'] = '其他'
+                        df.at[item['id'], 'sub_category'] = '其他'
         
         print(f"\n=" * 60)
         print(f"分类流程完成！")
@@ -116,8 +116,8 @@ class CloudAPIClassifier(BaseLLMClassifier):
         
         prompt = f"""你是用户行为分析专家。请对以下应用进行分类。
 分类选项：
-- A (大类): {self.categoryA}
-- B (具体目的): {self.categoryB}
+- A (大类): {self.category}
+- B (具体目的): {self.sub_category}
 分类规则：
 - A是背景，B是行为，需逻辑自洽
 - 如果应用信息不足，可以使用你的网络搜索能力查找应用信息
@@ -156,7 +156,7 @@ class QwenAPIClassifier(CloudAPIClassifier):
     使用阿里云通义千问API进行分类，支持网络搜索
     """
     
-    def __init__(self, api_key: str, base_url: str, categoryA: str, categoryB: str, 
+    def __init__(self, api_key: str, base_url: str, category: str, sub_category: str, 
                  model: str = "qwen-plus"):
         """
         初始化通义千问分类器
@@ -164,11 +164,11 @@ class QwenAPIClassifier(CloudAPIClassifier):
         Args:
             api_key (str): 通义千问API密钥
             base_url (str): API基础URL
-            categoryA (str): 大类分类选项
-            categoryB (str): 具体目的分类选项
+            category (str): 大类分类选项
+            sub_category (str): 具体目的分类选项
             model (str): 模型名称，默认qwen-plus
         """
-        super().__init__(api_key, categoryA, categoryB, model=model, base_url=base_url)
+        super().__init__(api_key, category, sub_category, model=model, base_url=base_url)
         self.model = model
         self.base_url = base_url
         

@@ -66,7 +66,7 @@ class LifeWatchDataManager(DatabaseManager):
         保存AI元数据到app_purpose_category表
         
         使用 UPSERT 策略：已存在的应用会被更新，新应用会被插入
-        自动处理字段名映射：'class' -> 'class_by_goals'
+        自动处理字段名映射：'class' -> 'sub_category'
         
         Args:
             ai_metadata_df: AI元数据DataFrame，应包含以下字段：
@@ -75,7 +75,7 @@ class LifeWatchDataManager(DatabaseManager):
                 - is_multipurpose_app: 是否多用途应用（可选）
                 - app_description: 应用描述（可选）
                 - title_description: 标题描述（可选）
-                - class 或 class_by_goals: 分类（可选）
+                - class 或 sub_category: 分类（可选）
         
         Returns:
             int: 受影响的行数
@@ -83,10 +83,10 @@ class LifeWatchDataManager(DatabaseManager):
         try:
             data_list = ai_metadata_df.to_dict('records')
             
-            # 映射字段名：'class' -> 'class_by_goals'
+            # 映射字段名：'class' -> 'sub_category'
             for data in data_list:
-                if 'class' in data and 'class_by_goals' not in data:
-                    data['class_by_goals'] = data.pop('class')
+                if 'class' in data and 'sub_category' not in data:
+                    data['sub_category'] = data.pop('class')
             
             affected = self.upsert_many('app_purpose_category', 
                                        data_list, 
@@ -181,8 +181,8 @@ class LifeWatchDataManager(DatabaseManager):
                 - id: 事件ID（可选，不存在会自动生成）
                 - duration: 持续时间（可选）
                 - title: 窗口标题（可选）
-                - class_by_default: 默认分类（可选）
-                - class_by_goals: 目标分类（可选）
+                - category: 默认分类（可选）
+                - sub_category: 目标分类（可选）
                 - is_multipurpose_app: 是否多用途应用（可选）
                 - category_id: 主分类ID（可选）
                 - sub_category_id: 子分类ID（可选）
@@ -202,8 +202,8 @@ class LifeWatchDataManager(DatabaseManager):
                     'duration': row.get('duration'),
                     'app': row['app'],
                     'title': row.get('title'),
-                    'class_by_default': row.get('class_by_default'),
-                    'class_by_goals': row.get('class_by_goals'),
+                    'category': row.get('category'),
+                    'sub_category': row.get('sub_category'),
                     'is_multipurpose_app': int(row.get('is_multipurpose_app', False)),
                     'category_id': row.get('category_id'),
                     'sub_category_id': row.get('sub_category_id')

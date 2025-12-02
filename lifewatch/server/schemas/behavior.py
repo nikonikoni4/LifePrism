@@ -14,8 +14,8 @@ class BehaviorLogItem(BaseModel):
     duration: int
     app: str
     title: Optional[str] = None
-    class_by_default: Optional[str] = None
-    class_by_goals: Optional[str] = None
+    category: Optional[str] = None
+    sub_category: Optional[str] = None
     is_multipurpose_app: int = 0
 
 
@@ -32,8 +32,8 @@ class TimelineEvent(BaseModel):
     app: str
     title: Optional[str] = None
     duration: int
-    class_by_default: Optional[str] = None
-    class_by_goals: Optional[str] = None
+    category: Optional[str] = None
+    sub_category: Optional[str] = None
 
 
 class TimelineSlot(BaseModel):

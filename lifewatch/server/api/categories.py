@@ -65,8 +65,8 @@ async def update_app_category(
     更新指定应用的分类信息
     
     可更新字段：
-    - class_by_default: 默认分类
-    - class_by_goals: 目标分类
+    - category: 默认分类
+    - sub_category: 目标分类
     - app_description: 应用描述
     - title_description: 标题描述
     

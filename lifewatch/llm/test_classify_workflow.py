@@ -35,8 +35,8 @@ df = pd.DataFrame(test_data)
 client = OllamaClient(config.OLLAMA_BASE_URL, "qwen3:8B")
 
 # 3. 定义分类选项
-categoryA = "工作/学习,娱乐,其他"
-categoryB = "写笔记,编程,学习AI相关内容,查资料,聊天,其他"
+category = "工作/学习,娱乐,其他"
+sub_category = "写笔记,编程,学习AI相关内容,查资料,聊天,其他"
 
 # 4. 执行完整的分类流程
 print("开始执行完整的分类流程...")
@@ -48,8 +48,8 @@ print("\n" + "=" * 80)
 result_df = classify_with_web_search(
     df=df,
     client=client,
-    categoryA=categoryA,
-    categoryB=categoryB,
+    category=category,
+    sub_category=sub_category,
     crawler_select="BaiDuBrowerCrawler",  # 或者 "DDGSAPICrawler"
     max_chars=2000,
     max_items=15
@@ -58,7 +58,7 @@ result_df = classify_with_web_search(
 # 5. 查看分类结果
 print("\n" + "=" * 80)
 print("分类结果:")
-print(result_df[['app', 'title', 'class_by_default', 'class_by_goals']].to_string())
+print(result_df[['app', 'title', 'category', 'sub_category']].to_string())
 print("=" * 80)
 
 # 6. 保存结果（可选）

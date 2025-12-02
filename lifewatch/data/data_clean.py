@@ -113,22 +113,22 @@ def clean_activitywatch_data(raw_events: List[Dict[str, Any]],app_purpose_catego
                         'duration': duration,
                         'app': app_name,
                         'title': title,
-                        'class_by_default': None,
-                        'class_by_goals': None,
+                        'category': None,
+                        'sub_category': None,
                         'is_multipurpose_app': is_multipurpose_app(app_name)
                     }
                     # 1.app已经被分类 且 app是单一用途的 ： 直接进行分类 
                     if app_name in categorized_single_purpose_apps and filtered_event['is_multipurpose_app']==0:
                         # 对于单一应用，直接从app_purpose_category_df获取分类数据
-                        filtered_event['class_by_default'] = app_purpose_category_df[app_purpose_category_df['app'].str.lower() == app_name]['class_by_default'].values[0]
-                        filtered_event['class_by_goals'] = app_purpose_category_df[app_purpose_category_df['app'].str.lower() == app_name]['class_by_goals'].values[0]
-                        print(f"✅ 成功获取分类数据: 默认={filtered_event['class_by_default']}, 目标={filtered_event['class_by_goals']}")
+                        filtered_event['category'] = app_purpose_category_df[app_purpose_category_df['app'].str.lower() == app_name]['category'].values[0]
+                        filtered_event['sub_category'] = app_purpose_category_df[app_purpose_category_df['app'].str.lower() == app_name]['sub_category'].values[0]
+                        print(f"✅ 成功获取分类数据: 默认={filtered_event['category']}, 目标={filtered_event['sub_category']}")
                     # 2.app已经被分类 但 app是多用途的 ： 根据title进行分类
                     elif app_name in categorized_single_purpose_apps and filtered_event['title'].lower() in categorized_mutilpurpose_titles:
                         # 对于多应用场景，根据title匹配分类数据
-                        filtered_event['class_by_default'] = app_purpose_category_df[app_purpose_category_df['title'].str.lower() == filtered_event['title'].lower()]['class_by_default'].values[0]
-                        filtered_event['class_by_goals'] = app_purpose_category_df[app_purpose_category_df['title'].str.lower() == filtered_event['title'].lower()]['class_by_goals'].values[0]
-                        print(f"✅ 成功获取分类数据: 默认={filtered_event['class_by_default']}, 目标={filtered_event['class_by_goals']}")
+                        filtered_event['category'] = app_purpose_category_df[app_purpose_category_df['title'].str.lower() == filtered_event['title'].lower()]['category'].values[0]
+                        filtered_event['sub_category'] = app_purpose_category_df[app_purpose_category_df['title'].str.lower() == filtered_event['title'].lower()]['sub_category'].values[0]
+                        print(f"✅ 成功获取分类数据: 默认={filtered_event['category']}, 目标={filtered_event['sub_category']}")
                    # 3. app未被分类，且是单一用途的 
                     elif filtered_event['is_multipurpose_app']==0 :
                         # 3.1 app未被分类，且是单一用途的 且 未被添加到待分类列表 ： 加入待分类列表
@@ -140,8 +140,8 @@ def clean_activitywatch_data(raw_events: List[Dict[str, Any]],app_purpose_catego
                                     'is_multipurpose_app': filtered_event['is_multipurpose_app'],
                                     'app_description': None,
                                     'title_description': None,
-                                    'class_by_default': None,
-                                    'class_by_goals': None,
+                                    'category': None,
+                                    'sub_category': None,
                                 })
                             # 加入待分类应用集合
                             apps_to_classify_set.add(app_name)
@@ -157,8 +157,8 @@ def clean_activitywatch_data(raw_events: List[Dict[str, Any]],app_purpose_catego
                                     'is_multipurpose_app': filtered_event['is_multipurpose_app'],
                                     'app_description': None,
                                     'title_description': None,
-                                    'class_by_default': None,
-                                    'class_by_goals': None,
+                                    'category': None,
+                                    'sub_category': None,
                                 })
                             # 加入待分类title集合
                             title_to_classify_set.add(title)

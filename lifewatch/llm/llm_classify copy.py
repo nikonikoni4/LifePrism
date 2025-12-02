@@ -88,8 +88,8 @@ def process_and_fill_dataframe(df, mock_llm_func=None):
                 
                 # 安全检查：确保索引存在
                 if idx in df.index:
-                    df.at[idx, 'class_by_default'] = res.get('A', 'Error')
-                    df.at[idx, 'class_by_goals'] = res.get('B', 'Error')
+                    df.at[idx, 'category'] = res.get('A', 'Error')
+                    df.at[idx, 'sub_category'] = res.get('B', 'Error')
                     
         except Exception as e:
             print(f"Error in batch {i+1}: {e}")
@@ -98,15 +98,15 @@ def process_and_fill_dataframe(df, mock_llm_func=None):
     return df
 
 
-def call_ollama_llm_api(batch_data, client: OllamaClient, categoryA: str, categoryB: str):
+def call_ollama_llm_api(batch_data, client: OllamaClient, category: str, sub_category: str):
     """
     调用 LLM API 进行分类
     
     Args:
         batch_data (list): 包含多个数据项的列表，每个项是一个字典
         client (OllamaClient): Ollama 客户端实例
-        categoryA (str): 大类分类选项
-        categoryB (str): 具体目的分类选项
+        category (str): 大类分类选项
+        sub_category (str): 具体目的分类选项
         
     Returns:
         str: LLM API 返回的原始字符串响应
@@ -117,8 +117,8 @@ def call_ollama_llm_api(batch_data, client: OllamaClient, categoryA: str, catego
     prompt = f"""
 你是用户行为分析专家，根据窗口活动推断用户意图。
 # 分类选项
-A (大类): {categoryA}
-B (具体目的): {categoryB}
+A (大类): {category}
+B (具体目的): {sub_category}
 # 分类规则
 - A 是背景，B 是行为，需逻辑自洽
 - 多用途应用(is_multipurpose=true)需依据 title 判断
@@ -147,15 +147,15 @@ B (具体目的): {categoryB}
     return response["response"]
 
 
-def call_ollama_llm_api_with_search_flag(batch_data, client: OllamaClient, categoryA: str, categoryB: str):
+def call_ollama_llm_api_with_search_flag(batch_data, client: OllamaClient, category: str, sub_category: str):
     """
     调用 LLM API 进行分类，并判断是否需要网络搜索
     
     Args:
         batch_data (list): 包含多个数据项的列表，每个项是一个字典
         client (OllamaClient): Ollama 客户端实例
-        categoryA (str): 大类分类选项
-        categoryB (str): 具体目的分类选项
+        category (str): 大类分类选项
+        sub_category (str): 具体目的分类选项
         
     Returns:
         str: LLM API 返回的原始字符串响应，包含 need_web_search 字段
@@ -166,8 +166,8 @@ def call_ollama_llm_api_with_search_flag(batch_data, client: OllamaClient, categ
     prompt = f"""
 你是用户行为分析专家，需判断应用分类及是否需网络搜索补充信息。
 # 分类选项
-A (大类): {categoryA}
-B (具体目的): {categoryB}
+A (大类): {category}
+B (具体目的): {sub_category}
 # 判断流程（重要）
 1. **先判断信息充分性**：
    - 若 app_name 是常见应用（Chrome/WeChat/Excel/PyCharm等）或 app_description 清晰 → 信息充分
@@ -251,21 +251,21 @@ def merge_classification_results(df, first_step_results, second_step_results):
             
         # 如果不需要网络搜索，直接使用第一步结果
         if not result.get('need_web_search', False):
-            df.at[idx, 'class_by_default'] = result.get('A', '其他')
-            df.at[idx, 'class_by_goals'] = result.get('B', '其他')
+            df.at[idx, 'category'] = result.get('A', '其他')
+            df.at[idx, 'sub_category'] = result.get('B', '其他')
         # 如果需要网络搜索，使用第二步结果
         elif idx in second_step_dict:
-            df.at[idx, 'class_by_default'] = second_step_dict[idx].get('A', '其他')
-            df.at[idx, 'class_by_goals'] = second_step_dict[idx].get('B', '其他')
+            df.at[idx, 'category'] = second_step_dict[idx].get('A', '其他')
+            df.at[idx, 'sub_category'] = second_step_dict[idx].get('B', '其他')
         else:
             # 如果第二步没有结果，使用默认值
-            df.at[idx, 'class_by_default'] = '其他'
-            df.at[idx, 'class_by_goals'] = '其他'
+            df.at[idx, 'category'] = '其他'
+            df.at[idx, 'sub_category'] = '其他'
             
     return df
 
 
-def classify_with_web_search(df, client: OllamaClient, categoryA: str, categoryB: str, 
+def classify_with_web_search(df, client: OllamaClient, category: str, sub_category: str, 
                              crawler_select="BaiDuBrowerCrawler", max_chars=2000, max_items=15):
     """
     完整的两步分类流程：第一步判断 -> 网络搜索 -> 第二步分类
@@ -273,14 +273,14 @@ def classify_with_web_search(df, client: OllamaClient, categoryA: str, categoryB
     Args:
         df (pd.DataFrame): 待分类的数据表，需包含 ['app', 'title', 'is_multipurpose_app', 'app_description'] 列
         client (OllamaClient): Ollama 客户端实例
-        categoryA (str): 大类分类选项
-        categoryB (str): 具体目的分类选项
+        category (str): 大类分类选项
+        sub_category (str): 具体目的分类选项
         crawler_select (str): 爬虫选择器，默认 "BaiDuBrowerCrawler"
         max_chars (int): 每批次最大字符数
         max_items (int): 每批次最大条数
         
     Returns:
-        pd.DataFrame: 包含分类结果的完整数据表（添加 'class_by_default' 和 'class_by_goals' 列）
+        pd.DataFrame: 包含分类结果的完整数据表（添加 'category' 和 'sub_category' 列）
     """
     from lifewatch.crawler.app_description_fetching import AppDescriptionFetcher
     
@@ -289,10 +289,10 @@ def classify_with_web_search(df, client: OllamaClient, categoryA: str, categoryB
     print(f"=" * 60)
     
     # 确保 DataFrame 有必要的列
-    if 'class_by_default' not in df.columns:
-        df['class_by_default'] = None
-    if 'class_by_goals' not in df.columns:
-        df['class_by_goals'] = None
+    if 'category' not in df.columns:
+        df['category'] = None
+    if 'sub_category' not in df.columns:
+        df['sub_category'] = None
     
     # ==================== 第一步：初步判断 ====================
     print("\n[第一步] 使用 LLM 进行初步判断（判断是否需要网络搜索）")
@@ -303,7 +303,7 @@ def classify_with_web_search(df, client: OllamaClient, categoryA: str, categoryB
     for i, batch in enumerate(batches):
         print(f"\n处理第 {i+1}/{len(batches)} 批 (包含 {len(batch)} 条数据)...")
         try:
-            response = call_ollama_llm_api_with_search_flag(batch, client, categoryA, categoryB)
+            response = call_ollama_llm_api_with_search_flag(batch, client, category, sub_category)
             result_list = extract_json(response)
             first_step_results.extend(result_list)
         except Exception as e:
@@ -370,7 +370,7 @@ def classify_with_web_search(df, client: OllamaClient, categoryA: str, categoryB
     for i, batch in enumerate(reclassify_batches):
         print(f"\n处理重分类批次 {i+1}/{len(reclassify_batches)} (包含 {len(batch)} 条数据)...")
         try:
-            response = call_ollama_llm_api(batch, client, categoryA, categoryB)
+            response = call_ollama_llm_api(batch, client, category, sub_category)
             result_list = extract_json(response)
             second_step_results.extend(result_list)
         except Exception as e:
@@ -398,8 +398,8 @@ def classify_with_web_search(df, client: OllamaClient, categoryA: str, categoryB
 
 if __name__ == "__main__":
     client = OllamaClient(config.OLLAMA_BASE_URL, "qwen3:8B")
-    categoryA = "工作/学习,娱乐,其他"
-    categoryB = "写笔记,编程,学习AI相关内容,其他"
+    category = "工作/学习,娱乐,其他"
+    sub_category = "写笔记,编程,学习AI相关内容,其他"
     batch_data = [
         {
             "id": 1,
@@ -423,4 +423,4 @@ if __name__ == "__main__":
             "app_description": None
         }
     ]
-    call_ollama_llm_api_with_search_flag(batch_data, client, categoryA, categoryB)
+    call_ollama_llm_api_with_search_flag(batch_data, client, category, sub_category)

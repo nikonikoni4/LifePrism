@@ -263,7 +263,7 @@ class DatabaseManager:
             
         Example:
             df = db.query('app_purpose_category', 
-                         columns=['app', 'class_by_default'],
+                         columns=['app', 'category'],
                          where={'is_multipurpose_app': 0},
                          order_by='app ASC',
                          limit=100)

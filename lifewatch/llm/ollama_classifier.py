@@ -23,16 +23,16 @@ class OllamaClassifier(BaseLLMClassifier):
     - 支持一步流程（直接分类）
     """
     
-    def __init__(self, client: OllamaClient, categoryA: str, categoryB: str):
+    def __init__(self, client: OllamaClient, category: str, sub_category: str):
         """
         初始化Ollama分类器
         
         Args:
             client (OllamaClient): Ollama客户端实例
-            categoryA (str): 大类分类选项
-            categoryB (str): 具体目的分类选项
+            category (str): 大类分类选项
+            sub_category (str): 具体目的分类选项
         """
-        super().__init__(categoryA, categoryB)
+        super().__init__(category, sub_category)
         self.client = client
     
     def classify(self, df: pd.DataFrame, enable_web_search: bool = True, 
@@ -77,10 +77,10 @@ class OllamaClassifier(BaseLLMClassifier):
         print(f"=" * 60)
         
         # 确保 DataFrame 有必要的列
-        if 'class_by_default' not in df.columns:
-            df['class_by_default'] = None
-        if 'class_by_goals' not in df.columns:
-            df['class_by_goals'] = None
+        if 'category' not in df.columns:
+            df['category'] = None
+        if 'sub_category' not in df.columns:
+            df['sub_category'] = None
         
         # ==================== 第一步：初步判断 ====================
         print("\n[第一步] 使用 LLM 进行初步判断（判断是否需要网络搜索）")
@@ -200,10 +200,10 @@ class OllamaClassifier(BaseLLMClassifier):
         print(f"=" * 60)
         
         # 确保 DataFrame 有必要的列
-        if 'class_by_default' not in df.columns:
-            df['class_by_default'] = None
-        if 'class_by_goals' not in df.columns:
-            df['class_by_goals'] = None
+        if 'category' not in df.columns:
+            df['category'] = None
+        if 'sub_category' not in df.columns:
+            df['sub_category'] = None
         
         # 生成批次
         batches = generate_llm_batches(df, max_chars=max_chars, max_items=max_items)
@@ -221,8 +221,8 @@ class OllamaClassifier(BaseLLMClassifier):
                 for res in result_list:
                     idx = res['id']
                     if idx in df.index:
-                        df.at[idx, 'class_by_default'] = res.get('A', '其他')
-                        df.at[idx, 'class_by_goals'] = res.get('B', '其他')
+                        df.at[idx, 'category'] = res.get('A', '其他')
+                        df.at[idx, 'sub_category'] = res.get('B', '其他')
                         
             except Exception as e:
                 print(f"批次 {i+1} 处理出错: {e}")
@@ -253,8 +253,8 @@ class OllamaClassifier(BaseLLMClassifier):
         prompt = f"""
         你是用户行为分析专家，需判断应用分类及是否需网络搜索补充信息。
         # 分类选项
-        A (大类): {self.categoryA}
-        B (具体目的): {self.categoryB}
+        A (大类): {self.category}
+        B (具体目的): {self.sub_category}
         # 判断流程（重要）
         1. **先判断信息充分性**：
         - 若 app_name 是常见应用（Chrome/WeChat/Excel/PyCharm等）或 app_description 清晰 → 信息充分
@@ -310,8 +310,8 @@ class OllamaClassifier(BaseLLMClassifier):
         prompt = f"""
                 你是用户行为分析专家，根据窗口活动推断用户意图。
                 # 分类选项
-                A (大类): {self.categoryA}
-                B (具体目的): {self.categoryB}
+                A (大类): {self.category}
+                B (具体目的): {self.sub_category}
                 # 分类规则
                 - A 是背景，B 是行为，需逻辑自洽
                 - 多用途应用(is_multipurpose=true)需依据 title 判断

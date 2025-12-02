@@ -79,8 +79,8 @@ class BehaviorService:
                     "database_manager.py - VS Code",
                     "Google Search - Python",
                 ][i % 3],
-                "class_by_default": ["工作/学习", "工作/学习", "生活/娱乐"][i % 3],
-                "class_by_goals": ["编写LifeWatch-AI项目(代码)", "编写LifeWatch-AI项目(代码)", "其他"][i % 3],
+                "category": ["工作/学习", "工作/学习", "生活/娱乐"][i % 3],
+                "sub_category": ["编写LifeWatch-AI项目(代码)", "编写LifeWatch-AI项目(代码)", "其他"][i % 3],
                 "is_multipurpose_app": [1, 0, 1][i % 3]
             }
             for i in range(1, 11)  # 生成10条 Mock 数据
@@ -114,8 +114,8 @@ class BehaviorService:
                         "app": ["code.exe", "chrome.exe", "msedge.exe"][hour % 3],
                         "title": f"工作内容 - {hour}:00",
                         "duration": 1800,
-                        "class_by_default": "工作/学习" if hour < 17 else "生活/娱乐",
-                        "class_by_goals": "编写LifeWatch-AI项目(代码)" if hour < 17 else "其他"
+                        "category": "工作/学习" if hour < 17 else "生活/娱乐",
+                        "sub_category": "编写LifeWatch-AI项目(代码)" if hour < 17 else "其他"
                     }
                 ]
             })

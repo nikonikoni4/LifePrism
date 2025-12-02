@@ -95,8 +95,8 @@ class DashboardService:
         1. 查询指定日期的所有行为日志
         2. 按 app 聚合统计时长
         3. 按 title 聚合统计时长  
-        4. 按 class_by_default 聚合统计
-        5. 按 class_by_goals 聚合统计
+        4. 按 category 聚合统计
+        5. 按 sub_category 聚合统计
         6. 计算百分比
         7. 返回格式化数据
         

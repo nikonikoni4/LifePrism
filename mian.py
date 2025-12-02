@@ -80,14 +80,14 @@ if __name__ == "__main__":
         if is_multipurpose == 0:
             # 单用途应用，以app为键
             processed_dict[('single', app.lower())] = {
-                'class_by_default': row.get('class_by_default'),
-                'class_by_goals': row.get('class_by_goals')
+                'category': row.get('category'),
+                'sub_category': row.get('sub_category')
             }
         else:
             # 多用途应用，以(app, title)为键
             processed_dict[('multi', app.lower(), title.lower() if title else '')] = {
-                'class_by_default': row.get('class_by_default'),
-                'class_by_goals': row.get('class_by_goals')
+                'category': row.get('category'),
+                'sub_category': row.get('sub_category')
             }
     
     # 遍历filtered_events_df进行赋值
@@ -102,23 +102,23 @@ if __name__ == "__main__":
             key = ('single', app.lower())
             if key in processed_dict:
                 classification = processed_dict[key]
-                filtered_events_df.at[index, 'class_by_default'] = classification['class_by_default']
-                filtered_events_df.at[index, 'class_by_goals'] = classification['class_by_goals']
+                filtered_events_df.at[index, 'category'] = classification['category']
+                filtered_events_df.at[index, 'sub_category'] = classification['sub_category']
                 assigned_count += 1
-                print(f"✅ 单用途应用分类成功: {app} -> {classification['class_by_default']}/{classification['class_by_goals']}")
+                print(f"✅ 单用途应用分类成功: {app} -> {classification['category']}/{classification['sub_category']}")
         else:
             # 多用途应用匹配：匹配app和title
             key = ('multi', app.lower(), title.lower() if title else '')
             if key in processed_dict:
                 classification = processed_dict[key]
-                filtered_events_df.at[index, 'class_by_default'] = classification['class_by_default']
-                filtered_events_df.at[index, 'class_by_goals'] = classification['class_by_goals']
+                filtered_events_df.at[index, 'category'] = classification['category']
+                filtered_events_df.at[index, 'sub_category'] = classification['sub_category']
                 assigned_count += 1
-                print(f"✅ 多用途应用分类成功: {app} - {title} -> {classification['class_by_default']}/{classification['class_by_goals']}")
+                print(f"✅ 多用途应用分类成功: {app} - {title} -> {classification['category']}/{classification['sub_category']}")
     
     print(f"分类结果赋值完成！共赋值了 {assigned_count} 条记录")
     print(f"filtered_events_df中总记录数: {len(filtered_events_df)}")
-    print(f"未分类记录数: {len(filtered_events_df[filtered_events_df['class_by_default'].isna()])}")
+    print(f"未分类记录数: {len(filtered_events_df[filtered_events_df['category'].isna()])}")
     
     
 

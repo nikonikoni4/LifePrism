@@ -14,8 +14,8 @@ class AppCategory(BaseModel):
     is_multipurpose_app: int = 0
     app_description: Optional[str] = None
     title_description: Optional[str] = None
-    class_by_default: Optional[str] = None
-    class_by_goals: Optional[str] = None
+    category: Optional[str] = None
+    sub_category: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -28,7 +28,7 @@ class AppCategoryList(BaseModel):
 
 class UpdateCategoryRequest(BaseModel):
     """更新应用分类请求"""
-    class_by_default: Optional[str] = None
-    class_by_goals: Optional[str] = None
+    category: Optional[str] = None
+    sub_category: Optional[str] = None
     app_description: Optional[str] = None
     title_description: Optional[str] = None

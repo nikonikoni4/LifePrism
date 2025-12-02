@@ -35,12 +35,12 @@ APP_PURPOSE_CATEGORY_CONFIG = {
             'constraints': [],
             'comment': '应用程序title的描述'
         },
-        'class_by_default': {
+        'category': {
             'type': 'TEXT',
             'constraints': [],
             'comment': '默认分类（工作/学习/其他）'
         },
-        'class_by_goals': {
+        'sub_category': {
             'type': 'TEXT',
             'constraints': [],
             'comment': '根据目标分类（编码，读书笔记等）'
@@ -82,12 +82,12 @@ USER_APP_BEHAVIOR_LOG_CONFIG = {
             'constraints': [],
             'comment': '应用程序的标题'
         },
-        'class_by_default': {
+        'category': {
             'type': 'TEXT',
             'constraints': [],
             'comment': '默认分类（工作/学习/其他）'
         },
-        'class_by_goals': {
+        'sub_category': {
             'type': 'TEXT',
             'constraints': [],
             'comment': '根据目标分类（编码，读书笔记等）'

@@ -110,16 +110,16 @@ def merge_classification_results(df: pd.DataFrame,
             
         # 如果不需要网络搜索，直接使用第一步结果
         if not result.get('need_web_search', False):
-            df.at[idx, 'class_by_default'] = result.get('A', '其他')
-            df.at[idx, 'class_by_goals'] = result.get('B', '其他')
+            df.at[idx, 'category'] = result.get('A', '其他')
+            df.at[idx, 'sub_category'] = result.get('B', '其他')
         # 如果需要网络搜索，使用第二步结果
         elif idx in second_step_dict:
-            df.at[idx, 'class_by_default'] = second_step_dict[idx].get('A', '其他')
-            df.at[idx, 'class_by_goals'] = second_step_dict[idx].get('B', '其他')
+            df.at[idx, 'category'] = second_step_dict[idx].get('A', '其他')
+            df.at[idx, 'sub_category'] = second_step_dict[idx].get('B', '其他')
         else:
             # 如果第二步没有结果，使用默认值
-            df.at[idx, 'class_by_default'] = '其他'
-            df.at[idx, 'class_by_goals'] = '其他'
+            df.at[idx, 'category'] = '其他'
+            df.at[idx, 'sub_category'] = '其他'
             
     return df
 
@@ -137,16 +137,16 @@ class BaseLLMClassifier(ABC):
     - 云端API分类器：只需一步（模型自带网络搜索能力）
     """
     
-    def __init__(self, categoryA: str, categoryB: str):
+    def __init__(self, category: str, sub_category: str):
         """
         初始化分类器
         
         Args:
-            categoryA (str): 大类分类选项，逗号分隔，如 "工作/学习,娱乐,其他"
-            categoryB (str): 具体目的分类选项，逗号分隔
+            category (str): 大类分类选项，逗号分隔，如 "工作/学习,娱乐,其他"
+            sub_category (str): 具体目的分类选项，逗号分隔
         """
-        self.categoryA = categoryA
-        self.categoryB = categoryB
+        self.category = category
+        self.sub_category = sub_category
     
     @abstractmethod
     def classify(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:

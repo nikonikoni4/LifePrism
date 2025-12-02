@@ -40,10 +40,6 @@ app = FastAPI(
     
     真实数据实现将在第二阶段完成。
     """,
-    version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json"
 )
 
 # 配置 CORS 中间件（允许前端跨域访问）
@@ -51,9 +47,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",  # Vue/React 开发服务器
+        "http://localhost:3001",  # Vite 端口 (当3000被占用时)
         "http://localhost:5173",  # Vite 默认端口
         "http://localhost:8080",  # 其他可能的前端端口
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:8080",
     ],

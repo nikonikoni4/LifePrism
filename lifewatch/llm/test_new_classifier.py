@@ -45,8 +45,8 @@ def example_ollama_two_step():
     client = OllamaClient(config.OLLAMA_BASE_URL, "qwen3:8B")
     classifier = OllamaClassifier(
         client=client,
-        categoryA="工作/学习,娱乐,其他",
-        categoryB="写笔记,编程,学习AI相关内容,查资料,聊天,其他"
+        category="工作/学习,娱乐,其他",
+        sub_category="写笔记,编程,学习AI相关内容,查资料,聊天,其他"
     )
     
     # 执行两步分类（启用网络搜索）
@@ -58,7 +58,7 @@ def example_ollama_two_step():
     
     # 查看结果
     print("\n分类结果:")
-    print(result_df[['app', 'title', 'class_by_default', 'class_by_goals']].to_string())
+    print(result_df[['app', 'title', 'category', 'sub_category']].to_string())
 
 
 # ==================== 示例2: Ollama一步流程 ====================
@@ -93,8 +93,8 @@ def example_ollama_one_step():
     client = OllamaClient(config.OLLAMA_BASE_URL, "qwen3:8B")
     classifier = OllamaClassifier(
         client=client,
-        categoryA="工作/学习,娱乐,其他",
-        categoryB="写笔记,编程,查资料,聊天,其他"
+        category="工作/学习,娱乐,其他",
+        sub_category="写笔记,编程,查资料,聊天,其他"
     )
     
     # 执行一步分类（不启用网络搜索）
@@ -105,7 +105,7 @@ def example_ollama_one_step():
     
     # 查看结果
     print("\n分类结果:")
-    print(result_df[['app', 'title', 'class_by_default', 'class_by_goals']].to_string())
+    print(result_df[['app', 'title', 'category', 'sub_category']].to_string())
 
 
 # ==================== 示例3: 通义千问一步流程 ====================
@@ -141,8 +141,8 @@ def example_qwen_classifier():
     classifier = QwenAPIClassifier(
         api_key=config.MODEL_KEY[config.SELECT_MODEL]["api_key"],
         base_url=config.MODEL_KEY[config.SELECT_MODEL]["base_url"],
-        categoryA="工作/学习,娱乐,其他",
-        categoryB="写笔记,编程,视频娱乐,办公,学习AI相关内容,其他",
+        category="工作/学习,娱乐,其他",
+        sub_category="写笔记,编程,视频娱乐,办公,学习AI相关内容,其他",
         model=config.SELECT_MODEL
     )
     
@@ -151,7 +151,7 @@ def example_qwen_classifier():
     
     # 查看结果
     print("\n分类结果:")
-    print(result_df[['app', 'title', 'class_by_default', 'class_by_goals']].to_string())
+    print(result_df[['app', 'title', 'category', 'sub_category']].to_string())
     
     # 打印累计token统计
     print("\n" + "=" * 60)
