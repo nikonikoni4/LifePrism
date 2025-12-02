@@ -42,6 +42,7 @@ async def sync_from_activitywatch(
     """
     result = sync_service.sync_from_activitywatch(
         hours=sync_request.hours,
-        auto_classify=sync_request.auto_classify
+        auto_classify=sync_request.auto_classify,
+        use_incremental_sync=sync_request.use_incremental_sync
     )
     return result

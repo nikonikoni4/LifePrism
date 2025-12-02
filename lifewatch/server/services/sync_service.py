@@ -24,20 +24,22 @@ class SyncService:
     def sync_from_activitywatch(
         self,
         hours: int = 24,
-        auto_classify: bool = True
+        auto_classify: bool = True,
+        use_incremental_sync: bool = False
     ) -> Dict:
         """
         从 ActivityWatch 同步数据
         
         Args:
-            hours: 同步最近N小时的数据
+            hours: 同步最近N小时的数据（当 use_incremental_sync=False 时使用）
             auto_classify: 是否自动分类新应用
+            use_incremental_sync: 是否使用增量同步
             
         Returns:
             Dict: 同步结果
         """
         # 使用真实同步逻辑（基于 DataProcessingService）
-        return self._real_sync(hours, auto_classify)
+        return self._real_sync(hours, auto_classify, use_incremental_sync)
         
         # 如需使用 Mock 数据进行测试，取消下面的注释
         # return self._mock_sync(hours, auto_classify)
@@ -55,7 +57,7 @@ class SyncService:
             "message": f"成功同步最近 {hours} 小时的数据（Mock）"
         }
     
-    def _real_sync(self, hours: int, auto_classify: bool) -> Dict:
+    def _real_sync(self, hours: int, auto_classify: bool, use_incremental_sync: bool = False) -> Dict:
         """
         真实的数据同步逻辑
         
@@ -67,7 +69,8 @@ class SyncService:
             # 使用 DataProcessingService 处理数据
             result = self.data_processor.process_activitywatch_data(
                 hours=hours,
-                auto_classify=auto_classify
+                auto_classify=auto_classify,
+                use_incremental_sync=use_incremental_sync
             )
             
             duration = time.time() - start_time
@@ -77,8 +80,10 @@ class SyncService:
                 "synced_events": result["saved_events"],
                 "new_apps_classified": result["classified_apps"],
                 "duration": round(duration, 2),
-                "message": f"成功同步最近 {hours} 小时的数据",
+                "message": f"成功同步数据（{result['sync_mode']}模式）",
                 "details": {
+                    "sync_mode": result["sync_mode"],
+                    "time_range": result["time_range"],
                     "total_events": result["total_events"],
                     "filtered_events": result["filtered_events"],
                     "apps_to_classify": result["apps_to_classify"],

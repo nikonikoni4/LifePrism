@@ -6,7 +6,8 @@
 import logging
 import pandas as pd
 from typing import Dict, Tuple, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
+import pytz
 
 from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
 from lifewatch.data.get_activitywatch_data import get_window_events
@@ -39,14 +40,18 @@ class DataProcessingService:
     def process_activitywatch_data(
         self,
         hours: int = 24,
-        auto_classify: bool = True
+        auto_classify: bool = True,
+        use_incremental_sync: bool = False
     ) -> Dict:
         """
         处理 ActivityWatch 数据的完整流程
         
         Args:
-            hours: 获取最近N小时的数据
+            hours: 获取最近N小时的数据（当 use_incremental_sync=False 时使用）
             auto_classify: 是否自动分类新应用
+            use_incremental_sync: 是否使用增量同步
+                - True: 从数据库最新的 end_time 开始获取到现在的数据
+                - False: 获取最近 hours 小时的数据（默认）
             
         Returns:
             Dict: 处理结果统计
@@ -55,10 +60,45 @@ class DataProcessingService:
                 - apps_to_classify: 待分类应用数
                 - classified_apps: 已分类应用数
                 - saved_events: 保存的事件数
+                - sync_mode: 同步模式（'incremental' 或 'full'）
+                - time_range: 同步的时间范围
         """
-        logger.info(f"开始处理 ActivityWatch 数据 (最近 {hours} 小时)")
-        
         try:
+            # 确定同步模式和时间范围
+            sync_mode = 'incremental' if use_incremental_sync else 'full'
+            
+            if use_incremental_sync:
+                # 增量同步：从数据库最新的 end_time 开始
+                latest_end_time = self.db_manager.get_latest_end_time()
+                
+                if latest_end_time:
+                    # 计算从最新时间到现在的小时数
+                    latest_dt = datetime.strptime(latest_end_time, '%Y-%m-%d %H:%M:%S')
+                    # 假设数据库时间是本地时区
+                    local_tz = pytz.timezone(config.LOCAL_TIMEZONE)
+                    latest_dt = local_tz.localize(latest_dt)
+                    now_dt = datetime.now(local_tz)
+                    
+                    time_diff = now_dt - latest_dt
+                    hours_since_last = int(time_diff.total_seconds() / 3600) + 1  # 向上取整，确保覆盖
+                    
+                    logger.info(f"开始增量同步 ActivityWatch 数据")
+                    logger.info(f"  上次同步时间: {latest_end_time}")
+                    logger.info(f"  时间跨度: {hours_since_last} 小时")
+                    
+                    hours = hours_since_last
+                    time_range = f"{latest_end_time} ~ 现在"
+                else:
+                    # 数据库为空，使用默认的 24 小时
+                    logger.info("数据库为空，执行首次全量同步（24小时）")
+                    hours = 24
+                    sync_mode = 'full'
+                    time_range = f"最近 {hours} 小时"
+            else:
+                # 全量同步：获取最近 N 小时
+                logger.info(f"开始全量同步 ActivityWatch 数据 (最近 {hours} 小时)")
+                time_range = f"最近 {hours} 小时"
+            
             # 1. 获取 ActivityWatch 数据
             logger.info("步骤 1/6: 获取 ActivityWatch 数据...")
             aw_data = get_window_events(hours=hours)
@@ -116,11 +156,15 @@ class DataProcessingService:
                 "apps_to_classify": apps_to_classify,
                 "classified_apps": classified_apps,
                 "saved_events": saved_events,
-                "unclassified_events": len(filtered_data[filtered_data['category'].isna()])
+                "unclassified_events": len(filtered_data[filtered_data['category'].isna()]),
+                "sync_mode": sync_mode,
+                "time_range": time_range
             }
             
             logger.info("=" * 60)
             logger.info("数据处理完成！")
+            logger.info(f"  - 同步模式: {sync_mode}")
+            logger.info(f"  - 时间范围: {time_range}")
             logger.info(f"  - 总事件数: {total_events}")
             logger.info(f"  - 有效事件数: {filtered_events}")
             logger.info(f"  - 新分类应用数: {classified_apps}")

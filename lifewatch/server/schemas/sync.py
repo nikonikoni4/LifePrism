@@ -10,6 +10,7 @@ class SyncRequest(BaseModel):
     """同步请求参数"""
     hours: int = 24
     auto_classify: bool = True
+    use_incremental_sync: bool = False
 
 
 class SyncResponse(BaseModel):
