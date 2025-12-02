@@ -74,3 +74,26 @@ export interface ActivityRecord {
   categoryId: string; // e.g., 'work'
   subCategoryId: string; // e.g., 'programming'
 }
+
+// Dashboard API Types
+export interface ChartSegment {
+  key: string;
+  name: string;
+  value: number;
+  color: string;
+}
+
+export interface BarConfig {
+  key: string;
+  label: string;
+  color: string;
+}
+
+export interface TimeOverviewResponse {
+  title: string;
+  subTitle: string;
+  totalTrackedMinutes: number;
+  pieData: ChartSegment[];
+  barKeys: BarConfig[];
+  barData: TimeDistribution[];
+}
