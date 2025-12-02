@@ -41,14 +41,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const TimeOverviewWidget: React.FC = () => {
+const TimeOverviewWidget: React.FC<{ selectedDate: string }> = ({ selectedDate }) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<TimeOverviewResponse | null>(null);
-
-  // TODO: 从全局状态或上下文获取当前选中的日期
-  const selectedDate = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     fetchData();
