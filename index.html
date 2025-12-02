@@ -42,6 +42,8 @@
           scrollbar-width: none;  /* Firefox */
       }
     </style>
+  <!-- 
+  NOTE: Import Maps 与 Vite 冲突,已注释
   <script type="importmap">
 {
   "imports": {
@@ -54,8 +56,10 @@
   }
 }
 </script>
+  -->
 </head>
   <body class="bg-[#F3F4F6] text-slate-800 antialiased">
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
