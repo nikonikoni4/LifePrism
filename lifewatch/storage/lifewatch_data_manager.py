@@ -74,6 +74,7 @@ class LifeWatchDataManager(DatabaseManager):
                 - title: 应用标题（可选）
                 - is_multipurpose_app: 是否多用途应用（可选）
                 - app_description: 应用描述（可选）
+                - title_description: 标题描述（可选）
                 - class 或 class_by_goals: 分类（可选）
         
         Returns:
@@ -95,6 +96,27 @@ class LifeWatchDataManager(DatabaseManager):
         except Exception as e:
             logger.error(f"保存AI元数据失败: {e}")
             raise
+    
+    def load_categories(self) -> Optional[pd.DataFrame]:
+        """
+        获取所有主分类
+        
+        Returns:
+            Optional[pd.DataFrame]: 包含所有主分类数据的DataFrame，如果为空返回None
+        """
+        df = self.query('category', order_by='order_index ASC')
+        return df if not df.empty else None
+    
+    def load_sub_categories(self) -> Optional[pd.DataFrame]:
+        """
+        获取所有子分类
+        
+        Returns:
+            Optional[pd.DataFrame]: 包含所有子分类数据的DataFrame，如果为空返回None
+        """
+        df = self.query('sub_category', order_by='order_index ASC')
+        return df if not df.empty else None
+
     
     # ==================== 用户行为日志管理 ====================
     
@@ -162,6 +184,8 @@ class LifeWatchDataManager(DatabaseManager):
                 - class_by_default: 默认分类（可选）
                 - class_by_goals: 目标分类（可选）
                 - is_multipurpose_app: 是否多用途应用（可选）
+                - category_id: 主分类ID（可选）
+                - sub_category_id: 子分类ID（可选）
         
         Returns:
             int: 实际插入的行数
@@ -180,7 +204,9 @@ class LifeWatchDataManager(DatabaseManager):
                     'title': row.get('title'),
                     'class_by_default': row.get('class_by_default'),
                     'class_by_goals': row.get('class_by_goals'),
-                    'is_multipurpose_app': int(row.get('is_multipurpose_app', False))
+                    'is_multipurpose_app': int(row.get('is_multipurpose_app', False)),
+                    'category_id': row.get('category_id'),
+                    'sub_category_id': row.get('sub_category_id')
                 })
             
             # 使用 INSERT OR IGNORE（基于 UNIQUE 约束）

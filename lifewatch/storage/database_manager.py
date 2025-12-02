@@ -292,11 +292,13 @@ class DatabaseManager:
             
             with self.get_connection() as conn:
                 df = pd.read_sql_query(sql, conn, params=params)
-                logger.debug(f"查询成功，返回 {len(df)} 行数据")
+                # logger.debug(f"查询成功，返回 {len(df)} 行数据")
+                logger.info(f"查询成功，返回 {len(df)} 行数据")
                 return df if not df.empty else pd.DataFrame()
                 
         except Exception as e:
             logger.error(f"查询失败: {e}")
+            logger.info(f"查询失败: {e}")
             raise
     
     def get_by_id(self, table_name: str, id_column: str, id_value: Any) -> Optional[Dict]:

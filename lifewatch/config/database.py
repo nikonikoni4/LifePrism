@@ -4,7 +4,7 @@
 """
 
 # 数据库路径
-DB_PATH = "lifewatch_ai.db"
+DB_PATH = "D:\desktop\软件开发\LifeWatch-AI\lifewatch\server\lifewatch_ai.db"
 
 # 应用程序用途分类表配置
 APP_PURPOSE_CATEGORY_CONFIG = {
@@ -96,6 +96,16 @@ USER_APP_BEHAVIOR_LOG_CONFIG = {
             'type': 'INTEGER',
             'constraints': ['DEFAULT 0'],
             'comment': '是否为被选择需要使用title信息来判断用途的应用'
+        },
+        'category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '主分类ID（外键引用 category.id，新增字段）'
+        },
+        'sub_category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '子分类ID（外键引用 sub_category.id，新增字段）'
         }
     },
     'table_constraints': [
@@ -108,10 +118,79 @@ USER_APP_BEHAVIOR_LOG_CONFIG = {
     'timestamps': True  # 自动添加 created_at
 }
 
+# 分类定义表配置（主分类）
+CATEGORY_CONFIG = {
+    'table_name': 'category',
+    'columns': {
+        'id': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '分类唯一标识符（例如：work, entertainment）'
+        },
+        'name': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '分类名称（例如：工作/学习）'
+        },
+        'color': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '分类颜色（十六进制格式，例如：#5B8FF9）'
+        },
+        'order_index': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '显示顺序索引'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_category_id', 'columns': ['id']}
+    ],
+    'timestamps': True  # 自动添加 created_at, updated_at
+}
+
+# 子分类定义表配置
+SUB_CATEGORY_CONFIG = {
+    'table_name': 'sub_category',
+    'columns': {
+        'id': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '子分类唯一标识符（例如：coding, meeting）'
+        },
+        'category_id': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '所属主分类ID（外键引用 category.id）'
+        },
+        'name': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '子分类名称（例如：编程、会议）'
+        },
+        'order_index': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '显示顺序索引'
+        }
+    },
+    'table_constraints': [
+        'FOREIGN KEY (category_id) REFERENCES category(id) ON DELETE CASCADE'
+    ],
+    'indexes': [
+        {'name': 'idx_sub_category_id', 'columns': ['id']},
+        {'name': 'idx_sub_category_parent', 'columns': ['category_id']}
+    ],
+    'timestamps': True  # 自动添加 created_at, updated_at
+}
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'app_purpose_category': APP_PURPOSE_CATEGORY_CONFIG,
-    'user_app_behavior_log': USER_APP_BEHAVIOR_LOG_CONFIG
+    'user_app_behavior_log': USER_APP_BEHAVIOR_LOG_CONFIG,
+    'category': CATEGORY_CONFIG,
+    'sub_category': SUB_CATEGORY_CONFIG
 }
 
 

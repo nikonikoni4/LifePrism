@@ -1,0 +1,97 @@
+from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
+from lifewatch import config
+from lifewatch.data.get_activitywatch_data import get_window_events
+from lifewatch.data.data_clean import clean_activitywatch_data
+from lifewatch.llm.cloud_classifier import QwenAPIClassifier
+# 初始化数据库管理器
+db_manager = LifeWatchDataManager(db_path=config.DB_PATH)
+
+# 获取activitywatch的数据
+aw_data = get_window_events(hours=6)
+# 数据清洗
+app_purpose_category_df = db_manager.load_app_purpose_category()
+filtered_data,app_to_classify_df,app_to_classify_set = clean_activitywatch_data(aw_data, app_purpose_category_df)
+# 分类
+# 获取category和sub_category的id
+category = db_manager.load_categories()
+sub_category = db_manager.load_sub_categories()
+category_id_dict = category.set_index('name')['id'].to_dict()
+sub_category_id_dict = sub_category.set_index('name')['id'].to_dict()
+classifier = QwenAPIClassifier(
+    api_key=config.MODEL_KEY[config.SELECT_MODEL]["api_key"],
+    base_url=config.MODEL_KEY[config.SELECT_MODEL]["base_url"],
+    model=config.SELECT_MODEL,
+    categoryA=", ".join(category['name'].tolist()),
+    categoryB=", ".join(sub_category['name'].tolist())
+)
+
+
+
+
+
+print(app_to_classify_df)
+classified_app_df = classifier.classify(app_to_classify_df)
+# 保存分类
+db_manager.save_app_purpose_category(classified_app_df)
+# 
+print("开始将分类结果赋值给filtered_events_df...")
+
+# 创建processed_df的查找字典，提高匹配效率
+processed_dict = {}
+for _, row in classified_app_df.iterrows():
+    app = row['app']
+    title = row.get('title', '')
+    is_multipurpose = row.get('is_multipurpose_app', 0)
+    
+    if is_multipurpose == 0:
+        # 单用途应用，以app为键
+        processed_dict[('single', app.lower())] = {
+            'class_by_default': row.get('class_by_default'),
+            'class_by_goals': row.get('class_by_goals')
+        }
+    else:
+        # 多用途应用，以(app, title)为键
+        processed_dict[('multi', app.lower(), title.lower() if title else '')] = {
+            'class_by_default': row.get('class_by_default'),
+            'class_by_goals': row.get('class_by_goals')
+        }
+
+# 遍历filtered_events_df进行赋值
+assigned_count = 0
+for index, row in filtered_data.iterrows():
+    app = row['app']
+    title = row.get('title', '')
+    is_multipurpose = row.get('is_multipurpose_app', 0)
+    
+    if is_multipurpose == 0:
+        # 单用途应用匹配：只匹配app
+        key = ('single', app.lower())
+        if key in processed_dict:
+            classification = processed_dict[key]
+            filtered_data.at[index, 'class_by_default'] = classification['class_by_default']
+            filtered_data.at[index, 'class_by_goals'] = classification['class_by_goals']
+            filtered_data.at[index, 'category_id'] = category_id_dict.get(classification['class_by_default'])
+            filtered_data.at[index, 'sub_category_id'] = sub_category_id_dict.get(classification['class_by_goals'])
+            assigned_count += 1
+            print(f"✅ 单用途应用分类成功: {app} -> {classification['class_by_default']}/{classification['class_by_goals']}")
+    else:
+        # 多用途应用匹配：匹配app和title
+        key = ('multi', app.lower(), title.lower() if title else '')
+        if key in processed_dict:
+            classification = processed_dict[key]
+            filtered_data.at[index, 'class_by_default'] = classification['class_by_default']
+            filtered_data.at[index, 'class_by_goals'] = classification['class_by_goals']
+            assigned_count += 1
+            print(f"✅ 多用途应用分类成功: {app} - {title} -> {classification['class_by_default']}/{classification['class_by_goals']}")
+    # 获取分类id
+            filtered_data.at[index, 'category_id'] = category_id_dict.get(classification['class_by_default'])
+            filtered_data.at[index, 'sub_category_id'] = sub_category_id_dict.get(classification['class_by_goals'])
+print(f"分类结果赋值完成！共赋值了 {assigned_count} 条记录")
+print(f"filtered_data中总记录数: {len(filtered_data)}")
+print(f"未分类记录数: {len(filtered_data[filtered_data['class_by_default'].isna()])}")
+# 保存到数据库
+db_manager.save_user_app_behavior_log(filtered_data)
+
+
+
+

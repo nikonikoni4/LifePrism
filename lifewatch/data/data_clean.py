@@ -89,8 +89,8 @@ def clean_activitywatch_data(raw_events: List[Dict[str, Any]],app_purpose_catego
         categorized_mutilpurpose_titles = set()
     
     # output - 使用新的字典格式配置
-    filtered_events_df = pd.DataFrame(columns=config.USER_APP_BEHAVIOR_LOG['keys'])
-    apps_to_classify_df = pd.DataFrame(columns=config.APP_PURPOSE_CATEGORY['keys'])
+    filtered_events_df = pd.DataFrame(columns=config.get_table_columns('user_app_behavior_log'))
+    apps_to_classify_df = pd.DataFrame(columns=config.get_table_columns('app_purpose_category'))
 
     for event in raw_events:
             duration = event.get('duration', 0)

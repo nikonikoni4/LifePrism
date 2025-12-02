@@ -1,0 +1,3 @@
+[submodule "frontend"]
+	path = frontend
+	url = https://github.com/nikonikoni4/frontend-of-lifewatchai.git
