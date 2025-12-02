@@ -71,7 +71,8 @@ class BehaviorService:
         mock_logs = [
             {
                 "id": f"event_{i}",
-                "timestamp": datetime.now() - timedelta(hours=i),
+                "start_time": datetime.now() - timedelta(hours=i),
+                "end_time": datetime.now() - timedelta(hours=i) + timedelta(minutes=3 + i//6),
                 "duration": 180 + (i * 10),
                 "app": ["chrome.exe", "code.exe", "msedge.exe"][i % 3],
                 "title": [
@@ -106,8 +107,10 @@ class BehaviorService:
         timeline_slots = []
         for hour in range(8, 18):  # 模拟8点到18点的活动
             slot_time = base_time + timedelta(hours=hour)
+            slot_end_time = slot_time + timedelta(hours=1 if hour % 2 == 0 else 0.5)
             timeline_slots.append({
-                "timestamp": slot_time,
+                "start_time": slot_time,
+                "end_time": slot_end_time,
                 "duration": 3600 if hour % 2 == 0 else 1800,  # 交替使用1小时或30分钟
                 "events": [
                     {

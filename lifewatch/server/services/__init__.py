@@ -6,10 +6,12 @@ from .dashboard_service import DashboardService
 from .behavior_service import BehaviorService
 from .analytics_service import AnalyticsService
 from .sync_service import SyncService
+from .data_processing_service import DataProcessingService
 
 __all__ = [
     "DashboardService",
     "BehaviorService",
     "AnalyticsService",
-    "SyncService"
+    "SyncService",
+    "DataProcessingService"
 ]

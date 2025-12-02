@@ -176,13 +176,13 @@ class DashboardService:
         
         # 使用 query 方法查询所有数据，然后用 pandas 过滤
         # 因为 DatabaseManager.query() 不支持范围查询
-        logs_df = self.db_manager.query('user_app_behavior_log', order_by='timestamp')
+        logs_df = self.db_manager.query('user_app_behavior_log', order_by='start_time')
         
         # 使用 pandas 过滤日期范围
         if not logs_df.empty:
             logs_df = logs_df[
-                (logs_df['timestamp'] >= start_time) & 
-                (logs_df['timestamp'] <= end_time)
+                (logs_df['start_time'] >= start_time) & 
+                (logs_df['end_time'] <= end_time)
             ]
         
         return logs_df
@@ -304,12 +304,12 @@ class DashboardService:
                 if is_sub:
                     slot_logs = logs_df[
                         (logs_df['sub_category_id'] == key) &
-                        (logs_df['timestamp'].apply(lambda x: start_hour <= datetime.strptime(x, '%Y-%m-%d %H:%M:%S').hour < end_hour))
+                        (logs_df['start_time'].apply(lambda x: start_hour <= datetime.strptime(x, '%Y-%m-%d %H:%M:%S').hour < end_hour))
                     ]
                 else:
                     slot_logs = logs_df[
                         (logs_df['category_id'] == key) &
-                        (logs_df['timestamp'].apply(lambda x: start_hour <= datetime.strptime(x, '%Y-%m-%d %H:%M:%S').hour < end_hour))
+                        (logs_df['start_time'].apply(lambda x: start_hour <= datetime.strptime(x, '%Y-%m-%d %H:%M:%S').hour < end_hour))
                     ]
                 
                 total_minutes = slot_logs['duration'].sum() / 60 if not slot_logs.empty else 0

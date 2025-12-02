@@ -10,7 +10,8 @@ from datetime import datetime, date
 class BehaviorLogItem(BaseModel):
     """单条行为日志"""
     id: str
-    timestamp: datetime
+    start_time: datetime
+    end_time: datetime
     duration: int
     app: str
     title: Optional[str] = None
@@ -38,7 +39,8 @@ class TimelineEvent(BaseModel):
 
 class TimelineSlot(BaseModel):
     """时间线时间槽"""
-    timestamp: datetime
+    start_time: datetime
+    end_time: datetime
     duration: int
     events: List[TimelineEvent]
 

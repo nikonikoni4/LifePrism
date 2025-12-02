@@ -7,13 +7,7 @@ import time
 from datetime import datetime
 from typing import Dict
 from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
-
-# 以下导入仅在真实同步逻辑中使用，暂时注释掉
-# from  lifewatch.data.get_activitywatch_data import ActivityWatchTimeRangeAccessor
-# from lifewatch.data.data_clean import clean_activitywatch_data
-# from lifewatch.crawler.app_description_fetching import AppDescriptionFetcher
-# from lifewatch.llm.ollama_client import OllamaClient
-# from lifewatch import config
+from lifewatch.server.services.data_processing_service import DataProcessingService
 
 
 class SyncService:
@@ -25,6 +19,7 @@ class SyncService:
     
     def __init__(self):
         self.db = LifeWatchDataManager()
+        self.data_processor = DataProcessingService()
     
     def sync_from_activitywatch(
         self,
@@ -41,11 +36,11 @@ class SyncService:
         Returns:
             Dict: 同步结果
         """
-        # 第一阶段：返回 Mock 同步结果
-        return self._mock_sync(hours, auto_classify)
+        # 使用真实同步逻辑（基于 DataProcessingService）
+        return self._real_sync(hours, auto_classify)
         
-        # 第二阶段：实现真实同步逻辑
-        # return self._real_sync(hours, auto_classify)
+        # 如需使用 Mock 数据进行测试，取消下面的注释
+        # return self._mock_sync(hours, auto_classify)
     
     def _mock_sync(self, hours: int, auto_classify: bool) -> Dict:
         """返回 Mock 同步结果"""
@@ -64,79 +59,31 @@ class SyncService:
         """
         真实的数据同步逻辑
         
-        基于 mian.py 中的业务流程实现
-        
-        TODO: 第二阶段实现
-        1. 从 ActivityWatch 获取数据
-        2. 数据清洗
-        3. 查询待分类应用
-        4. 抓取应用描述（如果需要）
-        5. 调用 LLM 分类（如果 auto_classify=True）
-        6. 保存到数据库
-        7. 返回同步结果
+        使用 DataProcessingService 处理完整的数据流程
         """
         start_time = time.time()
         
         try:
-            # 1. 获取 ActivityWatch 数据
-            aw_accessor = ActivityWatchTimeRangeAccessor(
-                base_url=config.AW_URL_CONFIG["base_url"],
-                local_tz=config.LOCAL_TIMEZONE
+            # 使用 DataProcessingService 处理数据
+            result = self.data_processor.process_activitywatch_data(
+                hours=hours,
+                auto_classify=auto_classify
             )
-            user_behavior_logs = aw_accessor.get_window_events(hours=hours)
-            
-            # 2. 读取已有分类
-            app_purpose_category_df = self.db.load_app_purpose_category()
-            
-            # 3. 数据清洗
-            filtered_events_df, apps_to_classify_df, apps_to_classify_set = clean_activitywatch_data(
-                user_behavior_logs,
-                app_purpose_category_df
-            )
-            
-            synced_events = len(filtered_events_df)
-            new_apps_classified = 0
-            
-            # 4. 如果需要分类且有待分类应用
-            if auto_classify and len(apps_to_classify_df) > 0:
-                # 获取应用描述
-                app_description_fetcher = AppDescriptionFetcher("BaiDuBrowerCrawler")
-                app_descriptions_dict = app_description_fetcher.fetch_batch_app_descriptions(
-                    apps_to_classify_set
-                )
-                
-                # 添加描述到 DataFrame
-                apps_to_classify_df['app_description'] = apps_to_classify_df['app'].map(
-                    app_descriptions_dict
-                )
-                
-                # LLM 分类
-                client = OllamaClient(config.OLLAMA_BASE_URL)
-                processed_df = process_and_fill_dataframe(
-                    apps_to_classify_df,
-                    mock_llm_func=lambda batch: call_ollama_llm_api(
-                        batch, client, config.CATEGORY_A, config.CATEGORY_B
-                    )
-                )
-                
-                # 保存分类结果
-                self.db.save_app_purpose_category(processed_df)
-                new_apps_classified = len(processed_df)
-                
-                # TODO: 将分类结果赋值给 filtered_events_df
-                # （参考 mian.py 中的逻辑）
-            
-            # 5. 保存行为日志
-            self.db.save_user_app_behavior_log(filtered_events_df)
             
             duration = time.time() - start_time
             
             return {
                 "status": "success",
-                "synced_events": synced_events,
-                "new_apps_classified": new_apps_classified,
+                "synced_events": result["saved_events"],
+                "new_apps_classified": result["classified_apps"],
                 "duration": round(duration, 2),
-                "message": f"成功同步最近 {hours} 小时的数据"
+                "message": f"成功同步最近 {hours} 小时的数据",
+                "details": {
+                    "total_events": result["total_events"],
+                    "filtered_events": result["filtered_events"],
+                    "apps_to_classify": result["apps_to_classify"],
+                    "unclassified_events": result["unclassified_events"]
+                }
             }
             
         except Exception as e:
