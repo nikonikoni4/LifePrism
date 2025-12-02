@@ -7,7 +7,7 @@
 # ==============================================================================
 
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List,Any
 import pytz
 from lifewatch.storage.lifewatch_data_manager import get_app_purpose_category
@@ -96,7 +96,11 @@ def clean_activitywatch_data(raw_events: List[Dict[str, Any]],app_purpose_catego
             duration = event.get('duration', 0)
             if duration >= lower_bound:
                 # 转换时间戳
-                local_timestamp = convert_utc_to_local(event.get('timestamp', ''),config.LOCAL_TIMEZONE)
+                local_start_time = convert_utc_to_local(event.get('timestamp', ''),config.LOCAL_TIMEZONE)
+                # 计算结束时间
+                start_dt = datetime.strptime(local_start_time, '%Y-%m-%d %H:%M:%S')
+                end_dt = start_dt + timedelta(seconds=duration)
+                local_end_time = end_dt.strftime('%Y-%m-%d %H:%M:%S')
                 # 获得应用名称
                 app_name = event.get('data', {}).get('app', None)
                 
@@ -109,7 +113,8 @@ def clean_activitywatch_data(raw_events: List[Dict[str, Any]],app_purpose_catego
                     # 初始化事件数据
                     filtered_event = {
                         'id': event.get('id', ''),
-                        'timestamp': local_timestamp,
+                        'start_time': local_start_time,
+                        'end_time': local_end_time,
                         'duration': duration,
                         'app': app_name,
                         'title': title,
@@ -167,7 +172,7 @@ def clean_activitywatch_data(raw_events: List[Dict[str, Any]],app_purpose_catego
             else:
                 # 记录被过滤的短暂活动
                 removed_count += 1
-                print(f"🗑️  过滤短暂活动: {event.get('data', {}).get('app', 'Unknown')} - {duration:.1f}秒")
+                # print(f"🗑️  过滤短暂活动: {event.get('data', {}).get('app', 'Unknown')} - {duration:.1f}秒")
     # 一次性创建DataFrame，避免循环中的concat警告
     if filtered_events_list:
         filtered_events_df = pd.DataFrame(filtered_events_list)

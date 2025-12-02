@@ -27,14 +27,16 @@ class DataProcessingService:
     提供优化的分类结果合并和批量处理功能
     """
     
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: Optional[str] = None, aw_db_path: Optional[str] = None):
         """
         初始化数据处理服务
         
         Args:
-            db_path: 数据库路径，默认使用 config.DB_PATH
+            db_path: LifeWatch 数据库路径，默认使用 config.DB_PATH
+            aw_db_path: ActivityWatch 数据库路径，用于直接读取 AW 数据
         """
         self.db_manager = LifeWatchDataManager(db_path=db_path or config.DB_PATH)
+        self.aw_db_path = aw_db_path  # ActivityWatch 数据库路径
         self._category_mappings_cache = None  # 缓存分类映射
         
     def process_activitywatch_data(
@@ -67,27 +69,31 @@ class DataProcessingService:
             # 确定同步模式和时间范围
             sync_mode = 'incremental' if use_incremental_sync else 'full'
             
+            # 初始化时间参数
+            start_time = None
+            end_time = None
+            
             if use_incremental_sync:
-                # 增量同步：从数据库最新的 end_time 开始
+                # 增量同步：从数据库最新的 end_time 开始获取到现在
                 latest_end_time = self.db_manager.get_latest_end_time()
                 
                 if latest_end_time:
-                    # 计算从最新时间到现在的小时数
+                    # 解析最新时间
                     latest_dt = datetime.strptime(latest_end_time, '%Y-%m-%d %H:%M:%S')
                     # 假设数据库时间是本地时区
                     local_tz = pytz.timezone(config.LOCAL_TIMEZONE)
-                    latest_dt = local_tz.localize(latest_dt)
-                    now_dt = datetime.now(local_tz)
+                    start_time = local_tz.localize(latest_dt)
+                    end_time = datetime.now(local_tz)
                     
-                    time_diff = now_dt - latest_dt
-                    hours_since_last = int(time_diff.total_seconds() / 3600) + 1  # 向上取整，确保覆盖
+                    time_diff = end_time - start_time
+                    hours_diff = time_diff.total_seconds() / 3600
                     
                     logger.info(f"开始增量同步 ActivityWatch 数据")
-                    logger.info(f"  上次同步时间: {latest_end_time}")
-                    logger.info(f"  时间跨度: {hours_since_last} 小时")
+                    logger.info(f"  开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    logger.info(f"  结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    logger.info(f"  时间跨度: {hours_diff:.2f} 小时")
                     
-                    hours = hours_since_last
-                    time_range = f"{latest_end_time} ~ 现在"
+                    time_range = f"{latest_end_time} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
                 else:
                     # 数据库为空，使用默认的 24 小时
                     logger.info("数据库为空，执行首次全量同步（24小时）")
@@ -101,7 +107,21 @@ class DataProcessingService:
             
             # 1. 获取 ActivityWatch 数据
             logger.info("步骤 1/6: 获取 ActivityWatch 数据...")
-            aw_data = get_window_events(hours=hours)
+            if start_time and end_time:
+                # 增量同步：使用时间范围
+                aw_data = get_window_events(
+                    start_time=start_time,
+                    end_time=end_time,
+                    use_database=True,
+                    aw_db_path=self.aw_db_path
+                )
+            else:
+                # 全量同步：使用小时数
+                aw_data = get_window_events(
+                    hours=hours,
+                    use_database=True,
+                    aw_db_path=self.aw_db_path
+                )
             total_events = len(aw_data)
             logger.info(f"  ✓ 获取到 {total_events} 条原始事件")
             
@@ -322,9 +342,18 @@ class DataProcessingService:
             category = self.db_manager.load_categories()
             sub_category = self.db_manager.load_sub_categories()
             
+            # 处理分类为空的情况
+            category_dict = {}
+            if category is not None and not category.empty:
+                category_dict = category.set_index('name')['id'].to_dict()
+                
+            sub_category_dict = {}
+            if sub_category is not None and not sub_category.empty:
+                sub_category_dict = sub_category.set_index('name')['id'].to_dict()
+            
             self._category_mappings_cache = {
-                'category_id_dict': category.set_index('name')['id'].to_dict(),
-                'sub_category_id_dict': sub_category.set_index('name')['id'].to_dict()
+                'category_id_dict': category_dict,
+                'sub_category_id_dict': sub_category_dict
             }
             logger.info("  ✓ 创建分类映射字典缓存")
         

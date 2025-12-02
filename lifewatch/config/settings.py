@@ -46,9 +46,9 @@ CATEGORY_B = get_category_b()
 
 # 2.被选择需要使用title信息来判断用途的应用（可配置）
 MULTIPURPOSE_APP = [
-    "chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", 
-    "opera.exe", "safari.exe", "vivaldi.exe", "duckduckgo.exe",
-    "tor.exe", "iexplore.exe","explorer.exe"
+    "chrome", "msedge", "firefox", "brave", 
+    "opera", "safari", "vivaldi", "duckduckgo",
+    "tor", "iexplore","explorer"
 ]
 
 """

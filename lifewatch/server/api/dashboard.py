@@ -7,7 +7,8 @@ from datetime import date
 from typing import Optional
 from lifewatch.server.schemas.dashboard import DashboardResponse
 from lifewatch.server.schemas.dashboard_schemas import TimeOverviewResponse
-from lifewatch.server.services.dashboard_service import DashboardService
+from lifewatch.server.services import DashboardService
+
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 dashboard_service = DashboardService()

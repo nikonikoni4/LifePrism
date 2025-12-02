@@ -1,67 +1,62 @@
 """
 仪表盘服务
-提供仪表盘数据查询功能（当前使用 Mock 数据）
+提供仪表盘数据和时间概览功能
 """
 
-import logging
-from datetime import date, datetime
-from typing import Dict, List, Any, Optional
+from datetime import date, datetime, timedelta
+from typing import Dict, Optional
+import pandas as pd
 from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
-from lifewatch.storage.database_manager import DatabaseManager
-from lifewatch.config.database import DB_PATH
-
-logger = logging.getLogger(__name__)
-
-# 24小时分为12个时间段（每2小时）
-TIME_RANGES = [
-    "0-2", "2-4", "4-6", "6-8", "8-10", "10-12",
-    "12-14", "14-16", "16-18", "18-20", "20-22", "22-24"
-]
 
 
 class DashboardService:
     """
     仪表盘数据服务
     
-    TODO: 当前返回 Mock 数据，后续需要实现真实统计逻辑
+    提供仪表盘总览数据、时间概览等功能
     """
     
-    def __init__(self, db_path: str = None):
+    def __init__(self):
         self.db = LifeWatchDataManager()
-        # 为 Time Overview 使用 DatabaseManager
-        if db_path is None:
-            db_path = DB_PATH
-        self.db_manager = DatabaseManager(db_path=db_path)
     
-    def get_dashboard_data(self, target_date: date) -> Dict:
+    def get_dashboard_data(self, query_date: date) -> Dict:
         """
         获取指定日期的仪表盘数据
         
         Args:
-            target_date: 查询日期
+            query_date: 查询日期
             
         Returns:
-            Dict: 仪表盘数据
+            Dict: 仪表盘数据，包括总活跃时长、Top应用、Top标题、分类统计
         """
         # 第一阶段：返回 Mock 数据
-        # return self._get_mock_dashboard_data(target_date)
+        return self._get_mock_dashboard_data(query_date)
         
-        # 第二阶段：实现真实数据库查询
-        return self._get_real_dashboard_data(target_date)
+        # 第二阶段：实现真实查询
+        # return self._get_real_dashboard_data(query_date)
     
-    def _get_mock_dashboard_data(self, target_date: date) -> Dict:
+    def get_time_overview(self, date_str: str, parent_id: Optional[str] = None) -> Dict:
         """
-        返回固定的 Mock 数据用于前端开发和API测试
+        获取时间概览数据
         
         Args:
-            target_date: 查询日期
+            date_str: 日期字符串 (YYYY-MM-DD)
+            parent_id: 主分类ID（用于下钻到子分类）
             
         Returns:
-            Dict: Mock 仪表盘数据
+            Dict: 时间概览数据，包括饼图、柱状图配置和24小时分布
         """
+        # 使用真实数据查询
+        return self._get_real_time_overview(date_str, parent_id)
+        
+        # Mock 数据（如需要可以切换回来）
+        # return self._get_mock_time_overview(date_str, parent_id)
+    
+    def _get_mock_dashboard_data(self, query_date: date) -> Dict:
+        """返回 Mock 仪表盘数据"""
         return {
-            "date": target_date,
-            "total_active_time": 10800,  # 3小时
+            "date": query_date,
+            "total_active_time": 10800,  # 3小时（秒）
             "summary": {
                 "top_apps": [
                     {"name": "chrome.exe", "duration": 4500, "percentage": 41.7},
@@ -69,16 +64,13 @@ class DashboardService:
                     {"name": "msedge.exe", "duration": 2700, "percentage": 25.0}
                 ],
                 "top_titles": [
-                    {"name": "LifeWatch-AI - database_manager.py", "duration": 3600, "percentage": 33.3},
-                    {"name": "Google - YouTube", "duration": 2400, "percentage": 22.2},
-                    {"name": "GitHub - LifeWatch-AI", "duration": 2100, "percentage": 19.4},
-                    {"name": "Stack Overflow - Python Questions", "duration": 1500, "percentage": 13.9},
-                    {"name": "Bilibili - 技术视频", "duration": 1200, "percentage": 11.1}
+                    {"name": "LifeWatch Documentation", "duration": 2400, "percentage": 22.2},
+                    {"name": "database_manager.py - VS Code", "duration": 2100, "percentage": 19.4},
+                    {"name": "Google Search - Python", "duration": 1800, "percentage": 16.7}
                 ],
                 "categories_by_default": [
                     {"category": "工作/学习", "duration": 7200, "percentage": 66.7},
-                    {"category": "生活/娱乐", "duration": 3600, "percentage": 33.3},
-                    {"category": "其他", "duration": 0, "percentage": 0}
+                    {"category": "生活/娱乐", "duration": 3600, "percentage": 33.3}
                 ],
                 "categories_by_goals": [
                     {"category": "编写LifeWatch-AI项目(代码)", "duration": 5400, "percentage": 50.0},
@@ -87,268 +79,361 @@ class DashboardService:
             }
         }
     
-    def _get_real_dashboard_data(self, target_date: date) -> Dict:
-        """
-        从数据库查询真实数据并统计
+    def _get_mock_time_overview(self, date_str: str, parent_id: Optional[str] = None) -> Dict:
+        """返回 Mock 时间概览数据"""
         
-        实现步骤：
-        1. 查询指定日期的所有行为日志
-        2. 按 app 聚合统计时长
-        3. 按 title 聚合统计时长  
-        4. 按 category 聚合统计
-        5. 按 sub_category 聚合统计
-        6. 计算百分比
-        7. 返回格式化数据
-        
-        Args:
-            target_date: 查询日期
-            
-        Returns:
-            Dict: 真实仪表盘数据
-        """
-        # TODO: 第二阶段实现
-        start_time = f"{target_date} 00:00:00"
-        end_time = f"{target_date} 23:59:59"
-        
-        # 查询该日期的所有行为日志
-        logs_df = self.db.load_user_app_behavior_log(
-            start_time=start_time,
-            end_time=end_time
-        )
-        
-        if logs_df is None or logs_df.empty:
+        # 一级分类数据
+        if parent_id is None:
             return {
-                "date": target_date,
-                "total_active_time": 0,
-                "summary": {
-                    "top_apps": [],
-                    "top_titles": [],
-                    "categories_by_default": [],
-                    "categories_by_goals": []
-                }
+                "title": "Time Overview",
+                "subTitle": "Activity breakdown & timeline",
+                "totalTrackedMinutes": 780,
+                "pieData": [
+                    {"key": "work", "name": "Work/Study", "value": 480, "color": "#5B8FF9"},
+                    {"key": "entertainment", "name": "Entertainment", "value": 200, "color": "#5AD8A6"},
+                    {"key": "other", "name": "Other", "value": 100, "color": "#5D7092"}
+                ],
+                "barKeys": [
+                    {"key": "work", "label": "Work", "color": "#5B8FF9"},
+                    {"key": "entertainment", "label": "Entertainment", "color": "#5AD8A6"},
+                    {"key": "other", "label": "Other", "color": "#5D7092"}
+                ],
+                "barData": [
+                    {"timeRange": "0-2", "work": 0, "entertainment": 0, "other": 0},
+                    {"timeRange": "2-4", "work": 0, "entertainment": 0, "other": 0},
+                    {"timeRange": "4-6", "work": 0, "entertainment": 0, "other": 0},
+                    {"timeRange": "6-8", "work": 30, "entertainment": 0, "other": 30},
+                    {"timeRange": "8-10", "work": 120, "entertainment": 0, "other": 0},
+                    {"timeRange": "10-12", "work": 100, "entertainment": 10, "other": 10},
+                    {"timeRange": "12-14", "work": 60, "entertainment": 40, "other": 20},
+                    {"timeRange": "14-16", "work": 90, "entertainment": 20, "other": 10},
+                    {"timeRange": "16-18", "work": 80, "entertainment": 30, "other": 10},
+                    {"timeRange": "18-20", "work": 0, "entertainment": 60, "other": 20},
+                    {"timeRange": "20-22", "work": 0, "entertainment": 40, "other": 0},
+                    {"timeRange": "22-24", "work": 0, "entertainment": 0, "other": 0}
+                ]
             }
         
-        # TODO: 实现统计逻辑
-        # - 总时长计算
-        # - Top Apps 排序
-        # - Top Titles 排序
-        # - 分类统计和百分比计算
+        # 二级分类数据（下钻示例：work分类）
+        if parent_id == "work":
+            return {
+                "title": "Work/Study Details",
+                "subTitle": "Detailed breakdown of work activities",
+                "totalTrackedMinutes": 480,
+                "pieData": [
+                    {"key": "coding", "name": "Coding", "value": 300, "color": "#5B8FF9"},
+                    {"key": "documentation", "name": "Documentation", "value": 120, "color": "#61DDAA"},
+                    {"key": "meetings", "name": "Meetings", "value": 60, "color": "#F6BD16"}
+                ],
+                "barKeys": [
+                    {"key": "coding", "label": "Coding", "color": "#5B8FF9"},
+                    {"key": "documentation", "label": "Documentation", "color": "#61DDAA"},
+                    {"key": "meetings", "label": "Meetings", "color": "#F6BD16"}
+                ],
+                "barData": [
+                    {"timeRange": "0-2", "coding": 0, "documentation": 0, "meetings": 0},
+                    {"timeRange": "2-4", "coding": 0, "documentation": 0, "meetings": 0},
+                    {"timeRange": "4-6", "coding": 0, "documentation": 0, "meetings": 0},
+                    {"timeRange": "6-8", "coding": 20, "documentation": 10, "meetings": 0},
+                    {"timeRange": "8-10", "coding": 80, "documentation": 30, "meetings": 10},
+                    {"timeRange": "10-12", "coding": 60, "documentation": 30, "meetings": 10},
+                    {"timeRange": "12-14", "coding": 40, "documentation": 10, "meetings": 10},
+                    {"timeRange": "14-16", "coding": 60, "documentation": 20, "meetings": 10},
+                    {"timeRange": "16-18", "coding": 40, "documentation": 20, "meetings": 20},
+                    {"timeRange": "18-20", "coding": 0, "documentation": 0, "meetings": 0},
+                    {"timeRange": "20-22", "coding": 0, "documentation": 0, "meetings": 0},
+                    {"timeRange": "22-24", "coding": 0, "documentation": 0, "meetings": 0}
+                ]
+            }
         
+        # 未知父分类ID
+        raise ValueError(f"Unknown parent_id: {parent_id}")
+    
+    def _get_real_dashboard_data(self, query_date: date) -> Dict:
+        """
+        从数据库查询真实仪表盘数据
+        
+        TODO: 第二阶段实现
+        - 使用 LifeWatchDataManager 查询数据
+        - 计算总活跃时长
+        - 统计 Top 应用和标题
+        - 汇总分类数据
+        """
         pass
     
-    # ==================== Time Overview 功能 ====================
-    
-    def get_time_overview(self, date_str: str, parent_id: Optional[str] = None) -> Dict[str, Any]:
+    def _get_real_time_overview(self, date_str: str, parent_id: Optional[str] = None) -> Dict:
         """
-        获取 Time Overview 数据
+        从数据库查询真实时间概览数据
         
         Args:
             date_str: 日期字符串 (YYYY-MM-DD)
-            parent_id: 可选，主分类ID（用于下钻到子分类）
+            parent_id: 主分类ID（用于下钻到子分类）
             
         Returns:
-            Dict: Time Overview 响应数据
+            Dict: 时间概览数据，包括饼图、柱状图配置和24小时分布
         """
-        try:
-            # 1. 获取当天的行为日志
-            logs_df = self._get_behavior_logs(date_str)
-            
-            if logs_df.empty:
-                logger.warning(f"没有找到日期 {date_str} 的行为日志")
-                return self._empty_response(parent_id)
-            
-            # 2. 根据 parent_id 决定聚合级别
-            if parent_id is None:
-                # 一级分类概览
-                return self._build_main_category_overview(logs_df, date_str)
-            else:
-                # 二级分类详情
-                return self._build_sub_category_details(logs_df, date_str, parent_id)
-                
-        except Exception as e:
-            logger.error(f"获取 Time Overview 失败: {e}")
-            raise
-    
-    def _get_behavior_logs(self, date_str: str) -> Any:
-        """获取指定日期的行为日志"""
+        from datetime import datetime
+        from collections import defaultdict
+        
+        # 解析日期并构建查询日期范围
+        target_date = datetime.strptime(date_str, "%Y-%m-%d")
         start_time = f"{date_str} 00:00:00"
         end_time = f"{date_str} 23:59:59"
         
-        # 使用 query 方法查询所有数据，然后用 pandas 过滤
-        # 因为 DatabaseManager.query() 不支持范围查询
-        logs_df = self.db_manager.query('user_app_behavior_log', order_by='start_time')
+        # 从数据库查询该日期的所有行为日志
+        df = self.db.load_user_app_behavior_log(start_time=start_time, end_time=end_time)
         
-        # 使用 pandas 过滤日期范围
-        if not logs_df.empty:
-            logs_df = logs_df[
-                (logs_df['start_time'] >= start_time) & 
-                (logs_df['end_time'] <= end_time)
-            ]
+        # 从数据库加载分类颜色信息
+        category_df = self.db.load_categories()
+        sub_category_df = self.db.load_sub_categories()
         
-        return logs_df
-    
-    def _build_main_category_overview(self, logs_df: Any, date_str: str) -> Dict[str, Any]:
-        """构建一级分类概览"""
-        categories_df = self.db_manager.query('category', order_by='order_index ASC')
+        # 构建分类名称到颜色的映射
+        color_map = {}
+        if category_df is not None and not category_df.empty:
+            for _, row in category_df.iterrows():
+                color_map[row['name']] = row['color']
         
-        category_times = {}
-        for _, cat in categories_df.iterrows():
-            cat_id = cat['id']
-            cat_logs = logs_df[logs_df['category_id'] == cat_id]
-            total_minutes = cat_logs['duration'].sum() / 60 if not cat_logs.empty else 0
-            category_times[cat_id] = {
-                'name': cat['name'],
-                'color': cat['color'],
-                'minutes': int(total_minutes)
+        # 对于子分类，使用父分类的颜色（因为sub_category表没有color字段）
+        # 也可以根据需要为每个子分类设置独立的颜色
+        if sub_category_df is not None and not sub_category_df.empty:
+            for _, row in sub_category_df.iterrows():
+                # 找到该子分类的父分类颜色
+                if category_df is not None and not category_df.empty:
+                    parent = category_df[category_df['id'] == row['category_id']]
+                    if not parent.empty:
+                        color_map[row['name']] = parent.iloc[0]['color']
+        
+        # 如果没有数据，返回空数据结构
+        if df is None or df.empty:
+            return {
+                "title": "Time Overview",
+                "subTitle": f"No activity data for {date_str}",
+                "totalTrackedMinutes": 0,
+                "pieData": [],
+                "barKeys": [],
+                "barData": self._get_empty_bar_data()
             }
         
+        # 计算每条记录的时长（分钟）
+        df['start_dt'] = pd.to_datetime(df['start_time'])
+        df['end_dt'] = pd.to_datetime(df['end_time'])
+        df['duration_minutes'] = (df['end_dt'] - df['start_dt']).dt.total_seconds() / 60
+        
+        # 根据是否有 parent_id 决定使用哪个分类字段
+        if parent_id is None:
+            # 一级分类：按 category 聚合
+            group_field = 'category'
+            title = "Time Overview"
+            subtitle = "Activity breakdown & timeline"
+        else:
+            # 二级分类：按 sub_category 聚合，并过滤出属于该 parent_id 的记录
+            # 注意：这里假设 parent_id 对应 category 字段的值
+            df = df[df['category'] == parent_id]
+            group_field = 'sub_category'
+            title = f"{parent_id} Details"
+            subtitle = f"Detailed breakdown of {parent_id} activities"
+            
+            if df.empty:
+                return {
+                    "title": title,
+                    "subTitle": subtitle,
+                    "totalTrackedMinutes": 0,
+                    "pieData": [],
+                    "barKeys": [],
+                    "barData": self._get_empty_bar_data()
+                }
+        
+        # 聚合数据：按分类统计总时长
+        category_stats = df.groupby(group_field)['duration_minutes'].sum().to_dict()
+        total_minutes = sum(category_stats.values())
+        
+        # 构建饼图数据和柱状图配置
         pie_data = []
         bar_keys = []
-        total_tracked = 0
         
-        for cat_id, data in category_times.items():
-            if data['minutes'] > 0:
-                pie_data.append({
-                    'key': cat_id,
-                    'name': data['name'],
-                    'value': data['minutes'],
-                    'color': data['color']
-                })
-                bar_keys.append({
-                    'key': cat_id,
-                    'label': data['name'][:4],
-                    'color': data['color']
-                })
-                total_tracked += data['minutes']
+        for idx, (category, minutes) in enumerate(sorted(category_stats.items(), key=lambda x: x[1], reverse=True)):
+            if category is None or pd.isna(category):
+                category = "Uncategorized"
+                color = "#999999"
+            else:
+                # 从数据库颜色映射中获取颜色
+                color = color_map.get(category, "#E8684A")  # 默认颜色
+            
+            # 生成 key（用于数据引用）
+            key = self._category_to_key(category)
+            
+            pie_data.append({
+                "key": key,
+                "name": category,
+                "value": int(minutes),
+                "color": color
+            })
+            
+            bar_keys.append({
+                "key": key,
+                "label": category,
+                "color": color
+            })
         
-        bar_data = self._build_time_distribution(logs_df, list(category_times.keys()))
+        # 构建24小时分布数据（按2小时间隔）
+        bar_data = self._calculate_time_distribution(df, group_field)
         
         return {
-            'title': 'Time Overview',
-            'subTitle': 'Activity breakdown & timeline',
-            'totalTrackedMinutes': total_tracked,
-            'pieData': pie_data,
-            'barKeys': bar_keys,
-            'barData': bar_data
+            "title": title,
+            "subTitle": subtitle,
+            "totalTrackedMinutes": int(total_minutes),
+            "pieData": pie_data,
+            "barKeys": bar_keys,
+            "barData": bar_data
         }
     
-    def _build_sub_category_details(self, logs_df: Any, date_str: str, parent_id: str) -> Dict[str, Any]:
-        """构建二级分类详情"""
-        parent_cat = self.db_manager.get_by_id('category', 'id', parent_id)
-        if not parent_cat:
-            raise ValueError(f"分类 '{parent_id}' 不存在")
-        
-        sub_categories_df = self.db_manager.query(
-            'sub_category',
-            where={'category_id': parent_id},
-            order_by='order_index ASC'
-        )
-        
-        parent_logs = logs_df[logs_df['category_id'] == parent_id]
-        
-        sub_category_times = {}
-        base_color = parent_cat['color']
-        
-        for idx, sub_cat in sub_categories_df.iterrows():
-            sub_id = sub_cat['id']
-            sub_logs = parent_logs[parent_logs['sub_category_id'] == sub_id]
-            total_minutes = sub_logs['duration'].sum() / 60 if not sub_logs.empty else 0
-            
-            sub_color = self._generate_sub_color(base_color, idx, len(sub_categories_df))
-            
-            sub_category_times[sub_id] = {
-                'name': sub_cat['name'],
-                'color': sub_color,
-                'minutes': int(total_minutes)
-            }
-        
-        pie_data = []
-        bar_keys = []
-        total_tracked = 0
-        
-        for sub_id, data in sub_category_times.items():
-            if data['minutes'] > 0:
-                pie_data.append({
-                    'key': sub_id,
-                    'name': data['name'],
-                    'value': data['minutes'],
-                    'color': data['color']
-                })
-                bar_keys.append({
-                    'key': sub_id,
-                    'label': data['name'][:8],
-                    'color': data['color']
-                })
-                total_tracked += data['minutes']
-        
-        bar_data = self._build_time_distribution(parent_logs, list(sub_category_times.keys()), is_sub=True)
-        
-        return {
-            'title': f"{parent_cat['name']} Details",
-            'subTitle': 'Detailed breakdown & timeline',
-            'totalTrackedMinutes': total_tracked,
-            'pieData': pie_data,
-            'barKeys': bar_keys,
-            'barData': bar_data
-        }
+    def _get_empty_bar_data(self) -> list:
+        """生成空的24小时分布数据"""
+        return [
+            {"timeRange": f"{h}-{h+2}"} 
+            for h in range(0, 24, 2)
+        ]
     
-    def _build_time_distribution(self, logs_df: Any, category_keys: List[str], is_sub: bool = False) -> List[Dict[str, Any]]:
-        """构建24小时时间分布数据"""
-        bar_data = []
+    def _calculate_time_distribution(self, df, group_field: str) -> list:
+        """
+        计算24小时分布数据（按2小时间隔）
         
-        for time_range in TIME_RANGES:
-            start_hour, end_hour = map(int, time_range.split('-'))
-            time_slot = {'timeRange': time_range}
+        Args:
+            df: 行为日志DataFrame
+            group_field: 分类字段（category 或 sub_category）
             
-            for key in category_keys:
-                if is_sub:
-                    slot_logs = logs_df[
-                        (logs_df['sub_category_id'] == key) &
-                        (logs_df['start_time'].apply(lambda x: start_hour <= datetime.strptime(x, '%Y-%m-%d %H:%M:%S').hour < end_hour))
-                    ]
-                else:
-                    slot_logs = logs_df[
-                        (logs_df['category_id'] == key) &
-                        (logs_df['start_time'].apply(lambda x: start_hour <= datetime.strptime(x, '%Y-%m-%d %H:%M:%S').hour < end_hour))
-                    ]
+        Returns:
+            list: 24小时分布数据
+        """
+        from collections import defaultdict
+        
+        # 初始化24小时的时间槽（每2小时一个）
+        time_slots = defaultdict(lambda: defaultdict(int))
+        
+        for _, row in df.iterrows():
+            start = row['start_dt']
+            end = row['end_dt']
+            category = row[group_field]
+            
+            if category is None or pd.isna(category):
+                category = "Uncategorized"
+            
+            key = self._category_to_key(category)
+            
+            # 计算该事件在每个2小时时间槽中的时长
+            for hour in range(0, 24, 2):
+                slot_start = start.replace(hour=hour, minute=0, second=0, microsecond=0)
+                slot_end = slot_start + timedelta(hours=2)
                 
-                total_minutes = slot_logs['duration'].sum() / 60 if not slot_logs.empty else 0
-                time_slot[key] = int(total_minutes)
+                # 计算该事件与时间槽的重叠部分
+                overlap_start = max(start, slot_start)
+                overlap_end = min(end, slot_end)
+                
+                if overlap_start < overlap_end:
+                    overlap_minutes = (overlap_end - overlap_start).total_seconds() / 60
+                    time_slots[hour][key] += overlap_minutes
+        
+        # 构建柱状图数据
+        bar_data = []
+        for hour in range(0, 24, 2):
+            time_range = f"{hour}-{hour+2}"
+            slot_data = {"timeRange": time_range}
             
-            bar_data.append(time_slot)
+            # 添加每个分类的时长
+            for key, minutes in time_slots[hour].items():
+                slot_data[key] = int(minutes)
+            
+            bar_data.append(slot_data)
         
         return bar_data
-
     
-    def _generate_sub_color(self, base_color: str, index: int, total: int) -> str:
-        """基于主色生成子分类渐变色"""
-        if index == 0:
-            return base_color
+    def _category_to_key(self, category: str) -> str:
+        """
+        将分类名称转换为key（用于前端数据引用）
         
-        r = int(base_color[1:3], 16)
-        g = int(base_color[3:5], 16)
-        b = int(base_color[5:7], 16)
+        Args:
+            category: 分类名称
+            
+        Returns:
+            str: key（小写、去除特殊字符）
+        """
+        if category is None or pd.isna(category):
+            return "uncategorized"
         
-        factor = 1 + (index / total) * 0.3
-        r = min(255, int(r * factor))
-        g = min(255, int(g * factor))
-        b = min(255, int(b * factor))
-        
-        return f"#{r:02X}{g:02X}{b:02X}"
+        # 简单的转换规则：小写化，替换特殊字符
+        key = category.lower().replace(' ', '_').replace('/', '_').replace('\\', '_')
+        # 移除中文字符，保留字母、数字和下划线
+        import re
+        key = re.sub(r'[^\w]', '_', key)
+        return key
     
-    def _empty_response(self, parent_id: Optional[str] = None) -> Dict[str, Any]:
-        """返回空数据响应"""
-        title = "Time Overview" if not parent_id else "Category Details"
+    def _get_category_colors(self) -> dict:
+        """
+        获取分类颜色映射
         
-        return {
-            'title': title,
-            'subTitle': 'No data available',
-            'totalTrackedMinutes': 0,
-            'pieData': [],
-            'barKeys': [],
-            'barData': [{'timeRange': tr} for tr in TIME_RANGES]
+        Returns:
+            dict: 分类key到颜色的映射
+        """
+        # 基础颜色映射（支持中文和英文）
+        base_colors = {
+            # 一级分类颜色（中文）
+            "工作_学习": "#5B8FF9",
+            "工作": "#5B8FF9",
+            "学习": "#61DDAA",
+            "娱乐": "#5AD8A6",
+            "生活": "#F6BD16",
+            "其他": "#5D7092",
+            "uncategorized": "#999999",
+            
+            # 一级分类颜色（英文）
+            "work": "#5B8FF9",
+            "study": "#61DDAA",
+            "entertainment": "#5AD8A6",
+            "life": "#F6BD16",
+            "other": "#5D7092",
+            
+            # 工作子分类颜色
+            "coding": "#5B8FF9",
+            "编程": "#5B8FF9",
+            "编写lifewatch_ai项目_代码_": "#5B8FF9",
+            "documentation": "#61DDAA",
+            "文档": "#61DDAA",
+            "meetings": "#F6BD16",
+            "会议": "#F6BD16",
+            
+            # 默认颜色
+            "default": "#E8684A"
         }
-if __name__ == "__main__":
-    service = DashboardService()
-    today = date.today().strftime("%Y-%m-%d")
         
+        return base_colors
+    
+    def _get_color_for_category(self, key: str, colors: dict) -> str:
+        """
+        智能获取分类的颜色，支持模糊匹配
+        
+        Args:
+            key: 分类key
+            colors: 颜色映射字典
+            
+        Returns:
+            str: 颜色代码
+        """
+        # 精确匹配
+        if key in colors:
+            return colors[key]
+        
+        # 模糊匹配：检查是否包含关键词
+        key_lower = key.lower()
+        if "work" in key_lower or "工作" in key_lower:
+            return colors.get("work", "#5B8FF9")
+        if "study" in key_lower or "学习" in key_lower:
+            return colors.get("study", "#61DDAA")
+        if "entertainment" in key_lower or "娱乐" in key_lower:
+            return colors.get("entertainment", "#5AD8A6")
+        if "life" in key_lower or "生活" in key_lower:
+            return colors.get("life", "#F6BD16")
+        if "coding" in key_lower or "编程" in key_lower or "代码" in key_lower:
+            return colors.get("coding", "#5B8FF9")
+        
+        # 返回默认颜色
+        return colors.get("default", "#E8684A")

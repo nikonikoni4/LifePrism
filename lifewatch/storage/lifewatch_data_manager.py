@@ -149,14 +149,14 @@ class LifeWatchDataManager(DatabaseManager):
                 params.append(app_filter)
             
             if start_time:
-                sql += " AND timestamp >= ?"
+                sql += " AND start_time >= ?"
                 params.append(start_time)
             
             if end_time:
-                sql += " AND timestamp <= ?"
+                sql += " AND end_time <= ?"
                 params.append(end_time)
             
-            sql += " ORDER BY timestamp DESC"
+            sql += " ORDER BY start_time DESC"
             
             with self.get_connection() as conn:
                 df = pd.read_sql_query(sql, conn, params=params)
@@ -164,19 +164,46 @@ class LifeWatchDataManager(DatabaseManager):
         else:
             df = self.query('user_app_behavior_log', 
                           where=where if where else None,
-                          order_by='timestamp DESC')
+                          order_by='start_time DESC')
             return df if not df.empty else None
+    
+    def get_latest_end_time(self) -> Optional[str]:
+        """
+        获取数据库中最新的 end_time
+        用于增量同步，获取上次同步的最后时间点
+        
+        Returns:
+            Optional[str]: 最新的 end_time，格式：'YYYY-MM-DD HH:MM:SS'，如果表为空返回 None
+        """
+        try:
+            sql = "SELECT MAX(end_time) as latest_end_time FROM user_app_behavior_log"
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql)
+                result = cursor.fetchone()
+                latest_time = result[0] if result and result[0] else None
+                
+                if latest_time:
+                    logger.info(f"数据库中最新的 end_time: {latest_time}")
+                else:
+                    logger.info("数据库为空，没有历史数据")
+                
+                return latest_time
+        except Exception as e:
+            logger.error(f"获取最新 end_time 失败: {e}")
+            return None
     
     def save_user_app_behavior_log(self, cleaned_events_df: pd.DataFrame) -> int:
         """
         保存行为分类后的数据到user_app_behavior_log表
         
-        使用 INSERT OR IGNORE 策略，避免插入重复记录（基于 UNIQUE(app, timestamp) 约束）
+        使用 INSERT OR IGNORE 策略，避免插入重复记录（基于 UNIQUE(app, start_time) 约束）
         自动生成 event_id 如果不存在
         
         Args:
             cleaned_events_df: 清洗后的事件数据DataFrame，应包含以下字段：
-                - timestamp: 时间戳（必需）
+                - start_time: 开始时间（必需）
+                - end_time: 结束时间（必需）
                 - app: 应用名称（必需）
                 - id: 事件ID（可选，不存在会自动生成）
                 - duration: 持续时间（可选）
@@ -194,11 +221,12 @@ class LifeWatchDataManager(DatabaseManager):
             data_list = []
             for _, row in cleaned_events_df.iterrows():
                 # 确保id字段存在，自动生成如果缺失
-                event_id = row.get('id', f"event_{row.get('timestamp', '')}_{row.get('app', 'unknown')}")
+                event_id = row.get('id', f"event_{row.get('start_time', '')}_{row.get('app', 'unknown')}")
                 
                 data_list.append({
                     'id': event_id,
-                    'timestamp': row['timestamp'],
+                    'start_time': row['start_time'],
+                    'end_time': row['end_time'],
                     'duration': row.get('duration'),
                     'app': row['app'],
                     'title': row.get('title'),
@@ -295,11 +323,11 @@ class LifeWatchDataManager(DatabaseManager):
         params = []
         
         if start_time:
-            sql += " AND timestamp >= ?"
+            sql += " AND start_time >= ?"
             params.append(start_time)
         
         if end_time:
-            sql += " AND timestamp <= ?"
+            sql += " AND end_time <= ?"
             params.append(end_time)
         
         sql += " GROUP BY app ORDER BY total_duration DESC"

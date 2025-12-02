@@ -227,19 +227,45 @@ class ActivityWatchTimeRangeAccessor:
             window_events = []
         return window_events
 # 测试用
-def get_window_events(start_time=None,end_time=None,hours=1):
-    """从事件数据中提取窗口事件"""
-    aw_accessor = ActivityWatchTimeRangeAccessor(
-        base_url="http://localhost:5600",
-        local_tz="Asia/Shanghai"
-    )
-    result = aw_accessor.get_time_range_data(start_time,end_time,hours)
-    for bucket_id, events in result['events_by_bucket'].items():
-        if bucket_id.startswith(WINDOW_BUCKET_ID):
-            window_events = events
-            break
+def get_window_events(start_time=None, end_time=None, hours=1, use_database=True, aw_db_path=None):
+    """
+    从事件数据中提取窗口事件
+    
+    Args:
+        start_time: 开始时间
+        end_time: 结束时间
+        hours: 获取最近 N 小时的数据
+        use_database: 是否使用数据库模式(默认 True,性能更好)
+        aw_db_path: ActivityWatch 数据库路径(仅在 use_database=True 时需要)
+    
+    Returns:
+        list: 窗口事件列表
+    """
+    if use_database:
+        # 使用数据库模式
+        from lifewatch.data.aw_db_reader import ActivityWatchDBReader
+        
+        if not aw_db_path:
+            # 默认数据库路径
+            aw_db_path = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
+        
+        reader = ActivityWatchDBReader(db_path=aw_db_path)
+        window_events = reader.get_window_events(start_time, end_time, hours)
     else:
-        window_events = []
+        # 使用 API 模式(向后兼容)
+        aw_accessor = ActivityWatchTimeRangeAccessor(
+            base_url="http://localhost:5600",
+            local_tz="Asia/Shanghai"
+        )
+        result = aw_accessor.get_time_range_data(start_time, end_time, hours)
+        
+        for bucket_id, events in result['events_by_bucket'].items():
+            if bucket_id.startswith(WINDOW_BUCKET_ID):
+                window_events = events
+                break
+        else:
+            window_events = []
+    
     return window_events
 
 if __name__ == "__main__":

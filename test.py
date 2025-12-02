@@ -7,7 +7,7 @@ from lifewatch.llm.cloud_classifier import QwenAPIClassifier
 db_manager = LifeWatchDataManager(db_path=config.DB_PATH)
 
 # 获取activitywatch的数据
-aw_data = get_window_events(hours=6)
+aw_data = get_window_events(hours=48)
 # 数据清洗
 app_purpose_category_df = db_manager.load_app_purpose_category()
 filtered_data,app_to_classify_df,app_to_classify_set = clean_activitywatch_data(aw_data, app_purpose_category_df)

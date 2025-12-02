@@ -62,15 +62,20 @@ USER_APP_BEHAVIOR_LOG_CONFIG = {
             'constraints': ['PRIMARY KEY'],
             'comment': 'ActivityWatch事件ID（原生态ID，与ActivityWatch系统匹配）'
         },
-        'timestamp': {
+        'start_time': {
             'type': 'TEXT',
             'constraints': ['NOT NULL'],
-            'comment': '记录行为的时间'
+            'comment': '行为开始时间'
+        },
+        'end_time': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '行为结束时间'
         },
         'duration': {
             'type': 'INTEGER',
             'constraints': [],
-            'comment': '应用程序运行的持续时间（秒）'
+            'comment': '应用程序运行的持续时间（秒），用于数据验证和兼容性'
         },
         'app': {
             'type': 'TEXT',
@@ -109,11 +114,14 @@ USER_APP_BEHAVIOR_LOG_CONFIG = {
         }
     },
     'table_constraints': [
-        'UNIQUE(app, timestamp)'  # 复合唯一索引
+        'UNIQUE(app, start_time)',  # 复合唯一索引
+        'CHECK(end_time > start_time)'  # 确保时间逻辑正确
     ],
     'indexes': [
-        {'name': 'idx_app_timestamp', 'columns': ['app', 'timestamp']},
-        {'name': 'idx_timestamp', 'columns': ['timestamp']}
+        {'name': 'idx_app_start_time', 'columns': ['app', 'start_time']},
+        {'name': 'idx_start_time', 'columns': ['start_time']},
+        {'name': 'idx_end_time', 'columns': ['end_time']},
+        {'name': 'idx_time_range', 'columns': ['start_time', 'end_time']}  # 时间范围查询优化
     ],
     'timestamps': True  # 自动添加 created_at
 }
