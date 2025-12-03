@@ -162,6 +162,7 @@ export const TOP_APPS: AppUsage[] = [
   { name: 'Google Chrome', duration: '2h 30m', percentage: 38 },
   { name: 'Figma', duration: '1h 15m', percentage: 20 },
   { name: 'Spotify', duration: '45m', percentage: 12 },
+  { name: 'Discord', duration: '35m', percentage: 9 },
 ];
 
 export const TOP_WINDOWS: AppUsage[] = [
@@ -169,6 +170,7 @@ export const TOP_WINDOWS: AppUsage[] = [
   { name: 'Stack Overflow - React Types', duration: '45m', percentage: 18 },
   { name: 'Youtube - Lofi Beats', duration: '2h 10m', percentage: 55 },
   { name: 'Localhost:3000', duration: '1h 10m', percentage: 28 },
+  { name: 'Notion - Daily Notes', duration: '50m', percentage: 22 },
 ];
 
 export const TIMELINE_EVENTS: TimelineEvent[] = [

@@ -73,11 +73,11 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
       }
     }
   };
-
+  
   // Calculate start and end dates for labels based on the window
   const startDateLabel = history[0].day;
   const endDateLabel = history[history.length - 1].day;
-
+  const TodayTotalActiveTime = "6h 35m"
   return (
     <div className="bg-white rounded-3xl p-6 lg:p-8 shadow-sm border border-gray-100 mb-8 animate-fade-in w-full">
 
@@ -91,7 +91,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
           </h2>
           <div className="flex items-center gap-2 mt-2 text-morandi-blue font-semibold">
             <Clock size={16} />
-            <span>Total Active Time: <span className="font-mono text-lg font-bold">6h 35m</span></span>
+            <span>Total Active Time: <span className="font-mono text-lg font-bold">{TodayTotalActiveTime}</span></span>
           </div>
         </div>
       </div>

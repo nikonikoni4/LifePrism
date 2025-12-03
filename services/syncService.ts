@@ -68,6 +68,7 @@ export async function syncActivityWatchData(
  */
 export async function incrementalSync(): Promise<SyncResponse> {
     return syncActivityWatchData({
+        hours: null,
         use_incremental_sync: true,
         auto_classify: true,
     });
