@@ -285,23 +285,23 @@ class ActivityWatchDBReader:
         """
         # 处理时间参数
         if hours:
-            # 使用 UTC 时间
             end_time = datetime.now(timezone.utc)
             start_time = end_time - timedelta(hours=hours)
             
         elif not start_time or not end_time:
             raise ValueError("必须提供 start_time 和 end_time,或 hours 参数")
         
-        # 确保时间是 UTC
-        if start_time.tzinfo is None:
-            start_time = start_time.replace(tzinfo=timezone.utc)
-        else:
-            start_time = start_time.astimezone(timezone.utc)
-            
-        if end_time.tzinfo is None:
-            end_time = end_time.replace(tzinfo=timezone.utc)
-        else:
-            end_time = end_time.astimezone(timezone.utc)
+        if isinstance(start_time, str):
+            start_time = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+        if isinstance(end_time, str):
+            end_time = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+        
+        # 将本地时间转换为UTC
+        start_utc = self._local_to_utc(start_time)
+        end_utc = self._local_to_utc(end_time)
+        
+        start_time = start_utc.isoformat().replace('T', ' ')
+        end_time = end_utc.isoformat().replace('T', ' ')
             
         logger.info(f"获取窗口事件(UTC): {start_time} ~ {end_time}")
         

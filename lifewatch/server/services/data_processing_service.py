@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import pytz
 
 from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
-from lifewatch.data.get_activitywatch_data import get_window_events
+from lifewatch.data.aw_db_reader import ActivityWatchDBReader
 from lifewatch.data.data_clean import clean_activitywatch_data
 from lifewatch.llm.cloud_classifier import QwenAPIClassifier
 from lifewatch import config
@@ -35,8 +35,8 @@ class DataProcessingService:
             db_path: LifeWatch 数据库路径，默认使用 config.DB_PATH
             aw_db_path: ActivityWatch 数据库路径，用于直接读取 AW 数据
         """
-        self.db_manager = LifeWatchDataManager(db_path=db_path or config.DB_PATH)
-        self.aw_db_path = aw_db_path  # ActivityWatch 数据库路径
+        self.lw_db_managet = LifeWatchDataManager(db_path=db_path or config.DB_PATH)
+        self.aw_db_reader = ActivityWatchDBReader(db_path=aw_db_path or config.ACTIVITYWATCH_DB_PATH)
         self._category_mappings_cache = None  # 缓存分类映射
         
     def process_activitywatch_data(
@@ -68,33 +68,28 @@ class DataProcessingService:
         try:
             # 确定同步模式和时间范围
             sync_mode = 'incremental' if use_incremental_sync else 'full'
-            # 获取时间范围
+            # 0. 获取时间范围
             start_time, end_time = self._process_time_range(use_incremental_sync,hours)
-            
+            time_range = f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
             # 1. 获取 ActivityWatch 数据
             logger.info("步骤 1/6: 获取 ActivityWatch 数据...")
             if start_time and end_time:
                 # 增量同步：使用时间范围
-                aw_data = get_window_events(
+                aw_data = self.aw_db_reader.get_window_events(
                     start_time=start_time,
                     end_time=end_time,
-                    use_database=True,
-                    aw_db_path=self.aw_db_path
                 )
             else:
                 # 全量同步：使用小时数
-                aw_data = get_window_events(
-                    start_time=start_time,
-                    end_time=end_time,
-                    use_database=True,
-                    aw_db_path=self.aw_db_path
+                aw_data = self.aw_db_reader.get_window_events(
+                    hours=hours,
                 )
             total_events = len(aw_data)
             logger.info(f"  ✓ 获取到 {total_events} 条原始事件")
             
             # 2. 数据清洗
             logger.info("步骤 2/6: 数据清洗...")
-            app_purpose_category_df = self.db_manager.load_app_purpose_category() # 获取已缓存的分类结果
+            app_purpose_category_df = self.lw_db_managet.load_app_purpose_category() # 获取已缓存的分类结果
             filtered_data, app_to_classify_df, app_to_classify_set = clean_activitywatch_data(
                 aw_data, 
                 app_purpose_category_df
@@ -114,7 +109,7 @@ class DataProcessingService:
                 
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
-                self.db_manager.save_app_purpose_category(classified_app_df)
+                self.lw_db_managet.save_app_purpose_category(classified_app_df)
                 classified_apps = len(classified_app_df)
                 logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
                 
@@ -133,7 +128,7 @@ class DataProcessingService:
             
             # 7. 保存行为日志
             logger.info("保存行为日志到数据库...")
-            self.db_manager.save_user_app_behavior_log(filtered_data)
+            self.lw_db_managet.save_user_app_behavior_log(filtered_data)
             saved_events = len(filtered_data)
             logger.info(f"  ✓ 保存了 {saved_events} 条行为日志")
             
@@ -187,7 +182,7 @@ class DataProcessingService:
         
         if use_incremental_sync:
             # 增量同步：从数据库最新的 end_time 开始获取到现在
-            latest_end_time = self.db_manager.get_latest_end_time()
+            latest_end_time = self.lw_db_managet.get_latest_end_time()
             
             if latest_end_time:
                 # 解析最新时间
@@ -217,7 +212,9 @@ class DataProcessingService:
             
             start_time = datetime.now() - timedelta(hours=hours)
             end_time = datetime.now()
-    
+
+        
+
         return start_time, end_time
 
     def _classify_apps(self, app_to_classify_df: pd.DataFrame) -> pd.DataFrame:
@@ -231,8 +228,8 @@ class DataProcessingService:
             pd.DataFrame: 包含分类结果的 DataFrame
         """
         # 获取 category 和 sub_category
-        category = self.db_manager.load_categories()
-        sub_category = self.db_manager.load_sub_categories()
+        category = self.lw_db_managet.load_categories()
+        sub_category = self.lw_db_managet.load_sub_categories()
         
         # 初始化分类器
         classifier = QwenAPIClassifier(
@@ -361,8 +358,8 @@ class DataProcessingService:
         """
         # 获取或使用缓存的映射字典
         if self._category_mappings_cache is None:
-            category = self.db_manager.load_categories()
-            sub_category = self.db_manager.load_sub_categories()
+            category = self.lw_db_managet.load_categories()
+            sub_category = self.lw_db_managet.load_sub_categories()
             
             # 处理分类为空的情况
             category_dict = {}

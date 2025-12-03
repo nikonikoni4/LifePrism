@@ -4,8 +4,8 @@
 """
 
 # 数据库路径
-DB_PATH = "D:\desktop\软件开发\LifeWatch-AI\lifewatch\server\lifewatch_ai.db"
-
+DB_PATH = r"D:\desktop\软件开发\LifeWatch-AI\lifewatch\server\lifewatch_ai.db"
+ACTIVITYWATCH_DB_PATH = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
 # 应用程序用途分类表配置
 APP_PURPOSE_CATEGORY_CONFIG = {
     'table_name': 'app_purpose_category',
