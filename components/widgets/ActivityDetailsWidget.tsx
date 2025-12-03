@@ -22,11 +22,11 @@ const ActivityBar: React.FC<{ item: TopItem; colorClass: string; barColor: strin
           {item.name.substring(0, 1)}
         </div>
         <div className="flex flex-col min-w-0">
-          <span className="text-sm font-semibold text-slate-700 truncate group-hover:text-blue-600 transition-colors">{item.name}</span>
-          <span className="text-xs text-slate-400 font-medium">{item.percentage}% Usage</span>
+          <span className="text-base font-semibold text-slate-700 truncate group-hover:text-blue-600 transition-colors">{item.name}</span>
+          <span className="text-sm text-slate-400 font-medium">{item.percentage}% Usage</span>
         </div>
       </div>
-      <span className="text-xs font-mono font-bold text-slate-600 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
+      <span className="text-sm font-mono font-bold text-slate-600 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
         {formatDuration(item.duration)}
       </span>
     </div>
@@ -79,7 +79,7 @@ const ActivityDetailsWidget: React.FC<{ selectedDate: string }> = ({ selectedDat
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
       {/* Top Applications */}
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
-        <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-3">
+        <h3 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3">
           <div className="p-2 bg-blue-50 rounded-xl text-morandi-blue">
             <Smartphone size={20} />
           </div>
@@ -98,7 +98,7 @@ const ActivityDetailsWidget: React.FC<{ selectedDate: string }> = ({ selectedDat
 
       {/* Top Title */}
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
-        <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-3">
+        <h3 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3">
           <div className="p-2 bg-orange-50 rounded-xl text-morandi-orange">
             <Monitor size={20} />
           </div>
