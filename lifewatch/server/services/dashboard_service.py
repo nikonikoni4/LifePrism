@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta
 from typing import Dict, Optional
 import pandas as pd
 from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
+from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
 
 
 class DashboardService:
@@ -18,6 +19,7 @@ class DashboardService:
     
     def __init__(self):
         self.db = LifeWatchDataManager()
+        self.stat_provider = StatisticalDataProvider()
     
     def get_dashboard_data(self, query_date: date) -> Dict:
         """
@@ -29,11 +31,11 @@ class DashboardService:
         Returns:
             Dict: 仪表盘数据，包括总活跃时长、Top应用、Top标题、分类统计
         """
-        # 第一阶段：返回 Mock 数据
-        return self._get_mock_dashboard_data(query_date)
+        # 使用真实数据
+        return self._get_real_dashboard_data(query_date)
         
-        # 第二阶段：实现真实查询
-        # return self._get_real_dashboard_data(query_date)
+        # Mock 数据（调试时可切换回来）
+        # return self._get_mock_dashboard_data(query_date)
     
     def get_time_overview(self, date_str: str, parent_id: Optional[str] = None) -> Dict:
         """
@@ -61,12 +63,16 @@ class DashboardService:
                 "top_apps": [
                     {"name": "chrome.exe", "duration": 4500, "percentage": 41.7},
                     {"name": "code.exe", "duration": 3600, "percentage": 33.3},
-                    {"name": "msedge.exe", "duration": 2700, "percentage": 25.0}
+                    {"name": "msedge.exe", "duration": 2700, "percentage": 25.0},
+                    {"name": "figma.exe", "duration": 1800, "percentage": 16.7},
+                    {"name": "spotify.exe", "duration": 1200, "percentage": 11.1}
                 ],
                 "top_titles": [
                     {"name": "LifeWatch Documentation", "duration": 2400, "percentage": 22.2},
                     {"name": "database_manager.py - VS Code", "duration": 2100, "percentage": 19.4},
-                    {"name": "Google Search - Python", "duration": 1800, "percentage": 16.7}
+                    {"name": "Google Search - Python", "duration": 1800, "percentage": 16.7},
+                    {"name": "Dashboard Design - Figma", "duration": 1500, "percentage": 13.9},
+                    {"name": "Localhost:3000 - Development", "duration": 1200, "percentage": 11.1}
                 ],
                 "categories_by_default": [
                     {"category": "工作/学习", "duration": 7200, "percentage": 66.7},
@@ -153,13 +159,96 @@ class DashboardService:
         """
         从数据库查询真实仪表盘数据
         
-        TODO: 第二阶段实现
-        - 使用 LifeWatchDataManager 查询数据
-        - 计算总活跃时长
-        - 统计 Top 应用和标题
-        - 汇总分类数据
+        Args:
+            query_date: 查询日期
+            
+        Returns:
+            Dict: 仪表盘数据
         """
-        pass
+        # 设置统计数据提供者的查询日期
+        self.stat_provider.current_date = query_date.strftime("%Y-%m-%d")
+        
+        # 获取基础数据
+        total_time = self.stat_provider.get_active_time()
+        top_apps = self.stat_provider.get_top_applications(top_n=5)
+        top_titles = self.stat_provider.get_top_title(top_n=5)
+        category_stats = self.stat_provider.get_category_stats()
+        
+        # 格式化数据
+        return {
+            "date": query_date,
+            "total_active_time": int(total_time),  # 转换为整数，匹配 schema
+            "summary": {
+                "top_apps": self._format_top_items(top_apps, total_time),
+                "top_titles": self._format_top_items(top_titles, total_time),
+                "categories_by_default": self._format_categories(category_stats, total_time),
+                "categories_by_goals": []  # TODO: 后续实现目标分类统计
+            }
+        }
+    
+    def _format_top_items(self, items: list[dict], total_time: int) -> list[dict]:
+        """
+        格式化 Top 项目数据，添加百分比
+        
+        Args:
+            items: 原始数据列表，每项包含 name 和 duration(秒)
+            total_time: 总时长（秒）
+            
+        Returns:
+            list[dict]: 格式化后的数据，包含 name, duration(秒), percentage
+        """
+        return [
+            {
+                "name": item["name"],
+                "duration": int(item["duration"]),  # 转换为整数，匹配 schema
+                "percentage": round(item["duration"] / total_time * 100, 1) if total_time > 0 else 0
+            }
+            for item in items
+        ]
+    
+    def _format_duration(self, seconds: int) -> str:
+        """
+        将秒数转换为人类可读的时长格式
+        
+        Args:
+            seconds: 秒数
+            
+        Returns:
+            str: 格式化的时长，如 "2h 30m", "45m", "30s"
+        """
+        if seconds < 60:
+            return f"{seconds}s"
+        
+        minutes = seconds // 60
+        if minutes < 60:
+            return f"{minutes}m"
+        
+        hours = minutes // 60
+        remaining_minutes = minutes % 60
+        
+        if remaining_minutes == 0:
+            return f"{hours}h"
+        return f"{hours}h {remaining_minutes}m"
+    
+    def _format_categories(self, categories: list[dict], total_time: int) -> list[dict]:
+        """
+        格式化分类统计数据
+        
+        Args:
+            categories: 原始分类数据
+            total_time: 总时长（秒）
+            
+        Returns:
+            list[dict]: 格式化后的分类数据
+        """
+        return [
+            {
+                "category": cat["name"],
+                "duration": int(cat["duration"]),  # 转换为整数，匹配 schema
+                "percentage": round(cat["duration"] / total_time * 100, 1) if total_time > 0 else 0
+            }
+            for cat in categories
+        ]
     
     def _get_real_time_overview(self, date_str: str, parent_id: Optional[str] = None) -> Dict:
         """
@@ -366,46 +455,6 @@ class DashboardService:
         import re
         key = re.sub(r'[^\w]', '_', key)
         return key
-    
-    def _get_category_colors(self) -> dict:
-        """
-        获取分类颜色映射
-        
-        Returns:
-            dict: 分类key到颜色的映射
-        """
-        # 基础颜色映射（支持中文和英文）
-        base_colors = {
-            # 一级分类颜色（中文）
-            "工作_学习": "#5B8FF9",
-            "工作": "#5B8FF9",
-            "学习": "#61DDAA",
-            "娱乐": "#5AD8A6",
-            "生活": "#F6BD16",
-            "其他": "#5D7092",
-            "uncategorized": "#999999",
-            
-            # 一级分类颜色（英文）
-            "work": "#5B8FF9",
-            "study": "#61DDAA",
-            "entertainment": "#5AD8A6",
-            "life": "#F6BD16",
-            "other": "#5D7092",
-            
-            # 工作子分类颜色
-            "coding": "#5B8FF9",
-            "编程": "#5B8FF9",
-            "编写lifewatch_ai项目_代码_": "#5B8FF9",
-            "documentation": "#61DDAA",
-            "文档": "#61DDAA",
-            "meetings": "#F6BD16",
-            "会议": "#F6BD16",
-            
-            # 默认颜色
-            "default": "#E8684A"
-        }
-        
-        return base_colors
     
     def _get_color_for_category(self, key: str, colors: dict) -> str:
         """
