@@ -135,6 +135,7 @@ class DataProcessingService:
             filtered_events = len(filtered_data)
             apps_to_classify = len(app_to_classify_df)
             logger.info(f"  ✓ 过滤后保留 {filtered_events} 条事件")
+            logger.info(f"  {filtered_data[['app','duration','start_time','end_time']]}")
             logger.info(f"  ✓ 发现 {apps_to_classify} 个待分类应用")
             
             classified_apps = 0
