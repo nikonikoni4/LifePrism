@@ -1,7 +1,7 @@
 """
 数据模块
 """
-from .get_activitywatch_data import ActivityWatchTimeRangeAccessor
+from .aw_data_reader import ActivityWatchTimeRangeAccessor
 __all__ = [
     "ActivityWatchTimeRangeAccessor",
 ]
