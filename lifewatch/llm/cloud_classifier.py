@@ -19,18 +19,23 @@ class CloudAPIClassifier(BaseLLMClassifier):
     - 为不同的云端API提供统一接口
     """
     
-    def __init__(self, api_key: str, category: str, sub_category: str, **kwargs):
+    def __init__(self, api_key: str, category_tree: dict, **kwargs):
         """
         初始化云端API分类器
         
         Args:
             api_key (str): API密钥
-            category (str): 大类分类选项
-            sub_category (str): 具体目的分类选项
+            category_tree (dict): 分类树结构，格式为 {"主分类名": ["子分类1", "子分类2"]}
+                例如: {"工作/学习": ["编程", "会议"], "娱乐": ["视频", "游戏"]}
             **kwargs: 其他配置参数（如base_url、model_name等）
         """
+        # 为了兼容父类，提取所有分类名称
+        category = ", ".join(category_tree.keys())
+        sub_category = ", ".join([sub for subs in category_tree.values() for sub in subs])
         super().__init__(category, sub_category)
+        
         self.api_key = api_key
+        self.category_tree = category_tree  # 保存分类树结构
         self.config = kwargs
     
     def classify(self, df: pd.DataFrame, max_chars: int = 2000, max_items: int = 15, **kwargs) -> pd.DataFrame:
@@ -81,16 +86,16 @@ class CloudAPIClassifier(BaseLLMClassifier):
                 for res in result_list:
                     idx = res['id']
                     if idx in df.index:
-                        df.at[idx, 'category'] = res.get('A', '其他')
-                        df.at[idx, 'sub_category'] = res.get('B', '其他')
+                        df.at[idx, 'category'] = res.get('A', None)
+                        df.at[idx, 'sub_category'] = res.get('B', None)
                         
             except Exception as e:
                 print(f"批次 {i+1} 处理出错: {e}")
                 # 使用默认值
                 for item in batch:
                     if item['id'] in df.index:
-                        df.at[item['id'], 'category'] = '其他'
-                        df.at[item['id'], 'sub_category'] = '其他'
+                        df.at[item['id'], 'category'] = None
+                        df.at[item['id'], 'sub_category'] = None
         
         print(f"=" * 60)
         print(f"分类流程完成！")
@@ -114,21 +119,32 @@ class CloudAPIClassifier(BaseLLMClassifier):
             for item in batch_data
         ]
         
+        # 构建分类树的文本展示
+        category_tree_text = "分类选项（主分类 -> 子分类）：\n"
+        for main_cat, sub_cats in self.category_tree.items():
+            category_tree_text += f"- {main_cat}\n"
+            for sub_cat in sub_cats:
+                category_tree_text += f"  - {sub_cat}\n"
+        
         prompt = f"""你是用户行为分析专家。请对以下应用进行分类。
-分类选项：
-- A (大类): {self.category}
-- B (具体目的): {self.sub_category}
-分类规则：
-- A是背景，B是行为，需逻辑自洽
+{category_tree_text}
+分类规则（按优先级）：
+1. A是主分类，B必须是A下的子分类（层级匹配）
+2. 若能确定A但无法确定具体的B，则A正常分类，B返回null
+3. 若无法确定A，则A和B都返回null
+4. 若B不属于A的子分类，视为错误，A和B都返回null
+
+判断依据：
 - 如果应用信息不足，可以使用你的网络搜索能力查找应用信息
 - 多用途应用(is_multipurpose=true)根据title判断
 - 单用途应用(is_multipurpose=false)根据app_name判断
-- 无法确定时选择"其他"
+
 数据格式：[id, app_name, app_description, title, is_multipurpose]
 {json.dumps(compact_data, ensure_ascii=False)}
+
 请返回JSON数组（仅JSON，无其他文本）：
 [
-  {{"id": <数字>, "A": "<分类值>", "B": "<分类值>"}}
+  {{"id": <数字>, "A": "<分类值或null>", "B": "<分类值或null>"}}
 ]
 """
         return prompt
@@ -156,7 +172,7 @@ class QwenAPIClassifier(CloudAPIClassifier):
     使用阿里云通义千问API进行分类，支持网络搜索
     """
     
-    def __init__(self, api_key: str, base_url: str, category: str, sub_category: str, 
+    def __init__(self, api_key: str, base_url: str, category_tree: dict, 
                  model: str = "qwen-plus"):
         """
         初始化通义千问分类器
@@ -164,11 +180,10 @@ class QwenAPIClassifier(CloudAPIClassifier):
         Args:
             api_key (str): 通义千问API密钥
             base_url (str): API基础URL
-            category (str): 大类分类选项
-            sub_category (str): 具体目的分类选项
+            category_tree (dict): 分类树结构，格式为 {"主分类名": ["子分类1", "子分类2"]}
             model (str): 模型名称，默认qwen-plus
         """
-        super().__init__(api_key, category, sub_category, model=model, base_url=base_url)
+        super().__init__(api_key, category_tree, model=model, base_url=base_url)
         self.model = model
         self.base_url = base_url
         

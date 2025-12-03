@@ -231,13 +231,23 @@ class DataProcessingService:
         category = self.lw_db_managet.load_categories()
         sub_category = self.lw_db_managet.load_sub_categories()
         
+        # 构建分类树结构：{主分类名: [子分类名列表]}
+        category_tree = {}
+        for _, cat in category.iterrows():
+            cat_id = cat['id']
+            cat_name = cat['name']
+            # 找到属于该主分类的所有子分类
+            subs = sub_category[sub_category['category_id'] == cat_id]['name'].tolist()
+            category_tree[cat_name] = subs
+        
+        logger.info(f"  构建分类树: {category_tree}")
+        
         # 初始化分类器
         classifier = QwenAPIClassifier(
             api_key=config.MODEL_KEY[config.SELECT_MODEL]["api_key"],
             base_url=config.MODEL_KEY[config.SELECT_MODEL]["base_url"],
             model=config.SELECT_MODEL,
-            category=", ".join(category['name'].tolist()),
-            sub_category=", ".join(sub_category['name'].tolist())
+            category_tree=category_tree  # 传递分类树而非字符串
         )
         
         # 执行分类
@@ -245,7 +255,82 @@ class DataProcessingService:
         classified_app_df = classifier.classify(app_to_classify_df)
         logger.info(f"  ✓ 分类完成")
         
+        # 验证分类结果
+        logger.info(f"  验证分类结果...")
+        classified_app_df = self._validate_classification_results(classified_app_df, category_tree)
+        logger.info(f"  ✓ 验证完成")
+        
         return classified_app_df
+    
+    def _validate_classification_results(self, df: pd.DataFrame, category_tree: dict) -> pd.DataFrame:
+        """
+        验证分类结果是否符合层级规则
+        
+        规则（按优先级）：
+        1. A是主分类，B必须是A下的子分类（层级匹配）
+        2. 若能确定A但无法确定B，则A正常分类，B返回null（合法）
+        3. 若无法确定A，则A和B都返回null（合法）
+        4. 若B不属于A的子分类，视为错误，A和B都返回null
+        
+        Args:
+            df: 包含分类结果的DataFrame
+            category_tree: 分类树结构 {"主分类": ["子分类列表"]}
+            
+        Returns:
+            pd.DataFrame: 验证并修正后的DataFrame
+        """
+        invalid_count = 0
+        
+        for idx in df.index:
+            cat = df.at[idx, 'category']
+            sub_cat = df.at[idx, 'sub_category']
+            
+            # 规则3: 两者都为None是合法的
+            if pd.isna(cat) and pd.isna(sub_cat):
+                continue
+            
+            # 规则4: A为None但B有值，不合法 -> 修正为都为None
+            if pd.isna(cat) and not pd.isna(sub_cat):
+                logger.warning(f"    ⚠ 索引 {idx}: 主分类为None但子分类为'{sub_cat}'，修正为都为None")
+                df.at[idx, 'sub_category'] = None
+                invalid_count += 1
+                continue
+            
+            # 规则2: A有值但B为None是合法的（A必须在分类树中）
+            if not pd.isna(cat) and pd.isna(sub_cat):
+                if cat not in category_tree:
+                    logger.warning(f"    ⚠ 索引 {idx}: 主分类'{cat}'不在分类树中，修正为None")
+                    df.at[idx, 'category'] = None
+                    invalid_count += 1
+                continue
+            
+            # 规则1: A和B都有值，需要验证层级关系
+            if not pd.isna(cat) and not pd.isna(sub_cat):
+                # 检查主分类是否存在
+                if cat not in category_tree:
+                    logger.warning(f"    ⚠ 索引 {idx}: 主分类'{cat}'不在分类树中，修正为都为None")
+                    df.at[idx, 'category'] = None
+                    df.at[idx, 'sub_category'] = None
+                    invalid_count += 1
+                    continue
+                
+                # 检查子分类是否属于该主分类
+                if sub_cat not in category_tree[cat]:
+                    logger.warning(
+                        f"    ⚠ 索引 {idx}: 子分类'{sub_cat}'不属于主分类'{cat}'，"
+                        f"期望子分类为{category_tree[cat]}，修正为都为None"
+                    )
+                    df.at[idx, 'category'] = None
+                    df.at[idx, 'sub_category'] = None
+                    invalid_count += 1
+                    continue
+        
+        if invalid_count > 0:
+            logger.info(f"    修正了 {invalid_count} 条不符合规则的分类结果")
+        else:
+            logger.info(f"    所有分类结果均符合规则")
+        
+        return df
     
     def _merge_classification_results(
         self,
