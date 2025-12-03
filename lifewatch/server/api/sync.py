@@ -40,6 +40,7 @@ async def sync_from_activitywatch(
     - 自动分类会调用 LLM API，可能需要较长时间
     - 建议首次同步使用较小的 hours 值进行测试
     """
+    print("sync_request", sync_request)
     result = sync_service.sync_from_activitywatch(
         hours=sync_request.hours,
         auto_classify=sync_request.auto_classify,

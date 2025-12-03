@@ -227,7 +227,7 @@ class ActivityWatchTimeRangeAccessor:
             window_events = []
         return window_events
 # 测试用
-def get_window_events(start_time=None, end_time=None, hours=1, use_database=True, aw_db_path=None):
+def get_window_events(start_time=None, end_time=None, hours=None, use_database=True, aw_db_path=None):
     """
     从事件数据中提取窗口事件
     
