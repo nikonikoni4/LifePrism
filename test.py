@@ -1,98 +1,82 @@
-from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
-from lifewatch import config
-from lifewatch.data.get_activitywatch_data import get_window_events
-from lifewatch.data.data_clean import clean_activitywatch_data
-from lifewatch.llm.cloud_classifier import QwenAPIClassifier
-# 初始化数据库管理器
-db_manager = LifeWatchDataManager(db_path=config.DB_PATH)
+import os
+import logging
+import json
+from lifewatch.server.services.data_processing_service import DataProcessingService
+from lifewatch.config import database as db_config
 
-# 获取activitywatch的数据
-aw_data = get_window_events(hours=48)
-# 数据清洗
-app_purpose_category_df = db_manager.load_app_purpose_category()
-filtered_data,app_to_classify_df,app_to_classify_set = clean_activitywatch_data(aw_data, app_purpose_category_df)
-# 分类
-# 获取category和sub_category的id
-category = db_manager.load_categories()
-sub_category = db_manager.load_sub_categories()
-category_id_dict = category.set_index('name')['id'].to_dict()
-sub_category_id_dict = sub_category.set_index('name')['id'].to_dict()
-classifier = QwenAPIClassifier(
-    api_key=config.MODEL_KEY[config.SELECT_MODEL]["api_key"],
-    base_url=config.MODEL_KEY[config.SELECT_MODEL]["base_url"],
-    model=config.SELECT_MODEL,
-    category=", ".join(category['name'].tolist()),
-    sub_category=", ".join(sub_category['name'].tolist())
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
 
+def test_data_processing_service():
+    print("=" * 60)
+    print("开始测试 DataProcessingService")
+    print("=" * 60)
 
-
-
-
-print(app_to_classify_df)
-classified_app_df = classifier.classify(app_to_classify_df)
-# 保存分类
-db_manager.save_app_purpose_category(classified_app_df)
-# 
-print("开始将分类结果赋值给filtered_events_df...")
-
-# 创建processed_df的查找字典，提高匹配效率
-processed_dict = {}
-for _, row in classified_app_df.iterrows():
-    app = row['app']
-    title = row.get('title', '')
-    is_multipurpose = row.get('is_multipurpose_app', 0)
+    # 1. 配置路径
+    # ActivityWatch 数据库路径
+    aw_db_path = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
+    # LifeWatch 数据库路径
+    lifewatch_db_path = db_config.DB_PATH
     
-    if is_multipurpose == 0:
-        # 单用途应用，以app为键
-        processed_dict[('single', app.lower())] = {
-            'category': row.get('category'),
-            'sub_category': row.get('sub_category')
-        }
-    else:
-        # 多用途应用，以(app, title)为键
-        processed_dict[('multi', app.lower(), title.lower() if title else '')] = {
-            'category': row.get('category'),
-            'sub_category': row.get('sub_category')
-        }
-
-# 遍历filtered_events_df进行赋值
-assigned_count = 0
-for index, row in filtered_data.iterrows():
-    app = row['app']
-    title = row.get('title', '')
-    is_multipurpose = row.get('is_multipurpose_app', 0)
+    print(f"ActivityWatch DB: {aw_db_path}")
+    print(f"LifeWatch DB: {lifewatch_db_path}")
     
-    if is_multipurpose == 0:
-        # 单用途应用匹配：只匹配app
-        key = ('single', app.lower())
-        if key in processed_dict:
-            classification = processed_dict[key]
-            filtered_data.at[index, 'category'] = classification['category']
-            filtered_data.at[index, 'sub_category'] = classification['sub_category']
-            assigned_count += 1
-            print(f"✅ 单用途应用分类成功: {app} -> {classification['category']}/{classification['sub_category']}")
-    else:
-        # 多用途应用匹配：匹配app和title
-        key = ('multi', app.lower(), title.lower() if title else '')
-        if key in processed_dict:
-            classification = processed_dict[key]
-            filtered_data.at[index, 'category'] = classification['category']
-            filtered_data.at[index, 'sub_category'] = classification['sub_category']
-            assigned_count += 1
-            print(f"✅ 多用途应用分类成功: {app} - {title} -> {classification['category']}/{classification['sub_category']}")
-    # 获取分类id
+    if not os.path.exists(aw_db_path):
+        print(f"❌ 错误: 找不到 ActivityWatch 数据库文件: {aw_db_path}")
+        return
 
-print(f"分类结果赋值完成！共赋值了 {assigned_count} 条记录")
-print(f"filtered_data中总记录数: {len(filtered_data)}")
-print(f"未分类记录数: {len(filtered_data[filtered_data['category'].isna()])}")
-# 增加表中的category_id和sub_category_id
-filtered_data['category_id'] = filtered_data['category'].map(category_id_dict)
-filtered_data['sub_category_id'] = filtered_data['sub_category'].map(sub_category_id_dict)
-# 保存到数据库
+    try:
+        # 2. 初始化服务
+        print("\n正在初始化 DataProcessingService...")
+        service = DataProcessingService(
+            db_path=lifewatch_db_path,
+            aw_db_path=aw_db_path
+        )
+        
+        # 3. 执行数据处理
+        # 测试参数: 最近 1 小时, 开启自动分类, 不使用增量同步(强制获取最近数据)
+        hours = 24
+        auto_classify = True
+        use_incremental_sync = False
+        
+        print(f"\n正在执行数据处理:")
+        print(f"- 时间范围: 最近 {hours} 小时")
+        print(f"- 自动分类: {auto_classify}")
+        print(f"- 增量同步: {use_incremental_sync}")
+        
+        result = service.process_activitywatch_data(
+            hours=hours,
+            auto_classify=auto_classify,
+            use_incremental_sync=use_incremental_sync
+        )
+        
+        # 4. 输出结果
+        print("\n✅ 处理完成!")
+        print("\n处理结果统计:")
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        
+    except Exception as e:
+        print(f"\n❌ 测试过程中发生错误: {e}")
+        import traceback
+        traceback.print_exc()
 
-db_manager.save_user_app_behavior_log(filtered_data)
-
-
-
-
+if __name__ == "__main__":
+    # test_data_processing_service()
+    sql = """SELECT id, timestamp, duration, datastr
+                FROM eventmodel
+                WHERE bucket_id = ?
+             AND timestamp >= ? AND timestamp < ? ORDER BY timestamp DESC LIMIT ?"""
+    import sqlite3
+    param = [2, '2025-12-03T02:00:40.792302+00:00', '2025-12-03T03:00:40.792302+00:00', 10000]
+    aw_db_path = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
+    conn = sqlite3.connect(aw_db_path)
+    cursor = conn.cursor()
+    cursor.execute(sql, param)
+    cursor.execute("""SELECT id, timestamp, duration, datastr FROM eventmodel where bucket_id = 2 and 
+        timestamp >= '2025-12-03 02:56:29.452000+00:00' and timestamp < '2025-12-03 03:03:27.919000+00:00' ORDER BY timestamp DESC LIMIT 10000""")
+    rows = cursor.fetchall()
+    print(rows)

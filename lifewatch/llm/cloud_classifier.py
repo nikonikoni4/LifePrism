@@ -92,7 +92,7 @@ class CloudAPIClassifier(BaseLLMClassifier):
                         df.at[item['id'], 'category'] = '其他'
                         df.at[item['id'], 'sub_category'] = '其他'
         
-        print(f"\n=" * 60)
+        print(f"=" * 60)
         print(f"分类流程完成！")
         print(f"=" * 60)
         

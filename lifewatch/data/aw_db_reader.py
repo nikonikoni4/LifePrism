@@ -213,16 +213,17 @@ class ActivityWatchDBReader:
             if start_time:
                 start_utc = self._local_to_utc(start_time)
                 query += " AND timestamp >= ?"
-                params.append(start_utc.isoformat())
+                params.append(start_utc.isoformat(sep=' '))
             
             if end_time:
                 end_utc = self._local_to_utc(end_time)
                 query += " AND timestamp < ?"
-                params.append(end_utc.isoformat())
+                params.append(end_utc.isoformat(sep=' '))
             
             query += " ORDER BY timestamp DESC LIMIT ?"
             params.append(limit)
             
+            print(f"DEBUG SQL: {query} \nParams: {params}")
             cursor.execute(query, params)
             
             # 解析事件
