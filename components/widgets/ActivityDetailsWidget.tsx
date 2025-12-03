@@ -1,10 +1,19 @@
-
-import React from 'react';
-import { TOP_APPS, TOP_WINDOWS } from '../../constants';
-import { AppUsage } from '../../types';
+import React, { useEffect, useState } from 'react';
+import { DashboardAPI } from '../../services/dashboardService';
+import { TopItem } from '../../types';
 import { Monitor, Smartphone } from 'lucide-react';
 
-const ActivityBar: React.FC<{ item: AppUsage; colorClass: string; barColor: string }> = ({ item, colorClass, barColor }) => (
+// Helper to format duration seconds to string
+const formatDuration = (seconds: number): string => {
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes === 0 ? `${hours}h` : `${hours}h ${remainingMinutes}m`;
+};
+
+const ActivityBar: React.FC<{ item: TopItem; colorClass: string; barColor: string }> = ({ item, colorClass, barColor }) => (
   <div className="mb-5 last:mb-0 group">
     <div className="flex justify-between items-center mb-2">
       <div className="flex items-center gap-3 overflow-hidden">
@@ -17,7 +26,9 @@ const ActivityBar: React.FC<{ item: AppUsage; colorClass: string; barColor: stri
           <span className="text-xs text-slate-400 font-medium">{item.percentage}% Usage</span>
         </div>
       </div>
-      <span className="text-xs font-mono font-bold text-slate-600 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">{item.duration}</span>
+      <span className="text-xs font-mono font-bold text-slate-600 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
+        {formatDuration(item.duration)}
+      </span>
     </div>
     <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
       <div
@@ -29,6 +40,41 @@ const ActivityBar: React.FC<{ item: AppUsage; colorClass: string; barColor: stri
 );
 
 const ActivityDetailsWidget: React.FC<{ selectedDate: string }> = ({ selectedDate }) => {
+  const [topApps, setTopApps] = useState<TopItem[]>([]);
+  const [topWindows, setTopWindows] = useState<TopItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const data = await DashboardAPI.getDashboardData(selectedDate);
+        setTopApps(data.summary.top_apps);
+        setTopWindows(data.summary.top_titles);
+      } catch (error) {
+        console.error('Failed to load activity details:', error);
+        // Fallback to empty or handle error UI
+        setTopApps([]);
+        setTopWindows([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (selectedDate) {
+      fetchData();
+    }
+  }, [selectedDate]);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full animate-pulse">
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 h-64"></div>
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 h-64"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
       {/* Top Applications */}
@@ -40,9 +86,13 @@ const ActivityDetailsWidget: React.FC<{ selectedDate: string }> = ({ selectedDat
           Top Applications
         </h3>
         <div className="space-y-1">
-          {TOP_APPS.map((app, idx) => (
-            <ActivityBar key={idx} item={app} colorClass="bg-morandi-blue text-morandi-blue border-morandi-blue" barColor="bg-morandi-blue" />
-          ))}
+          {topApps.length > 0 ? (
+            topApps.map((app, idx) => (
+              <ActivityBar key={idx} item={app} colorClass="bg-morandi-blue text-morandi-blue border-morandi-blue" barColor="bg-morandi-blue" />
+            ))
+          ) : (
+            <div className="text-center text-slate-400 py-8">No application data available</div>
+          )}
         </div>
       </div>
 
@@ -55,9 +105,13 @@ const ActivityDetailsWidget: React.FC<{ selectedDate: string }> = ({ selectedDat
           Top Title
         </h3>
         <div className="space-y-1">
-          {TOP_WINDOWS.map((win, idx) => (
-            <ActivityBar key={idx} item={win} colorClass="bg-morandi-orange text-morandi-orange border-morandi-orange" barColor="bg-morandi-orange" />
-          ))}
+          {topWindows.length > 0 ? (
+            topWindows.map((win, idx) => (
+              <ActivityBar key={idx} item={win} colorClass="bg-morandi-orange text-morandi-orange border-morandi-orange" barColor="bg-morandi-orange" />
+            ))
+          ) : (
+            <div className="text-center text-slate-400 py-8">No window title data available</div>
+          )}
         </div>
       </div>
     </div>

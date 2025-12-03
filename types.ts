@@ -97,3 +97,28 @@ export interface TimeOverviewResponse {
   barKeys: BarConfig[];
   barData: TimeDistribution[];
 }
+
+export interface TopItem {
+  name: string;
+  duration: number; // seconds
+  percentage: number;
+}
+
+export interface CategorySummary {
+  category: string;
+  duration: number; // seconds
+  percentage: number;
+}
+
+export interface DashboardSummary {
+  top_apps: TopItem[];
+  top_titles: TopItem[];
+  categories_by_default: CategorySummary[];
+  categories_by_goals: CategorySummary[];
+}
+
+export interface DashboardResponse {
+  date: string;
+  total_active_time: number; // seconds
+  summary: DashboardSummary;
+}

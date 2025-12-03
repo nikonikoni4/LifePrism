@@ -3,7 +3,7 @@
  * 用于与后端 Dashboard API 交互
  */
 
-import { TimeOverviewResponse } from '../types';
+import { TimeOverviewResponse, DashboardResponse } from '../types';
 
 // 使用与 categoryService.ts 相同的 BASE_URL
 const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
@@ -35,6 +35,27 @@ export class DashboardAPI {
             return await response.json();
         } catch (error) {
             console.error('Error fetching time overview:', error);
+            throw error;
+        }
+    }
+    /**
+     * 获取仪表盘数据
+     * @param date 日期 (YYYY-MM-DD)
+     */
+    static async getDashboardData(date: string): Promise<DashboardResponse> {
+        try {
+            const params = new URLSearchParams({ date });
+            const response = await fetch(
+                `${API_BASE_URL}/dashboard?${params.toString()}`
+            );
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch dashboard data: ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
             throw error;
         }
     }
