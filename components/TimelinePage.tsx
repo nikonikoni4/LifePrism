@@ -38,7 +38,7 @@ const TimelinePage: React.FC = () => {
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [currentDate, setCurrentDate] = useState('2023-10-25');
 
-    type TimeScale = '2h' | '1h' | '30m' | '15m';
+    type TimeScale = '2h' | '1h' | '30m' | '15m' | '1m';
     const [timeScale, setTimeScale] = useState<TimeScale>('1h');
 
     const dateInputRef = React.useRef<HTMLInputElement>(null);
@@ -49,6 +49,7 @@ const TimelinePage: React.FC = () => {
         '1h': { hourHeight: 80, labelInterval: 1 },
         '30m': { hourHeight: 120, labelInterval: 0.5 },
         '15m': { hourHeight: 200, labelInterval: 0.25 },
+        '1m': { hourHeight: 1200, labelInterval: 1 / 60 },
     };
 
     const { hourHeight: HOUR_HEIGHT, labelInterval } = SCALE_CONFIG[timeScale];
@@ -209,6 +210,12 @@ const TimelinePage: React.FC = () => {
                         className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '15m' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                         15m
+                    </button>
+                    <button
+                        onClick={() => setTimeScale('1m')}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '1m' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        1m
                     </button>
                 </div>
             </div>
