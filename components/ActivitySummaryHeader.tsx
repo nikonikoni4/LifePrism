@@ -147,12 +147,60 @@ const getActivitySummary = async (centerDate: string, historyNumber: number, fut
   }
 }
 
+// Helper function to process ActivitySummaryResponse data (when passed as prop)
+const processActivitySummaryData = (
+  activitySummaryData: ActivitySummaryResponse,
+  centerDate: string,
+  historyNumber: number,
+  futureNumber: number
+) => {
+  const dailyActivities = activitySummaryData.dailyActivities || [];
+  const totalDay = historyNumber + futureNumber + 1;
+
+  const centerDateObj = normalizeDateToMidnight(parseLocalDate(centerDate));
+  const startDate = new Date(centerDateObj);
+  startDate.setDate(startDate.getDate() - historyNumber);
+
+  const actualToday = normalizeDateToMidnight(new Date());
+
+  const history = [];
+
+  for (let i = 0; i < totalDay && i < dailyActivities.length; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    const dateStr = `${month}/${day}`;
+    const fullDate = formatDateToYYYYMMDD(d);
+
+    const isActualToday = fullDate === formatDateToYYYYMMDD(actualToday);
+    const isFuture = d.getTime() > actualToday.getTime();
+    const isSelected = fullDate === centerDate;
+
+    const activityData = dailyActivities[i];
+    const value = activityData ? activityData.activeTimePercentage : 0;
+
+    history.push({
+      day: dateStr,
+      fullDate: fullDate,
+      value: value,
+      isActualToday,
+      isFuture,
+      isSelected
+    });
+  }
+
+  return history;
+};
+
 interface ActivitySummaryHeaderProps {
   selectedDate: string;
   onDateChange: (date: string) => void;
+  activitySummaryData?: ActivitySummaryResponse; // Optional: if provided, use this data instead of fetching
 }
 
-const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedDate, onDateChange }) => {
+const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedDate, onDateChange, activitySummaryData }) => {
   const dateInputRef = React.useRef<HTMLInputElement>(null);
   const [history, setHistory] = React.useState<any[]>([]);
   const [TodayTotalActiveTime, setTodayTotalActiveTime] = React.useState<string>('');
@@ -160,6 +208,17 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
 
   // 使用useEffect处理异步数据获取
   React.useEffect(() => {
+    // If activitySummaryData is provided, use it directly
+    if (activitySummaryData) {
+      // Process the provided data
+      const processedHistory = processActivitySummaryData(activitySummaryData, selectedDate, 15, 14);
+      setHistory(processedHistory);
+      setTodayTotalActiveTime(activitySummaryData.todayActiveTime);
+      setIsLoading(false);
+      return;
+    }
+
+    // Otherwise, fetch data from API (backward compatibility)
     const fetchHistory = async () => {
       setIsLoading(true);
       try {
@@ -174,7 +233,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
       }
     };
     fetchHistory();
-  }, [selectedDate]);
+  }, [selectedDate, activitySummaryData]);
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onDateChange(e.target.value);
@@ -199,20 +258,8 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
   const startDateLabel = history.length > 0 ? history[0].day : "";
   const endDateLabel = history.length > 0 ? history[history.length - 1].day : "";
 
-  // 加载状态显示
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-3xl p-6 lg:p-8 shadow-sm border border-gray-100 mb-8 animate-fade-in w-full">
-        <div className="flex items-center justify-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-morandi-blue"></div>
-          <span className="ml-3 text-gray-500">Loading activity data...</span>
-        </div>
-      </div>
-    );
-  }
-
   // 错误状态显示
-  if (history.length === 0) {
+  if (history.length === 0 && !isLoading) {
     return (
       <div className="bg-white rounded-3xl p-6 lg:p-8 shadow-sm border border-gray-100 mb-8 animate-fade-in w-full">
         <div className="text-center text-gray-500">
@@ -224,7 +271,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
   }
 
   return (
-    <div className="bg-white rounded-3xl p-6 lg:p-8 shadow-sm border border-gray-100 mb-8 animate-fade-in w-full">
+    <div className={`bg-white rounded-3xl p-6 lg:p-8 shadow-sm border border-gray-100 mb-8 animate-fade-in w-full transition-opacity duration-300 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
 
       {/* Top Row: Title & Stats */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">

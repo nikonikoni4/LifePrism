@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { DashboardAPI } from '../../services/dashboardService';
-import { TopItem } from '../../types';
+import { TopItem, DashboardResponse } from '../../types';
 import { Monitor, Smartphone } from 'lucide-react';
 
 // Helper to format duration seconds to string
@@ -39,12 +39,25 @@ const ActivityBar: React.FC<{ item: TopItem; colorClass: string; barColor: strin
   </div>
 );
 
-const ActivityDetailsWidget: React.FC<{ selectedDate: string }> = ({ selectedDate }) => {
+interface ActivityDetailsWidgetProps {
+  selectedDate: string;
+  dashboardData?: DashboardResponse; // Optional: if provided, use this data instead of fetching
+}
+
+const ActivityDetailsWidget: React.FC<ActivityDetailsWidgetProps> = ({ selectedDate, dashboardData }) => {
   const [topApps, setTopApps] = useState<TopItem[]>([]);
   const [topWindows, setTopWindows] = useState<TopItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // If dashboardData is provided, use it directly
+    if (dashboardData) {
+      setTopApps(dashboardData.summary.top_apps);
+      setTopWindows(dashboardData.summary.top_titles);
+      return;
+    }
+
+    // Otherwise, fetch data from API (backward compatibility)
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -64,7 +77,7 @@ const ActivityDetailsWidget: React.FC<{ selectedDate: string }> = ({ selectedDat
     if (selectedDate) {
       fetchData();
     }
-  }, [selectedDate]);
+  }, [selectedDate, dashboardData]);
 
   if (loading) {
     return (

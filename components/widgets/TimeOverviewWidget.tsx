@@ -41,15 +41,23 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const TimeOverviewWidget: React.FC<{ selectedDate: string }> = ({ selectedDate }) => {
+const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOverviewResponse }> = ({ selectedDate, initialData }) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<TimeOverviewResponse | null>(null);
 
   useEffect(() => {
+    // If no category is selected and initialData is provided, use it
+    if (!selectedCategory && initialData) {
+      setData(initialData);
+      setLoading(false);
+      return;
+    }
+
+    // Otherwise fetch data (either for drill-down or if no initialData)
     fetchData();
-  }, [selectedCategory, selectedDate]);
+  }, [selectedCategory, selectedDate, initialData]);
 
   const fetchData = async () => {
     try {

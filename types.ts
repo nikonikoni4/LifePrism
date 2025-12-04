@@ -132,3 +132,10 @@ export interface ActivitySummaryResponse {
   todayActiveTime: string; // e.g., "6h 35m"
   dailyActivities: DailyActivitiesResponse[];
 }
+
+// Unified Homepage Response (combines three APIs into one)
+export interface HomepageResponse {
+  activity_summary: ActivitySummaryResponse;
+  dashboard: DashboardResponse;
+  time_overview: TimeOverviewResponse;
+}
