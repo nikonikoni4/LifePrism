@@ -68,3 +68,38 @@ async def get_time_overview(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取 Time Overview 失败: {str(e)}")
+
+
+@router.get("/homepage", response_model=None, summary="获取首页统一数据")
+async def get_homepage(
+    date: str = Query(..., description="日期 (YYYY-MM-DD 格式)", regex=r"^\d{4}-\d{2}-\d{2}$"),
+    history_number: int = Query(15, description="历史数据天数", ge=0, le=365),
+    future_number: int = Query(14, description="未来数据天数", ge=0, le=365)
+):
+    """
+    获取首页统一数据（整合三个API调用）
+    
+    **功能：**
+    - 一次性返回首页所有组件所需的数据
+    - 整合 activity_summary、dashboard 和 time_overview 三个接口
+    
+    **返回数据：**
+    - activity_summary: 活动总结条形图数据
+    - dashboard: 仪表盘数据（top应用、top标题、分类统计）
+    - time_overview: 时间概览图表数据
+    
+    **优势：**
+    - 减少网络请求次数（从3次降为1次）
+    - 提高页面加载速度
+    - 优化数据库查询（可复用查询结果）
+    
+    **示例：**
+    - `/api/v1/dashboard/homepage?date=2023-10-25&history_number=15&future_number=14`
+    """
+    try:
+        data = dashboard_service.get_homepage_data(date, history_number, future_number)
+        return data
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取首页数据失败: {str(e)}")

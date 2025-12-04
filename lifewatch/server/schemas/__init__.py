@@ -21,11 +21,7 @@ from .categories import (
     AppCategoryList,
     UpdateCategoryRequest
 )
-from .analytics import (
-    AnalyticsSummary,
-    AnalyticsResponse,
-    DailyStatistics
-)
+from .homepage import HomepageResponse
 from .sync import (
     SyncRequest,
     SyncResponse
@@ -46,9 +42,7 @@ __all__ = [
     "AppCategory",
     "AppCategoryList",
     "UpdateCategoryRequest",
-    "AnalyticsSummary",
-    "AnalyticsResponse",
-    "DailyStatistics",
+    "HomepageResponse",
     "SyncRequest",
     "SyncResponse"
 ]

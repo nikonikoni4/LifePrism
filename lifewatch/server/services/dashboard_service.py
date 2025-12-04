@@ -54,6 +54,41 @@ class DashboardService:
         # Mock 数据（如需要可以切换回来）
         # return self._get_mock_time_overview(date_str, parent_id)
     
+    def get_homepage_data(self, date_str: str, history_days: int = 15, future_days: int = 14) -> Dict:
+        """
+        获取首页统一数据（整合三个API的数据）
+        
+        Args:
+            date_str: 日期字符串 (YYYY-MM-DD)
+            history_days: 活动总结历史天数（默认15天）
+            future_days: 活动总结未来天数（默认14天）
+            
+        Returns:
+            Dict: 包含 activity_summary、dashboard 和 time_overview 的统一数据
+        """
+        from datetime import datetime
+        from lifewatch.server.services.activity_summery_service import ActivitySummaryService
+        
+        # 解析日期
+        query_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        
+        # 初始化 activity_summary 服务
+        activity_summary_service = ActivitySummaryService()
+        
+        # 获取三部分数据
+        activity_summary_data = activity_summary_service.get_activity_summary_data(
+            date_str, history_days, future_days
+        )
+        dashboard_data = self.get_dashboard_data(query_date)
+        time_overview_data = self.get_time_overview(date_str, parent_id=None)
+        
+        # 整合返回
+        return {
+            "activity_summary": activity_summary_data,
+            "dashboard": dashboard_data,
+            "time_overview": time_overview_data
+        }
+    
     def _get_mock_dashboard_data(self, query_date: date) -> Dict:
         """返回 Mock 仪表盘数据"""
         return {

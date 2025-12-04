@@ -8,7 +8,6 @@ from lifewatch.server.api import (
     dashboard_router,
     behavior_router,
     categories_router,
-    analytics_router,
     sync_router,
     activity_summary_router
 )
@@ -23,10 +22,10 @@ app = FastAPI(
     
     ### 功能模块
     
-    - **Dashboard**: 仪表盘数据，包括 Top Apps、Top Titles、分类统计
+    - **Dashboard**: 仪表盘数据，包括 Top Apps、Top Titles、分类统计、首页统一数据
     - **Behavior Logs**: 行为日志查询和时间线数据
     - **Categories**: 应用分类管理
-    - **Analytics**: 统计分析和报告
+    - **Activity Summary**: 活动总结数据
     - **Sync**: 从 ActivityWatch 同步数据
     
     ### 数据来源
@@ -65,7 +64,6 @@ app.add_middleware(
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(behavior_router, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
-app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
 app.include_router(activity_summary_router, prefix="/api/v1")
 
@@ -88,11 +86,12 @@ async def root():
             "openapi_spec": "/openapi.json"
         },
         "endpoints": {
+            "homepage": "/api/v1/dashboard/homepage",
             "dashboard": "/api/v1/dashboard",
             "behavior_logs": "/api/v1/behavior/logs",
             "timeline": "/api/v1/behavior/timeline",
             "categories": "/api/v1/categories/apps",
-            "analytics": "/api/v1/analytics/summary",
+            "activity_summary": "/api/v1/activity-summary",
             "sync": "/api/v1/sync/activitywatch"
         }
     }
