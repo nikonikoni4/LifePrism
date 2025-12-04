@@ -21,32 +21,35 @@ const Dashboard: React.FC = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const hasLoaded = React.useRef(false);
+
   // Fetch all homepage data in one API call
-  useEffect(() => {
-    const fetchHomepageData = async () => {
-      // Only show full loading state on initial mount
-      if (homepageData === null) {
-        setIsInitialLoading(true);
-      } else {
-        // For subsequent updates, just set updating flag
-        setIsUpdating(true);
-      }
-      setError(null);
+  const fetchHomepageData = React.useCallback(async () => {
+    // Only show full loading state on initial mount
+    if (!hasLoaded.current) {
+      setIsInitialLoading(true);
+    } else {
+      // For subsequent updates, just set updating flag
+      setIsUpdating(true);
+    }
+    setError(null);
 
-      try {
-        const data = await DashboardAPI.getHomepageData(selectedDate, 15, 14);
-        setHomepageData(data);
-      } catch (err) {
-        console.error('Failed to fetch homepage data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load homepage data');
-      } finally {
-        setIsInitialLoading(false);
-        setIsUpdating(false);
-      }
-    };
-
-    fetchHomepageData();
+    try {
+      const data = await DashboardAPI.getHomepageData(selectedDate, 15, 14);
+      setHomepageData(data);
+      hasLoaded.current = true;
+    } catch (err) {
+      console.error('Failed to fetch homepage data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load homepage data');
+    } finally {
+      setIsInitialLoading(false);
+      setIsUpdating(false);
+    }
   }, [selectedDate]);
+
+  useEffect(() => {
+    fetchHomepageData();
+  }, [fetchHomepageData]);
 
   // Only show full loading screen on initial load
   if (isInitialLoading && homepageData === null) {
@@ -101,6 +104,7 @@ const Dashboard: React.FC = () => {
         selectedDate={selectedDate}
         onDateChange={setSelectedDate}
         activitySummaryData={homepageData.activity_summary}
+        onRefresh={fetchHomepageData}
       />
 
       {/* Bento Grid Layout */}

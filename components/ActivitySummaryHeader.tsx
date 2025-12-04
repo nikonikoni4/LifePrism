@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Filter, RefreshCw, Clock } from 'lucide-react';
 import { ActivitySummaryResponse } from '../types';
 import { DashboardAPI } from '../services/dashboardService';
+import { incrementalSync } from '../services/syncService';
 
 // 安全的日期解析函数,支持多种格式
 const parseLocalDate = (dateStr: string): Date => {
@@ -198,13 +199,15 @@ interface ActivitySummaryHeaderProps {
   selectedDate: string;
   onDateChange: (date: string) => void;
   activitySummaryData?: ActivitySummaryResponse; // Optional: if provided, use this data instead of fetching
+  onRefresh?: () => void;
 }
 
-const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedDate, onDateChange, activitySummaryData }) => {
+const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedDate, onDateChange, activitySummaryData, onRefresh }) => {
   const dateInputRef = React.useRef<HTMLInputElement>(null);
   const [history, setHistory] = React.useState<any[]>([]);
   const [TodayTotalActiveTime, setTodayTotalActiveTime] = React.useState<string>('');
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isSyncing, setIsSyncing] = React.useState(false);
 
   // 使用useEffect处理异步数据获取
   React.useEffect(() => {
@@ -323,9 +326,26 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
             <Filter size={16} />
             Filters
           </button>
-          <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-slate-600 text-sm font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm">
-            <RefreshCw size={16} />
-            Refresh
+          <button
+            onClick={async () => {
+              if (isSyncing) return;
+              setIsSyncing(true);
+              try {
+                await incrementalSync();
+                if (onRefresh) {
+                  onRefresh();
+                }
+              } catch (error) {
+                console.error('Sync failed:', error);
+              } finally {
+                setIsSyncing(false);
+              }
+            }}
+            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-slate-600 text-sm font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm ${isSyncing ? 'opacity-70 cursor-not-allowed' : ''}`}
+            disabled={isSyncing}
+          >
+            <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+            {isSyncing ? 'Syncing...' : 'Refresh'}
           </button>
         </div>
       </div>
