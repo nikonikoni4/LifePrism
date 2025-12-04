@@ -37,12 +37,13 @@ const formatDateToYYYYMMDD = (date: Date): string => {
 const TimelinePage: React.FC = () => {
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [currentDate, setCurrentDate] = useState('2023-10-25');
+    const [events, setEvents] = useState(TIMELINE_EVENTS);
 
     type TimeScale = '2h' | '1h' | '30m' | '15m' | '1m';
     const [timeScale, setTimeScale] = useState<TimeScale>('1h');
 
     const dateInputRef = React.useRef<HTMLInputElement>(null);
-    const selectedEvent = TIMELINE_EVENTS.find(e => e.id === selectedEventId);
+    const selectedEvent = events.find(e => e.id === selectedEventId);
 
     const SCALE_CONFIG: Record<TimeScale, { hourHeight: number; labelInterval: number }> = {
         '2h': { hourHeight: 60, labelInterval: 2 },
@@ -141,6 +142,13 @@ const TimelinePage: React.FC = () => {
         setCurrentDate(formatDateToYYYYMMDD(date));
     };
 
+    const handleCategoryChange = (categoryId: string) => {
+        if (!selectedEventId) return;
+        setEvents(prev => prev.map(e =>
+            e.id === selectedEventId ? { ...e, category: categoryId } : e
+        ));
+    };
+
     const formattedDateLabel = new Date(currentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
     // Helper to get active category definition for dropdowns
@@ -223,7 +231,7 @@ const TimelinePage: React.FC = () => {
             {/* Main Content Area */}
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Column: Vertical Timeline Feed */}
-                <div className="w-full lg:w-[65%] h-full overflow-y-auto relative bg-[#FAFAFA] no-scrollbar">
+                <div className="w-full lg:w-[65%] h-full overflow-y-auto relative bg-[#FAFAFA]">
                     <div className="relative min-h-[2000px] py-4" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
                         {/* Time Ruler */}
                         <div className="absolute left-0 top-0 bottom-0 w-16 border-r border-dashed border-gray-200 bg-white z-0">
@@ -240,7 +248,7 @@ const TimelinePage: React.FC = () => {
                         ))}
 
                         {/* Events */}
-                        {TIMELINE_EVENTS.map((event) => {
+                        {events.map((event) => {
                             const style = getEventStyle(event);
                             const catDef = MOCK_CATEGORIES.find(c => c.id === event.category);
                             const subCatDef = catDef?.subCategories.find(s => s.id === event.subCategoryId);
@@ -308,6 +316,7 @@ const TimelinePage: React.FC = () => {
                                         {MOCK_CATEGORIES.map(cat => (
                                             <button
                                                 key={cat.id}
+                                                onClick={() => handleCategoryChange(cat.id)}
                                                 className={`px-3 py-2 rounded-lg text-sm font-medium capitalize border transition-all ${selectedEvent.category === cat.id
                                                     ? 'bg-slate-800 text-white border-slate-800'
                                                     : 'bg-white border-gray-200 text-slate-600 hover:bg-gray-50'
