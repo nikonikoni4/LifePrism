@@ -26,14 +26,13 @@ class StatisticalDataProvider:
         self._end_time = end_time.strftime("%Y-%m-%d %H:%M:%S")
         self._current_date = value
 
-    def get_active_time(self) -> int:
+    def get_active_time(self,date) -> int:
         """
         获取指定日期的总活跃时长
         return 
             int, 活跃时长(秒)
         """
-        if not self._current_date:
-            raise AttributeError("请先使用 self.current_date = 'YYYY-MM-DD' 设置日期。")
+        self.current_date = date
         sql = """
         SELECT SUM(duration) 
         FROM user_app_behavior_log 
@@ -167,21 +166,87 @@ class StatisticalDataProvider:
     
         return [{"name": row[0], "duration": row[1],"id": sub_category_id_dict[row[0]]["id"],"category_id": sub_category_id_dict[row[0]]["category_id"]} for row in results]
     
+    def get_range_active_time(self, start_date: str, end_date: str) -> int:
+        """
+        获取指定日期范围的活跃时长
+        arg:
+            start_date: str, 开始日期（YYYY-MM-DD 格式）
+            end_date: str, 结束日期（YYYY-MM-DD 格式）
+        return 
+            int, 活跃时长（秒）
+        """
+        sql = """
+        SELECT SUM(duration) as total_duration
+        FROM user_app_behavior_log
+        WHERE start_time >= ? AND start_time <= ?
+        """
+        with self.lw_db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (start_date, end_date))
+            result = cursor.fetchone()
+        return result[0] if result[0] else 0
+    
+    def get_daily_active_time(self, start_date: str, end_date: str) -> list[dict]:
+        """
+        获取指定日期范围内每天的活跃时长（只使用一次SQL查询）
+        arg:
+            start_date: str, 开始日期（YYYY-MM-DD 格式）
+            end_date: str, 结束日期（YYYY-MM-DD 格式）
+        return 
+            list[dict], 每天的活动数据:
+                date: str, 日期（YYYY-MM-DD 格式）
+                active_time_percentage: int, 活动时长占比（%）
+        """
+        sql = """
+        SELECT 
+            DATE(start_time) as activity_date,
+            SUM(duration) as total_duration,
+            CAST((SUM(duration) * 100.0 / 86400) AS INTEGER) as active_time_percentage
+        FROM user_app_behavior_log
+        WHERE start_time >= ? AND start_time <= ?
+        GROUP BY DATE(start_time)
+        ORDER BY activity_date
+        """
+        with self.lw_db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (start_date, end_date))
+            results = cursor.fetchall()
+        
+        # 转换为响应格式
+        daily_activities = []
+        for row in results:
+            daily_activities.append({
+                "date": row[0],
+                "active_time_percentage": row[2]  # 直接使用计算好的百分比
+            })
+        
+        return daily_activities
 if __name__ == "__main__":
     sdp = StatisticalDataProvider()
+    
+    # 测试新的每日活动数据查询方法
+    print("=== 测试每日活动数据查询 ===")
+    start_date = "2025-12-01"
+    end_date = "2025-12-07"
+    daily_data = sdp.get_daily_active_time(start_date, end_date)
+    print(f"日期范围: {start_date} 到 {end_date}")
+    print(f"查询结果数量: {len(daily_data)}")
+    for activity in daily_data:
+        print(f"日期: {activity['date']}, 活动占比: {activity['activeTimePercentage']}%")
+    
+    print("\n=== 原有功能测试 ===")
     sdp.current_date = "2025-12-02"
-    print(sdp.current_date)
-    print(sdp._start_time)
-    print(sdp._end_time)
-    # print(sdp.get_active_time())
-    # print(sdp.get_top_applications(10))
-    # print(sdp.get_top_title(10))
-    # print(sdp.get_category_stats())
-    print(sdp.get_sub_category_stats())
+    print(f"当前日期: {sdp.current_date}")
+    print(f"开始时间: {sdp._start_time}")
+    print(f"结束时间: {sdp._end_time}")
+    print(f"子分类统计: {sdp.get_sub_category_stats()}")
+    
+    # 测试数据库连接
     with sdp.lw_db_manager.get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("select distinct sub_category from user_app_behavior_log")
         result = cursor.fetchall()
+    print(f"子分类数量: {len(result)}")
     for row in result:
         for sub_category in row:
-            print(sub_category)
+            print(f"子分类: {sub_category}")

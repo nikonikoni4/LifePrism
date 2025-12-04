@@ -165,11 +165,9 @@ class DashboardService:
         Returns:
             Dict: 仪表盘数据
         """
-        # 设置统计数据提供者的查询日期
-        self.stat_provider.current_date = query_date.strftime("%Y-%m-%d")
         
         # 获取基础数据
-        total_time = self.stat_provider.get_active_time()
+        total_time = self.stat_provider.get_active_time(query_date.strftime("%Y-%m-%d"))
         top_apps = self.stat_provider.get_top_applications(top_n=5)
         top_titles = self.stat_provider.get_top_title(top_n=5)
         category_stats = self.stat_provider.get_category_stats()

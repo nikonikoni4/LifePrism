@@ -9,7 +9,8 @@ from lifewatch.server.api import (
     behavior_router,
     categories_router,
     analytics_router,
-    sync_router
+    sync_router,
+    activity_summary_router
 )
 
 # 创建 FastAPI 应用实例
@@ -66,6 +67,8 @@ app.include_router(behavior_router, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
+app.include_router(activity_summary_router, prefix="/api/v1")
+
 
 
 @app.get("/", tags=["Root"])
