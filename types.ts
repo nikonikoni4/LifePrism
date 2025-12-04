@@ -140,3 +140,23 @@ export interface HomepageResponse {
   dashboard: DashboardResponse;
   time_overview: TimeOverviewResponse;
 }
+
+// Timeline API Types
+export interface TimelineEventData {
+  id: string;
+  startTime: number; // Hour as float (e.g., 9.5 = 09:30)
+  endTime: number;
+  title: string;
+  category: string; // Category ID
+  categoryName: string;
+  subCategoryId?: string | null;
+  subCategoryName?: string | null;
+  description: string;
+  deviceType: 'pc' | 'mobile';
+}
+
+export interface TimelineResponse {
+  date: string; // YYYY-MM-DD
+  events: TimelineEventData[];
+  currentTime?: number | null; // Current hour as float (only for today)
+}

@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Smartphone, Monitor, AlertCircle, Clock, Link, Tag } from 'lucide-react';
-import { TIMELINE_EVENTS, COLORS, MOCK_GOALS, MOCK_CATEGORIES } from '../constants';
-import { TimelineEvent } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Calendar, Smartphone, Monitor, AlertCircle, Clock, Link, Tag, Loader2 } from 'lucide-react';
+import { MOCK_GOALS, MOCK_CATEGORIES } from '../constants';
+import { TimelineEvent, TimelineEventData } from '../types';
+import { TimelineAPI } from '../services/timelineService';
 
 // 安全的日期解析函数,支持多种格式
 const parseLocalDate = (dateStr: string): Date => {
@@ -36,14 +37,38 @@ const formatDateToYYYYMMDD = (date: Date): string => {
 
 const TimelinePage: React.FC = () => {
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-    const [currentDate, setCurrentDate] = useState('2023-10-25');
-    const [events, setEvents] = useState(TIMELINE_EVENTS);
+    const [currentDate, setCurrentDate] = useState(() => formatDateToYYYYMMDD(new Date()));
+    const [events, setEvents] = useState<TimelineEventData[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [currentTime, setCurrentTime] = useState<number | null>(null);
 
     type TimeScale = '2h' | '1h' | '30m' | '15m' | '1m';
     const [timeScale, setTimeScale] = useState<TimeScale>('1h');
 
     const dateInputRef = React.useRef<HTMLInputElement>(null);
     const selectedEvent = events.find(e => e.id === selectedEventId);
+
+    // 获取时间线数据
+    useEffect(() => {
+        const fetchTimelineData = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const data = await TimelineAPI.getTimelineData(currentDate, 'all');
+                setEvents(data.events);
+                setCurrentTime(data.currentTime || null);
+            } catch (err) {
+                console.error('Failed to fetch timeline data:', err);
+                setError('无法加载时间线数据，请稍后重试');
+                setEvents([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTimelineData();
+    }, [currentDate]);
 
     const SCALE_CONFIG: Record<TimeScale, { hourHeight: number; labelInterval: number }> = {
         '2h': { hourHeight: 60, labelInterval: 2 },
@@ -247,6 +272,45 @@ const TimelinePage: React.FC = () => {
                             <div key={`line-${t}`} className="absolute left-16 right-0 border-t border-gray-100" style={{ top: `${t * HOUR_HEIGHT}px` }}></div>
                         ))}
 
+                        {/* Loading State */}
+                        {loading && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-30">
+                                <div className="flex flex-col items-center gap-3">
+                                    <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                                    <p className="text-sm text-gray-600 font-medium">加载时间线数据...</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Error State */}
+                        {error && !loading && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-30">
+                                <div className="flex flex-col items-center gap-3 max-w-md p-6">
+                                    <AlertCircle className="w-12 h-12 text-red-500" />
+                                    <p className="text-sm text-gray-700 font-medium text-center">{error}</p>
+                                    <button
+                                        onClick={() => setCurrentDate(currentDate)}
+                                        className="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors"
+                                    >
+                                        重试
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Empty State */}
+                        {!loading && !error && events.length === 0 && (
+                            <div className="absolute inset-0 flex items-center justify-center z-30">
+                                <div className="flex flex-col items-center gap-3 max-w-md p-6 text-center">
+                                    <Monitor className="w-16 h-16 text-gray-300" />
+                                    <h3 className="text-lg font-bold text-gray-700">暂无活动数据</h3>
+                                    <p className="text-sm text-gray-500">
+                                        该日期没有记录到任何活动。请选择其他日期，或确保 ActivityWatch 正在运行。
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Events */}
                         {events.map((event) => {
                             const style = getEventStyle(event);
@@ -281,11 +345,13 @@ const TimelinePage: React.FC = () => {
                             );
                         })}
 
-                        {/* Current Time Indicator (Mock) */}
-                        <div className="absolute left-0 right-0 border-t-2 border-red-400 z-20 pointer-events-none flex items-center" style={{ top: `${14.05 * HOUR_HEIGHT}px` }}>
-                            <div className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-r-md -mt-[9px]">14:03</div>
-                            <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 -mt-[1px]"></div>
-                        </div>
+                        {/* Current Time Indicator */}
+                        {currentTime !== null && (
+                            <div className="absolute left-0 right-0 border-t-2 border-red-400 z-20 pointer-events-none flex items-center" style={{ top: `${currentTime * HOUR_HEIGHT}px` }}>
+                                <div className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-r-md -mt-[9px]">{formatTime(currentTime)}</div>
+                                <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 -mt-[1px]"></div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
