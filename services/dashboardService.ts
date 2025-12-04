@@ -15,14 +15,10 @@ export class DashboardAPI {
      * @param parentId 可选，主分类ID（用于下钻）
      */
     static async getTimeOverview(
-        date: string,
-        parentId?: string
+        date: string
     ): Promise<TimeOverviewResponse> {
         try {
             const params = new URLSearchParams({ date });
-            if (parentId) {
-                params.append('parent_id', parentId);
-            }
 
             const response = await fetch(
                 `${API_BASE_URL}/dashboard/time-overview?${params.toString()}`

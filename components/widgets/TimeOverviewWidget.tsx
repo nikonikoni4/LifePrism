@@ -42,28 +42,30 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOverviewResponse }> = ({ selectedDate, initialData }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [viewStack, setViewStack] = useState<TimeOverviewResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<TimeOverviewResponse | null>(null);
 
   useEffect(() => {
-    // If no category is selected and initialData is provided, use it
-    if (!selectedCategory && initialData) {
+    // Reset view stack when date changes
+    setViewStack([]);
+
+    if (initialData) {
       setData(initialData);
       setLoading(false);
       return;
     }
 
-    // Otherwise fetch data (either for drill-down or if no initialData)
     fetchData();
-  }, [selectedCategory, selectedDate, initialData]);
+  }, [selectedDate, initialData]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await DashboardAPI.getTimeOverview(selectedDate, selectedCategory || undefined);
+      // No parentId needed anymore
+      const response = await DashboardAPI.getTimeOverview(selectedDate);
       setData(response);
     } catch (err) {
       console.error('Failed to fetch time overview:', err);
@@ -73,15 +75,17 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
     }
   };
 
+  const currentView = viewStack.length > 0 ? viewStack[viewStack.length - 1] : data;
+
   const handlePieClick = (entry: any) => {
-    // Only allow drilldown if we are at the top level (no selected category)
-    if (!selectedCategory && entry.key) {
-      setSelectedCategory(entry.key);
+    // Check if the clicked item has details (children)
+    if (currentView?.details && currentView.details[entry.key]) {
+      setViewStack([...viewStack, currentView.details[entry.key]]);
     }
   };
 
   const handleBack = () => {
-    setSelectedCategory(null);
+    setViewStack(prev => prev.slice(0, -1));
   };
 
   if (loading && !data) {
@@ -107,16 +111,17 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
     );
   }
 
-  if (!data) return null;
+  if (!currentView) return null;
 
-  const { title, subTitle, totalTrackedMinutes, pieData, barKeys, barData } = data;
+  const { title, subTitle, totalTrackedMinutes, pieData, barKeys, barData, details } = currentView;
   const hours = Math.floor(totalTrackedMinutes / 60);
+  const hasDetails = !!details && Object.keys(details).length > 0;
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 h-full flex flex-col transition-all duration-300">
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
-          {selectedCategory && (
+          {viewStack.length > 0 && (
             <button
               onClick={handleBack}
               className="p-2 -ml-2 rounded-xl hover:bg-gray-50 text-slate-400 hover:text-slate-700 transition-colors"
@@ -167,13 +172,13 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
                     stroke="none"
                     cornerRadius={6}
                     onClick={handlePieClick}
-                    className={!selectedCategory ? "cursor-pointer" : ""}
+                    className={hasDetails ? "cursor-pointer" : ""}
                   >
                     {pieData.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={entry.color}
-                        className={`transition-all duration-300 ${!selectedCategory ? 'hover:opacity-80' : ''}`}
+                        className={`transition-all duration-300 ${hasDetails ? 'hover:opacity-80' : ''}`}
                       />
                     ))}
                   </Pie>
@@ -192,7 +197,7 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
               </div>
             ))}
           </div>
-          {!selectedCategory && (
+          {hasDetails && (
             <p className="absolute bottom-4 text-[10px] text-slate-300 font-medium italic">Click slice to drill down</p>
           )}
         </div>

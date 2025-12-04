@@ -96,6 +96,7 @@ export interface TimeOverviewResponse {
   pieData: ChartSegment[];
   barKeys: BarConfig[];
   barData: TimeDistribution[];
+  details?: { [key: string]: TimeOverviewResponse };
 }
 
 export interface TopItem {
