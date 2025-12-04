@@ -368,6 +368,24 @@ class DashboardService:
         category_stats = df.groupby(group_field)['duration_minutes'].sum().to_dict()
         total_minutes = sum(category_stats.values())
         
+        # 如果是下钻模式（有parent_id），为子分类生成同色系配色
+        if parent_id:
+            # 获取父分类的基础颜色
+            base_color = color_map.get(parent_id, "#5B8FF9")
+            
+            # 获取排序后的子分类列表（为了颜色分配的一致性）
+            sorted_subs = [k for k, v in sorted(category_stats.items(), key=lambda x: x[1], reverse=True)]
+            
+            # 生成对应数量的同色系颜色
+            variants = self._generate_color_variants(base_color, len(sorted_subs))
+            
+            # 更新这些子分类的颜色映射
+            for sub, color in zip(sorted_subs, variants):
+                # 处理 None 或 NaN 的情况
+                if sub is None or pd.isna(sub):
+                    continue
+                color_map[sub] = color
+
         # 构建饼图数据和柱状图配置
         pie_data = []
         bar_keys = []
@@ -405,6 +423,78 @@ class DashboardService:
             "barKeys": bar_keys,
             "barData": bar_data
         }
+
+    def _generate_color_variants(self, base_color: str, count: int) -> list[str]:
+        """
+        基于基础颜色生成同色系配色方案
+        
+        Args:
+            base_color: 基础颜色 (Hex)
+            count: 需要生成的颜色数量
+            
+        Returns:
+            list[str]: 颜色列表 (Hex)
+        """
+        import colorsys
+        
+        # 处理 Hex 格式
+        if base_color.startswith('#'):
+            base_color = base_color[1:]
+        
+        if len(base_color) != 6:
+            # 格式错误回退
+            return [f"#{base_color}"] * count if base_color else ["#5B8FF9"] * count
+            
+        try:
+            r = int(base_color[0:2], 16) / 255.0
+            g = int(base_color[2:4], 16) / 255.0
+            b = int(base_color[4:6], 16) / 255.0
+        except ValueError:
+            return ["#5B8FF9"] * count
+        
+        h, l, s = colorsys.rgb_to_hls(r, g, b)
+        
+        colors = []
+        
+        if count <= 1:
+            return [f"#{base_color}"]
+            
+        # 生成亮度变化
+        # 保持色相(H)和饱和度(S)基本不变，调整亮度(L)
+        # 亮度范围控制在 0.3 (深) 到 0.85 (浅) 之间
+        # 基础颜色的亮度也应该在其中
+        
+        for i in range(count):
+            # 简单的线性分布
+            # 最大的块（i=0）使用接近基础颜色的亮度，或者稍微深一点
+            # 越小的块越浅（或者反过来）
+            
+            # 这里采用从深到浅的分布，让大块颜色更重
+            # 映射 i (0..count-1) 到 0.35..0.85
+            
+            # 动态调整范围，避免颜色太接近
+            min_l = 0.35
+            max_l = 0.85
+            
+            if count > 1:
+                new_l = min_l + (max_l - min_l) * (i / (count - 1))
+            else:
+                new_l = l
+                
+            # 稍微调整饱和度，越亮越低饱和度，看起来更自然
+            new_s = s * (1 - 0.2 * (i / count)) 
+            
+            r_new, g_new, b_new = colorsys.hls_to_rgb(h, new_l, new_s)
+            
+            # 转换为 Hex
+            hex_color = "#{:02x}{:02x}{:02x}".format(
+                int(max(0, min(1, r_new)) * 255),
+                int(max(0, min(1, g_new)) * 255),
+                int(max(0, min(1, b_new)) * 255)
+            )
+            colors.append(hex_color)
+            
+        return colors
     
     def _get_empty_bar_data(self) -> list:
         """生成空的24小时分布数据"""
