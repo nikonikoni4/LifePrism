@@ -12,7 +12,7 @@ const generateMockHistory = (centerDateStr: string) => {
 
   // Window: 15 days before + center date + 14 days after = 30 days
   const startDate = new Date(centerDate);
-  startDate.setDate(centerDate.getDate() - 15);
+  startDate.setDate(centerDate.getDate() - 16);
 
   for (let i = 0; i < 30; i++) {
     const d = new Date(startDate);
@@ -73,7 +73,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
       }
     }
   };
-  
+
   // Calculate start and end dates for labels based on the window
   const startDateLabel = history[0].day;
   const endDateLabel = history[history.length - 1].day;
@@ -142,8 +142,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
       <div className="relative pt-6 border-t border-dashed border-gray-100">
         <div className="h-[80px] flex items-end justify-between gap-1 md:gap-2">
           {history.map((item, index) => (
-            <div key={index} className="flex-1 flex flex-col justify-end group relative">
-
+            <div key={index} className="flex-1 flex flex-col justify-end group relative h-full">
               {/* Tooltip on Hover */}
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-[10px] py-1 px-2 rounded pointer-events-none whitespace-nowrap z-10 shadow-lg">
                 {item.day}: {item.value}m

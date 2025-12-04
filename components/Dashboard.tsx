@@ -6,7 +6,13 @@ import ActivityDetailsWidget from './widgets/ActivityDetailsWidget';
 import ActivitySummaryHeader from './ActivitySummaryHeader';
 
 const Dashboard: React.FC = () => {
-  const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = React.useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
 
   return (
     <div className="max-w-7xl mx-auto">
