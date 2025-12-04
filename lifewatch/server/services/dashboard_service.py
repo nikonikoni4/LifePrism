@@ -349,7 +349,6 @@ class DashboardService:
             subtitle = "Activity breakdown & timeline"
         else:
             # 二级分类：按 sub_category 聚合，并过滤出属于该 parent_id 的记录
-            # 注意：这里假设 parent_id 对应 category 字段的值
             df = df[df['category'] == parent_id]
             group_field = 'sub_category'
             title = f"{parent_id} Details"
@@ -381,18 +380,16 @@ class DashboardService:
                 # 从数据库颜色映射中获取颜色
                 color = color_map.get(category, "#E8684A")  # 默认颜色
             
-            # 生成 key（用于数据引用）
-            key = self._category_to_key(category)
-            
+            # 直接使用分类名称作为 key
             pie_data.append({
-                "key": key,
+                "key": category,
                 "name": category,
                 "value": int(minutes),
                 "color": color
             })
             
             bar_keys.append({
-                "key": key,
+                "key": category,
                 "label": category,
                 "color": color
             })
@@ -440,7 +437,8 @@ class DashboardService:
             if category is None or pd.isna(category):
                 category = "Uncategorized"
             
-            key = self._category_to_key(category)
+            # 直接使用分类名称作为 key
+            key = category
             
             # 计算该事件在每个2小时时间槽中的时长
             for hour in range(0, 24, 2):
@@ -469,26 +467,7 @@ class DashboardService:
         
         return bar_data
     
-    def _category_to_key(self, category: str) -> str:
-        """
-        将分类名称转换为key（用于前端数据引用）
-        
-        Args:
-            category: 分类名称
-            
-        Returns:
-            str: key（小写、去除特殊字符）
-        """
-        if category is None or pd.isna(category):
-            return "uncategorized"
-        
-        # 简单的转换规则：小写化，替换特殊字符
-        key = category.lower().replace(' ', '_').replace('/', '_').replace('\\', '_')
-        # 移除中文字符，保留字母、数字和下划线
-        import re
-        key = re.sub(r'[^\w]', '_', key)
-        return key
-    
+
     def _get_color_for_category(self, key: str, colors: dict) -> str:
         """
         智能获取分类的颜色，支持模糊匹配

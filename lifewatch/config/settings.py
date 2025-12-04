@@ -83,4 +83,4 @@ MAX_ITEMS = 10 # 请求时的最大items
 数据清洗配置模块
 """
 # 数据清洗配置
-CLEAN_LOWER_BOUND = 60 # 数据清洗配置
+CLEAN_LOWER_BOUND = 10 # 数据清洗配置
