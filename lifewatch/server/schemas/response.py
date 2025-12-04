@@ -23,9 +23,3 @@ class PaginatedResponse(BaseModel):
     data: List[Any]
 
 
-class ErrorResponse(BaseModel):
-    """错误响应格式"""
-    success: bool = False
-    error: str
-    message: str
-    timestamp: Optional[datetime] = None

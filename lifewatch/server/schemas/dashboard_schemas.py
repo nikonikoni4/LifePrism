@@ -27,7 +27,7 @@ class ChartSegment(BaseModel):
 
 class BarConfig(BaseModel):
     """柱状图配置项（用于 Legend 和堆叠顺序）"""
-    key: str = Field(..., description="数据键（与 TimeDistribution 中的键对应）")
+    key: str = Field(..., description="数据键（与 barData 中的键对应）")
     label: str = Field(..., description="图例标签")
     color: str = Field(..., description="颜色（十六进制格式）")
     
@@ -41,22 +41,6 @@ class BarConfig(BaseModel):
         }
 
 
-class TimeDistribution(BaseModel):
-    """24小时时间分布数据"""
-    time_range: str = Field(..., alias="timeRange", description="时间段（如 '0-2', '2-4'）")
-    # 动态字段通过 extra 允许
-    
-    class Config:
-        populate_by_name = True
-        extra = "allow"  # 允许动态字段（work: 120, entertainment: 60 等）
-        json_schema_extra = {
-            "example": {
-                "timeRange": "8-10",
-                "work": 120,
-                "entertainment": 0,
-                "other": 0
-            }
-        }
 
 
 class TimeOverviewResponse(BaseModel):
