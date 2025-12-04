@@ -37,12 +37,27 @@ const formatDateToYYYYMMDD = (date: Date): string => {
 const TimelinePage: React.FC = () => {
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [currentDate, setCurrentDate] = useState('2023-10-25');
+
+    type TimeScale = '2h' | '1h' | '30m' | '15m';
+    const [timeScale, setTimeScale] = useState<TimeScale>('1h');
+
     const dateInputRef = React.useRef<HTMLInputElement>(null);
     const selectedEvent = TIMELINE_EVENTS.find(e => e.id === selectedEventId);
 
-    // Time ruler generation (0 to 24)
-    const hours = Array.from({ length: 25 }, (_, i) => i);
-    const HOUR_HEIGHT = 80; // pixels per hour
+    const SCALE_CONFIG: Record<TimeScale, { hourHeight: number; labelInterval: number }> = {
+        '2h': { hourHeight: 60, labelInterval: 2 },
+        '1h': { hourHeight: 80, labelInterval: 1 },
+        '30m': { hourHeight: 120, labelInterval: 0.5 },
+        '15m': { hourHeight: 200, labelInterval: 0.25 },
+    };
+
+    const { hourHeight: HOUR_HEIGHT, labelInterval } = SCALE_CONFIG[timeScale];
+
+    // Time ruler generation
+    const ticks: number[] = [];
+    for (let i = 0; i <= 24; i += labelInterval) {
+        ticks.push(i);
+    }
 
     // Helper to calculate style for event blocks
     const getEventStyle = (event: TimelineEvent) => {
@@ -84,6 +99,13 @@ const TimelinePage: React.FC = () => {
 
     // Format float hour to HH:MM
     const formatTime = (time: number) => {
+        const h = Math.floor(time);
+        const m = Math.round((time - h) * 60);
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    };
+
+    // Format tick label (e.g. 1.5 -> 01:30)
+    const formatTickLabel = (time: number) => {
         const h = Math.floor(time);
         const m = Math.round((time - h) * 60);
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
@@ -164,9 +186,30 @@ const TimelinePage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
-                    <button className="px-3 py-1 bg-white shadow-sm rounded-md text-xs font-bold text-gray-800">1h</button>
-                    <button className="px-3 py-1 text-xs font-medium text-gray-500 hover:text-gray-700">30m</button>
-                    <button className="px-3 py-1 text-xs font-medium text-gray-500 hover:text-gray-700">15m</button>
+                    <button
+                        onClick={() => setTimeScale('2h')}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '2h' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        2h
+                    </button>
+                    <button
+                        onClick={() => setTimeScale('1h')}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '1h' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        1h
+                    </button>
+                    <button
+                        onClick={() => setTimeScale('30m')}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '30m' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        30m
+                    </button>
+                    <button
+                        onClick={() => setTimeScale('15m')}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '15m' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        15m
+                    </button>
                 </div>
             </div>
 
@@ -177,16 +220,16 @@ const TimelinePage: React.FC = () => {
                     <div className="relative min-h-[2000px] py-4" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
                         {/* Time Ruler */}
                         <div className="absolute left-0 top-0 bottom-0 w-16 border-r border-dashed border-gray-200 bg-white z-0">
-                            {hours.map((h) => (
-                                <div key={h} className="absolute w-full flex justify-end pr-2 text-[10px] font-mono font-medium text-gray-400" style={{ top: `${h * HOUR_HEIGHT - 6}px` }}>
-                                    {h}:00
+                            {ticks.map((t) => (
+                                <div key={t} className="absolute w-full flex justify-end pr-2 text-[10px] font-mono font-medium text-gray-400" style={{ top: `${t * HOUR_HEIGHT - 6}px` }}>
+                                    {formatTickLabel(t)}
                                 </div>
                             ))}
                         </div>
 
                         {/* Grid Lines */}
-                        {hours.map((h) => (
-                            <div key={`line-${h}`} className="absolute left-16 right-0 border-t border-gray-100" style={{ top: `${h * HOUR_HEIGHT}px` }}></div>
+                        {ticks.map((t) => (
+                            <div key={`line-${t}`} className="absolute left-16 right-0 border-t border-gray-100" style={{ top: `${t * HOUR_HEIGHT}px` }}></div>
                         ))}
 
                         {/* Events */}
