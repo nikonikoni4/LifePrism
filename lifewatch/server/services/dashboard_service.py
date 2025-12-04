@@ -37,19 +37,18 @@ class DashboardService:
         # Mock 数据（调试时可切换回来）
         # return self._get_mock_dashboard_data(query_date)
     
-    def get_time_overview(self, date_str: str, parent_id: Optional[str] = None) -> Dict:
+    def get_time_overview(self, date_str: str) -> Dict:
         """
         获取时间概览数据
         
         Args:
             date_str: 日期字符串 (YYYY-MM-DD)
-            parent_id: 主分类ID（用于下钻到子分类）
             
         Returns:
             Dict: 时间概览数据，包括饼图、柱状图配置和24小时分布
         """
         # 使用真实数据查询
-        return self._get_real_time_overview(date_str, parent_id)
+        return self._get_real_time_overview(date_str)
         
         # Mock 数据（如需要可以切换回来）
         # return self._get_mock_time_overview(date_str, parent_id)
@@ -80,7 +79,7 @@ class DashboardService:
             date_str, history_days, future_days
         )
         dashboard_data = self.get_dashboard_data(query_date)
-        time_overview_data = self.get_time_overview(date_str, parent_id=None)
+        time_overview_data = self.get_time_overview(date_str)
         
         # 整合返回
         return {
@@ -285,144 +284,242 @@ class DashboardService:
     
     def _get_real_time_overview(self, date_str: str, parent_id: Optional[str] = None) -> Dict:
         """
-        从数据库查询真实时间概览数据
+        从数据库查询真实时间概览数据（包含完整层级结构）
         
         Args:
             date_str: 日期字符串 (YYYY-MM-DD)
-            parent_id: 主分类ID（用于下钻到子分类）
+            parent_id: (已弃用) 兼容性保留，不再使用
             
         Returns:
-            Dict: 时间概览数据，包括饼图、柱状图配置和24小时分布
+            Dict: 包含完整层级的时间概览数据
         """
         from datetime import datetime
-        from collections import defaultdict
         
-        # 解析日期并构建查询日期范围
+        # 1. 准备数据
         target_date = datetime.strptime(date_str, "%Y-%m-%d")
         start_time = f"{date_str} 00:00:00"
         end_time = f"{date_str} 23:59:59"
         
-        # 从数据库查询该日期的所有行为日志
         df = self.db.load_user_app_behavior_log(start_time=start_time, end_time=end_time)
         
-        # 从数据库加载分类颜色信息
-        category_df = self.db.load_categories()
-        sub_category_df = self.db.load_sub_categories()
-        
-        # 构建分类名称到颜色的映射
-        color_map = {}
-        if category_df is not None and not category_df.empty:
-            for _, row in category_df.iterrows():
-                color_map[row['name']] = row['color']
-        
-        # 对于子分类，使用父分类的颜色（因为sub_category表没有color字段）
-        # 也可以根据需要为每个子分类设置独立的颜色
-        if sub_category_df is not None and not sub_category_df.empty:
-            for _, row in sub_category_df.iterrows():
-                # 找到该子分类的父分类颜色
-                if category_df is not None and not category_df.empty:
-                    parent = category_df[category_df['id'] == row['category_id']]
-                    if not parent.empty:
-                        color_map[row['name']] = parent.iloc[0]['color']
-        
-        # 如果没有数据，返回空数据结构
+        # 如果没有数据
         if df is None or df.empty:
-            return {
-                "title": "Time Overview",
-                "subTitle": f"No activity data for {date_str}",
-                "totalTrackedMinutes": 0,
-                "pieData": [],
-                "barKeys": [],
-                "barData": self._get_empty_bar_data()
-            }
-        
-        # 计算每条记录的时长（分钟）
+            return self._build_empty_response(date_str)
+            
+        # 预计算时长
         df['start_dt'] = pd.to_datetime(df['start_time'])
         df['end_dt'] = pd.to_datetime(df['end_time'])
         df['duration_minutes'] = (df['end_dt'] - df['start_dt']).dt.total_seconds() / 60
         
-        # 根据是否有 parent_id 决定使用哪个分类字段
-        if parent_id is None:
-            # 一级分类：按 category 聚合
-            group_field = 'category'
-            title = "Time Overview"
-            subtitle = "Activity breakdown & timeline"
-        else:
-            # 二级分类：按 sub_category 聚合，并过滤出属于该 parent_id 的记录
-            df = df[df['category'] == parent_id]
-            group_field = 'sub_category'
-            title = f"{parent_id} Details"
-            subtitle = f"Detailed breakdown of {parent_id} activities"
-            
-            if df.empty:
-                return {
-                    "title": title,
-                    "subTitle": subtitle,
-                    "totalTrackedMinutes": 0,
-                    "pieData": [],
-                    "barKeys": [],
-                    "barData": self._get_empty_bar_data()
-                }
+        # 加载颜色映射
+        color_map = self._load_color_map()
         
-        # 聚合数据：按分类统计总时长
-        category_stats = df.groupby(group_field)['duration_minutes'].sum().to_dict()
-        total_minutes = sum(category_stats.values())
+        # 2. 构建 Level 1 (Category)
+        root_data = self._build_view_data(
+            df, 
+            group_field='category', 
+            title="Time Overview", 
+            sub_title="Activity breakdown & timeline",
+            color_map=color_map
+        )
         
-        # 如果是下钻模式（有parent_id），为子分类生成同色系配色
-        if parent_id:
-            # 获取父分类的基础颜色
-            base_color = color_map.get(parent_id, "#5B8FF9")
+        root_data['details'] = {}
+        
+        # 获取所有一级分类
+        categories = df['category'].unique()
+        
+        for category in categories:
+            if pd.isna(category): continue
             
-            # 获取排序后的子分类列表（为了颜色分配的一致性）
-            sorted_subs = [k for k, v in sorted(category_stats.items(), key=lambda x: x[1], reverse=True)]
+            # 过滤当前分类数据
+            cat_df = df[df['category'] == category]
+            if cat_df.empty: continue
             
-            # 生成对应数量的同色系颜色
-            variants = self._generate_color_variants(base_color, len(sorted_subs))
+            # 3. 构建 Level 2 (Sub-category)
+            # 为子分类生成同色系颜色
+            cat_color = color_map.get(category, "#5B8FF9")
+            sub_categories = cat_df['sub_category'].unique()
+            sub_colors = self._generate_color_variants(cat_color, len(sub_categories))
+            sub_color_map = {sub: color for sub, color in zip(sub_categories, sub_colors)}
             
-            # 更新这些子分类的颜色映射
-            for sub, color in zip(sorted_subs, variants):
-                # 处理 None 或 NaN 的情况
-                if sub is None or pd.isna(sub):
-                    continue
-                color_map[sub] = color
+            cat_data = self._build_view_data(
+                cat_df,
+                group_field='sub_category',
+                title=f"{category} Details",
+                sub_title=f"Detailed breakdown of {category}",
+                color_map=sub_color_map
+            )
+            
+            cat_data['details'] = {}
+            root_data['details'][category] = cat_data
+            
+            # 4. 构建 Level 3 (Apps)
+            for sub_cat in sub_categories:
+                if pd.isna(sub_cat): continue
+                
+                sub_df = cat_df[cat_df['sub_category'] == sub_cat]
+                if sub_df.empty: continue
+                
+                # 应用级别的特殊处理（Top 5 + Other）
+                app_data = self._build_app_level_data(
+                    sub_df,
+                    title=f"{sub_cat} Apps",
+                    sub_title=f"Top applications in {sub_cat}",
+                    base_color=sub_color_map.get(sub_cat, cat_color)
+                )
+                
+                cat_data['details'][sub_cat] = app_data
+                
+        return root_data
 
-        # 构建饼图数据和柱状图配置
+    def _build_empty_response(self, date_str: str) -> Dict:
+        return {
+            "title": "Time Overview",
+            "subTitle": f"No activity data for {date_str}",
+            "totalTrackedMinutes": 0,
+            "pieData": [],
+            "barKeys": [],
+            "barData": self._get_empty_bar_data(),
+            "details": {}
+        }
+
+    def _load_color_map(self) -> Dict[str, str]:
+        """加载分类颜色映射"""
+        category_df = self.db.load_categories()
+        color_map = {}
+        if category_df is not None and not category_df.empty:
+            for _, row in category_df.iterrows():
+                color_map[row['name']] = row['color']
+        return color_map
+
+    def _build_view_data(self, df, group_field: str, title: str, sub_title: str, color_map: Dict) -> Dict:
+        """构建标准视图数据（饼图 + 柱状图）"""
+        # 聚合数据
+        stats = df.groupby(group_field)['duration_minutes'].sum().to_dict()
+        total_minutes = sum(stats.values())
+        
         pie_data = []
         bar_keys = []
         
-        for idx, (category, minutes) in enumerate(sorted(category_stats.items(), key=lambda x: x[1], reverse=True)):
-            if category is None or pd.isna(category):
-                category = "Uncategorized"
-                color = "#999999"
-            else:
-                # 从数据库颜色映射中获取颜色
-                color = color_map.get(category, "#E8684A")  # 默认颜色
+        # 排序并构建图表数据
+        for name, minutes in sorted(stats.items(), key=lambda x: x[1], reverse=True):
+            if pd.isna(name): name = "Uncategorized"
+            color = color_map.get(name, "#E8684A")
             
-            # 直接使用分类名称作为 key
             pie_data.append({
-                "key": category,
-                "name": category,
+                "key": name,
+                "name": name,
                 "value": int(minutes),
                 "color": color
             })
             
             bar_keys.append({
-                "key": category,
-                "label": category,
+                "key": name,
+                "label": name,
                 "color": color
             })
-        
-        # 构建24小时分布数据（按2小时间隔）
+            
         bar_data = self._calculate_time_distribution(df, group_field)
         
         return {
             "title": title,
-            "subTitle": subtitle,
+            "subTitle": sub_title,
             "totalTrackedMinutes": int(total_minutes),
             "pieData": pie_data,
             "barKeys": bar_keys,
             "barData": bar_data
         }
+
+    def _build_app_level_data(self, df, title: str, sub_title: str, base_color: str) -> Dict:
+        """构建应用级别数据（Top 5 + Other）"""
+        # 按应用分组
+        stats = df.groupby('app')['duration_minutes'].sum().sort_values(ascending=False)
+        total_minutes = stats.sum()
+        
+        # 取 Top 5
+        top_5 = stats.head(5)
+        other_value = stats.iloc[5:].sum()
+        
+        # 生成颜色
+        colors = self._generate_color_variants(base_color, len(top_5) + (1 if other_value > 0 else 0))
+        
+        pie_data = []
+        bar_keys = []
+        
+        # 处理 Top 5
+        for i, (app_name, minutes) in enumerate(top_5.items()):
+            color = colors[i]
+            pie_data.append({
+                "key": app_name,
+                "name": app_name,
+                "value": int(minutes),
+                "color": color
+            })
+            bar_keys.append({
+                "key": app_name,
+                "label": app_name,
+                "color": color
+            })
+            
+        # 处理 Other
+        if other_value > 0:
+            other_color = colors[-1]
+            pie_data.append({
+                "key": "Other",
+                "name": "Other Apps",
+                "value": int(other_value),
+                "color": other_color
+            })
+            bar_keys.append({
+                "key": "Other",
+                "label": "Other",
+                "color": other_color
+            })
+            
+        # 重新计算 bar_data (需要处理 Other 的合并)
+        # 这里需要特殊的 _calculate_app_time_distribution
+        bar_data = self._calculate_app_time_distribution(df, top_5.index.tolist())
+        
+        return {
+            "title": title,
+            "subTitle": sub_title,
+            "totalTrackedMinutes": int(total_minutes),
+            "pieData": pie_data,
+            "barKeys": bar_keys,
+            "barData": bar_data
+        }
+
+    def _calculate_app_time_distribution(self, df, top_apps: list) -> list:
+        """计算应用级别的24小时分布（处理 Other）"""
+        from collections import defaultdict
+        time_slots = defaultdict(lambda: defaultdict(int))
+        
+        for _, row in df.iterrows():
+            app_name = row['app']
+            # 如果不在 Top 5，归为 Other
+            key = app_name if app_name in top_apps else "Other"
+            
+            start = row['start_dt']
+            end = row['end_dt']
+            
+            for hour in range(0, 24, 2):
+                slot_start = start.replace(hour=hour, minute=0, second=0, microsecond=0)
+                slot_end = slot_start + timedelta(hours=2)
+                overlap_start = max(start, slot_start)
+                overlap_end = min(end, slot_end)
+                
+                if overlap_start < overlap_end:
+                    minutes = (overlap_end - overlap_start).total_seconds() / 60
+                    time_slots[hour][key] += minutes
+                    
+        bar_data = []
+        for hour in range(0, 24, 2):
+            slot_data = {"timeRange": f"{hour}-{hour+2}"}
+            for key, minutes in time_slots[hour].items():
+                slot_data[key] = int(minutes)
+            bar_data.append(slot_data)
+            
+        return bar_data
 
     def _generate_color_variants(self, base_color: str, count: int) -> list[str]:
         """

@@ -67,6 +67,7 @@ class TimeOverviewResponse(BaseModel):
     pie_data: List[ChartSegment] = Field(..., alias="pieData", description="饼图数据")
     bar_keys: List[BarConfig] = Field(..., alias="barKeys", description="柱状图配置")
     bar_data: List[Dict[str, Any]] = Field(..., alias="barData", description="24小时分布数据")
+    details: Optional[Dict[str, 'TimeOverviewResponse']] = Field(None, description="子分类详情（递归结构）")
     
     class Config:
         populate_by_name = True
@@ -83,6 +84,16 @@ class TimeOverviewResponse(BaseModel):
                 ],
                 "barData": [
                     {"timeRange": "0-2", "work": 0, "entertainment": 30, "other": 90}
-                ]
+                ],
+                "details": {
+                    "Work/Study": {
+                        "title": "Work/Study Details",
+                        "subTitle": "Detailed breakdown",
+                        "totalTrackedMinutes": 480,
+                        "pieData": [],
+                        "barKeys": [],
+                        "barData": []
+                    }
+                }
             }
         }

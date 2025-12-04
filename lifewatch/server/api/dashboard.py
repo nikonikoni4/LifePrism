@@ -42,27 +42,19 @@ async def get_dashboard(
 
 @router.get("/time-overview", response_model=TimeOverviewResponse, summary="获取 Time Overview 数据")
 async def get_time_overview(
-    date: str = Query(..., description="日期 (YYYY-MM-DD 格式)", regex=r"^\d{4}-\d{2}-\d{2}$"),
-    parent_id: Optional[str] = Query(None, description="主分类ID（用于下钻到子分类）")
+    date: str = Query(..., description="日期 (YYYY-MM-DD 格式)", regex=r"^\d{4}-\d{2}-\d{2}$")
 ):
     """
     获取 Time Overview 数据
     
     **功能：**
-    - 一级分类概览：不传 parent_id，返回所有主分类的时间分布
-    - 二级分类详情：传入 parent_id，返回该主分类下所有子分类的时间分布
+    - 一次性返回所有层级的时间分布数据（Category -> Sub-category -> Apps）
     
     **返回数据：**
-    - 饼图数据（pieData）：各分类的时长和占比
-    - 柱状图配置（barKeys）：图例和颜色配置
-    - 24小时分布（barData）：每2小时的活动分布
-    
-    **示例：**
-    - 一级概览：`/api/v1/dashboard/time-overview?date=2023-10-25`
-    - 二级详情：`/api/v1/dashboard/time-overview?date=2023-10-25&parent_id=work`
+    - 包含嵌套的 details 字段，支持前端本地下钻
     """
     try:
-        data = dashboard_service.get_time_overview(date, parent_id)
+        data = dashboard_service.get_time_overview(date)
         return data
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
