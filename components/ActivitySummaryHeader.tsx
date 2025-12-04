@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Filter, RefreshCw, Clock } from 'lucide-react';
-
+import { ActivitySummaryResponse } from '../types';
+import { DashboardAPI } from '../services/dashboardService';
 // Generate 30 days of mock history data
 // Generate 30 days of mock history data centered around the selected date
 const generateMockHistory = (centerDateStr: string) => {
@@ -44,17 +45,51 @@ const generateMockHistory = (centerDateStr: string) => {
   return history;
 };
 
+const getActivitySummary = (centerDate:string,historyNumber:number,futureNumber:number) => {
+  const ActivitySummaryData = DashboardAPI.getActivitySummaryData(centerDate,historyNumber,futureNumber);
+  const totalDay = historyNumber + futureNumber + 1;
+  const startDate = new Date(centerDate);
+  startDate.setDate(startDate.getDate() - historyNumber);
+  const today = new Date(centerDate);
+  today.setHours(0, 0, 0, 0); // Normalize today to midnight
+  const history = []
+  for (let i = 0; i < totalDay; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    const dateStr = `${month}/${day}`;
+    const fullDate = d.toISOString().split('T')[0];
+    const isActualToday = d.getTime() === today.getTime();
+    const isFuture = d.getTime() > today.getTime();
+    const isSelected = fullDate === centerDate;
+    const value = ActivitySummaryData[i]["activeTimePercentage"]
+    history.push({
+      day: dateStr,
+      fullDate: fullDate,
+      value: value,
+      isActualToday,
+      isFuture,
+      isSelected
+    })
+  }
+  return history;
+}
+
 interface ActivitySummaryHeaderProps {
   selectedDate: string;
   onDateChange: (date: string) => void;
 }
 
+
+
+
 const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedDate, onDateChange }) => {
   const dateInputRef = React.useRef<HTMLInputElement>(null);
 
   // Memoize history generation to avoid unnecessary recalculations
-  const history = React.useMemo(() => generateMockHistory(selectedDate), [selectedDate]);
-
+  //const history = React.useMemo(() => generateMockHistory(selectedDate), [selectedDate]);
+  const history = React.useMemo(() => DashboardAPI.getActivitySummaryData(selectedDate,15,14), [selectedDate]);
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onDateChange(e.target.value);
   };

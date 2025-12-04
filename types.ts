@@ -122,3 +122,12 @@ export interface DashboardResponse {
   total_active_time: number; // seconds
   summary: DashboardSummary;
 }
+
+export interface DaylyActivitiesResponse{
+  data:string;
+  activeTimePercentage:number; // percentage of total active time
+}
+
+export interface ActivitySummaryResponse {
+  DaylyActivities: DaylyActivitiesResponse[];
+}
