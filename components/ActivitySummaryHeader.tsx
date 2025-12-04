@@ -3,13 +3,50 @@ import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Filter, RefreshCw, Clock } from 'lucide-react';
 import { ActivitySummaryResponse } from '../types';
 import { DashboardAPI } from '../services/dashboardService';
-// Generate 30 days of mock history data
+
+// 安全的日期解析函数,支持多种格式
+const parseLocalDate = (dateStr: string): Date => {
+  // 判断输入格式
+  const dateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const match = dateStr.match(dateRegex);
+
+  if (match) {
+    // 如果是 YYYY-MM-DD 格式，手动解析为本地时间
+    const year = parseInt(match[1]);
+    const month = parseInt(match[2]) - 1; // 月份从0开始
+    const day = parseInt(match[3]);
+    return new Date(year, month, day);
+  } else {
+    // 其他格式，尝试直接解析
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      throw new Error(`Invalid date format: ${dateStr}`);
+    }
+    return date;
+  }
+};
+
+// 格式化日期为 YYYY-MM-DD 格式，确保一致性
+const formatDateToYYYYMMDD = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// 规范化日期到午夜（本地时间），用于日期比较
+const normalizeDateToMidnight = (date: Date): Date => {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+};
+
 // Generate 30 days of mock history data centered around the selected date
+// Note: This function is kept for backward compatibility but not currently used
 const generateMockHistory = (centerDateStr: string) => {
   const history = [];
-  const centerDate = new Date(centerDateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalize today to midnight
+  const centerDate = parseLocalDate(centerDateStr);
+  const today = normalizeDateToMidnight(new Date());
 
   // Window: 15 days before + center date + 14 days after = 30 days
   const startDate = new Date(centerDate);
@@ -22,14 +59,14 @@ const generateMockHistory = (centerDateStr: string) => {
     const month = d.getMonth() + 1;
     const day = d.getDate();
     const dateStr = `${month}/${day}`;
-    const fullDate = d.toISOString().split('T')[0];
+    const fullDate = formatDateToYYYYMMDD(d);
 
     // Random value between 10 and 100, with some "weekend" dips
     const dayOfWeek = d.getDay();
     let baseValue = Math.floor(Math.random() * 60) + 30;
     if (dayOfWeek === 0 || dayOfWeek === 6) baseValue -= 20;
 
-    const isActualToday = d.getTime() === today.getTime();
+    const isActualToday = fullDate === formatDateToYYYYMMDD(today);
     const isFuture = d.getTime() > today.getTime();
     const isSelected = fullDate === centerDateStr;
 
@@ -45,35 +82,69 @@ const generateMockHistory = (centerDateStr: string) => {
   return history;
 };
 
-const getActivitySummary = (centerDate:string,historyNumber:number,futureNumber:number) => {
-  const ActivitySummaryData = DashboardAPI.getActivitySummaryData(centerDate,historyNumber,futureNumber);
-  const totalDay = historyNumber + futureNumber + 1;
-  const startDate = new Date(centerDate);
-  startDate.setDate(startDate.getDate() - historyNumber);
-  const today = new Date(centerDate);
-  today.setHours(0, 0, 0, 0); // Normalize today to midnight
-  const history = []
-  for (let i = 0; i < totalDay; i++) {
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + i);
-    const month = d.getMonth() + 1;
-    const day = d.getDate();
-    const dateStr = `${month}/${day}`;
-    const fullDate = d.toISOString().split('T')[0];
-    const isActualToday = d.getTime() === today.getTime();
-    const isFuture = d.getTime() > today.getTime();
-    const isSelected = fullDate === centerDate;
-    const value = ActivitySummaryData[i]["activeTimePercentage"]
-    history.push({
-      day: dateStr,
-      fullDate: fullDate,
-      value: value,
-      isActualToday,
-      isFuture,
-      isSelected
-    })
+const getActivitySummary = async (centerDate: string, historyNumber: number, futureNumber: number) => {
+  try {
+    const ActivitySummaryData = await DashboardAPI.getActivitySummaryData(centerDate, historyNumber, futureNumber);
+    console.log('ActivitySummaryData:', ActivitySummaryData);
+    const dailyActivities = ActivitySummaryData.dailyActivities || [];
+    const totalDay = historyNumber + futureNumber + 1;
+    const TodayTotalActiveTime = ActivitySummaryData.todayActiveTime;
+
+    // 使用安全的日期解析并规范化到午夜
+    const centerDateObj = normalizeDateToMidnight(parseLocalDate(centerDate));
+    const startDate = new Date(centerDateObj);
+    startDate.setDate(startDate.getDate() - historyNumber);
+
+    // 获取实际的今天日期（而不是中心日期）
+    const actualToday = normalizeDateToMidnight(new Date());
+
+    console.log("centerDate:", centerDate);
+    console.log("centerDateObj:", formatDateToYYYYMMDD(centerDateObj));
+    console.log("startDate:", formatDateToYYYYMMDD(startDate));
+    console.log("actualToday:", formatDateToYYYYMMDD(actualToday));
+
+    const history = []
+
+    for (let i = 0; i < totalDay; i++) {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + i);
+
+      // 格式化日期字符串
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const dateStr = `${month}/${day}`;
+
+      // 使用统一的日期格式 YYYY-MM-DD
+      const fullDate = formatDateToYYYYMMDD(d);
+
+      // 使用字符串比较，避免时区问题
+      const isActualToday = fullDate === formatDateToYYYYMMDD(actualToday);
+      const isFuture = d.getTime() > actualToday.getTime();
+      const isSelected = fullDate === centerDate;
+
+      console.log(`Date: ${fullDate}, isToday: ${isActualToday}, isFuture: ${isFuture}, isSelected: ${isSelected}`);
+
+      // 安全地获取活动数据，防止数组越界
+      const activityData = dailyActivities[i];
+      const value = activityData ? activityData.activeTimePercentage : 0;
+
+      history.push({
+        day: dateStr,
+        fullDate: fullDate,
+        value: value,
+        isActualToday,
+        isFuture,
+        isSelected
+      })
+      console.log(history[i])
+    }
+
+    return [history, TodayTotalActiveTime];
+  } catch (error) {
+    console.error('Error getting activity summary:', error);
+    // 返回空数组作为后备方案
+    return [];
   }
-  return history;
 }
 
 interface ActivitySummaryHeaderProps {
@@ -81,15 +152,30 @@ interface ActivitySummaryHeaderProps {
   onDateChange: (date: string) => void;
 }
 
-
-
-
 const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedDate, onDateChange }) => {
   const dateInputRef = React.useRef<HTMLInputElement>(null);
+  const [history, setHistory] = React.useState<any[]>([]);
+  const [TodayTotalActiveTime, setTodayTotalActiveTime] = React.useState<string>('');
+  const [isLoading, setIsLoading] = React.useState(true);
 
-  // Memoize history generation to avoid unnecessary recalculations
-  //const history = React.useMemo(() => generateMockHistory(selectedDate), [selectedDate]);
-  const history = React.useMemo(() => DashboardAPI.getActivitySummaryData(selectedDate,15,14), [selectedDate]);
+  // 使用useEffect处理异步数据获取
+  React.useEffect(() => {
+    const fetchHistory = async () => {
+      setIsLoading(true);
+      try {
+        const [historyData, TodayTotalActiveTime] = await getActivitySummary(selectedDate, 15, 14);
+        setHistory(historyData);
+        setTodayTotalActiveTime(TodayTotalActiveTime);
+      } catch (error) {
+        console.error('Failed to fetch history:', error);
+        setHistory([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchHistory();
+  }, [selectedDate]);
+
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onDateChange(e.target.value);
   };
@@ -110,9 +196,33 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
   };
 
   // Calculate start and end dates for labels based on the window
-  const startDateLabel = history[0].day;
-  const endDateLabel = history[history.length - 1].day;
-  const TodayTotalActiveTime = "6h 35m"
+  const startDateLabel = history.length > 0 ? history[0].day : "";
+  const endDateLabel = history.length > 0 ? history[history.length - 1].day : "";
+
+  // 加载状态显示
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-3xl p-6 lg:p-8 shadow-sm border border-gray-100 mb-8 animate-fade-in w-full">
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-morandi-blue"></div>
+          <span className="ml-3 text-gray-500">Loading activity data...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 错误状态显示
+  if (history.length === 0) {
+    return (
+      <div className="bg-white rounded-3xl p-6 lg:p-8 shadow-sm border border-gray-100 mb-8 animate-fade-in w-full">
+        <div className="text-center text-gray-500">
+          <p>No activity data available</p>
+          <p className="text-sm mt-1">Please check your connection or try refreshing</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-3xl p-6 lg:p-8 shadow-sm border border-gray-100 mb-8 animate-fade-in w-full">
 

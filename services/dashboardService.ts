@@ -69,7 +69,7 @@ export class DashboardAPI {
         try {
             const params = new URLSearchParams({ date,historyNumber:historyNumber.toString(),futureNumber:futureNumber.toString() });
             const response = await fetch(
-                `${API_BASE_URL}/dashboard/activity-summary?${params.toString()}`
+                `${API_BASE_URL}/activity-summary?${params.toString()}`
             );
 
             if (!response.ok) {
