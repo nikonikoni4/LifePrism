@@ -257,6 +257,18 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
     }
   };
 
+  const handlePrevDay = () => {
+    const date = parseLocalDate(selectedDate);
+    date.setDate(date.getDate() - 1);
+    onDateChange(formatDateToYYYYMMDD(date));
+  };
+
+  const handleNextDay = () => {
+    const date = parseLocalDate(selectedDate);
+    date.setDate(date.getDate() + 1);
+    onDateChange(formatDateToYYYYMMDD(date));
+  };
+
   // Calculate start and end dates for labels based on the window
   const startDateLabel = history.length > 0 ? history[0].day : "";
   const endDateLabel = history.length > 0 ? history[history.length - 1].day : "";
@@ -295,7 +307,10 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
         {/* Date Navigation */}
         <div className="flex items-center w-full md:w-auto bg-gray-50 p-1 rounded-xl border border-gray-200 relative group">
-          <button className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-500 transition-all z-10">
+          <button
+            onClick={handlePrevDay}
+            className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-500 transition-all z-10"
+          >
             <ChevronLeft size={20} />
           </button>
 
@@ -315,7 +330,10 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
             <span className="text-sm font-bold text-slate-700 whitespace-nowrap pointer-events-none">{selectedDate}</span>
           </div>
 
-          <button className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-500 transition-all z-10">
+          <button
+            onClick={handleNextDay}
+            className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-500 transition-all z-10"
+          >
             <ChevronRight size={20} />
           </button>
         </div>
@@ -357,7 +375,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
             <div key={index} className="flex-1 flex flex-col justify-end group relative h-full">
               {/* Tooltip on Hover */}
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-[10px] py-1 px-2 rounded pointer-events-none whitespace-nowrap z-10 shadow-lg">
-                {item.day}: {item.value}m
+                {item.day}: {item.value * 24 / 100}h
               </div>
 
               {/* The Bar */}
