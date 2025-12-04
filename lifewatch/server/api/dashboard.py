@@ -7,11 +7,14 @@ from datetime import date
 from typing import Optional
 from lifewatch.server.schemas.dashboard import DashboardResponse
 from lifewatch.server.schemas.dashboard_schemas import TimeOverviewResponse
+from lifewatch.server.schemas.timeline_schemas import TimelineResponse
 from lifewatch.server.services import DashboardService
+from lifewatch.server.services.timeline_service import TimelineService
 
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 dashboard_service = DashboardService()
+timeline_service = TimelineService()
 
 
 @router.get("", response_model=DashboardResponse, summary="获取仪表盘数据")
@@ -95,3 +98,40 @@ async def get_homepage(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取首页数据失败: {str(e)}")
+
+
+@router.get("/timeline", response_model=TimelineResponse, summary="获取时间线数据")
+async def get_timeline(
+    date: str = Query(..., description="日期，格式：YYYY-MM-DD", regex=r"^\d{4}-\d{2}-\d{2}$"),
+    device_filter: str = Query('all', description="设备过滤：all/pc/mobile")
+):
+    """
+    获取指定日期的时间线数据
+    
+    **功能：**
+    - 返回指定日期的所有活动事件
+    - 支持按设备类型过滤（PC/Mobile/All）
+    - 包含事件的详细信息（分类、描述等）
+    
+    **返回数据：**
+    - date: 查询的日期
+    - events: 事件列表，包含开始/结束时间（小时浮点数）、分类、描述等
+    - currentTime: 当前时间（仅当查询今天时返回）
+    
+    **时间格式：**
+    - 时间以小时浮点数表示，如 9.5 表示 09:30
+    
+    **示例：**
+    - `/api/v1/dashboard/timeline?date=2023-10-25\u0026device_filter=all`
+    """
+    try:
+        # 验证 device_filter 参数
+        if device_filter not in ['all', 'pc', 'mobile']:
+            raise HTTPException(status_code=400, detail="device_filter 必须是 'all'、'pc' 或 'mobile'")
+        
+        data = timeline_service.get_timeline_events(date, device_filter)
+        return data
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取时间线数据失败: {str(e)}")

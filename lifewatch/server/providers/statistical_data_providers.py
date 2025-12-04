@@ -221,18 +221,106 @@ class StatisticalDataProvider:
             })
         
         return daily_activities
+    
+    def get_timeline_events_by_date(self, date: str, channel: str = 'pc') -> list[dict]:
+        """
+        获取指定日期的时间线事件数据
+        
+        Args:
+            date: str, 日期（YYYY-MM-DD 格式）
+            channel: str, 数据通道 ('pc' 或 'mobile'，当前仅支持 'pc')
+        
+        Returns:
+            list[dict], 事件列表:
+                id: str, 事件ID
+                start_time: str, 开始时间（ISO格式）
+                end_time: str, 结束时间（ISO格式）
+                duration: int, 持续时间（秒）
+                app: str, 应用名称
+                title: str, 窗口标题
+                category_id: str, 主分类ID
+                category_name: str, 主分类名称
+                sub_category_id: str, 子分类ID
+                sub_category_name: str, 子分类名称
+                app_description: str, 应用描述
+                title_description: str, 标题描述
+                device_type: str, 设备类型（'pc' 或 'mobile'）
+        """
+        # 设置日期范围
+        self.current_date = date
+        
+        # TODO: 未来根据 channel 参数从不同数据源获取数据
+        # 当前阶段仅实现 PC 端数据，忽略 channel 参数
+        
+        sql = """
+        SELECT 
+            uabl.id,
+            uabl.start_time,
+            uabl.end_time,
+            uabl.duration,
+            uabl.app,
+            uabl.title,
+            uabl.category_id,
+            c.name as category_name,
+            uabl.sub_category_id,
+            sc.name as sub_category_name,
+            apc.app_description,
+            apc.title_description
+        FROM user_app_behavior_log uabl
+        LEFT JOIN category c ON uabl.category_id = c.id
+        LEFT JOIN sub_category sc ON uabl.sub_category_id = sc.id
+        LEFT JOIN app_purpose_category apc ON uabl.app = apc.app
+        WHERE uabl.start_time >= ? AND uabl.start_time <= ?
+        ORDER BY uabl.start_time ASC
+        """
+        
+        with self.lw_db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (self._start_time, self._end_time))
+            results = cursor.fetchall()
+        
+        # 转换为字典列表
+        events = []
+        for row in results:
+            events.append({
+                "id": row[0],
+                "start_time": row[1],
+                "end_time": row[2],
+                "duration": row[3],
+                "app": row[4],
+                "title": row[5],
+                "category_id": row[6] or "",
+                "category_name": row[7] or "",
+                "sub_category_id": row[8] or "",
+                "sub_category_name": row[9] or "",
+                "app_description": row[10] or "",
+                "title_description": row[11] or "",
+                "device_type": "pc"  # 当前阶段固定为 'pc'
+            })
+        
+        return events
+
 if __name__ == "__main__":
     sdp = StatisticalDataProvider()
     
-    # 测试新的每日活动数据查询方法
-    print("=== 测试每日活动数据查询 ===")
+    # 测试 Timeline 数据查询
+    print("=== 测试 Timeline 数据查询 ===")
+    date = "2025-12-02"
+    events = sdp.get_timeline_events_by_date(date)
+    print(f"日期: {date}")
+    print(f"事件数量: {len(events)}")
+    if events:
+        print(f"第一个事件: {events[0]}")
+    
+    #测试新的每日活动数据查询方法
+    print("\n=== 测试每日活动数据查询 ===")
     start_date = "2025-12-01"
     end_date = "2025-12-07"
     daily_data = sdp.get_daily_active_time(start_date, end_date)
     print(f"日期范围: {start_date} 到 {end_date}")
     print(f"查询结果数量: {len(daily_data)}")
     for activity in daily_data:
-        print(f"日期: {activity['date']}, 活动占比: {activity['activeTimePercentage']}%")
+        print(f"日期: {activity['date']}, 活动占比: {activity['active_time_percentage']}%")
     
     print("\n=== 原有功能测试 ===")
     sdp.current_date = "2025-12-02"
