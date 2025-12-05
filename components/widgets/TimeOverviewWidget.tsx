@@ -117,55 +117,6 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
   const hours = Math.floor(totalTrackedMinutes / 60);
   const hasDetails = !!details && Object.keys(details).length > 0;
 
-  // Build hierarchical sunburst data structure
-  // Inner ring: parent categories
-  // Outer ring: subcategories from details, positioned relative to parents
-  const buildSunburstData = () => {
-    if (!hasDetails || viewStack.length > 0) {
-      // If no details or already drilled down, use simple dual-ring with same data
-      return {
-        innerRing: pieData,
-        outerRing: pieData,
-        hasHierarchy: false
-      };
-    }
-
-    // Build outer ring with subcategories
-    const outerRingData: any[] = [];
-
-    pieData.forEach(parent => {
-      const parentDetails = details[parent.key];
-      if (parentDetails && parentDetails.pieData && parentDetails.pieData.length > 0) {
-        // Add subcategories for this parent
-        parentDetails.pieData.forEach(subCategory => {
-          outerRingData.push({
-            ...subCategory,
-            parentKey: parent.key,
-            parentColor: parent.color
-          });
-        });
-      } else {
-        // No subcategories, add placeholder with parent data
-        outerRingData.push({
-          key: parent.key,
-          name: parent.name,
-          value: parent.value,
-          color: parent.color,
-          parentKey: parent.key,
-          parentColor: parent.color
-        });
-      }
-    });
-
-    return {
-      innerRing: pieData,
-      outerRing: outerRingData,
-      hasHierarchy: true
-    };
-  };
-
-  const sunburstData = buildSunburstData();
-
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 h-full flex flex-col transition-all duration-300">
       <div className="flex justify-between items-center mb-8">
@@ -199,7 +150,7 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
 
       <div className="flex flex-col lg:flex-row gap-8 flex-1 min-h-0">
 
-        {/* Sunburst Chart */}
+        {/* Donut Chart */}
         <div className="w-full lg:w-1/3 h-64 lg:h-auto relative flex flex-col items-center justify-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 p-4">
           <div className="w-full h-48 relative isolate">
             {/* Center Text - Z-0 (Behind) */}
@@ -208,62 +159,29 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
               <span className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Tracked</span>
             </div>
 
-            {/* Sunburst Chart - Z-10 (On Top) */}
+            {/* Chart - Z-10 (On Top) */}
             <div className="absolute inset-0 z-10">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  {/* Inner ring - Parent categories */}
                   <Pie
-                    data={sunburstData.innerRing}
-                    innerRadius={45}
-                    outerRadius={60}
-                    paddingAngle={2}
-                    dataKey="value"
-                    stroke="none"
-                    cornerRadius={4}
-                    isAnimationActive={true}
-                    onClick={(data, index) => {
-                      const entry = sunburstData.innerRing[index];
-                      if (entry && details && details[entry.key]) {
-                        handlePieClick(entry);
-                      }
-                    }}
-                  >
-                    {sunburstData.innerRing.map((entry, index) => {
-                      const isClickable = details && details[entry.key];
-                      return (
-                        <Cell
-                          key={`cell-inner-${index}`}
-                          fill={entry.color}
-                          opacity={0.7}
-                          className={`transition-all duration-300 ${isClickable ? 'cursor-pointer hover:opacity-90' : 'cursor-default'}`}
-                        />
-                      );
-                    })}
-                  </Pie>
-
-                  {/* Outer ring - Subcategories or same data if no hierarchy */}
-                  <Pie
-                    data={sunburstData.outerRing}
+                    data={pieData}
                     innerRadius={65}
-                    outerRadius={90}
-                    paddingAngle={sunburstData.hasHierarchy ? 1 : 4}
+                    outerRadius={85}
+                    paddingAngle={4}
                     dataKey="value"
                     stroke="none"
                     cornerRadius={6}
-                    isAnimationActive={true}
+                    onClick={handlePieClick}
+                    className={hasDetails ? "cursor-pointer" : ""}
                   >
-                    {sunburstData.outerRing.map((entry, index) => {
-                      return (
-                        <Cell
-                          key={`cell-outer-${index}`}
-                          fill={entry.color}
-                          className="transition-all duration-300"
-                        />
-                      );
-                    })}
+                    {pieData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.color}
+                        className={`transition-all duration-300 ${hasDetails ? 'hover:opacity-80' : ''}`}
+                      />
+                    ))}
                   </Pie>
-
                   <Tooltip content={<CustomTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
@@ -279,8 +197,8 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
               </div>
             ))}
           </div>
-          {hasDetails && !sunburstData.hasHierarchy && (
-            <p className="absolute bottom-4 text-[10px] text-slate-300 font-medium italic">Click inner ring to view details</p>
+          {hasDetails && (
+            <p className="absolute bottom-4 text-[10px] text-slate-300 font-medium italic">Click slice to drill down</p>
           )}
         </div>
 
