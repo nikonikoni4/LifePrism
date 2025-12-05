@@ -98,10 +98,16 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
         {
           type: 'sunburst',
           data: data,
-          radius: ['40%', '90%'],
+          radius: ['15%', '90%'],
           label: {
             rotate: 'radial',
-            minAngle: 5 // Hide labels for small slices
+            minAngle: 10, // Hide labels for small slices
+            fontSize: 10,
+            formatter: function (param: any) {
+              const name = param.name;
+              if (!name) return '';
+              return name.length > 5 ? name.slice(0, 5) + '...' : name;
+            }
           },
           itemStyle: {
             borderRadius: 4,

@@ -115,7 +115,7 @@ const Dashboard: React.FC = () => {
           <GoalsWidget selectedDate={selectedDate} />
         </div>
 
-        <div className="col-span-1 md:col-span-12 h-[500px]">
+        <div className="col-span-1 md:col-span-12 h-[600px]">
           {/* Pass initial time overview data as props */}
           <TimeOverviewWidget
             selectedDate={selectedDate}
