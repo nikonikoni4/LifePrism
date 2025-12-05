@@ -15,8 +15,10 @@ class TimelineEventSchema(BaseModel):
     title: str = Field(..., description="窗口标题或应用名称")
     category: str = Field(..., description="主分类ID")
     category_name: str = Field(..., alias="categoryName", description="主分类名称")
+    category_color: str = Field(..., alias="categoryColor", description="主分类颜色 (Hex)")
     sub_category_id: Optional[str] = Field(None, alias="subCategoryId", description="子分类ID")
     sub_category_name: Optional[str] = Field(None, alias="subCategoryName", description="子分类名称")
+    sub_category_color: Optional[str] = Field(None, alias="subCategoryColor", description="子分类颜色 (Hex)")
     description: str = Field(..., description="事件描述（app_description + title_description 组合）")
     device_type: str = Field(default="pc", alias="deviceType", description="数据来源设备类型")
     

@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import List, Optional
 from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
 from lifewatch.server.schemas.timeline_schemas import TimelineEventSchema, TimelineResponse
+from lifewatch.server.services.category_color_manager import color_manager
 
 
 class TimelineService:
@@ -48,6 +49,12 @@ class TimelineService:
             start_hour = self._time_to_hour_float(event["start_time"], date)
             end_hour = self._time_to_hour_float(event["end_time"], date)
             
+            # 获取分类颜色
+            category_color = color_manager.get_main_category_color(event["category_id"])
+            sub_category_color = None
+            if event["sub_category_id"]:
+                sub_category_color = color_manager.get_sub_category_color(event["sub_category_id"])
+            
             events.append(TimelineEventSchema(
                 id=event["id"],
                 start_time=start_hour,
@@ -55,8 +62,10 @@ class TimelineService:
                 title=event["title"],
                 category=event["category_id"],
                 category_name=event["category_name"],
+                category_color=category_color,
                 sub_category_id=event["sub_category_id"] if event["sub_category_id"] else None,
                 sub_category_name=event["sub_category_name"] if event["sub_category_name"] else None,
+                sub_category_color=sub_category_color,
                 description=description,
                 device_type=event["device_type"]
             ))
