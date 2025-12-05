@@ -111,11 +111,11 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
 
         {/* Row 1: Goals & Identity (33%) + Time Overview Charts (66%) */}
-        <div className="col-span-1 md:col-span-4 h-[500px]">
+        <div className="col-span-1 md:col-span-5 h-[700px]">
           <GoalsWidget selectedDate={selectedDate} />
         </div>
 
-        <div className="col-span-1 md:col-span-12 h-[600px]">
+        <div className="col-span-1 md:col-span-7 h-[700px]">
           {/* Pass initial time overview data as props */}
           <TimeOverviewWidget
             selectedDate={selectedDate}

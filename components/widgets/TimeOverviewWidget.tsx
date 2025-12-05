@@ -92,7 +92,14 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
     return {
       tooltip: {
         trigger: 'item',
-        formatter: '{b}: {c}m ({d}%)'
+        formatter: function (params: any) {
+          const name = params.name;
+          const value = params.value;
+          const hours = (value / 60).toFixed(1);
+          const total = rootData?.totalTrackedMinutes || 1;
+          const percent = ((value / total) * 100).toFixed(1);
+          return `${name}: ${hours}h (${percent}%)`;
+        }
       },
       series: [
         {
@@ -205,15 +212,17 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 flex-1 min-h-0">
+      <div className="flex flex-col gap-8 flex-1 min-h-0"> {/* Layout: Changed to vertical flex-col */}
 
         {/* Sunburst Chart */}
-        <div className="w-full lg:w-1/3 h-64 lg:h-auto relative flex flex-col items-center justify-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 p-4">
+        {/* Adjust height here: h-[400px] */}
+        <div className="w-full h-[400px] relative flex flex-col items-center justify-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 p-4">
           <div className="w-full h-full relative isolate">
             {/* Center Text - Z-0 (Behind) */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
-              <span className="text-5xl font-bold text-slate-800 font-mono tracking-tighter">{hours}h</span>
-              <span className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Tracked</span>
+              {/* Adjust font size here: text-3xl */}
+              <span className="text-2xl font-bold text-slate-800 font-mono tracking-tighter">{hours}h</span>
+              {/* <span className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Tracked</span> */}
             </div>
 
             {/* Chart - Z-10 (On Top) */}
@@ -232,7 +241,8 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
         </div>
 
         {/* Stacked Bar Chart */}
-        <div className="w-full lg:w-2/3 h-64 lg:h-auto pt-2">
+        {/* Adjust height here: h-[200px] */}
+        <div className="w-full h-[200px] pt-2">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={barData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }} barSize={36}>
               <CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="3 3" />
