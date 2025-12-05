@@ -102,6 +102,7 @@ class StatisticalDataProvider:
             results = cursor.fetchall()
             
         return [{"name": row[0], "duration": row[1]} for row in results]
+
     def get_category_stats(self) -> list[dict]:
         """
         获取指定日期的分类统计
@@ -134,7 +135,16 @@ class StatisticalDataProvider:
             category_color = cursor.fetchall()
         category_color_dict = {row[0]: {"id": row[2], "color": row[1]} for row in category_color}
             
-        return [{"name": row[0], "duration": row[1],"color": category_color_dict[row[0]]["color"],"id": category_color_dict[row[0]]["id"]} for row in results]
+        return [
+            {
+                "name": row[0], 
+                "duration": row[1],
+                "color": category_color_dict.get(row[0], {}).get("color", "#E8684A"),
+                "id": category_color_dict.get(row[0], {}).get("id", -1)
+            } 
+            for row in results if row[0] is not None
+        ]
+
     def get_sub_category_stats(self) -> list[dict]:
         """
         获取指定日期的子分类统计
@@ -162,9 +172,16 @@ class StatisticalDataProvider:
             cursor.execute(sql_id)
             sub_category_id = cursor.fetchall()
             sub_category_id_dict = {row[0]: {"id": row[1],"category_id": row[2]} for row in sub_category_id}
-        # return [{"name": row[0], "duration": row[1]} for row in results]
-    
-        return [{"name": row[0], "duration": row[1],"id": sub_category_id_dict[row[0]]["id"],"category_id": sub_category_id_dict[row[0]]["category_id"]} for row in results]
+        
+        return [
+            {
+                "name": row[0], 
+                "duration": row[1],
+                "id": sub_category_id_dict.get(row[0], {}).get("id", -1),
+                "category_id": sub_category_id_dict.get(row[0], {}).get("category_id", -1)
+            } 
+            for row in results if row[0] is not None
+        ]
     
     def get_range_active_time(self, start_date: str, end_date: str) -> int:
         """
