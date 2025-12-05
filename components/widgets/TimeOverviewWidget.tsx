@@ -58,6 +58,7 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
   const [error, setError] = useState<string | null>(null);
   const [rootData, setRootData] = useState<TimeOverviewResponse | null>(null);
   const [selectedView, setSelectedView] = useState<TimeOverviewResponse | null>(null);
+  const [chartKey, setChartKey] = useState(0); // Key to force re-render of chart
 
   useEffect(() => {
     if (initialData) {
@@ -140,6 +141,7 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
 
   const handleReset = () => {
     setSelectedView(rootData);
+    setChartKey(prev => prev + 1); // Force chart re-render to reset visual state
   };
 
   const handleBack = () => {
@@ -177,7 +179,7 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
   if (!selectedView || !rootData) return null;
 
   const { title, subTitle, barKeys, barData } = selectedView;
-  const hours = Math.floor(rootData.totalTrackedMinutes / 60);
+  const hours = Math.floor(selectedView.totalTrackedMinutes / 60);
   const isRoot = selectedView === rootData;
 
   return (
@@ -228,6 +230,7 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
             {/* Chart - Z-10 (On Top) */}
             <div className="absolute inset-0 z-10">
               <ReactECharts
+                key={chartKey}
                 option={sunburstOption}
                 style={{ height: '100%', width: '100%' }}
                 onEvents={{
