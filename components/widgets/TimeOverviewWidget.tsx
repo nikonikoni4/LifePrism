@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import ReactECharts from 'echarts-for-react';
 import {
-  PieChart,
-  Pie,
-  Cell,
   ResponsiveContainer,
   BarChart,
   Bar,
@@ -11,15 +9,9 @@ import {
   YAxis,
   CartesianGrid
 } from 'recharts';
-import { ChevronLeft, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
 import { DashboardAPI } from '../../services/dashboardService';
-import { TimeOverviewResponse, ChartSegment, BarConfig, TimeDistribution } from '../../types';
-
-const COLORS = {
-  WORK: '#5B8FF9',
-  ENTERTAINMENT: '#FA8C16',
-  OTHER: '#BFBFBF'
-};
+import { TimeOverviewResponse } from '../../types';
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -41,22 +33,39 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+// Helper to transform data for Sunburst recursively
+const transformDataToSunburst = (data: TimeOverviewResponse): any[] => {
+  if (!data || !data.pieData) return [];
+
+  return data.pieData.map((segment) => {
+    const childData = data.details?.[segment.key];
+    const children = childData ? transformDataToSunburst(childData) : undefined;
+
+    return {
+      name: segment.name,
+      value: segment.value,
+      itemStyle: { color: segment.color },
+      // Custom payload to identify the node and its associated data
+      // If childData exists, clicking this node should show the child's details (bar chart)
+      dataRef: childData,
+      children: children
+    };
+  });
+};
+
 const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOverviewResponse }> = ({ selectedDate, initialData }) => {
-  const [viewStack, setViewStack] = useState<TimeOverviewResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<TimeOverviewResponse | null>(null);
+  const [rootData, setRootData] = useState<TimeOverviewResponse | null>(null);
+  const [selectedView, setSelectedView] = useState<TimeOverviewResponse | null>(null);
 
   useEffect(() => {
-    // Reset view stack when date changes
-    setViewStack([]);
-
     if (initialData) {
-      setData(initialData);
+      setRootData(initialData);
+      setSelectedView(initialData);
       setLoading(false);
       return;
     }
-
     fetchData();
   }, [selectedDate, initialData]);
 
@@ -64,9 +73,9 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
     try {
       setLoading(true);
       setError(null);
-      // No parentId needed anymore
       const response = await DashboardAPI.getTimeOverview(selectedDate);
-      setData(response);
+      setRootData(response);
+      setSelectedView(response);
     } catch (err) {
       console.error('Failed to fetch time overview:', err);
       setError('Failed to load data');
@@ -75,20 +84,61 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
     }
   };
 
-  const currentView = viewStack.length > 0 ? viewStack[viewStack.length - 1] : data;
+  const sunburstOption = useMemo(() => {
+    if (!rootData) return {};
 
-  const handlePieClick = (entry: any) => {
-    // Check if the clicked item has details (children)
-    if (currentView?.details && currentView.details[entry.key]) {
-      setViewStack([...viewStack, currentView.details[entry.key]]);
+    const data = transformDataToSunburst(rootData);
+
+    return {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c}m ({d}%)'
+      },
+      series: [
+        {
+          type: 'sunburst',
+          data: data,
+          radius: ['40%', '90%'],
+          label: {
+            rotate: 'radial',
+            minAngle: 5 // Hide labels for small slices
+          },
+          itemStyle: {
+            borderRadius: 4,
+            borderWidth: 2,
+            borderColor: '#fff'
+          },
+          emphasis: {
+            focus: 'ancestor'
+          }
+        }
+      ]
+    };
+  }, [rootData]);
+
+  const onChartClick = (params: any) => {
+    const { data } = params;
+    // data.dataRef contains the TimeOverviewResponse for this node (if it has children/details)
+    if (data && data.dataRef) {
+      setSelectedView(data.dataRef);
     }
+    // If leaf node (no dataRef), do nothing as per requirements
+  };
+
+  const handleReset = () => {
+    setSelectedView(rootData);
   };
 
   const handleBack = () => {
-    setViewStack(prev => prev.slice(0, -1));
+    // Since we don't track a stack, "Back" is ambiguous in a tree. 
+    // But we can reset to root, or maybe we don't need a back button if we have Reset.
+    // The previous implementation had a stack. Here the Sunburst IS the navigation.
+    // But if the user wants to go "up" one level from the Bar Chart perspective?
+    // For now, "Reset" is sufficient to go back to the overview.
+    setSelectedView(rootData);
   };
 
-  if (loading && !data) {
+  if (loading && !rootData) {
     return (
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 h-full flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
@@ -111,22 +161,23 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
     );
   }
 
-  if (!currentView) return null;
+  if (!selectedView || !rootData) return null;
 
-  const { title, subTitle, totalTrackedMinutes, pieData, barKeys, barData, details } = currentView;
-  const hours = Math.floor(totalTrackedMinutes / 60);
-  const hasDetails = !!details && Object.keys(details).length > 0;
+  const { title, subTitle, barKeys, barData } = selectedView;
+  const hours = Math.floor(rootData.totalTrackedMinutes / 60);
+  const isRoot = selectedView === rootData;
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 h-full flex flex-col transition-all duration-300">
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
-          {viewStack.length > 0 && (
+          {!isRoot && (
             <button
-              onClick={handleBack}
+              onClick={handleReset}
               className="p-2 -ml-2 rounded-xl hover:bg-gray-50 text-slate-400 hover:text-slate-700 transition-colors"
+              title="Reset to Overview"
             >
-              <ChevronLeft size={24} />
+              <RotateCcw size={20} />
             </button>
           )}
           <div>
@@ -150,9 +201,9 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
 
       <div className="flex flex-col lg:flex-row gap-8 flex-1 min-h-0">
 
-        {/* Donut Chart */}
+        {/* Sunburst Chart */}
         <div className="w-full lg:w-1/3 h-64 lg:h-auto relative flex flex-col items-center justify-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 p-4">
-          <div className="w-full h-48 relative isolate">
+          <div className="w-full h-full relative isolate">
             {/* Center Text - Z-0 (Behind) */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
               <span className="text-5xl font-bold text-slate-800 font-mono tracking-tighter">{hours}h</span>
@@ -161,45 +212,17 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
 
             {/* Chart - Z-10 (On Top) */}
             <div className="absolute inset-0 z-10">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    innerRadius={65}
-                    outerRadius={85}
-                    paddingAngle={4}
-                    dataKey="value"
-                    stroke="none"
-                    cornerRadius={6}
-                    onClick={handlePieClick}
-                    className={hasDetails ? "cursor-pointer" : ""}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.color}
-                        className={`transition-all duration-300 ${hasDetails ? 'hover:opacity-80' : ''}`}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                option={sunburstOption}
+                style={{ height: '100%', width: '100%' }}
+                onEvents={{
+                  click: onChartClick
+                }}
+              />
             </div>
           </div>
 
-          {/* Legend underneath */}
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-4 pb-2 relative z-20">
-            {pieData.map((item, idx) => (
-              <div key={idx} className="text-center min-w-[60px]">
-                <p className="text-lg font-bold text-slate-700">{Math.round((item.value / totalTrackedMinutes) * 100) || 0}%</p>
-                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate max-w-[80px]">{item.name}</p>
-              </div>
-            ))}
-          </div>
-          {hasDetails && (
-            <p className="absolute bottom-4 text-[10px] text-slate-300 font-medium italic">Click slice to drill down</p>
-          )}
+          <p className="absolute bottom-4 text-[10px] text-slate-300 font-medium italic">Click slices to drill down</p>
         </div>
 
         {/* Stacked Bar Chart */}
