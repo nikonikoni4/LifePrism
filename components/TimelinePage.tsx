@@ -43,8 +43,25 @@ const TimelinePage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [currentTime, setCurrentTime] = useState<number | null>(null);
 
-    type TimeScale = '2h' | '1h' | '30m' | '15m' | '1m';
+    type TimeScale = '2h' | '1h' | '30m' | '15m' | '5m';
     const [timeScale, setTimeScale] = useState<TimeScale>('1h');
+
+    // === Thumbnail 缩略图配置 ===
+    interface ThumbnailConfig {
+        enabled: boolean;
+        hourGranularity: 1 | 2 | 3 | 4 | 6;
+        categoryLevel: 'main' | 'sub';
+        maxCategories: number;
+        width: number;
+    }
+
+    const [thumbnailConfig, setThumbnailConfig] = useState<ThumbnailConfig>({
+        enabled: true,
+        hourGranularity: 1,
+        categoryLevel: 'main',
+        maxCategories: 3,
+        width: 80
+    });
 
     const dateInputRef = React.useRef<HTMLInputElement>(null);
     const selectedEvent = events.find(e => e.id === selectedEventId);
@@ -70,20 +87,63 @@ const TimelinePage: React.FC = () => {
         fetchTimelineData();
     }, [currentDate]);
 
-    const SCALE_CONFIG: Record<TimeScale, { hourHeight: number; labelInterval: number }> = {
-        '2h': { hourHeight: 60, labelInterval: 2 },
-        '1h': { hourHeight: 80, labelInterval: 1 },
-        '30m': { hourHeight: 120, labelInterval: 0.5 },
-        '15m': { hourHeight: 200, labelInterval: 0.25 },
-        '1m': { hourHeight: 1200, labelInterval: 1 / 60 },
+    // 最小刻度高度限制（像素）
+    const MIN_TICK_HEIGHT = 20;
+
+    // 刻度配置：主刻度（显示标签）+ 次刻度（只显示网格线）
+    const SCALE_CONFIG: Record<TimeScale, {
+        hourHeight: number;
+        majorInterval: number;  // 主刻度间隔（小时）
+        minorInterval?: number; // 次刻度间隔（小时），可选
+    }> = {
+        '2h': {
+            hourHeight: 60,
+            majorInterval: 2,
+            minorInterval: 1  // 每小时一个次刻度
+        },
+        '1h': {
+            hourHeight: 80,
+            majorInterval: 1,
+            minorInterval: 0.5  // 每半小时一个次刻度
+        },
+        '30m': {
+            hourHeight: 120,
+            majorInterval: 0.5,
+            minorInterval: 0.25  // 每15分钟一个次刻度
+        },
+        '15m': {
+            hourHeight: 200,
+            majorInterval: 0.25,
+            minorInterval: 5 / 60  // 每5分钟一个次刻度
+        },
+        '5m': {
+            hourHeight: 600,  // 增加高度以支持更密集的刻度
+            majorInterval: 5 / 60,  // 主刻度：每5分钟
+            minorInterval: 1 / 60   // 次刻度：每1分钟
+        },
     };
 
-    const { hourHeight: HOUR_HEIGHT, labelInterval } = SCALE_CONFIG[timeScale];
+    const { hourHeight: HOUR_HEIGHT, majorInterval, minorInterval } = SCALE_CONFIG[timeScale];
 
-    // Time ruler generation
-    const ticks: number[] = [];
-    for (let i = 0; i <= 24; i += labelInterval) {
-        ticks.push(i);
+    // 生成主刻度（显示标签）
+    const majorTicks: number[] = [];
+    for (let i = 0; i <= 24; i += majorInterval) {
+        majorTicks.push(i);
+    }
+
+    // 生成次刻度（只显示网格线）
+    const minorTicks: number[] = [];
+    if (minorInterval) {
+        const minorTickHeight = HOUR_HEIGHT * minorInterval;
+        // 只有当次刻度高度满足最小要求时才生成
+        if (minorTickHeight >= MIN_TICK_HEIGHT) {
+            for (let i = 0; i < 24; i += minorInterval) {
+                // 排除与主刻度重合的位置
+                if (!majorTicks.includes(i)) {
+                    minorTicks.push(i);
+                }
+            }
+        }
     }
 
     // Helper to calculate style for event blocks
@@ -122,6 +182,118 @@ const TimelinePage: React.FC = () => {
             height: `${height}px`,
             className: `absolute left-16 right-4 rounded-xl border ${borderColor} ${bgColor} ${textColor} p-3 text-xs cursor-pointer hover:shadow-md transition-all duration-200 flex flex-col justify-center overflow-hidden`
         };
+    };
+
+    // === Thumbnail 数据聚合逻辑 ===
+    interface CategoryData {
+        id: string;
+        name: string;
+        color: string;
+        duration: number;  // 秒
+        percentage: number;
+    }
+
+    interface HourlyData {
+        hour: number;
+        categories: CategoryData[];
+        emptyPercentage: number;
+    }
+
+    // 获取分类颜色（直接使用后端返回的颜色）
+    const getCategoryColor = (event: TimelineEventData): string => {
+        if (thumbnailConfig.categoryLevel === 'main') {
+            return event.categoryColor;
+        } else {
+            return event.subCategoryColor || event.categoryColor;
+        }
+    };
+
+    // 聚合按小时数据
+    const aggregateByHour = React.useMemo(() => {
+        const hourlyMap = new Map<number, Map<string, CategoryData>>();
+        const hourDuration = 3600 * thumbnailConfig.hourGranularity;
+
+        // 初始化所有时间块
+        for (let h = 0; h < 24; h += thumbnailConfig.hourGranularity) {
+            hourlyMap.set(h, new Map());
+        }
+
+        // 聚合事件数据
+        events.forEach(event => {
+            const startHour = Math.floor(event.startTime / thumbnailConfig.hourGranularity) * thumbnailConfig.hourGranularity;
+            const endHour = Math.floor(event.endTime / thumbnailConfig.hourGranularity) * thumbnailConfig.hourGranularity;
+
+            for (let h = startHour; h <= endHour && h < 24; h += thumbnailConfig.hourGranularity) {
+                const categoryMap = hourlyMap.get(h);
+                if (!categoryMap) continue;
+
+                // 计算重叠时长
+                const blockStart = h;
+                const blockEnd = h + thumbnailConfig.hourGranularity;
+                const overlapStart = Math.max(event.startTime, blockStart);
+                const overlapEnd = Math.min(event.endTime, blockEnd);
+                const overlapDuration = Math.max(0, (overlapEnd - overlapStart) * 3600);
+
+                // 确定分类Key
+                const categoryKey = thumbnailConfig.categoryLevel === 'main'
+                    ? event.category
+                    : event.subCategoryId || event.category;
+
+                const categoryName = thumbnailConfig.categoryLevel === 'main'
+                    ? event.categoryName
+                    : event.subCategoryName || event.categoryName;
+
+                let categoryData = categoryMap.get(categoryKey);
+                if (!categoryData) {
+                    categoryData = {
+                        id: categoryKey,
+                        name: categoryName,
+                        color: getCategoryColor(event),
+                        duration: 0,
+                        percentage: 0
+                    };
+                    categoryMap.set(categoryKey, categoryData);
+                }
+
+                categoryData.duration += overlapDuration;
+            }
+        });
+
+        // 转换为数组并计算百分比
+        const hourlyData: HourlyData[] = [];
+        for (let h = 0; h < 24; h += thumbnailConfig.hourGranularity) {
+            const categoryMap = hourlyMap.get(h)!;
+            const categories = Array.from(categoryMap.values());
+
+            const totalDuration = categories.reduce((sum, cat) => sum + cat.duration, 0);
+            const emptyDuration = hourDuration - totalDuration;
+            const emptyPercentage = (emptyDuration / hourDuration) * 100;
+
+            categories.forEach(cat => {
+                cat.percentage = (cat.duration / hourDuration) * 100;
+            });
+
+            // 按时长排序并选择 Top N
+            categories.sort((a, b) => b.duration - a.duration);
+
+            hourlyData.push({
+                hour: h,
+                categories,
+                emptyPercentage: Math.max(0, emptyPercentage)
+            });
+        }
+
+        return hourlyData;
+    }, [events, thumbnailConfig.hourGranularity, thumbnailConfig.categoryLevel]);
+
+    // 格式化时长
+    const formatDuration = (seconds: number): string => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        }
+        return `${minutes}m`;
     };
 
     // Format float hour to HH:MM
@@ -178,6 +350,91 @@ const TimelinePage: React.FC = () => {
 
     // Helper to get active category definition for dropdowns
     const activeCategoryDef = selectedEvent ? MOCK_CATEGORIES.find(c => c.id === selectedEvent.category) : null;
+
+    // === Thumbnail Components ===
+    const ThumbnailBlock: React.FC<{
+        hourData: HourlyData;
+        height: number;
+    }> = ({ hourData, height }) => {
+        const topCategories = hourData.categories.slice(0, thumbnailConfig.maxCategories);
+        const otherCategories = hourData.categories.slice(thumbnailConfig.maxCategories);
+
+        let otherPercentage = 0;
+        let otherDuration = 0;
+        let otherName = '其他';
+        let otherColor = '#9CA3AF';
+
+        if (otherCategories.length > 0) {
+            otherDuration = otherCategories.reduce((sum, cat) => sum + cat.duration, 0);
+            otherPercentage = otherCategories.reduce((sum, cat) => sum + cat.percentage, 0);
+
+            // 使用第一个剩余分类的名称和颜色，格式为"A等..."
+            const firstOther = otherCategories[0];
+            otherName = `${firstOther.name}等...`;
+            otherColor = firstOther.color;
+        }
+
+        return (
+            <div
+                className="relative border-b border-gray-100 group"
+                style={{ height: `${height}px` }}
+            >
+                {/* 横向堆叠条 */}
+                <div className="absolute inset-0 flex">
+                    {/* Top N 分类 */}
+                    {topCategories.map((cat, idx) => (
+                        <div
+                            key={cat.id}
+                            style={{
+                                width: `${cat.percentage}%`,
+                                backgroundColor: cat.color
+                            }}
+                            className="relative flex items-center justify-center overflow-hidden text-[9px] font-medium text-white transition-all"
+                            title={`${cat.name}: ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)`}
+                        >
+                            {/* 显示分类信息（如果宽度足够） */}
+                            {cat.percentage > 8 && (
+                                <div className="px-1 text-center leading-tight" style={{
+                                    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                                    fontSize: '8px'
+                                }}>
+                                    <div className="font-bold truncate">{cat.name}</div>
+                                    <div className="opacity-90">{formatDuration(cat.duration)}</div>
+                                    <div className="opacity-75">{cat.percentage.toFixed(0)}%</div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+
+                    {/* 其他分类（动态命名） */}
+                    {otherPercentage > 0 && (
+                        <div
+                            style={{
+                                width: `${otherPercentage}%`,
+                                backgroundColor: otherColor
+                            }}
+                            className="relative flex items-center justify-center text-[9px] font-medium text-white"
+                            title={`${otherName}: ${formatDuration(otherDuration)} (${otherPercentage.toFixed(1)}%)`}
+                        >
+                            {otherPercentage > 5 && (
+                                <div style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)', fontSize: '8px' }}>
+                                    {otherName}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 空白时间 */}
+                    {hourData.emptyPercentage > 0 && (
+                        <div
+                            style={{ width: `${hourData.emptyPercentage}%` }}
+                            className="bg-gray-50 border-l border-gray-100"
+                        />
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="flex flex-col h-screen -m-6 lg:-m-10">
@@ -245,11 +502,68 @@ const TimelinePage: React.FC = () => {
                         15m
                     </button>
                     <button
-                        onClick={() => setTimeScale('1m')}
+                        onClick={() => setTimeScale('5m')}
                         className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '1m' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                        1m
+                        5m
                     </button>
+                </div>
+
+                {/* Thumbnail Controls - 移到最右侧 */}
+                <div className="flex items-center gap-3 ml-auto">
+                    {thumbnailConfig.enabled && (
+                        <>
+                            {/* 时间粒度 */}
+                            <select
+                                value={thumbnailConfig.hourGranularity}
+                                onChange={(e) => setThumbnailConfig(prev => ({ ...prev, hourGranularity: Number(e.target.value) as any }))}
+                                className="text-xs border rounded px-2 py-1 bg-white"
+                            >
+                                <option value={1}>1小时</option>
+                                <option value={2}>2小时</option>
+                                <option value={3}>3小时</option>
+                                <option value={4}>4小时</option>
+                                <option value={6}>6小时</option>
+                            </select>
+
+                            {/* 分类级别 */}
+                            <select
+                                value={thumbnailConfig.categoryLevel}
+                                onChange={(e) => setThumbnailConfig(prev => ({ ...prev, categoryLevel: e.target.value as any }))}
+                                className="text-xs border rounded px-2 py-1 bg-white"
+                            >
+                                <option value="main">主分类</option>
+                                <option value="sub">子分类</option>
+                            </select>
+
+                            {/* 显示数量 */}
+                            <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-gray-500">Top</span>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={5}
+                                    value={thumbnailConfig.maxCategories}
+                                    onChange={(e) => setThumbnailConfig(prev => ({ ...prev, maxCategories: Number(e.target.value) }))}
+                                    className="w-12 text-xs border rounded px-1 py-1 text-center"
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    {/* Toggle Switch */}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <span className="text-xs font-medium text-gray-700">缩略图</span>
+                        <div className="relative">
+                            <input
+                                type="checkbox"
+                                checked={thumbnailConfig.enabled}
+                                onChange={(e) => setThumbnailConfig(prev => ({ ...prev, enabled: e.target.checked }))}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+                        </div>
+                    </label>
                 </div>
             </div>
 
@@ -258,99 +572,122 @@ const TimelinePage: React.FC = () => {
                 {/* Left Column: Vertical Timeline Feed */}
                 <div className="w-full lg:w-[65%] h-full overflow-y-auto relative bg-[#FAFAFA]">
                     <div className="relative min-h-[2000px] py-4" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
-                        {/* Time Ruler */}
+                        {/* Time Ruler - Major Ticks with Labels */}
                         <div className="absolute left-0 top-0 bottom-0 w-16 border-r border-dashed border-gray-200 bg-white z-0">
-                            {ticks.map((t) => (
+                            {majorTicks.map((t) => (
                                 <div key={t} className="absolute w-full flex justify-end pr-2 text-[10px] font-mono font-medium text-gray-400" style={{ top: `${t * HOUR_HEIGHT - 6}px` }}>
                                     {formatTickLabel(t)}
                                 </div>
                             ))}
                         </div>
 
-                        {/* Grid Lines */}
-                        {ticks.map((t) => (
-                            <div key={`line-${t}`} className="absolute left-16 right-0 border-t border-gray-100" style={{ top: `${t * HOUR_HEIGHT}px` }}></div>
+                        {/* Grid Lines - Major Ticks */}
+                        {majorTicks.map((t) => (
+                            <div key={`major-${t}`} className="absolute left-16 right-0 border-t border-gray-200" style={{ top: `${t * HOUR_HEIGHT}px` }}></div>
                         ))}
 
-                        {/* Loading State */}
-                        {loading && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-30">
-                                <div className="flex flex-col items-center gap-3">
-                                    <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-                                    <p className="text-sm text-gray-600 font-medium">加载时间线数据...</p>
-                                </div>
+                        {/* Grid Lines - Minor Ticks (lighter) */}
+                        {minorTicks.map((t) => (
+                            <div key={`minor-${t}`} className="absolute left-16 right-0 border-t border-gray-100" style={{ top: `${t * HOUR_HEIGHT}px` }}></div>
+                        ))}
+
+                        {/* === 条件渲染：缩略图 OR 事件详情 === */}
+                        {thumbnailConfig.enabled ? (
+                            /* 缩略图视图 */
+                            <div className="absolute left-16 right-0 top-0 bottom-0">
+                                {aggregateByHour.map(hourData => (
+                                    <ThumbnailBlock
+                                        key={hourData.hour}
+                                        hourData={hourData}
+                                        height={HOUR_HEIGHT * thumbnailConfig.hourGranularity}
+                                    />
+                                ))}
                             </div>
-                        )}
+                        ) : (
+                            /* 事件详情视图 */
+                            <>
 
-                        {/* Error State */}
-                        {error && !loading && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-30">
-                                <div className="flex flex-col items-center gap-3 max-w-md p-6">
-                                    <AlertCircle className="w-12 h-12 text-red-500" />
-                                    <p className="text-sm text-gray-700 font-medium text-center">{error}</p>
-                                    <button
-                                        onClick={() => setCurrentDate(currentDate)}
-                                        className="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors"
-                                    >
-                                        重试
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                                {/* Loading State */}
+                                {loading && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-30">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                                            <p className="text-sm text-gray-600 font-medium">加载时间线数据...</p>
+                                        </div>
+                                    </div>
+                                )}
 
-                        {/* Empty State */}
-                        {!loading && !error && events.length === 0 && (
-                            <div className="absolute inset-0 flex items-center justify-center z-30">
-                                <div className="flex flex-col items-center gap-3 max-w-md p-6 text-center">
-                                    <Monitor className="w-16 h-16 text-gray-300" />
-                                    <h3 className="text-lg font-bold text-gray-700">暂无活动数据</h3>
-                                    <p className="text-sm text-gray-500">
-                                        该日期没有记录到任何活动。请选择其他日期，或确保 ActivityWatch 正在运行。
-                                    </p>
-                                </div>
-                            </div>
-                        )}
+                                {/* Error State */}
+                                {error && !loading && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-30">
+                                        <div className="flex flex-col items-center gap-3 max-w-md p-6">
+                                            <AlertCircle className="w-12 h-12 text-red-500" />
+                                            <p className="text-sm text-gray-700 font-medium text-center">{error}</p>
+                                            <button
+                                                onClick={() => setCurrentDate(currentDate)}
+                                                className="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors"
+                                            >
+                                                重试
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
 
-                        {/* Events */}
-                        {events.map((event) => {
-                            const style = getEventStyle(event);
-                            const catDef = MOCK_CATEGORIES.find(c => c.id === event.category);
-                            const subCatDef = catDef?.subCategories.find(s => s.id === event.subCategoryId);
+                                {/* Empty State */}
+                                {!loading && !error && events.length === 0 && (
+                                    <div className="absolute inset-0 flex items-center justify-center z-30">
+                                        <div className="flex flex-col items-center gap-3 max-w-md p-6 text-center">
+                                            <Monitor className="w-16 h-16 text-gray-300" />
+                                            <h3 className="text-lg font-bold text-gray-700">暂无活动数据</h3>
+                                            <p className="text-sm text-gray-500">
+                                                该日期没有记录到任何活动。请选择其他日期，或确保 ActivityWatch 正在运行。
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
 
-                            return (
-                                <div
-                                    key={event.id}
-                                    style={{ top: style.top, height: style.height }}
-                                    className={style.className}
-                                    onClick={() => setSelectedEventId(event.id)}
-                                >
-                                    <div className="font-bold truncate">{event.title}</div>
-                                    {style.height !== '0px' && parseInt(style.height) > 30 && (
-                                        <div className="flex items-center justify-between mt-1">
-                                            <div className="flex items-center gap-1 opacity-80">
-                                                <span className="text-[10px]">{formatTime(event.startTime)} - {formatTime(event.endTime)}</span>
-                                                {subCatDef && (
-                                                    <>
-                                                        <span className="mx-0.5">•</span>
-                                                        <span className="text-[10px] font-medium opacity-100 bg-black/5 px-1.5 rounded-sm">{subCatDef.name}</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                            {event.linkedGoal && (
-                                                <div className="w-2 h-2 rounded-full bg-current opacity-50"></div>
+                                {/* Events */}
+                                {events.map((event) => {
+                                    const style = getEventStyle(event);
+                                    const catDef = MOCK_CATEGORIES.find(c => c.id === event.category);
+                                    const subCatDef = catDef?.subCategories.find(s => s.id === event.subCategoryId);
+
+                                    return (
+                                        <div
+                                            key={event.id}
+                                            style={{ top: style.top, height: style.height }}
+                                            className={style.className}
+                                            onClick={() => setSelectedEventId(event.id)}
+                                        >
+                                            <div className="font-bold truncate">{event.title}</div>
+                                            {style.height !== '0px' && parseInt(style.height) > 30 && (
+                                                <div className="flex items-center justify-between mt-1">
+                                                    <div className="flex items-center gap-1 opacity-80">
+                                                        <span className="text-[10px]">{formatTime(event.startTime)} - {formatTime(event.endTime)}</span>
+                                                        {subCatDef && (
+                                                            <>
+                                                                <span className="mx-0.5">•</span>
+                                                                <span className="text-[10px] font-medium opacity-100 bg-black/5 px-1.5 rounded-sm">{subCatDef.name}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    {event.linkedGoal && (
+                                                        <div className="w-2 h-2 rounded-full bg-current opacity-50"></div>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+                                    );
+                                })}
 
-                        {/* Current Time Indicator */}
-                        {currentTime !== null && (
-                            <div className="absolute left-0 right-0 border-t-2 border-red-400 z-20 pointer-events-none flex items-center" style={{ top: `${currentTime * HOUR_HEIGHT}px` }}>
-                                <div className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-r-md -mt-[9px]">{formatTime(currentTime)}</div>
-                                <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 -mt-[1px]"></div>
-                            </div>
+                                {/* Current Time Indicator */}
+                                {currentTime !== null && (
+                                    <div className="absolute left-0 right-0 border-t-2 border-red-400 z-20 pointer-events-none flex items-center" style={{ top: `${currentTime * HOUR_HEIGHT}px` }}>
+                                        <div className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-r-md -mt-[9px]">{formatTime(currentTime)}</div>
+                                        <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 -mt-[1px]"></div>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>

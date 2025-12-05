@@ -149,8 +149,10 @@ export interface TimelineEventData {
   title: string;
   category: string; // Category ID
   categoryName: string;
+  categoryColor: string; // Category color from backend
   subCategoryId?: string | null;
   subCategoryName?: string | null;
+  subCategoryColor?: string | null; // Sub-category color from backend
   description: string;
   deviceType: 'pc' | 'mobile';
 }
