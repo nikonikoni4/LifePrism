@@ -96,7 +96,7 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
         formatter: function (params: any) {
           const name = params.name;
           const value = params.value;
-          const hours = (value / 60).toFixed(1);
+          const hours = (value / 60).toFixed(2);
           const total = rootData?.totalTrackedMinutes || 1;
           const percent = ((value / total) * 100).toFixed(1);
           return `${name}: ${hours}h (${percent}%)`;
@@ -186,15 +186,17 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 h-full flex flex-col transition-all duration-300">
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
-          {!isRoot && (
-            <button
-              onClick={handleReset}
-              className="p-2 -ml-2 rounded-xl hover:bg-gray-50 text-slate-400 hover:text-slate-700 transition-colors"
-              title="Reset to Overview"
-            >
-              <RotateCcw size={20} />
-            </button>
-          )}
+          <button
+            onClick={handleReset}
+            disabled={isRoot}
+            className={`p-2 -ml-2 rounded-xl transition-colors ${isRoot
+                ? 'text-slate-200 cursor-not-allowed'
+                : 'hover:bg-gray-50 text-slate-400 hover:text-slate-700'
+              }`}
+            title="Reset to Overview"
+          >
+            <RotateCcw size={20} />
+          </button>
           <div>
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight animate-fade-in">{title}</h2>
             <p className="text-slate-500 text-sm mt-1 font-medium">{subTitle}</p>
