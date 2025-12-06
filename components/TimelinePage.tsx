@@ -45,10 +45,16 @@ const TimelinePage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [currentTime, setCurrentTime] = useState<number | null>(null);
     // 时间过滤器状态（分钟），用于非缩略图视图
-    const [minDurationFilter, setMinDurationFilter] = useState<number>(0);
+    const [minDurationFilter, setMinDurationFilter] = useState<number>(3);
 
-    type TimeScale = '2h' | '1h' | '30m' | '15m' | '5m';
-    const [timeScale, setTimeScale] = useState<TimeScale>('1h');
+    // === 缩放相关配置 ===
+    const MIN_HOUR_HEIGHT = 30;   // 最小每小时高度（像素）
+    const MAX_HOUR_HEIGHT = 1200; // 最大每小时高度（像素）
+    const DEFAULT_HOUR_HEIGHT = 80;
+    const ZOOM_STEP = 1.15;       // 每次滚轮的缩放倍率
+
+    const [hourHeight, setHourHeight] = useState<number>(DEFAULT_HOUR_HEIGHT);
+    const timelineContainerRef = useRef<HTMLDivElement>(null);
 
     // === Thumbnail 缩略图配置 ===
     interface ThumbnailConfig {
@@ -100,64 +106,111 @@ const TimelinePage: React.FC = () => {
         fetchTimelineData();
     }, [currentDate]);
 
-    // 最小刻度高度限制（像素）
-    const MIN_TICK_HEIGHT = 20;
+    // === Ctrl+滚轮缩放处理 ===
+    const pendingZoomRef = useRef<{ height: number; scrollTop: number } | null>(null);
 
-    // 刻度配置：主刻度（显示标签）+ 次刻度（只显示网格线）
-    const SCALE_CONFIG: Record<TimeScale, {
-        hourHeight: number;
-        majorInterval: number;  // 主刻度间隔（小时）
-        minorInterval?: number; // 次刻度间隔（小时），可选
-    }> = {
-        '2h': {
-            hourHeight: 60,
-            majorInterval: 2,
-            minorInterval: 1  // 每小时一个次刻度
-        },
-        '1h': {
-            hourHeight: 80,
-            majorInterval: 1,
-            minorInterval: 0.5  // 每半小时一个次刻度
-        },
-        '30m': {
-            hourHeight: 120,
-            majorInterval: 0.5,
-            minorInterval: 0.25  // 每15分钟一个次刻度
-        },
-        '15m': {
-            hourHeight: 200,
-            majorInterval: 0.25,
-            minorInterval: 5 / 60  // 每5分钟一个次刻度
-        },
-        '5m': {
-            hourHeight: 600,  // 增加高度以支持更密集的刻度
-            majorInterval: 5 / 60,  // 主刻度：每5分钟
-            minorInterval: 1 / 60   // 次刻度：每1分钟
-        },
+    const handleWheel = React.useCallback((e: WheelEvent) => {
+        // 只在按住 Ctrl 键时处理缩放
+        if (!e.ctrlKey) return;
+
+        e.preventDefault();
+
+        const container = timelineContainerRef.current;
+        if (!container) return;
+
+        // 获取鼠标在容器中的相对位置
+        const rect = container.getBoundingClientRect();
+        const mouseY = e.clientY - rect.top + container.scrollTop;
+        const mouseTimePosition = mouseY / hourHeight; // 鼠标所在的时间位置（小时）
+
+        // 计算新的高度
+        const zoomIn = e.deltaY < 0;
+        const newHeight = zoomIn
+            ? Math.min(hourHeight * ZOOM_STEP, MAX_HOUR_HEIGHT)
+            : Math.max(hourHeight / ZOOM_STEP, MIN_HOUR_HEIGHT);
+
+        // 如果高度没有变化，直接返回
+        if (Math.abs(newHeight - hourHeight) < 0.1) return;
+
+        // 计算新的滚动位置
+        const newMouseY = mouseTimePosition * newHeight;
+        const newScrollTop = Math.max(0, newMouseY - (e.clientY - rect.top));
+
+        // 保存待处理的缩放信息
+        pendingZoomRef.current = { height: newHeight, scrollTop: newScrollTop };
+
+        // 更新高度（这会触发 useLayoutEffect）
+        setHourHeight(newHeight);
+    }, [hourHeight]);
+
+    // 使用 useLayoutEffect 同步更新滚动位置
+    React.useLayoutEffect(() => {
+        if (pendingZoomRef.current && timelineContainerRef.current) {
+            timelineContainerRef.current.scrollTop = pendingZoomRef.current.scrollTop;
+            pendingZoomRef.current = null;
+        }
+    }, [hourHeight]);
+
+    // 绑定滚轮事件
+    useEffect(() => {
+        const container = timelineContainerRef.current;
+        if (!container) return;
+
+        container.addEventListener('wheel', handleWheel, { passive: false });
+        return () => container.removeEventListener('wheel', handleWheel);
+    }, [handleWheel]);
+
+    // 最小刻度高度限制（像素）
+    const MIN_TICK_HEIGHT = 15;
+
+    // 使用当前 hourHeight 作为 HOUR_HEIGHT
+    const HOUR_HEIGHT = hourHeight;
+
+    // 根据 hourHeight 动态计算刻度间隔
+    const getScaleIntervals = (height: number): { majorInterval: number; minorInterval: number } => {
+        if (height >= 400) {
+            return { majorInterval: 5 / 60, minorInterval: 1 / 60 };  // 5分钟/1分钟
+        } else if (height >= 180) {
+            return { majorInterval: 0.25, minorInterval: 5 / 60 };   // 15分钟/5分钟
+        } else if (height >= 100) {
+            return { majorInterval: 0.5, minorInterval: 0.25 };      // 30分钟/15分钟
+        } else if (height >= 60) {
+            return { majorInterval: 1, minorInterval: 0.5 };         // 1小时/30分钟
+        } else {
+            return { majorInterval: 2, minorInterval: 1 };           // 2小时/1小时
+        }
     };
 
-    const { hourHeight: HOUR_HEIGHT, majorInterval, minorInterval } = SCALE_CONFIG[timeScale];
+    const { majorInterval, minorInterval } = getScaleIntervals(hourHeight);
 
     // 生成主刻度（显示标签）
-    const majorTicks: number[] = [];
-    for (let i = 0; i <= 24; i += majorInterval) {
-        majorTicks.push(i);
-    }
+    const majorTicks: number[] = React.useMemo(() => {
+        const ticks: number[] = [];
+        for (let i = 0; i <= 24; i += majorInterval) {
+            ticks.push(Math.round(i * 1000) / 1000); // 避免浮点精度问题
+        }
+        return ticks;
+    }, [majorInterval]);
 
     // 生成次刻度（只显示网格线）
-    const minorTicks: number[] = [];
-    if (minorInterval) {
+    const minorTicks: number[] = React.useMemo(() => {
+        const ticks: number[] = [];
         const minorTickHeight = HOUR_HEIGHT * minorInterval;
         // 只有当次刻度高度满足最小要求时才生成
         if (minorTickHeight >= MIN_TICK_HEIGHT) {
             for (let i = 0; i < 24; i += minorInterval) {
+                const rounded = Math.round(i * 1000) / 1000;
                 // 排除与主刻度重合的位置
-                if (!majorTicks.includes(i)) {
-                    minorTicks.push(i);
+                if (!majorTicks.some(t => Math.abs(t - rounded) < 0.001)) {
+                    ticks.push(rounded);
                 }
             }
         }
-    }
+        return ticks;
+    }, [HOUR_HEIGHT, minorInterval, majorTicks]);
+
+    // 计算缩放百分比用于显示
+    const zoomPercentage = Math.round((hourHeight / DEFAULT_HOUR_HEIGHT) * 100);
 
     // Helper to calculate style for event blocks
     const getEventStyle = (event: TimelineEvent) => {
@@ -193,7 +246,7 @@ const TimelinePage: React.FC = () => {
         return {
             top: `${top}px`,
             height: `${height}px`,
-            className: `absolute left-16 right-4 rounded-xl border ${borderColor} ${bgColor} ${textColor} p-3 text-xs cursor-pointer hover:shadow-md transition-all duration-200 flex flex-col justify-center overflow-hidden`
+            className: `absolute left-16 right-4 rounded-xl border ${borderColor} ${bgColor} ${textColor} p-3 text-xs cursor-pointer hover:shadow-md transition-shadow duration-200 flex flex-col justify-center overflow-hidden`
         };
     };
 
@@ -532,37 +585,18 @@ const TimelinePage: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+                {/* 缩放控制 - 显示当前缩放级别和提示 */}
+                <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-lg">
+                    <span className="text-xs font-medium text-gray-600">缩放</span>
+                    <span className="text-xs font-bold text-gray-800 min-w-[3rem] text-center">{zoomPercentage}%</span>
                     <button
-                        onClick={() => setTimeScale('2h')}
-                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '2h' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setHourHeight(DEFAULT_HOUR_HEIGHT)}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-0.5 hover:bg-indigo-50 rounded transition-colors"
+                        title="重置缩放"
                     >
-                        2h
+                        重置
                     </button>
-                    <button
-                        onClick={() => setTimeScale('1h')}
-                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '1h' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        1h
-                    </button>
-                    <button
-                        onClick={() => setTimeScale('30m')}
-                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '30m' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        30m
-                    </button>
-                    <button
-                        onClick={() => setTimeScale('15m')}
-                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '15m' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        15m
-                    </button>
-                    <button
-                        onClick={() => setTimeScale('5m')}
-                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '5m' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        5m
-                    </button>
+                    <span className="text-[10px] text-gray-400 hidden md:inline">Ctrl+滚轮缩放</span>
                 </div>
 
                 {/* 时间过滤器 - 仅在非缩略图模式下显示 */}
@@ -642,7 +676,10 @@ const TimelinePage: React.FC = () => {
             {/* Main Content Area */}
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Column: Vertical Timeline Feed */}
-                <div className="w-full lg:w-[65%] h-full overflow-y-auto relative bg-[#FAFAFA]">
+                <div
+                    ref={timelineContainerRef}
+                    className="w-full lg:w-[65%] h-full overflow-y-auto relative bg-[#FAFAFA]"
+                >
                     <div className="relative min-h-[2000px] py-4" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
                         {/* Time Ruler - Major Ticks with Labels */}
                         <div className="absolute left-0 top-0 bottom-0 w-16 border-r border-dashed border-gray-200 bg-white z-0">
