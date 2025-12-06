@@ -398,6 +398,30 @@ class StatisticalDataProvider:
         
         return events
 
+    def update_event_category(self, event_id: str, category_id: str, sub_category_id: str = None) -> bool:
+        """
+        更新事件的分类信息
+        
+        Args:
+            event_id: 事件ID
+            category_id: 主分类ID
+            sub_category_id: 子分类ID（可选）
+        
+        Returns:
+            bool: 是否更新成功
+        """
+        sql = """
+        UPDATE user_app_behavior_log 
+        SET category_id = ?, sub_category_id = ?
+        WHERE id = ?
+        """
+        
+        with self.lw_db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (category_id, sub_category_id, event_id))
+            conn.commit()
+            return cursor.rowcount > 0
+
 if __name__ == "__main__":
     sdp = StatisticalDataProvider()
     

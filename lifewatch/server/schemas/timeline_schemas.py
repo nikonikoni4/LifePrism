@@ -13,6 +13,7 @@ class TimelineEventSchema(BaseModel):
     start_time: float = Field(..., alias="startTime", description="开始时间（小时浮点数，如 9.5 表示 09:30）")
     end_time: float = Field(..., alias="endTime", description="结束时间（小时浮点数）")
     title: str = Field(..., description="窗口标题或应用名称")
+    app: str = Field(..., description="应用程序名称")
     category: str = Field(..., description="主分类ID")
     category_name: str = Field(..., alias="categoryName", description="主分类名称")
     category_color: str = Field(..., alias="categoryColor", description="主分类颜色 (Hex)")
@@ -20,6 +21,8 @@ class TimelineEventSchema(BaseModel):
     sub_category_name: Optional[str] = Field(None, alias="subCategoryName", description="子分类名称")
     sub_category_color: Optional[str] = Field(None, alias="subCategoryColor", description="子分类颜色 (Hex)")
     description: str = Field(..., description="事件描述（app_description + title_description 组合）")
+    app_description: Optional[str] = Field(None, alias="appDescription", description="应用描述")
+    title_description: Optional[str] = Field(None, alias="titleDescription", description="标题描述")
     device_type: str = Field(default="pc", alias="deviceType", description="数据来源设备类型")
     
     class Config:

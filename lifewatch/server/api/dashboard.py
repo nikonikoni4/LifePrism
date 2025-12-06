@@ -135,3 +135,36 @@ async def get_timeline(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取时间线数据失败: {str(e)}")
+
+
+@router.patch("/timeline/events/{event_id}", summary="更新事件分类")
+async def update_event_category(
+    event_id: str,
+    category_id: str = Query(..., description="主分类ID"),
+    sub_category_id: Optional[str] = Query(None, description="子分类ID")
+):
+    """
+    更新指定事件的分类信息
+    
+    **功能：**
+    - 更新 user_app_behavior_log 表中的 category_id 和 sub_category_id
+    
+    **参数：**
+    - event_id: 事件ID（路径参数）
+    - category_id: 主分类ID（查询参数）
+    - sub_category_id: 子分类ID（查询参数，可选）
+    
+    **返回：**
+    - success: 是否成功
+    - message: 操作消息
+    """
+    try:
+        success = timeline_service.update_event_category(event_id, category_id, sub_category_id)
+        if success:
+            return {"success": True, "message": "事件分类更新成功"}
+        else:
+            raise HTTPException(status_code=404, detail=f"事件 '{event_id}' 未找到")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"更新事件分类失败: {str(e)}")

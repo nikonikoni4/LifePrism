@@ -60,6 +60,7 @@ class TimelineService:
                 start_time=start_hour,
                 end_time=end_hour,
                 title=event["title"],
+                app=event["app"],
                 category=event["category_id"],
                 category_name=event["category_name"],
                 category_color=category_color,
@@ -67,6 +68,8 @@ class TimelineService:
                 sub_category_name=event["sub_category_name"] if event["sub_category_name"] else None,
                 sub_category_color=sub_category_color,
                 description=description,
+                app_description=event.get("app_description") or None,
+                title_description=event.get("title_description") or None,
                 device_type=event["device_type"]
             ))
         
@@ -82,6 +85,20 @@ class TimelineService:
             events=events,
             current_time=current_time
         )
+    
+    def update_event_category(self, event_id: str, category_id: str, sub_category_id: Optional[str] = None) -> bool:
+        """
+        更新事件的分类信息
+        
+        Args:
+            event_id: 事件ID
+            category_id: 主分类ID
+            sub_category_id: 子分类ID（可选）
+        
+        Returns:
+            bool: 是否更新成功
+        """
+        return self.data_provider.update_event_category(event_id, category_id, sub_category_id)
     
     def _time_to_hour_float(self, time_str: str, date_str: str) -> float:
         """
