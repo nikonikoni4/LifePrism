@@ -11,6 +11,12 @@ export interface SyncRequest {
     use_incremental_sync?: boolean;
 }
 
+export interface SyncTimeRangeRequest {
+    start_time: string; // Format: YYYY-MM-DD HH:MM:SS
+    end_time: string;   // Format: YYYY-MM-DD HH:MM:SS
+    auto_classify?: boolean;
+}
+
 export interface SyncResponse {
     status: string;
     synced_events: number;
@@ -85,3 +91,37 @@ export async function fullSync(hours: number = 24): Promise<SyncResponse> {
         use_incremental_sync: false,
     });
 }
+
+/**
+ * 按时间范围同步数据
+ * @param request 时间范围同步请求参数
+ * @returns 同步结果
+ */
+export async function syncActivityWatchDataByTimeRange(
+    request: SyncTimeRangeRequest
+): Promise<SyncResponse> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/sync/activitywatch/timerange`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                start_time: request.start_time,
+                end_time: request.end_time,
+                auto_classify: request.auto_classify ?? true,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`同步失败: ${response.statusText}`);
+        }
+
+        const data: SyncResponse = await response.json();
+        return data;
+    } catch (error) {
+        console.error('时间范围数据同步错误:', error);
+        throw error;
+    }
+}
+

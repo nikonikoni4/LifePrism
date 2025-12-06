@@ -1,9 +1,9 @@
 
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Filter, RefreshCw, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Filter, RefreshCw, Clock, Database } from 'lucide-react';
 import { ActivitySummaryResponse } from '../types';
 import { DashboardAPI } from '../services/dashboardService';
-import { incrementalSync } from '../services/syncService';
+import { incrementalSync, syncActivityWatchDataByTimeRange } from '../services/syncService';
 
 // 安全的日期解析函数,支持多种格式
 const parseLocalDate = (dateStr: string): Date => {
@@ -208,6 +208,9 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
   const [TodayTotalActiveTime, setTodayTotalActiveTime] = React.useState<string>('');
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSyncing, setIsSyncing] = React.useState(false);
+  const [showSyncDialog, setShowSyncDialog] = React.useState(false);
+  const [syncStartDate, setSyncStartDate] = React.useState('');
+  const [syncEndDate, setSyncEndDate] = React.useState('');
 
   // 使用useEffect处理异步数据获取
   React.useEffect(() => {
@@ -267,6 +270,65 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
     const date = parseLocalDate(selectedDate);
     date.setDate(date.getDate() + 1);
     onDateChange(formatDateToYYYYMMDD(date));
+  };
+
+  // 格式化日期时间为 YYYY-MM-DD HH:MM:SS
+  const formatDateTime = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  };
+
+  // 打开同步对话框，设置默认时间范围
+  const handleOpenSyncDialog = () => {
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 0);
+
+    setSyncStartDate(formatDateToYYYYMMDD(yesterday));
+    setSyncEndDate(formatDateToYYYYMMDD(now));
+    setShowSyncDialog(true);
+  };
+
+  // 执行时间范围同步
+  const handleTimeRangeSync = async () => {
+    if (!syncStartDate || !syncEndDate) {
+      alert('请选择开始和结束日期');
+      return;
+    }
+
+    setIsSyncing(true);
+    setShowSyncDialog(false);
+
+    try {
+      // 构建完整的时间字符串
+      const startDateTime = `${syncStartDate} 00:00:00`;
+      const endDateTime = `${syncEndDate} 23:59:59`;
+
+      await syncActivityWatchDataByTimeRange({
+        start_time: startDateTime,
+        end_time: endDateTime,
+        auto_classify: true,
+      });
+
+      if (onRefresh) {
+        onRefresh();
+      }
+      alert('数据同步成功！');
+    } catch (error) {
+      console.error('Sync failed:', error);
+      alert('数据同步失败，请查看控制台了解详情');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // Calculate start and end dates for labels based on the window
@@ -365,6 +427,14 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
             <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
             {isSyncing ? 'Syncing...' : 'Refresh'}
           </button>
+          <button
+            onClick={handleOpenSyncDialog}
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-morandi-blue text-white border border-morandi-blue rounded-xl text-sm font-semibold hover:bg-opacity-90 transition-all shadow-sm"
+            disabled={isSyncing}
+          >
+            <Database size={16} />
+            Sync Data
+          </button>
         </div>
       </div>
 
@@ -411,6 +481,59 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
           <span className="text-[10px] font-bold text-gray-400">{endDateLabel}</span>
         </div>
       </div>
+
+      {/* Sync Time Range Dialog */}
+      {showSyncDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full mx-4 animate-fade-in">
+            <h3 className="text-xl font-bold text-slate-900 mb-4">同步数据</h3>
+            <p className="text-sm text-slate-600 mb-6">选择要同步的时间范围</p>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  开始日期
+                </label>
+                <input
+                  type="date"
+                  value={syncStartDate}
+                  onChange={(e) => setSyncStartDate(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-morandi-blue focus:border-transparent"
+                />
+                <p className="text-xs text-slate-500 mt-1">时间将从 00:00:00 开始</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  结束日期
+                </label>
+                <input
+                  type="date"
+                  value={syncEndDate}
+                  onChange={(e) => setSyncEndDate(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-morandi-blue focus:border-transparent"
+                />
+                <p className="text-xs text-slate-500 mt-1">时间将到 23:59:59 结束</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSyncDialog(false)}
+                className="flex-1 px-4 py-2.5 bg-gray-100 text-slate-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleTimeRangeSync}
+                className="flex-1 px-4 py-2.5 bg-morandi-blue text-white rounded-xl font-semibold hover:bg-opacity-90 transition-all"
+              >
+                开始同步
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
