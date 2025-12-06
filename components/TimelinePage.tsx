@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Smartphone, Monitor, AlertCircle, Clock, Link, Tag, Loader2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Smartphone, Monitor, AlertCircle, Clock, Link, Tag, Loader2, X, Save, Undo2 } from 'lucide-react';
 import { MOCK_GOALS, MOCK_CATEGORIES } from '../constants';
-import { TimelineEvent, TimelineEventData, TimeOverviewResponse } from '../types';
+import { TimelineEvent, TimelineEventData, TimeOverviewResponse, CategoryDef } from '../types';
 import { TimelineAPI } from '../services/timelineService';
+import { categoryPI } from '../services/categoryService';
 import { DashboardAPI } from '../services/dashboardService';
 import TimeOverviewWidget from './widgets/TimeOverviewWidget';
 
@@ -84,6 +85,70 @@ const TimelinePage: React.FC = () => {
 
     const dateInputRef = React.useRef<HTMLInputElement>(null);
     const selectedEvent = events.find(e => e.id === selectedEventId);
+
+    // === 分类编辑状态 ===
+    const [categories, setCategories] = useState<CategoryDef[]>([]);
+    const [editedCategory, setEditedCategory] = useState<string | null>(null);
+    const [editedSubCategory, setEditedSubCategory] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // 加载分类列表
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const data = await categoryPI.getAllCategories();
+                setCategories(data);
+            } catch (err) {
+                console.error('Failed to load categories:', err);
+            }
+        };
+        fetchCategories();
+    }, []);
+
+    // 当选中事件变化时，同步编辑状态
+    useEffect(() => {
+        if (selectedEvent) {
+            setEditedCategory(selectedEvent.category);
+            setEditedSubCategory(selectedEvent.subCategoryId || null);
+        } else {
+            setEditedCategory(null);
+            setEditedSubCategory(null);
+        }
+    }, [selectedEventId, selectedEvent?.category, selectedEvent?.subCategoryId]);
+
+    // 检测是否有变化
+    const hasChanges = selectedEvent && (
+        editedCategory !== selectedEvent.category ||
+        editedSubCategory !== (selectedEvent.subCategoryId || null)
+    );
+
+    // 保存分类变更
+    const handleSaveCategory = async () => {
+        if (!selectedEvent || !editedCategory || !hasChanges) return;
+
+        setIsSaving(true);
+        try {
+            await TimelineAPI.updateEventCategory(
+                selectedEvent.id,
+                editedCategory,
+                editedSubCategory
+            );
+            // 更新本地事件数据
+            setEvents(prev => prev.map(e =>
+                e.id === selectedEvent.id
+                    ? { ...e, category: editedCategory, subCategoryId: editedSubCategory }
+                    : e
+            ));
+        } catch (err) {
+            console.error('Failed to save category:', err);
+            alert('保存失败，请重试');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // 获取当前选中的分类定义
+    const activeCategoryDef = editedCategory ? categories.find(c => c.id === editedCategory) : null;
 
     // 获取时间线数据
     useEffect(() => {
@@ -406,10 +471,9 @@ const TimelinePage: React.FC = () => {
     };
 
     const handleCategoryChange = (categoryId: string) => {
-        if (!selectedEventId) return;
-        setEvents(prev => prev.map(e =>
-            e.id === selectedEventId ? { ...e, category: categoryId } : e
-        ));
+        setEditedCategory(categoryId);
+        // 当分类改变时，清空子分类选择
+        setEditedSubCategory(null);
     };
 
     // === Thumbnail Click Handler ===
@@ -450,9 +514,6 @@ const TimelinePage: React.FC = () => {
     };
 
     const formattedDateLabel = new Date(currentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
-    // Helper to get active category definition for dropdowns
-    const activeCategoryDef = selectedEvent ? MOCK_CATEGORIES.find(c => c.id === selectedEvent.category) : null;
 
     // === Thumbnail Components ===
     const ThumbnailBlock: React.FC<{
@@ -871,11 +932,11 @@ const TimelinePage: React.FC = () => {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-2">Category</label>
                                     <div className="grid grid-cols-3 gap-2">
-                                        {MOCK_CATEGORIES.map(cat => (
+                                        {categories.map(cat => (
                                             <button
                                                 key={cat.id}
                                                 onClick={() => handleCategoryChange(cat.id)}
-                                                className={`px-3 py-2 rounded-lg text-sm font-medium capitalize border transition-all ${selectedEvent.category === cat.id
+                                                className={`px-3 py-2 rounded-lg text-sm font-medium capitalize border transition-all ${editedCategory === cat.id
                                                     ? 'bg-slate-800 text-white border-slate-800'
                                                     : 'bg-white border-gray-200 text-slate-600 hover:bg-gray-50'
                                                     }`}
@@ -892,10 +953,11 @@ const TimelinePage: React.FC = () => {
                                     <div className="relative">
                                         <select
                                             className="w-full appearance-none bg-white border border-gray-200 text-slate-700 rounded-xl px-4 py-3 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-shadow cursor-pointer hover:bg-gray-50"
-                                            defaultValue={selectedEvent.subCategoryId || ''}
+                                            value={editedSubCategory || ''}
+                                            onChange={(e) => setEditedSubCategory(e.target.value || null)}
                                         >
-                                            <option value="" disabled>Select a sub-category...</option>
-                                            {activeCategoryDef?.subCategories.map((sub) => (
+                                            <option value="">Select a sub-category...</option>
+                                            {activeCategoryDef?.subCategories?.map((sub) => (
                                                 <option key={sub.id} value={sub.id}>{sub.name}</option>
                                             ))}
                                         </select>
@@ -904,36 +966,63 @@ const TimelinePage: React.FC = () => {
                                         </div>
                                     </div>
                                     <p className="text-[10px] text-slate-400 mt-2 font-medium">
-                                        Showing sub-categories for <span className="text-slate-600 font-bold">{activeCategoryDef?.name}</span>
+                                        Showing sub-categories for <span className="text-slate-600 font-bold">{activeCategoryDef?.name || 'None'}</span>
                                     </p>
                                 </div>
 
-                                {/* Linked Goal - 暂时隐藏 */}
-
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-2">Linked Goal</label>
-                                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between group cursor-pointer hover:border-blue-200 hover:bg-blue-50/30 transition-all">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-white rounded-lg text-blue-500 shadow-sm">
-                                                <Link size={16} />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-medium text-slate-400 italic">No goal linked</p>
-                                            </div>
-                                        </div>
-                                        <ChevronRight size={16} className="text-gray-400" />
-                                    </div>
+                                {/* Action Buttons */}
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            if (selectedEvent) {
+                                                setEditedCategory(selectedEvent.category);
+                                                setEditedSubCategory(selectedEvent.subCategoryId || null);
+                                            }
+                                        }}
+                                        disabled={!hasChanges || isSaving}
+                                        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all ${hasChanges
+                                                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300 cursor-pointer'
+                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            }`}
+                                        title="撤销修改"
+                                    >
+                                        <Undo2 size={16} />
+                                    </button>
+                                    <button
+                                        onClick={handleSaveCategory}
+                                        disabled={!hasChanges || isSaving}
+                                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all ${hasChanges
+                                                ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            }`}
+                                    >
+                                        {isSaving ? (
+                                            <>
+                                                <Loader2 size={16} className="animate-spin" />
+                                                保存中...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save size={16} />
+                                                {hasChanges ? '保存修改' : '无修改'}
+                                            </>
+                                        )}
+                                    </button>
                                 </div>
 
-
-                                {/* Description */}
+                                {/* Description - New Format */}
                                 <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-2">Description</label>
-                                    <textarea
-                                        className="w-full h-32 p-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none"
-                                        defaultValue={selectedEvent.description || ''}
-                                        placeholder="Add notes about this session..."
-                                    />
+                                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-2 text-sm">
+                                        <div className="flex">
+                                            <span className="text-slate-500 font-mono">"app:{selectedEvent.app}"：</span>
+                                            <span className="text-slate-700 ml-1">{selectedEvent.appDescription || '无'}</span>
+                                        </div>
+                                        <div className="flex">
+                                            <span className="text-slate-500 font-mono">"title:{selectedEvent.title}"：</span>
+                                            <span className="text-slate-700 ml-1">{selectedEvent.titleDescription || '无'}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

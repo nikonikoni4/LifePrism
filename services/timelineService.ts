@@ -48,29 +48,31 @@ export class TimelineAPI {
     static async updateEventCategory(
         eventId: string,
         categoryId: string,
-        subCategoryId?: string
-    ): Promise<void> {
+        subCategoryId?: string | null
+    ): Promise<{ success: boolean; message: string }> {
         try {
-            // TODO: 实现分类更新 API（如果后端支持）
-            console.warn('updateEventCategory not yet implemented on backend');
+            const params = new URLSearchParams({
+                category_id: categoryId
+            });
+            if (subCategoryId) {
+                params.append('sub_category_id', subCategoryId);
+            }
 
             const response = await fetch(
-                `${API_BASE_URL}/timeline/events/${eventId}/category`,
+                `${API_BASE_URL}/dashboard/timeline/events/${eventId}?${params.toString()}`,
                 {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        category_id: categoryId,
-                        sub_category_id: subCategoryId
-                    })
+                    }
                 }
             );
 
             if (!response.ok) {
                 throw new Error(`Failed to update event category: ${response.statusText}`);
             }
+
+            return await response.json();
         } catch (error) {
             console.error('Error updating event category:', error);
             throw error;

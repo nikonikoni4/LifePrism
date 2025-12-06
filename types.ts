@@ -147,6 +147,7 @@ export interface TimelineEventData {
   startTime: number; // Hour as float (e.g., 9.5 = 09:30)
   endTime: number;
   title: string;
+  app: string; // Application name
   category: string; // Category ID
   categoryName: string;
   categoryColor: string; // Category color from backend
@@ -154,6 +155,8 @@ export interface TimelineEventData {
   subCategoryName?: string | null;
   subCategoryColor?: string | null; // Sub-category color from backend
   description: string;
+  appDescription?: string | null; // Application description
+  titleDescription?: string | null; // Title description
   deviceType: 'pc' | 'mobile';
 }
 
