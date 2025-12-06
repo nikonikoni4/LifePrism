@@ -44,6 +44,8 @@ const TimelinePage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [currentTime, setCurrentTime] = useState<number | null>(null);
+    // 时间过滤器状态（分钟），用于非缩略图视图
+    const [minDurationFilter, setMinDurationFilter] = useState<number>(0);
 
     type TimeScale = '2h' | '1h' | '30m' | '15m' | '5m';
     const [timeScale, setTimeScale] = useState<TimeScale>('1h');
@@ -557,11 +559,27 @@ const TimelinePage: React.FC = () => {
                     </button>
                     <button
                         onClick={() => setTimeScale('5m')}
-                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '1m' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeScale === '5m' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                         5m
                     </button>
                 </div>
+
+                {/* 时间过滤器 - 仅在非缩略图模式下显示 */}
+                {!thumbnailConfig.enabled && (
+                    <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
+                        <span className="text-xs font-medium text-gray-600">过滤</span>
+                        <input
+                            type="number"
+                            min={0}
+                            value={minDurationFilter}
+                            onChange={(e) => setMinDurationFilter(Math.max(0, Number(e.target.value)))}
+                            className="w-16 text-xs border rounded px-2 py-1 text-center"
+                            placeholder="0"
+                        />
+                        <span className="text-xs text-gray-500">分钟以下</span>
+                    </div>
+                )}
 
                 {/* Thumbnail Controls - 移到最右侧 */}
                 <div className="flex items-center gap-3 ml-auto">
@@ -700,39 +718,42 @@ const TimelinePage: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* Events */}
-                                {events.map((event) => {
-                                    const style = getEventStyle(event);
-                                    const catDef = MOCK_CATEGORIES.find(c => c.id === event.category);
-                                    const subCatDef = catDef?.subCategories.find(s => s.id === event.subCategoryId);
+                                {/* Events - 根据 minDurationFilter 过滤 */}
+                                {events
+                                    .filter((event) => {
+                                        // 计算事件时长（分钟）
+                                        const durationMinutes = (event.endTime - event.startTime) * 60;
+                                        return durationMinutes >= minDurationFilter;
+                                    })
+                                    .map((event) => {
+                                        const style = getEventStyle(event);
+                                        const catDef = MOCK_CATEGORIES.find(c => c.id === event.category);
+                                        const subCatDef = catDef?.subCategories.find(s => s.id === event.subCategoryId);
 
-                                    return (
-                                        <div
-                                            key={event.id}
-                                            style={{ top: style.top, height: style.height }}
-                                            className={style.className}
-                                            onClick={() => setSelectedEventId(event.id)}
-                                        >
-                                            <div className="font-bold truncate">{event.title}</div>
-                                            {style.height !== '0px' && parseInt(style.height) > 30 && (
-                                                <div className="flex items-center justify-between mt-1">
-                                                    <div className="flex items-center gap-1 opacity-80">
-                                                        <span className="text-[10px]">{formatTime(event.startTime)} - {formatTime(event.endTime)}</span>
-                                                        {subCatDef && (
-                                                            <>
-                                                                <span className="mx-0.5">•</span>
-                                                                <span className="text-[10px] font-medium opacity-100 bg-black/5 px-1.5 rounded-sm">{subCatDef.name}</span>
-                                                            </>
-                                                        )}
+                                        return (
+                                            <div
+                                                key={event.id}
+                                                style={{ top: style.top, height: style.height }}
+                                                className={style.className}
+                                                onClick={() => setSelectedEventId(event.id)}
+                                            >
+                                                <div className="font-bold truncate">{event.title}</div>
+                                                {style.height !== '0px' && parseInt(style.height) > 30 && (
+                                                    <div className="flex items-center justify-between mt-1">
+                                                        <div className="flex items-center gap-1 opacity-80">
+                                                            <span className="text-[10px]">{formatTime(event.startTime)} - {formatTime(event.endTime)}</span>
+                                                            {subCatDef && (
+                                                                <>
+                                                                    <span className="mx-0.5">•</span>
+                                                                    <span className="text-[10px] font-medium opacity-100 bg-black/5 px-1.5 rounded-sm">{subCatDef.name}</span>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    {event.linkedGoal && (
-                                                        <div className="w-2 h-2 rounded-full bg-current opacity-50"></div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                                )}
+                                            </div>
+                                        );
+                                    })}
 
                                 {/* Current Time Indicator */}
                                 {currentTime !== null && (
@@ -850,7 +871,8 @@ const TimelinePage: React.FC = () => {
                                     </p>
                                 </div>
 
-                                {/* Linked Goal */}
+                                {/* Linked Goal - 暂时隐藏 */}
+
                                 <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-2">Linked Goal</label>
                                     <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between group cursor-pointer hover:border-blue-200 hover:bg-blue-50/30 transition-all">
@@ -859,18 +881,13 @@ const TimelinePage: React.FC = () => {
                                                 <Link size={16} />
                                             </div>
                                             <div>
-                                                {selectedEvent.linkedGoal ? (
-                                                    <p className="text-sm font-semibold text-slate-800">
-                                                        {MOCK_GOALS.find(g => g.id === selectedEvent.linkedGoal)?.text || 'Unknown Goal'}
-                                                    </p>
-                                                ) : (
-                                                    <p className="text-sm font-medium text-slate-400 italic">No goal linked</p>
-                                                )}
+                                                <p className="text-sm font-medium text-slate-400 italic">No goal linked</p>
                                             </div>
                                         </div>
                                         <ChevronRight size={16} className="text-gray-400" />
                                     </div>
                                 </div>
+
 
                                 {/* Description */}
                                 <div>
