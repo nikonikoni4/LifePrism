@@ -141,7 +141,8 @@ class TimelineService:
             title=f"{self._format_hour(start_hour)} - {self._format_hour(end_hour)}",
             sub_title="Activity breakdown for selected time range",
             start_hour=start_hour,
-            end_hour=end_hour
+            end_hour=end_hour,
+            include_blank=True  # 只在根级别添加空白
         )
         
         # 4. 构建 details (Sub-category)
@@ -155,6 +156,8 @@ class TimelineService:
         
         for cat_id, cat_events in category_events.items():
             cat_name = cat_events[0]["category_name"] if cat_events else cat_id
+            cat_color = main_colors.get(cat_id, "#9CA3AF")
+            
             cat_data = self._build_overview_data(
                 events=cat_events,
                 group_field="sub_category_id",
@@ -163,8 +166,35 @@ class TimelineService:
                 title=f"{cat_name} Details",
                 sub_title=f"Breakdown of {cat_name}",
                 start_hour=start_hour,
-                end_hour=end_hour
+                end_hour=end_hour,
+                include_blank=False  # 子级别不添加空白
             )
+            
+            # 5. 构建 Level 3 (App) - 在每个子分类下添加应用级别
+            cat_data["details"] = {}
+            
+            # 按子分类分组
+            sub_cat_events = defaultdict(list)
+            for event in cat_events:
+                sub_id = event.get("sub_category_id")
+                if sub_id:
+                    sub_cat_events[sub_id].append(event)
+            
+            for sub_id, sub_events in sub_cat_events.items():
+                sub_name = sub_events[0].get("sub_category_name", sub_id) if sub_events else sub_id
+                sub_color = sub_colors.get(sub_id, cat_color)
+                
+                # 构建 App 级别数据
+                app_data = self._build_app_level_data(
+                    events=sub_events,
+                    title=f"{sub_name} Apps",
+                    sub_title=f"Top applications in {sub_name}",
+                    base_color=sub_color,
+                    start_hour=start_hour,
+                    end_hour=end_hour
+                )
+                cat_data["details"][sub_id] = app_data
+            
             root_data["details"][cat_id] = cat_data
         
         return root_data
@@ -178,7 +208,8 @@ class TimelineService:
         title: str,
         sub_title: str,
         start_hour: float,
-        end_hour: float
+        end_hour: float,
+        include_blank: bool = False  # 是否添加空白类别
     ) -> dict:
         """构建 Overview 数据结构"""
         from collections import defaultdict
@@ -216,6 +247,23 @@ class TimelineService:
                 "label": name,
                 "color": color
             })
+        
+        # 只在根级别添加空白时间
+        if include_blank:
+            total_range_minutes = int((end_hour - start_hour) * 60)
+            blank_minutes = total_range_minutes - int(total_minutes)
+            if blank_minutes > 0:
+                pie_data.append({
+                    "key": "blank",
+                    "name": "空白",
+                    "value": blank_minutes,
+                    "color": "#eeeeee"
+                })
+                bar_keys.append({
+                    "key": "空白",
+                    "label": "空白",
+                    "color": "#eeeeee"
+                })
         
         # 构建 6 刻度柱状图数据
         bar_data = self._build_fixed_interval_bar_data(
@@ -295,9 +343,16 @@ class TimelineService:
                         category_duration[group_id] += overlap_minutes
             
             # 添加分类数据（使用名称而非 ID）
+            total_tracked = 0
             for group_id, minutes in category_duration.items():
                 group_name = group_names.get(group_id, group_id)
                 slot[group_name] = int(minutes)
+                total_tracked += minutes
+            
+            # 计算空白时间
+            blank_minutes = interval_minutes - total_tracked
+            if blank_minutes > 0:
+                slot["空白"] = int(blank_minutes)
             
             # 清理内部字段
             del slot["start_min"]
@@ -318,4 +373,118 @@ class TimelineService:
         h = int(hour)
         m = int((hour % 1) * 60)
         return f"{h:02d}:{m:02d}"
-
+    
+    def _build_app_level_data(
+        self,
+        events: list,
+        title: str,
+        sub_title: str,
+        base_color: str,
+        start_hour: float,
+        end_hour: float
+    ) -> dict:
+        """
+        构建应用级别数据（Top 5 + Other）
+        
+        Args:
+            events: 事件列表
+            title: 标题
+            sub_title: 副标题
+            base_color: 基础颜色（用于生成渐变色）
+            start_hour: 开始小时
+            end_hour: 结束小时
+        """
+        from collections import defaultdict
+        
+        # 按应用分组统计时长
+        app_duration = defaultdict(int)
+        for event in events:
+            app = event.get("app", "Unknown")
+            app_duration[app] += event.get("duration", 0)
+        
+        # 排序并取 Top 5
+        sorted_apps = sorted(app_duration.items(), key=lambda x: x[1], reverse=True)
+        top_5 = sorted_apps[:5]
+        other_apps = sorted_apps[5:]
+        
+        # 计算 Other 总时长
+        other_seconds = sum(d for _, d in other_apps)
+        
+        # 生成颜色
+        num_colors = len(top_5) + (1 if other_seconds > 0 else 0)
+        colors = self._generate_color_variants(base_color, num_colors)
+        
+        pie_data = []
+        bar_keys = []
+        total_seconds = sum(app_duration.values())
+        total_minutes = total_seconds // 60
+        
+        # 处理 Top 5
+        for i, (app_name, seconds) in enumerate(top_5):
+            color = colors[i] if i < len(colors) else base_color
+            pie_data.append({
+                "key": app_name,
+                "name": app_name,
+                "value": seconds // 60,
+                "color": color
+            })
+            bar_keys.append({
+                "key": app_name,
+                "label": app_name,
+                "color": color
+            })
+        
+        # 处理 Other
+        if other_seconds > 0:
+            other_color = colors[-1] if colors else "#9CA3AF"
+            pie_data.append({
+                "key": "Other",
+                "name": "Other Apps",
+                "value": other_seconds // 60,
+                "color": other_color
+            })
+            bar_keys.append({
+                "key": "Other",
+                "label": "Other",
+                "color": other_color
+            })
+        
+        # App 级别不添加空白（空白只在根级别显示）
+        
+        return {
+            "title": title,
+            "subTitle": sub_title,
+            "totalTrackedMinutes": int(total_minutes),
+            "pieData": pie_data,
+            "barKeys": bar_keys,
+            "barData": [],  # App 级别暂不需要 barData
+            "details": None  # 叶子节点无 details
+        }
+    
+    def _generate_color_variants(self, base_color: str, count: int) -> list:
+        """
+        基于基础颜色生成渐变色
+        """
+        if count <= 0:
+            return []
+        if count == 1:
+            return [base_color]
+        
+        # 简单的亮度变化
+        variants = []
+        for i in range(count):
+            # 将 hex 转换为 RGB
+            hex_color = base_color.lstrip('#')
+            r = int(hex_color[0:2], 16)
+            g = int(hex_color[2:4], 16)
+            b = int(hex_color[4:6], 16)
+            
+            # 调整亮度 (0.7 到 1.0)
+            factor = 0.7 + (0.3 * i / (count - 1)) if count > 1 else 1.0
+            r = min(255, int(r * factor + (255 - r) * (1 - factor) * 0.5))
+            g = min(255, int(g * factor + (255 - g) * (1 - factor) * 0.5))
+            b = min(255, int(b * factor + (255 - b) * (1 - factor) * 0.5))
+            
+            variants.append(f"#{r:02x}{g:02x}{b:02x}")
+        
+        return variants

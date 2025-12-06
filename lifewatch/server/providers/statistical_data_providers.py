@@ -194,14 +194,18 @@ class StatisticalDataProvider:
         
         Returns:
             list[dict]: 事件列表，包含 category_id, category_name, sub_category_id, 
-                       sub_category_name, duration, start_time, end_time, app
+                       sub_category_name, duration (重新计算的重叠时长), start_time, end_time, app
         """
+        from datetime import datetime
+        
         # 计算精确时间范围
         start_min = int((start_hour % 1) * 60)
         end_min = int((end_hour % 1) * 60)
         start_time_str = f"{date} {int(start_hour):02d}:{start_min:02d}:00"
         end_time_str = f"{date} {int(end_hour):02d}:{end_min:02d}:00"
         
+        # 修改 SQL：查找所有与时间范围有重叠的事件
+        # 条件：事件开始时间 < 范围结束时间 AND 事件结束时间 > 范围开始时间
         sql = """
         SELECT 
             uabl.id,
@@ -216,28 +220,47 @@ class StatisticalDataProvider:
         FROM user_app_behavior_log uabl
         LEFT JOIN category c ON uabl.category_id = c.id
         LEFT JOIN sub_category sc ON uabl.sub_category_id = sc.id
-        WHERE uabl.start_time >= ? AND uabl.end_time <= ?
+        WHERE uabl.start_time < ? AND uabl.end_time > ?
         ORDER BY uabl.start_time ASC
         """
         
         with self.lw_db_manager.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (start_time_str, end_time_str))
+            # 注意参数顺序：start_time < end_time_str AND end_time > start_time_str
+            cursor.execute(sql, (end_time_str, start_time_str))
             results = cursor.fetchall()
+        
+        # 解析范围边界时间
+        range_start = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+        range_end = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
         
         events = []
         for row in results:
-            events.append({
-                "id": row[0],
-                "start_time": row[1],
-                "end_time": row[2],
-                "duration": row[3],
-                "app": row[4],
-                "category_id": row[5] or "",
-                "category_name": row[6] or "",
-                "sub_category_id": row[7] or "",
-                "sub_category_name": row[8] or ""
-            })
+            event_start_str = row[1]
+            event_end_str = row[2]
+            
+            # 解析事件时间
+            event_start = datetime.strptime(event_start_str, "%Y-%m-%d %H:%M:%S")
+            event_end = datetime.strptime(event_end_str, "%Y-%m-%d %H:%M:%S")
+            
+            # 计算实际重叠时长（秒）
+            overlap_start = max(event_start, range_start)
+            overlap_end = min(event_end, range_end)
+            overlap_duration = max(0, (overlap_end - overlap_start).total_seconds())
+            
+            # 只添加有实际重叠的事件
+            if overlap_duration > 0:
+                events.append({
+                    "id": row[0],
+                    "start_time": event_start_str,
+                    "end_time": event_end_str,
+                    "duration": int(overlap_duration),  # 使用重叠时长
+                    "app": row[4],
+                    "category_id": row[5] or "",
+                    "category_name": row[6] or "",
+                    "sub_category_id": row[7] or "",
+                    "sub_category_name": row[8] or ""
+                })
         
         return events
 
