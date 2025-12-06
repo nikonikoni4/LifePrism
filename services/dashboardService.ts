@@ -109,4 +109,38 @@ export class DashboardAPI {
             throw error;
         }
     }
+
+    /**
+     * 获取指定时间范围的 Timeline Overview 数据
+     * @param date 日期 (YYYY-MM-DD)
+     * @param startHour 开始小时 (浮点数，如 12.5 = 12:30)
+     * @param endHour 结束小时 (浮点数)
+     */
+    static async getTimelineOverview(
+        date: string,
+        startHour: number,
+        endHour: number
+    ): Promise<TimeOverviewResponse> {
+        try {
+            const params = new URLSearchParams({
+                date,
+                start_hour: startHour.toString(),
+                end_hour: endHour.toString()
+            });
+
+            const response = await fetch(
+                `${API_BASE_URL}/timeline/overview?${params.toString()}`
+            );
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch timeline overview: ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching timeline overview:', error);
+            throw error;
+        }
+    }
 }
+

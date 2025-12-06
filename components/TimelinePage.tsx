@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Smartphone, Monitor, AlertCircle, Clock, Link, Tag, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight, Calendar, Smartphone, Monitor, AlertCircle, Clock, Link, Tag, Loader2, X } from 'lucide-react';
 import { MOCK_GOALS, MOCK_CATEGORIES } from '../constants';
-import { TimelineEvent, TimelineEventData } from '../types';
+import { TimelineEvent, TimelineEventData, TimeOverviewResponse } from '../types';
 import { TimelineAPI } from '../services/timelineService';
+import { DashboardAPI } from '../services/dashboardService';
+import TimeOverviewWidget from './widgets/TimeOverviewWidget';
 
 // 安全的日期解析函数,支持多种格式
 const parseLocalDate = (dateStr: string): Date => {
@@ -62,6 +64,15 @@ const TimelinePage: React.FC = () => {
         maxCategories: 3,
         width: 80
     });
+
+    // === Timeline Overview 状态 ===
+    const [selectedTimeRange, setSelectedTimeRange] = useState<{
+        startHour: number;
+        endHour: number;
+    } | null>(null);
+    const [overviewData, setOverviewData] = useState<TimeOverviewResponse | null>(null);
+    const [overviewLoading, setOverviewLoading] = useState(false);
+    const overviewCache = useRef<Map<string, TimeOverviewResponse>>(new Map());
 
     const dateInputRef = React.useRef<HTMLInputElement>(null);
     const selectedEvent = events.find(e => e.id === selectedEventId);
@@ -346,6 +357,43 @@ const TimelinePage: React.FC = () => {
         ));
     };
 
+    // === Thumbnail Click Handler ===
+    const handleThumbnailClick = async (startHour: number) => {
+        const endHour = startHour + thumbnailConfig.hourGranularity;
+        const cacheKey = `${currentDate}-${startHour}-${endHour}`;
+
+        // 清除事件选中状态，显示 overview
+        setSelectedEventId(null);
+        setSelectedTimeRange({ startHour, endHour });
+
+        // 检查缓存
+        if (overviewCache.current.has(cacheKey)) {
+            setOverviewData(overviewCache.current.get(cacheKey)!);
+            return;
+        }
+
+        // 加载数据
+        setOverviewLoading(true);
+        try {
+            const data = await DashboardAPI.getTimelineOverview(
+                currentDate, startHour, endHour
+            );
+            overviewCache.current.set(cacheKey, data);
+            setOverviewData(data);
+        } catch (error) {
+            console.error('Failed to fetch timeline overview:', error);
+            setOverviewData(null);
+        } finally {
+            setOverviewLoading(false);
+        }
+    };
+
+    // === 关闭 Overview Panel ===
+    const handleCloseOverview = () => {
+        setSelectedTimeRange(null);
+        setOverviewData(null);
+    };
+
     const formattedDateLabel = new Date(currentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
     // Helper to get active category definition for dropdowns
@@ -374,10 +422,16 @@ const TimelinePage: React.FC = () => {
             otherColor = firstOther.color;
         }
 
+        const isSelected = selectedTimeRange?.startHour === hourData.hour;
+
         return (
             <div
-                className="relative border-b border-gray-100 group"
+                className={`relative border-b border-gray-100 group cursor-pointer transition-all ${isSelected
+                    ? 'ring-2 ring-indigo-500 ring-inset bg-indigo-50/30'
+                    : 'hover:bg-gray-50/50'
+                    }`}
                 style={{ height: `${height}px` }}
+                onClick={() => handleThumbnailClick(hourData.hour)}
             >
                 {/* 横向堆叠条 */}
                 <div className="absolute inset-0 flex">
@@ -694,7 +748,50 @@ const TimelinePage: React.FC = () => {
 
                 {/* Right Column: Inspector Panel */}
                 <div className="hidden lg:flex w-[35%] h-full bg-white border-l border-gray-200 flex-col overflow-y-auto">
-                    {selectedEvent ? (
+                    {/* Timeline Overview Panel */}
+                    {selectedTimeRange ? (
+                        <div className="p-4 h-full flex flex-col animate-fade-in">
+                            {/* Header with close button */}
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                    <Clock size={14} />
+                                    {formatTime(selectedTimeRange.startHour)} - {formatTime(selectedTimeRange.endHour)}
+                                </div>
+                                <button
+                                    onClick={handleCloseOverview}
+                                    className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                                    title="关闭"
+                                >
+                                    <X size={16} className="text-gray-400" />
+                                </button>
+                            </div>
+
+                            {/* Loading State */}
+                            {overviewLoading && (
+                                <div className="flex-1 flex items-center justify-center">
+                                    <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                                </div>
+                            )}
+
+                            {/* Overview Widget */}
+                            {!overviewLoading && overviewData && (
+                                <div className="flex-1 min-h-0">
+                                    <TimeOverviewWidget
+                                        selectedDate={currentDate}
+                                        initialData={overviewData}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Error State */}
+                            {!overviewLoading && !overviewData && (
+                                <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400">
+                                    <AlertCircle className="w-12 h-12 text-gray-300 mb-4" />
+                                    <p className="text-sm">无法加载该时间段的数据</p>
+                                </div>
+                            )}
+                        </div>
+                    ) : selectedEvent ? (
                         <div className="p-8 animate-fade-in">
                             <div className="flex items-center gap-2 mb-6 text-xs font-bold text-gray-400 uppercase tracking-widest">
                                 <Clock size={14} />
@@ -731,7 +828,7 @@ const TimelinePage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Level 2: Sub-category (New) */}
+                                {/* Level 2: Sub-category */}
                                 <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-2">Sub-category</label>
                                     <div className="relative">
@@ -791,8 +888,13 @@ const TimelinePage: React.FC = () => {
                             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
                                 <Smartphone size={24} className="text-gray-300" />
                             </div>
-                            <h3 className="text-slate-900 font-bold mb-1">No Event Selected</h3>
-                            <p className="text-sm max-w-[200px]">Click on any time block in the feed to view details or edit categorization.</p>
+                            <h3 className="text-slate-900 font-bold mb-1">No Selection</h3>
+                            <p className="text-sm max-w-[200px]">
+                                {thumbnailConfig.enabled
+                                    ? "点击左侧缩略图查看时间段概览，或切换到详情视图编辑事件。"
+                                    : "Click on any time block in the feed to view details or edit categorization."
+                                }
+                            </p>
 
                             <div className="mt-12 w-full p-4 bg-yellow-50 rounded-2xl border border-yellow-100 text-left">
                                 <div className="flex items-center gap-2 text-yellow-700 font-bold text-xs uppercase mb-2">

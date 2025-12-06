@@ -202,12 +202,12 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
         </div>
 
         {/* Dynamic Legend */}
-        <div className="flex gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-100 overflow-x-auto no-scrollbar max-w-[50%]">
+        <div className="flex flex-wrap gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-100 max-w-[50%]">
           {barKeys.map((item) => {
             return (
-              <div key={item.key} className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg shadow-sm border border-gray-100">
+              <div key={item.key} className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1 bg-white rounded-lg shadow-sm border border-gray-100">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
-                <span className="text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap">{item.label}</span>
+                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap">{item.label}</span>
               </div>
             );
           })}
