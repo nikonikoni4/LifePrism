@@ -68,3 +68,39 @@ class TimelineResponse(BaseModel):
                 "currentTime": 14.05
             }
         }
+
+
+# 导入共享的图表组件 schema
+from lifewatch.server.schemas.dashboard_schemas import ChartSegment, BarConfig
+
+
+class TimelineOverviewResponse(BaseModel):
+    """Timeline Overview 响应（用于缩略图点击详情）"""
+    title: str = Field(..., description="标题")
+    sub_title: str = Field(..., alias="subTitle", description="副标题")
+    total_tracked_minutes: int = Field(..., alias="totalTrackedMinutes", description="总追踪时长（分钟）")
+    pie_data: List[ChartSegment] = Field(..., alias="pieData", description="饼图数据")
+    bar_keys: List[BarConfig] = Field(..., alias="barKeys", description="柱状图配置")
+    bar_data: List[dict] = Field(..., alias="barData", description="柱状图数据（6个固定刻度）")
+    details: Optional[dict] = Field(None, description="子分类详情（递归结构）")
+    
+    class Config:
+        populate_by_name = True
+        json_schema_extra = {
+            "example": {
+                "title": "12:00 - 13:00 Overview",
+                "subTitle": "Activity breakdown for selected time range",
+                "totalTrackedMinutes": 45,
+                "pieData": [
+                    {"key": "work", "name": "工作/学习", "value": 30, "color": "#5B8FF9"}
+                ],
+                "barKeys": [
+                    {"key": "work", "label": "工作/学习", "color": "#5B8FF9"}
+                ],
+                "barData": [
+                    {"timeRange": "12:00", "work": 5},
+                    {"timeRange": "12:10", "work": 8}
+                ]
+            }
+        }
+

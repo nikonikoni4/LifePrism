@@ -183,6 +183,64 @@ class StatisticalDataProvider:
             for row in results if row[0] is not None
         ]
     
+    def get_events_by_time_range(self, date: str, start_hour: float, end_hour: float) -> list[dict]:
+        """
+        获取指定日期和时间范围内的事件数据（用于 Timeline Overview）
+        
+        Args:
+            date: 日期 (YYYY-MM-DD)
+            start_hour: 开始小时 (浮点数，如 12.5 = 12:30)
+            end_hour: 结束小时 (浮点数)
+        
+        Returns:
+            list[dict]: 事件列表，包含 category_id, category_name, sub_category_id, 
+                       sub_category_name, duration, start_time, end_time, app
+        """
+        # 计算精确时间范围
+        start_min = int((start_hour % 1) * 60)
+        end_min = int((end_hour % 1) * 60)
+        start_time_str = f"{date} {int(start_hour):02d}:{start_min:02d}:00"
+        end_time_str = f"{date} {int(end_hour):02d}:{end_min:02d}:00"
+        
+        sql = """
+        SELECT 
+            uabl.id,
+            uabl.start_time,
+            uabl.end_time,
+            uabl.duration,
+            uabl.app,
+            uabl.category_id,
+            c.name as category_name,
+            uabl.sub_category_id,
+            sc.name as sub_category_name
+        FROM user_app_behavior_log uabl
+        LEFT JOIN category c ON uabl.category_id = c.id
+        LEFT JOIN sub_category sc ON uabl.sub_category_id = sc.id
+        WHERE uabl.start_time >= ? AND uabl.end_time <= ?
+        ORDER BY uabl.start_time ASC
+        """
+        
+        with self.lw_db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (start_time_str, end_time_str))
+            results = cursor.fetchall()
+        
+        events = []
+        for row in results:
+            events.append({
+                "id": row[0],
+                "start_time": row[1],
+                "end_time": row[2],
+                "duration": row[3],
+                "app": row[4],
+                "category_id": row[5] or "",
+                "category_name": row[6] or "",
+                "sub_category_id": row[7] or "",
+                "sub_category_name": row[8] or ""
+            })
+        
+        return events
+
     def get_range_active_time(self, start_date: str, end_date: str) -> int:
         """
         获取指定日期范围的活跃时长

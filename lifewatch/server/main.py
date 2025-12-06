@@ -11,6 +11,7 @@ from lifewatch.server.api import (
     sync_router,
     activity_summary_router
 )
+from lifewatch.server.api.timeline import router as timeline_router
 
 # 创建 FastAPI 应用实例
 app = FastAPI(
@@ -66,6 +67,7 @@ app.include_router(behavior_router, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
 app.include_router(activity_summary_router, prefix="/api/v1")
+app.include_router(timeline_router, prefix="/api/v1")
 
 
 
@@ -89,7 +91,8 @@ async def root():
             "homepage": "/api/v1/dashboard/homepage",
             "dashboard": "/api/v1/dashboard",
             "behavior_logs": "/api/v1/behavior/logs",
-            "timeline": "/api/v1/behavior/timeline",
+            "timeline": "/api/v1/timeline",
+            "timeline_overview": "/api/v1/timeline/overview",
             "categories": "/api/v1/categories/apps",
             "activity_summary": "/api/v1/activity-summary",
             "sync": "/api/v1/sync/activitywatch"
