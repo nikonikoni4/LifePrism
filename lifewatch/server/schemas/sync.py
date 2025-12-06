@@ -13,6 +13,13 @@ class SyncRequest(BaseModel):
     use_incremental_sync: bool = False
 
 
+class SyncTimeRangeRequest(BaseModel):
+    """时间范围同步请求参数"""
+    start_time: str  # Format: YYYY-MM-DD HH:MM:SS
+    end_time: str    # Format: YYYY-MM-DD HH:MM:SS
+    auto_classify: bool = True
+
+
 class SyncResponse(BaseModel):
     """同步响应结果"""
     status: str

@@ -161,6 +161,109 @@ class DataProcessingService:
             logger.error(f"数据处理失败: {e}", exc_info=True)
             raise
     
+    def process_activitywatch_data_by_time_range(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        auto_classify: bool
+    ) -> Dict:
+        """
+        按时间范围处理 ActivityWatch 数据
+        
+        Args:
+            start_time: 开始时间 (datetime对象)
+            end_time: 结束时间 (datetime对象)
+            auto_classify: 是否自动分类新应用
+            
+        Returns:
+            Dict: 处理结果统计
+        """
+        try:
+            time_range = f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            logger.info(f"开始按时间范围同步数据: {time_range}")
+            
+            # 1. 获取 ActivityWatch 数据
+            logger.info("步骤 1/6: 获取 ActivityWatch 数据...")
+            aw_data = self.aw_db_reader.get_window_events(
+                start_time=start_time,
+                end_time=end_time,
+            )
+            total_events = len(aw_data)
+            logger.info(f"  ✓ 获取到 {total_events} 条原始事件")
+            
+            # 2. 数据清洗
+            logger.info("步骤 2/6: 数据清洗...")
+            app_purpose_category_df = self.lw_db_managet.load_app_purpose_category()
+            filtered_data, app_to_classify_df, app_to_classify_set = clean_activitywatch_data(
+                aw_data, 
+                app_purpose_category_df
+            )
+            filtered_events = len(filtered_data)
+            apps_to_classify = len(app_to_classify_df)
+            logger.info(f"  ✓ 过滤后保留 {filtered_events} 条事件")
+            logger.info(f"  ✓ 发现 {apps_to_classify} 个待分类应用")
+            
+            classified_apps = 0
+            
+            # 3. LLM 分类（如果需要）
+            if auto_classify and apps_to_classify > 0:
+                logger.info(f"步骤 3/6: LLM 分类 {apps_to_classify} 个应用...")
+                classified_app_df = self._classify_apps(app_to_classify_df)
+                
+                # 4. 保存分类结果
+                logger.info("步骤 4/6: 保存分类结果...")
+                self.lw_db_managet.save_app_purpose_category(classified_app_df)
+                classified_apps = len(classified_app_df)
+                logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
+                
+                # 5. 合并分类结果到事件数据
+                logger.info("步骤 5/6: 合并分类结果...")
+                filtered_data = self._merge_classification_results(
+                    filtered_data, 
+                    classified_app_df
+                )
+            else:
+                logger.info("步骤 3-5/6: 跳过分类（auto_classify=False 或无待分类应用）")
+            
+            # 6. 映射 category_id 和 sub_category_id
+            logger.info("步骤 6/6: 映射分类 ID...")
+            filtered_data = self._map_category_ids(filtered_data)
+            
+            # 7. 保存行为日志
+            logger.info("保存行为日志到数据库...")
+            self.lw_db_managet.save_user_app_behavior_log(filtered_data)
+            saved_events = len(filtered_data)
+            logger.info(f"  ✓ 保存了 {saved_events} 条行为日志")
+            
+            # 统计结果
+            result = {
+                "total_events": total_events,
+                "filtered_events": filtered_events,
+                "apps_to_classify": apps_to_classify,
+                "classified_apps": classified_apps,
+                "saved_events": saved_events,
+                "unclassified_events": len(filtered_data[filtered_data['category'].isna()]),
+                "sync_mode": "time_range",
+                "time_range": time_range
+            }
+            
+            logger.info("=" * 60)
+            logger.info("数据处理完成！")
+            logger.info(f"  - 同步模式: time_range")
+            logger.info(f"  - 时间范围: {time_range}")
+            logger.info(f"  - 总事件数: {total_events}")
+            logger.info(f"  - 有效事件数: {filtered_events}")
+            logger.info(f"  - 新分类应用数: {classified_apps}")
+            logger.info(f"  - 保存事件数: {saved_events}")
+            logger.info(f"  - 未分类事件数: {result['unclassified_events']}")
+            logger.info("=" * 60)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"时间范围数据处理失败: {e}", exc_info=True)
+            raise
+    
 
     def _process_time_range(self,use_incremental_sync:bool,hours:Optional[int]):
         """
