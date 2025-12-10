@@ -18,7 +18,7 @@ def format_category_tree_for_prompt(category_tree: dict[str, list[str] | None]) 
     if not category_tree:
         return "暂无分类体系"
     
-    formatted = "分类体系：\n"
+    formatted = "分类体系：category -> sub_category\n"
     for category, sub_categories in category_tree.items():
         formatted += f"• {category}\n"
         if sub_categories:
@@ -55,3 +55,9 @@ def format_log_items_for_prompt(log_items: list[LogItem]) -> str:
 if __name__ == "__main__":
     from lifewatch.llm.langchain_test.mock_data import mock_log_items
     print(format_log_items_for_prompt(mock_log_items))
+    category_tree = {
+        "工作/学习": ["编程", "学习AI相关知识", "记笔记"],
+        "娱乐": ["游戏", "看电视"],
+        "其他": None,
+    }
+    print(format_category_tree_for_prompt(category_tree))
