@@ -99,29 +99,21 @@ def get_app_description(state: classifyState):
 def easy_app_to_classify(state: classifyState):
     """
     简单的app分类
-    策略： 极速匹配，不消耗 LLM 推理能力。
-    2.1 单用途 App： 直接根据 App 描述分类（如 PyCharm -> 工作）。
-    2.2 强关联 Goal：
-    检查 Title 是否包含用户设定的 Goal 关键词。
-    例子： 用户设定 Goal 为“学习红楼梦”。Title 包含“红楼梦” -> 直接分类为“学习”，并关联该 Goal。
     """
     goal = format_goals_for_prompt(state.goal)
     category_tree = format_category_tree_for_prompt(state.category_tree)
     system_message = SystemMessage(content=f"""
-        # 你是一个软件分类专家。你的任务是根据软件名称,描述,Title,将软件进行分类,分类有category和sub_category两级分类。
+        # 你是一个软件分类专家。你的任务是根据软件名称,描述,将软件进行分类,分类有category和sub_category两级分类。
         # 分类类别
         {category_tree}
         # 用户目标
         {goal}
         # 分类规则
-        1. 对于app和title与goal高度相关的条目,使用goal的分类类别,并关联goal,link_to_goal = goal;否则link_to_goal = None
+        1. 对于app与goal高度相关的条目,使用goal的分类类别,并关联goal,link_to_goal = goal;否则link_to_goal = None
         2. 对于单用途,依据app_description进行分类,若无法分类,则分类为None
-        3. 对于多用途,依据title进行分类:
-            - 若对于title完全已知,且有且只有一个分类能够匹配,则直接进行分类
-            - 若对于title内某些内容未知,给出你需要查询的内容赋值给search_title_query,或无法确定的,各级分类为None
-        4. 若category有分类而sub_category无法分类,则sub_category = None
+        3. 若category有分类而sub_category无法分类,则sub_category = None
         # 输出格式
-        {{<id>:(<category>|None,<sub_category>|None,<link_to_goal>|None,<search_title_query>|None)}}
+        {{<id>:(<category>|None,<sub_category>|None,<link_to_goal>|None)}}
         """)
 
     # 按 app 分组 log_items
@@ -206,7 +198,7 @@ def easy_app_to_classify(state: classifyState):
         
         # 遍历所有匹配结果
         for match in matches:
-            item_id, category, sub_category, link_to_goal, search_title_query = match
+            item_id, category, sub_category, link_to_goal = match
             item_id = int(item_id)  # 转换为整数
             
             if item_id in log_items_dict:
@@ -221,12 +213,6 @@ def easy_app_to_classify(state: classifyState):
                 log_items_dict[item_id].category = clean_value(category)
                 log_items_dict[item_id].sub_category = clean_value(sub_category)
                 log_items_dict[item_id].link_to_goal = clean_value(link_to_goal)
-                
-                # search_title_query 可能包含 "搜索: xxx" 格式
-                search_query = clean_value(search_title_query)
-                if search_query and search_query.startswith("搜索:"):
-                    search_query = search_query[3:].strip().strip('"')
-                log_items_dict[item_id].search_title_query = search_query
             else:
                 print(f"警告: 找不到ID为 {item_id} 的log_item")
         
@@ -342,8 +328,7 @@ def split_by_purpose(state: classifyState) -> tuple[classifyState, classifyState
 
 
 def multi_app_to_classify(state: classifyState) -> classifyState:
-    
-
+    return state
 
 
 
@@ -366,7 +351,7 @@ if __name__ == "__main__":
     print("\n" + "="*120)
     print("分类结果汇总")
     print("="*120)
-    print(f"{'ID':<8} {'应用':<20} {'分类':<15} {'子分类':<15} {'关联目标':<20} {'搜索查询':<30}")
+    print(f"{'ID':<8} {'应用':<20} {'分类':<15} {'子分类':<15} {'关联目标':<20}")
     print("-"*120)
     
     for item in state.log_items:
@@ -375,21 +360,18 @@ if __name__ == "__main__":
         category = (item.category[:13] if item.category and len(item.category) > 13 else item.category) or "未分类"
         sub_category = (item.sub_category[:13] if item.sub_category and len(item.sub_category) > 13 else item.sub_category) or "-"
         link_to_goal = (item.link_to_goal[:18] if item.link_to_goal and len(item.link_to_goal) > 18 else item.link_to_goal) or "-"
-        search_query = (item.search_title_query[:28] if item.search_title_query and len(item.search_title_query) > 28 else item.search_title_query) or "-"
         title = item.title[:28] if item.title and len(item.title) > 28 else item.title
-        print(f"{item.id:<8} {app:<20} {title:<28}{category:<15} {sub_category:<15} {link_to_goal:<20} {search_query:<30}")
+        print(f"{item.id:<8} {app:<20} {title:<28}{category:<15} {sub_category:<15} {link_to_goal:<20}")
     
     print("="*120)
     
     # 统计信息
     classified_count = sum(1 for item in state.log_items if item.category is not None)
-    has_search_query = sum(1 for item in state.log_items if item.search_title_query is not None)
     linked_to_goal = sum(1 for item in state.log_items if item.link_to_goal is not None)
     
     print(f"\n统计信息:")
     print(f"  总记录数: {len(state.log_items)}")
     print(f"  已分类: {classified_count} ({classified_count/len(state.log_items)*100:.1f}%)")
-    print(f"  需要搜索: {has_search_query}")
     print(f"  关联目标: {linked_to_goal}")
     
     # 测试分离功能
