@@ -7,18 +7,16 @@
 3. 管理工具状态
 """
 from langchain_core.tools import tool
-from lifewatch.llm.llm_classify.providers.lw_data_providers import LWDataProviders
+from lifewatch.llm.llm_classify.providers.lw_data_providers import lw_data_providers
 from lifewatch.llm.llm_classify.schemas.database_tool_shemas import (
     TitleDescriptionInput,
     TitleDescriptionOutput
 )
 
-lw_data_providers = LWDataProviders()
 @tool(args_schema=TitleDescriptionInput)
 def query_title_description(query_list: list[str]) -> TitleDescriptionOutput:
     """从数据库查询标题描述信息,适用于查询网站名称、实体名称等的详细描述"""
     results = lw_data_providers.query_title_description(query_list)
-    print(results)
     if not results:
         return TitleDescriptionOutput(result={})
     
