@@ -42,6 +42,7 @@ class Goal(BaseModel):
 class AppInFo(BaseModel):
     description : str = Field(description="app的描述")
     is_multipurpose : bool = Field(description="是否为被选择需要使用title信息来判断用途的应用")
+    titles : list[str] | None = Field(default=None, description="该app的典型标题示例列表，用于辅助识别app用途")
 # 定义状态
 class classifyState(BaseModel):
     app_registry: dict[str, AppInFo] = Field(description="app : app_description") # app : app_description
