@@ -7,7 +7,7 @@ from typing import Set, Dict, Optional
 import logging
 
 from lifewatch.storage.database_manager import DatabaseManager
-from lifewatch.config.database import TABLE_CONFIGS, DB_PATH
+from lifewatch.config.database import TABLE_CONFIGS, LW_DB_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +20,16 @@ class LifeWatchDataManager(DatabaseManager):
     包括应用分类管理、用户行为日志管理等
     """
     
-    def __init__(self, db_path: str = DB_PATH, use_pool: bool = True, pool_size: int = 5):
+    def __init__(self, LW_DB_PATH: str = LW_DB_PATH, use_pool: bool = True, pool_size: int = 5):
         """
         初始化 LifeWatch 数据管理器
         
         Args:
-            db_path: 数据库文件路径
+            LW_DB_PATH: 数据库文件路径
             use_pool: 是否启用连接池
             pool_size: 连接池大小
         """
-        super().__init__(db_path, use_pool, pool_size)
+        super().__init__(LW_DB_PATH, use_pool, pool_size)
     
     # ==================== 应用分类管理 ====================
     
@@ -280,7 +280,7 @@ class LifeWatchDataManager(DatabaseManager):
                 cursor = conn.cursor()
                 
                 stats = {
-                    'database_file': self.db_path
+                    'database_file': self.LW_DB_PATH
                 }
                 
                 # 获取每个表的统计信息
@@ -297,7 +297,7 @@ class LifeWatchDataManager(DatabaseManager):
                 
         except Exception as e:
             logger.error(f"获取数据库统计失败: {e}")
-            return {'database_file': self.db_path, 'error': str(e)}
+            return {'database_file': self.LW_DB_PATH, 'error': str(e)}
     
     def get_app_usage_summary(self, 
                              start_time: str = None, 

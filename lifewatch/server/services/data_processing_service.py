@@ -27,16 +27,16 @@ class DataProcessingService:
     提供优化的分类结果合并和批量处理功能
     """
     
-    def __init__(self, db_path: Optional[str] = None, aw_db_path: Optional[str] = None):
+    def __init__(self, LW_DB_PATH: Optional[str] = None, aw_LW_DB_PATH: Optional[str] = None):
         """
         初始化数据处理服务
         
         Args:
-            db_path: LifeWatch 数据库路径，默认使用 config.DB_PATH
-            aw_db_path: ActivityWatch 数据库路径，用于直接读取 AW 数据
+            LW_DB_PATH: LifeWatch 数据库路径，默认使用 config.LW_DB_PATH
+            aw_LW_DB_PATH: ActivityWatch 数据库路径，用于直接读取 AW 数据
         """
-        self.lw_db_managet = LifeWatchDataManager(db_path=db_path or config.DB_PATH)
-        self.aw_db_reader = ActivityWatchDBReader(db_path=aw_db_path or config.ACTIVITYWATCH_DB_PATH)
+        self.lw_db_managet = LifeWatchDataManager(LW_DB_PATH=LW_DB_PATH or config.LW_DB_PATH)
+        self.aw_db_reader = ActivityWatchDBReader(LW_DB_PATH=aw_LW_DB_PATH or config.ACTIVITYWATCH_DB_PATH)
         self._category_mappings_cache = None  # 缓存分类映射
         
     def process_activitywatch_data(

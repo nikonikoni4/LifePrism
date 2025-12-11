@@ -28,35 +28,35 @@ class ActivityWatchDBReader:
     - 灵活查询(可自定义 SQL 优化)
     """
     
-    def __init__(self, db_path: str, local_tz: str = LOCAL_TIMEZONE):
+    def __init__(self, LW_DB_PATH: str, local_tz: str = LOCAL_TIMEZONE):
         """
         初始化数据库读取器
         
         Args:
-            db_path: ActivityWatch 数据库路径(必需)
+            LW_DB_PATH: ActivityWatch 数据库路径(必需)
             local_tz: 本地时区,默认 'Asia/Shanghai'
         """
-        self.db_path = db_path
+        self.LW_DB_PATH = LW_DB_PATH
         self.local_tz = pytz.timezone(local_tz)
         self.utc_tz = timezone.utc
         
         # 验证数据库文件存在
         self._validate_database()
         
-        logger.info(f"初始化 ActivityWatch 数据库读取器: {self.db_path}")
+        logger.info(f"初始化 ActivityWatch 数据库读取器: {self.LW_DB_PATH}")
     
     def _validate_database(self):
         """验证数据库文件是否存在且可访问"""
         import os
-        if not os.path.exists(self.db_path):
+        if not os.path.exists(self.LW_DB_PATH):
             raise FileNotFoundError(
-                f"ActivityWatch 数据库文件不存在: {self.db_path}\n"
+                f"ActivityWatch 数据库文件不存在: {self.LW_DB_PATH}\n"
                 f"请检查配置文件中的 ACTIVITYWATCH_DATABASE_PATH 是否正确"
             )
         
         # 尝试连接数据库
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.LW_DB_PATH)
             conn.close()
         except sqlite3.Error as e:
             raise RuntimeError(f"无法连接到 ActivityWatch 数据库: {e}")
@@ -69,7 +69,7 @@ class ActivityWatchDBReader:
             sqlite3.Connection: 数据库连接对象
         """
         # 使用只读模式打开数据库,避免意外修改
-        conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
+        conn = sqlite3.connect(f"file:{self.LW_DB_PATH}?mode=ro", uri=True)
         conn.row_factory = sqlite3.Row  # 使用字典式访问
         return conn
     
@@ -404,7 +404,7 @@ class ActivityWatchDBReader:
 
 # 便捷函数,用于快速获取窗口事件
 def get_window_events_from_db(
-    db_path: str,
+    LW_DB_PATH: str,
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
     hours: int = 1
@@ -413,7 +413,7 @@ def get_window_events_from_db(
     从数据库获取窗口事件的便捷函数
     
     Args:
-        db_path: ActivityWatch 数据库路径
+        LW_DB_PATH: ActivityWatch 数据库路径
         start_time: 开始时间
         end_time: 结束时间
         hours: 最近 N 小时(默认 1)
@@ -421,7 +421,7 @@ def get_window_events_from_db(
     Returns:
         List[Dict]: 窗口事件列表
     """
-    reader = ActivityWatchDBReader(db_path=db_path)
+    reader = ActivityWatchDBReader(LW_DB_PATH=LW_DB_PATH)
     return reader.get_window_events(start_time, end_time, hours)
 
 
@@ -434,10 +434,10 @@ if __name__ == "__main__":
     print("=" * 60)
     
     # 指定数据库路径
-    db_path = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
+    LW_DB_PATH = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
     
     try:
-        reader = ActivityWatchDBReader(db_path=db_path)
+        reader = ActivityWatchDBReader(LW_DB_PATH=LW_DB_PATH)
         
         # 测试获取 buckets
         print("\n1. 获取存储桶列表:")

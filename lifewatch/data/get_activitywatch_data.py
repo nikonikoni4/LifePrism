@@ -227,7 +227,7 @@ class ActivityWatchTimeRangeAccessor:
             window_events = []
         return window_events
 # 测试用
-def get_window_events(start_time=None, end_time=None, hours=None, use_database=True, aw_db_path=None):
+def get_window_events(start_time=None, end_time=None, hours=None, use_database=True, aw_LW_DB_PATH=None):
     """
     从事件数据中提取窗口事件
     
@@ -236,7 +236,7 @@ def get_window_events(start_time=None, end_time=None, hours=None, use_database=T
         end_time: 结束时间
         hours: 获取最近 N 小时的数据
         use_database: 是否使用数据库模式(默认 True,性能更好)
-        aw_db_path: ActivityWatch 数据库路径(仅在 use_database=True 时需要)
+        aw_LW_DB_PATH: ActivityWatch 数据库路径(仅在 use_database=True 时需要)
     
     Returns:
         list: 窗口事件列表
@@ -245,11 +245,11 @@ def get_window_events(start_time=None, end_time=None, hours=None, use_database=T
         # 使用数据库模式
         from lifewatch.data.aw_db_reader import ActivityWatchDBReader
         
-        if not aw_db_path:
+        if not aw_LW_DB_PATH:
             # 默认数据库路径
-            aw_db_path = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
+            aw_LW_DB_PATH = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
         
-        reader = ActivityWatchDBReader(db_path=aw_db_path)
+        reader = ActivityWatchDBReader(LW_DB_PATH=aw_LW_DB_PATH)
         window_events = reader.get_window_events(start_time, end_time, hours)
     else:
         # 使用 API 模式(向后兼容)

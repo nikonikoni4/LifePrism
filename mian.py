@@ -18,7 +18,7 @@ import pandas as pd
 
 if __name__ == "__main__":
     # 判断数据库是否存在，不存在则创建数据库和数据表 app_purpose_category和user_app_behavior_log
-    db_manager = DatabaseManager(config.DB_PATH)
+    db_manager = DatabaseManager(config.LW_DB_PATH)
     
     # 获取数据
     aw_accessor = ActivityWatchTimeRangeAccessor(

@@ -17,17 +17,17 @@ logger = logging.getLogger(__name__)
 class CategoryService:
     """分类管理服务"""
     
-    def __init__(self, db_path: str = None):
+    def __init__(self, LW_DB_PATH: str = None):
         """
         初始化分类服务
         
         Args:
-            db_path: 数据库路径，None 则使用默认路径
+            LW_DB_PATH: 数据库路径，None 则使用默认路径
         """
-        from lifewatch.config.database import DB_PATH
-        if db_path is None:
-            db_path = DB_PATH
-        self.db = DatabaseManager(db_path=db_path)
+        from lifewatch.config.database import LW_DB_PATH
+        if LW_DB_PATH is None:
+            LW_DB_PATH = LW_DB_PATH
+        self.db = DatabaseManager(LW_DB_PATH=LW_DB_PATH)
     
     def get_all_categories(self) -> List[Dict[str, Any]]:
         """
