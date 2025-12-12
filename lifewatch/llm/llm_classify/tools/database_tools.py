@@ -27,6 +27,6 @@ def query_title_description(query_list: list[str]) -> TitleDescriptionOutput:
     return TitleDescriptionOutput(result=descriptions)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     result = query_title_description.invoke({"query_list": ["爱奇艺", "抖音"]})
     print(result)

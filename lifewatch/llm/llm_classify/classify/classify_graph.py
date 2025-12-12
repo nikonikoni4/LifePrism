@@ -3,18 +3,18 @@ from lifewatch.llm.llm_classify.utils.create_model import create_ChatTongyiModel
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import SystemMessage, HumanMessage
 from lifewatch.llm.llm_classify.providers.lw_data_providers import lw_data_providers
+from lifewatch.llm.llm_classify.utils.format_prompt_utils import format_goals_for_prompt, format_category_tree_for_prompt, format_log_items_for_prompt, format_single_app_log_items_for_prompt
 import json
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 # step 0 : 创建模型
 chat_model = create_ChatTongyiModel()
 
 # step 1: 获取所有app的描述
 def get_app_description(state: classifyState):
-    # 判断那些app没有描述
+    # 1. 判断那些app没有描述
     app_to_web_search = []
     app_titles_map = {}  # 存储每个app对应的titles样本
     for app, app_info in state.app_registry.items():
@@ -23,6 +23,7 @@ def get_app_description(state: classifyState):
             # 收集该app的titles信息（如果有的话）
             if app_info.titles:
                 app_titles_map[app] = app_info.titles[:2]  # 最多取1个title样本
+    # 2. 对未知app进行搜索和总结
     if app_to_web_search:
         # 构建包含titles信息的软件列表描述
         app_info_list = []
@@ -58,7 +59,8 @@ def get_app_description(state: classifyState):
         
         # 重试机制
         app_description = None
-        for attempt in range(3):
+        max_attempt = 3
+        for attempt in range(max_attempt):
             try:
                 results = chat_model.invoke(messages)
                 
@@ -74,7 +76,8 @@ def get_app_description(state: classifyState):
                 break # 解析成功，跳出循环
             except Exception as e:
                 print(f"get_app_description 输出格式错误 (第 {attempt + 1} 次尝试), 错误: {e}")
-                if attempt == 2: # 最后一次尝试也失败
+                if attempt == max_attempt - 1: # 最后一次尝试也失败
+                    print(f"get_app_description token usage: {state.node_token_usage['get_app_description']}")
                     return state
 
         if not app_description:
@@ -94,8 +97,116 @@ def get_app_description(state: classifyState):
             {"app": app, "app_description": state.app_registry[app].description}
             for app in app_to_web_search
         ])
+    print(f"get_app_description 重复次数: {max_attempt}")
     print(f"get_app_description token usage: {state.node_token_usage['get_app_description']}")
     return state
+
+
+
+
+# step 2: 单用途分类
+def single_classify(state: classifyState) -> classifyState:
+    """
+    单用途app分类
+    """
+    # system message
+    goal = format_goals_for_prompt(state.goal)
+    category_tree = format_category_tree_for_prompt(state.category_tree)
+    print(goal)
+    print(category_tree)
+    system_message = SystemMessage(content=f"""
+        # 你是一个软件分类专家。你的任务是根据软件名称,描述,将软件进行分类,分类有category和sub_category两级分类。
+        # 分类类别
+        {category_tree}
+        # 用户目标
+        {goal}
+        # 分类规则
+        1. 对于app与goal高度相关的条目,使用goal的分类类别,并关联goal,link_to_goal = goal;否则link_to_goal = null
+        2. 对于单用途,依据app_description进行分类,若无法分类,则分类为null
+        3. 若category有分类而sub_category无法分类,则sub_category = null
+        # 输出格式（重要：必须是标准JSON格式）
+        返回一个JSON对象，key是log item的id（整数），value是一个包含3个元素的数组：[category, sub_category, link_to_goal]
+        注意：
+        - 必须使用JSON数组 [] 而不是Python元组 ()
+        - 无值时使用 null 而不是 None
+        - key必须是id，不是app名称
+        """)
+    # 获取单用途的log_item
+    single_purpose_items = [
+        item for item in state.log_items 
+        if not state.app_registry[item.app].is_multipurpose
+    ]
+    
+    if not single_purpose_items:
+        logger.info("没有单用途应用需要分类")
+        return state
+    
+    # 使用工具函数格式化 log_items
+    app_content = format_single_app_log_items_for_prompt(single_purpose_items, state.app_registry)
+    print(app_content)
+    
+    # 构建 human_message
+    human_message = HumanMessage(content=app_content)
+    messages = [system_message, human_message]
+    
+    # 发送请求并解析结果
+    try:
+        results = chat_model.invoke(messages)
+    
+        # 提取 token 使用情况
+        token_usage = results.response_metadata.get('token_usage', {})
+        if 'single_classify' not in state.node_token_usage.keys():
+            state.node_token_usage['single_classify'] = token_usage
+        else:
+            for key in token_usage.keys():
+                state.node_token_usage['single_classify'][key] += token_usage[key]
+        
+        # 打印原始响应内容以便调试
+        print("\n=== LLM 原始响应 ===")
+        print(results.content)
+        print("=== 响应结束 ===\n")
+        
+        # 解析 JSON 结果
+        classification_result = json.loads(results.content)
+        logger.info(f"single_classify 成功获取分类结果")
+        
+        # 按照 id 赋值给 logitem
+        # 创建 id 到 log_item 的映射
+        id_to_item = {item.id: item for item in state.log_items}
+        # 遍历分类结果，更新对应的 log_item
+        for item_id_str, classification in classification_result.items():
+            try:
+                item_id = int(item_id_str)
+                if item_id in id_to_item:
+                    # classification 格式: [category, sub_category, link_to_goal]
+                    # 确保 classification 是列表/数组
+                    if isinstance(classification, (list, tuple)) and len(classification) == 3:
+                        category, sub_category, link_to_goal = classification
+                        
+                        # 更新 log_item (JSON中的null会被解析为Python的None)
+                        id_to_item[item_id].category = category
+                        id_to_item[item_id].sub_category = sub_category
+                        id_to_item[item_id].link_to_goal = link_to_goal
+                        
+                        logger.debug(f"已更新 log_item {item_id}: category={category}, sub_category={sub_category}, link_to_goal={link_to_goal}")
+                    else:
+                        logger.error(f"分类结果格式错误: item_id={item_id}, classification={classification}")
+                else:
+                    logger.warning(f"分类结果中的 id {item_id} 在 log_items 中不存在")
+            except (ValueError, TypeError) as e:
+                logger.error(f"解析分类结果时出错: item_id={item_id_str}, classification={classification}, error={e}")
+        
+        logger.info(f"single_classify token usage: {state.node_token_usage.get('single_classify', {})}")
+        
+    except Exception as e:
+        logger.error(f"single_classify 执行失败, 错误: {e}")
+        return state
+    
+    return state
+
+# 
+
+
 
 if __name__ == "__main__":
     from lifewatch.llm.llm_classify.classify.data_loader import get_real_data,filter_by_duration,deduplicate_log_items
@@ -114,5 +225,10 @@ if __name__ == "__main__":
         print(f"  - 过滤后 log_items: {len(state.log_items)} 条")
         print(f"  - 过滤后 app_registry: {len(state.app_registry)} 个应用")
         return state
-    state = get_state(hours=24)
+    state = get_state(hours=48)
     state = get_app_description(state)
+    state = single_classify(state)
+    # graph = StateGraph(state)
+    # graph.add_node("get_app_description",get_app_description)
+    # graph.add_node()
+    # state = get_app_description(state)
