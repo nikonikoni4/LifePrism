@@ -52,7 +52,7 @@ def format_log_items_for_prompt(log_items: list[LogItem]) -> str:
     
     return formatted.strip()
 
-def format_single_app_log_items_for_prompt(log_items: list[LogItem], app_registry: dict) -> str:
+def format_app_log_items_for_prompt(log_items: list[LogItem], app_registry: dict) -> str:
     """
     将单用途应用的 log_items 按应用分组格式化为 prompt
     
@@ -80,12 +80,10 @@ def format_single_app_log_items_for_prompt(log_items: list[LogItem], app_registr
         app_info = app_registry.get(app_name)
         if app_info:
             app_description = app_info.description
-            is_multipurpose = "多用途" if app_info.is_multipurpose else "单用途"
         else:
             app_description = "无描述"
-            is_multipurpose = "未知"
         app_content += f"## {app_name}\n"
-        app_content += f"应用描述: {app_description} ({is_multipurpose})\n"
+        app_content += f"应用描述: {app_description}\n"
         app_content += "活动记录:\n"
         
         # 第一条记录显示键名

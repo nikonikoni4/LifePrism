@@ -3,7 +3,7 @@ from lifewatch.llm.llm_classify.utils.create_model import create_ChatTongyiModel
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import SystemMessage, HumanMessage
 from lifewatch.llm.llm_classify.providers.lw_data_providers import lw_data_providers
-from lifewatch.llm.llm_classify.utils.format_prompt_utils import format_goals_for_prompt, format_category_tree_for_prompt, format_log_items_for_prompt, format_single_app_log_items_for_prompt
+from lifewatch.llm.llm_classify.utils.format_prompt_utils import format_goals_for_prompt, format_category_tree_for_prompt, format_log_items_for_prompt, format_app_log_items_for_prompt
 import json
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -83,6 +83,7 @@ def get_app_description(state: classifyState):
         if not app_description:
             return state
 
+        # 3. 更新app描述
         for app in app_to_web_search:
             desc = app_description.get(app, None)
             if desc:
@@ -102,7 +103,113 @@ def get_app_description(state: classifyState):
     return state
 
 
-
+# step 2: 单用途分类
+# def single_classify(state: classifyState) -> classifyState:
+#     """
+#     单用途app分类
+#     """
+#     # system message
+#     goal = format_goals_for_prompt(state.goal)
+#     category_tree = format_category_tree_for_prompt(state.category_tree)
+#     print(goal)
+#     print(category_tree)
+#     system_message = SystemMessage(content=f"""
+#         # 你是一个软件分类专家。你的任务是根据软件名称,描述,将软件进行分类,分类有category和sub_category两级分类。
+#         # 分类类别
+#         {category_tree}
+#         # 用户目标
+#         {goal}
+#         # 分类规则
+#         1. 对于app与goal高度相关的条目,使用goal的分类类别,并关联goal,link_to_goal = goal;否则link_to_goal = null
+#         2. 对于单用途,依据app_description进行分类,若无法分类,则分类为null
+#         3. 若category有分类而sub_category无法分类,则sub_category = null
+#         # 输出格式（重要：必须是标准JSON格式）
+#         返回一个JSON对象，key是log item的id（整数），value是一个包含category、sub_category、link_to_goal的JSON对象
+#         {{
+#             <id>: {{
+#                 "category": <category值或null>,
+#                 "sub_category": <sub_category值或null>,
+#                 "link_to_goal": <link_to_goal值或null>
+#             }}
+#         }}
+#         示例：
+#         {{
+#             "1": {{"category": "工作", "sub_category": "编程", "link_to_goal": "goal1"}},
+#         }}
+#         """)
+#     # 获取单用途的log_item
+#     single_purpose_items = [
+#         item for item in state.log_items 
+#         if not state.app_registry[item.app].is_multipurpose
+#     ]
+    
+#     if not single_purpose_items:
+#         logger.info("没有单用途应用需要分类")
+#         return state
+    
+#     # 使用工具函数格式化 log_items
+#     app_content = format_app_log_items_for_prompt(single_purpose_items, state.app_registry)
+#     print(app_content)
+    
+#     # 构建 human_message
+#     human_message = HumanMessage(content=app_content)
+#     messages = [system_message, human_message]
+    
+#     # 发送请求并解析结果
+#     try:
+#         results = chat_model.invoke(messages)
+    
+#         # 提取 token 使用情况
+#         token_usage = results.response_metadata.get('token_usage', {})
+#         if 'single_classify' not in state.node_token_usage.keys():
+#             state.node_token_usage['single_classify'] = token_usage
+#         else:
+#             for key in token_usage.keys():
+#                 state.node_token_usage['single_classify'][key] += token_usage[key]
+        
+#         # 打印原始响应内容以便调试
+#         print("\n=== LLM 原始响应 ===")
+#         print(results.content)
+#         print("=== 响应结束 ===\n")
+        
+#         # 解析 JSON 结果
+#         classification_result = json.loads(results.content)
+#         logger.info(f"single_classify 成功获取分类结果")
+        
+#         # 按照 id 赋值给 logitem
+#         # 创建 id 到 log_item 的映射
+#         id_to_item = {item.id: item for item in state.log_items}
+#         # 遍历分类结果，更新对应的 log_item
+#         for item_id_str, classification in classification_result.items():
+#             try:
+#                 item_id = int(item_id_str)
+#                 if item_id in id_to_item:
+#                     # classification 格式: {"category": ..., "sub_category": ..., "link_to_goal": ...}
+#                     # 确保 classification 是字典对象
+#                     if isinstance(classification, dict):
+#                         category = classification.get("category")
+#                         sub_category = classification.get("sub_category")
+#                         link_to_goal = classification.get("link_to_goal")
+#                         # 更新 log_item (JSON中的null会被解析为Python的None)
+#                         id_to_item[item_id].category = category
+#                         id_to_item[item_id].sub_category = sub_category
+#                         id_to_item[item_id].link_to_goal = link_to_goal
+                        
+#                         logger.debug(f"已更新 log_item {item_id}: category={category}, sub_category={sub_category}, link_to_goal={link_to_goal}")
+#                     else:
+#                         logger.error(f"分类结果格式错误: item_id={item_id}, classification={classification}, 期望字典对象")
+#                 else:
+#                     logger.warning(f"分类结果中的 id {item_id} 在 log_items 中不存在")
+#             except (ValueError, TypeError) as e:
+#                 logger.error(f"解析分类结果时出错: item_id={item_id_str}, classification={classification}, error={e}")
+        
+#         logger.info(f"single_classify token usage: {state.node_token_usage.get('single_classify', {})}")
+        
+#     except Exception as e:
+#         logger.error(f"single_classify 执行失败, 错误: {e}")
+#         return state
+    
+#     return state
 
 # step 2: 单用途分类
 def single_classify(state: classifyState) -> classifyState:
@@ -125,11 +232,22 @@ def single_classify(state: classifyState) -> classifyState:
         2. 对于单用途,依据app_description进行分类,若无法分类,则分类为null
         3. 若category有分类而sub_category无法分类,则sub_category = null
         # 输出格式（重要：必须是标准JSON格式）
-        返回一个JSON对象，key是log item的id（整数），value是一个包含3个元素的数组：[category, sub_category, link_to_goal]
+        返回一个JSON对象，key是log item的id（整数），value是一个字符串，格式为 "category|sub_category|link_to_goal"
+        {{
+            <id>: "category|sub_category|link_to_goal"
+        }}
+        
+        示例：
+        {{
+            "1": "工作|编程|goal1",
+            "2": "娱乐|null|null"
+        }}
+
         注意：
-        - 必须使用JSON数组 [] 而不是Python元组 ()
-        - 无值时使用 null 而不是 None
+        - value必须是字符串，使用 | 分隔三个字段
+        - 无值时使用 null（字符串形式）
         - key必须是id，不是app名称
+
         """)
     # 获取单用途的log_item
     single_purpose_items = [
@@ -142,7 +260,7 @@ def single_classify(state: classifyState) -> classifyState:
         return state
     
     # 使用工具函数格式化 log_items
-    app_content = format_single_app_log_items_for_prompt(single_purpose_items, state.app_registry)
+    app_content = format_app_log_items_for_prompt(single_purpose_items, state.app_registry)
     print(app_content)
     
     # 构建 human_message
@@ -178,19 +296,28 @@ def single_classify(state: classifyState) -> classifyState:
             try:
                 item_id = int(item_id_str)
                 if item_id in id_to_item:
-                    # classification 格式: [category, sub_category, link_to_goal]
-                    # 确保 classification 是列表/数组
-                    if isinstance(classification, (list, tuple)) and len(classification) == 3:
-                        category, sub_category, link_to_goal = classification
-                        
-                        # 更新 log_item (JSON中的null会被解析为Python的None)
-                        id_to_item[item_id].category = category
-                        id_to_item[item_id].sub_category = sub_category
-                        id_to_item[item_id].link_to_goal = link_to_goal
-                        
-                        logger.debug(f"已更新 log_item {item_id}: category={category}, sub_category={sub_category}, link_to_goal={link_to_goal}")
+                    # classification 格式: "category|sub_category|link_to_goal"
+                    # 确保 classification 是字符串
+                    if isinstance(classification, str):
+                        parts = classification.split('|')
+                        if len(parts) == 3:
+                            category, sub_category, link_to_goal = parts
+                            
+                            # 将字符串 "null" 转换为 Python 的 None
+                            category = None if category == "null" else category
+                            sub_category = None if sub_category == "null" else sub_category
+                            link_to_goal = None if link_to_goal == "null" else link_to_goal
+                            
+                            # 更新 log_item
+                            id_to_item[item_id].category = category
+                            id_to_item[item_id].sub_category = sub_category
+                            id_to_item[item_id].link_to_goal = link_to_goal
+                            
+                            logger.debug(f"已更新 log_item {item_id}: category={category}, sub_category={sub_category}, link_to_goal={link_to_goal}")
+                        else:
+                            logger.error(f"分类结果格式错误: item_id={item_id}, classification={classification}, 期望3个字段")
                     else:
-                        logger.error(f"分类结果格式错误: item_id={item_id}, classification={classification}")
+                        logger.error(f"分类结果格式错误: item_id={item_id}, classification={classification}, 期望字符串")
                 else:
                     logger.warning(f"分类结果中的 id {item_id} 在 log_items 中不存在")
             except (ValueError, TypeError) as e:
@@ -204,7 +331,15 @@ def single_classify(state: classifyState) -> classifyState:
     
     return state
 
-# 
+# step 3: 多用途分类
+# step 3.1 提取title中的实体
+
+# step 3.2 使用数据库查询实体
+
+# step 3.3 使用网络搜索查询剩余信息并保存实体
+
+# step 3.4 分析用户的行为，并分类
+
 
 
 
