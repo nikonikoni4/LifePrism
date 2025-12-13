@@ -110,12 +110,10 @@ class DataLoader:
                 app=row.get('app', ''),
                 duration=int(row.get('duration', 0)),
                 title=row.get('title', None),
+                title_analysis=None,  # 初始化为 None，后续由搜索节点填充
                 category=row.get('category', None),
                 sub_category=row.get('sub_category', None),
-                link_to_goal=None,
-                search_title_query=None,
-                search_title_content=None,
-                need_analyze_context=False
+                link_to_goal=None
             )
             log_items.append(log_item)
         

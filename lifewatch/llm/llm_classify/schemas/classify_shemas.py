@@ -8,6 +8,7 @@ class LogItem(BaseModel):
     app: str
     duration: int = Field(description="时长,单位秒") # 时长
     title: str | None
+    title_analysis: str | None = None  # 搜索分析结果，初始为None
     # 分类结果
     category: str | None = Field(default=None, description="存储分类结果") # 存储分类结果
     sub_category: str | None = Field(default=None, description="存储分类结果") # 存储分类结果
@@ -30,6 +31,8 @@ class classifyState(BaseModel):
     node_token_usage: dict[str, dict] = Field(default_factory=dict, description="记录每个 node 的 token 消耗: {node_name: {input_tokens, output_tokens, total_tokens}}") # 记录每个 node 的 token 消耗: {node_name: {input_tokens, output_tokens, total_tokens}}
     category_tree : dict[str, list[str]| None] = Field(description="具体分类") # 具体分类
 
+
+
 class SearchOutput(BaseModel):
-    title_analysis:Annotated[list[tuple[int,str]],operator.add]
-    input_data : list[tuple[int,str]]
+    title_analysis: Annotated[dict[int, str], operator.or_]  # 使用 dict 合并，key 为 id，value 为分析结果
+    input_data: dict[int, str]  # key 为 id，value 为 title

@@ -1,5 +1,3 @@
-
-from langchain_core.prompts.chat import AIMessagePromptTemplate
 from lifewatch.llm.llm_classify.schemas.classify_shemas import classifyState,LogItem,Goal,AppInFo,SearchOutput
 from lifewatch.llm.llm_classify.utils.create_model import create_ChatTongyiModel
 from langgraph.graph import StateGraph, START, END
@@ -165,7 +163,7 @@ def router_by_duration_for_multi(state:classifyState):
     short_state, long_state = split_by_duartion(state)
     return [
         Send("multi_classify_short", short_state),
-        Send("multi_classify_long", long_state)
+        Send("get_titles", long_state)
     ]
 
 # 通用解析函数
@@ -462,38 +460,178 @@ def multi_classify_short(state:classifyState) -> classifyState:
 # step 3.2 长时长分类
 # step 3.2.1 搜索title，并总结title活动
 # 由于一次请求只能进行一次搜索，所以需要进行并发
-def multi_classify_long(state:classifyState) ->SearchOutput:
-    # 生成title，list
-    title_set = set()
+def get_titles(state:classifyState) -> SearchOutput:
+    # 生成title字典，key为id，value为title
+    title_dict = {}
     for item in state.log_items:
-        title_set.add((item.id,item.title))
+        if item.title:  # 只添加有title的项
+            title_dict[item.id] = item.title
     return {
-        "input_data":list(title_set)
+        "input_data": title_dict,
+        "title_analysis": {}  # 初始化为空字典
     }
 
-def send_title(input:SearchOutput):
+def send_title(input: SearchOutput):
+    # 为每个 id-title 对创建一个 Send 任务
     return [
-        Send("search_title",input) for input in input.input_data
+        Send("search_title", {"id": item_id, "title": title}) 
+        for item_id, title in input.input_data.items()
     ]
 
-def search_title(input:tuple[int,str])->SearchOutput:
+def search_title(input: dict) -> SearchOutput:
+    """搜索并分析单个title
+    
+    Args:
+        input: 包含 'id' 和 'title' 的字典
+    
+    Returns:
+        SearchOutput: 包含该id的分析结果
+    """
+    item_id = input["id"]
+    title = input["title"]
+    
     system_message = SystemMessage(content="""
     你是一个通过网络搜索分析的助手,依据网络搜索结果和title分析用户的活动，要求结果在50字以内
     # 输出格式:str 内容为:用户活动
     """)
-    human_message = HumanMessage(content=f"""搜索并分析{input[1]}""")
-    message = [system_message,human_message]
+    human_message = HumanMessage(content=f"""搜索并分析{title}""")
+    message = [system_message, human_message]
     result = chat_model.invoke(message)
-    print(result)
-    print(result.content)
+    print(f"ID {item_id} 分析结果: {result.content}")
+    
     return {
-        "title_analysis": [(input[0],result.content)]
-        }
+        "title_analysis": {item_id: result.content},
+    }
+
+# step 3.2.2 汇总数据
+def merge_data(output: SearchOutput) -> classifyState:
+    """将搜索分析结果合并回state
+    
+    Args:
+        output: SearchOutput 包含 title_analysis 字典 (id -> analysis_result)
+    
+    Returns:
+        classifyState: 更新了 title_analysis 的状态
+    """
+    # 创建 id 到 log_item 的映射
+    id_to_item = {item.id: item for item in state.log_items}
+    
+    # 将 title_analysis 结果更新到对应的 log_item
+    for item_id, analysis in output.title_analysis.items():
+        if item_id in id_to_item:
+            id_to_item[item_id].title_analysis = analysis
+            logger.info(f"已更新 log_item {item_id} 的 title_analysis")
+        else:
+            logger.warning(f"SearchOutput 中的 id {item_id} 在 log_items 中不存在")
+    
+    return state
+# step 3.3 进行分类
+def multi_classify_long(state:classifyState)->classifyState:
+    goal = format_goals_for_prompt(state.goal)
+    category_tree = format_category_tree_for_prompt(state.category_tree)
+    # log -> prompt (表格格式)
+    # 构建表格头部
+    table_lines = []
+    table_lines.append("| ID | Title | Title Analysis |")
+    table_lines.append("|-----|-------|----------------|")
+    
+    # 添加每一行数据
+    for item in state.log_items:
+        # 处理可能的 None 值
+        title = item.title or "N/A"
+        title_analysis = item.title_analysis or "N/A"
+        
+        # 转义特殊字符，避免破坏表格格式
+        title = title.replace("|", "\\|").replace("\n", " ")
+        title_analysis = title_analysis.replace("|", "\\|").replace("\n", " ")
+        
+        # 限制长度，避免表格过宽
+        if len(title) > 50:
+            title = title[:47] + "..."
+        if len(title_analysis) > 100:
+            title_analysis = title_analysis[:97] + "..."
+        
+        table_lines.append(f"| {item.id} | {title} | {title_analysis} |")
+    
+    # 合并为完整的表格字符串
+    log_items_table = "\n".join(table_lines)
+
+    system_message = SystemMessage(content=f"""
+    你是一个用户行为分类专家。你的任务是根据网页标题(Title)和标题分析(Title Analysis)对用户的行为进行分类。
+    
+    # 分类类别
+    {category_tree}
+    
+    # 用户目标
+    {goal}
+    
+    # 分类规则
+    1. 对于与goal高度相关的条目,使用goal的分类类别,并关联goal,link_to_goal = goal;否则link_to_goal = null
+    2. 主要依据Title Analysis来理解用户的活动内容,结合Title进行分类
+    3. 类别有两个层级category->sub_category,分类结果sub_category要属于category
+    4. 若category有分类而sub_category无法分类,则sub_category = null
+    5. 若无法分类,则分类为null
+    
+    # 输出格式为json,key为数据的id,value为一个list[category,sub_category,link_to_goal]
+    {{
+        "id":[category,sub_category,link_to_goal]
+    }}
+
+    示例：
+    {{
+        "1": ["工作/学习", "编程", "完成LifeWatch-AI项目开发"],
+        "2": ["娱乐", "看电视", null]
+    }}
+
+    注意：
+    - value必须是列表，包含三个元素 [category, sub_category, link_to_goal]
+    - 无值时使用 null
+    - key必须是id，不是app名称
+    """)
+    
+    human_message = HumanMessage(content=f"""
+    请对以下用户行为数据进行分类：
+    
+    {log_items_table}
+    
+    请根据Title Analysis的内容判断用户的活动类型，并进行分类。
+    """)
+    
+    messages = [system_message, human_message]
+    
+    # 发送请求并解析结果
+    try:
+        result = chat_model.invoke(messages)
+        
+        # 提取 token 使用情况
+        token_usage = result.response_metadata.get('token_usage', {})
+        if 'multi_classify_long' not in state.node_token_usage.keys():
+            state.node_token_usage['multi_classify_long'] = token_usage
+        else:
+            for key in token_usage.keys():
+                state.node_token_usage['multi_classify_long'][key] += token_usage[key]
+        
+        # 打印原始响应内容以便调试
+        print("\n=== LLM 原始响应 ===")
+        print(result.content)
+        print("=== 响应结束 ===\n")
+        
+        # 解析 JSON 结果
+        classification_result = json.loads(result.content)
+        logger.info(f"multi_classify_long 成功获取分类结果")
+        
+        # 使用通用解析函数更新 state
+        state = parse_classification_result(state, classification_result, "multi_classify_long")
+        
+        logger.info(f"multi_classify_long token usage: {state.node_token_usage.get('multi_classify_long', {})}")
+        
+    except Exception as e:
+        logger.error(f"multi_classify_long 执行失败, 错误: {e}")
+        return state
+    
+    return state
 
 
-# step 3.2 使用数据库查询实体
-
-# step 3.3 使用网络搜索查询剩余信息并保存实体
 
 # step 3.4 分析用户的行为，并分类
 
@@ -521,11 +659,15 @@ if __name__ == "__main__":
     s,m=split_by_purpose(state)
     ms,ml=split_by_duartion(m)
     graph = StateGraph(classifyState)
-    graph.add_node("multi_classify_long",multi_classify_long)
+    graph.add_node("get_titles",get_titles)
     graph.add_node("search_title",search_title)
-    graph.add_edge(START,"multi_classify_long")
-    graph.add_conditional_edges("multi_classify_long",send_title)
-    graph.add_edge("search_title",END)
+    graph.add_node("merge_data",merge_data)
+    graph.add_node("multi_classify_long",multi_classify_long)
+    graph.add_edge(START,"get_titles")
+    graph.add_conditional_edges("get_titles",send_title)
+    graph.add_edge("search_title","merge_data")
+    graph.add_edge("merge_data","multi_classify_long")
+    graph.add_edge("multi_classify_long",END)
     app = graph.compile()
     output = app.invoke(ml)
     print(output)
