@@ -6,7 +6,8 @@ from .classify_shemas import (
     LogItem,
     Goal,
     AppInFo,
-    MultiNodeResult
+    SearchOutput
+    
 )
 
 __all__ = [
@@ -14,5 +15,5 @@ __all__ = [
     "LogItem",
     "Goal",
     "AppInFo",
-    "MultiNodeResult"
+    "SearchOutput"
 ]

@@ -25,7 +25,7 @@ def format_category_tree_for_prompt(category_tree: dict[str, list[str] | None]) 
             for sub in sub_categories:
                 formatted += f"  - {sub}\n"
         else:
-            formatted += f"  - (无子分类)\n"
+            formatted += f"\n"
     return formatted.strip()
 
 def format_log_items_for_prompt(log_items: list[LogItem]) -> str:
@@ -114,3 +114,18 @@ def format_app_log_items_for_prompt(log_items: list[LogItem], app_registry: dict
         app_content += "\n"
     
     return app_content.strip()
+
+
+def data_spliter(data:list,each_item_count)->list[list]:
+    
+    length = len(data)
+    if each_item_count >= length:
+        return [data]
+    result_list:list[list] = []
+    for i in range(0,len(data),each_item_count):
+        print(i)
+        result_list.append(data[i:i+each_item_count])
+    return result_list
+if __name__ == "__main__":
+    data = [i for i in range(50)]
+    print(data_spliter(data,51))

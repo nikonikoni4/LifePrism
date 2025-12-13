@@ -10,7 +10,7 @@ LifeWatch LLM 分类模块
 """
 
 # 导出核心组件
-from .schemas import classifyState, LogItem, Goal, AppInFo, MultiNodeResult
+from .schemas import classifyState, LogItem, Goal, AppInFo
 from .utils import create_ChatTongyiModel, LangChainToonAdapter
 from .providers import LWDataProviders
 
@@ -20,7 +20,7 @@ __all__ = [
     "LogItem",
     "Goal",
     "AppInFo",
-    "MultiNodeResult",
+    "",
     # 工具类
     "create_ChatTongyiModel",
     "LangChainToonAdapter",
