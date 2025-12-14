@@ -1,4 +1,4 @@
-from lifewatch.llm.langchain_test.state_define import LogItem, Goal, classifyState, AppInFo
+from lifewatch.llm.llm_classify.schemas import LogItem, Goal, classifyState, AppInFo
 
 # App registry - mapping app names to their descriptions and multipurpose status
 mock_app_registry = {

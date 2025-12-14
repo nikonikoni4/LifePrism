@@ -9,7 +9,7 @@ from typing import Optional
 
 from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
 from lifewatch.llm.llm_classify.schemas.classify_shemas import classifyState, LogItem, AppInFo, Goal
-from lifewatch.llm.langchain_test.mock_data import mock_goals as _mock_goals_raw
+from lifewatch.llm.llm_classify.classify.mock_data import mock_goals as _mock_goals_raw
 from lifewatch.utils import is_multipurpose_app
 from lifewatch import config
 

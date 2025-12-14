@@ -15,7 +15,7 @@ import logging
 from langgraph.types import Send
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-MAX_LOG_ITEMS = 2
+MAX_LOG_ITEMS = 15
 MAX_TITLE_ITEMS = 5
 SPLIT_DURATION = 10*60 # 20min
 
