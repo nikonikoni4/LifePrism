@@ -1,14 +1,13 @@
 """
 lifewatch数据提供者
 """
-from lifewatch.storage.database_manager import DatabaseManager
-from lifewatch.config.database import LW_DB_PATH
+from lifewatch.storage import lw_db_manager
 
 
 
 class LWDataProviders:
     def __init__(self):
-        self.db_manager = DatabaseManager(LW_DB_PATH,use_pool=True,pool_size=3)
+        self.db_manager = lw_db_manager
 
     def query_title_description(self,query_list:list[str])->list[dict[str,str]]:
         sql = """

@@ -1,13 +1,12 @@
 """
 从数据库中读取数据,计算统计指标,为前端显示提供数据支持
 """
-from lifewatch.storage.database_manager import DatabaseManager
-from lifewatch import config
+from lifewatch.storage import lw_db_manager
 from datetime import datetime
 
 class StatisticalDataProvider:
     def __init__(self):
-        self.lw_db_manager = DatabaseManager(LW_DB_PATH=config.LW_DB_PATH)
+        self.lw_db_manager = lw_db_manager
         self._current_date = None
         self._start_time = None
         self._end_time = None

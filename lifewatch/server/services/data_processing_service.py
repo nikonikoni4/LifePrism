@@ -9,6 +9,7 @@ from typing import Dict, Tuple, Optional
 from datetime import datetime, timedelta
 import pytz
 
+from lifewatch.storage import lw_db_manager, aw_db_manager
 from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
 from lifewatch.data.aw_db_reader import ActivityWatchDBReader
 from lifewatch.data.data_clean import clean_activitywatch_data
@@ -27,16 +28,14 @@ class DataProcessingService:
     提供优化的分类结果合并和批量处理功能
     """
     
-    def __init__(self, LW_DB_PATH: Optional[str] = None, aw_LW_DB_PATH: Optional[str] = None):
+    def __init__(self):
         """
         初始化数据处理服务
         
-        Args:
-            LW_DB_PATH: LifeWatch 数据库路径，默认使用 config.LW_DB_PATH
-            aw_LW_DB_PATH: ActivityWatch 数据库路径，用于直接读取 AW 数据
+        使用全局单例数据库管理器
         """
-        self.lw_db_managet = LifeWatchDataManager(LW_DB_PATH=LW_DB_PATH or config.LW_DB_PATH)
-        self.aw_db_reader = ActivityWatchDBReader(LW_DB_PATH=aw_LW_DB_PATH or config.ACTIVITYWATCH_DB_PATH)
+        self.lw_db_managet = LifeWatchDataManager()
+        self.aw_db_reader = ActivityWatchDBReader(db_manager=aw_db_manager)
         self._category_mappings_cache = None  # 缓存分类映射
         
     def process_activitywatch_data(

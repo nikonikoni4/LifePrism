@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """数据库管理器 - 配置驱动的增强版"""
     
-    def __init__(self, LW_DB_PATH: str = None, use_pool: bool = False, pool_size: int = 5):
+    def __init__(self, LW_DB_PATH: str = None, use_pool: bool = False, pool_size: int = 5, readonly: bool = False):
         """
         初始化数据库管理器
         
@@ -37,10 +37,12 @@ class DatabaseManager:
             LW_DB_PATH: 数据库文件路径，默认使用配置文件中的路径
             use_pool: 是否启用连接池（默认 False，保持向后兼容）
             pool_size: 连接池大小（默认 5）
+            readonly: 是否只读模式（用于外部数据库，默认 False）
         """
         self.LW_DB_PATH = LW_DB_PATH 
         self.use_pool = use_pool
         self.pool_size = pool_size
+        self.readonly = readonly
         
         # 连接池相关
         self._connection_pool = None
@@ -51,7 +53,9 @@ class DatabaseManager:
             # 注册程序退出时关闭连接池
             atexit.register(self._close_connection_pool)
         
-        self.init_database()
+        # 只读模式下跳过数据库初始化（外部数据库不需要创建表）
+        if not self.readonly:
+            self.init_database()
     
     def _init_connection_pool(self):
         """初始化连接池"""
@@ -65,7 +69,11 @@ class DatabaseManager:
     
     def _create_connection(self) -> sqlite3.Connection:
         """创建新的数据库连接"""
-        conn = sqlite3.connect(self.LW_DB_PATH, check_same_thread=False)
+        if self.readonly:
+            # 只读模式打开数据库（用于外部数据库如 ActivityWatch）
+            conn = sqlite3.connect(f"file:{self.LW_DB_PATH}?mode=ro", uri=True, check_same_thread=False)
+        else:
+            conn = sqlite3.connect(self.LW_DB_PATH, check_same_thread=False)
         conn.row_factory = sqlite3.Row  # 启用字典式访问
         return conn
     

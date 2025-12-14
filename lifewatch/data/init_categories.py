@@ -3,7 +3,7 @@
 用于初始化默认的主分类和子分类数据
 """
 
-from lifewatch.storage.database_manager import DatabaseManager
+from lifewatch.storage import lw_db_manager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -51,24 +51,17 @@ DEFAULT_SUB_CATEGORIES = [
 ]
 
 
-def init_default_categories(LW_DB_PATH: str = None) -> bool:
+def init_default_categories() -> bool:
     """
     初始化默认分类数据
     
     如果分类表为空，则插入默认的主分类和子分类数据
-    
-    Args:
-        LW_DB_PATH: 数据库路径，None 则使用默认路径
         
     Returns:
         bool: 是否成功初始化
     """
     try:
-        from lifewatch.config.database import LW_DB_PATH
-        if LW_DB_PATH is None:
-            LW_DB_PATH = LW_DB_PATH
-        
-        db = DatabaseManager(LW_DB_PATH=LW_DB_PATH)
+        db = lw_db_manager
         
         # 检查是否已有分类数据
         existing_categories = db.query('category')
@@ -95,24 +88,17 @@ def init_default_categories(LW_DB_PATH: str = None) -> bool:
         return False
 
 
-def reset_categories(LW_DB_PATH: str = None) -> bool:
+def reset_categories() -> bool:
     """
     重置分类数据（清空并重新初始化）
     
     警告：此操作会删除所有现有分类数据！
-    
-    Args:
-        LW_DB_PATH: 数据库路径，None 则使用默认路径
         
     Returns:
         bool: 是否成功重置
     """
     try:
-        from lifewatch.config.database import LW_DB_PATH
-        if LW_DB_PATH is None:
-            LW_DB_PATH = LW_DB_PATH
-            
-        db = DatabaseManager(LW_DB_PATH=LW_DB_PATH)
+        db = lw_db_manager
         
         # 清空子分类表
         logger.warning("清空子分类表...")
@@ -123,7 +109,7 @@ def reset_categories(LW_DB_PATH: str = None) -> bool:
         db.truncate('category')
         
         # 重新初始化
-        return init_default_categories(LW_DB_PATH)
+        return init_default_categories()
         
     except Exception as e:
         logger.error(f"重置分类数据失败: {e}")
@@ -148,8 +134,7 @@ if __name__ == "__main__":
         print("\n✓ 分类数据初始化成功！")
         
         # 验证数据
-        from lifewatch.config.database import LW_DB_PATH
-        db = DatabaseManager(LW_DB_PATH=LW_DB_PATH)
+        db = lw_db_manager
         categories = db.query('category')
         sub_categories = db.query('sub_category')
         

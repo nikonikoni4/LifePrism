@@ -5,14 +5,15 @@ ActivityWatch 数据库直接读取器
 直接从 ActivityWatch SQLite 数据库读取数据,替代 API 方式,提升性能
 """
 
-import sqlite3
 import json
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Tuple
 import pytz
 
 from lifewatch.config import WINDOW_BUCKET_ID, LOCAL_TIMEZONE
+from lifewatch.storage.database_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -28,17 +29,32 @@ class ActivityWatchDBReader:
     - 灵活查询(可自定义 SQL 优化)
     """
     
-    def __init__(self, LW_DB_PATH: str, local_tz: str = LOCAL_TIMEZONE):
+    def __init__(self, db_manager: DatabaseManager = None, LW_DB_PATH: str = None, local_tz: str = LOCAL_TIMEZONE):
         """
         初始化数据库读取器
         
         Args:
-            LW_DB_PATH: ActivityWatch 数据库路径(必需)
+            db_manager: DatabaseManager 实例，None 则创建新实例或使用全局单例
+            LW_DB_PATH: ActivityWatch 数据库路径(仅在 db_manager 为 None 时使用)
             local_tz: 本地时区,默认 'Asia/Shanghai'
         """
-        self.LW_DB_PATH = LW_DB_PATH
         self.local_tz = pytz.timezone(local_tz)
         self.utc_tz = timezone.utc
+        
+        # 使用传入的 db_manager 或创建新实例
+        if db_manager is not None:
+            self.db_manager = db_manager
+            self.LW_DB_PATH = db_manager.LW_DB_PATH
+        elif LW_DB_PATH is not None:
+            self.LW_DB_PATH = LW_DB_PATH
+            self.db_manager = DatabaseManager(
+                LW_DB_PATH=LW_DB_PATH,
+                use_pool=True,
+                pool_size=3,
+                readonly=True
+            )
+        else:
+            raise ValueError("必须提供 db_manager 或 LW_DB_PATH 参数")
         
         # 验证数据库文件存在
         self._validate_database()
@@ -47,31 +63,18 @@ class ActivityWatchDBReader:
     
     def _validate_database(self):
         """验证数据库文件是否存在且可访问"""
-        import os
         if not os.path.exists(self.LW_DB_PATH):
             raise FileNotFoundError(
                 f"ActivityWatch 数据库文件不存在: {self.LW_DB_PATH}\n"
                 f"请检查配置文件中的 ACTIVITYWATCH_DATABASE_PATH 是否正确"
             )
         
-        # 尝试连接数据库
+        # 尝试连接数据库验证可访问性
         try:
-            conn = sqlite3.connect(self.LW_DB_PATH)
-            conn.close()
-        except sqlite3.Error as e:
+            with self.db_manager.get_connection() as conn:
+                conn.execute("SELECT 1")
+        except Exception as e:
             raise RuntimeError(f"无法连接到 ActivityWatch 数据库: {e}")
-    
-    def _get_connection(self) -> sqlite3.Connection:
-        """
-        获取数据库连接(只读模式)
-        
-        Returns:
-            sqlite3.Connection: 数据库连接对象
-        """
-        # 使用只读模式打开数据库,避免意外修改
-        conn = sqlite3.connect(f"file:{self.LW_DB_PATH}?mode=ro", uri=True)
-        conn.row_factory = sqlite3.Row  # 使用字典式访问
-        return conn
     
     def _parse_timestamp(self, timestamp_str: str) -> datetime:
         """
@@ -134,10 +137,9 @@ class ActivityWatchDBReader:
         Returns:
             List[Dict]: 存储桶列表
         """
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        try:
+        with self.db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            
             if bucket_type:
                 cursor.execute(
                     "SELECT * FROM bucketmodel WHERE type = ?",
@@ -163,9 +165,6 @@ class ActivityWatchDBReader:
                 buckets.append(bucket)
             
             return buckets
-        
-        finally:
-            conn.close()
     
     def get_events(
         self,
@@ -186,10 +185,9 @@ class ActivityWatchDBReader:
         Returns:
             List[Dict]: 事件列表
         """
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        try:
+        with self.db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            
             # 获取 bucket_id (Integer)
             # 注意: 查询 id 列(String Key) 来获取 key 列(Integer ID)
             cursor.execute("SELECT key FROM bucketmodel WHERE id = ?", (bucket_key,))
@@ -247,9 +245,6 @@ class ActivityWatchDBReader:
                 events.append(event)
             
             return events
-        
-        finally:
-            conn.close()
     
     def _get_bucket_key_by_type(self, bucket_type: str) -> Optional[str]:
         """

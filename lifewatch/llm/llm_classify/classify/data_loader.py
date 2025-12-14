@@ -27,14 +27,13 @@ class DataLoader:
     并转换为 classifyState 格式供 LangGraph 使用
     """
     
-    def __init__(self, LW_DB_PATH: Optional[str] = None):
+    def __init__(self):
         """
         初始化数据加载器
         
-        Args:
-            LW_DB_PATH: 数据库路径，默认使用 config.LW_DB_PATH
+        使用全局单例数据库管理器
         """
-        self.lw_db_manager = LifeWatchDataManager(LW_DB_PATH=LW_DB_PATH or config.LW_DB_PATH)
+        self.lw_db_manager = LifeWatchDataManager()
     
     def get_real_data(self, hours: int = 24) -> classifyState:
         """

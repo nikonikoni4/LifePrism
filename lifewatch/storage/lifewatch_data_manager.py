@@ -1,35 +1,37 @@
 """
 LifeWatch 业务数据管理器
-继承 DatabaseManager，实现 LifeWatch 项目特定的业务逻辑
+使用 DatabaseManager 实例，实现 LifeWatch 项目特定的业务逻辑
 """
 import pandas as pd
 from typing import Set, Dict, Optional
 import logging
 
-from lifewatch.storage.database_manager import DatabaseManager
-from lifewatch.config.database import TABLE_CONFIGS, LW_DB_PATH
+from lifewatch.config.database import TABLE_CONFIGS
 
 logger = logging.getLogger(__name__)
 
 
-class LifeWatchDataManager(DatabaseManager):
+class LifeWatchDataManager:
     """
     LifeWatch 数据管理器
     
-    继承自 DatabaseManager，添加 LifeWatch 项目特定的业务逻辑
+    使用 DatabaseManager 实例，封装 LifeWatch 项目特定的业务逻辑
     包括应用分类管理、用户行为日志管理等
     """
     
-    def __init__(self, LW_DB_PATH: str = LW_DB_PATH, use_pool: bool = True, pool_size: int = 5):
+    def __init__(self, db_manager=None):
         """
         初始化 LifeWatch 数据管理器
         
         Args:
-            LW_DB_PATH: 数据库文件路径
-            use_pool: 是否启用连接池
-            pool_size: 连接池大小
+            db_manager: DatabaseManager 实例，None 则使用全局单例
         """
-        super().__init__(LW_DB_PATH, use_pool, pool_size)
+        if db_manager is None:
+            # 延迟导入避免循环依赖
+            from lifewatch.storage import lw_db_manager
+            self.db = lw_db_manager
+        else:
+            self.db = db_manager
     
     # ==================== 应用分类管理 ====================
     
@@ -41,7 +43,7 @@ class LifeWatchDataManager(DatabaseManager):
             Set[str]: 应用名称集合（不包括多用途应用）
         """
         try:
-            df = self.query('app_purpose_category', 
+            df = self.db.query('app_purpose_category', 
                           columns=['app'],
                           where={'is_multipurpose_app': 0})
             existing_apps = set(df['app'].dropna().tolist()) if not df.empty else set()
@@ -58,7 +60,7 @@ class LifeWatchDataManager(DatabaseManager):
         Returns:
             Optional[pd.DataFrame]: 包含所有应用分类数据的DataFrame，如果为空返回None
         """
-        df = self.query('app_purpose_category')
+        df = self.db.query('app_purpose_category')
         return df if not df.empty else None
     
     def save_app_purpose_category(self, ai_metadata_df: pd.DataFrame) -> int:
@@ -88,7 +90,7 @@ class LifeWatchDataManager(DatabaseManager):
                 if 'class' in data and 'sub_category' not in data:
                     data['sub_category'] = data.pop('class')
             
-            affected = self.upsert_many('app_purpose_category', 
+            affected = self.db.upsert_many('app_purpose_category', 
                                        data_list, 
                                        conflict_columns=['app'])
             logger.info(f"成功保存 {len(data_list)} 行AI元数据到数据库")
@@ -104,7 +106,7 @@ class LifeWatchDataManager(DatabaseManager):
         Returns:
             Optional[pd.DataFrame]: 包含所有主分类数据的DataFrame，如果为空返回None
         """
-        df = self.query('category', order_by='order_index ASC')
+        df = self.db.query('category', order_by='order_index ASC')
         return df if not df.empty else None
     
     def load_sub_categories(self) -> Optional[pd.DataFrame]:
@@ -114,7 +116,7 @@ class LifeWatchDataManager(DatabaseManager):
         Returns:
             Optional[pd.DataFrame]: 包含所有子分类数据的DataFrame，如果为空返回None
         """
-        df = self.query('sub_category', order_by='order_index ASC')
+        df = self.db.query('sub_category', order_by='order_index ASC')
         return df if not df.empty else None
 
     
@@ -158,11 +160,11 @@ class LifeWatchDataManager(DatabaseManager):
             
             sql += " ORDER BY start_time DESC"
             
-            with self.get_connection() as conn:
+            with self.db.get_connection() as conn:
                 df = pd.read_sql_query(sql, conn, params=params)
             return df if not df.empty else None
         else:
-            df = self.query('user_app_behavior_log', 
+            df = self.db.query('user_app_behavior_log', 
                           where=where if where else None,
                           order_by='start_time DESC')
             return df if not df.empty else None
@@ -177,7 +179,7 @@ class LifeWatchDataManager(DatabaseManager):
         """
         try:
             sql = "SELECT MAX(end_time) as latest_end_time FROM user_app_behavior_log"
-            with self.get_connection() as conn:
+            with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(sql)
                 result = cursor.fetchone()
@@ -251,7 +253,7 @@ class LifeWatchDataManager(DatabaseManager):
                 for row in data_list
             ]
             
-            with self.get_connection() as conn:
+            with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.executemany(sql, values_list)
                 affected = cursor.rowcount
@@ -276,11 +278,11 @@ class LifeWatchDataManager(DatabaseManager):
                 - unique_apps: 唯一应用数量
         """
         try:
-            with self.get_connection() as conn:
+            with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 
                 stats = {
-                    'database_file': self.LW_DB_PATH
+                    'database_file': self.db.LW_DB_PATH
                 }
                 
                 # 获取每个表的统计信息
@@ -297,7 +299,7 @@ class LifeWatchDataManager(DatabaseManager):
                 
         except Exception as e:
             logger.error(f"获取数据库统计失败: {e}")
-            return {'database_file': self.LW_DB_PATH, 'error': str(e)}
+            return {'database_file': self.db.LW_DB_PATH, 'error': str(e)}
     
     def get_app_usage_summary(self, 
                              start_time: str = None, 
@@ -332,7 +334,7 @@ class LifeWatchDataManager(DatabaseManager):
         
         sql += " GROUP BY app ORDER BY total_duration DESC"
         
-        with self.get_connection() as conn:
+        with self.db.get_connection() as conn:
             df = pd.read_sql_query(sql, conn, params=params)
         
         return df
@@ -347,17 +349,17 @@ def get_app_purpose_category() -> Optional[pd.DataFrame]:
     Returns:
         Optional[pd.DataFrame]: 应用分类数据
     """
-    db_manager = LifeWatchDataManager()
-    return db_manager.load_app_purpose_category()
+    lw_manager = LifeWatchDataManager()
+    return lw_manager.load_app_purpose_category()
 
 
 if __name__ == "__main__":
     # 测试业务数据管理器
-    db = LifeWatchDataManager()
-    stats = db.get_database_stats()
-    print(db.get_existing_apps())
+    lw = LifeWatchDataManager()
+    stats = lw.get_database_stats()
+    print(lw.get_existing_apps())
     print("数据库统计:", stats)
     
     # 测试应用分类
-    apps = db.get_existing_apps()
+    apps = lw.get_existing_apps()
     print(f"已有应用数量: {len(apps)}")

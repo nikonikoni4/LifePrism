@@ -4,7 +4,7 @@
 """
 
 from typing import List, Dict, Optional, Any
-from lifewatch.storage.database_manager import DatabaseManager
+from lifewatch.storage import lw_db_manager
 from lifewatch.server.schemas.category_schemas import (
     CategoryDef, SubCategoryDef, CategoryResponse, SubCategoryResponse
 )
@@ -17,17 +17,11 @@ logger = logging.getLogger(__name__)
 class CategoryService:
     """分类管理服务"""
     
-    def __init__(self, LW_DB_PATH: str = None):
+    def __init__(self):
         """
-        初始化分类服务
-        
-        Args:
-            LW_DB_PATH: 数据库路径，None 则使用默认路径
+        初始化分类服务，使用全局数据库单例
         """
-        from lifewatch.config.database import LW_DB_PATH
-        if LW_DB_PATH is None:
-            LW_DB_PATH = LW_DB_PATH
-        self.db = DatabaseManager(LW_DB_PATH=LW_DB_PATH)
+        self.db = lw_db_manager
     
     def get_all_categories(self) -> List[Dict[str, Any]]:
         """

@@ -1,6 +1,6 @@
 # 主流程
 from lifewatch import config
-from lifewatch.storage.database_manager import DatabaseManager
+from lifewatch.storage import lw_db_manager
 from lifewatch.data.get_activitywatch_data import ActivityWatchTimeRangeAccessor
 from lifewatch.data.data_clean import clean_activitywatch_data
 from lifewatch.crawler.app_description_fetching import AppDescriptionFetcher
@@ -17,8 +17,8 @@ import pandas as pd
 #     llm_client.print_result_non_stream(response)
 
 if __name__ == "__main__":
-    # 判断数据库是否存在，不存在则创建数据库和数据表 app_purpose_category和user_app_behavior_log
-    db_manager = DatabaseManager(config.LW_DB_PATH)
+    # 使用全局单例数据库管理器
+    db_manager = lw_db_manager
     
     # 获取数据
     aw_accessor = ActivityWatchTimeRangeAccessor(

@@ -6,8 +6,7 @@
 
 import colorsys
 from typing import Dict, Optional
-from lifewatch.storage.database_manager import DatabaseManager
-from lifewatch import config
+from lifewatch.storage import lw_db_manager
 
 
 class CategoryColorManager:
@@ -27,7 +26,7 @@ class CategoryColorManager:
     def __init__(self):
         """初始化颜色管理器"""
         if not CategoryColorManager._initialized:
-            self.db_manager = DatabaseManager(LW_DB_PATH=config.LW_DB_PATH)
+            self.db_manager = lw_db_manager
             self._main_category_colors: Dict[str, str] = {}  # {category_id: color}
             self._sub_category_colors: Dict[str, str] = {}   # {sub_category_id: color}
             CategoryColorManager._initialized = True
