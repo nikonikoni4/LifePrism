@@ -215,7 +215,7 @@ def parse_classification_result(state: classifyState, classification_result: dic
 chat_model = create_ChatTongyiModel()
 
 # step 1: 获取所有app的描述
-def get_app_description(state: classifyState):
+def get_app_description(state: classifyState)->classifyState:
     # 1. 判断那些app没有描述
     app_to_web_search = []
     app_titles_map = {}  # 存储每个app对应的titles样本
@@ -399,7 +399,7 @@ def single_classify(state: classifyState) -> classifyState:
 # step 3: 多用途分类
 def multi_classify(state:classifyState)->classifyState:
     # 空节点，后续接上多分类路由
-    return classifyState
+    return state
 # step 3.1 短时长分类
 def multi_classify_short(state:classifyState) -> classifyState:
     category_tree = format_category_tree_for_prompt(state.category_tree)
@@ -455,7 +455,9 @@ def multi_classify_short(state:classifyState) -> classifyState:
         logger.error(f"multi_classify_short 执行失败, 错误: {e}")
         return state
     
-    return state
+    return {
+        "log_items" : state.log_items
+    }
 
 # step 3.2 长时长分类
 # step 3.2.1 搜索title，并总结title活动
@@ -504,9 +506,8 @@ def search_title(input: dict) -> SearchOutput:
     }
 
 # step 3.2.2 汇总数据
-def merge_data(output: SearchOutput) -> classifyState:
+def merge_searchoutput_to_classifystate(output: SearchOutput) -> classifyState:
     """将搜索分析结果合并回state
-    
     Args:
         output: SearchOutput 包含 title_analysis 字典 (id -> analysis_result)
     
@@ -591,10 +592,7 @@ def multi_classify_long(state:classifyState)->classifyState:
     
     human_message = HumanMessage(content=f"""
     请对以下用户行为数据进行分类：
-    
     {log_items_table}
-    
-    请根据Title Analysis的内容判断用户的活动类型，并进行分类。
     """)
     
     messages = [system_message, human_message]
@@ -629,11 +627,10 @@ def multi_classify_long(state:classifyState)->classifyState:
         logger.error(f"multi_classify_long 执行失败, 错误: {e}")
         return state
     
-    return state
+    return {
+        "log_items" : state.log_items
+    }
 
-
-
-# step 3.4 分析用户的行为，并分类
 
 
 
@@ -656,20 +653,31 @@ if __name__ == "__main__":
         print(f"  - 过滤后 app_registry: {len(state.app_registry)} 个应用")
         return state
     state = get_state(hours=100)
-    s,m=split_by_purpose(state)
-    ms,ml=split_by_duartion(m)
     graph = StateGraph(classifyState)
-    graph.add_node("get_titles",get_titles)
-    graph.add_node("search_title",search_title)
-    graph.add_node("merge_data",merge_data)
-    graph.add_node("multi_classify_long",multi_classify_long)
-    graph.add_edge(START,"get_titles")
-    graph.add_conditional_edges("get_titles",send_title)
-    graph.add_edge("search_title","merge_data")
-    graph.add_edge("merge_data","multi_classify_long")
+    graph.add_node("get_app_description",get_app_description)
+    graph.add_node("single_classify",single_classify)
+    graph.add_node("multi_classify",multi_classify) # 空节点
+    graph.add_node("get_titles",get_titles) # 获取title
+    graph.add_node("search_title",search_title) # 多并发查询title
+    graph.add_node("merge_searchoutput_to_classifystate",merge_searchoutput_to_classifystate) # 合并查询数据
+    graph.add_node("multi_classify_long",multi_classify_long)  # 长时间多用途分类
+    graph.add_node("multi_classify_short",multi_classify_short) # 短时间多用途分类
+
+    graph.add_edge(START,"get_app_description")
+    graph.add_conditional_edges("get_app_description",router_by_multi_purpose) # -> single_classify | -> multi_classify
+    # 单用途分类
+    graph.add_edge("single_classify",END)
+    # 多用途分类
+    graph.add_conditional_edges("multi_classify",router_by_duration_for_multi) # ->multi_classify_short | -> get_titles
+    # 短时间分类
+    graph.add_edge("multi_classify_short",END)
+    # 长时间分类
+    graph.add_conditional_edges("get_titles",send_title) # 并发搜索
+    graph.add_edge("search_title","merge_searchoutput_to_classifystate") # 合并数据
+    graph.add_edge("merge_searchoutput_to_classifystate","multi_classify_long") # 分类
     graph.add_edge("multi_classify_long",END)
     app = graph.compile()
-    output = app.invoke(ml)
+    output = app.invoke(state)
     print(output)
     # multi_classify_short(ms)
 
