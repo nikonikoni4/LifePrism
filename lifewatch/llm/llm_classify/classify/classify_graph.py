@@ -67,7 +67,6 @@ def split_by_purpose(state: classifyState) -> tuple[classifyState, classifyState
         log_items=single_purpose_items,
         goal=state.goal,
         category_tree=state.category_tree,
-        node_token_usage=state.node_token_usage.copy()
     )
     
     # 创建多用途 state
@@ -76,7 +75,6 @@ def split_by_purpose(state: classifyState) -> tuple[classifyState, classifyState
         log_items=multi_purpose_items,
         goal=state.goal,
         category_tree=state.category_tree,
-        node_token_usage=state.node_token_usage.copy()
     )
     
     logger.info(f"分离完成: 单用途 {len(single_purpose_items)} 条, 多用途 {len(multi_purpose_items)} 条")
@@ -128,16 +126,13 @@ def split_by_duartion(state: classifyState)->tuple[classifyState,classifyState]:
         log_items=short_duration_items,
         goal=state.goal,
         category_tree=state.category_tree,
-        node_token_usage=state.node_token_usage.copy()
     )
-    
     # 创建长时长 state
     long_state = classifyState(
         app_registry=long_app_registry,
         log_items=long_duration_items,
         goal=state.goal,
         category_tree=state.category_tree,
-        node_token_usage=state.node_token_usage.copy()
     )
     
     logger.info(f"按时长分离完成: 短时长(<{SPLIT_DURATION}s) {len(short_duration_items)} 条, 长时长(>={SPLIT_DURATION}s) {len(long_duration_items)} 条")
@@ -266,13 +261,18 @@ def get_app_description(state: classifyState)->classifyState:
             try:
                 results = chat_model.invoke(messages)
                 
-                # 提取 token 使用情况
-                token_usage = results.response_metadata.get('token_usage', {})
-                # 累加或更新 token usage (这里简单覆盖，或者你可以选择累加)
+                # 提取 token 使用情况 (只获取 input_tokens, output_tokens, total_tokens)
+                raw_token_usage = results.response_metadata.get('token_usage', {})
+                token_usage = {
+                    'input_tokens': raw_token_usage.get('input_tokens', 0),
+                    'output_tokens': raw_token_usage.get('output_tokens', 0),
+                    'total_tokens': raw_token_usage.get('total_tokens', 0)
+                }
+                # 累加或更新 token usage
                 if 'get_app_description' not in state.node_token_usage.keys():
                     state.node_token_usage['get_app_description'] = token_usage
                 else:
-                    for key,_  in token_usage.items():
+                    for key in token_usage.keys():
                         state.node_token_usage['get_app_description'][key] += token_usage[key]
                 app_description = json.loads(results.content)
                 break # 解析成功，跳出循环
@@ -302,7 +302,10 @@ def get_app_description(state: classifyState)->classifyState:
         ])
     print(f"get_app_description 重复次数: {max_attempt}")
     print(f"get_app_description token usage: {state.node_token_usage['get_app_description']}")
-    return state
+    return {
+        "app_registry" : state.app_registry,
+        "node_token_usage" : {"get_app_description":state.node_token_usage["get_app_description"]}
+    }
 
 
 
@@ -368,8 +371,13 @@ def single_classify(state: classifyState) -> classifyState:
     try:
         results = chat_model.invoke(messages)
     
-        # 提取 token 使用情况
-        token_usage = results.response_metadata.get('token_usage', {})
+        # 提取 token 使用情况 (只获取 input_tokens, output_tokens, total_tokens)
+        raw_token_usage = results.response_metadata.get('token_usage', {})
+        token_usage = {
+            'input_tokens': raw_token_usage.get('input_tokens', 0),
+            'output_tokens': raw_token_usage.get('output_tokens', 0),
+            'total_tokens': raw_token_usage.get('total_tokens', 0)
+        }
         if 'single_classify' not in state.node_token_usage.keys():
             state.node_token_usage['single_classify'] = token_usage
         else:
@@ -394,12 +402,17 @@ def single_classify(state: classifyState) -> classifyState:
         logger.error(f"single_classify 执行失败, 错误: {e}")
         return state
     
-    return state
+    return {
+        "result_items" : state.log_items,
+        "node_token_usage":{"single_classify":state.node_token_usage["single_classify"]}
+    }
 
 # step 3: 多用途分类
 def multi_classify(state:classifyState)->classifyState:
     # 空节点，后续接上多分类路由
-    return state
+    return {
+        
+    }
 # step 3.1 短时长分类
 def multi_classify_short(state:classifyState) -> classifyState:
     category_tree = format_category_tree_for_prompt(state.category_tree)
@@ -429,8 +442,13 @@ def multi_classify_short(state:classifyState) -> classifyState:
     try:
         result = chat_model.invoke(message)
         
-        # 提取 token 使用情况
-        token_usage = result.response_metadata.get('token_usage', {})
+        # 提取 token 使用情况 (只获取 input_tokens, output_tokens, total_tokens)
+        raw_token_usage = result.response_metadata.get('token_usage', {})
+        token_usage = {
+            'input_tokens': raw_token_usage.get('input_tokens', 0),
+            'output_tokens': raw_token_usage.get('output_tokens', 0),
+            'total_tokens': raw_token_usage.get('total_tokens', 0)
+        }
         if 'multi_classify_short' not in state.node_token_usage.keys():
             state.node_token_usage['multi_classify_short'] = token_usage
         else:
@@ -456,7 +474,8 @@ def multi_classify_short(state:classifyState) -> classifyState:
         return state
     
     return {
-        "log_items" : state.log_items
+        "result_items" : state.log_items,
+        "node_token_usage":{"multi_classify_short":state.node_token_usage["multi_classify_short"]}
     }
 
 # step 3.2 长时长分类
@@ -470,7 +489,6 @@ def get_titles(state:classifyState) -> SearchOutput:
             title_dict[item.id] = item.title
     return {
         "input_data": title_dict,
-        "title_analysis": {}  # 初始化为空字典
     }
 
 def send_title(input: SearchOutput):
@@ -498,11 +516,26 @@ def search_title(input: dict) -> SearchOutput:
     """)
     human_message = HumanMessage(content=f"""搜索并分析{title}""")
     message = [system_message, human_message]
-    result = chat_model.invoke(message)
-    print(f"ID {item_id} 分析结果: {result.content}")
-    
+   
+    try:
+        result = chat_model.invoke(message)
+        # 打印原始响应内容以便调试
+        print("\n=== LLM 原始响应 ===")
+        print(f"title:{result.content}")
+        print("=== 响应结束 ===\n")
+    except Exception as e:
+        logger.error(f"search_title 执行失败, 错误: {e}")
+        return state
+    # 提取 token 使用情况 (只获取 input_tokens, output_tokens, total_tokens)
+    raw_token_usage = result.response_metadata.get('token_usage', {})
+    token_usage = {
+        'input_tokens': raw_token_usage.get('input_tokens', 0),
+        'output_tokens': raw_token_usage.get('output_tokens', 0),
+        'total_tokens': raw_token_usage.get('total_tokens', 0)
+    }
     return {
         "title_analysis": {item_id: result.content},
+        "search_tokens": [token_usage]
     }
 
 # step 3.2.2 汇总数据
@@ -514,18 +547,21 @@ def merge_searchoutput_to_classifystate(output: SearchOutput) -> classifyState:
     Returns:
         classifyState: 更新了 title_analysis 的状态
     """
-    # 创建 id 到 log_item 的映射
-    id_to_item = {item.id: item for item in state.log_items}
+    print("test---")
+    # 计算search_title的tokens消耗
+    from collections import Counter
+    search_tokens = Counter()
+    for d in output.search_tokens:
+        search_tokens.update(d)
+    search_tokens = dict(search_tokens)
+    return {
+        "node_token_usage" : {"search_title":search_tokens},
+        "log_items" : {
+            "update_flag":"title_analysis",
+            "update_data":output.title_analysis
+        }
+    }
     
-    # 将 title_analysis 结果更新到对应的 log_item
-    for item_id, analysis in output.title_analysis.items():
-        if item_id in id_to_item:
-            id_to_item[item_id].title_analysis = analysis
-            logger.info(f"已更新 log_item {item_id} 的 title_analysis")
-        else:
-            logger.warning(f"SearchOutput 中的 id {item_id} 在 log_items 中不存在")
-    
-    return state
 # step 3.3 进行分类
 def multi_classify_long(state:classifyState)->classifyState:
     goal = format_goals_for_prompt(state.goal)
@@ -601,8 +637,13 @@ def multi_classify_long(state:classifyState)->classifyState:
     try:
         result = chat_model.invoke(messages)
         
-        # 提取 token 使用情况
-        token_usage = result.response_metadata.get('token_usage', {})
+        # 提取 token 使用情况 (只获取 input_tokens, output_tokens, total_tokens)
+        raw_token_usage = result.response_metadata.get('token_usage', {})
+        token_usage = {
+            'input_tokens': raw_token_usage.get('input_tokens', 0),
+            'output_tokens': raw_token_usage.get('output_tokens', 0),
+            'total_tokens': raw_token_usage.get('total_tokens', 0)
+        }
         if 'multi_classify_long' not in state.node_token_usage.keys():
             state.node_token_usage['multi_classify_long'] = token_usage
         else:
@@ -628,7 +669,8 @@ def multi_classify_long(state:classifyState)->classifyState:
         return state
     
     return {
-        "log_items" : state.log_items
+        "log_items" : state.log_items,
+        "node_token_usage":{"multi_classify_long":state.node_token_usage["multi_classify_long"]}
     }
 
 
@@ -662,7 +704,7 @@ if __name__ == "__main__":
     graph.add_node("merge_searchoutput_to_classifystate",merge_searchoutput_to_classifystate) # 合并查询数据
     graph.add_node("multi_classify_long",multi_classify_long)  # 长时间多用途分类
     graph.add_node("multi_classify_short",multi_classify_short) # 短时间多用途分类
-
+    
     graph.add_edge(START,"get_app_description")
     graph.add_conditional_edges("get_app_description",router_by_multi_purpose) # -> single_classify | -> multi_classify
     # 单用途分类
@@ -678,13 +720,60 @@ if __name__ == "__main__":
     graph.add_edge("multi_classify_long",END)
     app = graph.compile()
     output = app.invoke(state)
-    print(output)
-    # multi_classify_short(ms)
+    # 格式化输出结果
+    print("\n" + "="*80)
+    print("分类结果汇总")
+    print("="*80)
+    
+    # 输出 token 使用情况
+    if "node_token_usage" in output:
+        print("\n【Token 使用统计】")
+        total_tokens = 0
+        for node_name, usage in output["node_token_usage"].items():
+            print(f"\n  {node_name}:")
+            print(f"    - Input Tokens:  {usage.get('input_tokens', 0):,}")
+            print(f"    - Output Tokens: {usage.get('output_tokens', 0):,}")
+            print(f"    - Total Tokens:  {usage.get('total_tokens', 0):,}")
+            total_tokens += usage.get('total_tokens', 0)
+        print(f"\n  总计 Token 使用: {total_tokens:,}")
+    
+    # 输出分类结果
+    if "result_items" in output:
+        print("\n【分类结果】")
+        print(f"  共分类 {len(output['result_items'])} 条记录\n")
+        
+        for item in output["result_items"]:
+            print(f"  ID: {item.id}")
+            print(f"    应用: {item.app}")
+            if item.title:
+                print(f"    标题: {item.title[:50]}{'...' if len(item.title) > 50 else ''}")
+            print(f"    分类: {item.category or 'N/A'} -> {item.sub_category or 'N/A'}")
+            print(f"    关联目标: {item.link_to_goal or 'N/A'}")
+            print(f"    时长: {item.duration}s")
+            print()
+    
+    print("="*80)
+    
+    # 同时保存完整的 JSON 输出到文件（可选）
+    # with open("classification_output.json", "w", encoding="utf-8") as f:
+    #     json.dump(output, f, ensure_ascii=False, indent=2, default=str)
+    # 测试merge_searchoutput_to_classifystate
+    # 构建测试流程: get_titles -> search_title (并发) -> merge_searchoutput_to_classifystate
+    # s,m = split_by_purpose(state)
+    # s,l = split_by_duartion(m)
+    # state = l
+    # print(l)
+    # graph.add_edge(START, "get_titles")
+    # graph.add_conditional_edges("get_titles", send_title)  # 并发搜索
+    # graph.add_edge("search_title", "merge_searchoutput_to_classifystate")  # 合并数据
+    # graph.add_edge("merge_searchoutput_to_classifystate", END)
+    
+    # # 编译并运行
+    # app = graph.compile()
+    # output = app.invoke(state)
+    
+    # print(output)
 
-    # multi_classify_node1(state)
-    #state = get_app_description(state)
-    #state = single_classify(state)
-    # graph = StateGraph(state)
-    # graph.add_node("get_app_description",get_app_description)
-    # graph.add_node()
-    # state = get_app_description(state)
+
+
+

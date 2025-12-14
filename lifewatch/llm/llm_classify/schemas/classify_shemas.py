@@ -1,6 +1,6 @@
+from bokeh.core.validation.decorators import warning
 from pydantic import BaseModel,Field
 from typing import Annotated
-from langgraph.channels.binop import BinaryOperator
 import operator
 
 def remain_old_value(old_value,new_value):
@@ -8,6 +8,8 @@ def remain_old_value(old_value,new_value):
         return old_value
     else:
         return new_value
+
+
 
 class LogItem(BaseModel):
     # 基础数据
@@ -31,15 +33,44 @@ class AppInFo(BaseModel):
     is_multipurpose : bool = Field(description="是否为被选择需要使用title信息来判断用途的应用")
     titles : list[str] | None = Field(default=None, description="该app的典型标题示例列表，用于辅助识别app用途")
 # 定义状态
+
+
+def update_logitem(item_list:list[LogItem],update_data)->list[LogItem]:
+    """
+    更新LogItem 或 替换
+    args:
+        item_list : 原数据
+        update_data : 更新数据 {
+                        "update_flag": str,
+                        "update_date": 
+                        }
+    return:
+        list[LogItem]
+    """
+    # 获取更新类型
+    if isinstance(update_data,dict):
+        update_flag = update_data.get("update_flag",None)
+        if update_flag == "title_analysis":
+            update_data = update_data.get("update_data",None)
+            if isinstance(update_data,dict): # id:title_analysis
+                for log_item in item_list:
+                    if log_item.id in update_data:
+                        log_item.title_analysis = update_data[log_item.id]
+        return item_list # 修改后的元数据
+    elif update_data:
+        return update_data # 直接替换
+    else:
+        return item_list
+    
 class classifyState(BaseModel):
-    app_registry: Annotated[dict[str, AppInFo], operator.or_] = Field(description="app : app_description") # app : app_description
-    log_items: Annotated[list[LogItem],operator.add] = Field(description="分类数据") # 分类数据 
+    app_registry: Annotated[dict[str, AppInFo], remain_old_value] = Field(description="app : app_description") # app : app_description
+    log_items: Annotated[list[LogItem],update_logitem] = Field(description="分类数据") # 分类数据 
     goal: Annotated[list[Goal], remain_old_value]= Field(description="用户的目标") # 用户的目标
-    node_token_usage: Annotated[dict[str, dict], operator.or_] = Field(default_factory=dict, description="记录每个 node 的 token 消耗: {node_name: {input_tokens, output_tokens, total_tokens}}") # 记录每个 node 的 token 消耗: {node_name: {input_tokens, output_tokens, total_tokens}}
+    node_token_usage: Annotated[dict[str, dict], operator.or_] = Field(default_factory=dict, description="记录每个 node 的 token 消耗") # 记录每个 node 的 token 消耗: {node_name: {input_tokens, output_tokens, total_tokens}}
     category_tree : Annotated[dict[str, list[str]| None], remain_old_value] = Field(description="具体分类") # 具体分类
-
-
+    result_items:Annotated[list[LogItem],operator.add]|None = Field(default=None, description="输出结果") # 不更新log_items
 
 class SearchOutput(BaseModel):
-    title_analysis: Annotated[dict[int, str], operator.or_]  # 使用 dict 合并，key 为 id，value 为分析结果
-    input_data: dict[int, str]  # key 为 id，value 为 title
+    title_analysis: Annotated[dict[int, str], operator.or_]|None = None # 使用 dict 合并，key 为 id，value 为分析结果
+    input_data: Annotated[dict[int, str], remain_old_value] # key 为 id，value 为 title
+    search_tokens: Annotated[list[dict[str, int]], operator.add] | None = Field(default_factory=dict, description="记录每个 seatch title 的 token 消耗")
