@@ -1,6 +1,13 @@
 from pydantic import BaseModel,Field
 from typing import Annotated
+from langgraph.channels.binop import BinaryOperator
 import operator
+
+def remain_old_value(old_value,new_value):
+    if old_value:
+        return old_value
+    else:
+        return new_value
 
 class LogItem(BaseModel):
     # 基础数据
@@ -25,11 +32,11 @@ class AppInFo(BaseModel):
     titles : list[str] | None = Field(default=None, description="该app的典型标题示例列表，用于辅助识别app用途")
 # 定义状态
 class classifyState(BaseModel):
-    app_registry: dict[str, AppInFo] = Field(description="app : app_description") # app : app_description
-    log_items: list[LogItem] = Field(description="分类数据") # 分类数据 
-    goal: list[Goal] = Field(description="用户的目标") # 用户的目标
-    node_token_usage: dict[str, dict] = Field(default_factory=dict, description="记录每个 node 的 token 消耗: {node_name: {input_tokens, output_tokens, total_tokens}}") # 记录每个 node 的 token 消耗: {node_name: {input_tokens, output_tokens, total_tokens}}
-    category_tree : dict[str, list[str]| None] = Field(description="具体分类") # 具体分类
+    app_registry: Annotated[dict[str, AppInFo], operator.or_] = Field(description="app : app_description") # app : app_description
+    log_items: Annotated[list[LogItem],operator.add] = Field(description="分类数据") # 分类数据 
+    goal: Annotated[list[Goal], remain_old_value]= Field(description="用户的目标") # 用户的目标
+    node_token_usage: Annotated[dict[str, dict], operator.or_] = Field(default_factory=dict, description="记录每个 node 的 token 消耗: {node_name: {input_tokens, output_tokens, total_tokens}}") # 记录每个 node 的 token 消耗: {node_name: {input_tokens, output_tokens, total_tokens}}
+    category_tree : Annotated[dict[str, list[str]| None], remain_old_value] = Field(description="具体分类") # 具体分类
 
 
 
