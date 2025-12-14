@@ -61,9 +61,10 @@ def update_logitem(item_list:list[LogItem],update_data)->list[LogItem]:
         return update_data # 直接替换
     else:
         return item_list
-    
+
+
 class classifyState(BaseModel):
-    app_registry: Annotated[dict[str, AppInFo], remain_old_value] = Field(description="app : app_description") # app : app_description
+    app_registry: dict[str, AppInFo]= Field(description="app : app_description") # app : app_description
     log_items: Annotated[list[LogItem],update_logitem] = Field(description="分类数据") # 分类数据 
     goal: Annotated[list[Goal], remain_old_value]= Field(description="用户的目标") # 用户的目标
     node_token_usage: Annotated[dict[str, dict], operator.or_] = Field(default_factory=dict, description="记录每个 node 的 token 消耗") # 记录每个 node 的 token 消耗: {node_name: {input_tokens, output_tokens, total_tokens}}
