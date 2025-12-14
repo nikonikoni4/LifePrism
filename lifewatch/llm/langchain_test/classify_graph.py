@@ -1,0 +1,761 @@
+from lifewatch.llm.langchain_test.creat_model import create_ChatTongyiModel 
+from langgraph.graph import StateGraph, START, END
+from langchain_core.messages import SystemMessage, HumanMessage
+import json
+from lifewatch.llm.langchain_test.utils import format_goals_for_prompt, format_category_tree_for_prompt,format_log_items_for_prompt
+from lifewatch.llm.langchain_test.mock_data import mock_log_items, mock_goals, mock_app_registry
+from lifewatch.llm.langchain_test.state_define import classifyState, LogItem, Goal, AppInFo, MultiNodeResult
+from lifewatch.llm.langchain_test.data_loader import get_real_data,filter_by_duration,deduplicate_log_items
+import logging
+import re
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+# 创建chatmodel
+chat_model = create_ChatTongyiModel()
+
+# 定义router
+
+
+# 定义node
+
+def mock_app_description(state: classifyState) -> classifyState:
+    """
+    使用预定义的描述填充 app_registry，避免每次测试都调用 LLM
+    
+    Args:
+        state: 输入的 classifyState
+        
+    Returns:
+        classifyState: 更新了 app 描述的新状态
+    """
+    # 预定义的 app 描述（从之前的 LLM 查询结果中获取）
+    predefined_descriptions = {
+        'doubao': '字节跳动推出的AI助手，支持多模态内容生成与智能对话',
+        'lockapp': '基于生物识别与密码的手机应用锁屏工具，保障隐私安全',
+        'affine': '基于Web的协作式文档与项目管理平台，支持实时协同编辑',
+        'clash for windows': '跨平台网络代理工具，支持规则分流与科学上网配置',
+        'msedge': '微软开发的基于Chromium的网页浏览器，集成AI功能与高效浏览体验',
+        'antigravity': '专为开发者设计的AI原生代码生成与自动化编程工具',
+    }
+    
+    # 更新 app_registry 中的描述
+    for app, app_info in state.app_registry.items():
+        if app in predefined_descriptions:
+            # 更新 description，保持 is_multipurpose 不变
+            state.app_registry[app] = AppInFo(
+                description=predefined_descriptions[app],
+                is_multipurpose=app_info.is_multipurpose
+            )
+    
+    return state
+
+
+def get_app_description(state: classifyState):
+    # 判断那些app没有描述
+    app_to_web_search = []
+    for app, app_info in state.app_registry.items():
+        if app_info.description == None or app_info.description == "":
+            app_to_web_search.append(app)
+    if app_to_web_search:
+        system_message = SystemMessage(content="""
+        你是一个软件识别专家。你的任务是通过 web 搜索识别软件应用程序，并提供准确、精炼的描述。
+        **输出要求：**
+        - 返回 JSON 数组格式
+        - 每个软件用一句话（不超过20字）描述核心功能
+        - 描述要准确、专业，突出主要用途
+        - 如果搜索后仍无法确定，返回 None
+        """)
+        user_message = HumanMessage(content=f"""
+        请通过 web 搜索识别以下软件应用程序，并用一句简短的话描述每个软件的核心功能和用途。
+        待识别的软件列表：
+        {app_to_web_search}
+        返回格式JSON：
+            {{"<软件名称>": "<精炼的功能描述>"}}
+        示例：
+        输入: ["weixin", "vscode"]
+        输出: {{"weixin": "腾讯开发的即时通讯和社交平台","Antigravity": "谷歌推出的AI原生集成开发环境"}}
+        """)
+        messages = [system_message, user_message]
+        results = chat_model.invoke(messages)
+        
+        # 提取 token 使用情况
+        token_usage = results.response_metadata.get('token_usage', {})
+        state.node_token_usage['get_app_description'] = token_usage
+        # 更新state
+        try:
+           app_description = json.loads(results.content)
+        except:
+            print("get_app_description 输出格式错误, results.content : {results.content}")
+            return state
+        for app in app_to_web_search:
+            desc = app_description.get(app, None)
+            if desc:
+                # 更新 description，保持 is_multipurpose 不变
+                state.app_registry[app] = AppInFo(
+                    description=desc,
+                    is_multipurpose=state.app_registry[app].is_multipurpose
+                )
+    return state
+
+def easy_app_to_classify(state: classifyState):
+    """
+    简单的app分类
+    """
+    goal = format_goals_for_prompt(state.goal)
+    category_tree = format_category_tree_for_prompt(state.category_tree)
+    system_message = SystemMessage(content=f"""
+        # 你是一个软件分类专家。你的任务是根据软件名称,描述,将软件进行分类,分类有category和sub_category两级分类。
+        # 分类类别
+        {category_tree}
+        # 用户目标
+        {goal}
+        # 分类规则
+        1. 对于app与goal高度相关的条目,使用goal的分类类别,并关联goal,link_to_goal = goal;否则link_to_goal = None
+        2. 对于单用途,依据app_description进行分类,若无法分类,则分类为None
+        3. 若category有分类而sub_category无法分类,则sub_category = None
+        # 输出格式
+        {{<id>:(<category>|None,<sub_category>|None,<link_to_goal>|None)}}
+        """)
+
+    # 按 app 分组 log_items
+    app_groups = {}
+    for log_item in state.log_items:
+        app_name = log_item.app
+        if app_name not in app_groups:
+            app_groups[app_name] = []
+        app_groups[app_name].append(log_item)
+    
+    # 构建按 app 分组的内容
+    app_content = "待分类的软件列表（按应用分组）：\n\n"
+    for app_name, items in app_groups.items():
+        app_info = state.app_registry.get(app_name)
+        if app_info:
+            app_description = app_info.description
+            is_multipurpose = "多用途" if app_info.is_multipurpose else "单用途"
+        else:
+            app_description = "无描述"
+            is_multipurpose = "未知"
+        app_content += f"## {app_name}\n"
+        app_content += f"应用描述: {app_description} ({is_multipurpose})\n"
+        app_content += "活动记录:\n"
+        
+        # 第一条记录显示键名
+        if items:
+            first_item = items[0]
+            first_dict = first_item.model_dump(exclude={
+                "category", "sub_category", "link_to_goal",
+                "search_title_query", "search_title_content", "need_analyze_context",
+            })
+            # 显示键名
+            keys = list(first_dict.keys())
+            app_content += f"  {' | '.join(keys)}\n"
+            # 显示第一条数据的值
+            values = [str(first_dict[k]) for k in keys]
+            app_content += f"  {' | '.join(values)}\n"
+            
+            # 后续记录只显示值
+            for item in items[1:]:
+                item_dict = item.model_dump(exclude={
+                    "category", "sub_category", "link_to_goal",
+                    "search_title_query", "search_title_content", "need_analyze_context",
+                })
+                values = [str(item_dict[k]) for k in keys]
+                app_content += f"  {' | '.join(values)}\n"
+        
+        app_content += "\n"
+
+    user_message = HumanMessage(content=f"""
+        请根据软件名称,描述,Title,将软件进行分类。
+        {app_content}
+        """)
+    messages = [system_message, user_message]
+    results = chat_model.invoke(messages)
+    print(results.content)
+    # 提取 token 使用情况
+    token_usage = results.response_metadata.get('token_usage', {})
+    state.node_token_usage['easy_app_to_classify'] = token_usage
+    
+    # 更新state
+    try:
+        import re
+        
+        # 创建一个id到log_item的映射，方便快速查找
+        log_items_dict = {item.id: item for item in state.log_items}
+        
+        # LLM返回的格式是多行文本，每行格式为: {id:(category,sub_category,link_to_goal,search_title_query)}
+        # 使用正则表达式解析每一行
+        content = results.content.strip()
+        
+        # 正则表达式匹配模式: {数字:(值1,值2,值3,值4)}
+        # 注意：值可能包含中文、英文、空格、None等
+        pattern = r'\{(\d+):\(([^,]+),([^,]+),([^,]+),([^)]+)\)\}'
+        
+        matches = re.findall(pattern, content)
+        
+        if not matches:
+            print(f"警告: 无法解析LLM返回的内容")
+            print(f"返回内容: {content}")
+            return state
+        
+        # 遍历所有匹配结果
+        for match in matches:
+            item_id, category, sub_category, link_to_goal = match
+            item_id = int(item_id)  # 转换为整数
+            
+            if item_id in log_items_dict:
+                # 处理每个字段，去除首尾空格，并将 "None" 或 "无" 转换为 None
+                def clean_value(value):
+                    value = value.strip()
+                    if value in ["None", "无", "null", ""]:
+                        return None
+                    return value
+                
+                # 更新log_item的分类信息
+                log_items_dict[item_id].category = clean_value(category)
+                log_items_dict[item_id].sub_category = clean_value(sub_category)
+                log_items_dict[item_id].link_to_goal = clean_value(link_to_goal)
+            else:
+                print(f"警告: 找不到ID为 {item_id} 的log_item")
+        
+        print(f"成功更新了 {len(matches)} 个log_item的分类信息")
+        
+    except Exception as e:
+        print(f"更新state时发生错误: {e}")
+        print(f"results.content: {results.content}")
+    
+    return state
+
+
+
+
+def test_get_app_description():
+    state = classifyState(
+        app_registry = {"Antigravity": AppInFo(description=None, is_multipurpose=False)},
+        goal = mock_goals,
+        log_items = mock_log_items,
+    )
+    state = get_app_description(state)
+    print(state.app_registry)
+
+    
+def test_easy_app_to_classify():
+    state = classifyState(
+        app_registry = mock_app_registry,
+        goal = mock_goals,
+        log_items = mock_log_items,
+        category_tree = category_tree
+    )
+    easy_app_to_classify(state)
+
+
+def get_state(hours = 36) -> classifyState:
+    state = get_real_data(hours=hours)
+    state = filter_by_duration(state, min_duration=60)
+    state = deduplicate_log_items(state)
+    print(f"\n去重后的日志（前10条）:")
+    for item in state.log_items[:10]:
+        multipurpose = "多用途" if state.app_registry[item.app].is_multipurpose else "单用途"
+        print(f"  {item.app} ({multipurpose}) | {item.title} | {item.duration}s")
+    
+    # 测试过滤功能
+    print(f"\n测试过滤功能（只保留 duration >= 60 秒的记录）:")
+    print(f"  - 过滤后 log_items: {len(state.log_items)} 条")
+    print(f"  - 过滤后 app_registry: {len(state.app_registry)} 个应用")
+    return state
+
+
+def split_by_purpose(state: classifyState) -> tuple[classifyState, classifyState]:
+    """
+    将 classifyState 按单用途和多用途分开
+    
+    Args:
+        state: 原始的 classifyState 对象
+        
+    Returns:
+        tuple[classifyState, classifyState]: (单用途state, 多用途state)
+        
+    Example:
+        single_state, multi_state = split_by_purpose(state)
+    """
+    # 分离 log_items
+    single_purpose_items = []
+    multi_purpose_items = []
+    
+    for item in state.log_items:
+        app_info = state.app_registry.get(item.app)
+        if app_info and not app_info.is_multipurpose:
+            single_purpose_items.append(item)
+        else:
+            multi_purpose_items.append(item)
+    
+    # 构建单用途 app_registry
+    single_apps = set(item.app for item in single_purpose_items)
+    single_app_registry = {
+        app: info 
+        for app, info in state.app_registry.items() 
+        if app in single_apps
+    }
+    
+    # 构建多用途 app_registry
+    multi_apps = set(item.app for item in multi_purpose_items)
+    multi_app_registry = {
+        app: info 
+        for app, info in state.app_registry.items() 
+        if app in multi_apps
+    }
+    
+    # 创建单用途 state
+    single_state = classifyState(
+        app_registry=single_app_registry,
+        log_items=single_purpose_items,
+        goal=state.goal,
+        category_tree=state.category_tree,
+        node_token_usage=state.node_token_usage.copy()
+    )
+    
+    # 创建多用途 state
+    multi_state = classifyState(
+        app_registry=multi_app_registry,
+        log_items=multi_purpose_items,
+        goal=state.goal,
+        category_tree=state.category_tree,
+        node_token_usage=state.node_token_usage.copy()
+    )
+    
+    logger.info(f"分离完成: 单用途 {len(single_purpose_items)} 条, 多用途 {len(multi_purpose_items)} 条")
+    
+    return single_state, multi_state
+
+
+
+def multi_app_to_classify(state: classifyState) -> classifyState:
+    """
+    对于多用途的app进行分类（浏览器）
+    分类规则：
+    节点1:判断title是否与goal高度相关,若高度相关,则使用goal的分类类别,并goal,link_to_goal = goal;否则link_to_goal = None
+    节点2:分析tile中的website,明确website的用途 | 分析title中的实体,明确实体的含义
+    节点3:结合节点1和节点2的结果,进行分类
+    """
+    # 筛选未分类的数据
+    unclassified_items = [item for item in state.log_items if item.category is None]
+    if not unclassified_items:
+        logger.info("没有未分类的数据")
+        return state
+    
+    logger.info(f"开始多节点分类，共 {len(unclassified_items)} 条未分类数据")
+    
+    # 执行三节点分类
+    state = node1_goal_matching(state)
+    state = node2_info_supplement(state)
+    state = node3_final_classify(state)
+    
+    return state
+
+
+def _get_unclassified_items(state: classifyState) -> list[LogItem]:
+    """获取未分类的 log_items"""
+    return [item for item in state.log_items if item.category is None]
+
+
+def _format_unclassified_for_prompt(items: list[LogItem]) -> str:
+    """将未分类的items格式化为prompt字符串"""
+    if not items:
+        return "暂无待分类数据"
+    
+    formatted = ""
+    for item in items:
+        formatted += f"{{id:{item.id}, title:\"{item.title}\", duration:{item.duration}s}}\n"
+    return formatted.strip()
+
+
+def node1_goal_matching(state: classifyState) -> classifyState:
+    """
+    节点1: 判断title是否与goal高度相关
+    - 若高度相关: 使用goal的分类类别，设置 link_to_goal = goal
+    - 若不相关: link_to_goal = None，等待后续节点处理
+    
+    只处理未分类的数据
+    """
+    unclassified = _get_unclassified_items(state)
+    if not unclassified:
+        logger.info("节点1: 没有未分类的数据，跳过")
+        return state
+    
+    goal_prompt = format_goals_for_prompt(state.goal)
+    items_prompt = _format_unclassified_for_prompt(unclassified)
+    
+    system_message = SystemMessage(content=f"""
+你是一个活动与目标匹配专家。你的任务是判断浏览器标题(title)是否与用户目标(goal)高度相关。
+
+# 用户目标
+{goal_prompt}
+
+# 判断规则
+1. 标题中包含与目标直接相关的关键词、网站或内容
+2. 只有明确相关的才标记为相关，模糊或间接相关的标记为不相关
+
+# 输出格式
+每行一个结果，格式：{{id:是否相关(true/false),关联的目标名称或None,目标分类或None,目标子分类或None}}
+**重要：id 必须使用输入数据中提供的原始 id 值，不要自己编号！**
+示例（假设输入id为12345和67890）：
+{{12345:true,学习LangGraph,工作/学习,学习AI相关知识}}
+{{67890:false,None,None,None}}
+""")
+    user_message = HumanMessage(content=f"""
+请判断以下浏览器活动标题是否与用户目标高度相关：
+
+{items_prompt}
+""")
+    
+    messages = [system_message, user_message]
+    results = chat_model.invoke(messages)
+    
+    # 记录token使用
+    token_usage = results.response_metadata.get('token_usage', {})
+    state.node_token_usage['node1_goal_matching'] = token_usage
+    
+    # 解析结果并更新state
+    try:
+        content = results.content.strip()
+        # 正则匹配: {id:true/false,goal或None,category或None,sub_category或None}
+        pattern = r'\{(\d+):(true|false),([^,]+),([^,]+),([^}]+)\}'
+        matches = re.findall(pattern, content, re.IGNORECASE)
+        
+        log_items_dict = {item.id: item for item in state.log_items}
+        
+        for match in matches:
+            item_id = int(match[0])
+            is_related = match[1].lower() == 'true'
+            goal_name = None if match[2].strip() in ['None', 'null', '无'] else match[2].strip()
+            category = None if match[3].strip() in ['None', 'null', '无'] else match[3].strip()
+            sub_category = None if match[4].strip() in ['None', 'null', '无'] else match[4].strip()
+            
+            if item_id in log_items_dict:
+                item = log_items_dict[item_id]
+                # 初始化 multi_node_result
+                if item.multi_node_result is None:
+                    item.multi_node_result = MultiNodeResult()
+                
+                item.multi_node_result.is_goal_related = is_related
+                if is_related:
+                    item.multi_node_result.node1_link_to_goal = goal_name
+                    item.multi_node_result.node1_category = category
+                    item.multi_node_result.node1_sub_category = sub_category
+                    # 直接应用分类结果
+                    item.category = category
+                    item.sub_category = sub_category
+                    item.link_to_goal = goal_name
+        
+        classified_count = sum(1 for m in matches if m[1].lower() == 'true')
+        logger.info(f"节点1完成: 共处理 {len(matches)} 条，{classified_count} 条与目标相关")
+        
+    except Exception as e:
+        logger.error(f"节点1解析结果时出错: {e}")
+        logger.error(f"LLM返回内容: {results.content}")
+    
+    return state
+
+
+def node2_info_supplement(state: classifyState) -> classifyState:
+    """
+    节点2: 信息补充
+    - 分析title中的website，明确website的用途
+    - 分析title中的实体，明确实体的含义
+    
+    只处理未分类的数据（节点1没有分类的数据）
+    """
+    unclassified = _get_unclassified_items(state)
+    if not unclassified:
+        logger.info("节点2: 没有未分类的数据，跳过")
+        return state
+    
+    items_prompt = _format_unclassified_for_prompt(unclassified)
+    
+    system_message = SystemMessage(content="""
+你是一个网页标题分析专家。你的任务是分析浏览器标题，提取并解释其中的关键信息。
+
+# 分析要点
+1. 网站识别：从标题中识别网站名称（如 GitHub, Bilibili, Google等），并简述其用途
+2. 实体识别：识别标题中的关键实体（如产品名、专用术语、人名等），并简述其含义
+3. 活动推断：基于标题内容推断用户正在进行的活动
+
+# 输出格式
+每行一个结果，格式：{id:网站名称,网站用途,实体名称,实体含义,活动描述}
+**重要：id 必须使用输入数据中提供的原始 id 值，不要自己编号！**
+如果某项无法识别，使用 None
+示例（假设输入id为12345）：
+{12345:GitHub,代码托管平台,LangGraph,LangChain的图执行框架,阅读LangGraph文档}
+""")
+
+    user_message = HumanMessage(content=f"""
+请分析以下浏览器活动标题，提取网站信息和关键实体：
+
+{items_prompt}
+""")
+    
+    messages = [system_message, user_message]
+    results = chat_model.invoke(messages)
+    
+    # 记录token使用
+    token_usage = results.response_metadata.get('token_usage', {})
+    state.node_token_usage['node2_info_supplement'] = token_usage
+    
+    # 解析结果并更新state
+    try:
+        content = results.content.strip()
+        logger.info(f"节点2 LLM返回内容:\n{content}")  # 调试输出
+        
+        # 正则匹配: {id:website,purpose,entity,meaning,activity}
+        pattern = r'\{(\d+):([^,]*),([^,]*),([^,]*),([^,]*),([^}]*)\}'
+        matches = re.findall(pattern, content)
+        logger.info(f"节点2 正则匹配结果: {matches}")  # 调试输出
+        
+        log_items_dict = {item.id: item for item in state.log_items}
+        
+        for match in matches:
+            item_id = int(match[0])
+            website_name = None if match[1].strip() in ['None', 'null', '无', ''] else match[1].strip()
+            website_purpose = None if match[2].strip() in ['None', 'null', '无', ''] else match[2].strip()
+            entity_name = None if match[3].strip() in ['None', 'null', '无', ''] else match[3].strip()
+            entity_meaning = None if match[4].strip() in ['None', 'null', '无', ''] else match[4].strip()
+            title_analysis = None if match[5].strip() in ['None', 'null', '无', ''] else match[5].strip()
+            
+            if item_id in log_items_dict:
+                item = log_items_dict[item_id]
+                # 初始化 multi_node_result
+                if item.multi_node_result is None:
+                    item.multi_node_result = MultiNodeResult()
+                
+                item.multi_node_result.website_name = website_name
+                item.multi_node_result.website_purpose = website_purpose
+                item.multi_node_result.entity_name = entity_name
+                item.multi_node_result.entity_meaning = entity_meaning
+                item.multi_node_result.title_analysis = title_analysis
+        
+        logger.info(f"节点2完成: 共补充 {len(matches)} 条数据的信息")
+        
+    except Exception as e:
+        logger.error(f"节点2解析结果时出错: {e}")
+        logger.error(f"LLM返回内容: {results.content}")
+    
+    return state
+
+
+def node3_final_classify(state: classifyState) -> classifyState:
+    """
+    节点3: 最终分类
+    结合节点1和节点2的结果，对仍未分类的数据进行最终分类
+    
+    只处理未分类的数据
+    """
+    unclassified = _get_unclassified_items(state)
+    if not unclassified:
+        logger.info("节点3: 没有未分类的数据，跳过")
+        return state
+    
+    category_tree = format_category_tree_for_prompt(state.category_tree)
+    
+    # 构建带有节点2补充信息的prompt
+    items_with_info = ""
+    for item in unclassified:
+        info = item.multi_node_result
+        if info:
+            items_with_info += f"{{id:{item.id}, title:\"{item.title}\", "
+            items_with_info += f"网站:{info.website_name or '未知'}, "
+            items_with_info += f"网站用途:{info.website_purpose or '未知'}, "
+            items_with_info += f"实体:{info.entity_name or '无'}, "
+            items_with_info += f"实体含义:{info.entity_meaning or '无'}, "
+            items_with_info += f"活动推断:{info.title_analysis or '未知'}}}\n"
+        else:
+            items_with_info += f"{{id:{item.id}, title:\"{item.title}\"}}\n"
+    
+    system_message = SystemMessage(content=f"""
+你是一个行为分类专家。根据提供的信息对浏览器活动进行分类。
+
+# 分类类别
+{category_tree}
+
+# 分类规则
+1. 根据网站用途和活动推断选择最合适的分类
+2. 优先使用具体的子分类，如果无法确定子分类则只填category
+
+# 输出格式
+每行一个结果，格式：{{id:(category,sub_category)}}
+**重要：id 必须使用输入数据中提供的原始 id 值，不要自己编号！**
+如果sub_category无法确定，使用 None
+示例（假设输入id为12345和67890）：
+{{12345:(工作/学习,学习AI相关知识)}}
+{{67890:(娱乐,看电视)}}
+""")
+
+    user_message = HumanMessage(content=f"""
+请根据以下信息对活动进行分类：
+
+{items_with_info}
+""")
+    
+    messages = [system_message, user_message]
+    results = chat_model.invoke(messages)
+    
+    # 记录token使用
+    token_usage = results.response_metadata.get('token_usage', {})
+    state.node_token_usage['node3_final_classify'] = token_usage
+    
+    # 解析结果并更新state
+    try:
+        content = results.content.strip()
+        # 正则匹配: {id:(category,sub_category)}
+        pattern = r'\{(\d+):\(([^,)]+),([^)]+)\)\}'
+        matches = re.findall(pattern, content)
+        
+        log_items_dict = {item.id: item for item in state.log_items}
+        
+        for match in matches:
+            item_id = int(match[0])
+            category = None if match[1].strip() in ['None', 'null', '无'] else match[1].strip()
+            sub_category = None if match[2].strip() in ['None', 'null', '无'] else match[2].strip()
+            
+            if item_id in log_items_dict:
+                item = log_items_dict[item_id]
+                item.category = category
+                item.sub_category = sub_category
+        
+        logger.info(f"节点3完成: 共分类 {len(matches)} 条数据")
+        
+    except Exception as e:
+        logger.error(f"节点3解析结果时出错: {e}")
+        logger.error(f"LLM返回内容: {results.content}")
+    
+    return state
+
+
+
+
+
+
+category_tree = {
+        "工作/学习": ["编程", "学习AI相关知识", "记笔记"],
+        "娱乐": ["游戏", "看电视"],
+        "其他": None,
+    }
+
+
+def single_purpose_test():
+    state = get_state(hours=36)
+    state = mock_app_description(state)
+    state = get_app_description(state)
+    state = split_by_purpose(state)[0]
+    state = easy_app_to_classify(state)
+    # 格式化输出分类结果
+    print("\n" + "="*120)
+    print("分类结果汇总")
+    print("="*120)
+    print(f"{'ID':<8} {'应用':<20} {'分类':<15} {'子分类':<15} {'关联目标':<20}")
+    print("-"*120)
+    
+    for item in state.log_items:
+        # 截断过长的字段
+        app = item.app[:18] if len(item.app) > 18 else item.app
+        category = (item.category[:13] if item.category and len(item.category) > 13 else item.category) or "未分类"
+        sub_category = (item.sub_category[:13] if item.sub_category and len(item.sub_category) > 13 else item.sub_category) or "-"
+        link_to_goal = (item.link_to_goal[:18] if item.link_to_goal and len(item.link_to_goal) > 18 else item.link_to_goal) or "-"
+        title = item.title[:28] if item.title and len(item.title) > 28 else item.title
+        print(f"{item.id:<8} {app:<20} {title:<28}{category:<15} {sub_category:<15} {link_to_goal:<20}")
+    
+    print("="*120)
+    
+    # 统计信息
+    classified_count = sum(1 for item in state.log_items if item.category is not None)
+    linked_to_goal = sum(1 for item in state.log_items if item.link_to_goal is not None)
+    
+    print(f"\n统计信息:")
+    print(f"  总记录数: {len(state.log_items)}")
+    print(f"  已分类: {classified_count} ({classified_count/len(state.log_items)*100:.1f}%)")
+    print(f"  关联目标: {linked_to_goal}")
+    
+    # 测试分离功能
+    print("\n" + "="*120)
+    print("测试分离单用途和多用途")
+    print("="*120)
+    single_state, multi_state = split_by_purpose(state)
+    
+    print(f"\n单用途 state:")
+    print(f"  - log_items: {len(single_state.log_items)} 条")
+    print(f"  - app_registry: {len(single_state.app_registry)} 个应用")
+    print(f"  - 应用列表: {list(single_state.app_registry.keys())}")
+    
+    print(f"\n多用途 state:")
+    print(f"  - log_items: {len(multi_state.log_items)} 条")
+    print(f"  - app_registry: {len(multi_state.app_registry)} 个应用")
+    print(f"  - 应用列表: {list(multi_state.app_registry.keys())}")
+    print()
+
+if __name__ == "__main__":
+    state = get_state(hours=24)
+    state = mock_app_description(state)
+    state = get_app_description(state)
+    state = filter_by_duration(state,min_duration=60)
+    state = split_by_purpose(state)[1]  # 获取多用途数据
+    
+    # 强制将分类设置为 None，确保数据被当作未分类处理
+    for item in state.log_items:
+        item.category = None
+        item.sub_category = None
+        item.link_to_goal = None
+        item.multi_node_result = None
+    
+    state = multi_app_to_classify(state)
+    
+    # 格式化打印输出
+    print("\n" + "="*140)
+    print("多节点分类结果汇总")
+    print("="*140)
+    
+    for item in state.log_items:
+        app_info = state.app_registry.get(item.app)
+        app_desc = app_info.description if app_info else "无描述"
+        
+        print(f"\n{'─'*140}")
+        print(f"【ID: {item.id}】 {item.app}")
+        print(f"  App描述: {app_desc}")
+        print(f"  Title: {item.title}")
+        print(f"  Duration: {item.duration}s")
+        print(f"  ───分类结果───")
+        print(f"  Category: {item.category or '未分类'}")
+        print(f"  Sub-Category: {item.sub_category or '-'}")
+        print(f"  Link to Goal: {item.link_to_goal or '-'}")
+        
+        # 打印中间过程
+        if item.multi_node_result:
+            info = item.multi_node_result
+            print(f"  ───节点1: 目标匹配───")
+            print(f"  是否与目标相关: {info.is_goal_related}")
+            if info.is_goal_related:
+                print(f"  匹配的目标: {info.node1_link_to_goal}")
+                print(f"  目标分类: {info.node1_category} > {info.node1_sub_category}")
+            
+            print(f"  ───节点2: 信息补充───")
+            print(f"  网站名称: {info.website_name or '-'}")
+            print(f"  网站用途: {info.website_purpose or '-'}")
+            print(f"  实体名称: {info.entity_name or '-'}")
+            print(f"  实体含义: {info.entity_meaning or '-'}")
+            print(f"  活动推断: {info.title_analysis or '-'}")
+    
+    print("\n" + "="*140)
+    
+    # 统计信息
+    classified_count = sum(1 for item in state.log_items if item.category is not None)
+    goal_related = sum(1 for item in state.log_items if item.link_to_goal is not None)
+    
+    print(f"\n统计信息:")
+    print(f"  总记录数: {len(state.log_items)}")
+    print(f"  已分类: {classified_count} ({classified_count/len(state.log_items)*100:.1f}%)" if state.log_items else "  已分类: 0")
+    print(f"  与目标相关: {goal_related}")
+    
+    # Token 使用统计
+    print(f"\nToken 使用量:")
+    for node_name, usage in state.node_token_usage.items():
+        input_tokens = usage.get('input_tokens', 0)
+        output_tokens = usage.get('output_tokens', 0)
+        total = usage.get('total_tokens', input_tokens + output_tokens)
+        print(f"  {node_name}: 输入={input_tokens}, 输出={output_tokens}, 总计={total}")

@@ -7,7 +7,7 @@ from datetime import datetime
 
 class StatisticalDataProvider:
     def __init__(self):
-        self.lw_db_manager = DatabaseManager(db_path=config.DB_PATH)
+        self.lw_db_manager = DatabaseManager(LW_DB_PATH=config.LW_DB_PATH)
         self._current_date = None
         self._start_time = None
         self._end_time = None

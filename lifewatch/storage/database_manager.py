@@ -18,7 +18,7 @@ from lifewatch.config.database import (
     TABLE_CONFIGS, 
     get_table_config, 
     get_table_columns,
-    DB_PATH as DEFAULT_DB_PATH
+    LW_DB_PATH as DEFAULT_LW_DB_PATH
 )
 
 # 配置日志
@@ -29,16 +29,16 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """数据库管理器 - 配置驱动的增强版"""
     
-    def __init__(self, db_path: str = None, use_pool: bool = False, pool_size: int = 5):
+    def __init__(self, LW_DB_PATH: str = None, use_pool: bool = False, pool_size: int = 5):
         """
         初始化数据库管理器
         
         Args:
-            db_path: 数据库文件路径，默认使用配置文件中的路径
+            LW_DB_PATH: 数据库文件路径，默认使用配置文件中的路径
             use_pool: 是否启用连接池（默认 False，保持向后兼容）
             pool_size: 连接池大小（默认 5）
         """
-        self.db_path = db_path 
+        self.LW_DB_PATH = LW_DB_PATH 
         self.use_pool = use_pool
         self.pool_size = pool_size
         
@@ -65,7 +65,7 @@ class DatabaseManager:
     
     def _create_connection(self) -> sqlite3.Connection:
         """创建新的数据库连接"""
-        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        conn = sqlite3.connect(self.LW_DB_PATH, check_same_thread=False)
         conn.row_factory = sqlite3.Row  # 启用字典式访问
         return conn
     

@@ -10,3 +10,6 @@ test
 docs
 *-info
 *.db
+.agent
+./lifewatch/llm/langchain_test/langgraph_errors_summary.md
+*.csv

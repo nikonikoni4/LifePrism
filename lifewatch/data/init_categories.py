@@ -51,24 +51,24 @@ DEFAULT_SUB_CATEGORIES = [
 ]
 
 
-def init_default_categories(db_path: str = None) -> bool:
+def init_default_categories(LW_DB_PATH: str = None) -> bool:
     """
     初始化默认分类数据
     
     如果分类表为空，则插入默认的主分类和子分类数据
     
     Args:
-        db_path: 数据库路径，None 则使用默认路径
+        LW_DB_PATH: 数据库路径，None 则使用默认路径
         
     Returns:
         bool: 是否成功初始化
     """
     try:
-        from lifewatch.config.database import DB_PATH
-        if db_path is None:
-            db_path = DB_PATH
+        from lifewatch.config.database import LW_DB_PATH
+        if LW_DB_PATH is None:
+            LW_DB_PATH = LW_DB_PATH
         
-        db = DatabaseManager(db_path=db_path)
+        db = DatabaseManager(LW_DB_PATH=LW_DB_PATH)
         
         # 检查是否已有分类数据
         existing_categories = db.query('category')
@@ -95,24 +95,24 @@ def init_default_categories(db_path: str = None) -> bool:
         return False
 
 
-def reset_categories(db_path: str = None) -> bool:
+def reset_categories(LW_DB_PATH: str = None) -> bool:
     """
     重置分类数据（清空并重新初始化）
     
     警告：此操作会删除所有现有分类数据！
     
     Args:
-        db_path: 数据库路径，None 则使用默认路径
+        LW_DB_PATH: 数据库路径，None 则使用默认路径
         
     Returns:
         bool: 是否成功重置
     """
     try:
-        from lifewatch.config.database import DB_PATH
-        if db_path is None:
-            db_path = DB_PATH
+        from lifewatch.config.database import LW_DB_PATH
+        if LW_DB_PATH is None:
+            LW_DB_PATH = LW_DB_PATH
             
-        db = DatabaseManager(db_path=db_path)
+        db = DatabaseManager(LW_DB_PATH=LW_DB_PATH)
         
         # 清空子分类表
         logger.warning("清空子分类表...")
@@ -123,7 +123,7 @@ def reset_categories(db_path: str = None) -> bool:
         db.truncate('category')
         
         # 重新初始化
-        return init_default_categories(db_path)
+        return init_default_categories(LW_DB_PATH)
         
     except Exception as e:
         logger.error(f"重置分类数据失败: {e}")
@@ -148,8 +148,8 @@ if __name__ == "__main__":
         print("\n✓ 分类数据初始化成功！")
         
         # 验证数据
-        from lifewatch.config.database import DB_PATH
-        db = DatabaseManager(db_path=DB_PATH)
+        from lifewatch.config.database import LW_DB_PATH
+        db = DatabaseManager(LW_DB_PATH=LW_DB_PATH)
         categories = db.query('category')
         sub_categories = db.query('sub_category')
         

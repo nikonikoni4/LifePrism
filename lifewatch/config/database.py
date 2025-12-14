@@ -4,7 +4,7 @@
 """
 
 # 数据库路径
-DB_PATH = r"D:\desktop\软件开发\LifeWatch-AI\lifewatch\server\lifewatch_ai.db"
+LW_DB_PATH = r"D:\desktop\软件开发\LifeWatch-AI\lifewatch\server\lifewatch_ai.db"
 ACTIVITYWATCH_DB_PATH = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
 # 应用程序用途分类表配置
 APP_PURPOSE_CATEGORY_CONFIG = {
@@ -30,7 +30,7 @@ APP_PURPOSE_CATEGORY_CONFIG = {
             'constraints': [],
             'comment': '应用程序的描述'
         },
-        'title_description': {
+        'title_description': { # 已弃用
             'type': 'TEXT',
             'constraints': [],
             'comment': '应用程序title的描述'
@@ -52,6 +52,26 @@ APP_PURPOSE_CATEGORY_CONFIG = {
     ],
     'timestamps': True  # 自动添加 created_at, updated_at
 }
+
+TITLE_DESCRIPTION_CONFIG = { 
+    'table_name': 'title_description',
+    'columns': {
+        "key_word": {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '关键词'
+        },
+        "description": {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '描述'
+        }
+    },
+    'timestamps': True  # 自动添加 created_at, updated_at
+}
+
+
+
 
 # 用户应用行为日志表配置
 USER_APP_BEHAVIOR_LOG_CONFIG = {
@@ -196,9 +216,11 @@ SUB_CATEGORY_CONFIG = {
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'app_purpose_category': APP_PURPOSE_CATEGORY_CONFIG,
+    'title_analysis': TITLE_DESCRIPTION_CONFIG,
     'user_app_behavior_log': USER_APP_BEHAVIOR_LOG_CONFIG,
     'category': CATEGORY_CONFIG,
     'sub_category': SUB_CATEGORY_CONFIG
+
 }
 
 
