@@ -29,13 +29,13 @@ class ActivityWatchDBReader:
     - 灵活查询(可自定义 SQL 优化)
     """
     
-    def __init__(self, db_manager: DatabaseManager = None, LW_DB_PATH: str = None, local_tz: str = LOCAL_TIMEZONE):
+    def __init__(self, db_manager: DatabaseManager = None, AW_DB_PATH: str = None, local_tz: str = LOCAL_TIMEZONE):
         """
         初始化数据库读取器
         
         Args:
             db_manager: DatabaseManager 实例，None 则创建新实例或使用全局单例
-            LW_DB_PATH: ActivityWatch 数据库路径(仅在 db_manager 为 None 时使用)
+            AW_DB_PATH: ActivityWatch 数据库路径(仅在 db_manager 为 None 时使用)
             local_tz: 本地时区,默认 'Asia/Shanghai'
         """
         self.local_tz = pytz.timezone(local_tz)
@@ -44,28 +44,28 @@ class ActivityWatchDBReader:
         # 使用传入的 db_manager 或创建新实例
         if db_manager is not None:
             self.db_manager = db_manager
-            self.LW_DB_PATH = db_manager.LW_DB_PATH
-        elif LW_DB_PATH is not None:
-            self.LW_DB_PATH = LW_DB_PATH
+            self.AW_DB_PATH = db_manager.DB_PATH
+        elif AW_DB_PATH is not None:
+            self.AW_DB_PATH = AW_DB_PATH
             self.db_manager = DatabaseManager(
-                LW_DB_PATH=LW_DB_PATH,
+                AW_DB_PATH=AW_DB_PATH,
                 use_pool=True,
                 pool_size=3,
                 readonly=True
             )
         else:
-            raise ValueError("必须提供 db_manager 或 LW_DB_PATH 参数")
+            raise ValueError("必须提供 db_manager 或 AW_DB_PATH 参数")
         
         # 验证数据库文件存在
         self._validate_database()
         
-        logger.info(f"初始化 ActivityWatch 数据库读取器: {self.LW_DB_PATH}")
+        logger.info(f"初始化 ActivityWatch 数据库读取器: {self.AW_DB_PATH}")
     
     def _validate_database(self):
         """验证数据库文件是否存在且可访问"""
-        if not os.path.exists(self.LW_DB_PATH):
+        if not os.path.exists(self.AW_DB_PATH):
             raise FileNotFoundError(
-                f"ActivityWatch 数据库文件不存在: {self.LW_DB_PATH}\n"
+                f"ActivityWatch 数据库文件不存在: {self.AW_DB_PATH}\n"
                 f"请检查配置文件中的 ACTIVITYWATCH_DATABASE_PATH 是否正确"
             )
         
@@ -399,7 +399,7 @@ class ActivityWatchDBReader:
 
 # 便捷函数,用于快速获取窗口事件
 def get_window_events_from_db(
-    LW_DB_PATH: str,
+    AW_DB_PATH: str,
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
     hours: int = 1
@@ -408,7 +408,7 @@ def get_window_events_from_db(
     从数据库获取窗口事件的便捷函数
     
     Args:
-        LW_DB_PATH: ActivityWatch 数据库路径
+        AW_DB_PATH: ActivityWatch 数据库路径
         start_time: 开始时间
         end_time: 结束时间
         hours: 最近 N 小时(默认 1)
@@ -416,7 +416,7 @@ def get_window_events_from_db(
     Returns:
         List[Dict]: 窗口事件列表
     """
-    reader = ActivityWatchDBReader(LW_DB_PATH=LW_DB_PATH)
+    reader = ActivityWatchDBReader(AW_DB_PATH=AW_DB_PATH)
     return reader.get_window_events(start_time, end_time, hours)
 
 
@@ -429,10 +429,10 @@ if __name__ == "__main__":
     print("=" * 60)
     
     # 指定数据库路径
-    LW_DB_PATH = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
+    AW_DB_PATH = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
     
     try:
-        reader = ActivityWatchDBReader(LW_DB_PATH=LW_DB_PATH)
+        reader = ActivityWatchDBReader(AW_DB_PATH=AW_DB_PATH)
         
         # 测试获取 buckets
         print("\n1. 获取存储桶列表:")

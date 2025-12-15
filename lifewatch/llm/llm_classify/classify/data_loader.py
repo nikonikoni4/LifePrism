@@ -7,7 +7,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
+from lifewatch.llm.llm_classify.providers.lw_data_providers import lw_data_providers
+from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
 from lifewatch.llm.llm_classify.schemas.classify_shemas import classifyState, LogItem, AppInFo, Goal
 from lifewatch.llm.llm_classify.classify.mock_data import mock_goals as _mock_goals_raw
 from lifewatch.utils import is_multipurpose_app
@@ -31,9 +32,10 @@ class DataLoader:
         """
         初始化数据加载器
         
-        使用全局单例数据库管理器
+        使用全局单例数据提供者
         """
-        self.lw_db_manager = LifeWatchDataManager()
+        self.lw_data_provider = lw_data_providers
+        self.stat_provider = StatisticalDataProvider()
     
     def get_real_data(self, hours: int = 24) -> classifyState:
         """
@@ -92,7 +94,7 @@ class DataLoader:
         end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
         
         # 从数据库加载数据
-        df = self.lw_db_manager.load_user_app_behavior_log(
+        df = self.stat_provider.load_user_app_behavior_log(
             start_time=start_time_str,
             end_time=end_time_str
         )
@@ -136,7 +138,7 @@ class DataLoader:
         unique_apps = set(item.app for item in log_items)
         
         # 从数据库加载应用分类数据
-        app_category_df = self.lw_db_manager.load_app_purpose_category()
+        app_category_df = self.lw_data_provider.load_app_purpose_category()
         
         # 为每个 app 收集 titles 样本（最多5个非空且不重复的title）
         app_titles_map = {}
@@ -179,8 +181,8 @@ class DataLoader:
             dict[str, list[str] | None]: 主分类到子分类列表的映射
         """
         # 加载分类数据
-        category_df = self.lw_db_manager.load_categories()
-        sub_category_df = self.lw_db_manager.load_sub_categories()
+        category_df = self.stat_provider.load_categories()
+        sub_category_df = self.stat_provider.load_sub_categories()
         
         if category_df is None or category_df.empty:
             logger.warning("未找到分类数据，使用默认分类树")

@@ -5,10 +5,11 @@
 from fastapi import APIRouter, HTTPException, Path
 from lifewatch.server.schemas.categories import AppCategoryList, AppCategory, UpdateCategoryRequest
 from lifewatch.server.schemas.response import StandardResponse
-from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
+from lifewatch.storage import lw_db_manager
+from lifewatch.llm.llm_classify.providers.lw_data_providers import lw_data_providers
 
 router = APIRouter(prefix="/categories", tags=["Categories Management"])
-db_manager = LifeWatchDataManager()
+db_manager = lw_db_manager
 
 
 @router.get("/apps", response_model=AppCategoryList, summary="获取所有应用分类")
@@ -25,7 +26,7 @@ async def get_all_app_categories():
     **使用真实数据库查询**
     """
     try:
-        df = db_manager.load_app_purpose_category()
+        df = lw_data_providers.load_app_purpose_category()
         if df is None or df.empty:
             return {"total": 0, "data": []}
         

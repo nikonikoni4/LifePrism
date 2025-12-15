@@ -1,6 +1,8 @@
 """
 从数据库中读取数据,计算统计指标,为前端显示提供数据支持
 """
+import pandas as pd
+from typing import Optional
 from lifewatch.storage import lw_db_manager
 from datetime import datetime
 
@@ -434,6 +436,113 @@ class StatisticalDataProvider:
             cursor.execute(sql, (category_id, sub_category_id, event_id))
             conn.commit()
             return cursor.rowcount > 0
+
+    # ==================== 迁移自 LifeWatchDataManager 的方法 ====================
+    
+    def load_user_app_behavior_log(self, 
+                                   start_time: str = None,
+                                   end_time: str = None,
+                                   app_filter: str = None) -> Optional[pd.DataFrame]:
+        """
+        从 user_app_behavior_log 表加载数据
+        
+        Args:
+            start_time: 开始时间（可选），格式：'YYYY-MM-DD HH:MM:SS'
+            end_time: 结束时间（可选）
+            app_filter: 应用过滤（可选），只返回指定应用的记录
+        
+        Returns:
+            Optional[pd.DataFrame]: 包含行为日志数据的DataFrame，如果为空返回None
+        """
+        where = {}
+        if app_filter:
+            where['app'] = app_filter
+        
+        # 如果有时间范围，需要使用原始SQL（因为需要范围查询）
+        if start_time or end_time:
+            sql = "SELECT * FROM user_app_behavior_log WHERE 1=1"
+            params = []
+            
+            if app_filter:
+                sql += " AND app = ?"
+                params.append(app_filter)
+            
+            if start_time:
+                sql += " AND start_time >= ?"
+                params.append(start_time)
+            
+            if end_time:
+                sql += " AND end_time <= ?"
+                params.append(end_time)
+            
+            sql += " ORDER BY start_time DESC"
+            
+            with self.lw_db_manager.get_connection() as conn:
+                df = pd.read_sql_query(sql, conn, params=params)
+            return df if not df.empty else None
+        else:
+            df = self.lw_db_manager.query('user_app_behavior_log', 
+                          where=where if where else None,
+                          order_by='start_time DESC')
+            return df if not df.empty else None
+    
+    def load_categories(self) -> Optional[pd.DataFrame]:
+        """
+        获取所有主分类
+        
+        Returns:
+            Optional[pd.DataFrame]: 包含所有主分类数据的DataFrame，如果为空返回None
+        """
+        df = self.lw_db_manager.query('category', order_by='order_index ASC')
+        return df if not df.empty else None
+    
+    def load_sub_categories(self) -> Optional[pd.DataFrame]:
+        """
+        获取所有子分类
+        
+        Returns:
+            Optional[pd.DataFrame]: 包含所有子分类数据的DataFrame，如果为空返回None
+        """
+        df = self.lw_db_manager.query('sub_category', order_by='order_index ASC')
+        return df if not df.empty else None
+    
+    def get_app_usage_summary(self, 
+                             start_time: str = None, 
+                             end_time: str = None) -> pd.DataFrame:
+        """
+        获取应用使用时长汇总
+        
+        Args:
+            start_time: 开始时间（可选）
+            end_time: 结束时间（可选）
+        
+        Returns:
+            pd.DataFrame: 应用使用汇总，包含 app, total_duration, event_count
+        """
+        sql = """
+        SELECT 
+            app,
+            SUM(duration) as total_duration,
+            COUNT(*) as event_count
+        FROM user_app_behavior_log
+        WHERE 1=1
+        """
+        params = []
+        
+        if start_time:
+            sql += " AND start_time >= ?"
+            params.append(start_time)
+        
+        if end_time:
+            sql += " AND end_time <= ?"
+            params.append(end_time)
+        
+        sql += " GROUP BY app ORDER BY total_duration DESC"
+        
+        with self.lw_db_manager.get_connection() as conn:
+            df = pd.read_sql_query(sql, conn, params=params)
+        
+        return df
 
 if __name__ == "__main__":
     sdp = StatisticalDataProvider()

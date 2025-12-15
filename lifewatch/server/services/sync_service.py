@@ -6,7 +6,6 @@
 import time
 from datetime import datetime
 from typing import Dict
-from lifewatch.storage.lifewatch_data_manager import LifeWatchDataManager
 from lifewatch.server.services.data_processing_service import DataProcessingService
 
 
@@ -18,7 +17,6 @@ class SyncService:
     """
     
     def __init__(self):
-        self.db = LifeWatchDataManager()
         self.data_processor = DataProcessingService()
     
     def sync_from_activitywatch(

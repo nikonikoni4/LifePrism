@@ -2,8 +2,11 @@
 LifeWatch Server - FastAPI 主应用程序
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+
 from lifewatch.server.api import (
     dashboard_router,
     behavior_router,
@@ -12,9 +15,36 @@ from lifewatch.server.api import (
     activity_summary_router
 )
 from lifewatch.server.api.timeline import router as timeline_router
+from lifewatch.storage.lw_table_manager import init_database
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    应用生命周期管理
+    
+    在应用启动时初始化数据库
+    注：数据库连接池清理由 DatabaseManager 的 atexit 处理
+    """
+    # 启动时：初始化数据库表结构
+    logger.info("正在初始化 LifeWatch 数据库...")
+    try:
+        init_database()
+        logger.info("✅ 数据库初始化成功")
+    except Exception as e:
+        logger.error(f"❌ 数据库初始化失败: {e}")
+        raise
+    
+    yield  # 应用运行期间
+    
+    # 关闭时：无需额外清理（全局单例通过 atexit 自动清理）
+
 
 # 创建 FastAPI 应用实例
 app = FastAPI(
+    lifespan=lifespan,  # 添加生命周期管理
     title="LifeWatch API",
     description="""
     ## LifeWatch-AI 后端 API 服务

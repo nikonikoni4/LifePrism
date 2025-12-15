@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+已弃用
 ActivityWatch指定时间段数据访问脚本
 功能：访问指定时间段的数据，并进行时间戳分析
 集成功能：时间戳格式分析、时区转换、事件详细分析
@@ -11,6 +12,9 @@ from datetime import datetime, timedelta, timezone
 import pytz
 from lifewatch.config import WINDOW_BUCKET_ID
 class ActivityWatchTimeRangeAccessor:
+    """
+    ActivityWatchTimeRangeAccessor已弃用
+    """
     def __init__(self, base_url="http://localhost:5600", local_tz='Asia/Shanghai',headers=None):
         self.base_url = base_url
         self.headers = headers 
@@ -227,7 +231,7 @@ class ActivityWatchTimeRangeAccessor:
             window_events = []
         return window_events
 # 测试用
-def get_window_events(start_time=None, end_time=None, hours=None, use_database=True, aw_LW_DB_PATH=None):
+def get_window_events(start_time=None, end_time=None, hours=None, use_database=True, AW_DB_PATH=None):
     """
     从事件数据中提取窗口事件
     
@@ -236,7 +240,7 @@ def get_window_events(start_time=None, end_time=None, hours=None, use_database=T
         end_time: 结束时间
         hours: 获取最近 N 小时的数据
         use_database: 是否使用数据库模式(默认 True,性能更好)
-        aw_LW_DB_PATH: ActivityWatch 数据库路径(仅在 use_database=True 时需要)
+        AW_DB_PATH: ActivityWatch 数据库路径(仅在 use_database=True 时需要)
     
     Returns:
         list: 窗口事件列表
@@ -245,11 +249,11 @@ def get_window_events(start_time=None, end_time=None, hours=None, use_database=T
         # 使用数据库模式
         from lifewatch.data.aw_db_reader import ActivityWatchDBReader
         
-        if not aw_LW_DB_PATH:
+        if not AW_DB_PATH:
             # 默认数据库路径
-            aw_LW_DB_PATH = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
+            AW_DB_PATH = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
         
-        reader = ActivityWatchDBReader(LW_DB_PATH=aw_LW_DB_PATH)
+        reader = ActivityWatchDBReader(AW_DB_PATH=AW_DB_PATH)
         window_events = reader.get_window_events(start_time, end_time, hours)
     else:
         # 使用 API 模式(向后兼容)

@@ -15,10 +15,7 @@ import atexit
 import logging
 
 from lifewatch.config.database import (
-    TABLE_CONFIGS, 
     get_table_config, 
-    get_table_columns,
-    LW_DB_PATH as DEFAULT_LW_DB_PATH
 )
 
 # 配置日志
@@ -29,17 +26,17 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """数据库管理器 - 配置驱动的增强版"""
     
-    def __init__(self, LW_DB_PATH: str = None, use_pool: bool = False, pool_size: int = 5, readonly: bool = False):
+    def __init__(self, DB_PATH: str = None, use_pool: bool = False, pool_size: int = 5, readonly: bool = False):
         """
         初始化数据库管理器
         
         Args:
-            LW_DB_PATH: 数据库文件路径，默认使用配置文件中的路径
+            DB_PATH: 数据库文件路径，默认使用配置文件中的路径
             use_pool: 是否启用连接池（默认 False，保持向后兼容）
             pool_size: 连接池大小（默认 5）
             readonly: 是否只读模式（用于外部数据库，默认 False）
         """
-        self.LW_DB_PATH = LW_DB_PATH 
+        self.DB_PATH = DB_PATH 
         self.use_pool = use_pool
         self.pool_size = pool_size
         self.readonly = readonly
@@ -52,10 +49,6 @@ class DatabaseManager:
             self._init_connection_pool()
             # 注册程序退出时关闭连接池
             atexit.register(self._close_connection_pool)
-        
-        # 只读模式下跳过数据库初始化（外部数据库不需要创建表）
-        if not self.readonly:
-            self.init_database()
     
     def _init_connection_pool(self):
         """初始化连接池"""
@@ -71,9 +64,9 @@ class DatabaseManager:
         """创建新的数据库连接"""
         if self.readonly:
             # 只读模式打开数据库（用于外部数据库如 ActivityWatch）
-            conn = sqlite3.connect(f"file:{self.LW_DB_PATH}?mode=ro", uri=True, check_same_thread=False)
+            conn = sqlite3.connect(f"file:{self.DB_PATH}?mode=ro", uri=True, check_same_thread=False)
         else:
-            conn = sqlite3.connect(self.LW_DB_PATH, check_same_thread=False)
+            conn = sqlite3.connect(self.DB_PATH, check_same_thread=False)
         conn.row_factory = sqlite3.Row  # 启用字典式访问
         return conn
     
@@ -168,85 +161,6 @@ class DatabaseManager:
                 raise
             finally:
                 conn.close()
-    
-    def init_database(self):
-        """初始化数据库，根据配置创建所有表"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # 遍历所有表配置并创建表
-                for table_name, config in TABLE_CONFIGS.items():
-                    self._create_table_from_config(cursor, config)
-                
-                logger.info(f"数据库初始化成功，共创建 {len(TABLE_CONFIGS)} 个表")
-                
-        except Exception as e:
-            logger.error(f"数据库初始化失败: {e}")
-            raise
-    
-    def _create_table_from_config(self, cursor: sqlite3.Cursor, config: dict):
-        """
-        根据配置创建表
-        
-        Args:
-            cursor: 数据库游标
-            config: 表配置字典
-        """
-        table_name = config['table_name']
-        columns = config['columns']
-        table_constraints = config.get('table_constraints', [])
-        indexes = config.get('indexes', [])
-        timestamps = config.get('timestamps', False)
-        
-        # 1. 构建列定义
-        column_definitions = []
-        for col_name, col_config in columns.items():
-            col_type = col_config['type']
-            col_constraints = col_config.get('constraints', [])
-            
-            # 组装列定义
-            col_def = f"{col_name} {col_type}"
-            if col_constraints:
-                col_def += " " + " ".join(col_constraints)
-            
-            # 添加注释（SQLite不支持行内注释，记录在文档中）
-            column_definitions.append(col_def)
-        
-        # 2. 添加时间戳列
-        if timestamps:
-            column_definitions.append(
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-            )
-            # 只有首次创建时添加updated_at，某些表不需要
-            if table_name == 'app_purpose_category':
-                column_definitions.append(
-                    "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-                )
-        
-        # 3. 添加表级约束
-        all_constraints = column_definitions + table_constraints
-        
-        # 4. 组装 CREATE TABLE 语句
-        create_table_sql = f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            {', '.join(all_constraints)}
-        );
-        """
-        
-        cursor.execute(create_table_sql)
-        logger.info(f"表 '{table_name}' 创建成功")
-        
-        # 5. 创建索引
-        for index in indexes:
-            index_name = index['name']
-            index_columns = ', '.join(index['columns'])
-            create_index_sql = f"""
-            CREATE INDEX IF NOT EXISTS {index_name} 
-            ON {table_name}({index_columns});
-            """
-            cursor.execute(create_index_sql)
-            logger.debug(f"索引 '{index_name}' 创建成功")
     
     # ==================== 通用查询操作 (READ) ====================
     
