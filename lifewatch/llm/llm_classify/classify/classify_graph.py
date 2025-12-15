@@ -1,14 +1,16 @@
 from lifewatch.llm.llm_classify.schemas.classify_shemas import classifyState,Goal,AppInFo,SearchOutput
-from lifewatch.llm.llm_classify.utils.create_model import create_ChatTongyiModel
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import SystemMessage, HumanMessage,AIMessage
 from lifewatch.llm.llm_classify.providers.lw_data_providers import lw_data_providers
-from lifewatch.llm.llm_classify.utils.format_prompt_utils import (
+from lifewatch.llm.llm_classify.utils import (
     format_goals_for_prompt, 
-    format_category_tree_for_prompt, 
-    format_log_items_for_prompt, 
-    format_app_log_items_for_prompt,
-    data_spliter
+    format_category_tree_for_prompt,
+    format_log_items_table,
+    create_ChatTongyiModel,
+    split_by_purpose,
+    split_by_duartion,
+    parse_classification_result,
+    extract_json_from_response,
     )
 import json
 import logging
@@ -18,127 +20,6 @@ logger = logging.getLogger(__name__)
 MAX_LOG_ITEMS = 15
 MAX_TITLE_ITEMS = 5
 SPLIT_DURATION = 10*60 # 20min
-
-# utils
-
-def split_by_purpose(state: classifyState) -> tuple[classifyState, classifyState]:
-    """
-    将 classifyState 按单用途和多用途分开
-    
-    Args:
-        state: 原始的 classifyState 对象
-        
-    Returns:
-        tuple[classifyState, classifyState]: (单用途state, 多用途state)
-        
-    Example:
-        single_state, multi_state = split_by_purpose(state)
-    """
-    # 分离 log_items
-    single_purpose_items = []
-    multi_purpose_items = []
-    
-    for item in state.log_items:
-        app_info = state.app_registry.get(item.app)
-        if app_info and not app_info.is_multipurpose:
-            single_purpose_items.append(item)
-        else:
-            multi_purpose_items.append(item)
-    
-    # 构建单用途 app_registry
-    single_apps = set(item.app for item in single_purpose_items)
-    single_app_registry = {
-        app: info 
-        for app, info in state.app_registry.items() 
-        if app in single_apps
-    }
-    
-    # 构建多用途 app_registry
-    multi_apps = set(item.app for item in multi_purpose_items)
-    multi_app_registry = {
-        app: info 
-        for app, info in state.app_registry.items() 
-        if app in multi_apps
-    }
-    
-    # 创建单用途 state
-    single_state = classifyState(
-        app_registry=single_app_registry,
-        log_items=single_purpose_items,
-        goal=state.goal,
-        category_tree=state.category_tree,
-    )
-    
-    # 创建多用途 state
-    multi_state = classifyState(
-        app_registry=multi_app_registry,
-        log_items=multi_purpose_items,
-        goal=state.goal,
-        category_tree=state.category_tree,
-    )
-    
-    logger.info(f"分离完成: 单用途 {len(single_purpose_items)} 条, 多用途 {len(multi_purpose_items)} 条")
-    
-    return single_state, multi_state
-
-def split_by_duartion(state: classifyState)->tuple[classifyState,classifyState]:
-    """
-    将 classifyState 按时长分开
-    
-    Args:
-        state: 原始的 classifyState 对象
-        
-    Returns:
-        tuple[classifyState, classifyState]: (短时长state, 长时长state)
-        
-    Example:
-        short_state, long_state = split_by_duartion(state)
-    """
-    # 分离 log_items
-    short_duration_items = []
-    long_duration_items = []
-    
-    for item in state.log_items:
-        if item.duration < SPLIT_DURATION:
-            short_duration_items.append(item)
-        else:
-            long_duration_items.append(item)
-    
-    # 构建短时长 app_registry
-    short_apps = set(item.app for item in short_duration_items)
-    short_app_registry = {
-        app: info 
-        for app, info in state.app_registry.items() 
-        if app in short_apps
-    }
-    
-    # 构建长时长 app_registry
-    long_apps = set(item.app for item in long_duration_items)
-    long_app_registry = {
-        app: info 
-        for app, info in state.app_registry.items() 
-        if app in long_apps
-    }
-    
-    # 创建短时长 state
-    short_state = classifyState(
-        app_registry=short_app_registry,
-        log_items=short_duration_items,
-        goal=state.goal,
-        category_tree=state.category_tree,
-    )
-    # 创建长时长 state
-    long_state = classifyState(
-        app_registry=long_app_registry,
-        log_items=long_duration_items,
-        goal=state.goal,
-        category_tree=state.category_tree,
-    )
-    
-    logger.info(f"按时长分离完成: 短时长(<{SPLIT_DURATION}s) {len(short_duration_items)} 条, 长时长(>={SPLIT_DURATION}s) {len(long_duration_items)} 条")
-    
-    return short_state, long_state
-
 
 # router
 def router_by_multi_purpose(state: classifyState):
@@ -160,51 +41,6 @@ def router_by_duration_for_multi(state:classifyState):
         Send("multi_classify_short", short_state),
         Send("get_titles", long_state)
     ]
-
-# 通用解析函数
-def parse_classification_result(state: classifyState, classification_result: dict, node_name: str) -> classifyState:
-    """
-    通用的分类结果解析函数
-    
-    Args:
-        state: classifyState 对象
-        classification_result: LLM 返回的分类结果，格式为 {id: [category, sub_category, link_to_goal]}
-        node_name: 节点名称，用于日志输出
-        
-    Returns:
-        更新后的 classifyState 对象
-    """
-    # 创建 id 到 log_item 的映射
-    id_to_item = {item.id: item for item in state.log_items}
-    
-    # 遍历分类结果，更新对应的 log_item
-    for item_id_str, classification in classification_result.items():
-        try:
-            item_id = int(item_id_str)
-            if item_id in id_to_item:
-                # classification 格式: [category, sub_category, link_to_goal]
-                if isinstance(classification, list) and len(classification) == 3:
-                    category, sub_category, link_to_goal = classification
-                    
-                    # 将字符串 "null" 或 None 转换为 Python 的 None
-                    category = None if (category == "null" or category is None) else category
-                    sub_category = None if (sub_category == "null" or sub_category is None) else sub_category
-                    link_to_goal = None if (link_to_goal == "null" or link_to_goal is None) else link_to_goal
-                    
-                    # 更新 log_item
-                    id_to_item[item_id].category = category
-                    id_to_item[item_id].sub_category = sub_category
-                    id_to_item[item_id].link_to_goal = link_to_goal
-                    
-                    logger.debug(f"[{node_name}] 已更新 log_item {item_id}: category={category}, sub_category={sub_category}, link_to_goal={link_to_goal}")
-                else:
-                    logger.error(f"[{node_name}] 分类结果格式错误: item_id={item_id}, classification={classification}, 期望列表格式 [category, sub_category, link_to_goal]")
-            else:
-                logger.warning(f"[{node_name}] 分类结果中的 id {item_id} 在 log_items 中不存在")
-        except (ValueError, TypeError) as e:
-            logger.error(f"[{node_name}] 解析分类结果时出错: item_id={item_id_str}, classification={classification}, error={e}")
-    
-    return state
 
 # 创建模型
 chat_model = create_ChatTongyiModel()
@@ -319,6 +155,11 @@ def single_classify(state: classifyState) -> classifyState:
         {{
             id:[category,sub_category,link_to_goal]
         }}
+        示例:
+        {{
+            "1": ["工作/学习", "编程", "完成LifeWatch-AI项目开发"],
+            "2": ["娱乐", "看电视", null]
+        }}
         注意：
         - value必须是列表，包含三个元素 [category, sub_category, link_to_goal]
         - 无值时使用 null
@@ -350,7 +191,13 @@ def single_classify(state: classifyState) -> classifyState:
         logger.info(f"single_classify 处理第 {batch_num} 批，共 {len(batch)} 条记录")
         
         # 使用工具函数格式化 log_items
-        app_content = format_app_log_items_for_prompt(batch, state.app_registry)
+        app_content = format_log_items_table(
+            batch,
+            fields=["id", "app", "title"],
+            app_registry=state.app_registry,
+            group_by_app=True,
+            show_app_description=True
+        )
         print(app_content)
         
         # 构建 human_message
@@ -373,8 +220,9 @@ def single_classify(state: classifyState) -> classifyState:
             print(results.content)
             print("=== 响应结束 ===\n")
             
-            # 解析 JSON 结果
-            classification_result = json.loads(results.content)
+            # 解析 JSON 结果（先清理可能的代码块标记）
+            clean_content = extract_json_from_response(results.content)
+            classification_result = json.loads(clean_content)
             logger.info(f"single_classify 批次 {batch_num} 成功获取分类结果")
             
             # 使用通用解析函数更新 state
@@ -421,6 +269,11 @@ def multi_classify_short(state:classifyState) -> classifyState:
     {{
         id:[category,sub_category,link_to_goal]
     }}
+    示例:
+    {{
+        "1": ["工作/学习", "编程", "完成LifeWatch-AI项目开发"],
+        "2": ["娱乐", "看电视", null]
+    }}
     """)
     
     if not state.log_items:
@@ -441,8 +294,11 @@ def multi_classify_short(state:classifyState) -> classifyState:
         batch_num = i // MAX_LOG_ITEMS + 1
         logger.info(f"multi_classify_short 处理第 {batch_num} 批，共 {len(batch)} 条记录")
         
-        items = format_app_log_items_for_prompt(batch, state.app_registry)
-        human_message = HumanMessage(content=f"""对下面的数据进行分类:{items}
+        items = format_log_items_table(
+            batch,
+            fields=["id", "app", "title", "title_analysis"]
+        )
+        human_message = HumanMessage(content=f"""对下面的数据进行分类:\n{items}
         """)
         messages = [system_message, human_message]
         
@@ -462,8 +318,9 @@ def multi_classify_short(state:classifyState) -> classifyState:
             print(result.content)
             print("=== 响应结束 ===\n")
             
-            # 解析 JSON 结果
-            classification_result = json.loads(result.content)
+            # 解析 JSON 结果（先清理可能的代码块标记）
+            clean_content = extract_json_from_response(result.content)
+            classification_result = json.loads(clean_content)
             logger.info(f"multi_classify_short 批次 {batch_num} 成功获取分类结果")
             
             # 使用通用解析函数更新 state
@@ -600,7 +457,6 @@ def multi_classify_long(state:classifyState)->classifyState:
         "1": ["工作/学习", "编程", "完成LifeWatch-AI项目开发"],
         "2": ["娱乐", "看电视", null]
     }}
-
     注意：
     - value必须是列表，包含三个元素 [category, sub_category, link_to_goal]
     - 无值时使用 null
@@ -625,35 +481,15 @@ def multi_classify_long(state:classifyState)->classifyState:
         batch_num = i // MAX_LOG_ITEMS + 1
         logger.info(f"multi_classify_long 处理第 {batch_num} 批，共 {len(batch)} 条记录")
         
-        # 构建表格头部
-        table_lines = []
-        table_lines.append("| ID | Title | Title Analysis |")
-        table_lines.append("|-----|-------|----------------|")
-        
-        # 添加每一行数据
-        for item in batch:
-            # 处理可能的 None 值
-            title = item.title or "N/A"
-            title_analysis = item.title_analysis or "N/A"
-            
-            # 转义特殊字符，避免破坏表格格式
-            title = title.replace("|", "\\|").replace("\n", " ")
-            title_analysis = title_analysis.replace("|", "\\|").replace("\n", " ")
-            
-            # 限制长度，避免表格过宽
-            if len(title) > 50:
-                title = title[:47] + "..."
-            if len(title_analysis) > 100:
-                title_analysis = title_analysis[:97] + "..."
-            
-            table_lines.append(f"| {item.id} | {title} | {title_analysis} |")
-        
-        # 合并为完整的表格字符串
-        log_items_table = "\n".join(table_lines)
+        # 使用工具函数格式化 log_items
+        items = format_log_items_table(
+            batch,
+            fields=["id", "app", "title", "title_analysis"]
+        )
         
         human_message = HumanMessage(content=f"""
         请对以下用户行为数据进行分类：
-        {log_items_table}
+        {items}
         """)
         
         messages = [system_message, human_message]
@@ -674,8 +510,9 @@ def multi_classify_long(state:classifyState)->classifyState:
             print(result.content)
             print("=== 响应结束 ===\n")
             
-            # 解析 JSON 结果
-            classification_result = json.loads(result.content)
+            # 解析 JSON 结果（先清理可能的代码块标记）
+            clean_content = extract_json_from_response(result.content)
+            classification_result = json.loads(clean_content)
             logger.info(f"multi_classify_long 批次 {batch_num} 成功获取分类结果")
             
             # 使用通用解析函数更新 state
@@ -714,7 +551,7 @@ if __name__ == "__main__":
         print(f"  - 过滤后 log_items: {len(state.log_items)} 条")
         print(f"  - 过滤后 app_registry: {len(state.app_registry)} 个应用")
         return state
-    state = get_state(hours=100)
+    state = get_state(hours=12)
     input_items_len = len(state.log_items)
     graph = StateGraph(classifyState)
     graph.add_node("get_app_description",get_app_description)

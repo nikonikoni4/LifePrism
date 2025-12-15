@@ -28,104 +28,95 @@ def format_category_tree_for_prompt(category_tree: dict[str, list[str] | None]) 
             formatted += f"\n"
     return formatted.strip()
 
-def format_log_items_for_prompt(log_items: list[LogItem]) -> str:
-    """
-    返回LogItem中的非输出字段,并按照
-    id app duration title  的顺序转化为str
-    """ 
-    if not log_items:
-        return "暂无待分类数据"
-    
-    formatted = "待分类的活动记录：\n"
-    for log_item in log_items:
-        # 提取需要的字段
-        item_dict = log_item.model_dump(exclude={
-            "category", 
-            "sub_category", 
-            "link_to_goal",
-            "search_title_query",
-            "search_title_content",
-            "need_analyze_context",
-            "is_multipurpose"
-        })
-        formatted += f"{item_dict}\n"
-    
-    return formatted.strip()
 
-def format_app_log_items_for_prompt(log_items: list[LogItem], app_registry: dict) -> str:
+def format_log_items_table(
+    log_items: list[LogItem],
+    fields: list[str],
+    app_registry: dict = None,
+    group_by_app: bool = False,
+    show_app_description: bool = False
+) -> str:
     """
-    将单用途应用的 log_items 按应用分组格式化为 prompt
+    通用的 log_items 表格格式化函数
     
     Args:
         log_items: LogItem 列表
-        app_registry: 应用注册表（字典），key为app名称，value为AppInfo对象
+        fields: 要显示的字段列表，如 ["id", "app", "title"]
+        app_registry: 应用注册表（group_by_app=True 时需要）
+        group_by_app: 是否按应用分组（用于 single_classify）
+        show_app_description: 是否显示应用描述（group_by_app=True 时有效）
         
     Returns:
-        格式化后的字符串，按应用分组展示
+        格式化后的表格字符串
+        
+    Example:
+        >>> # single_classify 用法
+        >>> format_log_items_table(
+        ...     items, 
+        ...     fields=["id", "app", "title"],
+        ...     app_registry=app_registry,
+        ...     group_by_app=True,
+        ...     show_app_description=True
+        ... )
+        
+        >>> # multi_classify 用法
+        >>> format_log_items_table(items, fields=["id", "app", "title", "title_analysis"])
     """
     if not log_items:
         return "暂无待分类数据"
     
-    # 按 app 分组 log_items
-    app_groups = {}
-    for log_item in log_items:
-        app_name = log_item.app
-        if app_name not in app_groups:
-            app_groups[app_name] = []
-        app_groups[app_name].append(log_item)
+    def get_field_value(item: LogItem, field: str) -> str:
+        """获取 LogItem 的字段值"""
+        value = getattr(item, field, None)
+        if value is None:
+            return "N/A"
+        # 限制长度，避免表格过宽
+        str_value = str(value)
+        if len(str_value) > 80:
+            return str_value[:77] + "..."
+        return str_value
     
-    # 构建按 app 分组的内容
-    app_content = "待分类的软件列表（按应用分组）：\n\n"
-    for app_name, items in app_groups.items():
-        app_info = app_registry.get(app_name)
-        if app_info:
-            app_description = app_info.description
-        else:
-            app_description = "无描述"
-        app_content += f"## {app_name}\n"
-        app_content += f"应用描述: {app_description}\n"
-        app_content += "活动记录:\n"
+    if group_by_app:
+        # 按应用分组模式
+        app_groups = {}
+        for item in log_items:
+            app_name = item.app
+            if app_name not in app_groups:
+                app_groups[app_name] = []
+            app_groups[app_name].append(item)
         
-        # 第一条记录显示键名
-        if items:
-            first_item = items[0]
-            first_dict = first_item.model_dump(exclude={
-                "category", "sub_category", "link_to_goal",
-                "search_title_query", "search_title_content", "need_analyze_context",
-                "multi_node_result"
-            })
-            # 显示键名
-            keys = list(first_dict.keys())
-            app_content += f"  {' | '.join(keys)}\n"
-            # 显示第一条数据的值
-            values = [str(first_dict[k]) for k in keys]
-            app_content += f"  {' | '.join(values)}\n"
+        result = "待分类的软件列表（按应用分组）：\n\n"
+        for app_name, items in app_groups.items():
+            result += f"## {app_name}\n"
             
-            # 后续记录只显示值
-            for item in items[1:]:
-                item_dict = item.model_dump(exclude={
-                    "category", "sub_category", "link_to_goal",
-                    "search_title_query", "search_title_content", "need_analyze_context",
-                    "multi_node_result"
-                })
-                values = [str(item_dict[k]) for k in keys]
-                app_content += f"  {' | '.join(values)}\n"
+            if show_app_description and app_registry:
+                app_info = app_registry.get(app_name)
+                description = app_info.description if app_info else "无描述"
+                result += f"应用描述: {description}\n"
+            
+            result += "活动记录:\n"
+            # 表头
+            result += f"  {' | '.join(fields)}\n"
+            # 数据行
+            for item in items:
+                values = [get_field_value(item, f) for f in fields]
+                result += f"  {' | '.join(values)}\n"
+            result += "\n"
         
-        app_content += "\n"
-    
-    return app_content.strip()
+        return result.strip()
+    else:
+        # 简单表格模式
+        result = "待分类的活动记录：\n"
+        # 表头
+        result += f"  {' | '.join(fields)}\n"
+        # 数据行
+        for item in log_items:
+            values = [get_field_value(item, f) for f in fields]
+            result += f"  {' | '.join(values)}\n"
+        
+        return result.strip()
 
 
-def data_spliter(data:list,each_item_count)->list[list]:
-    
-    length = len(data)
-    if each_item_count >= length:
-        return [data]
-    result_list:list[list] = []
-    for i in range(0,len(data),each_item_count):
-        print(i)
-        result_list.append(data[i:i+each_item_count])
-    return result_list
 if __name__ == "__main__":
     data = [i for i in range(50)]
     print(data_spliter(data,51))
