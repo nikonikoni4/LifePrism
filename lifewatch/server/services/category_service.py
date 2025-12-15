@@ -364,7 +364,7 @@ class CategoryService:
     
     def _get_category_by_id(self, category_id: str) -> Dict[str, Any]:
         """
-        根据ID获取完整的分类对象（含子分类）
+        根据ID获取完整的分类对象（含子分类）- 内部使用，不存在时抛出异常
         
         Args:
             category_id: 分类ID
@@ -397,3 +397,24 @@ class CategoryService:
             'color': category['color'],
             'subCategories': sub_cats
         }
+    
+    def get_category_by_id(self, category_id: str) -> Optional[Dict[str, Any]]:
+        """
+        根据ID获取分类对象（公共方法，不存在时返回None）
+        
+        Args:
+            category_id: 分类ID
+            
+        Returns:
+            Dict: 分类对象，或 None 如果不存在
+        """
+        category = self.db.get_by_id('category', 'id', category_id)
+        if not category:
+            return None
+        
+        return {
+            'id': category['id'],
+            'name': category['name'],
+            'color': category['color']
+        }
+

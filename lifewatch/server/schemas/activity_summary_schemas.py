@@ -3,13 +3,14 @@
 """
 
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 from datetime import date
 
 class DailyActivitiesResponse(BaseModel):
     """每日活动数据项"""
     date: str = Field(..., description="日期（YYYY-MM-DD 格式）")
     active_time_percentage: int = Field(..., description="活动时长占比（%）", alias="activeTimePercentage")
+    color: Optional[str] = Field(None, description="分类颜色（十六进制格式）")
     
     class Config:
         populate_by_name = True

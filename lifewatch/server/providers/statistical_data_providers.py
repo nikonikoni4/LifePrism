@@ -283,30 +283,44 @@ class StatisticalDataProvider:
             result = cursor.fetchone()
         return result[0] if result[0] else 0
     
-    def get_daily_active_time(self, start_date: str, end_date: str) -> list[dict]:
+    def get_daily_active_time(self, start_date: str, end_date: str, category_id: str = None, sub_category_id: str = None) -> list[dict]:
         """
         获取指定日期范围内每天的活跃时长（只使用一次SQL查询）
         arg:
             start_date: str, 开始日期（YYYY-MM-DD 格式）
             end_date: str, 结束日期（YYYY-MM-DD 格式）
+            category_id: str, 主分类ID筛选（可选）
+            sub_category_id: str, 子分类ID筛选（可选）
         return 
             list[dict], 每天的活动数据:
                 date: str, 日期（YYYY-MM-DD 格式）
                 active_time_percentage: int, 活动时长占比（%）
         """
-        sql = """
+        # 构建动态SQL查询
+        where_conditions = ["start_time >= ?", "start_time <= ?"]
+        params = [start_date, end_date]
+        
+        if category_id:
+            where_conditions.append("category_id = ?")
+            params.append(category_id)
+        
+        if sub_category_id:
+            where_conditions.append("sub_category_id = ?")
+            params.append(sub_category_id)
+        
+        sql = f"""
         SELECT 
             DATE(start_time) as activity_date,
             SUM(duration) as total_duration,
             CAST((SUM(duration) * 100.0 / 86400) AS INTEGER) as active_time_percentage
         FROM user_app_behavior_log
-        WHERE start_time >= ? AND start_time <= ?
+        WHERE {' AND '.join(where_conditions)}
         GROUP BY DATE(start_time)
         ORDER BY activity_date
         """
         with self.lw_db_manager.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (start_date, end_date))
+            cursor.execute(sql, params)
             results = cursor.fetchall()
         
         # 转换为响应格式
