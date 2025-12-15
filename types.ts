@@ -127,6 +127,7 @@ export interface DashboardResponse {
 export interface DailyActivitiesResponse {
   date: string;
   activeTimePercentage: number; // percentage of total active time
+  color?: string; // optional category color for bar chart
 }
 
 export interface ActivitySummaryResponse {

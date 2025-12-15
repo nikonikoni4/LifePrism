@@ -60,10 +60,31 @@ export class DashboardAPI {
      * @param date 日期 (YYYY-MM-DD)
      * @param historyNumber 历史数据数量
      * @param futureNumber 未来数据数量
+     * @param categoryId 主分类ID筛选（可选）
+     * @param subCategoryId 子分类ID筛选（可选）
      */
-    static async getActivitySummaryData(date: string, historyNumber: number, futureNumber: number): Promise<ActivitySummaryResponse> {
+    static async getActivitySummaryData(
+        date: string,
+        historyNumber: number,
+        futureNumber: number,
+        categoryId?: string,
+        subCategoryId?: string
+    ): Promise<ActivitySummaryResponse> {
         try {
-            const params = new URLSearchParams({ date, historyNumber: historyNumber.toString(), futureNumber: futureNumber.toString() });
+            const params = new URLSearchParams({
+                date,
+                historyNumber: historyNumber.toString(),
+                futureNumber: futureNumber.toString()
+            });
+
+            // 添加可选的筛选参数
+            if (categoryId) {
+                params.append('category_id', categoryId);
+            }
+            if (subCategoryId) {
+                params.append('sub_category_id', subCategoryId);
+            }
+
             const response = await fetch(
                 `${API_BASE_URL}/activity-summary?${params.toString()}`
             );

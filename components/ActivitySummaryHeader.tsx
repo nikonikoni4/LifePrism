@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Filter, RefreshCw, Clock, Database } from 'lucide-react';
-import { ActivitySummaryResponse } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Calendar, Filter, RefreshCw, Clock, Database, X, Check } from 'lucide-react';
+import { ActivitySummaryResponse, CategoryDef } from '../types';
 import { DashboardAPI } from '../services/dashboardService';
+import { categoryPI } from '../services/categoryService';
 import { incrementalSync, syncActivityWatchDataByTimeRange } from '../services/syncService';
 
 // 安全的日期解析函数,支持多种格式
@@ -83,9 +84,19 @@ const generateMockHistory = (centerDateStr: string) => {
   return history;
 };
 
-const getActivitySummary = async (centerDate: string, historyNumber: number, futureNumber: number) => {
+const getActivitySummary = async (
+  centerDate: string,
+  historyNumber: number,
+  futureNumber: number,
+  categoryId?: string | null,
+  subCategoryId?: string | null
+) => {
   try {
-    const ActivitySummaryData = await DashboardAPI.getActivitySummaryData(centerDate, historyNumber, futureNumber);
+    const ActivitySummaryData = await DashboardAPI.getActivitySummaryData(
+      centerDate, historyNumber, futureNumber,
+      categoryId || undefined,
+      subCategoryId || undefined
+    );
     console.log('ActivitySummaryData:', ActivitySummaryData);
     const dailyActivities = ActivitySummaryData.dailyActivities || [];
     const totalDay = historyNumber + futureNumber + 1;
@@ -212,10 +223,33 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
   const [syncStartDate, setSyncStartDate] = React.useState('');
   const [syncEndDate, setSyncEndDate] = React.useState('');
 
+  // Filter states
+  const [showFilterDialog, setShowFilterDialog] = useState(false);
+  const [categories, setCategories] = useState<CategoryDef[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string | null>(null);
+  const [filterColor, setFilterColor] = useState<string | null>(null);
+
+  // Load categories on mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const cats = await categoryPI.getAllCategories();
+        setCategories(cats);
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+      }
+    };
+    loadCategories();
+  }, []);
+
   // 使用useEffect处理异步数据获取
   React.useEffect(() => {
-    // If activitySummaryData is provided, use it directly
-    if (activitySummaryData) {
+    // If filters are applied, always fetch from API (ignore prop data)
+    const hasFilter = selectedCategoryId !== null;
+
+    // If activitySummaryData is provided AND no filter is active, use it directly
+    if (activitySummaryData && !hasFilter) {
       // Process the provided data
       const processedHistory = processActivitySummaryData(activitySummaryData, selectedDate, 15, 14);
       setHistory(processedHistory);
@@ -224,11 +258,13 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
       return;
     }
 
-    // Otherwise, fetch data from API (backward compatibility)
+    // Otherwise, fetch data from API (with or without filters)
     const fetchHistory = async () => {
       setIsLoading(true);
       try {
-        const [historyData, TodayTotalActiveTime] = await getActivitySummary(selectedDate, 15, 14);
+        const [historyData, TodayTotalActiveTime] = await getActivitySummary(
+          selectedDate, 15, 14, selectedCategoryId, selectedSubCategoryId
+        );
         setHistory(historyData);
         setTodayTotalActiveTime(TodayTotalActiveTime);
       } catch (error) {
@@ -239,7 +275,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
       }
     };
     fetchHistory();
-  }, [selectedDate, activitySummaryData]);
+  }, [selectedDate, activitySummaryData, selectedCategoryId, selectedSubCategoryId]);
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onDateChange(e.target.value);
@@ -348,7 +384,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
   }
 
   return (
-    <div className={`bg-white rounded-3xl p-6 lg:p-8 shadow-sm border border-gray-100 mb-8 animate-fade-in w-full transition-opacity duration-300 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
+    <div className="bg-white rounded-3xl p-6 lg:p-8 shadow-sm border border-gray-100 mb-8 animate-fade-in w-full">
 
       {/* Top Row: Title & Stats */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
@@ -402,9 +438,33 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-slate-600 text-sm font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm">
+          <button
+            onClick={() => setShowFilterDialog(true)}
+            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm ${selectedCategoryId
+              ? 'bg-opacity-20 border-2'
+              : 'bg-white border-gray-200 text-slate-600'
+              }`}
+            style={selectedCategoryId && filterColor ? {
+              backgroundColor: `${filterColor}20`,
+              borderColor: filterColor,
+              color: filterColor
+            } : {}}
+          >
             <Filter size={16} />
-            Filters
+            {selectedCategoryId ? 'Filtered' : 'Filters'}
+            {selectedCategoryId && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedCategoryId(null);
+                  setSelectedSubCategoryId(null);
+                  setFilterColor(null);
+                }}
+                className="ml-1 hover:bg-white/50 rounded-full p-0.5"
+              >
+                <X size={12} />
+              </span>
+            )}
           </button>
           <button
             onClick={async () => {
@@ -439,7 +499,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
       </div>
 
       {/* Bottom Row: Mini Trend Chart (Sparkline) */}
-      <div className="relative pt-6 border-t border-dashed border-gray-100">
+      <div className={`relative pt-6 border-t border-dashed border-gray-100 transition-opacity duration-300 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
         <div className="h-[80px] flex items-end justify-between gap-1 md:gap-2">
           {history.map((item, index) => (
             <div key={index} className="flex-1 flex flex-col justify-end group relative h-full">
@@ -456,10 +516,15 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
                     ? 'bg-transparent border-2 border-dashed border-gray-300 cursor-default'
                     : 'cursor-pointer hover:opacity-80'
                   }
-                  ${!item.isFuture && item.isSelected ? 'bg-morandi-orange' : ''}
-                  ${!item.isFuture && !item.isSelected ? 'bg-gray-200' : ''}
+                  ${!item.isFuture && item.isSelected && !filterColor ? 'bg-morandi-orange' : ''}
+                  ${!item.isFuture && !item.isSelected && !filterColor ? 'bg-gray-200' : ''}
                 `}
-                style={{ height: item.isFuture ? '40%' : `${item.value}%` }}
+                style={{
+                  height: item.isFuture ? '40%' : `${item.value}%`,
+                  ...(filterColor && !item.isFuture ? {
+                    backgroundColor: item.isSelected ? filterColor : `${filterColor}80`
+                  } : {})
+                }}
               >
                 {/* "Today" Indicator Label - Always on actual today */}
                 {item.isActualToday && (
@@ -535,8 +600,122 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
         </div>
       )}
 
+      {/* Category Filter Dialog */}
+      {showFilterDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-lg w-full mx-4 animate-fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-slate-900">筛选分类</h3>
+              <button
+                onClick={() => setShowFilterDialog(false)}
+                className="p-1 hover:bg-gray-100 rounded-full transition-all"
+              >
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-600 mb-6">选择分类以筛选活动数据</p>
+
+            <div className="flex gap-4 mb-6">
+              {/* Categories Column */}
+              <div className="flex-1">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  主分类
+                </label>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setSelectedCategoryId(cat.id);
+                        setSelectedSubCategoryId(null);
+                        setFilterColor(cat.color);
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${selectedCategoryId === cat.id
+                        ? 'border-2 bg-opacity-10'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      style={selectedCategoryId === cat.id ? {
+                        borderColor: cat.color,
+                        backgroundColor: `${cat.color}15`
+                      } : {}}
+                    >
+                      <span
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: cat.color }}
+                      />
+                      <span className="text-sm font-medium text-slate-700 truncate">
+                        {cat.name}
+                      </span>
+                      {selectedCategoryId === cat.id && (
+                        <Check size={16} className="ml-auto text-green-500" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sub-Categories Column */}
+              <div className="flex-1">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  子分类 <span className="font-normal text-slate-400">(可选)</span>
+                </label>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {selectedCategoryId ? (
+                    categories
+                      .find(c => c.id === selectedCategoryId)
+                      ?.subCategories?.map((sub) => (
+                        <button
+                          key={sub.id}
+                          onClick={() => setSelectedSubCategoryId(
+                            selectedSubCategoryId === sub.id ? null : sub.id
+                          )}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${selectedSubCategoryId === sub.id
+                            ? 'border-2 border-morandi-blue bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                        >
+                          <span className="text-sm font-medium text-slate-700 truncate">
+                            {sub.name}
+                          </span>
+                          {selectedSubCategoryId === sub.id && (
+                            <Check size={16} className="ml-auto text-green-500" />
+                          )}
+                        </button>
+                      ))
+                  ) : (
+                    <p className="text-sm text-slate-400 italic py-4 text-center">
+                      请先选择主分类
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setSelectedCategoryId(null);
+                  setSelectedSubCategoryId(null);
+                  setFilterColor(null);
+                }}
+                className="flex-1 px-4 py-2.5 bg-gray-100 text-slate-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
+              >
+                重置
+              </button>
+              <button
+                onClick={() => setShowFilterDialog(false)}
+                className="flex-1 px-4 py-2.5 bg-morandi-blue text-white rounded-xl font-semibold hover:bg-opacity-90 transition-all"
+              >
+                应用筛选
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
 
 export default ActivitySummaryHeader;
+
