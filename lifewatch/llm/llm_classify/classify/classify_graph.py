@@ -14,12 +14,50 @@ from lifewatch.llm.llm_classify.utils import (
     )
 import json
 import logging
-from langgraph.types import Send
+from langgraph.types import Send,RetryPolicy
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 MAX_LOG_ITEMS = 15
 MAX_TITLE_ITEMS = 5
 SPLIT_DURATION = 10*60 # 20min
+
+# 全局 token 累加列表
+global_token_usage = []
+
+def record_token_usage(node_name: str, result):
+    """
+    记录 token 使用情况到全局列表
+    
+    Args:
+        node_name: 节点名称
+        result: LLM invoke 返回的结果
+    """
+    raw_usage = result.response_metadata.get('token_usage', {})
+    global_token_usage.append({
+        'node': node_name,
+        'input_tokens': raw_usage.get('input_tokens', 0),
+        'output_tokens': raw_usage.get('output_tokens', 0),
+        'total_tokens': raw_usage.get('total_tokens', 0),
+        'search_count': raw_usage.get('plugins', {}).get('search', {}).get('count', 0)
+    })
+
+def reset_token_usage():
+    """重置全局 token 列表"""
+    global global_token_usage
+    global_token_usage = []
+
+def get_token_summary():
+    """获取 token 使用汇总"""
+    summary = {}
+    for item in global_token_usage:
+        node = item['node']
+        if node not in summary:
+            summary[node] = {'input_tokens': 0, 'output_tokens': 0, 'total_tokens': 0, 'search_count': 0}
+        summary[node]['input_tokens'] += item['input_tokens']
+        summary[node]['output_tokens'] += item['output_tokens']
+        summary[node]['total_tokens'] += item['total_tokens']
+        summary[node]['search_count'] += item['search_count']
+    return summary
 
 # router
 def router_by_multi_purpose(state: classifyState):
@@ -72,12 +110,6 @@ def get_app_description(state: classifyState) -> classifyState:
     
     # 2. 顺序搜索每个 app 的描述
     app_descriptions = {}  # app_name -> description
-    token_usage = {
-        'input_tokens': 0,
-        'output_tokens': 0,
-        'total_tokens': 0,
-        'search_count': 0
-    }
     
     system_message = SystemMessage(content="""
     你是一个软件程序识别专家。你的任务是通过 web 搜索识别软件应用程序，并提供准确、精炼的描述。
@@ -96,20 +128,11 @@ def get_app_description(state: classifyState) -> classifyState:
             
             result = chat_model.invoke(messages)
             
+            # 记录 token 使用到全局列表
+            record_token_usage("get_app_description", result)
+            
             # 提取描述
             app_descriptions[app] = result.content
-            
-            # 累计 token 使用
-            return_tokens = result.response_metadata.get('token_usage', {})
-            print(return_tokens)
-            token_usage['input_tokens'] += return_tokens.get('input_tokens', 0)
-            token_usage['output_tokens'] += return_tokens.get('output_tokens', 0)
-            token_usage['total_tokens'] += return_tokens.get('total_tokens', 0)
-            # 提取 search_count
-            plugins = return_tokens.get('plugins', {})
-            search_info = plugins.get('search', {})
-            token_usage['search_count'] += search_info.get('count', 0)
-            
             logger.info(f"已获取 {app} 的描述: {result.content[:50]}...")
             
         except Exception as e:
@@ -124,12 +147,8 @@ def get_app_description(state: classifyState) -> classifyState:
     
     # 返回更新后的状态
     return {
-        "node_token_usage": {"get_app_description": token_usage},
         "app_registry": state.app_registry
     }
-
-
-
 
 # step 2: 单用途分类
 def single_classify(state: classifyState) -> classifyState:
@@ -176,14 +195,6 @@ def single_classify(state: classifyState) -> classifyState:
         logger.info("没有单用途应用需要分类")
         return state
     
-    # 初始化 token 统计
-    total_token_usage = {
-        'input_tokens': 0,
-        'output_tokens': 0,
-        'total_tokens': 0,
-        'search_count': 0
-    }
-    
     # 分批处理
     for i in range(0, len(single_purpose_items), MAX_LOG_ITEMS):
         batch = single_purpose_items[i:i + MAX_LOG_ITEMS]
@@ -205,39 +216,27 @@ def single_classify(state: classifyState) -> classifyState:
         messages = [system_message, human_message]
         
         # 发送请求并解析结果
-        try:
-            results = chat_model.invoke(messages)
+        results = chat_model.invoke(messages)
         
-            # 提取 token 使用情况
-            raw_token_usage = results.response_metadata.get('token_usage', {})
-            total_token_usage['input_tokens'] += raw_token_usage.get('input_tokens', 0)
-            total_token_usage['output_tokens'] += raw_token_usage.get('output_tokens', 0)
-            total_token_usage['total_tokens'] += raw_token_usage.get('total_tokens', 0)
-            total_token_usage['search_count'] += raw_token_usage.get('plugins', {}).get('search', {}).get('count', 0)
-            
-            # 打印原始响应内容以便调试
-            print(f"\n=== LLM 原始响应 (批次 {batch_num}) ===")
-            print(results.content)
-            print("=== 响应结束 ===\n")
-            
-            # 解析 JSON 结果（先清理可能的代码块标记）
-            clean_content = extract_json_from_response(results.content)
-            classification_result = json.loads(clean_content)
-            logger.info(f"single_classify 批次 {batch_num} 成功获取分类结果")
-            
-            # 使用通用解析函数更新 state
-            state = parse_classification_result(state, classification_result, "single_classify")
-            
-        except Exception as e:
-            logger.error(f"single_classify 批次 {batch_num} 执行失败, 错误: {e}")
-            continue
-    
-    state.node_token_usage['single_classify'] = total_token_usage
-    logger.info(f"single_classify token usage: {total_token_usage}")
+        # 记录 token 使用到全局列表
+        record_token_usage("single_classify", results)
+        
+        # 打印原始响应内容以便调试
+        print(f"\n=== LLM 原始响应 (批次 {batch_num}) ===")
+        print(results.content)
+        print("=== 响应结束 ===\n")
+        
+        # 解析 JSON 结果（先清理可能的代码块标记）
+        clean_content = extract_json_from_response(results.content)
+        classification_result = json.loads(clean_content)
+        logger.info(f"single_classify 批次 {batch_num} 成功获取分类结果")
+        
+        # 使用通用解析函数更新 state
+        state = parse_classification_result(state, classification_result, "single_classify")
+
     
     return {
-        "result_items" : state.log_items,
-        "node_token_usage":{"single_classify": total_token_usage}
+        "result_items" : state.log_items
     }
 
 # step 3: 多用途分类
@@ -280,14 +279,6 @@ def multi_classify_short(state:classifyState) -> classifyState:
         logger.info("没有短时长多用途应用需要分类")
         return state
     
-    # 初始化 token 统计
-    total_token_usage = {
-        'input_tokens': 0,
-        'output_tokens': 0,
-        'total_tokens': 0,
-        'search_count': 0
-    }
-    
     # 分批处理
     for i in range(0, len(state.log_items), MAX_LOG_ITEMS):
         batch = state.log_items[i:i + MAX_LOG_ITEMS]
@@ -303,39 +294,27 @@ def multi_classify_short(state:classifyState) -> classifyState:
         messages = [system_message, human_message]
         
         # 发送请求并解析结果
-        try:
-            result = chat_model.invoke(messages)
-            
-            # 提取 token 使用情况
-            raw_token_usage = result.response_metadata.get('token_usage', {})
-            total_token_usage['input_tokens'] += raw_token_usage.get('input_tokens', 0)
-            total_token_usage['output_tokens'] += raw_token_usage.get('output_tokens', 0)
-            total_token_usage['total_tokens'] += raw_token_usage.get('total_tokens', 0)
-            total_token_usage['search_count'] += raw_token_usage.get('plugins', {}).get('search', {}).get('count', 0)
-            
-            # 打印原始响应内容以便调试
-            print(f"\n=== LLM 原始响应 (批次 {batch_num}) ===")
-            print(result.content)
-            print("=== 响应结束 ===\n")
-            
-            # 解析 JSON 结果（先清理可能的代码块标记）
-            clean_content = extract_json_from_response(result.content)
-            classification_result = json.loads(clean_content)
-            logger.info(f"multi_classify_short 批次 {batch_num} 成功获取分类结果")
-            
-            # 使用通用解析函数更新 state
-            state = parse_classification_result(state, classification_result, "multi_classify_short")
-            
-        except Exception as e:
-            logger.error(f"multi_classify_short 批次 {batch_num} 执行失败, 错误: {e}")
-            continue
-    
-    state.node_token_usage['multi_classify_short'] = total_token_usage
-    logger.info(f"multi_classify_short token usage: {total_token_usage}")
+        result = chat_model.invoke(messages)
+        
+        # 记录 token 使用到全局列表
+        record_token_usage("multi_classify_short", result)
+        
+        # 打印原始响应内容以便调试
+        print(f"\n=== LLM 原始响应 (批次 {batch_num}) ===")
+        print(result.content)
+        print("=== 响应结束 ===\n")
+        
+        # 解析 JSON 结果（先清理可能的代码块标记）
+        clean_content = extract_json_from_response(result.content)
+        classification_result = json.loads(clean_content)
+        logger.info(f"multi_classify_short 批次 {batch_num} 成功获取分类结果")
+        
+        # 使用通用解析函数更新 state
+        state = parse_classification_result(state, classification_result, "multi_classify_short")
+
     
     return {
-        "result_items" : state.log_items,
-        "node_token_usage":{"multi_classify_short": total_token_usage}
+        "result_items" : state.log_items
     }
 
 # step 3.2 长时长分类
@@ -379,24 +358,20 @@ def search_title(input: dict) -> SearchOutput:
    
     try:
         result = chat_model.invoke(message)
+        
+        # 记录 token 使用到全局列表
+        record_token_usage("search_title", result)
+        
         # 打印原始响应内容以便调试
         print("\n=== LLM 原始响应 ===")
         print(f"title:{result.content}")
         print("=== 响应结束 ===\n")
     except Exception as e:
         logger.error(f"search_title 执行失败, 错误: {e}")
-        return state
-    # 提取 token 使用情况 (只获取 input_tokens, output_tokens, total_tokens)
-    raw_token_usage = result.response_metadata.get('token_usage', {})
-    token_usage = {
-        'input_tokens': raw_token_usage.get('input_tokens', 0),
-        'output_tokens': raw_token_usage.get('output_tokens', 0),
-        'total_tokens': raw_token_usage.get('total_tokens', 0),
-        'search_count': raw_token_usage.get('plugins', {}).get('search', {}).get('count', 0)
-    }
+        return {"title_analysis": {item_id: None}}
+    
     return {
-        "title_analysis": {item_id: result.content},
-        "search_tokens": [token_usage]
+        "title_analysis": {item_id: result.content}
     }
 
 # step 3.2.2 汇总数据
@@ -408,15 +383,7 @@ def merge_searchoutput_to_classifystate(output: SearchOutput) -> classifyState:
     Returns:
         classifyState: 更新了 title_analysis 的状态
     """
-    print("test---")
-    # 计算search_title的tokens消耗
-    from collections import Counter
-    search_tokens = Counter()
-    for d in output.search_tokens:
-        search_tokens.update(d)
-    search_tokens = dict(search_tokens)
     return {
-        "node_token_usage" : {"search_title":search_tokens},
         "log_items" : {
             "update_flag":"title_analysis",
             "update_data":output.title_analysis
@@ -467,14 +434,6 @@ def multi_classify_long(state:classifyState)->classifyState:
         logger.info("没有长时长多用途应用需要分类")
         return state
     
-    # 初始化 token 统计
-    total_token_usage = {
-        'input_tokens': 0,
-        'output_tokens': 0,
-        'total_tokens': 0,
-        'search_count': 0
-    }
-    
     # 分批处理
     for i in range(0, len(state.log_items), MAX_LOG_ITEMS):
         batch = state.log_items[i:i + MAX_LOG_ITEMS]
@@ -495,39 +454,27 @@ def multi_classify_long(state:classifyState)->classifyState:
         messages = [system_message, human_message]
         
         # 发送请求并解析结果
-        try:
-            result = chat_model.invoke(messages)
-            
-            # 提取 token 使用情况
-            raw_token_usage = result.response_metadata.get('token_usage', {})
-            total_token_usage['input_tokens'] += raw_token_usage.get('input_tokens', 0)
-            total_token_usage['output_tokens'] += raw_token_usage.get('output_tokens', 0)
-            total_token_usage['total_tokens'] += raw_token_usage.get('total_tokens', 0)
-            total_token_usage['search_count'] += raw_token_usage.get('plugins', {}).get('search', {}).get('count', 0)
-            
-            # 打印原始响应内容以便调试
-            print(f"\n=== LLM 原始响应 (批次 {batch_num}) ===")
-            print(result.content)
-            print("=== 响应结束 ===\n")
-            
-            # 解析 JSON 结果（先清理可能的代码块标记）
-            clean_content = extract_json_from_response(result.content)
-            classification_result = json.loads(clean_content)
-            logger.info(f"multi_classify_long 批次 {batch_num} 成功获取分类结果")
-            
-            # 使用通用解析函数更新 state
-            state = parse_classification_result(state, classification_result, "multi_classify_long")
-            
-        except Exception as e:
-            logger.error(f"multi_classify_long 批次 {batch_num} 执行失败, 错误: {e}")
-            continue
-    
-    state.node_token_usage['multi_classify_long'] = total_token_usage
-    logger.info(f"multi_classify_long token usage: {total_token_usage}")
+        result = chat_model.invoke(messages)
+        
+        # 记录 token 使用到全局列表
+        record_token_usage("multi_classify_long", result)
+        
+        # 打印原始响应内容以便调试
+        print(f"\n=== LLM 原始响应 (批次 {batch_num}) ===")
+        print(result.content)
+        print("=== 响应结束 ===\n")
+        
+        # 解析 JSON 结果（先清理可能的代码块标记）
+        clean_content = extract_json_from_response(result.content)
+        classification_result = json.loads(clean_content)
+        logger.info(f"multi_classify_long 批次 {batch_num} 成功获取分类结果")
+        
+        # 使用通用解析函数更新 state
+        state = parse_classification_result(state, classification_result, "multi_classify_long")
+
     
     return {
-        "result_items" : state.log_items,
-        "node_token_usage":{"multi_classify_long": total_token_usage}
+        "result_items" : state.log_items
     }
 
 
@@ -555,13 +502,13 @@ if __name__ == "__main__":
     input_items_len = len(state.log_items)
     graph = StateGraph(classifyState)
     graph.add_node("get_app_description",get_app_description)
-    graph.add_node("single_classify",single_classify)
+    graph.add_node("single_classify",single_classify,retry_policy=RetryPolicy(max_attempts=3))
     graph.add_node("multi_classify",multi_classify) # 空节点
     graph.add_node("get_titles",get_titles) # 获取title
     graph.add_node("search_title",search_title) # 多并发查询title
     graph.add_node("merge_searchoutput_to_classifystate",merge_searchoutput_to_classifystate) # 合并查询数据
-    graph.add_node("multi_classify_long",multi_classify_long)  # 长时间多用途分类
-    graph.add_node("multi_classify_short",multi_classify_short) # 短时间多用途分类
+    graph.add_node("multi_classify_long",multi_classify_long,retry_policy=RetryPolicy(max_attempts=3))  # 长时间多用途分类
+    graph.add_node("multi_classify_short",multi_classify_short,retry_policy=RetryPolicy(max_attempts=3)) # 短时间多用途分类
     
     graph.add_edge(START,"get_app_description")
     graph.add_conditional_edges("get_app_description",router_by_multi_purpose) # -> single_classify | -> multi_classify
@@ -577,18 +524,24 @@ if __name__ == "__main__":
     graph.add_edge("merge_searchoutput_to_classifystate","multi_classify_long") # 分类
     graph.add_edge("multi_classify_long",END)
     app = graph.compile()
+    
+    # 重置全局 token 列表
+    reset_token_usage()
+    
     output = app.invoke(state)
     # 格式化输出结果
     print("\n" + "="*80)
     print("分类结果汇总")
     print("="*80)
     print(output)
-    # 输出 token 使用情况
-    if "node_token_usage" in output:
+    
+    # 输出 token 使用情况（使用全局列表汇总）
+    token_summary = get_token_summary()
+    if token_summary:
         print("\n【Token 使用统计】")
         total_tokens = 0
         total_search_count = 0
-        for node_name, usage in output["node_token_usage"].items():
+        for node_name, usage in token_summary.items():
             print(f"\n  {node_name}:")
             print(f"    - Input Tokens:  {usage.get('input_tokens', 0):,}")
             print(f"    - Output Tokens: {usage.get('output_tokens', 0):,}")
@@ -598,6 +551,9 @@ if __name__ == "__main__":
             total_search_count += usage.get('search_count', 0)
         print(f"\n  总计 Token 使用: {total_tokens:,}")
         print(f"  总计搜索次数: {total_search_count}")
+        
+        # 显示详细的调用记录
+        print(f"\n  API 调用次数: {len(global_token_usage)}")
     
     # 输出分类结果
     if "result_items" in output:

@@ -67,11 +67,9 @@ class classifyState(BaseModel):
     app_registry: dict[str, AppInFo]= Field(description="app : app_description") # app : app_description
     log_items: Annotated[list[LogItem],update_logitem] = Field(description="分类数据") # 分类数据 
     goal: Annotated[list[Goal], remain_old_value]= Field(description="用户的目标") # 用户的目标
-    node_token_usage: Annotated[dict[str, dict], operator.or_] = Field(default_factory=dict, description="记录每个 node 的 token 消耗") # 记录每个 node 的 token 消耗: {node_name: {input_tokens, output_tokens, total_tokens}}
     category_tree : Annotated[dict[str, list[str]| None], remain_old_value] = Field(description="具体分类") # 具体分类
     result_items:Annotated[list[LogItem],operator.add]|None = Field(default=None, description="输出结果") # 不更新log_items
 
 class SearchOutput(BaseModel):
     title_analysis: Annotated[dict[int, str], operator.or_]|None = None # 使用 dict 合并，key 为 id，value 为分析结果
     input_data: Annotated[dict[int, str], remain_old_value] # key 为 id，value 为 title
-    search_tokens: Annotated[list[dict[str, int]], operator.add] | None = Field(default_factory=dict, description="记录每个 seatch title 的 token 消耗")

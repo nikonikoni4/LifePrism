@@ -268,8 +268,7 @@ def filter_by_duration(
         app_registry=filtered_app_registry,
         log_items=filtered_log_items,
         goal=state.goal,
-        category_tree=state.category_tree,
-        node_token_usage=state.node_token_usage
+        category_tree=state.category_tree
     )
     
     logger.info(f"过滤完成: {len(state.log_items)} -> {len(filtered_log_items)} 条记录")
@@ -343,8 +342,7 @@ def deduplicate_log_items(state: classifyState) -> classifyState:
         app_registry=dedup_app_registry,
         log_items=deduplicated_items,
         goal=state.goal,
-        category_tree=state.category_tree,
-        node_token_usage=state.node_token_usage
+        category_tree=state.category_tree
     )
     
     logger.info(f"去重完成: {len(state.log_items)} -> {len(deduplicated_items)} 条记录")
