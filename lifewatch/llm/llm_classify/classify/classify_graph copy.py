@@ -8,7 +8,7 @@ from lifewatch.llm.llm_classify.utils import (
     format_log_items_table,
     create_ChatTongyiModel,
     split_by_purpose,
-    split_by_duartion,
+    split_by_duration,
     parse_classification_result,
     extract_json_from_response,
     )
@@ -74,7 +74,7 @@ def router_by_duration_for_multi(state:classifyState):
     """
     多用途应用按时长路由，短时长和长时长分开处理
     """
-    short_state, long_state = split_by_duartion(state)
+    short_state, long_state = split_by_duration(state)
     return [
         Send("multi_classify_short", short_state),
         Send("get_titles", long_state)
@@ -350,7 +350,7 @@ def search_title(input: dict) -> classifyState:
     title = input["title"]
     
     system_message = SystemMessage(content="""
-    你是一个通过网络搜索分析的助手,依据网络搜索结果和title分析用户的活动，要求结果在50字以内
+    你是一个通过网络搜索分析的助手,依据网络搜索结果和title分析用户的活动，要求结果在30字以内
     # 输出格式:str 内容为:用户活动
     """)
     human_message = HumanMessage(content=f"""搜索并分析{title}""")
@@ -488,7 +488,7 @@ if __name__ == "__main__":
         print(f"  - 过滤后 log_items: {len(state.log_items)} 条")
         print(f"  - 过滤后 app_registry: {len(state.app_registry)} 个应用")
         return state
-    state = get_state(hours=100)
+    state = get_state(hours=8)
     input_items_len = len(state.log_items)
     graph = StateGraph(classifyState)
     graph.add_node("get_app_description",get_app_description)
@@ -566,7 +566,7 @@ if __name__ == "__main__":
     # 测试merge_searchoutput_to_classifystate
     # 构建测试流程: get_titles -> search_title (并发) -> merge_searchoutput_to_classifystate
     # s,m = split_by_purpose(state)
-    # s,l = split_by_duartion(m)
+    # s,l = split_by_duration(m)
     # state = l
     # print(l)
     # graph.add_edge(START, "get_titles")

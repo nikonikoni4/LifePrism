@@ -13,7 +13,7 @@ from .parse_utils import (
     extract_json_from_response,
 )
 from .split_utils import (
-    split_by_duartion,
+    split_by_duration,
     split_by_purpose,
 )
 
@@ -25,6 +25,6 @@ __all__ = [
     "format_log_items_table",
     "parse_classification_result",
     "extract_json_from_response",
-    "split_by_duartion",
+    "split_by_duration",
     "split_by_purpose"
 ]

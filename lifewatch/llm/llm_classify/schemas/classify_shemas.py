@@ -1,3 +1,4 @@
+
 from bokeh.core.validation.decorators import warning
 from pydantic import BaseModel,Field
 from typing import Annotated
@@ -56,20 +57,31 @@ def update_logitem(item_list:list[LogItem],update_data)->list[LogItem]:
                 for log_item in item_list:
                     if log_item.id in update_data:
                         log_item.title_analysis = update_data[log_item.id]
-        return item_list # 修改后的元数据
+        return item_list # 返回完整列表，只更新 title_analysis 字段
     elif update_data:
         return update_data # 直接替换
     else:
         return item_list
 
+def test_add(item_list:list[LogItem],update_data:list[LogItem])->list[LogItem]:
+    print(f"test_add : {update_data}")
+    if item_list and update_data:
+        return item_list+ update_data
+    elif item_list:
+        return item_list
+    elif update_data:
+        return update_data
+    return None
 
 class classifyState(BaseModel):
     app_registry: dict[str, AppInFo]= Field(description="app : app_description") # app : app_description
-    log_items: Annotated[list[LogItem],update_logitem] = Field(description="分类数据") # 分类数据 
+    log_items: Annotated[list[LogItem],remain_old_value] = Field(description="原始分类数据") # 分类数据，不使用 reducer
     goal: Annotated[list[Goal], remain_old_value]= Field(description="用户的目标") # 用户的目标
     category_tree : Annotated[dict[str, list[str]| None], remain_old_value] = Field(description="具体分类") # 具体分类
-    result_items:Annotated[list[LogItem],operator.add]|None = Field(default=None, description="输出结果") # 不更新log_items
+    result_items: Annotated[list[LogItem] | None, test_add] = Field(default=None, description="输出结果") # 不更新log_items
 
-class SearchOutput(BaseModel):
-    title_analysis: Annotated[dict[int, str], operator.or_]|None = None # 使用 dict 合并，key 为 id，value 为分析结果
-    input_data: Annotated[dict[int, str], remain_old_value] # key 为 id，value 为 title
+class classifyStateLogitems(BaseModel):
+    log_items_for_single: list[LogItem] | None = Field(default=None, description="单用途分类数据")
+    log_items_for_multi: list[LogItem] | None = Field(default=None, description="多用途分类数据")
+    log_items_for_multi_short: list[LogItem] | None = Field(default=None, description="多用途短时长分类数据")
+    log_items_for_multi_long: list[LogItem] | None = Field(default=None, description="多用途长时长分类数据")

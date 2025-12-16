@@ -49,30 +49,30 @@ def extract_json_from_response(content: str) -> str:
 
 
 def parse_classification_result(
-    state: classifyState, 
+    log_items: list, 
     classification_result: dict, 
     node_name: str
-) -> classifyState:
+) -> list:
     """
     通用的分类结果解析函数
     
     Args:
-        state: classifyState 对象
+        log_items: LogItem 列表
         classification_result: LLM 返回的分类结果，格式为 {id: [category, sub_category, link_to_goal]}
         node_name: 节点名称，用于日志输出
         
     Returns:
-        更新后的 classifyState 对象
+        更新后的 LogItem 列表
         
     Example:
         >>> classification_result = {
         ...     "1": ["工作/学习", "编程", "完成项目"],
         ...     "2": ["娱乐", "看视频", None]
         ... }
-        >>> state = parse_classification_result(state, classification_result, "single_classify")
+        >>> log_items = parse_classification_result(log_items, classification_result, "single_classify")
     """
     # 创建 id 到 log_item 的映射
-    id_to_item = {item.id: item for item in state.log_items}
+    id_to_item = {item.id: item for item in log_items}
     
     # 遍历分类结果，更新对应的 log_item
     for item_id_str, classification in classification_result.items():
@@ -110,4 +110,4 @@ def parse_classification_result(
                 f"item_id={item_id_str}, classification={classification}, error={e}"
             )
     
-    return state
+    return log_items
