@@ -111,3 +111,47 @@ def parse_classification_result(
             )
     
     return log_items
+
+
+def parse_token_usage(result) -> dict:
+    """
+    从 LangChain LLM 调用结果中解析 token 使用情况
+    
+    Args:
+        result: LLM invoke 返回的结果对象 (AIMessage)
+        
+    Returns:
+        包含 token 使用信息的字典:
+        {
+            'input_tokens': int,   # 输入 token 数
+            'output_tokens': int,  # 输出 token 数
+            'total_tokens': int,   # 总 token 数
+            'search_count': int    # 搜索插件调用次数
+        }
+        
+    Example:
+        >>> result = chat_model.invoke(messages)
+        >>> usage = parse_token_usage(result)
+        >>> print(usage)
+        {'input_tokens': 100, 'output_tokens': 50, 'total_tokens': 150, 'search_count': 0}
+    """
+    # 从 response_metadata 中获取 token_usage
+    raw_usage = {}
+    if hasattr(result, 'response_metadata'):
+        raw_usage = result.response_metadata.get('token_usage', {})
+    
+    # 解析 token 数量
+    input_tokens = raw_usage.get('input_tokens', 0)
+    output_tokens = raw_usage.get('output_tokens', 0)
+    total_tokens = raw_usage.get('total_tokens', 0)
+    
+    # 解析搜索插件调用次数 (通义千问特有)
+    search_count = raw_usage.get('plugins', {}).get('search', {}).get('count', 0)
+    
+    return {
+        'input_tokens': input_tokens,
+        'output_tokens': output_tokens,
+        'total_tokens': total_tokens,
+        'search_count': search_count
+    }
+

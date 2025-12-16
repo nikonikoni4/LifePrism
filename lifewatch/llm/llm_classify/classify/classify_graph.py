@@ -14,12 +14,15 @@ from lifewatch.llm.llm_classify.utils import (
     split_by_duration,
     parse_classification_result,
     extract_json_from_response,
+    parse_token_usage
     )
 import json
 import logging
 from langgraph.types import Send,RetryPolicy
-from langgraph.checkpoint.memory import InMemorySaver  
+from langgraph.checkpoint.memory import InMemorySaver 
+from langgraph.store.memory import InMemoryStore
 import functools
+import uuid
 MAX_LOG_ITEMS = 15
 MAX_TITLE_ITEMS = 5
 SPLIT_DURATION = 10*60 # 20min
@@ -51,32 +54,86 @@ def test_for_state(func):
 class LLMClassify:
     def __init__(self):
         self.chat_model = create_ChatTongyiModel()
+        self.store = InMemoryStore()
         self.bulit_graph()
+        
         pass
+
+    def recode_tokens_usage(self,node_name,tokens_usage):
+        name_space = ("tokens_usage",node_name)
+        self.store.put(name_space,str(uuid.uuid4()),tokens_usage) # 生成str(uuid.uuid4())唯一key，避免值被覆盖
+    
+    def get_total_tokens_usage(self) -> dict:
+        """
+        使用 Counter 汇总所有节点的 token 使用情况
+        
+        Returns:
+            {
+                'total_input_tokens': int,
+                'total_output_tokens': int,
+                'total_tokens': int,
+                'total_search_count': int,
+                'by_node': {
+                    'node_name': {
+                        'input_tokens': int,
+                        'output_tokens': int,
+                        'total_tokens': int,
+                        'search_count': int,
+                        'call_count': int
+                    },
+                    ...
+                }
+            }
+        """
+        from collections import Counter
+        
+        # 总计数器
+        total_counter = Counter({
+            'input_tokens': 0,
+            'output_tokens': 0,
+            'total_tokens': 0,
+            'search_count': 0
+        })
+        
+        # 按节点统计
+        node_stats = {}
+        
+        # 获取所有 tokens_usage 命名空间
+        namespaces = self.store.list_namespaces(prefix=("tokens_usage",))
+        
+        for namespace in namespaces:
+            node_name = namespace[1] if len(namespace) > 1 else "unknown"
+            
+            # 初始化节点统计
+            if node_name not in node_stats:
+                node_stats[node_name] = Counter({
+                    'input_tokens': 0,
+                    'output_tokens': 0,
+                    'total_tokens': 0,
+                    'search_count': 0,
+                    'call_count': 0
+                })
+            
+            # 搜索该命名空间下的所有记录
+            items = self.store.search(namespace)
+            for item in items:
+                usage = item.value
+                node_stats[node_name].update(usage)
+                node_stats[node_name]['call_count'] += 1
+                total_counter.update(usage)
+        
+        return {
+            'total_input_tokens': total_counter['input_tokens'],
+            'total_output_tokens': total_counter['output_tokens'],
+            'total_tokens': total_counter['total_tokens'],
+            'total_search_count': total_counter['search_count'],
+            'by_node': {k: dict(v) for k, v in node_stats.items()}
+        }
+
+    
     def bulit_graph(self):
         
         graph = StateGraph(classifyState)
-        # graph.add_node("get_app_description",get_app_description)
-        # graph.add_node("single_classify",single_classify,retry_policy=RetryPolicy(max_attempts=3))
-        # graph.add_node("multi_classify",multi_classify) # 空节点
-        # graph.add_node("get_titles",get_titles) # 获取title
-        # graph.add_node("search_title",search_title) # 多并发查询title，直接更新classifyState
-        # graph.add_node("multi_classify_long",multi_classify_long,retry_policy=RetryPolicy(max_attempts=3))  # 长时间多用途分类
-        # graph.add_node("multi_classify_short",multi_classify_short,retry_policy=RetryPolicy(max_attempts=3)) # 短时间多用途分类
-        
-        # graph.add_edge(START,"get_app_description")
-        # graph.add_conditional_edges("get_app_description",router_by_multi_purpose) # -> single_classify | -> multi_classify
-        # # 单用途分类
-        # graph.add_edge("single_classify",END)
-        # # 多用途分类
-        # graph.add_conditional_edges("multi_classify",router_by_duration_for_multi) # ->multi_classify_short | -> get_titles
-        # # 短时间分类
-        # graph.add_edge("multi_classify_short",END)
-        # # 长时间分类
-        # graph.add_conditional_edges("get_titles",send_title) # 并发搜索
-        # graph.add_edge("search_title","multi_classify_long") # search_title 直接更新 state，然后进入分类
-        # graph.add_edge("multi_classify_long",END)
-        
         graph.add_node("get_app_description",self.get_app_description)
         graph.add_node("single_classify",self.single_classify,retry_policy=RetryPolicy(max_attempts=3))
         graph.add_node("multi_classify",self.multi_classify) # 空节点
@@ -94,8 +151,8 @@ class LLMClassify:
         graph.add_edge("get_titles","multi_classify_long")
         graph.add_edge("multi_classify_long",END)
         # 短时间分类
-        checkpointer = InMemorySaver()  
-        self.app = graph.compile(checkpointer = checkpointer)
+        # checkpointer = InMemorySaver()  
+        self.app = graph.compile(store=self.store)
     # node 1 获取所有app的描述
     def get_app_description(self,state: classifyState) -> classifyState:
         """
@@ -140,7 +197,7 @@ class LLMClassify:
                 messages = [system_message, user_message]
                 
                 result = self.chat_model.invoke(messages)
-                
+                self.recode_tokens_usage("app_descriptions",parse_token_usage(result))
                 # 记录 token 使用到全局列表
                 # record_token_usage("get_app_description", result)
                 
@@ -268,18 +325,18 @@ class LLMClassify:
             messages = [system_message, human_message]
             
             # 发送请求并解析结果
-            results = self.chat_model.invoke(messages)
-            
+            result = self.chat_model.invoke(messages)
+            self.recode_tokens_usage("single_classify",parse_token_usage(result))
             # 记录 token 使用到全局列表
-            # record_token_usage("single_classify", results)
+            # record_token_usage("single_classify", result)
             
             # 打印原始响应内容以便调试
             #print(f"\n=== LLM 原始响应 (批次 {batch_num}) ===")
-            #print(results.content)
+            #print(result.content)
             #print("=== 响应结束 ===\n")
             
             # 解析 JSON 结果（先清理可能的代码块标记）
-            clean_content = extract_json_from_response(results.content)
+            clean_content = extract_json_from_response(result.content)
             classification_result = json.loads(clean_content)
             logger.info(f"single_classify 批次 {batch_num} 成功获取分类结果")
             
@@ -375,7 +432,7 @@ class LLMClassify:
             
             # 发送请求并解析结果
             result = self.chat_model.invoke(messages)
-            
+            self.recode_tokens_usage("multi_classify_short",parse_token_usage(result))
             # 记录 token 使用到全局列表
             # record_token_usage("multi_classify_short", result)
             
@@ -409,6 +466,7 @@ class LLMClassify:
                 human_message = HumanMessage(content=f"""搜索并分析{item.title}""")
                 message = [system_message, human_message]
                 result = self.chat_model.invoke(message)
+                self.recode_tokens_usage("get_titles",parse_token_usage(result))
                 item.title_analysis = result.content
         return {
             "log_items_for_multi_long" : state.log_items_for_multi_long
@@ -480,7 +538,7 @@ class LLMClassify:
             
             # 发送请求并解析结果
             result = self.chat_model.invoke(messages)
-            
+            self.recode_tokens_usage("multi_classify_long",parse_token_usage(result))
             # 记录 token 使用到全局列表
             # record_token_usage("multi_classify_long", result)
             
@@ -525,4 +583,34 @@ if __name__ == "__main__":
     output = llm_classify.app.invoke(main_state,config)
     print(output)
     if "result_items" in output:
-        print(output["result_items"])
+        result_items = output["result_items"]
+        print("\n" + "="*80)
+        print("📝 分类结果")
+        print("="*80)
+        print(f"  共 {len(result_items)} 条记录")
+        print("-"*80)
+        for item in result_items:
+            goal_str = f"🎯 {item.link_to_goal}" if item.link_to_goal else ""
+            category_str = f"{item.category or '未分类'}/{item.sub_category or '-'}"
+            print(f"  [{item.id}] {item.app:<15} | {category_str:<20} | {item.duration:>5}s | {goal_str}")
+            if item.title:
+                print(f"        └─ 标题: {item.title[:55]}{'...' if len(item.title) > 55 else ''}")
+            if item.title_analysis:
+                print(f"        └─ 分析: {item.title_analysis[:55]}{'...' if len(item.title_analysis) > 55 else ''}")
+        print("="*80)
+    
+    # 计算并格式化输出 tokens
+    tokens_usage = llm_classify.get_total_tokens_usage()
+    print("\n" + "="*50)
+    print("📊 Token 使用统计")
+    print("="*50)
+    print(f"  输入 tokens:  {tokens_usage['total_input_tokens']:,}")
+    print(f"  输出 tokens:  {tokens_usage['total_output_tokens']:,}")
+    print(f"  总 tokens:    {tokens_usage['total_tokens']:,}")
+    print(f"  搜索次数:     {tokens_usage['total_search_count']}")
+    print("-"*50)
+    print("📋 按节点统计:")
+    for node, stats in tokens_usage['by_node'].items():
+        print(f"  [{node}]")
+        print(f"    调用次数: {stats['call_count']} | 输入: {stats['input_tokens']:,} | 输出: {stats['output_tokens']:,} | 搜索: {stats['search_count']}")
+    print("="*50)
