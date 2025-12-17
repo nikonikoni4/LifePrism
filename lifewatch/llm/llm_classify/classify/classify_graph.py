@@ -144,6 +144,21 @@ class ClassifyGraph:
         # 短时间分类
         # checkpointer = InMemorySaver()  
         self.app = graph.compile(store=self.store)
+    
+    def classify(self, state: classifyState) -> dict:
+        """
+        执行分类任务的入口方法
+        
+        Args:
+            state: classifyState 对象，包含待分类的数据
+            
+        Returns:
+            dict: 分类结果，包含 result_items 等字段
+        """
+        config = {"configurable": {"thread_id": f"thread-{uuid.uuid4()}"}}
+        output = self.app.invoke(state, config)
+        return output
+    
     # node 1 获取所有app的描述
     def get_app_description(self,state: classifyState) -> classifyState:
         """
@@ -230,6 +245,7 @@ class ClassifyGraph:
         log_items_state = classifyStateLogitems(
             log_items_for_single=log_items_for_single if log_items_for_single else None,
             log_items_for_multi=log_items_for_multi if log_items_for_multi else None,
+            private_app_registry=state.app_registry
         )
         
         send_list = []
@@ -285,11 +301,8 @@ class ClassifyGraph:
             - key必须是id，不是app名称
 
             """)
-        # 获取单用途的log_item
-        single_purpose_items = [
-            item for item in main_state.log_items 
-            if not main_state.app_registry[item.app].is_multipurpose
-        ]
+        # 获取单用途的log_item（已经在路由时分好了）
+        single_purpose_items = state.log_items_for_single or []
         
         if not single_purpose_items:
             logger.info("没有单用途应用需要分类")
@@ -305,7 +318,7 @@ class ClassifyGraph:
             app_content = format_log_items_table(
                 batch,
                 fields=["id", "app", "title"],
-                app_registry=main_state.app_registry,
+                app_registry=state.private_app_registry,
                 group_by_app=True,
                 show_app_description=True
             )
@@ -356,6 +369,7 @@ class ClassifyGraph:
         log_items_for_multi_long = log_dict.get("log_items_for_multi_long", None)
         # 更新中间私有状态
         log_items_state = classifyStateLogitems(
+            private_app_registry=state.private_app_registry,
             log_items_for_single=state.log_items_for_single,
             log_items_for_multi=state.log_items_for_multi,
             log_items_for_multi_short=log_items_for_multi_short,

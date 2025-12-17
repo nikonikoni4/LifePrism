@@ -79,6 +79,7 @@ class classifyState(BaseModel):
     result_items: Annotated[list[LogItem] | None, test_add] = Field(default=None, description="输出结果") # 不更新log_items
 
 class classifyStateLogitems(BaseModel):
+    private_app_registry: dict[str, AppInFo]= Field(description="app : app_description") # app : app_description
     log_items_for_single: list[LogItem] | None = Field(default=None, description="单用途分类数据")
     log_items_for_multi: list[LogItem] | None = Field(default=None, description="多用途分类数据")
     log_items_for_multi_short: list[LogItem] | None = Field(default=None, description="多用途短时长分类数据")
