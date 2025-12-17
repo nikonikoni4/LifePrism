@@ -7,8 +7,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-from lifewatch.llm.llm_classify.providers.lw_data_providers import lw_data_providers
-from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
+from lifewatch.llm.llm_classify.providers import LLMLWDataProvider
+from lifewatch.server.providers.statistical_data_providers import ServerLWDataProvider
 from lifewatch.llm.llm_classify.schemas.classify_shemas import classifyState, LogItem, AppInFo, Goal
 from lifewatch.llm.llm_classify.classify.mock_data import mock_goals as _mock_goals_raw
 from lifewatch.utils import is_multipurpose_app
@@ -34,8 +34,8 @@ class DataLoader:
         
         使用全局单例数据提供者
         """
-        self.lw_data_provider = lw_data_providers
-        self.stat_provider = StatisticalDataProvider()
+        self.lw_data_provider = LLMLWDataProvider()
+        self.stat_provider = ServerLWDataProvider()
     
     def get_real_data(self, hours: int = 24) -> tuple[classifyState, list[Goal], dict[str, list[str] | None]]:
         """

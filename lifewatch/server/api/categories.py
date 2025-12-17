@@ -5,11 +5,9 @@
 from fastapi import APIRouter, HTTPException, Path
 from lifewatch.server.schemas.categories import AppCategoryList, AppCategory, UpdateCategoryRequest
 from lifewatch.server.schemas.response import StandardResponse
-from lifewatch.storage import lw_db_manager
-from lifewatch.llm.llm_classify.providers.lw_data_providers import lw_data_providers
+from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
 
 router = APIRouter(prefix="/categories", tags=["Categories Management"])
-db_manager = lw_db_manager
 
 
 @router.get("/apps", response_model=AppCategoryList, summary="获取所有应用分类")
@@ -26,7 +24,7 @@ async def get_all_app_categories():
     **使用真实数据库查询**
     """
     try:
-        df = lw_data_providers.load_app_purpose_category()
+        df = server_lw_data_provider.load_app_purpose_category()
         if df is None or df.empty:
             return {"total": 0, "data": []}
         
@@ -46,7 +44,7 @@ async def get_app_category(
     **使用真实数据库查询**
     """
     try:
-        df = db_manager.query('app_purpose_category', where={'app': app_name})
+        df = server_lw_data_provider.db.query('app_purpose_category', where={'app': app_name})
         if df.empty:
             raise HTTPException(status_code=404, detail=f"应用 '{app_name}' 未找到")
         
@@ -75,7 +73,7 @@ async def update_app_category(
     """
     try:
         # 检查应用是否存在
-        df = db_manager.query('app_purpose_category', where={'app': app_name})
+        df = server_lw_data_provider.db.query('app_purpose_category', where={'app': app_name})
         if df.empty:
             raise HTTPException(status_code=404, detail=f"应用 '{app_name}' 未找到")
         
@@ -84,7 +82,7 @@ async def update_app_category(
         update_dict['app'] = app_name
         
         # 执行更新
-        affected = db_manager.upsert_many(
+        affected = server_lw_data_provider.db.upsert_many(
             'app_purpose_category',
             [update_dict],
             conflict_columns=['app']

@@ -21,8 +21,13 @@ aw_db_manager = DatabaseManager(
     readonly=True
 )
 
+# ==================== 基础数据提供者 ====================
+from .base_providers import LWBaseDataProvider, AWBaseDataProvider
+
 __all__ = [
     "DatabaseManager",
     "lw_db_manager",
     "aw_db_manager",
+    "LWBaseDataProvider",
+    "AWBaseDataProvider",
 ]

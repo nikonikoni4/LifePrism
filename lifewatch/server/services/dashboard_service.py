@@ -6,7 +6,7 @@
 from datetime import date, datetime, timedelta
 from typing import Dict, Optional
 import pandas as pd
-from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
+from lifewatch.server.providers.statistical_data_providers import ServerLWDataProvider
 
 
 class DashboardService:
@@ -17,7 +17,7 @@ class DashboardService:
     """
     
     def __init__(self):
-        self.db = StatisticalDataProvider()  # 现在使用 StatisticalDataProvider
+        self.db = ServerLWDataProvider()  # 现在使用 ServerLWDataProvider
         self.stat_provider = self.db  # 保持兼容性
     
     def get_dashboard_data(self, query_date: date) -> Dict:

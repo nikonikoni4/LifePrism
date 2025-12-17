@@ -9,13 +9,11 @@ from typing import Dict, Tuple, Optional
 from datetime import datetime, timedelta
 import pytz
 
-from lifewatch.storage import lw_db_manager, aw_db_manager
-from lifewatch.data.lw_data_writer import LWDataWriter
-from lifewatch.llm.llm_classify.providers.lw_data_providers import lw_data_providers
-from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
-from lifewatch.data.aw_db_reader import ActivityWatchDBReader
-from lifewatch.data.data_clean import clean_activitywatch_data
-from lifewatch.llm.cloud_classifier import QwenAPIClassifier
+from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
+from lifewatch.processors.data_clean import clean_activitywatch_data
+from lifewatch.llm.llm_classify.classify.main_classify import LLMClassify
+from lifewatch.llm.llm_classify.classify.mock_data import mock_goals
+from lifewatch.llm.llm_classify.schemas import classifyState
 from lifewatch import config
 
 # 配置日志
@@ -34,12 +32,9 @@ class DataProcessingService:
         """
         初始化数据处理服务
         
-        使用全局单例数据库管理器
+        使用全局单例数据提供者
         """
-        self.lw_data_writer = LWDataWriter()
-        self.lw_data_provider = lw_data_providers
-        self.stat_provider = StatisticalDataProvider()
-        self.aw_db_reader = ActivityWatchDBReader(db_manager=aw_db_manager)
+        self.server_lw_data_provider = server_lw_data_provider
         self._category_mappings_cache = None  # 缓存分类映射
         
     def process_activitywatch_data(
@@ -72,56 +67,47 @@ class DataProcessingService:
             # 确定同步模式和时间范围
             sync_mode = 'incremental' if use_incremental_sync else 'full'
             # 0. 获取时间范围
-            start_time, end_time = self._process_time_range(use_incremental_sync,hours)
+            start_time, end_time = self._process_time_range(use_incremental_sync, hours)
             time_range = f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
-            # 1. 获取 ActivityWatch 数据
-            logger.info("步骤 1/6: 获取 ActivityWatch 数据...")
-            if start_time and end_time:
-                # 增量同步：使用时间范围
-                aw_data = self.aw_db_reader.get_window_events(
-                    start_time=start_time,
-                    end_time=end_time,
-                )
-            else:
-                # 全量同步：使用小时数
-                aw_data = self.aw_db_reader.get_window_events(
-                    hours=hours,
-                )
-            total_events = len(aw_data)
-            logger.info(f"  ✓ 获取到 {total_events} 条原始事件")
             
-            # 2. 数据清洗
-            logger.info("步骤 2/6: 数据清洗...")
-            app_purpose_category_df = self.lw_data_provider.load_app_purpose_category() # 获取已缓存的分类结果
-            filtered_data, app_to_classify_df, app_to_classify_set = clean_activitywatch_data(
-                aw_data, 
-                app_purpose_category_df
+            # 1-2. 获取 ActivityWatch 数据并清洗
+            logger.info("步骤 1-2/6: 获取 ActivityWatch 数据并清洗...")
+            app_purpose_category_df = self.server_lw_data_provider.load_app_purpose_category()  # 获取已缓存的分类结果
+            filtered_data, classify_state = clean_activitywatch_data(
+                start_time=start_time,
+                end_time=end_time, 
+                app_purpose_category_df=app_purpose_category_df
             )
+            total_events = len(filtered_data) + (len(classify_state.log_items) if classify_state.log_items else 0)
             filtered_events = len(filtered_data)
-            apps_to_classify = len(app_to_classify_df)
-            logger.info(f"  ✓ 过滤后保留 {filtered_events} 条事件")
-            logger.info(f"  {filtered_data[['app','duration','start_time','end_time']]}")
-            logger.info(f"  ✓ 发现 {apps_to_classify} 个待分类应用")
+            apps_to_classify = len(classify_state.log_items) if classify_state.log_items else 0
+            logger.info(f"  ✓ 获取并过滤后保留 {filtered_events} 条事件")
+            if not filtered_data.empty:
+                logger.info(f"  {filtered_data[['app','duration','start_time','end_time']]}")
+            logger.info(f"  ✓ 发现 {apps_to_classify} 条待分类日志项")
             
             classified_apps = 0
             
             # 3. LLM 分类（如果需要）
             if auto_classify and apps_to_classify > 0:
-                logger.info(f"步骤 3/6: LLM 分类 {apps_to_classify} 个应用...")
-                classified_app_df = self._classify_apps(app_to_classify_df)
+                logger.info(f"步骤 3/6: LLM 分类 {apps_to_classify} 条日志项...")
+                classified_app_df = self._classify_apps(classify_state)
                 
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
-                self.lw_data_writer.save_app_purpose_category(classified_app_df)
-                classified_apps = len(classified_app_df)
-                logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
-                
-                # 5. 合并分类结果到事件数据
-                logger.info("步骤 5/6: 合并分类结果...")
-                filtered_data = self._merge_classification_results(
-                    filtered_data, 
-                    classified_app_df
-                )
+                if classified_app_df is not None and not classified_app_df.empty:
+                    self.server_lw_data_provider.save_app_purpose_category(classified_app_df)
+                    classified_apps = len(classified_app_df)
+                    logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
+                    
+                    # 5. 合并分类结果到事件数据
+                    logger.info("步骤 5/6: 合并分类结果...")
+                    filtered_data = self._merge_classification_results(
+                        filtered_data, 
+                        classified_app_df
+                    )
+                else:
+                    logger.warning("  ⚠ 分类结果为空，跳过保存和合并")
             else:
                 logger.info("步骤 3-5/6: 跳过分类（auto_classify=False 或无待分类应用）")
             
@@ -131,7 +117,7 @@ class DataProcessingService:
             
             # 7. 保存行为日志
             logger.info("保存行为日志到数据库...")
-            self.lw_data_writer.save_user_app_behavior_log(filtered_data)
+            self.server_lw_data_provider.save_user_app_behavior_log(filtered_data)
             saved_events = len(filtered_data)
             logger.info(f"  ✓ 保存了 {saved_events} 条行为日志")
             
@@ -185,46 +171,42 @@ class DataProcessingService:
             time_range = f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
             logger.info(f"开始按时间范围同步数据: {time_range}")
             
-            # 1. 获取 ActivityWatch 数据
-            logger.info("步骤 1/6: 获取 ActivityWatch 数据...")
-            aw_data = self.aw_db_reader.get_window_events(
+            # 1-2. 获取 ActivityWatch 数据并清洗
+            logger.info("步骤 1-2/6: 获取 ActivityWatch 数据并清洗...")
+            app_purpose_category_df = self.server_lw_data_provider.load_app_purpose_category()
+            filtered_data, classify_state = clean_activitywatch_data(
                 start_time=start_time,
                 end_time=end_time,
+                app_purpose_category_df=app_purpose_category_df
             )
-            total_events = len(aw_data)
-            logger.info(f"  ✓ 获取到 {total_events} 条原始事件")
-            
-            # 2. 数据清洗
-            logger.info("步骤 2/6: 数据清洗...")
-            app_purpose_category_df = self.lw_data_provider.load_app_purpose_category()
-            filtered_data, app_to_classify_df, app_to_classify_set = clean_activitywatch_data(
-                aw_data, 
-                app_purpose_category_df
-            )
+            total_events = len(filtered_data) + (len(classify_state.log_items) if classify_state.log_items else 0)
             filtered_events = len(filtered_data)
-            apps_to_classify = len(app_to_classify_df)
-            logger.info(f"  ✓ 过滤后保留 {filtered_events} 条事件")
-            logger.info(f"  ✓ 发现 {apps_to_classify} 个待分类应用")
+            apps_to_classify = len(classify_state.log_items) if classify_state.log_items else 0
+            logger.info(f"  ✓ 获取并过滤后保留 {filtered_events} 条事件")
+            logger.info(f"  ✓ 发现 {apps_to_classify} 条待分类日志项")
             
             classified_apps = 0
             
             # 3. LLM 分类（如果需要）
             if auto_classify and apps_to_classify > 0:
-                logger.info(f"步骤 3/6: LLM 分类 {apps_to_classify} 个应用...")
-                classified_app_df = self._classify_apps(app_to_classify_df)
+                logger.info(f"步骤 3/6: LLM 分类 {apps_to_classify} 条日志项...")
+                classified_app_df = self._classify_apps(classify_state)
                 
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
-                self.lw_data_writer.save_app_purpose_category(classified_app_df)
-                classified_apps = len(classified_app_df)
-                logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
-                
-                # 5. 合并分类结果到事件数据
-                logger.info("步骤 5/6: 合并分类结果...")
-                filtered_data = self._merge_classification_results(
-                    filtered_data, 
-                    classified_app_df
-                )
+                if classified_app_df is not None and not classified_app_df.empty:
+                    self.server_lw_data_provider.save_app_purpose_category(classified_app_df)
+                    classified_apps = len(classified_app_df)
+                    logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
+                    
+                    # 5. 合并分类结果到事件数据
+                    logger.info("步骤 5/6: 合并分类结果...")
+                    filtered_data = self._merge_classification_results(
+                        filtered_data, 
+                        classified_app_df
+                    )
+                else:
+                    logger.warning("  ⚠ 分类结果为空，跳过保存和合并")
             else:
                 logger.info("步骤 3-5/6: 跳过分类（auto_classify=False 或无待分类应用）")
             
@@ -234,7 +216,7 @@ class DataProcessingService:
             
             # 7. 保存行为日志
             logger.info("保存行为日志到数据库...")
-            self.lw_data_writer.save_user_app_behavior_log(filtered_data)
+            self.server_lw_data_provider.save_user_app_behavior_log(filtered_data)
             saved_events = len(filtered_data)
             logger.info(f"  ✓ 保存了 {saved_events} 条行为日志")
             
@@ -288,7 +270,7 @@ class DataProcessingService:
         
         if use_incremental_sync:
             # 增量同步：从数据库最新的 end_time 开始获取到现在
-            latest_end_time = self.lw_data_writer.get_latest_end_time()
+            latest_end_time = self.server_lw_data_provider.get_latest_end_time()
             
             if latest_end_time:
                 # 解析最新时间
@@ -323,19 +305,19 @@ class DataProcessingService:
 
         return start_time, end_time
 
-    def _classify_apps(self, app_to_classify_df: pd.DataFrame) -> pd.DataFrame:
+    def _classify_apps(self, classify_state: classifyState) -> pd.DataFrame:
         """
         使用 LLM 分类应用
         
         Args:
-            app_to_classify_df: 待分类应用 DataFrame
+            classify_state: 待分类数据的 classifyState 对象
             
         Returns:
             pd.DataFrame: 包含分类结果的 DataFrame
         """
         # 获取 category 和 sub_category
-        category = self.stat_provider.load_categories()
-        sub_category = self.stat_provider.load_sub_categories()
+        category = self.server_lw_data_provider.load_categories()
+        sub_category = self.server_lw_data_provider.load_sub_categories()
         
         # 构建分类树结构：{主分类名: [子分类名列表]}
         category_tree = {}
@@ -348,18 +330,75 @@ class DataProcessingService:
         
         logger.info(f"  构建分类树: {category_tree}")
         
-        # 初始化分类器
-        classifier = QwenAPIClassifier(
-            api_key=config.MODEL_KEY[config.SELECT_MODEL]["api_key"],
-            base_url=config.MODEL_KEY[config.SELECT_MODEL]["base_url"],
-            model=config.SELECT_MODEL,
-            category_tree=category_tree  # 传递分类树而非字符串
+        # 获取分类模式
+        classify_mode = getattr(config, 'CLASSIFY_MODE', 'classify_graph')
+        logger.info(f"  使用分类模式: {classify_mode}")
+        
+        # 初始化 LLMClassify 分类器
+        classifier = LLMClassify(
+            classify_mode=classify_mode,
+            goal=mock_goals,
+            category_tree=category_tree
         )
         
         # 执行分类
         logger.info(f"  调用 LLM 分类器...")
-        classified_app_df = classifier.classify(app_to_classify_df)
+        result = classifier.classify(classify_state)
         logger.info(f"  ✓ 分类完成")
+        
+        # 处理分类结果
+        if result is None or not result.get('result_items'):
+            logger.warning("  ⚠ 分类结果为空")
+            return pd.DataFrame()
+        
+        result_items = result['result_items']
+        logger.info(f"  ✓ 获取到 {len(result_items)} 条分类结果")
+        
+        # 转换为 DataFrame 格式（适配 app_purpose_category 表结构）
+        # 按 app 分组处理：单用途应用只保存一条，多用途应用保存所有 title
+        classified_records = []
+        app_groups = {}  # {app: [items]}
+        
+        # 先按 app 分组
+        for item in result_items:
+            if item.app not in app_groups:
+                app_groups[item.app] = []
+            app_groups[item.app].append(item)
+        
+        # 处理每个 app 组
+        for app, items in app_groups.items():
+            is_multipurpose = classify_state.app_registry.get(app, None)
+            is_multipurpose_flag = 1 if (is_multipurpose and is_multipurpose.is_multipurpose) else 0
+            
+            if is_multipurpose_flag == 0:
+                # 单用途应用：只保存第一条记录（代表性记录）
+                item = items[0]
+                classified_records.append({
+                    'app': item.app,
+                    'title': item.title,
+                    'is_multipurpose_app': is_multipurpose_flag,
+                    'app_description': is_multipurpose.description if is_multipurpose else None,
+                    'title_analysis': item.title_analysis,
+                    'category': item.category,
+                    'sub_category': item.sub_category,
+                })
+                if len(items) > 1:
+                    logger.info(f"    单用途应用 '{app}' 有 {len(items)} 条记录，只保存第一条")
+            else:
+                # 多用途应用：保存所有不同 title 的记录
+                for item in items:
+                    classified_records.append({
+                        'app': item.app,
+                        'title': item.title,
+                        'is_multipurpose_app': is_multipurpose_flag,
+                        'app_description': is_multipurpose.description if is_multipurpose else None,
+                        'title_analysis': item.title_analysis,
+                        'category': item.category,
+                        'sub_category': item.sub_category,
+                    })
+        
+        logger.info(f"  ✓ 处理后保留 {len(classified_records)} 条分类记录（原始 {len(result_items)} 条）")
+        classified_app_df = pd.DataFrame(classified_records)
         
         # 验证分类结果
         logger.info(f"  验证分类结果...")
@@ -549,8 +588,8 @@ class DataProcessingService:
         """
         # 获取或使用缓存的映射字典
         if self._category_mappings_cache is None:
-            category = self.stat_provider.load_categories()
-            sub_category = self.stat_provider.load_sub_categories()
+            category = self.server_lw_data_provider.load_categories()
+            sub_category = self.server_lw_data_provider.load_sub_categories()
             
             # 处理分类为空的情况
             category_dict = {}

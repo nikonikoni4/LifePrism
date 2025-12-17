@@ -5,7 +5,7 @@ Timeline 数据服务层
 
 from datetime import datetime
 from typing import List, Optional
-from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
+from lifewatch.server.providers.statistical_data_providers import ServerLWDataProvider
 from lifewatch.server.schemas.timeline_schemas import TimelineEventSchema, TimelineResponse
 from lifewatch.server.services.category_color_manager import color_manager
 
@@ -14,7 +14,7 @@ class TimelineService:
     """Timeline 服务类"""
     
     def __init__(self):
-        self.data_provider = StatisticalDataProvider()
+        self.data_provider = ServerLWDataProvider()
     
     def get_timeline_events(self, date: str, device_filter: str = 'all') -> TimelineResponse:
         """

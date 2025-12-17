@@ -1,6 +1,8 @@
 """
 分类图模块
 """
-from .classify_graph import *
+from .main_classify import LLMClassify
 
-__all__ = []
+__all__ = [
+    "LLMClassify"
+]
