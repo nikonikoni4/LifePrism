@@ -125,14 +125,23 @@ def clean_activitywatch_data(
     log_item_id_counter = 0  # LogItem ID 计数器
     
     # 已经分类的应用（单一用途app和多用途title）
+    # 以及已存在的app_description，避免LLM重复搜索
     if app_purpose_category_df is not None and not app_purpose_category_df.empty:
         # 获取已存在的单一用途的应用集合
         categorized_single_purpose_apps = set(app_purpose_category_df['app'].unique())
         # 获取非单一用途的title集合
         categorized_mutilpurpose_titles = set(app_purpose_category_df[app_purpose_category_df['is_multipurpose_app'] == 1]['title'].unique())
+        # 创建 app -> app_description 映射，用于复用已有的应用描述
+        app_description_map: Dict[str, str] = {}
+        for _, row in app_purpose_category_df.iterrows():
+            app = row.get('app', '')
+            desc = row.get('app_description', '')
+            if app and desc and app not in app_description_map:
+                app_description_map[app] = desc
     else:
         categorized_single_purpose_apps = set()
         categorized_mutilpurpose_titles = set()
+        app_description_map = {}
     
     # output - 使用动态字典格式配置
     filtered_events_df = pd.DataFrame(columns=get_table_columns('user_app_behavior_log'))
@@ -186,31 +195,34 @@ def clean_activitywatch_data(
                 # 3. app未被分类，且是单一用途的 
                 elif not is_multipurpose:
                     # 3.1 app未被分类，且是单一用途的 且 未被添加到待分类列表 ： 加入待分类列表
-                    # 一个app只需要加入一次
+                    # 一个app只需要加入一次，只创建一个LogItem
                     if app_name not in apps_to_classify_set:
-                        # 添加到 app_registry
+                        # 添加到 app_registry，复用已存在的app_description
+                        existing_desc = app_description_map.get(app_name, "")
                         app_registry[app_name] = AppInFo(
-                            description="",  # 待LLM填充
+                            description=existing_desc,  # 复用已有描述，空则待LLM填充
                             is_multipurpose=False,
                             titles=[title]
                         )
                         apps_to_classify_set.add(app_name)
-                    
-                    # 创建 LogItem 并添加到 log_items
-                    log_items.append(LogItem(
-                        id=log_item_id_counter,
-                        app=app_name,
-                        duration=int(duration),
-                        title=title
-                    ))
-                    log_item_id_counter += 1
+                        
+                        # 创建 LogItem 并添加到 log_items（每个单用途app只需一个）
+                        log_items.append(LogItem(
+                            id=log_item_id_counter,
+                            app=app_name,
+                            duration=int(duration),
+                            title=title
+                        ))
+                        log_item_id_counter += 1
                 
                 # 4.app未被分类，且是多用途的 ： 加入待分类列表
                 elif is_multipurpose:
                     # 确保 app 在 registry 中
                     if app_name not in apps_to_classify_set:
+                        # 复用已存在的app_description
+                        existing_desc = app_description_map.get(app_name, "")
                         app_registry[app_name] = AppInFo(
-                            description="",  # 待LLM填充
+                            description=existing_desc,  # 复用已有描述，空则待LLM填充
                             is_multipurpose=True,
                             titles=[]
                         )

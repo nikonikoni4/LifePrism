@@ -355,21 +355,49 @@ class DataProcessingService:
         logger.info(f"  ✓ 获取到 {len(result_items)} 条分类结果")
         
         # 转换为 DataFrame 格式（适配 app_purpose_category 表结构）
+        # 按 app 分组处理：单用途应用只保存一条，多用途应用保存所有 title
         classified_records = []
+        app_groups = {}  # {app: [items]}
+        
+        # 先按 app 分组
         for item in result_items:
-            is_multipurpose = classify_state.app_registry.get(item.app, None)
+            if item.app not in app_groups:
+                app_groups[item.app] = []
+            app_groups[item.app].append(item)
+        
+        # 处理每个 app 组
+        for app, items in app_groups.items():
+            is_multipurpose = classify_state.app_registry.get(app, None)
             is_multipurpose_flag = 1 if (is_multipurpose and is_multipurpose.is_multipurpose) else 0
             
-            classified_records.append({
-                'app': item.app,
-                'title': item.title,
-                'is_multipurpose_app': is_multipurpose_flag,
-                'app_description': is_multipurpose.description if is_multipurpose else None,
-                'title_analysis': item.title_analysis,
-                'category': item.category,
-                'sub_category': item.sub_category,
-            })
+            if is_multipurpose_flag == 0:
+                # 单用途应用：只保存第一条记录（代表性记录）
+                item = items[0]
+                classified_records.append({
+                    'app': item.app,
+                    'title': item.title,
+                    'is_multipurpose_app': is_multipurpose_flag,
+                    'app_description': is_multipurpose.description if is_multipurpose else None,
+                    'title_analysis': item.title_analysis,
+                    'category': item.category,
+                    'sub_category': item.sub_category,
+                })
+                if len(items) > 1:
+                    logger.info(f"    单用途应用 '{app}' 有 {len(items)} 条记录，只保存第一条")
+            else:
+                # 多用途应用：保存所有不同 title 的记录
+                for item in items:
+                    classified_records.append({
+                        'app': item.app,
+                        'title': item.title,
+                        'is_multipurpose_app': is_multipurpose_flag,
+                        'app_description': is_multipurpose.description if is_multipurpose else None,
+                        'title_analysis': item.title_analysis,
+                        'category': item.category,
+                        'sub_category': item.sub_category,
+                    })
         
+        logger.info(f"  ✓ 处理后保留 {len(classified_records)} 条分类记录（原始 {len(result_items)} 条）")
         classified_app_df = pd.DataFrame(classified_records)
         
         # 验证分类结果

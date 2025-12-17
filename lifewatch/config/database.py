@@ -12,12 +12,12 @@ APP_PURPOSE_CATEGORY_CONFIG = {
     'columns': {
         'app': {
             'type': 'TEXT',
-            'constraints': ['PRIMARY KEY'],
+            'constraints': ['NOT NULL'],
             'comment': '应用程序的文件名（例如：chrome.exe）'
         },
         'title': {
             'type': 'TEXT',
-            'constraints': [],
+            'constraints': ['NOT NULL'],
             'comment': '应用程序的标题（例如：Google Chrome）'
         },
         'is_multipurpose_app': {
@@ -46,10 +46,8 @@ APP_PURPOSE_CATEGORY_CONFIG = {
             'comment': '根据目标分类（编码，读书笔记等）'
         }
     },
-    'table_constraints': [],  # 表级约束
-    'indexes': [
-        {'name': 'idx_app', 'columns': ['app']}
-    ],
+    'table_constraints': ['PRIMARY KEY (app, title)'],  # 表级约束：复合主键
+    'indexes': [],
     'timestamps': True  # 自动添加 created_at, updated_at
 }
 
