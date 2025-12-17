@@ -9,10 +9,8 @@ from typing import Dict, Tuple, Optional
 from datetime import datetime, timedelta
 import pytz
 
-from lifewatch.storage import aw_db_manager
 from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
-from lifewatch.data.aw_db_reader import ActivityWatchDBReader
-from lifewatch.data.data_clean import clean_activitywatch_data
+from lifewatch.processors.data_clean import clean_activitywatch_data
 from lifewatch.llm.llm_classify.classify.main_classify import LLMClassify
 from lifewatch.llm.llm_classify.classify.mock_data import mock_goals
 from lifewatch.llm.llm_classify.schemas import classifyState
@@ -37,7 +35,6 @@ class DataProcessingService:
         使用全局单例数据提供者
         """
         self.server_lw_data_provider = server_lw_data_provider
-        self.aw_db_reader = ActivityWatchDBReader(db_manager=aw_db_manager)
         self._category_mappings_cache = None  # 缓存分类映射
         
     def process_activitywatch_data(
@@ -70,35 +67,23 @@ class DataProcessingService:
             # 确定同步模式和时间范围
             sync_mode = 'incremental' if use_incremental_sync else 'full'
             # 0. 获取时间范围
-            start_time, end_time = self._process_time_range(use_incremental_sync,hours)
+            start_time, end_time = self._process_time_range(use_incremental_sync, hours)
             time_range = f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
-            # 1. 获取 ActivityWatch 数据
-            logger.info("步骤 1/6: 获取 ActivityWatch 数据...")
-            if start_time and end_time:
-                # 增量同步：使用时间范围
-                aw_data = self.aw_db_reader.get_window_events(
-                    start_time=start_time,
-                    end_time=end_time,
-                )
-            else:
-                # 全量同步：使用小时数
-                aw_data = self.aw_db_reader.get_window_events(
-                    hours=hours,
-                )
-            total_events = len(aw_data)
-            logger.info(f"  ✓ 获取到 {total_events} 条原始事件")
             
-            # 2. 数据清洗
-            logger.info("步骤 2/6: 数据清洗...")
+            # 1-2. 获取 ActivityWatch 数据并清洗
+            logger.info("步骤 1-2/6: 获取 ActivityWatch 数据并清洗...")
             app_purpose_category_df = self.server_lw_data_provider.load_app_purpose_category()  # 获取已缓存的分类结果
             filtered_data, classify_state = clean_activitywatch_data(
-                aw_data, 
-                app_purpose_category_df
+                start_time=start_time,
+                end_time=end_time, 
+                app_purpose_category_df=app_purpose_category_df
             )
+            total_events = len(filtered_data) + (len(classify_state.log_items) if classify_state.log_items else 0)
             filtered_events = len(filtered_data)
             apps_to_classify = len(classify_state.log_items) if classify_state.log_items else 0
-            logger.info(f"  ✓ 过滤后保留 {filtered_events} 条事件")
-            logger.info(f"  {filtered_data[['app','duration','start_time','end_time']]}")
+            logger.info(f"  ✓ 获取并过滤后保留 {filtered_events} 条事件")
+            if not filtered_data.empty:
+                logger.info(f"  {filtered_data[['app','duration','start_time','end_time']]}")
             logger.info(f"  ✓ 发现 {apps_to_classify} 条待分类日志项")
             
             classified_apps = 0
@@ -186,25 +171,18 @@ class DataProcessingService:
             time_range = f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
             logger.info(f"开始按时间范围同步数据: {time_range}")
             
-            # 1. 获取 ActivityWatch 数据
-            logger.info("步骤 1/6: 获取 ActivityWatch 数据...")
-            aw_data = self.aw_db_reader.get_window_events(
-                start_time=start_time,
-                end_time=end_time,
-            )
-            total_events = len(aw_data)
-            logger.info(f"  ✓ 获取到 {total_events} 条原始事件")
-            
-            # 2. 数据清洗
-            logger.info("步骤 2/6: 数据清洗...")
+            # 1-2. 获取 ActivityWatch 数据并清洗
+            logger.info("步骤 1-2/6: 获取 ActivityWatch 数据并清洗...")
             app_purpose_category_df = self.server_lw_data_provider.load_app_purpose_category()
             filtered_data, classify_state = clean_activitywatch_data(
-                aw_data, 
-                app_purpose_category_df
+                start_time=start_time,
+                end_time=end_time,
+                app_purpose_category_df=app_purpose_category_df
             )
+            total_events = len(filtered_data) + (len(classify_state.log_items) if classify_state.log_items else 0)
             filtered_events = len(filtered_data)
             apps_to_classify = len(classify_state.log_items) if classify_state.log_items else 0
-            logger.info(f"  ✓ 过滤后保留 {filtered_events} 条事件")
+            logger.info(f"  ✓ 获取并过滤后保留 {filtered_events} 条事件")
             logger.info(f"  ✓ 发现 {apps_to_classify} 条待分类日志项")
             
             classified_apps = 0
