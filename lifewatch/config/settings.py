@@ -78,9 +78,13 @@ OLLAMA_MODEL = "qwen3:0.6b"
 # LLM配置
 MAX_CHARS = 2000 # 请求时的最大tokens
 MAX_ITEMS = 10 # 请求时的最大items
-
 """
 数据清洗配置模块
 """
 # 数据清洗配置
 CLEAN_LOWER_BOUND = 10 # 数据清洗配置
+
+# 使用的分类模式
+# classify_graph: 使用 LangGraph 的复杂分类流程（支持搜索、多步骤分类）
+# classify_simple: 使用简单的单次 LLM 调用分类
+CLASSIFY_MODE ="classify_graph" #"classify_simple" # 

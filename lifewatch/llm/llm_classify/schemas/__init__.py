@@ -5,10 +5,14 @@ from .classify_shemas import (
     classifyState,
     LogItem,
     AppInFo,
+    Goal,
+    classifyStateLogitems
 )
 
 __all__ = [
     "classifyState",
     "LogItem",
     "AppInFo",
+    "Goal",
+    "classifyStateLogitems"
 ]

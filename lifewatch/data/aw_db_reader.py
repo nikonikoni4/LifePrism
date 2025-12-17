@@ -48,7 +48,7 @@ class ActivityWatchDBReader:
         elif AW_DB_PATH is not None:
             self.AW_DB_PATH = AW_DB_PATH
             self.db_manager = DatabaseManager(
-                AW_DB_PATH=AW_DB_PATH,
+                DB_PATH=AW_DB_PATH,
                 use_pool=True,
                 pool_size=3,
                 readonly=True

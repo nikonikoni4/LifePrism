@@ -10,8 +10,8 @@ LifeWatch LLM 分类模块
 """
 
 # 导出核心组件
-from .schemas import classifyState, LogItem, Goal, AppInFo
-from .classify import llm_classify
+from .schemas import classifyState, LogItem, AppInFo
+from .classify import LLMClassify
 
 
 __all__ = [
