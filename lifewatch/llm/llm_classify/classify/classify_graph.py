@@ -7,7 +7,6 @@ date : 2025.12.17
 from lifewatch.llm.llm_classify.schemas.classify_shemas import classifyState,Goal,AppInFo,classifyStateLogitems
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import SystemMessage, HumanMessage,AIMessage
-from lifewatch.llm.llm_classify.providers.lw_data_providers import lw_data_providers
 from lifewatch.llm.llm_classify.utils import (
     format_goals_for_prompt, 
     format_category_tree_for_prompt,
@@ -29,7 +28,7 @@ import uuid
 MAX_LOG_ITEMS = 15
 MAX_TITLE_ITEMS = 5
 SPLIT_DURATION = 10*60 # 20min
-TEST_FLAG = True
+TEST_FLAG = False
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
