@@ -14,44 +14,26 @@ from lifewatch.llm.llm_classify.utils import (
     split_by_duration,
     parse_classification_result,
     extract_json_from_response,
-    parse_token_usage
+    parse_token_usage,
+    test_for_llm_class_state
     )
 import json
 import logging
 from langgraph.types import Send,RetryPolicy
 from langgraph.checkpoint.memory import InMemorySaver 
 from langgraph.store.memory import InMemoryStore
-import functools
+
 import uuid
 MAX_LOG_ITEMS = 15
 MAX_TITLE_ITEMS = 5
 SPLIT_DURATION = 10*60 # 20min
+TEST_FLAG = True
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def test_for_state(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        if len(args) >= 2:
-            input_data = args[1]
-            if isinstance(input_data, classifyStateLogitems):
-                single_len = len(input_data.log_items_for_single) if input_data.log_items_for_single else 0
-                multi_len = len(input_data.log_items_for_multi) if input_data.log_items_for_multi else 0
-                multi_short_len = len(input_data.log_items_for_multi_short) if input_data.log_items_for_multi_short else 0
-                multi_long_len = len(input_data.log_items_for_multi_long) if input_data.log_items_for_multi_long else 0
-                print(f"{func.__name__}: 输入数据长度 - single: {single_len}, multi: {multi_len}, multi_short: {multi_short_len}, multi_long: {multi_long_len}")
-            elif isinstance(input_data, classifyState):
-                length = len(input_data.log_items) if input_data.log_items else 0
-                print(f"{func.__name__}: 输入数据长度 {length}")
-            length =  len(main_state.result_items) if main_state.result_items else 0
-            print(f"{func.__name__}:当前主状态结果长度:{length}")
-        result = func(*args, **kwargs)
-        if isinstance(result, dict):
-            print(f"{func.__name__}:当前函数输出result_items:{result.get("result_items",None)}")
-        print(f"{func.__name__}:当前函数输出结果类型:{type(result)}")
-        return result
-    return wrapper
-class LLMClassify:
+
+class ClassifyGraph:
     def __init__(self):
         self.chat_model = create_ChatTongyiModel()
         self.store = InMemoryStore()
@@ -221,7 +203,7 @@ class LLMClassify:
         }
 
     # router 1 
-    @test_for_state
+    @test_for_llm_class_state(TEST_FLAG)
     def router_by_multi_purpose(self,state: classifyState):
         """
         软件分类路由,单用途和多用途分开处理
@@ -259,7 +241,7 @@ class LLMClassify:
         return send_list
     
     # node superstape2: 单用途分类 -> result_items
-    @test_for_state
+    @test_for_llm_class_state(TEST_FLAG)
     def single_classify(self,state: classifyStateLogitems) -> classifyState:
         """
         单用途app分类（分批处理，每批最多 MAX_LOG_ITEMS 条）
@@ -349,13 +331,13 @@ class LLMClassify:
         }
  
     # node supperstep2 多用途分类(空节点) ->classifyStateLogitems
-    @test_for_state
+    @test_for_llm_class_state(TEST_FLAG)
     def multi_classify(self,state:classifyStateLogitems)->classifyStateLogitems:
         # 空节点，后续接上多分类路由
         # 私有变量传递不能中断传递，而同超步的single_class返回主状态，这里更新不会影响到单应用分支
         return state 
     # router_by_duration_for_multi
-    @test_for_state
+    @test_for_llm_class_state(TEST_FLAG)
     def router_by_duration_for_multi(self, state: classifyStateLogitems):
         """
         多用途应用按时长路由，短时长和长时长分开处理
@@ -382,7 +364,7 @@ class LLMClassify:
         
         return send_list
     # node supperstep 3 :多用途短时长分类->{result_items}
-    @test_for_state
+    @test_for_llm_class_state(TEST_FLAG)
     def multi_classify_short(self,state:classifyStateLogitems) -> classifyState:
         """
         短时长多用途分类（分批处理，每批最多 MAX_LOG_ITEMS 条）
@@ -455,7 +437,7 @@ class LLMClassify:
         }
 
     # node supperstep 3 :获取title_analysis->{title_analysis_results}
-    @test_for_state
+    @test_for_llm_class_state(TEST_FLAG)
     def get_titles(self,state:classifyStateLogitems)->classifyStateLogitems:
         system_message = SystemMessage(content="""
         你是一个通过网络搜索分析的助手,依据网络搜索结果和title分析用户的活动，要求结果在30字以内
@@ -473,7 +455,7 @@ class LLMClassify:
         }
 
     # node supperstep 4 : 多分类长时间 {result_items}
-    @test_for_state
+    @test_for_llm_class_state(TEST_FLAG)
     def multi_classify_long(self,state:classifyStateLogitems)->classifyState:
         """
         长时长多用途分类（分批处理，每批最多 MAX_LOG_ITEMS 条）
@@ -578,7 +560,7 @@ if __name__ == "__main__":
         #print(f"  - 过滤后 app_registry: {len(state.app_registry)} 个应用")
         return state
     main_state = get_state(hours=12)
-    llm_classify = LLMClassify()
+    llm_classify = ClassifyGraph()
     config = {"configurable": {"thread_id": "thread-1"}}
     output = llm_classify.app.invoke(main_state,config)
     print(output)

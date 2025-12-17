@@ -16,6 +16,11 @@ from .parse_utils import (
 from .split_utils import (
     split_by_duration,
     split_by_purpose,
+    
+)
+
+from .debug_utils import(
+    test_for_llm_class_state
 )
 
 __all__ = [
@@ -28,5 +33,6 @@ __all__ = [
     "extract_json_from_response",
     "split_by_duration",
     "split_by_purpose",
-    "parse_token_usage"
+    "parse_token_usage",
+    "test_for_llm_class_state"
 ]
