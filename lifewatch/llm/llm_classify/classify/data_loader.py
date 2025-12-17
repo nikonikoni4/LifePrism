@@ -37,7 +37,7 @@ class DataLoader:
         self.lw_data_provider = lw_data_providers
         self.stat_provider = StatisticalDataProvider()
     
-    def get_real_data(self, hours: int = 24) -> classifyState:
+    def get_real_data(self, hours: int = 24) -> tuple[classifyState, list[Goal], dict[str, list[str] | None]]:
         """
         获取真实数据并转换为 classifyState
         
@@ -45,7 +45,10 @@ class DataLoader:
             hours: 获取最近N小时的数据
             
         Returns:
-            classifyState: 包含真实数据的状态对象
+            tuple: (classifyState, goals, category_tree)
+                - classifyState: 包含 app_registry, log_items, result_items
+                - goals: 用户目标列表
+                - category_tree: 分类树
         """
         logger.info(f"开始加载最近 {hours} 小时的数据...")
         
@@ -65,16 +68,14 @@ class DataLoader:
         goals = mock_goals
         logger.info(f"  ✓ 使用 mock_goals，共 {len(goals)} 个目标")
         
-        # 构建状态
+        # 构建状态 (不再包含 goal 和 category_tree)
         state = classifyState(
             app_registry=app_registry,
-            log_items=log_items,
-            goal=goals,
-            category_tree=category_tree
+            log_items=log_items
         )
         
         logger.info(f"数据加载完成！")
-        return state
+        return state, goals, category_tree
     
     def _load_log_items(self, hours: int) -> list[LogItem]:
         """
@@ -209,7 +210,7 @@ class DataLoader:
 
 
 # 便捷函数
-def get_real_data(hours: int = 24) -> classifyState:
+def get_real_data(hours: int = 24) -> tuple[classifyState, list[Goal], dict[str, list[str] | None]]:
     """
     便捷函数：获取真实数据
     
@@ -217,7 +218,7 @@ def get_real_data(hours: int = 24) -> classifyState:
         hours: 获取最近N小时的数据
         
     Returns:
-        classifyState: 包含真实数据的状态对象
+        tuple: (classifyState, goals, category_tree)
     """
     loader = DataLoader()
     return loader.get_real_data(hours=hours)
@@ -265,12 +266,10 @@ def filter_by_duration(
         if app in filtered_apps
     }
     
-    # 创建新的 classifyState
+    # 创建新的 classifyState (不再包含 goal 和 category_tree)
     filtered_state = classifyState(
         app_registry=filtered_app_registry,
-        log_items=filtered_log_items,
-        goal=state.goal,
-        category_tree=state.category_tree
+        log_items=filtered_log_items
     )
     
     logger.info(f"过滤完成: {len(state.log_items)} -> {len(filtered_log_items)} 条记录")
@@ -339,12 +338,10 @@ def deduplicate_log_items(state: classifyState) -> classifyState:
         if app in dedup_apps
     }
     
-    # 创建新的 classifyState
+    # 创建新的 classifyState (不再包含 goal 和 category_tree)
     dedup_state = classifyState(
         app_registry=dedup_app_registry,
-        log_items=deduplicated_items,
-        goal=state.goal,
-        category_tree=state.category_tree
+        log_items=deduplicated_items
     )
     
     logger.info(f"去重完成: {len(state.log_items)} -> {len(deduplicated_items)} 条记录")
@@ -357,13 +354,13 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.INFO)
     
-    state = get_real_data(hours=36)
+    state, goals, category_tree = get_real_data(hours=36)
     state = filter_by_duration(state, min_duration=60)
     print(f"\n加载结果:")
     print(f"  - log_items: {len(state.log_items)} 条")
     print(f"  - app_registry: {len(state.app_registry)} 个应用")
-    print(f"  - category_tree: {state.category_tree}")
-    print(f"  - goals: {len(state.goal)} 个目标")
+    print(f"  - category_tree: {category_tree}")
+    print(f"  - goals: {len(goals)} 个目标")
     
     # 打印前5条日志
     print(f"\n前5条日志:")

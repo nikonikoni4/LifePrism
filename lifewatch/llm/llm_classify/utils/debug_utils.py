@@ -19,8 +19,6 @@ def test_for_llm_class_state(test_flag : bool):
                     elif isinstance(input_data, classifyState):
                         length = len(input_data.log_items) if input_data.log_items else 0
                         print(f"{func.__name__}: 输入数据长度 {length}")
-                    length =  len(main_state.result_items) if main_state.result_items else 0
-                    print(f"{func.__name__}:当前主状态结果长度:{length}")
                 result = func(*args, **kwargs)
                 if isinstance(result, dict):
                     print(f"{func.__name__}:当前函数输出result_items:{result.get("result_items",None)}")

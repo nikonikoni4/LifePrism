@@ -76,8 +76,6 @@ def test_add(item_list:list[LogItem],update_data:list[LogItem])->list[LogItem]:
 class classifyState(BaseModel):
     app_registry: dict[str, AppInFo]= Field(description="app : app_description") # app : app_description
     log_items: Annotated[list[LogItem],remain_old_value] = Field(description="原始分类数据") # 分类数据，不使用 reducer
-    goal: Annotated[list[Goal], remain_old_value]= Field(description="用户的目标") # 用户的目标
-    category_tree : Annotated[dict[str, list[str]| None], remain_old_value] = Field(description="具体分类") # 具体分类
     result_items: Annotated[list[LogItem] | None, test_add] = Field(default=None, description="输出结果") # 不更新log_items
 
 class classifyStateLogitems(BaseModel):

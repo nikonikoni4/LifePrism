@@ -1,6 +1,9 @@
 """
-将分类graph整合成一个class,兼容之前的简单分类
+功能描述: 实现分类的langgraph
+待实现内容: 分类结果的验证功能
+date : 2025.12.17 
 """
+# Date: 2025/12/17
 from lifewatch.llm.llm_classify.schemas.classify_shemas import classifyState,Goal,AppInFo,classifyStateLogitems
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import SystemMessage, HumanMessage,AIMessage
@@ -20,9 +23,8 @@ from lifewatch.llm.llm_classify.utils import (
 import json
 import logging
 from langgraph.types import Send,RetryPolicy
-from langgraph.checkpoint.memory import InMemorySaver 
 from langgraph.store.memory import InMemoryStore
-
+from collections import Counter
 import uuid
 MAX_LOG_ITEMS = 15
 MAX_TITLE_ITEMS = 5
@@ -34,12 +36,19 @@ logger = logging.getLogger(__name__)
 
 
 class ClassifyGraph:
-    def __init__(self):
+    def __init__(self, goal: list, category_tree: dict):
+        """
+        初始化分类图
+        
+        Args:
+            goal: 用户目标列表
+            category_tree: 分类树字典
+        """
+        self.goal = goal
+        self.category_tree = category_tree
         self.chat_model = create_ChatTongyiModel()
         self.store = InMemoryStore()
         self.bulit_graph()
-        
-        pass
 
     def recode_tokens_usage(self,node_name,tokens_usage):
         name_space = ("tokens_usage",node_name)
@@ -67,7 +76,7 @@ class ClassifyGraph:
                 }
             }
         """
-        from collections import Counter
+        
         
         # 总计数器
         total_counter = Counter({
@@ -247,8 +256,8 @@ class ClassifyGraph:
         单用途app分类（分批处理，每批最多 MAX_LOG_ITEMS 条）
         """
         # system message
-        goal = format_goals_for_prompt(main_state.goal)
-        category_tree = format_category_tree_for_prompt(main_state.category_tree)
+        goal = format_goals_for_prompt(self.goal)
+        category_tree = format_category_tree_for_prompt(self.category_tree)
         #print(goal)
         #print(category_tree)
         system_message = SystemMessage(content=f"""
@@ -369,8 +378,8 @@ class ClassifyGraph:
         """
         短时长多用途分类（分批处理，每批最多 MAX_LOG_ITEMS 条）
         """
-        category_tree = format_category_tree_for_prompt(main_state.category_tree) # 使用主节点内容
-        goal = format_goals_for_prompt(main_state.goal)
+        category_tree = format_category_tree_for_prompt(self.category_tree) # 使用类变量
+        goal = format_goals_for_prompt(self.goal)
         
         # system message
         system_message = SystemMessage(content = f"""
@@ -460,8 +469,8 @@ class ClassifyGraph:
         """
         长时长多用途分类（分批处理，每批最多 MAX_LOG_ITEMS 条）
         """
-        goal = format_goals_for_prompt(main_state.goal)
-        category_tree = format_category_tree_for_prompt(main_state.category_tree)
+        goal = format_goals_for_prompt(self.goal)
+        category_tree = format_category_tree_for_prompt(self.category_tree)
         
         system_message = SystemMessage(content=f"""
         你是一个用户行为分类专家。你的任务是根据网页标题(Title)和标题分析(Title Analysis)对用户的行为进行分类。
@@ -545,8 +554,8 @@ class ClassifyGraph:
 if __name__ == "__main__":
     from lifewatch.llm.llm_classify.classify.data_loader import get_real_data,filter_by_duration,deduplicate_log_items
     
-    def get_state(hours = 36) -> classifyState:
-        state = get_real_data(hours=hours)
+    def get_state(hours = 36) -> tuple:
+        state, goals, category_tree = get_real_data(hours=hours)
         state = filter_by_duration(state, min_duration=60)
         state = deduplicate_log_items(state)
         #print(f"\n去重后的日志（前10条）:")
@@ -558,11 +567,12 @@ if __name__ == "__main__":
         #print(f"\n测试过滤功能（只保留 duration >= 60 秒的记录）:")
         #print(f"  - 过滤后 log_items: {len(state.log_items)} 条")
         #print(f"  - 过滤后 app_registry: {len(state.app_registry)} 个应用")
-        return state
-    main_state = get_state(hours=12)
-    llm_classify = ClassifyGraph()
+        return state, goals, category_tree
+    
+    main_state, goals, category_tree = get_state(hours=18)
+    llm_classify = ClassifyGraph(goal=goals, category_tree=category_tree)
     config = {"configurable": {"thread_id": "thread-1"}}
-    output = llm_classify.app.invoke(main_state,config)
+    output = llm_classify.app.invoke(main_state, config)
     print(output)
     if "result_items" in output:
         result_items = output["result_items"]
