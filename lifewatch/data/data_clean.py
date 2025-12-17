@@ -3,7 +3,6 @@
 # 功能说明：
 # 1. 时间戳标准化：将ActivityWatch API返回的UTC时间转换为用户本地时间 ✅ 已实现
 # 2. 数据清洗：删除持续时间小于阈值的短暂活动 ✅ 已实现
-# 3. AI数据生成：为AI分析准备结构化的pandas数据 🔄 正在实现
 # ==============================================================================
 
 import pandas as pd
@@ -14,6 +13,8 @@ from lifewatch.llm.llm_classify.providers.lw_data_providers import get_app_purpo
 from lifewatch.data.aw_data_reader import get_window_events
 from lifewatch.utils import is_multipurpose_app
 from lifewatch import config
+from lifewatch.llm.llm_classify import AppInFo,LogItem,classifyState
+import logging
 def convert_utc_to_local(utc_timestamp_str: str, target_tz: str ) -> str:
     """
     将ActivityWatch API返回的UTC时间戳转换为用户本地时间
@@ -47,6 +48,10 @@ def convert_utc_to_local(utc_timestamp_str: str, target_tz: str ) -> str:
         # 错误处理：如果解析失败，返回原始字符串并记录警告
         print(f"⚠️  时间戳转换失败: {utc_timestamp_str} -> {str(e)}")
         return utc_timestamp_str
+
+
+def clean_activitywatch_data(raw_events: List[Dict[str, Any]],app_purpose_category_df:pd.DataFrame)->tuple[pd.DataFrame,classifyState] :
+
 
 
 

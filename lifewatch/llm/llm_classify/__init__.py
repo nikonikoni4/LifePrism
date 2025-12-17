@@ -11,8 +11,8 @@ LifeWatch LLM 分类模块
 
 # 导出核心组件
 from .schemas import classifyState, LogItem, Goal, AppInFo
-from .utils import create_ChatTongyiModel, LangChainToonAdapter
-from .providers import LWDataProviders
+from .classify import llm_classify
+
 
 __all__ = [
     # 数据模型
