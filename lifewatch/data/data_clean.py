@@ -144,7 +144,7 @@ def clean_activitywatch_data(raw_events: List[Dict[str, Any]],app_purpose_catego
                                     'title': title,
                                     'is_multipurpose_app': filtered_event['is_multipurpose_app'],
                                     'app_description': None,
-                                    'title_description': None,
+                                    'title_analysis': None,
                                     'category': None,
                                     'sub_category': None,
                                 })
@@ -161,7 +161,7 @@ def clean_activitywatch_data(raw_events: List[Dict[str, Any]],app_purpose_catego
                                     'title': title,
                                     'is_multipurpose_app': filtered_event['is_multipurpose_app'],
                                     'app_description': None,
-                                    'title_description': None,
+                                    'title_analysis': None,
                                     'category': None,
                                     'sub_category': None,
                                 })

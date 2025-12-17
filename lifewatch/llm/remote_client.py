@@ -14,7 +14,7 @@ class LLMClient:
         self.total_completion_tokens = 0
         self.api_call_count = 0
         
-    def sent_message(self,messages,model="qwen-flash",enable_thinking=True,enable_search=True):
+    def sent_message(self,messages,model="qwen-plus",enable_thinking=True,enable_search=True):
         self.api_call_count += 1
         extra_body = {"enable_thinking": enable_thinking,"enable_search":enable_search}
         
@@ -28,7 +28,7 @@ class LLMClient:
         
         return completion, start_time
     
-    def sent_message_no_stream(self,messages,model="qwen-flash",enable_thinking=False,enable_search=True):
+    def sent_message_no_stream(self,messages,model="qwen-plus",enable_thinking=False,enable_search=True):
         """非流式调用，获取完整token统计"""
         self.api_call_count += 1
         extra_body = {"enable_thinking": enable_thinking,"enable_search":enable_search}

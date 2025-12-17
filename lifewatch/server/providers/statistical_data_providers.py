@@ -356,7 +356,7 @@ class StatisticalDataProvider:
                 sub_category_id: str, 子分类ID
                 sub_category_name: str, 子分类名称
                 app_description: str, 应用描述
-                title_description: str, 标题描述
+                title_analysis: str, 标题描述
                 device_type: str, 设备类型（'pc' 或 'mobile'）
         """
         # 设置日期范围
@@ -378,7 +378,7 @@ class StatisticalDataProvider:
             uabl.sub_category_id,
             sc.name as sub_category_name,
             apc.app_description,
-            apc.title_description
+            apc.title_analysis
         FROM user_app_behavior_log uabl
         LEFT JOIN category c ON uabl.category_id = c.id
         LEFT JOIN sub_category sc ON uabl.sub_category_id = sc.id
@@ -407,7 +407,7 @@ class StatisticalDataProvider:
                 "sub_category_id": row[8] or "",
                 "sub_category_name": row[9] or "",
                 "app_description": row[10] or "",
-                "title_description": row[11] or "",
+                "title_analysis": row[11] or "",
                 "device_type": "pc"  # 当前阶段固定为 'pc'
             })
         

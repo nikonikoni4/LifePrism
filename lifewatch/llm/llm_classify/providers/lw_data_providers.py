@@ -25,7 +25,7 @@ class LWDataProviders:
         """查询标题描述"""
         sql = """
         SELECT key_word, description
-        FROM title_description
+        FROM title_analysis
         WHERE key_word IN ({})
         """.format(",".join(["?" for _ in query_list]))
         with self.db_manager.get_connection() as conn:

@@ -116,7 +116,7 @@ class LWDataWriter:
                 - title: 应用标题（可选）
                 - is_multipurpose_app: 是否多用途应用（可选）
                 - app_description: 应用描述（可选）
-                - title_description: 标题描述（可选）
+                - title_analysis: 标题描述（可选）
                 - class 或 sub_category: 分类（可选）
         
         Returns:

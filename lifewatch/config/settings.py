@@ -3,9 +3,9 @@
 """
 =========================API KEY==========================
 """
-SELECT_MODEL = "qwen-flash"
+SELECT_MODEL = "qwen-plus"
 MODEL_KEY = {
-    "qwen-flash": {"api_key":"sk-b6f3052f6c4f46a9a658bfc020d90c3f","base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1"},
+    "qwen-plus": {"api_key":"sk-b6f3052f6c4f46a9a658bfc020d90c3f","base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1"},
 }
 
 

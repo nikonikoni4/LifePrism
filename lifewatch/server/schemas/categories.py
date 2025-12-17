@@ -13,7 +13,7 @@ class AppCategory(BaseModel):
     title: Optional[str] = None
     is_multipurpose_app: int = 0
     app_description: Optional[str] = None
-    title_description: Optional[str] = None
+    title_analysis: Optional[str] = None
     category: Optional[str] = None
     sub_category: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -31,4 +31,4 @@ class UpdateCategoryRequest(BaseModel):
     category: Optional[str] = None
     sub_category: Optional[str] = None
     app_description: Optional[str] = None
-    title_description: Optional[str] = None
+    title_analysis: Optional[str] = None

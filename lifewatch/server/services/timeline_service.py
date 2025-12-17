@@ -37,12 +37,12 @@ class TimelineService:
         # 转换为前端需要的格式
         events = []
         for event in raw_events:
-            # 组装 description：app_description + title_description
+            # 组装 description：app_description + title_analysis
             description_parts = []
             if event.get("app_description"):
                 description_parts.append(event["app_description"])
-            if event.get("title_description"):
-                description_parts.append(event["title_description"])
+            if event.get("title_analysis"):
+                description_parts.append(event["title_analysis"])
             description = " - ".join(description_parts) if description_parts else event.get("title", "")
             
             # 将ISO timestamp转换为小时浮点数
@@ -69,7 +69,7 @@ class TimelineService:
                 sub_category_color=sub_category_color,
                 description=description,
                 app_description=event.get("app_description") or None,
-                title_description=event.get("title_description") or None,
+                title_analysis=event.get("title_analysis") or None,
                 device_type=event["device_type"]
             ))
         

@@ -69,7 +69,7 @@ async def update_app_category(
     - category: 默认分类
     - sub_category: 目标分类
     - app_description: 应用描述
-    - title_description: 标题描述
+    - title_analysis: 标题描述
     
     **使用真实数据库更新**
     """
