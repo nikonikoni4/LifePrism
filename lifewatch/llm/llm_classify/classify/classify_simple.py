@@ -48,15 +48,39 @@ class ClassifySimple:
         self.chat_model = create_ChatTongyiModel()
         self.token_usage_list = []  # 记录 token 使用
     
-    def classify(self, state: classifyState) -> classifyState:
+    def classify(self, state: classifyState) -> dict:
         """
-        对所有 log_items 进行分类
+        执行分类任务的入口方法
+        
+        Args:
+            state: classifyState 对象，包含待分类的数据
+            
+        Returns:
+            dict: 包含 result_items 和 tokens_usage 的字典
+        """
+        # 重置 token 使用记录
+        self.token_usage_list = []
+        
+        # 执行分类
+        output = self._classify_internal(state)
+        
+        # 获取 token 使用统计
+        tokens_usage = self.get_total_tokens_usage()
+        
+        return {
+            "result_items": output.get("result_items"),
+            "tokens_usage": tokens_usage
+        }
+    
+    def _classify_internal(self, state: classifyState) -> dict:
+        """
+        对所有 log_items 进行分类（内部实现）
         
         Args:
             state: classifyState 对象，包含 log_items, app_registry
             
         Returns:
-            classifyState: 包含 result_items 的状态
+            dict: 包含 result_items 的字典
         """
         if not state.log_items:
             logger.info("log_items 为空，跳过分类")
@@ -140,21 +164,6 @@ class ClassifySimple:
                 all_result_items.extend(batch)
         
         return {"result_items": all_result_items}
-    
-    def _build_category_tree_text(self, category_tree: dict) -> str:
-        """
-        构建分类树的文本展示
-        """
-        if not category_tree:
-            return ""
-        
-        text = "分类选项（主分类 -> 子分类）：\n"
-        for main_cat, sub_cats in category_tree.items():
-            text += f"- {main_cat}\n"
-            if sub_cats:
-                for sub_cat in sub_cats:
-                    text += f"  - {sub_cat}\n"
-        return text
     
     def _parse_classification_result(
         self, 

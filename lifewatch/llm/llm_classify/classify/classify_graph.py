@@ -144,7 +144,6 @@ class ClassifyGraph:
         # 短时间分类
         # checkpointer = InMemorySaver()  
         self.app = graph.compile(store=self.store)
-    
     def classify(self, state: classifyState) -> dict:
         """
         执行分类任务的入口方法
@@ -153,7 +152,28 @@ class ClassifyGraph:
             state: classifyState 对象，包含待分类的数据
             
         Returns:
-            dict: 分类结果，包含 result_items 等字段
+            dict: 包含 result_items 和 tokens_usage 的字典
+        """
+        # 执行分类
+        output = self._classify_internal(state)
+        
+        # 获取 token 使用统计
+        tokens_usage = self.get_total_tokens_usage()
+        
+        return {
+            "result_items": output.get("result_items"),
+            "tokens_usage": tokens_usage
+        }
+    
+    def _classify_internal(self, state: classifyState) -> dict:
+        """
+        内部分类实现，调用 LangGraph
+        
+        Args:
+            state: classifyState 对象，包含待分类的数据
+            
+        Returns:
+            dict: LangGraph 返回的原始结果
         """
         config = {"configurable": {"thread_id": f"thread-{uuid.uuid4()}"}}
         output = self.app.invoke(state, config)

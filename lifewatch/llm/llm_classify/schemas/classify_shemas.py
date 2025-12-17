@@ -36,32 +36,32 @@ class AppInFo(BaseModel):
 # 定义状态
 
 
-def update_logitem(item_list:list[LogItem],update_data)->list[LogItem]:
-    """
-    更新LogItem 或 替换
-    args:
-        item_list : 原数据
-        update_data : 更新数据 {
-                        "update_flag": str,
-                        "update_date": 
-                        }
-    return:
-        list[LogItem]
-    """
-    # 获取更新类型
-    if isinstance(update_data,dict):
-        update_flag = update_data.get("update_flag",None)
-        if update_flag == "title_analysis":
-            update_data = update_data.get("update_data",None)
-            if isinstance(update_data,dict): # id:title_analysis
-                for log_item in item_list:
-                    if log_item.id in update_data:
-                        log_item.title_analysis = update_data[log_item.id]
-        return item_list # 返回完整列表，只更新 title_analysis 字段
-    elif update_data:
-        return update_data # 直接替换
-    else:
-        return item_list
+# def update_logitem(item_list:list[LogItem],update_data)->list[LogItem]:
+#     """
+#     更新LogItem 或 替换
+#     args:
+#         item_list : 原数据
+#         update_data : 更新数据 {
+#                         "update_flag": str,
+#                         "update_date": 
+#                         }
+#     return:
+#         list[LogItem]
+#     """
+#     # 获取更新类型
+#     if isinstance(update_data,dict):
+#         update_flag = update_data.get("update_flag",None)
+#         if update_flag == "title_analysis":
+#             update_data = update_data.get("update_data",None)
+#             if isinstance(update_data,dict): # id:title_analysis
+#                 for log_item in item_list:
+#                     if log_item.id in update_data:
+#                         log_item.title_analysis = update_data[log_item.id]
+#         return item_list # 返回完整列表，只更新 title_analysis 字段
+#     elif update_data:
+#         return update_data # 直接替换
+#     else:
+#         return item_list
 
 def test_add(item_list:list[LogItem],update_data:list[LogItem])->list[LogItem]:
     print(f"test_add : {update_data}")
