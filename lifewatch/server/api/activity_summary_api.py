@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, HTTPException
 from datetime import date, timedelta
 from typing import Optional
 from lifewatch.server.schemas.activity_summary_schemas import ActivitySummaryResponse
-from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
+from lifewatch.server.providers.statistical_data_providers import ServerLWDataProvider
 from lifewatch.server.services.activity_summery_service import ActivitySummaryService
 
 router = APIRouter(prefix="/activity-summary", tags=["ActivitySummary"])

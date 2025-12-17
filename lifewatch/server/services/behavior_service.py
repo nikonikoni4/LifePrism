@@ -5,7 +5,7 @@
 
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
-from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
+from lifewatch.server.providers.statistical_data_providers import ServerLWDataProvider
 
 
 class BehaviorService:
@@ -16,7 +16,7 @@ class BehaviorService:
     """
     
     def __init__(self):
-        self.db = StatisticalDataProvider()
+        self.db = ServerLWDataProvider()
     
     def get_behavior_logs(
         self,

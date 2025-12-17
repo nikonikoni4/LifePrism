@@ -4,7 +4,7 @@
 """
 
 from typing import List, Dict, Optional, Any
-from lifewatch.storage import lw_db_manager
+from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
 from lifewatch.server.schemas.category_schemas import (
     CategoryDef, SubCategoryDef, CategoryResponse, SubCategoryResponse
 )
@@ -19,9 +19,9 @@ class CategoryService:
     
     def __init__(self):
         """
-        初始化分类服务，使用全局数据库单例
+        初始化分类服务，使用全局数据提供者单例
         """
-        self.db = lw_db_manager
+        self.db = server_lw_data_provider.db
     
     def get_all_categories(self) -> List[Dict[str, Any]]:
         """

@@ -1,12 +1,12 @@
 import datetime
-from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
+from lifewatch.server.providers.statistical_data_providers import ServerLWDataProvider
 from lifewatch.server.schemas.activity_summary_schemas import DailyActivitiesResponse,ActivitySummaryResponse
 from lifewatch.server.services.category_service import CategoryService
 from typing import List, Optional
 
 class ActivitySummaryService:
     def __init__(self):
-        self.statistical_data_provider = StatisticalDataProvider()
+        self.statistical_data_provider = ServerLWDataProvider()
         self.category_service = CategoryService()
         
     def get_activity_summary_data(

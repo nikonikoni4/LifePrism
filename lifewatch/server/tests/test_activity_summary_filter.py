@@ -197,11 +197,11 @@ class TestActivitySummaryService:
 
 
 class TestStatisticalDataProviderFilter:
-    """Test cases for StatisticalDataProvider.get_daily_active_time with filters"""
+    """Test cases for ServerLWDataProvider.get_daily_active_time with filters"""
     
     def test_sql_query_without_filter(self):
         """Test that SQL query is correct without filters"""
-        from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
+        from lifewatch.server.providers.statistical_data_providers import ServerLWDataProvider
         
         with patch('lifewatch.storage.lw_db_manager') as mock_db:
             mock_conn = MagicMock()
@@ -211,7 +211,7 @@ class TestStatisticalDataProviderFilter:
             mock_db.get_connection.return_value.__enter__ = lambda x: mock_conn
             mock_db.get_connection.return_value.__exit__ = lambda x, a, b, c: None
             
-            provider = StatisticalDataProvider()
+            provider = ServerLWDataProvider()
             provider.lw_db_manager = mock_db
             
             provider.get_daily_active_time("2025-12-01", "2025-12-15")
@@ -227,7 +227,7 @@ class TestStatisticalDataProviderFilter:
     
     def test_sql_query_with_category_filter(self):
         """Test that SQL query includes category filter"""
-        from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
+        from lifewatch.server.providers.statistical_data_providers import ServerLWDataProvider
         
         with patch('lifewatch.storage.lw_db_manager') as mock_db:
             mock_conn = MagicMock()
@@ -237,7 +237,7 @@ class TestStatisticalDataProviderFilter:
             mock_db.get_connection.return_value.__enter__ = lambda x: mock_conn
             mock_db.get_connection.return_value.__exit__ = lambda x, a, b, c: None
             
-            provider = StatisticalDataProvider()
+            provider = ServerLWDataProvider()
             provider.lw_db_manager = mock_db
             
             provider.get_daily_active_time("2025-12-01", "2025-12-15", category_id="work")

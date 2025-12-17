@@ -9,10 +9,8 @@ from typing import Dict, Tuple, Optional
 from datetime import datetime, timedelta
 import pytz
 
-from lifewatch.storage import lw_db_manager, aw_db_manager
-from lifewatch.data.lw_data_writer import LWDataWriter
-from lifewatch.llm.llm_classify.providers.lw_data_providers import lw_data_providers
-from lifewatch.server.providers.statistical_data_providers import StatisticalDataProvider
+from lifewatch.storage import aw_db_manager
+from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
 from lifewatch.data.aw_db_reader import ActivityWatchDBReader
 from lifewatch.data.data_clean import clean_activitywatch_data
 from lifewatch.llm.llm_classify.classify.main_classify import LLMClassify
@@ -36,11 +34,9 @@ class DataProcessingService:
         """
         初始化数据处理服务
         
-        使用全局单例数据库管理器
+        使用全局单例数据提供者
         """
-        self.lw_data_writer = LWDataWriter()
-        self.lw_data_provider = lw_data_providers
-        self.stat_provider = StatisticalDataProvider()
+        self.server_lw_data_provider = server_lw_data_provider
         self.aw_db_reader = ActivityWatchDBReader(db_manager=aw_db_manager)
         self._category_mappings_cache = None  # 缓存分类映射
         
@@ -94,7 +90,7 @@ class DataProcessingService:
             
             # 2. 数据清洗
             logger.info("步骤 2/6: 数据清洗...")
-            app_purpose_category_df = self.lw_data_provider.load_app_purpose_category()  # 获取已缓存的分类结果
+            app_purpose_category_df = self.server_lw_data_provider.load_app_purpose_category()  # 获取已缓存的分类结果
             filtered_data, classify_state = clean_activitywatch_data(
                 aw_data, 
                 app_purpose_category_df
@@ -115,7 +111,7 @@ class DataProcessingService:
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
                 if classified_app_df is not None and not classified_app_df.empty:
-                    self.lw_data_writer.save_app_purpose_category(classified_app_df)
+                    self.server_lw_data_provider.save_app_purpose_category(classified_app_df)
                     classified_apps = len(classified_app_df)
                     logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
                     
@@ -136,7 +132,7 @@ class DataProcessingService:
             
             # 7. 保存行为日志
             logger.info("保存行为日志到数据库...")
-            self.lw_data_writer.save_user_app_behavior_log(filtered_data)
+            self.server_lw_data_provider.save_user_app_behavior_log(filtered_data)
             saved_events = len(filtered_data)
             logger.info(f"  ✓ 保存了 {saved_events} 条行为日志")
             
@@ -201,7 +197,7 @@ class DataProcessingService:
             
             # 2. 数据清洗
             logger.info("步骤 2/6: 数据清洗...")
-            app_purpose_category_df = self.lw_data_provider.load_app_purpose_category()
+            app_purpose_category_df = self.server_lw_data_provider.load_app_purpose_category()
             filtered_data, classify_state = clean_activitywatch_data(
                 aw_data, 
                 app_purpose_category_df
@@ -221,7 +217,7 @@ class DataProcessingService:
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
                 if classified_app_df is not None and not classified_app_df.empty:
-                    self.lw_data_writer.save_app_purpose_category(classified_app_df)
+                    self.server_lw_data_provider.save_app_purpose_category(classified_app_df)
                     classified_apps = len(classified_app_df)
                     logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
                     
@@ -242,7 +238,7 @@ class DataProcessingService:
             
             # 7. 保存行为日志
             logger.info("保存行为日志到数据库...")
-            self.lw_data_writer.save_user_app_behavior_log(filtered_data)
+            self.server_lw_data_provider.save_user_app_behavior_log(filtered_data)
             saved_events = len(filtered_data)
             logger.info(f"  ✓ 保存了 {saved_events} 条行为日志")
             
@@ -296,7 +292,7 @@ class DataProcessingService:
         
         if use_incremental_sync:
             # 增量同步：从数据库最新的 end_time 开始获取到现在
-            latest_end_time = self.lw_data_writer.get_latest_end_time()
+            latest_end_time = self.server_lw_data_provider.get_latest_end_time()
             
             if latest_end_time:
                 # 解析最新时间
@@ -342,8 +338,8 @@ class DataProcessingService:
             pd.DataFrame: 包含分类结果的 DataFrame
         """
         # 获取 category 和 sub_category
-        category = self.stat_provider.load_categories()
-        sub_category = self.stat_provider.load_sub_categories()
+        category = self.server_lw_data_provider.load_categories()
+        sub_category = self.server_lw_data_provider.load_sub_categories()
         
         # 构建分类树结构：{主分类名: [子分类名列表]}
         category_tree = {}
@@ -586,8 +582,8 @@ class DataProcessingService:
         """
         # 获取或使用缓存的映射字典
         if self._category_mappings_cache is None:
-            category = self.stat_provider.load_categories()
-            sub_category = self.stat_provider.load_sub_categories()
+            category = self.server_lw_data_provider.load_categories()
+            sub_category = self.server_lw_data_provider.load_sub_categories()
             
             # 处理分类为空的情况
             category_dict = {}
