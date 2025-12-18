@@ -200,10 +200,11 @@ class DashboardService:
         """
         
         # 获取基础数据
-        total_time = self.stat_provider.get_active_time(query_date.strftime("%Y-%m-%d"))
+        date_str = query_date.strftime("%Y-%m-%d")
+        total_time = self.stat_provider.get_active_time(date_str)
         top_apps = self.stat_provider.get_top_applications(top_n=5)
         top_titles = self.stat_provider.get_top_title(top_n=5)
-        category_stats = self.stat_provider.get_category_stats()
+        category_stats = self.stat_provider.get_category_stats(date_str, "category")
         
         # 格式化数据
         return {

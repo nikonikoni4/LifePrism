@@ -112,85 +112,74 @@ class ServerLWDataProvider(LWBaseDataProvider):
             
         return [{"name": row[0], "duration": row[1]} for row in results]
 
-    def get_category_stats(self) -> list[dict]:
+    def get_category_stats(self, date: str, category_type: str = "category") -> list[dict]:
         """
-        获取指定日期的分类统计
-        return 
-            list[dict], 分类统计:
+        获取指定日期的分类统计（统一方法）
+        
+        Args:
+            date: 日期字符串 (YYYY-MM-DD)
+            category_type: 分类类型，"category" 表示主分类，"sub_category" 表示子分类
+            
+        Returns:
+            list[dict]: 分类统计数据
                 name: str, 分类名称
-                color: str, 分类颜色
                 id: int, 分类ID
                 duration: int, 活跃时长(秒)
+                color: str, 分类颜色 (仅主分类有)
+                category_id: int, 所属主分类ID (仅子分类有)
         """
-        if not self._current_date:
-            raise AttributeError("请先使用 self.current_date = 'YYYY-MM-DD' 设置日期。")
-        sql_data = """
-        SELECT category, SUM(duration) as total_duration
+        # 通过 current_date setter 自动设置时间范围
+        self.current_date = date
+        
+        # 验证 category_type 参数
+        if category_type not in ("category", "sub_category"):
+            raise ValueError(f"无效的 category_type: {category_type}，只支持 'category' 或 'sub_category'")
+        
+        # 动态构建SQL查询
+        sql_data = f"""
+        SELECT {category_type}, SUM(duration) as total_duration
         FROM user_app_behavior_log
-        WHERE start_time >= ? AND start_time <= ?
-        GROUP BY category
+        WHERE start_time >= ? AND start_time <= ? AND {category_type} IS NOT NULL
+        GROUP BY {category_type}
         """
-        sql_color = """
-        SELECT name, color,id
-        FROM category
-        """
-
+        
+        # 根据类型选择元数据表
+        if category_type == "category":
+            sql_meta = "SELECT name, id, color FROM category"
+        else:
+            sql_meta = "SELECT name, id, category_id FROM sub_category"
+        
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(sql_data, (self._start_time, self._end_time))
             results = cursor.fetchall()
             
-            cursor.execute(sql_color)
-            category_color = cursor.fetchall()
-        category_color_dict = {row[0]: {"id": row[2], "color": row[1]} for row in category_color}
-            
-        return [
-            {
-                "name": row[0], 
-                "duration": row[1],
-                "color": category_color_dict.get(row[0], {}).get("color", "#E8684A"),
-                "id": category_color_dict.get(row[0], {}).get("id", -1)
-            } 
-            for row in results if row[0] is not None
-        ]
-
-    def get_sub_category_stats(self) -> list[dict]:
-        """
-        获取指定日期的子分类统计
-        return 
-            list[dict], 子分类统计:
-                name: str, 子分类名称
-                duration: int, 活跃时长(秒)
-        """
-        if not self._current_date:
-            raise AttributeError("请先使用 self.current_date = 'YYYY-MM-DD' 设置日期。")
-        sql = """
-        SELECT sub_category, SUM(duration) as total_duration
-        FROM user_app_behavior_log
-        WHERE start_time >= ? AND start_time <= ? AND sub_category IS NOT NULL
-        GROUP BY sub_category
-        """
-        sql_id = """
-        SELECT name, id,category_id
-        FROM sub_category
-        """
-        with self.db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(sql, (self._start_time, self._end_time))
-            results = cursor.fetchall()
-            cursor.execute(sql_id)
-            sub_category_id = cursor.fetchall()
-            sub_category_id_dict = {row[0]: {"id": row[1],"category_id": row[2]} for row in sub_category_id}
+            cursor.execute(sql_meta)
+            meta_rows = cursor.fetchall()
         
-        return [
-            {
-                "name": row[0], 
-                "duration": row[1],
-                "id": sub_category_id_dict.get(row[0], {}).get("id", -1),
-                "category_id": sub_category_id_dict.get(row[0], {}).get("category_id", -1)
-            } 
-            for row in results if row[0] is not None
-        ]
+        # 构建元数据字典
+        if category_type == "category":
+            meta_dict = {row[0]: {"id": row[1], "color": row[2]} for row in meta_rows}
+            return [
+                {
+                    "name": row[0], 
+                    "duration": row[1],
+                    "id": meta_dict.get(row[0], {}).get("id", -1),
+                    "color": meta_dict.get(row[0], {}).get("color", "#E8684A")
+                } 
+                for row in results if row[0] is not None
+            ]
+        else:
+            meta_dict = {row[0]: {"id": row[1], "category_id": row[2]} for row in meta_rows}
+            return [
+                {
+                    "name": row[0], 
+                    "duration": row[1],
+                    "id": meta_dict.get(row[0], {}).get("id", -1),
+                    "category_id": meta_dict.get(row[0], {}).get("category_id", -1)
+                } 
+                for row in results if row[0] is not None
+            ]
     
     def get_events_by_time_range(self, date: str, start_hour: float, end_hour: float) -> list[dict]:
         """
@@ -511,11 +500,10 @@ if __name__ == "__main__":
         print(f"日期: {activity['date']}, 活动占比: {activity['active_time_percentage']}%")
     
     print("\n=== 原有功能测试 ===")
-    sdp.current_date = "2025-12-02"
-    print(f"当前日期: {sdp.current_date}")
-    print(f"开始时间: {sdp._start_time}")
-    print(f"结束时间: {sdp._end_time}")
-    print(f"子分类统计: {sdp.get_sub_category_stats()}")
+    test_date = "2025-12-16"
+    print(f"测试日期: {test_date}")
+    print(f"主分类统计: {sdp.get_category_stats(test_date, 'category')}")
+    print(f"子分类统计: {sdp.get_category_stats(test_date, 'sub_category')}")
     
     # 测试数据库连接
     with sdp.db.get_connection() as conn:
