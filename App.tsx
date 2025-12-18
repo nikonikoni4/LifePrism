@@ -7,7 +7,7 @@ import TimelinePage from './components/TimelinePage';
 import CategorizationPage from './components/CategorizationPage';
 import AIChatPanel from './components/AIChatPanel';
 import { incrementalSync } from './services/syncService';
-
+import UsagePage from './components/UsagePage';
 function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState('home');

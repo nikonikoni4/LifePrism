@@ -166,3 +166,10 @@ export interface TimelineResponse {
   events: TimelineEventData[];
   currentTime?: number | null; // Current hour as float (only for today)
 }
+
+export interface TokenUsage {
+  date: string;
+  inputTokens: number;
+  outputTokens: number;
+  processedRecords: number;
+}

@@ -981,8 +981,8 @@ const TimelinePage: React.FC = () => {
                                         }}
                                         disabled={!hasChanges || isSaving}
                                         className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all ${hasChanges
-                                                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300 cursor-pointer'
-                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            ? 'bg-gray-200 text-gray-700 hover:bg-gray-300 cursor-pointer'
+                                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                             }`}
                                         title="撤销修改"
                                     >
@@ -992,8 +992,8 @@ const TimelinePage: React.FC = () => {
                                         onClick={handleSaveCategory}
                                         disabled={!hasChanges || isSaving}
                                         className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all ${hasChanges
-                                                ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
-                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                             }`}
                                     >
                                         {isSaving ? (

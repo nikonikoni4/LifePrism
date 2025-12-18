@@ -1,5 +1,5 @@
 
-import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord } from "./types";
+import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage } from "./types";
 
 export const COLORS = {
   WORK: '#5B8FF9',
@@ -196,4 +196,14 @@ export const MOCK_ACTIVITY_RECORDS: ActivityRecord[] = [
   { id: '5', appName: 'Steam', windowTitle: 'Cyberpunk 2077', timestamp: '08:30 PM', duration: '1h 20m', aiDescription: 'AI: Gaming activity detected', categoryId: 'entertainment', subCategoryId: 'games' },
   { id: '6', appName: 'Finder', windowTitle: 'Downloads', timestamp: '06:15 PM', duration: '5m', aiDescription: 'AI: File management', categoryId: 'other', subCategoryId: 'utilities' },
   { id: '7', appName: 'UnknownApp.exe', windowTitle: 'Untitled Window', timestamp: '04:00 PM', duration: '15m', aiDescription: 'AI: Could not determine activity type', categoryId: 'other', subCategoryId: 'untracked' },
+];
+
+export const MOCK_USAGE_HISTORY: TokenUsage[] = [
+  { date: '11-25', inputTokens: 4200, outputTokens: 1500, processedRecords: 120 },
+  { date: '11-26', inputTokens: 5100, outputTokens: 2100, processedRecords: 155 },
+  { date: '11-27', inputTokens: 3800, outputTokens: 1100, processedRecords: 95 },
+  { date: '11-28', inputTokens: 6200, outputTokens: 2800, processedRecords: 190 },
+  { date: '11-29', inputTokens: 4900, outputTokens: 1800, processedRecords: 140 },
+  { date: '11-30', inputTokens: 7500, outputTokens: 3200, processedRecords: 210 },
+  { date: '12-01', inputTokens: 5800, outputTokens: 2400, processedRecords: 168 },
 ];
