@@ -193,13 +193,55 @@ SUB_CATEGORY_CONFIG = {
     'timestamps': True  # 自动添加 created_at, updated_at
 }
 
+# Token 使用统计表配置
+TOKENS_USAGE_CONFIG = {
+    'table_name': 'tokens_usage',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自动生成的唯一标识符'
+        },
+        'input_tokens': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '输入 token 数量'
+        },
+        'output_tokens': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '输出 token 数量'
+        },
+        'total_tokens': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '总 token 数量'
+        },
+        'search_count': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '搜索次数'
+        },
+        'result_items_count': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '分类结果数量（result_items 长度）'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_tokens_usage_created_at', 'columns': ['created_at']}
+    ],
+    'timestamps': True  # 自动添加 created_at
+}
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'app_purpose_category': APP_PURPOSE_CATEGORY_CONFIG,
     'user_app_behavior_log': USER_APP_BEHAVIOR_LOG_CONFIG,
     'category': CATEGORY_CONFIG,
-    'sub_category': SUB_CATEGORY_CONFIG
-
+    'sub_category': SUB_CATEGORY_CONFIG,
+    'tokens_usage': TOKENS_USAGE_CONFIG
 }
 
 

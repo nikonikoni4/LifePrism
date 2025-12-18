@@ -23,7 +23,7 @@ import json
 import logging
 from langgraph.types import Send,RetryPolicy
 from langgraph.store.memory import InMemoryStore
-from collections import Counter
+
 import uuid
 MAX_LOG_ITEMS = 15
 MAX_TITLE_ITEMS = 5
@@ -55,70 +55,29 @@ class ClassifyGraph:
     
     def get_total_tokens_usage(self) -> dict:
         """
-        使用 Counter 汇总所有节点的 token 使用情况
-        
-        Returns:
-            {
-                'total_input_tokens': int,
-                'total_output_tokens': int,
-                'total_tokens': int,
-                'total_search_count': int,
-                'by_node': {
-                    'node_name': {
-                        'input_tokens': int,
-                        'output_tokens': int,
-                        'total_tokens': int,
-                        'search_count': int,
-                        'call_count': int
-                    },
-                    ...
-                }
-            }
+        获取总 token 使用统计
         """
-        
-        
-        # 总计数器
-        total_counter = Counter({
+        total = {
             'input_tokens': 0,
             'output_tokens': 0,
             'total_tokens': 0,
             'search_count': 0
-        })
-        
-        # 按节点统计
-        node_stats = {}
+        }
         
         # 获取所有 tokens_usage 命名空间
         namespaces = self.store.list_namespaces(prefix=("tokens_usage",))
         
         for namespace in namespaces:
-            node_name = namespace[1] if len(namespace) > 1 else "unknown"
-            
-            # 初始化节点统计
-            if node_name not in node_stats:
-                node_stats[node_name] = Counter({
-                    'input_tokens': 0,
-                    'output_tokens': 0,
-                    'total_tokens': 0,
-                    'search_count': 0,
-                    'call_count': 0
-                })
-            
             # 搜索该命名空间下的所有记录
             items = self.store.search(namespace)
             for item in items:
                 usage = item.value
-                node_stats[node_name].update(usage)
-                node_stats[node_name]['call_count'] += 1
-                total_counter.update(usage)
+                total['input_tokens'] += usage.get('input_tokens', 0)
+                total['output_tokens'] += usage.get('output_tokens', 0)
+                total['total_tokens'] += usage.get('total_tokens', 0)
+                total['search_count'] += usage.get('search_count', 0)
         
-        return {
-            'total_input_tokens': total_counter['input_tokens'],
-            'total_output_tokens': total_counter['output_tokens'],
-            'total_tokens': total_counter['total_tokens'],
-            'total_search_count': total_counter['search_count'],
-            'by_node': {k: dict(v) for k, v in node_stats.items()}
-        }
+        return total
 
     
     def bulit_graph(self):
@@ -629,13 +588,8 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     print("📊 Token 使用统计")
     print("="*50)
-    print(f"  输入 tokens:  {tokens_usage['total_input_tokens']:,}")
-    print(f"  输出 tokens:  {tokens_usage['total_output_tokens']:,}")
+    print(f"  输入 tokens:  {tokens_usage['input_tokens']:,}")
+    print(f"  输出 tokens:  {tokens_usage['output_tokens']:,}")
     print(f"  总 tokens:    {tokens_usage['total_tokens']:,}")
-    print(f"  搜索次数:     {tokens_usage['total_search_count']}")
-    print("-"*50)
-    print("📋 按节点统计:")
-    for node, stats in tokens_usage['by_node'].items():
-        print(f"  [{node}]")
-        print(f"    调用次数: {stats['call_count']} | 输入: {stats['input_tokens']:,} | 输出: {stats['output_tokens']:,} | 搜索: {stats['search_count']}")
+    print(f"  搜索次数:     {tokens_usage['search_count']}")
     print("="*50)
