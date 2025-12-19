@@ -1,3 +1,8 @@
+/**
+ * Time Overview Widget V2
+ * 
+ * 时间概览组件（旭日图 + 柱状图），使用 V2 API
+ */
 import React, { useState, useEffect, useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import {
@@ -9,9 +14,9 @@ import {
   YAxis,
   CartesianGrid
 } from 'recharts';
-import { ChevronLeft, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
-import { DashboardAPI } from '../../services/dashboardService';
-import { TimeOverviewResponse } from '../../types';
+import { Loader2, AlertCircle, RotateCcw } from 'lucide-react';
+import { TimeOverviewDataV2, ChartSegmentV2 } from '../types';
+import { ActivityAPIV2 } from '../api';
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -34,11 +39,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 // Helper to transform data for Sunburst recursively
-const transformDataToSunburst = (data: TimeOverviewResponse): any[] => {
+const transformDataToSunburst = (data: TimeOverviewDataV2): any[] => {
   if (!data || !data.pieData) return [];
 
-  return data.pieData.map((segment) => {
-    const childData = data.details?.[segment.key];
+  return data.pieData.map((segment: ChartSegmentV2) => {
+    const childData = data.details?.[segment.name];
     const children = childData ? transformDataToSunburst(childData) : undefined;
 
     return {
@@ -48,16 +53,23 @@ const transformDataToSunburst = (data: TimeOverviewResponse): any[] => {
       // Custom payload to identify the node and its associated data
       // If childData exists, clicking this node should show the child's details (bar chart)
       dataRef: childData,
+      // Keep the title for app layer tooltip
+      appTitle: segment.title,
       children: children
     };
   });
 };
 
-const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOverviewResponse }> = ({ selectedDate, initialData }) => {
+interface TimeOverviewWidgetV2Props {
+  selectedDate: string;
+  initialData?: TimeOverviewDataV2;
+}
+
+const TimeOverviewWidgetV2: React.FC<TimeOverviewWidgetV2Props> = ({ selectedDate, initialData }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rootData, setRootData] = useState<TimeOverviewResponse | null>(null);
-  const [selectedView, setSelectedView] = useState<TimeOverviewResponse | null>(null);
+  const [rootData, setRootData] = useState<TimeOverviewDataV2 | null>(null);
+  const [selectedView, setSelectedView] = useState<TimeOverviewDataV2 | null>(null);
   const [chartKey, setChartKey] = useState(0); // Key to force re-render of chart
 
   useEffect(() => {
@@ -74,9 +86,14 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
     try {
       setLoading(true);
       setError(null);
-      const response = await DashboardAPI.getTimeOverview(selectedDate);
-      setRootData(response);
-      setSelectedView(response);
+      const response = await ActivityAPIV2.getStats({
+        date: selectedDate,
+        include: 'time_overview',
+      });
+      if (response.time_overview) {
+        setRootData(response.time_overview);
+        setSelectedView(response.time_overview);
+      }
     } catch (err) {
       console.error('Failed to fetch time overview:', err);
       setError('Failed to load data');
@@ -99,6 +116,21 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
           const hours = (value / 60).toFixed(2);
           const total = rootData?.totalTrackedMinutes || 1;
           const percent = ((value / total) * 100).toFixed(1);
+
+          // 检查是否是 app 层（有 appTitle）
+          const appTitle = params.data?.appTitle;
+          if (appTitle) {
+            // 将 -split- 分隔的 titles 换行显示
+            const titles = appTitle.split('-split-').map((t: string) =>
+              `<div style="color: #666; font-size: 11px; padding: 2px 0; max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">• ${t}</div>`
+            ).join('');
+            return `<div style="max-width: 280px;">
+              <strong>${name}</strong>: ${hours}h (${percent}%)<br/>
+              <div style="color: #999; font-size: 10px; margin-top: 4px;">Top Titles:</div>
+              ${titles}
+            </div>`;
+          }
+
           return `${name}: ${hours}h (${percent}%)`;
         }
       },
@@ -132,7 +164,7 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
 
   const onChartClick = (params: any) => {
     const { data } = params;
-    // data.dataRef contains the TimeOverviewResponse for this node (if it has children/details)
+    // data.dataRef contains the TimeOverviewDataV2 for this node (if it has children/details)
     if (data && data.dataRef) {
       setSelectedView(data.dataRef);
     }
@@ -142,15 +174,6 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
   const handleReset = () => {
     setSelectedView(rootData);
     setChartKey(prev => prev + 1); // Force chart re-render to reset visual state
-  };
-
-  const handleBack = () => {
-    // Since we don't track a stack, "Back" is ambiguous in a tree. 
-    // But we can reset to root, or maybe we don't need a back button if we have Reset.
-    // The previous implementation had a stack. Here the Sunburst IS the navigation.
-    // But if the user wants to go "up" one level from the Bar Chart perspective?
-    // For now, "Reset" is sufficient to go back to the overview.
-    setSelectedView(rootData);
   };
 
   if (loading && !rootData) {
@@ -190,8 +213,8 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
             onClick={handleReset}
             disabled={isRoot}
             className={`p-2 -ml-2 rounded-xl transition-colors ${isRoot
-                ? 'text-slate-200 cursor-not-allowed'
-                : 'hover:bg-gray-50 text-slate-400 hover:text-slate-700'
+              ? 'text-slate-200 cursor-not-allowed'
+              : 'hover:bg-gray-50 text-slate-400 hover:text-slate-700'
               }`}
             title="Reset to Overview"
           >
@@ -285,4 +308,4 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
   );
 };
 
-export default TimeOverviewWidget;
+export default TimeOverviewWidgetV2;
