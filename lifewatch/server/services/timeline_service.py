@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List, Optional
 from lifewatch.server.providers.statistical_data_providers import ServerLWDataProvider
 from lifewatch.server.schemas.timeline_schemas import TimelineEventSchema, TimelineResponse
-from lifewatch.server.services.category_color_manager import color_manager
+from lifewatch.server.providers.category_color_provider import color_manager
 
 
 class TimelineService:
