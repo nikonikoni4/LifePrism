@@ -116,7 +116,7 @@ class CategoryTreeResponse(BaseModel):
     data: list[CategoryDef]
 
 
-class CategoryStateResponse(BaseModel):
+class CategoryStatsResponse(BaseModel):
     """GET /category/state 响应"""
     data: list[CategoryDef]
     query: dict | None = Field(default=None, description="查询参数回显（调试用）")

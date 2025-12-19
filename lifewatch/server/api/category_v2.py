@@ -12,7 +12,7 @@ from datetime import datetime
 
 from lifewatch.server.schemas.category_v2_schemas import (
     CategoryTreeResponse,
-    CategoryStateResponse,
+    CategoryStatsResponse,
     CategoryDef,
     SubCategoryDef,
     CreateCategoryRequest,
@@ -47,11 +47,11 @@ async def get_category_tree(
 
 
 # ============================================================================
-# /state - 分类统计接口
+# /stats - 分类统计接口
 # ============================================================================
 
-@router.get("/state", summary="获取分类统计数据")
-async def get_category_state(
+@router.get("/stats", summary="获取分类统计数据")
+async def get_category_stats(
     # 包含的数据类型（可多选，逗号分隔）
     include: str = Query(
         default="app,duration,title",
@@ -80,7 +80,7 @@ async def get_category_state(
         default=None,
         description="按子分类ID筛选"
     )
-)->CategoryStateResponse:
+)->CategoryStatsResponse:
     """
     获取分类相关的统计数据
     
@@ -117,7 +117,7 @@ async def get_category_state(
     """
     try:
         category_service = CategoryService()
-        return category_service.get_category_state(start_time, end_time, include, top_title, category, sub_category)
+        return category_service.get_category_stats(start_time, end_time, include, top_title, category, sub_category)
     except HTTPException:
         raise
     except Exception as e:

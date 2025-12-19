@@ -5,7 +5,7 @@
 from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
 from lifewatch.server.schemas.category_v2_schemas import (
     CategoryTreeResponse,
-    CategoryStateResponse,
+    CategoryStatsResponse,
     CategoryDef,
     SubCategoryDef,
     AppUseInfo,
@@ -97,13 +97,13 @@ class CategoryService:
             logger.error(f"获取分类树失败: {e}")
             raise
 
-    def get_category_state(self,
+    def get_category_stats(self,
                             start_time: datetime,
                             end_time: datetime,
                             include: str,
                             top_title: int,
                             category: str,
-                            sub_category: str) -> CategoryStateResponse:
+                            sub_category: str) -> CategoryStatsResponse:
         """
         获取分类统计数据
         
@@ -116,7 +116,7 @@ class CategoryService:
             sub_category: 按子分类ID筛选（可选）
             
         Returns:
-            CategoryStateResponse: 分类统计响应
+            CategoryStatsResponse: 分类统计响应
         """
         
         # 验证时间参数（在 try 之外，让验证错误直接抛出）
@@ -145,7 +145,7 @@ class CategoryService:
             
             # 使用缓存的分类元数据
             if self._categories_df is None or self._categories_df.empty:
-                return CategoryStateResponse(data=[], query={"start_time": start_time_str, "end_time": end_time_str})
+                return CategoryStatsResponse(data=[], query={"start_time": start_time_str, "end_time": end_time_str})
             
             # 如果没有行为数据，返回空结构
             if behavior_df is None or behavior_df.empty:
@@ -208,7 +208,7 @@ class CategoryService:
             # 按时长降序排序
             category_state.sort(key=lambda x: x.duration or 0, reverse=True)
             
-            return CategoryStateResponse(
+            return CategoryStatsResponse(
                 data=category_state,
                 query={
                     "start_time": start_time_str,
@@ -308,7 +308,7 @@ class CategoryService:
                                      category_filter: str,
                                      sub_category_filter: str,
                                      start_time_str: str,
-                                     end_time_str: str) -> CategoryStateResponse:
+                                     end_time_str: str) -> CategoryStatsResponse:
         """构建空数据状态响应"""
         
         # 如果有筛选条件，只返回筛选的分类
@@ -349,7 +349,7 @@ class CategoryService:
                 subcategories=subcategories
             ))
         
-        return CategoryStateResponse(
+        return CategoryStatsResponse(
             data=category_state,
             query={
                 "start_time": start_time_str,
@@ -752,11 +752,11 @@ if __name__ == "__main__":
     
     category_service = CategoryService()
     
-    # 测试 get_category_state
+    # 测试 get_category_stats
     end_time = datetime.now()
     start_time = end_time - timedelta(days=1)
     
-    category_state = category_service.get_category_state(
+    category_state = category_service.get_category_stats(
         start_time=start_time,
         end_time=end_time,
         include="duration,app,title",
