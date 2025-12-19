@@ -8,6 +8,7 @@ import CategorizationPage from './components/CategorizationPage';
 import AIChatPanel from './components/AIChatPanel';
 import { incrementalSync } from './services/syncService';
 import UsagePage from './components/UsagePage';
+import HomeV2 from './page/home-v2/HomeV2';
 function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState('home');
@@ -81,11 +82,12 @@ function App() {
           }`}
       >
         {currentPage === 'home' && <Dashboard />}
+        {currentPage === 'home-v2' && <HomeV2 />}
         {currentPage === 'timeline' && <TimelinePage />}
         {currentPage === 'categorization' && <CategorizationPage />}
 
         {/* Fallback for pages not yet implemented */}
-        {!['home', 'timeline', 'categorization'].includes(currentPage) && (
+        {!['home', 'home-v2', 'timeline', 'categorization'].includes(currentPage) && (
           <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-fade-in">
             <h2 className="text-2xl font-bold text-slate-300 mb-2">Coming Soon</h2>
             <p className="text-slate-400">The {currentPage} module is currently under development.</p>
