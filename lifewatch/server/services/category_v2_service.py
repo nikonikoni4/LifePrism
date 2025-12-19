@@ -6,6 +6,7 @@ from lifewatch.server.providers.statistical_data_providers import server_lw_data
 from lifewatch.server.schemas.category_v2_schemas import (
     CategoryTreeResponse,
     CategoryStatsResponse,
+    CategoryStatsIncludeOptions,
     CategoryDef,
     SubCategoryDef,
     AppUseInfo,
@@ -100,7 +101,7 @@ class CategoryService:
     def get_category_stats(self,
                             start_time: datetime,
                             end_time: datetime,
-                            include: str,
+                            include_options: CategoryStatsIncludeOptions,
                             top_title: int,
                             category: str,
                             sub_category: str) -> CategoryStatsResponse:
@@ -110,7 +111,7 @@ class CategoryService:
         Args:
             start_time: 开始时间
             end_time: 结束时间
-            include: 包含的数据类型，逗号分隔（app, duration, title）
+            include_options: 包含选项（由 API 层解析后传入）
             top_title: 返回的 Top 标题数量
             category: 按主分类ID筛选（可选）
             sub_category: 按子分类ID筛选（可选）
@@ -127,11 +128,10 @@ class CategoryService:
             raise ValueError(f"end_time ({end_time}) 不能大于当前时间 ({now})")
         
         try:
-            # 解析 include 参数
-            include_set = set(item.strip() for item in include.split(','))
-            include_duration = 'duration' in include_set
-            include_app = 'app' in include_set
-            include_title = 'title' in include_set
+            # 直接使用结构化的 include 选项（由 API 层解析）
+            include_duration = include_options.include_duration
+            include_app = include_options.include_app
+            include_title = include_options.include_title
             
             # 转换时间为字符串格式
             start_time_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -153,7 +153,8 @@ class CategoryService:
                     category, 
                     sub_category,
                     start_time_str, 
-                    end_time_str
+                    end_time_str,
+                    include_options
                 )
             
             # 应用筛选条件
@@ -165,7 +166,8 @@ class CategoryService:
             if behavior_df.empty:
                 return self._build_empty_category_state(
                     category, sub_category,
-                    start_time_str, end_time_str
+                    start_time_str, end_time_str,
+                    include_options
                 )
             
             # 计算总时长（用于百分比计算）
@@ -213,7 +215,7 @@ class CategoryService:
                 query={
                     "start_time": start_time_str,
                     "end_time": end_time_str,
-                    "include": include,
+                    "include_options": include_options.model_dump(),
                     "category": category,
                     "sub_category": sub_category
                 }
@@ -308,7 +310,8 @@ class CategoryService:
                                      category_filter: str,
                                      sub_category_filter: str,
                                      start_time_str: str,
-                                     end_time_str: str) -> CategoryStatsResponse:
+                                     end_time_str: str,
+                                     include_options: CategoryStatsIncludeOptions) -> CategoryStatsResponse:
         """构建空数据状态响应"""
         
         # 如果有筛选条件，只返回筛选的分类
@@ -354,6 +357,7 @@ class CategoryService:
             query={
                 "start_time": start_time_str,
                 "end_time": end_time_str,
+                "include_options": include_options.model_dump(),
                 "category": category_filter,
                 "sub_category": sub_category_filter
             }

@@ -122,6 +122,35 @@ class CategoryStatsResponse(BaseModel):
     query: dict | None = Field(default=None, description="查询参数回显（调试用）")
 
 
+class CategoryStatsIncludeOptions(BaseModel):
+    """
+    分类统计 include 选项
+    
+    用于在 API 层解析 include 字符串后，以类型安全的方式传递给 Service 层
+    """
+    include_duration: bool = Field(default=True, description="是否包含时长统计")
+    include_app: bool = Field(default=True, description="是否包含应用列表")
+    include_title: bool = Field(default=True, description="是否包含标题列表")
+    
+    @classmethod
+    def from_include_string(cls, include_str: str) -> "CategoryStatsIncludeOptions":
+        """
+        从逗号分隔的字符串解析选项
+        
+        Args:
+            include_str: 如 "app,duration,title"
+            
+        Returns:
+            CategoryStatsIncludeOptions 实例
+        """
+        include_set = {item.strip().lower() for item in include_str.split(',')}
+        return cls(
+            include_duration='duration' in include_set,
+            include_app='app' in include_set,
+            include_title='title' in include_set
+        )
+
+
 # ============================================================================
 # CRUD 请求/响应模型
 # ============================================================================
@@ -153,8 +182,3 @@ class UpdateSubCategoryRequest(BaseModel):
     name: str = Field(..., description="新的子分类名称")
 
 
-class StandardResponse(BaseModel):
-    """通用响应模型"""
-    success: bool = Field(..., description="操作是否成功")
-    data: dict | None = Field(default=None, description="响应数据")
-    message: str | None = Field(default=None, description="响应消息")
