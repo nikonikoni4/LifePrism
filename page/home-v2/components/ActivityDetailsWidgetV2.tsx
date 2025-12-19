@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { DashboardAPI } from '../../services/dashboardService';
-import { TopItem, DashboardResponse } from '../../types';
+import { TopAppDataV2, TopTitleDataV2 } from '../types';
+import { ActivityAPIV2 } from '../api';
 import { Monitor, Smartphone } from 'lucide-react';
 
 // Helper to format duration seconds to string
@@ -13,7 +13,14 @@ const formatDuration = (seconds: number): string => {
   return remainingMinutes === 0 ? `${hours}h` : `${hours}h ${remainingMinutes}m`;
 };
 
-const ActivityBar: React.FC<{ item: TopItem; colorClass: string; barColor: string }> = ({ item, colorClass, barColor }) => (
+// TopItem 类型兼容（用于 ActivityBar 组件）
+interface TopItemV2 {
+  name: string;
+  duration: number;
+  percentage: number;
+}
+
+const ActivityBar: React.FC<{ item: TopItemV2; colorClass: string; barColor: string }> = ({ item, colorClass, barColor }) => (
   <div className="mb-5 last:mb-0 group">
     <div className="flex justify-between items-center mb-2">
       <div className="flex items-center gap-3 overflow-hidden">
@@ -39,34 +46,37 @@ const ActivityBar: React.FC<{ item: TopItem; colorClass: string; barColor: strin
   </div>
 );
 
-interface ActivityDetailsWidgetProps {
+interface ActivityDetailsWidgetV2Props {
   selectedDate: string;
-  dashboardData?: DashboardResponse; // Optional: if provided, use this data instead of fetching
+  topApps?: TopAppDataV2[];  // Optional: if provided, use this data instead of fetching
+  topTitles?: TopTitleDataV2[];  // Optional: if provided, use this data instead of fetching
 }
 
-const ActivityDetailsWidget: React.FC<ActivityDetailsWidgetProps> = ({ selectedDate, dashboardData }) => {
-  const [topApps, setTopApps] = useState<TopItem[]>([]);
-  const [topWindows, setTopWindows] = useState<TopItem[]>([]);
+const ActivityDetailsWidgetV2: React.FC<ActivityDetailsWidgetV2Props> = ({ selectedDate, topApps: propsTopApps, topTitles: propsTopTitles }) => {
+  const [topApps, setTopApps] = useState<TopAppDataV2[]>([]);
+  const [topWindows, setTopWindows] = useState<TopTitleDataV2[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // If dashboardData is provided, use it directly
-    if (dashboardData) {
-      setTopApps(dashboardData.summary.top_apps);
-      setTopWindows(dashboardData.summary.top_titles);
+    // If props data is provided, use it directly
+    if (propsTopApps && propsTopTitles) {
+      setTopApps(propsTopApps);
+      setTopWindows(propsTopTitles);
       return;
     }
 
-    // Otherwise, fetch data from API (backward compatibility)
+    // Otherwise, fetch data from V2 API
     const fetchData = async () => {
       setLoading(true);
       try {
-        const data = await DashboardAPI.getDashboardData(selectedDate);
-        setTopApps(data.summary.top_apps);
-        setTopWindows(data.summary.top_titles);
+        const response = await ActivityAPIV2.getStats({
+          date: selectedDate,
+          include: 'top_app,top_title',
+        });
+        setTopApps(response.top_app || []);
+        setTopWindows(response.top_title || []);
       } catch (error) {
         console.error('Failed to load activity details:', error);
-        // Fallback to empty or handle error UI
         setTopApps([]);
         setTopWindows([]);
       } finally {
@@ -77,7 +87,7 @@ const ActivityDetailsWidget: React.FC<ActivityDetailsWidgetProps> = ({ selectedD
     if (selectedDate) {
       fetchData();
     }
-  }, [selectedDate, dashboardData]);
+  }, [selectedDate, propsTopApps, propsTopTitles]);
 
   if (loading) {
     return (
@@ -131,4 +141,4 @@ const ActivityDetailsWidget: React.FC<ActivityDetailsWidgetProps> = ({ selectedD
   );
 };
 
-export default ActivityDetailsWidget;
+export default ActivityDetailsWidgetV2;

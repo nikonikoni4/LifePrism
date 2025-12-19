@@ -6,6 +6,8 @@
 
 import React, { useState } from 'react';
 import ActivitySummaryHeaderV2 from './components/ActivitySummaryHeaderV2';
+import ActivityDetailsWidgetV2 from './components/ActivityDetailsWidgetV2';
+import TodoListWidgetV2 from './components/TodoListWidgetV2';
 
 // 获取今天日期 YYYY-MM-DD 格式
 const getTodayDate = (): string => {
@@ -40,34 +42,26 @@ const HomeV2: React.FC = () => {
                 onRefresh={handleRefresh}
             />
 
-            {/* 占位符：其他组件将在后续添加 */}
+            {/* TodoList & Time Overview */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* TodoList Widget - 使用 V2 API */}
+                <TodoListWidgetV2
+                    key={`todolist-${refreshKey}`}
+                    selectedDate={selectedDate}
+                />
+
                 {/* Time Overview Placeholder */}
                 <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
                     <h3 className="text-lg font-semibold text-slate-700 mb-4">Time Overview V2</h3>
                     <p className="text-slate-400 text-sm">组件开发中...</p>
                 </div>
-
-                {/* Goals Widget Placeholder */}
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-                    <h3 className="text-lg font-semibold text-slate-700 mb-4">Goals Widget V2</h3>
-                    <p className="text-slate-400 text-sm">组件开发中...</p>
-                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Top Apps Placeholder */}
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-                    <h3 className="text-lg font-semibold text-slate-700 mb-4">Top Applications V2</h3>
-                    <p className="text-slate-400 text-sm">组件开发中...</p>
-                </div>
-
-                {/* Top Titles Placeholder */}
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-                    <h3 className="text-lg font-semibold text-slate-700 mb-4">Top Titles V2</h3>
-                    <p className="text-slate-400 text-sm">组件开发中...</p>
-                </div>
-            </div>
+            {/* Top Apps & Top Titles - 使用 V2 API */}
+            <ActivityDetailsWidgetV2
+                key={`details-${refreshKey}`}
+                selectedDate={selectedDate}
+            />
         </div>
     );
 };

@@ -60,12 +60,14 @@ export interface TimeOverviewDataV2 {
 export interface TopTitleDataV2 {
     name: string;  // 窗口标题
     duration: number;  // 活跃时长（秒）
+    percentage: number;  // 活跃时长占比（%）
 }
 
 /** 热门应用数据 */
 export interface TopAppDataV2 {
     name: string;  // 应用名称
     duration: number;  // 活跃时长（秒）
+    percentage: number;  // 活跃时长占比（%）
 }
 
 // ============================================================================
@@ -74,8 +76,10 @@ export interface TopAppDataV2 {
 
 /** 待办事项数据 */
 export interface TodoListDataV2 {
+    id: number;
     name: string;  // 待办事项名称
     isCompleted: boolean;  // 是否完成
+    linkToGoal: number;  // 关联目标ID
 }
 
 // ============================================================================
