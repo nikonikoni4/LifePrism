@@ -56,18 +56,18 @@ class ServerLWDataProvider(LWBaseDataProvider):
         return result[0] if result and result[0] is not None else 0
     
 
-    def get_top_applications(self,top_n) -> list[dict]:
+    def get_top_applications(self,date,top_n) -> list[dict]:
         """
         获取指定日期的Top应用排行
         arg:
+            date: 日期字符串 (YYYY-MM-DD)
             top_n: int, Top N
         return 
             list[dict], Top应用排行:
                 name: str, 应用名称
                 duration: int, 活跃时长(秒)
         """
-        if not self._current_date:
-            raise AttributeError("请先使用 self.current_date = 'YYYY-MM-DD' 设置日期。")
+        self.current_date = date
         sql = """
         SELECT app, SUM(duration) as total_duration
         FROM user_app_behavior_log
@@ -84,18 +84,18 @@ class ServerLWDataProvider(LWBaseDataProvider):
             
         return [{"name": row[0], "duration": row[1]} for row in results]
 
-    def get_top_title(self, top_n) -> list[dict]:
+    def get_top_title(self, date,top_n) -> list[dict]:
         """
         获取指定日期的Top窗口标题排行
         arg:
+            date: 日期字符串 (YYYY-MM-DD)
             top_n: int, Top N
         return 
             list[dict], Top窗口标题排行:
                 name: str, 窗口标题
                 duration: int, 活跃时长(秒)
         """
-        if not self._current_date:
-            raise AttributeError("请先使用 self.current_date = 'YYYY-MM-DD' 设置日期。")
+        self.current_date = date
         sql = """
         SELECT title, SUM(duration) as total_duration
         FROM user_app_behavior_log
