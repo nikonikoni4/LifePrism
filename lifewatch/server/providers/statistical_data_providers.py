@@ -20,7 +20,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
         self._current_date = None
         self._start_time = None
         self._end_time = None
-
+    
     @property
     def current_date(self):
         if not self._current_date:
