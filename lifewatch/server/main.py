@@ -16,7 +16,7 @@ from lifewatch.server.api import (
 )
 from lifewatch.server.api.timeline import router as timeline_router
 from lifewatch.storage.lw_table_manager import init_database
-
+from lifewatch.server.providers.category_color_provider import initialize_category_colors
 logger = logging.getLogger(__name__)
 
 
@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI):
     logger.info("正在初始化 LifeWatch 数据库...")
     try:
         init_database()
+        initialize_category_colors()
         logger.info("✅ 数据库初始化成功")
     except Exception as e:
         logger.error(f"❌ 数据库初始化失败: {e}")
@@ -98,6 +99,10 @@ app.include_router(categories_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
 app.include_router(activity_summary_router, prefix="/api/v1")
 app.include_router(timeline_router, prefix="/api/v1")
+
+# V2 API 路由
+from lifewatch.server.api import category_v2_router
+app.include_router(category_v2_router, prefix="/api/v2")
 
 
 

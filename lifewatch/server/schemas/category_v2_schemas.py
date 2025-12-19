@@ -120,3 +120,41 @@ class CategoryStateResponse(BaseModel):
     """GET /category/state 响应"""
     data: list[CategoryDef]
     query: dict | None = Field(default=None, description="查询参数回显（调试用）")
+
+
+# ============================================================================
+# CRUD 请求/响应模型
+# ============================================================================
+
+class CreateCategoryRequest(BaseModel):
+    """创建主分类请求"""
+    name: str = Field(..., description="分类名称")
+    color: str = Field(..., description="分类颜色（十六进制格式，如 #5B8FF9）")
+
+
+class UpdateCategoryRequest(BaseModel):
+    """更新主分类请求"""
+    name: str | None = Field(default=None, description="新的分类名称")
+    color: str | None = Field(default=None, description="新的分类颜色")
+
+
+class DeleteCategoryRequest(BaseModel):
+    """删除主分类请求"""
+    reassign_to: str = Field(default="other", description="重新分配关联记录到的分类ID")
+
+
+class CreateSubCategoryRequest(BaseModel):
+    """创建子分类请求"""
+    name: str = Field(..., description="子分类名称")
+
+
+class UpdateSubCategoryRequest(BaseModel):
+    """更新子分类请求"""
+    name: str = Field(..., description="新的子分类名称")
+
+
+class StandardResponse(BaseModel):
+    """通用响应模型"""
+    success: bool = Field(..., description="操作是否成功")
+    data: dict | None = Field(default=None, description="响应数据")
+    message: str | None = Field(default=None, description="响应消息")
