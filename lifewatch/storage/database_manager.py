@@ -13,16 +13,15 @@ from queue import Queue, Empty
 import threading
 import atexit
 import logging
-
+from lifewatch.utils import get_logger
 from lifewatch.config.database import (
     get_table_config, 
 )
 
 # 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
-
+    
 class DatabaseManager:
     """数据库管理器 - 配置驱动的增强版"""
     
