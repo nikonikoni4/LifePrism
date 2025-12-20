@@ -142,14 +142,53 @@ class TimelineService:
         """
         from collections import defaultdict
         
-        # 1. 从 data_provider 获取数据
-        events = self.data_provider.get_events_by_time_range(date, start_hour, end_hour)
+        # 1. 将小时浮点数转换为时间字符串
+        start_min = int((start_hour % 1) * 60)
+        end_min = int((end_hour % 1) * 60)
+        start_time_str = f"{date} {int(start_hour):02d}:{start_min:02d}:00"
+        end_time_str = f"{date} {int(end_hour):02d}:{end_min:02d}:00"
         
-        # 2. 使用 color_manager 获取颜色
+        # 2. 使用新的统一方法获取数据
+        raw_events, _ = self.data_provider.get_activity_logs(
+            start_time=start_time_str,
+            end_time=end_time_str,
+            query_fields=["id", "start_time", "end_time", "duration", "app", 
+                         "category_id", "sub_category_id"],
+            order_desc=False
+        )
+        
+        # 3. 计算实际重叠时长（与旧的 get_events_by_time_range 逻辑相同）
+        range_start = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+        range_end = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+        
+        events = []
+        for event in raw_events:
+            event_start = datetime.strptime(event["start_time"], "%Y-%m-%d %H:%M:%S")
+            event_end = datetime.strptime(event["end_time"], "%Y-%m-%d %H:%M:%S")
+            
+            # 计算实际重叠时长（秒）
+            overlap_start = max(event_start, range_start)
+            overlap_end = min(event_end, range_end)
+            overlap_duration = max(0, (overlap_end - overlap_start).total_seconds())
+            
+            if overlap_duration > 0:
+                events.append({
+                    "id": event["id"],
+                    "start_time": event["start_time"],
+                    "end_time": event["end_time"],
+                    "duration": int(overlap_duration),  # 使用重叠时长
+                    "app": event["app"],
+                    "category_id": event.get("category_id") or "",
+                    "category_name": event.get("category_name") or "",
+                    "sub_category_id": event.get("sub_category_id") or "",
+                    "sub_category_name": event.get("sub_category_name") or ""
+                })
+        
+        # 4. 使用 color_manager 获取颜色
         main_colors = color_manager.get_all_main_colors()
         sub_colors = color_manager.get_all_sub_colors()
         
-        # 3. 构建根级别数据 (Category)
+        # 5. 构建根级别数据 (Category)
         root_data = self._build_overview_data(
             events=events,
             group_field="category_id",
@@ -162,7 +201,7 @@ class TimelineService:
             include_blank=True  # 只在根级别添加空白
         )
         
-        # 4. 构建 details (Sub-category)
+        # 6. 构建 details (Sub-category)
         root_data["details"] = {}
         
         # 按主分类分组
@@ -187,7 +226,7 @@ class TimelineService:
                 include_blank=False  # 子级别不添加空白
             )
             
-            # 5. 构建 Level 3 (App) - 在每个子分类下添加应用级别
+            # 7. 构建 Level 3 (App) - 在每个子分类下添加应用级别
             cat_data["details"] = {}
             
             # 按子分类分组

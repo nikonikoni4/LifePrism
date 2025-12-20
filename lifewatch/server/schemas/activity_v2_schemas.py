@@ -183,13 +183,15 @@ class ActivityLogItem(BaseModel):
     """活动日志条目（框架）"""
     # TODO: 根据业务需求补充具体字段
     id: str = Field(..., description="日志ID")
-    timestamp: str = Field(..., description="时间戳")
+    start_time: str = Field(..., description="开始时间")
+    end_time: str = Field(..., description="结束时间")
     app: str = Field(..., description="应用名称")
     title: str = Field(..., description="窗口标题")
     duration: int = Field(..., description="持续时长（秒）")
     category_id: Optional[str] = Field(default=None, description="主分类ID")
     sub_category_id: Optional[str] = Field(default=None, description="子分类ID")
-
+    category: Optional[str] = Field(default=None, description="主分类")
+    sub_category: Optional[str] = Field(default=None, description="子分类")
 
 class ActivityLogsResponse(BaseModel):
     """GET /activity/logs 响应"""
@@ -198,4 +200,7 @@ class ActivityLogsResponse(BaseModel):
     page: int = Field(..., description="当前页码")
     page_size: int = Field(..., description="每页数量")
 
+class ActivityLogDetailResponse(BaseModel):
+    """GET /activity/logs/{log_id} 响应"""
+    data: ActivityLogItem = Field(..., description="日志详情")
 

@@ -5,6 +5,10 @@ import pandas as pd
 from typing import Optional
 from datetime import datetime
 from lifewatch.storage import LWBaseDataProvider
+from lifewatch.utils import get_logger
+from lifewatch.config.database import get_table_columns
+
+logger = get_logger(__name__)
 
 
 class ServerLWDataProvider(LWBaseDataProvider):
@@ -181,86 +185,164 @@ class ServerLWDataProvider(LWBaseDataProvider):
                 for row in results if row[0] is not None
             ]
     
-    def get_events_by_time_range(self, date: str, start_hour: float, end_hour: float) -> list[dict]:
+    def get_activity_logs(
+        self,
+        date: Optional[str] = None,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        category_id: Optional[str] = None,
+        sub_category_id: Optional[str] = None,
+        query_fields: Optional[list[str]] = None,
+        page: Optional[int] = None,
+        page_size: Optional[int] = None,
+        order_by: str = "start_time",
+        order_desc: bool = True
+    ) -> tuple[list[dict], int]:
         """
-        获取指定日期和时间范围内的事件数据（用于 Timeline Overview）
+        统一的活动日志查询方法
+        
+        支持按日期或时间范围查询，支持分类过滤和分页，支持自定义返回字段
         
         Args:
-            date: 日期 (YYYY-MM-DD)
-            start_hour: 开始小时 (浮点数，如 12.5 = 12:30)
-            end_hour: 结束小时 (浮点数)
+            date: 查询日期 (YYYY-MM-DD 格式)，会自动设置 start_time 和 end_time 为当天范围
+            start_time: 开始时间 (YYYY-MM-DD HH:MM:SS 格式)
+            end_time: 结束时间 (YYYY-MM-DD HH:MM:SS 格式)
+            category_id: 主分类ID筛选（可选）
+            sub_category_id: 子分类ID筛选（可选）
+            query_fields: 要查询的字段列表（可选，默认返回常用字段）
+            page: 页码（从1开始，可选，不传则不分页）
+            page_size: 每页数量（可选，不传则不分页）
+            order_by: 排序字段（默认 start_time）
+            order_desc: 是否降序（默认 True）
         
         Returns:
-            list[dict]: 事件列表，包含 category_id, category_name, sub_category_id, 
-                       sub_category_name, duration (重新计算的重叠时长), start_time, end_time, app
+            tuple[list[dict], int]: (日志列表, 总记录数)
+        
+        Raises:
+            ValueError: 如果 query_fields 包含无效字段
         """
-        from datetime import datetime
+        # 1. 确定时间范围
+        if date:
+            # 使用 current_date setter 自动设置时间范围
+            self.current_date = date
+            query_start_time = self._start_time
+            query_end_time = self._end_time
+        elif start_time and end_time:
+            query_start_time = start_time
+            query_end_time = end_time
+        else:
+            raise ValueError("必须提供 date 或 (start_time 和 end_time)")
         
-        # 计算精确时间范围
-        start_min = int((start_hour % 1) * 60)
-        end_min = int((end_hour % 1) * 60)
-        start_time_str = f"{date} {int(start_hour):02d}:{start_min:02d}:00"
-        end_time_str = f"{date} {int(end_hour):02d}:{end_min:02d}:00"
+        # 2. 验证并构建查询字段
+        valid_columns = get_table_columns("user_app_behavior_log")
         
-        # 修改 SQL：查找所有与时间范围有重叠的事件
-        # 条件：事件开始时间 < 范围结束时间 AND 事件结束时间 > 范围开始时间
-        sql = """
-        SELECT 
-            uabl.id,
-            uabl.start_time,
-            uabl.end_time,
-            uabl.duration,
-            uabl.app,
-            uabl.category_id,
-            c.name as category_name,
-            uabl.sub_category_id,
-            sc.name as sub_category_name
+        # 默认查询字段
+        default_fields = ["id", "start_time", "end_time", "duration", "app", "title", 
+                          "category_id", "sub_category_id"]
+        
+        if query_fields:
+            # 验证字段是否有效
+            invalid_fields = [f for f in query_fields if f not in valid_columns]
+            if invalid_fields:
+                raise ValueError(f"无效的查询字段: {invalid_fields}，有效字段: {valid_columns}")
+            select_fields = query_fields
+        else:
+            select_fields = default_fields
+        
+        # 3. 构建 SELECT 子句（带表别名和 JOIN 字段）
+        select_parts = []
+        join_category = False
+        join_sub_category = False
+        
+        for field in select_fields:
+            select_parts.append(f"uabl.{field}")
+        
+        # 添加关联字段
+        if "category_id" in select_fields:
+            select_parts.append("c.name as category_name")
+            join_category = True
+        if "sub_category_id" in select_fields:
+            select_parts.append("sc.name as sub_category_name")
+            join_sub_category = True
+        
+        select_clause = ", ".join(select_parts)
+        
+        # 4. 构建 WHERE 条件
+        where_conditions = ["uabl.start_time >= ?", "uabl.start_time <= ?"]
+        params = [query_start_time, query_end_time]
+        
+        if category_id:
+            where_conditions.append("uabl.category_id = ?")
+            params.append(category_id)
+        
+        if sub_category_id:
+            where_conditions.append("uabl.sub_category_id = ?")
+            params.append(sub_category_id)
+        
+        where_clause = " AND ".join(where_conditions)
+        
+        # 5. 构建 JOIN 子句
+        join_clause = ""
+        if join_category:
+            join_clause += " LEFT JOIN category c ON uabl.category_id = c.id"
+        if join_sub_category:
+            join_clause += " LEFT JOIN sub_category sc ON uabl.sub_category_id = sc.id"
+        
+        # 6. 构建 ORDER BY 子句
+        order_direction = "DESC" if order_desc else "ASC"
+        order_clause = f"ORDER BY uabl.{order_by} {order_direction}"
+        
+        # 7. 查询总数
+        count_sql = f"""
+        SELECT COUNT(*) 
         FROM user_app_behavior_log uabl
-        LEFT JOIN category c ON uabl.category_id = c.id
-        LEFT JOIN sub_category sc ON uabl.sub_category_id = sc.id
-        WHERE uabl.start_time < ? AND uabl.end_time > ?
-        ORDER BY uabl.start_time ASC
+        WHERE {where_clause}
         """
+        
+        # 8. 构建数据查询 SQL
+        data_sql = f"""
+        SELECT {select_clause}
+        FROM user_app_behavior_log uabl
+        {join_clause}
+        WHERE {where_clause}
+        {order_clause}
+        """
+        
+        # 9. 添加分页
+        pagination_params = []
+        if page is not None and page_size is not None:
+            offset = (page - 1) * page_size
+            data_sql += " LIMIT ? OFFSET ?"
+            pagination_params = [page_size, offset]
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            # 注意参数顺序：start_time < end_time_str AND end_time > start_time_str
-            cursor.execute(sql, (end_time_str, start_time_str))
+            
+            # 获取总数
+            cursor.execute(count_sql, params)
+            total = cursor.fetchone()[0]
+            
+            # 获取数据
+            cursor.execute(data_sql, params + pagination_params)
             results = cursor.fetchall()
+            
+            # 获取列名
+            column_names = [description[0] for description in cursor.description]
         
-        # 解析范围边界时间
-        range_start = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
-        range_end = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
-        
-        events = []
+        # 10. 转换为字典列表
+        logs = []
         for row in results:
-            event_start_str = row[1]
-            event_end_str = row[2]
-            
-            # 解析事件时间
-            event_start = datetime.strptime(event_start_str, "%Y-%m-%d %H:%M:%S")
-            event_end = datetime.strptime(event_end_str, "%Y-%m-%d %H:%M:%S")
-            
-            # 计算实际重叠时长（秒）
-            overlap_start = max(event_start, range_start)
-            overlap_end = min(event_end, range_end)
-            overlap_duration = max(0, (overlap_end - overlap_start).total_seconds())
-            
-            # 只添加有实际重叠的事件
-            if overlap_duration > 0:
-                events.append({
-                    "id": row[0],
-                    "start_time": event_start_str,
-                    "end_time": event_end_str,
-                    "duration": int(overlap_duration),  # 使用重叠时长
-                    "app": row[4],
-                    "category_id": row[5] or "",
-                    "category_name": row[6] or "",
-                    "sub_category_id": row[7] or "",
-                    "sub_category_name": row[8] or ""
-                })
+            log_item = {}
+            for i, col_name in enumerate(column_names):
+                value = row[i]
+                # 将 ID 字段转换为字符串
+                if col_name in ("id", "category_id", "sub_category_id") and value is not None:
+                    value = str(value)
+                log_item[col_name] = value
+            logs.append(log_item)
         
-        return events
+        logger.debug(f"获取活动日志: {len(logs)} 条, 总数: {total}")
+        return logs, total
 
     def get_range_active_time(self, start_date: str, end_date: str) -> int:
         """
@@ -334,34 +416,56 @@ class ServerLWDataProvider(LWBaseDataProvider):
     
     def get_timeline_events_by_date(self, date: str, channel: str = 'pc') -> list[dict]:
         """
-        获取指定日期的时间线事件数据
+        获取指定日期的时间线事件数据（封装方法）
+        
+        内部调用 get_activity_logs，保留向后兼容性
         
         Args:
             date: str, 日期（YYYY-MM-DD 格式）
             channel: str, 数据通道 ('pc' 或 'mobile'，当前仅支持 'pc')
         
         Returns:
-            list[dict], 事件列表:
-                id: str, 事件ID
-                start_time: str, 开始时间（ISO格式）
-                end_time: str, 结束时间（ISO格式）
-                duration: int, 持续时间（秒）
-                app: str, 应用名称
-                title: str, 窗口标题
-                category_id: str, 主分类ID
-                category_name: str, 主分类名称
-                sub_category_id: str, 子分类ID
-                sub_category_name: str, 子分类名称
-                app_description: str, 应用描述
-                title_analysis: str, 标题描述
-                device_type: str, 设备类型（'pc' 或 'mobile'）
+            list[dict]: 事件列表
         """
-        # 设置日期范围
-        self.current_date = date
+        # 调用统一方法
+        logs, _ = self.get_activity_logs(
+            date=date,
+            query_fields=["id", "start_time", "end_time", "duration", "app", "title", 
+                         "category_id", "sub_category_id"],
+            order_desc=False  # 升序
+        )
         
-        # TODO: 未来根据 channel 参数从不同数据源获取数据
-        # 当前阶段仅实现 PC 端数据，忽略 channel 参数
+        # 转换为旧的返回格式
+        events = []
+        for log in logs:
+            events.append({
+                "id": log.get("id"),
+                "start_time": log.get("start_time"),
+                "end_time": log.get("end_time"),
+                "duration": log.get("duration"),
+                "app": log.get("app"),
+                "title": log.get("title"),
+                "category_id": log.get("category_id") or "",
+                "category_name": log.get("category_name") or "",
+                "sub_category_id": log.get("sub_category_id") or "",
+                "sub_category_name": log.get("sub_category_name") or "",
+                "app_description": "",  # 新方法不返回此字段
+                "title_analysis": "",   # 新方法不返回此字段
+                "device_type": "pc"
+            })
         
+        return events
+    
+    def get_activity_log_by_id(self, log_id: str) -> Optional[dict]:
+        """
+        根据 ID 获取单条活动日志
+        
+        Args:
+            log_id: 日志ID
+        
+        Returns:
+            dict: 日志详情，如果不存在返回 None
+        """
         sql = """
         SELECT 
             uabl.id,
@@ -373,42 +477,33 @@ class ServerLWDataProvider(LWBaseDataProvider):
             uabl.category_id,
             c.name as category_name,
             uabl.sub_category_id,
-            sc.name as sub_category_name,
-            apc.app_description,
-            apc.title_analysis
+            sc.name as sub_category_name
         FROM user_app_behavior_log uabl
         LEFT JOIN category c ON uabl.category_id = c.id
         LEFT JOIN sub_category sc ON uabl.sub_category_id = sc.id
-        LEFT JOIN app_purpose_category apc ON uabl.app = apc.app
-        WHERE uabl.start_time >= ? AND uabl.start_time <= ?
-        ORDER BY uabl.start_time ASC
+        WHERE uabl.id = ?
         """
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (self._start_time, self._end_time))
-            results = cursor.fetchall()
+            cursor.execute(sql, (log_id,))
+            row = cursor.fetchone()
         
-        # 转换为字典列表
-        events = []
-        for row in results:
-            events.append({
-                "id": row[0],
-                "start_time": row[1],
-                "end_time": row[2],
-                "duration": row[3],
-                "app": row[4],
-                "title": row[5],
-                "category_id": row[6] or "",
-                "category_name": row[7] or "",
-                "sub_category_id": row[8] or "",
-                "sub_category_name": row[9] or "",
-                "app_description": row[10] or "",
-                "title_analysis": row[11] or "",
-                "device_type": "pc"  # 当前阶段固定为 'pc'
-            })
+        if not row:
+            return None
         
-        return events
+        return {
+            "id": str(row[0]),
+            "start_time": row[1],
+            "end_time": row[2],
+            "duration": row[3],
+            "app": row[4],
+            "title": row[5],
+            "category_id": str(row[6]) if row[6] else None,
+            "category_name": row[7],
+            "sub_category_id": str(row[8]) if row[8] else None,
+            "sub_category_name": row[9]
+        }
 
     def update_event_category(self, event_id: str, category_id: str, sub_category_id: str = None) -> bool:
         """
@@ -472,6 +567,10 @@ class ServerLWDataProvider(LWBaseDataProvider):
         
         return df
 
+
+
+        
+        
 
 # ==================== 模块级单例 ====================
 server_lw_data_provider = ServerLWDataProvider()

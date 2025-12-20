@@ -11,7 +11,9 @@ from lifewatch.server.schemas.activity_v2_schemas import (
     ActivityStatsIncludeOptions,
     ActivityStatsResponse,
     ActivityLogsResponse,
+    ActivityLogItem,
 )
+from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
 from lifewatch.server.services.activity_stats_builder import (
     build_activity_summary,
     build_time_overview,
@@ -82,12 +84,14 @@ class ActivityService:
         return result
     
     # ========================================================================
-    # 日志相关方法（待实现）
+    # 日志相关方法
     # ========================================================================
     
     def get_activity_logs(
         self,
-        date: str,
+        date: Optional[str],
+        start_time: Optional[str],
+        end_time: Optional[str],
         device_filter: str,
         category_id: Optional[str],
         sub_category_id: Optional[str],
@@ -97,9 +101,13 @@ class ActivityService:
         """
         获取活动日志列表
         
+        支持按日期或时间范围查询，使用 provider 的统一查询方法
+        
         Args:
-            date: 查询日期 (YYYY-MM-DD 格式)
-            device_filter: 设备过滤 (all/pc/mobile)
+            date: 查询日期 (YYYY-MM-DD 格式)，提供时查询整天数据
+            start_time: 开始时间 (YYYY-MM-DD HH:MM:SS 格式)
+            end_time: 结束时间 (YYYY-MM-DD HH:MM:SS 格式)
+            device_filter: 设备过滤 (all/pc/mobile)，当前未使用
             category_id: 主分类ID筛选
             sub_category_id: 子分类ID筛选
             page: 页码
@@ -107,19 +115,72 @@ class ActivityService:
             
         Returns:
             ActivityLogsResponse: 日志列表响应
+            
+        Note:
+            必须提供 date 或 (start_time 和 end_time) 之一
         """
-        # TODO: 实现业务逻辑
+        # 通过 provider 的统一方法获取数据
+        logs, total = server_lw_data_provider.get_activity_logs(
+            date=date,
+            start_time=start_time,
+            end_time=end_time,
+            category_id=category_id,
+            sub_category_id=sub_category_id,
+            page=page,
+            page_size=page_size
+        )
+        
+        # 转换为 ActivityLogItem 列表
+        log_items = [
+            ActivityLogItem(
+                id=log["id"],
+                start_time=log["start_time"],
+                end_time=log["end_time"],
+                app=log["app"],
+                title=log["title"],
+                duration=log["duration"],
+                category_id=log.get("category_id"),
+                sub_category_id=log.get("sub_category_id"),
+                category=log.get("category_name"),
+                sub_category=log.get("sub_category_name")
+            )
+            for log in logs
+        ]
+        
         return ActivityLogsResponse(
-            data=[],
-            total=0,
+            data=log_items,
+            total=total,
             page=page,
             page_size=page_size
         )
     
-    def get_activity_log_detail(self, log_id: str):
-        """获取单条日志详情"""
-        # TODO: 实现业务逻辑
-        return None
+    def get_activity_log_detail(self, log_id: str) -> Optional[ActivityLogItem]:
+        """
+        获取单条日志详情
+        
+        Args:
+            log_id: 日志ID
+            
+        Returns:
+            ActivityLogItem: 日志详情，如果不存在返回 None
+        """
+        log = server_lw_data_provider.get_activity_log_by_id(log_id)
+        
+        if not log:
+            return None
+        
+        return ActivityLogItem(
+            id=log["id"],
+            start_time=log["start_time"],
+            end_time=log["end_time"],
+            app=log["app"],
+            title=log["title"],
+            duration=log["duration"],
+            category_id=log.get("category_id"),
+            sub_category_id=log.get("sub_category_id"),
+            category=log.get("category_name"),
+            sub_category=log.get("sub_category_name")
+        )
     
     def update_log_category(
         self,
