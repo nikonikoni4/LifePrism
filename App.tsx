@@ -7,7 +7,7 @@ import Timeline from './page/timeline/Timeline';
 import CategorizationPage from './components/CategorizationPage';
 import AIChatPanel from './components/AIChatPanel';
 import { incrementalSync } from './services/syncService';
-import UsagePage from './components/UsagePage';
+import UsagePage from './page/usage/UsagePage';
 import HomeV2 from './page/home-v2/HomeV2';
 import CategoryPage from './page/category/CategoryPage';
 
