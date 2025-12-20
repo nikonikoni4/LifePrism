@@ -111,9 +111,10 @@ class TimeOverviewData(BaseModel):
     title: str = Field(..., description="旭日图标题") 
     sub_title: str = Field(..., alias="subTitle", description="旭日图副标题")
     total_tracked_minutes: int = Field(..., alias="totalTrackedMinutes", description="总追踪时长（分钟）")
+    total_range_minutes: Optional[int] = Field(default=None, alias="totalRangeMinutes", description="时间范围总分钟数（用于计算百分比的分母）")
     pie_data: List[ChartSegment] = Field(..., alias="pieData", description="旭日图数据")
     bar_keys: List[BarConfig] = Field(..., alias="barKeys", description="柱状图配置")
-    bar_data: List[Dict[str, Any]] = Field(..., alias="barData", description="24小时分布数据")
+    bar_data: List[Dict[str, Any]] = Field(..., alias="barData", description="时间分布数据")
     details: Optional[Dict[str, 'TimeOverviewData']] = Field(None, description="子分类详情（递归结构）")
     
     class Config:
@@ -192,7 +193,8 @@ class ActivityLogItem(BaseModel):
     sub_category_id: Optional[str] = Field(default=None, description="子分类ID")
     category: Optional[str] = Field(default=None, description="主分类")
     sub_category: Optional[str] = Field(default=None, description="子分类")
-
+    app_description: Optional[str] = Field(None, alias="appDescription", description="应用描述")
+    title_analysis: Optional[str] = Field(None, alias="titleDescription", description="标题描述")
 class ActivityLogsResponse(BaseModel):
     """GET /activity/logs 响应"""
     data: List[ActivityLogItem] = Field(default=[], description="日志列表")

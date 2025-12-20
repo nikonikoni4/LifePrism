@@ -16,6 +16,9 @@ from .data_processing_service import DataProcessingService
 from .activity_v2_service import ActivityService
 from .category_v2_service import CategoryService
 
+# V2 纯函数服务模块
+from . import timeline_v2_service
+
 # 创建单例实例
 activity_service = ActivityService()
 category_service = CategoryService()
@@ -29,4 +32,7 @@ __all__ = [
     # V2 单例
     "activity_service",
     "category_service",
+    # V2 纯函数模块
+    "timeline_v2_service",
 ]
+

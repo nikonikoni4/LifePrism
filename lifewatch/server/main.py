@@ -101,9 +101,10 @@ app.include_router(activity_summary_router, prefix="/api/v1") # 已弃用
 app.include_router(timeline_router, prefix="/api/v1")
 
 # V2 API 路由
-from lifewatch.server.api import category_v2_router, activity_v2_router
+from lifewatch.server.api import category_v2_router, activity_v2_router, timeline_v2_router
 app.include_router(category_v2_router, prefix="/api/v2")
 app.include_router(activity_v2_router, prefix="/api/v2")
+app.include_router(timeline_v2_router)  # 已包含 /api/v2/timeline 前缀
 
 
 
