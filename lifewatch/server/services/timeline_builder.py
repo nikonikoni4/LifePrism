@@ -295,7 +295,8 @@ def build_time_overview_from_df(
             sub_title=f"Detailed breakdown of {category_name}",
             is_main_category=False,
             range_start=range_start,
-            range_end=range_end
+            range_end=range_end,
+            include_idle=False  # 子分类层不显示空闲时间
         )
         
         cat_data['details'] = {}
@@ -316,7 +317,8 @@ def build_time_overview_from_df(
                 sub_title=f"Top applications in {sub_cat_name}",
                 parent_sub_category_id=str(sub_cat_id),
                 range_start=range_start,
-                range_end=range_end
+                range_end=range_end,
+                include_idle=False  # 应用层不显示空闲时间
             )
             
             cat_data['details'][sub_cat_name] = app_data
@@ -336,20 +338,23 @@ def _build_category_level_data(
     sub_title: str,
     is_main_category: bool,
     range_start: datetime = None,
-    range_end: datetime = None
+    range_end: datetime = None,
+    include_idle: bool = True  # 是否包含空闲时间
 ) -> Dict:
-    """构建分类层级的视图数据（包含空闲时间）"""
+    """构建分类层级的视图数据（只在根层级包含空闲时间）"""
     stats = df.groupby([group_field, name_field])['duration_minutes'].sum().reset_index()
     stats.columns = ['id', 'name', 'minutes']
     stats = stats.sort_values('minutes', ascending=False)
     
     total_minutes = stats['minutes'].sum()
     
-    # 计算空闲时间
+    # 计算空闲时间（只在根层级且 include_idle=True 时添加）
     idle_minutes = 0
+    total_range_minutes = None
     if range_start and range_end:
         total_range_minutes = (range_end - range_start).total_seconds() / 60
-        idle_minutes = max(0, total_range_minutes - total_minutes)
+        if include_idle:
+            idle_minutes = max(0, total_range_minutes - total_minutes)
     
     pie_data = []
     bar_keys = []
@@ -378,8 +383,8 @@ def _build_category_level_data(
             "color": item_color
         })
     
-    # 添加空闲时间到饼图和柱状图
-    if idle_minutes > 0:
+    # 只在 include_idle=True 时添加空闲时间到饼图和柱状图
+    if include_idle and idle_minutes > 0:
         idle_color = "#E5E7EB"  # 浅灰色表示空闲
         pie_data.append({
             "key": "idle",
@@ -394,18 +399,19 @@ def _build_category_level_data(
             "color": idle_color
         })
     
-    bar_data = _calculate_time_distribution(df, group_field=name_field, range_start=range_start, range_end=range_end)
-    
-    # 计算 totalRangeMinutes
-    total_range_minutes = None
-    if range_start and range_end:
-        total_range_minutes = int((range_end - range_start).total_seconds() / 60)
+    bar_data = _calculate_time_distribution(
+        df, 
+        group_field=name_field, 
+        range_start=range_start, 
+        range_end=range_end,
+        include_idle=include_idle
+    )
     
     return {
         "title": title,
         "subTitle": sub_title,
         "totalTrackedMinutes": int(total_minutes),
-        "totalRangeMinutes": total_range_minutes,
+        "totalRangeMinutes": int(total_range_minutes) if total_range_minutes else None,
         "pieData": pie_data,
         "barKeys": bar_keys,
         "barData": bar_data
@@ -418,7 +424,8 @@ def _build_app_level_data(
     sub_title: str,
     parent_sub_category_id: str,
     range_start: datetime = None,
-    range_end: datetime = None
+    range_end: datetime = None,
+    include_idle: bool = True  # 是否包含空闲时间
 ) -> Dict:
     """构建应用级别数据（Top 5 + Other，包含 top 3 titles）"""
     stats = df.groupby('app')['duration_minutes'].sum().sort_values(ascending=False)
@@ -468,7 +475,13 @@ def _build_app_level_data(
             "color": other_color
         })
     
-    bar_data = _calculate_time_distribution(df, top_items=top_5.index.tolist(), range_start=range_start, range_end=range_end)
+    bar_data = _calculate_time_distribution(
+        df, 
+        top_items=top_5.index.tolist(), 
+        range_start=range_start, 
+        range_end=range_end,
+        include_idle=include_idle
+    )
     
     # 计算 totalRangeMinutes
     total_range_minutes = None
@@ -491,7 +504,8 @@ def _calculate_time_distribution(
     group_field: str = None,
     top_items: List[str] = None,
     range_start: datetime = None,
-    range_end: datetime = None
+    range_end: datetime = None,
+    include_idle: bool = True  # 是否包含空闲时间
 ) -> List[Dict]:
     """
     计算时间分布数据（动态时间刻度，6个格子）
@@ -508,6 +522,7 @@ def _calculate_time_distribution(
         top_items: Top N 项目列表（用于应用层级，其他归为 'Other'）
         range_start: 时间范围开始
         range_end: 时间范围结束
+        include_idle: 是否包含空闲时间
         
     Returns:
         List[Dict]: 时间分布数据（6个格子）
@@ -576,10 +591,11 @@ def _calculate_time_distribution(
         for key, minutes in time_slots[slot_idx].items():
             slot_data[key] = int(minutes)
         
-        # 添加空闲时间
-        idle = max(0, slot_idle_minutes[slot_idx])
-        if idle > 0:
-            slot_data["Idle"] = int(idle)
+        # 只在 include_idle=True 时添加空闲时间
+        if include_idle:
+            idle = max(0, slot_idle_minutes[slot_idx])
+            if idle > 0:
+                slot_data["Idle"] = int(idle)
         
         bar_data.append(slot_data)
     

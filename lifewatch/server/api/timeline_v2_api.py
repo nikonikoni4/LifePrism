@@ -13,7 +13,7 @@ from lifewatch.server.schemas.timeline_v2_schemas import (
 )
 from lifewatch.server.services import timeline_v2_service
 
-router = APIRouter(prefix="/api/v2/timeline", tags=["Timeline V2"])
+router = APIRouter(prefix="/timeline", tags=["Timeline V2"])
 
 
 @router.get("/stats", response_model=TimelineStatsResponse)

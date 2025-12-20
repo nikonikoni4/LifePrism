@@ -95,16 +95,16 @@ app.add_middleware(
 # 注册 API 路由
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(behavior_router, prefix="/api/v1")
-app.include_router(categories_router, prefix="/api/v1") # 已弃用
+# app.include_router(categories_router, prefix="/api/v1") # 已弃用
 app.include_router(sync_router, prefix="/api/v1")
-app.include_router(activity_summary_router, prefix="/api/v1") # 已弃用
+# app.include_router(activity_summary_router, prefix="/api/v1") # 已弃用
 app.include_router(timeline_router, prefix="/api/v1")
 
 # V2 API 路由
 from lifewatch.server.api import category_v2_router, activity_v2_router, timeline_v2_router
 app.include_router(category_v2_router, prefix="/api/v2")
 app.include_router(activity_v2_router, prefix="/api/v2")
-app.include_router(timeline_v2_router)  # 已包含 /api/v2/timeline 前缀
+app.include_router(timeline_v2_router,prefix="/api/v2")  # 已包含 /api/v2/timeline 前缀
 
 
 
