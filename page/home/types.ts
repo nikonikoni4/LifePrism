@@ -1,5 +1,5 @@
 /**
- * Home V2 Types
+ * Home Types
  * 
  * TypeScript 类型定义，对应后端 activity_v2_schemas.py
  */
@@ -9,7 +9,7 @@
 // ============================================================================
 
 /** 每日活动数据项 */
-export interface DailyActivityV2 {
+export interface DailyActivity {
     date: string;  // YYYY-MM-DD
     duration: number;  // 活动时长（秒）
     activeTimePercentage: number;  // 活动时长占比（%）
@@ -17,8 +17,8 @@ export interface DailyActivityV2 {
 }
 
 /** Activity Summary 响应数据 */
-export interface ActivitySummaryDataV2 {
-    dailyActivities: DailyActivityV2[];
+export interface ActivitySummaryData {
+    dailyActivities: DailyActivity[];
 }
 
 // ============================================================================
@@ -26,7 +26,7 @@ export interface ActivitySummaryDataV2 {
 // ============================================================================
 
 /** 饼图/旭日图数据项 */
-export interface ChartSegmentV2 {
+export interface ChartSegment {
     key: string;  // 分类唯一标识符
     name: string;  // 显示名称
     value: number;  // 时长（分钟）
@@ -35,22 +35,22 @@ export interface ChartSegmentV2 {
 }
 
 /** 柱状图配置项 */
-export interface BarConfigV2 {
+export interface BarConfig {
     key: string;  // 数据键
     label: string;  // 图例标签
     color: string;  // 颜色
 }
 
 /** Time Overview 完整数据 */
-export interface TimeOverviewDataV2 {
+export interface TimeOverviewData {
     title: string;
     subTitle: string;
     totalTrackedMinutes: number;
     totalRangeMinutes?: number;  // 时间范围总分钟数（用于计算百分比的分母）
-    pieData: ChartSegmentV2[];
-    barKeys: BarConfigV2[];
+    pieData: ChartSegment[];
+    barKeys: BarConfig[];
     barData: Array<Record<string, any>>;  // 时间分布数据
-    details?: Record<string, TimeOverviewDataV2>;  // 子分类详情（递归结构）
+    details?: Record<string, TimeOverviewData>;  // 子分类详情（递归结构）
 }
 
 // ============================================================================
@@ -58,14 +58,14 @@ export interface TimeOverviewDataV2 {
 // ============================================================================
 
 /** 热门标题数据 */
-export interface TopTitleDataV2 {
+export interface TopTitleData {
     name: string;  // 窗口标题
     duration: number;  // 活跃时长（秒）
     percentage: number;  // 活跃时长占比（%）
 }
 
 /** 热门应用数据 */
-export interface TopAppDataV2 {
+export interface TopAppData {
     name: string;  // 应用名称
     duration: number;  // 活跃时长（秒）
     percentage: number;  // 活跃时长占比（%）
@@ -76,7 +76,7 @@ export interface TopAppDataV2 {
 // ============================================================================
 
 /** 待办事项数据 */
-export interface TodoListDataV2 {
+export interface TodoListData {
     id: number;
     name: string;  // 待办事项名称
     isCompleted: boolean;  // 是否完成
@@ -88,12 +88,12 @@ export interface TodoListDataV2 {
 // ============================================================================
 
 /** GET /api/v2/activity/stats 响应 */
-export interface ActivityStatsResponseV2 {
-    activity_summary?: ActivitySummaryDataV2;
-    time_overview?: TimeOverviewDataV2;
-    top_title?: TopTitleDataV2[];
-    top_app?: TopAppDataV2[];
-    todolist?: TodoListDataV2[];
+export interface ActivityStatsResponse {
+    activity_summary?: ActivitySummaryData;
+    time_overview?: TimeOverviewData;
+    top_title?: TopTitleData[];
+    top_app?: TopAppData[];
+    todolist?: TodoListData[];
     query?: Record<string, any>;  // 查询参数回显
 }
 
@@ -102,7 +102,7 @@ export interface ActivityStatsResponseV2 {
 // ============================================================================
 
 /** 活动统计请求参数 */
-export interface ActivityStatsParamsV2 {
+export interface ActivityStatsParams {
     date: string;  // YYYY-MM-DD
     include?: string;  // 逗号分隔的模块列表
     history_number?: number;

@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 
 import Timeline from './page/timeline/Timeline';
-import CategorizationPage from './components/CategorizationPage';
 import AIChatPanel from './components/AIChatPanel';
 import { incrementalSync } from './services/syncService';
 import UsagePage from './page/usage/UsagePage';
-import HomeV2 from './page/home-v2/HomeV2';
+import Home from './page/home/Home';
 import CategoryPage from './page/category/CategoryPage';
+import GoalsPage from './page/goals/GoalsPage';
+import ReportsPage from './page/reports/ReportsPage';
+import SettingsPage from './page/settings/SettingsPage';
 
 function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -83,23 +85,12 @@ function App() {
         className={`lg:ml-64 p-6 lg:p-10 min-h-screen transition-all duration-300 ease-in-out ${isChatOpen ? 'lg:mr-[400px]' : ''
           }`}
       >
-        {currentPage === 'home' && <HomeV2 />}
+        {currentPage === 'home' && <Home />}
         {currentPage === 'timeline' && <Timeline />}
         {currentPage === 'category' && <CategoryPage />}
-
-        {/* Fallback for pages not yet implemented */}
-        {!['home', 'timeline', 'category'].includes(currentPage) && (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-fade-in">
-            <h2 className="text-2xl font-bold text-slate-300 mb-2">Coming Soon</h2>
-            <p className="text-slate-400">The {currentPage} module is currently under development.</p>
-            <button
-              onClick={() => setCurrentPage('home')}
-              className="mt-6 px-6 py-2 bg-white border border-gray-200 rounded-xl text-slate-600 font-medium hover:bg-gray-50 transition-colors"
-            >
-              Return Home
-            </button>
-          </div>
-        )}
+        {currentPage === 'goals' && <GoalsPage />}
+        {currentPage === 'reports' && <ReportsPage />}
+        {currentPage === 'settings' && <SettingsPage />}
       </main>
 
       {/* AI Chat (Right Sidebar) */}

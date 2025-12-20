@@ -1,15 +1,15 @@
 /**
- * Home V2 Page
+ * Home Page
  * 
- * 新版首页，使用 /api/v2/activity 接口
+ * 首页，使用 /api/v2/activity 接口
  */
 
 import React, { useState, useEffect } from 'react';
-import ActivitySummaryHeaderV2 from './components/ActivitySummaryHeaderV2';
-import ActivityDetailsWidgetV2 from './components/ActivityDetailsWidgetV2';
-import TodoListWidgetV2 from './components/TodoListWidgetV2';
+import ActivitySummaryHeader from './components/ActivitySummaryHeader';
+import ActivityDetailsWidget from './components/ActivityDetailsWidget';
+import TodoListWidget from './components/TodoListWidget';
 import { TimeOverviewWidget, TimeOverviewData } from '../common';
-import { ActivityAPIV2 } from './api';
+import { ActivityAPI } from './api';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 // 获取今天日期 YYYY-MM-DD 格式
@@ -21,7 +21,7 @@ const getTodayDate = (): string => {
     return `${year}-${month}-${day}`;
 };
 
-const HomeV2: React.FC = () => {
+const Home: React.FC = () => {
     const [selectedDate, setSelectedDate] = useState(getTodayDate());
     const [refreshKey, setRefreshKey] = useState(0);
 
@@ -36,7 +36,7 @@ const HomeV2: React.FC = () => {
             try {
                 setTimeOverviewLoading(true);
                 setTimeOverviewError(null);
-                const response = await ActivityAPIV2.getStats({
+                const response = await ActivityAPI.getStats({
                     date: selectedDate,
                     include: 'time_overview',
                 });
@@ -96,8 +96,8 @@ const HomeV2: React.FC = () => {
                 <p className="text-slate-500 mt-1 font-medium">愿此行, 终抵群星</p>
             </header>
 
-            {/* Activity Summary Header - 使用 V2 API */}
-            <ActivitySummaryHeaderV2
+            {/* Activity Summary Header */}
+            <ActivitySummaryHeader
                 key={refreshKey}
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
@@ -109,7 +109,7 @@ const HomeV2: React.FC = () => {
 
                 {/* Row 1: TodoList (5 columns) + Time Overview (7 columns) */}
                 <div className="col-span-1 md:col-span-5 h-[700px]">
-                    <TodoListWidgetV2
+                    <TodoListWidget
                         key={`todolist-${refreshKey}`}
                         selectedDate={selectedDate}
                     />
@@ -121,7 +121,7 @@ const HomeV2: React.FC = () => {
 
                 {/* Row 2: Activity Details (Full Width) */}
                 <div className="col-span-1 md:col-span-12 h-auto">
-                    <ActivityDetailsWidgetV2
+                    <ActivityDetailsWidget
                         key={`details-${refreshKey}`}
                         selectedDate={selectedDate}
                     />
@@ -136,5 +136,4 @@ const HomeV2: React.FC = () => {
     );
 };
 
-export default HomeV2;
-
+export default Home;

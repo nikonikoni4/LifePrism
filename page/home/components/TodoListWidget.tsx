@@ -1,20 +1,20 @@
 /**
- * TodoList Widget V2
+ * TodoList Widget
  * 
  * 待办事项组件，使用 V2 API
  */
 import React, { useState, useEffect } from 'react';
 import { Check, Plus, Trophy, Link } from 'lucide-react';
-import { TodoListDataV2 } from '../types';
-import { ActivityAPIV2 } from '../api';
+import { TodoListData } from '../types';
+import { ActivityAPI } from '../api';
 
-interface TodoListWidgetV2Props {
+interface TodoListWidgetProps {
     selectedDate: string;
-    todolist?: TodoListDataV2[];  // Optional: if provided, use this data instead of fetching
+    todolist?: TodoListData[];  // Optional: if provided, use this data instead of fetching
 }
 
-const TodoListWidgetV2: React.FC<TodoListWidgetV2Props> = ({ selectedDate, todolist: propsTodolist }) => {
-    const [todos, setTodos] = useState<TodoListDataV2[]>([]);
+const TodoListWidget: React.FC<TodoListWidgetProps> = ({ selectedDate, todolist: propsTodolist }) => {
+    const [todos, setTodos] = useState<TodoListData[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -24,11 +24,11 @@ const TodoListWidgetV2: React.FC<TodoListWidgetV2Props> = ({ selectedDate, todol
             return;
         }
 
-        // Otherwise, fetch data from V2 API
+        // Otherwise, fetch data from API
         const fetchData = async () => {
             setLoading(true);
             try {
-                const response = await ActivityAPIV2.getStats({
+                const response = await ActivityAPI.getStats({
                     date: selectedDate,
                     include: 'todolist',
                 });
@@ -166,4 +166,4 @@ const TodoListWidgetV2: React.FC<TodoListWidgetV2Props> = ({ selectedDate, todol
     );
 };
 
-export default TodoListWidgetV2;
+export default TodoListWidget;

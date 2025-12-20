@@ -14,7 +14,7 @@ import {
    Legend
 } from 'recharts';
 import { CreditCard, Info, DollarSign, Database, TrendingUp } from 'lucide-react';
-import { MOCK_USAGE_HISTORY } from '../../constants';
+import { MOCK_USAGE_HISTORY } from './api';
 
 const UsagePage: React.FC = () => {
    const [inputRate, setInputRate] = useState<number>(0.0001); // Rate per 1k

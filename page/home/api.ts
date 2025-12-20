@@ -1,24 +1,24 @@
 /**
- * Home V2 API
+ * Home API
  * 
  * 调用后端 /api/v2/activity 相关接口
  */
 
-import { ActivityStatsResponseV2, ActivityStatsParamsV2, CategoryTreeItem } from './types';
+import { ActivityStatsResponse, ActivityStatsParams, CategoryTreeItem } from './types';
 
 const API_BASE = 'http://localhost:8000/api/v2';
 
 /**
- * Activity V2 API
+ * Activity API
  */
-export const ActivityAPIV2 = {
+export const ActivityAPI = {
     /**
      * 获取活动统计数据
      * 
      * @param params 请求参数
      * @returns 活动统计响应数据
      */
-    async getStats(params: ActivityStatsParamsV2): Promise<ActivityStatsResponseV2> {
+    async getStats(params: ActivityStatsParams): Promise<ActivityStatsResponse> {
         const searchParams = new URLSearchParams();
 
         searchParams.set('date', params.date);
@@ -63,7 +63,7 @@ export const ActivityAPIV2 = {
         futureNumber: number = 14,
         categoryId?: string,
         subCategoryId?: string
-    ): Promise<ActivityStatsResponseV2> {
+    ): Promise<ActivityStatsResponse> {
         return this.getStats({
             date,
             include: 'activity_summary',
@@ -85,7 +85,7 @@ export const ActivityAPIV2 = {
         date: string,
         historyNumber: number = 15,
         futureNumber: number = 14
-    ): Promise<ActivityStatsResponseV2> {
+    ): Promise<ActivityStatsResponse> {
         return this.getStats({
             date,
             include: 'activity_summary,time_overview,top_title,top_app,todolist',
@@ -96,9 +96,9 @@ export const ActivityAPIV2 = {
 };
 
 /**
- * Category API（复用 v1 接口，用于筛选器）
+ * Category API（复用 v2 接口，用于筛选器）
  */
-export const CategoryAPIV2 = {
+export const CategoryAPI = {
     /**
      * 获取所有分类（带子分类）
      */
@@ -116,9 +116,9 @@ export const CategoryAPIV2 = {
 };
 
 /**
- * Sync API（复用 v1 接口）
+ * Sync API
  */
-export const SyncAPIV2 = {
+export const SyncAPI = {
     /**
      * 增量同步
      */
