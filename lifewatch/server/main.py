@@ -8,13 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 
 from lifewatch.server.api import (
-    dashboard_router,
-    behavior_router,
-    categories_router,
     sync_router,
-    activity_summary_router
+    category_v2_router, 
+    activity_v2_router, 
+    timeline_v2_router
 )
-from lifewatch.server.api.timeline import router as timeline_router
 from lifewatch.storage.lw_table_manager import init_database
 from lifewatch.server.providers.category_color_provider import initialize_category_colors
 logger = logging.getLogger(__name__)
@@ -93,15 +91,8 @@ app.add_middleware(
 )
 
 # 注册 API 路由
-app.include_router(dashboard_router, prefix="/api/v1")
-app.include_router(behavior_router, prefix="/api/v1")
-# app.include_router(categories_router, prefix="/api/v1") # 已弃用
 app.include_router(sync_router, prefix="/api/v1")
-# app.include_router(activity_summary_router, prefix="/api/v1") # 已弃用
-app.include_router(timeline_router, prefix="/api/v1")
-
 # V2 API 路由
-from lifewatch.server.api import category_v2_router, activity_v2_router, timeline_v2_router
 app.include_router(category_v2_router, prefix="/api/v2")
 app.include_router(activity_v2_router, prefix="/api/v2")
 app.include_router(timeline_v2_router,prefix="/api/v2")  # 已包含 /api/v2/timeline 前缀
@@ -125,14 +116,10 @@ async def root():
             "openapi_spec": "/openapi.json"
         },
         "endpoints": {
-            "homepage": "/api/v1/dashboard/homepage",
-            "dashboard": "/api/v1/dashboard",
-            "behavior_logs": "/api/v1/behavior/logs",
-            "timeline": "/api/v1/timeline",
-            "timeline_overview": "/api/v1/timeline/overview",
-            "categories": "/api/v1/categories/apps",
-            "activity_summary": "/api/v1/activity-summary",
-            "sync": "/api/v1/sync/activitywatch"
+            "sync": "/api/v1/sync/activitywatch",
+            "categories": "/api/v2/categories/apps",
+            "timeline": "/api/v2/timeline",
+            "activity": "/api/v2/activity"
         }
     }
 
@@ -147,7 +134,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "lifewatch-api",
-        "version": "0.1.0"
+        "version": "0.2.0"
     }
 
 

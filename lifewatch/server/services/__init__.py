@@ -7,10 +7,8 @@ V2 架构：
 """
 
 # 旧的 Service 类导出（逐步废弃）
-from .dashboard_service import DashboardService
-from .behavior_service import BehaviorService
-from .sync_service import SyncService
-from .data_processing_service import DataProcessingService
+from .activity_v2_service import ActivityService
+from .category_v2_service import CategoryService
 
 # V2 Service 单例
 from .activity_v2_service import ActivityService
@@ -25,10 +23,8 @@ category_service = CategoryService()
 
 __all__ = [
     # 旧类（逐步废弃）
-    "DashboardService",
-    "BehaviorService", 
-    "SyncService",
-    "DataProcessingService",
+    "ActivityService",
+    "CategoryService", 
     # V2 单例
     "activity_service",
     "category_service",
