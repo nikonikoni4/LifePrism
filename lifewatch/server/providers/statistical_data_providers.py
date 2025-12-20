@@ -533,6 +533,73 @@ class ServerLWDataProvider(LWBaseDataProvider):
             conn.commit()
             return cursor.rowcount > 0
 
+    def batch_update_event_category(self, event_ids: list[str], category_id: str, sub_category_id: str = None) -> int:
+        """
+        批量更新事件分类，返回更新数量
+        
+        Args:
+            event_ids: 事件ID列表
+            category_id: 主分类ID
+            sub_category_id: 子分类ID（可选）
+        
+        Returns:
+            int: 成功更新的数量
+        """
+        if not event_ids:
+            return 0
+        placeholders = ",".join("?" * len(event_ids))
+        sql = f"""
+        UPDATE user_app_behavior_log 
+        SET category_id = ?, sub_category_id = ?
+        WHERE id IN ({placeholders})
+        """
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (category_id, sub_category_id, *event_ids))
+            conn.commit()
+            return cursor.rowcount
+
+    def delete_event(self, event_id: str) -> bool:
+        """
+        删除单条事件
+        
+        Args:
+            event_id: 事件ID
+        
+        Returns:
+            bool: 是否删除成功
+        """
+        sql = "DELETE FROM user_app_behavior_log WHERE id = ?"
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (event_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def batch_delete_events(self, event_ids: list[str]) -> int:
+        """
+        批量删除事件，返回删除数量
+        
+        Args:
+            event_ids: 事件ID列表
+        
+        Returns:
+            int: 成功删除的数量
+        """
+        if not event_ids:
+            return 0
+        placeholders = ",".join("?" * len(event_ids))
+        sql = f"DELETE FROM user_app_behavior_log WHERE id IN ({placeholders})"
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, event_ids)
+            conn.commit()
+            return cursor.rowcount
+
+
     def get_app_usage_summary(self, 
                              start_time: str = None, 
                              end_time: str = None) -> pd.DataFrame:

@@ -195,8 +195,7 @@ class ActivityService:
         sub_category_id: Optional[str]
     ) -> bool:
         """更新日志分类"""
-        # TODO: 实现业务逻辑
-        return False
+        return server_lw_data_provider.update_event_category(log_id, category_id, sub_category_id)
     
     def batch_update_log_category(
         self,
@@ -205,5 +204,14 @@ class ActivityService:
         sub_category_id: Optional[str]
     ) -> int:
         """批量更新日志分类，返回更新数量"""
-        # TODO: 实现业务逻辑
-        return 0
+        return server_lw_data_provider.batch_update_event_category(log_ids, category_id, sub_category_id)
+    
+    def delete_log(self, log_id: str) -> bool:
+        """删除单条日志"""
+        return server_lw_data_provider.delete_event(log_id)
+    
+    def batch_delete_logs(self, log_ids: list[str]) -> int:
+        """批量删除日志，返回删除数量"""
+        print(log_ids)
+        return server_lw_data_provider.batch_delete_events(log_ids)
+

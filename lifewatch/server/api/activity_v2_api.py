@@ -286,3 +286,55 @@ async def batch_update_log_category(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"批量更新分类失败: {str(e)}")
+
+
+@router.delete("/manage/logs/batch", summary="批量删除日志", response_model=StandardResponse)
+async def batch_delete_logs(
+    log_ids: List[str] = Query(
+        ..., 
+        description="日志ID列表"
+    )
+) -> StandardResponse:
+    """
+    批量删除多条日志
+    
+    **参数：**
+    - log_ids: 日志ID列表（查询参数）
+    
+    **返回：**
+    - success: 是否成功
+    - deleted_count: 成功删除的数量
+    """
+    try:
+        deleted_count = activity_service.batch_delete_logs(log_ids)
+        return StandardResponse(
+            success=True,
+            data={"deleted_count": deleted_count},
+            message=f"成功删除 {deleted_count} 条日志"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"批量删除失败: {str(e)}")
+
+
+@router.delete("/manage/logs/{log_id}", summary="删除日志", response_model=StandardResponse)
+async def delete_log(log_id: str) -> StandardResponse:
+    """
+    删除指定的日志记录
+    
+    **参数：**
+    - log_id: 日志ID（路径参数）
+    
+    **返回：**
+    - success: 是否成功
+    - message: 操作消息
+    """
+    try:
+        success = activity_service.delete_log(log_id)
+        return StandardResponse(
+            success=success,
+            message=f"日志 '{log_id}' 删除{'成功' if success else '失败'}"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除日志失败: {str(e)}")
+
+
