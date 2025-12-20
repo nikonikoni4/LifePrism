@@ -1,5 +1,6 @@
 ---
-trigger: always_on
+trigger: model_decision
+description: 编写server文件夹下的函数时启用
 ---
 
 在编写server模块下的函数时，
