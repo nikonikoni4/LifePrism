@@ -97,7 +97,8 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
           const name = params.name;
           const value = params.value;
           const hours = (value / 60).toFixed(2);
-          const total = rootData?.totalTrackedMinutes || 1;
+          // 使用 totalRangeMinutes 作为分母（如果存在），否则使用 totalTrackedMinutes
+          const total = rootData?.totalRangeMinutes || rootData?.totalTrackedMinutes || 1;
           const percent = ((value / total) * 100).toFixed(1);
           return `${name}: ${hours}h (${percent}%)`;
         }
@@ -190,8 +191,8 @@ const TimeOverviewWidget: React.FC<{ selectedDate: string; initialData?: TimeOve
             onClick={handleReset}
             disabled={isRoot}
             className={`p-2 -ml-2 rounded-xl transition-colors ${isRoot
-                ? 'text-slate-200 cursor-not-allowed'
-                : 'hover:bg-gray-50 text-slate-400 hover:text-slate-700'
+              ? 'text-slate-200 cursor-not-allowed'
+              : 'hover:bg-gray-50 text-slate-400 hover:text-slate-700'
               }`}
             title="Reset to Overview"
           >

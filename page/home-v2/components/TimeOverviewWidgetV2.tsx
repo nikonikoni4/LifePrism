@@ -114,7 +114,7 @@ const TimeOverviewWidgetV2: React.FC<TimeOverviewWidgetV2Props> = ({ selectedDat
           const name = params.name;
           const value = params.value;
           const hours = (value / 60).toFixed(2);
-          const total = rootData?.totalTrackedMinutes || 1;
+          const total = rootData?.totalRangeMinutes || rootData?.totalTrackedMinutes || 1;
           const percent = ((value / total) * 100).toFixed(1);
 
           // 检查是否是 app 层（有 appTitle）

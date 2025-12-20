@@ -29,6 +29,7 @@ export interface TimeOverviewData {
     title: string;
     subTitle: string;
     totalTrackedMinutes: number;
+    totalRangeMinutes?: number;  // 时间范围总分钟数（用于计算百分比的分母）
     pieData: ChartSegment[];
     barKeys: BarConfig[];
     barData: Array<Record<string, any>>;
@@ -75,6 +76,8 @@ export interface ActivityLogItem {
     sub_category_id?: string;
     category?: string;
     sub_category?: string;
+    app_description?: string;
+    title_analysis?: string;
 }
 
 /** GET /activity/logs 响应 */

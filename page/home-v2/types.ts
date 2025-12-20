@@ -46,9 +46,10 @@ export interface TimeOverviewDataV2 {
     title: string;
     subTitle: string;
     totalTrackedMinutes: number;
+    totalRangeMinutes?: number;  // 时间范围总分钟数（用于计算百分比的分母）
     pieData: ChartSegmentV2[];
     barKeys: BarConfigV2[];
-    barData: Array<Record<string, any>>;  // 24小时分布数据
+    barData: Array<Record<string, any>>;  // 时间分布数据
     details?: Record<string, TimeOverviewDataV2>;  // 子分类详情（递归结构）
 }
 

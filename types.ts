@@ -93,6 +93,7 @@ export interface TimeOverviewResponse {
   title: string;
   subTitle: string;
   totalTrackedMinutes: number;
+  totalRangeMinutes?: number;  // 时间范围总分钟数（用于计算百分比的分母）
   pieData: ChartSegment[];
   barKeys: BarConfig[];
   barData: TimeDistribution[];

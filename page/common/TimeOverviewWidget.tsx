@@ -88,7 +88,8 @@ const TimeOverviewWidget: React.FC<TimeOverviewWidgetProps> = ({
                     const name = params.name;
                     const value = params.value;
                     const hours = (value / 60).toFixed(2);
-                    const total = data?.totalTrackedMinutes || 1;
+                    // 使用 totalRangeMinutes 作为分母（如果存在），否则使用 totalTrackedMinutes
+                    const total = data?.totalRangeMinutes || data?.totalTrackedMinutes || 1;
                     const percent = ((value / total) * 100).toFixed(1);
 
                     const appTitle = params.data?.appTitle;
