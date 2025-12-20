@@ -385,6 +385,9 @@ class CategoryService:
             str(row['id']): str(row['category_id'])
             for _, row in self._sub_categories_df.iterrows()
         } if self._sub_categories_df is not None and not self._sub_categories_df.empty else {}
+        
+        # 刷新颜色管理器缓存
+        color_manager.refresh_colors()
     
     def create_category(self, name: str, color: str) -> CategoryTreeItem:
         """

@@ -37,7 +37,7 @@ router = APIRouter(prefix="/category", tags=["Category V2"])
 @router.get("/tree", summary="获取分类树形结构")
 async def get_category_tree(
     depth: int = Query(
-        default=1,
+        default=2,
         ge=1,
         le=2,
         description="返回层级深度。1=仅主分类，2=主分类+子分类"
@@ -136,6 +136,7 @@ async def get_category_stats(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"获取分类统计失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"获取分类统计失败: {str(e)}")
 
 
@@ -161,6 +162,7 @@ async def create_category(request: CreateCategoryRequest):
         )
         return category
     except Exception as e:
+        logger.error(f"创建分类失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"创建分类失败: {str(e)}")
 
 
@@ -189,6 +191,7 @@ async def update_category(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error(f"更新分类失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"更新分类失败: {str(e)}")
 
 
@@ -217,6 +220,7 @@ async def delete_category(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error(f"删除分类失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"删除分类失败: {str(e)}")
 
 
@@ -243,6 +247,7 @@ async def create_sub_category(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error(f"创建子分类失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"创建子分类失败: {str(e)}")
 
 
@@ -272,6 +277,7 @@ async def update_sub_category(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error(f"更新子分类失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"更新子分类失败: {str(e)}")
 
 
@@ -298,6 +304,7 @@ async def delete_sub_category(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error(f"删除子分类失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"删除子分类失败: {str(e)}")
 
 
