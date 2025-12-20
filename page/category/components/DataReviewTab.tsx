@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Trash2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, Filter, Trash2, ChevronLeft, ChevronRight, Loader2, Edit3, X } from 'lucide-react';
 import { CategoryTreeItem, ActivityLogItem } from '../../common/types';
 import { ActivityLogsAPI } from '../../common/api';
 
@@ -60,6 +60,15 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
     const [totalRecords, setTotalRecords] = useState(0);
     const [pageSize] = useState(50);
 
+    // 选择状态
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    // 批量分类修改弹窗
+    const [showBatchCategoryModal, setShowBatchCategoryModal] = useState(false);
+    const [batchCategoryId, setBatchCategoryId] = useState('');
+    const [batchSubCategoryId, setBatchSubCategoryId] = useState('');
+
     // 加载数据
     useEffect(() => {
         const fetchLogs = async () => {
@@ -84,6 +93,8 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
 
                 setRecords(response.data);
                 setTotalRecords(response.total);
+                // 清除选择
+                setSelectedIds(new Set());
             } catch (err) {
                 console.error('Failed to fetch activity logs:', err);
                 setError('Failed to load activity logs. Please try again.');
@@ -109,6 +120,119 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
         if (!catId) return '#CBD5E1';
         const cat = categories.find(c => c.id === catId);
         return cat ? cat.color : '#CBD5E1';
+    };
+
+    // 全选/取消全选
+    const handleSelectAll = () => {
+        if (selectedIds.size === filteredRecords.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(filteredRecords.map(r => r.id)));
+        }
+    };
+
+    // 单选切换
+    const handleSelectOne = (id: string) => {
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedIds(newSelected);
+    };
+
+    // 单条分类变更处理
+    const handleCategoryChange = async (logId: string, newCategoryId: string) => {
+        try {
+            await ActivityLogsAPI.updateCategory(logId, newCategoryId);
+            // 更新本地状态
+            setRecords(prev => prev.map(r =>
+                r.id === logId ? { ...r, category_id: newCategoryId, sub_category_id: undefined } : r
+            ));
+        } catch (err) {
+            console.error('Failed to update category:', err);
+            alert('更新分类失败，请重试');
+        }
+    };
+
+    // 子分类变更处理
+    const handleSubCategoryChange = async (logId: string, categoryId: string, newSubCategoryId: string) => {
+        try {
+            await ActivityLogsAPI.updateCategory(logId, categoryId, newSubCategoryId || undefined);
+            // 更新本地状态
+            setRecords(prev => prev.map(r =>
+                r.id === logId ? { ...r, sub_category_id: newSubCategoryId || undefined } : r
+            ));
+        } catch (err) {
+            console.error('Failed to update sub-category:', err);
+            alert('更新子分类失败，请重试');
+        }
+    };
+
+    // 单条删除处理
+    const handleDelete = async (logId: string) => {
+        if (!confirm('确定要删除这条记录吗？此操作不可撤销。')) return;
+        try {
+            await ActivityLogsAPI.deleteLog(logId);
+            setRecords(prev => prev.filter(r => r.id !== logId));
+            setTotalRecords(prev => prev - 1);
+            selectedIds.delete(logId);
+            setSelectedIds(new Set(selectedIds));
+        } catch (err) {
+            console.error('Failed to delete log:', err);
+            alert('删除失败，请重试');
+        }
+    };
+
+    // 批量删除
+    const handleBatchDelete = async () => {
+        if (!confirm(`确定要删除选中的 ${selectedIds.size} 条记录吗？此操作不可撤销。`)) return;
+        try {
+            setIsProcessing(true);
+            const result = await ActivityLogsAPI.batchDeleteLogs(Array.from(selectedIds));
+            const deletedCount = result?.data?.deleted_count ?? selectedIds.size;
+            setRecords(prev => prev.filter(r => !selectedIds.has(r.id)));
+            setTotalRecords(prev => prev - deletedCount);
+            setSelectedIds(new Set());
+            alert(`成功删除 ${deletedCount} 条记录`);
+        } catch (err) {
+            console.error('Failed to batch delete:', err);
+            alert('批量删除失败，请重试');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    // 批量分类修改
+    const handleBatchCategoryUpdate = async () => {
+        if (!batchCategoryId) {
+            alert('请选择分类');
+            return;
+        }
+        try {
+            setIsProcessing(true);
+            const result = await ActivityLogsAPI.batchUpdateCategory(
+                Array.from(selectedIds),
+                batchCategoryId,
+                batchSubCategoryId || undefined
+            );
+            const updatedCount = result?.data?.updated_count ?? selectedIds.size;
+            // 更新本地状态
+            setRecords(prev => prev.map(r =>
+                selectedIds.has(r.id) ? { ...r, category_id: batchCategoryId, sub_category_id: batchSubCategoryId || undefined } : r
+            ));
+            setShowBatchCategoryModal(false);
+            setBatchCategoryId('');
+            setBatchSubCategoryId('');
+            setSelectedIds(new Set());
+            alert(`成功更新 ${updatedCount} 条记录的分类`);
+        } catch (err) {
+            console.error('Failed to batch update category:', err);
+            alert('批量更新分类失败，请重试');
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const totalPages = Math.ceil(totalRecords / pageSize);
@@ -171,6 +295,38 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
                 </div>
             </div>
 
+            {/* Batch Actions Bar - 固定在底部，不影响布局 */}
+            {selectedIds.size > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-white border border-gray-200 rounded-2xl shadow-xl flex items-center gap-4">
+                    <span className="text-sm font-semibold text-indigo-700">
+                        已选择 {selectedIds.size} 项
+                    </span>
+                    <button
+                        onClick={() => setShowBatchCategoryModal(true)}
+                        disabled={isProcessing}
+                        className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                        <Edit3 size={14} />
+                        批量修改分类
+                    </button>
+                    <button
+                        onClick={handleBatchDelete}
+                        disabled={isProcessing}
+                        className="px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center gap-2"
+                    >
+                        <Trash2 size={14} />
+                        批量删除
+                    </button>
+                    <button
+                        onClick={() => setSelectedIds(new Set())}
+                        className="px-4 py-2 text-slate-600 text-sm font-medium hover:bg-gray-100 rounded-lg flex items-center gap-2"
+                    >
+                        <X size={14} />
+                        取消选择
+                    </button>
+                </div>
+            )}
+
             {/* Loading State */}
             {isLoading && (
                 <div className="flex-1 flex items-center justify-center">
@@ -199,8 +355,13 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-gray-50 sticky top-0 z-10">
                             <tr>
-                                <th className="py-4 px-6 w-12 border-b border-gray-100">
-                                    <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                <th className="py-4 px-6 w-14 border-b border-gray-100">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.size === filteredRecords.length && filteredRecords.length > 0}
+                                        onChange={handleSelectAll}
+                                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                    />
                                 </th>
                                 <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-gray-100">App</th>
                                 <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-gray-100">Window Title</th>
@@ -215,7 +376,12 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
                             {filteredRecords.map((record) => (
                                 <tr key={record.id} className="hover:bg-slate-50/80 transition-colors group">
                                     <td className="py-4 px-6">
-                                        <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(record.id)}
+                                            onChange={() => handleSelectOne(record.id)}
+                                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                        />
                                     </td>
                                     <td className="py-4 px-6">
                                         <div className="flex items-start gap-3">
@@ -247,7 +413,8 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
                                         <div className="relative">
                                             <select
                                                 className="appearance-none w-full pl-3 pr-8 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-slate-700 focus:outline-none focus:border-blue-400 cursor-pointer hover:bg-gray-50"
-                                                defaultValue={record.category_id || ''}
+                                                value={record.category_id || ''}
+                                                onChange={(e) => handleCategoryChange(record.id, e.target.value)}
                                             >
                                                 <option value="">-- Select --</option>
                                                 {categories.map(cat => (
@@ -263,7 +430,9 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
                                         <div className="relative">
                                             <select
                                                 className="appearance-none w-full px-3 py-1.5 bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg text-sm text-slate-600 focus:outline-none focus:bg-white focus:border-blue-400 cursor-pointer"
-                                                defaultValue={record.sub_category_id || ''}
+                                                value={record.sub_category_id || ''}
+                                                onChange={(e) => handleSubCategoryChange(record.id, record.category_id || '', e.target.value)}
+                                                disabled={!record.category_id}
                                             >
                                                 <option value="">-- Select --</option>
                                                 {categories.find(c => c.id === record.category_id)?.subcategories?.map(sub => (
@@ -273,7 +442,10 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
                                         </div>
                                     </td>
                                     <td className="py-4 px-6 text-right">
-                                        <button className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                                        <button
+                                            onClick={() => handleDelete(record.id)}
+                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                        >
                                             <Trash2 size={16} />
                                         </button>
                                     </td>
@@ -313,6 +485,70 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
                     >
                         <ChevronRight size={20} />
                     </button>
+                </div>
+            )}
+
+            {/* Batch Category Modal */}
+            {showBatchCategoryModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl shadow-xl p-6 w-96">
+                        <h3 className="text-lg font-bold text-slate-900 mb-4">批量修改分类</h3>
+                        <p className="text-sm text-slate-500 mb-4">
+                            将为选中的 {selectedIds.size} 条记录设置新的分类
+                        </p>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">主分类</label>
+                                <select
+                                    value={batchCategoryId}
+                                    onChange={(e) => {
+                                        setBatchCategoryId(e.target.value);
+                                        setBatchSubCategoryId('');
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
+                                >
+                                    <option value="">-- 请选择 --</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {batchCategoryId && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">子分类（可选）</label>
+                                    <select
+                                        value={batchSubCategoryId}
+                                        onChange={(e) => setBatchSubCategoryId(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
+                                    >
+                                        <option value="">-- 请选择 --</option>
+                                        {categories.find(c => c.id === batchCategoryId)?.subcategories?.map(sub => (
+                                            <option key={sub.id} value={sub.id}>{sub.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => {
+                                    setShowBatchCategoryModal(false);
+                                    setBatchCategoryId('');
+                                    setBatchSubCategoryId('');
+                                }}
+                                className="flex-1 px-4 py-2 text-slate-600 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleBatchCategoryUpdate}
+                                disabled={!batchCategoryId || isProcessing}
+                                className="flex-1 px-4 py-2 text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
+                            >
+                                {isProcessing ? '处理中...' : '确认修改'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

@@ -84,4 +84,53 @@ export const ActivityLogsAPI = {
 
         return response.json();
     },
+
+    /** 更新单条日志分类 */
+    async updateCategory(logId: string, categoryId: string, subCategoryId?: string): Promise<{ success: boolean; message: string }> {
+        const params = new URLSearchParams();
+        params.set('category_id', categoryId);
+        if (subCategoryId) params.set('sub_category_id', subCategoryId);
+
+        const response = await fetch(`${API_BASE}/activity/manage/logs/${logId}/category?${params.toString()}`, {
+            method: 'PATCH',
+        });
+        if (!response.ok) throw new Error(`Failed to update category: ${response.statusText}`);
+        return response.json();
+    },
+
+    /** 批量更新日志分类 */
+    async batchUpdateCategory(logIds: string[], categoryId: string, subCategoryId?: string): Promise<{ success: boolean; data: { updated_count: number }; message: string }> {
+        const params = new URLSearchParams();
+        logIds.forEach(id => params.append('log_ids', id));
+        params.set('category_id', categoryId);
+        if (subCategoryId) params.set('sub_category_id', subCategoryId);
+
+        const response = await fetch(`${API_BASE}/activity/manage/logs/batch-category?${params.toString()}`, {
+            method: 'POST',
+        });
+        if (!response.ok) throw new Error(`Failed to batch update: ${response.statusText}`);
+        return response.json();
+    },
+
+    /** 删除单条日志 */
+    async deleteLog(logId: string): Promise<{ success: boolean; message: string }> {
+        const response = await fetch(`${API_BASE}/activity/manage/logs/${logId}`, {
+            method: 'DELETE',
+        });
+        if (!response.ok) throw new Error(`Failed to delete log: ${response.statusText}`);
+        return response.json();
+    },
+
+    /** 批量删除日志 */
+    async batchDeleteLogs(logIds: string[]): Promise<{ success: boolean; data: { deleted_count: number }; message: string }> {
+        const params = new URLSearchParams();
+        logIds.forEach(id => params.append('log_ids', id));
+
+        const response = await fetch(`${API_BASE}/activity/manage/logs/batch?${params.toString()}`, {
+            method: 'DELETE',
+        });
+        if (!response.ok) throw new Error(`Failed to batch delete: ${response.statusText}`);
+        return response.json();
+    },
 };
+

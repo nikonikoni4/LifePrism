@@ -5,12 +5,12 @@
 
 import { CategoryDef, SubCategoryDef } from '../types';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
+const API_BASE_URL = 'http://127.0.0.1:8000/api/v2';
 
 // ============ 类型定义 ============
 
 interface CategoryListResponse {
-    categories: CategoryDef[];
+    data: CategoryDef[];
 }
 
 interface StandardResponse {
@@ -23,16 +23,20 @@ interface StandardResponse {
 
 export class categoryPI {
     /**
-     * 获取所有分类
+     * 获取所有分类（使用 tree 接口）
      */
     static async getAllCategories(): Promise<CategoryDef[]> {
         try {
-            const response = await fetch(`${API_BASE_URL}/categories`);
+            const response = await fetch(`${API_BASE_URL}/category/tree?depth=2`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch categories: ${response.statusText}`);
             }
             const data: CategoryListResponse = await response.json();
-            return data.categories;
+            // 转换 tree 响应格式为 CategoryDef 格式
+            return data.data.map(cat => ({
+                ...cat,
+                sub_categories: cat.subcategories || [],
+            } as unknown as CategoryDef));
         } catch (error) {
             console.error('Error fetching categories:', error);
             throw error;
@@ -44,7 +48,7 @@ export class categoryPI {
      */
     static async createCategory(name: string, color: string): Promise<CategoryDef> {
         try {
-            const response = await fetch(`${API_BASE_URL}/categories`, {
+            const response = await fetch(`${API_BASE_URL}/category/manage`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -56,7 +60,8 @@ export class categoryPI {
                 throw new Error(`Failed to create category: ${response.statusText}`);
             }
 
-            return await response.json();
+            const data: StandardResponse = await response.json();
+            return data.data;
         } catch (error) {
             console.error('Error creating category:', error);
             throw error;
@@ -71,7 +76,7 @@ export class categoryPI {
         updates: { name?: string; color?: string }
     ): Promise<CategoryDef> {
         try {
-            const response = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
+            const response = await fetch(`${API_BASE_URL}/category/manage/${categoryId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -83,7 +88,8 @@ export class categoryPI {
                 throw new Error(`Failed to update category: ${response.statusText}`);
             }
 
-            return await response.json();
+            const data: StandardResponse = await response.json();
+            return data.data;
         } catch (error) {
             console.error('Error updating category:', error);
             throw error;
@@ -95,7 +101,7 @@ export class categoryPI {
      */
     static async deleteCategory(categoryId: string): Promise<void> {
         try {
-            const response = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
+            const response = await fetch(`${API_BASE_URL}/category/manage/${categoryId}`, {
                 method: 'DELETE',
             });
 
@@ -116,7 +122,7 @@ export class categoryPI {
         name: string
     ): Promise<SubCategoryDef> {
         try {
-            const response = await fetch(`${API_BASE_URL}/categories/${parentId}/sub`, {
+            const response = await fetch(`${API_BASE_URL}/category/manage/${parentId}/sub`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -128,7 +134,8 @@ export class categoryPI {
                 throw new Error(`Failed to create sub-category: ${response.statusText}`);
             }
 
-            return await response.json();
+            const data: StandardResponse = await response.json();
+            return data.data;
         } catch (error) {
             console.error('Error creating sub-category:', error);
             throw error;
@@ -145,7 +152,7 @@ export class categoryPI {
     ): Promise<SubCategoryDef> {
         try {
             const response = await fetch(
-                `${API_BASE_URL}/categories/${parentId}/sub/${subId}`,
+                `${API_BASE_URL}/category/manage/${parentId}/sub/${subId}`,
                 {
                     method: 'PUT',
                     headers: {
@@ -159,7 +166,8 @@ export class categoryPI {
                 throw new Error(`Failed to update sub-category: ${response.statusText}`);
             }
 
-            return await response.json();
+            const data: StandardResponse = await response.json();
+            return data.data;
         } catch (error) {
             console.error('Error updating sub-category:', error);
             throw error;
@@ -172,7 +180,7 @@ export class categoryPI {
     static async deleteSubCategory(parentId: string, subId: string): Promise<void> {
         try {
             const response = await fetch(
-                `${API_BASE_URL}/categories/${parentId}/sub/${subId}`,
+                `${API_BASE_URL}/category/manage/${parentId}/sub/${subId}`,
                 {
                     method: 'DELETE',
                 }
