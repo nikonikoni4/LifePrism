@@ -20,7 +20,6 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, onChatToggle }) => {
   const navItems = [
     { id: 'home', icon: Home, label: 'Home' },
-    { id: 'home-v2', icon: Home, label: 'Home V2' },
     { id: 'timeline', icon: Clock, label: 'Timeline' },
     { id: 'categorization', icon: Tag, label: 'Categorization' },
     { id: 'goals', icon: Target, label: 'Goals' },
@@ -49,8 +48,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, onChatToggle
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group ${isActive
-                  ? 'bg-blue-50 text-blue-600 shadow-sm ring-1 ring-blue-100'
-                  : 'text-slate-500 hover:bg-gray-50 hover:text-slate-800'
+                ? 'bg-blue-50 text-blue-600 shadow-sm ring-1 ring-blue-100'
+                : 'text-slate-500 hover:bg-gray-50 hover:text-slate-800'
                 }`}
             >
               <item.icon

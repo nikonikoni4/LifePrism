@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
+
 import TimelinePage from './components/TimelinePage';
 import CategorizationPage from './components/CategorizationPage';
 import AIChatPanel from './components/AIChatPanel';
@@ -81,13 +81,12 @@ function App() {
         className={`lg:ml-64 p-6 lg:p-10 min-h-screen transition-all duration-300 ease-in-out ${isChatOpen ? 'lg:mr-[400px]' : ''
           }`}
       >
-        {currentPage === 'home' && <Dashboard />}
-        {currentPage === 'home-v2' && <HomeV2 />}
+        {currentPage === 'home' && <HomeV2 />}
         {currentPage === 'timeline' && <TimelinePage />}
         {currentPage === 'categorization' && <CategorizationPage />}
 
         {/* Fallback for pages not yet implemented */}
-        {!['home', 'home-v2', 'timeline', 'categorization'].includes(currentPage) && (
+        {!['home', 'timeline', 'categorization'].includes(currentPage) && (
           <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-fade-in">
             <h2 className="text-2xl font-bold text-slate-300 mb-2">Coming Soon</h2>
             <p className="text-slate-400">The {currentPage} module is currently under development.</p>
