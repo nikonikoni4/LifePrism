@@ -255,7 +255,11 @@ class ServerLWDataProvider(LWBaseDataProvider):
         join_sub_category = False
         
         for field in select_fields:
-            select_parts.append(f"uabl.{field}")
+            # duration 字段需要转换为整数
+            if field == "duration":
+                select_parts.append(f"CAST(uabl.{field} AS INTEGER) as {field}")
+            else:
+                select_parts.append(f"uabl.{field}")
         
         # 添加关联字段
         if "category_id" in select_fields:

@@ -17,6 +17,9 @@ from lifewatch.server.schemas.activity_v2_schemas import (
 )
 from lifewatch.server.schemas.common_schemas import StandardResponse
 from lifewatch.server.services import activity_service
+from lifewatch.utils import get_logger
+
+logger = get_logger(__name__)
 
 
 router = APIRouter(prefix="/activity", tags=["Activity V2"])
@@ -100,10 +103,15 @@ async def get_activity_stats(
 
 @router.get("/logs", summary="获取活动日志列表", response_model=ActivityLogsResponse)
 async def get_activity_logs(
-    date: str = Query(
+    start_time: str = Query(
         ..., 
-        description="查询日期 (YYYY-MM-DD 格式)", 
-        regex=r"^\d{4}-\d{2}-\d{2}$"
+        description="开始时间 (YYYY-MM-DD HH:MM:SS 格式)", 
+        regex=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$"
+    ),
+    end_time: str = Query(
+        ..., 
+        description="结束时间 (YYYY-MM-DD HH:MM:SS 格式)", 
+        regex=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$"
     ),
     device_filter: str = Query(
         "all", 
@@ -116,6 +124,14 @@ async def get_activity_logs(
     sub_category_id: Optional[str] = Query(
         None, 
         description="子分类ID筛选（可选）"
+    ),
+    sort_by: str = Query(
+        None,
+        description="排序字段：duration/start_time/app"
+    ),
+    sort_order: str = Query(
+        None,
+        description="排序方向：asc/desc"
     ),
     page: int = Query(
         1, 
@@ -133,29 +149,36 @@ async def get_activity_logs(
     获取活动日志列表
     
     **功能：**
-    - 获取指定日期的活动日志
+    - 获取指定时间范围的活动日志
     - 支持设备和分类过滤
+    - 支持排序（默认按时长降序）
     - 支持分页
     
     **返回数据：**
     - 活动事件列表（包含时间、应用、标题、分类等）
     
     **示例：**
-    - `/api/v2/activity/logs?date=2025-12-19`
-    - `/api/v2/activity/logs?date=2025-12-19&device_filter=pc&page=2`
+    - `/api/v2/activity/logs?start_time=2025-12-19 00:00:00&end_time=2025-12-19 23:59:59`
+    - `/api/v2/activity/logs?start_time=2025-12-18 00:00:00&end_time=2025-12-20 23:59:59&sort_by=start_time&sort_order=asc`
     """
     try:
         return activity_service.get_activity_logs(
-            date=date,
+            date=None,
+            start_time=start_time,
+            end_time=end_time,
             device_filter=device_filter,
             category_id=category_id,
             sub_category_id=sub_category_id,
+            sort_by=sort_by,
+            sort_order=sort_order,
             page=page,
             page_size=page_size
         )
     except ValueError as e:
+        logger.error(f"获取活动日志失败: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"获取活动日志失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"获取活动日志失败: {str(e)}")
 
 

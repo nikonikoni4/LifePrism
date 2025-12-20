@@ -95,6 +95,8 @@ class ActivityService:
         device_filter: str,
         category_id: Optional[str],
         sub_category_id: Optional[str],
+        sort_by: Optional[str],
+        sort_order: Optional[str],
         page: int,
         page_size: int
     ) -> ActivityLogsResponse:
@@ -110,6 +112,8 @@ class ActivityService:
             device_filter: 设备过滤 (all/pc/mobile)，当前未使用
             category_id: 主分类ID筛选
             sub_category_id: 子分类ID筛选
+            sort_by: 排序字段 (duration/start_time/app)
+            sort_order: 排序方向 (asc/desc)
             page: 页码
             page_size: 每页数量
             
@@ -126,6 +130,8 @@ class ActivityService:
             end_time=end_time,
             category_id=category_id,
             sub_category_id=sub_category_id,
+            order_by=sort_by,
+            order_desc=(sort_order == "desc"),
             page=page,
             page_size=page_size
         )
