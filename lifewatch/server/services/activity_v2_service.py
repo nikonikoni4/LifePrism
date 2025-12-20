@@ -12,7 +12,13 @@ from lifewatch.server.schemas.activity_v2_schemas import (
     ActivityStatsResponse,
     ActivityLogsResponse,
 )
-from lifewatch.server.services.activity_stats_builder import activity_stats_builder
+from lifewatch.server.services.activity_stats_builder import (
+    build_activity_summary,
+    build_time_overview,
+    get_top_title,
+    get_top_app,
+    get_todolist,
+)
 from lifewatch.utils import get_logger
 
 logger = get_logger(__name__)
@@ -20,10 +26,6 @@ logger = get_logger(__name__)
 
 class ActivityService:
     """活动管理服务"""
-    
-    def __init__(self):
-        """初始化活动服务"""
-        self.stats_builder = activity_stats_builder
     
     def get_activity_stats(
         self,
@@ -59,24 +61,24 @@ class ActivityService:
             }
         )
         
-        # 根据 include 选项按需获取数据（委托给 stats_builder）
+        # 根据 include 选项按需获取数据（调用纯函数模块）
         if include_options.include_activity_summary:
-            result.activity_summary = self.stats_builder.build_activity_summary(
+            result.activity_summary = build_activity_summary(
                 date, history_number, future_number, category_id, sub_category_id
             )
         
         if include_options.include_time_overview:
-            result.time_overview = self.stats_builder.build_time_overview(date)
+            result.time_overview = build_time_overview(date)
         
         if include_options.include_top_title:
-            result.top_title = self.stats_builder.get_top_title(date, top_n=5)
+            result.top_title = get_top_title(date, top_n=5)
         
         if include_options.include_top_app:
-            result.top_app = self.stats_builder.get_top_app(date, top_n=5)
+            result.top_app = get_top_app(date, top_n=5)
         
         if include_options.include_todolist:
-            result.todolist = self.stats_builder.get_todolist(date)
-        print(result.todolist)
+            result.todolist = get_todolist(date)
+        
         return result
     
     # ========================================================================

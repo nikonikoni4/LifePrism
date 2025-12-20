@@ -16,7 +16,7 @@ from lifewatch.server.schemas.activity_v2_schemas import (
     ActivityLogsResponse,
 )
 from lifewatch.server.schemas.common_schemas import StandardResponse
-from lifewatch.server.services.activity_v2_service import ActivityService
+from lifewatch.server.services import activity_service
 
 
 router = APIRouter(prefix="/activity", tags=["Activity V2"])
@@ -80,7 +80,6 @@ async def get_activity_stats(
         # API 层职责：解析 include 字符串为结构化选项
         include_options = ActivityStatsIncludeOptions.from_include_string(include)
         
-        activity_service = ActivityService()
         return activity_service.get_activity_stats(
             date=date,
             include_options=include_options,
@@ -146,7 +145,6 @@ async def get_activity_logs(
     - `/api/v2/activity/logs?date=2025-12-19&device_filter=pc&page=2`
     """
     try:
-        activity_service = ActivityService()
         return activity_service.get_activity_logs(
             date=date,
             device_filter=device_filter,
@@ -170,7 +168,6 @@ async def get_activity_log_detail(log_id: str):
     - log_id: 日志ID（路径参数）
     """
     try:
-        activity_service = ActivityService()
         result = activity_service.get_activity_log_detail(log_id)
         if result is None:
             raise HTTPException(status_code=404, detail=f"日志 '{log_id}' 不存在")
@@ -213,7 +210,6 @@ async def update_log_category(
     - message: 操作消息
     """
     try:
-        activity_service = ActivityService()
         success = activity_service.update_log_category(
             log_id=log_id,
             category_id=category_id,
@@ -255,7 +251,6 @@ async def batch_update_log_category(
     - updated_count: 成功更新的数量
     """
     try:
-        activity_service = ActivityService()
         updated_count = activity_service.batch_update_log_category(
             log_ids=log_ids,
             category_id=category_id,
