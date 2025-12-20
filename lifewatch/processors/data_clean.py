@@ -147,7 +147,7 @@ def clean_activitywatch_data(
     filtered_events_df = pd.DataFrame(columns=get_table_columns('user_app_behavior_log'))
 
     for event in raw_events:
-        duration = event.get('duration', 0)
+        duration = int(event.get('duration', 0))
         if duration >= lower_bound:
             # 转换时间戳
             local_start_time = convert_utc_to_local(event.get('timestamp', ''), config.LOCAL_TIMEZONE)

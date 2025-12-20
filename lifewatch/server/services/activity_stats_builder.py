@@ -16,6 +16,9 @@ from lifewatch.server.schemas.activity_v2_schemas import (
     TimeOverviewData,
     ChartSegment,
     BarConfig,
+    TopTitleData,
+    TopAppData,
+    TodoListData,
 )
 from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
 from lifewatch.server.providers.category_color_provider import color_manager
@@ -187,6 +190,75 @@ class ActivityStatsBuilder:
         return self._dict_to_time_overview_data(root_data)
     
     # ========================================================================
+    # Top N
+    # ========================================================================
+
+    def get_top_title(self, date: str, top_n:int) -> List[TopTitleData]:
+        """获取热门标题数据
+        arg:
+            date: 日期字符串 (YYYY-MM-DD)
+            top_n: int, Top N
+        return 
+            list[TopTitleData], Top窗口标题排行:
+                name: str, 窗口标题
+                duration: int, 活跃时长(秒)
+        """
+
+        title_list = self.data_provider.get_top_title(date, top_n)
+        total_duration = self.data_provider.get_active_time(date)
+        # 构建TopTitleData列表
+        result = []
+        for title in title_list:
+            result.append(TopTitleData(name=title['name'], duration=int(title['duration']), percentage=int(title['duration'] / total_duration * 100)))
+        return result
+
+    def get_top_app(self, date: str, top_n:int) -> List[TopAppData]:
+        """获取热门应用数据
+        arg:
+            date: 日期字符串 (YYYY-MM-DD)
+            top_n: int, Top N
+        return 
+            list[TopAppData], Top应用排行:
+                name: str, 应用名称
+                duration: int, 活跃时长(秒)
+        """
+        app_list = self.data_provider.get_top_applications(date, top_n)
+        total_duration = self.data_provider.get_active_time(date)
+        # 构建TopAppData列表
+        result = []
+        for app in app_list:
+            result.append(TopAppData(name=app['name'], duration=int(app['duration']), percentage=int(app['duration'] / total_duration * 100)))
+        return result
+
+    def get_todolist(self,date:str) -> List[TodoListData]:
+        """获取待办事项数据
+        arg:
+            date: 日期字符串 (YYYY-MM-DD)
+        return 
+            list[TodoListData], 待办事项列表:
+                name: str, 待办事项名称
+                is_completed: bool, 是否完成
+        """
+        # Mock
+        todo_list = [
+            {"id": 1, "name": "待办事项1", "is_completed": False, "link_to_goal": 1},
+            {"id": 2, "name": "待办事项2", "is_completed": True, "link_to_goal": 2},
+            {"id": 3, "name": "待办事项3", "is_completed": False, "link_to_goal": 0},
+        ]
+
+        result = []
+        for todo in todo_list:
+            result.append(TodoListData(id=todo['id'], name=todo['name'], is_completed=todo['is_completed'], link_to_goal=todo['link_to_goal']))
+        print(result)
+        return result
+        # todolist_list = self.data_provider.get_todolist(date)
+        # # TodoListData列表
+        # result = []
+        # for todolist in todolist_list:
+        #     result.append(TodoListData(name=todolist['name'], is_completed=todolist['is_completed']))
+        # return result
+
+    # ========================================================================
     # 私有辅助方法
     # ========================================================================
     
@@ -268,7 +340,7 @@ class ActivityStatsBuilder:
             
             app_df = df[df['app'] == app_name]
             title_stats = app_df.groupby('title')['duration_minutes'].sum().sort_values(ascending=False).head(3)
-            top_titles = ", ".join(title_stats.index.tolist())
+            top_titles = "-split-".join(title_stats.index.tolist())
             
             pie_data.append({
                 "key": app_name,

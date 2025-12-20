@@ -69,44 +69,15 @@ class ActivityService:
             result.time_overview = self.stats_builder.build_time_overview(date)
         
         if include_options.include_top_title:
-            result.top_title = self._get_top_titles(date, category_id, sub_category_id)
+            result.top_title = self.stats_builder.get_top_title(date, top_n=5)
         
         if include_options.include_top_app:
-            result.top_app = self._get_top_apps(date, category_id, sub_category_id)
+            result.top_app = self.stats_builder.get_top_app(date, top_n=5)
         
         if include_options.include_todolist:
-            result.todolist = self._get_todolist(date)
-        
+            result.todolist = self.stats_builder.get_todolist(date)
+        print(result.todolist)
         return result
-    
-    # ========================================================================
-    # 私有方法 - 其他模块数据获取（待实现）
-    # ========================================================================
-    
-    def _get_top_titles(
-        self,
-        date: str,
-        category_id: Optional[str],
-        sub_category_id: Optional[str]
-    ):
-        """获取热门标题数据"""
-        # TODO: 实现业务逻辑
-        return None
-    
-    def _get_top_apps(
-        self,
-        date: str,
-        category_id: Optional[str],
-        sub_category_id: Optional[str]
-    ):
-        """获取热门应用数据"""
-        # TODO: 实现业务逻辑
-        return None
-    
-    def _get_todolist(self, date: str):
-        """获取待办事项数据"""
-        # TODO: 实现业务逻辑
-        return None
     
     # ========================================================================
     # 日志相关方法（待实现）

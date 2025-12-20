@@ -69,7 +69,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
         """
         self.current_date = date
         sql = """
-        SELECT app, SUM(duration) as total_duration
+        SELECT app, CAST(SUM(duration) AS INTEGER) as total_duration
         FROM user_app_behavior_log
         WHERE start_time >= ? AND start_time <= ?
         GROUP BY app
@@ -97,7 +97,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
         """
         self.current_date = date
         sql = """
-        SELECT title, SUM(duration) as total_duration
+        SELECT title, CAST(SUM(duration) AS INTEGER) as total_duration
         FROM user_app_behavior_log
         WHERE start_time >= ? AND start_time <= ?
         GROUP BY title

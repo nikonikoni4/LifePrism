@@ -144,35 +144,38 @@ class TimeOverviewData(BaseModel):
         }
 class TopTitleData(BaseModel):
     """热门标题数据（框架）"""
-    # TODO: 根据业务需求补充具体字段
-    pass
-
-
+    name: str = Field(..., description="窗口标题")
+    duration: int = Field(..., description="活跃时长（秒）")
+    percentage: int = Field(..., description="占比（%）")
 class TopAppData(BaseModel):
     """热门应用数据（框架）"""
-    # TODO: 根据业务需求补充具体字段
-    pass
-
+    name: str = Field(..., description="应用名称")
+    duration: int = Field(..., description="活跃时长（秒）")
+    percentage: int = Field(..., description="占比（%）")
 
 class TodoListData(BaseModel):
     """待办事项数据（框架）"""
-    # TODO: 根据业务需求补充具体字段
-    pass
-
+    id: int = Field(..., description="待办事项ID")
+    name: str = Field(..., description="待办事项名称")
+    is_completed: bool = Field(..., description="是否完成",alias="isCompleted")
+    link_to_goal: int = Field(..., description="关联目标ID",alias="linkToGoal")
+    class Config:
+        populate_by_name = True
 
 # ============================================================================
 # API 响应模型
 # ============================================================================
-
+from lifewatch.server.schemas.category_v2_schemas import CategoryDef
 class ActivityStatsResponse(BaseModel):
     """GET /activity/stats 响应"""
-    activity_summary: Optional[Any] = Field(default=None, description="活动摘要条形图数据")
-    time_overview: Optional[Any] = Field(default=None, description="时间概览数据")
-    top_title: Optional[Any] = Field(default=None, description="热门标题数据")
-    top_app: Optional[Any] = Field(default=None, description="热门应用数据")
-    todolist: Optional[Any] = Field(default=None, description="待办事项数据")
+    activity_summary: Optional[ActivitySummaryData] = Field(default=None, description="活动摘要条形图数据")
+    time_overview: Optional[TimeOverviewData] = Field(default=None, description="时间概览数据")
+    top_title: Optional[List[TopTitleData]] = Field(default=None, description="热门标题数据")
+    top_app: Optional[List[TopAppData]] = Field(default=None, description="热门应用数据")
+    todolist: Optional[List[TodoListData]] = Field(default=None, description="待办事项数据")
+    category_tree : Optional[List[CategoryDef]] = Field(default=None, description="分类树")
     query: Optional[Dict[str, Any]] = Field(default=None, description="查询参数回显（调试用）")
-
+    
 
 class ActivityLogItem(BaseModel):
     """活动日志条目（框架）"""

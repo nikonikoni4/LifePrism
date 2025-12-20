@@ -34,7 +34,7 @@ async def get_activity_stats(
         regex=r"^\d{4}-\d{2}-\d{2}$"
     ),
     include: str = Query(
-        "activity_summary,time_overview,top_title,top_app",
+        "activity_summary,time_overview,top_title,top_app,todolist",
         description="需要包含的数据模块，多个用逗号分隔。可选值: activity_summary, time_overview, top_title, top_app, todolist"
     ),
     history_number: int = Query(
