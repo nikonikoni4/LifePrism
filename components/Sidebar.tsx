@@ -21,7 +21,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, onChatToggle
   const navItems = [
     { id: 'home', icon: Home, label: 'Home' },
     { id: 'timeline', icon: Clock, label: 'Timeline' },
-    { id: 'timeline-v2', icon: Clock, label: 'Timeline V2' },
     { id: 'category', icon: Tag, label: 'Category' },
     { id: 'goals', icon: Target, label: 'Goals' },
     { id: 'reports', icon: FileBarChart, label: 'Reports' },

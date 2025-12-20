@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 
 import Timeline from './page/timeline/Timeline';
-import TimelinePage from './components/TimelinePage';
 import CategorizationPage from './components/CategorizationPage';
 import AIChatPanel from './components/AIChatPanel';
 import { incrementalSync } from './services/syncService';
@@ -85,12 +84,11 @@ function App() {
           }`}
       >
         {currentPage === 'home' && <HomeV2 />}
-        {currentPage === 'timeline' && <TimelinePage />}
-        {currentPage === 'timeline-v2' && <Timeline />}
+        {currentPage === 'timeline' && <Timeline />}
         {currentPage === 'category' && <CategoryPage />}
 
         {/* Fallback for pages not yet implemented */}
-        {!['home', 'timeline', 'timeline-v2', 'category'].includes(currentPage) && (
+        {!['home', 'timeline', 'category'].includes(currentPage) && (
           <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-fade-in">
             <h2 className="text-2xl font-bold text-slate-300 mb-2">Coming Soon</h2>
             <p className="text-slate-400">The {currentPage} module is currently under development.</p>

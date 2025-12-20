@@ -677,10 +677,16 @@ const Timeline: React.FC = () => {
                             <input
                                 type="checkbox"
                                 checked={thumbnailConfig.enabled}
-                                onChange={(e) => setThumbnailConfig(prev => ({
-                                    ...prev,
-                                    enabled: e.target.checked
-                                }))}
+                                onChange={(e) => {
+                                    // 切换模式时清除所有选中状态
+                                    setSelectedEventId(null);
+                                    setSelectedTimeRange(null);
+                                    setOverviewData(null);
+                                    setThumbnailConfig(prev => ({
+                                        ...prev,
+                                        enabled: e.target.checked
+                                    }));
+                                }}
                                 className="sr-only peer"
                             />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
@@ -815,7 +821,12 @@ const Timeline: React.FC = () => {
                                                 key={log.id}
                                                 style={{ top: style.top, height: style.height }}
                                                 className={style.className}
-                                                onClick={() => setSelectedEventId(log.id)}
+                                                onClick={() => {
+                                                    // 点击事件时清除时间范围选择，以显示事件详情
+                                                    setSelectedTimeRange(null);
+                                                    setOverviewData(null);
+                                                    setSelectedEventId(log.id);
+                                                }}
                                             >
                                                 <div className="font-bold truncate">{log.title}</div>
                                                 {parseInt(style.height) > 30 && (
