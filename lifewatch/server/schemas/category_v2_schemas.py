@@ -16,10 +16,52 @@ from typing import List
 
 
 
+# ============================================================================
+# Tree 端点专用模型（精简版，无统计数据）
+# ============================================================================
+
+class SubCategoryTreeItem(BaseModel):
+    """子分类树节点（精简）"""
+    id: str = Field(..., description="子分类唯一标识符")
+    name: str = Field(..., description="子分类名称")
+    color: str = Field(..., description="分类颜色（十六进制格式）")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "coding",
+                "name": "编程",
+                "color": "#5B8FF9"
+            }
+        }
+
+
+class CategoryTreeItem(BaseModel):
+    """主分类树节点（精简）"""
+    id: str = Field(..., description="分类唯一标识符")
+    name: str = Field(..., description="分类名称")
+    color: str = Field(..., description="分类颜色（十六进制格式）")
+    subcategories: list[SubCategoryTreeItem] | None = Field(default=None, description="子分类列表，depth=1时为None")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "work",
+                "name": "工作/学习",
+                "color": "#5B8FF9",
+                "subcategories": [
+                    {
+                        "id": "coding",
+                        "name": "编程",
+                        "color": "#7C9AE6"
+                    }
+                ]
+            }
+        }
 
 
 # ============================================================================
-# 基础数据模型（从底层往上定义）
+# Stats 端点专用模型（完整版，含统计数据）
 # ============================================================================
 
 class TitleDuration(BaseModel):
@@ -119,7 +161,7 @@ class CategoryDef(BaseModel):
 
 class CategoryTreeResponse(BaseModel):
     """GET /category/tree 响应"""
-    data: list[CategoryDef]
+    data: list[CategoryTreeItem]
 
 
 class CategoryStatsResponse(BaseModel):

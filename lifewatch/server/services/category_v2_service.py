@@ -5,6 +5,8 @@
 from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
 from lifewatch.server.schemas.category_v2_schemas import (
     CategoryTreeResponse,
+    CategoryTreeItem,
+    SubCategoryTreeItem,
     CategoryStatsResponse,
     CategoryStatsIncludeOptions,
     CategoryDef,
@@ -77,7 +79,7 @@ class CategoryService:
                     # 筛选属于当前主分类的子分类
                     sub_df = self._sub_categories_df[self._sub_categories_df['category_id'] == cat_row['id']]
                     subcategories = [
-                        SubCategoryDef(
+                        SubCategoryTreeItem(
                             id=str(sub_row['id']),
                             name=self.sub_category_name_map.get(str(sub_row['id']), sub_row['name']),
                             color=color_manager.get_sub_category_color(str(sub_row['id']))
@@ -85,7 +87,7 @@ class CategoryService:
                         for _, sub_row in sub_df.iterrows()
                     ]
                 
-                category_tree.append(CategoryDef(
+                category_tree.append(CategoryTreeItem(
                     id=category_id,
                     name=self.category_name_map.get(category_id, cat_row['name']),
                     color=color_manager.get_main_category_color(category_id),
@@ -384,7 +386,7 @@ class CategoryService:
             for _, row in self._sub_categories_df.iterrows()
         } if self._sub_categories_df is not None and not self._sub_categories_df.empty else {}
     
-    def create_category(self, name: str, color: str) -> CategoryDef:
+    def create_category(self, name: str, color: str) -> CategoryTreeItem:
         """
         创建新的主分类
         
@@ -393,7 +395,7 @@ class CategoryService:
             color: 分类颜色（十六进制格式）
             
         Returns:
-            CategoryDef: 创建的分类对象
+            CategoryTreeItem: 创建的分类对象
         """
         try:
             if not name or not color:
@@ -421,7 +423,7 @@ class CategoryService:
             # 刷新缓存
             self._refresh_cache()
             
-            return CategoryDef(
+            return CategoryTreeItem(
                 id=category_id,
                 name=name,
                 color=color,
@@ -432,7 +434,7 @@ class CategoryService:
             logger.error(f"创建分类失败: {e}")
             raise
     
-    def update_category(self, category_id: str, name: str, color: str) -> CategoryDef:
+    def update_category(self, category_id: str, name: str, color: str) -> CategoryTreeItem:
         """
         更新主分类
         
@@ -442,7 +444,7 @@ class CategoryService:
             color: 新的分类颜色（空字符串表示不更新）
             
         Returns:
-            CategoryDef: 更新后的分类对象
+            CategoryTreeItem: 更新后的分类对象
             
         Raises:
             ValueError: 如果分类不存在
@@ -529,7 +531,7 @@ class CategoryService:
             logger.error(f"删除分类失败: {e}")
             raise
     
-    def create_sub_category(self, category_id: str, name: str) -> SubCategoryDef:
+    def create_sub_category(self, category_id: str, name: str) -> SubCategoryTreeItem:
         """
         创建子分类
         
@@ -538,7 +540,7 @@ class CategoryService:
             name: 子分类名称
             
         Returns:
-            SubCategoryDef: 创建的子分类对象
+            SubCategoryTreeItem: 创建的子分类对象
             
         Raises:
             ValueError: 如果主分类不存在
@@ -575,7 +577,7 @@ class CategoryService:
             # 刷新缓存
             self._refresh_cache()
             
-            return SubCategoryDef(
+            return SubCategoryTreeItem(
                 id=sub_id,
                 name=name,
                 color=color_manager.get_sub_category_color(sub_id)
@@ -587,7 +589,7 @@ class CategoryService:
             logger.error(f"创建子分类失败: {e}")
             raise
     
-    def update_sub_category(self, category_id: str, sub_id: str, name: str) -> SubCategoryDef:
+    def update_sub_category(self, category_id: str, sub_id: str, name: str) -> SubCategoryTreeItem:
         """
         更新子分类
         
@@ -597,7 +599,7 @@ class CategoryService:
             name: 新的子分类名称
             
         Returns:
-            SubCategoryDef: 更新后的子分类对象
+            SubCategoryTreeItem: 更新后的子分类对象
             
         Raises:
             ValueError: 如果主分类或子分类不存在
@@ -623,7 +625,7 @@ class CategoryService:
             # 刷新缓存
             self._refresh_cache()
             
-            return SubCategoryDef(
+            return SubCategoryTreeItem(
                 id=sub_id,
                 name=name,
                 color=color_manager.get_sub_category_color(sub_id)
@@ -692,7 +694,7 @@ class CategoryService:
             logger.error(f"删除子分类失败: {e}")
             raise
     
-    def _get_category_by_id(self, category_id: str) -> CategoryDef:
+    def _get_category_by_id(self, category_id: str) -> CategoryTreeItem:
         """
         根据ID获取完整的分类对象（含子分类）- 内部使用，不存在时抛出异常
         
@@ -700,7 +702,7 @@ class CategoryService:
             category_id: 分类ID
             
         Returns:
-            CategoryDef: 分类对象
+            CategoryTreeItem: 分类对象
         """
         category = self.db.get_by_id('category', 'id', category_id)
         if not category:
@@ -716,20 +718,20 @@ class CategoryService:
         subcategories = []
         if not sub_cats_df.empty:
             for _, sub_row in sub_cats_df.iterrows():
-                subcategories.append(SubCategoryDef(
+                subcategories.append(SubCategoryTreeItem(
                     id=str(sub_row['id']),
                     name=sub_row['name'],
                     color=color_manager.get_sub_category_color(str(sub_row['id']))
                 ))
         
-        return CategoryDef(
+        return CategoryTreeItem(
             id=category['id'],
             name=category['name'],
             color=color_manager.get_main_category_color(category['id']),
             subcategories=subcategories
         )
     
-    def get_category_by_id(self, category_id: str) -> CategoryDef:
+    def get_category_by_id(self, category_id: str) -> CategoryTreeItem:
         """
         根据ID获取分类对象（公共方法，不存在时返回None）
         
@@ -737,33 +739,35 @@ class CategoryService:
             category_id: 分类ID
             
         Returns:
-            CategoryDef: 分类对象，或 None 如果不存在
+            CategoryTreeItem: 分类对象，或 None 如果不存在
         """
         category = self.db.get_by_id('category', 'id', category_id)
         if not category:
             return None
         
-        return CategoryDef(
+        return CategoryTreeItem(
             id=category['id'],
             name=category['name'],
             color=color_manager.get_main_category_color(category['id'])
         )
 
 
-
 if __name__ == "__main__":
     from datetime import datetime, timedelta
+    from lifewatch.server.schemas.category_v2_schemas import CategoryStatsIncludeOptions
     
-    category_service = CategoryService()
+    test_service = CategoryService()
     
     # 测试 get_category_stats
     end_time = datetime.now()
     start_time = end_time - timedelta(days=1)
     
-    category_state = category_service.get_category_stats(
+    include_options = CategoryStatsIncludeOptions.from_include_string("duration,app,title")
+    
+    category_state = test_service.get_category_stats(
         start_time=start_time,
         end_time=end_time,
-        include="duration,app,title",
+        include_options=include_options,
         top_title=5,
         category="",
         sub_category=""

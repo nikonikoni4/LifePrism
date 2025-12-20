@@ -1,5 +1,6 @@
 """
 应用分类管理API路由
+(已弃用)
 """
 
 from fastapi import APIRouter, HTTPException, Path

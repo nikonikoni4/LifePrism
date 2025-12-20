@@ -12,10 +12,10 @@ from datetime import datetime
 
 from lifewatch.server.schemas.category_v2_schemas import (
     CategoryTreeResponse,
+    CategoryTreeItem,
+    SubCategoryTreeItem,
     CategoryStatsResponse,
     CategoryStatsIncludeOptions,
-    CategoryDef,
-    SubCategoryDef,
     CreateCategoryRequest,
     UpdateCategoryRequest,
     DeleteCategoryRequest,
@@ -23,7 +23,10 @@ from lifewatch.server.schemas.category_v2_schemas import (
     UpdateSubCategoryRequest
 )
 from lifewatch.server.schemas.common_schemas import StandardResponse
-from lifewatch.server.services.category_v2_service import CategoryService
+from lifewatch.server.services import category_service
+from lifewatch.utils import get_logger
+logger = get_logger(__name__)
+
 router = APIRouter(prefix="/category", tags=["Category V2"])
 
 
@@ -41,9 +44,9 @@ async def get_category_tree(
     )
 )->CategoryTreeResponse:
     try:
-        category_service = CategoryService()
         return category_service.get_category_tree(depth)
     except Exception as e:
+        logger.error(f"获取分类结构失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"获取分类结构失败: {str(e)}")
 
 
@@ -120,7 +123,6 @@ async def get_category_stats(
         # API 层职责：解析 include 字符串为结构化选项
         include_options = CategoryStatsIncludeOptions.from_include_string(include)
         
-        category_service = CategoryService()
         return category_service.get_category_stats(
             start_time=start_time,
             end_time=end_time,
@@ -141,7 +143,7 @@ async def get_category_stats(
 # /manage - 分类管理接口（CRUD）
 # ============================================================================
 
-@router.post("/manage", response_model=CategoryDef, summary="创建主分类")
+@router.post("/manage", response_model=CategoryTreeItem, summary="创建主分类")
 async def create_category(request: CreateCategoryRequest):
     """
     创建新的主分类
@@ -153,7 +155,6 @@ async def create_category(request: CreateCategoryRequest):
     返回创建的分类对象
     """
     try:
-        category_service = CategoryService()
         category = category_service.create_category(
             name=request.name,
             color=request.color
@@ -163,7 +164,7 @@ async def create_category(request: CreateCategoryRequest):
         raise HTTPException(status_code=500, detail=f"创建分类失败: {str(e)}")
 
 
-@router.put("/manage/{category_id}", response_model=CategoryDef, summary="更新主分类")
+@router.put("/manage/{category_id}", response_model=CategoryTreeItem, summary="更新主分类")
 async def update_category(
     category_id: str = Path(..., description="分类ID"),
     request: UpdateCategoryRequest = ...
@@ -179,7 +180,6 @@ async def update_category(
     - color: 新的分类颜色（可选）
     """
     try:
-        category_service = CategoryService()
         category = category_service.update_category(
             category_id=category_id,
             name=request.name or "",
@@ -205,7 +205,6 @@ async def delete_category(
     - 关联的活动记录会被重新分配到指定分类（默认 'other'）
     """
     try:
-        category_service = CategoryService()
         success = category_service.delete_category(
             category_id=category_id,
             reassign_to=request.reassign_to
@@ -221,7 +220,7 @@ async def delete_category(
         raise HTTPException(status_code=500, detail=f"删除分类失败: {str(e)}")
 
 
-@router.post("/manage/{parent_id}/sub", response_model=SubCategoryDef, summary="添加子分类")
+@router.post("/manage/{parent_id}/sub", response_model=SubCategoryTreeItem, summary="添加子分类")
 async def create_sub_category(
     parent_id: str = Path(..., description="主分类ID"),
     request: CreateSubCategoryRequest = ...
@@ -236,7 +235,6 @@ async def create_sub_category(
     - name: 子分类名称
     """
     try:
-        category_service = CategoryService()
         sub_category = category_service.create_sub_category(
             category_id=parent_id,
             name=request.name
@@ -248,7 +246,7 @@ async def create_sub_category(
         raise HTTPException(status_code=500, detail=f"创建子分类失败: {str(e)}")
 
 
-@router.put("/manage/{parent_id}/sub/{sub_id}", response_model=SubCategoryDef, summary="更新子分类")
+@router.put("/manage/{parent_id}/sub/{sub_id}", response_model=SubCategoryTreeItem, summary="更新子分类")
 async def update_sub_category(
     parent_id: str = Path(..., description="主分类ID"),
     sub_id: str = Path(..., description="子分类ID"),
@@ -265,7 +263,6 @@ async def update_sub_category(
     - name: 新的子分类名称
     """
     try:
-        category_service = CategoryService()
         sub_category = category_service.update_sub_category(
             category_id=parent_id,
             sub_id=sub_id,
@@ -289,7 +286,6 @@ async def delete_sub_category(
     注意：关联的活动记录会被重新分配到 'untracked' 子分类
     """
     try:
-        category_service = CategoryService()
         success = category_service.delete_sub_category(
             category_id=parent_id,
             sub_id=sub_id
