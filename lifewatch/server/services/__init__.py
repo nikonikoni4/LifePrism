@@ -12,9 +12,6 @@ from .behavior_service import BehaviorService
 from .sync_service import SyncService
 from .data_processing_service import DataProcessingService
 
-# V2 纯函数模块
-from . import activity_stats_builder
-
 # V2 Service 单例
 from .activity_v2_service import ActivityService
 from .category_v2_service import CategoryService
@@ -29,8 +26,6 @@ __all__ = [
     "BehaviorService", 
     "SyncService",
     "DataProcessingService",
-    # V2 纯函数模块
-    "activity_stats_builder",
     # V2 单例
     "activity_service",
     "category_service",

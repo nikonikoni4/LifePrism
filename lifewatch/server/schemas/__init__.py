@@ -16,16 +16,16 @@ from .behavior import (
     TimelineEvent,
     TimelineSlot
 )
-from .categories import (
-    AppCategory,
-    AppCategoryList,
-    UpdateCategoryRequest
-)
-from .homepage import HomepageResponse
-from .sync import (
-    SyncRequest,
-    SyncResponse
-)
+# from .categories import (
+#     AppCategory,
+#     AppCategoryList,
+#     UpdateCategoryRequest
+# )
+# from .homepage import HomepageResponse
+# from .sync import (
+#     SyncRequest,
+#     SyncResponse
+# )
 
 
 __all__ = [
