@@ -84,11 +84,10 @@ function App() {
       >
         {currentPage === 'home' && <HomeV2 />}
         {currentPage === 'timeline' && <TimelinePage />}
-        {currentPage === 'categorization' && <CategorizationPage />}
-        {currentPage === 'category-v2' && <CategoryPage />}
+        {currentPage === 'category' && <CategoryPage />}
 
         {/* Fallback for pages not yet implemented */}
-        {!['home', 'timeline', 'categorization', 'category-v2'].includes(currentPage) && (
+        {!['home', 'timeline', 'category'].includes(currentPage) && (
           <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-fade-in">
             <h2 className="text-2xl font-bold text-slate-300 mb-2">Coming Soon</h2>
             <p className="text-slate-400">The {currentPage} module is currently under development.</p>

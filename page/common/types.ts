@@ -58,3 +58,42 @@ export interface CategoryTreeItem {
 export interface CategoryTreeResponse {
     data: CategoryTreeItem[];
 }
+
+// ============================================================================
+// Activity Log 相关类型（日志列表）
+// ============================================================================
+
+/** 活动日志条目 */
+export interface ActivityLogItem {
+    id: string;
+    start_time: string;
+    end_time: string;
+    app: string;
+    title: string;
+    duration: number;  // 秒
+    category_id?: string;
+    sub_category_id?: string;
+    category?: string;
+    sub_category?: string;
+}
+
+/** GET /activity/logs 响应 */
+export interface ActivityLogsResponse {
+    data: ActivityLogItem[];
+    total: number;
+    page: number;
+    page_size: number;
+}
+
+/** 活动日志请求参数 */
+export interface ActivityLogsParams {
+    start_time: string;  // YYYY-MM-DD HH:MM:SS
+    end_time: string;    // YYYY-MM-DD HH:MM:SS
+    device_filter?: 'all' | 'pc' | 'mobile';
+    category_id?: string;
+    sub_category_id?: string;
+    sort_by?: 'duration' | 'start_time' | 'app';
+    sort_order?: 'asc' | 'desc';
+    page?: number;
+    page_size?: number;
+}
