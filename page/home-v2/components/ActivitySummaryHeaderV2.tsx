@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Filter, RefreshCw, Clock, Database, X, Check } from 'lucide-react';
-import { ActivitySummaryDataV2, CategoryDefV2 } from '../types';
+import { ActivitySummaryDataV2, CategoryTreeItem } from '../types';
 import { ActivityAPIV2, CategoryAPIV2, SyncAPIV2 } from '../api';
 
 // 安全的日期解析函数,支持多种格式
@@ -228,7 +228,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
 
   // Filter states
   const [showFilterDialog, setShowFilterDialog] = useState(false);
-  const [categories, setCategories] = useState<CategoryDefV2[]>([]);
+  const [categories, setCategories] = useState<CategoryTreeItem[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string | null>(null);
   const [filterColor, setFilterColor] = useState<string | null>(null);
@@ -671,7 +671,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
                   {selectedCategoryId ? (
                     categories
                       .find(c => c.id === selectedCategoryId)
-                      ?.subCategories?.map((sub) => (
+                      ?.subcategories?.map((sub) => (
                         <button
                           key={sub.id}
                           onClick={() => setSelectedSubCategoryId(

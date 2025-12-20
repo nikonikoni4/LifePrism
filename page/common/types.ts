@@ -34,3 +34,27 @@ export interface TimeOverviewData {
     barData: Array<Record<string, any>>;
     details?: Record<string, TimeOverviewData>;
 }
+
+// ============================================================================
+// Category 相关类型（树形结构）
+// ============================================================================
+
+/** 子分类树节点 */
+export interface SubCategoryTreeItem {
+    id: string;
+    name: string;
+    color: string;
+}
+
+/** 主分类树节点 */
+export interface CategoryTreeItem {
+    id: string;
+    name: string;
+    color: string;
+    subcategories?: SubCategoryTreeItem[];
+}
+
+/** GET /category/tree 响应 */
+export interface CategoryTreeResponse {
+    data: CategoryTreeItem[];
+}

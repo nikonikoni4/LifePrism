@@ -5,28 +5,10 @@
  */
 
 // ============================================================================
-// Tree 端点专用类型（精简版，无统计数据）
+// Tree 端点专用类型（从 common 重新导出）
 // ============================================================================
 
-/** 子分类树节点（精简） */
-export interface SubCategoryTreeItem {
-    id: string;
-    name: string;
-    color: string;
-}
-
-/** 主分类树节点（精简） */
-export interface CategoryTreeItem {
-    id: string;
-    name: string;
-    color: string;
-    subcategories?: SubCategoryTreeItem[];
-}
-
-/** GET /category/tree 响应 */
-export interface CategoryTreeResponse {
-    data: CategoryTreeItem[];
-}
+export type { CategoryTreeItem, SubCategoryTreeItem, CategoryTreeResponse } from '../common/types';
 
 // ============================================================================
 // CRUD 请求类型

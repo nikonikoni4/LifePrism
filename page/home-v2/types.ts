@@ -111,20 +111,7 @@ export interface ActivityStatsParamsV2 {
 }
 
 // ============================================================================
-// 分类相关类型（用于筛选器）
+// 分类相关类型（从 common 重新导出）
 // ============================================================================
 
-/** 子分类定义 */
-export interface SubCategoryDefV2 {
-    id: string;
-    name: string;
-    color?: string;
-}
-
-/** 分类定义 */
-export interface CategoryDefV2 {
-    id: string;
-    name: string;
-    color: string;
-    subCategories?: SubCategoryDefV2[];
-}
+export type { CategoryTreeItem, SubCategoryTreeItem } from '../common/types';

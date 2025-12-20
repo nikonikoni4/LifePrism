@@ -4,7 +4,7 @@
  * 调用后端 /api/v2/activity 相关接口
  */
 
-import { ActivityStatsResponseV2, ActivityStatsParamsV2, CategoryDefV2 } from './types';
+import { ActivityStatsResponseV2, ActivityStatsParamsV2, CategoryTreeItem } from './types';
 
 const API_BASE = 'http://localhost:8000/api/v2';
 
@@ -102,7 +102,7 @@ export const CategoryAPIV2 = {
     /**
      * 获取所有分类（带子分类）
      */
-    async getAllCategories(): Promise<CategoryDefV2[]> {
+    async getAllCategories(): Promise<CategoryTreeItem[]> {
         const response = await fetch('http://localhost:8000/api/v2/category/tree?depth=2');
 
         if (!response.ok) {
@@ -110,17 +110,8 @@ export const CategoryAPIV2 = {
         }
 
         const data = await response.json();
-        // 转换为 CategoryDefV2 格式
-        return data.categories.map((cat: any) => ({
-            id: cat.id,
-            name: cat.name,
-            color: cat.color,
-            subCategories: cat.sub_categories?.map((sub: any) => ({
-                id: sub.id,
-                name: sub.name,
-                color: sub.color,
-            })) || [],
-        }));
+        // 直接使用 v2 API 返回的 data 字段
+        return data.data;
     },
 };
 
