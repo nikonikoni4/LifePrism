@@ -25,6 +25,25 @@ from lifewatch.server.providers.category_color_provider import color_manager
 
 
 # ============================================================================
+# 分类名称查找辅助函数
+# ============================================================================
+
+def _get_category_name_map() -> Dict[str, str]:
+    """获取主分类 ID -> 名称映射（从 category 表加载）"""
+    categories_df = server_lw_data_provider.load_categories()
+    if categories_df is None or categories_df.empty:
+        return {}
+    return {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
+
+def _get_sub_category_name_map() -> Dict[str, str]:
+    """获取子分类 ID -> 名称映射（从 sub_category 表加载）"""
+    sub_categories_df = server_lw_data_provider.load_sub_categories()
+    if sub_categories_df is None or sub_categories_df.empty:
+        return {}
+    return {str(row['id']): row['name'] for _, row in sub_categories_df.iterrows()}
+
+
+# ============================================================================
 # 通用工具函数
 # ============================================================================
 
@@ -177,12 +196,12 @@ def _calculate_block_stats(
     # 2. 确定分组字段和颜色获取函数
     if category_level == "main":
         group_field = "category_id"
-        name_field = "category"
         color_getter = color_manager.get_main_category_color
+        name_map = _get_category_name_map()
     else:
         group_field = "sub_category_id"
-        name_field = "sub_category"
         color_getter = color_manager.get_sub_category_color
+        name_map = _get_sub_category_name_map()
     
     # 3. 聚合分类统计
     block_seconds = (end_hour - start_hour) * 3600
@@ -193,17 +212,17 @@ def _calculate_block_stats(
         block_df = block_df.copy()
         block_df['duration_seconds'] = block_df['duration_minutes'] * 60
         
-        # 按分类 id 聚合，避免同一个 id 因名称不一致产生多行
+        # 按分类 id 聚合（只需要 duration_seconds）
         stats = block_df.groupby(group_field).agg({
-            name_field: 'first',  # 取名称的第一个值
             'duration_seconds': 'sum'
         }).reset_index()
-        stats.columns = ['id', 'name', 'duration']
+        stats.columns = ['id', 'duration']
         stats = stats.sort_values('duration', ascending=False)
         
         for _, row in stats.iterrows():
             cat_id = str(row['id']) if pd.notna(row['id']) else "unknown"
-            cat_name = row['name'] if pd.notna(row['name']) else "Uncategorized"
+            # 从分类表查找名称，而不是使用日志中可能过时的名称
+            cat_name = name_map.get(cat_id, "Uncategorized")
             duration = int(row['duration'])
             
             categories.append(TimelineCategoryStats(
@@ -344,12 +363,17 @@ def _build_category_level_data(
     include_idle: bool = True  # 是否包含空闲时间
 ) -> Dict:
     """构建分类层级的视图数据（只在根层级包含空闲时间）"""
-    # 只按 id 分组，避免同一个 id 因名称不一致产生多行
+    # 获取分类名称映射（从分类表加载，确保使用最新的名称）
+    if is_main_category:
+        name_map = _get_category_name_map()
+    else:
+        name_map = _get_sub_category_name_map()
+    
+    # 只按 id 分组（不需要读取名称列，从 name_map 查找）
     stats = df.groupby(group_field).agg({
-        name_field: 'first',  # 取名称的第一个值
         'duration_minutes': 'sum'
     }).reset_index()
-    stats.columns = ['id', 'name', 'minutes']
+    stats.columns = ['id', 'minutes']
     stats = stats.sort_values('minutes', ascending=False)
     
     total_minutes = stats['minutes'].sum()
@@ -367,7 +391,8 @@ def _build_category_level_data(
     
     for _, row in stats.iterrows():
         cat_id = str(row['id']) if pd.notna(row['id']) else "unknown"
-        name = row['name'] if pd.notna(row['name']) else "Uncategorized"
+        # 从分类表查找名称，而不是使用日志中可能过时的名称
+        name = name_map.get(cat_id, "Uncategorized")
         minutes = int(row['minutes'])
         
         if is_main_category:
@@ -405,9 +430,10 @@ def _build_category_level_data(
             "color": idle_color
         })
     
+    # barData 直接使用 category_id 进行分组，避免名称不一致问题
     bar_data = _calculate_time_distribution(
         df, 
-        group_field=name_field, 
+        group_field=group_field,  # 使用 ID 字段（如 category_id）
         range_start=range_start, 
         range_end=range_end,
         include_idle=include_idle
@@ -524,7 +550,7 @@ def _calculate_time_distribution(
     
     Args:
         df: 数据DataFrame（需包含 start_dt, end_dt 列）
-        group_field: 分组字段名（用于分类层级，如 'category', 'sub_category'）
+        group_field: 分组字段名（如 'category_id', 'sub_category_id'）
         top_items: Top N 项目列表（用于应用层级，其他归为 'Other'）
         range_start: 时间范围开始
         range_end: 时间范围结束
@@ -567,9 +593,13 @@ def _calculate_time_distribution(
                 raw_key = row['app']
                 key = raw_key if raw_key in top_items else "Other"
             else:
-                key = row[group_field]
-                if key is None or pd.isna(key):
-                    key = "Uncategorized"
+                # 分类层级：直接使用 ID 字段（如 category_id）
+                raw_key = row[group_field]
+                if raw_key is None or pd.isna(raw_key):
+                    key = "unknown"
+                else:
+                    # 转换为字符串格式，与 barKeys 中的 key 保持一致
+                    key = str(raw_key)
             
             # 计算每个时间槽的重叠时长
             for slot_idx in range(num_slots):
