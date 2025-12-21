@@ -1,7 +1,7 @@
 /**
  * Category V2 Types
  * 
- * TypeScript 类型定义，对应后端 category_v2_schemas.py
+ * TypeScript 类型定义，对应后端 category_schemas.py
  */
 
 // ============================================================================

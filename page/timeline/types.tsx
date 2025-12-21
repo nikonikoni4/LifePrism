@@ -1,11 +1,11 @@
 /**
  * Timeline Types
  * 
- * TypeScript 类型定义，对应后端 timeline_v2_schemas.py
+ * TypeScript 类型定义，对应后端 timeline_schemas.py
  */
 
 // ============================================================================
-// 缩略图 Timeline 相关类型 (来自 timeline_v2_schemas.py)
+// 缩略图 Timeline 相关类型 (来自 timeline_schemas.py)
 // ============================================================================
 
 /** 单个分类在时间块内的统计数据 */

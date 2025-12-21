@@ -25,68 +25,70 @@ const Home: React.FC = () => {
     const [selectedDate, setSelectedDate] = useState(getTodayDate());
     const [refreshKey, setRefreshKey] = useState(0);
 
-    // TimeOverview 数据状态
-    const [timeOverviewData, setTimeOverviewData] = useState<TimeOverviewData | null>(null);
-    const [timeOverviewLoading, setTimeOverviewLoading] = useState(true);
-    const [timeOverviewError, setTimeOverviewError] = useState<string | null>(null);
+    // 统一的数据状态
+    const [homepageData, setHomepageData] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    // 获取 TimeOverview 数据
+    // 统一获取首页所有数据
     useEffect(() => {
-        const fetchTimeOverview = async () => {
+        const fetchHomepageData = async () => {
             try {
-                setTimeOverviewLoading(true);
-                setTimeOverviewError(null);
-                const response = await ActivityAPI.getStats({
-                    date: selectedDate,
-                    include: 'time_overview',
-                });
-                if (response.time_overview) {
-                    setTimeOverviewData(response.time_overview as TimeOverviewData);
-                }
+                setLoading(true);
+                setError(null);
+                const response = await ActivityAPI.getHomepageData(selectedDate, 15, 14);
+                setHomepageData(response);
             } catch (err) {
-                console.error('Failed to fetch time overview:', err);
-                setTimeOverviewError('Failed to load time overview data');
+                console.error('Failed to fetch homepage data:', err);
+                setError('Failed to load homepage data');
             } finally {
-                setTimeOverviewLoading(false);
+                setLoading(false);
             }
         };
 
-        fetchTimeOverview();
+        fetchHomepageData();
     }, [selectedDate, refreshKey]);
 
     const handleRefresh = () => {
         setRefreshKey(prev => prev + 1);
     };
 
-    // TimeOverview 渲染函数
-    const renderTimeOverview = () => {
-        if (timeOverviewLoading) {
-            return (
-                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 h-full flex items-center justify-center">
-                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+    // 加载状态
+    if (loading) {
+        return (
+            <div className="max-w-7xl mx-auto">
+                <header className="mb-6">
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifeWatchAI</h1>
+                    <p className="text-slate-500 mt-1 font-medium">愿此行, 终抵群星</p>
+                </header>
+                <div className="flex items-center justify-center h-96">
+                    <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
                 </div>
-            );
-        }
+            </div>
+        );
+    }
 
-        if (timeOverviewError) {
-            return (
-                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 h-full flex flex-col items-center justify-center text-red-500 gap-2">
-                    <AlertCircle className="w-8 h-8" />
-                    <p>{timeOverviewError}</p>
+    // 错误状态
+    if (error) {
+        return (
+            <div className="max-w-7xl mx-auto">
+                <header className="mb-6">
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifeWatchAI</h1>
+                    <p className="text-slate-500 mt-1 font-medium">愿此行, 终抵群星</p>
+                </header>
+                <div className="flex flex-col items-center justify-center h-96 text-red-500 gap-4">
+                    <AlertCircle className="w-12 h-12" />
+                    <p className="text-lg font-semibold">{error}</p>
                     <button
                         onClick={handleRefresh}
-                        className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
+                        className="px-6 py-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-medium"
                     >
                         Retry
                     </button>
                 </div>
-            );
-        }
-
-        if (!timeOverviewData) return null;
-
-        return <TimeOverviewWidget data={timeOverviewData} />;
-    };
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-7xl mx-auto">
@@ -102,6 +104,7 @@ const Home: React.FC = () => {
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
                 onRefresh={handleRefresh}
+                activitySummaryData={homepageData?.activity_summary}
             />
 
             {/* Bento Grid Layout */}
@@ -112,11 +115,18 @@ const Home: React.FC = () => {
                     <TodoListWidget
                         key={`todolist-${refreshKey}`}
                         selectedDate={selectedDate}
+                        todolist={homepageData?.todolist}
                     />
                 </div>
 
                 <div className="col-span-1 md:col-span-7 h-[700px]">
-                    {renderTimeOverview()}
+                    {homepageData?.time_overview ? (
+                        <TimeOverviewWidget data={homepageData.time_overview as TimeOverviewData} />
+                    ) : (
+                        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 h-full flex items-center justify-center text-slate-400">
+                            No time overview data available
+                        </div>
+                    )}
                 </div>
 
                 {/* Row 2: Activity Details (Full Width) */}
@@ -124,6 +134,8 @@ const Home: React.FC = () => {
                     <ActivityDetailsWidget
                         key={`details-${refreshKey}`}
                         selectedDate={selectedDate}
+                        topApps={homepageData?.top_app}
+                        topTitles={homepageData?.top_title}
                     />
                 </div>
 

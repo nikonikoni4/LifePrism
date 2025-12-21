@@ -1,7 +1,7 @@
 /**
  * Home Types
  * 
- * TypeScript 类型定义，对应后端 activity_v2_schemas.py
+ * TypeScript 类型定义，对应后端 activity_schemas.py
  */
 
 // ============================================================================
