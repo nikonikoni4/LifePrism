@@ -194,8 +194,8 @@ SUB_CATEGORY_CONFIG = {
 }
 
 # Token 使用统计表配置
-TOKENS_USAGE_CONFIG = {
-    'table_name': 'tokens_usage',
+TOKENS_USAGE_LOG_CONFIG = {
+    'table_name': 'tokens_usage_log',
     'columns': {
         'id': {
             'type': 'INTEGER',
@@ -226,6 +226,11 @@ TOKENS_USAGE_CONFIG = {
             'type': 'INTEGER',
             'constraints': ['NOT NULL', 'DEFAULT 0'],
             'comment': '分类结果数量（result_items 长度）'
+        },
+        'mode': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL', 'DEFAULT "classification"'],   
+            'comment': '模式'
         }
     },
     'table_constraints': [],
@@ -235,13 +240,14 @@ TOKENS_USAGE_CONFIG = {
     'timestamps': True  # 自动添加 created_at
 }
 
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'app_purpose_category': APP_PURPOSE_CATEGORY_CONFIG,
     'user_app_behavior_log': USER_APP_BEHAVIOR_LOG_CONFIG,
     'category': CATEGORY_CONFIG,
     'sub_category': SUB_CATEGORY_CONFIG,
-    'tokens_usage': TOKENS_USAGE_CONFIG
+    'tokens_usage_log': TOKENS_USAGE_LOG_CONFIG
 }
 
 

@@ -639,8 +639,70 @@ class ServerLWDataProvider(LWBaseDataProvider):
         return df
 
 
-
+    def get_tokens_usage(self, date: str = None,
+                            start_time: str = None, 
+                            end_time: str = None) -> dict[str, dict]:
+        """
+        获取token使用汇总
         
+        Args:
+            date: 日期（YYYY-MM-DD 格式）
+            start_time: 开始时间（可选，YYYY-MM-DD HH:MM:SS 格式）
+            end_time: 结束时间（可选，YYYY-MM-DD HH:MM:SS 格式）
+        
+        Returns:
+            dict[str, dict]: 日期到使用统计的映射，例如 
+                {
+                    "2025-12-20": {
+                        "input_tokens": 800,
+                        "output_tokens": 700,
+                        "total_tokens": 1500,
+                        "result_items_count": 25
+                    }
+                }
+        """
+        # 1. 确定时间范围
+        if date:
+            # 使用 current_date setter 自动设置时间范围
+            self.current_date = date
+            query_start_time = self._start_time
+            query_end_time = self._end_time
+        elif start_time and end_time:
+            query_start_time = start_time
+            query_end_time = end_time
+        else:
+            raise ValueError("必须提供 date 或 (start_time 和 end_time)")
+        
+        # 2. 构建SQL查询
+        sql = """
+        SELECT 
+            DATE(created_at) as usage_date,
+            SUM(input_tokens) as input_tokens,
+            SUM(output_tokens) as output_tokens,
+            SUM(total_tokens) as total_tokens,
+            SUM(result_items_count) as result_items_count
+        FROM tokens_usage_log
+        WHERE created_at >= ? AND created_at <= ?
+        GROUP BY DATE(created_at)
+        ORDER BY usage_date
+        """
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (query_start_time, query_end_time))
+            results = cursor.fetchall()
+        
+        # 3. 转换为字典格式
+        usage_dict = {}
+        for row in results:
+            usage_dict[row[0]] = {
+                "input_tokens": row[1] if row[1] is not None else 0,
+                "output_tokens": row[2] if row[2] is not None else 0,
+                "total_tokens": row[3] if row[3] is not None else 0,
+                "result_items_count": row[4] if row[4] is not None else 0
+            }
+        
+        return usage_dict
         
 
 # ==================== 模块级单例 ====================

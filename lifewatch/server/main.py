@@ -11,7 +11,8 @@ from lifewatch.server.api import (
     sync_router,
     category_v2_router, 
     activity_v2_router, 
-    timeline_v2_router
+    timeline_v2_router,
+    usage_router
 )
 from lifewatch.storage.lw_table_manager import init_database
 from lifewatch.server.providers.category_color_provider import initialize_category_colors
@@ -95,7 +96,8 @@ app.include_router(sync_router, prefix="/api/v1")
 # V2 API 路由
 app.include_router(category_v2_router, prefix="/api/v2")
 app.include_router(activity_v2_router, prefix="/api/v2")
-app.include_router(timeline_v2_router,prefix="/api/v2")  # 已包含 /api/v2/timeline 前缀
+app.include_router(timeline_v2_router, prefix="/api/v2")  # 已包含 /api/v2/timeline 前缀
+app.include_router(usage_router, prefix="/api/v2")  # Token 使用统计
 
 
 
@@ -119,7 +121,8 @@ async def root():
             "sync": "/api/v1/sync/activitywatch",
             "categories": "/api/v2/categories/apps",
             "timeline": "/api/v2/timeline",
-            "activity": "/api/v2/activity"
+            "activity": "/api/v2/activity",
+            "usage": "/api/v2/usage"
         }
     }
 

@@ -88,3 +88,9 @@ CLEAN_LOWER_BOUND = 10 # 数据清洗配置
 # classify_graph: 使用 LangGraph 的复杂分类流程（支持搜索、多步骤分类）
 # classify_simple: 使用简单的单次 LLM 调用分类
 CLASSIFY_MODE ="classify_graph" #"classify_simple" # 
+
+"""
+=========================费用模块==========================
+"""
+INPUT_TOKEN_PRICE_PER_1K = 0.0001 # 每1000个token的费用
+OUTPUT_TOKEN_PRICE_PER_1K = 0.0001 # 每1000个token的费用

@@ -91,7 +91,7 @@ class DataProcessingService:
             # 3. LLM 分类（如果需要）
             if auto_classify and apps_to_classify > 0:
                 logger.info(f"步骤 3/6: LLM 分类 {apps_to_classify} 条日志项...")
-                classified_app_df = self._classify_apps(classify_state)
+                classified_app_df = self._classify_apps(classify_state, filtered_events)
                 
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
@@ -190,7 +190,7 @@ class DataProcessingService:
             # 3. LLM 分类（如果需要）
             if auto_classify and apps_to_classify > 0:
                 logger.info(f"步骤 3/6: LLM 分类 {apps_to_classify} 条日志项...")
-                classified_app_df = self._classify_apps(classify_state)
+                classified_app_df = self._classify_apps(classify_state, filtered_events)
                 
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
@@ -305,12 +305,13 @@ class DataProcessingService:
 
         return start_time, end_time
 
-    def _classify_apps(self, classify_state: classifyState) -> pd.DataFrame:
+    def _classify_apps(self, classify_state: classifyState, filtered_events: int) -> pd.DataFrame:
         """
         使用 LLM 分类应用
         
         Args:
             classify_state: 待分类数据的 classifyState 对象
+            filtered_events: 过滤后的事件数量，用于统计
             
         Returns:
             pd.DataFrame: 包含分类结果的 DataFrame
@@ -353,6 +354,9 @@ class DataProcessingService:
         
         result_items = result['result_items']
         logger.info(f"  ✓ 获取到 {len(result_items)} 条分类结果")
+        
+        # 保存 token 使用数据（使用 filtered_events 作为 result_items_count）
+        self._save_tokens_usage(result, filtered_events)
         
         # 转换为 DataFrame 格式（适配 app_purpose_category 表结构）
         # 按 app 分组处理：单用途应用只保存一条，多用途应用保存所有 title
@@ -619,6 +623,40 @@ class DataProcessingService:
         logger.info(f"  ✓ 映射了 {mapped_count} 条记录的分类 ID")
         
         return filtered_data
+    
+    def _save_tokens_usage(self, result: dict, result_items_count: int):
+        """
+        保存 token 使用数据到数据库
+        
+        Args:
+            result: LLM 分类结果字典，包含 tokens_usage 信息
+            result_items_count: 分类结果项目数
+        """
+        try:
+            # 从 result 中提取 tokens_usage 字典
+            tokens_usage = result.get('tokens_usage', {})
+            input_tokens = tokens_usage.get('input_tokens', 0)
+            output_tokens = tokens_usage.get('output_tokens', 0)
+            total_tokens = tokens_usage.get('total_tokens', 0)
+            search_count = tokens_usage.get('search_count', 0)
+            
+            # 创建 DataFrame
+            tokens_usage_data = pd.DataFrame([{
+                'input_tokens': input_tokens,
+                'output_tokens': output_tokens,
+                'total_tokens': total_tokens,
+                'search_count': search_count,
+                'result_items_count': result_items_count,
+                'mode': 'classification'
+            }])
+            
+            # 保存到数据库
+            self.server_lw_data_provider.save_tokens_usage(tokens_usage_data)
+            logger.info(f"  ✓ 保存 token 使用数据: input={input_tokens}, output={output_tokens}, total={total_tokens}")
+            
+        except Exception as e:
+            logger.error(f"保存 token 使用数据失败: {e}")
+            # 不抛出异常，避免影响主流程
     
     def clear_cache(self):
         """清除缓存的映射字典"""

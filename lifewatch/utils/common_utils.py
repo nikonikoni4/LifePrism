@@ -15,4 +15,3 @@ def is_multipurpose_app(app: str) -> bool:
         - 不区分大小写，支持各种命名格式
     """
     return app.lower() in config.MULTIPURPOSE_APP
-
