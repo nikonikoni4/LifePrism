@@ -10,7 +10,7 @@ Activity V2 API 路由
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional, List
 
-from lifewatch.server.schemas.activity_v2_schemas import (
+from lifewatch.server.schemas.activity_schemas import (
     ActivityStatsIncludeOptions,
     ActivityStatsResponse,
     ActivityLogsResponse,

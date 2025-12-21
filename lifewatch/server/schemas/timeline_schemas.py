@@ -4,7 +4,7 @@ from typing import List, Optional, Literal
 # ============================================================================
 # 非缩略图的 Timeline 数据显示
 # ============================================================================
-# 使用 activity_v2_schemas.py 中的:
+# 使用 activity_schemas.py 中的:
 #   - ActivityLogItem: 单条日志
 #   - ActivityLogDetailResponse: 日志详情
 #   - ActivityLogsResponse: 日志列表
@@ -51,7 +51,7 @@ class TimelineStatsResponse(BaseModel):
 # ============================================================================
 # 缩略图点击后的 Time Overview
 # ============================================================================
-from lifewatch.server.schemas.activity_v2_schemas import TimeOverviewData
+from lifewatch.server.schemas.activity_schemas import TimeOverviewData
 
 class TimelineTimeOverviewResponse(BaseModel):
     """点击缩略图时间块后的详细概览"""

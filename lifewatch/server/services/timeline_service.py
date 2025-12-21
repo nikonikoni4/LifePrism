@@ -7,7 +7,7 @@ Timeline V2 服务层 - 缩略图统计
 from typing import Literal
 from datetime import datetime
 
-from lifewatch.server.schemas.timeline_v2_schemas import (
+from lifewatch.server.schemas.timeline_schemas import (
     TimelineStatsResponse,
     TimelineTimeOverviewResponse,
 )

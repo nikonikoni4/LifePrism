@@ -7,15 +7,15 @@ V2 架构：
 """
 
 # 旧的 Service 类导出（逐步废弃）
-from .activity_v2_service import ActivityService
-from .category_v2_service import CategoryService
+from .activity_service import ActivityService
+from .category_service import CategoryService
 
 # V2 Service 单例
-from .activity_v2_service import ActivityService
-from .category_v2_service import CategoryService
+from .activity_service import ActivityService
+from .category_service import CategoryService
 
 # V2 纯函数服务模块
-from . import timeline_v2_service
+from . import timeline_service
 
 # 创建单例实例
 activity_service = ActivityService()
@@ -29,6 +29,6 @@ __all__ = [
     "activity_service",
     "category_service",
     # V2 纯函数模块
-    "timeline_v2_service",
+    "timeline_service",
 ]
 

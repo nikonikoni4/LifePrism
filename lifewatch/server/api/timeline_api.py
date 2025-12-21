@@ -7,11 +7,11 @@ Timeline V2 API - 缩略图统计
 from fastapi import APIRouter, Query
 from typing import Literal
 
-from lifewatch.server.schemas.timeline_v2_schemas import (
+from lifewatch.server.schemas.timeline_schemas import (
     TimelineStatsResponse,
     TimelineTimeOverviewResponse,
 )
-from lifewatch.server.services import timeline_v2_service
+from lifewatch.server.services import timeline_service
 
 router = APIRouter(prefix="/timeline", tags=["Timeline V2"])
 
@@ -31,7 +31,7 @@ async def get_timeline_stats(
     - **hour_granularity**: 时间粒度，1/2/3/4/6 小时
     - **category_level**: 分类级别，main=主分类，sub=子分类
     """
-    return timeline_v2_service.get_timeline_stats(
+    return timeline_service.get_timeline_stats(
         date=date,
         hour_granularity=hour_granularity,
         category_level=category_level
@@ -53,7 +53,7 @@ async def get_timeline_overview(
     - **start_hour**: 时间块开始小时（0-23）
     - **end_hour**: 时间块结束小时（1-24）
     """
-    return timeline_v2_service.get_timeline_time_overview(
+    return timeline_service.get_timeline_time_overview(
         date=date,
         start_hour=start_hour,
         end_hour=end_hour

@@ -3,7 +3,7 @@
 实现分类的业务逻辑和数据库操作
 """
 from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
-from lifewatch.server.schemas.category_v2_schemas import (
+from lifewatch.server.schemas.category_schemas import (
     CategoryTreeResponse,
     CategoryTreeItem,
     SubCategoryTreeItem,
@@ -757,7 +757,7 @@ class CategoryService:
 
 if __name__ == "__main__":
     from datetime import datetime, timedelta
-    from lifewatch.server.schemas.category_v2_schemas import CategoryStatsIncludeOptions
+    from lifewatch.server.schemas.category_schemas import CategoryStatsIncludeOptions
     
     test_service = CategoryService()
     

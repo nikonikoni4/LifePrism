@@ -59,7 +59,7 @@ class DailyActivitiesData(BaseModel):
     color: str = Field(..., description="分类颜色（十六进制格式）", alias="color")
     class Config:
         populate_by_name = True
-from lifewatch.server.schemas.category_v2_schemas import CategoryTreeItem
+from lifewatch.server.schemas.category_schemas import CategoryTreeItem
 class ActivitySummaryData(BaseModel):
     """活动摘要条形图数据（框架）"""
     daily_activities: List[DailyActivitiesData] = Field(..., description="每日活动数据", alias="dailyActivities")
@@ -168,7 +168,7 @@ class TodoListData(BaseModel):
 # ============================================================================
 # API 响应模型
 # ============================================================================
-from lifewatch.server.schemas.category_v2_schemas import CategoryDef
+from lifewatch.server.schemas.category_schemas import CategoryDef
 class ActivityStatsResponse(BaseModel):
     """GET /activity/stats 响应"""
     activity_summary: Optional[ActivitySummaryData] = Field(default=None, description="活动摘要条形图数据")

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Query, HTTPException, Path
 from typing import Optional, List
 from datetime import datetime
 
-from lifewatch.server.schemas.category_v2_schemas import (
+from lifewatch.server.schemas.category_schemas import (
     CategoryTreeResponse,
     CategoryTreeItem,
     SubCategoryTreeItem,

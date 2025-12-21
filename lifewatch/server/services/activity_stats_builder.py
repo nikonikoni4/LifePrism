@@ -10,7 +10,7 @@ from typing import Optional, List, Dict
 from collections import defaultdict
 import pandas as pd
 
-from lifewatch.server.schemas.activity_v2_schemas import (
+from lifewatch.server.schemas.activity_schemas import (
     ActivitySummaryData,
     DailyActivitiesData,
     TimeOverviewData,

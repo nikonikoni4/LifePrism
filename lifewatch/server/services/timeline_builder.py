@@ -10,12 +10,12 @@ from typing import List, Dict, Optional, Literal
 from collections import defaultdict
 import pandas as pd
 
-from lifewatch.server.schemas.timeline_v2_schemas import (
+from lifewatch.server.schemas.timeline_schemas import (
     TimelineStatsResponse,
     TimelineBlockStats,
     TimelineCategoryStats,
 )
-from lifewatch.server.schemas.activity_v2_schemas import (
+from lifewatch.server.schemas.activity_schemas import (
     TimeOverviewData,
     ChartSegment,
     BarConfig,

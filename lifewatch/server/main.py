@@ -140,10 +140,28 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "lifewatch.server.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,  # 开发模式：代码变更自动重启
-        log_level="info"
-    )
+    import os
+    
+    # 通过环境变量判断是否为开发模式
+    # 开发时设置 LIFEWATCH_DEV=1，打包后默认为生产模式
+    is_dev_mode = os.environ.get("LIFEWATCH_DEV", "0") == "1"
+    is_dev_mode = True
+    if is_dev_mode:
+        # 开发模式：启用热重载
+        uvicorn.run(
+            "lifewatch.server.main:app",
+            host="0.0.0.0",
+            port=8000,
+            reload=True,
+            reload_dirs=["lifewatch"],  # 只监控 Python 代码目录
+            reload_excludes=["__pycache__", "*.pyc", ".git"],
+            log_level="info"
+        )
+    else:
+        # 生产模式：禁用热重载，启动极快
+        uvicorn.run(
+            app,  # 直接传入 app 对象，不使用字符串
+            host="0.0.0.0",
+            port=8000,
+            log_level="info"
+        )

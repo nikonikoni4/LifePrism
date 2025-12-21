@@ -4,9 +4,9 @@ API路由模块
 
 
 from .sync import router as sync_router
-from .category_v2_api import router as category_v2_router
-from .activity_v2_api import router as activity_v2_router
-from .timeline_v2_api import router as timeline_v2_router
+from .category_api import router as category_v2_router
+from .activity_api import router as activity_v2_router
+from .timeline_api import router as timeline_v2_router
 
 __all__ = [
     "dashboard_router",

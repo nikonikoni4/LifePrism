@@ -7,7 +7,7 @@ Activity V2 Service 层
 from datetime import datetime, timedelta
 from typing import Optional, List
 
-from lifewatch.server.schemas.activity_v2_schemas import (
+from lifewatch.server.schemas.activity_schemas import (
     ActivityStatsIncludeOptions,
     ActivityStatsResponse,
     ActivityLogsResponse,
