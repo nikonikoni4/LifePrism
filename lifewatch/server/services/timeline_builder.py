@@ -193,9 +193,11 @@ def _calculate_block_stats(
         block_df = block_df.copy()
         block_df['duration_seconds'] = block_df['duration_minutes'] * 60
         
-        # 按分类聚合
-        stats = block_df.groupby([group_field, name_field])['duration_seconds'].sum()
-        stats = stats.reset_index()
+        # 按分类 id 聚合，避免同一个 id 因名称不一致产生多行
+        stats = block_df.groupby(group_field).agg({
+            name_field: 'first',  # 取名称的第一个值
+            'duration_seconds': 'sum'
+        }).reset_index()
         stats.columns = ['id', 'name', 'duration']
         stats = stats.sort_values('duration', ascending=False)
         
@@ -342,7 +344,11 @@ def _build_category_level_data(
     include_idle: bool = True  # 是否包含空闲时间
 ) -> Dict:
     """构建分类层级的视图数据（只在根层级包含空闲时间）"""
-    stats = df.groupby([group_field, name_field])['duration_minutes'].sum().reset_index()
+    # 只按 id 分组，避免同一个 id 因名称不一致产生多行
+    stats = df.groupby(group_field).agg({
+        name_field: 'first',  # 取名称的第一个值
+        'duration_minutes': 'sum'
+    }).reset_index()
     stats.columns = ['id', 'name', 'minutes']
     stats = stats.sort_values('minutes', ascending=False)
     
@@ -378,7 +384,7 @@ def _build_category_level_data(
         })
         
         bar_keys.append({
-            "key": name,
+            "key": cat_id,
             "label": name,
             "color": item_color
         })

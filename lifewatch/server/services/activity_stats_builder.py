@@ -276,8 +276,11 @@ def _build_category_level_data(
     sub_title: str,
     is_main_category: bool
 ) -> Dict:
-    """构建分类层级的视图数据"""
-    stats = df.groupby([group_field, name_field])['duration_minutes'].sum().reset_index()
+    # 只按 id 分组，避免同一个 id 因名称不一致产生多行
+    stats = df.groupby(group_field).agg({
+        name_field: 'first',  # 取名称的第一个值
+        'duration_minutes': 'sum'
+    }).reset_index()
     stats.columns = ['id', 'name', 'minutes']
     stats = stats.sort_values('minutes', ascending=False)
     
@@ -305,7 +308,7 @@ def _build_category_level_data(
         })
         
         bar_keys.append({
-            "key": name,
+            "key": cat_id,
             "label": name,
             "color": item_color
         })
