@@ -143,6 +143,10 @@ def build_time_overview(date: str) -> TimeOverviewData:
     df['end_dt'] = pd.to_datetime(df['end_time'])
     df['duration_minutes'] = (df['end_dt'] - df['start_dt']).dt.total_seconds() / 60
     
+    # 获取分类名称映射（从分类表加载，确保使用最新名称）
+    category_name_map = _get_category_name_map()
+    sub_category_name_map = _get_sub_category_name_map()
+    
     # 2. 构建 Level 1 (Category)
     root_data = _build_category_level_data(
         df, 
@@ -163,7 +167,8 @@ def build_time_overview(date: str) -> TimeOverviewData:
         if cat_df.empty:
             continue
         
-        category_name = cat_df['category'].iloc[0] if 'category' in cat_df.columns else str(category_id)
+        # 从分类表查找名称（不再从 DataFrame 读取）
+        category_name = category_name_map.get(str(category_id), "Uncategorized")
         
         cat_data = _build_category_level_data(
             cat_df,
@@ -184,7 +189,8 @@ def build_time_overview(date: str) -> TimeOverviewData:
             if sub_df.empty:
                 continue
             
-            sub_cat_name = sub_df['sub_category'].iloc[0] if 'sub_category' in sub_df.columns else str(sub_cat_id)
+            # 从分类表查找名称（不再从 DataFrame 读取）
+            sub_cat_name = sub_category_name_map.get(str(sub_cat_id), "Uncategorized")
             
             app_data = _build_app_level_data(
                 sub_df,

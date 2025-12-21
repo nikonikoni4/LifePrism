@@ -128,7 +128,7 @@ class DataProcessingService:
                 "apps_to_classify": apps_to_classify,
                 "classified_apps": classified_apps,
                 "saved_events": saved_events,
-                "unclassified_events": len(filtered_data[filtered_data['category'].isna()]),
+                "unclassified_events": len(filtered_data[filtered_data['category_id'].isna()]),
                 "sync_mode": sync_mode,
                 "time_range": time_range
             }
@@ -227,7 +227,7 @@ class DataProcessingService:
                 "apps_to_classify": apps_to_classify,
                 "classified_apps": classified_apps,
                 "saved_events": saved_events,
-                "unclassified_events": len(filtered_data[filtered_data['category'].isna()]),
+                "unclassified_events": len(filtered_data[filtered_data['category_id'].isna()]),
                 "sync_mode": "time_range",
                 "time_range": time_range
             }
@@ -582,13 +582,13 @@ class DataProcessingService:
     
     def _map_category_ids(self, filtered_data: pd.DataFrame) -> pd.DataFrame:
         """
-        批量映射 category_id 和 sub_category_id
+        批量映射 category_id 和 sub_category_id，并删除冗余的名称列
         
         Args:
             filtered_data: 包含 category 和 sub_category 的数据
             
         Returns:
-            pd.DataFrame: 添加了 category_id 和 sub_category_id 的数据
+            pd.DataFrame: 只包含 category_id 和 sub_category_id 的数据（名称列已删除）
         """
         # 获取或使用缓存的映射字典
         if self._category_mappings_cache is None:
@@ -611,16 +611,24 @@ class DataProcessingService:
             logger.info("  ✓ 创建分类映射字典缓存")
         
         # 批量映射
-        filtered_data['category_id'] = filtered_data['category'].map(
-            self._category_mappings_cache['category_id_dict']
-        )
-        filtered_data['sub_category_id'] = filtered_data['sub_category'].map(
-            self._category_mappings_cache['sub_category_id_dict']
-        )
+        if 'category' in filtered_data.columns:
+            filtered_data['category_id'] = filtered_data['category'].map(
+                self._category_mappings_cache['category_id_dict']
+            )
+        if 'sub_category' in filtered_data.columns:
+            filtered_data['sub_category_id'] = filtered_data['sub_category'].map(
+                self._category_mappings_cache['sub_category_id_dict']
+            )
         
         # 统计映射结果
-        mapped_count = filtered_data['category_id'].notna().sum()
+        mapped_count = filtered_data['category_id'].notna().sum() if 'category_id' in filtered_data.columns else 0
         logger.info(f"  ✓ 映射了 {mapped_count} 条记录的分类 ID")
+        
+        # 删除冗余的名称列（只保留 ID）
+        columns_to_drop = [col for col in ['category', 'sub_category'] if col in filtered_data.columns]
+        if columns_to_drop:
+            filtered_data = filtered_data.drop(columns=columns_to_drop)
+            logger.info(f"  ✓ 删除冗余列: {columns_to_drop}")
         
         return filtered_data
     

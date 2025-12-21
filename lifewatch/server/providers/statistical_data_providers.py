@@ -127,10 +127,10 @@ class ServerLWDataProvider(LWBaseDataProvider):
         Returns:
             list[dict]: 分类统计数据
                 name: str, 分类名称
-                id: int, 分类ID
+                id: str, 分类ID
                 duration: int, 活跃时长(秒)
                 color: str, 分类颜色 (仅主分类有)
-                category_id: int, 所属主分类ID (仅子分类有)
+                category_id: str, 所属主分类ID (仅子分类有)
         """
         # 通过 current_date setter 自动设置时间范围
         self.current_date = date
@@ -139,19 +139,22 @@ class ServerLWDataProvider(LWBaseDataProvider):
         if category_type not in ("category", "sub_category"):
             raise ValueError(f"无效的 category_type: {category_type}，只支持 'category' 或 'sub_category'")
         
-        # 动态构建SQL查询
+        # 使用 ID 字段分组（不再使用 name 字段）
+        id_field = f"{category_type}_id"
+        
+        # 动态构建SQL查询（按 ID 分组）
         sql_data = f"""
-        SELECT {category_type}, SUM(duration) as total_duration
+        SELECT {id_field}, SUM(duration) as total_duration
         FROM user_app_behavior_log
-        WHERE start_time >= ? AND start_time <= ? AND {category_type} IS NOT NULL
-        GROUP BY {category_type}
+        WHERE start_time >= ? AND start_time <= ? AND {id_field} IS NOT NULL
+        GROUP BY {id_field}
         """
         
         # 根据类型选择元数据表
         if category_type == "category":
-            sql_meta = "SELECT name, id, color FROM category"
+            sql_meta = "SELECT id, name, color FROM category"
         else:
-            sql_meta = "SELECT name, id, category_id FROM sub_category"
+            sql_meta = "SELECT id, name, category_id FROM sub_category"
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -161,26 +164,26 @@ class ServerLWDataProvider(LWBaseDataProvider):
             cursor.execute(sql_meta)
             meta_rows = cursor.fetchall()
         
-        # 构建元数据字典
+        # 构建元数据字典（以 ID 为 key）
         if category_type == "category":
-            meta_dict = {row[0]: {"id": row[1], "color": row[2]} for row in meta_rows}
+            meta_dict = {str(row[0]): {"name": row[1], "color": row[2]} for row in meta_rows}
             return [
                 {
-                    "name": row[0], 
+                    "id": str(row[0]),
+                    "name": meta_dict.get(str(row[0]), {}).get("name", "未知"),
                     "duration": row[1],
-                    "id": meta_dict.get(row[0], {}).get("id", -1),
-                    "color": meta_dict.get(row[0], {}).get("color", "#E8684A")
+                    "color": meta_dict.get(str(row[0]), {}).get("color", "#E8684A")
                 } 
                 for row in results if row[0] is not None
             ]
         else:
-            meta_dict = {row[0]: {"id": row[1], "category_id": row[2]} for row in meta_rows}
+            meta_dict = {str(row[0]): {"name": row[1], "category_id": str(row[2])} for row in meta_rows}
             return [
                 {
-                    "name": row[0], 
+                    "id": str(row[0]),
+                    "name": meta_dict.get(str(row[0]), {}).get("name", "未知"),
                     "duration": row[1],
-                    "id": meta_dict.get(row[0], {}).get("id", -1),
-                    "category_id": meta_dict.get(row[0], {}).get("category_id", -1)
+                    "category_id": meta_dict.get(str(row[0]), {}).get("category_id", "")
                 } 
                 for row in results if row[0] is not None
             ]

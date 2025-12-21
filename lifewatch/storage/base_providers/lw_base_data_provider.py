@@ -216,8 +216,6 @@ class LWBaseDataProvider:
                     'duration': row.get('duration'),
                     'app': row['app'],
                     'title': row.get('title'),
-                    'category': row.get('category'),
-                    'sub_category': row.get('sub_category'),
                     'is_multipurpose_app': int(row.get('is_multipurpose_app', False)),
                     'category_id': row.get('category_id'),
                     'sub_category_id': row.get('sub_category_id')

@@ -87,16 +87,6 @@ USER_APP_BEHAVIOR_LOG_CONFIG = {
             'constraints': [],
             'comment': '应用程序的标题'
         },
-        'category': {
-            'type': 'TEXT',
-            'constraints': [],
-            'comment': '默认分类（工作/学习/其他）'
-        },
-        'sub_category': {
-            'type': 'TEXT',
-            'constraints': [],
-            'comment': '根据目标分类（编码，读书笔记等）'
-        },
         'is_multipurpose_app': {
             'type': 'INTEGER',
             'constraints': ['DEFAULT 0'],
