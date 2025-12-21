@@ -92,5 +92,5 @@ CLASSIFY_MODE ="classify_graph" #"classify_simple" #
 """
 =========================费用模块==========================
 """
-INPUT_TOKEN_PRICE_PER_1K = 0.0001 # 每1000个token的费用
-OUTPUT_TOKEN_PRICE_PER_1K = 0.0001 # 每1000个token的费用
+INPUT_TOKEN_PRICE_PER_1K = 0.0008 # 每1000个token的费用
+OUTPUT_TOKEN_PRICE_PER_1K = 0.002 # 每1000个token的费用
