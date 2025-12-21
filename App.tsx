@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 
 import Timeline from './page/timeline/Timeline';
-import AIChatPanel from './components/AIChatPanel';
+import AIChatPanel, { ChatDisplayMode } from './components/AIChatPanel';
 import { incrementalSync } from './services/syncService';
 import UsagePage from './page/usage/UsagePage';
 import Home from './page/home/Home';
@@ -14,7 +14,7 @@ import ReportsPage from './page/reports/ReportsPage';
 import SettingsPage from './page/settings/SettingsPage';
 
 function App() {
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatDisplayMode, setChatDisplayMode] = useState<ChatDisplayMode>('hidden');
   const [currentPage, setCurrentPage] = useState('home');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -77,12 +77,12 @@ function App() {
       <Sidebar
         currentPage={currentPage}
         onNavigate={setCurrentPage}
-        onChatToggle={() => setIsChatOpen(!isChatOpen)}
+        onChatToggle={() => setChatDisplayMode(prev => prev === 'hidden' ? 'sidebar' : 'hidden')}
       />
 
       {/* Main Content Area (Center) */}
       <main
-        className={`lg:ml-64 p-6 lg:p-10 min-h-screen transition-all duration-300 ease-in-out ${isChatOpen ? 'lg:mr-[400px]' : ''
+        className={`lg:ml-64 p-6 lg:p-10 min-h-screen transition-all duration-300 ease-in-out ${chatDisplayMode === 'sidebar' ? 'lg:mr-[400px]' : ''
           }`}
       >
         {currentPage === 'home' && <Home />}
@@ -95,7 +95,7 @@ function App() {
       </main>
 
       {/* AI Chat (Right Sidebar) */}
-      <AIChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+      <AIChatPanel displayMode={chatDisplayMode} onModeChange={setChatDisplayMode} />
 
     </div>
   );
