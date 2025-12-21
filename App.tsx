@@ -90,6 +90,7 @@ function App() {
         {currentPage === 'category' && <CategoryPage />}
         {currentPage === 'goals' && <GoalsPage />}
         {currentPage === 'reports' && <ReportsPage />}
+        {currentPage === 'usage' && <UsagePage />}
         {currentPage === 'settings' && <SettingsPage />}
       </main>
 

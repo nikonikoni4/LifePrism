@@ -1,57 +1,38 @@
 /**
  * Usage Page API
  * 
- * API 使用量相关接口（目前使用 Mock 数据）
+ * API 使用量相关接口
+ * 
+ * 对应后端 API: lifewatch/server/api/usage.py
  */
 
-import { TokenUsage, UsageStatsResponse } from './types';
+import { UsageStatsResponse } from './types';
 
-// Mock 历史数据
-const MOCK_USAGE_HISTORY: TokenUsage[] = [
-    { date: '11-25', inputTokens: 4200, outputTokens: 1500, processedRecords: 120 },
-    { date: '11-26', inputTokens: 5100, outputTokens: 2100, processedRecords: 155 },
-    { date: '11-27', inputTokens: 3800, outputTokens: 1600, processedRecords: 110 },
-    { date: '11-28', inputTokens: 6200, outputTokens: 2800, processedRecords: 185 },
-    { date: '11-29', inputTokens: 4900, outputTokens: 1800, processedRecords: 140 },
-    { date: '11-30', inputTokens: 7500, outputTokens: 3200, processedRecords: 210 },
-    { date: '12-01', inputTokens: 5800, outputTokens: 2400, processedRecords: 168 },
-];
+const API_BASE = 'http://localhost:8000/api/v2';
 
-/**
- * Usage API
- */
+// ============================================================================
+// Usage API
+// ============================================================================
+
 export const UsageAPI = {
     /**
-     * 获取使用统计数据
+     * 获取 Token 使用统计数据
      * 
-     * @returns 使用统计响应
-     */
-    async getUsageStats(): Promise<UsageStatsResponse> {
-        // TODO: 替换为真实 API 调用
-        const history = MOCK_USAGE_HISTORY;
-        const today = history[history.length - 1];
-
-        return {
-            today: {
-                inputTokens: today.inputTokens,
-                outputTokens: today.outputTokens,
-                totalTokens: today.inputTokens + today.outputTokens,
-                processedRecords: today.processedRecords,
-            },
-            history,
-        };
-    },
-
-    /**
-     * 获取使用历史
+     * @param date 查询日期 (YYYY-MM-DD 格式)
+     * @returns 使用统计响应（包含总览、7天趋势、数据处理统计）
      * 
-     * @param days 天数
-     * @returns Token 使用历史记录
+     * @example
+     * const stats = await UsageAPI.getUsageStats('2025-12-20');
+     * // 返回 2025-12-20 当天的使用总览，以及从 2025-12-14 到 2025-12-20 的7天趋势
      */
-    async getUsageHistory(days: number = 7): Promise<TokenUsage[]> {
-        // TODO: 替换为真实 API 调用
-        return MOCK_USAGE_HISTORY.slice(-days);
+    async getUsageStats(date: string): Promise<UsageStatsResponse> {
+        const response = await fetch(`${API_BASE}/usage/stats?date=${date}`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch usage stats: ${response.statusText}`);
+        }
+
+        return response.json();
     },
 };
 
-export { MOCK_USAGE_HISTORY };

@@ -8,7 +8,8 @@ import {
   Settings,
   Sparkles,
   User,
-  Tag
+  Tag,
+  DollarSign
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,6 +25,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, onChatToggle
     { id: 'category', icon: Tag, label: 'Category' },
     { id: 'goals', icon: Target, label: 'Goals' },
     { id: 'reports', icon: FileBarChart, label: 'Reports' },
+    { id: 'usage', icon: DollarSign, label: 'Usage' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
 

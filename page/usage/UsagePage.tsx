@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
    PieChart,
    Pie,
@@ -14,31 +14,76 @@ import {
    Legend
 } from 'recharts';
 import { CreditCard, Info, DollarSign, Database, TrendingUp } from 'lucide-react';
-import { MOCK_USAGE_HISTORY } from './api';
+import { UsageAPI } from './api';
+import { UsageStatsResponse } from './types';
 
 const UsagePage: React.FC = () => {
-   const [inputRate, setInputRate] = useState<number>(0.0001); // Rate per 1k
-   const [outputRate, setOutputRate] = useState<number>(0.0004); // Rate per 1k
+   // State
+   const [usageData, setUsageData] = useState<UsageStatsResponse | null>(null);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState<string | null>(null);
+   const [selectedDate, setSelectedDate] = useState<string>(() => {
+      // 默认使用今天的日期
+      const today = new Date();
+      return today.toISOString().split('T')[0]; // YYYY-MM-DD
+   });
 
-   const todayUsage = MOCK_USAGE_HISTORY[MOCK_USAGE_HISTORY.length - 1];
-   const totalTokensToday = todayUsage.inputTokens + todayUsage.outputTokens;
+   // Fetch data
+   useEffect(() => {
+      const fetchUsageData = async () => {
+         setLoading(true);
+         setError(null);
+         try {
+            const data = await UsageAPI.getUsageStats(selectedDate);
+            setUsageData(data);
+         } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to fetch usage data');
+            console.error('Failed to fetch usage data:', err);
+         } finally {
+            setLoading(false);
+         }
+      };
 
-   const todayCost = (
-      (todayUsage.inputTokens / 1000) * inputRate +
-      (todayUsage.outputTokens / 1000) * outputRate
-   ).toFixed(4);
+      fetchUsageData();
+   }, [selectedDate]);
 
+   // Loading state
+   if (loading) {
+      return (
+         <div className="max-w-7xl mx-auto flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+               <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+               <p className="mt-4 text-slate-500 font-medium">Loading usage data...</p>
+            </div>
+         </div>
+      );
+   }
+
+   // Error state
+   if (error || !usageData) {
+      return (
+         <div className="max-w-7xl mx-auto">
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
+               <p className="text-red-600 font-medium">{error || 'No data available'}</p>
+            </div>
+         </div>
+      );
+   }
+
+   // Extract data
+   const { usage_overview, data_processing_usage_stats, usage_stats_7days } = usageData;
+
+   // Pie chart data
    const pieData = [
-      { name: 'Input Tokens', value: todayUsage.inputTokens, color: '#5B8FF9' },
-      { name: 'Output Tokens', value: todayUsage.outputTokens, color: '#FA8C16' }
+      { name: 'Input Tokens', value: usage_overview.input_tokens, color: '#5B8FF9' },
+      { name: 'Output Tokens', value: usage_overview.output_tokens, color: '#FA8C16' }
    ];
 
-   const avgTokensPerRecord = Math.round(totalTokensToday / todayUsage.processedRecords);
-   const avgCostPerRecord = (parseFloat(todayCost) / todayUsage.processedRecords).toFixed(5);
-
-   const chartData = MOCK_USAGE_HISTORY.map(item => ({
-      ...item,
-      cost: ((item.inputTokens / 1000) * inputRate + (item.outputTokens / 1000) * outputRate).toFixed(3)
+   // Bar chart data
+   const chartData = usage_stats_7days.items.map(item => ({
+      date: item.day,
+      totalTokens: item.total_tokens,
+      cost: item.total_cost.toFixed(3)
    }));
 
    const CustomTooltip = ({ active, payload, label }: any) => {
@@ -53,7 +98,7 @@ const UsagePage: React.FC = () => {
                         <span className="text-slate-500 font-medium">{entry.name}</span>
                      </div>
                      <span className="font-mono font-bold text-slate-700">
-                        {entry.name === 'Cost' ? `$${entry.value}` : entry.value}
+                        {entry.name === 'Cost' ? `$${entry.value}` : entry.value.toLocaleString()}
                      </span>
                   </div>
                ))}
@@ -70,6 +115,17 @@ const UsagePage: React.FC = () => {
             <p className="text-slate-500 mt-1 font-medium">Monitor your Gemini API consumption and project costs.</p>
          </header>
 
+         {/* Date Selector */}
+         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <label className="text-sm font-bold text-slate-600 mb-2 block">Select Date</label>
+            <input
+               type="date"
+               value={selectedDate}
+               onChange={(e) => setSelectedDate(e.target.value)}
+               className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:outline-none"
+            />
+         </div>
+
          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
             {/* Today's Usage Overview */}
@@ -77,9 +133,9 @@ const UsagePage: React.FC = () => {
                <div className="flex-1">
                   <div className="flex justify-between items-start mb-6">
                      <div>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Today's Usage</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Token Usage</span>
                         <h2 className="text-4xl font-mono font-bold text-slate-800 mt-1">
-                           {(totalTokensToday / 1000).toFixed(1)}k
+                           {(usage_overview.total_tokens / 1000).toFixed(1)}k
                         </h2>
                      </div>
                      <div className="p-3 bg-blue-50 text-morandi-blue rounded-2xl border border-blue-100">
@@ -89,35 +145,27 @@ const UsagePage: React.FC = () => {
 
                   <div className="space-y-4">
                      <div>
-                        <label className="text-xs font-bold text-slate-500 mb-2 block">Input Token Rate (per 1k)</label>
+                        <label className="text-xs font-bold text-slate-500 mb-2 block">Input Token Price (per 1k)</label>
                         <div className="relative">
                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><DollarSign size={14} /></div>
-                           <input
-                              type="number"
-                              step="0.00001"
-                              value={inputRate}
-                              onChange={(e) => setInputRate(parseFloat(e.target.value) || 0)}
-                              className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-100 focus:outline-none"
-                           />
+                           <div className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono">
+                              {usage_overview.input_tokens_price.toFixed(5)}
+                           </div>
                         </div>
                      </div>
                      <div>
-                        <label className="text-xs font-bold text-slate-500 mb-2 block">Output Token Rate (per 1k)</label>
+                        <label className="text-xs font-bold text-slate-500 mb-2 block">Output Token Price (per 1k)</label>
                         <div className="relative">
                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><DollarSign size={14} /></div>
-                           <input
-                              type="number"
-                              step="0.00001"
-                              value={outputRate}
-                              onChange={(e) => setOutputRate(parseFloat(e.target.value) || 0)}
-                              className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-100 focus:outline-none"
-                           />
+                           <div className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono">
+                              {usage_overview.output_tokens_price.toFixed(5)}
+                           </div>
                         </div>
                      </div>
                      <div className="pt-4 border-t border-dashed border-gray-100">
                         <div className="flex justify-between items-end">
-                           <span className="text-sm font-bold text-slate-500">Estimated Today:</span>
-                           <span className="text-3xl font-mono font-bold text-morandi-orange">${todayCost}</span>
+                           <span className="text-sm font-bold text-slate-500">Total Cost:</span>
+                           <span className="text-3xl font-mono font-bold text-morandi-orange">${usage_overview.total_price.toFixed(4)}</span>
                         </div>
                      </div>
                   </div>
@@ -169,19 +217,19 @@ const UsagePage: React.FC = () => {
 
                <div className="flex-1 space-y-8">
                   <div>
-                     <p className="text-sm font-medium text-slate-400 mb-1">Records Processed Today</p>
-                     <p className="text-3xl font-mono font-bold text-slate-800">{todayUsage.processedRecords}</p>
+                     <p className="text-sm font-medium text-slate-400 mb-1">Records Processed</p>
+                     <p className="text-3xl font-mono font-bold text-slate-800">{data_processing_usage_stats.processing_items}</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                         <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Avg Tokens</p>
-                        <p className="text-lg font-mono font-bold text-slate-700">{avgTokensPerRecord}</p>
+                        <p className="text-lg font-mono font-bold text-slate-700">{Math.round(data_processing_usage_stats.avg_processing_tokens)}</p>
                         <p className="text-[10px] text-slate-400 font-medium">per record</p>
                      </div>
                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                         <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Avg Cost</p>
-                        <p className="text-lg font-mono font-bold text-slate-700">${avgCostPerRecord}</p>
+                        <p className="text-lg font-mono font-bold text-slate-700">${data_processing_usage_stats.avg_cost.toFixed(5)}</p>
                         <p className="text-[10px] text-slate-400 font-medium">per record</p>
                      </div>
                   </div>
@@ -190,7 +238,7 @@ const UsagePage: React.FC = () => {
                      <div className="flex items-start gap-3 text-amber-600 bg-amber-50 p-4 rounded-2xl border border-amber-100">
                         <Info size={16} className="mt-0.5 flex-shrink-0" />
                         <p className="text-xs font-medium leading-relaxed">
-                           Lowering the average tokens per record will directly reduce your monthly billing. Consider optimizing prompts.
+                           Total processing cost: <span className="font-bold">${data_processing_usage_stats.total_cost.toFixed(4)}</span>. Optimizing prompts can reduce costs.
                         </p>
                      </div>
                   </div>
@@ -203,18 +251,18 @@ const UsagePage: React.FC = () => {
                   <div>
                      <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                         <TrendingUp size={20} className="text-morandi-blue" />
-                        Historical Token Consumption
+                        7-Day Usage Trend
                      </h3>
-                     <p className="text-sm text-slate-500 font-medium mt-1">7-day rolling window of Gemini API activity.</p>
+                     <p className="text-sm text-slate-500 font-medium mt-1">Token consumption and cost over the past week.</p>
                   </div>
                   <div className="flex gap-2">
                      <div className="px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-morandi-blue"></div>
-                        <span className="text-[10px] font-bold text-slate-600 uppercase">Input</span>
+                        <span className="text-[10px] font-bold text-slate-600 uppercase">Tokens</span>
                      </div>
                      <div className="px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-morandi-orange"></div>
-                        <span className="text-[10px] font-bold text-slate-600 uppercase">Output</span>
+                        <span className="text-[10px] font-bold text-slate-600 uppercase">Cost</span>
                      </div>
                   </div>
                </div>
@@ -247,19 +295,9 @@ const UsagePage: React.FC = () => {
                         <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F1F5F9', radius: 8 }} />
                         <Bar
                            yAxisId="left"
-                           dataKey="inputTokens"
-                           name="Input Tokens"
-                           stackId="a"
+                           dataKey="totalTokens"
+                           name="Total Tokens"
                            fill="#5B8FF9"
-                           radius={[0, 0, 0, 0]}
-                           barSize={40}
-                        />
-                        <Bar
-                           yAxisId="left"
-                           dataKey="outputTokens"
-                           name="Output Tokens"
-                           stackId="a"
-                           fill="#FA8C16"
                            radius={[8, 8, 0, 0]}
                            barSize={40}
                         />
