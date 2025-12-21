@@ -212,7 +212,7 @@ const TimeOverviewWidget: React.FC<TimeOverviewWidgetProps> = ({
 
                 {/* Stacked Bar Chart */}
                 <div className="w-full h-[200px] pt-2">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100}>
                         <BarChart data={barData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }} barSize={36}>
                             <CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="3 3" />
                             <XAxis
@@ -234,6 +234,7 @@ const TimeOverviewWidget: React.FC<TimeOverviewWidgetProps> = ({
                                 <Bar
                                     key={barItem.key}
                                     dataKey={barItem.key}
+                                    name={barItem.label}
                                     stackId="a"
                                     fill={barItem.color}
                                     radius={index === barKeys.length - 1 ? [8, 8, 0, 0] : [0, 0, 0, 0]}
