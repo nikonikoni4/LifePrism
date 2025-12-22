@@ -165,4 +165,47 @@ export const CategoryAPI = {
 
         return response.json();
     },
+
+    /**
+     * 切换主分类状态
+     * 
+     * @param categoryId 分类ID
+     * @param state 新状态（1: 启用, 0: 禁用）
+     * @returns 更新后的分类
+     */
+    async toggleCategoryState(categoryId: string, state: number): Promise<CategoryTreeItem> {
+        const response = await fetch(`${API_BASE}/manage/${categoryId}/state`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to toggle category state: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * 切换子分类状态
+     * 
+     * @param parentId 主分类ID
+     * @param subId 子分类ID
+     * @param state 新状态（1: 启用, 0: 禁用）
+     * @returns 更新后的子分类
+     */
+    async toggleSubCategoryState(parentId: string, subId: string, state: number): Promise<SubCategoryTreeItem> {
+        const response = await fetch(`${API_BASE}/manage/${parentId}/sub/${subId}/state`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to toggle sub-category state: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
 };

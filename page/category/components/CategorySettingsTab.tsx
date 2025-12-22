@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { Trash2, Edit2, Plus, Check, X as XIcon } from 'lucide-react';
+import { Trash2, Edit2, Plus, Check, X as XIcon, Ban, CircleCheck } from 'lucide-react';
 import { CategoryTreeItem, SubCategoryTreeItem } from '../types';
 import { CategoryAPI } from '../api';
 
@@ -120,6 +120,63 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
         } catch (error) {
             console.error('Failed to update category color:', error);
             alert('Failed to update color. Please try again.');
+        }
+    };
+
+    // --- Toggle State Logic ---
+
+    const handleToggleCategoryState = async (id: string, currentState: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const newState = currentState === 1 ? 0 : 1;
+        const action = newState === 0 ? '禁用' : '启用';
+
+        if (newState === 0) {
+            const confirmed = confirm(
+                `确定要禁用此分类吗？\n\n禁用后，已分类的历史数据不会受影响，但该分类将不再参与后续的自动分类处理。`
+            );
+            if (!confirmed) return;
+        }
+
+        try {
+            const updated = await CategoryAPI.toggleCategoryState(id, newState);
+            setCategories(categories.map(c =>
+                c.id === id ? updated : c
+            ));
+        } catch (error) {
+            console.error(`Failed to ${action} category:`, error);
+            alert(`Failed to ${action} category. Please try again.`);
+        }
+    };
+
+    const handleToggleSubCategoryState = async (subId: string, currentState: number) => {
+        if (!activeCategory) return;
+
+        const newState = currentState === 1 ? 0 : 1;
+        const action = newState === 0 ? '禁用' : '启用';
+
+        if (newState === 0) {
+            const confirmed = confirm(
+                `确定要禁用此子分类吗？\n\n禁用后，已分类的历史数据不会受影响，但该子分类将不再参与后续的自动分类处理。`
+            );
+            if (!confirmed) return;
+        }
+
+        try {
+            const updated = await CategoryAPI.toggleSubCategoryState(activeCategory.id, subId, newState);
+            setCategories(categories.map(c => {
+                if (c.id === activeCategory.id) {
+                    return {
+                        ...c,
+                        subcategories: (c.subcategories || []).map(s =>
+                            s.id === subId ? updated : s
+                        )
+                    };
+                }
+                return c;
+            }));
+        } catch (error) {
+            console.error(`Failed to ${action} sub-category:`, error);
+            alert(`Failed to ${action} sub-category. Please try again.`);
         }
     };
 
@@ -265,10 +322,17 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
                                             </span>
                                         </div>
                                         <div className={`flex items-center gap-1 opacity-0 ${isSelected ? 'opacity-100' : 'group-hover:opacity-100'} transition-opacity`}>
-                                            <button onClick={(e) => startEditCategory(cat.id, cat.name, e)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                                            <button onClick={(e) => startEditCategory(cat.id, cat.name, e)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit">
                                                 <Edit2 size={14} />
                                             </button>
-                                            <button onClick={(e) => handleDeleteCategory(cat.id, e)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                                            <button
+                                                onClick={(e) => handleToggleCategoryState(cat.id, cat.state ?? 1, e)}
+                                                className={`p-1.5 rounded-lg ${cat.state === 0 ? 'text-green-500 hover:text-green-600 hover:bg-green-50' : 'text-slate-400 hover:text-orange-600 hover:bg-orange-50'}`}
+                                                title={cat.state === 0 ? 'Enable' : 'Disable'}
+                                            >
+                                                {cat.state === 0 ? <CircleCheck size={14} /> : <Ban size={14} />}
+                                            </button>
+                                            <button onClick={(e) => handleDeleteCategory(cat.id, e)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
                                                 <Trash2 size={14} />
                                             </button>
                                         </div>
@@ -326,10 +390,17 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
                                             <>
                                                 <span className="font-semibold text-slate-700">{sub.name}</span>
                                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => startEditSub(sub.id, sub.name)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                                                    <button onClick={() => startEditSub(sub.id, sub.name)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit">
                                                         <Edit2 size={16} />
                                                     </button>
-                                                    <button onClick={() => handleDeleteSubCategory(sub.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                                                    <button
+                                                        onClick={() => handleToggleSubCategoryState(sub.id, sub.state ?? 1)}
+                                                        className={`p-2 rounded-lg ${sub.state === 0 ? 'text-green-500 hover:text-green-600 hover:bg-green-50' : 'text-slate-400 hover:text-orange-600 hover:bg-orange-50'}`}
+                                                        title={sub.state === 0 ? 'Enable' : 'Disable'}
+                                                    >
+                                                        {sub.state === 0 ? <CircleCheck size={16} /> : <Ban size={16} />}
+                                                    </button>
+                                                    <button onClick={() => handleDeleteSubCategory(sub.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>

@@ -45,6 +45,7 @@ export interface SubCategoryTreeItem {
     id: string;
     name: string;
     color: string;
+    state?: number;  // 1 = enabled, 0 = disabled
 }
 
 /** 主分类树节点 */
@@ -52,6 +53,7 @@ export interface CategoryTreeItem {
     id: string;
     name: string;
     color: string;
+    state?: number;  // 1 = enabled, 0 = disabled
     subcategories?: SubCategoryTreeItem[];
 }
 

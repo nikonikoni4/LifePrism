@@ -30,14 +30,28 @@ const Home: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // 记录组件挂载时间
+    const [mountTime] = useState(() => {
+        const time = performance.now();
+        console.log(`⏱️ [Home] 组件开始渲染: ${new Date().toLocaleTimeString()}`);
+        return time;
+    });
+
     // 统一获取首页所有数据
     useEffect(() => {
         const fetchHomepageData = async () => {
+            const fetchStart = performance.now();
+            console.log(`📡 [Home] 开始请求数据...`);
+
             try {
                 setLoading(true);
                 setError(null);
                 const response = await ActivityAPI.getHomepageData(selectedDate, 15, 14);
                 setHomepageData(response);
+
+                const fetchEnd = performance.now();
+                console.log(`✅ [Home] 数据加载完成: ${(fetchEnd - fetchStart).toFixed(0)}ms (API 请求)`);
+                console.log(`✅ [Home] 总渲染时间: ${(fetchEnd - mountTime).toFixed(0)}ms (从组件挂载到数据就绪)`);
             } catch (err) {
                 console.error('Failed to fetch homepage data:', err);
                 setError('Failed to load homepage data');
@@ -47,7 +61,7 @@ const Home: React.FC = () => {
         };
 
         fetchHomepageData();
-    }, [selectedDate, refreshKey]);
+    }, [selectedDate, refreshKey, mountTime]);
 
     const handleRefresh = () => {
         setRefreshKey(prev => prev + 1);

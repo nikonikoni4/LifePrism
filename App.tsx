@@ -19,29 +19,27 @@ function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
-  // 页面加载时自动同步数据
+  // 页面加载时自动同步数据（非阻塞模式，在后台运行）
   useEffect(() => {
-    const performSync = async () => {
-      setIsSyncing(true);
-      setSyncError(null);
+    // 后台同步，不阻塞页面渲染
+    console.log('🔄 开始后台同步数据...');
+    setIsSyncing(true);
 
-      try {
-        console.log('🔄 开始自动同步数据...');
-        const result = await incrementalSync();
-        console.log('✅ 同步成功:', result);
+    incrementalSync()
+      .then(result => {
+        console.log('✅ 后台同步成功:', result);
         console.log(`  - 模式: ${result.details?.sync_mode}`);
         console.log(`  - 时间范围: ${result.details?.time_range}`);
         console.log(`  - 同步事件数: ${result.synced_events}`);
         console.log(`  - 新分类应用: ${result.new_apps_classified}`);
-      } catch (error) {
-        console.error('❌ 同步失败:', error);
+      })
+      .catch(error => {
+        console.error('❌ 后台同步失败:', error);
         setSyncError(error instanceof Error ? error.message : '同步失败');
-      } finally {
+      })
+      .finally(() => {
         setIsSyncing(false);
-      }
-    };
-
-    performSync();
+      });
   }, []); // 空依赖数组，只在组件挂载时执行一次
 
 
