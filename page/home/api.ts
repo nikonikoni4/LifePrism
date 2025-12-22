@@ -120,11 +120,17 @@ export const CategoryAPI = {
  */
 export const SyncAPI = {
     /**
-     * 增量同步
+     * 增量同步（从数据库最新时间开始同步到现在）
      */
-    async incrementalSync(): Promise<any> {
-        const response = await fetch('http://localhost:8000/api/v1/sync/activitywatch', {
+    async incrementalSync(autoClassify: boolean = true): Promise<any> {
+        const response = await fetch('http://localhost:8000/api/v2/sync/activitywatch', {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                auto_classify: autoClassify,
+            }),
         });
 
         if (!response.ok) {
@@ -142,7 +148,7 @@ export const SyncAPI = {
         end_time: string;
         auto_classify?: boolean;
     }): Promise<any> {
-        const response = await fetch('http://localhost:8000/api/v1/sync/activitywatch/timerange', {
+        const response = await fetch('http://localhost:8000/api/v2/sync/activitywatch/timerange', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

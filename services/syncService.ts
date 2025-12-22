@@ -3,12 +3,10 @@
  * 负责与后端同步 ActivityWatch 数据
  */
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = 'http://localhost:8000/api/v2';
 
 export interface SyncRequest {
-    hours?: number;
     auto_classify?: boolean;
-    use_incremental_sync?: boolean;
 }
 
 export interface SyncTimeRangeRequest {
@@ -34,27 +32,19 @@ export interface SyncResponse {
 }
 
 /**
- * 同步 ActivityWatch 数据
- * @param request 同步请求参数
- * @returns 同步结果
+ * 执行增量同步（从数据库最新时间开始同步到现在）
+ * @param autoClassify 是否自动分类新应用，默认开启
  */
-export async function syncActivityWatchData(
-    request: SyncRequest = {}
-): Promise<SyncResponse> {
-    const defaultRequest: SyncRequest = {
-        hours: 24,
-        auto_classify: true,
-        use_incremental_sync: true, // 默认使用增量同步
-        ...request,
-    };
-
+export async function incrementalSync(autoClassify: boolean = true): Promise<SyncResponse> {
     try {
         const response = await fetch(`${API_BASE_URL}/sync/activitywatch`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(defaultRequest),
+            body: JSON.stringify({
+                auto_classify: autoClassify,
+            }),
         });
 
         if (!response.ok) {
@@ -64,32 +54,9 @@ export async function syncActivityWatchData(
         const data: SyncResponse = await response.json();
         return data;
     } catch (error) {
-        console.error('数据同步错误:', error);
+        console.error('增量同步错误:', error);
         throw error;
     }
-}
-
-/**
- * 执行增量同步（从上次同步时间开始）
- */
-export async function incrementalSync(): Promise<SyncResponse> {
-    return syncActivityWatchData({
-        hours: null,
-        use_incremental_sync: true,
-        auto_classify: true,
-    });
-}
-
-/**
- * 执行全量同步（获取最近N小时的数据）
- * @param hours 小时数，默认24小时
- */
-export async function fullSync(hours: number = 24): Promise<SyncResponse> {
-    return syncActivityWatchData({
-        hours,
-        auto_classify: true,
-        use_incremental_sync: false,
-    });
 }
 
 /**
