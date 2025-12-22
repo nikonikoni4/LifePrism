@@ -67,4 +67,6 @@ class LLMLWDataProvider(LWBaseDataProvider):
         """
         return self.db.upsert_many("app_purpose_category", app_description_list, "app")
 
-llm_lw_data_provider = LLMLWDataProvider()
+# 懒加载单例
+from lifewatch.utils import LazySingleton
+llm_lw_data_provider = LazySingleton(LLMLWDataProvider)

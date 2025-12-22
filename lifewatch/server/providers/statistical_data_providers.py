@@ -708,8 +708,9 @@ class ServerLWDataProvider(LWBaseDataProvider):
         return usage_dict
         
 
-# ==================== 模块级单例 ====================
-server_lw_data_provider = ServerLWDataProvider()
+# ==================== 模块级单例（懒加载） ====================
+from lifewatch.utils import LazySingleton
+server_lw_data_provider = LazySingleton(ServerLWDataProvider)
 
 
 if __name__ == "__main__":

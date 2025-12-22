@@ -6,6 +6,7 @@ V2 架构：
 - Builder/Helper 模块作为纯函数模块导入
 """
 
+from lifewatch.utils import LazySingleton
 
 # V2 Service 单例（有状态或需要缓存的服务）
 from .activity_service import ActivityService
@@ -15,9 +16,9 @@ from .category_service import CategoryService
 from . import timeline_service
 from . import usage_service
 
-# 创建单例实例（仅用于有状态或需要缓存的服务）
-activity_service = ActivityService()
-category_service = CategoryService()
+# 创建懒加载单例实例（首次访问时才初始化）
+activity_service = LazySingleton(ActivityService)
+category_service = LazySingleton(CategoryService)
 
 __all__ = [
     # V2 单例（有状态服务）

@@ -213,11 +213,13 @@ class CategoryColorManager:
             )
             colors.append(hex_color)
             
+
         return colors
 
 
-# 全局单例实例
-color_manager = CategoryColorManager()
+# 全局单例实例（懒加载）
+from lifewatch.utils import LazySingleton
+color_manager = LazySingleton(CategoryColorManager)
 
 
 # 便捷函数

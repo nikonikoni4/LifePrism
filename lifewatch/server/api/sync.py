@@ -5,9 +5,10 @@
 from fastapi import APIRouter
 from lifewatch.server.schemas.sync import SyncRequest, SyncResponse, SyncTimeRangeRequest
 from lifewatch.server.services.sync_service import SyncService
+from lifewatch.utils import LazySingleton
 
 router = APIRouter(prefix="/sync", tags=["Data Synchronization"])
-sync_service = SyncService()
+sync_service = LazySingleton(SyncService)
 
 
 @router.post("/activitywatch", response_model=SyncResponse, summary="增量同步ActivityWatch数据")
