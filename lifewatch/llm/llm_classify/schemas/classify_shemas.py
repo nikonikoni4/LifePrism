@@ -64,7 +64,7 @@ class AppInFo(BaseModel):
 #         return item_list
 
 def test_add(item_list:list[LogItem],update_data:list[LogItem])->list[LogItem]:
-    print(f"test_add : {update_data}")
+    # print(f"test_add : {update_data}")
     if item_list and update_data:
         return item_list+ update_data
     elif item_list:

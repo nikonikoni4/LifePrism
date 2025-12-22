@@ -39,19 +39,15 @@ class DataProcessingService:
         
     def process_activitywatch_data(
         self,
-        hours: Optional[int] ,
-        auto_classify: bool,
-        use_incremental_sync: bool
+        auto_classify: bool = True
     ) -> Dict:
         """
-        处理 ActivityWatch 数据的完整流程
+        增量同步处理 ActivityWatch 数据
+        
+        从数据库最新的 end_time 开始获取到现在的数据
         
         Args:
-            hours: 获取最近N小时的数据（当 use_incremental_sync=False 时使用）
             auto_classify: 是否自动分类新应用
-            use_incremental_sync: 是否使用增量同步
-                - True: 从数据库最新的 end_time 开始获取到现在的数据
-                - False: 获取最近 hours 小时的数据（默认）
             
         Returns:
             Dict: 处理结果统计
@@ -60,14 +56,13 @@ class DataProcessingService:
                 - apps_to_classify: 待分类应用数
                 - classified_apps: 已分类应用数
                 - saved_events: 保存的事件数
-                - sync_mode: 同步模式（'incremental' 或 'full'）
+                - sync_mode: 同步模式（始终为 'incremental'）
                 - time_range: 同步的时间范围
         """
         try:
-            # 确定同步模式和时间范围
-            sync_mode = 'incremental' if use_incremental_sync else 'full'
-            # 0. 获取时间范围
-            start_time, end_time = self._process_time_range(use_incremental_sync, hours)
+            # 获取增量同步的时间范围
+            sync_mode = 'incremental'
+            start_time, end_time = self._get_incremental_time_range()
             time_range = f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
             
             # 1-2. 获取 ActivityWatch 数据并清洗
@@ -250,58 +245,36 @@ class DataProcessingService:
             raise
     
 
-    def _process_time_range(self,use_incremental_sync:bool,hours:Optional[int]):
+    def _get_incremental_time_range(self):
         """
-        初始化时间参数
-        use_incremental_sync = True时，从数据库最新的 end_time 开始获取到现在
-        use_incremental_sync = False时，获取最近N小时的数据
-        lifewatch_db中user_app_behavior_log表为空时，使用默认的24小时
-        Args:
-            use_incremental_sync: 是否使用增量同步
-            hours: 时间范围（小时）
+        获取增量同步的时间范围
+        
+        从数据库最新的 end_time 开始获取到现在
+        如果数据库为空，则获取最近24小时的数据（首次同步）
 
         Returns:
             start_time: 开始时间
             end_time: 结束时间
         """
-        # 初始化时间参数
-        start_time = None
-        end_time = None
+        local_tz = pytz.timezone(config.LOCAL_TIMEZONE)
+        latest_end_time = self.server_lw_data_provider.get_latest_end_time()
         
-        if use_incremental_sync:
+        if latest_end_time:
             # 增量同步：从数据库最新的 end_time 开始获取到现在
-            latest_end_time = self.server_lw_data_provider.get_latest_end_time()
-            
-            if latest_end_time:
-                # 解析最新时间
-                latest_dt = datetime.strptime(latest_end_time, '%Y-%m-%d %H:%M:%S')
-                # 数据库时间是本地时区
-                local_tz = pytz.timezone(config.LOCAL_TIMEZONE)
-                start_time = local_tz.localize(latest_dt)
-                end_time = datetime.now(local_tz)
-                time_diff = end_time - start_time
-                hours_diff = time_diff.total_seconds() / 3600
-                logger.info(f"开始增量同步 ActivityWatch 数据")
-                logger.info(f"  开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-                logger.info(f"  结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
-                logger.info(f"  时间跨度: {hours_diff:.2f} 小时")
-            else:
-                # 数据库为空，使用默认的 24 小时
-                start_time = datetime.now() - timedelta(hours=24)
-                end_time = datetime.now()
-                logger.info("数据库为空，执行首次全量同步（24小时）")
+            latest_dt = datetime.strptime(latest_end_time, '%Y-%m-%d %H:%M:%S')
+            start_time = local_tz.localize(latest_dt)
+            end_time = datetime.now(local_tz)
+            time_diff = end_time - start_time
+            hours_diff = time_diff.total_seconds() / 3600
+            logger.info(f"开始增量同步 ActivityWatch 数据")
+            logger.info(f"  开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info(f"  结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            logger.info(f"  时间跨度: {hours_diff:.2f} 小时")
         else:
-            # 全量同步：获取最近 N 小时
-            
-            if hours is None:
-                hours = 24
-                logger.info(f"传入hours为 None，使用默认时间范围: {hours} 小时")
-            logger.info(f"开始全量同步 ActivityWatch 数据,时间范围: {hours} 小时")
-            
-            start_time = datetime.now() - timedelta(hours=hours)
-            end_time = datetime.now()
-
-        
+            # 数据库为空，首次同步：获取最近24小时
+            start_time = datetime.now(local_tz) - timedelta(hours=24)
+            end_time = datetime.now(local_tz)
+            logger.info("数据库为空，执行首次同步（24小时）")
 
         return start_time, end_time
 

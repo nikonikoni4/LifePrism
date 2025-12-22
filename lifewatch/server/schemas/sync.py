@@ -7,10 +7,8 @@ from typing import Optional
 
 
 class SyncRequest(BaseModel):
-    """同步请求参数"""
-    hours: Optional[int] = 24
+    """增量同步请求参数（从数据库最新时间开始同步到现在）"""
     auto_classify: bool = True
-    use_incremental_sync: bool = False
 
 
 class SyncTimeRangeRequest(BaseModel):

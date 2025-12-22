@@ -92,7 +92,7 @@ app.add_middleware(
 )
 
 # 注册 API 路由
-app.include_router(sync_router, prefix="/api/v1")
+app.include_router(sync_router, prefix="/api/v2")
 # V2 API 路由
 app.include_router(category_v2_router, prefix="/api/v2")
 app.include_router(activity_v2_router, prefix="/api/v2")
@@ -118,7 +118,7 @@ async def root():
             "openapi_spec": "/openapi.json"
         },
         "endpoints": {
-            "sync": "/api/v1/sync/activitywatch",
+            "sync": "/api/v2/sync/activitywatch",
             "categories": "/api/v2/categories/apps",
             "timeline": "/api/v2/timeline",
             "activity": "/api/v2/activity",

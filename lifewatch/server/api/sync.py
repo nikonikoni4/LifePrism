@@ -10,23 +10,23 @@ router = APIRouter(prefix="/sync", tags=["Data Synchronization"])
 sync_service = SyncService()
 
 
-@router.post("/activitywatch", response_model=SyncResponse, summary="从ActivityWatch同步数据")
+@router.post("/activitywatch", response_model=SyncResponse, summary="增量同步ActivityWatch数据")
 async def sync_from_activitywatch(
     sync_request: SyncRequest = SyncRequest()
 ):
     """
-    从 ActivityWatch 同步数据并可选择性自动分类
+    增量同步 ActivityWatch 数据（从数据库最新时间同步到现在）
     
     **流程**:
-    1. 从 ActivityWatch 获取最近N小时的数据
-    2. 数据清洗和去重
-    3. 识别未分类的应用
-    4. （可选）自动抓取应用描述并调用 LLM 分类
-    5. 保存到数据库
+    1. 从数据库获取最新的 end_time
+    2. 从 ActivityWatch 获取该时间到现在的数据
+    3. 数据清洗和去重
+    4. 识别未分类的应用
+    5. （可选）自动抓取应用描述并调用 LLM 分类
+    6. 保存到数据库
     
     **请求参数**:
-    - hours: 同步最近N小时的数据（1-720小时）
-    - auto_classify: 是否自动分类新应用
+    - auto_classify: 是否自动分类新应用（默认开启）
     
     **响应**:
     - status: 同步状态（success/failed/partial）
@@ -34,17 +34,13 @@ async def sync_from_activitywatch(
     - new_apps_classified: 新分类的应用数量
     - duration: 同步耗时（秒）
     
-    **当前返回 Mock 数据**
-    
     **注意**: 
     - 自动分类会调用 LLM API，可能需要较长时间
-    - 建议首次同步使用较小的 hours 值进行测试
+    - 如需同步指定时间范围，请使用 /activitywatch/timerange 接口
     """
-    print("sync_request", sync_request)
+    print("sync_request (incremental)", sync_request)
     result = sync_service.sync_from_activitywatch(
-        hours=sync_request.hours,
-        auto_classify=sync_request.auto_classify,
-        use_incremental_sync=sync_request.use_incremental_sync
+        auto_classify=sync_request.auto_classify
     )
     return result
 
