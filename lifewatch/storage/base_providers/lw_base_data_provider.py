@@ -43,13 +43,15 @@ class LWBaseDataProvider:
                 - app, title, is_multipurpose_app
                 - app_description, title_analysis
                 - category_id, sub_category_id
+                - state, created_at
             为空返回 None
         """
         # 只查询需要的列，不再查询已弃用的 category/sub_category 名称字段
         columns = [
             'app', 'title', 'is_multipurpose_app',
             'app_description', 'title_analysis',
-            'category_id', 'sub_category_id'
+            'category_id', 'sub_category_id',
+            'state', 'created_at'
         ]
         df = self.db.query('app_purpose_category', columns=columns)
         return df if not df.empty else None
@@ -99,7 +101,7 @@ class LWBaseDataProvider:
             # 使用 (app, title) 作为冲突列，因为是复合主键
             affected = self.db.upsert_many('app_purpose_category', 
                                        data_list, 
-                                       conflict_columns=['app', 'title'])
+                                       conflict_columns=['app', 'title','state'])
             logger.info(f"成功保存 {len(data_list)} 行AI元数据到数据库")
             return affected
         except Exception as e:
