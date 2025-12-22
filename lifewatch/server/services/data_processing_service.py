@@ -334,7 +334,7 @@ class DataProcessingService:
         # 初始化 LLMClassify 分类器
         classifier = LLMClassify(
             classify_mode=classify_mode,
-            goal=mock_goals,
+            goal=None,
             category_tree=category_tree
         )
         
@@ -342,7 +342,7 @@ class DataProcessingService:
         logger.info(f"  调用 LLM 分类器...")
         result = classifier.classify(classify_state)
         logger.info(f"  ✓ 分类完成")
-        
+        print(result)
         # 处理分类结果
         if result is None or not result.get('result_items'):
             logger.warning("  ⚠ 分类结果为空")
@@ -678,6 +678,6 @@ class DataProcessingService:
 
 if __name__ == "__main__":
     data_processing_service = DataProcessingService()
-    start_time = datetime.now() - timedelta(hours=1)
+    start_time = datetime.now() - timedelta(minutes=5)
     end_time = datetime.now()
     data_processing_service.process_activitywatch_data_by_time_range(auto_classify=True, start_time=start_time, end_time=end_time)

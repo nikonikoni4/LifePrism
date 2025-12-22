@@ -23,7 +23,7 @@ import json
 import logging
 from langgraph.types import Send,RetryPolicy
 from langgraph.store.memory import InMemoryStore
-
+import time
 import uuid
 MAX_LOG_ITEMS = 15
 MAX_TITLE_ITEMS = 5
@@ -175,29 +175,40 @@ class ClassifyGraph:
         - 如果搜索后仍无法确定，返回 None
         """)
         
+        MAX_RETRIES = 3
         for app, title in app_to_search:
-            try:
-                user_message = HumanMessage(content=f"""软件名称:{app} title:{title}""")
-                messages = [system_message, user_message]
-                
-                result = self.chat_model.invoke(messages)
-                self.recode_tokens_usage("app_descriptions",parse_token_usage(result))
-                # 记录 token 使用到全局列表
-                # record_token_usage("get_app_description", result)
-                
-                # 提取描述
-                app_descriptions[app] = result.content
-                logger.info(f"已获取 {app} 的描述: {result.content[:50]}...")
-                
-            except Exception as e:
-                logger.error(f"搜索 {app} 描述失败: {e}")
-                app_descriptions[app] = None
-        
-        
-        # 3. 直接更新 state.app_registry
-        for app_name, description in app_descriptions.items():
-            if app_name in state.app_registry:
-                state.app_registry[app_name].description = description
+            success = False
+            for attempt in range(1, MAX_RETRIES + 1):
+                try:
+                    user_message = HumanMessage(content=f"""软件名称:{app} title:{title}""")
+                    messages = [system_message, user_message]
+                    
+                    result = self.chat_model.invoke(messages)
+                    self.recode_tokens_usage("app_descriptions", parse_token_usage(result))
+                    
+                    # 检查结果是否为空
+                    if result.content is None or result.content.strip() == "" or result.content.strip().lower() == "none":
+                        logger.warning(f"获取 {app} 的描述失败（第 {attempt}/{MAX_RETRIES} 次），结果为空")
+                        if attempt < MAX_RETRIES:
+                            
+                            time.sleep(0.5)  # 重试前等待 1 秒
+                        continue
+                    
+                    # 收到非空结果，立即更新 app_registry
+                    if app in state.app_registry:
+                        state.app_registry[app].description = result.content
+                        logger.info(f"已获取并更新 {app} 的描述: {result.content[:50]}...")
+                    success = True
+                    break  # 成功获取，跳出重试循环
+                    
+                except Exception as e:
+                    logger.warning(f"获取 {app} 的描述时发生异常（第 {attempt}/{MAX_RETRIES} 次）: {e}")
+                    if attempt < MAX_RETRIES:
+                        import time
+                        time.sleep(1)
+            
+            if not success:
+                logger.warning(f"获取 {app} 的描述失败，已重试 {MAX_RETRIES} 次，跳过该应用")
         
         # 返回更新后的状态
         return {

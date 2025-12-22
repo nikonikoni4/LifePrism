@@ -16,34 +16,6 @@ from lifewatch.utils import get_logger
 logger = get_logger(__name__)
 
 
-# 禁用分类集合（在模块加载时初始化）
-_disabled_category_ids: set = set()
-_disabled_sub_category_ids: set = set()
-
-
-def _init_disabled_categories():
-    """加载禁用的分类 ID”"""
-    global _disabled_category_ids, _disabled_sub_category_ids
-    try:
-        from lifewatch.storage import lw_db_manager
-        with lw_db_manager.get_connection() as conn:
-            cursor = conn.cursor()
-            # 加载禁用的主分类
-            cursor.execute("SELECT id FROM category WHERE state = 0")
-            _disabled_category_ids = {row[0] for row in cursor.fetchall()}
-            # 加载禁用的子分类
-            cursor.execute("SELECT id FROM sub_category WHERE state = 0")
-            _disabled_sub_category_ids = {row[0] for row in cursor.fetchall()}
-            logger.info(f"加载禁用分类: 主分类 {len(_disabled_category_ids)} 个, 子分类 {len(_disabled_sub_category_ids)} 个")
-    except Exception as e:
-        logger.warning(f"加载禁用分类失败: {e}")
-
-
-def refresh_disabled_categories():
-    """刷新禁用分类缓存"""
-    _init_disabled_categories()
-
-
 def create_dict_from_table_columns(table_name: str, values: dict = None) -> dict:
     """
     根据数据库表配置动态创建字典
@@ -154,15 +126,12 @@ def clean_activitywatch_data(
     
     # 已经分类的应用（单一用途app和多用途title）
     # 以及已存在的app_description，避免LLM重复搜索
-    # 初始化禁用分类集合
-    _init_disabled_categories()
     logger.debug(f"原始 app_purpose_category_df 长度: {len(app_purpose_category_df) if app_purpose_category_df is not None else 0}")
     if app_purpose_category_df is not None and not app_purpose_category_df.empty:
-        # 过滤掉禁用分类的记录
+        # 直接使用 state 字段过滤（state=0 表示对应的分类被禁用）
         valid_df = app_purpose_category_df[
-            ~app_purpose_category_df['category_id'].isin(_disabled_category_ids) &
-            ~app_purpose_category_df['sub_category_id'].isin(_disabled_sub_category_ids)
-        ].copy()
+            app_purpose_category_df.get('state', 1) == 1
+        ].copy() if 'state' in app_purpose_category_df.columns else app_purpose_category_df.copy()
         logger.debug(f"过滤后的 valid_df 长度: {len(valid_df)}")
         # 获取已存在的单一用途的应用集合
         categorized_single_purpose_apps = set(valid_df['app'].unique())

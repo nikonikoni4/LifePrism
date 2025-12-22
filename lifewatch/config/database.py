@@ -54,9 +54,14 @@ APP_PURPOSE_CATEGORY_CONFIG = {
             'type': 'TEXT',
             'constraints': [],
             'comment': '[已弃用] 子分类名称，保留用于调试'
+        },
+        'state': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 1'],
+            'comment': '记录状态（1: 有效, 0: 无效/分类被禁用）'
         }
     },
-    'table_constraints': ['PRIMARY KEY (app, title)'],  # 表级约束：复合主键
+    'table_constraints': ['PRIMARY KEY (app, title,state)'],  # 表级约束：复合主键
     'indexes': [],
     'timestamps': True  # 自动添加 created_at, updated_at
 }

@@ -2,7 +2,7 @@ from lifewatch.llm.llm_classify.schemas.classify_shemas import Goal,LogItem
 def format_goals_for_prompt(goals: list[Goal]) -> str:
     """将 goals 列表格式化为易于 AI 理解的字符串"""
     if not goals:
-        return "用户暂未设定目标"
+        return ""
     
     formatted = "用户目标列表：\n"
     for i, goal in enumerate(goals, 1):
