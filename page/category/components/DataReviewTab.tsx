@@ -5,9 +5,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Trash2, ChevronLeft, ChevronRight, Loader2, Edit3, X } from 'lucide-react';
+import { Search, Filter, Trash2, ChevronLeft, ChevronRight, Loader2, Edit3, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { CategoryTreeItem, ActivityLogItem } from '../../common/types';
 import { ActivityLogsAPI } from '../../common/api';
+
+// 排序字段类型
+type SortField = 'duration' | 'timestamp';
 
 // 格式化日期为 YYYY-MM-DD
 const formatDate = (date: Date): string => {
@@ -50,6 +53,10 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [dateRange, setDateRange] = useState({ start: today, end: today });
 
+    // 排序状态
+    const [sortBy, setSortBy] = useState<SortField>('duration');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
     // 数据状态
     const [records, setRecords] = useState<ActivityLogItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -80,13 +87,16 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
                 const startTime = `${dateRange.start} 00:00:00`;
                 const endTime = `${dateRange.end} 23:59:59`;
 
+                // 将前端排序字段映射到后端字段
+                const backendSortBy = sortBy === 'timestamp' ? 'start_time' : sortBy;
+
                 const response = await ActivityLogsAPI.getLogs({
                     start_time: startTime,
                     end_time: endTime,
                     page: currentPage,
                     page_size: pageSize,
-                    sort_by: 'duration',
-                    sort_order: 'desc',
+                    sort_by: backendSortBy,
+                    sort_order: sortOrder,
                     category_id: showUncategorized ? 'other' : undefined,
                     sub_category_id: showUncategorized ? 'untracked' : undefined,
                 });
@@ -105,7 +115,7 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
         };
 
         fetchLogs();
-    }, [dateRange, currentPage, pageSize, showUncategorized]);
+    }, [dateRange, currentPage, pageSize, showUncategorized, sortBy, sortOrder]);
 
     // 本地搜索过滤
     const filteredRecords = records.filter(record => {
@@ -120,6 +130,38 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
         if (!catId) return '#CBD5E1';
         const cat = categories.find(c => c.id === catId);
         return cat ? cat.color : '#CBD5E1';
+    };
+
+    // 处理排序点击
+    const handleSort = (field: SortField) => {
+        if (sortBy === field) {
+            // 如果点击同一列，切换排序方向
+            setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            // 切换到新的排序字段，默认降序
+            setSortBy(field);
+            setSortOrder('desc');
+        }
+        setCurrentPage(1); // 排序后回到第一页
+    };
+
+    // 渲染排序图标 - 双箭头样式
+    const renderSortIcon = (field: SortField) => {
+        const isActive = sortBy === field;
+        return (
+            <span className="inline-flex flex-col items-center ml-1 -my-1">
+                <ArrowUp
+                    size={10}
+                    className={`${isActive && sortOrder === 'asc' ? 'text-indigo-600' : 'text-gray-300'} transition-colors`}
+                    strokeWidth={2.5}
+                />
+                <ArrowDown
+                    size={10}
+                    className={`-mt-1 ${isActive && sortOrder === 'desc' ? 'text-indigo-600' : 'text-gray-300'} transition-colors`}
+                    strokeWidth={2.5}
+                />
+            </span>
+        );
     };
 
     // 全选/取消全选
@@ -365,8 +407,18 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
                                 </th>
                                 <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-gray-100">App</th>
                                 <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-gray-100">Window Title</th>
-                                <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-gray-100 w-24">Duration</th>
-                                <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-gray-100 w-32">Time</th>
+                                <th
+                                    className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-gray-100 w-24 cursor-pointer hover:bg-gray-100 hover:text-slate-700 transition-colors select-none"
+                                    onClick={() => handleSort('duration')}
+                                >
+                                    Duration{renderSortIcon('duration')}
+                                </th>
+                                <th
+                                    className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-gray-100 w-32 cursor-pointer hover:bg-gray-100 hover:text-slate-700 transition-colors select-none"
+                                    onClick={() => handleSort('timestamp')}
+                                >
+                                    Time{renderSortIcon('timestamp')}
+                                </th>
                                 <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-gray-100 w-40">Category</th>
                                 <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-gray-100 w-40">Sub-category</th>
                                 <th className="py-4 px-6 w-16 border-b border-gray-100"></th>
