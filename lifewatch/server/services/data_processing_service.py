@@ -597,12 +597,6 @@ class DataProcessingService:
         mapped_count = filtered_data['category_id'].notna().sum() if 'category_id' in filtered_data.columns else 0
         logger.info(f"  ✓ 映射了 {mapped_count} 条记录的分类 ID")
         
-        # 删除冗余的名称列（只保留 ID）
-        columns_to_drop = [col for col in ['category', 'sub_category'] if col in filtered_data.columns]
-        if columns_to_drop:
-            filtered_data = filtered_data.drop(columns=columns_to_drop)
-            logger.info(f"  ✓ 删除冗余列: {columns_to_drop}")
-        
         return filtered_data
     
     def _save_tokens_usage(self, result: dict, result_items_count: int):
@@ -643,3 +637,10 @@ class DataProcessingService:
         """清除缓存的映射字典"""
         self._category_mappings_cache = None
         logger.info("已清除分类映射缓存")
+
+
+if __name__ == "__main__":
+    data_processing_service = DataProcessingService()
+    start_time = datetime.now() - timedelta(hours=1)
+    end_time = datetime.now()
+    data_processing_service.process_activitywatch_data_by_time_range(auto_classify=True, start_time=start_time, end_time=end_time)

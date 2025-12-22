@@ -157,7 +157,7 @@ if __name__ == "__main__":
             port=8000,
             reload=True,
             reload_dirs=["lifewatch"],  # 只监控 Python 代码目录
-            reload_excludes=["__pycache__", "*.pyc", ".git","lifewatch_ai.db"],
+            reload_excludes=["__pycache__", "*.pyc", ".git","*.db"],
             log_level="info"
         )
     else:

@@ -163,7 +163,7 @@ def clean_activitywatch_data(
                 # 获得title
                 title = event.get('data', {}).get('title', None)
                 if title:
-                    title = title.split('和另外')[0].strip()
+                    title = title.split('和另外')[0].strip().lower()
                 
                 is_multipurpose = is_multipurpose_app(app_name)
                 
@@ -186,12 +186,12 @@ def clean_activitywatch_data(
                     logger.debug(f"✅ 成功获取分类数据: 默认={filtered_event['category']}, 目标={filtered_event['sub_category']}")
                 
                 # 2.app已经被分类 但 app是多用途的 ： 根据title进行分类
-                elif app_name in categorized_single_purpose_apps and title and title.lower() in categorized_mutilpurpose_titles:
+                elif app_name in categorized_single_purpose_apps and title and title in categorized_mutilpurpose_titles:
                     # 对于多应用场景，根据title匹配分类数据
-                    filtered_event['category'] = app_purpose_category_df[app_purpose_category_df['title'].str.lower() == title.lower()]['category'].values[0]
-                    filtered_event['sub_category'] = app_purpose_category_df[app_purpose_category_df['title'].str.lower() == title.lower()]['sub_category'].values[0]
+                    filtered_event['category'] = app_purpose_category_df[app_purpose_category_df['title'].str.lower() == title]['category'].values[0]
+                    filtered_event['sub_category'] = app_purpose_category_df[app_purpose_category_df['title'].str.lower() == title]['sub_category'].values[0]
                     logger.debug(f"✅ 成功获取分类数据: 默认={filtered_event['category']}, 目标={filtered_event['sub_category']}")
-                
+                    logger.debug(f"✅ 多用途匹配成功: app_name={app_name}, title={title}")
                 # 3. app未被分类，且是单一用途的 
                 elif not is_multipurpose:
                     # 3.1 app未被分类，且是单一用途的 且 未被添加到待分类列表 ： 加入待分类列表
