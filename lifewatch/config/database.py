@@ -139,6 +139,11 @@ CATEGORY_CONFIG = {
             'type': 'INTEGER',
             'constraints': ['DEFAULT 0'],
             'comment': '显示顺序索引'
+        },
+        'state': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 1'],
+            'comment': '分类状态（1: 启用, 0: 禁用）'
         }
     },
     'table_constraints': [],
@@ -171,6 +176,11 @@ SUB_CATEGORY_CONFIG = {
             'type': 'INTEGER',
             'constraints': ['DEFAULT 0'],
             'comment': '显示顺序索引'
+        },
+        'state': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 1'],
+            'comment': '子分类状态（1: 启用, 0: 禁用）'
         }
     },
     'table_constraints': [

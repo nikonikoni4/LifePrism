@@ -20,7 +20,8 @@ from lifewatch.server.schemas.category_schemas import (
     UpdateCategoryRequest,
     DeleteCategoryRequest,
     CreateSubCategoryRequest,
-    UpdateSubCategoryRequest
+    UpdateSubCategoryRequest,
+    ToggleCategoryStateRequest
 )
 from lifewatch.server.schemas.common_schemas import StandardResponse
 from lifewatch.server.services import category_service
@@ -307,4 +308,57 @@ async def delete_sub_category(
         logger.error(f"删除子分类失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"删除子分类失败: {str(e)}")
 
+
+# ============================================================================
+# /state - 分类状态切换接口
+# ============================================================================
+
+@router.patch("/manage/{category_id}/state", response_model=CategoryTreeItem, summary="切换主分类状态")
+async def toggle_category_state(
+    category_id: str = Path(..., description="分类ID"),
+    request: ToggleCategoryStateRequest = ...
+):
+    """
+    切换主分类的启用/禁用状态
+    
+    - state=1: 启用
+    - state=0: 禁用（该分类将不再参与自动分类，已分类数据不受影响）
+    """
+    try:
+        category = category_service.toggle_category_state(
+            category_id=category_id,
+            state=request.state
+        )
+        return category
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"切换分类状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"切换分类状态失败: {str(e)}")
+
+
+@router.patch("/manage/{parent_id}/sub/{sub_id}/state", response_model=SubCategoryTreeItem, summary="切换子分类状态")
+async def toggle_sub_category_state(
+    parent_id: str = Path(..., description="主分类ID"),
+    sub_id: str = Path(..., description="子分类ID"),
+    request: ToggleCategoryStateRequest = ...
+):
+    """
+    切换子分类的启用/禁用状态
+    
+    - state=1: 启用
+    - state=0: 禁用（该子分类将不再参与自动分类，已分类数据不受影响）
+    """
+    try:
+        sub_category = category_service.toggle_sub_category_state(
+            category_id=parent_id,
+            sub_id=sub_id,
+            state=request.state
+        )
+        return sub_category
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"切换子分类状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"切换子分类状态失败: {str(e)}")
 

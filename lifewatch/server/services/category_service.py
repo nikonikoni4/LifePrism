@@ -35,17 +35,27 @@ class CategoryService:
         self._categories_df = self.server_lw_data_provider.load_categories()
         self._sub_categories_df = self.server_lw_data_provider.load_sub_categories()
         
-        # 初始化分类名称映射
-        self.category_name_map = {
-            str(row['id']): row['name'] 
-            for _, row in self._categories_df.iterrows()
-        } if self._categories_df is not None and not self._categories_df.empty else {}
+        # 初始化分类名称映射（禁用的分类添加 (banned) 后缀）
+        self.category_name_map = {}
+        if self._categories_df is not None and not self._categories_df.empty:
+            for _, row in self._categories_df.iterrows():
+                cat_id = str(row['id'])
+                name = row['name']
+                state = row.get('state', 1) if 'state' in self._categories_df.columns else 1
+                if state == 0:
+                    name = f"{name} (banned)"
+                self.category_name_map[cat_id] = name
         
-        # 初始化子分类名称映射
-        self.sub_category_name_map = {
-            str(row['id']): row['name']
-            for _, row in self._sub_categories_df.iterrows()
-        } if self._sub_categories_df is not None and not self._sub_categories_df.empty else {}
+        # 初始化子分类名称映射（禁用的子分类添加 (banned) 后缀）
+        self.sub_category_name_map = {}
+        if self._sub_categories_df is not None and not self._sub_categories_df.empty:
+            for _, row in self._sub_categories_df.iterrows():
+                sub_id = str(row['id'])
+                name = row['name']
+                state = row.get('state', 1) if 'state' in self._sub_categories_df.columns else 1
+                if state == 0:
+                    name = f"{name} (banned)"
+                self.sub_category_name_map[sub_id] = name
         
         # 子分类 -> 父分类ID映射
         self.sub_to_parent_map = {
@@ -82,15 +92,20 @@ class CategoryService:
                         SubCategoryTreeItem(
                             id=str(sub_row['id']),
                             name=self.sub_category_name_map.get(str(sub_row['id']), sub_row['name']),
-                            color=color_manager.get_sub_category_color(str(sub_row['id']))
+                            color=color_manager.get_sub_category_color(str(sub_row['id'])),
+                            state=int(sub_row.get('state', 1)) if 'state' in sub_df.columns else 1
                         )
                         for _, sub_row in sub_df.iterrows()
                     ]
+                
+                # 获取主分类的 state
+                cat_state = int(cat_row.get('state', 1)) if 'state' in self._categories_df.columns else 1
                 
                 category_tree.append(CategoryTreeItem(
                     id=category_id,
                     name=self.category_name_map.get(category_id, cat_row['name']),
                     color=color_manager.get_main_category_color(category_id),
+                    state=cat_state,
                     subcategories=subcategories
                 ))
             
@@ -370,16 +385,26 @@ class CategoryService:
         self._categories_df = self.server_lw_data_provider.load_categories()
         self._sub_categories_df = self.server_lw_data_provider.load_sub_categories()
         
-        # 更新名称映射
-        self.category_name_map = {
-            str(row['id']): row['name'] 
-            for _, row in self._categories_df.iterrows()
-        } if self._categories_df is not None and not self._categories_df.empty else {}
+        # 更新名称映射（禁用的分类添加 (banned) 后缀）
+        self.category_name_map = {}
+        if self._categories_df is not None and not self._categories_df.empty:
+            for _, row in self._categories_df.iterrows():
+                cat_id = str(row['id'])
+                name = row['name']
+                state = row.get('state', 1) if 'state' in self._categories_df.columns else 1
+                if state == 0:
+                    name = f"{name} (banned)"
+                self.category_name_map[cat_id] = name
         
-        self.sub_category_name_map = {
-            str(row['id']): row['name']
-            for _, row in self._sub_categories_df.iterrows()
-        } if self._sub_categories_df is not None and not self._sub_categories_df.empty else {}
+        self.sub_category_name_map = {}
+        if self._sub_categories_df is not None and not self._sub_categories_df.empty:
+            for _, row in self._sub_categories_df.iterrows():
+                sub_id = str(row['id'])
+                name = row['name']
+                state = row.get('state', 1) if 'state' in self._sub_categories_df.columns else 1
+                if state == 0:
+                    name = f"{name} (banned)"
+                self.sub_category_name_map[sub_id] = name
         
         self.sub_to_parent_map = {
             str(row['id']): str(row['category_id'])
@@ -753,6 +778,92 @@ class CategoryService:
             name=category['name'],
             color=color_manager.get_main_category_color(category['id'])
         )
+    
+    def toggle_category_state(self, category_id: str, state: int) -> CategoryTreeItem:
+        """
+        切换主分类的启用/禁用状态
+        
+        Args:
+            category_id: 分类ID
+            state: 新状态（1: 启用, 0: 禁用）
+            
+        Returns:
+            CategoryTreeItem: 更新后的分类对象
+            
+        Raises:
+            ValueError: 如果分类不存在
+        """
+        try:
+            # 检查分类是否存在
+            existing = self.db.get_by_id('category', 'id', category_id)
+            if not existing:
+                raise ValueError(f"分类 '{category_id}' 不存在")
+            
+            # 更新状态
+            self.db.update_by_id('category', 'id', category_id, {'state': state})
+            logger.info(f"成功切换分类 '{category_id}' 状态为 {state}")
+            
+            # 刷新缓存
+            self._refresh_cache()
+            
+            # 返回更新后的分类
+            return self._get_category_by_id(category_id)
+            
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"切换分类状态失败: {e}")
+            raise
+    
+    def toggle_sub_category_state(self, category_id: str, sub_id: str, state: int) -> SubCategoryTreeItem:
+        """
+        切换子分类的启用/禁用状态
+        
+        Args:
+            category_id: 主分类ID
+            sub_id: 子分类ID
+            state: 新状态（1: 启用, 0: 禁用）
+            
+        Returns:
+            SubCategoryTreeItem: 更新后的子分类对象
+            
+        Raises:
+            ValueError: 如果主分类或子分类不存在
+        """
+        try:
+            # 验证主分类存在
+            existing_cat = self.db.get_by_id('category', 'id', category_id)
+            if not existing_cat:
+                raise ValueError(f"主分类 '{category_id}' 不存在")
+            
+            # 验证子分类存在且属于该主分类
+            existing_sub = self.db.get_by_id('sub_category', 'id', sub_id)
+            if not existing_sub:
+                raise ValueError(f"子分类 '{sub_id}' 不存在")
+            
+            if existing_sub['category_id'] != category_id:
+                raise ValueError(f"子分类 '{sub_id}' 不属于分类 '{category_id}'")
+            
+            # 更新状态
+            self.db.update_by_id('sub_category', 'id', sub_id, {'state': state})
+            logger.info(f"成功切换子分类 '{sub_id}' 状态为 {state}")
+            
+            # 刷新缓存
+            self._refresh_cache()
+            
+            # 返回更新后的子分类
+            return SubCategoryTreeItem(
+                id=sub_id,
+                name=self.sub_category_name_map.get(sub_id, existing_sub['name']),
+                color=color_manager.get_sub_category_color(sub_id),
+                state=state
+            )
+            
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"切换子分类状态失败: {e}")
+            raise
 
 
 if __name__ == "__main__":

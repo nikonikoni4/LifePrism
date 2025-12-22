@@ -172,7 +172,8 @@ class DataProcessingService:
             filtered_data, classify_state = clean_activitywatch_data(
                 start_time=start_time,
                 end_time=end_time,
-                app_purpose_category_df=app_purpose_category_df
+                # app_purpose_category_df=app_purpose_category_df
+                app_purpose_category_df=None
             )
             total_events = len(filtered_data) + (len(classify_state.log_items) if classify_state.log_items else 0)
             filtered_events = len(filtered_data)
@@ -294,15 +295,29 @@ class DataProcessingService:
         sub_category = self.server_lw_data_provider.load_sub_categories()
         
         # 构建分类树结构：{主分类名: [子分类名列表]}
+        # 只包含启用的分类（state == 1）
         category_tree = {}
         for _, cat in category.iterrows():
+            # 过滤被禁用的主分类
+            if cat.get('state', 1) == 0:
+                logger.info(f"  跳过禁用的主分类: {cat['name']}")
+                continue
+            
             cat_id = cat['id']
             cat_name = cat['name']
-            # 找到属于该主分类的所有子分类
-            subs = sub_category[sub_category['category_id'] == cat_id]['name'].tolist()
-            category_tree[cat_name] = subs
+            # 找到属于该主分类的所有启用的子分类
+            sub_mask = sub_category['category_id'] == cat_id
+            if 'state' in sub_category.columns:
+                sub_mask = sub_mask & (sub_category['state'].fillna(1) == 1)
+            enabled_subs = sub_category[sub_mask]['name'].tolist()
+            category_tree[cat_name] = enabled_subs
         
-        logger.info(f"  构建分类树: {category_tree}")
+        logger.info(f"  构建分类树（仅启用分类）: {category_tree}")
+        
+        # 严格检查：如果分类树为空，则无法进行分类
+        if not category_tree:
+            logger.error("所有分类均被禁用，无法进行 LLM 分类！请至少启用一个主分类。")
+            return pd.DataFrame()
         
         # 获取分类模式
         classify_mode = getattr(config, 'CLASSIFY_MODE', 'classify_graph')

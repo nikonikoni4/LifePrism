@@ -9,6 +9,10 @@ from typing import Dict, Optional
 from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
 
 
+# 禁用分类使用的浅灰色
+DISABLED_CATEGORY_COLOR = '#D1D5DB'
+
+
 class CategoryColorManager:
     """
     分类颜色管理器（单例模式）
@@ -40,41 +44,59 @@ class CategoryColorManager:
         with self.db_manager.get_connection() as conn:
             cursor = conn.cursor()
             
-            # 1. 获取所有主分类及其基础颜色
+            # 1. 获取所有主分类及其基础颜色和状态
             cursor.execute("""
-                SELECT id, name, color 
+                SELECT id, name, color, COALESCE(state, 1) as state
                 FROM category 
                 ORDER BY id
             """)
             main_categories = cursor.fetchall()
             
-            for cat_id, cat_name, base_color in main_categories:
-                # 主分类使用数据库中的颜色
-                self._main_category_colors[cat_id] = base_color or self._get_default_color(cat_id)
+            # 记录禁用的主分类
+            disabled_main_categories = set()
             
-            # 2. 获取所有子分类并生成渐变色
+            for cat_id, cat_name, base_color, state in main_categories:
+                if state == 0:
+                    # 禁用的主分类使用浅灰色
+                    self._main_category_colors[cat_id] = DISABLED_CATEGORY_COLOR
+                    disabled_main_categories.add(cat_id)
+                else:
+                    # 启用的主分类使用数据库中的颜色
+                    self._main_category_colors[cat_id] = base_color or self._get_default_color(cat_id)
+            
+            # 2. 获取所有子分类并生成渐变色（包含状态）
             cursor.execute("""
-                SELECT sc.id, sc.name, sc.category_id, c.color
+                SELECT sc.id, sc.name, sc.category_id, c.color, COALESCE(sc.state, 1) as state
                 FROM sub_category sc
                 LEFT JOIN category c ON sc.category_id = c.id
                 ORDER BY sc.category_id, sc.id
             """)
             sub_categories = cursor.fetchall()
             
-            # 按主分类分组
-            sub_by_main: Dict[str, list] = {}
-            for sub_id, sub_name, main_cat_id, main_color in sub_categories:
-                if main_cat_id not in sub_by_main:
-                    sub_by_main[main_cat_id] = []
-                sub_by_main[main_cat_id].append((sub_id, sub_name, main_color))
+            # 按主分类分组（分离启用和禁用的子分类）
+            sub_by_main: Dict[str, list] = {}  # 启用的子分类
+            disabled_subs: Dict[str, str] = {}  # 禁用的子分类 {sub_id: sub_id}
             
-            # 为每个主分类的子分类生成颜色变体
+            for sub_id, sub_name, main_cat_id, main_color, state in sub_categories:
+                if state == 0 or main_cat_id in disabled_main_categories:
+                    # 禁用的子分类，或者其主分类被禁用
+                    disabled_subs[sub_id] = sub_id
+                else:
+                    if main_cat_id not in sub_by_main:
+                        sub_by_main[main_cat_id] = []
+                    sub_by_main[main_cat_id].append((sub_id, sub_name, main_color))
+            
+            # 为启用的子分类生成颜色变体
             for main_cat_id, subs in sub_by_main.items():
                 base_color = self._main_category_colors.get(main_cat_id, '#5B8FF9')
                 variant_colors = self._generate_color_variants(base_color, len(subs))
                 
                 for idx, (sub_id, sub_name, _) in enumerate(subs):
                     self._sub_category_colors[sub_id] = variant_colors[idx]
+            
+            # 为禁用的子分类设置浅灰色
+            for sub_id in disabled_subs:
+                self._sub_category_colors[sub_id] = DISABLED_CATEGORY_COLOR
     
     def get_main_category_color(self, category_id: str) -> str:
         """

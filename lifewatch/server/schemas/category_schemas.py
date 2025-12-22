@@ -25,13 +25,15 @@ class SubCategoryTreeItem(BaseModel):
     id: str = Field(..., description="子分类唯一标识符")
     name: str = Field(..., description="子分类名称")
     color: str = Field(..., description="分类颜色（十六进制格式）")
+    state: int = Field(default=1, description="分类状态（1: 启用, 0: 禁用）")
 
     class Config:
         json_schema_extra = {
             "example": {
                 "id": "coding",
                 "name": "编程",
-                "color": "#5B8FF9"
+                "color": "#5B8FF9",
+                "state": 1
             }
         }
 
@@ -41,6 +43,7 @@ class CategoryTreeItem(BaseModel):
     id: str = Field(..., description="分类唯一标识符")
     name: str = Field(..., description="分类名称")
     color: str = Field(..., description="分类颜色（十六进制格式）")
+    state: int = Field(default=1, description="分类状态（1: 启用, 0: 禁用）")
     subcategories: list[SubCategoryTreeItem] | None = Field(default=None, description="子分类列表，depth=1时为None")
 
     class Config:
@@ -49,11 +52,13 @@ class CategoryTreeItem(BaseModel):
                 "id": "work",
                 "name": "工作/学习",
                 "color": "#5B8FF9",
+                "state": 1,
                 "subcategories": [
                     {
                         "id": "coding",
                         "name": "编程",
-                        "color": "#7C9AE6"
+                        "color": "#7C9AE6",
+                        "state": 1
                     }
                 ]
             }
@@ -229,4 +234,8 @@ class UpdateSubCategoryRequest(BaseModel):
     """更新子分类请求"""
     name: str = Field(..., description="新的子分类名称")
 
+
+class ToggleCategoryStateRequest(BaseModel):
+    """切换分类状态请求"""
+    state: int = Field(..., ge=0, le=1, description="新状态（1: 启用, 0: 禁用）")
 
