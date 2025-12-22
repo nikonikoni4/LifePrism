@@ -86,6 +86,26 @@ const UsagePage: React.FC = () => {
       cost: item.total_cost.toFixed(3)
    }));
 
+   // Tooltip for Pie Chart (no label needed)
+   const PieTooltip = ({ active, payload }: any) => {
+      if (active && payload && payload.length) {
+         const data = payload[0];
+         return (
+            <div className="bg-white p-3 border border-gray-100 shadow-xl rounded-xl text-sm z-50 relative">
+               <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.payload.color }}></div>
+                  <span className="text-slate-600 font-medium">{data.name}</span>
+               </div>
+               <p className="font-mono font-bold text-slate-800 mt-1 text-right">
+                  {data.value.toLocaleString()}
+               </p>
+            </div>
+         );
+      }
+      return null;
+   };
+
+   // Tooltip for Bar Chart (with date label)
    const CustomTooltip = ({ active, payload, label }: any) => {
       if (active && payload && payload.length) {
          return (
@@ -188,10 +208,10 @@ const UsagePage: React.FC = () => {
                               <Cell key={`cell-${index}`} fill={entry.color} />
                            ))}
                         </Pie>
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip content={<PieTooltip />} wrapperStyle={{ zIndex: 100 }} />
                      </PieChart>
                   </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
                      <span className="text-xl font-bold text-slate-700">Tokens</span>
                      <span className="text-[10px] text-slate-400 font-bold uppercase">Split</span>
                   </div>
