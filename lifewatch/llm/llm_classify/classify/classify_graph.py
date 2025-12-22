@@ -268,15 +268,11 @@ class ClassifyGraph:
             {{
                 id:[category,sub_category,link_to_goal]
             }}
-            示例:
-            {{
-                "1": ["工作/学习", "编程", "完成LifeWatch-AI项目开发"],
-                "2": ["娱乐", "看电视", null]
-            }}
             注意：
             - value必须是列表，包含三个元素 [category, sub_category, link_to_goal]
             - 无值时使用 null
             - key必须是id，不是app名称
+            - category 和 sub_category 必须在上述分类类别中选择
 
             """)
         # 获取单用途的log_item（已经在路由时分好了）
@@ -388,11 +384,10 @@ class ClassifyGraph:
         {{
             id:[category,sub_category,link_to_goal]
         }}
-        示例:
-        {{
-            "1": ["工作/学习", "编程", "完成LifeWatch-AI项目开发"],
-            "2": ["娱乐", "看电视", null]
-        }}
+        注意:
+        - value必须是列表，包含三个元素 [category, sub_category, link_to_goal]
+        - 无值时使用 null
+        - category 和 sub_category 必须在上述分类类别中选择
         """)
         
         if not state.log_items_for_multi_short:
@@ -485,15 +480,11 @@ class ClassifyGraph:
             "id":[category,sub_category,link_to_goal]
         }}
 
-        示例：
-        {{
-            "1": ["工作/学习", "编程", "完成LifeWatch-AI项目开发"],
-            "2": ["娱乐", "看电视", null]
-        }}
         注意：
         - value必须是列表，包含三个元素 [category, sub_category, link_to_goal]
         - 无值时使用 null
         - key必须是id，不是app名称
+        - category 和 sub_category 必须在上述分类类别中选择
         """)
         
         if not state.log_items_for_multi_long:
