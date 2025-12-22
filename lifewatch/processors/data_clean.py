@@ -16,6 +16,34 @@ from lifewatch.utils import get_logger
 logger = get_logger(__name__)
 
 
+# 禁用分类集合（在模块加载时初始化）
+_disabled_category_ids: set = set()
+_disabled_sub_category_ids: set = set()
+
+
+def _init_disabled_categories():
+    """加载禁用的分类 ID”"""
+    global _disabled_category_ids, _disabled_sub_category_ids
+    try:
+        from lifewatch.storage import lw_db_manager
+        with lw_db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            # 加载禁用的主分类
+            cursor.execute("SELECT id FROM category WHERE state = 0")
+            _disabled_category_ids = {row[0] for row in cursor.fetchall()}
+            # 加载禁用的子分类
+            cursor.execute("SELECT id FROM sub_category WHERE state = 0")
+            _disabled_sub_category_ids = {row[0] for row in cursor.fetchall()}
+            logger.info(f"加载禁用分类: 主分类 {len(_disabled_category_ids)} 个, 子分类 {len(_disabled_sub_category_ids)} 个")
+    except Exception as e:
+        logger.warning(f"加载禁用分类失败: {e}")
+
+
+def refresh_disabled_categories():
+    """刷新禁用分类缓存"""
+    _init_disabled_categories()
+
+
 def create_dict_from_table_columns(table_name: str, values: dict = None) -> dict:
     """
     根据数据库表配置动态创建字典
@@ -126,11 +154,37 @@ def clean_activitywatch_data(
     
     # 已经分类的应用（单一用途app和多用途title）
     # 以及已存在的app_description，避免LLM重复搜索
+    # 初始化禁用分类集合
+    _init_disabled_categories()
+    logger.debug(f"原始 app_purpose_category_df 长度: {len(app_purpose_category_df) if app_purpose_category_df is not None else 0}")
     if app_purpose_category_df is not None and not app_purpose_category_df.empty:
+        # 过滤掉禁用分类的记录
+        valid_df = app_purpose_category_df[
+            ~app_purpose_category_df['category_id'].isin(_disabled_category_ids) &
+            ~app_purpose_category_df['sub_category_id'].isin(_disabled_sub_category_ids)
+        ].copy()
+        logger.debug(f"过滤后的 valid_df 长度: {len(valid_df)}")
         # 获取已存在的单一用途的应用集合
-        categorized_single_purpose_apps = set(app_purpose_category_df['app'].unique())
+        categorized_single_purpose_apps = set(valid_df['app'].unique())
         # 获取非单一用途的title集合
-        categorized_mutilpurpose_titles = set(app_purpose_category_df[app_purpose_category_df['is_multipurpose_app'] == 1]['title'].unique())
+        categorized_mutilpurpose_titles = set(valid_df[valid_df['is_multipurpose_app'] == 1]['title'].unique())
+        
+        # 创建 app -> (category_id, sub_category_id) 映射
+        app_category_map: Dict[str, tuple] = {}
+        title_category_map: Dict[str, tuple] = {}
+        for _, row in valid_df.iterrows():
+            app = row.get('app', '').lower()
+            title_val = row.get('title', '').lower() if row.get('title') else ''
+            cat_id = row.get('category_id')
+            sub_cat_id = row.get('sub_category_id')
+            is_multi = row.get('is_multipurpose_app', 0)
+            
+            if app and cat_id:
+                if is_multi == 0 and app not in app_category_map:
+                    app_category_map[app] = (cat_id, sub_cat_id)
+                elif is_multi == 1 and title_val:
+                    title_category_map[title_val] = (cat_id, sub_cat_id)
+        
         # 创建 app -> app_description 映射，用于复用已有的应用描述
         app_description_map: Dict[str, str] = {}
         for _, row in app_purpose_category_df.iterrows():
@@ -141,6 +195,8 @@ def clean_activitywatch_data(
     else:
         categorized_single_purpose_apps = set()
         categorized_mutilpurpose_titles = set()
+        app_category_map = {}
+        title_category_map = {}
         app_description_map = {}
     
     # output - 使用动态字典格式配置
@@ -180,18 +236,22 @@ def clean_activitywatch_data(
                 
                 # 1.app已经被分类 且 app是单一用途的 ： 直接进行分类 
                 if app_name in categorized_single_purpose_apps and not is_multipurpose:
-                    # 对于单一应用，直接从app_purpose_category_df获取分类数据
-                    filtered_event['category'] = app_purpose_category_df[app_purpose_category_df['app'].str.lower() == app_name]['category'].values[0]
-                    filtered_event['sub_category'] = app_purpose_category_df[app_purpose_category_df['app'].str.lower() == app_name]['sub_category'].values[0]
-                    logger.debug(f"✅ 成功获取分类数据: 默认={filtered_event['category']}, 目标={filtered_event['sub_category']}")
+                    # 对于单一应用，直接从映射获取分类ID
+                    cat_ids = app_category_map.get(app_name)
+                    if cat_ids:
+                        filtered_event['category_id'] = cat_ids[0]
+                        filtered_event['sub_category_id'] = cat_ids[1]
+                        logger.debug(f"✅ 成功获取分类数据: category_id={cat_ids[0]}, sub_category_id={cat_ids[1]}")
                 
                 # 2.app已经被分类 但 app是多用途的 ： 根据title进行分类
                 elif app_name in categorized_single_purpose_apps and title and title in categorized_mutilpurpose_titles:
                     # 对于多应用场景，根据title匹配分类数据
-                    filtered_event['category'] = app_purpose_category_df[app_purpose_category_df['title'].str.lower() == title]['category'].values[0]
-                    filtered_event['sub_category'] = app_purpose_category_df[app_purpose_category_df['title'].str.lower() == title]['sub_category'].values[0]
-                    logger.debug(f"✅ 成功获取分类数据: 默认={filtered_event['category']}, 目标={filtered_event['sub_category']}")
-                    logger.debug(f"✅ 多用途匹配成功: app_name={app_name}, title={title}")
+                    cat_ids = title_category_map.get(title)
+                    if cat_ids:
+                        filtered_event['category_id'] = cat_ids[0]
+                        filtered_event['sub_category_id'] = cat_ids[1]
+                        logger.debug(f"✅ 成功获取分类数据: category_id={cat_ids[0]}, sub_category_id={cat_ids[1]}")
+                        logger.debug(f"✅ 多用途匹配成功: app_name={app_name}, title={title}")
                 # 3. app未被分类，且是单一用途的 
                 elif not is_multipurpose:
                     # 3.1 app未被分类，且是单一用途的 且 未被添加到待分类列表 ： 加入待分类列表
@@ -276,7 +336,7 @@ if __name__ == "__main__":
     from datetime import timedelta
     # 测试时间范围
     end_time = datetime.now()
-    start_time = end_time - timedelta(hours=1)
+    start_time = end_time - timedelta(minutes=1)
     
     # 测试数据库功能
     app_purpose_category_df = LWBaseDataProvider().load_app_purpose_category()

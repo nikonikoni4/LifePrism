@@ -35,15 +35,25 @@ APP_PURPOSE_CATEGORY_CONFIG = {
             'constraints': [],
             'comment': '应用程序title的描述'
         },
+        'category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '主分类ID（关联 category.id）'
+        },
+        'sub_category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '子分类ID（关联 sub_category.id）'
+        },
         'category': {
             'type': 'TEXT',
             'constraints': [],
-            'comment': '默认分类（工作/学习/其他）'
+            'comment': '[已弃用] 默认分类名称，保留用于调试'
         },
         'sub_category': {
             'type': 'TEXT',
             'constraints': [],
-            'comment': '根据目标分类（编码，读书笔记等）'
+            'comment': '[已弃用] 子分类名称，保留用于调试'
         }
     },
     'table_constraints': ['PRIMARY KEY (app, title)'],  # 表级约束：复合主键

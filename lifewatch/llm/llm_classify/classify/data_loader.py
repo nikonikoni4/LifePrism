@@ -162,7 +162,7 @@ class DataLoader:
             if app_category_df is not None and not app_category_df.empty:
                 app_row = app_category_df[app_category_df['app'].str.lower() == app_name.lower()]
                 if not app_row.empty:
-                    description = app_row.iloc[0].get('description', '') or ''
+                    description = app_row.iloc[0].get('app_description', '') or ''
             
             app_registry[app_name] = AppInFo(
                 description=description,

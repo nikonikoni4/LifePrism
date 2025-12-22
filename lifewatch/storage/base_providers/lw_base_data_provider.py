@@ -39,9 +39,19 @@ class LWBaseDataProvider:
         获取应用分类数据
         
         Returns:
-            Optional[pd.DataFrame]: 应用分类数据，为空返回 None
+            Optional[pd.DataFrame]: 应用分类数据，包含以下列：
+                - app, title, is_multipurpose_app
+                - app_description, title_analysis
+                - category_id, sub_category_id
+            为空返回 None
         """
-        df = self.db.query('app_purpose_category')
+        # 只查询需要的列，不再查询已弃用的 category/sub_category 名称字段
+        columns = [
+            'app', 'title', 'is_multipurpose_app',
+            'app_description', 'title_analysis',
+            'category_id', 'sub_category_id'
+        ]
+        df = self.db.query('app_purpose_category', columns=columns)
         return df if not df.empty else None
     
     def get_existing_apps(self) -> Set[str]:
@@ -67,16 +77,18 @@ class LWBaseDataProvider:
         保存AI元数据到 app_purpose_category 表
         
         使用 UPSERT 策略：已存在的应用会被更新，新应用会被插入
-        自动处理字段名映射：'class' -> 'sub_category'
         
         Args:
             ai_metadata_df: AI元数据DataFrame，应包含以下字段：
                 - app: 应用名称（必需）
-                - title: 应用标题（可选）
+                - title: 应用标题（必需）
                 - is_multipurpose_app: 是否多用途应用（可选）
                 - app_description: 应用描述（可选）
                 - title_analysis: 标题描述（可选）
-                - class 或 sub_category: 分类（可选）
+                - category_id: 主分类ID（可选）
+                - sub_category_id: 子分类ID（可选）
+                - category: [已弃用] 分类名称，保留用于调试
+                - sub_category: [已弃用] 子分类名称，保留用于调试
         
         Returns:
             int: 受影响的行数
@@ -84,14 +96,10 @@ class LWBaseDataProvider:
         try:
             data_list = ai_metadata_df.to_dict('records')
             
-            # 映射字段名：'class' -> 'sub_category'
-            for data in data_list:
-                if 'class' in data and 'sub_category' not in data:
-                    data['sub_category'] = data.pop('class')
-            
+            # 使用 (app, title) 作为冲突列，因为是复合主键
             affected = self.db.upsert_many('app_purpose_category', 
                                        data_list, 
-                                       conflict_columns=['app'])
+                                       conflict_columns=['app', 'title'])
             logger.info(f"成功保存 {len(data_list)} 行AI元数据到数据库")
             return affected
         except Exception as e:

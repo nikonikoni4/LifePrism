@@ -294,6 +294,14 @@ class DataProcessingService:
         category = self.server_lw_data_provider.load_categories()
         sub_category = self.server_lw_data_provider.load_sub_categories()
         
+        # 构建分类名称到ID的映射
+        category_name_to_id = {}
+        sub_category_name_to_id = {}
+        if category is not None and not category.empty:
+            category_name_to_id = category.set_index('name')['id'].to_dict()
+        if sub_category is not None and not sub_category.empty:
+            sub_category_name_to_id = sub_category.set_index('name')['id'].to_dict()
+        
         # 构建分类树结构：{主分类名: [子分类名列表]}
         # 只包含启用的分类（state == 1）
         category_tree = {}
@@ -365,28 +373,40 @@ class DataProcessingService:
             if is_multipurpose_flag == 0:
                 # 单用途应用：只保存第一条记录（代表性记录）
                 item = items[0]
+                # 获取分类ID
+                cat_id = category_name_to_id.get(item.category) if item.category else None
+                sub_cat_id = sub_category_name_to_id.get(item.sub_category) if item.sub_category else None
+                
                 classified_records.append({
                     'app': item.app,
                     'title': item.title,
                     'is_multipurpose_app': is_multipurpose_flag,
                     'app_description': is_multipurpose.description if is_multipurpose else None,
                     'title_analysis': item.title_analysis,
-                    'category': item.category,
-                    'sub_category': item.sub_category,
+                    'category_id': cat_id,
+                    'sub_category_id': sub_cat_id,
+                    'category': item.category,  # 保留用于调试
+                    'sub_category': item.sub_category,  # 保留用于调试
                 })
                 if len(items) > 1:
                     logger.info(f"    单用途应用 '{app}' 有 {len(items)} 条记录，只保存第一条")
             else:
                 # 多用途应用：保存所有不同 title 的记录
                 for item in items:
+                    # 获取分类ID
+                    cat_id = category_name_to_id.get(item.category) if item.category else None
+                    sub_cat_id = sub_category_name_to_id.get(item.sub_category) if item.sub_category else None
+                    
                     classified_records.append({
                         'app': item.app,
                         'title': item.title,
                         'is_multipurpose_app': is_multipurpose_flag,
                         'app_description': is_multipurpose.description if is_multipurpose else None,
                         'title_analysis': item.title_analysis,
-                        'category': item.category,
-                        'sub_category': item.sub_category,
+                        'category_id': cat_id,
+                        'sub_category_id': sub_cat_id,
+                        'category': item.category,  # 保留用于调试
+                        'sub_category': item.sub_category,  # 保留用于调试
                     })
         
         logger.info(f"  ✓ 处理后保留 {len(classified_records)} 条分类记录（原始 {len(result_items)} 条）")
@@ -477,6 +497,8 @@ class DataProcessingService:
         """
         优化的分类结果合并逻辑（使用 pandas merge 替代 iterrows）
         
+        使用 category_id 和 sub_category_id 进行合并（而非名称）
+        
         Args:
             filtered_data: 过滤后的事件数据
             classified_app_df: 分类结果数据
@@ -487,10 +509,10 @@ class DataProcessingService:
         logger.info("  使用向量化操作合并分类结果...")
         
         # 确保列存在
-        if 'category' not in filtered_data.columns:
-            filtered_data['category'] = None
-        if 'sub_category' not in filtered_data.columns:
-            filtered_data['sub_category'] = None
+        if 'category_id' not in filtered_data.columns:
+            filtered_data['category_id'] = None
+        if 'sub_category_id' not in filtered_data.columns:
+            filtered_data['sub_category_id'] = None
         
         # 分离单用途和多用途应用
         single_purpose = classified_app_df[classified_app_df['is_multipurpose_app'] == 0].copy()
@@ -503,8 +525,8 @@ class DataProcessingService:
             filtered_data['app_lower'] = filtered_data['app'].str.lower()
             
             # 只保留需要的列，避免列名冲突
-            single_merge = single_purpose[['app_lower', 'category', 'sub_category']].rename(
-                columns={'category': 'category_single', 'sub_category': 'sub_category_single'}
+            single_merge = single_purpose[['app_lower', 'category_id', 'sub_category_id']].rename(
+                columns={'category_id': 'category_id_single', 'sub_category_id': 'sub_category_id_single'}
             )
             
             # 合并单用途应用的分类
@@ -515,12 +537,12 @@ class DataProcessingService:
             )
             
             # 只更新单用途应用的分类（is_multipurpose_app == 0）
-            mask_single = (filtered_data['is_multipurpose_app'] == 0) & (filtered_data['category_single'].notna())
-            filtered_data.loc[mask_single, 'category'] = filtered_data.loc[mask_single, 'category_single']
-            filtered_data.loc[mask_single, 'sub_category'] = filtered_data.loc[mask_single, 'sub_category_single']
+            mask_single = (filtered_data['is_multipurpose_app'] == 0) & (filtered_data['category_id_single'].notna())
+            filtered_data.loc[mask_single, 'category_id'] = filtered_data.loc[mask_single, 'category_id_single']
+            filtered_data.loc[mask_single, 'sub_category_id'] = filtered_data.loc[mask_single, 'sub_category_id_single']
             
             # 删除临时列
-            filtered_data = filtered_data.drop(columns=['category_single', 'sub_category_single'])
+            filtered_data = filtered_data.drop(columns=['category_id_single', 'sub_category_id_single'])
             
             logger.info(f"    ✓ 合并了 {mask_single.sum()} 个单用途应用的分类")
         
@@ -535,8 +557,8 @@ class DataProcessingService:
             filtered_data['title_lower'] = filtered_data['title'].str.lower()
             
             # 只保留需要的列
-            multi_merge = multi_purpose[['app_lower', 'title_lower', 'category', 'sub_category']].rename(
-                columns={'category': 'category_multi', 'sub_category': 'sub_category_multi'}
+            multi_merge = multi_purpose[['app_lower', 'title_lower', 'category_id', 'sub_category_id']].rename(
+                columns={'category_id': 'category_id_multi', 'sub_category_id': 'sub_category_id_multi'}
             )
             
             # 合并多用途应用的分类
@@ -547,12 +569,12 @@ class DataProcessingService:
             )
             
             # 只更新多用途应用的分类（is_multipurpose_app == 1）
-            mask_multi = (filtered_data['is_multipurpose_app'] == 1) & (filtered_data['category_multi'].notna())
-            filtered_data.loc[mask_multi, 'category'] = filtered_data.loc[mask_multi, 'category_multi']
-            filtered_data.loc[mask_multi, 'sub_category'] = filtered_data.loc[mask_multi, 'sub_category_multi']
+            mask_multi = (filtered_data['is_multipurpose_app'] == 1) & (filtered_data['category_id_multi'].notna())
+            filtered_data.loc[mask_multi, 'category_id'] = filtered_data.loc[mask_multi, 'category_id_multi']
+            filtered_data.loc[mask_multi, 'sub_category_id'] = filtered_data.loc[mask_multi, 'sub_category_id_multi']
             
             # 删除临时列
-            filtered_data = filtered_data.drop(columns=['category_multi', 'sub_category_multi'])
+            filtered_data = filtered_data.drop(columns=['category_id_multi', 'sub_category_id_multi'])
             
             logger.info(f"    ✓ 合并了 {mask_multi.sum()} 个多用途应用的分类")
         
@@ -563,7 +585,7 @@ class DataProcessingService:
             filtered_data = filtered_data.drop(columns=['title_lower'])
         
         # 统计
-        total_classified = filtered_data['category'].notna().sum()
+        total_classified = filtered_data['category_id'].notna().sum()
         logger.info(f"  ✓ 总共合并了 {total_classified} 条记录的分类")
         
         return filtered_data
