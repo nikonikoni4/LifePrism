@@ -168,9 +168,9 @@ class ClassifyGraph:
         system_message = SystemMessage(content="""
         你是一个软件程序识别专家。你的任务是通过 web 搜索识别软件应用程序，并提供准确、精炼的描述。
         **输入说明：**
-        - 输入软件名称或程序名称与窗口title
+        - 输入软件名称或程序名称
         **输出要求：**
-        - 软件描述(不超过20词):以web搜索为主,title信息为辅
+        - 软件描述(不超过20词)
         - 返回软件描述
         - 如果搜索后仍无法确定，返回 None
         """)
@@ -180,7 +180,7 @@ class ClassifyGraph:
             success = False
             for attempt in range(1, MAX_RETRIES + 1):
                 try:
-                    user_message = HumanMessage(content=f"""软件名称:{app} title:{title}""")
+                    user_message = HumanMessage(content=f"""软件名称:{app}""")
                     messages = [system_message, user_message]
                     
                     result = self.chat_model.invoke(messages)
