@@ -750,14 +750,16 @@ class CategoryService:
                 subcategories.append(SubCategoryTreeItem(
                     id=str(sub_row['id']),
                     name=sub_row['name'],
-                    color=color_manager.get_sub_category_color(str(sub_row['id']))
+                    color=color_manager.get_sub_category_color(str(sub_row['id'])),
+                    state=int(sub_row.get('state', 1))
                 ))
         
         return CategoryTreeItem(
             id=category['id'],
             name=category['name'],
             color=color_manager.get_main_category_color(category['id']),
-            subcategories=subcategories
+            subcategories=subcategories,
+            state=int(category.get('state', 1))
         )
     
     def get_category_by_id(self, category_id: str) -> CategoryTreeItem:
