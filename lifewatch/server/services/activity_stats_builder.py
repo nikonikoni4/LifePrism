@@ -20,7 +20,7 @@ from lifewatch.server.schemas.activity_schemas import (
     TopAppData,
     TodoListData,
 )
-from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
+from lifewatch.server.providers import server_lw_data_provider
 from lifewatch.server.providers.category_color_provider import color_manager
 
 

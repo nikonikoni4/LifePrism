@@ -13,7 +13,7 @@ from lifewatch.server.schemas.usage_schemas import (
     UsageStats7DaysItem,
     UsageStatsResponse
 )
-from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
+from lifewatch.server.providers import server_lw_data_provider
 from lifewatch.config.settings import INPUT_TOKEN_PRICE_PER_1K, OUTPUT_TOKEN_PRICE_PER_1K
 
 

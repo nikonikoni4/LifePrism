@@ -261,13 +261,121 @@ TOKENS_USAGE_LOG_CONFIG = {
 }
 
 
+# TodoList 主任务表配置
+TODO_LIST_CONFIG = {
+    'table_name': 'todo_list',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键'
+        },
+        'order_index': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '排序索引，用于拖拽排序'
+        },
+        'content': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '任务内容'
+        },
+        'color': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT "#FFFFFF"'],
+            'comment': '任务颜色（十六进制格式）'
+        },
+        'completed': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '是否完成（0: 未完成, 1: 已完成）'
+        },
+        'link_to_goal': {
+            'type': 'INTEGER',
+            'constraints': [],
+            'comment': '关联的目标 ID（可为空）'
+        },
+        'date': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '任务日期（YYYY-MM-DD格式，用于日历筛选）'
+        },
+        'expected_finished_at': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '预计完成日期（YYYY-MM-DD格式）'
+        },
+        'actual_finished_at': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '实际完成日期（YYYY-MM-DD格式，完成时填写）'
+        },
+        'cross_day': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '是否开启跨天追踪（0: 否, 1: 是），开启后在未完成前会持续显示'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_todo_list_date', 'columns': ['date']},
+        {'name': 'idx_todo_list_cross_day_completed', 'columns': ['cross_day', 'completed']},
+        {'name': 'idx_todo_list_link_to_goal', 'columns': ['link_to_goal']}
+    ],
+    'timestamps': True  # 自动添加 created_at
+}
+
+
+# SubTodoList 子任务表配置
+SUB_TODO_LIST_CONFIG = {
+    'table_name': 'sub_todo_list',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键'
+        },
+        'parent_id': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL'],
+            'comment': '父任务 ID（关联 todo_list.id）'
+        },
+        'order_index': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '排序索引，用于拖拽排序'
+        },
+        'content': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '子任务内容'
+        },
+        'completed': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '是否完成（0: 未完成, 1: 已完成）'
+        }
+    },
+    'table_constraints': [
+        'FOREIGN KEY (parent_id) REFERENCES todo_list(id) ON DELETE CASCADE'
+    ],
+    'indexes': [
+        {'name': 'idx_sub_todo_list_parent_id', 'columns': ['parent_id']},
+        {'name': 'idx_sub_todo_list_order', 'columns': ['parent_id', 'order_index']}
+    ],
+    'timestamps': True  # 自动添加 created_at
+}
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'category_map_cache': category_map_cache_CONFIG,
     'user_app_behavior_log': USER_APP_BEHAVIOR_LOG_CONFIG,
     'category': CATEGORY_CONFIG,
     'sub_category': SUB_CATEGORY_CONFIG,
-    'tokens_usage_log': TOKENS_USAGE_LOG_CONFIG
+    'tokens_usage_log': TOKENS_USAGE_LOG_CONFIG,
+    'todo_list': TODO_LIST_CONFIG,
+    'sub_todo_list': SUB_TODO_LIST_CONFIG
 }
 
 

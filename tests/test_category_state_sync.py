@@ -75,7 +75,7 @@ class TestCategoryStateSync:
         self.service._refresh_cache()
         print("✓ 测试分类和子分类创建完成")
     
-    def insert_mock_app_purpose_record(self, app: str, title: str, category_id: str, 
+    def insert_mock_category_map_record(self, app: str, title: str, category_id: str, 
                                         sub_category_id: str, state: int, 
                                         created_at: str) -> None:
         """插入模拟的 category_map_cache 记录"""
@@ -88,7 +88,7 @@ class TestCategoryStateSync:
             """, (app, title, category_id, sub_category_id, state, created_at))
             conn.commit()
     
-    def get_app_purpose_records(self, app: str) -> list:
+    def get_category_map_records(self, app: str) -> list:
         """获取指定应用的所有记录"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -102,7 +102,7 @@ class TestCategoryStateSync:
     
     def print_records(self, app: str, label: str = ""):
         """打印指定应用的记录"""
-        records = self.get_app_purpose_records(app)
+        records = self.get_category_map_records(app)
         print(f"\n{label} - {app} 的记录 ({len(records)} 条):")
         print("-" * 80)
         for r in records:
@@ -133,7 +133,7 @@ class TestCategoryStateSync:
         
         # Step 1: 模拟启用状态下识别产生的记录
         print(f"\n[Step 1] 启用分类，识别产生记录 (created_at = {t1})")
-        self.insert_mock_app_purpose_record(
+        self.insert_mock_category_map_record(
             app=app, 
             title="记事本 - 文档1.txt",
             category_id=self.test_category_id,
@@ -158,7 +158,7 @@ class TestCategoryStateSync:
         # Step 3: 模拟禁用期间产生的新记录（不同 title，被分到其他分类）
         print(f"\n[Step 3] 禁用期间再次识别，产生新记录 (created_at = {t2}, 不同 title)")
         other_category_id = "other-cat-xxx"  # 模拟被分到其他分类
-        self.insert_mock_app_purpose_record(
+        self.insert_mock_category_map_record(
             app=app, 
             title="记事本 - 新文档.txt",  # 不同的 title
             category_id=other_category_id,
@@ -169,12 +169,12 @@ class TestCategoryStateSync:
         self.print_records(app, "[Step 3]")
         
         # Step 4: 恢复分类
-        print(f"\n[Step 4] 恢复分类，调用 _enable_app_purpose_records_by_category")
-        self.service._enable_app_purpose_records_by_category(self.test_category_id)
+        print(f"\n[Step 4] 恢复分类，调用 _enable_category_map_records_by_category")
+        self.service._enable_category_map_records_by_category(self.test_category_id)
         self.print_records(app, "[Step 4]")
         
         # 验证结果
-        records = self.get_app_purpose_records(app)
+        records = self.get_category_map_records(app)
         print("\n验证结果:")
         
         # 对于单分类应用，应该只保留原始记录（t1），删除新记录（t2）
@@ -211,7 +211,7 @@ class TestCategoryStateSync:
         
         # Step 1: 模拟启用状态下识别产生的记录
         print(f"\n[Step 1] 启用分类，识别产生记录 (created_at = {t1})")
-        self.insert_mock_app_purpose_record(
+        self.insert_mock_category_map_record(
             app=app, 
             title="GitHub - Pull Requests",  # 工作相关
             category_id=self.test_category_id,
@@ -237,7 +237,7 @@ class TestCategoryStateSync:
         # 对于多分类应用，不同 title 应该保留（因为可能是不同用途）
         print(f"\n[Step 3] 禁用期间再次识别，产生新记录 (created_at = {t2}, 不同 title)")
         other_category_id = "entertainment-cat"  # 娱乐分类
-        self.insert_mock_app_purpose_record(
+        self.insert_mock_category_map_record(
             app=app, 
             title="YouTube - Music",  # 娱乐相关，不同 title
             category_id=other_category_id,
@@ -248,12 +248,12 @@ class TestCategoryStateSync:
         self.print_records(app, "[Step 3]")
         
         # Step 4: 恢复分类
-        print(f"\n[Step 4] 恢复分类，调用 _enable_app_purpose_records_by_category")
-        self.service._enable_app_purpose_records_by_category(self.test_category_id)
+        print(f"\n[Step 4] 恢复分类，调用 _enable_category_map_records_by_category")
+        self.service._enable_category_map_records_by_category(self.test_category_id)
         self.print_records(app, "[Step 4]")
         
         # 验证结果
-        records = self.get_app_purpose_records(app)
+        records = self.get_category_map_records(app)
         print("\n验证结果:")
         
         # 对于多分类应用，两条记录都应该保留（不同 title 是不同用途）
@@ -291,7 +291,7 @@ class TestCategoryStateSync:
         
         # Step 1: 模拟启用状态下识别产生的记录
         print(f"\n[Step 1] 启用分类，识别产生记录 (created_at = {t1})")
-        self.insert_mock_app_purpose_record(
+        self.insert_mock_category_map_record(
             app=app, 
             title=same_title,
             category_id=self.test_category_id,
@@ -316,7 +316,7 @@ class TestCategoryStateSync:
         # Step 3: 模拟禁用期间产生的新记录（相同 title，被分到其他分类）
         print(f"\n[Step 3] 禁用期间再次识别，产生新记录 (created_at = {t2}, 相同 title)")
         other_category_id = "other-cat-xxx"
-        self.insert_mock_app_purpose_record(
+        self.insert_mock_category_map_record(
             app=app, 
             title=same_title,  # 相同 title
             category_id=other_category_id,
@@ -327,12 +327,12 @@ class TestCategoryStateSync:
         self.print_records(app, "[Step 3]")
         
         # Step 4: 恢复分类
-        print(f"\n[Step 4] 恢复分类，调用 _enable_app_purpose_records_by_category")
-        self.service._enable_app_purpose_records_by_category(self.test_category_id)
+        print(f"\n[Step 4] 恢复分类，调用 _enable_category_map_records_by_category")
+        self.service._enable_category_map_records_by_category(self.test_category_id)
         self.print_records(app, "[Step 4]")
         
         # 验证结果
-        records = self.get_app_purpose_records(app)
+        records = self.get_category_map_records(app)
         print("\n验证结果:")
         
         # 对于多分类应用相同 title，应该只保留原始记录
@@ -367,7 +367,7 @@ class TestCategoryStateSync:
         
         # Step 1: 插入记录
         print(f"\n[Step 1] 启用子分类，识别产生记录 (created_at = {t1})")
-        self.insert_mock_app_purpose_record(
+        self.insert_mock_category_map_record(
             app=app, 
             title="VSCode - project",
             category_id=self.test_category_id,
@@ -391,7 +391,7 @@ class TestCategoryStateSync:
         
         # Step 3: 产生新记录
         print(f"\n[Step 3] 禁用期间产生新记录 (created_at = {t2})")
-        self.insert_mock_app_purpose_record(
+        self.insert_mock_category_map_record(
             app=app, 
             title="VSCode - other",
             category_id="other-cat",
@@ -402,15 +402,15 @@ class TestCategoryStateSync:
         self.print_records(app, "[Step 3]")
         
         # Step 4: 恢复子分类
-        print(f"\n[Step 4] 恢复子分类，调用 _enable_app_purpose_records_by_sub_category")
-        self.service._enable_app_purpose_records_by_sub_category(
+        print(f"\n[Step 4] 恢复子分类，调用 _enable_category_map_records_by_sub_category")
+        self.service._enable_category_map_records_by_sub_category(
             self.test_sub_category_id, 
             self.test_category_id
         )
         self.print_records(app, "[Step 4]")
         
         # 验证结果
-        records = self.get_app_purpose_records(app)
+        records = self.get_category_map_records(app)
         print("\n验证结果:")
         
         if len(records) == 1 and records[0][4] == 1:

@@ -13,7 +13,7 @@ from lifewatch.server.schemas.activity_schemas import (
     ActivityLogsResponse,
     ActivityLogItem,
 )
-from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
+from lifewatch.server.providers import server_lw_data_provider
 from lifewatch.server.services.activity_stats_builder import (
     build_activity_summary,
     build_time_overview,

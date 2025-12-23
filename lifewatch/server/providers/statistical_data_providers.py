@@ -885,12 +885,8 @@ class ServerLWDataProvider(LWBaseDataProvider):
             return cursor.rowcount
 
 
-# ==================== 模块级单例（懒加载） ====================
-from lifewatch.utils import LazySingleton
-server_lw_data_provider = LazySingleton(ServerLWDataProvider)
-
-
 if __name__ == "__main__":
+    from lifewatch.server.providers import server_lw_data_provider
     sdp = server_lw_data_provider
     
     # 测试 Timeline 数据查询

@@ -6,7 +6,7 @@
 
 import colorsys
 from typing import Dict, Optional
-from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
+from lifewatch.storage import lw_db_manager
 
 
 # 禁用分类使用的浅灰色
@@ -30,7 +30,7 @@ class CategoryColorManager:
     def __init__(self):
         """初始化颜色管理器"""
         if not CategoryColorManager._initialized:
-            self.db_manager = server_lw_data_provider.db
+            self.db_manager = lw_db_manager
             self._main_category_colors: Dict[str, str] = {}  # {category_id: color}
             self._sub_category_colors: Dict[str, str] = {}   # {sub_category_id: color}
             CategoryColorManager._initialized = True

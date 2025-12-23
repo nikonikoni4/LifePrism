@@ -2,7 +2,7 @@
 分类管理服务层
 实现分类的业务逻辑和数据库操作
 """
-from lifewatch.server.providers.statistical_data_providers import server_lw_data_provider
+from lifewatch.server.providers import server_lw_data_provider
 from lifewatch.server.schemas.category_schemas import (
     CategoryTreeResponse,
     CategoryTreeItem,
