@@ -67,3 +67,48 @@ export interface ActivityRecord {
     categoryId: string;
     subCategoryId: string;
 }
+
+// ============================================================================
+// CategoryMapCache 类型（用于 Map Cache 选项卡）
+// ============================================================================
+
+/** CategoryMapCache 表项 */
+export interface CategoryMapCacheItem {
+    id: number;
+    app: string;
+    app_description: string | null;
+    title: string;
+    title_analysis: string | null;
+    category: string | null;
+    sub_category: string | null;
+    category_id: string | null;
+    sub_category_id: string | null;
+    is_multipurpose_app: boolean;
+    state: number;
+    created_at: string | null;
+}
+
+/** GET /category_map 响应 */
+export interface CategoryMapCacheResponse {
+    data: CategoryMapCacheItem[];
+    total: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+}
+
+/** 更新单条 CategoryMapCache 记录请求 */
+export interface UpdateCategoryMapCacheRequest {
+    category_id?: string | null;
+    sub_category_id?: string | null;
+    app_description?: string | null;
+    title_analysis?: string | null;
+}
+
+/** 批量更新 CategoryMapCache 记录请求 */
+export interface BatchUpdateCategoryMapCacheRequest {
+    ids: number[];
+    category_id?: string | null;
+    sub_category_id?: string | null;
+    app_description?: string | null;
+}

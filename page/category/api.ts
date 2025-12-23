@@ -12,7 +12,10 @@ import {
     UpdateCategoryRequest,
     CreateSubCategoryRequest,
     UpdateSubCategoryRequest,
-    StandardResponse
+    StandardResponse,
+    CategoryMapCacheResponse,
+    UpdateCategoryMapCacheRequest,
+    BatchUpdateCategoryMapCacheRequest
 } from './types';
 
 const API_BASE = 'http://localhost:8000/api/v2/category';
@@ -204,6 +207,127 @@ export const CategoryAPI = {
 
         if (!response.ok) {
             throw new Error(`Failed to toggle sub-category state: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
+};
+
+// ============================================================================
+// CategoryMapCache API
+// ============================================================================
+
+export const CategoryMapCacheAPI = {
+    /**
+     * 获取分类缓存列表
+     * 
+     * @param params 请求参数
+     * @returns 分页响应
+     */
+    async getList(params: {
+        page?: number;
+        page_size?: number;
+        search?: string;
+        state?: number;
+    } = {}): Promise<CategoryMapCacheResponse> {
+        const searchParams = new URLSearchParams();
+
+        if (params.page !== undefined) {
+            searchParams.set('page', params.page.toString());
+        }
+        if (params.page_size !== undefined) {
+            searchParams.set('page_size', params.page_size.toString());
+        }
+        if (params.search) {
+            searchParams.set('search', params.search);
+        }
+        if (params.state !== undefined) {
+            searchParams.set('state', params.state.toString());
+        }
+
+        const response = await fetch(`${API_BASE}/category_map?${searchParams.toString()}`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch category map cache: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * 更新单条记录
+     * 
+     * @param recordId 记录ID
+     * @param data 更新数据
+     * @returns 标准响应
+     */
+    async update(recordId: number, data: UpdateCategoryMapCacheRequest): Promise<StandardResponse> {
+        const response = await fetch(`${API_BASE}/category_map/${recordId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: recordId, ...data }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to update category map cache: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * 批量更新记录
+     * 
+     * @param data 批量更新数据
+     * @returns 标准响应
+     */
+    async batchUpdate(data: BatchUpdateCategoryMapCacheRequest): Promise<StandardResponse> {
+        const response = await fetch(`${API_BASE}/category_map/batch`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to batch update category map cache: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * 删除单条记录
+     * 
+     * @param recordId 记录ID
+     * @returns 标准响应
+     */
+    async delete(recordId: number): Promise<StandardResponse> {
+        const response = await fetch(`${API_BASE}/category_map/${recordId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to delete category map cache: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * 批量删除记录
+     * 
+     * @param ids 记录ID列表
+     * @returns 标准响应
+     */
+    async batchDelete(ids: number[]): Promise<StandardResponse> {
+        const response = await fetch(`${API_BASE}/category_map/batch`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to batch delete category map cache: ${response.statusText}`);
         }
 
         return response.json();

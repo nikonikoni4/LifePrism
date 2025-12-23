@@ -1,7 +1,7 @@
 /**
  * Category Page (V2)
  * 
- * 分类管理页面，包含分类设置和数据审核两个选项卡
+ * 分类管理页面，包含分类设置、数据审核和 Map Cache 三个选项卡
  */
 
 import React, { useState, useEffect } from 'react';
@@ -9,8 +9,9 @@ import { CategoryTreeItem } from './types';
 import { CategoryAPI } from './api';
 import DataReviewTab from './components/DataReviewTab';
 import CategorySettingsTab from './components/CategorySettingsTab';
+import CategoryMapCacheTab from './components/CategoryMapCacheTab';
 
-type Tab = 'settings' | 'review';
+type Tab = 'settings' | 'review' | 'mapCache';
 
 const CategoryPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<Tab>('settings');
@@ -39,7 +40,7 @@ const CategoryPage: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="max-w-7xl mx-auto h-[calc(100vh-100px)] flex items-center justify-center">
+            <div className="max-w-[1600px] w-full px-6 mx-auto h-[calc(100vh-100px)] flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
                     <p className="text-slate-500">Loading categories...</p>
@@ -50,7 +51,7 @@ const CategoryPage: React.FC = () => {
 
     if (error) {
         return (
-            <div className="max-w-7xl mx-auto h-[calc(100vh-100px)] flex items-center justify-center">
+            <div className="max-w-[1600px] w-full px-6 mx-auto h-[calc(100vh-100px)] flex items-center justify-center">
                 <div className="text-center">
                     <p className="text-red-500 mb-4">{error}</p>
                     <button
@@ -65,7 +66,7 @@ const CategoryPage: React.FC = () => {
     }
 
     return (
-        <div className="max-w-7xl mx-auto h-[calc(100vh-100px)] flex flex-col">
+        <div className="max-w-[1600px] w-full px-6 mx-auto h-[calc(100vh-100px)] flex flex-col">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 flex-shrink-0">
                 <div>
@@ -93,15 +94,28 @@ const CategoryPage: React.FC = () => {
                     >
                         Data Review
                     </button>
+                    <button
+                        onClick={() => setActiveTab('mapCache')}
+                        className={`px-6 py-2 rounded-lg transition-all ${activeTab === 'mapCache'
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                    >
+                        Map Cache
+                    </button>
                 </div>
             </div>
 
             {/* Tab Content */}
             <div className="flex-1 min-h-0 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-                {activeTab === 'review' ? (
+                {activeTab === 'review' && (
                     <DataReviewTab categories={categories} />
-                ) : (
+                )}
+                {activeTab === 'settings' && (
                     <CategorySettingsTab categories={categories} setCategories={setCategories} />
+                )}
+                {activeTab === 'mapCache' && (
+                    <CategoryMapCacheTab categories={categories} />
                 )}
             </div>
         </div>
