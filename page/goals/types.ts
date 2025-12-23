@@ -1,4 +1,42 @@
 
+// ============================================================================
+// TodoList Types (与后端 API 对齐)
+// ============================================================================
+
+export interface SubTodoItem {
+    id: number;
+    orderIndex: number;
+    parentId: number;
+    content: string;
+    completed: boolean;
+}
+
+export interface TodoItem {
+    id: number;
+    orderIndex: number;
+    content: string;
+    color: string;
+    completed: boolean;
+    linkToGoal: number | null;
+    date: string;
+    expectedFinishedAt: string | null;
+    actualFinishedAt: string | null;
+    crossDay: boolean;
+    subItems?: SubTodoItem[];
+}
+
+export interface TodoListResponse {
+    items: TodoItem[];
+}
+
+export interface SubTodoListResponse {
+    items: SubTodoItem[];
+}
+
+// ============================================================================
+// Legacy Types (保留用于其他组件)
+// ============================================================================
+
 export interface GoalItem {
     id: string;
     text: string;

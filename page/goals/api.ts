@@ -1,5 +1,161 @@
 
-import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, IdentityBeing } from "./types";
+import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse } from "./types";
+
+const API_BASE = '/api/v2/goal';
+
+// ============================================================================
+// TodoList API - 真实后端接口
+// ============================================================================
+
+// 辅助函数：处理 snake_case 到 camelCase 的转换
+const toCamelCase = (data: any): any => {
+    if (Array.isArray(data)) {
+        return data.map(toCamelCase);
+    }
+    if (data !== null && typeof data === 'object') {
+        return Object.keys(data).reduce((acc, key) => {
+            const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+            acc[camelKey] = toCamelCase(data[key]);
+            return acc;
+        }, {} as any);
+    }
+    return data;
+};
+
+// 辅助函数：处理 camelCase 到 snake_case 的转换
+const toSnakeCase = (data: any): any => {
+    if (Array.isArray(data)) {
+        return data.map(toSnakeCase);
+    }
+    if (data !== null && typeof data === 'object') {
+        return Object.keys(data).reduce((acc, key) => {
+            const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+            acc[snakeKey] = toSnakeCase(data[key]);
+            return acc;
+        }, {} as any);
+    }
+    return data;
+};
+
+export const todoApi = {
+    // 获取任务列表
+    getTodos: async (date: string, includeCrossDay = true): Promise<TodoListResponse> => {
+        const res = await fetch(`${API_BASE}/todos?date=${date}&include_cross_day=${includeCrossDay}`);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 获取任务详情
+    getTodoDetail: async (id: number): Promise<TodoItem> => {
+        const res = await fetch(`${API_BASE}/todos/${id}`);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 创建任务
+    createTodo: async (data: {
+        content: string;
+        date: string;
+        color?: string;
+        linkToGoal?: number | null;
+        expectedFinishedAt?: string | null;
+        crossDay?: boolean;
+    }): Promise<TodoItem> => {
+        const res = await fetch(`${API_BASE}/todos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toSnakeCase(data))
+        });
+        const result = await res.json();
+        return toCamelCase(result);
+    },
+
+    // 更新任务
+    updateTodo: async (id: number, data: Partial<{
+        content: string;
+        color: string;
+        completed: boolean;
+        linkToGoal: number | null;
+        expectedFinishedAt: string | null;
+        crossDay: boolean;
+    }>): Promise<TodoItem> => {
+        const res = await fetch(`${API_BASE}/todos/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toSnakeCase(data))
+        });
+        const result = await res.json();
+        return toCamelCase(result);
+    },
+
+    // 删除任务
+    deleteTodo: async (id: number): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/todos/${id}`, { method: 'DELETE' });
+        return res.ok;
+    },
+
+    // 重排序任务
+    reorderTodos: async (todoIds: number[]): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/todos/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ todo_ids: todoIds })
+        });
+        return res.ok;
+    },
+
+    // 获取子任务列表
+    getSubTodos: async (parentId: number): Promise<SubTodoListResponse> => {
+        const res = await fetch(`${API_BASE}/todos/${parentId}/subtodos`);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 创建子任务
+    createSubTodo: async (parentId: number, content: string): Promise<SubTodoItem> => {
+        const res = await fetch(`${API_BASE}/subtodos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parent_id: parentId, content })
+        });
+        const result = await res.json();
+        return toCamelCase(result);
+    },
+
+    // 更新子任务
+    updateSubTodo: async (id: number, data: Partial<{
+        content: string;
+        completed: boolean;
+    }>): Promise<SubTodoItem> => {
+        const res = await fetch(`${API_BASE}/subtodos/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toSnakeCase(data))
+        });
+        const result = await res.json();
+        return toCamelCase(result);
+    },
+
+    // 删除子任务
+    deleteSubTodo: async (id: number): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/subtodos/${id}`, { method: 'DELETE' });
+        return res.ok;
+    },
+
+    // 重排序子任务
+    reorderSubTodos: async (parentId: number, subTodoIds: number[]): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/subtodos/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parent_id: parentId, sub_todo_ids: subTodoIds })
+        });
+        return res.ok;
+    }
+};
+
+// ============================================================================
+// Mock Data (保留用于其他组件)
+// ============================================================================
 
 export const COLORS = {
     WORK: '#5B8FF9',
