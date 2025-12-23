@@ -712,49 +712,85 @@ class ServerLWDataProvider(LWBaseDataProvider):
     def update_category_map_cache_by_id(
         self, 
         record_id: int,
-        category_id: str,
-        sub_category_id: str | None,
-        state: int
+        category_id: str | None = None,
+        sub_category_id: str | None = None,
+        state: int | None = None,
+        app_description: str | None = None,
+        title_analysis: str | None = None
     ) -> bool:
         """
         通过 ID 更新单条 category_map_cache 记录的分类
         
         Args:
             record_id: 记录的自增主键 ID
-            category_id: 新的主分类ID
+            category_id: 新的主分类ID（可选，为空时不修改）
             sub_category_id: 新的子分类ID
-            state: 新状态（由 Service 层根据目标分类计算）
+            state: 新状态（由 Service 层根据目标分类计算，可选）
+            app_description: 应用程序描述（可选，为空时不修改）
+            title_analysis: 标题分析结果（可选，为空时不修改）
         
         Returns:
             bool: 是否更新成功
         """
-        sql = """
+        # 动态构建 SET 子句
+        set_parts = []
+        params = []
+        
+        if category_id is not None:
+            set_parts.append("category_id = ?")
+            params.append(category_id)
+        
+        if sub_category_id is not None:
+            set_parts.append("sub_category_id = ?")
+            params.append(sub_category_id)
+        
+        if state is not None:
+            set_parts.append("state = ?")
+            params.append(state)
+        
+        if app_description is not None:
+            set_parts.append("app_description = ?")
+            params.append(app_description)
+        
+        if title_analysis is not None:
+            set_parts.append("title_analysis = ?")
+            params.append(title_analysis)
+        
+        # 如果没有任何字段需要更新，返回 False
+        if not set_parts:
+            return False
+        
+        params.append(record_id)
+        
+        sql = f"""
         UPDATE category_map_cache 
-        SET category_id = ?, sub_category_id = ?, state = ?
+        SET {", ".join(set_parts)}
         WHERE id = ?
         """
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (category_id, sub_category_id, state, record_id))
+            cursor.execute(sql, params)
             conn.commit()
             return cursor.rowcount > 0
     
     def batch_update_category_map_cache_by_ids(
         self, 
         record_ids: list[int],
-        category_id: str,
-        sub_category_id: str | None,
-        state: int
+        category_id: str | None = None,
+        sub_category_id: str | None = None,
+        state: int | None = None,
+        app_description: str | None = None
     ) -> int:
         """
         批量通过 ID 更新 category_map_cache 记录的分类
         
         Args:
             record_ids: 记录的 ID 列表
-            category_id: 新的主分类ID
+            category_id: 新的主分类ID（可选，为空时不修改）
             sub_category_id: 新的子分类ID
-            state: 新状态（由 Service 层根据目标分类计算）
+            state: 新状态（由 Service 层根据目标分类计算，可选）
+            app_description: 应用程序描述（可选，为空时不修改）
         
         Returns:
             int: 成功更新的数量
@@ -762,16 +798,43 @@ class ServerLWDataProvider(LWBaseDataProvider):
         if not record_ids:
             return 0
         
+        # 动态构建 SET 子句
+        set_parts = []
+        params = []
+        
+        if category_id is not None:
+            set_parts.append("category_id = ?")
+            params.append(category_id)
+        
+        if sub_category_id is not None:
+            set_parts.append("sub_category_id = ?")
+            params.append(sub_category_id)
+        
+        if state is not None:
+            set_parts.append("state = ?")
+            params.append(state)
+        
+        if app_description is not None:
+            set_parts.append("app_description = ?")
+            params.append(app_description)
+        
+        # 如果没有任何字段需要更新，返回 0
+        if not set_parts:
+            return 0
+        
+        # 添加 record_ids 参数
+        params.extend(record_ids)
+        
         placeholders = ",".join("?" * len(record_ids))
         sql = f"""
         UPDATE category_map_cache 
-        SET category_id = ?, sub_category_id = ?, state = ?
+        SET {", ".join(set_parts)}
         WHERE id IN ({placeholders})
         """
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (category_id, sub_category_id, state, *record_ids))
+            cursor.execute(sql, params)
             conn.commit()
             return cursor.rowcount
     

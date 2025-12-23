@@ -241,10 +241,10 @@ class ToggleCategoryStateRequest(BaseModel):
 
 
 # ============================================================================
-# AppPurposeCategory 数据展示模型
+# CategoryMapCache 数据展示模型
 # ============================================================================
 
-class AppPurposeCategoryItem(BaseModel):
+class CategoryMapCacheItem(BaseModel):
     """
     category_map_cache 表单条记录展示
     
@@ -287,9 +287,9 @@ class AppPurposeCategoryItem(BaseModel):
             }
         }
 
-class AppPurposeCategoryResponse(BaseModel):
+class CategoryMapCacheResponse(BaseModel):
     """GET /category/app-purpose 响应"""
-    data: List[AppPurposeCategoryItem] = Field(..., description="数据列表")
+    data: List[CategoryMapCacheItem] = Field(..., description="数据列表")
     total: int = Field(..., description="总记录数")
     page: int = Field(..., description="当前页码")
     page_size: int = Field(..., description="每页记录数")
@@ -317,42 +317,47 @@ class AppPurposeCategoryResponse(BaseModel):
 
 
 # ============================================================================
-# AppPurposeCategory 更新/删除请求模型
+# CategoryMapCache 更新/删除请求模型
 # ============================================================================
 
-class UpdateAppPurposeCategoryRequest(BaseModel):
+class UpdateCategoryMapCacheRequest(BaseModel):
     """更新 category_map_cache 记录请求"""
     id: int = Field(..., description="记录ID")
-    category_id: str = Field(..., description="新的主分类ID")
+    category_id: str | None = Field(default=None, description="新的主分类ID，为空时不修改")
     sub_category_id: str | None = Field(default=None, description="新的子分类ID")
+    app_description: str | None = Field(default=None, description="应用程序描述，为空时不修改")
+    title_analysis: str | None = Field(default=None, description="标题分析结果，为空时不修改")
     
     class Config:
         json_schema_extra = {
             "example": {
                 "id": 1,
                 "category_id": "cat-124",
-                "sub_category_id": "subcat-124"
+                "sub_category_id": "subcat-124",
+                "app_description": "Microsoft Edge 浏览器",
+                "title_analysis": "用户正在浏览视频网站"
             }
         }
 
 
-class BatchUpdateAppPurposeCategoryRequest(BaseModel):
+class BatchUpdateCategoryMapCacheRequest(BaseModel):
     """批量更新 category_map_cache 记录请求"""
     ids: List[int] = Field(..., description="记录ID列表", min_length=1)
-    category_id: str = Field(..., description="新的主分类ID")
+    category_id: str | None = Field(default=None, description="新的主分类ID，为空时不修改")
     sub_category_id: str | None = Field(default=None, description="新的子分类ID")
-
+    app_description: str | None = Field(default=None, description="应用程序描述，为空时不修改")
     class Config:
         json_schema_extra = {
             "example": {
                 "ids": [1, 2, 3],
                 "category_id": "cat-124",
-                "sub_category_id": "subcat-124"
+                "sub_category_id": "subcat-124",
+                "app_description": "Microsoft Edge 浏览器"
             }
         }
 
 
-class DeleteAppPurposeCategoryRequest(BaseModel):
+class DeleteCategoryMapCacheRequest(BaseModel):
     """删除 category_map_cache 记录请求"""
     id: int = Field(..., description="记录ID")
 
@@ -364,7 +369,7 @@ class DeleteAppPurposeCategoryRequest(BaseModel):
         }
 
 
-class BatchDeleteAppPurposeCategoryRequest(BaseModel):
+class BatchDeleteCategoryMapCacheRequest(BaseModel):
     """批量删除 category_map_cache 记录请求"""
     ids: List[int] = Field(..., description="记录ID列表", min_length=1)
 

@@ -809,10 +809,10 @@ class CategoryService:
             # 同步更新 category_map_cache 表的 state
             if state == 0:
                 # 禁用：将该分类下所有记录的 state 置为 0
-                self._disable_app_purpose_records_by_category(category_id)
+                self._disable_category_map_records_by_category(category_id)
             elif state == 1 and old_state == 0:
                 # 启用：恢复符合条件的记录（主分类和子分类都启用）
-                self._enable_app_purpose_records_by_category(category_id)
+                self._enable_category_map_records_by_category(category_id)
             
             # 刷新缓存
             self._refresh_cache()
@@ -864,10 +864,10 @@ class CategoryService:
             # 同步更新 category_map_cache 表的 state
             if state == 0:
                 # 禁用：将该子分类下所有记录的 state 置为 0
-                self._disable_app_purpose_records_by_sub_category(sub_id)
+                self._disable_category_map_records_by_sub_category(sub_id)
             elif state == 1 and old_state == 0:
                 # 启用：恢复符合条件的记录（主分类和子分类都启用）
-                self._enable_app_purpose_records_by_sub_category(sub_id, category_id)
+                self._enable_category_map_records_by_sub_category(sub_id, category_id)
             
             # 刷新缓存
             self._refresh_cache()
@@ -888,7 +888,7 @@ class CategoryService:
     
     # ==================== category_map_cache 状态同步方法 ====================
     
-    def _disable_app_purpose_records_by_category(self, category_id: str):
+    def _disable_category_map_records_by_category(self, category_id: str):
         """
         禁用主分类时，将 category_map_cache 中该分类的所有记录 state 置为 0
         """
@@ -907,7 +907,7 @@ class CategoryService:
             logger.error(f"禁用分类记录失败: {e}")
             raise
     
-    def _disable_app_purpose_records_by_sub_category(self, sub_category_id: str):
+    def _disable_category_map_records_by_sub_category(self, sub_category_id: str):
         """
         禁用子分类时，将 category_map_cache 中该子分类的所有记录 state 置为 0
         """
@@ -926,7 +926,7 @@ class CategoryService:
             logger.error(f"禁用子分类记录失败: {e}")
             raise
     
-    def _enable_app_purpose_records_by_category(self, category_id: str):
+    def _enable_category_map_records_by_category(self, category_id: str):
         """
         启用主分类时，恢复 category_map_cache 中符合条件的记录
         
@@ -994,7 +994,7 @@ class CategoryService:
             logger.error(f"启用分类记录失败: {e}")
             raise
     
-    def _enable_app_purpose_records_by_sub_category(self, sub_category_id: str, category_id: str):
+    def _enable_category_map_records_by_sub_category(self, sub_category_id: str, category_id: str):
         """
         启用子分类时，恢复 category_map_cache 中符合条件的记录
         
@@ -1079,11 +1079,11 @@ class CategoryService:
             state: 状态筛选
         
         Returns:
-            AppPurposeCategoryResponse: 分页响应
+            CategoryMapCacheResponse: 分页响应
         """
         from lifewatch.server.schemas.category_schemas import (
-            AppPurposeCategoryItem,
-            AppPurposeCategoryResponse
+            CategoryMapCacheItem,
+            CategoryMapCacheResponse
         )
         import math
         
@@ -1110,7 +1110,7 @@ class CategoryService:
                     category_name = self.category_name_map.get(str(category_id), None) if category_id else None
                     sub_category_name = self.sub_category_name_map.get(str(sub_category_id), None) if sub_category_id else None
                     
-                    items.append(AppPurposeCategoryItem(
+                    items.append(CategoryMapCacheItem(
                         id=int(row['id']),
                         app=row['app'],
                         app_description=row.get('app_description'),
@@ -1127,7 +1127,7 @@ class CategoryService:
             
             total_pages = math.ceil(total / page_size) if total > 0 else 1
             
-            return AppPurposeCategoryResponse(
+            return CategoryMapCacheResponse(
                 data=items,
                 total=total,
                 page=page,
@@ -1161,29 +1161,37 @@ class CategoryService:
     def update_category_map_cache(
         self, 
         record_id: int, 
-        category_id: str, 
-        sub_category_id: str | None = None
+        category_id: str | None = None, 
+        sub_category_id: str | None = None,
+        app_description: str | None = None,
+        title_analysis: str | None = None
     ) -> bool:
         """
         更新 category_map_cache 记录的分类
         
         Args:
             record_id: 记录ID
-            category_id: 新的主分类ID
+            category_id: 新的主分类ID（可选，为空时不修改）
             sub_category_id: 新的子分类ID
+            app_description: 应用程序描述（可选，为空时不修改）
+            title_analysis: 标题分析结果（可选，为空时不修改）
         
         Returns:
             bool: 是否更新成功
         """
         try:
-            # 从缓存获取目标分类的状态
-            state = self._get_category_state_from_cache(category_id)
+            # 只有当 category_id 不为空时才获取目标分类的状态
+            state = None
+            if category_id is not None:
+                state = self._get_category_state_from_cache(category_id)
             
             result = self.server_lw_data_provider.update_category_map_cache_by_id(
                 record_id=record_id,
                 category_id=category_id,
                 sub_category_id=sub_category_id,
-                state=state
+                state=state,
+                app_description=app_description,
+                title_analysis=title_analysis
             )
             
             if result:
@@ -1200,29 +1208,34 @@ class CategoryService:
     def batch_update_category_map_cache(
         self,
         record_ids: list[int],
-        category_id: str,
-        sub_category_id: str | None = None
+        category_id: str | None = None,
+        sub_category_id: str | None = None,
+        app_description: str | None = None
     ) -> int:
         """
         批量更新 category_map_cache 记录的分类
         
         Args:
             record_ids: 记录ID列表
-            category_id: 新的主分类ID
+            category_id: 新的主分类ID（可选，为空时不修改）
             sub_category_id: 新的子分类ID
+            app_description: 应用程序描述（可选，为空时不修改）
         
         Returns:
             int: 成功更新的数量
         """
         try:
-            # 从缓存获取目标分类的状态
-            state = self._get_category_state_from_cache(category_id)
+            # 只有当 category_id 不为空时才获取目标分类的状态
+            state = None
+            if category_id is not None:
+                state = self._get_category_state_from_cache(category_id)
             
             count = self.server_lw_data_provider.batch_update_category_map_cache_by_ids(
                 record_ids=record_ids,
                 category_id=category_id,
                 sub_category_id=sub_category_id,
-                state=state
+                state=state,
+                app_description=app_description
             )
             
             logger.info(f"批量更新 {count} 条 category_map_cache 记录的分类")

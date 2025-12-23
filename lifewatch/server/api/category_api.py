@@ -22,13 +22,13 @@ from lifewatch.server.schemas.category_schemas import (
     CreateSubCategoryRequest,
     UpdateSubCategoryRequest,
     ToggleCategoryStateRequest,
-    # AppPurposeCategory 相关
-    AppPurposeCategoryItem,
-    AppPurposeCategoryResponse,
-    UpdateAppPurposeCategoryRequest,
-    BatchUpdateAppPurposeCategoryRequest,
-    DeleteAppPurposeCategoryRequest,
-    BatchDeleteAppPurposeCategoryRequest
+    # CategoryMapCache 相关
+    CategoryMapCacheItem,
+    CategoryMapCacheResponse,
+    UpdateCategoryMapCacheRequest,
+    BatchUpdateCategoryMapCacheRequest,
+    DeleteCategoryMapCacheRequest,
+    BatchDeleteCategoryMapCacheRequest
 )
 from lifewatch.server.schemas.common_schemas import StandardResponse
 from lifewatch.server.services import category_service
@@ -374,7 +374,7 @@ async def toggle_sub_category_state(
 # /category_map_cache - 分类缓存表接口
 # ============================================================================
 
-@router.get("/app_purpose", response_model=AppPurposeCategoryResponse, summary="获取分类缓存列表")
+@router.get("/category_map", response_model=CategoryMapCacheResponse, summary="获取分类缓存列表")
 async def get_category_map_cache_list(
     page: int = Query(default=1, ge=1, description="页码"),
     page_size: int = Query(default=50, ge=1, le=200, description="每页数量"),
@@ -401,20 +401,29 @@ async def get_category_map_cache_list(
 
 
 # 注意：静态路径路由必须放在动态路径路由之前，否则 "batch" 会被错误解析为 record_id
-@router.put("/app_purpose/batch", response_model=StandardResponse, summary="批量更新分类缓存记录")
+@router.put("/category_map/batch", response_model=StandardResponse, summary="批量更新分类缓存记录")
 async def batch_update_category_map_cache(
-    request: BatchUpdateAppPurposeCategoryRequest
+    request: BatchUpdateCategoryMapCacheRequest
 ):
     """
     批量更新 category_map_cache 记录的分类
     
     - 更新时会自动同步目标分类的 state 状态
+    - category_id 和 app_description 至少需要提供一个
     """
+    # 参数校验：category_id 和 app_description 不能同时为空
+    if request.category_id is None and request.app_description is None:
+        raise HTTPException(
+            status_code=400, 
+            detail="参数错误：category_id 和 app_description 不能同时为空"
+        )
+    
     try:
         count = category_service.batch_update_category_map_cache(
             record_ids=request.ids,
             category_id=request.category_id,
-            sub_category_id=request.sub_category_id
+            sub_category_id=request.sub_category_id,
+            app_description=request.app_description
         )
         return StandardResponse(
             success=True,
@@ -426,21 +435,31 @@ async def batch_update_category_map_cache(
         raise HTTPException(status_code=500, detail=f"批量更新分类缓存记录失败: {str(e)}")
 
 
-@router.put("/app_purpose/{record_id}", response_model=StandardResponse, summary="更新分类缓存记录")
+@router.put("/category_map/{record_id}", response_model=StandardResponse, summary="更新分类缓存记录")
 async def update_category_map_cache(
     record_id: int = Path(..., description="记录ID"),
-    request: UpdateAppPurposeCategoryRequest = ...
+    request: UpdateCategoryMapCacheRequest = ...
 ):
     """
     更新单条 category_map_cache 记录的分类
     
     - 更新时会自动同步目标分类的 state 状态
+    - category_id、app_description、title_analysis 至少需要提供一个
     """
+    # 参数校验：category_id、app_description、title_analysis 不能同时为空
+    if request.category_id is None and request.app_description is None and request.title_analysis is None:
+        raise HTTPException(
+            status_code=400, 
+            detail="参数错误：category_id、app_description、title_analysis 不能同时为空"
+        )
+    
     try:
         success = category_service.update_category_map_cache(
             record_id=record_id,
             category_id=request.category_id,
-            sub_category_id=request.sub_category_id
+            sub_category_id=request.sub_category_id,
+            app_description=request.app_description,
+            title_analysis=request.title_analysis
         )
         if not success:
             raise HTTPException(status_code=404, detail=f"记录 ID={record_id} 不存在")
@@ -457,9 +476,9 @@ async def update_category_map_cache(
 
 
 # 同样，DELETE 的 batch 路由也需要放在动态路径之前
-@router.delete("/app_purpose/batch", response_model=StandardResponse, summary="批量删除分类缓存记录")
+@router.delete("/category_map/batch", response_model=StandardResponse, summary="批量删除分类缓存记录")
 async def batch_delete_category_map_cache(
-    request: BatchDeleteAppPurposeCategoryRequest
+    request: BatchDeleteCategoryMapCacheRequest
 ):
     """
     批量删除 category_map_cache 记录
@@ -476,7 +495,7 @@ async def batch_delete_category_map_cache(
         raise HTTPException(status_code=500, detail=f"批量删除分类缓存记录失败: {str(e)}")
 
 
-@router.delete("/app_purpose/{record_id}", response_model=StandardResponse, summary="删除分类缓存记录")
+@router.delete("/category_map/{record_id}", response_model=StandardResponse, summary="删除分类缓存记录")
 async def delete_category_map_cache(
     record_id: int = Path(..., description="记录ID")
 ):
