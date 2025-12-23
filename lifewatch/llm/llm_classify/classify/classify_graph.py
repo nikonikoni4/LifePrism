@@ -152,8 +152,10 @@ class ClassifyGraph:
         app_to_search = []
         for app, app_info in state.app_registry.items():
             if app_info.description is None or app_info.description == "":
-                # 获取一个 title 样本用于辅助识别
-                title_sample = app_info.titles[0] if app_info.titles else ""
+                # 只有单用途应用才获取 title 样本用于辅助识别
+                title_sample = ""
+                if not app_info.is_multipurpose and app_info.titles:
+                    title_sample = app_info.titles[0]
                 app_to_search.append((app, title_sample))
         
         if not app_to_search:
@@ -166,13 +168,14 @@ class ClassifyGraph:
         app_descriptions = {}  # app_name -> description
         
         system_message = SystemMessage(content="""
-        你是一个软件程序识别专家。你的任务是通过 web 搜索识别软件应用程序，并提供准确、精炼的描述。
-        **输入说明：**
-        - 输入软件名称或程序名称
+        你是一个软件程序识别专家。
+        **任务流程：**
+        1. 实时查询该软件最新的描述
+        2. 根据搜索结果，结合软件名称和标题样本，生成准确的软件描述
+        
         **输出要求：**
-        - 软件描述(不超过20词)
-        - 返回软件描述
-        - 如果搜索后仍无法确定，返回 None
+        - 基于搜索结果提供软件描述（不超过20词）
+        - 如果搜索后仍无法确定是什么软件，返回 None
         """)
         
         MAX_RETRIES = 3
@@ -180,7 +183,11 @@ class ClassifyGraph:
             success = False
             for attempt in range(1, MAX_RETRIES + 1):
                 try:
-                    user_message = HumanMessage(content=f"""软件名称:{app}""")
+                    # 根据是否有 title 调整 prompt
+                    if title:
+                        user_message = HumanMessage(content=f"""软件名称:{app},软件标题样本:{title}""")
+                    else:
+                        user_message = HumanMessage(content=f"""软件名称:{app}""")
                     messages = [system_message, user_message]
                     
                     result = self.chat_model.invoke(messages)
@@ -204,7 +211,6 @@ class ClassifyGraph:
                 except Exception as e:
                     logger.warning(f"获取 {app} 的描述时发生异常（第 {attempt}/{MAX_RETRIES} 次）: {e}")
                     if attempt < MAX_RETRIES:
-                        import time
                         time.sleep(1)
             
             if not success:
