@@ -65,7 +65,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
         Returns:
             int: 受影响的行数
         """
-        return self.db.upsert_many("app_purpose_category", app_description_list, "app")
+        return self.db.upsert_many("category_map_cache", app_description_list, "app")
 
 # 懒加载单例
 from lifewatch.utils import LazySingleton

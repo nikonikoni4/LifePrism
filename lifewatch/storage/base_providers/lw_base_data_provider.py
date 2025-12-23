@@ -32,9 +32,9 @@ class LWBaseDataProvider:
         else:
             self.db = db_manager
     
-    # ==================== app_purpose_category 表 ====================
+    # ==================== category_map_cache 表 ====================
     
-    def load_app_purpose_category(
+    def load_category_map_cache(
         self, 
         page: Optional[int] = None, 
         page_size: Optional[int] = None,
@@ -106,25 +106,25 @@ class LWBaseDataProvider:
             if where_conditions:
                 # 有筛选条件时使用原生 SQL
                 columns_str = ", ".join(columns)
-                sql = f"SELECT {columns_str} FROM app_purpose_category WHERE {where_clause}"
+                sql = f"SELECT {columns_str} FROM category_map_cache WHERE {where_clause}"
                 with self.db.get_connection() as conn:
                     df = pd.read_sql_query(sql, conn, params=params)
                 return df if not df.empty else None
             else:
-                df = self.db.query('app_purpose_category', columns=columns)
+                df = self.db.query('category_map_cache', columns=columns)
                 return df if not df.empty else None
         
         # 有分页参数时，返回 (数据, 总数)
         columns_str = ", ".join(columns)
         
         # 查询总数
-        count_sql = f"SELECT COUNT(*) FROM app_purpose_category WHERE {where_clause}"
+        count_sql = f"SELECT COUNT(*) FROM category_map_cache WHERE {where_clause}"
         
         # 查询数据
         offset = (page - 1) * page_size
         data_sql = f"""
         SELECT {columns_str} 
-        FROM app_purpose_category 
+        FROM category_map_cache 
         WHERE {where_clause}
         ORDER BY created_at DESC
         LIMIT ? OFFSET ?
@@ -147,7 +147,7 @@ class LWBaseDataProvider:
             Set[str]: 应用名称集合（不包括多用途应用）
         """
         try:
-            df = self.db.query('app_purpose_category', 
+            df = self.db.query('category_map_cache', 
                               columns=['app'],
                               where={'is_multipurpose_app': 0})
             existing_apps = set(df['app'].dropna().tolist()) if not df.empty else set()
@@ -157,9 +157,9 @@ class LWBaseDataProvider:
             logger.error(f"获取已有应用失败: {e}")
             return set()
     
-    def save_app_purpose_category(self, ai_metadata_df: pd.DataFrame) -> int:
+    def save_category_map_cache(self, ai_metadata_df: pd.DataFrame) -> int:
         """
-        保存AI元数据到 app_purpose_category 表
+        保存AI元数据到 category_map_cache 表
         
         使用 UPSERT 策略：已存在的应用会被更新，新应用会被插入
         
@@ -182,7 +182,7 @@ class LWBaseDataProvider:
             data_list = ai_metadata_df.to_dict('records')
             
             # 使用 (app, title,state) 作为冲突列，因为是复合主键
-            affected = self.db.upsert_many('app_purpose_category', 
+            affected = self.db.upsert_many('category_map_cache', 
                                        data_list, 
                                        conflict_columns=['app', 'title','state'])
             logger.info(f"成功保存 {len(data_list)} 行AI元数据到数据库")

@@ -246,7 +246,7 @@ class ToggleCategoryStateRequest(BaseModel):
 
 class AppPurposeCategoryItem(BaseModel):
     """
-    app_purpose_category 表单条记录展示
+    category_map_cache 表单条记录展示
     
     用于在分类管理页面的新选项卡中展示 AI 分类元数据
     注意：category 和 sub_category 是通过 ID 映射得到的名称，而非直接从表中读取
@@ -321,7 +321,7 @@ class AppPurposeCategoryResponse(BaseModel):
 # ============================================================================
 
 class UpdateAppPurposeCategoryRequest(BaseModel):
-    """更新 app_purpose_category 记录请求"""
+    """更新 category_map_cache 记录请求"""
     id: int = Field(..., description="记录ID")
     category_id: str = Field(..., description="新的主分类ID")
     sub_category_id: str | None = Field(default=None, description="新的子分类ID")
@@ -337,7 +337,7 @@ class UpdateAppPurposeCategoryRequest(BaseModel):
 
 
 class BatchUpdateAppPurposeCategoryRequest(BaseModel):
-    """批量更新 app_purpose_category 记录请求"""
+    """批量更新 category_map_cache 记录请求"""
     ids: List[int] = Field(..., description="记录ID列表", min_length=1)
     category_id: str = Field(..., description="新的主分类ID")
     sub_category_id: str | None = Field(default=None, description="新的子分类ID")
@@ -353,7 +353,7 @@ class BatchUpdateAppPurposeCategoryRequest(BaseModel):
 
 
 class DeleteAppPurposeCategoryRequest(BaseModel):
-    """删除 app_purpose_category 记录请求"""
+    """删除 category_map_cache 记录请求"""
     id: int = Field(..., description="记录ID")
 
     class Config:
@@ -365,7 +365,7 @@ class DeleteAppPurposeCategoryRequest(BaseModel):
 
 
 class BatchDeleteAppPurposeCategoryRequest(BaseModel):
-    """批量删除 app_purpose_category 记录请求"""
+    """批量删除 category_map_cache 记录请求"""
     ids: List[int] = Field(..., description="记录ID列表", min_length=1)
 
     class Config:

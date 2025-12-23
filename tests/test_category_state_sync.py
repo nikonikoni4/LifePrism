@@ -52,7 +52,7 @@ class TestCategoryStateSync:
             cursor = conn.cursor()
             
             # 清理旧的测试数据
-            cursor.execute("DELETE FROM app_purpose_category WHERE app IN (?, ?)", 
+            cursor.execute("DELETE FROM category_map_cache WHERE app IN (?, ?)", 
                           (self.single_purpose_app, self.multi_purpose_app))
             cursor.execute("DELETE FROM sub_category WHERE id = ?", (self.test_sub_category_id,))
             cursor.execute("DELETE FROM category WHERE id = ?", (self.test_category_id,))
@@ -78,11 +78,11 @@ class TestCategoryStateSync:
     def insert_mock_app_purpose_record(self, app: str, title: str, category_id: str, 
                                         sub_category_id: str, state: int, 
                                         created_at: str) -> None:
-        """插入模拟的 app_purpose_category 记录"""
+        """插入模拟的 category_map_cache 记录"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT OR REPLACE INTO app_purpose_category 
+                INSERT OR REPLACE INTO category_map_cache 
                 (app, title, category_id, sub_category_id, state, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """, (app, title, category_id, sub_category_id, state, created_at))
@@ -94,7 +94,7 @@ class TestCategoryStateSync:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT app, title, category_id, sub_category_id, state, created_at
-                FROM app_purpose_category
+                FROM category_map_cache
                 WHERE app = ?
                 ORDER BY created_at
             """, (app,))
@@ -124,7 +124,7 @@ class TestCategoryStateSync:
         # 清理该应用的旧记录
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM app_purpose_category WHERE app = ?", (app,))
+            cursor.execute("DELETE FROM category_map_cache WHERE app = ?", (app,))
             conn.commit()
         
         # 时间点
@@ -148,7 +148,7 @@ class TestCategoryStateSync:
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE app_purpose_category 
+                UPDATE category_map_cache 
                 SET state = 0, updated_at = CURRENT_TIMESTAMP
                 WHERE app = ? AND category_id = ?
             """, (app, self.test_category_id))
@@ -202,7 +202,7 @@ class TestCategoryStateSync:
         # 清理该应用的旧记录
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM app_purpose_category WHERE app = ?", (app,))
+            cursor.execute("DELETE FROM category_map_cache WHERE app = ?", (app,))
             conn.commit()
         
         # 时间点
@@ -226,7 +226,7 @@ class TestCategoryStateSync:
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE app_purpose_category 
+                UPDATE category_map_cache 
                 SET state = 0, updated_at = CURRENT_TIMESTAMP
                 WHERE app = ? AND category_id = ?
             """, (app, self.test_category_id))
@@ -282,7 +282,7 @@ class TestCategoryStateSync:
         # 清理该应用的旧记录
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM app_purpose_category WHERE app = ?", (app,))
+            cursor.execute("DELETE FROM category_map_cache WHERE app = ?", (app,))
             conn.commit()
         
         # 时间点
@@ -306,7 +306,7 @@ class TestCategoryStateSync:
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE app_purpose_category 
+                UPDATE category_map_cache 
                 SET state = 0, updated_at = CURRENT_TIMESTAMP
                 WHERE app = ? AND category_id = ?
             """, (app, self.test_category_id))
@@ -358,7 +358,7 @@ class TestCategoryStateSync:
         # 清理该应用的旧记录
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM app_purpose_category WHERE app = ?", (app,))
+            cursor.execute("DELETE FROM category_map_cache WHERE app = ?", (app,))
             conn.commit()
         
         # 时间点
@@ -382,7 +382,7 @@ class TestCategoryStateSync:
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE app_purpose_category 
+                UPDATE category_map_cache 
                 SET state = 0, updated_at = CURRENT_TIMESTAMP
                 WHERE app = ? AND sub_category_id = ?
             """, (app, self.test_sub_category_id))
@@ -430,7 +430,7 @@ class TestCategoryStateSync:
             cursor = conn.cursor()
             
             # 清理测试记录
-            cursor.execute("DELETE FROM app_purpose_category WHERE app IN (?, ?, ?)", 
+            cursor.execute("DELETE FROM category_map_cache WHERE app IN (?, ?, ?)", 
                           (self.single_purpose_app, self.multi_purpose_app, "vscode.exe"))
             cursor.execute("DELETE FROM sub_category WHERE id = ?", (self.test_sub_category_id,))
             cursor.execute("DELETE FROM category WHERE id = ?", (self.test_category_id,))

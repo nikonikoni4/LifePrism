@@ -77,7 +77,7 @@ def convert_utc_to_local(utc_timestamp_str: str, target_tz: str ) -> str:
 def clean_activitywatch_data(
     start_time: datetime, 
     end_time: datetime, 
-    app_purpose_category_df: pd.DataFrame
+    category_map_cache_df: pd.DataFrame
 ) -> Tuple[pd.DataFrame, classifyState]:
     """
     完整的数据清洗流程：从 AW 获取数据 + 时间戳标准化 + 短活动过滤 + 数据库查询优化
@@ -85,7 +85,7 @@ def clean_activitywatch_data(
     Args:
         start_time: 开始时间 (datetime 对象)
         end_time: 结束时间 (datetime 对象)
-        app_purpose_category_df: 应用目的分类DataFrame，包含app_purpose_category_df表中的数据
+        category_map_cache_df: 应用目的分类DataFrame，包含category_map_cache_df表中的数据
     
     Returns:
         Tuple[pd.DataFrame, classifyState]:
@@ -126,12 +126,12 @@ def clean_activitywatch_data(
     
     # 已经分类的应用（单一用途app和多用途title）
     # 以及已存在的app_description，避免LLM重复搜索
-    logger.debug(f"原始 app_purpose_category_df 长度: {len(app_purpose_category_df) if app_purpose_category_df is not None else 0}")
-    if app_purpose_category_df is not None and not app_purpose_category_df.empty:
+    logger.debug(f"原始 category_map_cache_df 长度: {len(category_map_cache_df) if category_map_cache_df is not None else 0}")
+    if category_map_cache_df is not None and not category_map_cache_df.empty:
         # 直接使用 state 字段过滤（state=0 表示对应的分类被禁用）
-        valid_df = app_purpose_category_df[
-            app_purpose_category_df.get('state', 1) == 1
-        ].copy() if 'state' in app_purpose_category_df.columns else app_purpose_category_df.copy()
+        valid_df = category_map_cache_df[
+            category_map_cache_df.get('state', 1) == 1
+        ].copy() if 'state' in category_map_cache_df.columns else category_map_cache_df.copy()
         logger.debug(f"过滤后的 valid_df 长度: {len(valid_df)}")
         # 获取已存在的单一用途的应用集合
         categorized_single_purpose_apps = set(valid_df['app'].unique())
@@ -156,7 +156,7 @@ def clean_activitywatch_data(
         
         # 创建 app -> app_description 映射，用于复用已有的应用描述
         app_description_map: Dict[str, str] = {}
-        for _, row in app_purpose_category_df.iterrows():
+        for _, row in category_map_cache_df.iterrows():
             app = row.get('app', '')
             desc = row.get('app_description', '')
             if app and desc and app not in app_description_map:
@@ -308,10 +308,10 @@ if __name__ == "__main__":
     start_time = end_time - timedelta(minutes=1)
     
     # 测试数据库功能
-    app_purpose_category_df = LWBaseDataProvider().load_app_purpose_category()
-    print(app_purpose_category_df)
+    category_map_cache_df = LWBaseDataProvider().load_category_map_cache()
+    print(category_map_cache_df)
     # 测试数据清洗功能
-    filtered_events_df, classify_state = clean_activitywatch_data(start_time, end_time, app_purpose_category_df)
+    filtered_events_df, classify_state = clean_activitywatch_data(start_time, end_time, category_map_cache_df)
     print(f"过滤后事件数: {len(filtered_events_df)}")
     print(f"待分类应用: {list(classify_state.app_registry.keys())}")
     print(f"待分类日志项数: {len(classify_state.log_items)}")

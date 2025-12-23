@@ -7,8 +7,8 @@
 LW_DB_PATH = r"D:\desktop\软件开发\LifeWatch-AI\lifewatch\server\lifewatch_ai.db"
 ACTIVITYWATCH_DB_PATH = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
 # 应用程序用途分类表配置
-APP_PURPOSE_CATEGORY_CONFIG = {
-    'table_name': 'app_purpose_category',
+category_map_cache_CONFIG = {
+    'table_name': 'category_map_cache',
     'columns': {
         'id': {
             'type': 'INTEGER',
@@ -263,7 +263,7 @@ TOKENS_USAGE_LOG_CONFIG = {
 
 # 所有表配置的映射
 TABLE_CONFIGS = {
-    'app_purpose_category': APP_PURPOSE_CATEGORY_CONFIG,
+    'category_map_cache': category_map_cache_CONFIG,
     'user_app_behavior_log': USER_APP_BEHAVIOR_LOG_CONFIG,
     'category': CATEGORY_CONFIG,
     'sub_category': SUB_CATEGORY_CONFIG,

@@ -125,7 +125,7 @@ class DataLoader:
         """
         构建应用注册表
         
-        从 app_purpose_category 表获取应用描述，
+        从 category_map_cache 表获取应用描述，
         对于没有描述的应用，设置为空字符串
         同时从 log_items 中收集每个应用的典型 titles 样本
         
@@ -139,7 +139,7 @@ class DataLoader:
         unique_apps = set(item.app for item in log_items)
         
         # 从数据库加载应用分类数据
-        app_category_df = self.lw_data_provider.load_app_purpose_category()
+        app_category_df = self.lw_data_provider.load_category_map_cache()
         
         # 为每个 app 收集 titles 样本（最多5个非空且不重复的title）
         app_titles_map = {}

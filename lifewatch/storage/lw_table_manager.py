@@ -81,7 +81,7 @@ class LWTableManager:
                 "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
             )
             # 只有首次创建时添加updated_at，某些表不需要
-            if table_name == 'app_purpose_category':
+            if table_name == 'category_map_cache':
                 column_definitions.append(
                     "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
                 )
@@ -135,7 +135,7 @@ class LWTableManager:
                     stats[f'{table_name}_rows'] = count
                 
                 # 额外统计：唯一应用数量
-                cursor.execute("SELECT COUNT(DISTINCT app) FROM app_purpose_category")
+                cursor.execute("SELECT COUNT(DISTINCT app) FROM category_map_cache")
                 stats['unique_apps'] = cursor.fetchone()[0]
                 
                 return stats

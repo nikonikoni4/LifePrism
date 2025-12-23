@@ -67,11 +67,11 @@ class DataProcessingService:
             
             # 1-2. 获取 ActivityWatch 数据并清洗
             logger.info("步骤 1-2/6: 获取 ActivityWatch 数据并清洗...")
-            app_purpose_category_df = self.server_lw_data_provider.load_app_purpose_category()  # 获取已缓存的分类结果
+            category_map_cache_df = self.server_lw_data_provider.load_category_map_cache()  # 获取已缓存的分类结果
             filtered_data, classify_state = clean_activitywatch_data(
                 start_time=start_time,
                 end_time=end_time, 
-                app_purpose_category_df=app_purpose_category_df
+                category_map_cache_df=category_map_cache_df
             )
             total_events = len(filtered_data) + (len(classify_state.log_items) if classify_state.log_items else 0)
             filtered_events = len(filtered_data)
@@ -91,7 +91,7 @@ class DataProcessingService:
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
                 if classified_app_df is not None and not classified_app_df.empty:
-                    self.server_lw_data_provider.save_app_purpose_category(classified_app_df)
+                    self.server_lw_data_provider.save_category_map_cache(classified_app_df)
                     classified_apps = len(classified_app_df)
                     logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
                     
@@ -168,12 +168,12 @@ class DataProcessingService:
             
             # 1-2. 获取 ActivityWatch 数据并清洗
             logger.info("步骤 1-2/6: 获取 ActivityWatch 数据并清洗...")
-            app_purpose_category_df = self.server_lw_data_provider.load_app_purpose_category()
+            category_map_cache_df = self.server_lw_data_provider.load_category_map_cache()
             filtered_data, classify_state = clean_activitywatch_data(
                 start_time=start_time,
                 end_time=end_time,
-                # app_purpose_category_df=app_purpose_category_df
-                app_purpose_category_df=None
+                # category_map_cache_df=category_map_cache_df
+                category_map_cache_df=None
             )
             total_events = len(filtered_data) + (len(classify_state.log_items) if classify_state.log_items else 0)
             filtered_events = len(filtered_data)
@@ -191,7 +191,7 @@ class DataProcessingService:
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
                 if classified_app_df is not None and not classified_app_df.empty:
-                    self.server_lw_data_provider.save_app_purpose_category(classified_app_df)
+                    self.server_lw_data_provider.save_category_map_cache(classified_app_df)
                     classified_apps = len(classified_app_df)
                     logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
                     
@@ -354,7 +354,7 @@ class DataProcessingService:
         # 保存 token 使用数据（使用 filtered_events 作为 result_items_count）
         self._save_tokens_usage(result, filtered_events)
         
-        # 转换为 DataFrame 格式（适配 app_purpose_category 表结构）
+        # 转换为 DataFrame 格式（适配 category_map_cache 表结构）
         # 按 app 分组处理：单用途应用只保存一条，多用途应用保存所有 title
         classified_records = []
         app_groups = {}  # {app: [items]}

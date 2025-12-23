@@ -707,9 +707,9 @@ class ServerLWDataProvider(LWBaseDataProvider):
         
         return usage_dict
     
-    # ==================== app_purpose_category 表 操作 ====================
+    # ==================== category_map_cache 表 操作 ====================
     
-    def update_app_purpose_category_by_id(
+    def update_category_map_cache_by_id(
         self, 
         record_id: int,
         category_id: str,
@@ -717,7 +717,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
         state: int
     ) -> bool:
         """
-        通过 ID 更新单条 app_purpose_category 记录的分类
+        通过 ID 更新单条 category_map_cache 记录的分类
         
         Args:
             record_id: 记录的自增主键 ID
@@ -729,7 +729,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
             bool: 是否更新成功
         """
         sql = """
-        UPDATE app_purpose_category 
+        UPDATE category_map_cache 
         SET category_id = ?, sub_category_id = ?, state = ?
         WHERE id = ?
         """
@@ -740,7 +740,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
             conn.commit()
             return cursor.rowcount > 0
     
-    def batch_update_app_purpose_category_by_ids(
+    def batch_update_category_map_cache_by_ids(
         self, 
         record_ids: list[int],
         category_id: str,
@@ -748,7 +748,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
         state: int
     ) -> int:
         """
-        批量通过 ID 更新 app_purpose_category 记录的分类
+        批量通过 ID 更新 category_map_cache 记录的分类
         
         Args:
             record_ids: 记录的 ID 列表
@@ -764,7 +764,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
         
         placeholders = ",".join("?" * len(record_ids))
         sql = f"""
-        UPDATE app_purpose_category 
+        UPDATE category_map_cache 
         SET category_id = ?, sub_category_id = ?, state = ?
         WHERE id IN ({placeholders})
         """
@@ -775,12 +775,12 @@ class ServerLWDataProvider(LWBaseDataProvider):
             conn.commit()
             return cursor.rowcount
     
-    def delete_app_purpose_category_by_id(
+    def delete_category_map_cache_by_id(
         self, 
         record_id: int
     ) -> bool:
         """
-        通过 ID 删除单条 app_purpose_category 记录
+        通过 ID 删除单条 category_map_cache 记录
         
         Args:
             record_id: 记录的自增主键 ID
@@ -788,7 +788,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
         Returns:
             bool: 是否删除成功
         """
-        sql = "DELETE FROM app_purpose_category WHERE id = ?"
+        sql = "DELETE FROM category_map_cache WHERE id = ?"
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -796,12 +796,12 @@ class ServerLWDataProvider(LWBaseDataProvider):
             conn.commit()
             return cursor.rowcount > 0
     
-    def batch_delete_app_purpose_category_by_ids(
+    def batch_delete_category_map_cache_by_ids(
         self, 
         record_ids: list[int]
     ) -> int:
         """
-        批量通过 ID 删除 app_purpose_category 记录
+        批量通过 ID 删除 category_map_cache 记录
         
         Args:
             record_ids: 记录的 ID 列表
@@ -813,7 +813,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
             return 0
         
         placeholders = ",".join("?" * len(record_ids))
-        sql = f"DELETE FROM app_purpose_category WHERE id IN ({placeholders})"
+        sql = f"DELETE FROM category_map_cache WHERE id IN ({placeholders})"
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()

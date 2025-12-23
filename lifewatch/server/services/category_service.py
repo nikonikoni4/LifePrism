@@ -806,7 +806,7 @@ class CategoryService:
             self.db.update_by_id('category', 'id', category_id, {'state': state})
             logger.info(f"成功切换分类 '{category_id}' 状态为 {state}")
             
-            # 同步更新 app_purpose_category 表的 state
+            # 同步更新 category_map_cache 表的 state
             if state == 0:
                 # 禁用：将该分类下所有记录的 state 置为 0
                 self._disable_app_purpose_records_by_category(category_id)
@@ -861,7 +861,7 @@ class CategoryService:
             self.db.update_by_id('sub_category', 'id', sub_id, {'state': state})
             logger.info(f"成功切换子分类 '{sub_id}' 状态为 {state}")
             
-            # 同步更新 app_purpose_category 表的 state
+            # 同步更新 category_map_cache 表的 state
             if state == 0:
                 # 禁用：将该子分类下所有记录的 state 置为 0
                 self._disable_app_purpose_records_by_sub_category(sub_id)
@@ -886,49 +886,49 @@ class CategoryService:
             logger.error(f"切换子分类状态失败: {e}")
             raise
     
-    # ==================== app_purpose_category 状态同步方法 ====================
+    # ==================== category_map_cache 状态同步方法 ====================
     
     def _disable_app_purpose_records_by_category(self, category_id: str):
         """
-        禁用主分类时，将 app_purpose_category 中该分类的所有记录 state 置为 0
+        禁用主分类时，将 category_map_cache 中该分类的所有记录 state 置为 0
         """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    UPDATE app_purpose_category 
+                    UPDATE category_map_cache 
                     SET state = 0, updated_at = CURRENT_TIMESTAMP
                     WHERE category_id = ?
                 """, (category_id,))
                 affected = cursor.rowcount
                 conn.commit()
-                logger.info(f"禁用分类 '{category_id}' 时，置 {affected} 条 app_purpose_category 记录为无效")
+                logger.info(f"禁用分类 '{category_id}' 时，置 {affected} 条 category_map_cache 记录为无效")
         except Exception as e:
             logger.error(f"禁用分类记录失败: {e}")
             raise
     
     def _disable_app_purpose_records_by_sub_category(self, sub_category_id: str):
         """
-        禁用子分类时，将 app_purpose_category 中该子分类的所有记录 state 置为 0
+        禁用子分类时，将 category_map_cache 中该子分类的所有记录 state 置为 0
         """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    UPDATE app_purpose_category 
+                    UPDATE category_map_cache 
                     SET state = 0, updated_at = CURRENT_TIMESTAMP
                     WHERE sub_category_id = ?
                 """, (sub_category_id,))
                 affected = cursor.rowcount
                 conn.commit()
-                logger.info(f"禁用子分类 '{sub_category_id}' 时，置 {affected} 条 app_purpose_category 记录为无效")
+                logger.info(f"禁用子分类 '{sub_category_id}' 时，置 {affected} 条 category_map_cache 记录为无效")
         except Exception as e:
             logger.error(f"禁用子分类记录失败: {e}")
             raise
     
     def _enable_app_purpose_records_by_category(self, category_id: str):
         """
-        启用主分类时，恢复 app_purpose_category 中符合条件的记录
+        启用主分类时，恢复 category_map_cache 中符合条件的记录
         
         恢复条件：主分类启用 AND 子分类也启用
         恢复前：删除同 (app, title) 中 created_at 更晚的记录
@@ -946,7 +946,7 @@ class CategoryService:
                 # 获取该分类下所有待恢复的记录
                 cursor.execute("""
                     SELECT app, title, sub_category_id, created_at 
-                    FROM app_purpose_category 
+                    FROM category_map_cache 
                     WHERE category_id = ? AND state = 0
                 """, (category_id,))
                 records = cursor.fetchall()
@@ -968,20 +968,20 @@ class CategoryService:
                         if is_multipurpose_app(app):
                             # 多分类应用：删除同 (app, title) 中 created_at 更晚的记录
                             cursor.execute("""
-                                DELETE FROM app_purpose_category 
+                                DELETE FROM category_map_cache 
                                 WHERE app = ? AND title = ? AND created_at > ?
                             """, (app, title, created_at))
                         else:
                             # 单分类应用：删除同 app 中 created_at 更晚的记录
                             cursor.execute("""
-                                DELETE FROM app_purpose_category 
+                                DELETE FROM category_map_cache 
                                 WHERE app = ? AND created_at > ?
                             """, (app, created_at))
                         total_deleted += cursor.rowcount
                     
                     # 恢复该记录
                     cursor.execute("""
-                        UPDATE app_purpose_category 
+                        UPDATE category_map_cache 
                         SET state = 1, updated_at = CURRENT_TIMESTAMP
                         WHERE app = ? AND title = ? AND category_id = ?
                     """, (app, title, category_id))
@@ -996,7 +996,7 @@ class CategoryService:
     
     def _enable_app_purpose_records_by_sub_category(self, sub_category_id: str, category_id: str):
         """
-        启用子分类时，恢复 app_purpose_category 中符合条件的记录
+        启用子分类时，恢复 category_map_cache 中符合条件的记录
         
         恢复条件：主分类启用 AND 子分类启用
         恢复前：删除同 (app, title) 中 created_at 更晚的记录
@@ -1018,7 +1018,7 @@ class CategoryService:
                 # 获取该子分类下所有待恢复的记录
                 cursor.execute("""
                     SELECT app, title, created_at 
-                    FROM app_purpose_category 
+                    FROM category_map_cache 
                     WHERE sub_category_id = ? AND state = 0
                 """, (sub_category_id,))
                 records = cursor.fetchall()
@@ -1034,20 +1034,20 @@ class CategoryService:
                         if is_multipurpose_app(app):
                             # 多分类应用：删除同 (app, title) 中 created_at 更晚的记录
                             cursor.execute("""
-                                DELETE FROM app_purpose_category 
+                                DELETE FROM category_map_cache 
                                 WHERE app = ? AND title = ? AND created_at > ?
                             """, (app, title, created_at))
                         else:
                             # 单分类应用：删除同 app 中 created_at 更晚的记录
                             cursor.execute("""
-                                DELETE FROM app_purpose_category 
+                                DELETE FROM category_map_cache 
                                 WHERE app = ? AND created_at > ?
                             """, (app, created_at))
                         total_deleted += cursor.rowcount
                     
                     # 恢复该记录
                     cursor.execute("""
-                        UPDATE app_purpose_category 
+                        UPDATE category_map_cache 
                         SET state = 1, updated_at = CURRENT_TIMESTAMP
                         WHERE app = ? AND title = ? AND sub_category_id = ?
                     """, (app, title, sub_category_id))
@@ -1060,9 +1060,9 @@ class CategoryService:
             logger.error(f"启用子分类记录失败: {e}")
             raise
 
-    # ==================== app_purpose_category 数据管理 ====================
+    # ==================== category_map_cache 数据管理 ====================
     
-    def get_app_purpose_category_list(
+    def get_category_map_cache_list(
         self,
         page: int = 1,
         page_size: int = 50,
@@ -1070,7 +1070,7 @@ class CategoryService:
         state: int | None = None
     ):
         """
-        获取 app_purpose_category 列表
+        获取 category_map_cache 列表
         
         Args:
             page: 页码
@@ -1089,7 +1089,7 @@ class CategoryService:
         
         try:
             # 调用 base provider 的分页查询
-            result = self.server_lw_data_provider.load_app_purpose_category(
+            result = self.server_lw_data_provider.load_category_map_cache(
                 page=page,
                 page_size=page_size,
                 search=search,
@@ -1136,7 +1136,7 @@ class CategoryService:
             )
             
         except Exception as e:
-            logger.error(f"获取 app_purpose_category 列表失败: {e}")
+            logger.error(f"获取 category_map_cache 列表失败: {e}")
             raise
     
     def _get_category_state_from_cache(self, category_id: str) -> int:
@@ -1158,14 +1158,14 @@ class CategoryService:
         
         return int(cat_row.iloc[0].get('state', 1))
     
-    def update_app_purpose_category(
+    def update_category_map_cache(
         self, 
         record_id: int, 
         category_id: str, 
         sub_category_id: str | None = None
     ) -> bool:
         """
-        更新 app_purpose_category 记录的分类
+        更新 category_map_cache 记录的分类
         
         Args:
             record_id: 记录ID
@@ -1179,7 +1179,7 @@ class CategoryService:
             # 从缓存获取目标分类的状态
             state = self._get_category_state_from_cache(category_id)
             
-            result = self.server_lw_data_provider.update_app_purpose_category_by_id(
+            result = self.server_lw_data_provider.update_category_map_cache_by_id(
                 record_id=record_id,
                 category_id=category_id,
                 sub_category_id=sub_category_id,
@@ -1187,24 +1187,24 @@ class CategoryService:
             )
             
             if result:
-                logger.info(f"成功更新 app_purpose_category 记录 ID={record_id} 的分类")
+                logger.info(f"成功更新 category_map_cache 记录 ID={record_id} 的分类")
             else:
-                logger.warning(f"未找到 app_purpose_category 记录 ID={record_id}")
+                logger.warning(f"未找到 category_map_cache 记录 ID={record_id}")
             
             return result
             
         except Exception as e:
-            logger.error(f"更新 app_purpose_category 记录失败: {e}")
+            logger.error(f"更新 category_map_cache 记录失败: {e}")
             raise
     
-    def batch_update_app_purpose_category(
+    def batch_update_category_map_cache(
         self,
         record_ids: list[int],
         category_id: str,
         sub_category_id: str | None = None
     ) -> int:
         """
-        批量更新 app_purpose_category 记录的分类
+        批量更新 category_map_cache 记录的分类
         
         Args:
             record_ids: 记录ID列表
@@ -1218,23 +1218,23 @@ class CategoryService:
             # 从缓存获取目标分类的状态
             state = self._get_category_state_from_cache(category_id)
             
-            count = self.server_lw_data_provider.batch_update_app_purpose_category_by_ids(
+            count = self.server_lw_data_provider.batch_update_category_map_cache_by_ids(
                 record_ids=record_ids,
                 category_id=category_id,
                 sub_category_id=sub_category_id,
                 state=state
             )
             
-            logger.info(f"批量更新 {count} 条 app_purpose_category 记录的分类")
+            logger.info(f"批量更新 {count} 条 category_map_cache 记录的分类")
             return count
             
         except Exception as e:
-            logger.error(f"批量更新 app_purpose_category 记录失败: {e}")
+            logger.error(f"批量更新 category_map_cache 记录失败: {e}")
             raise
     
-    def delete_app_purpose_category(self, record_id: int) -> bool:
+    def delete_category_map_cache(self, record_id: int) -> bool:
         """
-        删除 app_purpose_category 记录
+        删除 category_map_cache 记录
         
         Args:
             record_id: 记录ID
@@ -1243,22 +1243,22 @@ class CategoryService:
             bool: 是否删除成功
         """
         try:
-            result = self.server_lw_data_provider.delete_app_purpose_category_by_id(record_id)
+            result = self.server_lw_data_provider.delete_category_map_cache_by_id(record_id)
             
             if result:
-                logger.info(f"成功删除 app_purpose_category 记录 ID={record_id}")
+                logger.info(f"成功删除 category_map_cache 记录 ID={record_id}")
             else:
-                logger.warning(f"未找到 app_purpose_category 记录 ID={record_id}")
+                logger.warning(f"未找到 category_map_cache 记录 ID={record_id}")
             
             return result
             
         except Exception as e:
-            logger.error(f"删除 app_purpose_category 记录失败: {e}")
+            logger.error(f"删除 category_map_cache 记录失败: {e}")
             raise
     
-    def batch_delete_app_purpose_category(self, record_ids: list[int]) -> int:
+    def batch_delete_category_map_cache(self, record_ids: list[int]) -> int:
         """
-        批量删除 app_purpose_category 记录
+        批量删除 category_map_cache 记录
         
         Args:
             record_ids: 记录ID列表
@@ -1267,13 +1267,13 @@ class CategoryService:
             int: 成功删除的数量
         """
         try:
-            count = self.server_lw_data_provider.batch_delete_app_purpose_category_by_ids(record_ids)
+            count = self.server_lw_data_provider.batch_delete_category_map_cache_by_ids(record_ids)
             
-            logger.info(f"批量删除 {count} 条 app_purpose_category 记录")
+            logger.info(f"批量删除 {count} 条 category_map_cache 记录")
             return count
             
         except Exception as e:
-            logger.error(f"批量删除 app_purpose_category 记录失败: {e}")
+            logger.error(f"批量删除 category_map_cache 记录失败: {e}")
             raise
 
 
