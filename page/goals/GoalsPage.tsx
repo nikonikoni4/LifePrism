@@ -53,7 +53,7 @@ const GoalsPage: React.FC = () => {
     ];
 
     return (
-        <div className="flex flex-col h-full -m-6 lg:-m-10 animate-fade-in bg-[#F1F5F9]">
+        <div className="fixed inset-0 lg:left-64 flex flex-col animate-fade-in bg-[#F1F5F9] overflow-hidden">
             {/* 1. Top Header Section (White Desk Surface) */}
             <header className="bg-white border-b border-slate-200 px-10 pt-10 pb-0 z-20 shadow-sm shrink-0">
                 <div className="mb-8 flex flex-col items-start gap-1">
