@@ -1,48 +1,143 @@
-/**
- * Goals Page
- * 
- * 目标管理页面（开发中）
- */
 
-import React from 'react';
-import { Target, Plus } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Edit2 } from 'lucide-react';
+import TodoTabView from './components/TodoTabView';
+import PlanTabView from './components/PlanTabView';
+import GoalTabView from './components/GoalTabView';
+import GoalDetailView from './components/GoalDetailView';
+import RewardTabView from './components/RewardTabView';
+import BeingTabView from './components/BeingTabView';
+import { MOCK_GOALS_LIST } from './api';
+import { UserGoal } from './types';
+
+type TabType = 'todo' | 'plan' | 'goal' | 'reward' | 'being';
 
 const GoalsPage: React.FC = () => {
+    const [activeTab, setActiveTab] = useState<TabType>('todo');
+    const [slogan, setSlogan] = useState('Build a life you don’t need a vacation from.');
+    const [isEditingSlogan, setIsEditingSlogan] = useState(false);
+    const [greeting, setGreeting] = useState('');
+
+    // State for handling Goal Detail View
+    const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+
+    const selectedGoal = useMemo(() =>
+        MOCK_GOALS_LIST.find(g => g.id === selectedGoalId),
+        [selectedGoalId]);
+
+    useEffect(() => {
+        const hour = new Date().getHours();
+        if (hour < 12) setGreeting('Good Morning');
+        else if (hour < 18) setGreeting('Good Afternoon');
+        else setGreeting('Good Evening');
+    }, []);
+
+    // When switching tabs, clear the selected goal to reset view
+    const handleTabChange = (tab: TabType) => {
+        setActiveTab(tab);
+        setSelectedGoalId(null);
+    };
+
+    const handleSaveGoal = (updatedGoal: UserGoal) => {
+        console.log("Saving goal:", updatedGoal);
+        // Here you would typically update the state or call an API
+        setSelectedGoalId(null); // Return to list after save
+    };
+
+    const tabs = [
+        { id: 'todo', label: 'To do list' },
+        { id: 'plan', label: 'Plan' },
+        { id: 'goal', label: 'Goal' },
+        { id: 'reward', label: 'Reward' },
+        { id: 'being', label: 'Being' },
+    ];
+
     return (
-        <div className="max-w-7xl mx-auto animate-fade-in">
-            {/* Page Header */}
-            <header className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
-                    <div className="p-2 bg-green-50 rounded-xl text-green-600">
-                        <Target size={28} />
+        <div className="flex flex-col h-full -m-6 lg:-m-10 animate-fade-in bg-[#F1F5F9]">
+            {/* 1. Top Header Section (White Desk Surface) */}
+            <header className="bg-white border-b border-slate-200 px-10 pt-10 pb-0 z-20 shadow-sm shrink-0">
+                <div className="mb-8 flex flex-col items-start gap-1">
+                    <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
+                        {greeting}, Alex
+                    </h1>
+                    <div className="flex items-center gap-2 group min-h-[24px]">
+                        {isEditingSlogan ? (
+                            <input
+                                autoFocus
+                                type="text"
+                                value={slogan}
+                                onChange={(e) => setSlogan(e.target.value)}
+                                onBlur={() => setIsEditingSlogan(false)}
+                                onKeyDown={(e) => e.key === 'Enter' && setIsEditingSlogan(false)}
+                                className="bg-transparent border-none focus:ring-0 text-slate-500 font-medium italic text-base p-0 placeholder-slate-300 w-full"
+                            />
+                        ) : (
+                            <>
+                                <p className="text-base text-slate-500 font-medium italic">
+                                    "{slogan}"
+                                </p>
+                                <button
+                                    onClick={() => setIsEditingSlogan(true)}
+                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-50 rounded-md transition-all"
+                                >
+                                    <Edit2 size={12} className="text-slate-400" />
+                                </button>
+                            </>
+                        )}
                     </div>
-                    Goals
-                </h1>
-                <p className="text-slate-500 mt-2 font-medium">Set and track your productivity goals.</p>
+                </div>
+
+                {/* Minimal Tabs inside White Header */}
+                <div className="flex gap-10">
+                    {tabs.map((tab) => {
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => handleTabChange(tab.id as TabType)}
+                                className={`py-4 text-xs font-bold uppercase tracking-widest transition-all relative ${isActive
+                                    ? 'text-blue-600'
+                                    : 'text-slate-400 hover:text-slate-600'
+                                    }`}
+                            >
+                                {tab.label}
+                                {isActive && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-blue-600 rounded-full animate-fade-in" />
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
             </header>
 
-            {/* Coming Soon Card */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-12 text-center">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
-                    <Target size={40} className="text-green-500" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800 mb-3">Goals Module Coming Soon</h2>
-                <p className="text-slate-500 max-w-md mx-auto mb-8">
-                    Track your daily, weekly, and monthly productivity goals.
-                    Link activities to goals and visualize your progress.
-                </p>
-                <div className="flex flex-wrap gap-4 justify-center">
-                    <div className="px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 text-sm text-slate-600">
-                        📊 Goal Progress Tracking
+            {/* 2. Main Body Content Area */}
+            <main className="flex-1 flex min-h-0 overflow-hidden">
+                {activeTab === 'todo' && <TodoTabView />}
+
+                {activeTab !== 'todo' && (
+                    <div className="flex-1 overflow-y-auto p-0 no-scrollbar">
+                        {activeTab === 'plan' && <PlanTabView />}
+
+                        <div className="max-w-6xl mx-auto p-10 h-full">
+                            {/* Goal Tab Logic: Toggle between List and Detail */}
+                            {activeTab === 'goal' && (
+                                selectedGoalId && selectedGoal ? (
+                                    <GoalDetailView
+                                        goal={selectedGoal}
+                                        onBack={() => setSelectedGoalId(null)}
+                                        onSave={handleSaveGoal}
+                                    />
+                                ) : (
+                                    <GoalTabView onSelectGoal={setSelectedGoalId} />
+                                )
+                            )}
+
+                            {activeTab === 'reward' && <RewardTabView />}
+                            {activeTab === 'being' && <BeingTabView />}
+                        </div>
                     </div>
-                    <div className="px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 text-sm text-slate-600">
-                        🎯 Category-linked Goals
-                    </div>
-                    <div className="px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 text-sm text-slate-600">
-                        📅 Daily/Weekly/Monthly Views
-                    </div>
-                </div>
-            </div>
+                )}
+            </main>
         </div>
     );
 };
