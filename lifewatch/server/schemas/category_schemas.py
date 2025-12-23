@@ -239,3 +239,138 @@ class ToggleCategoryStateRequest(BaseModel):
     """切换分类状态请求"""
     state: int = Field(..., ge=0, le=1, description="新状态（1: 启用, 0: 禁用）")
 
+
+# ============================================================================
+# AppPurposeCategory 数据展示模型
+# ============================================================================
+
+class AppPurposeCategoryItem(BaseModel):
+    """
+    app_purpose_category 表单条记录展示
+    
+    用于在分类管理页面的新选项卡中展示 AI 分类元数据
+    注意：category 和 sub_category 是通过 ID 映射得到的名称，而非直接从表中读取
+    """
+    # 主键
+    id: int = Field(..., description="记录唯一标识（自增主键）")
+    # 核心展示字段
+    app: str = Field(..., description="应用程序名称（如 chrome.exe）")
+    app_description: str | None = Field(default=None, description="应用程序描述（AI 生成）")
+    title: str = Field(..., description="窗口标题")
+    title_analysis: str | None = Field(default=None, description="标题分析结果（AI 生成）")
+    # 分类信息（映射后的名称）
+    category: str | None = Field(default=None, description="主分类名称（通过 category_id 映射）")
+    sub_category: str | None = Field(default=None, description="子分类名称（通过 sub_category_id 映射）")
+    # 分类 ID（原始值）
+    category_id: str | None = Field(default=None, description="主分类ID（原始值）")
+    sub_category_id: str | None = Field(default=None, description="子分类ID（原始值）")
+    # 其他字段
+    is_multipurpose_app: bool = Field(default=False, description="是否为多用途应用")
+    state: int = Field(default=1, description="记录状态（1: 有效, 0: 无效）")
+    created_at: str | None = Field(default=None, description="创建时间")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "app": "msedge.exe",
+                "app_description": "Microsoft Edge 浏览器，用于网页浏览",
+                "title": "YouTube - 首页",
+                "title_analysis": "用户正在观看 YouTube 视频",
+                "category": "娱乐",
+                "sub_category": "视频",
+                "category_id": "entertainment",
+                "sub_category_id": "video",
+                "is_multipurpose_app": True,
+                "state": 1,
+                "created_at": "2025-12-22T10:30:00"
+            }
+        }
+
+class AppPurposeCategoryResponse(BaseModel):
+    """GET /category/app-purpose 响应"""
+    data: List[AppPurposeCategoryItem] = Field(..., description="数据列表")
+    total: int = Field(..., description="总记录数")
+    page: int = Field(..., description="当前页码")
+    page_size: int = Field(..., description="每页记录数")
+    total_pages: int = Field(..., description="总页数")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "data": [
+                    {
+                        "app": "msedge.exe",
+                        "app_description": "Microsoft Edge 浏览器",
+                        "title": "YouTube",
+                        "title_analysis": "视频观看",
+                        "category": "娱乐",
+                        "sub_category": "视频"
+                    }
+                ],
+                "total": 100,
+                "page": 1,
+                "page_size": 50,
+                "total_pages": 2
+            }
+        }
+
+
+# ============================================================================
+# AppPurposeCategory 更新/删除请求模型
+# ============================================================================
+
+class UpdateAppPurposeCategoryRequest(BaseModel):
+    """更新 app_purpose_category 记录请求"""
+    id: int = Field(..., description="记录ID")
+    category_id: str = Field(..., description="新的主分类ID")
+    sub_category_id: str | None = Field(default=None, description="新的子分类ID")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "category_id": "cat-124",
+                "sub_category_id": "subcat-124"
+            }
+        }
+
+
+class BatchUpdateAppPurposeCategoryRequest(BaseModel):
+    """批量更新 app_purpose_category 记录请求"""
+    ids: List[int] = Field(..., description="记录ID列表", min_length=1)
+    category_id: str = Field(..., description="新的主分类ID")
+    sub_category_id: str | None = Field(default=None, description="新的子分类ID")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "ids": [1, 2, 3],
+                "category_id": "cat-124",
+                "sub_category_id": "subcat-124"
+            }
+        }
+
+
+class DeleteAppPurposeCategoryRequest(BaseModel):
+    """删除 app_purpose_category 记录请求"""
+    id: int = Field(..., description="记录ID")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": 1
+            }
+        }
+
+
+class BatchDeleteAppPurposeCategoryRequest(BaseModel):
+    """批量删除 app_purpose_category 记录请求"""
+    ids: List[int] = Field(..., description="记录ID列表", min_length=1)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "ids": [1, 2, 3]
+            }
+        }

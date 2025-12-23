@@ -706,7 +706,121 @@ class ServerLWDataProvider(LWBaseDataProvider):
             }
         
         return usage_dict
+    
+    # ==================== app_purpose_category 表 操作 ====================
+    
+    def update_app_purpose_category_by_id(
+        self, 
+        record_id: int,
+        category_id: str,
+        sub_category_id: str | None,
+        state: int
+    ) -> bool:
+        """
+        通过 ID 更新单条 app_purpose_category 记录的分类
         
+        Args:
+            record_id: 记录的自增主键 ID
+            category_id: 新的主分类ID
+            sub_category_id: 新的子分类ID
+            state: 新状态（由 Service 层根据目标分类计算）
+        
+        Returns:
+            bool: 是否更新成功
+        """
+        sql = """
+        UPDATE app_purpose_category 
+        SET category_id = ?, sub_category_id = ?, state = ?
+        WHERE id = ?
+        """
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (category_id, sub_category_id, state, record_id))
+            conn.commit()
+            return cursor.rowcount > 0
+    
+    def batch_update_app_purpose_category_by_ids(
+        self, 
+        record_ids: list[int],
+        category_id: str,
+        sub_category_id: str | None,
+        state: int
+    ) -> int:
+        """
+        批量通过 ID 更新 app_purpose_category 记录的分类
+        
+        Args:
+            record_ids: 记录的 ID 列表
+            category_id: 新的主分类ID
+            sub_category_id: 新的子分类ID
+            state: 新状态（由 Service 层根据目标分类计算）
+        
+        Returns:
+            int: 成功更新的数量
+        """
+        if not record_ids:
+            return 0
+        
+        placeholders = ",".join("?" * len(record_ids))
+        sql = f"""
+        UPDATE app_purpose_category 
+        SET category_id = ?, sub_category_id = ?, state = ?
+        WHERE id IN ({placeholders})
+        """
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (category_id, sub_category_id, state, *record_ids))
+            conn.commit()
+            return cursor.rowcount
+    
+    def delete_app_purpose_category_by_id(
+        self, 
+        record_id: int
+    ) -> bool:
+        """
+        通过 ID 删除单条 app_purpose_category 记录
+        
+        Args:
+            record_id: 记录的自增主键 ID
+        
+        Returns:
+            bool: 是否删除成功
+        """
+        sql = "DELETE FROM app_purpose_category WHERE id = ?"
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (record_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+    
+    def batch_delete_app_purpose_category_by_ids(
+        self, 
+        record_ids: list[int]
+    ) -> int:
+        """
+        批量通过 ID 删除 app_purpose_category 记录
+        
+        Args:
+            record_ids: 记录的 ID 列表
+        
+        Returns:
+            int: 成功删除的数量
+        """
+        if not record_ids:
+            return 0
+        
+        placeholders = ",".join("?" * len(record_ids))
+        sql = f"DELETE FROM app_purpose_category WHERE id IN ({placeholders})"
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, record_ids)
+            conn.commit()
+            return cursor.rowcount
+
 
 # ==================== 模块级单例（懒加载） ====================
 from lifewatch.utils import LazySingleton

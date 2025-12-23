@@ -53,10 +53,10 @@ class ActivityStatsIncludeOptions(BaseModel):
 
 class DailyActivitiesData(BaseModel):
     """每日活动数据项"""
-    date: str = Field(..., description="日期（YYYY-MM-DD 格式）", alias="date")
-    duration: int = Field(..., description="活动时长（秒）", alias="duration")
-    percentage: int = Field(..., description="活动时长占比（%）", alias="activeTimePercentage")
-    color: str = Field(..., description="分类颜色（十六进制格式）", alias="color")
+    date: str = Field(..., description="日期（YYYY-MM-DD 格式）", serialization_alias="date")
+    duration: int = Field(..., description="活动时长（秒）", serialization_alias="duration")
+    active_time_percentage: int = Field(..., description="活动时长占比（%）", serialization_alias="activeTimePercentage")
+    color: str = Field(..., description="分类颜色（十六进制格式）", serialization_alias="color")
     class Config:
         populate_by_name = True
 from lifewatch.server.schemas.category_schemas import CategoryTreeItem

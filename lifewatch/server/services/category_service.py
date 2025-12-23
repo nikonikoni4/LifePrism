@@ -1060,6 +1060,222 @@ class CategoryService:
             logger.error(f"启用子分类记录失败: {e}")
             raise
 
+    # ==================== app_purpose_category 数据管理 ====================
+    
+    def get_app_purpose_category_list(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+        search: str | None = None,
+        state: int | None = None
+    ):
+        """
+        获取 app_purpose_category 列表
+        
+        Args:
+            page: 页码
+            page_size: 每页数量
+            search: 搜索关键词
+            state: 状态筛选
+        
+        Returns:
+            AppPurposeCategoryResponse: 分页响应
+        """
+        from lifewatch.server.schemas.category_schemas import (
+            AppPurposeCategoryItem,
+            AppPurposeCategoryResponse
+        )
+        import math
+        
+        try:
+            # 调用 base provider 的分页查询
+            result = self.server_lw_data_provider.load_app_purpose_category(
+                page=page,
+                page_size=page_size,
+                search=search,
+                state=state
+            )
+            
+            # 分页查询返回 (df, total) 元组
+            df, total = result
+            
+            # 构建响应数据
+            items = []
+            if df is not None and not df.empty:
+                for _, row in df.iterrows():
+                    # 映射 category_id 和 sub_category_id 到名称
+                    category_id = row.get('category_id')
+                    sub_category_id = row.get('sub_category_id')
+                    
+                    category_name = self.category_name_map.get(str(category_id), None) if category_id else None
+                    sub_category_name = self.sub_category_name_map.get(str(sub_category_id), None) if sub_category_id else None
+                    
+                    items.append(AppPurposeCategoryItem(
+                        id=int(row['id']),
+                        app=row['app'],
+                        app_description=row.get('app_description'),
+                        title=row['title'],
+                        title_analysis=row.get('title_analysis'),
+                        category=category_name,
+                        sub_category=sub_category_name,
+                        category_id=str(category_id) if category_id else None,
+                        sub_category_id=str(sub_category_id) if sub_category_id else None,
+                        is_multipurpose_app=bool(row.get('is_multipurpose_app', 0)),
+                        state=int(row.get('state', 1)),
+                        created_at=str(row.get('created_at')) if row.get('created_at') else None
+                    ))
+            
+            total_pages = math.ceil(total / page_size) if total > 0 else 1
+            
+            return AppPurposeCategoryResponse(
+                data=items,
+                total=total,
+                page=page,
+                page_size=page_size,
+                total_pages=total_pages
+            )
+            
+        except Exception as e:
+            logger.error(f"获取 app_purpose_category 列表失败: {e}")
+            raise
+    
+    def _get_category_state_from_cache(self, category_id: str) -> int:
+        """
+        从缓存获取分类的状态
+        
+        Args:
+            category_id: 主分类ID
+        
+        Returns:
+            int: 分类状态（1: 启用, 0: 禁用），默认返回 1
+        """
+        if self._categories_df is None or self._categories_df.empty:
+            return 1
+        
+        cat_row = self._categories_df[self._categories_df['id'] == category_id]
+        if cat_row.empty:
+            return 1
+        
+        return int(cat_row.iloc[0].get('state', 1))
+    
+    def update_app_purpose_category(
+        self, 
+        record_id: int, 
+        category_id: str, 
+        sub_category_id: str | None = None
+    ) -> bool:
+        """
+        更新 app_purpose_category 记录的分类
+        
+        Args:
+            record_id: 记录ID
+            category_id: 新的主分类ID
+            sub_category_id: 新的子分类ID
+        
+        Returns:
+            bool: 是否更新成功
+        """
+        try:
+            # 从缓存获取目标分类的状态
+            state = self._get_category_state_from_cache(category_id)
+            
+            result = self.server_lw_data_provider.update_app_purpose_category_by_id(
+                record_id=record_id,
+                category_id=category_id,
+                sub_category_id=sub_category_id,
+                state=state
+            )
+            
+            if result:
+                logger.info(f"成功更新 app_purpose_category 记录 ID={record_id} 的分类")
+            else:
+                logger.warning(f"未找到 app_purpose_category 记录 ID={record_id}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"更新 app_purpose_category 记录失败: {e}")
+            raise
+    
+    def batch_update_app_purpose_category(
+        self,
+        record_ids: list[int],
+        category_id: str,
+        sub_category_id: str | None = None
+    ) -> int:
+        """
+        批量更新 app_purpose_category 记录的分类
+        
+        Args:
+            record_ids: 记录ID列表
+            category_id: 新的主分类ID
+            sub_category_id: 新的子分类ID
+        
+        Returns:
+            int: 成功更新的数量
+        """
+        try:
+            # 从缓存获取目标分类的状态
+            state = self._get_category_state_from_cache(category_id)
+            
+            count = self.server_lw_data_provider.batch_update_app_purpose_category_by_ids(
+                record_ids=record_ids,
+                category_id=category_id,
+                sub_category_id=sub_category_id,
+                state=state
+            )
+            
+            logger.info(f"批量更新 {count} 条 app_purpose_category 记录的分类")
+            return count
+            
+        except Exception as e:
+            logger.error(f"批量更新 app_purpose_category 记录失败: {e}")
+            raise
+    
+    def delete_app_purpose_category(self, record_id: int) -> bool:
+        """
+        删除 app_purpose_category 记录
+        
+        Args:
+            record_id: 记录ID
+        
+        Returns:
+            bool: 是否删除成功
+        """
+        try:
+            result = self.server_lw_data_provider.delete_app_purpose_category_by_id(record_id)
+            
+            if result:
+                logger.info(f"成功删除 app_purpose_category 记录 ID={record_id}")
+            else:
+                logger.warning(f"未找到 app_purpose_category 记录 ID={record_id}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"删除 app_purpose_category 记录失败: {e}")
+            raise
+    
+    def batch_delete_app_purpose_category(self, record_ids: list[int]) -> int:
+        """
+        批量删除 app_purpose_category 记录
+        
+        Args:
+            record_ids: 记录ID列表
+        
+        Returns:
+            int: 成功删除的数量
+        """
+        try:
+            count = self.server_lw_data_provider.batch_delete_app_purpose_category_by_ids(record_ids)
+            
+            logger.info(f"批量删除 {count} 条 app_purpose_category 记录")
+            return count
+            
+        except Exception as e:
+            logger.error(f"批量删除 app_purpose_category 记录失败: {e}")
+            raise
+
 
 if __name__ == "__main__":
     from datetime import datetime, timedelta

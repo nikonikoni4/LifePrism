@@ -10,6 +10,11 @@ ACTIVITYWATCH_DB_PATH = r"C:\Users\15535\AppData\Local\activitywatch\activitywat
 APP_PURPOSE_CATEGORY_CONFIG = {
     'table_name': 'app_purpose_category',
     'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键，用于删除操作'
+        },
         'app': {
             'type': 'TEXT',
             'constraints': ['NOT NULL'],
@@ -61,7 +66,7 @@ APP_PURPOSE_CATEGORY_CONFIG = {
             'comment': '记录状态（1: 有效, 0: 无效/分类被禁用）'
         }
     },
-    'table_constraints': ['PRIMARY KEY (app, title,state)'],  # 表级约束：复合主键
+    'table_constraints': ['UNIQUE (app, title, state)'],  # 唯一约束：保证数据不重复
     'indexes': [],
     'timestamps': True  # 自动添加 created_at, updated_at
 }

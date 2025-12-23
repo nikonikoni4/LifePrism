@@ -21,7 +21,14 @@ from lifewatch.server.schemas.category_schemas import (
     DeleteCategoryRequest,
     CreateSubCategoryRequest,
     UpdateSubCategoryRequest,
-    ToggleCategoryStateRequest
+    ToggleCategoryStateRequest,
+    # AppPurposeCategory 相关
+    AppPurposeCategoryItem,
+    AppPurposeCategoryResponse,
+    UpdateAppPurposeCategoryRequest,
+    BatchUpdateAppPurposeCategoryRequest,
+    DeleteAppPurposeCategoryRequest,
+    BatchDeleteAppPurposeCategoryRequest
 )
 from lifewatch.server.schemas.common_schemas import StandardResponse
 from lifewatch.server.services import category_service
@@ -362,3 +369,131 @@ async def toggle_sub_category_state(
         logger.error(f"切换子分类状态失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"切换子分类状态失败: {str(e)}")
 
+
+# ============================================================================
+# /app_purpose_category - 分类缓存表接口
+# ============================================================================
+
+@router.get("/app_purpose", response_model=AppPurposeCategoryResponse, summary="获取分类缓存列表")
+async def get_app_purpose_category_list(
+    page: int = Query(default=1, ge=1, description="页码"),
+    page_size: int = Query(default=50, ge=1, le=200, description="每页数量"),
+    search: Optional[str] = Query(default=None, description="搜索关键词（匹配 app 或 title）"),
+    state: Optional[int] = Query(default=None, ge=0, le=1, description="按状态筛选"),
+):
+    """
+    获取 app_purpose_category 分类缓存列表
+    
+    支持分页、搜索和状态筛选
+    """
+    try:
+        # 调用 Service 层获取数据
+        result = category_service.get_app_purpose_category_list(
+            page=page,
+            page_size=page_size,
+            search=search,
+            state=state
+        )
+        return result
+    except Exception as e:
+        logger.error(f"获取分类缓存列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取分类缓存列表失败: {str(e)}")
+
+
+# 注意：静态路径路由必须放在动态路径路由之前，否则 "batch" 会被错误解析为 record_id
+@router.put("/app_purpose/batch", response_model=StandardResponse, summary="批量更新分类缓存记录")
+async def batch_update_app_purpose_category(
+    request: BatchUpdateAppPurposeCategoryRequest
+):
+    """
+    批量更新 app_purpose_category 记录的分类
+    
+    - 更新时会自动同步目标分类的 state 状态
+    """
+    try:
+        count = category_service.batch_update_app_purpose_category(
+            record_ids=request.ids,
+            category_id=request.category_id,
+            sub_category_id=request.sub_category_id
+        )
+        return StandardResponse(
+            success=True,
+            data={"updated_count": count},
+            message=f"成功更新 {count} 条记录"
+        )
+    except Exception as e:
+        logger.error(f"批量更新分类缓存记录失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"批量更新分类缓存记录失败: {str(e)}")
+
+
+@router.put("/app_purpose/{record_id}", response_model=StandardResponse, summary="更新分类缓存记录")
+async def update_app_purpose_category(
+    record_id: int = Path(..., description="记录ID"),
+    request: UpdateAppPurposeCategoryRequest = ...
+):
+    """
+    更新单条 app_purpose_category 记录的分类
+    
+    - 更新时会自动同步目标分类的 state 状态
+    """
+    try:
+        success = category_service.update_app_purpose_category(
+            record_id=record_id,
+            category_id=request.category_id,
+            sub_category_id=request.sub_category_id
+        )
+        if not success:
+            raise HTTPException(status_code=404, detail=f"记录 ID={record_id} 不存在")
+        return StandardResponse(
+            success=True,
+            data={"updated": True},
+            message=f"记录 ID={record_id} 更新成功"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新分类缓存记录失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"更新分类缓存记录失败: {str(e)}")
+
+
+# 同样，DELETE 的 batch 路由也需要放在动态路径之前
+@router.delete("/app_purpose/batch", response_model=StandardResponse, summary="批量删除分类缓存记录")
+async def batch_delete_app_purpose_category(
+    request: BatchDeleteAppPurposeCategoryRequest
+):
+    """
+    批量删除 app_purpose_category 记录
+    """
+    try:
+        count = category_service.batch_delete_app_purpose_category(record_ids=request.ids)
+        return StandardResponse(
+            success=True,
+            data={"deleted_count": count},
+            message=f"成功删除 {count} 条记录"
+        )
+    except Exception as e:
+        logger.error(f"批量删除分类缓存记录失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"批量删除分类缓存记录失败: {str(e)}")
+
+
+@router.delete("/app_purpose/{record_id}", response_model=StandardResponse, summary="删除分类缓存记录")
+async def delete_app_purpose_category(
+    record_id: int = Path(..., description="记录ID")
+):
+    """
+    删除单条 app_purpose_category 记录
+    """
+    try:
+        success = category_service.delete_app_purpose_category(record_id=record_id)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"记录 ID={record_id} 不存在")
+        return StandardResponse(
+            success=True,
+            data={"deleted": True},
+            message=f"记录 ID={record_id} 删除成功"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除分类缓存记录失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"删除分类缓存记录失败: {str(e)}")

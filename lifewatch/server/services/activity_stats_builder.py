@@ -109,7 +109,7 @@ def build_activity_summary(
         daily_activities.append(DailyActivitiesData(
             date=date_str,
             duration=duration,
-            percentage=percentage,
+            active_time_percentage=percentage,
             color=filter_color or default_color
         ))
     
