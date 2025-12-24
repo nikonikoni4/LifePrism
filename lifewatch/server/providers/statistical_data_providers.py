@@ -707,6 +707,125 @@ class ServerLWDataProvider(LWBaseDataProvider):
         
         return usage_dict
     
+    def get_all_tokens_usage(self) -> dict:
+        """
+        获取全部token使用汇总（不限日期范围）
+        
+        Returns:
+            dict: 全部使用统计
+                {
+                    "input_tokens": 总输入tokens,
+                    "output_tokens": 总输出tokens,
+                    "total_tokens": 总tokens,
+                    "result_items_count": 总处理项目数
+                }
+        """
+        sql = """
+        SELECT 
+            SUM(input_tokens) as input_tokens,
+            SUM(output_tokens) as output_tokens,
+            SUM(total_tokens) as total_tokens,
+            SUM(result_items_count) as result_items_count
+        FROM tokens_usage_log
+        """
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            row = cursor.fetchone()
+        
+        return {
+            "input_tokens": row[0] if row[0] is not None else 0,
+            "output_tokens": row[1] if row[1] is not None else 0,
+            "total_tokens": row[2] if row[2] is not None else 0,
+            "result_items_count": row[3] if row[3] is not None else 0
+        }
+    
+    def get_tokens_usage_by_mode(self, date: str = None,
+                                  start_time: str = None, 
+                                  end_time: str = None,
+                                  mode: str = None) -> dict[str, dict]:
+        """
+        获取按 mode 分组的 token 使用汇总
+        
+        Args:
+            date: 日期（YYYY-MM-DD 格式）
+            start_time: 开始时间（可选，YYYY-MM-DD HH:MM:SS 格式）
+            end_time: 结束时间（可选，YYYY-MM-DD HH:MM:SS 格式）
+            mode: 筛选特定的 mode（可选，如 'classification'）
+        
+        Returns:
+            dict[str, dict]: mode 到使用统计的映射，例如 
+                {
+                    "classification": {
+                        "input_tokens": 800,
+                        "output_tokens": 700,
+                        "total_tokens": 1500,
+                        "result_items_count": 25
+                    }
+                }
+        """
+        # 1. 确定时间范围
+        params = []
+        where_conditions = []
+        
+        if date:
+            self.current_date = date
+            where_conditions.append("created_at >= ? AND created_at <= ?")
+            params.extend([self._start_time, self._end_time])
+        elif start_time and end_time:
+            where_conditions.append("created_at >= ? AND created_at <= ?")
+            params.extend([start_time, end_time])
+        # 如果都不提供，则查询全部数据
+        
+        if mode:
+            where_conditions.append("mode = ?")
+            params.append(mode)
+        
+        # 2. 构建SQL查询
+        where_clause = " WHERE " + " AND ".join(where_conditions) if where_conditions else ""
+        
+        sql = f"""
+        SELECT 
+            mode,
+            SUM(input_tokens) as input_tokens,
+            SUM(output_tokens) as output_tokens,
+            SUM(total_tokens) as total_tokens,
+            SUM(result_items_count) as result_items_count
+        FROM tokens_usage_log
+        {where_clause}
+        GROUP BY mode
+        """
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            results = cursor.fetchall()
+        
+        # 3. 转换为字典格式
+        usage_dict = {}
+        for row in results:
+            usage_dict[row[0]] = {
+                "input_tokens": row[1] if row[1] is not None else 0,
+                "output_tokens": row[2] if row[2] is not None else 0,
+                "total_tokens": row[3] if row[3] is not None else 0,
+                "result_items_count": row[4] if row[4] is not None else 0
+            }
+        
+        return usage_dict
+    
+    def get_all_tokens_usage_by_mode(self, mode: str = None) -> dict[str, dict]:
+        """
+        获取全部token使用汇总（不限日期范围），按 mode 分组
+        
+        Args:
+            mode: 筛选特定的 mode（可选，如 'classification'）
+        
+        Returns:
+            dict[str, dict]: mode 到使用统计的映射
+        """
+        return self.get_tokens_usage_by_mode(mode=mode)
+    
     # ==================== category_map_cache 表 操作 ====================
     
     def update_category_map_cache_by_id(
