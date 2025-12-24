@@ -372,8 +372,8 @@ const TodoTabView: React.FC = () => {
                     <div className="flex items-center gap-3 mb-6">
                         <h3 className="text-lg font-black text-slate-800 tracking-tight">Today's Focus</h3>
                         <span className={`text-sm font-medium px-3 py-1 rounded-full ${dailyFocusContent
-                                ? 'bg-blue-50 text-blue-600 border border-blue-100'
-                                : 'bg-slate-50 text-slate-400 border border-slate-100'
+                            ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                            : 'bg-slate-50 text-slate-400 border border-slate-100'
                             }`}>
                             {dailyFocusContent || '未设置今日重点'}
                         </span>
@@ -537,7 +537,7 @@ const TodoTabView: React.FC = () => {
                                 >
                                     <option value="">无</option>
                                     {MOCK_GOALS_LIST.map(g => (
-                                        <option key={g.id} value={g.id}>{g.alias || g.name}</option>
+                                        <option key={g.id} value={g.id}>{g.abstract || g.name}</option>
                                     ))}
                                 </select>
                             </div>

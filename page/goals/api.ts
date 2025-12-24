@@ -1,5 +1,5 @@
 
-import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse } from "./types";
+import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse, CreateGoalRequest, UpdateGoalRequest, GoalListResponse, CategoryTreeResponse } from "./types";
 
 const API_BASE = '/api/v2/goal';
 
@@ -194,6 +194,92 @@ export const planApi = {
 };
 
 // ============================================================================
+// Goal API - 真实后端接口
+// ============================================================================
+
+const CATEGORY_API_BASE = '/api/v2/category';
+
+export const goalApi = {
+    // 获取目标列表
+    getGoals: async (params?: {
+        status?: string;
+        categoryId?: string;
+        page?: number;
+        pageSize?: number;
+    }): Promise<GoalListResponse> => {
+        const queryParams = new URLSearchParams();
+        if (params?.status) queryParams.append('status', params.status);
+        if (params?.categoryId) queryParams.append('category_id', params.categoryId);
+        if (params?.page) queryParams.append('page', params.page.toString());
+        if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString());
+
+        const queryString = queryParams.toString();
+        const url = queryString ? `${API_BASE}/goals?${queryString}` : `${API_BASE}/goals`;
+        const res = await fetch(url);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 获取目标详情
+    getGoalDetail: async (id: number): Promise<UserGoal> => {
+        const res = await fetch(`${API_BASE}/goals/${id}`);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 创建目标
+    createGoal: async (data: CreateGoalRequest): Promise<UserGoal> => {
+        const res = await fetch(`${API_BASE}/goals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toSnakeCase(data))
+        });
+        const result = await res.json();
+        return toCamelCase(result);
+    },
+
+    // 更新目标
+    updateGoal: async (id: number, data: UpdateGoalRequest): Promise<UserGoal> => {
+        const res = await fetch(`${API_BASE}/goals/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toSnakeCase(data))
+        });
+        const result = await res.json();
+        return toCamelCase(result);
+    },
+
+    // 删除目标
+    deleteGoal: async (id: number): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/goals/${id}`, { method: 'DELETE' });
+        return res.ok;
+    },
+
+    // 重排序目标
+    reorderGoals: async (goalIds: number[]): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/goals/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ goal_ids: goalIds })
+        });
+        return res.ok;
+    }
+};
+
+// ============================================================================
+// Category API - 真实后端接口
+// ============================================================================
+
+export const categoryApi = {
+    // 获取分类树形结构
+    getCategoryTree: async (depth: number = 2): Promise<CategoryTreeResponse> => {
+        const res = await fetch(`${CATEGORY_API_BASE}/tree?depth=${depth}`);
+        const data = await res.json();
+        return toCamelCase(data);
+    }
+};
+
+// ============================================================================
 // Mock Data (保留用于其他组件)
 // ============================================================================
 
@@ -207,28 +293,9 @@ export const COLORS = {
     UNTRACKED: '#E5E7EB'
 };
 
-export const MOCK_GOALS_LIST: UserGoal[] = [
-    {
-        id: 'g1',
-        name: 'Master React 19',
-        alias: 'React Ninja',
-        content: 'Learn all new features including Server Components and Actions.',
-        createdAt: '2025-01-01',
-        expectedFinishedAt: '2025-03-01',
-        expectedEndAt: '2025-03-15',
-        estimatedDuration: '60h'
-    },
-    {
-        id: 'g2',
-        name: 'Build SaaS Dashboard',
-        alias: 'Profit Mode',
-        content: 'Launch a fully functional analytics dashboard for small businesses.',
-        createdAt: '2025-01-10',
-        expectedFinishedAt: '2025-04-01',
-        expectedEndAt: '2025-04-10',
-        estimatedDuration: '120h'
-    },
-];
+// MOCK_GOALS_LIST 已弃用，使用 goalApi.getGoals() 替代
+// 保留空数组导出以兼容其他组件（RewardTabView, TodoTabView），待后续迭代更新
+export const MOCK_GOALS_LIST: UserGoal[] = [];
 
 export const MOCK_TODOS: GoalItem[] = [
     {

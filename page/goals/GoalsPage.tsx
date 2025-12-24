@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Edit2 } from 'lucide-react';
 import TodoTabView from './components/TodoTabView';
 import PlanTabView from './components/PlanTabView';
@@ -7,23 +7,18 @@ import GoalTabView from './components/GoalTabView';
 import GoalDetailView from './components/GoalDetailView';
 import RewardTabView from './components/RewardTabView';
 import BeingTabView from './components/BeingTabView';
-import { MOCK_GOALS_LIST } from './api';
 import { UserGoal } from './types';
 
 type TabType = 'todo' | 'plan' | 'goal' | 'reward' | 'being';
 
 const GoalsPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabType>('todo');
-    const [slogan, setSlogan] = useState('Build a life you don’t need a vacation from.');
+    const [slogan, setSlogan] = useState("Build a life you don't need a vacation from.");
     const [isEditingSlogan, setIsEditingSlogan] = useState(false);
     const [greeting, setGreeting] = useState('');
 
-    // State for handling Goal Detail View
-    const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
-
-    const selectedGoal = useMemo(() =>
-        MOCK_GOALS_LIST.find(g => g.id === selectedGoalId),
-        [selectedGoalId]);
+    // State for handling Goal Detail View - now uses number ID
+    const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
 
     useEffect(() => {
         const hour = new Date().getHours();
@@ -39,8 +34,7 @@ const GoalsPage: React.FC = () => {
     };
 
     const handleSaveGoal = (updatedGoal: UserGoal) => {
-        console.log("Saving goal:", updatedGoal);
-        // Here you would typically update the state or call an API
+        console.log("Goal saved:", updatedGoal);
         setSelectedGoalId(null); // Return to list after save
     };
 
@@ -120,9 +114,9 @@ const GoalsPage: React.FC = () => {
                         <div className="max-w-6xl mx-auto p-10 h-full">
                             {/* Goal Tab Logic: Toggle between List and Detail */}
                             {activeTab === 'goal' && (
-                                selectedGoalId && selectedGoal ? (
+                                selectedGoalId !== null ? (
                                     <GoalDetailView
-                                        goal={selectedGoal}
+                                        goalId={selectedGoalId}
                                         onBack={() => setSelectedGoalId(null)}
                                         onSave={handleSaveGoal}
                                     />

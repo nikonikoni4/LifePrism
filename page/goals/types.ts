@@ -85,15 +85,73 @@ export interface GoalItem {
 }
 
 export interface UserGoal {
+    id: number;
+    name: string;
+    abstract?: string;
+    content: string;
+    color: string;
+    createdAt: string;
+    linkToCategory?: string;      // 分类名称 (非 ID)
+    linkToSubCategory?: string;   // 子分类名称 (非 ID)
+    linkToRewardId?: number;
+    expectedFinishedAt?: string;
+    expectedHours?: number;
+    actualFinishedAt?: string;
+    actualHours?: number;
+    completionRate: number;
+    status: 'active' | 'completed' | 'archived';
+    orderIndex: number;
+}
+
+export interface CreateGoalRequest {
+    name: string;
+    abstract?: string;
+    content?: string;
+    color?: string;
+    linkToCategoryId?: string;
+    linkToSubCategoryId?: string;
+    expectedFinishedAt?: string;
+    expectedHours?: number;
+}
+
+export interface UpdateGoalRequest {
+    name?: string;
+    abstract?: string;
+    content?: string;
+    color?: string;
+    linkToCategoryId?: string;
+    linkToSubCategoryId?: string;
+    expectedFinishedAt?: string;
+    expectedHours?: number;
+    actualFinishedAt?: string;
+    actualHours?: number;
+    completionRate?: number;
+    status?: 'active' | 'completed' | 'archived';
+}
+
+export interface GoalListResponse {
+    items: UserGoal[];
+    total: number;
+}
+
+// Category Types (匹配后端 CategoryTreeItem)
+export interface SubCategoryTreeItem {
     id: string;
     name: string;
-    alias?: string;
-    content: string;
-    createdAt: string;
-    expectedFinishedAt: string;
-    expectedEndAt: string;
-    estimatedDuration: string; // e.g. "40 hours"
-    categoryId?: string;
+    color: string;
+    state: number;
+}
+
+export interface CategoryTreeItem {
+    id: string;
+    name: string;
+    color: string;
+    state: number;
+    subcategories?: SubCategoryTreeItem[];
+}
+
+export interface CategoryTreeResponse {
+    data: CategoryTreeItem[];
 }
 
 export interface DailyPlan {

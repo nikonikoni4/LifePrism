@@ -81,7 +81,7 @@ const RewardFormModal: React.FC<RewardFormModalProps> = ({
                             >
                                 <option value="" disabled>Select a Goal</option>
                                 {goals.map(g => (
-                                    <option key={g.id} value={g.id}>{g.alias || g.name}</option>
+                                    <option key={g.id} value={g.id}>{g.abstract || g.name}</option>
                                 ))}
                             </select>
                             <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
@@ -205,8 +205,8 @@ const RewardTabView: React.FC = () => {
                             key={idx}
                             onClick={() => setSelectedRewardIndex(idx)}
                             className={`group relative p-6 rounded-[2rem] border cursor-pointer transition-all duration-300 ${isSelected
-                                    ? 'bg-[#EBF6FF] border-blue-200 shadow-xl scale-[1.02]'
-                                    : 'bg-white border-slate-200 hover:border-blue-200 hover:shadow-lg'
+                                ? 'bg-[#EBF6FF] border-blue-200 shadow-xl scale-[1.02]'
+                                : 'bg-white border-slate-200 hover:border-blue-200 hover:shadow-lg'
                                 }`}
                         >
                             <div className="flex justify-between items-start mb-6">
@@ -222,8 +222,8 @@ const RewardTabView: React.FC = () => {
                                     <button
                                         onClick={(e) => handleEdit(idx, e)}
                                         className={`p-2 rounded-full transition-all ${isSelected
-                                                ? 'text-blue-400 hover:bg-white hover:text-blue-600'
-                                                : 'text-slate-300 hover:bg-slate-100 hover:text-slate-600 opacity-0 group-hover:opacity-100'
+                                            ? 'text-blue-400 hover:bg-white hover:text-blue-600'
+                                            : 'text-slate-300 hover:bg-slate-100 hover:text-slate-600 opacity-0 group-hover:opacity-100'
                                             }`}
                                     >
                                         <Edit2 size={16} />
@@ -236,7 +236,7 @@ const RewardTabView: React.FC = () => {
                             </h4>
                             <div className={`flex items-center gap-2 text-xs font-medium ${isSelected ? 'text-blue-500' : 'text-slate-500'}`}>
                                 <Target size={14} />
-                                <span>{goal?.alias || 'Unknown Goal'}</span>
+                                <span>{goal?.abstract || goal?.name || 'Unknown Goal'}</span>
                             </div>
                         </div>
                     );
