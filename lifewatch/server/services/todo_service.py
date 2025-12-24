@@ -43,6 +43,10 @@ def get_todos(date: str, include_cross_day: bool = True) -> TodoListResponse:
     Returns:
         TodoListResponse: 任务列表响应
     """
+    # 获取日计划重点
+    daily_focus = todo_provider.get_daily_focus(date)
+    daily_focus_content = daily_focus['content'] if daily_focus else None
+    
     todos_data = todo_provider.get_todos_by_date(date, include_cross_day)
     
     items = []
@@ -74,7 +78,7 @@ def get_todos(date: str, include_cross_day: bool = True) -> TodoListResponse:
             sub_items=sub_items if sub_items else None
         ))
     
-    return TodoListResponse(items=items)
+    return TodoListResponse(daily_focus_content=daily_focus_content, items=items)
 
 
 def get_todo_detail(todo_id: int) -> Optional[TodoListItem]:

@@ -22,8 +22,15 @@ from lifewatch.server.schemas.goal_schemas import (
     MonthlyPlanItem,
     UpsertDailyFocusRequest,
     UpsertWeeklyFocusRequest,
+    # Goal Schemas
+    GoalItem,
+    GoalListResponse,
+    CreateGoalRequest,
+    UpdateGoalRequest,
+    ReorderGoalRequest,
 )
 from lifewatch.server.services import todo_service
+from lifewatch.server.services import goal_service
 
 router = APIRouter(prefix="/goal", tags=["Goal - TodoList"])
 
@@ -267,3 +274,115 @@ async def upsert_weekly_focus(request: UpsertWeeklyFocusRequest):
     if not success:
         raise HTTPException(status_code=500, detail="更新周焦点失败")
     return {"success": True}
+
+
+# ============================================================================
+# Goal 接口
+# ============================================================================
+
+@router.get("/goals", response_model=GoalListResponse)
+async def get_goals(
+    status: Optional[str] = Query(default=None, description="按状态筛选 (active, completed, archived)"),
+    category_id: Optional[str] = Query(default=None, description="按分类筛选"),
+    page: int = Query(default=1, ge=1, description="页码"),
+    page_size: int = Query(default=20, ge=1, le=100, description="每页数量")
+):
+    """
+    获取目标列表
+    
+    - **status**: 按状态筛选（可选）
+    - **category_id**: 按分类筛选（可选）
+    - **page**: 页码，从1开始
+    - **page_size**: 每页数量，最大100
+    """
+    return goal_service.get_goals(status, category_id, page, page_size)
+
+
+@router.post("/goals", response_model=GoalItem)
+async def create_goal(request: CreateGoalRequest):
+    """
+    创建新目标
+    
+    请求体:
+    - **name**: 目标名称（必需）
+    - **abstract**: 目标摘要/别名（可选）
+    - **content**: 目标详细内容（可选）
+    - **color**: 目标颜色（可选，默认 #5B8FF9）
+    - **link_to_category**: 关联分类 ID（可选）
+    - **link_to_sub_category**: 关联子分类 ID（可选）
+    - **expected_finished_at**: 预计完成时间（可选）
+    - **expected_hours**: 预计耗时小时数（可选）
+    """
+    result = goal_service.create_goal(request)
+    if not result:
+        raise HTTPException(status_code=500, detail="创建目标失败")
+    return result
+
+
+@router.post("/goals/reorder")
+async def reorder_goals(request: ReorderGoalRequest):
+    """
+    重排序目标
+    
+    请求体:
+    - **goal_ids**: 目标 ID 列表（按新顺序排列）
+    """
+    success = goal_service.reorder_goals(request)
+    if not success:
+        raise HTTPException(status_code=500, detail="重排序目标失败")
+    return {"success": True}
+
+
+@router.get("/goals/{goal_id}", response_model=GoalItem)
+async def get_goal_detail(
+    goal_id: int = Path(..., description="目标 ID")
+):
+    """
+    获取目标详情
+    """
+    result = goal_service.get_goal_detail(goal_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="目标不存在")
+    return result
+
+
+@router.patch("/goals/{goal_id}", response_model=GoalItem)
+async def update_goal(
+    goal_id: int = Path(..., description="目标 ID"),
+    request: UpdateGoalRequest = ...
+):
+    """
+    更新目标（部分更新）
+    
+    请求体（所有字段可选）:
+    - **name**: 目标名称
+    - **abstract**: 目标摘要/别名
+    - **content**: 目标详细内容
+    - **color**: 目标颜色
+    - **link_to_category**: 关联分类 ID
+    - **link_to_sub_category**: 关联子分类 ID
+    - **expected_finished_at**: 预计完成时间
+    - **expected_hours**: 预计耗时
+    - **actual_finished_at**: 实际完成时间
+    - **actual_hours**: 实际耗时
+    - **completion_rate**: 完成度 (0-1)
+    - **status**: 目标状态
+    """
+    result = goal_service.update_goal(goal_id, request)
+    if not result:
+        raise HTTPException(status_code=404, detail="目标不存在或更新失败")
+    return result
+
+
+@router.delete("/goals/{goal_id}")
+async def delete_goal(
+    goal_id: int = Path(..., description="目标 ID")
+):
+    """
+    删除目标
+    """
+    success = goal_service.delete_goal(goal_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="目标不存在")
+    return {"success": True}
+

@@ -433,6 +433,96 @@ WEEKLY_FOCUS_CONFIG = {
 }
 
 
+# Goal 目标表配置
+GOAL_CONFIG = {
+    'table_name': 'goal',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键'
+        },
+        'name': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '目标名称'
+        },
+        'abstract': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '目标摘要/别名'
+        },
+        'content': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT ""'],
+            'comment': '目标详细内容'
+        },
+        'color': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT "#5B8FF9"'],
+            'comment': '目标颜色（十六进制）'
+        },
+        'link_to_category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '关联的分类 ID'
+        },
+        'link_to_sub_category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '关联的子分类 ID'
+        },
+        'link_to_reward_id': {
+            'type': 'INTEGER',
+            'constraints': [],
+            'comment': '关联的奖励 ID'
+        },
+        'expected_finished_at': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '预计完成时间 YYYY-MM-DD'
+        },
+        'expected_hours': {
+            'type': 'INTEGER',
+            'constraints': [],
+            'comment': '预计耗时（小时）'
+        },
+        'actual_finished_at': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '实际完成时间 YYYY-MM-DD'
+        },
+        'actual_hours': {
+            'type': 'INTEGER',
+            'constraints': [],
+            'comment': '实际耗时（小时）'
+        },
+        'completion_rate': {
+            'type': 'REAL',
+            'constraints': ['DEFAULT 0.0'],
+            'comment': '完成度 0-1'
+        },
+        'status': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT "active"'],
+            'comment': '状态: active, completed, archived'
+        },
+        'order_index': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '排序索引'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_goal_status', 'columns': ['status']},
+        {'name': 'idx_goal_category', 'columns': ['link_to_category_id']},
+        {'name': 'idx_goal_order', 'columns': ['order_index']}
+    ],
+    'timestamps': True
+}
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'category_map_cache': category_map_cache_CONFIG,
@@ -443,7 +533,8 @@ TABLE_CONFIGS = {
     'todo_list': TODO_LIST_CONFIG,
     'sub_todo_list': SUB_TODO_LIST_CONFIG,
     'daily_focus': DAILY_FOCUS_CONFIG,
-    'weekly_focus': WEEKLY_FOCUS_CONFIG
+    'weekly_focus': WEEKLY_FOCUS_CONFIG,
+    'goal': GOAL_CONFIG,
 }
 
 

@@ -10,16 +10,17 @@ from lifewatch.utils import LazySingleton
 
 # V2 Service 单例（有状态或需要缓存的服务）
 from .activity_service import ActivityService
-from .category_service import CategoryService
+from .category_service import CategoryService, category_service
 
 # V2 纯函数服务模块
 from . import timeline_service
 from . import usage_service
 from . import todo_service
+from . import goal_service
 
 # 创建懒加载单例实例（首次访问时才初始化）
 activity_service = LazySingleton(ActivityService)
-category_service = LazySingleton(CategoryService)
+
 
 __all__ = [
     # V2 单例（有状态服务）
@@ -29,6 +30,7 @@ __all__ = [
     "timeline_service",
     "usage_service",
     "todo_service",
+    "goal_service",
 ]
 
 

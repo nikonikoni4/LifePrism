@@ -1292,6 +1292,9 @@ class CategoryService:
             raise
 
 
+from lifewatch.utils import LazySingleton
+category_service = LazySingleton(CategoryService)
+
 if __name__ == "__main__":
     from datetime import datetime, timedelta
     from lifewatch.server.schemas.category_schemas import CategoryStatsIncludeOptions

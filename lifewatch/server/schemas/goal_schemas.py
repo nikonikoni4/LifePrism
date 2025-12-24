@@ -47,6 +47,7 @@ class TodoListItem(BaseModel):
 
 class TodoListResponse(BaseModel):
     """任务列表响应"""
+    daily_focus_content: Optional[str] = Field(default=None, description="日计划重点")
     items: List[TodoListItem] = Field(default=[], description="任务列表")
 
 
@@ -155,38 +156,75 @@ class UpsertWeeklyFocusRequest(BaseModel):
 
 
 # ============================================================================
-# goal Schemas 
+# Goal Schemas 
 # ============================================================================
 
 
 class GoalItem(BaseModel):
     """目标项"""
     id: int = Field(..., description="唯一标识符 id")
-    abstract: str = Field(..., description="目标摘要")
-    content: str = Field(..., description="目标内容")
-    color: str = Field(..., description="目标颜色")
+    name: str = Field(..., description="目标名称")
+    abstract: Optional[str] = Field(default=None, description="目标摘要/别名")
+    content: str = Field(default="", description="目标内容")
+    color: str = Field(default="#5B8FF9", description="目标颜色")
     created_at: str = Field(..., description="创建时间")
-    # 关联内容
-    link_to_category: int = Field(..., description="关联的分类 id")
-    link_to_sub_category: int = Field(..., description="关联的子分类 id")
-    link_to_reward: int = Field(..., description="关联的奖励 id")
-    expected_finished_at: str = Field(..., description="预计完成时间")
-    expected_hours: int = Field(..., description="预计耗时")
-    actual_finished_at: str = Field(..., description="实际完成时间")
-    actual_hours: int = Field(..., description="实际耗时")
-    completion_rate: float = Field(..., description="完成度")
-    # 可选 被关联的 todolist
-    todo_link_to_goal: Optional[int] = Field(default=None, description="关联的 todolist id")
+    # 关联内容（返回名称，非 ID）
+    link_to_category: Optional[str] = Field(default=None, description="关联的分类名称")
+    link_to_sub_category: Optional[str] = Field(default=None, description="关联的子分类名称")
+    link_to_reward_id: Optional[int] = Field(default=None, description="关联的奖励 id")
+    expected_finished_at: Optional[str] = Field(default=None, description="预计完成时间 YYYY-MM-DD")
+    expected_hours: Optional[int] = Field(default=None, description="预计耗时（小时）")
+    actual_finished_at: Optional[str] = Field(default=None, description="实际完成时间 YYYY-MM-DD")
+    actual_hours: Optional[int] = Field(default=None, description="实际耗时（小时）")
+    completion_rate: float = Field(default=0.0, description="完成度 0-1")
+    status: str = Field(default="active", description="目标状态: active, completed, archived")
+    order_index: int = Field(default=0, description="排序索引")
 
 
 class GoalListResponse(BaseModel):
     """目标列表响应"""
     items: List[GoalItem] = Field(default=[], description="目标列表")
+    total: int = Field(default=0, description="总数")
 
 
 # ============================================================================
-# goal Request Schemas (预留)
+# Goal Request Schemas
 # ============================================================================
+
+
+class CreateGoalRequest(BaseModel):
+    """创建目标请求"""
+    name: str = Field(..., description="目标名称")
+    abstract: Optional[str] = Field(default=None, description="目标摘要/别名")
+    content: str = Field(default="", description="目标内容")
+    color: str = Field(default="#5B8FF9", description="目标颜色")
+    link_to_category_id: Optional[str] = Field(default=None, description="关联的分类 id")
+    link_to_sub_category_id: Optional[str] = Field(default=None, description="关联的子分类 id")
+    link_to_reward_id: Optional[int] = Field(default=None, description="关联的奖励 id")
+    expected_finished_at: Optional[str] = Field(default=None, description="预计完成时间 YYYY-MM-DD")
+    expected_hours: Optional[int] = Field(default=None, description="预计耗时（小时）")
+
+
+class UpdateGoalRequest(BaseModel):
+    """更新目标请求（部分更新）"""
+    name: Optional[str] = Field(default=None, description="目标名称")
+    abstract: Optional[str] = Field(default=None, description="目标摘要/别名")
+    content: Optional[str] = Field(default=None, description="目标内容")
+    color: Optional[str] = Field(default=None, description="目标颜色")
+    link_to_category_id: Optional[str] = Field(default=None, description="关联的分类 id")
+    link_to_sub_category_id: Optional[str] = Field(default=None, description="关联的子分类 id")
+    link_to_reward_id: Optional[int] = Field(default=None, description="关联的奖励 id")
+    expected_finished_at: Optional[str] = Field(default=None, description="预计完成时间")
+    expected_hours: Optional[int] = Field(default=None, description="预计耗时（小时）")
+    actual_finished_at: Optional[str] = Field(default=None, description="实际完成时间")
+    actual_hours: Optional[int] = Field(default=None, description="实际耗时（小时）")
+    completion_rate: Optional[float] = Field(default=None, description="完成度 0-1")
+    status: Optional[str] = Field(default=None, description="目标状态")
+
+
+class ReorderGoalRequest(BaseModel):
+    """目标重排序请求"""
+    goal_ids: List[int] = Field(..., description="目标 ID 列表（按新顺序排列）")
 
 
 
