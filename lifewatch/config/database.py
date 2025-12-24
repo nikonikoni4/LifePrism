@@ -290,10 +290,10 @@ TODO_LIST_CONFIG = {
             'constraints': ['DEFAULT 0'],
             'comment': '是否完成（0: 未完成, 1: 已完成）'
         },
-        'link_to_goal': {
-            'type': 'INTEGER',
+        'link_to_goal_id': {
+            'type': 'TEXT',
             'constraints': [],
-            'comment': '关联的目标 ID（可为空）'
+            'comment': '关联的目标 ID（可为空，格式：goal-xxx）'
         },
         'date': {
             'type': 'TEXT',
@@ -320,7 +320,7 @@ TODO_LIST_CONFIG = {
     'indexes': [
         {'name': 'idx_todo_list_date', 'columns': ['date']},
         {'name': 'idx_todo_list_cross_day_completed', 'columns': ['cross_day', 'completed']},
-        {'name': 'idx_todo_list_link_to_goal', 'columns': ['link_to_goal']}
+        {'name': 'idx_todo_list_link_to_goal_id', 'columns': ['link_to_goal_id']}
     ],
     'timestamps': True  # 自动添加 created_at
 }
@@ -438,9 +438,9 @@ GOAL_CONFIG = {
     'table_name': 'goal',
     'columns': {
         'id': {
-            'type': 'INTEGER',
-            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
-            'comment': '自增主键'
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '目标唯一标识符（格式：goal-{uuid[:8]}）'
         },
         'name': {
             'type': 'TEXT',
