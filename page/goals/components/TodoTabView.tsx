@@ -30,8 +30,8 @@ import {
     useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { TodoItem, SubTodoItem } from '../types';
-import { todoApi, MOCK_GOALS_LIST } from '../api';
+import { TodoItem, SubTodoItem, ActiveGoalItem } from '../types';
+import { todoApi, goalApi } from '../api';
 import WeekDayTreeSelector from './WeekDayTreeSelector';
 
 // --- Types & Constants ---
@@ -153,6 +153,7 @@ const TodoTabView: React.FC = () => {
     const [dailyFocusContent, setDailyFocusContent] = useState<string | null>(null);
     const [selectedL1Id, setSelectedL1Id] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
+    const [activeGoals, setActiveGoals] = useState<ActiveGoalItem[]>([]);
 
     // Handle date change from WeekDayTreeSelector
     const handleDateChange = (date: string) => {
@@ -177,6 +178,19 @@ const TodoTabView: React.FC = () => {
     useEffect(() => {
         loadTodos();
     }, [loadTodos]);
+
+    // 加载活跃目标列表
+    useEffect(() => {
+        const loadActiveGoals = async () => {
+            try {
+                const response = await goalApi.getActiveGoalNames();
+                setActiveGoals(response.items || []);
+            } catch (error) {
+                console.error('Failed to load active goals:', error);
+            }
+        };
+        loadActiveGoals();
+    }, []);
 
     // Filter items based on Date
     const filteredL1Items = useMemo(() => {
@@ -529,15 +543,15 @@ const TodoTabView: React.FC = () => {
                                     <span className="text-[8px] font-bold uppercase tracking-wider">目标</span>
                                 </div>
                                 <select
-                                    value={selectedL1Item.linkToGoal || ''}
+                                    value={selectedL1Item.linkToGoalId || ''}
                                     onChange={(e) => handleUpdateL1(selectedL1Item.id, {
-                                        linkToGoal: e.target.value ? parseInt(e.target.value) : null
+                                        linkToGoalId: e.target.value || null
                                     })}
                                     className="bg-transparent text-[10px] font-bold text-slate-700 w-full outline-none cursor-pointer truncate"
                                 >
                                     <option value="">无</option>
-                                    {MOCK_GOALS_LIST.map(g => (
-                                        <option key={g.id} value={g.id}>{g.abstract || g.name}</option>
+                                    {activeGoals.map(g => (
+                                        <option key={g.id} value={g.id}>{g.name}</option>
                                     ))}
                                 </select>
                             </div>

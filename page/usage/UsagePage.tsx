@@ -13,7 +13,7 @@ import {
    CartesianGrid,
    Legend
 } from 'recharts';
-import { CreditCard, Info, DollarSign, Database, TrendingUp } from 'lucide-react';
+import { CreditCard, Info, DollarSign, Database, TrendingUp, Zap } from 'lucide-react';
 import { UsageAPI } from './api';
 import { UsageStatsResponse } from './types';
 
@@ -71,7 +71,7 @@ const UsagePage: React.FC = () => {
    }
 
    // Extract data
-   const { usage_overview, data_processing_usage_stats, usage_stats_7days } = usageData;
+   const { usage_overview, data_processing_usage_stats, other_usage_stats, usage_stats_7days } = usageData;
 
    // Pie chart data
    const pieData = [
@@ -85,6 +85,16 @@ const UsagePage: React.FC = () => {
       totalTokens: item.total_tokens,
       cost: item.total_cost.toFixed(3)
    }));
+
+   // 格式化 tokens 显示
+   const formatTokens = (tokens: number) => {
+      if (tokens >= 1000000) {
+         return `${(tokens / 1000000).toFixed(1)}M`;
+      } else if (tokens >= 1000) {
+         return `${(tokens / 1000).toFixed(1)}k`;
+      }
+      return tokens.toString();
+   };
 
    // Tooltip for Pie Chart (no label needed)
    const PieTooltip = ({ active, payload }: any) => {
@@ -146,59 +156,69 @@ const UsagePage: React.FC = () => {
             />
          </div>
 
-         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-            {/* Today's Usage Overview */}
-            <div className="col-span-1 lg:col-span-8 bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col md:flex-row gap-8">
+            {/* Today's Usage Overview - 减小宽度 */}
+            <div className="col-span-1 lg:col-span-5 bg-white rounded-3xl shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row gap-6">
                <div className="flex-1">
-                  <div className="flex justify-between items-start mb-6">
+                  <div className="flex justify-between items-start mb-4">
                      <div>
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Token Usage</span>
-                        <h2 className="text-4xl font-mono font-bold text-slate-800 mt-1">
-                           {(usage_overview.total_tokens / 1000).toFixed(1)}k
-                        </h2>
+                        <div className="flex items-baseline gap-2 mt-1">
+                           <h2 className="text-3xl font-mono font-bold text-slate-800">
+                              {formatTokens(usage_overview.total_tokens)}
+                           </h2>
+                           <span className="text-sm text-slate-400 font-medium">
+                              / {formatTokens(usage_overview.all_total_tokens)}
+                           </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">today / total</p>
                      </div>
-                     <div className="p-3 bg-blue-50 text-morandi-blue rounded-2xl border border-blue-100">
-                        <CreditCard size={24} />
+                     <div className="p-2.5 bg-blue-50 text-morandi-blue rounded-2xl border border-blue-100">
+                        <CreditCard size={20} />
                      </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                      <div>
-                        <label className="text-xs font-bold text-slate-500 mb-2 block">Input Token Price (per 1k)</label>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Input Token Price (per 1k)</label>
                         <div className="relative">
-                           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><DollarSign size={14} /></div>
-                           <div className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono">
+                           <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"><DollarSign size={12} /></div>
+                           <div className="w-full pl-7 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono">
                               {usage_overview.input_tokens_price.toFixed(5)}
                            </div>
                         </div>
                      </div>
                      <div>
-                        <label className="text-xs font-bold text-slate-500 mb-2 block">Output Token Price (per 1k)</label>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Output Token Price (per 1k)</label>
                         <div className="relative">
-                           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><DollarSign size={14} /></div>
-                           <div className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono">
+                           <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"><DollarSign size={12} /></div>
+                           <div className="w-full pl-7 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono">
                               {usage_overview.output_tokens_price.toFixed(5)}
                            </div>
                         </div>
                      </div>
-                     <div className="pt-4 border-t border-dashed border-gray-100">
+                     <div className="pt-3 border-t border-dashed border-gray-100">
                         <div className="flex justify-between items-end">
                            <span className="text-sm font-bold text-slate-500">Total Cost:</span>
-                           <span className="text-3xl font-mono font-bold text-morandi-orange">${usage_overview.total_price.toFixed(4)}</span>
+                           <div className="text-right">
+                              <span className="text-2xl font-mono font-bold text-morandi-orange">${usage_overview.total_price.toFixed(4)}</span>
+                              <span className="text-sm text-slate-400 font-medium ml-2">/ ${usage_overview.all_total_price.toFixed(4)}</span>
+                           </div>
                         </div>
+                        <p className="text-xs text-slate-400 text-right mt-0.5">today / total</p>
                      </div>
                   </div>
                </div>
 
                {/* Donut Chart */}
-               <div className="w-full md:w-64 h-64 relative flex flex-col items-center justify-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 p-4">
+               <div className="w-full md:w-48 h-48 relative flex flex-col items-center justify-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 p-3">
                   <ResponsiveContainer width="100%" height="100%">
                      <PieChart>
                         <Pie
                            data={pieData}
-                           innerRadius={55}
-                           outerRadius={75}
+                           innerRadius={40}
+                           outerRadius={55}
                            paddingAngle={8}
                            dataKey="value"
                            stroke="none"
@@ -212,53 +232,102 @@ const UsagePage: React.FC = () => {
                      </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
-                     <span className="text-xl font-bold text-slate-700">Tokens</span>
+                     <span className="text-lg font-bold text-slate-700">Tokens</span>
                      <span className="text-[10px] text-slate-400 font-bold uppercase">Split</span>
                   </div>
-                  <div className="flex gap-4 mt-2">
+                  <div className="flex gap-3 mt-1">
                      {pieData.map(item => (
-                        <div key={item.name} className="flex items-center gap-1.5">
+                        <div key={item.name} className="flex items-center gap-1">
                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
-                           <span className="text-[10px] font-bold text-slate-500 uppercase">{item.name.split(' ')[0]}</span>
+                           <span className="text-[9px] font-bold text-slate-500 uppercase">{item.name.split(' ')[0]}</span>
                         </div>
                      ))}
                   </div>
                </div>
             </div>
 
-            {/* Data Efficiency Stats */}
-            <div className="col-span-1 lg:col-span-4 bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col">
-               <div className="flex items-center gap-3 mb-6">
+            {/* Data Processing Stats */}
+            <div className="col-span-1 lg:col-span-4 bg-white rounded-3xl shadow-sm border border-gray-100 p-6 flex flex-col">
+               <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
-                     <Database size={20} />
+                     <Database size={18} />
                   </div>
-                  <h3 className="text-lg font-bold text-slate-800">Data Processing</h3>
+                  <h3 className="text-base font-bold text-slate-800">Data Processing</h3>
                </div>
 
-               <div className="flex-1 space-y-8">
+               <div className="flex-1 space-y-4">
                   <div>
-                     <p className="text-sm font-medium text-slate-400 mb-1">Records Processed</p>
-                     <p className="text-3xl font-mono font-bold text-slate-800">{data_processing_usage_stats.processing_items}</p>
+                     <p className="text-xs font-medium text-slate-400 mb-0.5">Records Processed</p>
+                     <p className="text-2xl font-mono font-bold text-slate-800">{data_processing_usage_stats.processing_items}</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                     <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Avg Tokens</p>
-                        <p className="text-lg font-mono font-bold text-slate-700">{Math.round(data_processing_usage_stats.avg_processing_tokens)}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">per record</p>
+                  {/* 今日总Tokens和总费用 */}
+                  <div className="grid grid-cols-2 gap-3">
+                     <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Today Tokens</p>
+                        <div className="flex items-baseline gap-1">
+                           <p className="text-base font-mono font-bold text-slate-700">{formatTokens(data_processing_usage_stats.total_tokens)}</p>
+                           <span className="text-xs text-slate-400">/ {formatTokens(data_processing_usage_stats.all_total_tokens)}</span>
+                        </div>
                      </div>
-                     <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Avg Cost</p>
-                        <p className="text-lg font-mono font-bold text-slate-700">${data_processing_usage_stats.avg_cost.toFixed(5)}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">per record</p>
+                     <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Today Cost</p>
+                        <div className="flex items-baseline gap-1">
+                           <p className="text-base font-mono font-bold text-slate-700">${data_processing_usage_stats.total_cost.toFixed(4)}</p>
+                           <span className="text-xs text-slate-400">/ ${data_processing_usage_stats.all_total_cost.toFixed(4)}</span>
+                        </div>
                      </div>
                   </div>
 
-                  <div className="mt-auto pt-6 border-t border-gray-100">
-                     <div className="flex items-start gap-3 text-amber-600 bg-amber-50 p-4 rounded-2xl border border-amber-100">
-                        <Info size={16} className="mt-0.5 flex-shrink-0" />
-                        <p className="text-xs font-medium leading-relaxed">
-                           Total processing cost: <span className="font-bold">${data_processing_usage_stats.total_cost.toFixed(4)}</span>. Optimizing prompts can reduce costs.
+                  {/* 平均值 */}
+                  <div className="grid grid-cols-2 gap-3">
+                     <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Avg Tokens</p>
+                        <p className="text-base font-mono font-bold text-slate-700">{Math.round(data_processing_usage_stats.avg_processing_tokens)}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">per record</p>
+                     </div>
+                     <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Avg Cost</p>
+                        <p className="text-base font-mono font-bold text-slate-700">${data_processing_usage_stats.avg_cost.toFixed(5)}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">per record</p>
+                     </div>
+                  </div>
+               </div>
+            </div>
+
+            {/* Other Usage Stats */}
+            <div className="col-span-1 lg:col-span-3 bg-white rounded-3xl shadow-sm border border-gray-100 p-6 flex flex-col">
+               <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                     <Zap size={18} />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800">Other Usage</h3>
+               </div>
+
+               <div className="flex-1 space-y-4">
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                     <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Tokens</p>
+                     <div className="flex items-baseline gap-2">
+                        <p className="text-xl font-mono font-bold text-slate-700">{formatTokens(other_usage_stats.total_tokens)}</p>
+                        <span className="text-sm text-slate-400">/ {formatTokens(other_usage_stats.all_total_tokens)}</span>
+                     </div>
+                     <p className="text-[10px] text-slate-400 font-medium mt-0.5">today / total</p>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                     <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Cost</p>
+                     <div className="flex items-baseline gap-2">
+                        <p className="text-xl font-mono font-bold text-morandi-orange">${other_usage_stats.total_cost.toFixed(4)}</p>
+                        <span className="text-sm text-slate-400">/ ${other_usage_stats.all_total_cost.toFixed(4)}</span>
+                     </div>
+                     <p className="text-[10px] text-slate-400 font-medium mt-0.5">today / total</p>
+                  </div>
+
+                  <div className="mt-auto pt-3">
+                     <div className="flex items-start gap-2 text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <Info size={14} className="mt-0.5 flex-shrink-0" />
+                        <p className="text-[11px] font-medium leading-relaxed">
+                           Other costs include non-classification API calls.
                         </p>
                      </div>
                   </div>

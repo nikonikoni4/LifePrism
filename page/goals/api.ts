@@ -1,5 +1,5 @@
 
-import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse, CreateGoalRequest, UpdateGoalRequest, GoalListResponse, CategoryTreeResponse } from "./types";
+import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse, CreateGoalRequest, UpdateGoalRequest, GoalListResponse, CategoryTreeResponse, ActiveGoalNamesResponse } from "./types";
 
 const API_BASE = '/api/v2/goal';
 
@@ -57,7 +57,7 @@ export const todoApi = {
         content: string;
         date: string;
         color?: string;
-        linkToGoal?: number | null;
+        linkToGoalId?: string | null;
         expectedFinishedAt?: string | null;
         crossDay?: boolean;
     }): Promise<TodoItem> => {
@@ -75,7 +75,7 @@ export const todoApi = {
         content: string;
         color: string;
         completed: boolean;
-        linkToGoal: number | null;
+        linkToGoalId: string | null;
         expectedFinishedAt: string | null;
         crossDay: boolean;
     }>): Promise<TodoItem> => {
@@ -221,7 +221,7 @@ export const goalApi = {
     },
 
     // 获取目标详情
-    getGoalDetail: async (id: number): Promise<UserGoal> => {
+    getGoalDetail: async (id: string): Promise<UserGoal> => {
         const res = await fetch(`${API_BASE}/goals/${id}`);
         const data = await res.json();
         return toCamelCase(data);
@@ -239,7 +239,7 @@ export const goalApi = {
     },
 
     // 更新目标
-    updateGoal: async (id: number, data: UpdateGoalRequest): Promise<UserGoal> => {
+    updateGoal: async (id: string, data: UpdateGoalRequest): Promise<UserGoal> => {
         const res = await fetch(`${API_BASE}/goals/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -250,19 +250,26 @@ export const goalApi = {
     },
 
     // 删除目标
-    deleteGoal: async (id: number): Promise<boolean> => {
+    deleteGoal: async (id: string): Promise<boolean> => {
         const res = await fetch(`${API_BASE}/goals/${id}`, { method: 'DELETE' });
         return res.ok;
     },
 
     // 重排序目标
-    reorderGoals: async (goalIds: number[]): Promise<boolean> => {
+    reorderGoals: async (goalIds: string[]): Promise<boolean> => {
         const res = await fetch(`${API_BASE}/goals/reorder`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ goal_ids: goalIds })
         });
         return res.ok;
+    },
+
+    // 获取活跃目标名称列表（用于下拉选择）
+    getActiveGoalNames: async (): Promise<ActiveGoalNamesResponse> => {
+        const res = await fetch(`${API_BASE}/goals/active-names`);
+        const data = await res.json();
+        return toCamelCase(data);
     }
 };
 

@@ -17,7 +17,7 @@ export interface TodoItem {
     content: string;
     color: string;
     completed: boolean;
-    linkToGoal: number | null;
+    linkToGoalId: string | null;
     date: string;
     expectedFinishedAt: string | null;
     actualFinishedAt: string | null;
@@ -85,7 +85,7 @@ export interface GoalItem {
 }
 
 export interface UserGoal {
-    id: number;
+    id: string;
     name: string;
     abstract?: string;
     content: string;
@@ -132,6 +132,16 @@ export interface UpdateGoalRequest {
 export interface GoalListResponse {
     items: UserGoal[];
     total: number;
+}
+
+// Active Goal Types (用于下拉选择)
+export interface ActiveGoalItem {
+    id: string;
+    name: string;
+}
+
+export interface ActiveGoalNamesResponse {
+    items: ActiveGoalItem[];
 }
 
 // Category Types (匹配后端 CategoryTreeItem)

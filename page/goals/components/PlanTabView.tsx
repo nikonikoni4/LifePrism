@@ -334,7 +334,7 @@ const PlanTabView: React.FC = () => {
             content: text,
             color: '#FFFFFF',
             completed: false,
-            linkToGoal: null,
+            linkToGoalId: null,
             date: date,
             expectedFinishedAt: null,
             actualFinishedAt: null,

@@ -80,7 +80,7 @@ export interface TodoListData {
     id: number;
     name: string;  // 待办事项名称
     isCompleted: boolean;  // 是否完成
-    linkToGoal: number;  // 关联目标ID
+    linkToGoalId: string | null;  // 关联目标ID
 }
 
 // ============================================================================
