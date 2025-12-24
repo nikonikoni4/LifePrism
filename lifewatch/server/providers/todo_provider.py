@@ -117,14 +117,14 @@ class TodoProvider(LWBaseDataProvider):
                 
                 # 插入数据
                 columns = ['order_index', 'content', 'color', 'completed', 
-                          'link_to_goal', 'date', 'expected_finished_at', 
+                          'link_to_goal_id', 'date', 'expected_finished_at', 
                           'actual_finished_at', 'cross_day']
                 values = [
                     next_order,
                     data.get('content'),
                     data.get('color', '#FFFFFF'),
                     0,  # completed
-                    data.get('link_to_goal'),
+                    data.get('link_to_goal_id'),
                     data.get('date'),
                     data.get('expected_finished_at'),
                     data.get('actual_finished_at'),
@@ -169,7 +169,7 @@ class TodoProvider(LWBaseDataProvider):
                 set_clauses = []
                 values = []
                 for key, value in data.items():
-                    if key in ['content', 'color', 'completed', 'link_to_goal',
+                    if key in ['content', 'color', 'completed', 'link_to_goal_id',
                               'expected_finished_at', 'actual_finished_at', 'cross_day']:
                         set_clauses.append(f"{key} = ?")
                         # 处理布尔值

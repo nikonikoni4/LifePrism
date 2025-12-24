@@ -161,7 +161,7 @@ class TodoListData(BaseModel):
     id: int = Field(..., description="待办事项ID")
     name: str = Field(..., description="待办事项名称")
     is_completed: bool = Field(..., description="是否完成",alias="isCompleted")
-    link_to_goal: int = Field(..., description="关联目标ID",alias="linkToGoal")
+    link_to_goal_id: Optional[str] = Field(default=None, description="关联目标ID",alias="linkToGoalId")
     class Config:
         populate_by_name = True
 

@@ -70,7 +70,7 @@ def get_todos(date: str, include_cross_day: bool = True) -> TodoListResponse:
             content=todo['content'],
             color=todo['color'] or '#FFFFFF',
             completed=bool(todo['completed']),
-            link_to_goal=todo['link_to_goal'],
+            link_to_goal_id=todo['link_to_goal_id'],
             date=todo['date'],
             expected_finished_at=todo['expected_finished_at'],
             actual_finished_at=todo['actual_finished_at'],
@@ -114,7 +114,7 @@ def get_todo_detail(todo_id: int) -> Optional[TodoListItem]:
         content=todo['content'],
         color=todo['color'] or '#FFFFFF',
         completed=bool(todo['completed']),
-        link_to_goal=todo['link_to_goal'],
+        link_to_goal_id=todo['link_to_goal_id'],
         date=todo['date'],
         expected_finished_at=todo['expected_finished_at'],
         actual_finished_at=todo['actual_finished_at'],
@@ -137,7 +137,7 @@ def create_todo(request: CreateTodoRequest) -> Optional[TodoListItem]:
         'content': request.content,
         'date': request.date,
         'color': request.color,
-        'link_to_goal': request.link_to_goal,
+        'link_to_goal_id': request.link_to_goal_id,
         'expected_finished_at': request.expected_finished_at,
         'cross_day': request.cross_day
     }
@@ -172,8 +172,8 @@ def update_todo(todo_id: int, request: UpdateTodoRequest) -> Optional[TodoListIt
             data['actual_finished_at'] = datetime.now().strftime('%Y-%m-%d')
         else:
             data['actual_finished_at'] = None
-    if request.link_to_goal is not None:
-        data['link_to_goal'] = request.link_to_goal
+    if request.link_to_goal_id is not None:
+        data['link_to_goal_id'] = request.link_to_goal_id
     if request.expected_finished_at is not None:
         data['expected_finished_at'] = request.expected_finished_at
     if request.cross_day is not None:

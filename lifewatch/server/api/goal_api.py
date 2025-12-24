@@ -28,9 +28,10 @@ from lifewatch.server.schemas.goal_schemas import (
     CreateGoalRequest,
     UpdateGoalRequest,
     ReorderGoalRequest,
+    ActiveGoalNamesResponse,
 )
 from lifewatch.server.services import todo_service
-from lifewatch.server.services import goal_service
+from lifewatch.server.services.goal_service import goal_service
 
 router = APIRouter(prefix="/goal", tags=["Goal - TodoList"])
 
@@ -333,9 +334,19 @@ async def reorder_goals(request: ReorderGoalRequest):
     return {"success": True}
 
 
+@router.get("/goals/active-names", response_model=ActiveGoalNamesResponse)
+async def get_active_goal_names():
+    """
+    获取所有进行中的目标名称（用于前端下拉选择绑定）
+    
+    返回 status='active' 的目标的 id 和 name
+    """
+    return goal_service.get_active_goal_names()
+
+
 @router.get("/goals/{goal_id}", response_model=GoalItem)
 async def get_goal_detail(
-    goal_id: int = Path(..., description="目标 ID")
+    goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)")
 ):
     """
     获取目标详情
@@ -348,7 +359,7 @@ async def get_goal_detail(
 
 @router.patch("/goals/{goal_id}", response_model=GoalItem)
 async def update_goal(
-    goal_id: int = Path(..., description="目标 ID"),
+    goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)"),
     request: UpdateGoalRequest = ...
 ):
     """
@@ -376,7 +387,7 @@ async def update_goal(
 
 @router.delete("/goals/{goal_id}")
 async def delete_goal(
-    goal_id: int = Path(..., description="目标 ID")
+    goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)")
 ):
     """
     删除目标

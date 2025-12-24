@@ -36,7 +36,7 @@ class TodoListItem(BaseModel):
     content: str = Field(..., description="任务内容")
     color: str = Field(default="#FFFFFF", description="任务颜色（十六进制格式）")
     completed: bool = Field(default=False, description="是否完成")
-    link_to_goal: Optional[int] = Field(default=None, description="关联的目标 ID")
+    link_to_goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
     date: str = Field(..., description="任务日期 YYYY-MM-DD")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期 YYYY-MM-DD")
     actual_finished_at: Optional[str] = Field(default=None, description="实际完成日期 YYYY-MM-DD")
@@ -66,7 +66,7 @@ class CreateTodoRequest(BaseModel):
     content: str = Field(..., description="任务内容")
     date: str = Field(..., description="任务日期 YYYY-MM-DD")
     color: str = Field(default="#FFFFFF", description="任务颜色")
-    link_to_goal: Optional[int] = Field(default=None, description="关联的目标 ID")
+    link_to_goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期 YYYY-MM-DD")
     cross_day: bool = Field(default=False, description="是否开启跨天追踪")
 
@@ -76,7 +76,7 @@ class UpdateTodoRequest(BaseModel):
     content: Optional[str] = Field(default=None, description="任务内容")
     color: Optional[str] = Field(default=None, description="任务颜色")
     completed: Optional[bool] = Field(default=None, description="是否完成")
-    link_to_goal: Optional[int] = Field(default=None, description="关联的目标 ID")
+    link_to_goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期")
     cross_day: Optional[bool] = Field(default=None, description="是否开启跨天追踪")
 
@@ -162,7 +162,7 @@ class UpsertWeeklyFocusRequest(BaseModel):
 
 class GoalItem(BaseModel):
     """目标项"""
-    id: int = Field(..., description="唯一标识符 id")
+    id: str = Field(..., description="唯一标识符 id（格式：goal-xxx）")
     name: str = Field(..., description="目标名称")
     abstract: Optional[str] = Field(default=None, description="目标摘要/别名")
     content: str = Field(default="", description="目标内容")
@@ -224,7 +224,18 @@ class UpdateGoalRequest(BaseModel):
 
 class ReorderGoalRequest(BaseModel):
     """目标重排序请求"""
-    goal_ids: List[int] = Field(..., description="目标 ID 列表（按新顺序排列）")
+    goal_ids: List[str] = Field(..., description="目标 ID 列表（按新顺序排列）")
+
+
+class ActiveGoalItem(BaseModel):
+    """活跃目标项（用于下拉选择）"""
+    id: str = Field(..., description="目标 ID")
+    name: str = Field(..., description="目标名称")
+
+
+class ActiveGoalNamesResponse(BaseModel):
+    """活跃目标名称列表响应"""
+    items: List[ActiveGoalItem] = Field(default=[], description="活跃目标列表")
 
 
 

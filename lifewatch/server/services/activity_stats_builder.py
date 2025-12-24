@@ -273,9 +273,9 @@ def get_todolist(date: str) -> List[TodoListData]:
     """
     # Mock
     todo_list = [
-        {"id": 1, "name": "待办事项1", "is_completed": False, "link_to_goal": 1},
-        {"id": 2, "name": "待办事项2", "is_completed": True, "link_to_goal": 2},
-        {"id": 3, "name": "待办事项3", "is_completed": False, "link_to_goal": 0},
+        {"id": 1, "name": "待办事项1", "is_completed": False, "link_to_goal_id": None},
+        {"id": 2, "name": "待办事项2", "is_completed": True, "link_to_goal_id": None},
+        {"id": 3, "name": "待办事项3", "is_completed": False, "link_to_goal_id": None},
     ]
 
     result = []
@@ -284,7 +284,7 @@ def get_todolist(date: str) -> List[TodoListData]:
             id=todo['id'], 
             name=todo['name'], 
             is_completed=todo['is_completed'], 
-            link_to_goal=todo['link_to_goal']
+            link_to_goal_id=todo['link_to_goal_id']
         ))
     return result
 

@@ -4,6 +4,7 @@ Goal 数据提供者
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+import uuid
 
 from lifewatch.storage import LWBaseDataProvider
 from lifewatch.utils import get_logger
@@ -87,12 +88,12 @@ class GoalProvider(LWBaseDataProvider):
             logger.error(f"获取目标列表失败: {e}")
             return [], 0
     
-    def get_goal_by_id(self, goal_id: int) -> Optional[Dict[str, Any]]:
+    def get_goal_by_id(self, goal_id: str) -> Optional[Dict[str, Any]]:
         """
         按 ID 获取单个目标
         
         Args:
-            goal_id: 目标 ID
+            goal_id: 目标 ID (格式: goal-xxx)
         
         Returns:
             Optional[Dict]: 目标数据，不存在返回 None
@@ -112,7 +113,7 @@ class GoalProvider(LWBaseDataProvider):
             logger.error(f"获取目标 {goal_id} 失败: {e}")
             return None
     
-    def create_goal(self, data: Dict[str, Any]) -> Optional[int]:
+    def create_goal(self, data: Dict[str, Any]) -> Optional[str]:
         """
         创建新目标
         
@@ -120,11 +121,14 @@ class GoalProvider(LWBaseDataProvider):
             data: 目标数据
         
         Returns:
-            Optional[int]: 新目标 ID，失败返回 None
+            Optional[str]: 新目标 ID (格式: goal-xxx)，失败返回 None
         """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
+                
+                # 生成唯一 ID（与 category 格式一致）
+                goal_id = f"goal-{str(uuid.uuid4())[:8]}"
                 
                 # 获取当前最大 order_index
                 cursor.execute("SELECT COALESCE(MAX(order_index), -1) + 1 FROM goal")
@@ -132,12 +136,13 @@ class GoalProvider(LWBaseDataProvider):
                 
                 # 构建插入数据
                 columns = [
-                    'name', 'abstract', 'content', 'color',
+                    'id', 'name', 'abstract', 'content', 'color',
                     'link_to_category_id', 'link_to_sub_category_id', 'link_to_reward_id',
                     'expected_finished_at', 'expected_hours',
                     'status', 'order_index'
                 ]
                 values = [
+                    goal_id,
                     data.get('name'),
                     data.get('abstract'),
                     data.get('content', ''),
@@ -159,20 +164,19 @@ class GoalProvider(LWBaseDataProvider):
                     values
                 )
                 
-                new_id = cursor.lastrowid
-                logger.info(f"创建目标成功，ID: {new_id}")
-                return new_id
+                logger.info(f"创建目标成功，ID: {goal_id}")
+                return goal_id
                 
         except Exception as e:
             logger.error(f"创建目标失败: {e}")
             return None
     
-    def update_goal(self, goal_id: int, data: Dict[str, Any]) -> bool:
+    def update_goal(self, goal_id: str, data: Dict[str, Any]) -> bool:
         """
         更新目标
         
         Args:
-            goal_id: 目标 ID
+            goal_id: 目标 ID (格式: goal-xxx)
             data: 要更新的字段
         
         Returns:
@@ -218,12 +222,12 @@ class GoalProvider(LWBaseDataProvider):
             logger.error(f"更新目标 {goal_id} 失败: {e}")
             return False
     
-    def delete_goal(self, goal_id: int) -> bool:
+    def delete_goal(self, goal_id: str) -> bool:
         """
         删除目标
         
         Args:
-            goal_id: 目标 ID
+            goal_id: 目标 ID (格式: goal-xxx)
         
         Returns:
             bool: 是否成功
@@ -231,6 +235,17 @@ class GoalProvider(LWBaseDataProvider):
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
+                
+                # 先清除 todo_list 中关联的目标
+                cursor.execute(
+                    "UPDATE todo_list SET link_to_goal_id = NULL WHERE link_to_goal_id = ?",
+                    (goal_id,)
+                )
+                cleared_count = cursor.rowcount
+                if cleared_count > 0:
+                    logger.info(f"清除了 {cleared_count} 个任务的目标关联")
+                
+                # 然后删除目标
                 cursor.execute("DELETE FROM goal WHERE id = ?", (goal_id,))
                 
                 success = cursor.rowcount > 0
@@ -242,7 +257,7 @@ class GoalProvider(LWBaseDataProvider):
             logger.error(f"删除目标 {goal_id} 失败: {e}")
             return False
     
-    def reorder_goals(self, goal_ids: List[int]) -> bool:
+    def reorder_goals(self, goal_ids: List[str]) -> bool:
         """
         批量更新目标排序
         
@@ -268,6 +283,29 @@ class GoalProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error(f"重排序目标失败: {e}")
             return False
+    
+    def get_active_goals(self) -> List[Dict[str, Any]]:
+        """
+        获取所有进行中的目标（用于前端选择绑定）
+        
+        Returns:
+            List[Dict]: 目标列表，包含 id 和 name
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT id, name FROM goal WHERE status = 'active' ORDER BY order_index ASC"
+                )
+                
+                columns = [description[0] for description in cursor.description]
+                rows = cursor.fetchall()
+                
+                return [dict(zip(columns, row)) for row in rows]
+                
+        except Exception as e:
+            logger.error(f"获取活跃目标列表失败: {e}")
+            return []
     
     def get_goals_linked_to_category(self, category_id: str) -> List[Dict[str, Any]]:
         """
