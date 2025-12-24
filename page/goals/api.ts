@@ -1,5 +1,5 @@
 
-import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse } from "./types";
+import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse } from "./types";
 
 const API_BASE = '/api/v2/goal';
 
@@ -148,6 +148,46 @@ export const todoApi = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parent_id: parentId, sub_todo_ids: subTodoIds })
+        });
+        return res.ok;
+    }
+};
+
+// ============================================================================
+// Plan API - 真实后端接口
+// ============================================================================
+
+export const planApi = {
+    // 获取周计划
+    getWeeklyPlan: async (year: number, month: number, weekNum: number): Promise<WeeklyPlanResponse> => {
+        const res = await fetch(`${API_BASE}/plan/weekly?year=${year}&month=${month}&week_num=${weekNum}`);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 获取月计划
+    getMonthlyPlan: async (year: number, month: number): Promise<MonthlyPlanResponse> => {
+        const res = await fetch(`${API_BASE}/plan/monthly?year=${year}&month=${month}`);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 更新日焦点
+    upsertDailyFocus: async (date: string, content: string): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/plan/daily-focus`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date, content })
+        });
+        return res.ok;
+    },
+
+    // 更新周焦点
+    upsertWeeklyFocus: async (year: number, month: number, weekNum: number, content: string): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/plan/weekly-focus`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ year, month, week_num: weekNum, content })
         });
         return res.ok;
     }

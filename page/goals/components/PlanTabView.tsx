@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
     Target,
     Plus,
@@ -14,10 +14,11 @@ import {
     Sparkles,
     ClipboardList,
     BookOpen,
-    X
+    X,
+    Loader2
 } from 'lucide-react';
-import { MOCK_TODOS, MOCK_PLANS } from '../api';
-import { GoalItem } from '../types';
+import { planApi, todoApi } from '../api';
+import { TodoItem, WeeklyPlanResponse, MonthlyPlanResponse, DailyPlanItem, WeeklyPlanItem } from '../types';
 import DateTreeSelector from './DateTreeSelector';
 
 // --- Types ---
@@ -102,15 +103,40 @@ const PlanTabView: React.FC = () => {
         [selectedMonthData]
     );
 
-    // Initialize selectedWeek using the new ID format: YYYY-M-wN
+    // Initialize selectedWeek to current week based on today's date
     const [selectedWeek, setSelectedWeek] = useState(() => {
         const year = today.getFullYear();
         const month = today.getMonth();
-        return `${year}-${month}-w1`;
+
+        // 计算当前日期在月份中属于第几周
+        const firstDay = new Date(year, month, 1);
+        const dayOfWeek = firstDay.getDay();
+        const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const firstMonday = new Date(firstDay);
+        firstMonday.setDate(firstDay.getDate() + diff);
+
+        // 计算今天距离第一周周一的天数
+        const daysDiff = Math.floor((today.getTime() - firstMonday.getTime()) / (1000 * 60 * 60 * 24));
+        const weekNum = Math.min(4, Math.max(1, Math.floor(daysDiff / 7) + 1));
+
+        return `${year}-${month}-w${weekNum}`;
     });
 
-    // Week summaries state for editing (plan content)
-    const [weekSummaries, setWeekSummaries] = useState<Record<string, string>>({});
+    // ============================================================================
+    // API Data State
+    // ============================================================================
+    const [weeklyPlanData, setWeeklyPlanData] = useState<WeeklyPlanResponse | null>(null);
+    const [monthlyPlanData, setMonthlyPlanData] = useState<MonthlyPlanResponse | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Daily focus content (local edits before saving)
+    const [dailyFocuses, setDailyFocuses] = useState<Record<string, string>>({});
+    // Weekly focus content (local edits)
+    const [weeklyFocuses, setWeeklyFocuses] = useState<Record<string, string>>({});
+
+    // Debounce timers
+    const dailyFocusTimerRef = useRef<Record<string, NodeJS.Timeout>>({});
+    const weeklyFocusTimerRef = useRef<Record<string, NodeJS.Timeout>>({});
 
     // Summary view state
     const [showSummaryView, setShowSummaryView] = useState(false);
@@ -124,13 +150,250 @@ const PlanTabView: React.FC = () => {
     // Collapsed state for daily sections in summary view
     const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({});
 
-    const getWeekSummary = (weekId: string, defaultSummary: string) => {
-        return weekSummaries[weekId] ?? defaultSummary;
+    // New todo input
+    const [newTodoInput, setNewTodoInput] = useState<{ [key: string]: string }>({});
+
+    // ============================================================================
+    // Data Fetching
+    // ============================================================================
+
+    // Parse week ID to get year, month, weekNum
+    const parseWeekId = (weekId: string) => {
+        const parts = weekId.split('-');
+        const year = parseInt(parts[0]);
+        const month = parseInt(parts[1]) + 1; // Convert 0-indexed to 1-indexed
+        const weekNum = parseInt(parts[2].replace('w', ''));
+        return { year, month, weekNum };
     };
 
-    const updateWeekSummary = (weekId: string, content: string) => {
-        setWeekSummaries(prev => ({ ...prev, [weekId]: content }));
+    // Fetch weekly plan data
+    const fetchWeeklyPlan = useCallback(async () => {
+        const { year, month, weekNum } = parseWeekId(selectedWeek);
+        setIsLoading(true);
+        try {
+            const data = await planApi.getWeeklyPlan(year, month, weekNum);
+            setWeeklyPlanData(data);
+
+            // Initialize daily focuses from API data
+            const focusMap: Record<string, string> = {};
+            data.items.forEach(item => {
+                focusMap[item.date] = item.dailyFocusContent || '';
+            });
+            setDailyFocuses(prev => ({ ...prev, ...focusMap }));
+
+            // Initialize weekly focus
+            setWeeklyFocuses(prev => ({
+                ...prev,
+                [selectedWeek]: data.weeklyFocusContent || ''
+            }));
+        } catch (error) {
+            console.error('Failed to fetch weekly plan:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [selectedWeek]);
+
+    // Fetch monthly plan data
+    const fetchMonthlyPlan = useCallback(async () => {
+        const { year, month: monthIndex } = selectedMonthData;
+        const month = monthIndex + 1; // Convert 0-indexed to 1-indexed
+        setIsLoading(true);
+        try {
+            const data = await planApi.getMonthlyPlan(year, month);
+            setMonthlyPlanData(data);
+
+            // Initialize weekly focuses from API data
+            const focusMap: Record<string, string> = {};
+            data.items.forEach((item, index) => {
+                const weekId = `${year}-${monthIndex}-w${index + 1}`;
+                focusMap[weekId] = item.weeklyFocusContent || '';
+            });
+            setWeeklyFocuses(prev => ({ ...prev, ...focusMap }));
+        } catch (error) {
+            console.error('Failed to fetch monthly plan:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [selectedMonthData]);
+
+    // Load data on week/month change
+    useEffect(() => {
+        if (viewType === 'week') {
+            fetchWeeklyPlan();
+        } else {
+            fetchMonthlyPlan();
+        }
+    }, [viewType, selectedWeek, fetchWeeklyPlan, fetchMonthlyPlan]);
+
+    // ============================================================================
+    // Focus Content Handlers with Debounced Save
+    // ============================================================================
+
+    const updateDailyFocus = (date: string, content: string) => {
+        setDailyFocuses(prev => ({ ...prev, [date]: content }));
+
+        // Clear existing timer
+        if (dailyFocusTimerRef.current[date]) {
+            clearTimeout(dailyFocusTimerRef.current[date]);
+        }
+
+        // Set new debounced save (1 second delay)
+        dailyFocusTimerRef.current[date] = setTimeout(async () => {
+            try {
+                await planApi.upsertDailyFocus(date, content);
+            } catch (error) {
+                console.error('Failed to save daily focus:', error);
+            }
+        }, 1000);
     };
+
+    const updateWeeklyFocus = (weekId: string, content: string) => {
+        setWeeklyFocuses(prev => ({ ...prev, [weekId]: content }));
+
+        // Clear existing timer
+        if (weeklyFocusTimerRef.current[weekId]) {
+            clearTimeout(weeklyFocusTimerRef.current[weekId]);
+        }
+
+        // Set new debounced save
+        weeklyFocusTimerRef.current[weekId] = setTimeout(async () => {
+            const { year, month, weekNum } = parseWeekId(weekId);
+            try {
+                await planApi.upsertWeeklyFocus(year, month, weekNum, content);
+            } catch (error) {
+                console.error('Failed to save weekly focus:', error);
+            }
+        }, 1000);
+    };
+
+    // ============================================================================
+    // Todo Handlers using API (乐观更新，避免闪烁)
+    // ============================================================================
+
+    const toggleTodo = async (id: number) => {
+        // 乐观更新：立即更新本地状态
+        setWeeklyPlanData(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                items: prev.items.map(day => ({
+                    ...day,
+                    todoList: day.todoList.map(todo =>
+                        todo.id === id ? { ...todo, completed: !todo.completed } : todo
+                    )
+                }))
+            };
+        });
+
+        try {
+            const todo = weeklyPlanData?.items.flatMap(d => d.todoList).find(t => t.id === id);
+            if (todo) {
+                await todoApi.updateTodo(id, { completed: !todo.completed });
+            }
+        } catch (error) {
+            console.error('Failed to toggle todo:', error);
+            // 失败时静默刷新恢复数据
+            fetchWeeklyPlan();
+        }
+    };
+
+    const deleteTodo = async (id: number) => {
+        // 乐观更新：立即从本地移除
+        setWeeklyPlanData(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                items: prev.items.map(day => ({
+                    ...day,
+                    todoList: day.todoList.filter(todo => todo.id !== id)
+                }))
+            };
+        });
+
+        try {
+            await todoApi.deleteTodo(id);
+        } catch (error) {
+            console.error('Failed to delete todo:', error);
+            // 失败时静默刷新恢复数据
+            fetchWeeklyPlan();
+        }
+    };
+
+    const addTodo = async (date: string) => {
+        const text = newTodoInput[date];
+        if (!text?.trim()) return;
+
+        // 清空输入框
+        setNewTodoInput(prev => ({ ...prev, [date]: '' }));
+
+        // 创建临时任务用于乐观更新
+        const tempId = -Date.now(); // 临时负数 ID
+        const tempTodo: TodoItem = {
+            id: tempId,
+            orderIndex: 999,
+            content: text,
+            color: '#FFFFFF',
+            completed: false,
+            linkToGoal: null,
+            date: date,
+            expectedFinishedAt: null,
+            actualFinishedAt: null,
+            crossDay: false
+        };
+
+        // 乐观更新：立即添加到本地
+        setWeeklyPlanData(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                items: prev.items.map(day =>
+                    day.date === date
+                        ? { ...day, todoList: [...day.todoList, tempTodo] }
+                        : day
+                )
+            };
+        });
+
+        try {
+            const newTodo = await todoApi.createTodo({
+                content: text,
+                date: date,
+                color: '#FFFFFF',
+                crossDay: false
+            });
+
+            // 用真实数据替换临时数据
+            setWeeklyPlanData(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    items: prev.items.map(day => ({
+                        ...day,
+                        todoList: day.todoList.map(todo =>
+                            todo.id === tempId ? newTodo : todo
+                        )
+                    }))
+                };
+            });
+        } catch (error) {
+            console.error('Failed to add todo:', error);
+            // 失败时移除临时任务
+            setWeeklyPlanData(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    items: prev.items.map(day => ({
+                        ...day,
+                        todoList: day.todoList.filter(todo => todo.id !== tempId)
+                    }))
+                };
+            });
+        }
+    };
+
+    // ============================================================================
+    // Other Handlers
+    // ============================================================================
 
     const getWeeklySummaryContent = (weekId: string) => {
         return weeklySummaryContent[weekId] ?? '';
@@ -152,8 +415,19 @@ const PlanTabView: React.FC = () => {
         setCollapsedDays(prev => ({ ...prev, [dayDate]: !prev[dayDate] }));
     };
 
-    // Days for the selected week
+    // Days for the selected week (from API data or computed)
     const days = useMemo(() => {
+        if (weeklyPlanData?.items) {
+            return weeklyPlanData.items.map(item => ({
+                name: new Date(item.date).toLocaleDateString('en-US', { weekday: 'long' }),
+                date: item.date,
+                todos: item.todoList,
+                focusContent: item.dailyFocusContent,
+                completionRate: item.completionRate
+            }));
+        }
+
+        // Fallback to computed days
         const week = weeksInMonth.find(w => w.id === selectedWeek);
         if (!week) return [];
 
@@ -166,41 +440,14 @@ const PlanTabView: React.FC = () => {
             d.setDate(start.getDate() + i);
             result.push({
                 name: dayNames[i],
-                date: d.toISOString().split('T')[0]
+                date: d.toISOString().split('T')[0],
+                todos: [] as TodoItem[],
+                focusContent: '',
+                completionRate: 0
             });
         }
         return result;
-    }, [selectedWeek, weeksInMonth]);
-
-    // Local state for todos
-    const [localTodos, setLocalTodos] = useState<GoalItem[]>(MOCK_TODOS);
-    const [newTodoInput, setNewTodoInput] = useState<{ [key: string]: string }>({});
-
-    const toggleTodo = (id: string) => {
-        setLocalTodos(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-    };
-
-    const deleteTodo = (id: string) => {
-        setLocalTodos(prev => prev.filter(t => t.id !== id));
-    };
-
-    const addTodo = (date: string) => {
-        const text = newTodoInput[date];
-        if (!text?.trim()) return;
-
-        const newId = `nt-${Date.now()}`;
-        const newTask: GoalItem = {
-            id: newId,
-            text: text,
-            completed: false,
-            date: date,
-            trackedTime: '0m',
-            tag: 'New'
-        };
-
-        setLocalTodos([...localTodos, newTask]);
-        setNewTodoInput(prev => ({ ...prev, [date]: '' }));
-    };
+    }, [selectedWeek, weeksInMonth, weeklyPlanData]);
 
     const handleSummaryClick = () => {
         setShowSummaryView(!showSummaryView);
@@ -244,14 +491,21 @@ const PlanTabView: React.FC = () => {
 
             {/* Right: Main Content Area */}
             <div className="flex-1 overflow-y-auto p-6 scrollbar-light transition-all">
-                {showSummaryView ? (
+                {isLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                        <div className="flex flex-col items-center gap-4">
+                            <Loader2 size={32} className="text-blue-500 animate-spin" />
+                            <span className="text-sm text-slate-500">加载中...</span>
+                        </div>
+                    </div>
+                ) : showSummaryView ? (
                     /* ========== SUMMARY VIEW ========== */
                     viewType === 'week' ? (
                         /* ----- WEEKLY SUMMARY VIEW ----- */
                         (() => {
                             const currentWeek = weeksInMonth.find(w => w.id === selectedWeek);
-                            const weekPlan = currentWeek ? getWeekSummary(currentWeek.id, currentWeek.summary) : '';
-                            const isPlaceholder = weekPlan.startsWith('What is the main objective');
+                            const weekPlan = weeklyFocuses[selectedWeek] || '';
+                            const isPlaceholder = weekPlan === '';
 
                             return (
                                 <div className="max-w-4xl mx-auto">
@@ -291,7 +545,7 @@ const PlanTabView: React.FC = () => {
                                         </div>
                                         <div className="divide-y divide-slate-100">
                                             {days.map(day => {
-                                                const dayTodos = localTodos.filter(t => t.date === day.date);
+                                                const dayTodos = day.todos || [];
                                                 const completedCount = dayTodos.filter(t => t.completed).length;
                                                 const totalCount = dayTodos.length;
                                                 const isCollapsed = collapsedDays[day.date] ?? true;
@@ -331,7 +585,7 @@ const PlanTabView: React.FC = () => {
                                                                                     {todo.completed && <Check size={10} className="text-white" strokeWidth={3} />}
                                                                                 </div>
                                                                                 <span className={`text-sm ${todo.completed ? 'text-slate-400 line-through' : 'text-slate-600'}`}>
-                                                                                    {todo.text}
+                                                                                    {todo.content}
                                                                                 </span>
                                                                             </div>
                                                                         ))}
@@ -472,10 +726,10 @@ const PlanTabView: React.FC = () => {
                                         <textarea
                                             className="w-full bg-transparent resize-none outline-none text-sm text-slate-600 placeholder-slate-300 leading-relaxed"
                                             placeholder={`What is the main objective for Week ${week.weekNum}?`}
-                                            value={getWeekSummary(week.id, week.summary === `What is the main objective for Week ${week.weekNum}?` ? '' : week.summary)}
+                                            value={weeklyFocuses[week.id] || ''}
                                             onChange={(e) => {
                                                 e.stopPropagation();
-                                                updateWeekSummary(week.id, e.target.value);
+                                                updateWeeklyFocus(week.id, e.target.value);
                                             }}
                                             onClick={(e) => e.stopPropagation()}
                                             rows={3}
@@ -518,8 +772,8 @@ const PlanTabView: React.FC = () => {
                         {/* Weekly Focus Banner - Shows summary from Month View */}
                         {(() => {
                             const currentWeek = weeksInMonth.find(w => w.id === selectedWeek);
-                            const weekFocus = currentWeek ? getWeekSummary(currentWeek.id, currentWeek.summary) : '';
-                            const isPlaceholder = weekFocus.startsWith('What is the main objective');
+                            const weekFocus = weeklyFocuses[selectedWeek] || '';
+                            const isPlaceholder = weekFocus === '';
 
                             return (
                                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-5 mb-6 flex items-start gap-4">
@@ -546,8 +800,8 @@ const PlanTabView: React.FC = () => {
 
                         <div className={viewMode === 'compact' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4' : 'space-y-6'}>
                             {days.map((day, index) => {
-                                const dayTodos = localTodos.filter(t => t.date === day.date);
-                                const defaultFocus = MOCK_PLANS.find(p => p.date === day.date)?.content || '';
+                                const dayTodos = day.todos || [];
+                                const defaultFocus = dailyFocuses[day.date] || '';
 
                                 // 3 up (span 4), 4 down (span 3)
                                 const compactColSpan = index < 3 ? 'xl:col-span-4' : 'xl:col-span-3';
@@ -569,7 +823,8 @@ const PlanTabView: React.FC = () => {
                                                     <textarea
                                                         className="w-full h-16 p-3 bg-slate-50 rounded-xl border border-slate-100 resize-none outline-none text-slate-700 font-medium leading-relaxed placeholder-slate-300 text-xs focus:bg-white focus:border-blue-200 transition-all no-scrollbar"
                                                         placeholder={`Focus for ${day.name}...`}
-                                                        defaultValue={defaultFocus}
+                                                        value={dailyFocuses[day.date] || ''}
+                                                        onChange={(e) => updateDailyFocus(day.date, e.target.value)}
                                                     />
                                                 </div>
 
@@ -587,7 +842,7 @@ const PlanTabView: React.FC = () => {
                                                                     {todo.completed && <Check size={10} className="text-white" strokeWidth={4} />}
                                                                 </button>
                                                                 <span className={`text-xs font-medium truncate flex-1 leading-tight ${todo.completed ? 'text-slate-300 line-through' : 'text-slate-600'}`}>
-                                                                    {todo.text}
+                                                                    {todo.content}
                                                                 </span>
                                                                 <button
                                                                     onClick={() => deleteTodo(todo.id)}
@@ -625,7 +880,8 @@ const PlanTabView: React.FC = () => {
                                                         <textarea
                                                             className="w-full h-full p-5 resize-none outline-none text-slate-700 font-medium leading-relaxed bg-transparent placeholder-slate-300 text-sm no-scrollbar"
                                                             placeholder={`What is your main focus for ${day.name}?`}
-                                                            defaultValue={defaultFocus}
+                                                            value={dailyFocuses[day.date] || ''}
+                                                            onChange={(e) => updateDailyFocus(day.date, e.target.value)}
                                                         />
                                                     </div>
                                                 </div>
@@ -648,7 +904,7 @@ const PlanTabView: React.FC = () => {
                                                                         {todo.completed && <Check size={12} className="text-white" strokeWidth={3} />}
                                                                     </button>
                                                                     <span className={`text-sm font-medium truncate flex-1 ${todo.completed ? 'text-slate-300 line-through' : 'text-slate-600'}`}>
-                                                                        {todo.text}
+                                                                        {todo.content}
                                                                     </span>
                                                                     <button
                                                                         onClick={() => deleteTodo(todo.id)}

@@ -34,6 +34,36 @@ export interface SubTodoListResponse {
 }
 
 // ============================================================================
+// Plan Types (与后端 API 对齐)
+// ============================================================================
+
+export interface DailyPlanItem {
+    id: number;
+    date: string;
+    dailyFocusContent: string;
+    completionRate: number;
+    todoList: TodoItem[];
+}
+
+export interface WeeklyPlanResponse {
+    weeklyFocusContent: string;
+    items: DailyPlanItem[];
+}
+
+export interface WeeklyPlanItem {
+    id: number;
+    startDate: string;
+    endDate: string;
+    weeklyFocusContent: string;
+    completionRate: number;
+}
+
+export interface MonthlyPlanResponse {
+    monthlyFocusContent: string;
+    items: WeeklyPlanItem[];
+}
+
+// ============================================================================
 // Legacy Types (保留用于其他组件)
 // ============================================================================
 
