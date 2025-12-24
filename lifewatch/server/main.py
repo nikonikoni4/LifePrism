@@ -12,7 +12,8 @@ from lifewatch.server.api import (
     category_v2_router, 
     activity_v2_router, 
     timeline_v2_router,
-    usage_router
+    usage_router,
+    goal_router
 )
 from lifewatch.storage.lw_table_manager import init_database
 from lifewatch.server.providers.category_color_provider import initialize_category_colors
@@ -98,6 +99,7 @@ app.include_router(category_v2_router, prefix="/api/v2")
 app.include_router(activity_v2_router, prefix="/api/v2")
 app.include_router(timeline_v2_router, prefix="/api/v2")  # 已包含 /api/v2/timeline 前缀
 app.include_router(usage_router, prefix="/api/v2")  # Token 使用统计
+app.include_router(goal_router, prefix="/api/v2")  # Goal/TodoList
 
 
 

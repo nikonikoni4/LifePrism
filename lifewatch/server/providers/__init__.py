@@ -7,14 +7,14 @@ from lifewatch.utils import LazySingleton
 
 # 导入 Provider 类
 from .statistical_data_providers import ServerLWDataProvider
-from .goal_provider import GoalProvider
+from .todo_provider import TodoProvider
 
 # 创建懒加载单例
 server_lw_data_provider = LazySingleton(ServerLWDataProvider)
-goal_provider = LazySingleton(GoalProvider)
+todo_provider = LazySingleton(TodoProvider)
 
 # 对外导出
 __all__ = [
     "server_lw_data_provider",
-    "goal_provider",
+    "todo_provider",
 ]

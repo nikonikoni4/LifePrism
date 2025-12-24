@@ -8,6 +8,7 @@ from .category_api import router as category_v2_router
 from .activity_api import router as activity_v2_router
 from .timeline_api import router as timeline_v2_router
 from .usage import router as usage_router
+from .goal_api import router as goal_router
 
 __all__ = [
     "dashboard_router",
@@ -19,6 +20,7 @@ __all__ = [
     "activity_v2_router",
     "timeline_v2_router",
     "usage_router",
+    "goal_router",
 ]
 
 

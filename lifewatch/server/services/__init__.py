@@ -15,6 +15,7 @@ from .category_service import CategoryService
 # V2 纯函数服务模块
 from . import timeline_service
 from . import usage_service
+from . import todo_service
 
 # 创建懒加载单例实例（首次访问时才初始化）
 activity_service = LazySingleton(ActivityService)
@@ -27,5 +28,7 @@ __all__ = [
     # V2 纯函数模块
     "timeline_service",
     "usage_service",
+    "todo_service",
 ]
+
 
