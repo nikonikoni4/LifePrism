@@ -41,6 +41,26 @@
           -ms-overflow-style: none;  /* IE and Edge */
           scrollbar-width: none;  /* Firefox */
       }
+      /* Light thin scrollbar styling */
+      .scrollbar-light::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+      }
+      .scrollbar-light::-webkit-scrollbar-track {
+          background: #F8FAFC;
+          border-radius: 3px;
+      }
+      .scrollbar-light::-webkit-scrollbar-thumb {
+          background: #E2E8F0;
+          border-radius: 3px;
+      }
+      .scrollbar-light::-webkit-scrollbar-thumb:hover {
+          background: #CBD5E1;
+      }
+      .scrollbar-light {
+          scrollbar-width: thin;
+          scrollbar-color: #E2E8F0 #F8FAFC;
+      }
     </style>
   <!-- 
   NOTE: Import Maps 与 Vite 冲突,已注释

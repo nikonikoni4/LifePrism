@@ -113,11 +113,10 @@ const GoalsPage: React.FC = () => {
             {/* 2. Main Body Content Area */}
             <main className="flex-1 flex min-h-0 overflow-hidden">
                 {activeTab === 'todo' && <TodoTabView />}
+                {activeTab === 'plan' && <PlanTabView />}
 
-                {activeTab !== 'todo' && (
+                {activeTab !== 'todo' && activeTab !== 'plan' && (
                     <div className="flex-1 overflow-y-auto p-0 no-scrollbar">
-                        {activeTab === 'plan' && <PlanTabView />}
-
                         <div className="max-w-6xl mx-auto p-10 h-full">
                             {/* Goal Tab Logic: Toggle between List and Detail */}
                             {activeTab === 'goal' && (

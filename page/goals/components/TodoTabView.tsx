@@ -10,7 +10,8 @@ import {
     Palette,
     Activity,
     CheckCircle,
-    Loader2
+    Loader2,
+    RefreshCw
 } from 'lucide-react';
 import {
     DndContext,
@@ -368,6 +369,9 @@ const TodoTabView: React.FC = () => {
     const [l1Input, setL1Input] = useState('');
     const [l2Input, setL2Input] = useState('');
 
+    // 日期范围选择弹窗状态
+    const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+
     return (
         <div className="flex-1 flex h-full overflow-hidden bg-[#F8FAFC]">
 
@@ -504,72 +508,130 @@ const TodoTabView: React.FC = () => {
                             />
                         </div>
 
-                        {/* 2x2 Grid for Metadata */}
-                        <div className="grid grid-cols-2 gap-4 mb-8">
-                            {/* 1. Date Range */}
-                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-between gap-2 hover:bg-white hover:shadow-sm transition-all group">
-                                <div className="flex items-center gap-2 text-slate-400">
-                                    <Calendar size={14} className="group-hover:text-blue-500 transition-colors" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Date</span>
+                        {/* 5-column Grid for Metadata */}
+                        <div className="grid grid-cols-5 gap-2 mb-6">
+                            {/* 1. Date Range - Single module with popup */}
+                            <div
+                                className="bg-slate-50/50 p-2.5 rounded-xl border border-slate-100 flex flex-col gap-1 hover:bg-white hover:shadow-sm transition-all group cursor-pointer relative"
+                                onClick={() => setShowDateRangePicker(!showDateRangePicker)}
+                            >
+                                <div className="flex items-center gap-1.5 text-slate-400">
+                                    <Calendar size={11} className="group-hover:text-blue-500 transition-colors" />
+                                    <span className="text-[8px] font-bold uppercase tracking-wider">日期</span>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <span className="text-xs font-bold text-slate-700">{selectedL1Item.date}</span>
+                                <div className="flex items-center gap-1 text-[10px] font-bold text-slate-700">
+                                    <span className="truncate">{selectedL1Item.date?.slice(5) || '--'}</span>
+                                    <span className="text-slate-400">→</span>
+                                    <span className="truncate">{selectedL1Item.expectedFinishedAt?.slice(5) || '--'}</span>
                                 </div>
+
+                                {/* Date Range Picker Popup */}
+                                {showDateRangePicker && (
+                                    <div
+                                        className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-200 p-4 z-50 w-64"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">开始日期</label>
+                                                <input
+                                                    type="date"
+                                                    value={selectedL1Item.date}
+                                                    onChange={(e) => handleUpdateL1(selectedL1Item.id, { date: e.target.value })}
+                                                    className="w-full px-3 py-2 text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">结束日期</label>
+                                                <input
+                                                    type="date"
+                                                    value={selectedL1Item.expectedFinishedAt || ''}
+                                                    onChange={(e) => handleUpdateL1(selectedL1Item.id, { expectedFinishedAt: e.target.value || null })}
+                                                    className="w-full px-3 py-2 text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={() => setShowDateRangePicker(false)}
+                                                className="w-full py-2 bg-blue-500 text-white text-sm font-bold rounded-lg hover:bg-blue-600 transition-colors"
+                                            >
+                                                确定
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
-                            {/* 2. Color Selection */}
-                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-between gap-2 hover:bg-white hover:shadow-sm transition-all group">
-                                <div className="flex items-center gap-2 text-slate-400">
-                                    <Palette size={14} className="group-hover:text-purple-500 transition-colors" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Color</span>
+                            {/* 2. Cross-Day Toggle */}
+                            <div
+                                onClick={() => handleUpdateL1(selectedL1Item.id, { crossDay: !selectedL1Item.crossDay })}
+                                className={`p-2.5 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all group ${selectedL1Item.crossDay
+                                        ? 'bg-amber-50/50 border-amber-200 hover:bg-amber-100'
+                                        : 'bg-slate-50/50 border-slate-100 hover:bg-white hover:shadow-sm'
+                                    }`}
+                                title="长期任务：每天都会出现直至完成"
+                            >
+                                <div className={`flex items-center gap-1.5 ${selectedL1Item.crossDay ? 'text-amber-600' : 'text-slate-400'}`}>
+                                    <RefreshCw size={11} className="group-hover:text-amber-500 transition-colors" />
+                                    <span className="text-[8px] font-bold uppercase tracking-wider">跨日</span>
                                 </div>
-                                <div className="flex gap-1.5 flex-wrap">
-                                    {TODO_COLORS.slice(0, 5).map(c => (
-                                        <button
-                                            key={c}
-                                            onClick={() => handleUpdateL1(selectedL1Item.id, { color: c })}
-                                            className={`w-4 h-4 rounded-full border border-slate-200 shadow-sm transition-transform hover:scale-110 ${selectedL1Item.color === c ? 'ring-2 ring-slate-400 scale-110' : ''}`}
-                                            style={{ backgroundColor: c }}
-                                        />
-                                    ))}
-                                </div>
+                                <span className={`text-[10px] font-bold truncate ${selectedL1Item.crossDay ? 'text-amber-700' : 'text-slate-500'}`}>
+                                    {selectedL1Item.crossDay ? '长期' : '单日'}
+                                </span>
                             </div>
 
-                            {/* 3. Link Goal */}
-                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-between gap-2 hover:bg-white hover:shadow-sm transition-all group">
-                                <div className="flex items-center gap-2 text-slate-400">
-                                    <Target size={14} className="group-hover:text-orange-500 transition-colors" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Goal Link</span>
+                            {/* 3. Goal Link */}
+                            <div className="bg-slate-50/50 p-2.5 rounded-xl border border-slate-100 flex flex-col gap-1 hover:bg-white hover:shadow-sm transition-all group">
+                                <div className="flex items-center gap-1.5 text-slate-400">
+                                    <Target size={11} className="group-hover:text-orange-500 transition-colors" />
+                                    <span className="text-[8px] font-bold uppercase tracking-wider">目标</span>
                                 </div>
                                 <select
                                     value={selectedL1Item.linkToGoal || ''}
                                     onChange={(e) => handleUpdateL1(selectedL1Item.id, {
                                         linkToGoal: e.target.value ? parseInt(e.target.value) : null
                                     })}
-                                    className="bg-transparent text-xs font-bold text-slate-700 w-full outline-none -ml-1 cursor-pointer"
+                                    className="bg-transparent text-[10px] font-bold text-slate-700 w-full outline-none cursor-pointer truncate"
                                 >
-                                    <option value="">No Goal</option>
+                                    <option value="">无</option>
                                     {MOCK_GOALS_LIST.map(g => (
                                         <option key={g.id} value={g.id}>{g.alias || g.name}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            {/* 4. Status Toggle */}
+                            {/* 4. Color Selection */}
+                            <div className="bg-slate-50/50 p-2.5 rounded-xl border border-slate-100 flex flex-col gap-1 hover:bg-white hover:shadow-sm transition-all group">
+                                <div className="flex items-center gap-1.5 text-slate-400">
+                                    <Palette size={11} className="group-hover:text-purple-500 transition-colors" />
+                                    <span className="text-[8px] font-bold uppercase tracking-wider">颜色</span>
+                                </div>
+                                <div className="flex gap-1">
+                                    {TODO_COLORS.slice(0, 5).map(c => (
+                                        <button
+                                            key={c}
+                                            onClick={() => handleUpdateL1(selectedL1Item.id, { color: c })}
+                                            className={`w-3.5 h-3.5 rounded-full border border-slate-200 shadow-sm transition-transform hover:scale-110 ${selectedL1Item.color === c ? 'ring-2 ring-slate-400 scale-110' : ''}`}
+                                            style={{ backgroundColor: c }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 5. Status Toggle */}
                             <div
                                 onClick={() => handleUpdateL1(selectedL1Item.id, { completed: !selectedL1Item.completed })}
-                                className={`p-4 rounded-2xl border flex flex-col justify-between gap-2 cursor-pointer transition-all ${selectedL1Item.completed
+                                className={`p-2.5 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all ${selectedL1Item.completed
                                     ? 'bg-green-50/50 border-green-200 hover:bg-green-100'
                                     : 'bg-slate-50/50 border-slate-100 hover:bg-white hover:shadow-sm hover:border-blue-200'
                                     }`}
                             >
-                                <div className={`flex items-center gap-2 ${selectedL1Item.completed ? 'text-green-600' : 'text-slate-400'}`}>
-                                    {selectedL1Item.completed ? <CheckCircle size={14} /> : <Activity size={14} />}
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Status</span>
+                                <div className={`flex items-center gap-1.5 ${selectedL1Item.completed ? 'text-green-600' : 'text-slate-400'}`}>
+                                    {selectedL1Item.completed ? <CheckCircle size={11} /> : <Activity size={11} />}
+                                    <span className="text-[8px] font-bold uppercase tracking-wider">状态</span>
                                 </div>
-                                <div className={`text-xs font-bold ${selectedL1Item.completed ? 'text-green-700' : 'text-slate-700'}`}>
-                                    {selectedL1Item.completed ? 'Completed' : 'In Progress'}
-                                </div>
+                                <span className={`text-[10px] font-bold truncate ${selectedL1Item.completed ? 'text-green-700' : 'text-slate-700'}`}>
+                                    {selectedL1Item.completed ? '完成' : '进行中'}
+                                </span>
                             </div>
                         </div>
 
