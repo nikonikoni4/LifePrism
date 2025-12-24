@@ -150,6 +150,7 @@ const TodoTabView: React.FC = () => {
     const [selectedDate, setSelectedDate] = useState(today);
 
     const [items, setItems] = useState<TodoItem[]>([]);
+    const [dailyFocusContent, setDailyFocusContent] = useState<string | null>(null);
     const [selectedL1Id, setSelectedL1Id] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -165,6 +166,7 @@ const TodoTabView: React.FC = () => {
         try {
             const response = await todoApi.getTodos(selectedDate, true);
             setItems(response.items || []);
+            setDailyFocusContent(response.dailyFocusContent);
         } catch (error) {
             console.error('Failed to load todos:', error);
         } finally {
@@ -367,7 +369,15 @@ const TodoTabView: React.FC = () => {
             {/* 2. MIDDLE PANE: LEVEL 1 TODOS */}
             <div className="flex-1 min-w-[300px] max-w-md bg-[#F8FAFC] flex flex-col border-r border-slate-200/60">
                 <div className="p-8">
-                    <h3 className="text-lg font-black text-slate-800 tracking-tight mb-6">Today's Focus</h3>
+                    <div className="flex items-center gap-3 mb-6">
+                        <h3 className="text-lg font-black text-slate-800 tracking-tight">Today's Focus</h3>
+                        <span className={`text-sm font-medium px-3 py-1 rounded-full ${dailyFocusContent
+                                ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                : 'bg-slate-50 text-slate-400 border border-slate-100'
+                            }`}>
+                            {dailyFocusContent || '未设置今日重点'}
+                        </span>
+                    </div>
 
                     {/* Create L1 Input */}
                     <div className="mb-6 relative group">

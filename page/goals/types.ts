@@ -26,6 +26,7 @@ export interface TodoItem {
 }
 
 export interface TodoListResponse {
+    dailyFocusContent: string | null;
     items: TodoItem[];
 }
 

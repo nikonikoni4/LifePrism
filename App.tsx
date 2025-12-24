@@ -83,7 +83,7 @@ function App() {
         className={`lg:ml-64 p-6 lg:p-10 min-h-screen transition-all duration-300 ease-in-out ${chatDisplayMode === 'sidebar' ? 'lg:mr-[400px]' : ''
           }`}
       >
-        {currentPage === 'home' && <Home />}
+        {currentPage === 'home' && <Home onNavigate={setCurrentPage} />}
         {currentPage === 'timeline' && <Timeline />}
         {currentPage === 'category' && <CategoryPage />}
         {currentPage === 'goals' && <GoalsPage />}

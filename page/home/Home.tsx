@@ -12,6 +12,10 @@ import { TimeOverviewWidget, TimeOverviewData } from '../common';
 import { ActivityAPI } from './api';
 import { Loader2, AlertCircle } from 'lucide-react';
 
+interface HomeProps {
+    onNavigate?: (page: string) => void;
+}
+
 // 获取今天日期 YYYY-MM-DD 格式
 const getTodayDate = (): string => {
     const today = new Date();
@@ -21,7 +25,7 @@ const getTodayDate = (): string => {
     return `${year}-${month}-${day}`;
 };
 
-const Home: React.FC = () => {
+const Home: React.FC<HomeProps> = ({ onNavigate }) => {
     const [selectedDate, setSelectedDate] = useState(getTodayDate());
     const [refreshKey, setRefreshKey] = useState(0);
 
@@ -130,6 +134,7 @@ const Home: React.FC = () => {
                         key={`todolist-${refreshKey}`}
                         selectedDate={selectedDate}
                         todolist={homepageData?.todolist}
+                        onNavigateToGoals={() => onNavigate?.('goals')}
                     />
                 </div>
 
