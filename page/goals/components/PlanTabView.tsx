@@ -1,11 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-    Calendar,
     Target,
     Plus,
     Trash2,
-    ChevronDown,
     ChevronRight,
     ChevronUp,
     LayoutGrid,
@@ -20,6 +18,7 @@ import {
 } from 'lucide-react';
 import { MOCK_TODOS, MOCK_PLANS } from '../api';
 import { GoalItem } from '../types';
+import DateTreeSelector from './DateTreeSelector';
 
 // --- Types ---
 interface WeekData {
@@ -55,8 +54,9 @@ const getWeeksInMonth = (year: number, month: number): WeekData[] => {
         const startStr = `${monthNames[weekStart.getMonth()]} ${String(weekStart.getDate()).padStart(2, '0')}`;
         const endStr = `${monthNames[weekEnd.getMonth()]} ${String(weekEnd.getDate()).padStart(2, '0')}`;
 
+        // Use YYYY-M-wN format to match DateTreeSelector
         weeks.push({
-            id: `w${weekNum}`,
+            id: `${year}-${month}-w${weekNum}`,
             weekNum,
             label: `${startStr} - ${endStr}`,
             startDate: weekStart.toISOString().split('T')[0],
@@ -77,49 +77,37 @@ const getWeeksInMonth = (year: number, month: number): WeekData[] => {
     return weeks;
 };
 
-const getMonthsAround = (): { value: string; label: string; year: number; month: number }[] => {
-    const today = new Date();
-    const months = [];
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'];
 
-    for (let i = -2; i <= 2; i++) {
-        const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-        months.push({
-            value: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
-            label: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
-            year: d.getFullYear(),
-            month: d.getMonth()
-        });
-    }
-    return months;
-};
 
 const PlanTabView: React.FC = () => {
     // View type: 'week' (detailed) or 'month' (card grid)
-    const [viewType, setViewType] = useState<'week' | 'month'>('month');
+    // Default to week view as per user requirement
+    const [viewType, setViewType] = useState<'week' | 'month'>('week');
 
     const today = new Date();
-    const currentMonthLabel = `${['January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'][today.getMonth()]} ${today.getFullYear()}`;
+    // Use YYYY-MM format for selectedMonth to match DateTreeSelector
+    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-    const [selectedMonth, setSelectedMonth] = useState(currentMonthLabel);
-    const [isMonthOpen, setIsMonthOpen] = useState(false);
+    const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
     const [viewMode, setViewMode] = useState<'detail' | 'compact'>('detail');
 
-    const availableMonths = useMemo(() => getMonthsAround(), []);
-
+    // Parse selected month to get year and month numbers
     const selectedMonthData = useMemo(() => {
-        const found = availableMonths.find(m => m.value === selectedMonth);
-        return found || { year: today.getFullYear(), month: today.getMonth() };
-    }, [selectedMonth, availableMonths, today]);
+        const [year, month] = selectedMonth.split('-').map(Number);
+        return { year, month: month - 1 }; // month is 0-indexed
+    }, [selectedMonth]);
 
     const weeksInMonth = useMemo(() =>
         getWeeksInMonth(selectedMonthData.year, selectedMonthData.month),
         [selectedMonthData]
     );
 
-    const [selectedWeek, setSelectedWeek] = useState(weeksInMonth[0]?.id || 'w1');
+    // Initialize selectedWeek using the new ID format: YYYY-M-wN
+    const [selectedWeek, setSelectedWeek] = useState(() => {
+        const year = today.getFullYear();
+        const month = today.getMonth();
+        return `${year}-${month}-w1`;
+    });
 
     // Week summaries state for editing (plan content)
     const [weekSummaries, setWeekSummaries] = useState<Record<string, string>>({});
@@ -218,103 +206,26 @@ const PlanTabView: React.FC = () => {
         setShowSummaryView(!showSummaryView);
     };
 
+    // Handle week change from DateTreeSelector
+    const handleWeekChange = (weekId: string, monthKey: string) => {
+        setSelectedWeek(weekId);
+        if (monthKey !== selectedMonth) {
+            setSelectedMonth(monthKey);
+        }
+    };
+
     return (
         <div className="flex flex-1 h-full overflow-hidden bg-transparent">
-            {/* Left: Sidebar */}
+            {/* Left: Sidebar with DateTreeSelector */}
             <div className="w-56 border-r border-slate-200 bg-white pt-6 px-4 flex flex-col flex-shrink-0 transition-all duration-300">
-
-                {/* Week/Month Toggle */}
-                <div className="mb-6">
-                    <div className="bg-slate-100 p-1 rounded-xl flex items-center">
-                        <button
-                            onClick={() => setViewType('week')}
-                            className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all ${viewType === 'week'
-                                ? 'bg-white text-slate-800 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            Week
-                        </button>
-                        <button
-                            onClick={() => setViewType('month')}
-                            className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all ${viewType === 'month'
-                                ? 'bg-white text-slate-800 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            Month
-                        </button>
-                    </div>
-                </div>
-
-                <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-2 block px-1">Focus on strategy</span>
-
-                {/* Month Selector */}
-                <div className="mb-6 relative">
-                    <button
-                        onClick={() => setIsMonthOpen(!isMonthOpen)}
-                        className={`flex items-center justify-between w-full p-3 border rounded-xl font-bold text-sm transition-all group ${isMonthOpen
-                            ? 'bg-white border-blue-200 ring-2 ring-blue-50'
-                            : 'bg-slate-50 border-slate-200 hover:bg-white text-slate-700'
-                            }`}
-                    >
-                        <span className="flex items-center gap-2">
-                            <span className={isMonthOpen ? 'text-slate-800' : ''}>{selectedMonth.split(' ')[0]} {selectedMonth.split(' ')[1]}</span>
-                        </span>
-                        <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-blue-500" />
-                            <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isMonthOpen ? 'rotate-180' : ''}`} />
-                        </div>
-                    </button>
-
-                    {/* Dropdown Menu */}
-                    {isMonthOpen && (
-                        <>
-                            <div className="fixed inset-0 z-20 cursor-default" onClick={() => setIsMonthOpen(false)}></div>
-                            <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-xl shadow-xl border border-slate-100 z-30 overflow-hidden animate-in fade-in zoom-in-95 duration-200 p-1">
-                                {availableMonths.map(month => (
-                                    <button
-                                        key={month.value}
-                                        onClick={() => {
-                                            setSelectedMonth(month.value);
-                                            setIsMonthOpen(false);
-                                        }}
-                                        className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-between ${selectedMonth === month.value
-                                            ? 'bg-blue-50 text-blue-600'
-                                            : 'text-slate-600 hover:bg-slate-50'
-                                            }`}
-                                    >
-                                        {month.label}
-                                        {selectedMonth === month.value && <Check size={14} />}
-                                    </button>
-                                ))}
-                            </div>
-                        </>
-                    )}
-                </div>
-
-                {/* Week List */}
-                <div
-                    className="flex-1 space-y-1 overflow-y-auto scrollbar-light"
-                    onWheel={(e) => e.stopPropagation()}
-                >
-                    {weeksInMonth.map(week => (
-                        <button
-                            key={week.id}
-                            onClick={() => setSelectedWeek(week.id)}
-                            className={`w-full text-left px-3 py-2.5 rounded-xl transition-all ${selectedWeek === week.id
-                                ? 'bg-blue-50 text-blue-600 border border-blue-200'
-                                : 'text-slate-600 hover:bg-slate-50 border border-transparent'
-                                }`}
-                        >
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold">Week {week.weekNum}</span>
-                                {selectedWeek === week.id && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
-                            </div>
-                            <span className="text-[10px] text-slate-400">{week.label}</span>
-                        </button>
-                    ))}
-                </div>
+                <DateTreeSelector
+                    viewType={viewType}
+                    selectedMonth={selectedMonth}
+                    selectedWeek={selectedWeek}
+                    onViewTypeChange={setViewType}
+                    onMonthChange={setSelectedMonth}
+                    onWeekChange={handleWeekChange}
+                />
 
                 {/* Summary Button */}
                 <div className="mt-4 mb-4">
@@ -518,12 +429,8 @@ const PlanTabView: React.FC = () => {
                             {weeksInMonth.map(week => (
                                 <div
                                     key={week.id}
-                                    className={`bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-lg transition-all cursor-pointer group ${selectedWeek === week.id ? 'ring-2 ring-blue-200' : ''
+                                    className={`bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-lg transition-all group ${selectedWeek === week.id ? 'ring-2 ring-blue-200' : ''
                                         }`}
-                                    onClick={() => {
-                                        setSelectedWeek(week.id);
-                                        setViewType('week');
-                                    }}
                                 >
                                     {/* Card Header */}
                                     <div className="flex items-start justify-between mb-4">
@@ -531,14 +438,27 @@ const PlanTabView: React.FC = () => {
                                             <h3 className="text-xl font-bold text-slate-800">Week {week.weekNum}</h3>
                                             <span className="text-xs text-slate-400">{week.label}</span>
                                         </div>
-                                        <div className={`p-2 rounded-lg ${week.isCompleted
-                                            ? 'bg-green-50 text-green-500'
-                                            : 'bg-slate-50 text-slate-400'
-                                            }`}>
-                                            {week.isCompleted
-                                                ? <CheckCircle2 size={20} />
-                                                : <FileText size={20} />
-                                            }
+                                        <div className="flex items-center gap-2">
+                                            <div className={`p-2 rounded-lg ${week.isCompleted
+                                                ? 'bg-green-50 text-green-500'
+                                                : 'bg-slate-50 text-slate-400'
+                                                }`}>
+                                                {week.isCompleted
+                                                    ? <CheckCircle2 size={20} />
+                                                    : <FileText size={20} />
+                                                }
+                                            </div>
+                                            {/* Navigation Arrow Button */}
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedWeek(week.id);
+                                                    setViewType('week');
+                                                }}
+                                                className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:bg-blue-50 hover:text-blue-500 transition-all"
+                                                title="Go to Week View"
+                                            >
+                                                <ChevronRight size={20} />
+                                            </button>
                                         </div>
                                     </div>
 
