@@ -2,6 +2,7 @@
 goal 页面的schemas定义
 """
 
+from tomlkit.api import datetime
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
@@ -104,4 +105,98 @@ class ReorderSubTodoRequest(BaseModel):
 
 # ============================================================================
 # Plan Schemas (预留)
+# ============================================================================
+
+# 周计划项
+class DailyPlanItem(BaseModel):
+    """日计划项"""
+    id: int = Field(..., description="唯一标识符 id")
+    date : str = Field(..., description="日期 YYYY-MM-DD")
+    daily_focus_content: str = Field(..., description="日计划重点")
+    completion_rate: float = Field(..., description="完成度")
+    todo_list: List[TodoListItem] = Field(default=[], description="任务列表（无子任务）")
+
+class WeeklyPlanResponse(BaseModel):
+    """周计划响应：包含日计划项列表"""
+    weekly_focus_content: str = Field(..., description="本周重点")
+    items: List[DailyPlanItem] = Field(default=[], description="周计划列表")
+
+class WeeklyPlanItem(BaseModel):
+    """周计划项:展示在月plan界面"""
+    id: int = Field(..., description="唯一标识符 id")
+    start_date : str = Field(..., description="开始日期 YYYY-MM-DD")
+    end_date : str = Field(..., description="结束日期 YYYY-MM-DD")
+    weekly_focus_content: str = Field(..., description="本周重点")
+    completion_rate: float = Field(..., description="完成度")
+
+
+class MonthlyPlanItem(BaseModel):
+    """月计划项"""
+    monthly_focus_content: str = Field(..., description="月计划重点")
+    items: List[WeeklyPlanItem] = Field(default=[], description="周计划列表")
+
+
+# ============================================================================
+# Plan Request Schemas
+# ============================================================================
+
+class UpsertDailyFocusRequest(BaseModel):
+    """更新日焦点请求"""
+    date: str = Field(..., description="日期 YYYY-MM-DD")
+    content: str = Field(..., description="焦点内容")
+
+
+class UpsertWeeklyFocusRequest(BaseModel):
+    """更新周焦点请求"""
+    year: int = Field(..., description="年份")
+    month: int = Field(..., description="月份 1-12")
+    week_num: int = Field(..., description="周序号 1-4")
+    content: str = Field(..., description="焦点内容")
+
+
+# ============================================================================
+# goal Schemas 
+# ============================================================================
+
+
+class GoalItem(BaseModel):
+    """目标项"""
+    id: int = Field(..., description="唯一标识符 id")
+    abstract: str = Field(..., description="目标摘要")
+    content: str = Field(..., description="目标内容")
+    color: str = Field(..., description="目标颜色")
+    created_at: str = Field(..., description="创建时间")
+    # 关联内容
+    link_to_category: int = Field(..., description="关联的分类 id")
+    link_to_sub_category: int = Field(..., description="关联的子分类 id")
+    link_to_reward: int = Field(..., description="关联的奖励 id")
+    expected_finished_at: str = Field(..., description="预计完成时间")
+    expected_hours: int = Field(..., description="预计耗时")
+    actual_finished_at: str = Field(..., description="实际完成时间")
+    actual_hours: int = Field(..., description="实际耗时")
+    completion_rate: float = Field(..., description="完成度")
+    # 可选 被关联的 todolist
+    todo_link_to_goal: Optional[int] = Field(default=None, description="关联的 todolist id")
+
+
+class GoalListResponse(BaseModel):
+    """目标列表响应"""
+    items: List[GoalItem] = Field(default=[], description="目标列表")
+
+
+# ============================================================================
+# goal Request Schemas (预留)
+# ============================================================================
+
+
+
+
+# ============================================================================
+# reward Schemas (预留)
+# ============================================================================
+
+
+
+# ============================================================================
+# reward Request Schemas (预留)
 # ============================================================================

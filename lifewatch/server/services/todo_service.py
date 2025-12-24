@@ -3,8 +3,8 @@ Goal 服务层 -TodoList 业务逻辑
 
 提供 TodoList 和 SubTodoList 的纯函数接口
 """
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timedelta
+from typing import Optional, List
 
 from lifewatch.server.schemas.goal_schemas import (
     TodoListItem,
@@ -16,7 +16,14 @@ from lifewatch.server.schemas.goal_schemas import (
     ReorderTodoRequest,
     CreateSubTodoRequest,
     UpdateSubTodoRequest,
-    ReorderSubTodoRequest
+    ReorderSubTodoRequest,
+    # Plan Schemas
+    DailyPlanItem,
+    WeeklyPlanResponse,
+    WeeklyPlanItem,
+    MonthlyPlanItem,
+    UpsertDailyFocusRequest,
+    UpsertWeeklyFocusRequest,
 )
 from lifewatch.server.providers.todo_provider import todo_provider
 
@@ -309,3 +316,195 @@ def reorder_sub_todos(request: ReorderSubTodoRequest) -> bool:
         bool: 是否成功
     """
     return todo_provider.reorder_sub_todos(request.parent_id, request.sub_todo_ids)
+
+
+# ============================================================================
+# Plan 服务
+# ============================================================================
+
+def _get_week_dates(year: int, month: int, week_num: int) -> tuple:
+    """
+    计算指定周的日期范围
+    
+    Args:
+        year: 年份
+        month: 月份 (1-12)
+        week_num: 周序号 (1-4)
+    
+    Returns:
+        tuple: (start_date, end_date) YYYY-MM-DD 格式
+    """
+    # 获取月份第一天
+    first_day = datetime(year, month, 1)
+    
+    # 调整到该周的周一
+    day_of_week = first_day.weekday()  # 0=Monday, 6=Sunday
+    first_monday = first_day - timedelta(days=day_of_week)
+    
+    # 计算目标周的开始日期
+    week_start = first_monday + timedelta(weeks=week_num - 1)
+    week_end = week_start + timedelta(days=6)
+    
+    return week_start.strftime('%Y-%m-%d'), week_end.strftime('%Y-%m-%d')
+
+
+def _get_weeks_in_month(year: int, month: int) -> List[dict]:
+    """
+    获取月份中的所有周信息
+    
+    Returns:
+        List[dict]: [{week_num, start_date, end_date}, ...]
+    """
+    weeks = []
+    for week_num in range(1, 5):
+        start_date, end_date = _get_week_dates(year, month, week_num)
+        weeks.append({
+            'week_num': week_num,
+            'start_date': start_date,
+            'end_date': end_date
+        })
+    return weeks
+
+
+def get_weekly_plan(year: int, month: int, week_num: int) -> WeeklyPlanResponse:
+    """
+    获取周计划数据
+    
+    Args:
+        year: 年份
+        month: 月份 (1-12)
+        week_num: 周序号 (1-4)
+    
+    Returns:
+        WeeklyPlanResponse: 周计划响应
+    """
+    # 1. 获取周焦点
+    weekly_focus = todo_provider.get_weekly_focus(year, month, week_num)
+    weekly_focus_content = weekly_focus['content'] if weekly_focus else ''
+    
+    # 2. 计算该周的日期范围
+    start_date, end_date = _get_week_dates(year, month, week_num)
+    
+    # 3. 获取该周所有日焦点
+    daily_focuses = todo_provider.get_daily_focuses_in_range(start_date, end_date)
+    focus_map = {f['date']: f['content'] for f in daily_focuses}
+    
+    # 4. 遍历7天，组装 DailyPlanItem
+    items = []
+    current = datetime.strptime(start_date, '%Y-%m-%d')
+    end = datetime.strptime(end_date, '%Y-%m-%d')
+    
+    day_id = 1
+    while current <= end:
+        date_str = current.strftime('%Y-%m-%d')
+        
+        # 获取当天任务（复用 get_todos）
+        todos_response = get_todos(date_str, include_cross_day=False)
+        todo_list = todos_response.items
+        
+        # 计算完成率
+        total = len(todo_list)
+        completed = sum(1 for t in todo_list if t.completed)
+        completion_rate = (completed / total) if total > 0 else 0.0
+        
+        items.append(DailyPlanItem(
+            id=day_id,
+            date=date_str,
+            daily_focus_content=focus_map.get(date_str, ''),
+            completion_rate=completion_rate,
+            todo_list=todo_list
+        ))
+        
+        current += timedelta(days=1)
+        day_id += 1
+    
+    return WeeklyPlanResponse(
+        weekly_focus_content=weekly_focus_content,
+        items=items
+    )
+
+
+def get_monthly_plan(year: int, month: int) -> MonthlyPlanItem:
+    """
+    获取月计划数据
+    
+    Args:
+        year: 年份
+        month: 月份 (1-12)
+    
+    Returns:
+        MonthlyPlanItem: 月计划响应
+    """
+    # 获取该月所有周焦点
+    weekly_focuses = todo_provider.get_weekly_focuses_in_month(year, month)
+    focus_map = {f['week_num']: f['content'] for f in weekly_focuses}
+    
+    # 组装周计划项
+    weeks = _get_weeks_in_month(year, month)
+    items = []
+    
+    for i, week in enumerate(weeks):
+        week_num = week['week_num']
+        
+        # 获取该周所有任务计算完成率
+        start_date = week['start_date']
+        end_date = week['end_date']
+        
+        # 简化完成率计算：获取该周每天的任务
+        total_todos = 0
+        completed_todos = 0
+        current = datetime.strptime(start_date, '%Y-%m-%d')
+        end = datetime.strptime(end_date, '%Y-%m-%d')
+        
+        while current <= end:
+            date_str = current.strftime('%Y-%m-%d')
+            todos = todo_provider.get_todos_by_date(date_str, include_cross_day=False)
+            total_todos += len(todos)
+            completed_todos += sum(1 for t in todos if t.get('completed'))
+            current += timedelta(days=1)
+        
+        completion_rate = (completed_todos / total_todos) if total_todos > 0 else 0.0
+        
+        items.append(WeeklyPlanItem(
+            id=i + 1,
+            start_date=start_date,
+            end_date=end_date,
+            weekly_focus_content=focus_map.get(week_num, ''),
+            completion_rate=completion_rate
+        ))
+    
+    return MonthlyPlanItem(
+        monthly_focus_content='',  # 暂不实现月焦点
+        items=items
+    )
+
+
+def upsert_daily_focus(request: UpsertDailyFocusRequest) -> bool:
+    """
+    创建或更新日焦点
+    
+    Args:
+        request: 更新请求
+    
+    Returns:
+        bool: 是否成功
+    """
+    return todo_provider.upsert_daily_focus(request.date, request.content)
+
+
+def upsert_weekly_focus(request: UpsertWeeklyFocusRequest) -> bool:
+    """
+    创建或更新周焦点
+    
+    Args:
+        request: 更新请求
+    
+    Returns:
+        bool: 是否成功
+    """
+    return todo_provider.upsert_weekly_focus(
+        request.year, 
+        request.month, 
+        request.week_num, 
+        request.content
+    )

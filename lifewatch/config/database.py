@@ -367,6 +367,72 @@ SUB_TODO_LIST_CONFIG = {
 }
 
 
+# Daily Focus 表配置（日焦点）
+DAILY_FOCUS_CONFIG = {
+    'table_name': 'daily_focus',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键'
+        },
+        'date': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL', 'UNIQUE'],
+            'comment': '日期 YYYY-MM-DD'
+        },
+        'content': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '日焦点内容'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_daily_focus_date', 'columns': ['date']}
+    ],
+    'timestamps': True
+}
+
+
+# Weekly Focus 表配置（周焦点）
+WEEKLY_FOCUS_CONFIG = {
+    'table_name': 'weekly_focus',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键'
+        },
+        'year': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL'],
+            'comment': '年份'
+        },
+        'month': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL'],
+            'comment': '月份 1-12'
+        },
+        'week_num': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL'],
+            'comment': '周序号 1-4'
+        },
+        'content': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '周焦点内容'
+        }
+    },
+    'table_constraints': ['UNIQUE(year, month, week_num)'],
+    'indexes': [
+        {'name': 'idx_weekly_focus_year_month', 'columns': ['year', 'month']}
+    ],
+    'timestamps': True
+}
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'category_map_cache': category_map_cache_CONFIG,
@@ -375,7 +441,9 @@ TABLE_CONFIGS = {
     'sub_category': SUB_CATEGORY_CONFIG,
     'tokens_usage_log': TOKENS_USAGE_LOG_CONFIG,
     'todo_list': TODO_LIST_CONFIG,
-    'sub_todo_list': SUB_TODO_LIST_CONFIG
+    'sub_todo_list': SUB_TODO_LIST_CONFIG,
+    'daily_focus': DAILY_FOCUS_CONFIG,
+    'weekly_focus': WEEKLY_FOCUS_CONFIG
 }
 
 

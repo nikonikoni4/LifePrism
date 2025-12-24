@@ -16,7 +16,12 @@ from lifewatch.server.schemas.goal_schemas import (
     ReorderTodoRequest,
     CreateSubTodoRequest,
     UpdateSubTodoRequest,
-    ReorderSubTodoRequest
+    ReorderSubTodoRequest,
+    # Plan Schemas
+    WeeklyPlanResponse,
+    MonthlyPlanItem,
+    UpsertDailyFocusRequest,
+    UpsertWeeklyFocusRequest,
 )
 from lifewatch.server.services import todo_service
 
@@ -195,4 +200,70 @@ async def delete_sub_todo(
     success = todo_service.delete_sub_todo(sub_id)
     if not success:
         raise HTTPException(status_code=404, detail="子任务不存在")
+    return {"success": True}
+
+
+# ============================================================================
+# Plan 接口
+# ============================================================================
+
+@router.get("/plan/weekly", response_model=WeeklyPlanResponse)
+async def get_weekly_plan(
+    year: int = Query(..., description="年份"),
+    month: int = Query(..., description="月份 (1-12)"),
+    week_num: int = Query(..., description="周序号 (1-4)")
+):
+    """
+    获取周计划
+    
+    - **year**: 年份
+    - **month**: 月份 (1-12)
+    - **week_num**: 周序号 (1-4)
+    """
+    return todo_service.get_weekly_plan(year, month, week_num)
+
+
+@router.get("/plan/monthly", response_model=MonthlyPlanItem)
+async def get_monthly_plan(
+    year: int = Query(..., description="年份"),
+    month: int = Query(..., description="月份 (1-12)")
+):
+    """
+    获取月计划
+    
+    - **year**: 年份
+    - **month**: 月份 (1-12)
+    """
+    return todo_service.get_monthly_plan(year, month)
+
+
+@router.post("/plan/daily-focus")
+async def upsert_daily_focus(request: UpsertDailyFocusRequest):
+    """
+    创建或更新日焦点
+    
+    请求体:
+    - **date**: 日期 (YYYY-MM-DD)
+    - **content**: 焦点内容
+    """
+    success = todo_service.upsert_daily_focus(request)
+    if not success:
+        raise HTTPException(status_code=500, detail="更新日焦点失败")
+    return {"success": True}
+
+
+@router.post("/plan/weekly-focus")
+async def upsert_weekly_focus(request: UpsertWeeklyFocusRequest):
+    """
+    创建或更新周焦点
+    
+    请求体:
+    - **year**: 年份
+    - **month**: 月份 (1-12)
+    - **week_num**: 周序号 (1-4)
+    - **content**: 焦点内容
+    """
+    success = todo_service.upsert_weekly_focus(request)
+    if not success:
+        raise HTTPException(status_code=500, detail="更新周焦点失败")
     return {"success": True}
