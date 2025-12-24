@@ -32,6 +32,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { TodoItem, SubTodoItem } from '../types';
 import { todoApi, MOCK_GOALS_LIST } from '../api';
+import WeekDayTreeSelector from './WeekDayTreeSelector';
 
 // --- Types & Constants ---
 const TODO_COLORS = [
@@ -140,43 +141,23 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({
     );
 };
 
-// --- 日期格式化辅助函数 ---
-const formatDateDisplay = (dateStr: string, today: string): string => {
-    if (dateStr === today) return 'Today';
-
-    const date = new Date(dateStr);
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = monthNames[date.getMonth()];
-    const day = date.getDate().toString().padStart(2, '0');
-    return `${month} ${day}`;
-};
-
 // --- Main Three-Pane Component ---
+
 
 const TodoTabView: React.FC = () => {
     // 使用今天的日期作为默认值
     const today = new Date().toISOString().split('T')[0];
     const [selectedDate, setSelectedDate] = useState(today);
 
-    // 中心日期（用于日期选择器）
-    const [centerDate, setCenterDate] = useState(today);
-
-    // 生成以中心日期为基准，前后各3天的日期列表（共7天）
-    const visibleDates = useMemo(() => {
-        const result = [];
-        const center = new Date(centerDate);
-        for (let i = -3; i <= 3; i++) {
-            const date = new Date(center);
-            date.setDate(center.getDate() + i);
-            result.push(date.toISOString().split('T')[0]);
-        }
-        return result;
-    }, [centerDate]);
-
     const [items, setItems] = useState<TodoItem[]>([]);
     const [selectedL1Id, setSelectedL1Id] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
+
+    // Handle date change from WeekDayTreeSelector
+    const handleDateChange = (date: string) => {
+        setSelectedDate(date);
+        setSelectedL1Id(null);
+    };
 
     // 加载任务数据
     const loadTodos = useCallback(async () => {
@@ -377,58 +358,10 @@ const TodoTabView: React.FC = () => {
 
             {/* 1. LEFT PANE: DATE SELECTION */}
             <aside className="w-52 bg-white flex-col flex-shrink-0 px-3 py-4 border-r border-slate-100 z-10 flex">
-                {/* 日期选择器 */}
-                <div className="mb-4 px-1">
-                    <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.25em] mb-2 block">选择日期</label>
-                    <input
-                        type="date"
-                        value={centerDate}
-                        onChange={(e) => {
-                            setCenterDate(e.target.value);
-                            setSelectedDate(e.target.value);
-                            setSelectedL1Id(null);
-                        }}
-                        className="w-full px-3 py-2 text-sm font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
-                    />
-                </div>
-
-                <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.25em] mb-3 px-1">Calendar</h4>
-
-                {/* 日期卡片容器 */}
-                <div className="flex-1 flex flex-col gap-1.5">
-                    {visibleDates.map((date) => {
-                        const isSelected = selectedDate === date;
-                        const isToday = date === today;
-                        return (
-                            <button
-                                key={date}
-                                onClick={() => { setSelectedDate(date); setSelectedL1Id(null); }}
-                                className={`
-                                    w-full px-3 py-2.5 rounded-lg transition-all duration-200
-                                    flex items-center justify-between
-                                    ${isSelected
-                                        ? 'bg-blue-50 border border-blue-200 shadow-sm'
-                                        : isToday
-                                            ? 'bg-blue-50/30 border border-blue-100 hover:bg-blue-50 hover:border-blue-200'
-                                            : 'bg-slate-50/50 border border-transparent hover:bg-slate-100 hover:border-slate-200'
-                                    }
-                                `}
-                            >
-                                <span className={`text-sm font-semibold tracking-tight ${isSelected
-                                    ? 'text-blue-700'
-                                    : isToday
-                                        ? 'text-blue-600'
-                                        : 'text-slate-500'
-                                    }`}>
-                                    {formatDateDisplay(date, today)}
-                                </span>
-                                {isSelected && (
-                                    <div className="w-2 h-2 rounded-full bg-blue-500" />
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
+                <WeekDayTreeSelector
+                    selectedDate={selectedDate}
+                    onDateChange={handleDateChange}
+                />
             </aside>
 
             {/* 2. MIDDLE PANE: LEVEL 1 TODOS */}
@@ -565,8 +498,8 @@ const TodoTabView: React.FC = () => {
                             <div
                                 onClick={() => handleUpdateL1(selectedL1Item.id, { crossDay: !selectedL1Item.crossDay })}
                                 className={`p-2.5 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all group ${selectedL1Item.crossDay
-                                        ? 'bg-amber-50/50 border-amber-200 hover:bg-amber-100'
-                                        : 'bg-slate-50/50 border-slate-100 hover:bg-white hover:shadow-sm'
+                                    ? 'bg-amber-50/50 border-amber-200 hover:bg-amber-100'
+                                    : 'bg-slate-50/50 border-slate-100 hover:bg-white hover:shadow-sm'
                                     }`}
                                 title="长期任务：每天都会出现直至完成"
                             >

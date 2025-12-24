@@ -122,11 +122,6 @@ const DateTreeSelector: React.FC<DateTreeSelectorProps> = ({
 
     const months = useMemo(() => getMonthsRange(), []);
 
-    // Get flat list of all weeks for scroll navigation
-    const allWeeks = useMemo(() => {
-        return months.flatMap(m => m.weeks.map(w => ({ ...w, monthKey: m.key })));
-    }, [months]);
-
     // Sync expanded state with viewType
     useEffect(() => {
         if (viewType === 'week') {
@@ -150,49 +145,6 @@ const DateTreeSelector: React.FC<DateTreeSelectorProps> = ({
         });
     };
 
-    const handleWheel = (e: React.WheelEvent) => {
-        e.stopPropagation();
-
-        if (viewType === 'week') {
-            // Navigate between weeks
-            const currentIndex = allWeeks.findIndex(w => w.id === selectedWeek);
-            if (currentIndex === -1) return;
-
-            let nextIndex = currentIndex;
-            if (e.deltaY > 0) {
-                // Scroll down -> next week
-                nextIndex = Math.min(currentIndex + 1, allWeeks.length - 1);
-            } else {
-                // Scroll up -> previous week
-                nextIndex = Math.max(currentIndex - 1, 0);
-            }
-
-            if (nextIndex !== currentIndex) {
-                const nextWeek = allWeeks[nextIndex];
-                onWeekChange(nextWeek.id, nextWeek.monthKey);
-                // Auto expand the month containing the selected week
-                if (!expandedMonths.has(nextWeek.monthKey)) {
-                    setExpandedMonths(prev => new Set([...prev, nextWeek.monthKey]));
-                }
-            }
-        } else {
-            // Navigate between months
-            const currentIndex = months.findIndex(m => m.key === selectedMonth);
-            if (currentIndex === -1) return;
-
-            let nextIndex = currentIndex;
-            if (e.deltaY > 0) {
-                nextIndex = Math.min(currentIndex + 1, months.length - 1);
-            } else {
-                nextIndex = Math.max(currentIndex - 1, 0);
-            }
-
-            if (nextIndex !== currentIndex) {
-                onMonthChange(months[nextIndex].key);
-            }
-        }
-    };
-
     const handleMonthSelect = (monthKey: string) => {
         onMonthChange(monthKey);
         setIsYearMonthPickerOpen(false);
@@ -208,8 +160,8 @@ const DateTreeSelector: React.FC<DateTreeSelectorProps> = ({
                     <button
                         onClick={() => onViewTypeChange('week')}
                         className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all ${viewType === 'week'
-                                ? 'bg-white text-slate-800 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
+                            ? 'bg-white text-slate-800 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
                             }`}
                     >
                         Week
@@ -217,8 +169,8 @@ const DateTreeSelector: React.FC<DateTreeSelectorProps> = ({
                     <button
                         onClick={() => onViewTypeChange('month')}
                         className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all ${viewType === 'month'
-                                ? 'bg-white text-slate-800 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
+                            ? 'bg-white text-slate-800 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
                             }`}
                     >
                         Month
@@ -235,8 +187,8 @@ const DateTreeSelector: React.FC<DateTreeSelectorProps> = ({
                 <button
                     onClick={() => setIsYearMonthPickerOpen(!isYearMonthPickerOpen)}
                     className={`flex items-center justify-between w-full p-3 border rounded-xl font-bold text-sm transition-all group ${isYearMonthPickerOpen
-                            ? 'bg-white border-blue-200 ring-2 ring-blue-50'
-                            : 'bg-slate-50 border-slate-200 hover:bg-white text-slate-700'
+                        ? 'bg-white border-blue-200 ring-2 ring-blue-50'
+                        : 'bg-slate-50 border-slate-200 hover:bg-white text-slate-700'
                         }`}
                 >
                     <span className="flex items-center gap-2">
@@ -272,8 +224,8 @@ const DateTreeSelector: React.FC<DateTreeSelectorProps> = ({
                                         key={month.key}
                                         onClick={() => handleMonthSelect(month.key)}
                                         className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-between ${selectedMonth === month.key
-                                                ? 'bg-blue-50 text-blue-600'
-                                                : 'text-slate-600 hover:bg-slate-50'
+                                            ? 'bg-blue-50 text-blue-600'
+                                            : 'text-slate-600 hover:bg-slate-50'
                                             }`}
                                     >
                                         {month.label}
@@ -290,7 +242,6 @@ const DateTreeSelector: React.FC<DateTreeSelectorProps> = ({
             <div
                 ref={containerRef}
                 className="flex-1 overflow-y-auto scrollbar-light"
-                onWheel={handleWheel}
             >
                 <div className="space-y-1">
                     {months.map(month => {
@@ -306,8 +257,8 @@ const DateTreeSelector: React.FC<DateTreeSelectorProps> = ({
                                         onMonthChange(month.key);
                                     }}
                                     className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-all text-left ${isSelected
-                                            ? 'bg-emerald-50 text-emerald-700'
-                                            : 'text-slate-600 hover:bg-slate-50'
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : 'text-slate-600 hover:bg-slate-50'
                                         }`}
                                 >
                                     <motion.div
@@ -345,8 +296,8 @@ const DateTreeSelector: React.FC<DateTreeSelectorProps> = ({
                                                             key={week.id}
                                                             onClick={() => onWeekChange(week.id, month.key)}
                                                             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all text-left ${isWeekSelected
-                                                                    ? 'bg-blue-50 text-blue-600 border border-blue-200'
-                                                                    : 'text-slate-500 hover:bg-slate-50 border border-transparent'
+                                                                ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                                                                : 'text-slate-500 hover:bg-slate-50 border border-transparent'
                                                                 }`}
                                                         >
                                                             <Calendar size={14} className={isWeekSelected ? 'text-blue-500' : 'text-slate-400'} />
