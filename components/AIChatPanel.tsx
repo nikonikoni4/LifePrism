@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Sparkles, Bot, User, ChevronLeft, ChevronRight, Plus, History, MoreHorizontal, Trash2, Search } from 'lucide-react';
-import { sendMessageToGemini } from '../services/geminiService';
-import { ChatMessage } from '../shared/types';
+import { X, Send, Sparkles, Bot, User, ChevronLeft, ChevronRight, Plus, History, MoreHorizontal, Trash2, Search, Brain, Globe, ChevronUp, MessageCircle, BookOpen, Square } from 'lucide-react';
+import { sendMessageStream, getSessions, deleteSession, updateSessionName, getModelConfig, updateModelConfig, getChatHistory } from '../services/chatbotService';
+import { ChatMessage, ChatSession, ModelConfig, SSEEvent, FeatureMode } from '../shared/types';
 
 export type ChatDisplayMode = 'fullscreen' | 'sidebar' | 'hidden';
 
@@ -13,29 +13,72 @@ interface AIChatPanelProps {
 const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'init', role: 'model', text: "Hi Alex! I've analyzed your focus time today. You've been crushing it in VS Code, but your entertainment usage is creeping up. How can I help you optimize?" }
+    { id: 'init', role: 'model', text: "你好！我是 LifeWatch AI 助手。我可以帮助你分析时间使用情况、提供生产力建议。有什么可以帮你的吗？" }
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Mock history data (placeholder)
-  const mockHistory = [
-    { id: '1', title: 'AI Chat Panel Expansion', time: '15 分钟前', isCurrent: true },
-    { id: '2', title: 'Fix Timeline Category Display', time: '35 分钟前', isCurrent: false },
-    { id: '3', title: 'Fixing Timeline Duplicates', time: '4 小时前', isCurrent: false },
-    { id: '4', title: 'Frontend Usage API Implementation', time: '8 小时前', isCurrent: false },
+  // 新增状态：会话管理
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+
+  // 新增状态：模型配置
+  const [modelConfig, setModelConfig] = useState<ModelConfig>({ enableSearch: false, enableThinking: false });
+
+  // 新增状态：功能菜单
+  const [showFeatureMenu, setShowFeatureMenu] = useState(false);
+  const [selectedFeature, setSelectedFeature] = useState<string>('default');
+
+  // 新增状态：取消请求
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
+
+  // 功能模式列表
+  const FEATURE_MODES: FeatureMode[] = [
+    { id: 'default', name: '正常聊天', icon: <MessageCircle size={16} /> },
+    { id: 'lifewatch', name: 'LifeWatch 功能讲解', icon: <BookOpen size={16} /> },
   ];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // 加载会话列表
+  const loadSessions = async () => {
+    setIsLoadingSessions(true);
+    try {
+      const data = await getSessions();
+      setSessions(data.items);
+    } catch (e) {
+      console.error('Failed to load sessions:', e);
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  };
+
+  // 加载模型配置
+  const loadModelConfig = async () => {
+    try {
+      const config = await getModelConfig();
+      setModelConfig(config);
+    } catch (e) {
+      console.error('Failed to load model config:', e);
+    }
+  };
+
+  // 初始化加载
+  useEffect(() => {
+    loadSessions();
+    loadModelConfig();
+  }, []);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
 
+  // 发送消息
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -49,28 +92,154 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) 
     setInput('');
     setIsTyping(true);
 
-    try {
-      const stream = sendMessageToGemini(userMsg.text);
+    // 创建 AbortController 用于暂停
+    const controller = new AbortController();
+    setAbortController(controller);
 
-      // Create a placeholder message for the AI response
+    try {
+      // 创建 AI 消息占位
       const aiMsgId = (Date.now() + 1).toString();
       setMessages(prev => [...prev, { id: aiMsgId, role: 'model', text: '', isLoading: true }]);
 
       let fullText = '';
 
-      for await (const chunk of stream) {
-        fullText += chunk;
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === aiMsgId ? { ...msg, text: fullText, isLoading: false } : msg
-          )
-        );
-      }
+      await sendMessageStream(
+        currentSessionId,
+        userMsg.text,
+        (event: SSEEvent) => {
+          switch (event.type) {
+            case 'session':
+              // 更新会话信息
+              setCurrentSessionId(event.sessionId || null);
+              if (event.isNewSession) {
+                // 刷新会话列表
+                loadSessions();
+              }
+              break;
+            case 'content':
+              fullText += event.content || '';
+              setMessages(prev =>
+                prev.map(msg =>
+                  msg.id === aiMsgId ? { ...msg, text: fullText, isLoading: false } : msg
+                )
+              );
+              break;
+            case 'done':
+              // 完成
+              break;
+            case 'error':
+              console.error('SSE Error:', event.error);
+              setMessages(prev =>
+                prev.map(msg =>
+                  msg.id === aiMsgId ? { ...msg, text: event.error || '发生错误', isLoading: false } : msg
+                )
+              );
+              break;
+          }
+        },
+        controller.signal
+      );
     } catch (e) {
-      console.error(e);
+      if (e instanceof Error && e.name === 'AbortError') {
+        console.log('Request aborted by user');
+      } else {
+        console.error(e);
+      }
     } finally {
       setIsTyping(false);
+      setAbortController(null);
     }
+  };
+
+  // 暂停输出
+  const handleStop = () => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+      setIsTyping(false);
+    }
+  };
+
+  // 切换深度思考
+  const handleToggleThinking = async () => {
+    try {
+      const newConfig = await updateModelConfig({ enableThinking: !modelConfig.enableThinking });
+      setModelConfig(newConfig);
+    } catch (e) {
+      console.error('Failed to update thinking mode:', e);
+    }
+  };
+
+  // 切换联网搜索
+  const handleToggleSearch = async () => {
+    try {
+      const newConfig = await updateModelConfig({ enableSearch: !modelConfig.enableSearch });
+      setModelConfig(newConfig);
+    } catch (e) {
+      console.error('Failed to update search mode:', e);
+    }
+  };
+
+  // 新建对话
+  const handleNewChat = () => {
+    setCurrentSessionId(null);
+    setMessages([
+      { id: 'init', role: 'model', text: "你好！我是 LifeWatch AI 助手。我可以帮助你分析时间使用情况、提供生产力建议。有什么可以帮你的吗？" }
+    ]);
+    setShowHistory(false);
+  };
+
+  // 删除会话
+  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await deleteSession(sessionId);
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
+      if (currentSessionId === sessionId) {
+        handleNewChat();
+      }
+    } catch (e) {
+      console.error('Failed to delete session:', e);
+    }
+  };
+
+  // 切换会话
+  const handleSelectSession = async (session: ChatSession) => {
+    setCurrentSessionId(session.id);
+    setShowHistory(false);
+
+    // 加载会话历史
+    try {
+      const history = await getChatHistory(session.id);
+
+      if (history.length > 0) {
+        setMessages(history);
+      } else {
+        // 没有历史消息时显示提示
+        setMessages([
+          { id: 'init', role: 'model', text: `已切换到会话：${session.name}（无历史消息）` }
+        ]);
+      }
+    } catch (e) {
+      console.error('Failed to load chat history:', e);
+      setMessages([
+        { id: 'init', role: 'model', text: `已切换到会话：${session.name}（加载历史失败）` }
+      ]);
+    }
+  };
+
+  // 格式化时间
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 60) return `${minutes} 分钟前`;
+    if (hours < 24) return `${hours} 小时前`;
+    return `${days} 天前`;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -168,16 +337,13 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) 
             </div>
             <div>
               <h3 className="font-bold text-gray-800">AI Assistant</h3>
-              <p className="text-xs text-gray-500">Powered by Gemini</p>
+              <p className="text-xs text-gray-500">LifeWatch AI</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
             {/* New Chat Button */}
             <button
-              onClick={() => {
-                // TODO: 新建对话功能
-                console.log('New chat');
-              }}
+              onClick={handleNewChat}
               className="p-2 hover:bg-white/80 rounded-lg text-gray-500 hover:text-indigo-600 transition-colors"
               title="新建对话"
             >
@@ -224,7 +390,7 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) 
                   type="text"
                   value={historySearch}
                   onChange={(e) => setHistorySearch(e.target.value)}
-                  placeholder="Select a conversation"
+                  placeholder="搜索对话..."
                   className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all text-sm"
                 />
               </div>
@@ -232,72 +398,67 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) 
 
             {/* Conversation List */}
             <div className="flex-1 overflow-y-auto">
-              {/* Current Section */}
-              <div className="px-4 pt-4 pb-2">
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Current</p>
-              </div>
-              {mockHistory.filter(h => h.isCurrent).map((item) => (
-                <div
-                  key={item.id}
-                  className="mx-3 mb-1 px-3 py-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-between group cursor-pointer hover:bg-amber-100 transition-colors"
-                  onClick={() => {
-                    // TODO: 切换到当前对话
-                    setShowHistory(false);
-                  }}
-                >
-                  <span className="text-sm font-medium text-gray-800 truncate">{item.title}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400 whitespace-nowrap">{item.time}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // TODO: 删除对话
-                        console.log('Delete conversation', item.id);
-                      }}
-                      className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+              {isLoadingSessions ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
                 </div>
-              ))}
-
-              {/* Recent Section */}
-              <div className="px-4 pt-4 pb-2">
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Recent in LifeWatch-AI</p>
-              </div>
-              {mockHistory.filter(h => !h.isCurrent).map((item) => (
-                <div
-                  key={item.id}
-                  className="mx-3 mb-1 px-3 py-3 rounded-lg flex items-center justify-between group cursor-pointer hover:bg-gray-50 transition-colors"
-                  onClick={() => {
-                    // TODO: 切换到该对话
-                    setShowHistory(false);
-                  }}
-                >
-                  <span className="text-sm text-gray-700 truncate">{item.title}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400 whitespace-nowrap">{item.time}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // TODO: 删除对话
-                        console.log('Delete conversation', item.id);
-                      }}
-                      className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+              ) : sessions.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p>暂无历史对话</p>
                 </div>
-              ))}
+              ) : (
+                <>
+                  {/* Current Session */}
+                  {currentSessionId && sessions.filter(s => s.id === currentSessionId).map((session) => (
+                    <div key={session.id}>
+                      <div className="px-4 pt-4 pb-2">
+                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">当前对话</p>
+                      </div>
+                      <div
+                        className="mx-3 mb-1 px-3 py-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-between group cursor-pointer hover:bg-amber-100 transition-colors"
+                        onClick={() => handleSelectSession(session)}
+                      >
+                        <span className="text-sm font-medium text-gray-800 truncate">{session.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400 whitespace-nowrap">{formatTime(session.updatedAt)}</span>
+                          <button
+                            onClick={(e) => handleDeleteSession(session.id, e)}
+                            className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
 
-              {/* Show More */}
-              <div className="px-4 py-3">
-                <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
-                  Show 93 more...
-                </button>
-              </div>
+                  {/* Other Sessions */}
+                  <div className="px-4 pt-4 pb-2">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">最近对话</p>
+                  </div>
+                  {sessions
+                    .filter(s => s.id !== currentSessionId)
+                    .filter(s => !historySearch || s.name.toLowerCase().includes(historySearch.toLowerCase()))
+                    .map((session) => (
+                      <div
+                        key={session.id}
+                        className="mx-3 mb-1 px-3 py-3 rounded-lg flex items-center justify-between group cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => handleSelectSession(session)}
+                      >
+                        <span className="text-sm text-gray-700 truncate">{session.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400 whitespace-nowrap">{formatTime(session.updatedAt)}</span>
+                          <button
+                            onClick={(e) => handleDeleteSession(session.id, e)}
+                            className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </>
+              )}
             </div>
           </div>
         )}
@@ -333,28 +494,103 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) 
         </div>
 
         {/* Input Area */}
-        <div className="p-4 bg-white border-t border-gray-100">
-          <div className="relative">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask about your productivity..."
-              disabled={isTyping}
-              className="w-full pl-4 pr-12 py-3 bg-gray-50 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
-            />
+        <div className="bg-white border-t border-gray-100">
+          {/* 底部工具栏 */}
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-50">
+            {/* 功能菜单按钮 */}
+            <div className="relative">
+              <button
+                onClick={() => setShowFeatureMenu(!showFeatureMenu)}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <span>{FEATURE_MODES.find(m => m.id === selectedFeature)?.name || '正常聊天'}</span>
+                <ChevronUp size={14} className={`transition-transform ${showFeatureMenu ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* 弹出菜单 */}
+              {showFeatureMenu && (
+                <div className="absolute bottom-full left-0 mb-2 w-52 bg-gray-800 rounded-lg shadow-xl py-2 z-50">
+                  {FEATURE_MODES.map(mode => (
+                    <button
+                      key={mode.id}
+                      onClick={() => {
+                        setSelectedFeature(mode.id);
+                        setShowFeatureMenu(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-left text-sm text-white hover:bg-gray-700 flex items-center gap-3 ${selectedFeature === mode.id ? 'bg-gray-700' : ''
+                        }`}
+                    >
+                      <span className="text-gray-400">{mode.icon}</span>
+                      <span>{mode.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1" />
+
+            {/* 深度思考开关 */}
             <button
-              onClick={handleSend}
-              disabled={!input.trim() || isTyping}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
+              onClick={handleToggleThinking}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${modelConfig.enableThinking
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              title="深度思考模式"
             >
-              <Send size={16} />
+              <Brain size={14} />
+              <span>深度思考</span>
+            </button>
+
+            {/* 联网搜索开关 */}
+            <button
+              onClick={handleToggleSearch}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${modelConfig.enableSearch
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              title="联网搜索"
+            >
+              <Globe size={14} />
+              <span>联网搜索</span>
             </button>
           </div>
-          <p className="text-[10px] text-center text-gray-400 mt-2">
-            AI can make mistakes. Please check important info.
-          </p>
+
+          {/* 输入框 */}
+          <div className="p-4">
+            <div className="relative">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="输入消息..."
+                disabled={isTyping}
+                className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
+              />
+              {isTyping ? (
+                <button
+                  onClick={handleStop}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                  title="停止生成"
+                >
+                  <Square size={16} />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
+                >
+                  <Send size={16} />
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] text-center text-gray-400 mt-2">
+              AI 可能会出错，请核实重要信息。
+            </p>
+          </div>
         </div>
       </aside>
     </>
