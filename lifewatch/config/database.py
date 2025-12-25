@@ -524,6 +524,44 @@ GOAL_CONFIG = {
 }
 
 
+# 聊天会话元数据表
+CHAT_SESSION_CONFIG = {
+    'table_name': 'chat_session',
+    'columns': {
+        'id': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '会话ID（如 session-xxxxxxxx）'
+        },
+        'name': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '会话名称'
+        },
+        'message_count': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '消息数量'
+        },
+        'created_at': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '创建时间（ISO格式）'
+        },
+        'updated_at': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '最后更新时间（ISO格式）'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_chat_session_updated', 'columns': ['updated_at']}
+    ],
+    'timestamps': False  # 使用自定义时间戳字段
+}
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'category_map_cache': category_map_cache_CONFIG,
@@ -536,6 +574,7 @@ TABLE_CONFIGS = {
     'daily_focus': DAILY_FOCUS_CONFIG,
     'weekly_focus': WEEKLY_FOCUS_CONFIG,
     'goal': GOAL_CONFIG,
+    'chat_session': CHAT_SESSION_CONFIG,
 }
 
 

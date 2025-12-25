@@ -20,6 +20,7 @@ from lifewatch.server.schemas.chatbot_schemas import (
     MessageRole,
     ChatStreamStartResponse,
 )
+from lifewatch.server.providers.chat_session_provider import get_chat_session_provider
 from lifewatch.utils import get_logger
 
 logger = get_logger(__name__)
@@ -38,8 +39,7 @@ class ChatbotService:
         self._chatbot_context = None  # 异步上下文管理器
         self._current_session_id: Optional[str] = None
         self._model_config = ModelConfig()
-        # 会话元数据缓存: session_id -> metadata
-        self._session_metadata: Dict[str, Dict[str, Any]] = {}
+        self._session_provider = get_chat_session_provider()  # 会话元数据持久化
         self._is_initialized = False
     
     async def initialize(self):
@@ -109,25 +109,20 @@ class ChatbotService:
         Returns:
             ChatSessionListResponse: 会话列表
         """
-        # 从缓存获取会话列表
-        all_sessions = list(self._session_metadata.values())
-        
-        # 按更新时间降序排序
-        all_sessions.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
-        
-        total = len(all_sessions)
-        start = (page - 1) * page_size
-        end = start + page_size
+        # 从数据库获取会话列表
+        offset = (page - 1) * page_size
+        sessions = self._session_provider.get_all_sessions(limit=page_size, offset=offset)
+        total = self._session_provider.get_session_count()
         
         items = [
             ChatSession(
-                id=meta["id"],
-                name=meta["name"],
-                created_at=meta["created_at"],
-                updated_at=meta["updated_at"],
-                message_count=meta.get("message_count", 0)
+                id=s["id"],
+                name=s["name"],
+                created_at=s["created_at"],
+                updated_at=s["updated_at"],
+                message_count=s.get("message_count", 0)
             )
-            for meta in all_sessions[start:end]
+            for s in sessions
         ]
         
         return ChatSessionListResponse(items=items, total=total)
@@ -151,22 +146,20 @@ class ChatbotService:
         
         is_new = False
         
-        if session_id is None or session_id not in self._session_metadata:
+        # 检查会话是否存在
+        if session_id is None or not self._session_provider.session_exists(session_id):
             # 创建新会话
             session_id = self._generate_session_id()
             name = self._generate_session_name(first_message)
             
-            self._session_metadata[session_id] = {
-                "id": session_id,
-                "name": name,
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat(),
-                "message_count": 0
-            }
+            # 持久化到数据库
+            self._session_provider.create_session(session_id, name)
             is_new = True
             logger.info(f"创建新会话: {session_id}")
         else:
-            name = self._session_metadata[session_id]["name"]
+            # 获取现有会话信息
+            session_data = self._session_provider.get_session_by_id(session_id)
+            name = session_data["name"] if session_data else "未知会话"
         
         # 设置当前会话
         self._current_session_id = session_id
@@ -189,12 +182,7 @@ class ChatbotService:
         Returns:
             bool: 是否成功
         """
-        if session_id not in self._session_metadata:
-            return False
-        
-        self._session_metadata[session_id]["name"] = request.name
-        self._session_metadata[session_id]["updated_at"] = datetime.now().isoformat()
-        return True
+        return self._session_provider.update_session_name(session_id, request.name)
     
     async def delete_session(self, session_id: str) -> bool:
         """
@@ -207,15 +195,13 @@ class ChatbotService:
             bool: 是否成功
         """
         # TODO: 从 checkpoint 数据库删除会话历史
-        if session_id in self._session_metadata:
-            del self._session_metadata[session_id]
-            
-            # 如果删除的是当前会话，清空当前会话
-            if self._current_session_id == session_id:
-                self._current_session_id = None
-            
-            return True
-        return False
+        success = self._session_provider.delete_session(session_id)
+        
+        # 如果删除的是当前会话，清空当前会话
+        if success and self._current_session_id == session_id:
+            self._current_session_id = None
+        
+        return success
     
     # ========== 模型配置 ==========
     
@@ -274,10 +260,8 @@ class ChatbotService:
             self._current_session_id = session_id
             self._chatbot.set_thread_id(session_id)
         
-        # 更新会话的消息计数和时间
-        if session_id in self._session_metadata:
-            self._session_metadata[session_id]["message_count"] += 1
-            self._session_metadata[session_id]["updated_at"] = datetime.now().isoformat()
+        # 更新会话的消息计数
+        self._session_provider.increment_message_count(session_id)
         
         # 流式输出
         async for chunk in self._chatbot.chat(content):
@@ -293,15 +277,52 @@ class ChatbotService:
         Returns:
             Optional[ChatHistoryResponse]: 历史消息，不存在返回 None
         """
-        if session_id not in self._session_metadata:
+        await self._ensure_initialized()
+        
+        session_data = self._session_provider.get_session_by_id(session_id)
+        if not session_data:
             return None
         
-        # TODO: 从 checkpoint 读取历史消息
-        # 目前返回空消息列表
+        # 从 checkpoint 读取历史消息
+        messages: List[ChatMessage] = []
+        
+        try:
+            config = {"configurable": {"thread_id": session_id}}
+            checkpoint_tuple = await self._chatbot.checkpointer.aget_tuple(config)
+            
+            if checkpoint_tuple and checkpoint_tuple.checkpoint:
+                channel_values = checkpoint_tuple.checkpoint.get("channel_values", {})
+                raw_messages = channel_values.get("messages", [])
+                
+                for msg in raw_messages:
+                    msg_type = type(msg).__name__
+                    
+                    if msg_type == "HumanMessage":
+                        role = MessageRole.USER
+                    elif msg_type in ("AIMessage", "AIMessageChunk"):
+                        role = MessageRole.ASSISTANT
+                    elif msg_type == "SystemMessage":
+                        role = MessageRole.SYSTEM
+                    else:
+                        # 跳过未知类型的消息
+                        continue
+                    
+                    messages.append(ChatMessage(
+                        role=role,
+                        content=msg.content,
+                        timestamp=None  # checkpoint 中没有单独的时间戳
+                    ))
+                    
+            logger.debug(f"会话 {session_id} 读取到 {len(messages)} 条历史消息")
+            
+        except Exception as e:
+            logger.error(f"读取会话历史失败: {e}")
+            # 出错时返回空消息列表，而不是 None
+        
         return ChatHistoryResponse(
             session_id=session_id,
-            session_name=self._session_metadata[session_id]["name"],
-            messages=[]
+            session_name=session_data["name"],
+            messages=messages
         )
     
     def get_last_token_usage(self) -> Dict[str, Any]:

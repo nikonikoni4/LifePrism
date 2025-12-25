@@ -2,7 +2,7 @@
 存储模块
 """
 from .database_manager import DatabaseManager
-from lifewatch.config.database import LW_DB_PATH, ACTIVITYWATCH_DB_PATH
+from lifewatch.config.database import LW_DB_PATH, ACTIVITYWATCH_DB_PATH, CHAT_HISTORY_DB
 
 # ==================== 全局单例实例 ====================
 
@@ -18,6 +18,13 @@ aw_db_manager = DatabaseManager(
     DB_PATH=ACTIVITYWATCH_DB_PATH,
     use_pool=True,
     pool_size=1,
+    readonly=True
+)
+
+chat_history_db_manager = DatabaseManager(
+    DB_PATH=CHAT_HISTORY_DB,
+    use_pool=True,
+    pool_size=2,
     readonly=True
 )
 

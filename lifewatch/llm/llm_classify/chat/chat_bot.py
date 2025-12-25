@@ -248,13 +248,29 @@ class ChatBot:
 
 if __name__ == "__main__":
     async def main():
-        # 使用持久化存储模式
+        """测试 chat() 方法的 tokens_usage 获取"""
         async with ChatBot.create_with_persistence() as chatbot:
-            chatbot.set_thread_id("test_session_1")  # 必须先设置会话ID
-            print("开始流式输出：\n")
-            async for chunk in chatbot.chat("简单介绍红楼梦"):
-                pass  # 消息已在 chat 方法中打印
+            chatbot.set_thread_id("test_tokens_usage")
+            
+            print("=" * 60)
+            print("测试：通过 chat() 方法验证 tokens_usage 获取")
+            print("=" * 60)
+            print()
+            
+            print("AI 回复：", end="")
+            async for chunk in chatbot.chat("你好，介绍一下你自己"):
+                pass  # chat() 内部已经 print 了
+            
             print("\n")
+            print("=" * 60)
+            print("tokens_usage 结果：")
+            print("=" * 60)
+            print(f"  input_tokens:  {chatbot.tokens_usage['input_tokens']}")
+            print(f"  output_tokens: {chatbot.tokens_usage['output_tokens']}")
+            print(f"  total_tokens:  {chatbot.tokens_usage['total_tokens']}")
+            print(f"  search_count:  {chatbot.tokens_usage['search_count']}")
+            print("=" * 60)
 
     import asyncio
     asyncio.run(main())
+
