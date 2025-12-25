@@ -15,6 +15,10 @@ dependencies = [
     "requests>=2.25.0",
     "DrissionPage>=4.0.0",
     "duckduckgo-search>=3.0.0",
+    # LangGraph 会话持久化依赖
+    "langgraph>=1.0.0",
+    "langgraph-checkpoint-sqlite>=3.0.0",
+    "aiosqlite==0.21.0",  # 注意：0.22.x 与 langgraph-checkpoint-sqlite 不兼容
 ]
 
 # 可选依赖

@@ -6,6 +6,7 @@
 # 数据库路径
 LW_DB_PATH = r"D:\desktop\软件开发\LifeWatch-AI\lifewatch\server\lifewatch_ai.db"
 ACTIVITYWATCH_DB_PATH = r"C:\Users\15535\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
+CHAT_HISTORY_DB = r"D:\desktop\软件开发\LifeWatch-AI\lifewatch\llm\llm_classify\chat\chat_history.db"
 # 应用程序用途分类表配置
 category_map_cache_CONFIG = {
     'table_name': 'category_map_cache',

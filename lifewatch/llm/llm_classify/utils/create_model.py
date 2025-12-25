@@ -38,11 +38,13 @@ def create_ChatTongyiModel( model_name="qwen-plus",
                             temperature=0.2,
                             dashscope_api_key="sk-b6f3052f6c4f46a9a658bfc020d90c3f",
                             enable_search=True,
-                            enable_thinking=False):
+                            enable_thinking=False,
+                            enable_streaming = False):
     return ChatTongyi(
         model=model_name,  # 指定使用 qwen-plus 模型，也可以改为 'qwen-max' 或 'qwen-turbo'
         temperature=temperature,
         dashscope_api_key=dashscope_api_key,
+        streaming=enable_streaming,
         model_kwargs={
             "enable_search": enable_search,
             "enable_thinking": enable_thinking

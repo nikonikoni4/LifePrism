@@ -12,3 +12,5 @@ docs
 *.db
 ./lifewatch/llm/langchain_test/langgraph_errors_summary.md
 *.csv
+*.db-shm
+*.db-wal

@@ -17,7 +17,7 @@ lw_db_manager = DatabaseManager(
 aw_db_manager = DatabaseManager(
     DB_PATH=ACTIVITYWATCH_DB_PATH,
     use_pool=True,
-    pool_size=3,
+    pool_size=1,
     readonly=True
 )
 

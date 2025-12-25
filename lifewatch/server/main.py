@@ -13,7 +13,8 @@ from lifewatch.server.api import (
     activity_v2_router, 
     timeline_v2_router,
     usage_router,
-    goal_router
+    goal_router,
+    chatbot_router
 )
 from lifewatch.storage.lw_table_manager import init_database
 from lifewatch.server.providers.category_color_provider import initialize_category_colors
@@ -38,9 +39,18 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ 数据库初始化失败: {e}")
         raise
     
+    # 初始化 ChatBot 服务（可选，延迟初始化也可以）
+    # from lifewatch.server.services.chatbot_service import chatbot_service
+    # await chatbot_service.initialize()
+    
     yield  # 应用运行期间
     
-    # 关闭时：无需额外清理（全局单例通过 atexit 自动清理）
+    # 关闭时：清理 ChatBot 资源
+    try:
+        from lifewatch.server.services.chatbot_service import chatbot_service
+        await chatbot_service.shutdown()
+    except Exception as e:
+        logger.warning(f"ChatBot 服务关闭时出现警告: {e}")
 
 
 # 创建 FastAPI 应用实例
@@ -100,6 +110,7 @@ app.include_router(activity_v2_router, prefix="/api/v2")
 app.include_router(timeline_v2_router, prefix="/api/v2")  # 已包含 /api/v2/timeline 前缀
 app.include_router(usage_router, prefix="/api/v2")  # Token 使用统计
 app.include_router(goal_router, prefix="/api/v2")  # Goal/TodoList
+app.include_router(chatbot_router, prefix="/api/v2")  # Chatbot
 
 
 
