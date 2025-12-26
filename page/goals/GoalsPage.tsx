@@ -49,8 +49,8 @@ const GoalsPage: React.FC = () => {
     return (
         <div className="fixed inset-0 lg:left-64 flex flex-col animate-fade-in bg-[#F1F5F9] overflow-hidden">
             {/* 1. Top Header Section (White Desk Surface) */}
-            <header className="bg-white border-b border-slate-200 px-10 pt-10 pb-0 z-20 shadow-sm shrink-0">
-                <div className="mb-8 flex flex-col items-start gap-1">
+            <header className="bg-white border-b border-slate-200 px-10 pt-6 pb-0 z-20 shadow-sm shrink-0">
+                <div className="mb-3 flex flex-col items-start gap-1">
                     <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
                         {greeting}, Alex
                     </h1>
@@ -89,7 +89,7 @@ const GoalsPage: React.FC = () => {
                             <button
                                 key={tab.id}
                                 onClick={() => handleTabChange(tab.id as TabType)}
-                                className={`py-4 text-xs font-bold uppercase tracking-widest transition-all relative ${isActive
+                                className={`py-2 text-xs font-bold uppercase tracking-widest transition-all relative ${isActive
                                     ? 'text-blue-600'
                                     : 'text-slate-400 hover:text-slate-600'
                                     }`}
@@ -111,7 +111,7 @@ const GoalsPage: React.FC = () => {
 
                 {activeTab !== 'todo' && activeTab !== 'plan' && (
                     <div className="flex-1 overflow-y-auto p-0 no-scrollbar">
-                        <div className="max-w-6xl mx-auto p-10 h-full">
+                        <div className="max-w-6xl mx-auto p-2 h-full">
                             {/* Goal Tab Logic: Toggle between List and Detail */}
                             {activeTab === 'goal' && (
                                 selectedGoalId !== null ? (
