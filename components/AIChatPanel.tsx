@@ -2,15 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Sparkles, Bot, User, ChevronLeft, ChevronRight, Plus, History, MoreHorizontal, Trash2, Search, Brain, Globe, ChevronUp, MessageCircle, BookOpen, Square } from 'lucide-react';
 import { sendMessageStream, getSessions, deleteSession, updateSessionName, getModelConfig, updateModelConfig, getChatHistory } from '../services/chatbotService';
 import { ChatMessage, ChatSession, ModelConfig, SSEEvent, FeatureMode } from '../shared/types';
+import MarkdownRenderer from './MarkdownRenderer';
 
 export type ChatDisplayMode = 'fullscreen' | 'sidebar' | 'hidden';
 
 interface AIChatPanelProps {
   displayMode: ChatDisplayMode;
   onModeChange: (mode: ChatDisplayMode) => void;
+  onWidthChange?: (width: number) => void;
 }
 
-const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) => {
+const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange, onWidthChange }) => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'init', role: 'model', text: "你好！我是 LifeWatch AI 助手。我可以帮助你分析时间使用情况、提供生产力建议。有什么可以帮你的吗？" }
@@ -34,6 +36,65 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) 
 
   // 新增状态：取消请求
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+
+  // 新增状态：面板宽度拖拽调整
+  const [panelWidth, setPanelWidth] = useState(400); // 默认宽度 400px
+  const [isResizing, setIsResizing] = useState(false);
+  const [isHoveringResizer, setIsHoveringResizer] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
+  const MIN_WIDTH = 320; // 最小宽度
+  const MAX_WIDTH = 800; // 最大宽度
+
+  // 拖拽开始
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  // 拖拽移动
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      const windowWidth = window.innerWidth;
+      const newWidth = windowWidth - e.clientX;
+
+      // 限制宽度在最小和最大值之间
+      const clampedWidth = Math.min(Math.max(newWidth, MIN_WIDTH), MAX_WIDTH);
+      setPanelWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      // 拖拽时禁止选择文本
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'ew-resize';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isResizing]);
+
+  // 通知父组件面板宽度变化
+  useEffect(() => {
+    if (displayMode === 'sidebar' && onWidthChange) {
+      onWidthChange(panelWidth);
+    } else if (displayMode === 'hidden' && onWidthChange) {
+      onWidthChange(0);
+    } else if (displayMode === 'fullscreen' && onWidthChange) {
+      // 全屏模式下不需要预留空间
+      onWidthChange(0);
+    }
+  }, [panelWidth, displayMode, onWidthChange]);
 
   // 功能模式列表
   const FEATURE_MODES: FeatureMode[] = [
@@ -272,7 +333,8 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) 
         // 全屏模式：从左侧导航栏右边缘开始（lg:left-64，对应导航栏宽度）
         return 'lg:left-64 left-0 w-full lg:w-auto';
       case 'sidebar':
-        return 'w-full sm:w-[400px]';
+        // sidebar 模式：宽度由内联样式控制，移动端使用全宽
+        return 'w-full sm:w-auto';
       case 'hidden':
         return 'w-full sm:w-[400px]';
     }
@@ -302,9 +364,44 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) 
 
       {/* Slide-over Panel */}
       <aside
+        ref={panelRef}
+        style={displayMode === 'sidebar' ? { width: `${panelWidth}px` } : undefined}
         className={`fixed right-0 top-0 h-full ${getPanelWidthClass()} bg-white z-50 transform transition-all duration-300 ease-in-out flex flex-col border-l border-gray-200 shadow-2xl lg:shadow-none ${isVisible ? 'translate-x-0' : 'translate-x-full'
-          } ${displayMode === 'fullscreen' ? '!right-0' : ''}`}
+          } ${displayMode === 'fullscreen' ? '!right-0' : ''} ${isResizing ? '!transition-none' : ''}`}
       >
+        {/* Resize Handle - 拖拽调整宽度 */}
+        {displayMode === 'sidebar' && isVisible && (
+          <div
+            className="absolute left-0 top-0 h-full w-1 cursor-ew-resize z-50 group"
+            onMouseDown={handleResizeMouseDown}
+            onMouseEnter={() => setIsHoveringResizer(true)}
+            onMouseLeave={() => setIsHoveringResizer(false)}
+          >
+            {/* 扩大点击区域的透明层 */}
+            <div className="absolute left-[-4px] top-0 h-full w-[12px]" />
+            {/* 视觉指示条 - 悬停或拖拽时显示 */}
+            <div
+              className={`absolute left-0 top-0 h-full w-1 transition-all duration-200 ${isResizing
+                ? 'bg-indigo-500'
+                : isHoveringResizer
+                  ? 'bg-indigo-400'
+                  : 'bg-transparent hover:bg-gray-300'
+                }`}
+            />
+            {/* 中间拖拽指示器 - 悬停时显示 */}
+            <div
+              className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-200 ${isHoveringResizer || isResizing ? 'opacity-100' : 'opacity-0'
+                }`}
+            >
+              <div className="flex flex-col items-center gap-1 px-1 py-3 bg-white rounded-full shadow-lg border border-gray-200">
+                <div className="w-1 h-1 rounded-full bg-gray-400" />
+                <div className="w-1 h-1 rounded-full bg-gray-400" />
+                <div className="w-1 h-1 rounded-full bg-gray-400" />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Mode Control Buttons (Left Edge) */}
         {isVisible && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full flex flex-col gap-1 z-50">
@@ -464,7 +561,7 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) 
         )}
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F9FAFB]">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F9FAFB] scrollbar-light">
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -475,17 +572,20 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({ displayMode, onModeChange }) 
                 {msg.role === 'user' ? <User size={14} /> : <Bot size={16} />}
               </div>
 
-              <div className={`max-w-[80%] rounded-2xl p-3 text-base leading-relaxed ${msg.role === 'user'
+              <div className={`max-w-[85%] rounded-2xl p-3 text-base leading-relaxed ${msg.role === 'user'
                 ? 'bg-gray-800 text-white rounded-tr-none'
                 : 'bg-white shadow-sm border border-gray-100 text-gray-700 rounded-tl-none'
                 }`}>
-                {msg.text}
-                {msg.isLoading && msg.text === '' && (
+                {msg.isLoading && msg.text === '' ? (
                   <span className="inline-flex gap-1 items-center h-4">
                     <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
                     <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
                     <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                   </span>
+                ) : msg.role === 'model' ? (
+                  <MarkdownRenderer content={msg.text} />
+                ) : (
+                  msg.text
                 )}
               </div>
             </div>

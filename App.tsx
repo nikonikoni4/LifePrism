@@ -15,9 +15,23 @@ import SettingsPage from './page/settings/SettingsPage';
 
 function App() {
   const [chatDisplayMode, setChatDisplayMode] = useState<ChatDisplayMode>('hidden');
+  const [chatPanelWidth, setChatPanelWidth] = useState(0); // 聊天面板宽度
+  const [isLargeScreen, setIsLargeScreen] = useState(false); // 是否为大屏幕
   const [currentPage, setCurrentPage] = useState('home');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  // 监听屏幕尺寸变化
+  useEffect(() => {
+    const checkScreenSize = () => {
+      // lg breakpoint is 1024px in Tailwind
+      setIsLargeScreen(window.innerWidth >= 1024);
+    };
+
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
   // 页面加载时自动同步数据（非阻塞模式，在后台运行）
   useEffect(() => {
@@ -80,8 +94,8 @@ function App() {
 
       {/* Main Content Area (Center) */}
       <main
-        className={`lg:ml-64 p-6 lg:p-10 min-h-screen transition-all duration-300 ease-in-out ${chatDisplayMode === 'sidebar' ? 'lg:mr-[400px]' : ''
-          }`}
+        className="lg:ml-64 p-6 lg:p-10 min-h-screen transition-all duration-300 ease-in-out"
+        style={{ marginRight: isLargeScreen && chatPanelWidth > 0 ? `${chatPanelWidth}px` : undefined }}
       >
         {currentPage === 'home' && <Home onNavigate={setCurrentPage} />}
         {currentPage === 'timeline' && <Timeline />}
@@ -93,7 +107,11 @@ function App() {
       </main>
 
       {/* AI Chat (Right Sidebar) */}
-      <AIChatPanel displayMode={chatDisplayMode} onModeChange={setChatDisplayMode} />
+      <AIChatPanel
+        displayMode={chatDisplayMode}
+        onModeChange={setChatDisplayMode}
+        onWidthChange={setChatPanelWidth}
+      />
 
     </div>
   );
