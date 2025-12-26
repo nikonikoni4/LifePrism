@@ -21,7 +21,7 @@ from lifewatch.server.schemas.activity_schemas import (
     BarConfig,
 )
 from lifewatch.server.providers import server_lw_data_provider
-from lifewatch.server.providers.category_color_provider import color_manager
+from lifewatch.server.providers.category_color_provider import color_manager, get_log_color
 
 
 # ============================================================================
@@ -478,7 +478,8 @@ def _build_app_level_data(
     bar_keys = []
     
     for i, (app_name, minutes) in enumerate(top_5.items()):
-        app_color = base_color
+        # 为每个 App 即时生成随机浅色（level=3）
+        app_color = get_log_color(base_color)
         
         app_df = df[df['app'] == app_name]
         title_stats = app_df.groupby('title')['duration_minutes'].sum().sort_values(ascending=False).head(3)

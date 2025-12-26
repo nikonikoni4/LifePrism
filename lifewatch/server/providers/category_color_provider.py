@@ -5,6 +5,7 @@
 """
 
 import colorsys
+import random
 from typing import Dict, Optional
 from lifewatch.storage import lw_db_manager
 
@@ -178,13 +179,14 @@ class CategoryColorManager:
             int(r * 255), int(g * 255), int(b * 255)
         )
     
-    def _generate_color_variants(self, base_color: str, count: int) -> list[str]:
+    def _generate_color_variants(self, base_color: str, count: int, level: int = 2) -> list[str]:
         """
         基于基础颜色生成同色系配色方案（亮度渐变）
         
         Args:
             base_color: 基础颜色 (Hex)
             count: 需要生成的颜色数量
+            level: 层级（2=子分类，3=具体log），层级越高颜色越浅
             
         Returns:
             list[str]: 颜色列表 (Hex)
@@ -208,23 +210,38 @@ class CategoryColorManager:
         colors = []
         
         if count <= 1:
-            return [f"#{base_color}"]
+            # 单个颜色时，根据层级选择亮度
+            if level == 2:
+                single_l = 0.55  # 子分类：中等偏深
+            else:  # level == 3
+                single_l = 0.75  # log：较浅
+            r_new, g_new, b_new = colorsys.hls_to_rgb(h, single_l, s)
+            return ["#{:02x}{:02x}{:02x}".format(
+                int(max(0, min(1, r_new)) * 255),
+                int(max(0, min(1, g_new)) * 255),
+                int(max(0, min(1, b_new)) * 255)
+            )]
             
-        # 生成亮度渐变
-        # 保持色相(H)和饱和度(S)基本不变，调整亮度(L)
-        # 亮度范围: 0.35 (深) 到 0.85 (浅)
+        # 根据层级设置亮度范围
+        # level=2 (子分类): 0.40 ~ 0.65 (较深)
+        # level=3 (log): 0.65 ~ 0.88 (较浅)
+        if level == 2:
+            max_l = 0.65  # 子分类最浅亮度
+            min_l = 0.40  # 子分类最深亮度
+        else:  # level == 3
+            max_l = 0.88  # log最浅亮度
+            min_l = 0.65  # log最深亮度
         
         for i in range(count):
-            min_l = 0.35
-            max_l = 0.85
-            
             if count > 1:
-                new_l = min_l + (max_l - min_l) * (i / (count - 1))
+                # 从浅到深：第一个(i=0)使用max_l，最后一个使用min_l
+                new_l = max_l - (max_l - min_l) * (i / (count - 1))
             else:
                 new_l = l
                 
-            # 饱和度微调
-            new_s = s * (1 - 0.2 * (i / count)) 
+            # 饱和度微调：浅色稍微降低饱和度，深色保持饱和度
+            sat_ratio = 1 - 0.15 * ((count - 1 - i) / count) if count > 1 else 1
+            new_s = s * sat_ratio
             
             r_new, g_new, b_new = colorsys.hls_to_rgb(h, new_l, new_s)
             
@@ -237,6 +254,20 @@ class CategoryColorManager:
             
 
         return colors
+    
+    def generate_color_variants(self, base_color: str, count: int, level: int = 2) -> list[str]:
+        """
+        公开方法：基于基础颜色生成同色系配色方案
+        
+        Args:
+            base_color: 基础颜色 (Hex)
+            count: 需要生成的颜色数量
+            level: 层级（2=子分类，3=具体log），层级越高颜色越浅
+            
+        Returns:
+            list[str]: 颜色列表 (Hex)
+        """
+        return self._generate_color_variants(base_color, count, level)
 
 
 # 全局单例实例（懒加载）
@@ -262,11 +293,73 @@ def get_category_color(category_id: str, is_sub_category: bool = False) -> str:
         return color_manager.get_main_category_color(category_id)
 
 
+def generate_color_variants(base_color: str, count: int, level: int = 2) -> list[str]:
+    """
+    生成颜色变体的便捷函数
+    
+    Args:
+        base_color: 基础颜色 (Hex)
+        count: 需要生成的颜色数量
+        level: 层级（2=子分类，3=具体log），层级越高颜色越浅
+            - level=2: 亮度范围 0.40~0.65 (较深，适用于子分类)
+            - level=3: 亮度范围 0.65~0.88 (较浅，适用于具体log)
+        
+    Returns:
+        list[str]: 颜色列表 (Hex)
+    """
+    return color_manager.generate_color_variants(base_color, count, level)
+
+
 def initialize_category_colors() -> None:
     """
     初始化分类颜色（应在应用启动时调用）
     """
     color_manager.initialize_colors()
+
+
+def get_log_color(base_color: str) -> str:
+    """
+    为 log 即时生成一个随机的浅色变体
+    
+    基于子分类颜色，在 level=3 的亮度范围 (0.65~0.88) 内随机生成一个浅色，
+    用于区分同一子分类下的不同 log。
+    
+    Args:
+        base_color: 子分类的基础颜色 (Hex)
+        
+    Returns:
+        str: 随机生成的浅色 (Hex)
+    """
+    # 处理 Hex 格式
+    color = base_color
+    if color.startswith('#'):
+        color = color[1:]
+    
+    if len(color) != 6:
+        return base_color
+        
+    try:
+        r = int(color[0:2], 16) / 255.0
+        g = int(color[2:4], 16) / 255.0
+        b = int(color[4:6], 16) / 255.0
+    except ValueError:
+        return base_color
+    
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    
+    # 在 level=3 的亮度范围内随机选择
+    new_l = random.uniform(0.65, 0.88)
+    
+    # 饱和度略微降低，让浅色更柔和
+    new_s = s * random.uniform(0.75, 0.95)
+    
+    r_new, g_new, b_new = colorsys.hls_to_rgb(h, new_l, new_s)
+    
+    return "#{:02x}{:02x}{:02x}".format(
+        int(max(0, min(1, r_new)) * 255),
+        int(max(0, min(1, g_new)) * 255),
+        int(max(0, min(1, b_new)) * 255)
+    )
 
 
 if __name__ == "__main__":
@@ -283,3 +376,23 @@ if __name__ == "__main__":
     sub_colors = color_manager.get_all_sub_colors()
     for sub_id, color in sub_colors.items():
         print(f"  {sub_id}: {color}")
+    
+    # 测试层级颜色生成
+    print("\n层级颜色变体测试 (基础色: #3B82F6 blue-500):")
+    base = "#3B82F6"
+    
+    print("\n  Level 2 (子分类, 较深):")
+    level2_colors = generate_color_variants(base, 5, level=2)
+    for i, c in enumerate(level2_colors):
+        print(f"    [{i}] {c}")
+    
+    print("\n  Level 3 (Log, 较浅):")
+    level3_colors = generate_color_variants(base, 5, level=3)
+    for i, c in enumerate(level3_colors):
+        print(f"    [{i}] {c}")
+    
+    # 测试 get_log_color 即时生成
+    print("\n即时生成 Log 颜色测试 (基于子分类色 #3B82F6):")
+    for i in range(5):
+        log_color = get_log_color(base)
+        print(f"  Log {i+1}: {log_color}")
