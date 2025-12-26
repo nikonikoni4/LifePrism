@@ -224,7 +224,7 @@ const GoalTabView: React.FC<GoalTabViewProps> = ({ onSelectGoal }) => {
 
                   {/* Title */}
                   <h4 className="text-2xl font-bold text-slate-800 mb-3">{goal.name}</h4>
-                  <p className="text-sm text-slate-500 font-medium mb-6 leading-relaxed line-clamp-2">{goal.content || goal.abstract || ''}</p>
+                  <p className="text-sm text-slate-500 font-medium mb-6 leading-relaxed line-clamp-2">{goal.abstract || goal.content || ''}</p>
 
                   {/* Date Info Row */}
                   <div className="flex items-center gap-4 mb-6 text-[10px] text-slate-400 font-medium">

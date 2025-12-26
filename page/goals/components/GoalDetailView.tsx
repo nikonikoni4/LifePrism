@@ -175,13 +175,24 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goalId, onBack, onSave 
       <div className="flex-1 overflow-y-auto no-scrollbar p-8 md:p-12 w-full max-w-5xl mx-auto">
 
         {/* Title Input (Huge) */}
-        <div className="mb-10 animate-fade-in" style={{ animationDelay: '100ms' }}>
+        <div className="mb-4 animate-fade-in" style={{ animationDelay: '100ms' }}>
           <input
             type="text"
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
             placeholder="Enter Goal Title..."
             className="w-full text-4xl md:text-6xl font-black text-slate-800 bg-transparent border-none outline-none placeholder-slate-200 leading-tight tracking-tight"
+          />
+        </div>
+
+        {/* Abstract/Summary Input */}
+        <div className="mb-10 animate-fade-in" style={{ animationDelay: '120ms' }}>
+          <input
+            type="text"
+            value={formData.abstract || ''}
+            onChange={(e) => handleChange('abstract', e.target.value)}
+            placeholder="Add a brief summary or alias for this goal..."
+            className="w-full text-lg md:text-xl font-medium text-slate-500 bg-transparent border-none outline-none placeholder-slate-300 leading-relaxed"
           />
         </div>
 
