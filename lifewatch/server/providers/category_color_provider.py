@@ -13,21 +13,21 @@ from lifewatch.storage import lw_db_manager
 # 禁用分类使用的浅灰色
 DISABLED_CATEGORY_COLOR = '#D1D5DB'
 
-# Tailwind CSS 500 → 200 系列颜色映射
+# Tailwind CSS 500 → 300 系列颜色映射
 # 用于 Timeline 缩略图的柔和颜色显示
 # ⚠️ 维护说明：如果前端调色盘变动，需同步更新此映射表
 # @see frontend/page/category/components/CategorySettingsTab.tsx
-TAILWIND_500_TO_200 = {
-    '#EF4444': '#FECACA',  # red
-    '#F97316': '#FED7AA',  # orange
-    '#EAB308': '#FEF08A',  # yellow
-    '#22C55E': '#BBF7D0',  # green
-    '#14B8A6': '#99F6E4',  # teal
-    '#06B6D4': '#A5F3FC',  # cyan
-    '#3B82F6': '#BFDBFE',  # blue
-    '#6366F1': '#C7D2FE',  # indigo
-    '#A855F7': '#DDD6FE',  # purple
-    '#EC4899': '#FBCFE8',  # pink
+TAILWIND_500_TO_300 = {
+    '#EF4444': '#FCA5A5',  # red-300
+    '#F97316': '#FDBA74',  # orange-300
+    '#EAB308': '#FCD34D',  # yellow-300
+    '#22C55E': '#86EFAC',  # green-300
+    '#14B8A6': '#5EEAD4',  # teal-300
+    '#06B6D4': '#67E8F9',  # cyan-300
+    '#3B82F6': '#93C5FD',  # blue-300
+    '#6366F1': '#A5B4FC',  # indigo-300
+    '#A855F7': '#C4B5FD',  # purple-300
+    '#EC4899': '#F9A8D4',  # pink-300
 }
 
 
@@ -227,8 +227,8 @@ class CategoryColorManager:
         normalized_color = hex_color.upper()
         
         # 1. 优先使用 Tailwind 500→200 映射
-        if normalized_color in TAILWIND_500_TO_200:
-            return TAILWIND_500_TO_200[normalized_color]
+        if normalized_color in TAILWIND_500_TO_300:
+            return TAILWIND_500_TO_300[normalized_color]
         
         # 2. 备用方案：动态计算柔和色
         color = hex_color
