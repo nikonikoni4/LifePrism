@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Save, Clock, Calendar, AlignLeft, Folder, ChevronDown, Palette, Check, Activity, Loader2, Edit3, Eye } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, Save, Clock, Calendar, AlignLeft, Folder, ChevronDown, Palette, Check, Activity, Loader2, Edit3, Eye } from 'lucide-react';
 import { UserGoal, CategoryTreeItem, UpdateGoalRequest } from '../types';
 import { categoryApi, goalApi } from '../api';
 import CategorySelectionModal from './CategorySelectionModal';
@@ -26,9 +26,11 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goalId, onBack, onSave 
   const [formData, setFormData] = useState<UserGoal | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState<CategoryTreeItem[]>([]);
   const [isEditingContent, setIsEditingContent] = useState(false);
+  const [isMetadataExpanded, setIsMetadataExpanded] = useState(false);
 
   // Track selected category/subcategory IDs for the modal
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -77,11 +79,13 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goalId, onBack, onSave 
     setShowCategoryModal(false);
   };
 
-  const handleSave = async () => {
+  // Save goal data, optionally silent (no callback to parent)
+  const handleSave = async (options?: { silent?: boolean }) => {
     if (!formData) return;
 
     try {
       setSaving(true);
+      setSaveMessage(null);
       const updateData: UpdateGoalRequest = {
         name: formData.name,
         abstract: formData.abstract,
@@ -95,13 +99,47 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goalId, onBack, onSave 
       };
 
       const updatedGoal = await goalApi.updateGoal(formData.id, updateData);
-      onSave(updatedGoal);
+
+      if (options?.silent) {
+        // Show success message for silent save (Ctrl+S)
+        setSaveMessage({ type: 'success', text: '保存成功' });
+        // Auto-hide message after 2 seconds
+        setTimeout(() => setSaveMessage(null), 2000);
+      } else {
+        // Trigger parent callback (for button save)
+        onSave(updatedGoal);
+      }
     } catch (err) {
       console.error('Failed to save goal:', err);
+      setSaveMessage({ type: 'error', text: '保存失败' });
+      setTimeout(() => setSaveMessage(null), 3000);
     } finally {
       setSaving(false);
     }
   };
+
+  // Handle back with auto-save
+  const handleBackWithSave = useCallback(async () => {
+    if (formData && !saving) {
+      await handleSave(); // Non-silent, will trigger onSave callback
+    }
+    onBack();
+  }, [formData, saving, selectedCategoryId, selectedSubCategoryId]);
+
+  // Ctrl+S keyboard shortcut to save (silent mode)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (!saving) {
+          handleSave({ silent: true });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [formData, saving, selectedCategoryId, selectedSubCategoryId]);
 
   const handleStatusToggle = () => {
     if (!formData) return;
@@ -152,151 +190,196 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goalId, onBack, onSave 
       />
 
       {/* Header Toolbar */}
-      <div className="flex items-center justify-between px-8 py-6 border-b border-slate-50 bg-white/80 backdrop-blur-md sticky top-0 z-20">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-20">
         <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-slate-400 hover:text-slate-800 transition-all group"
+          onClick={handleBackWithSave}
+          className="flex items-center gap-1.5 text-slate-400 hover:text-slate-800 transition-all group"
         >
-          <div className="p-2.5 rounded-2xl bg-slate-50 group-hover:bg-slate-100 transition-colors">
-            <ChevronLeft size={20} />
+          <div className="p-1.5 rounded-lg bg-slate-50 group-hover:bg-slate-100 transition-colors">
+            <ChevronLeft size={16} />
           </div>
-          <span className="font-bold text-xs uppercase tracking-widest">Back to Goals</span>
+          <span className="font-medium text-xs uppercase tracking-wider">返回</span>
         </button>
 
+        {/* Save Message Toast */}
+        {saveMessage && (
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all animate-fade-in ${saveMessage.type === 'success'
+              ? 'bg-green-50 text-green-700 border border-green-200'
+              : 'bg-red-50 text-red-700 border border-red-200'
+              }`}
+          >
+            {saveMessage.type === 'success' ? (
+              <Check size={14} className="text-green-500" />
+            ) : (
+              <span className="text-red-500">✕</span>
+            )}
+            {saveMessage.text}
+          </div>
+        )}
+
         <button
-          onClick={handleSave}
+          onClick={() => handleSave({ silent: true })}
           disabled={saving}
-          className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-500/20 transition-all transform active:scale-95 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-lg font-medium text-xs uppercase tracking-wider hover:bg-blue-600 hover:shadow-md hover:shadow-blue-500/20 transition-all transform active:scale-95 disabled:opacity-50"
         >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          Save Changes
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          保存
         </button>
       </div>
 
       {/* Main Content Scrollable Area */}
-      <div className="flex-1 overflow-y-auto no-scrollbar p-8 md:p-12 w-full max-w-5xl mx-auto">
+      <div className="flex-1 overflow-y-auto no-scrollbar p-6 md:p-8 w-full max-w-4xl mx-auto">
 
-        {/* Title Input (Huge) */}
-        <div className="mb-4 animate-fade-in" style={{ animationDelay: '100ms' }}>
+        {/* Title Input (Smaller, more compact) */}
+        <div className="mb-2 animate-fade-in" style={{ animationDelay: '100ms' }}>
           <input
             type="text"
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
             placeholder="Enter Goal Title..."
-            className="w-full text-4xl md:text-6xl font-black text-slate-800 bg-transparent border-none outline-none placeholder-slate-200 leading-tight tracking-tight"
+            className="w-full text-2xl md:text-3xl font-bold text-slate-800 bg-transparent border-none outline-none placeholder-slate-300 leading-tight"
           />
         </div>
 
         {/* Abstract/Summary Input */}
-        <div className="mb-10 animate-fade-in" style={{ animationDelay: '120ms' }}>
+        <div className="mb-4 animate-fade-in" style={{ animationDelay: '120ms' }}>
           <input
             type="text"
             value={formData.abstract || ''}
             onChange={(e) => handleChange('abstract', e.target.value)}
-            placeholder="Add a brief summary or alias for this goal..."
-            className="w-full text-lg md:text-xl font-medium text-slate-500 bg-transparent border-none outline-none placeholder-slate-300 leading-relaxed"
+            placeholder="Add a brief summary..."
+            className="w-full text-base text-slate-500 bg-transparent border-none outline-none placeholder-slate-300 leading-relaxed"
           />
         </div>
 
-        {/* Metadata Row */}
-        <div className="flex flex-wrap items-center gap-6 mb-12 text-slate-400 font-medium text-sm border-y border-dashed border-slate-100 py-6 animate-fade-in" style={{ animationDelay: '150ms' }}>
-          {/* Date Picker */}
-          <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-            <Calendar size={16} className="text-slate-400" />
-            <div className="flex flex-col">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Target Date</span>
-              <input
-                type="date"
-                value={formData.expectedFinishedAt || ''}
-                onChange={(e) => handleChange('expectedFinishedAt', e.target.value)}
-                className="bg-transparent text-slate-700 font-bold font-mono text-xs focus:outline-none p-0 w-28 cursor-pointer"
-              />
-            </div>
-          </div>
-
-          {/* Estimate Input */}
-          <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-            <Clock size={16} className="text-slate-400" />
-            <div className="flex flex-col">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Hours</span>
-              <input
-                type="number"
-                value={formatHoursForInput(formData.expectedHours)}
-                onChange={(e) => handleChange('expectedHours', parseHoursFromInput(e.target.value))}
-                className="bg-transparent text-slate-700 font-bold font-mono text-xs w-16 focus:outline-none placeholder-slate-300"
-                placeholder="60"
-                min={0}
-              />
-            </div>
-          </div>
-
-          {/* Color Picker */}
-          <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 hover:bg-white hover:border-blue-200 transition-all group min-w-[140px]">
-            <Palette size={16} className="text-slate-400 group-hover:text-purple-500 transition-colors" />
-            <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Color</span>
-              <div className="flex gap-1.5 mt-0.5">
-                {GOAL_COLORS.slice(0, 5).map(c => (
-                  <button
-                    key={c}
-                    onClick={() => handleChange('color', c)}
-                    className={`w-3.5 h-3.5 rounded-full border border-slate-200 shadow-sm transition-transform hover:scale-110 ${(formData.color || '#FFFFFF') === c ? 'ring-2 ring-slate-400 scale-110' : ''
-                      }`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Status Toggle */}
+        {/* Collapsible Metadata Section */}
+        <div className="mb-6 animate-fade-in" style={{ animationDelay: '150ms' }}>
+          {/* Toggle Button */}
           <button
-            onClick={handleStatusToggle}
-            className={`flex items-center gap-3 px-4 py-2 rounded-xl border transition-all min-w-[140px] group ${isCompleted
-              ? 'bg-green-50 border-green-200 hover:bg-green-100'
-              : 'bg-slate-50 border-slate-100 hover:bg-white hover:border-blue-200'
+            onClick={() => setIsMetadataExpanded(!isMetadataExpanded)}
+            className="flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors py-2 group"
+          >
+            <ChevronRight
+              size={14}
+              className={`transition-transform duration-200 ${isMetadataExpanded ? 'rotate-90' : ''}`}
+            />
+            <span className="text-xs font-medium uppercase tracking-wider">信息</span>
+            {!isMetadataExpanded && (
+              <span className="text-xs text-slate-300 ml-2">
+                {formData.expectedFinishedAt && `📅 ${formData.expectedFinishedAt}`}
+                {formData.expectedHours && ` • ⏱️ ${formData.expectedHours}h`}
+                {activeCategory && ` • 📁 ${activeCategory.name}`}
+              </span>
+            )}
+          </button>
+
+          {/* Expandable Metadata Content */}
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${isMetadataExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
               }`}
           >
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-colors ${isCompleted
-              ? 'bg-green-500 border-green-500 text-white'
-              : 'bg-white border-slate-200 text-slate-300'
-              }`}>
-              {isCompleted ? <Check size={16} strokeWidth={3} /> : <Activity size={16} />}
-            </div>
-            <div className="flex flex-col items-start">
-              <span className={`text-[9px] font-bold uppercase tracking-wider ${isCompleted ? 'text-green-600' : 'text-slate-400'}`}>Status</span>
-              <span className={`text-xs font-bold ${isCompleted ? 'text-green-700' : 'text-slate-700'}`}>
-                {isCompleted ? 'Completed' : 'In Progress'}
-              </span>
-            </div>
-          </button>
-
-          {/* Category Selector (Button Trigger) */}
-          <button
-            onClick={() => setShowCategoryModal(true)}
-            className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-white hover:shadow-sm transition-all text-left group min-w-[140px]"
-          >
-            <Folder size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-            <div className="flex flex-col flex-1">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Category</span>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  {activeCategory ? (
-                    <>
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: activeCategory.color }}></div>
-                      <span className="text-slate-700 font-bold text-xs whitespace-nowrap">
-                        {activeCategory.name}
-                        {activeSubCategory && <span className="opacity-50"> / {activeSubCategory.name}</span>}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-slate-700 font-bold text-xs">Uncategorized</span>
-                  )}
+            <div className="flex flex-wrap items-center gap-4 py-4 pl-6 border-l-2 border-slate-100">
+              {/* Date Picker */}
+              <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 hover:border-slate-200 transition-colors">
+                <Calendar size={14} className="text-slate-400" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">目标日期</span>
+                  <input
+                    type="date"
+                    value={formData.expectedFinishedAt || ''}
+                    onChange={(e) => handleChange('expectedFinishedAt', e.target.value)}
+                    className="bg-transparent text-slate-700 font-medium text-xs focus:outline-none p-0 w-28 cursor-pointer"
+                  />
                 </div>
-                <ChevronDown size={12} className="text-slate-400" />
               </div>
+
+              {/* Estimate Input */}
+              <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 hover:border-slate-200 transition-colors">
+                <Clock size={14} className="text-slate-400" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">预计时长</span>
+                  <input
+                    type="number"
+                    value={formatHoursForInput(formData.expectedHours)}
+                    onChange={(e) => handleChange('expectedHours', parseHoursFromInput(e.target.value))}
+                    className="bg-transparent text-slate-700 font-medium text-xs w-16 focus:outline-none placeholder-slate-300"
+                    placeholder="60"
+                    min={0}
+                  />
+                </div>
+              </div>
+
+              {/* Color Picker */}
+              <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 hover:border-slate-200 transition-colors">
+                <Palette size={14} className="text-slate-400" />
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">颜色</span>
+                  <div className="flex gap-1.5">
+                    {GOAL_COLORS.slice(0, 5).map(c => (
+                      <button
+                        key={c}
+                        onClick={() => handleChange('color', c)}
+                        className={`w-3.5 h-3.5 rounded-full border border-slate-200 shadow-sm transition-transform hover:scale-110 ${(formData.color || '#FFFFFF') === c ? 'ring-2 ring-slate-400 scale-110' : ''
+                          }`}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Toggle */}
+              <button
+                onClick={handleStatusToggle}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${isCompleted
+                  ? 'bg-green-50 border-green-200 hover:bg-green-100'
+                  : 'bg-slate-50 border-slate-100 hover:border-slate-200'
+                  }`}
+              >
+                <div className={`w-6 h-6 rounded-md flex items-center justify-center border transition-colors ${isCompleted
+                  ? 'bg-green-500 border-green-500 text-white'
+                  : 'bg-white border-slate-200 text-slate-300'
+                  }`}>
+                  {isCompleted ? <Check size={12} strokeWidth={3} /> : <Activity size={12} />}
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className={`text-[10px] font-medium uppercase tracking-wider ${isCompleted ? 'text-green-600' : 'text-slate-400'}`}>状态</span>
+                  <span className={`text-xs font-medium ${isCompleted ? 'text-green-700' : 'text-slate-700'}`}>
+                    {isCompleted ? '已完成' : '进行中'}
+                  </span>
+                </div>
+              </button>
+
+              {/* Category Selector */}
+              <button
+                onClick={() => setShowCategoryModal(true)}
+                className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 hover:border-slate-200 transition-all text-left"
+              >
+                <Folder size={14} className="text-slate-400" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">分类</span>
+                  <div className="flex items-center gap-1.5">
+                    {activeCategory ? (
+                      <>
+                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: activeCategory.color }}></div>
+                        <span className="text-slate-700 font-medium text-xs whitespace-nowrap">
+                          {activeCategory.name}
+                          {activeSubCategory && <span className="opacity-50"> / {activeSubCategory.name}</span>}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-slate-700 font-medium text-xs">未分类</span>
+                    )}
+                    <ChevronDown size={10} className="text-slate-400" />
+                  </div>
+                </div>
+              </button>
             </div>
-          </button>
+          </div>
+
+          {/* Divider */}
+          <div className="border-b border-slate-100 mt-2"></div>
         </div>
 
         {/* Main Description Area - Edit/Preview Toggle */}
@@ -306,8 +389,8 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goalId, onBack, onSave 
             <button
               onClick={() => setIsEditingContent(true)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${isEditingContent
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? 'bg-slate-900 text-white'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                 }`}
             >
               <span className="flex items-center gap-1.5">
@@ -318,8 +401,8 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goalId, onBack, onSave 
             <button
               onClick={() => setIsEditingContent(false)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${!isEditingContent
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? 'bg-slate-900 text-white'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                 }`}
             >
               <span className="flex items-center gap-1.5">

@@ -18,7 +18,7 @@ const GoalsPage: React.FC = () => {
     const [greeting, setGreeting] = useState('');
 
     // State for handling Goal Detail View - now uses number ID
-    const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
+    const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
 
     useEffect(() => {
         const hour = new Date().getHours();
