@@ -6,7 +6,7 @@ import { UserGoal, CategoryTreeItem } from '../types';
 import CategorySelectionModal from './CategorySelectionModal';
 
 interface GoalTabViewProps {
-  onSelectGoal: (goalId: number) => void;
+  onSelectGoal: (goalId: string) => void;
 }
 
 const GoalTabView: React.FC<GoalTabViewProps> = ({ onSelectGoal }) => {
@@ -84,7 +84,7 @@ const GoalTabView: React.FC<GoalTabViewProps> = ({ onSelectGoal }) => {
     }
   };
 
-  const handleDeleteGoal = async (goalId: number) => {
+  const handleDeleteGoal = async (goalId: string) => {
     if (!confirm('确定要删除这个目标吗？')) return;
     try {
       await goalApi.deleteGoal(goalId);

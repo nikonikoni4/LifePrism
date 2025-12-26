@@ -6,7 +6,7 @@ import { categoryApi, goalApi } from '../api';
 import CategorySelectionModal from './CategorySelectionModal';
 
 interface GoalDetailViewProps {
-  goalId: number;
+  goalId: string;
   onBack: () => void;
   onSave: (updatedGoal: UserGoal) => void;
 }
