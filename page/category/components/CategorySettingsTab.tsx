@@ -36,7 +36,8 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
     // --- L1 Logic ---
 
     const handleAddCategory = async () => {
-        const colors = ['#F87171', '#34D399', '#A78BFA', '#F472B6', '#60A5FA'];
+        // Tailwind CSS 500 series colors for random selection
+        const colors = ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#14B8A6', '#06B6D4', '#3B82F6', '#6366F1', '#A855F7', '#EC4899'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
         try {
@@ -97,17 +98,18 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
 
     // --- Color Picker Logic ---
 
+    // Tailwind CSS 500 series color palette
     const PRESET_COLORS = [
-        '#F87171', // Pink
-        '#34D399', // Green
-        '#A78BFA', // Purple
-        '#60A5FA', // Blue
-        '#FB923C', // Orange
-        '#EF4444', // Red
-        '#2DD4BF', // Teal
-        '#FBBF24', // Yellow
-        '#818CF8', // Indigo
-        '#10B981', // Emerald
+        '#EF4444', // red-500
+        '#F97316', // orange-500
+        '#EAB308', // yellow-500
+        '#22C55E', // green-500
+        '#14B8A6', // teal-500
+        '#06B6D4', // cyan-500
+        '#3B82F6', // blue-500
+        '#6366F1', // indigo-500
+        '#A855F7', // purple-500
+        '#EC4899', // pink-500
     ];
 
     const handleColorChange = async (catId: string, newColor: string) => {
