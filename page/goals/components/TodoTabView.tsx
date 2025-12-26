@@ -11,7 +11,8 @@ import {
     Activity,
     CheckCircle,
     Loader2,
-    RefreshCw
+    RefreshCw,
+    ChevronDown
 } from 'lucide-react';
 import {
     DndContext,
@@ -272,10 +273,15 @@ const TodoTabView: React.FC = () => {
 
     const handleCreateL1 = async (content: string) => {
         if (!content.trim()) return;
+        // 随机选择颜色（排除白色 #FFFFFF，选择更有辨识度的颜色）
+        const colorOptions = TODO_COLORS.slice(1); // 去掉第一个白色
+        const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
         try {
             const newItem = await todoApi.createTodo({
                 content,
-                date: selectedDate
+                date: selectedDate,
+                linkToGoalId: selectedGoalId,
+                color: randomColor
             });
             setItems(prev => [...prev, newItem]);
         } catch (error) {
@@ -365,6 +371,8 @@ const TodoTabView: React.FC = () => {
     // Inputs state
     const [l1Input, setL1Input] = useState('');
     const [l2Input, setL2Input] = useState('');
+    // 目标选择状态 - 用于给新任务绑定默认目标
+    const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
 
     // 日期范围选择弹窗状态
     const [showDateRangePicker, setShowDateRangePicker] = useState(false);
@@ -393,23 +401,43 @@ const TodoTabView: React.FC = () => {
                         </span>
                     </div>
 
-                    {/* Create L1 Input */}
-                    <div className="mb-6 relative group">
-                        <input
-                            type="text"
-                            value={l1Input}
-                            onChange={(e) => setL1Input(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    handleCreateL1(l1Input);
-                                    setL1Input('');
-                                }
-                            }}
-                            placeholder="Type to create a task..."
-                            className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-4 pl-11 shadow-sm text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
-                        />
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors">
-                            <Plus size={18} />
+                    {/* Create L1 Input with Goal Selector */}
+                    <div className="mb-6 flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
+                        {/* 目标选择器 - 上方 */}
+                        <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 bg-slate-50/30">
+                            <Target size={14} className="text-blue-500 flex-shrink-0" />
+                            <span className="text-sm font-semibold text-slate-500 flex-shrink-0">目标</span>
+                            <select
+                                value={selectedGoalId || ''}
+                                onChange={(e) => setSelectedGoalId(e.target.value || null)}
+                                className="flex-1 appearance-none bg-transparent text-sm font-semibold text-slate-700 outline-none cursor-pointer"
+                            >
+                                <option value="">无</option>
+                                {activeGoals.map(g => (
+                                    <option key={g.id} value={g.id}>{g.name}</option>
+                                ))}
+                            </select>
+                            <ChevronDown size={14} className="text-slate-400 flex-shrink-0" />
+                        </div>
+
+                        {/* 输入框 - 下方 */}
+                        <div className="relative group">
+                            <input
+                                type="text"
+                                value={l1Input}
+                                onChange={(e) => setL1Input(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleCreateL1(l1Input);
+                                        setL1Input('');
+                                    }
+                                }}
+                                placeholder="Type to create a task..."
+                                className="w-full bg-transparent px-4 py-4 pl-11 text-sm font-semibold outline-none"
+                            />
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors">
+                                <Plus size={18} />
+                            </div>
                         </div>
                     </div>
 
