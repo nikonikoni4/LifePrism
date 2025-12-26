@@ -1,7 +1,8 @@
 /**
- * Gemini Service
+ * AI Service
  * 
- * AI 聊天服务，调用 Gemini API
+ * 通用 AI 工具服务，提供非对话类 AI 功能
+ * 例如：摘要生成、内容总结等
  */
 
 const API_BASE = 'http://localhost:8000/api/v1';
@@ -75,4 +76,30 @@ export async function sendMessageToGeminiSync(message: string): Promise<string> 
         console.error('Error sending message to Gemini:', error);
         return 'Sorry, I encountered an error. Please try again later.';
     }
+}
+
+// ============================================================================
+// 未来扩展：通用 AI 工具函数
+// ============================================================================
+
+/**
+ * 生成目标摘要（待实现）
+ * 
+ * @param goalContent 目标内容
+ * @returns 生成的摘要
+ */
+export async function generateGoalSummary(goalContent: string): Promise<string> {
+    // TODO: 实现目标摘要生成
+    return sendMessageToGeminiSync(`请为以下目标生成一个简短的摘要：\n\n${goalContent}`);
+}
+
+/**
+ * 生成每日总结（待实现）
+ * 
+ * @param activities 当日活动数据
+ * @returns 生成的每日总结
+ */
+export async function generateDailySummary(activities: string): Promise<string> {
+    // TODO: 实现每日总结生成
+    return sendMessageToGeminiSync(`请根据以下活动数据生成一个每日总结：\n\n${activities}`);
 }

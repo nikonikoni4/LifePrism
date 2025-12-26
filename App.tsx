@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 
 import Timeline from './page/timeline/Timeline';
-import AIChatPanel, { ChatDisplayMode } from './components/AIChatPanel';
+import { ChatPanel, ChatDisplayMode } from './page/chatbot';
 import { incrementalSync } from './services/syncService';
 import UsagePage from './page/usage/UsagePage';
 import Home from './page/home/Home';
@@ -107,7 +107,7 @@ function App() {
       </main>
 
       {/* AI Chat (Right Sidebar) */}
-      <AIChatPanel
+      <ChatPanel
         displayMode={chatDisplayMode}
         onModeChange={setChatDisplayMode}
         onWidthChange={setChatPanelWidth}

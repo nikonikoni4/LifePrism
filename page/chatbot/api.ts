@@ -1,10 +1,10 @@
 /**
- * Chatbot Service
+ * Chatbot API
  * 
  * 调用后端 Chatbot API 的服务层
  */
 
-import { ChatSession, ModelConfig, SSEEvent, ChatMessage } from '../shared/types';
+import { ChatSession, ModelConfig, SSEEvent, ChatMessage } from './types';
 
 const API_BASE = 'http://localhost:8000/api/v2/chatbot';
 
