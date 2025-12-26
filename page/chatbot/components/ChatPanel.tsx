@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Sparkles, Bot, User, ChevronLeft, ChevronRight, Plus, History, MoreHorizontal, Trash2, Search, Brain, Globe, ChevronUp, MessageCircle, BookOpen, Square } from 'lucide-react';
 import { sendMessageStream, getSessions, deleteSession, getChatHistory, getModelConfig, updateModelConfig } from '../api';
 import { ChatMessage, ChatSession, ChatDisplayMode, ModelConfig, SSEEvent, FeatureMode } from '../types';
-import MarkdownRenderer from './MarkdownRenderer';
+import { MarkdownRenderer } from '../../common';
 
 interface ChatPanelProps {
     displayMode: ChatDisplayMode;

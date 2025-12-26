@@ -6,6 +6,7 @@
 
 // Components
 export { default as TimeOverviewWidget } from './TimeOverviewWidget';
+export { default as MarkdownRenderer } from './MarkdownRenderer';
 
 // Types
 export * from './types';

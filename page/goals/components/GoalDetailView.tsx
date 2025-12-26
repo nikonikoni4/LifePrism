@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Save, Clock, Calendar, AlignLeft, Folder, ChevronDown, Palette, Check, Activity, Loader2 } from 'lucide-react';
+import { ChevronLeft, Save, Clock, Calendar, AlignLeft, Folder, ChevronDown, Palette, Check, Activity, Loader2, Edit3, Eye } from 'lucide-react';
 import { UserGoal, CategoryTreeItem, UpdateGoalRequest } from '../types';
 import { categoryApi, goalApi } from '../api';
 import CategorySelectionModal from './CategorySelectionModal';
+import { MarkdownRenderer } from '../../common';
 
 interface GoalDetailViewProps {
   goalId: string;
@@ -27,6 +28,7 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goalId, onBack, onSave 
   const [saving, setSaving] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState<CategoryTreeItem[]>([]);
+  const [isEditingContent, setIsEditingContent] = useState(false);
 
   // Track selected category/subcategory IDs for the modal
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -297,17 +299,68 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goalId, onBack, onSave 
           </button>
         </div>
 
-        {/* Main Description Textarea */}
-        <div className="h-full min-h-[400px] animate-fade-in relative" style={{ animationDelay: '200ms' }}>
-          <div className="absolute -left-8 top-1 text-slate-200">
-            <AlignLeft size={24} />
+        {/* Main Description Area - Edit/Preview Toggle */}
+        <div className="min-h-[400px] animate-fade-in relative" style={{ animationDelay: '200ms' }}>
+          {/* Right-top Tab Buttons */}
+          <div className="absolute right-0 -top-2 flex items-center gap-1 bg-white rounded-lg shadow-sm border border-slate-100 p-1 z-10">
+            <button
+              onClick={() => setIsEditingContent(true)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${isEditingContent
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Edit3 size={12} />
+                编辑
+              </span>
+            </button>
+            <button
+              onClick={() => setIsEditingContent(false)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${!isEditingContent
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Eye size={12} />
+                预览
+              </span>
+            </button>
           </div>
-          <textarea
-            value={formData.content}
-            onChange={(e) => handleChange('content', e.target.value)}
-            placeholder="Describe your goal, milestones, and motivation here..."
-            className="w-full h-full min-h-[500px] resize-none outline-none text-lg md:text-xl text-slate-600 font-medium leading-relaxed bg-transparent placeholder-slate-200 pl-2 no-scrollbar"
-          />
+
+          {/* Content Area */}
+          <div className="pt-8">
+            {isEditingContent ? (
+              <textarea
+                value={formData.content}
+                onChange={(e) => handleChange('content', e.target.value)}
+                placeholder="在此描述你的目标、里程碑和动机... (支持 Markdown 格式)"
+                className="w-full min-h-[500px] resize-none outline-none text-lg text-slate-600 font-mono leading-relaxed bg-slate-50 rounded-xl p-4 border border-slate-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all"
+                autoFocus
+              />
+            ) : (
+              <div
+                className="min-h-[300px] text-lg text-slate-600 leading-relaxed rounded-xl p-4 transition-colors border border-transparent hover:border-slate-200 hover:bg-slate-50/50 cursor-pointer group"
+                onDoubleClick={() => setIsEditingContent(true)}
+                title="双击编辑"
+              >
+                {formData.content ? (
+                  <MarkdownRenderer content={formData.content} />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-[200px] text-slate-300">
+                    <AlignLeft size={32} className="mb-3 opacity-50" />
+                    <p className="italic">双击此处编辑目标描述...</p>
+                    <p className="text-xs mt-1 opacity-70">支持 Markdown 格式</p>
+                  </div>
+                )}
+                {/* Double-click hint on hover */}
+                <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-slate-400 bg-white px-2 py-1 rounded shadow-sm">
+                  双击编辑
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Category Modal */}
