@@ -84,6 +84,132 @@ interface ThumbnailBlockProps {
     onClick: () => void;
 }
 
+/** 单个分类色块组件 */
+interface CategoryBlockProps {
+    id: string;
+    name: string;
+    color: string;
+    percentage: number;
+    duration: number;
+    isLast?: boolean;
+}
+
+const CategoryBlock: React.FC<CategoryBlockProps> = ({
+    id,
+    name,
+    color,
+    percentage,
+    duration,
+    isLast = false
+}) => {
+    const [showTooltip, setShowTooltip] = useState(false);
+
+    // 只有占比足够大才显示文字（>15%）
+    const showText = percentage > 15;
+    // 中等占比显示简化文字（>10%）
+    const showSimpleText = percentage > 10 && percentage <= 15;
+
+    return (
+        <div
+            className="relative group/block"
+            style={{
+                width: `calc(${percentage}% - 2px)`,  // 减去间隙
+                marginRight: isLast ? '0' : '2px',    // 色块间隙
+            }}
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+        >
+            {/* 色块本体 */}
+            <div
+                className="h-full rounded-md overflow-hidden transition-all duration-200 
+                           group-hover/block:scale-[1.02] group-hover/block:shadow-lg
+                           group-hover/block:z-10 relative"
+                style={{
+                    background: `linear-gradient(135deg, ${color} 0%, ${adjustBrightness(color, -15)} 100%)`,
+                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.1)`,
+                }}
+            >
+                {/* 玻璃质感高光层 */}
+                <div
+                    className="absolute inset-0 opacity-30 pointer-events-none"
+                    style={{
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.4) 0%, transparent 50%)',
+                    }}
+                />
+
+                {/* 文字内容 */}
+                <div className="h-full flex items-center justify-center">
+                    {showText && (
+                        <div className="px-2 text-center leading-tight text-white">
+                            <div
+                                className="font-bold truncate text-[10px]"
+                                style={{
+                                    textShadow: '0 1px 3px rgba(0,0,0,0.5), 0 0 8px rgba(0,0,0,0.3)',
+                                }}
+                            >
+                                {name}
+                            </div>
+                            <div
+                                className="text-[9px] opacity-90 font-medium"
+                                style={{
+                                    textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+                                }}
+                            >
+                                {formatDuration(duration)}
+                            </div>
+                            <div
+                                className="text-[8px] opacity-75"
+                                style={{
+                                    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                                }}
+                            >
+                                {percentage.toFixed(0)}%
+                            </div>
+                        </div>
+                    )}
+                    {showSimpleText && (
+                        <div
+                            className="text-[9px] font-bold text-white truncate px-1"
+                            style={{
+                                textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+                            }}
+                        >
+                            {name}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Tooltip */}
+            {showTooltip && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 
+                                pointer-events-none animate-fade-in">
+                    <div className="bg-slate-900/95 backdrop-blur-sm text-white text-xs 
+                                    rounded-lg px-3 py-2 shadow-xl whitespace-nowrap
+                                    border border-white/10">
+                        <div className="font-bold text-sm">{name}</div>
+                        <div className="text-slate-300 mt-0.5">
+                            {formatDuration(duration)} · {percentage.toFixed(1)}%
+                        </div>
+                        {/* 小三角 */}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 
+                                        border-4 border-transparent border-t-slate-900/95" />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+/** 调整颜色亮度的辅助函数 */
+const adjustBrightness = (hex: string, percent: number): string => {
+    const color = hex.replace('#', '');
+    const r = Math.max(0, Math.min(255, parseInt(color.slice(0, 2), 16) + percent));
+    const g = Math.max(0, Math.min(255, parseInt(color.slice(2, 4), 16) + percent));
+    const b = Math.max(0, Math.min(255, parseInt(color.slice(4, 6), 16) + percent));
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+};
+
 const ThumbnailBlock: React.FC<ThumbnailBlockProps> = ({
     blockData,
     height,
@@ -109,62 +235,60 @@ const ThumbnailBlock: React.FC<ThumbnailBlockProps> = ({
 
     return (
         <div
-            className={`relative border-b border-gray-100 group cursor-pointer transition-all ${isSelected
-                ? 'ring-2 ring-indigo-500 ring-inset bg-indigo-50/30'
-                : 'hover:bg-gray-50/50'
+            className={`relative group cursor-pointer transition-all duration-200 ${isSelected
+                ? 'ring-2 ring-indigo-500 ring-inset bg-indigo-50/50 shadow-inner'
+                : 'hover:bg-white/60 hover:shadow-sm'
                 }`}
-            style={{ height: `${height}px` }}
+            style={{
+                height: `${height}px`,
+                // 玻璃拟态背景
+                background: isSelected
+                    ? 'rgba(238, 242, 255, 0.5)'
+                    : 'linear-gradient(180deg, rgba(255,255,255,0.8) 0%, rgba(249,250,251,0.6) 100%)',
+                backdropFilter: 'blur(8px)',
+            }}
             onClick={onClick}
         >
-            {/* 横向堆叠条 */}
-            <div className="absolute inset-0 flex">
+            {/* 底部分隔线 */}
+            <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+
+            {/* 横向堆叠条容器 */}
+            <div className="absolute inset-2 flex items-stretch">
                 {/* Top N 分类 */}
-                {topCategories.map((cat) => (
-                    <div
+                {topCategories.map((cat, index) => (
+                    <CategoryBlock
                         key={cat.id}
-                        style={{
-                            width: `${cat.percentage}%`,
-                            backgroundColor: cat.color
-                        }}
-                        className="relative flex items-center justify-center overflow-hidden text-[9px] font-medium text-white transition-all"
-                        title={`${cat.name}: ${formatDuration(cat.duration)} (${cat.percentage.toFixed(1)}%)`}
-                    >
-                        {cat.percentage > 8 && (
-                            <div className="px-1 text-center leading-tight" style={{
-                                textShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                                fontSize: '8px'
-                            }}>
-                                <div className="font-bold truncate">{cat.name}</div>
-                                <div className="opacity-90">{formatDuration(cat.duration)}</div>
-                                <div className="opacity-75">{cat.percentage.toFixed(0)}%</div>
-                            </div>
-                        )}
-                    </div>
+                        id={cat.id}
+                        name={cat.name}
+                        color={cat.color}
+                        percentage={cat.percentage}
+                        duration={cat.duration}
+                        isLast={index === topCategories.length - 1 && otherPercentage === 0 && blockData.empty_percentage === 0}
+                    />
                 ))}
 
                 {/* 其他分类 */}
                 {otherPercentage > 0 && (
-                    <div
-                        style={{
-                            width: `${otherPercentage}%`,
-                            backgroundColor: otherColor
-                        }}
-                        className="relative flex items-center justify-center text-[9px] font-medium text-white"
-                        title={`${otherName}: ${formatDuration(otherDuration)} (${otherPercentage.toFixed(1)}%)`}
-                    >
-                        {otherPercentage > 5 && (
-                            <div style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)', fontSize: '8px' }}>
-                                {otherName}
-                            </div>
-                        )}
-                    </div>
+                    <CategoryBlock
+                        id="other"
+                        name={otherName}
+                        color={otherColor}
+                        percentage={otherPercentage}
+                        duration={otherDuration}
+                        isLast={blockData.empty_percentage === 0}
+                    />
                 )}
 
                 {/* 空白时间 */}
                 {blockData.empty_percentage > 0 && (
                     <div
-                        style={{ width: `${blockData.empty_percentage}%` }}
-                        className="bg-gray-50 border-l border-gray-100"
+                        className="rounded-md transition-all duration-200"
+                        style={{
+                            width: `calc(${blockData.empty_percentage}% - 2px)`,
+                            marginLeft: topCategories.length > 0 || otherPercentage > 0 ? '0' : '0',
+                            background: 'repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 4px, #e5e7eb 4px, #e5e7eb 8px)',
+                            opacity: 0.6,
+                        }}
                     />
                 )}
             </div>
