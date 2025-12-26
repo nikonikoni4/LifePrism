@@ -389,8 +389,9 @@ const TodoTabView: React.FC = () => {
             </aside>
 
             {/* 2. MIDDLE PANE: LEVEL 1 TODOS */}
-            <div className="flex-1 min-w-[300px] max-w-md bg-[#F8FAFC] flex flex-col border-r border-slate-200/60">
-                <div className="p-8">
+            <div className="flex-1 min-w-[300px] max-w-md bg-[#F8FAFC] flex flex-col border-r border-slate-200/60 overflow-hidden">
+                {/* 固定头部区域 */}
+                <div className="flex-shrink-0 px-8 pt-8 pb-4">
                     <div className="flex items-center gap-3 mb-6">
                         <h3 className="text-lg font-black text-slate-800 tracking-tight">Today's Focus</h3>
                         <span className={`text-sm font-medium px-3 py-1 rounded-full ${dailyFocusContent
@@ -402,7 +403,7 @@ const TodoTabView: React.FC = () => {
                     </div>
 
                     {/* Create L1 Input with Goal Selector */}
-                    <div className="mb-6 flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
+                    <div className="flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
                         {/* 目标选择器 - 上方 */}
                         <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 bg-slate-50/30">
                             <Target size={14} className="text-blue-500 flex-shrink-0" />
@@ -440,7 +441,15 @@ const TodoTabView: React.FC = () => {
                             </div>
                         </div>
                     </div>
+                </div>
 
+                {/* 可滚动的任务列表区域 - 隐藏滚动条 */}
+                <div className="flex-1 overflow-y-auto px-8 pt-1 pb-8 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    <style>{`
+                        .scrollbar-hide::-webkit-scrollbar {
+                            display: none;
+                        }
+                    `}</style>
                     {/* Loading State */}
                     {loading ? (
                         <div className="flex items-center justify-center py-10">
