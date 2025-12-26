@@ -13,6 +13,23 @@ from lifewatch.storage import lw_db_manager
 # 禁用分类使用的浅灰色
 DISABLED_CATEGORY_COLOR = '#D1D5DB'
 
+# Tailwind CSS 500 → 200 系列颜色映射
+# 用于 Timeline 缩略图的柔和颜色显示
+# ⚠️ 维护说明：如果前端调色盘变动，需同步更新此映射表
+# @see frontend/page/category/components/CategorySettingsTab.tsx
+TAILWIND_500_TO_200 = {
+    '#EF4444': '#FECACA',  # red
+    '#F97316': '#FED7AA',  # orange
+    '#EAB308': '#FEF08A',  # yellow
+    '#22C55E': '#BBF7D0',  # green
+    '#14B8A6': '#99F6E4',  # teal
+    '#06B6D4': '#A5F3FC',  # cyan
+    '#3B82F6': '#BFDBFE',  # blue
+    '#6366F1': '#C7D2FE',  # indigo
+    '#A855F7': '#DDD6FE',  # purple
+    '#EC4899': '#FBCFE8',  # pink
+}
+
 
 class CategoryColorManager:
     """
@@ -34,6 +51,9 @@ class CategoryColorManager:
             self.db_manager = lw_db_manager
             self._main_category_colors: Dict[str, str] = {}  # {category_id: color}
             self._sub_category_colors: Dict[str, str] = {}   # {sub_category_id: color}
+            # Timeline 缩略图专用的柔和颜色缓存
+            self._timeline_main_colors: Dict[str, str] = {}  # {category_id: soft_color}
+            self._timeline_sub_colors: Dict[str, str] = {}   # {sub_category_id: soft_color}
             CategoryColorManager._initialized = True
     
     def initialize_colors(self) -> None:
@@ -98,6 +118,9 @@ class CategoryColorManager:
             # 为禁用的子分类设置浅灰色
             for sub_id in disabled_subs:
                 self._sub_category_colors[sub_id] = DISABLED_CATEGORY_COLOR
+            
+            # 4. 初始化 Timeline 缩略图专用的柔和颜色
+            self._initialize_timeline_colors()
     
     def get_main_category_color(self, category_id: str) -> str:
         """
@@ -159,7 +182,129 @@ class CategoryColorManager:
         """
         self._main_category_colors.clear()
         self._sub_category_colors.clear()
+        self._timeline_main_colors.clear()
+        self._timeline_sub_colors.clear()
         self.initialize_colors()
+    
+    # =========================================================================
+    # Timeline 缩略图专用颜色（柔和色调）
+    # =========================================================================
+    
+    def _initialize_timeline_colors(self) -> None:
+        """
+        初始化 Timeline 缩略图专用的柔和颜色
+        基于原有颜色生成更柔和的变体（更高亮度、更低饱和度）
+        """
+        # 为主分类生成柔和颜色
+        for cat_id, original_color in self._main_category_colors.items():
+            if original_color == DISABLED_CATEGORY_COLOR:
+                self._timeline_main_colors[cat_id] = DISABLED_CATEGORY_COLOR
+            else:
+                self._timeline_main_colors[cat_id] = self._soften_color(original_color)
+        
+        # 为子分类生成柔和颜色
+        for sub_id, original_color in self._sub_category_colors.items():
+            if original_color == DISABLED_CATEGORY_COLOR:
+                self._timeline_sub_colors[sub_id] = DISABLED_CATEGORY_COLOR
+            else:
+                self._timeline_sub_colors[sub_id] = self._soften_color(original_color)
+    
+    def _soften_color(self, hex_color: str) -> str:
+        """
+        将颜色转换为更柔和的版本
+        
+        策略：
+        1. 优先：检查 Tailwind 500→200 映射表，直接返回对应的 200 系列颜色
+        2. 备用：如果不在映射表中，动态计算柔和色（提高亮度、降低饱和度）
+        
+        Args:
+            hex_color: 原始 Hex 颜色
+            
+        Returns:
+            str: 柔和的 Hex 颜色
+        """
+        # 标准化颜色格式（大写）
+        normalized_color = hex_color.upper()
+        
+        # 1. 优先使用 Tailwind 500→200 映射
+        if normalized_color in TAILWIND_500_TO_200:
+            return TAILWIND_500_TO_200[normalized_color]
+        
+        # 2. 备用方案：动态计算柔和色
+        color = hex_color
+        if color.startswith('#'):
+            color = color[1:]
+        
+        if len(color) != 6:
+            return hex_color
+        
+        try:
+            r = int(color[0:2], 16) / 255.0
+            g = int(color[2:4], 16) / 255.0
+            b = int(color[4:6], 16) / 255.0
+        except ValueError:
+            return hex_color
+        
+        h, l, s = colorsys.rgb_to_hls(r, g, b)
+        
+        # 调整亮度和饱和度使颜色更柔和
+        # 亮度提高到 0.70 ~ 0.78 范围
+        new_l = 0.70 + (l * 0.1)  # 基础亮度 0.70，略微保留原亮度差异
+        new_l = min(0.78, max(0.65, new_l))  # 限制在合理范围
+        
+        # 饱和度降低到原来的 55% ~ 70%
+        new_s = s * 0.60
+        new_s = max(0.25, min(0.55, new_s))  # 保证有一定饱和度但不会太鲜艳
+        
+        r_new, g_new, b_new = colorsys.hls_to_rgb(h, new_l, new_s)
+        
+        return "#{:02x}{:02x}{:02x}".format(
+            int(max(0, min(1, r_new)) * 255),
+            int(max(0, min(1, g_new)) * 255),
+            int(max(0, min(1, b_new)) * 255)
+        )
+    
+    def get_timeline_main_color(self, category_id: str) -> str:
+        """
+        获取 Timeline 缩略图专用的主分类柔和颜色
+        
+        Args:
+            category_id: 主分类ID
+            
+        Returns:
+            str: 柔和颜色值 (Hex)
+        """
+        if not self._timeline_main_colors:
+            if not self._main_category_colors:
+                self.initialize_colors()
+            else:
+                self._initialize_timeline_colors()
+        
+        return self._timeline_main_colors.get(
+            category_id, 
+            self._soften_color(self._get_default_color(category_id))
+        )
+    
+    def get_timeline_sub_color(self, sub_category_id: str) -> str:
+        """
+        获取 Timeline 缩略图专用的子分类柔和颜色
+        
+        Args:
+            sub_category_id: 子分类ID
+            
+        Returns:
+            str: 柔和颜色值 (Hex)
+        """
+        if not self._timeline_sub_colors:
+            if not self._sub_category_colors:
+                self.initialize_colors()
+            else:
+                self._initialize_timeline_colors()
+        
+        return self._timeline_sub_colors.get(
+            sub_category_id,
+            self._soften_color('#9CA3AF')  # 默认灰色的柔和版本
+        )
     
     def _get_default_color(self, category_id: str) -> str:
         """
@@ -360,6 +505,28 @@ def get_log_color(base_color: str) -> str:
         int(max(0, min(1, g_new)) * 255),
         int(max(0, min(1, b_new)) * 255)
     )
+
+
+def get_timeline_category_color(category_id: str, is_sub_category: bool = False) -> str:
+    """
+    获取 Timeline 缩略图专用的柔和分类颜色
+    
+    这些颜色比原分类颜色更柔和（更高亮度、更低饱和度），
+    专门用于 Timeline 缩略图显示，使整体视觉效果更舒适。
+    
+    注意：旭日图等其他组件应继续使用 get_category_color() 获取原有颜色。
+    
+    Args:
+        category_id: 分类ID
+        is_sub_category: 是否为子分类
+        
+    Returns:
+        str: 柔和颜色值 (Hex)
+    """
+    if is_sub_category:
+        return color_manager.get_timeline_sub_color(category_id)
+    else:
+        return color_manager.get_timeline_main_color(category_id)
 
 
 if __name__ == "__main__":

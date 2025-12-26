@@ -21,7 +21,7 @@ from lifewatch.server.schemas.activity_schemas import (
     BarConfig,
 )
 from lifewatch.server.providers import server_lw_data_provider
-from lifewatch.server.providers.category_color_provider import color_manager, get_log_color
+from lifewatch.server.providers.category_color_provider import color_manager, get_log_color, get_timeline_category_color
 
 
 # ============================================================================
@@ -193,14 +193,15 @@ def _calculate_block_stats(
     
     block_df = slice_events_by_time_range(df, range_start, range_end)
     
-    # 2. 确定分组字段和颜色获取函数
+    # 2. 确定分组字段、颜色获取函数和名称映射
+    #    缩略图使用柔和颜色版本 (get_timeline_category_color)
     if category_level == "main":
         group_field = "category_id"
-        color_getter = color_manager.get_main_category_color
+        color_getter = lambda cat_id: get_timeline_category_color(cat_id, is_sub_category=False)
         name_map = _get_category_name_map()
     else:
         group_field = "sub_category_id"
-        color_getter = color_manager.get_sub_category_color
+        color_getter = lambda cat_id: get_timeline_category_color(cat_id, is_sub_category=True)
         name_map = _get_sub_category_name_map()
     
     # 3. 聚合分类统计
