@@ -20,7 +20,7 @@ from lifewatch.server.schemas.activity_schemas import (
     ChartSegment,
     BarConfig,
 )
-from lifewatch.server.providers import server_lw_data_provider
+from lifewatch.server.providers import timeline_provider
 from lifewatch.server.providers.category_color_provider import color_manager, get_log_color, get_timeline_category_color
 
 
@@ -30,14 +30,14 @@ from lifewatch.server.providers.category_color_provider import color_manager, ge
 
 def _get_category_name_map() -> Dict[str, str]:
     """获取主分类 ID -> 名称映射（从 category 表加载）"""
-    categories_df = server_lw_data_provider.load_categories()
+    categories_df = timeline_provider.load_categories()
     if categories_df is None or categories_df.empty:
         return {}
     return {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
 
 def _get_sub_category_name_map() -> Dict[str, str]:
     """获取子分类 ID -> 名称映射（从 sub_category 表加载）"""
-    sub_categories_df = server_lw_data_provider.load_sub_categories()
+    sub_categories_df = timeline_provider.load_sub_categories()
     if sub_categories_df is None or sub_categories_df.empty:
         return {}
     return {str(row['id']): row['name'] for _, row in sub_categories_df.iterrows()}
@@ -102,7 +102,7 @@ def load_day_events(date: str) -> pd.DataFrame:
     """
     start_time = f"{date} 00:00:00"
     end_time = f"{date} 23:59:59"
-    df = server_lw_data_provider.load_user_app_behavior_log(
+    df = timeline_provider.load_user_app_behavior_log(
         start_time=start_time, 
         end_time=end_time
     )

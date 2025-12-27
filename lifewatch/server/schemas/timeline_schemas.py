@@ -56,3 +56,18 @@ from lifewatch.server.schemas.activity_schemas import TimeOverviewData
 class TimelineTimeOverviewResponse(BaseModel):
     """点击缩略图时间块后的详细概览"""
     data: TimeOverviewData = Field(..., description="缩略图的 Time Overview")
+
+# ============================================================================
+# 用户的自定义添加数据，备注
+# ============================================================================
+
+class UserCustomBlock(BaseModel):
+    """用户自定义添加的数据块"""
+    id: int = Field(..., description="数据块ID")
+    value: str = Field(..., description="数据块名称")
+    duration: int = Field(..., description="数据块持续时长（秒）")
+    start_time: str = Field(..., description="数据块开始时间 YYYY-MM-DD HH:MM:SS")
+    end_time: str = Field(..., description="数据块结束时间 YYYY-MM-DD HH:MM:SS")
+    category_id: str = Field(..., description="数据块所属分类ID")
+    sub_category_id: str = Field(..., description="数据块所属子分类ID")
+

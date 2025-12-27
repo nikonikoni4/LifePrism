@@ -31,6 +31,185 @@ class LWBaseDataProvider:
             self.db = lw_db_manager
         else:
             self.db = db_manager
+        
+        # 日期/时间范围状态（供 get_activity_logs 等方法使用）
+        self._current_date = None
+        self._start_time = None
+        self._end_time = None
+    
+    # ==================== 日期/时间范围属性 ====================
+    
+    @property
+    def current_date(self):
+        """当前查询日期"""
+        if not self._current_date:
+            raise AttributeError("请先使用 self.current_date = 'YYYY-MM-DD' 设置日期。")
+        return self._current_date
+
+    @current_date.setter
+    def current_date(self, value):
+        """设置当前日期，自动计算时间范围"""
+        from datetime import datetime
+        start_time = datetime.strptime(value, "%Y-%m-%d").replace(hour=0, minute=0, second=0)
+        end_time = datetime.strptime(value, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        self._start_time = start_time.strftime("%Y-%m-%d %H:%M:%S")
+        self._end_time = end_time.strftime("%Y-%m-%d %H:%M:%S")
+        self._current_date = value
+    
+    # ==================== 活动日志查询 ====================
+    
+    def get_activity_logs(
+        self,
+        date: Optional[str] = None,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        category_id: Optional[str] = None,
+        sub_category_id: Optional[str] = None,
+        query_fields: Optional[List[str]] = None,
+        page: Optional[int] = None,
+        page_size: Optional[int] = None,
+        order_by: str = "start_time",
+        order_desc: bool = True
+    ) -> tuple[list[dict], int]:
+        """
+        统一的活动日志查询方法
+        
+        支持按日期或时间范围查询，支持分类过滤和分页，支持自定义返回字段
+        
+        Args:
+            date: 查询日期 (YYYY-MM-DD 格式)，会自动设置 start_time 和 end_time 为当天范围
+            start_time: 开始时间 (YYYY-MM-DD HH:MM:SS 格式)
+            end_time: 结束时间 (YYYY-MM-DD HH:MM:SS 格式)
+            category_id: 主分类ID筛选（可选）
+            sub_category_id: 子分类ID筛选（可选）
+            query_fields: 要查询的字段列表（可选，默认返回常用字段）
+            page: 页码（从1开始，可选，不传则不分页）
+            page_size: 每页数量（可选，不传则不分页）
+            order_by: 排序字段（默认 start_time）
+            order_desc: 是否降序（默认 True）
+        
+        Returns:
+            tuple[list[dict], int]: (日志列表, 总记录数)
+        
+        Raises:
+            ValueError: 如果 query_fields 包含无效字段
+        """
+        from lifewatch.config.database import get_table_columns
+        
+        # 1. 确定时间范围
+        if date:
+            self.current_date = date
+            query_start_time = self._start_time
+            query_end_time = self._end_time
+        elif start_time and end_time:
+            query_start_time = start_time
+            query_end_time = end_time
+        else:
+            raise ValueError("必须提供 date 或 (start_time 和 end_time)")
+        
+        # 2. 验证并构建查询字段
+        valid_columns = get_table_columns("user_app_behavior_log")
+        default_fields = ["id", "start_time", "end_time", "duration", "app", "title", 
+                          "category_id", "sub_category_id"]
+        
+        if query_fields:
+            invalid_fields = [f for f in query_fields if f not in valid_columns]
+            if invalid_fields:
+                raise ValueError(f"无效的查询字段: {invalid_fields}，有效字段: {valid_columns}")
+            select_fields = query_fields
+        else:
+            select_fields = default_fields
+        
+        # 3. 构建 SELECT 子句
+        select_parts = []
+        join_category = False
+        join_sub_category = False
+        
+        for field in select_fields:
+            if field == "duration":
+                select_parts.append(f"CAST(uabl.{field} AS INTEGER) as {field}")
+            else:
+                select_parts.append(f"uabl.{field}")
+        
+        if "category_id" in select_fields:
+            select_parts.append("c.name as category_name")
+            join_category = True
+        if "sub_category_id" in select_fields:
+            select_parts.append("sc.name as sub_category_name")
+            join_sub_category = True
+        
+        select_clause = ", ".join(select_parts)
+        
+        # 4. 构建 WHERE 条件
+        where_conditions = ["uabl.start_time >= ?", "uabl.start_time <= ?"]
+        params = [query_start_time, query_end_time]
+        
+        if category_id:
+            where_conditions.append("uabl.category_id = ?")
+            params.append(category_id)
+        
+        if sub_category_id:
+            where_conditions.append("uabl.sub_category_id = ?")
+            params.append(sub_category_id)
+        
+        where_clause = " AND ".join(where_conditions)
+        
+        # 5. 构建 JOIN 子句
+        join_clause = ""
+        if join_category:
+            join_clause += " LEFT JOIN category c ON uabl.category_id = c.id"
+        if join_sub_category:
+            join_clause += " LEFT JOIN sub_category sc ON uabl.sub_category_id = sc.id"
+        
+        # 6. 构建 ORDER BY 子句
+        order_direction = "DESC" if order_desc else "ASC"
+        order_clause = f"ORDER BY uabl.{order_by} {order_direction}"
+        
+        # 7. 查询总数
+        count_sql = f"""
+        SELECT COUNT(*) 
+        FROM user_app_behavior_log uabl
+        WHERE {where_clause}
+        """
+        
+        # 8. 构建数据查询 SQL
+        data_sql = f"""
+        SELECT {select_clause}
+        FROM user_app_behavior_log uabl
+        {join_clause}
+        WHERE {where_clause}
+        {order_clause}
+        """
+        
+        # 9. 添加分页
+        pagination_params = []
+        if page is not None and page_size is not None:
+            offset = (page - 1) * page_size
+            data_sql += " LIMIT ? OFFSET ?"
+            pagination_params = [page_size, offset]
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(count_sql, params)
+            total = cursor.fetchone()[0]
+            cursor.execute(data_sql, params + pagination_params)
+            results = cursor.fetchall()
+            column_names = [description[0] for description in cursor.description]
+        
+        # 10. 转换为字典列表
+        logs = []
+        for row in results:
+            log_item = {}
+            for i, col_name in enumerate(column_names):
+                value = row[i]
+                if col_name in ("id", "category_id", "sub_category_id") and value is not None:
+                    value = str(value)
+                log_item[col_name] = value
+            logs.append(log_item)
+        
+        logger.debug(f"获取活动日志: {len(logs)} 条, 总数: {total}")
+        return logs, total
+
     
     # ==================== category_map_cache 表 ====================
     
