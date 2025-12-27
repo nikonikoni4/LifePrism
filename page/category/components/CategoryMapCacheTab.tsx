@@ -54,6 +54,16 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
         sub_category_id: '',
     });
 
+    // 同步日志确认弹窗
+    const [showSyncConfirmModal, setShowSyncConfirmModal] = useState(false);
+    const [pendingSyncData, setPendingSyncData] = useState<{
+        app: string;
+        title: string;
+        is_multipurpose_app: boolean;
+        category_id: string;
+        sub_category_id: string | null;
+    } | null>(null);
+
     // 防抖搜索
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -134,6 +144,10 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
     const handleSaveEdit = async () => {
         if (!editingRecord) return;
 
+        // 检测是否修改了分类
+        const categoryChanged = editForm.category_id !== (editingRecord.category_id || '') ||
+            editForm.sub_category_id !== (editingRecord.sub_category_id || '');
+
         try {
             setIsProcessing(true);
             await CategoryMapCacheAPI.update(editingRecord.id, {
@@ -157,6 +171,19 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                     }
                     : r
             ));
+
+            // 如果分类发生变化，弹出同步确认窗口
+            if (categoryChanged && editForm.category_id) {
+                setPendingSyncData({
+                    app: editingRecord.app,
+                    title: editingRecord.title,
+                    is_multipurpose_app: editingRecord.is_multipurpose_app,
+                    category_id: editForm.category_id,
+                    sub_category_id: editForm.sub_category_id || null,
+                });
+                setShowSyncConfirmModal(true);
+            }
+
             setEditingRecord(null);
         } catch (err) {
             console.error('Failed to update record:', err);
@@ -164,6 +191,31 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
         } finally {
             setIsProcessing(false);
         }
+    };
+
+    // 确认同步日志
+    const handleConfirmSync = async () => {
+        if (!pendingSyncData) return;
+
+        try {
+            setIsProcessing(true);
+            const result = await CategoryMapCacheAPI.updateLogsByCache(pendingSyncData);
+            const updatedCount = result.data?.updated_count || 0;
+            alert(`成功同步更新 ${updatedCount} 条日志记录`);
+        } catch (err) {
+            console.error('Failed to sync logs:', err);
+            alert('同步日志失败，请重试');
+        } finally {
+            setIsProcessing(false);
+            setShowSyncConfirmModal(false);
+            setPendingSyncData(null);
+        }
+    };
+
+    // 取消同步
+    const handleCancelSync = () => {
+        setShowSyncConfirmModal(false);
+        setPendingSyncData(null);
     };
 
     // 批量更新
@@ -658,6 +710,49 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                                 className="flex-1 px-4 py-2 text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
                             >
                                 {isProcessing ? '处理中...' : '确认修改'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Sync Confirm Modal */}
+            {showSyncConfirmModal && pendingSyncData && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl shadow-xl p-6 w-96">
+                        <h3 className="text-lg font-bold text-slate-900 mb-4">同步更新日志</h3>
+                        <p className="text-sm text-slate-600 mb-2">
+                            您已修改了该缓存记录的分类。
+                        </p>
+                        <p className="text-sm text-slate-600 mb-4">
+                            {pendingSyncData.is_multipurpose_app ? (
+                                <>是否将所有匹配 <span className="font-semibold text-slate-800">{pendingSyncData.app}</span> + <span className="font-semibold text-slate-800 break-all">"{pendingSyncData.title}"</span> 的日志数据也更新为相同分类？</>
+                            ) : (
+                                <>是否将所有 <span className="font-semibold text-slate-800">{pendingSyncData.app}</span> 应用的日志数据也更新为相同分类？</>
+                            )}
+                        </p>
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+                            <p className="text-xs text-amber-700">
+                                <span className="font-semibold">提示：</span>
+                                {pendingSyncData.is_multipurpose_app
+                                    ? '多用途应用仅更新完全匹配 app + title 的日志'
+                                    : '单用途应用将更新该应用的所有日志'
+                                }
+                            </p>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleCancelSync}
+                                className="flex-1 px-4 py-2 text-slate-600 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium"
+                            >
+                                否，仅更新缓存
+                            </button>
+                            <button
+                                onClick={handleConfirmSync}
+                                disabled={isProcessing}
+                                className="flex-1 px-4 py-2 text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
+                            >
+                                {isProcessing ? '同步中...' : '是，同步更新'}
                             </button>
                         </div>
                     </div>

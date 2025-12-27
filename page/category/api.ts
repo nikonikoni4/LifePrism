@@ -332,4 +332,42 @@ export const CategoryMapCacheAPI = {
 
         return response.json();
     },
+
+    /**
+     * 根据缓存匹配条件更新日志分类
+     * 
+     * @param params 更新参数
+     * @returns 标准响应 (包含 updated_count)
+     */
+    async updateLogsByCache(params: {
+        app: string;
+        title?: string | null;
+        is_multipurpose_app: boolean;
+        category_id: string;
+        sub_category_id?: string | null;
+    }): Promise<StandardResponse> {
+        const searchParams = new URLSearchParams();
+        searchParams.set('app', params.app);
+        searchParams.set('is_multipurpose_app', params.is_multipurpose_app.toString());
+        searchParams.set('category_id', params.category_id);
+
+        if (params.title) {
+            searchParams.set('title', params.title);
+        }
+        if (params.sub_category_id) {
+            searchParams.set('sub_category_id', params.sub_category_id);
+        }
+
+        const ACTIVITY_API_BASE = 'http://localhost:8000/api/v2/activity';
+        const response = await fetch(`${ACTIVITY_API_BASE}/manage/logs/update-by-cache?${searchParams.toString()}`, {
+            method: 'POST',
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to update logs by cache: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
 };
+
