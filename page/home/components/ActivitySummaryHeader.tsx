@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Calendar, Filter, RefreshCw, Clock, Database, X, Check } from 'lucide-react';
 import { ActivitySummaryData, CategoryTreeItem } from '../types';
 import { ActivityAPI, CategoryAPI, SyncAPI } from '../api';
@@ -504,7 +505,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
             </div>
 
             {/* Sync Time Range Dialog */}
-            {showSyncDialog && (
+            {showSyncDialog && createPortal(
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full mx-4 animate-fade-in">
                         <h3 className="text-xl font-bold text-slate-900 mb-4">同步数据</h3>
@@ -553,11 +554,12 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Category Filter Dialog */}
-            {showFilterDialog && (
+            {showFilterDialog && createPortal(
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-lg w-full mx-4 animate-fade-in">
                         <div className="flex items-center justify-between mb-4">
@@ -666,7 +668,8 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
         </div>
