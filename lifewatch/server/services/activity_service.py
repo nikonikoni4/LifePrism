@@ -215,3 +215,37 @@ class ActivityService:
         print(log_ids)
         return server_lw_data_provider.batch_delete_events(log_ids)
 
+    def update_logs_by_app_title(
+        self,
+        app: str,
+        title: str | None,
+        is_multipurpose_app: bool,
+        category_id: str,
+        sub_category_id: str | None = None
+    ) -> int:
+        """
+        根据 app 和可选的 title 批量更新日志分类
+        
+        匹配逻辑：
+        - 单用途应用 (is_multipurpose_app=False): 仅按 app 匹配
+        - 多用途应用 (is_multipurpose_app=True): 按 app + title 匹配
+        
+        Args:
+            app: 应用名称
+            title: 窗口标题（多用途应用时必须提供）
+            is_multipurpose_app: 是否为多用途应用
+            category_id: 主分类ID
+            sub_category_id: 子分类ID（可选）
+        
+        Returns:
+            int: 成功更新的数量
+        """
+        return server_lw_data_provider.update_logs_by_app_title(
+            app=app,
+            title=title,
+            is_multipurpose_app=is_multipurpose_app,
+            category_id=category_id,
+            sub_category_id=sub_category_id
+        )
+
+

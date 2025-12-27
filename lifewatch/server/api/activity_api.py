@@ -338,3 +338,60 @@ async def delete_log(log_id: str) -> StandardResponse:
         raise HTTPException(status_code=500, detail=f"删除日志失败: {str(e)}")
 
 
+@router.post("/manage/logs/update-by-cache", summary="根据缓存更新日志分类", response_model=StandardResponse)
+async def update_logs_by_cache(
+    app: str = Query(..., description="应用名称"),
+    title: Optional[str] = Query(None, description="窗口标题（多用途应用时必填）"),
+    is_multipurpose_app: bool = Query(..., description="是否为多用途应用"),
+    category_id: str = Query(..., description="主分类ID"),
+    sub_category_id: Optional[str] = Query(None, description="子分类ID")
+) -> StandardResponse:
+    """
+    根据缓存匹配条件批量更新日志分类
+    
+    **匹配逻辑：**
+    - 单用途应用 (is_multipurpose_app=false): 仅按 app 匹配
+    - 多用途应用 (is_multipurpose_app=true): 按 app + title 匹配
+    
+    **参数：**
+    - app: 应用名称（必填）
+    - title: 窗口标题（多用途应用时必填）
+    - is_multipurpose_app: 是否为多用途应用
+    - category_id: 主分类ID
+    - sub_category_id: 子分类ID（可选）
+    
+    **返回：**
+    - success: 是否成功
+    - data.updated_count: 更新的日志数量
+    """
+    try:
+        # 验证：多用途应用必须提供 title
+        if is_multipurpose_app and not title:
+            raise HTTPException(
+                status_code=400, 
+                detail="多用途应用必须提供 title 参数"
+            )
+        
+        updated_count = activity_service.update_logs_by_app_title(
+            app=app,
+            title=title,
+            is_multipurpose_app=is_multipurpose_app,
+            category_id=category_id,
+            sub_category_id=sub_category_id
+        )
+        
+        return StandardResponse(
+            success=True,
+            data={"updated_count": updated_count},
+            message=f"成功更新 {updated_count} 条日志"
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"根据缓存更新日志分类失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"更新日志分类失败: {str(e)}")
+
+
+

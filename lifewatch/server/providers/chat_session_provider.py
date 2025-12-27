@@ -3,6 +3,16 @@ Chat Session Provider - 聊天会话元数据数据库操作
 
 负责会话元数据的持久化存储
 """
+# chat_session_provider.py
+"""
+Chat Session Provider - 聊天会话元数据数据库操作
+负责会话元数据的持久化存储（存储在 lifewatch_ai.db）
+注意：聊天消息内容由 LangGraph 的 AsyncSqliteSaver 管理，
+存储在独立的 chat_history.db 中。两个数据库通过 session_id（即 thread_id）关联。
+架构决策原因：
+1. LangGraph 管理的 checkpoint 表结构可能随版本变化
+2. 应用层元数据（name, message_count）与其他业务数据一起管理更合理
+"""
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 

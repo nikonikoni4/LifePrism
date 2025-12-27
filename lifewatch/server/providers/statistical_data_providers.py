@@ -602,6 +602,60 @@ class ServerLWDataProvider(LWBaseDataProvider):
             conn.commit()
             return cursor.rowcount
 
+    def update_logs_by_app_title(
+        self,
+        app: str,
+        title: str | None,
+        is_multipurpose_app: bool,
+        category_id: str,
+        sub_category_id: str | None = None
+    ) -> int:
+        """
+        根据 app 和可选的 title 批量更新日志分类
+        
+        匹配逻辑：
+        - 单用途应用 (is_multipurpose_app=False): 仅按 app 匹配
+        - 多用途应用 (is_multipurpose_app=True): 按 app + title 匹配
+        
+        Args:
+            app: 应用名称
+            title: 窗口标题（多用途应用时必须提供）
+            is_multipurpose_app: 是否为多用途应用
+            category_id: 主分类ID
+            sub_category_id: 子分类ID（可选）
+        
+        Returns:
+            int: 成功更新的数量
+        """
+        # 构建 WHERE 条件
+        if is_multipurpose_app:
+            # 多用途应用：匹配 app + title
+            if title is None:
+                raise ValueError("多用途应用必须提供 title 参数")
+            sql = """
+            UPDATE user_app_behavior_log 
+            SET category_id = ?, sub_category_id = ?
+            WHERE app = ? AND title = ?
+            """
+            params = (category_id, sub_category_id, app, title)
+        else:
+            # 单用途应用：仅匹配 app
+            sql = """
+            UPDATE user_app_behavior_log 
+            SET category_id = ?, sub_category_id = ?
+            WHERE app = ?
+            """
+            params = (category_id, sub_category_id, app)
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            conn.commit()
+            updated_count = cursor.rowcount
+        
+        logger.info(f"根据 app='{app}' {'+ title' if is_multipurpose_app else ''} 更新了 {updated_count} 条日志")
+        return updated_count
+
 
     def get_app_usage_summary(self, 
                              start_time: str = None, 
