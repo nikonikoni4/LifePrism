@@ -144,17 +144,31 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({
 
 // --- Main Three-Pane Component ---
 
+interface TodoTabViewProps {
+    initialDate?: string | null;
+    onDateUsed?: () => void;
+}
 
-const TodoTabView: React.FC = () => {
+const TodoTabView: React.FC<TodoTabViewProps> = ({ initialDate, onDateUsed }) => {
     // 使用今天的日期作为默认值
     const today = new Date().toISOString().split('T')[0];
-    const [selectedDate, setSelectedDate] = useState(today);
+    const [selectedDate, setSelectedDate] = useState(initialDate || today);
 
     const [items, setItems] = useState<TodoItem[]>([]);
     const [dailyFocusContent, setDailyFocusContent] = useState<string | null>(null);
     const [selectedL1Id, setSelectedL1Id] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [activeGoals, setActiveGoals] = useState<ActiveGoalItem[]>([]);
+
+    // Handle external date navigation from PlanTabView
+    useEffect(() => {
+        if (initialDate) {
+            setSelectedDate(initialDate);
+            setSelectedL1Id(null);
+            // Notify parent that the date has been used
+            onDateUsed?.();
+        }
+    }, [initialDate, onDateUsed]);
 
     // Handle date change from WeekDayTreeSelector
     const handleDateChange = (date: string) => {

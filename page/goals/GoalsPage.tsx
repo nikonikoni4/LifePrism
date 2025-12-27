@@ -20,6 +20,9 @@ const GoalsPage: React.FC = () => {
     // State for handling Goal Detail View - now uses number ID
     const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
 
+    // State for navigating to TodoTabView with a specific date
+    const [todoInitialDate, setTodoInitialDate] = useState<string | null>(null);
+
     useEffect(() => {
         const hour = new Date().getHours();
         if (hour < 12) setGreeting('Good Morning');
@@ -31,6 +34,16 @@ const GoalsPage: React.FC = () => {
     const handleTabChange = (tab: TabType) => {
         setActiveTab(tab);
         setSelectedGoalId(null);
+        // Clear the initial date when manually switching tabs
+        if (tab !== 'todo') {
+            setTodoInitialDate(null);
+        }
+    };
+
+    // Navigate to TodoTabView with a specific date
+    const handleNavigateToTodoWithDate = (date: string) => {
+        setTodoInitialDate(date);
+        setActiveTab('todo');
     };
 
     const handleSaveGoal = (updatedGoal: UserGoal) => {
@@ -106,8 +119,17 @@ const GoalsPage: React.FC = () => {
 
             {/* 2. Main Body Content Area */}
             <main className="flex-1 flex min-h-0 overflow-hidden">
-                {activeTab === 'todo' && <TodoTabView />}
-                {activeTab === 'plan' && <PlanTabView />}
+                {activeTab === 'todo' && (
+                    <TodoTabView
+                        initialDate={todoInitialDate}
+                        onDateUsed={() => setTodoInitialDate(null)}
+                    />
+                )}
+                {activeTab === 'plan' && (
+                    <PlanTabView
+                        onNavigateToTodo={handleNavigateToTodoWithDate}
+                    />
+                )}
 
                 {activeTab !== 'todo' && activeTab !== 'plan' && (
                     <div className="flex-1 overflow-y-auto p-0 no-scrollbar">

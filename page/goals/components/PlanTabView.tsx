@@ -15,7 +15,8 @@ import {
     ClipboardList,
     BookOpen,
     X,
-    Loader2
+    Loader2,
+    ExternalLink
 } from 'lucide-react';
 import { planApi, todoApi } from '../api';
 import { TodoItem, WeeklyPlanResponse, MonthlyPlanResponse, DailyPlanItem, WeeklyPlanItem } from '../types';
@@ -30,6 +31,10 @@ interface WeekData {
     endDate: string;
     isCompleted: boolean;
     summary: string;
+}
+
+interface PlanTabViewProps {
+    onNavigateToTodo?: (date: string) => void;
 }
 
 // --- Helper Functions ---
@@ -80,7 +85,7 @@ const getWeeksInMonth = (year: number, month: number): WeekData[] => {
 
 
 
-const PlanTabView: React.FC = () => {
+const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
     // View type: 'week' (detailed) or 'month' (card grid)
     // Default to week view as per user requirement
     const [viewType, setViewType] = useState<'week' | 'month'>('week');
@@ -810,8 +815,20 @@ const PlanTabView: React.FC = () => {
                                     <div key={day.date} className={`bg-white rounded-[1.5rem] border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow ${viewMode === 'compact' ? `flex flex-col ${compactColSpan}` : ''}`}>
                                         {/* Row 0: Day Header */}
                                         <div className="bg-slate-50/80 border-b border-slate-200 px-4 py-3 flex items-center justify-between backdrop-blur-sm">
-                                            <span className="text-sm font-bold text-slate-800">{day.name}</span>
-                                            <span className="text-[10px] font-mono font-medium text-slate-400">{day.date}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-slate-800">{day.name}</span>
+                                                <span className="text-[10px] font-mono font-medium text-slate-400">{day.date}</span>
+                                            </div>
+                                            {/* Navigate to TodoTabView button */}
+                                            {onNavigateToTodo && (
+                                                <button
+                                                    onClick={() => onNavigateToTodo(day.date)}
+                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all group"
+                                                    title={`查看 ${day.date} 的任务清单`}
+                                                >
+                                                    <ExternalLink size={14} className="group-hover:scale-110 transition-transform" />
+                                                </button>
+                                            )}
                                         </div>
 
                                         {viewMode === 'compact' ? (
