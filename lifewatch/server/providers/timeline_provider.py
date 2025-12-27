@@ -5,7 +5,6 @@ Timeline 数据提供者
 """
 from lifewatch.storage import LWBaseDataProvider
 from lifewatch.utils import get_logger
-
 logger = get_logger(__name__)
 
 
@@ -58,3 +57,111 @@ class TimelineProvider(LWBaseDataProvider):
             })
         
         return events
+
+    # ============================================================================
+    # UserCustomBlock CRUD 方法
+    # ============================================================================
+    
+    def create_custom_block(self, data: dict) -> dict:
+        """
+        创建用户自定义时间块
+        
+        Args:
+            data: dict, 包含 value, start_time, end_time, duration, category_id, sub_category_id
+        
+        Returns:
+            dict: 创建后的完整记录（含 id 和时间戳）
+        """
+        self.db.insert("timeline_custom_block", data)
+        
+        # 查询刚插入的记录（按创建时间倒序取最新一条）
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM timeline_custom_block ORDER BY id DESC LIMIT 1"
+            )
+            row = cursor.fetchone()
+            if row:
+                columns = [desc[0] for desc in cursor.description]
+                return dict(zip(columns, row))
+        return {}
+    
+    def get_custom_block_by_id(self, block_id: int) -> dict | None:
+        """
+        根据 ID 获取单条自定义时间块
+        
+        Args:
+            block_id: int, 时间块 ID
+        
+        Returns:
+            dict | None: 记录或 None
+        """
+        return self.db.get_by_id("timeline_custom_block", "id", block_id)
+    
+    def get_custom_blocks_by_date(self, date: str) -> list[dict]:
+        """
+        获取指定日期的所有自定义时间块
+        
+        Args:
+            date: str, 日期（YYYY-MM-DD 格式）
+        
+        Returns:
+            list[dict]: 时间块列表
+        """
+        # 使用 start_time 的日期部分过滤
+        start_of_day = f"{date}T00:00:00"
+        end_of_day = f"{date}T23:59:59"
+        
+        # 使用原生 SQL 查询时间范围
+        sql = """
+        SELECT * FROM timeline_custom_block
+        WHERE start_time >= ? AND start_time <= ?
+        ORDER BY start_time ASC
+        """
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, [start_of_day, end_of_day])
+            rows = cursor.fetchall()
+            if not rows:
+                return []
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in rows]
+    
+    def update_custom_block(self, block_id: int, data: dict) -> dict | None:
+        """
+        更新用户自定义时间块
+        
+        Args:
+            block_id: int, 时间块 ID
+            data: dict, 要更新的字段
+        
+        Returns:
+            dict | None: 更新后的完整记录或 None
+        """
+        # 过滤掉 None 值
+        update_data = {k: v for k, v in data.items() if v is not None}
+        if not update_data:
+            return self.get_custom_block_by_id(block_id)
+        
+        affected_rows = self.db.update(
+            "timeline_custom_block",
+            data=update_data,
+            where={"id": block_id}
+        )
+        if affected_rows > 0:
+            return self.get_custom_block_by_id(block_id)
+        return None
+    
+    def delete_custom_block(self, block_id: int) -> bool:
+        """
+        删除用户自定义时间块
+        
+        Args:
+            block_id: int, 时间块 ID
+        
+        Returns:
+            bool: 是否删除成功
+        """
+        affected_rows = self.db.delete("timeline_custom_block", where={"id": block_id})
+        return affected_rows > 0

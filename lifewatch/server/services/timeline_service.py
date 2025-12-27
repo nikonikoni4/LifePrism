@@ -83,3 +83,139 @@ def get_timeline_time_overview(
     
     return TimelineTimeOverviewResponse(data=overview)
 
+
+# ============================================================================
+# UserCustomBlock 服务层函数
+# ============================================================================
+
+from lifewatch.server.schemas.timeline_schemas import (
+    UserCustomBlock,
+    UserCustomBlockCreate,
+    UserCustomBlockUpdate,
+    UserCustomBlockResponse,
+    UserCustomBlockListResponse,
+)
+from lifewatch.server.providers.timeline_provider import TimelineProvider
+from lifewatch.server.services.category_service import CategoryService
+from lifewatch.server.providers.category_color_provider import get_custom_block_category_color
+
+# 创建 provider 和 service 实例
+_timeline_provider = TimelineProvider()
+_category_service = CategoryService()
+
+
+def _enrich_block_record(record: dict) -> dict:
+    """
+    丰富数据库记录，添加分类名称和颜色
+    
+    将数据库中存储的 category_id/sub_category_id 转换为前端需要的
+    category/sub_category 名称和 color 颜色
+    
+    Args:
+        record: dict, 数据库原始记录（含 category_id, sub_category_id）
+    
+    Returns:
+        dict: 丰富后的记录（含 category, sub_category, color）
+    """
+    category_id = record.get('category_id', '')
+    sub_category_id = record.get('sub_category_id', '')
+    
+    # 获取分类名称（使用缓存映射）
+    category_name = _category_service.category_name_map.get(category_id, '未知分类')
+    sub_category_name = _category_service.sub_category_name_map.get(sub_category_id, '未知子分类')
+    
+    # 获取 Tailwind 100 系列颜色（基于子分类）
+    color = get_custom_block_category_color(sub_category_id, is_sub_category=True)
+    
+    # 返回丰富后的记录
+    return {
+        **record,
+        'category': category_name,
+        'sub_category': sub_category_name,
+        'color': color,
+    }
+
+
+def create_custom_block(data: UserCustomBlockCreate) -> UserCustomBlockResponse:
+    """
+    创建用户自定义时间块
+    
+    Args:
+        data: UserCustomBlockCreate, 创建请求数据（含 category_id, sub_category_id）
+    
+    Returns:
+        UserCustomBlockResponse: 创建后的记录（含名称和颜色）
+    """
+    record = _timeline_provider.create_custom_block(data.model_dump())
+    enriched_record = _enrich_block_record(record)
+    return UserCustomBlockResponse(data=UserCustomBlock(**enriched_record))
+
+
+def get_custom_block(block_id: int) -> UserCustomBlockResponse:
+    """
+    获取单条用户自定义时间块
+    
+    Args:
+        block_id: int, 时间块 ID
+    
+    Returns:
+        UserCustomBlockResponse: 时间块记录（含名称和颜色）
+    
+    Raises:
+        ValueError: 如果记录不存在
+    """
+    record = _timeline_provider.get_custom_block_by_id(block_id)
+    if not record:
+        raise ValueError(f"Custom block with id {block_id} not found")
+    enriched_record = _enrich_block_record(record)
+    return UserCustomBlockResponse(data=UserCustomBlock(**enriched_record))
+
+
+def get_custom_blocks_by_date(date: str) -> UserCustomBlockListResponse:
+    """
+    获取指定日期的所有自定义时间块
+    
+    Args:
+        date: str, 日期（YYYY-MM-DD 格式）
+    
+    Returns:
+        UserCustomBlockListResponse: 时间块列表（每条含名称和颜色）
+    """
+    records = _timeline_provider.get_custom_blocks_by_date(date)
+    blocks = [UserCustomBlock(**_enrich_block_record(r)) for r in records]
+    return UserCustomBlockListResponse(data=blocks, total=len(blocks))
+
+
+def update_custom_block(block_id: int, data: UserCustomBlockUpdate) -> UserCustomBlockResponse:
+    """
+    更新用户自定义时间块
+    
+    Args:
+        block_id: int, 时间块 ID
+        data: UserCustomBlockUpdate, 更新请求数据
+    
+    Returns:
+        UserCustomBlockResponse: 更新后的记录（含名称和颜色）
+    
+    Raises:
+        ValueError: 如果记录不存在
+    """
+    record = _timeline_provider.update_custom_block(block_id, data.model_dump(exclude_unset=True))
+    if not record:
+        raise ValueError(f"Custom block with id {block_id} not found")
+    enriched_record = _enrich_block_record(record)
+    return UserCustomBlockResponse(data=UserCustomBlock(**enriched_record))
+
+
+def delete_custom_block(block_id: int) -> bool:
+    """
+    删除用户自定义时间块
+    
+    Args:
+        block_id: int, 时间块 ID
+    
+    Returns:
+        bool: 是否删除成功
+    """
+    return _timeline_provider.delete_custom_block(block_id)
+

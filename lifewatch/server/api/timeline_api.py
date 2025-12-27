@@ -1,15 +1,13 @@
-"""
-Timeline V2 API - 缩略图统计
-
-提供 Timeline 缩略图统计和时间块详情的 API 端点
-"""
-
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from typing import Literal
 
 from lifewatch.server.schemas.timeline_schemas import (
     TimelineStatsResponse,
     TimelineTimeOverviewResponse,
+    UserCustomBlockCreate,
+    UserCustomBlockUpdate,
+    UserCustomBlockResponse,
+    UserCustomBlockListResponse,
 )
 from lifewatch.server.services import timeline_service
 
@@ -58,3 +56,77 @@ async def get_timeline_overview(
         start_hour=start_hour,
         end_hour=end_hour
     )
+
+
+# ============================================================================
+# UserCustomBlock API 端点
+# ============================================================================
+
+@router.post("/custom-blocks", response_model=UserCustomBlockResponse)
+async def create_custom_block(data: UserCustomBlockCreate):
+    """
+    创建用户自定义时间块
+    
+    在 Timeline 上添加用户手动记录的活动。
+    
+    - **value**: 活动内容描述
+    - **start_time**: 开始时间（ISO格式：YYYY-MM-DDTHH:MM:SS）
+    - **end_time**: 结束时间（ISO格式：YYYY-MM-DDTHH:MM:SS）
+    - **duration**: 持续时长（分钟）
+    - **category_id**: 主分类ID
+    - **sub_category_id**: 子分类ID
+    
+    返回的数据会包含分类名称（category, sub_category）和颜色（color）。
+    """
+    return timeline_service.create_custom_block(data)
+
+
+@router.get("/custom-blocks", response_model=UserCustomBlockListResponse)
+async def get_custom_blocks(
+    date: str = Query(..., description="查询日期 (YYYY-MM-DD)")
+):
+    """
+    获取指定日期的所有自定义时间块
+    
+    - **date**: 查询日期，格式 YYYY-MM-DD
+    """
+    return timeline_service.get_custom_blocks_by_date(date)
+
+
+@router.get("/custom-blocks/{block_id}", response_model=UserCustomBlockResponse)
+async def get_custom_block(block_id: int):
+    """
+    获取单条自定义时间块
+    
+    - **block_id**: 时间块ID
+    """
+    try:
+        return timeline_service.get_custom_block(block_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/custom-blocks/{block_id}", response_model=UserCustomBlockResponse)
+async def update_custom_block(block_id: int, data: UserCustomBlockUpdate):
+    """
+    更新自定义时间块
+    
+    支持部分更新，只传需要修改的字段。
+    
+    - **block_id**: 时间块ID
+    """
+    try:
+        return timeline_service.update_custom_block(block_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/custom-blocks/{block_id}")
+async def delete_custom_block(block_id: int):
+    """
+    删除自定义时间块
+    
+    - **block_id**: 时间块ID
+    """
+    success = timeline_service.delete_custom_block(block_id)
+    return {"success": success, "message": "Deleted successfully" if success else "Block not found"}
