@@ -24,6 +24,12 @@ import {
     CategoryTreeItem,
 } from './types';
 
+// 自定义时间块组件
+import { CustomBlockLayer, CustomBlockAPI, UserCustomBlock, TodoSelectItem } from './components';
+
+// Todo API
+import { todoApi } from '../goals/api';
+
 // ============================================================================
 // 工具函数
 // ============================================================================
@@ -235,17 +241,16 @@ const ThumbnailBlock: React.FC<ThumbnailBlockProps> = ({
 
     return (
         <div
-            className={`relative group cursor-pointer transition-all duration-200 ${isSelected
+            className={`relative group cursor-pointer transition-all duration-200 z-[1] ${isSelected
                 ? 'ring-2 ring-indigo-500 ring-inset bg-indigo-50/50 shadow-inner'
-                : 'hover:bg-white/60 hover:shadow-sm'
+                : 'hover:bg-white/30 hover:shadow-sm'
                 }`}
             style={{
                 height: `${height}px`,
-                // 玻璃拟态背景
+                // 背景改为透明，让自定义块背景能够透出
                 background: isSelected
                     ? 'rgba(238, 242, 255, 0.5)'
-                    : 'linear-gradient(180deg, rgba(255,255,255,0.8) 0%, rgba(249,250,251,0.6) 100%)',
-                backdropFilter: 'blur(8px)',
+                    : 'transparent',
             }}
             onClick={onClick}
         >
@@ -339,6 +344,13 @@ const Timeline: React.FC = () => {
     const [editedSubCategory, setEditedSubCategory] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
+    // === 自定义时间块状态 ===
+    const [customBlocks, setCustomBlocks] = useState<UserCustomBlock[]>([]);
+    const [customBlocksLoading, setCustomBlocksLoading] = useState(false);
+
+    // === 当天待办事项状态（用于自定义时间块绑定） ===
+    const [todos, setTodos] = useState<TodoSelectItem[]>([]);
+
     // === 缩放配置 ===
     const MIN_HOUR_HEIGHT = 30;
     const MAX_HOUR_HEIGHT = 1200;
@@ -394,6 +406,44 @@ const Timeline: React.FC = () => {
         // 清除缓存
         overviewCache.current.clear();
     }, [currentDate, thumbnailConfig.enabled, thumbnailConfig.hourGranularity, thumbnailConfig.categoryLevel]);
+
+    // 获取自定义时间块数据
+    const fetchCustomBlocks = useCallback(async () => {
+        if (!thumbnailConfig.enabled) return;
+        setCustomBlocksLoading(true);
+        try {
+            const blocks = await CustomBlockAPI.getByDate(currentDate);
+            setCustomBlocks(blocks);
+        } catch (err) {
+            console.error('Failed to fetch custom blocks:', err);
+            setCustomBlocks([]);
+        } finally {
+            setCustomBlocksLoading(false);
+        }
+    }, [currentDate, thumbnailConfig.enabled]);
+
+    useEffect(() => {
+        fetchCustomBlocks();
+    }, [fetchCustomBlocks]);
+
+    // 获取当天待办事项（用于自定义时间块绑定下拉）
+    useEffect(() => {
+        const fetchTodos = async () => {
+            if (!thumbnailConfig.enabled) return;
+            try {
+                const response = await todoApi.getTodos(currentDate, true);
+                // 转换为 TodoSelectItem 格式
+                setTodos(response.items.map(todo => ({
+                    id: todo.id,
+                    content: todo.content,
+                })));
+            } catch (err) {
+                console.error('Failed to fetch todos for custom block:', err);
+                setTodos([]);
+            }
+        };
+        fetchTodos();
+    }, [currentDate, thumbnailConfig.enabled]);
 
     // 获取非缩略图模式的活动日志
     useEffect(() => {
@@ -651,7 +701,7 @@ const Timeline: React.FC = () => {
         return {
             top: `${top}px`,
             height: `${height}px`,
-            className: `absolute left-16 right-4 rounded-xl border ${isSelected
+            className: `absolute left-36 right-4 rounded-xl border ${isSelected
                 ? 'bg-white ring-2 ring-indigo-500 shadow-lg z-10 border-indigo-200 text-slate-800'
                 : 'bg-gray-200 border-gray-300 text-slate-700 hover:bg-gray-100 hover:shadow-md'
                 } p-3 text-xs cursor-pointer transition-shadow duration-200 flex flex-col justify-center overflow-hidden`,
@@ -826,9 +876,16 @@ const Timeline: React.FC = () => {
                     ref={timelineContainerRef}
                     className="w-full lg:w-[65%] h-full overflow-y-auto relative bg-[#FAFAFA]"
                 >
+                    {/* 
+                        布局结构：
+                        - 时间刻度区域：w-16 (64px)
+                        - 标签区域：w-20 (80px) - 用于显示自定义块标签
+                        - 内容区域：剩余空间
+                        总偏移量：64 + 80 = 144px (left-36 in rem, 或者用 left-[144px])
+                    */}
                     <div className="relative min-h-[2000px] py-4" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
-                        {/* Time Ruler */}
-                        <div className="absolute left-0 top-0 bottom-0 w-16 border-r border-dashed border-gray-200 bg-white z-0">
+                        {/* Time Ruler - 时间刻度区域 */}
+                        <div className="absolute left-0 top-0 bottom-0 w-16 border-r border-dashed border-gray-200 bg-white z-10">
                             {majorTicks.map((t) => (
                                 <div
                                     key={t}
@@ -840,11 +897,27 @@ const Timeline: React.FC = () => {
                             ))}
                         </div>
 
+                        {/* Label Area - 标签区域背景（用于显示自定义块标签） */}
+                        <div className="absolute left-16 top-0 bottom-0 w-20 bg-white/50 z-0" />
+
+                        {/* 自定义时间块层 - 在标签区域和内容区域之下，作为底层背景 */}
+                        {thumbnailConfig.enabled && (
+                            <CustomBlockLayer
+                                currentDate={currentDate}
+                                blocks={customBlocks}
+                                hourHeight={HOUR_HEIGHT}
+                                categories={categories}
+                                todos={todos}
+                                onUpdate={fetchCustomBlocks}
+                                isLoading={customBlocksLoading}
+                            />
+                        )}
+
                         {/* Major Grid Lines */}
                         {majorTicks.map((t) => (
                             <div
                                 key={`major-${t}`}
-                                className="absolute left-16 right-0 border-t border-gray-200"
+                                className="absolute left-36 right-0 border-t border-gray-200"
                                 style={{ top: `${t * HOUR_HEIGHT}px` }}
                             />
                         ))}
@@ -853,7 +926,7 @@ const Timeline: React.FC = () => {
                         {minorTicks.map((t) => (
                             <div
                                 key={`minor-${t}`}
-                                className="absolute left-16 right-0 border-t border-gray-100"
+                                className="absolute left-36 right-0 border-t border-gray-100"
                                 style={{ top: `${t * HOUR_HEIGHT}px` }}
                             />
                         ))}
@@ -861,7 +934,8 @@ const Timeline: React.FC = () => {
                         {/* === 条件渲染：缩略图 OR 事件详情 === */}
                         {thumbnailConfig.enabled ? (
                             /* 缩略图视图 */
-                            <div className="absolute left-16 right-0 top-0 bottom-0">
+                            <div className="absolute left-36 right-0 top-0 bottom-0 z-[1]">
+
                                 {thumbnailLoading && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-30">
                                         <div className="flex flex-col items-center gap-3">
