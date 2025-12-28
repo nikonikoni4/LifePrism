@@ -97,7 +97,7 @@ from lifewatch.server.schemas.timeline_schemas import (
 )
 from lifewatch.server.providers.timeline_provider import TimelineProvider
 from lifewatch.server.services.category_service import CategoryService
-from lifewatch.server.providers.category_color_provider import get_custom_block_category_color
+from lifewatch.server.providers.todo_provider import todo_provider
 
 # 创建 provider 和 service 实例
 _timeline_provider = TimelineProvider()
@@ -106,33 +106,43 @@ _category_service = CategoryService()
 
 def _enrich_block_record(record: dict) -> dict:
     """
-    丰富数据库记录，添加分类名称和颜色
+    丰富数据库记录，添加分类名称和 todo 内容
     
     将数据库中存储的 category_id/sub_category_id 转换为前端需要的
-    category/sub_category 名称和 color 颜色
+    category/sub_category 名称，并查询绑定的 todo 内容
     
     Args:
-        record: dict, 数据库原始记录（含 category_id, sub_category_id）
+        record: dict, 数据库原始记录
     
     Returns:
-        dict: 丰富后的记录（含 category, sub_category, color）
+        dict: 丰富后的记录（含 category, sub_category, todo_content）
     """
-    category_id = record.get('category_id', '')
-    sub_category_id = record.get('sub_category_id', '')
+    category_id = record.get('category_id')
+    sub_category_id = record.get('sub_category_id')
     
-    # 获取分类名称（使用缓存映射）
-    category_name = _category_service.category_name_map.get(category_id, '未知分类')
-    sub_category_name = _category_service.sub_category_name_map.get(sub_category_id, '未知子分类')
+    # 获取分类名称（如果有）
+    category_name = None
+    sub_category_name = None
+    if category_id:
+        category_name = _category_service.category_name_map.get(category_id)
+    if sub_category_id:
+        sub_category_name = _category_service.sub_category_name_map.get(sub_category_id)
     
-    # 获取 Tailwind 100 系列颜色（基于子分类）
-    color = get_custom_block_category_color(sub_category_id, is_sub_category=True)
+    # 获取 todo 内容（如果绑定了）
+    todo_id = record.get('todo_id')
+    todo_content = None
+    if todo_id:
+        todo = todo_provider.get_todo_by_id(todo_id)
+        if todo:
+            todo_content = todo.get('content')
     
     # 返回丰富后的记录
     return {
         **record,
         'category': category_name,
         'sub_category': sub_category_name,
-        'color': color,
+        'todo_content': todo_content,
+        # color 直接使用数据库中的值，不再映射
     }
 
 

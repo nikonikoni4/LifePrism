@@ -65,43 +65,50 @@ class UserCustomBlockCreate(BaseModel):
     """创建用户自定义数据块的请求体
     
     前端传入分类 ID，后端存储 ID 到数据库
+    分类和 todo_id 均为可选项
     """
-    value: str = Field(..., description="活动内容描述")
+    content: str = Field(..., description="活动内容描述")
     start_time: str = Field(..., description="开始时间（ISO格式：YYYY-MM-DDTHH:MM:SS）")
     end_time: str = Field(..., description="结束时间（ISO格式：YYYY-MM-DDTHH:MM:SS）")
     duration: int = Field(..., description="持续时长（分钟）")
-    category_id: str = Field(..., description="主分类ID")
-    sub_category_id: str = Field(..., description="子分类ID")
-
+    category_id: Optional[str] = Field(None, description="主分类ID（可选）")
+    sub_category_id: Optional[str] = Field(None, description="子分类ID（可选）")
+    todo_id: Optional[int] = Field(None, description="关联的待办事项ID（可选）")
+    color: Optional[str] = Field(None, description="活动颜色（可选，前端随机生成 Tailwind 200 系列）")
+    
 
 class UserCustomBlockUpdate(BaseModel):
     """更新用户自定义数据块的请求体（所有字段可选）"""
-    value: Optional[str] = Field(None, description="活动内容描述")
+    content: Optional[str] = Field(None, description="活动内容描述")
     start_time: Optional[str] = Field(None, description="开始时间（ISO格式：YYYY-MM-DDTHH:MM:SS）")
     end_time: Optional[str] = Field(None, description="结束时间（ISO格式：YYYY-MM-DDTHH:MM:SS）")
     duration: Optional[int] = Field(None, description="持续时长（分钟）")
     category_id: Optional[str] = Field(None, description="主分类ID")
     sub_category_id: Optional[str] = Field(None, description="子分类ID")
+    todo_id: Optional[int] = Field(None, description="关联的待办事项ID")
+    color: Optional[str] = Field(None, description="活动颜色")
 
 
 class UserCustomBlock(BaseModel):
     """用户自定义数据块 - 完整模型（返回给前端）
     
     注意：
-    - category 和 sub_category 使用分类名称（而非 ID），便于前端直接显示
-    - color 使用 Tailwind 100 系列极浅色，用于半透明覆盖显示
-    - category_id 和 sub_category_id 也返回，便于编辑时使用
+    - 分类字段为可选，如果未设置会返回 None
+    - todo_content 为绑定的待办事项内容
+    - color 由前端随机生成并存储
     """
     id: int = Field(..., description="数据块ID")
-    value: str = Field(..., description="活动内容描述")
+    content: str = Field(..., description="活动内容描述")
+    todo_id: Optional[int] = Field(None, description="关联的待办事项ID")
+    todo_content: Optional[str] = Field(None, description="关联的待办事项内容（由后端查询填充）")
     start_time: str = Field(..., description="开始时间（ISO格式：YYYY-MM-DDTHH:MM:SS）")
     end_time: str = Field(..., description="结束时间（ISO格式：YYYY-MM-DDTHH:MM:SS）")
     duration: int = Field(..., description="持续时长（分钟）")
-    category_id: str = Field(..., description="主分类ID")
-    sub_category_id: str = Field(..., description="子分类ID")
-    category: str = Field(..., description="主分类名称（通过 category_name_map 映射获得）")
-    sub_category: str = Field(..., description="子分类名称（通过 sub_category_name_map 映射获得）")
-    color: str = Field(..., description="分类颜色（Tailwind 100 系列极浅色，用于覆盖显示）")
+    category_id: Optional[str] = Field(None, description="主分类ID")
+    sub_category_id: Optional[str] = Field(None, description="子分类ID")
+    category: Optional[str] = Field(None, description="主分类名称")
+    sub_category: Optional[str] = Field(None, description="子分类名称")
+    color: Optional[str] = Field(None, description="活动颜色（Tailwind 200 系列）")
     created_at: Optional[str] = Field(None, description="创建时间")
     updated_at: Optional[str] = Field(None, description="更新时间")
 

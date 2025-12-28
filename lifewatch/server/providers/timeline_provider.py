@@ -67,7 +67,7 @@ class TimelineProvider(LWBaseDataProvider):
         创建用户自定义时间块
         
         Args:
-            data: dict, 包含 value, start_time, end_time, duration, category_id, sub_category_id
+            data: dict, 包含 content, start_time, end_time, duration, category_id, sub_category_id
         
         Returns:
             dict: 创建后的完整记录（含 id 和时间戳）
