@@ -36,6 +36,8 @@ interface CustomBlockPopoverProps {
     isSaving?: boolean;
     /** 当前日期（用于创建新块时） */
     currentDate?: string;
+    /** 初始时间（通过 + 按钮创建时预填，格式 HH:MM） */
+    initialTime?: string;
 }
 
 /**
@@ -58,6 +60,7 @@ const CustomBlockPopover: React.FC<CustomBlockPopoverProps> = ({
     onDelete,
     isSaving = false,
     currentDate,
+    initialTime,
 }) => {
     // 表单状态
     const [formData, setFormData] = useState<PopoverFormData>({
@@ -87,17 +90,23 @@ const CustomBlockPopover: React.FC<CustomBlockPopoverProps> = ({
             });
         } else {
             // 创建新块时的默认值
+            // 如果有 initialTime，使用它作为开始时间，结束时间为开始时间 +1 小时
+            const startTime = initialTime || '08:00';
+            const [h, m] = startTime.split(':').map(Number);
+            const endHour = Math.min(h + 1, 23);
+            const endTime = `${String(endHour).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+
             setFormData({
                 content: '',
-                startTime: '08:00',
-                endTime: '09:00',
+                startTime,
+                endTime,
                 categoryId: undefined,
                 subCategoryId: undefined,
                 todoId: undefined,
                 color: getRandomColor(),
             });
         }
-    }, [block]);
+    }, [block, initialTime]);
 
     // 自动聚焦到输入框
     useEffect(() => {

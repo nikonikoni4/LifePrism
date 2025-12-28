@@ -81,6 +81,7 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
         isOpen: boolean;
         block: UserCustomBlock | null;
         position: { x: number; y: number } | undefined;
+        initialTime?: string; // 新增：初始时间（用于通过 + 按钮创建时预填）
     }>({
         isOpen: false,
         block: null,
@@ -92,6 +93,12 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
     const [hoveredBlock, setHoveredBlock] = useState<{
         id: number;
         zone: DragZone;
+    } | null>(null);
+
+    // 标签区域悬停状态（用于显示跟随鼠标的 + 按钮）
+    const [labelAreaHover, setLabelAreaHover] = useState<{
+        y: number;      // 吸附后的 Y 坐标
+        hour: number;   // 对应的小时数
     } | null>(null);
 
     // 计算标签偏移
@@ -142,24 +149,42 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
         });
     }, [dragState.isDragging]);
 
-    // 处理双击创建新块
-    const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-        // 计算点击位置对应的时间
+    // 处理标签区域鼠标移动（显示跟随的 + 按钮）
+    const handleLabelAreaMouseMove = useCallback((e: React.MouseEvent) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const relativeY = e.clientY - rect.top;
         const hour = relativeY / hourHeight;
 
         // 吸附到最近的 5 分钟
         const snappedHour = Math.round(hour * 12) / 12; // 12 = 60/5
-        const startTime = formatHHMM(snappedHour);
-        const endTime = formatHHMM(snappedHour + 1);
+        const snappedY = snappedHour * hourHeight;
+
+        setLabelAreaHover({ y: snappedY, hour: snappedHour });
+    }, [hourHeight]);
+
+    // 处理标签区域鼠标离开
+    const handleLabelAreaMouseLeave = useCallback(() => {
+        setLabelAreaHover(null);
+    }, []);
+
+    // 处理点击 + 按钮创建新块
+    const handleAddButtonClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!labelAreaHover) return;
+
+        const startTime = formatHHMM(labelAreaHover.hour);
+        const endTime = formatHHMM(labelAreaHover.hour + 1);
 
         setPopoverState({
             isOpen: true,
             block: null, // null 表示创建新块
             position: undefined, // 居中显示
+            initialTime: startTime, // 预填开始时间
         });
-    }, [hourHeight]);
+
+        // 隐藏 + 按钮
+        setLabelAreaHover(null);
+    }, [labelAreaHover]);
 
     // 关闭 Popover
     const handleClosePopover = useCallback(() => {
@@ -387,7 +412,6 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
             <div
                 className="absolute left-16 right-0 top-0"
                 style={{ height: `${24 * hourHeight}px`, zIndex: 0 }}
-                onDoubleClick={handleDoubleClick}
             >
                 {blocks.map(renderBlock)}
             </div>
@@ -395,9 +419,41 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
             {/* 标签区域 - 显示在时间刻度右边的标签列 */}
             <div
                 className="absolute left-16 top-0 bottom-0 w-20 z-[3]"
+                onMouseMove={handleLabelAreaMouseMove}
+                onMouseLeave={handleLabelAreaMouseLeave}
             >
                 <div className="relative h-full">
                     {blocks.map(renderLabel)}
+
+                    {/* 跟随鼠标的 + 按钮 */}
+                    {labelAreaHover && !dragState.isDragging && (
+                        <div
+                            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2
+                                       pointer-events-auto cursor-pointer
+                                       transition-all duration-100 ease-out
+                                       group"
+                            style={{ top: `${labelAreaHover.y}px` }}
+                            onClick={handleAddButtonClick}
+                        >
+                            {/* 时间提示 */}
+                            <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2
+                                            opacity-0 group-hover:opacity-100
+                                            transition-opacity duration-150
+                                            bg-gray-800 text-white text-[10px] font-mono
+                                            px-1.5 py-0.5 rounded whitespace-nowrap">
+                                {formatHHMM(labelAreaHover.hour)}
+                            </div>
+                            {/* + 按钮本体 */}
+                            <div className="bg-white/90 backdrop-blur-sm
+                                            rounded-full p-1 shadow-md
+                                            border border-gray-200
+                                            hover:bg-indigo-50 hover:border-indigo-300
+                                            hover:shadow-lg hover:scale-110
+                                            transition-all duration-150">
+                                <Plus size={14} className="text-gray-500 group-hover:text-indigo-600" />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -413,14 +469,15 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
                 onDelete={handleDelete}
                 isSaving={isSaving}
                 currentDate={currentDate}
+                initialTime={popoverState.initialTime}
             />
 
-            {/* 添加按钮提示 */}
-            {blocks.length === 0 && !isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-5">
-                    <div className="flex flex-col items-center gap-2 text-gray-400">
-                        <Plus size={24} />
-                        <span className="text-xs font-medium">双击添加自定义时间块</span>
+            {/* 空状态提示 */}
+            {blocks.length === 0 && !isLoading && !labelAreaHover && (
+                <div className="absolute left-16 top-0 w-20 h-full flex items-center justify-center pointer-events-none z-[2]">
+                    <div className="flex flex-col items-center gap-1 text-gray-300">
+                        <Plus size={18} />
+                        <span className="text-[10px] font-medium text-center leading-tight">移动到此处<br />添加备注</span>
                     </div>
                 </div>
             )}
