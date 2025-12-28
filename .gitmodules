@@ -1,3 +1,7 @@
 [submodule "frontend"]
 	path = frontend
 	url = https://github.com/nikonikoni4/frontend-of-lifewatchai.git
+
+[submodule "lifeprism_custom_prompt"]
+	path = lifewatch/llm/custom_prompt
+	url = https://github.com/nikonikoni4/lifeprism_custom_prompt.git
