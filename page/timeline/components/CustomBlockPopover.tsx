@@ -12,7 +12,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Trash2, Save, Clock, Tag, FileText, ListTodo } from 'lucide-react';
-import { UserCustomBlock, PopoverFormData, TodoSelectItem, getRandomColor } from './types';
+import { UserCustomBlock, PopoverFormData, TodoSelectItem, getRandomColor, TAILWIND_200_COLORS } from './types';
 import { CategoryTreeItem } from '../../common/types';
 
 interface CustomBlockPopoverProps {
@@ -214,7 +214,7 @@ const CustomBlockPopover: React.FC<CustomBlockPopoverProps> = ({
                 <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none">
                     <div
                         ref={popoverRef}
-                        className="w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-fade-in pointer-events-auto"
+                        className="w-[560px] max-w-[90vw] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-fade-in pointer-events-auto"
                     >
                         {/* 标题栏 */}
                         <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-gray-100">
@@ -232,129 +232,161 @@ const CustomBlockPopover: React.FC<CustomBlockPopoverProps> = ({
                             </button>
                         </div>
 
-                        {/* 表单内容 */}
-                        <div className="p-4 space-y-4">
-                            {/* 内容输入 */}
-                            <div>
-                                <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-2">
-                                    <FileText size={12} />
-                                    内容
-                                </label>
-                                <input
-                                    ref={inputRef}
-                                    type="text"
-                                    value={formData.content}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-                                    placeholder="输入活动描述..."
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg 
-                                     focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
-                                     placeholder:text-gray-400 transition-all"
-                                />
-                            </div>
+                        {/* 表单内容 - 横向双栏布局 */}
+                        <div className="p-4 flex gap-4">
+                            {/* 左侧：内容、时间、颜色 */}
+                            <div className="flex-1 space-y-4 min-w-0">
+                                {/* 内容输入 */}
+                                <div>
+                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-2">
+                                        <FileText size={12} />
+                                        内容
+                                    </label>
+                                    <input
+                                        ref={inputRef}
+                                        type="text"
+                                        value={formData.content}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                                        placeholder="输入活动描述..."
+                                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg 
+                                         focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
+                                         placeholder:text-gray-400 transition-all"
+                                    />
+                                </div>
 
-                            {/* 时间选择 */}
-                            <div>
-                                <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-2">
-                                    <Clock size={12} />
-                                    时间
-                                </label>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="time"
-                                        value={formData.startTime}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
-                                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg
-                                         focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
-                                    />
-                                    <span className="text-gray-400">→</span>
-                                    <input
-                                        type="time"
-                                        value={formData.endTime}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
-                                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg
-                                         focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
-                                    />
+                                {/* 时间选择 */}
+                                <div>
+                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-2">
+                                        <Clock size={12} />
+                                        时间
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="time"
+                                            value={formData.startTime}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
+                                            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg
+                                             focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                                        />
+                                        <span className="text-gray-400">→</span>
+                                        <input
+                                            type="time"
+                                            value={formData.endTime}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
+                                            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg
+                                             focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* 颜色选择 */}
+                                <div>
+                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-2">
+                                        <div
+                                            className="w-3 h-3 rounded-full border border-gray-300"
+                                            style={{ backgroundColor: formData.color }}
+                                        />
+                                        颜色
+                                    </label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {TAILWIND_200_COLORS.map(color => (
+                                            <button
+                                                key={color}
+                                                type="button"
+                                                onClick={() => setFormData(prev => ({ ...prev, color }))}
+                                                className={`w-6 h-6 rounded-md border-2 transition-all
+                                                    ${formData.color === color
+                                                        ? 'border-gray-600 scale-110 shadow-md'
+                                                        : 'border-transparent hover:scale-105'
+                                                    }`}
+                                                style={{ backgroundColor: color }}
+                                            />
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* 待办事项绑定 */}
-                            <div>
-                                <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-2">
-                                    <ListTodo size={12} />
-                                    绑定待办（可选）
-                                </label>
-                                <select
-                                    value={formData.todoId ?? ''}
-                                    onChange={(e) => setFormData(prev => ({
-                                        ...prev,
-                                        todoId: e.target.value ? Number(e.target.value) : undefined
-                                    }))}
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg
-                                     focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
-                                     bg-white cursor-pointer"
-                                >
-                                    <option value="">不绑定待办事项</option>
-                                    {todos.map(todo => (
-                                        <option key={todo.id} value={todo.id}>
-                                            {todo.content}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* 主分类选择 */}
-                            <div>
-                                <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-2">
-                                    <Tag size={12} />
-                                    分类（可选）
-                                </label>
-                                <div className="flex flex-wrap gap-2">
-                                    <button
-                                        onClick={() => setFormData(prev => ({ ...prev, categoryId: undefined, subCategoryId: undefined }))}
-                                        className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all
-                                    ${!formData.categoryId
-                                                ? 'bg-gray-500 text-white border-gray-500'
-                                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                                            }`}
+                            {/* 右侧：待办绑定、分类、子分类 */}
+                            <div className="flex-1 space-y-4 min-w-0">
+                                {/* 待办事项绑定 */}
+                                <div>
+                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-2">
+                                        <ListTodo size={12} />
+                                        绑定待办（可选）
+                                    </label>
+                                    <select
+                                        value={formData.todoId ?? ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            todoId: e.target.value ? Number(e.target.value) : undefined
+                                        }))}
+                                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg
+                                         focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
+                                         bg-white cursor-pointer"
                                     >
-                                        不选择
-                                    </button>
-                                    {categories.map(cat => (
+                                        <option value="">不绑定待办事项</option>
+                                        {todos.map(todo => (
+                                            <option key={todo.id} value={todo.id}>
+                                                {todo.content}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* 主分类选择 */}
+                                <div>
+                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-2">
+                                        <Tag size={12} />
+                                        分类（可选）
+                                    </label>
+                                    <div className="flex flex-wrap gap-1.5">
                                         <button
-                                            key={cat.id}
-                                            onClick={() => handleCategoryChange(cat.id)}
-                                            className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all
-                                        ${formData.categoryId === cat.id
-                                                    ? 'bg-indigo-500 text-white border-indigo-500'
+                                            onClick={() => setFormData(prev => ({ ...prev, categoryId: undefined, subCategoryId: undefined }))}
+                                            className={`px-2 py-1 text-xs font-medium rounded-md border transition-all
+                                            ${!formData.categoryId
+                                                    ? 'bg-gray-500 text-white border-gray-500'
                                                     : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                                                 }`}
                                         >
-                                            {cat.name}
+                                            不选择
                                         </button>
-                                    ))}
+                                        {categories.map(cat => (
+                                            <button
+                                                key={cat.id}
+                                                onClick={() => handleCategoryChange(cat.id)}
+                                                className={`px-2 py-1 text-xs font-medium rounded-md border transition-all
+                                                ${formData.categoryId === cat.id
+                                                        ? 'bg-indigo-500 text-white border-indigo-500'
+                                                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                                    }`}
+                                            >
+                                                {cat.name}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* 子分类选择 */}
-                            <div>
-                                <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-2">
-                                    <Tag size={12} />
-                                    子分类
-                                </label>
-                                <select
-                                    value={formData.subCategoryId}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, subCategoryId: e.target.value }))}
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg
-                                     focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
-                                     bg-white cursor-pointer"
-                                >
-                                    <option value="">选择子分类...</option>
-                                    {selectedCategory?.subcategories?.map(sub => (
-                                        <option key={sub.id} value={sub.id}>
-                                            {sub.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                {/* 子分类选择 */}
+                                <div>
+                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-2">
+                                        <Tag size={12} />
+                                        子分类
+                                    </label>
+                                    <select
+                                        value={formData.subCategoryId}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, subCategoryId: e.target.value }))}
+                                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg
+                                         focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300
+                                         bg-white cursor-pointer"
+                                    >
+                                        <option value="">选择子分类...</option>
+                                        {selectedCategory?.subcategories?.map(sub => (
+                                            <option key={sub.id} value={sub.id}>
+                                                {sub.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
