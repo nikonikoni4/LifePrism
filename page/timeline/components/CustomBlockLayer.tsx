@@ -425,32 +425,31 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
                 <div className="relative h-full">
                     {blocks.map(renderLabel)}
 
-                    {/* 跟随鼠标的 + 按钮 */}
+                    {/* 跟随鼠标的添加按钮 - 紧贴左侧时间轴 */}
                     {labelAreaHover && !dragState.isDragging && (
                         <div
-                            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2
+                            className="absolute left-0 -translate-y-1/2
                                        pointer-events-auto cursor-pointer
                                        transition-all duration-100 ease-out
                                        group"
                             style={{ top: `${labelAreaHover.y}px` }}
                             onClick={handleAddButtonClick}
                         >
-                            {/* 时间提示 */}
-                            <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2
-                                            opacity-0 group-hover:opacity-100
-                                            transition-opacity duration-150
-                                            bg-gray-800 text-white text-[10px] font-mono
-                                            px-1.5 py-0.5 rounded whitespace-nowrap">
-                                {formatHHMM(labelAreaHover.hour)}
-                            </div>
-                            {/* + 按钮本体 */}
-                            <div className="bg-white/90 backdrop-blur-sm
-                                            rounded-full p-1 shadow-md
-                                            border border-gray-200
+                            {/* 竖直布局：时间在上，+ 在下 */}
+                            <div className="flex flex-col items-center
+                                            bg-white/95 backdrop-blur-sm
+                                            rounded-md px-1 py-0.5
+                                            shadow-sm border border-gray-200
                                             hover:bg-indigo-50 hover:border-indigo-300
-                                            hover:shadow-lg hover:scale-110
+                                            hover:shadow-md
                                             transition-all duration-150">
-                                <Plus size={14} className="text-gray-500 group-hover:text-indigo-600" />
+                                {/* 时间数字 */}
+                                <span className="text-[8px] font-mono font-medium text-gray-500 
+                                                 group-hover:text-indigo-600 transition-colors leading-none">
+                                    {formatHHMM(labelAreaHover.hour)}
+                                </span>
+                                {/* + 号 */}
+                                <Plus size={10} className="text-gray-400 group-hover:text-indigo-600 transition-colors" />
                             </div>
                         </div>
                     )}
