@@ -7,15 +7,13 @@
  * - 作为半透明背景层显示在原有时间块之下
  * - 使用 Tailwind 100 系列颜色
  * - 左侧 3px 标识线
- * - 支持拖拽调整时间
  * - 支持点击编辑
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { Plus } from 'lucide-react';
-import { UserCustomBlock, PopoverFormData, DragZone, TodoSelectItem } from './types';
+import { UserCustomBlock, PopoverFormData, TodoSelectItem } from './types';
 import { CategoryTreeItem } from '../../common/types';
-import { useCustomBlockDrag } from './useCustomBlockDrag';
 import CustomBlockLabel, { calculateLabelOffsets } from './CustomBlockLabel';
 import CustomBlockPopover from './CustomBlockPopover';
 import { CustomBlockAPI } from './customBlockApi';
@@ -81,19 +79,13 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
         isOpen: boolean;
         block: UserCustomBlock | null;
         position: { x: number; y: number } | undefined;
-        initialTime?: string; // 新增：初始时间（用于通过 + 按钮创建时预填）
+        initialTime?: string; // 初始时间（用于通过 + 按钮创建时预填）
     }>({
         isOpen: false,
         block: null,
         position: undefined,
     });
     const [isSaving, setIsSaving] = useState(false);
-
-    // 悬停状态（用于显示光标）
-    const [hoveredBlock, setHoveredBlock] = useState<{
-        id: number;
-        zone: DragZone;
-    } | null>(null);
 
     // 标签区域悬停状态（用于显示跟随鼠标的 + 按钮）
     const [labelAreaHover, setLabelAreaHover] = useState<{
@@ -103,30 +95,6 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
 
     // 计算标签偏移
     const labelOffsets = useMemo(() => calculateLabelOffsets(blocks), [blocks]);
-
-    // 拖拽 Hook
-    const { dragState, getDragZone, getCursorStyle, handleMouseDown, getPreviewTime } = useCustomBlockDrag({
-        hourHeight,
-        onDragStart: (blockId) => {
-            console.log('Drag started:', blockId);
-        },
-        onDragEnd: async (blockId, startTime, endTime) => {
-            console.log('Drag ended:', blockId, startTime, endTime);
-            try {
-                await CustomBlockAPI.update(blockId, {
-                    start_time: startTime,
-                    end_time: endTime,
-                    duration: calculateDuration(startTime, endTime),
-                });
-                onUpdate();
-            } catch (error) {
-                console.error('Failed to update block time:', error);
-            }
-        },
-        onDragCancel: () => {
-            console.log('Drag cancelled');
-        },
-    });
 
     // 处理标签点击 - 打开 Popover
     const handleLabelClick = useCallback((block: UserCustomBlock) => {
@@ -139,15 +107,12 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
 
     // 处理色块点击 - 打开 Popover（居中显示）
     const handleBlockClick = useCallback((e: React.MouseEvent, block: UserCustomBlock) => {
-        // 如果正在拖拽，不处理点击
-        if (dragState.isDragging) return;
-
         setPopoverState({
             isOpen: true,
             block,
             position: undefined, // 居中显示
         });
-    }, [dragState.isDragging]);
+    }, []);
 
     // 处理标签区域鼠标移动（显示跟随的 + 按钮）
     const handleLabelAreaMouseMove = useCallback((e: React.MouseEvent) => {
@@ -251,23 +216,6 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
         }
     }, [handleClosePopover, onUpdate]);
 
-    // 处理鼠标移动（用于更新光标）
-    const handleMouseMove = useCallback((e: React.MouseEvent, block: UserCustomBlock) => {
-        if (dragState.isDragging) return;
-        const zone = getDragZone(e, block);
-        setHoveredBlock({ id: block.id, zone });
-    }, [dragState.isDragging, getDragZone]);
-
-    // 处理鼠标离开
-    const handleMouseLeave = useCallback(() => {
-        if (!dragState.isDragging) {
-            setHoveredBlock(null);
-        }
-    }, [dragState.isDragging]);
-
-    // 获取拖拽预览时间
-    const previewTime = getPreviewTime();
-
     // 渲染单个色块（背景层）
     const renderBlock = (block: UserCustomBlock) => {
         const startHour = timeToHour(block.start_time);
@@ -275,25 +223,7 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
         const top = startHour * hourHeight;
         const height = (endHour - startHour) * hourHeight;
 
-        // 如果正在拖拽这个块，使用拖拽状态的时间
-        const isDragging = dragState.isDragging && dragState.blockId === block.id;
-        let displayTop = top;
-        let displayHeight = height;
-
-        if (isDragging) {
-            const dragStartHour = timeToHour(dragState.currentStartTime);
-            const dragEndHour = timeToHour(dragState.currentEndTime);
-            displayTop = dragStartHour * hourHeight;
-            displayHeight = (dragEndHour - dragStartHour) * hourHeight;
-        }
-
-        // 获取当前光标样式
-        const cursorStyle = hoveredBlock?.id === block.id
-            ? getCursorStyle(hoveredBlock.zone)
-            : 'pointer';
-
         // 解析颜色：后端返回的可能是 hex 或者 tailwind 类名
-        // 使用极浅色并添加透明度，让下面的内容可见
         const baseColor = block.color.startsWith('#') ? block.color : '#dcfce7'; // green-100 fallback
         const borderColor = block.color.startsWith('#') ? block.color : '#22c55e'; // green-500 fallback
 
@@ -312,39 +242,18 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
         return (
             <div
                 key={block.id}
-                className={`
-                    absolute w-full
-                    transition-all duration-75 ease-out
-                    rounded-sm pointer-events-auto
-                    ${isDragging ? 'opacity-90 shadow-lg' : ''}
-                `}
+                className="absolute w-full rounded-sm pointer-events-auto cursor-pointer
+                           hover:opacity-80 transition-opacity duration-150"
                 style={{
                     left: 0,
                     right: 0,
-                    top: `${displayTop}px`,
-                    height: `${displayHeight}px`,
+                    top: `${top}px`,
+                    height: `${height}px`,
                     backgroundColor: bgColor,
                     borderLeft: `3px solid ${borderColor}`,
-                    cursor: cursorStyle,
-                    zIndex: isDragging ? 10 : 0,
                 }}
                 onClick={(e) => handleBlockClick(e, block)}
-                onMouseMove={(e) => handleMouseMove(e, block)}
-                onMouseLeave={handleMouseLeave}
-                onMouseDown={(e) => {
-                    const zone = getDragZone(e, block);
-                    handleMouseDown(e, block, zone);
-                }}
-            >
-                {/* 拖拽时显示时间预览 */}
-                {isDragging && previewTime && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="bg-black/70 text-white px-3 py-1.5 rounded-lg text-sm font-mono font-bold shadow-lg">
-                            {previewTime.start} - {previewTime.end}
-                        </div>
-                    </div>
-                )}
-            </div>
+            />
         );
     };
 
@@ -360,7 +269,6 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
 
         // 解析颜色
         const dotColor = block.color?.startsWith('#') ? block.color : '#22c55e';
-        const isDragging = dragState.isDragging && dragState.blockId === block.id;
 
         return (
             <div
@@ -370,7 +278,7 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
                     flex flex-col items-center justify-center gap-0.5
                     px-1.5 cursor-pointer overflow-hidden
                     transition-opacity duration-150
-                    ${isDragging ? 'opacity-50' : 'hover:opacity-80'}
+                    hover:opacity-80
                 `}
                 style={{
                     top: `${top}px`,
@@ -426,7 +334,7 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
                     {blocks.map(renderLabel)}
 
                     {/* 跟随鼠标的添加按钮 - 紧贴左侧时间轴 */}
-                    {labelAreaHover && !dragState.isDragging && (
+                    {labelAreaHover && (
                         <div
                             className="absolute left-0 -translate-y-1/2
                                        pointer-events-auto cursor-pointer

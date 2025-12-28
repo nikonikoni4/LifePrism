@@ -11,7 +11,5 @@ export { default as CustomBlockPopover } from './CustomBlockPopover';
 
 // Custom Block API 和 Hooks
 export { CustomBlockAPI } from './customBlockApi';
-export { useCustomBlockDrag } from './useCustomBlockDrag';
-
 // 类型导出
 export * from './types';
