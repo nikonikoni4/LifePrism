@@ -12,8 +12,8 @@ from lifewatch.utils import is_multipurpose_app
 from lifewatch import config
 from lifewatch.config.database import get_table_columns
 from lifewatch.llm.llm_classify import AppInFo, LogItem, classifyState
-from lifewatch.utils import get_logger
-logger = get_logger(__name__)
+from lifewatch.utils import get_logger,DEBUG
+logger = get_logger(__name__,DEBUG)
 
 
 def create_dict_from_table_columns(table_name: str, values: dict = None) -> dict:
@@ -138,21 +138,27 @@ def clean_activitywatch_data(
         # 获取非单一用途的title集合
         categorized_mutilpurpose_titles = set(valid_df[valid_df['is_multipurpose_app'] == 1]['title'].unique())
         
-        # 创建 app -> (category_id, sub_category_id) 映射
+        # 创建 app -> (category_id, sub_category_id, link_to_goal_id) 映射
         app_category_map: Dict[str, tuple] = {}
         title_category_map: Dict[str, tuple] = {}
+        
         for _, row in valid_df.iterrows():
             app = row.get('app', '').lower()
             title_val = row.get('title', '').lower() if row.get('title') else ''
             cat_id = row.get('category_id')
             sub_cat_id = row.get('sub_category_id')
+            goal_id = row.get('link_to_goal_id')  # 获取 link_to_goal_id
             is_multi = row.get('is_multipurpose_app', 0)
+            if app == "antigravity":
+                logger.debug("="*20)
+                logger.debug(f"app: {app}, goal_id: {goal_id}")
+                logger.debug("="*20)
             
             if app and cat_id:
                 if is_multi == 0 and app not in app_category_map:
-                    app_category_map[app] = (cat_id, sub_cat_id)
+                    app_category_map[app] = (cat_id, sub_cat_id, goal_id)
                 elif is_multi == 1 and title_val:
-                    title_category_map[title_val] = (cat_id, sub_cat_id)
+                    title_category_map[title_val] = (cat_id, sub_cat_id, goal_id)
         
         # 创建 app -> app_description 映射，用于复用已有的应用描述
         app_description_map: Dict[str, str] = {}
@@ -170,7 +176,7 @@ def clean_activitywatch_data(
     
     # output - 使用动态字典格式配置
     filtered_events_df = pd.DataFrame(columns=get_table_columns('user_app_behavior_log'))
-
+    print(get_table_columns('user_app_behavior_log'))
     for event in raw_events:
         duration = int(event.get('duration', 0))
         if duration >= lower_bound:
@@ -210,7 +216,8 @@ def clean_activitywatch_data(
                     if cat_ids:
                         filtered_event['category_id'] = cat_ids[0]
                         filtered_event['sub_category_id'] = cat_ids[1]
-                        logger.debug(f"✅ 成功获取分类数据: category_id={cat_ids[0]}, sub_category_id={cat_ids[1]}")
+                        filtered_event['link_to_goal_id'] = cat_ids[2] if len(cat_ids) > 2 else None
+                        logger.debug(f"✅ 成功获取分类数据: category_id={cat_ids[0]}, sub_category_id={cat_ids[1]}, link_to_goal_id={cat_ids[2] if len(cat_ids) > 2 else None}")
                 
                 # 2.app已经被分类 但 app是多用途的 ： 根据title进行分类
                 elif app_name in categorized_single_purpose_apps and title and title in categorized_mutilpurpose_titles:
@@ -219,7 +226,8 @@ def clean_activitywatch_data(
                     if cat_ids:
                         filtered_event['category_id'] = cat_ids[0]
                         filtered_event['sub_category_id'] = cat_ids[1]
-                        logger.debug(f"✅ 成功获取分类数据: category_id={cat_ids[0]}, sub_category_id={cat_ids[1]}")
+                        filtered_event['link_to_goal_id'] = cat_ids[2] if len(cat_ids) > 2 else None
+                        logger.debug(f"✅ 成功获取分类数据: category_id={cat_ids[0]}, sub_category_id={cat_ids[1]}, link_to_goal_id={cat_ids[2] if len(cat_ids) > 2 else None}")
                         logger.debug(f"✅ 多用途匹配成功: app_name={app_name}, title={title}")
                 # 3. app未被分类，且是单一用途的 
                 elif not is_multipurpose:

@@ -2,23 +2,22 @@
 数据处理服务
 负责 ActivityWatch 数据的完整处理流程
 """
-
-import logging
 import pandas as pd
 from typing import Dict, Tuple, Optional
 from datetime import datetime, timedelta
 import pytz
 
-from lifewatch.server.providers import server_lw_data_provider
+from lifewatch.server.providers import server_lw_data_provider, goal_provider
 from lifewatch.processors.data_clean import clean_activitywatch_data
 from lifewatch.llm.llm_classify.classify.main_classify import LLMClassify
 from lifewatch.llm.llm_classify.schemas import classifyState
 from lifewatch import config
-
+import logging
+from lifewatch.utils import get_logger
 # 配置日志
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__,logging.DEBUG)
 
-
+ 
 class DataProcessingService:
     """
     数据处理服务
@@ -35,6 +34,7 @@ class DataProcessingService:
         """
         self.server_lw_data_provider = server_lw_data_provider
         self._category_mappings_cache = None  # 缓存分类映射
+        self._goal_name_to_id_cache = None  # 缓存 goal 名称到 ID 的映射
         
     def process_activitywatch_data(
         self,
@@ -301,6 +301,14 @@ class DataProcessingService:
         if sub_category is not None and not sub_category.empty:
             sub_category_name_to_id = sub_category.set_index('name')['id'].to_dict()
         
+        # 构建 goal 名称到 ID 的映射（用于将 LLM 输出的 link_to_goal 名称转换为 ID）
+        if self._goal_name_to_id_cache is None:
+            goals = goal_provider.get_active_goals_for_classify()
+            self._goal_name_to_id_cache = {g['name']: g['id'] for g in goals}
+            logger.info(f"  ✓ 创建 goal 名称映射缓存，共 {len(self._goal_name_to_id_cache)} 个活跃目标")
+            logger.debug(f"  [DEBUG] goal_name_to_id 映射: {self._goal_name_to_id_cache}")
+        goal_name_to_id = self._goal_name_to_id_cache
+        
         # 构建分类树结构：{主分类名: [子分类名列表]}
         # 只包含启用的分类（state == 1）
         category_tree = {}
@@ -375,6 +383,10 @@ class DataProcessingService:
                 # 获取分类ID
                 cat_id = category_name_to_id.get(item.category) if item.category else None
                 sub_cat_id = sub_category_name_to_id.get(item.sub_category) if item.sub_category else None
+                # 将 link_to_goal 名称转换为 ID
+                goal_id = goal_name_to_id.get(item.link_to_goal) if item.link_to_goal else None
+                if item.link_to_goal:
+                    logger.debug(f"  [DEBUG] 单用途 '{app}': link_to_goal='{item.link_to_goal}' -> goal_id='{goal_id}'")
                 
                 classified_records.append({
                     'app': item.app,
@@ -384,6 +396,7 @@ class DataProcessingService:
                     'title_analysis': item.title_analysis,
                     'category_id': cat_id,
                     'sub_category_id': sub_cat_id,
+                    'link_to_goal_id': goal_id,  # 新增: 关联的目标ID
                     'category': item.category,  # 保留用于调试
                     'sub_category': item.sub_category,  # 保留用于调试
                 })
@@ -395,6 +408,10 @@ class DataProcessingService:
                     # 获取分类ID
                     cat_id = category_name_to_id.get(item.category) if item.category else None
                     sub_cat_id = sub_category_name_to_id.get(item.sub_category) if item.sub_category else None
+                    # 将 link_to_goal 名称转换为 ID
+                    goal_id = goal_name_to_id.get(item.link_to_goal) if item.link_to_goal else None
+                    if item.link_to_goal:
+                        logger.debug(f"  [DEBUG] 多用途 '{app}' title='{item.title[:30]}': link_to_goal='{item.link_to_goal}' -> goal_id='{goal_id}'")
                     
                     classified_records.append({
                         'app': item.app,
@@ -404,6 +421,7 @@ class DataProcessingService:
                         'title_analysis': item.title_analysis,
                         'category_id': cat_id,
                         'sub_category_id': sub_cat_id,
+                        'link_to_goal_id': goal_id,  # 新增: 关联的目标ID
                         'category': item.category,  # 保留用于调试
                         'sub_category': item.sub_category,  # 保留用于调试
                     })
@@ -512,6 +530,8 @@ class DataProcessingService:
             filtered_data['category_id'] = None
         if 'sub_category_id' not in filtered_data.columns:
             filtered_data['sub_category_id'] = None
+        if 'link_to_goal_id' not in filtered_data.columns:
+            filtered_data['link_to_goal_id'] = None
         
         # 分离单用途和多用途应用
         single_purpose = classified_app_df[classified_app_df['is_multipurpose_app'] == 0].copy()
@@ -524,8 +544,15 @@ class DataProcessingService:
             filtered_data['app_lower'] = filtered_data['app'].str.lower()
             
             # 只保留需要的列，避免列名冲突
-            single_merge = single_purpose[['app_lower', 'category_id', 'sub_category_id']].rename(
-                columns={'category_id': 'category_id_single', 'sub_category_id': 'sub_category_id_single'}
+            merge_cols = ['app_lower', 'category_id', 'sub_category_id']
+            if 'link_to_goal_id' in single_purpose.columns:
+                merge_cols.append('link_to_goal_id')
+            single_merge = single_purpose[merge_cols].rename(
+                columns={
+                    'category_id': 'category_id_single', 
+                    'sub_category_id': 'sub_category_id_single',
+                    'link_to_goal_id': 'link_to_goal_id_single'
+                }
             )
             
             # 合并单用途应用的分类
@@ -539,9 +566,14 @@ class DataProcessingService:
             mask_single = (filtered_data['is_multipurpose_app'] == 0) & (filtered_data['category_id_single'].notna())
             filtered_data.loc[mask_single, 'category_id'] = filtered_data.loc[mask_single, 'category_id_single']
             filtered_data.loc[mask_single, 'sub_category_id'] = filtered_data.loc[mask_single, 'sub_category_id_single']
+            if 'link_to_goal_id_single' in filtered_data.columns:
+                filtered_data.loc[mask_single, 'link_to_goal_id'] = filtered_data.loc[mask_single, 'link_to_goal_id_single']
             
             # 删除临时列
-            filtered_data = filtered_data.drop(columns=['category_id_single', 'sub_category_id_single'])
+            drop_cols = ['category_id_single', 'sub_category_id_single']
+            if 'link_to_goal_id_single' in filtered_data.columns:
+                drop_cols.append('link_to_goal_id_single')
+            filtered_data = filtered_data.drop(columns=drop_cols)
             
             logger.info(f"    ✓ 合并了 {mask_single.sum()} 个单用途应用的分类")
         
@@ -556,8 +588,15 @@ class DataProcessingService:
             filtered_data['title_lower'] = filtered_data['title'].str.lower()
             
             # 只保留需要的列
-            multi_merge = multi_purpose[['app_lower', 'title_lower', 'category_id', 'sub_category_id']].rename(
-                columns={'category_id': 'category_id_multi', 'sub_category_id': 'sub_category_id_multi'}
+            merge_cols = ['app_lower', 'title_lower', 'category_id', 'sub_category_id']
+            if 'link_to_goal_id' in multi_purpose.columns:
+                merge_cols.append('link_to_goal_id')
+            multi_merge = multi_purpose[merge_cols].rename(
+                columns={
+                    'category_id': 'category_id_multi', 
+                    'sub_category_id': 'sub_category_id_multi',
+                    'link_to_goal_id': 'link_to_goal_id_multi'
+                }
             )
             
             # 合并多用途应用的分类
@@ -571,9 +610,14 @@ class DataProcessingService:
             mask_multi = (filtered_data['is_multipurpose_app'] == 1) & (filtered_data['category_id_multi'].notna())
             filtered_data.loc[mask_multi, 'category_id'] = filtered_data.loc[mask_multi, 'category_id_multi']
             filtered_data.loc[mask_multi, 'sub_category_id'] = filtered_data.loc[mask_multi, 'sub_category_id_multi']
+            if 'link_to_goal_id_multi' in filtered_data.columns:
+                filtered_data.loc[mask_multi, 'link_to_goal_id'] = filtered_data.loc[mask_multi, 'link_to_goal_id_multi']
             
             # 删除临时列
-            filtered_data = filtered_data.drop(columns=['category_id_multi', 'sub_category_id_multi'])
+            drop_cols = ['category_id_multi', 'sub_category_id_multi']
+            if 'link_to_goal_id_multi' in filtered_data.columns:
+                drop_cols.append('link_to_goal_id_multi')
+            filtered_data = filtered_data.drop(columns=drop_cols)
             
             logger.info(f"    ✓ 合并了 {mask_multi.sum()} 个多用途应用的分类")
         

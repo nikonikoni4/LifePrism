@@ -65,6 +65,11 @@ category_map_cache_CONFIG = {
             'type': 'INTEGER',
             'constraints': ['DEFAULT 1'],
             'comment': '记录状态（1: 有效, 0: 无效/分类被禁用）'
+        },
+        'link_to_goal_id': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '关联的goal_id'
         }
     },
     'table_constraints': ['UNIQUE (app, title, state)'],  # 唯一约束：保证数据不重复
@@ -122,6 +127,11 @@ USER_APP_BEHAVIOR_LOG_CONFIG = {
             'type': 'TEXT',
             'constraints': [],
             'comment': '子分类ID（外键引用 sub_category.id，新增字段）'
+        },
+        "link_to_goal_id": {
+            "type": "TEXT",
+            "constraints": ["DEFAULT NULL"],
+            "comment": "关联的goal_id"
         }
     },
     'table_constraints': [
@@ -446,8 +456,8 @@ GOAL_CONFIG = {
         },
         'name': {
             'type': 'TEXT',
-            'constraints': ['NOT NULL'],
-            'comment': '目标名称'
+            'constraints': ['NOT NULL', 'UNIQUE'],
+            'comment': '目标名称（唯一，用于分类时的名称-ID映射）'
         },
         'abstract': {
             'type': 'TEXT',

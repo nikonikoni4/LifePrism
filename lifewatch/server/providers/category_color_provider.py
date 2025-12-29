@@ -328,7 +328,6 @@ class CategoryColorManager:
         # 1. 优先使用 Tailwind 500→100 映射
         if normalized_color in TAILWIND_500_TO_100:
             return TAILWIND_500_TO_100[normalized_color]
-    
         # 2. 备用方案：动态计算极浅色
         color = hex_color
         if color.startswith('#'):

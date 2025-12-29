@@ -334,6 +334,33 @@ class GoalProvider(LWBaseDataProvider):
             logger.error(f"获取分类关联目标失败: {e}")
             return []
 
+    def get_active_goals_for_classify(self) -> List[Dict[str, Any]]:
+        """
+        获取所有活跃目标（用于 LLM 分类时的名称-ID映射）
+        
+        Returns:
+            List[Dict]: 包含 id, name, link_to_category_id, link_to_sub_category_id 的目标列表
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, name, link_to_category_id, link_to_sub_category_id 
+                    FROM goal 
+                    WHERE status = 'active' 
+                    ORDER BY order_index ASC
+                """)
+                
+                columns = [description[0] for description in cursor.description]
+                rows = cursor.fetchall()
+                
+                return [dict(zip(columns, row)) for row in rows]
+                
+        except Exception as e:
+            logger.error(f"获取活跃目标列表（用于分类）失败: {e}")
+            return []
+
 
 # 创建全局单例
 goal_provider = GoalProvider()
+

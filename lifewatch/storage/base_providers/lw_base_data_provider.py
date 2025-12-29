@@ -250,7 +250,7 @@ class LWBaseDataProvider:
         columns = [
             'id', 'app', 'title', 'is_multipurpose_app',
             'app_description', 'title_analysis',
-            'category_id', 'sub_category_id',
+            'category_id', 'sub_category_id', 'link_to_goal_id',
             'state', 'created_at'
         ]
         
@@ -490,7 +490,8 @@ class LWBaseDataProvider:
                     'title': row.get('title'),
                     'is_multipurpose_app': int(row.get('is_multipurpose_app', False)),
                     'category_id': row.get('category_id'),
-                    'sub_category_id': row.get('sub_category_id')
+                    'sub_category_id': row.get('sub_category_id'),
+                    'link_to_goal_id': row.get('link_to_goal_id')
                 })
             
             if not data_list:
