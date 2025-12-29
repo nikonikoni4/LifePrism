@@ -12,7 +12,6 @@ import pytz
 from lifewatch.server.providers import server_lw_data_provider
 from lifewatch.processors.data_clean import clean_activitywatch_data
 from lifewatch.llm.llm_classify.classify.main_classify import LLMClassify
-from lifewatch.llm.llm_classify.classify.mock_data import mock_goals
 from lifewatch.llm.llm_classify.schemas import classifyState
 from lifewatch import config
 

@@ -10,8 +10,6 @@ from contextlib import asynccontextmanager
 from lifewatch.llm.custom_prompt.common_prompt import intent_router_template,norm_chat_template
 from lifewatch.llm.custom_prompt.chatbot_prompt.feature_introduce import intro_template,intro_router_template
 from lifewatch.llm.llm_classify.utils import create_ChatTongyiModel
-from langchain.tools import ToolRuntime
-from typing import TypedDict
 import json
 from lifewatch.utils import get_logger
 import logging
@@ -58,7 +56,10 @@ def get_history_messages(messages: list[HumanMessage| AIMessage]):
 class ChatBot:
     def __init__(self,checkpointer: Optional[Union[InMemorySaver, AsyncSqliteSaver]] = None):
         self.current_total_tokens = 0
-        self.tokens_usage = {}
+        # tokens_usage: 每轮对话的使用量（每轮对话前清空）
+        self.tokens_usage: Dict[str, Dict[str, int]] = {}
+        # session_tokens_usage: 会话累计使用量（持续累加）
+        self.session_tokens_usage: Dict[str, Dict[str, int]] = {}
         self.checkpointer = checkpointer or InMemorySaver()
         # 用于流式输出
         self.llm_streaming = self.get_new_agent(enable_search=False,
@@ -133,11 +134,16 @@ class ChatBot:
         return self.graph.compile(checkpointer=self.checkpointer)
 
 
-    def init_tokens_usage(self,thread_id:str):
+    def init_tokens_usage(self, thread_id: str):
         """
-        初始化新会话的token使用情况
+        初始化会话的 token 使用情况（仅在不存在时初始化）
+        
+        - tokens_usage: 每轮对话的使用量
+        - session_tokens_usage: 会话累计使用量
         """
         logger.debug(f"初始化token使用情况: {thread_id}")
+        
+        # 仅在不存在时初始化
         if thread_id not in self.tokens_usage:
             self.tokens_usage[thread_id] = {
                 "input_tokens": 0,
@@ -145,6 +151,27 @@ class ChatBot:
                 "total_tokens": 0,
                 "search_count": 0
             }
+        
+        if thread_id not in self.session_tokens_usage:
+            self.session_tokens_usage[thread_id] = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "search_count": 0
+            }
+    
+    def reset_turn_usage(self):
+        """
+        清空本轮对话的 tokens_usage（每次用户发送消息时调用）
+        """
+        if self.thread_id and self.thread_id in self.tokens_usage:
+            self.tokens_usage[self.thread_id] = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "search_count": 0
+            }
+            logger.debug(f"清空本轮对话使用量: {self.thread_id}")
 
     def set_thread_id(self, thread_id: str):
         """
@@ -165,12 +192,28 @@ class ChatBot:
         return create_ChatTongyiModel(enable_search=enable_search,
                             enable_thinking=enable_thinking,
                             enable_streaming=enable_streaming,temperature=temperature)
-    def update_usage(self,result):
+    def update_usage(self, result):
+        """
+        更新 token 使用量
+        
+        同时更新:
+        - tokens_usage: 本轮对话使用量
+        - session_tokens_usage: 会话累计使用量
+        """
         token_usage = result.response_metadata.get("token_usage", {})
-        self.tokens_usage[self.thread_id]["input_tokens"] += token_usage.get("input_tokens", 0)
-        self.tokens_usage[self.thread_id]["output_tokens"] += token_usage.get("output_tokens", 0)
-        self.tokens_usage[self.thread_id]["total_tokens"] += token_usage.get("total_tokens", 0)
-        # self.tokens_usage[self.thread_id]["call_count"] += 1 # 这里有问题，暂时不改
+        input_tokens = token_usage.get("input_tokens", 0)
+        output_tokens = token_usage.get("output_tokens", 0)
+        total_tokens = token_usage.get("total_tokens", 0)
+        
+        # 更新本轮对话使用量
+        self.tokens_usage[self.thread_id]["input_tokens"] += input_tokens
+        self.tokens_usage[self.thread_id]["output_tokens"] += output_tokens
+        self.tokens_usage[self.thread_id]["total_tokens"] += total_tokens
+        
+        # 更新会话累计使用量
+        self.session_tokens_usage[self.thread_id]["input_tokens"] += input_tokens
+        self.session_tokens_usage[self.thread_id]["output_tokens"] += output_tokens
+        self.session_tokens_usage[self.thread_id]["total_tokens"] += total_tokens
 
         
 
@@ -376,6 +419,9 @@ class ChatBot:
         if thread_id is not None:
             self.set_thread_id(thread_id)
         
+        # 清空本轮对话使用量
+        self.reset_turn_usage()
+        
         # 使用 astream 进行流式输出
         # stream_mode="messages" 会流式输出所有消息事件
         async for event in self.chatbot.astream(
@@ -411,6 +457,9 @@ class ChatBot:
         
         if thread_id is not None:
             self.set_thread_id(thread_id)
+        
+        # 清空本轮对话使用量
+        self.reset_turn_usage()
         
         # 节点名称到中文描述的映射
         node_names = {

@@ -91,21 +91,19 @@ async def get_chat_history(
     return result
 
 
-@router.get("/sessions/{session_id}/tokens", response_model=TokenUsageEstimate)
+@router.get("/sessions/{session_id}/tokens")
 async def get_session_tokens(
     session_id: str = Path(..., description="会话 ID")
 ):
     """
     获取会话的 Token 使用情况
     
-    返回指定会话的最后一次对话 token 用量统计
+    返回指定会话的 token 用量统计，包含：
+    - turn_usage: 本轮对话使用量
+    - session_usage: 会话累计使用量
     """
     usage = chatbot_service.get_last_token_usage(session_id)
-    return TokenUsageEstimate(
-        input_tokens=usage.get('input_tokens', 0),
-        output_tokens=usage.get('output_tokens', 0),
-        total_tokens=usage.get('total_tokens', 0)
-    )
+    return usage
 
 
 # ============================================================================
@@ -187,8 +185,9 @@ async def chat_stream(request: ChatMessageRequest):
                 # event 格式: {"type": "status"|"content", "node": str, "message": str}
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             
-            # 3. 发送结束标记
-            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+            # 3. 发送结束标记（包含 token 使用量）
+            usage = chatbot_service.get_last_token_usage(session_info.session_id)
+            yield f"data: {json.dumps({'type': 'done', 'usage': usage}, ensure_ascii=False)}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"

@@ -501,11 +501,11 @@ class ChatbotService:
         self._current_session_id = session_id
         self._chatbot.set_thread_id(session_id)
         
-        # 从数据库加载该会话的已有使用量到 chatbot.tokens_usage
+        # 从数据库加载该会话的已有使用量到 chatbot.session_tokens_usage
         existing_usage = self._session_provider.get_session_tokens_usage(session_id)
         if existing_usage:
-            self._chatbot.tokens_usage[session_id] = existing_usage
-            logger.debug(f"从数据库加载会话 {session_id} 的使用量: {existing_usage}")
+            self._chatbot.session_tokens_usage[session_id] = existing_usage
+            logger.debug(f"从数据库加载会话 {session_id} 的累计使用量: {existing_usage}")
         
         return ChatStreamStartResponse(
             session_id=session_id,
@@ -712,19 +712,21 @@ class ChatbotService:
         """
         保存会话的 token 使用量到数据库
         
+        使用 session_tokens_usage（会话累计使用量）进行保存
+        
         Args:
             session_id: 会话 ID
         """
         try:
-            if not self._chatbot or session_id not in self._chatbot.tokens_usage:
+            if not self._chatbot or session_id not in self._chatbot.session_tokens_usage:
                 return
             
-            usage_data = self._chatbot.tokens_usage[session_id]
+            usage_data = self._chatbot.session_tokens_usage[session_id].copy()
             # 添加 mode 字段标识为 chatbot
             usage_data['mode'] = 'chatbot'
             
             self._session_provider.upsert_session_tokens_usage(session_id, usage_data)
-            logger.debug(f"保存会话 {session_id} 的使用量到数据库: {usage_data}")
+            logger.debug(f"保存会话 {session_id} 的累计使用量到数据库: {usage_data}")
         except Exception as e:
             logger.error(f"保存会话 {session_id} 的使用量失败: {e}")
     
@@ -736,7 +738,7 @@ class ChatbotService:
             session_id: 会话 ID，为 None 时使用当前会话
         
         Returns:
-            Dict: 包含 input_tokens, output_tokens, total_tokens, search_count
+            Dict: 包含 turn_usage (本轮对话) 和 session_usage (会话累计)
         """
         default_usage = {
             'input_tokens': 0,
@@ -745,16 +747,26 @@ class ChatbotService:
             'search_count': 0
         }
         
+        result = {
+            'turn_usage': default_usage.copy(),      # 本轮对话使用量
+            'session_usage': default_usage.copy()   # 会话累计使用量
+        }
+        
         if not self._chatbot:
-            return default_usage
+            return result
         
         # 使用指定的 session_id 或当前会话 ID
         target_session = session_id or self._current_session_id
         if not target_session:
-            return default_usage
+            return result
         
-        # tokens_usage 是 Dict[thread_id, Dict]，获取指定会话的使用情况
-        return self._chatbot.tokens_usage.get(target_session, default_usage)
+        # 获取本轮对话使用量
+        result['turn_usage'] = self._chatbot.tokens_usage.get(target_session, default_usage.copy())
+        
+        # 获取会话累计使用量
+        result['session_usage'] = self._chatbot.session_tokens_usage.get(target_session, default_usage.copy())
+        
+        return result
 
 
 # 创建全局单例

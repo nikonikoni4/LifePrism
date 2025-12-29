@@ -314,7 +314,7 @@ class DatabaseManager:
         Args:
             table_name: 表名
             data: 数据字典
-            conflict_columns: 冲突列（用于判断是否存在），None 则使用主键
+            conflict_columns: 冲突列（用于判断是否存在），需要有 UNIQUE 或 PRIMARY KEY 约束
             
         Returns:
             int: 受影响的行数
@@ -337,10 +337,16 @@ class DatabaseManager:
             if config.get('timestamps') and table_name == 'category_map_cache':
                 update_str += ", updated_at = CURRENT_TIMESTAMP"
             
+            # 构建 ON CONFLICT 子句
+            if conflict_columns:
+                conflict_str = f"({', '.join(conflict_columns)})"
+            else:
+                conflict_str = ""
+            
             sql = f"""
             INSERT INTO {table_name} ({columns_str}) 
             VALUES ({placeholders})
-            ON CONFLICT DO UPDATE SET {update_str}
+            ON CONFLICT{conflict_str} DO UPDATE SET {update_str}
             """
             
             with self.get_connection() as conn:
@@ -391,10 +397,16 @@ class DatabaseManager:
             if config.get('timestamps') and table_name == 'category_map_cache':
                 update_str += ", updated_at = CURRENT_TIMESTAMP"
             
+            # 构建 ON CONFLICT 子句
+            if conflict_columns:
+                conflict_str = f"({', '.join(conflict_columns)})"
+            else:
+                conflict_str = ""
+            
             sql = f"""
             INSERT INTO {table_name} ({columns_str}) 
             VALUES ({placeholders})
-            ON CONFLICT DO UPDATE SET {update_str}
+            ON CONFLICT{conflict_str} DO UPDATE SET {update_str}
             """
             
             # 准备数据

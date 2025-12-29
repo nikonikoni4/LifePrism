@@ -553,3 +553,92 @@ class LWBaseDataProvider:
         except Exception as e:
             logger.error(f"保存 token 使用数据失败: {e}")
             raise
+    
+    def get_session_tokens_usage(self, session_id: str) -> Optional[Dict]:
+        """
+        根据 session_id 获取已有的 token 使用量数据
+        
+        Args:
+            session_id: 会话ID
+        
+        Returns:
+            Optional[Dict]: 使用量数据，不存在返回 None
+                - input_tokens: 输入 token 数
+                - output_tokens: 输出 token 数
+                - total_tokens: 总 token 数
+                - search_count: 搜索次数
+                - result_items_count: 结果项目数
+        """
+        try:
+            sql = """
+            SELECT input_tokens, output_tokens, total_tokens, search_count, result_items_count
+            FROM tokens_usage_log
+            WHERE session_id = ?
+            """
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql, (session_id,))
+                row = cursor.fetchone()
+            
+            if row:
+                return {
+                    "input_tokens": row[0] or 0,
+                    "output_tokens": row[1] or 0,
+                    "total_tokens": row[2] or 0,
+                    "search_count": row[3] or 0,
+                    "result_items_count": row[4] or 0
+                }
+            return None
+            
+        except Exception as e:
+            logger.error(f"获取会话 {session_id} 的 token 使用数据失败: {e}")
+            return None
+    
+    def upsert_session_tokens_usage(self, session_id: str, usage_data: Dict) -> int:
+        """
+        基于 session_id 更新或插入 token 使用量数据
+        
+        每个 session_id 只保留一条记录，存在则更新，不存在则插入
+        使用 先查询再决定 INSERT 或 UPDATE 的方式
+        
+        Args:
+            session_id: 会话ID
+            usage_data: 使用量数据字典，应包含：
+                - input_tokens: 输入 token 数
+                - output_tokens: 输出 token 数
+                - total_tokens: 总 token 数
+                - search_count: 搜索次数(可选)
+                - result_items_count: 结果项目数(可选)
+                - mode: 模式(可选，默认 'chatbot')
+        
+        Returns:
+            int: 受影响的行数
+        """
+        try:
+            # 确保必需字段存在
+            data = {
+                'input_tokens': usage_data.get('input_tokens', 0),
+                'output_tokens': usage_data.get('output_tokens', 0),
+                'total_tokens': usage_data.get('total_tokens', 0),
+                'search_count': usage_data.get('search_count', 0),
+                'result_items_count': usage_data.get('result_items_count', 0),
+                'mode': usage_data.get('mode', 'chatbot')
+            }
+            
+            # 先查询是否存在
+            existing = self.get_session_tokens_usage(session_id)
+            if existing:
+                # 存在则 UPDATE
+                affected = self.db.update('tokens_usage_log', data, where={'session_id': session_id})
+                logger.debug(f"更新会话 {session_id} 的 token 使用记录")
+            else:
+                # 不存在则 INSERT
+                data['session_id'] = session_id
+                affected = self.db.insert('tokens_usage_log', data)
+                logger.debug(f"插入会话 {session_id} 的 token 使用记录")
+            
+            return affected
+            
+        except Exception as e:
+            logger.error(f"保存会话 {session_id} 的 token 使用数据失败: {e}")
+            raise
