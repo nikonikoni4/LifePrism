@@ -189,34 +189,37 @@ class GoalService:
         Returns:
             Optional[GoalItem]: 更新后的目标，失败返回 None
         """
-        # 构建更新数据，只包含非 None 的字段
+        # 构建更新数据
+        # 使用 model_fields_set 来判断哪些字段是显式提供的（包括显式设置为 None 的情况）
+        # 这样可以区分"未提供值"和"明确设置为 null"两种情况
         update_data = {}
+        explicitly_set_fields = request.model_fields_set
         
-        if request.name is not None:
+        if 'name' in explicitly_set_fields:
             update_data['name'] = request.name
-        if request.abstract is not None:
+        if 'abstract' in explicitly_set_fields:
             update_data['abstract'] = request.abstract
-        if request.content is not None:
+        if 'content' in explicitly_set_fields:
             update_data['content'] = request.content
-        if request.color is not None:
+        if 'color' in explicitly_set_fields:
             update_data['color'] = request.color
-        if request.link_to_category_id is not None:
+        if 'link_to_category_id' in explicitly_set_fields:
             update_data['link_to_category_id'] = request.link_to_category_id
-        if request.link_to_sub_category_id is not None:
+        if 'link_to_sub_category_id' in explicitly_set_fields:
             update_data['link_to_sub_category_id'] = request.link_to_sub_category_id
-        if request.link_to_reward_id is not None:
+        if 'link_to_reward_id' in explicitly_set_fields:
             update_data['link_to_reward_id'] = request.link_to_reward_id
-        if request.expected_finished_at is not None:
+        if 'expected_finished_at' in explicitly_set_fields:
             update_data['expected_finished_at'] = request.expected_finished_at
-        if request.expected_hours is not None:
+        if 'expected_hours' in explicitly_set_fields:
             update_data['expected_hours'] = request.expected_hours
-        if request.actual_finished_at is not None:
+        if 'actual_finished_at' in explicitly_set_fields:
             update_data['actual_finished_at'] = request.actual_finished_at
-        if request.actual_hours is not None:
+        if 'actual_hours' in explicitly_set_fields:
             update_data['actual_hours'] = request.actual_hours
-        if request.completion_rate is not None:
+        if 'completion_rate' in explicitly_set_fields:
             update_data['completion_rate'] = request.completion_rate
-        if request.status is not None:
+        if 'status' in explicitly_set_fields:
             update_data['status'] = request.status
         
         success = self.goal_provider.update_goal(goal_id, update_data)
