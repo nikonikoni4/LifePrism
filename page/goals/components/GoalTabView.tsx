@@ -52,9 +52,10 @@ const GoalTabView: React.FC<GoalTabViewProps> = ({ onSelectGoal }) => {
     if (editingGoal) {
       try {
         // Call API to update category
+        // 注意：使用 null 而不是 undefined，这样后端可以区分"未提供"和"设置为空"
         const updatedGoal = await goalApi.updateGoal(editingGoal.id, {
-          linkToCategoryId: categoryId || undefined,
-          linkToSubCategoryId: subCategoryId || undefined
+          linkToCategoryId: categoryId,
+          linkToSubCategoryId: subCategoryId
         });
 
         // Update local state with the returned goal (which has category names)

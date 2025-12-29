@@ -119,8 +119,8 @@ export interface UpdateGoalRequest {
     abstract?: string;
     content?: string;
     color?: string;
-    linkToCategoryId?: string;
-    linkToSubCategoryId?: string;
+    linkToCategoryId?: string | null;      // null 表示取消分类绑定
+    linkToSubCategoryId?: string | null;   // null 表示取消子分类绑定
     expectedFinishedAt?: string;
     expectedHours?: number;
     actualFinishedAt?: string;

@@ -129,18 +129,34 @@ export async function getTokenUsage(sessionId: string): Promise<TokenUsage> {
     if (!response.ok) {
         // 如果接口不存在或失败，返回默认值
         return {
-            inputTokens: 0,
-            outputTokens: 0,
-            totalTokens: 0,
-            searchCount: 0,
+            turn_usage: {
+                input_tokens: 0,
+                output_tokens: 0,
+                total_tokens: 0,
+                search_count: 0,
+            },
+            session_usage: {
+                input_tokens: 0,
+                output_tokens: 0,
+                total_tokens: 0,
+                search_count: 0,
+            },
         };
     }
     const data = await response.json();
     return {
-        inputTokens: data.input_tokens || 0,
-        outputTokens: data.output_tokens || 0,
-        totalTokens: data.total_tokens || 0,
-        searchCount: data.search_count || 0,
+        turn_usage: {
+            input_tokens: data.turn_usage?.input_tokens || 0,
+            output_tokens: data.turn_usage?.output_tokens || 0,
+            total_tokens: data.turn_usage?.total_tokens || 0,
+            search_count: data.turn_usage?.search_count || 0,
+        },
+        session_usage: {
+            input_tokens: data.session_usage?.input_tokens || 0,
+            output_tokens: data.session_usage?.output_tokens || 0,
+            total_tokens: data.session_usage?.total_tokens || 0,
+            search_count: data.session_usage?.search_count || 0,
+        },
     };
 }
 
