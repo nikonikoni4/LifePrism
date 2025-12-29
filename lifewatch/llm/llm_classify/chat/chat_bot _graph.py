@@ -1,3 +1,6 @@
+"""
+V2 ChatBot 改为使用graph 增加功能解说和相关功能解答
+"""
 from lifewatch.llm.llm_classify.schemas.chatbot_schemas import ChatBotSchemas
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.checkpoint.memory import InMemorySaver
@@ -12,7 +15,7 @@ from typing import TypedDict
 import json
 from lifewatch.utils import get_logger
 import logging
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage,AIMessageChunk
 from langgraph.graph import StateGraph
 from langgraph.types import RetryPolicy
 logger = get_logger(__name__,logging.DEBUG)
@@ -57,9 +60,10 @@ class ChatBot:
         self.current_total_tokens = 0
         self.tokens_usage = {}
         self.checkpointer = checkpointer or InMemorySaver()
-        self.main_chat_bot = self.get_new_agent(enable_search=False,
+        # 用于流式输出
+        self.llm_streaming = self.get_new_agent(enable_search=False,
                             enable_thinking=False,
-                            enable_streaming=False,temperature=0.5)
+                            enable_streaming=True,temperature=0.5)
         self.config: Optional[dict] = None
         self.thread_id = None
         # self._is_persistent = isinstance(self.checkpointer, AsyncSqliteSaver)
@@ -200,10 +204,10 @@ class ChatBot:
         promot = intent_router_template.format(
             question=main_state.messages[-1].content,
         )
-        chat_model = self.get_new_agent(enable_search=False,
+        llm = self.get_new_agent(enable_search=False,
                             enable_thinking=False,
                             enable_streaming=False,temperature=0.5)
-        result = await chat_model.ainvoke(promot) 
+        result = await llm.ainvoke(promot) 
         self.update_usage(result)
         
         # 去掉 LLM 返回内容中的引号（LLM 有时会返回带引号的字符串）
@@ -226,7 +230,7 @@ class ChatBot:
         """
         from lifewatch.llm.llm_classify.utils.user_guide_parser import load_user_guide
         from lifewatch.llm.llm_classify.schemas.user_guide_schemas import SummaryOption
-        chat_model = self.get_new_agent(enable_search=False,
+        llm = self.get_new_agent(enable_search=False,
                             enable_thinking=False,
                             enable_streaming=False,temperature=0.5)
         guide = load_user_guide()
@@ -234,7 +238,7 @@ class ChatBot:
         # 第一次路由
         option = SummaryOption(id = True,title = False,abstract = True)
         outline = guide.transform_to_table(guide.get_children_summary(options=option))
-        result = await chat_model.ainvoke(intro_router_template.format(
+        result = await llm.ainvoke(intro_router_template.format(
             question=main_state.messages[-1].content,
             outline=outline,
         ))
@@ -259,7 +263,7 @@ class ChatBot:
         logger.debug("\n=== 第2步：细筛路由 ===")
         outline = guide.transform_to_table(outline)
         logger.debug(f"细筛范围:\n{outline}")
-        result = await chat_model.ainvoke(intro_router_template.format(outline=outline, question=main_state.messages[-1].content))
+        result = await llm.ainvoke(intro_router_template.format(outline=outline, question=main_state.messages[-1].content))
         self.update_usage(result)
         id_list = json.loads(result.content)
         logger.debug(f"路由结果: {id_list}")
@@ -305,7 +309,7 @@ class ChatBot:
             guide_content=main_state.guide_content[-1],
             history_messages=history_messages
         )
-        result = await self.main_chat_bot.ainvoke(prompt)
+        result = await self.llm_streaming.ainvoke(prompt)
         self.update_usage(result)
         return {
             "messages" : [result]
@@ -317,13 +321,13 @@ class ChatBot:
             question=main_state.messages[-1].content,
             history_messages=history_messages
         )
-        result = await self.main_chat_bot.ainvoke(prompt)
+        result = await self.llm_streaming.ainvoke(prompt)
         self.update_usage(result)
         return {
             "messages" : [result]
         }
     
-    async def chat(self, user_input: str, thread_id: str = None) -> str:
+    async def chat_not_stream(self, user_input: str, thread_id: str = None) -> str:
         """
         发送消息并获取回复（主入口）
         
@@ -351,16 +355,121 @@ class ChatBot:
         
         # 返回最后一条 AI 消息的内容
         return result["messages"][-1].content
+    
+    async def chat_stream(self, user_input: str, thread_id: str = None):
+        """
+        发送消息并获取流式回复
+        
+        Args:
+            user_input: 用户输入的消息
+            thread_id: 会话ID
+            
+        Yields:
+            AI 回复的内容片段
+        """
+        from langchain_core.messages import HumanMessage, AIMessageChunk
+        
+        # 使用传入的 thread_id 或者已设置的 thread_id
+        if thread_id is None and self.thread_id is None:
+            raise ValueError("请先调用 set_thread_id() 或传入 thread_id 参数")
+        
+        if thread_id is not None:
+            self.set_thread_id(thread_id)
+        
+        # 使用 astream 进行流式输出
+        # stream_mode="messages" 会流式输出所有消息事件
+        async for event in self.chatbot.astream(
+            {"messages": [HumanMessage(content=user_input)]},
+            config=self.config,
+            stream_mode="messages"
+        ):
+            # event 是一个 tuple: (message, metadata)
+            if len(event) >= 1:
+                message = event[0]
+                # 只输出 AI 消息的内容
+                if isinstance(message, AIMessageChunk) and message.content:
+                    yield message.content
+    
+    async def chat_stream_with_status(self, user_input: str, thread_id: str = None):
+        """
+        发送消息并获取流式回复（带状态信息）
+        
+        前端可以根据 type 区分：
+        - type="status": 当前执行的步骤（节点开始时触发）
+        - type="content": AI 回复的内容片段
+        
+        Args:
+            user_input: 用户输入的消息
+            thread_id: 会话ID
+            
+        Yields:
+            dict: {"type": "status"|"content", "data": str, "node": str}
+        """
+        
+        if thread_id is None and self.thread_id is None:
+            raise ValueError("请先调用 set_thread_id() 或传入 thread_id 参数")
+        
+        if thread_id is not None:
+            self.set_thread_id(thread_id)
+        
+        # 节点名称到中文描述的映射
+        node_names = {
+            "intent_router": "正在识别意图...",
+            "feat_intro_router": "正在检索相关文档...",
+            "feature_introduce": "正在生成回答...",
+            "norm_chat": "正在生成回答...",
+        }
+        
+        last_node = None  # 记录上一个节点，避免重复发送状态
+        
+        # 使用 astream_events 获取更详细的事件（包括节点开始）
+        async for event in self.chatbot.astream_events(
+            {"messages": [HumanMessage(content=user_input)]},
+            config=self.config,
+            version="v2"  # 使用 v2 版本的事件格式
+        ):
+            event_type = event.get("event", "")
+            
+            # 节点开始事件
+            if event_type == "on_chain_start":
+                node_name = event.get("name", "")
+                if node_name in node_names and node_name != last_node:
+                    last_node = node_name
+                    yield {
+                        "type": "status",
+                        "node": node_name,
+                        "data": node_names[node_name]
+                    }
+            
+            # 消息流式输出事件
+            elif event_type == "on_chat_model_stream":
+                chunk = event.get("data", {}).get("chunk")
+                if chunk and hasattr(chunk, "content") and chunk.content:
+                    yield {
+                        "type": "content",
+                        "node": last_node,
+                        "data": chunk.content
+                    }
 
 async def main():
-    app = ChatBot()
-    app.set_thread_id("test_graph2")
-    while True:
-        user_input = input("User: ")
-        if user_input == "exit":
-            break
-        result = await app.chat(user_input)
-        print("AI: ", result)
+    # 使用持久化保存器（保存到数据库）
+    async with ChatBot.create_with_persistence() as app:
+        app.set_thread_id("test_stream_status")
+        while True:
+            user_input = input("User: ")
+            if user_input == "exit":
+                break
+            
+            print()  # 换行
+            async for event in app.chat_stream_with_status(user_input):
+                if event["type"] == "status":
+                    # 显示当前步骤
+                    print(f"🔄 {event['data']}")
+                elif event["type"] == "content":
+                    # 显示 AI 回复内容
+                    print(event["data"], end="", flush=True)
+            print()  # 换行
+
 from asyncio import run
 if __name__ == "__main__":
     run(main())

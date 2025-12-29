@@ -1,3 +1,7 @@
+"""
+V1 版本聊天机器人,带记忆功能
+"""
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from lifewatch.llm.llm_classify.utils.create_model import create_ChatTongyiModel
 from langchain.agents import create_agent
