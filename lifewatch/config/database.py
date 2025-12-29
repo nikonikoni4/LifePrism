@@ -223,6 +223,11 @@ TOKENS_USAGE_LOG_CONFIG = {
             'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
             'comment': '自动生成的唯一标识符'
         },
+        'session_id': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '会话ID'
+        },
         'input_tokens': {
             'type': 'INTEGER',
             'constraints': ['NOT NULL', 'DEFAULT 0'],
@@ -562,6 +567,69 @@ CHAT_SESSION_CONFIG = {
 }
 
 
+# Timeline 自定义时间块表配置（用户手动添加的活动记录）
+TIMELINE_CUSTOM_BLOCK_CONFIG = {
+    'table_name': 'timeline_custom_block',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键'
+        },
+        'start_time': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '开始时间（ISO格式，如 2025-12-27T14:00:00）'
+        },
+        'end_time': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '结束时间（ISO格式，如 2025-12-27T15:30:00）'
+        },
+        'duration': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL'],
+            'comment': '持续时间（分钟）'
+        },
+        'content': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '活动内容描述'
+        },
+        'todo_id':{
+            'type': 'INTEGER',
+            'constraints': [],
+            'comment': '关联的待办事项ID'
+        },
+        'color': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '活动颜色'
+        },
+        'category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '分类ID'
+        },
+        'sub_category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '子分类ID'
+        }
+    },
+    'table_constraints': [
+        'CHECK(end_time > start_time)',
+        'CHECK(duration > 0)'
+    ],
+    'indexes': [
+        {'name': 'idx_timeline_custom_block_start_time', 'columns': ['start_time']},
+        {'name': 'idx_timeline_custom_block_end_time', 'columns': ['end_time']},
+        {'name': 'idx_timeline_custom_block_time_range', 'columns': ['start_time', 'end_time']}
+    ],
+    'timestamps': True  # 自动添加 created_at, updated_at
+}
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'category_map_cache': category_map_cache_CONFIG,
@@ -575,6 +643,7 @@ TABLE_CONFIGS = {
     'weekly_focus': WEEKLY_FOCUS_CONFIG,
     'goal': GOAL_CONFIG,
     'chat_session': CHAT_SESSION_CONFIG,
+    'timeline_custom_block': TIMELINE_CUSTOM_BLOCK_CONFIG,
 }
 
 
