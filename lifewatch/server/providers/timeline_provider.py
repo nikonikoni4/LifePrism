@@ -138,9 +138,26 @@ class TimelineProvider(LWBaseDataProvider):
         
         Returns:
             dict | None: 更新后的完整记录或 None
+        
+        注意：
+            - todo_id, category_id, sub_category_id 允许设置为 None（清除绑定）
+            - 其他字段（content, start_time 等）不接受 None 值
         """
-        # 过滤掉 None 值
-        update_data = {k: v for k, v in data.items() if v is not None}
+        # 可清空的字段列表（这些字段允许显式设置为 None）
+        nullable_fields = {'todo_id', 'category_id', 'sub_category_id'}
+        
+        # 构建更新数据：
+        # - 可清空字段：保留 None 值（用于清除绑定）
+        # - 其他字段：过滤掉 None 值
+        update_data = {}
+        for k, v in data.items():
+            if k in nullable_fields:
+                # 可清空字段：无论是 None 还是有效值都保留
+                update_data[k] = v
+            elif v is not None:
+                # 其他字段：只保留非 None 值
+                update_data[k] = v
+        
         if not update_data:
             return self.get_custom_block_by_id(block_id)
         
