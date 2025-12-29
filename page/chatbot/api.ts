@@ -213,6 +213,8 @@ export async function sendMessageStream(
                             isNewSession: eventData.is_new_session,
                             // error 事件字段
                             error: eventData.error,
+                            // done 事件的 usage 字段
+                            usage: eventData.usage,
                             // 兼容旧的 content 字段（如有）
                             content: eventData.content || eventData.message,
                         };

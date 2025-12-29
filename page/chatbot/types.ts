@@ -64,16 +64,26 @@ export interface SSEEvent {
     isNewSession?: boolean;
     /** 错误信息（error 事件） */
     error?: string;
+    /** Token 使用情况（done 事件） */
+    usage?: TokenUsage;
     /** @deprecated 使用 message 替代 */
     content?: string;
 }
 
-/** Token 使用统计 */
+/** 单次 Token 使用量 */
+export interface TurnTokenUsage {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    search_count?: number;
+}
+
+/** Token 使用统计（包含本轮对话和会话累计） */
 export interface TokenUsage {
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
-    searchCount?: number;
+    /** 本轮对话使用量 */
+    turn_usage: TurnTokenUsage;
+    /** 会话累计使用量 */
+    session_usage: TurnTokenUsage;
 }
 
 /** 功能模式 */

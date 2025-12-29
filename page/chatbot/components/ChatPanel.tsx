@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Sparkles, Bot, User, ChevronLeft, ChevronRight, Plus, History, MoreHorizontal, Trash2, Search, Brain, Globe, ChevronUp, MessageCircle, BookOpen, Square, Loader2, Zap } from 'lucide-react';
-import { sendMessageStream, getSessions, deleteSession, getChatHistory, getModelConfig, updateModelConfig, getTokenUsage } from '../api';
+import { sendMessageStream, getSessions, deleteSession, getChatHistory, getModelConfig, updateModelConfig } from '../api';
 import { ChatMessage, ChatSession, ChatDisplayMode, ModelConfig, SSEEvent, FeatureMode, TokenUsage } from '../types';
 import { MarkdownRenderer } from '../../common';
 
@@ -197,18 +197,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                             );
                             break;
                         case 'done':
-                            // 完成，获取 token 使用情况
+                            // 完成，从事件中获取 token 使用情况
                             setCurrentStatus(null);
-                            if (newSessionId) {
-                                getTokenUsage(newSessionId).then(usage => {
-                                    setLastTokenUsage(usage);
-                                    // 将 token 信息附加到最后一条 AI 消息
-                                    setMessages(prev =>
-                                        prev.map(msg =>
-                                            msg.id === aiMsgId ? { ...msg, tokenUsage: usage } : msg
-                                        )
-                                    );
-                                });
+                            if (event.usage) {
+                                setLastTokenUsage(event.usage);
+                                // 将 token 信息附加到最后一条 AI 消息
+                                setMessages(prev =>
+                                    prev.map(msg =>
+                                        msg.id === aiMsgId ? { ...msg, tokenUsage: event.usage } : msg
+                                    )
+                                );
                             }
                             break;
                         case 'error':
@@ -615,17 +613,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
                             </div>
 
                             {/* Token 使用统计 - 仅显示在 AI 回复下方 */}
-                            {msg.role === 'model' && msg.tokenUsage && msg.tokenUsage.totalTokens > 0 && (() => {
+                            {msg.role === 'model' && msg.tokenUsage && msg.tokenUsage.turn_usage && msg.tokenUsage.turn_usage.total_tokens > 0 && (() => {
                                 // 格式化 token 数量（以 k 为单位）
                                 const formatTokens = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toString();
+                                const turn = msg.tokenUsage.turn_usage;
+                                const session = msg.tokenUsage.session_usage;
                                 return (
                                     <div className="flex items-center justify-start gap-1 ml-11 text-xs text-gray-400">
                                         <Zap size={10} className="text-amber-400" />
-                                        <span>输入: {formatTokens(msg.tokenUsage.inputTokens)}</span>
+                                        <span>输入: {formatTokens(turn.input_tokens)}</span>
                                         <span className="text-gray-300">|</span>
-                                        <span>输出: {formatTokens(msg.tokenUsage.outputTokens)}</span>
+                                        <span>输出: {formatTokens(turn.output_tokens)}</span>
                                         <span className="text-gray-300">|</span>
-                                        <span>总计: {formatTokens(msg.tokenUsage.totalTokens)}</span>
+                                        <span>本轮: {formatTokens(turn.total_tokens)}</span>
+                                        <span className="text-gray-300">|</span>
+                                        <span className="text-indigo-400">会话: {formatTokens(session.total_tokens)}</span>
                                     </div>
                                 );
                             })()}
