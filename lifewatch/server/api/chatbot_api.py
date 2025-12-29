@@ -91,6 +91,23 @@ async def get_chat_history(
     return result
 
 
+@router.get("/sessions/{session_id}/tokens", response_model=TokenUsageEstimate)
+async def get_session_tokens(
+    session_id: str = Path(..., description="会话 ID")
+):
+    """
+    获取会话的 Token 使用情况
+    
+    返回指定会话的最后一次对话 token 用量统计
+    """
+    usage = chatbot_service.get_last_token_usage(session_id)
+    return TokenUsageEstimate(
+        input_tokens=usage.get('input_tokens', 0),
+        output_tokens=usage.get('output_tokens', 0),
+        total_tokens=usage.get('total_tokens', 0)
+    )
+
+
 # ============================================================================
 # 模型配置接口
 # ============================================================================
@@ -128,7 +145,7 @@ async def update_model_config(request: UpdateModelConfigRequest):
 @router.post("/chat/stream")
 async def chat_stream(request: ChatMessageRequest):
     """
-    流式对话（SSE）
+    流式对话（SSE）- V2 版本，支持节点状态显示
     
     请求体:
     - **session_id**: 会话 ID（可选，为空时自动创建新会话）
@@ -138,9 +155,16 @@ async def chat_stream(request: ChatMessageRequest):
     
     SSE 事件格式:
     1. 首条消息（会话信息）: `{"type": "session", "session_id": "...", "session_name": "...", "is_new_session": true/false}`
-    2. 内容片段: `{"type": "content", "content": "..."}`
-    3. 结束标记: `{"type": "done", "content": ""}`
-    4. 错误: `{"type": "error", "error": "..."}`
+    2. 状态更新: `{"type": "status", "node": "intent_router", "message": "正在识别意图..."}`
+    3. 内容片段: `{"type": "content", "node": "feature_introduce", "message": "..."}`
+    4. 结束标记: `{"type": "done"}`
+    5. 错误: `{"type": "error", "error": "..."}`
+    
+    状态节点（node）说明:
+    - intent_router: 意图识别
+    - feat_intro_router: 功能文档检索
+    - feature_introduce: 功能介绍生成
+    - norm_chat: 普通对话生成
     
     客户端可通过断开连接来暂停输出
     """
@@ -155,15 +179,16 @@ async def chat_stream(request: ChatMessageRequest):
             # 发送会话信息
             yield f"data: {json.dumps({'type': 'session', 'session_id': session_info.session_id, 'session_name': session_info.session_name, 'is_new_session': session_info.is_new_session}, ensure_ascii=False)}\n\n"
             
-            # 2. 流式输出内容
-            async for chunk in chatbot_service.chat_stream(
+            # 2. 流式输出内容（带状态）
+            async for event in chatbot_service.chat_stream_with_status(
                 session_info.session_id,
                 request.content
             ):
-                yield f"data: {json.dumps({'type': 'content', 'content': chunk}, ensure_ascii=False)}\n\n"
+                # event 格式: {"type": "status"|"content", "node": str, "message": str}
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             
             # 3. 发送结束标记
-            yield f"data: {json.dumps({'type': 'done', 'content': ''}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"

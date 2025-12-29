@@ -403,7 +403,7 @@ class ChatBot:
             thread_id: 会话ID
             
         Yields:
-            dict: {"type": "status"|"content", "data": str, "node": str}
+            dict: {"type": "status"|"content", "message": str, "node": str}
         """
         
         if thread_id is None and self.thread_id is None:
@@ -438,7 +438,7 @@ class ChatBot:
                     yield {
                         "type": "status",
                         "node": node_name,
-                        "data": node_names[node_name]
+                        "message": node_names[node_name]
                     }
             
             # 消息流式输出事件
@@ -448,7 +448,7 @@ class ChatBot:
                     yield {
                         "type": "content",
                         "node": last_node,
-                        "data": chunk.content
+                        "message": chunk.content
                     }
 
 async def main():
@@ -464,10 +464,10 @@ async def main():
             async for event in app.chat_stream_with_status(user_input):
                 if event["type"] == "status":
                     # 显示当前步骤
-                    print(f"🔄 {event['data']}")
+                    print(f"🔄 {event['message']}")
                 elif event["type"] == "content":
                     # 显示 AI 回复内容
-                    print(event["data"], end="", flush=True)
+                    print(event["message"], end="", flush=True)
             print()  # 换行
 
 from asyncio import run

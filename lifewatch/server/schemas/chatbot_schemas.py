@@ -76,10 +76,41 @@ class ChatStreamStartResponse(BaseModel):
     is_new_session: bool = Field(default=False, description="是否为新创建的会话")
 
 
-class ChatMessageChunk(BaseModel):
-    """流式消息片段"""
-    content: str = Field(..., description="消息内容片段")
-    is_final: bool = Field(default=False, description="是否为最后一个片段")
+class SSEEventType(str, Enum):
+    """SSE 事件类型"""
+    SESSION = "session"      # 会话信息
+    STATUS = "status"        # 节点状态更新
+    CONTENT = "content"      # AI 回复内容片段
+    DONE = "done"            # 流结束标记
+    ERROR = "error"          # 错误信息
+
+
+class ChatNodeType(str, Enum):
+    """聊天节点类型（用于 status 事件）"""
+    INTENT_ROUTER = "intent_router"           # 意图识别
+    FEAT_INTRO_ROUTER = "feat_intro_router"   # 功能文档检索
+    FEATURE_INTRODUCE = "feature_introduce"   # 功能介绍生成
+    NORM_CHAT = "norm_chat"                   # 普通对话生成
+
+
+class ChatStreamEvent(BaseModel):
+    """
+    SSE 流式事件（统一格式）
+    
+    事件类型说明:
+    - session: 会话信息，包含 session_id, session_name, is_new_session
+    - status: 节点状态，包含 node, message
+    - content: 内容片段，包含 node, message
+    - done: 流结束标记
+    - error: 错误信息，包含 error
+    """
+    type: SSEEventType = Field(..., description="事件类型")
+    node: Optional[str] = Field(default=None, description="当前节点名称（status/content 事件）")
+    message: Optional[str] = Field(default=None, description="状态描述或内容片段")
+    session_id: Optional[str] = Field(default=None, description="会话 ID（session 事件）")
+    session_name: Optional[str] = Field(default=None, description="会话名称（session 事件）")
+    is_new_session: Optional[bool] = Field(default=None, description="是否新会话（session 事件）")
+    error: Optional[str] = Field(default=None, description="错误信息（error 事件）")
 
 
 class TokenUsageEstimate(BaseModel):
@@ -112,9 +143,8 @@ class ChatMessage(BaseModel):
     content: str = Field(..., description="消息内容")
     timestamp: Optional[str] = Field(default=None, description="消息时间戳")
 
-
 class ChatHistoryResponse(BaseModel):
     """聊天历史响应"""
     session_id: str = Field(..., description="会话 ID")
     session_name: str = Field(..., description="会话名称")
-    messages: List[ChatMessage] = Field(default=[], description="消息列表")
+    messages: Optional[List[ChatMessage]] = Field(default=[], description="消息列表")
