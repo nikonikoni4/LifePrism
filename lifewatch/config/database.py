@@ -218,15 +218,10 @@ SUB_CATEGORY_CONFIG = {
 TOKENS_USAGE_LOG_CONFIG = {
     'table_name': 'tokens_usage_log',
     'columns': {
-        'id': {
-            'type': 'INTEGER',
-            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
-            'comment': '自动生成的唯一标识符'
-        },
         'session_id': {
             'type': 'TEXT',
-            'constraints': ['DEFAULT NULL'],
-            'comment': '会话ID'
+            'constraints': ['PRIMARY KEY', 'NOT NULL'],
+            'comment': '会话ID（chatbot: UUID格式, classification: c-YYYY-MM-DD格式）'
         },
         'input_tokens': {
             'type': 'INTEGER',
@@ -256,12 +251,13 @@ TOKENS_USAGE_LOG_CONFIG = {
         'mode': {
             'type': 'TEXT',
             'constraints': ['NOT NULL', 'DEFAULT "classification"'],   
-            'comment': '模式'
+            'comment': '模式（classification 或 chatbot）'
         }
     },
     'table_constraints': [],
     'indexes': [
-        {'name': 'idx_tokens_usage_created_at', 'columns': ['created_at']}
+        {'name': 'idx_tokens_usage_created_at', 'columns': ['created_at']},
+        {'name': 'idx_tokens_usage_mode', 'columns': ['mode']}
     ],
     'timestamps': True  # 自动添加 created_at
 }

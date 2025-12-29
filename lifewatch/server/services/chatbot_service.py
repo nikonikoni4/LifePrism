@@ -375,7 +375,7 @@ class ChatbotService:
         self._chatbot_context = None  # 异步上下文管理器
         self._current_session_id: Optional[str] = None
         self._model_config = ModelConfig()
-        self._session_provider = get_chat_session_provider()  # 会话元数据持久化
+        self._session_provider = get_chat_session_provider()  # 会话元数据及tokens_usage持久化
         self._is_initialized = False
     
     async def initialize(self):
@@ -501,6 +501,12 @@ class ChatbotService:
         self._current_session_id = session_id
         self._chatbot.set_thread_id(session_id)
         
+        # 从数据库加载该会话的已有使用量到 chatbot.tokens_usage
+        existing_usage = self._session_provider.get_session_tokens_usage(session_id)
+        if existing_usage:
+            self._chatbot.tokens_usage[session_id] = existing_usage
+            logger.debug(f"从数据库加载会话 {session_id} 的使用量: {existing_usage}")
+        
         return ChatStreamStartResponse(
             session_id=session_id,
             session_name=name,
@@ -604,6 +610,9 @@ class ChatbotService:
         # 使用 chat_stream 进行流式输出
         async for chunk in self._chatbot.chat_stream(content):
             yield chunk
+        
+        # 对话完成后，保存使用量到数据库
+        await self._save_session_tokens_usage(session_id)
     
     async def chat_stream_with_status(
         self,
@@ -637,6 +646,9 @@ class ChatbotService:
         # 使用 chat_stream_with_status 进行带状态的流式输出
         async for event in self._chatbot.chat_stream_with_status(content):
             yield event
+        
+        # 对话完成后，保存使用量到数据库
+        await self._save_session_tokens_usage(session_id)
     
     async def get_chat_history(self, session_id: str) -> Optional[ChatHistoryResponse]:
         """
@@ -695,6 +707,26 @@ class ChatbotService:
             session_name=session_data["name"],
             messages=messages
         )
+    
+    async def _save_session_tokens_usage(self, session_id: str):
+        """
+        保存会话的 token 使用量到数据库
+        
+        Args:
+            session_id: 会话 ID
+        """
+        try:
+            if not self._chatbot or session_id not in self._chatbot.tokens_usage:
+                return
+            
+            usage_data = self._chatbot.tokens_usage[session_id]
+            # 添加 mode 字段标识为 chatbot
+            usage_data['mode'] = 'chatbot'
+            
+            self._session_provider.upsert_session_tokens_usage(session_id, usage_data)
+            logger.debug(f"保存会话 {session_id} 的使用量到数据库: {usage_data}")
+        except Exception as e:
+            logger.error(f"保存会话 {session_id} 的使用量失败: {e}")
     
     def get_last_token_usage(self, session_id: Optional[str] = None) -> Dict[str, Any]:
         """

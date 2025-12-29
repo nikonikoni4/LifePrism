@@ -635,36 +635,45 @@ class DataProcessingService:
         logger.info(f"  ✓ 映射了 {mapped_count} 条记录的分类 ID")
         
         return filtered_data
-    
+     
     def _save_tokens_usage(self, result: dict, result_items_count: int):
         """
-        保存 token 使用数据到数据库
+        保存 token 使用数据到数据库（按天累加）
         
         Args:
             result: LLM 分类结果字典，包含 tokens_usage 信息
             result_items_count: 分类结果项目数
         """
         try:
+            # 生成当天的 session_id（格式：c-YYYY-MM-DD）
+            today = datetime.now().strftime('%Y-%m-%d')
+            session_id = f"c-{today}"
+            
             # 从 result 中提取 tokens_usage 字典
             tokens_usage = result.get('tokens_usage', {})
-            input_tokens = tokens_usage.get('input_tokens', 0)
-            output_tokens = tokens_usage.get('output_tokens', 0)
-            total_tokens = tokens_usage.get('total_tokens', 0)
-            search_count = tokens_usage.get('search_count', 0)
             
-            # 构造 token 使用数据
-            tokens_usage_data = [{
-                'input_tokens': input_tokens,
-                'output_tokens': output_tokens,
-                'total_tokens': total_tokens,
-                'search_count': search_count,
+            # 构造新的使用量数据
+            new_usage = {
+                'input_tokens': tokens_usage.get('input_tokens', 0),
+                'output_tokens': tokens_usage.get('output_tokens', 0),
+                'total_tokens': tokens_usage.get('total_tokens', 0),
+                'search_count': tokens_usage.get('search_count', 0),
                 'result_items_count': result_items_count,
                 'mode': 'classification'
-            }]
+            }
+            
+            # 读取已有数据并累加
+            existing = self.server_lw_data_provider.get_session_tokens_usage(session_id)
+            if existing:
+                new_usage['input_tokens'] += existing.get('input_tokens', 0)
+                new_usage['output_tokens'] += existing.get('output_tokens', 0)
+                new_usage['total_tokens'] += existing.get('total_tokens', 0)
+                new_usage['search_count'] += existing.get('search_count', 0)
+                new_usage['result_items_count'] += existing.get('result_items_count', 0)
             
             # 保存到数据库
-            self.server_lw_data_provider.save_tokens_usage(tokens_usage_data)
-            logger.info(f"  ✓ 保存 token 使用数据: input={input_tokens}, output={output_tokens}, total={total_tokens}")
+            self.server_lw_data_provider.upsert_session_tokens_usage(session_id, new_usage)
+            logger.info(f"  ✓ 保存 token 使用数据到 {session_id}: input={new_usage['input_tokens']}, output={new_usage['output_tokens']}, total={new_usage['total_tokens']}")
             
         except Exception as e:
             logger.error(f"保存 token 使用数据失败: {e}")
