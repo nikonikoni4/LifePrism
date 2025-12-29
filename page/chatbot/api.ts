@@ -4,7 +4,7 @@
  * 调用后端 Chatbot API 的服务层
  */
 
-import { ChatSession, ModelConfig, SSEEvent, ChatMessage } from './types';
+import { ChatSession, ModelConfig, SSEEvent, ChatMessage, TokenUsage } from './types';
 
 const API_BASE = 'http://localhost:8000/api/v2/chatbot';
 
@@ -116,11 +116,40 @@ export async function updateModelConfig(config: Partial<ModelConfig>): Promise<M
 }
 
 // ============================================================================
+// Token 使用情况
+// ============================================================================
+
+/**
+ * 获取会话的 Token 使用情况
+ * 
+ * @param sessionId 会话 ID
+ */
+export async function getTokenUsage(sessionId: string): Promise<TokenUsage> {
+    const response = await fetch(`${API_BASE}/sessions/${sessionId}/tokens`);
+    if (!response.ok) {
+        // 如果接口不存在或失败，返回默认值
+        return {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            searchCount: 0,
+        };
+    }
+    const data = await response.json();
+    return {
+        inputTokens: data.input_tokens || 0,
+        outputTokens: data.output_tokens || 0,
+        totalTokens: data.total_tokens || 0,
+        searchCount: data.search_count || 0,
+    };
+}
+
+// ============================================================================
 // 流式聊天
 // ============================================================================
 
 /**
- * 发送消息（SSE 流式）
+ * 发送消息（SSE 流式）- V2 版本，支持状态显示
  * 
  * @param sessionId 会话ID，为null时自动创建新会话
  * @param content 消息内容
@@ -172,14 +201,20 @@ export async function sendMessageStream(
                         const jsonStr = line.slice(6); // 去掉 "data: " 前缀
                         const eventData = JSON.parse(jsonStr);
 
-                        // 转换为 SSEEvent
+                        // 转换为 SSEEvent（V2 格式）
                         const event: SSEEvent = {
                             type: eventData.type,
+                            // V2 新字段
+                            node: eventData.node,
+                            message: eventData.message,
+                            // session 事件字段
                             sessionId: eventData.session_id,
                             sessionName: eventData.session_name,
                             isNewSession: eventData.is_new_session,
-                            content: eventData.content,
+                            // error 事件字段
                             error: eventData.error,
+                            // 兼容旧的 content 字段（如有）
+                            content: eventData.content || eventData.message,
                         };
 
                         onEvent(event);
