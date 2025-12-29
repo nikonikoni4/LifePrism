@@ -78,12 +78,12 @@ class LWTableManager:
         # 2. 添加时间戳列
         if timestamps:
             column_definitions.append(
-                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                "created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
             )
             # 只有首次创建时添加updated_at，某些表不需要
             if table_name == 'category_map_cache':
                 column_definitions.append(
-                    "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                    "updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
                 )
         
         # 3. 添加表级约束

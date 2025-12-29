@@ -517,38 +517,36 @@ class LWBaseDataProvider:
             logger.error(f"保存清洗数据失败: {e}")
             raise
 
-    def save_tokens_usage(self, tokens_usage_df: pd.DataFrame) -> int:
+    def save_tokens_usage(self, tokens_usage_data: List[Dict]) -> int:
         """
         保存 token 使用数据到 tokens_usage_log 表
         
         Args:
-            tokens_usage_df: Token 使用数据 DataFrame，应包含以下字段：
+            tokens_usage_data: Token 使用数据列表,每个字典应包含以下字段:
                 - input_tokens: 输入 token 数
                 - output_tokens: 输出 token 数
                 - total_tokens: 总 token 数
-                - search_count: 搜索次数（可选）
+                - search_count: 搜索次数(可选)
                 - result_items_count: 结果项目数
-                - mode: 模式（默认 'classification'）
+                - mode: 模式(默认 'classification')
         
         Returns:
             int: 插入的行数
         """
         try:
-            if tokens_usage_df.empty:
-                logger.warning("Token 使用数据为空，跳过保存")
+            if not tokens_usage_data:
+                logger.warning("Token 使用数据为空,跳过保存")
                 return 0
             
-            data_list = tokens_usage_df.to_dict('records')
-            
             # 确保必需字段存在
-            for data in data_list:
+            for data in tokens_usage_data:
                 if 'mode' not in data:
                     data['mode'] = 'classification'
                 if 'search_count' not in data:
                     data['search_count'] = 0
             
             # 使用 insert_many 插入数据
-            affected = self.db.insert_many('tokens_usage_log', data_list)
+            affected = self.db.insert_many('tokens_usage_log', tokens_usage_data)
             logger.info(f"成功保存 {affected} 条 token 使用记录到数据库")
             return affected
             

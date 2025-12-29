@@ -652,15 +652,15 @@ class DataProcessingService:
             total_tokens = tokens_usage.get('total_tokens', 0)
             search_count = tokens_usage.get('search_count', 0)
             
-            # 创建 DataFrame
-            tokens_usage_data = pd.DataFrame([{
+            # 构造 token 使用数据
+            tokens_usage_data = [{
                 'input_tokens': input_tokens,
                 'output_tokens': output_tokens,
                 'total_tokens': total_tokens,
                 'search_count': search_count,
                 'result_items_count': result_items_count,
                 'mode': 'classification'
-            }])
+            }]
             
             # 保存到数据库
             self.server_lw_data_provider.save_tokens_usage(tokens_usage_data)
