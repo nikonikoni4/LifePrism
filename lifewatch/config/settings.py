@@ -1,6 +1,5 @@
-
 """
-=========================ActivityWatch配置模块==========================
+一些固定配置
 """
 # ActivityWatch配置
 # 本地时区（自动获取系统时区）
@@ -16,3 +15,8 @@ WINDOW_BUCKET_ID = 'aw-watcher-window_'
 # 本地模型
 OLLAMA_BASE_URL = "http://localhost:11434"
 OLLAMA_MODEL = "qwen3:0.6b"
+# 支持的模型服务商列表
+SUPPORT_PROVIDER = ["阿里云百炼 (Aliyun)", "火山引擎 (VolcEngine)"]
+
+
+

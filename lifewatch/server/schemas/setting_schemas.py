@@ -15,6 +15,7 @@ class SettingItems(BaseModel):
     # API 配置
     api_key: Optional[str] = Field(default=None, description="API Key (显示时脱敏)")
     provider: str = Field(description="LLM Provider")
+    provider_list: List[str] = Field(description="支持的模型服务商列表")
     model: str = Field(description="模型选择")
     input_tokens_cost: float = Field(description="输入token单价 /1k")
     output_tokens_cost: float = Field(description="输出token单价 /1k")

@@ -6,6 +6,7 @@ Settings 服务层 - 配置管理业务逻辑
 from typing import Dict, Any
 
 from lifewatch.config.settings_manager import settings
+from lifewatch.config.settings import SUPPORT_PROVIDER
 from lifewatch.server.schemas.setting_schemas import (
     SettingItems,
     UpdateSettingsRequest,
@@ -26,6 +27,8 @@ class SettingService:
             SettingItems: 完整配置，API Key 已脱敏
         """
         config = settings.get_for_display()
+        # 添加 provider_list (来自常量配置)
+        config['provider_list'] = SUPPORT_PROVIDER
         return SettingItems(**config)
     
     def update_settings(self, request: UpdateSettingsRequest) -> SettingItems:
