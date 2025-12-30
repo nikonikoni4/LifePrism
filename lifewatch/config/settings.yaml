@@ -1,0 +1,38 @@
+# LifeWatch-AI 配置文件
+# 请根据实际情况修改以下配置项
+
+# ===================== 用户配置 =====================
+user_name: "nico"
+
+# ===================== API 配置 =====================
+# 注意: API Key 通过系统密钥管理器安全存储，不在此文件中保存
+# 请通过设置界面或 settings.set('api_key', 'your-key') 设置
+provider: "toongyi"  # 可选: dashscope, openai, ollama 等
+model: "qwen-plus"
+input_tokens_cost: 0.0008  # 输入token单价 (元/1k tokens)
+output_tokens_cost: 0.002  # 输出token单价 (元/1k tokens)
+
+# ===================== 分类配置 =====================
+# 分类模式: classify_graph (LangGraph复杂分类) 或 classify_simple (简单单次LLM分类)
+classification_mode: "classify_graph"
+# 长时长阈值 (秒): 超过此时长的活动将被标记为长时活动
+long_log_threshold: 10*60 # 10min
+
+# ===================== 多用途应用配置 =====================
+# 需要使用title信息来判断用途的应用（浏览器等多用途应用）
+multi_purpose_app_names:
+  - "chrome"
+  - "msedge"
+  - "firefox"
+
+# ===================== 数据库路径配置 =====================
+# Activity Watch 数据库路径 (留空则使用默认路径)
+lw_db_path: "D:/desktop/软件开发/LifeWatch-AI/lifewatch/server/lifewatch_ai.db"
+# LifeWatch 数据库保存路径 (留空则使用默认路径)
+aw_db_path: "C:/Users/15535/AppData/Local/activitywatch/activitywatch/aw-server/peewee-sqlite.v2.db"
+# Chat 对话数据库保存路径 (留空则使用默认路径)
+chat_db_path: "D:/desktop/软件开发/LifeWatch-AI/lifewatch/llm/llm_classify/chat/chat_history.db"
+
+# ===================== 数据清洗配置 =====================
+# 数据清洗时长阈值 (秒): 低于此时长的活动将被过滤
+data_cleaning_threshold: 10

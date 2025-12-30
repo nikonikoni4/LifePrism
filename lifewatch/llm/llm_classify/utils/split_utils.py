@@ -1,10 +1,8 @@
 from lifewatch.llm.llm_classify.schemas import classifyState
 import logging
-
+from lifewatch.config.settings_manager import settings
 logger = logging.getLogger(__name__)
 
-# 时长分割阈值（秒）
-SPLIT_DURATION = 10 * 60  # 10分钟
 
 def split_by_purpose(state: classifyState) -> classifyState:
     """
@@ -57,12 +55,12 @@ def split_by_duration(state: classifyState) -> classifyState:
     long_duration_items = []
     
     for item in multi_purpose_items:
-        if item.duration < SPLIT_DURATION:
+        if item.duration < settings.long_log_threshold:
             short_duration_items.append(item)
         else:
             long_duration_items.append(item)
     
-    logger.info(f"按时长分离完成: 短时长(<{SPLIT_DURATION}s) {len(short_duration_items)} 条, 长时长(>={SPLIT_DURATION}s) {len(long_duration_items)} 条")
+    logger.info(f"按时长分离完成: 短时长(<{settings.long_log_threshold}s) {len(short_duration_items)} 条, 长时长(>={settings.long_log_threshold}s) {len(long_duration_items)} 条")
     
     return {
         "log_items_for_multi_short": short_duration_items,

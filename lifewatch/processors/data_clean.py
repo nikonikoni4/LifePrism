@@ -9,7 +9,8 @@ import pytz
 from lifewatch.storage import LWBaseDataProvider
 from lifewatch.processors import processor_aw_data_provider
 from lifewatch.utils import is_multipurpose_app
-from lifewatch import config
+from lifewatch.config import LOCAL_TIMEZONE
+from lifewatch.config.settings_manager import settings
 from lifewatch.config.database import get_table_columns
 from lifewatch.llm.llm_classify import AppInFo, LogItem, classifyState
 from lifewatch.utils import get_logger,DEBUG
@@ -111,7 +112,7 @@ def clean_activitywatch_data(
     logger.info(f"🧹 开始数据清洗流程...")
     logger.info(f"📥 原始数据: {len(raw_events)} 个事件")
     
-    lower_bound = config.CLEAN_LOWER_BOUND
+    lower_bound = settings.data_cleaning_threshold
     removed_count = 0  # 初始化被过滤事件计数
     filtered_events_list = []  # 过滤后的事件列表
     
@@ -181,7 +182,7 @@ def clean_activitywatch_data(
         duration = int(event.get('duration', 0))
         if duration >= lower_bound:
             # 转换时间戳
-            local_start_time = convert_utc_to_local(event.get('timestamp', ''), config.LOCAL_TIMEZONE)
+            local_start_time = convert_utc_to_local(event.get('timestamp', ''), LOCAL_TIMEZONE)
             # 计算结束时间
             start_dt = datetime.strptime(local_start_time, '%Y-%m-%d %H:%M:%S')
             end_dt = start_dt + timedelta(seconds=duration)

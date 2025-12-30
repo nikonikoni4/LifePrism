@@ -15,8 +15,7 @@ from lifewatch.server.schemas.usage_schemas import (
     UsageStatsResponse
 )
 from lifewatch.server.providers import server_lw_data_provider
-from lifewatch.config.settings import INPUT_TOKEN_PRICE_PER_1K, OUTPUT_TOKEN_PRICE_PER_1K
-
+from lifewatch.config.settings_manager import settings
 # 常量：Data Processing 的 mode
 MODE_CLASSIFICATION = "classification"
 
@@ -90,8 +89,8 @@ def get_usage_stats_7days(date: str) -> UsageStats7Days:
         
         # 计算总价格
         total_cost = (
-            day_data["input_tokens"] * INPUT_TOKEN_PRICE_PER_1K / 1000 +
-            day_data["output_tokens"] * OUTPUT_TOKEN_PRICE_PER_1K / 1000
+            day_data["input_tokens"] * settings.input_tokens_cost / 1000 +
+            day_data["output_tokens"] * settings.output_tokens_cost / 1000
         )
         
         items.append(UsageStats7DaysItem(
@@ -139,21 +138,21 @@ def get_usage_overview(date: str,
     total_tokens = day_data["total_tokens"]
     
     # 计算今日价格
-    input_price = input_tokens * INPUT_TOKEN_PRICE_PER_1K / 1000
-    output_price = output_tokens * OUTPUT_TOKEN_PRICE_PER_1K / 1000
+    input_price = input_tokens * settings.input_tokens_cost / 1000
+    output_price = output_tokens * settings.output_tokens_cost / 1000
     total_price = input_price + output_price
     
     # 计算全部价格
-    all_input_price = all_tokens_data["input_tokens"] * INPUT_TOKEN_PRICE_PER_1K / 1000
-    all_output_price = all_tokens_data["output_tokens"] * OUTPUT_TOKEN_PRICE_PER_1K / 1000
+    all_input_price = all_tokens_data["input_tokens"] * settings.input_tokens_cost / 1000
+    all_output_price = all_tokens_data["output_tokens"] * settings.output_tokens_cost / 1000
     all_total_price = all_input_price + all_output_price
     
     return UsageOverview(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_tokens=total_tokens,
-        input_tokens_price=INPUT_TOKEN_PRICE_PER_1K,
-        output_tokens_price=OUTPUT_TOKEN_PRICE_PER_1K,
+        input_tokens_price=settings.input_tokens_cost,
+        output_tokens_price=settings.output_tokens_cost,
         total_price=round(total_price, 4),
         all_total_tokens=all_tokens_data["total_tokens"],
         all_total_price=round(all_total_price, 4)
@@ -204,16 +203,16 @@ def get_data_processing_usage_stats(date: str,
     avg_processing_tokens = total_tokens / processing_items if processing_items > 0 else 0
     
     # 计算今日总价格
-    input_price = today_data["input_tokens"] * INPUT_TOKEN_PRICE_PER_1K / 1000
-    output_price = today_data["output_tokens"] * OUTPUT_TOKEN_PRICE_PER_1K / 1000
+    input_price = today_data["input_tokens"] * settings.input_tokens_cost / 1000
+    output_price = today_data["output_tokens"] * settings.output_tokens_cost / 1000
     total_cost = input_price + output_price
     
     # 计算今日平均价格
     avg_cost = total_cost / processing_items if processing_items > 0 else 0
     
     # 计算全部价格
-    all_input_price = all_data["input_tokens"] * INPUT_TOKEN_PRICE_PER_1K / 1000
-    all_output_price = all_data["output_tokens"] * OUTPUT_TOKEN_PRICE_PER_1K / 1000
+    all_input_price = all_data["input_tokens"] * settings.input_tokens_cost / 1000
+    all_output_price = all_data["output_tokens"] * settings.output_tokens_cost / 1000
     all_total_cost = all_input_price + all_output_price
     
     return DataProcessingUsageStats(
@@ -260,8 +259,8 @@ def get_other_usage_stats(date: str,
             today_total_tokens += data["total_tokens"]
     
     # 计算今日其他消耗总价格
-    today_input_price = today_input_tokens * INPUT_TOKEN_PRICE_PER_1K / 1000
-    today_output_price = today_output_tokens * OUTPUT_TOKEN_PRICE_PER_1K / 1000
+    today_input_price = today_input_tokens * settings.input_tokens_cost / 1000
+    today_output_price = today_output_tokens * settings.output_tokens_cost / 1000
     today_total_cost = today_input_price + today_output_price
     
     # 计算全部其他消耗（排除 classification）
@@ -276,8 +275,8 @@ def get_other_usage_stats(date: str,
             all_total_tokens += data["total_tokens"]
     
     # 计算全部其他消耗总价格
-    all_input_price = all_input_tokens * INPUT_TOKEN_PRICE_PER_1K / 1000
-    all_output_price = all_output_tokens * OUTPUT_TOKEN_PRICE_PER_1K / 1000
+    all_input_price = all_input_tokens * settings.input_tokens_cost / 1000
+    all_output_price = all_output_tokens * settings.output_tokens_cost / 1000
     all_total_cost = all_input_price + all_output_price
     
     return OtherUsageStats(

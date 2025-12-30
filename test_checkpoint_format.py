@@ -1,11 +1,11 @@
 """测试 checkpointer.aget() 返回的数据格式"""
 import asyncio
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from lifewatch.config.database import CHAT_HISTORY_DB
+from lifewatch.config.settings_manager import settings
 
 
 async def inspect_checkpoint():
-    async with AsyncSqliteSaver.from_conn_string(str(CHAT_HISTORY_DB)) as checkpointer:
+    async with AsyncSqliteSaver.from_conn_string(str(settings.chat_db_path)) as checkpointer:
         config = {"configurable": {"thread_id": "session-7f38c6a5"}}
         
         # 方式1: aget_tuple() - 返回完整的 CheckpointTuple

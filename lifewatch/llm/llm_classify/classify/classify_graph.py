@@ -27,7 +27,6 @@ import time
 import uuid
 MAX_LOG_ITEMS = 15
 MAX_TITLE_ITEMS = 5
-SPLIT_DURATION = 10*60 # 20min
 TEST_FLAG = False
 
 logging.basicConfig(level=logging.INFO)

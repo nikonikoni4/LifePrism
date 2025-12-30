@@ -12,7 +12,6 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Tuple
 import pytz
 
-from lifewatch.config import WINDOW_BUCKET_ID, LOCAL_TIMEZONE
 
 logger = logging.getLogger(__name__)
 from lifewatch.storage import AWBaseDataProvider

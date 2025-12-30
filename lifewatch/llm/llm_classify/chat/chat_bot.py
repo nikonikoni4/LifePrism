@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Optional, Union, AsyncGenerator, Dict, Any
-from lifewatch.config.database import CHAT_HISTORY_DB
+from lifewatch.config.settings_manager import settings
 
 # 暂定
 @dataclass
@@ -78,7 +78,7 @@ class ChatBot:
     @asynccontextmanager
     async def create_with_persistence(
         cls,
-        db_path: Union[str, Path] = CHAT_HISTORY_DB
+        db_path: Union[str, Path] = settings.chat_db_path
     ) -> AsyncGenerator["ChatBot", None]:
         """
         异步上下文管理器工厂方法：创建使用 AsyncSqliteSaver 持久化的 ChatBot 实例。

@@ -11,7 +11,8 @@ from lifewatch.server.providers import server_lw_data_provider, goal_provider
 from lifewatch.processors.data_clean import clean_activitywatch_data
 from lifewatch.llm.llm_classify.classify.main_classify import LLMClassify
 from lifewatch.llm.llm_classify.schemas import classifyState
-from lifewatch import config
+from lifewatch.config import settings,LOCAL_TIMEZONE
+
 import logging
 from lifewatch.utils import get_logger
 # 配置日志
@@ -256,7 +257,7 @@ class DataProcessingService:
             start_time: 开始时间
             end_time: 结束时间
         """
-        local_tz = pytz.timezone(config.LOCAL_TIMEZONE)
+        local_tz = pytz.timezone(LOCAL_TIMEZONE)
         latest_end_time = self.server_lw_data_provider.get_latest_end_time()
         
         if latest_end_time:
@@ -335,7 +336,7 @@ class DataProcessingService:
             return pd.DataFrame()
         
         # 获取分类模式
-        classify_mode = getattr(config, 'CLASSIFY_MODE', 'classify_graph')
+        classify_mode = settings.classification_mode
         logger.info(f"  使用分类模式: {classify_mode}")
         
         # 初始化 LLMClassify 分类器
