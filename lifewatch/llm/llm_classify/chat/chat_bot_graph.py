@@ -497,13 +497,17 @@ class ChatBot:
                 try:
                     # 执行工具（使用 invoke 方法）
                     tool_result = tool_map[tool_name].invoke(tool_args)
-                    result_str = json.dumps(tool_result, ensure_ascii=False, indent=2)
+                    # 根据返回类型处理结果
+                    if isinstance(tool_result, str):
+                        result_str = tool_result
+                    else:
+                        result_str = json.dumps(tool_result, ensure_ascii=False, indent=2)
                 except Exception as e:
                     logger.error(f"工具执行失败: {e}")
-                    result_str = json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+                    result_str = f"工具执行失败: {str(e)}"
             else:
                 logger.error(f"未知工具: {tool_name}")
-                result_str = json.dumps({"success": False, "error": f"未知工具: {tool_name}"}, ensure_ascii=False)
+                result_str = f"未知工具: {tool_name}"
             
             # 创建 ToolMessage
             tool_messages.append(ToolMessage(

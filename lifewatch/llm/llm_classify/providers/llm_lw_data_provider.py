@@ -381,74 +381,83 @@ class LLMLWDataProvider(LWBaseDataProvider):
         self, 
         start_time: str, 
         end_time: str
-    ) -> Dict[str, List[Dict[str, Any]]]:
+    ) -> List[Dict[str, Any]]:
         """
-        获取用户 focus 备注
+        获取用户手动添加的时间块备注
+        
+        从 timeline_custom_block 表查询用户在指定时间范围内
+        手动添加的活动记录，这些记录的 content 字段代表用户的备注。
         
         Args:
             start_time: 开始时间 YYYY-MM-DD HH:MM:SS
             end_time: 结束时间 YYYY-MM-DD HH:MM:SS
         
         Returns:
-            Dict:
-                - daily_focus: 日焦点列表
-                - weekly_focus: 周焦点列表
+            List[Dict]: 用户备注列表，每条包含：
+                - start_time: 开始时间
+                - end_time: 结束时间
+                - duration_minutes: 持续时间（分钟）
+                - content: 备注内容
+                - category_id: 关联的分类ID（可选）
+                - sub_category_id: 关联的子分类ID（可选）
         """
-        # 解析日期范围
-        start_date = start_time.split(" ")[0]  # YYYY-MM-DD
-        end_date = end_time.split(" ")[0]
-        
-        daily_focus = []
-        weekly_focus = []
+        results = []
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             
-            # 查询 daily_focus
+            # 查询 timeline_custom_block
+            # 时间格式为 ISO 格式如 2025-12-27T14:00:00
+            # 需要转换 start_time/end_time 为 ISO 格式进行比较
+            start_iso = start_time.replace(" ", "T")
+            end_iso = end_time.replace(" ", "T")
+            
             cursor.execute("""
-                SELECT date, content 
-                FROM daily_focus 
-                WHERE date >= ? AND date <= ? AND content IS NOT NULL AND content != ''
-                ORDER BY date
-            """, (start_date, end_date))
-            
-            for row in cursor.fetchall():
-                daily_focus.append({
-                    "date": row[0],
-                    "content": row[1]
-                })
-            
-            # 解析年月周范围（用于 weekly_focus）
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-            
-            start_year = start_dt.year
-            end_year = end_dt.year
-            start_month = start_dt.month
-            end_month = end_dt.month
-            
-            # 查询 weekly_focus
-            cursor.execute("""
-                SELECT year, month, week_num, content 
-                FROM weekly_focus 
-                WHERE ((year > ? OR (year = ? AND month >= ?)) 
-                   AND (year < ? OR (year = ? AND month <= ?)))
+                SELECT start_time, end_time, duration, content, category_id, sub_category_id
+                FROM timeline_custom_block 
+                WHERE start_time >= ? AND end_time <= ?
                    AND content IS NOT NULL AND content != ''
-                ORDER BY year, month, week_num
-            """, (start_year, start_year, start_month, end_year, end_year, end_month))
+                ORDER BY start_time
+            """, (start_iso, end_iso))
             
             for row in cursor.fetchall():
-                weekly_focus.append({
-                    "year": row[0],
-                    "month": row[1],
-                    "week_num": row[2],
-                    "content": row[3]
+                results.append({
+                    "start_time": row[0],
+                    "end_time": row[1],
+                    "duration_minutes": row[2],
+                    "content": row[3],
+                    "category_id": row[4] if row[4] else None,
+                    "sub_category_id": row[5] if row[5] else None
                 })
         
-        return {
-            "daily_focus": daily_focus,
-            "weekly_focus": weekly_focus
-        }
+        return results
+
+    def get_daily_focus(self, date: str) -> Optional[str]:
+        """
+        获取指定日期的今日重点内容
+        
+        从 daily_focus 表查询指定日期的重点内容。
+        
+        Args:
+            date: 日期 YYYY-MM-DD
+        
+        Returns:
+            str: 今日重点内容，如果没有则返回 None
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT content FROM daily_focus WHERE date = ?",
+                    (date,)
+                )
+                row = cursor.fetchone()
+                if row and row[0]:
+                    return row[0]
+                return None
+        except Exception as e:
+            logger.error(f"获取今日重点失败: {e}")
+            return None
 
 
 llm_lw_data_provider = LazySingleton(LLMLWDataProvider)
