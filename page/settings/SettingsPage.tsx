@@ -32,6 +32,7 @@ const SettingsPage: React.FC = () => {
 
     // 2. API Settings
     const [provider, setProvider] = useState('');
+    const [providerList, setProviderList] = useState<string[]>([]);
     const [modelName, setModelName] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [showKey, setShowKey] = useState(false);
@@ -65,6 +66,7 @@ const SettingsPage: React.FC = () => {
                 // Populate state from API response
                 setNickname(settings.user_name);
                 setProvider(settings.provider);
+                setProviderList(settings.provider_list);
                 setModelName(settings.model);
                 setApiKey(settings.api_key || '');
                 setCostInput(settings.input_tokens_cost);
@@ -249,13 +251,16 @@ const SettingsPage: React.FC = () => {
                     <div className="space-y-6">
                         <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Provider</label>
-                            <input
-                                type="text"
+                            <select
                                 value={provider}
                                 onChange={(e) => setProvider(e.target.value)}
-                                placeholder="e.g., dashscope, openai, ollama"
-                                className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all"
-                            />
+                                className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all appearance-none cursor-pointer"
+                            >
+                                <option value="">选择服务商...</option>
+                                {providerList.map(p => (
+                                    <option key={p} value={p}>{p}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Model Name</label>

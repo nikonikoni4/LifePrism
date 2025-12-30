@@ -9,6 +9,7 @@ export interface Settings {
     user_name: string;
     api_key: string | null;  // 脱敏显示
     provider: string;
+    provider_list: string[];  // 支持的模型服务商列表
     model: string;
     input_tokens_cost: number;
     output_tokens_cost: number;
