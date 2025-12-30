@@ -1,10 +1,17 @@
 /**
  * Settings Page API
  * 
- * 设置相关接口（占位）
+ * 配置管理接口
  */
 
-import { UserSettings, APIConfig } from './types';
+import {
+    Settings,
+    SettingsResponse,
+    UpdateSettingsRequest,
+    UpdateApiKeyRequest,
+    UpdateApiKeyResponse,
+    ApiKeyStatusResponse
+} from './types';
 
 const API_BASE = 'http://localhost:8000/api/v2';
 
@@ -13,34 +20,56 @@ const API_BASE = 'http://localhost:8000/api/v2';
  */
 export const SettingsAPI = {
     /**
-     * 获取用户设置
+     * 获取配置
      */
-    async getSettings(): Promise<UserSettings> {
-        // TODO: 实现真实 API 调用
-        throw new Error('Not implemented');
+    async getSettings(): Promise<Settings> {
+        const response = await fetch(`${API_BASE}/settings`);
+        if (!response.ok) {
+            throw new Error(`获取配置失败: ${response.statusText}`);
+        }
+        const data: SettingsResponse = await response.json();
+        return data.settings;
     },
 
     /**
-     * 更新用户设置
+     * 更新配置 (部分更新)
      */
-    async updateSettings(settings: Partial<UserSettings>): Promise<UserSettings> {
-        // TODO: 实现真实 API 调用
-        throw new Error('Not implemented');
+    async updateSettings(settings: UpdateSettingsRequest): Promise<Settings> {
+        const response = await fetch(`${API_BASE}/settings`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings),
+        });
+        if (!response.ok) {
+            throw new Error(`更新配置失败: ${response.statusText}`);
+        }
+        const data: SettingsResponse = await response.json();
+        return data.settings;
     },
 
     /**
-     * 获取 API 配置
+     * 更新 API Key (安全存储到 keyring)
      */
-    async getAPIConfig(): Promise<APIConfig> {
-        // TODO: 实现真实 API 调用
-        throw new Error('Not implemented');
+    async updateApiKey(apiKey: string): Promise<UpdateApiKeyResponse> {
+        const response = await fetch(`${API_BASE}/settings/api-key`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: apiKey } as UpdateApiKeyRequest),
+        });
+        if (!response.ok) {
+            throw new Error(`更新 API Key 失败: ${response.statusText}`);
+        }
+        return response.json();
     },
 
     /**
-     * 更新 API 配置
+     * 检查 API Key 配置状态
      */
-    async updateAPIConfig(config: Partial<APIConfig>): Promise<APIConfig> {
-        // TODO: 实现真实 API 调用
-        throw new Error('Not implemented');
+    async checkApiKeyStatus(): Promise<ApiKeyStatusResponse> {
+        const response = await fetch(`${API_BASE}/settings/api-key/status`);
+        if (!response.ok) {
+            throw new Error(`检查 API Key 状态失败: ${response.statusText}`);
+        }
+        return response.json();
     },
 };

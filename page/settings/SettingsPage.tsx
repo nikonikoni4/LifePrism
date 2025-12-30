@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     User,
     Cpu,
@@ -15,36 +15,78 @@ import {
     Filter,
     Plus,
     Minus,
-    X
+    X,
+    Loader2
 } from 'lucide-react';
+import { SettingsAPI } from './api';
 
 const SettingsPage: React.FC = () => {
-    const [isLoading, setIsLoading] = useState(false);
+    // Loading & Error States
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     // 1. User Settings
-    const [nickname, setNickname] = useState('Alex');
+    const [nickname, setNickname] = useState('');
 
     // 2. API Settings
-    const [provider, setProvider] = useState('Google Gemini');
-    const [modelName, setModelName] = useState('gemini-3-flash-preview');
-    const [apiKey, setApiKey] = useState('sk-****************************');
+    const [provider, setProvider] = useState('');
+    const [modelName, setModelName] = useState('');
+    const [apiKey, setApiKey] = useState('');
     const [showKey, setShowKey] = useState(false);
     const [apiStatus, setApiStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-    const [costInput, setCostInput] = useState(0.0001);
-    const [costOutput, setCostOutput] = useState(0.0004);
+    const [costInput, setCostInput] = useState(0);
+    const [costOutput, setCostOutput] = useState(0);
 
     // 3. Classification Settings
     const [classificationMode, setClassificationMode] = useState<'simple' | 'complex'>('simple');
-    const [browserApps, setBrowserApps] = useState<string[]>(['chrome.exe', 'msedge.exe', 'firefox.exe']);
+    const [browserApps, setBrowserApps] = useState<string[]>([]);
     const [newBrowserApp, setNewBrowserApp] = useState('');
+    const [longLogThreshold, setLongLogThreshold] = useState(600);
 
     // 4. Database Settings
-    const [awPath, setAwPath] = useState('C:/Users/Alex/AppData/Local/activitywatch');
-    const [storagePath, setStoragePath] = useState('./data/lifewatch_db');
+    const [awPath, setAwPath] = useState('');
+    const [lwPath, setLwPath] = useState('');
+    const [chatPath, setChatPath] = useState('');
     const [pathStatus, setPathStatus] = useState<'idle' | 'checking' | 'success'>('idle');
 
     // 5. Data Processing
-    const [filterDuration, setFilterDuration] = useState(5);
+    const [filterDuration, setFilterDuration] = useState(10);
+
+    // Load settings on mount
+    useEffect(() => {
+        const loadSettings = async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+                const settings = await SettingsAPI.getSettings();
+
+                // Populate state from API response
+                setNickname(settings.user_name);
+                setProvider(settings.provider);
+                setModelName(settings.model);
+                setApiKey(settings.api_key || '');
+                setCostInput(settings.input_tokens_cost);
+                setCostOutput(settings.output_tokens_cost);
+                setClassificationMode(
+                    settings.classification_mode === 'classify_graph' ? 'complex' : 'simple'
+                );
+                setLongLogThreshold(settings.long_log_threshold);
+                setBrowserApps(settings.multi_purpose_app_names);
+                setAwPath(settings.aw_db_path);
+                setLwPath(settings.lw_db_path);
+                setChatPath(settings.chat_db_path);
+                setFilterDuration(settings.data_cleaning_threshold);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : '加载配置失败');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadSettings();
+    }, []);
 
     // Handlers
     const handleTestConnection = () => {
@@ -74,13 +116,85 @@ const SettingsPage: React.FC = () => {
         setBrowserApps(browserApps.filter(a => a !== app));
     };
 
-    const handleSaveAll = () => {
-        setIsLoading(true);
-        setTimeout(() => setIsLoading(false), 1000);
+    const handleSaveAll = async () => {
+        try {
+            setIsSaving(true);
+            setError(null);
+            setSuccessMessage(null);
+
+            await SettingsAPI.updateSettings({
+                user_name: nickname,
+                provider: provider,
+                model: modelName,
+                input_tokens_cost: costInput,
+                output_tokens_cost: costOutput,
+                classification_mode: classificationMode === 'complex' ? 'classify_graph' : 'classify_simple',
+                long_log_threshold: longLogThreshold,
+                multi_purpose_app_names: browserApps,
+                aw_db_path: awPath,
+                lw_db_path: lwPath,
+                chat_db_path: chatPath,
+                data_cleaning_threshold: filterDuration,
+            });
+
+            setSuccessMessage('配置已保存');
+            setTimeout(() => setSuccessMessage(null), 3000);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '保存失败');
+        } finally {
+            setIsSaving(false);
+        }
     };
+
+    const handleApiKeyBlur = async () => {
+        // Only save if it's a new key (not masked)
+        if (apiKey && !apiKey.includes('*') && apiKey.length > 0) {
+            try {
+                await SettingsAPI.updateApiKey(apiKey);
+                // Reload to get masked version
+                const settings = await SettingsAPI.getSettings();
+                setApiKey(settings.api_key || '');
+                setSuccessMessage('API Key 已安全保存');
+                setTimeout(() => setSuccessMessage(null), 3000);
+            } catch (err) {
+                setError('API Key 保存失败');
+            }
+        }
+    };
+
+    // Loading skeleton
+    if (isLoading) {
+        return (
+            <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-20">
+                <div className="flex items-center justify-center h-64">
+                    <div className="flex flex-col items-center gap-4">
+                        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                        <span className="text-slate-500 font-medium">正在加载配置...</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-20">
+
+            {/* Error/Success Messages */}
+            {error && (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    <span className="text-red-700 text-sm font-medium">{error}</span>
+                    <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
+                        <X size={16} />
+                    </button>
+                </div>
+            )}
+            {successMessage && (
+                <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <span className="text-green-700 text-sm font-medium">{successMessage}</span>
+                </div>
+            )}
 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -90,14 +204,15 @@ const SettingsPage: React.FC = () => {
                 </div>
                 <button
                     onClick={handleSaveAll}
-                    className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg shadow-slate-200 hover:bg-blue-600 hover:shadow-blue-200 transition-all active:scale-95"
+                    disabled={isSaving}
+                    className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg shadow-slate-200 hover:bg-blue-600 hover:shadow-blue-200 transition-all active:scale-95 disabled:opacity-50"
                 >
-                    {isLoading ? (
+                    {isSaving ? (
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
                         <Save size={18} />
                     )}
-                    <span>Save Configuration</span>
+                    <span>{isSaving ? 'Saving...' : 'Save Configuration'}</span>
                 </button>
             </div>
 
@@ -134,16 +249,13 @@ const SettingsPage: React.FC = () => {
                     <div className="space-y-6">
                         <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Provider</label>
-                            <select
+                            <input
+                                type="text"
                                 value={provider}
                                 onChange={(e) => setProvider(e.target.value)}
-                                className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all appearance-none cursor-pointer"
-                            >
-                                <option>Google Gemini</option>
-                                <option>OpenAI</option>
-                                <option>Anthropic Claude</option>
-                                <option>Local (Ollama)</option>
-                            </select>
+                                placeholder="e.g., dashscope, openai, ollama"
+                                className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all"
+                            />
                         </div>
                         <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Model Name</label>
@@ -165,6 +277,8 @@ const SettingsPage: React.FC = () => {
                                     type={showKey ? "text" : "password"}
                                     value={apiKey}
                                     onChange={(e) => setApiKey(e.target.value)}
+                                    onBlur={handleApiKeyBlur}
+                                    placeholder="Enter your API key..."
                                     className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl pl-4 pr-12 py-3 text-slate-800 font-mono text-sm outline-none transition-all"
                                 />
                                 <button
@@ -174,6 +288,7 @@ const SettingsPage: React.FC = () => {
                                     {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                             </div>
+                            <p className="text-xs text-slate-400 mt-2">API Key will be securely saved when you leave this field.</p>
                         </div>
 
                         <div className="flex items-center gap-4">
@@ -181,8 +296,8 @@ const SettingsPage: React.FC = () => {
                                 onClick={handleTestConnection}
                                 disabled={apiStatus === 'testing'}
                                 className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${apiStatus === 'success'
-                                        ? 'bg-green-50 text-green-700 border-green-200'
-                                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                    ? 'bg-green-50 text-green-700 border-green-200'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                                     }`}
                             >
                                 {apiStatus === 'testing' ? (
@@ -206,26 +321,26 @@ const SettingsPage: React.FC = () => {
                 {/* Cost Estimation */}
                 <div className="mt-8 pt-6 border-t border-dashed border-gray-100">
                     <h3 className="text-xs font-bold text-slate-500 mb-4 flex items-center gap-2">
-                        Cost Estimation (Per 1k Tokens)
+                        Cost Estimation (Per 1k Tokens, ¥)
                     </h3>
                     <div className="grid grid-cols-2 gap-4 max-w-lg">
                         <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                            <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Input Cost ($)</label>
+                            <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Input Cost</label>
                             <input
                                 type="number"
                                 step="0.0001"
                                 value={costInput}
-                                onChange={(e) => setCostInput(parseFloat(e.target.value))}
+                                onChange={(e) => setCostInput(parseFloat(e.target.value) || 0)}
                                 className="w-full bg-transparent font-mono font-bold text-slate-700 outline-none"
                             />
                         </div>
                         <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                            <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Output Cost ($)</label>
+                            <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Output Cost</label>
                             <input
                                 type="number"
                                 step="0.0001"
                                 value={costOutput}
-                                onChange={(e) => setCostOutput(parseFloat(e.target.value))}
+                                onChange={(e) => setCostOutput(parseFloat(e.target.value) || 0)}
                                 className="w-full bg-transparent font-mono font-bold text-slate-700 outline-none"
                             />
                         </div>
@@ -250,8 +365,8 @@ const SettingsPage: React.FC = () => {
                             <button
                                 onClick={() => setClassificationMode('simple')}
                                 className={`text-left p-4 rounded-2xl border-2 transition-all ${classificationMode === 'simple'
-                                        ? 'border-blue-500 bg-blue-50/30'
-                                        : 'border-gray-100 hover:border-blue-200 bg-white'
+                                    ? 'border-blue-500 bg-blue-50/30'
+                                    : 'border-gray-100 hover:border-blue-200 bg-white'
                                     }`}
                             >
                                 <div className="flex justify-between items-start mb-1">
@@ -264,8 +379,8 @@ const SettingsPage: React.FC = () => {
                             <button
                                 onClick={() => setClassificationMode('complex')}
                                 className={`text-left p-4 rounded-2xl border-2 transition-all ${classificationMode === 'complex'
-                                        ? 'border-purple-500 bg-purple-50/30'
-                                        : 'border-gray-100 hover:border-purple-200 bg-white'
+                                    ? 'border-purple-500 bg-purple-50/30'
+                                    : 'border-gray-100 hover:border-purple-200 bg-white'
                                     }`}
                             >
                                 <div className="flex justify-between items-start mb-1">
@@ -277,10 +392,22 @@ const SettingsPage: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Long Log Threshold */}
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Long Activity Threshold (seconds)</label>
+                        <input
+                            type="number"
+                            value={longLogThreshold}
+                            onChange={(e) => setLongLogThreshold(parseInt(e.target.value) || 0)}
+                            className="w-32 bg-gray-50 border border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-50/50 rounded-xl px-4 py-3 text-slate-800 font-bold outline-none transition-all"
+                        />
+                        <p className="text-xs text-slate-400 mt-2">Activities longer than this will be marked as long activities.</p>
+                    </div>
+
                     {/* Browser Apps List */}
                     <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Browser Applications</label>
-                        <p className="text-xs text-slate-500 mb-3">Define which applications should be treated as browsers for granular URL/Title tracking.</p>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Multi-Purpose Applications</label>
+                        <p className="text-xs text-slate-500 mb-3">Define which applications should use title info for classification (browsers, etc.).</p>
 
                         <div className="bg-gray-50 border border-gray-200 rounded-xl p-2 flex flex-wrap gap-2 min-h-[50px]">
                             {browserApps.map(app => (
@@ -340,11 +467,21 @@ const SettingsPage: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">LifeWatch Storage Path</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">LifeWatch DB Path</label>
                         <input
                             type="text"
-                            value={storagePath}
-                            onChange={(e) => setStoragePath(e.target.value)}
+                            value={lwPath}
+                            onChange={(e) => setLwPath(e.target.value)}
+                            className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Chat DB Path</label>
+                        <input
+                            type="text"
+                            value={chatPath}
+                            onChange={(e) => setChatPath(e.target.value)}
                             className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
                         />
                     </div>
