@@ -2,7 +2,8 @@ from langchain_community.chat_models import ChatTongyi
 import langchain_community.llms.tongyi as llms_tongyi_module
 import langchain_community.chat_models.tongyi as chat_tongyi_module
 import logging
-
+from lifewatch.config import settings
+api_key = settings.api_key
 logger = logging.getLogger(__name__)
 
 # Monkey patch check_response 来修复 langchain-community 的 bug
@@ -49,14 +50,13 @@ chat_tongyi_module.check_response = _patched_check_response
 
 def create_ChatTongyiModel( model_name="qwen-plus",
                             temperature=0.2,
-                            dashscope_api_key="sk-b6f3052f6c4f46a9a658bfc020d90c3f",
                             enable_search=True,
                             enable_thinking=False,
                             enable_streaming = False):
     return ChatTongyi(
         model=model_name,  # 指定使用 qwen-plus 模型，也可以改为 'qwen-max' 或 'qwen-turbo'
         temperature=temperature,
-        dashscope_api_key=dashscope_api_key,
+        dashscope_api_key=settings.api_key,
         streaming=enable_streaming,
         model_kwargs={
             "enable_search": enable_search,

@@ -14,7 +14,8 @@ from lifewatch.server.api import (
     timeline_v2_router,
     usage_router,
     goal_router,
-    chatbot_router
+    chatbot_router,
+    setting_router,
 )
 from lifewatch.storage.lw_table_manager import init_database
 from lifewatch.server.providers.category_color_provider import initialize_category_colors
@@ -111,6 +112,7 @@ app.include_router(timeline_v2_router, prefix="/api/v2")  # 已包含 /api/v2/ti
 app.include_router(usage_router, prefix="/api/v2")  # Token 使用统计
 app.include_router(goal_router, prefix="/api/v2")  # Goal/TodoList
 app.include_router(chatbot_router, prefix="/api/v2")  # Chatbot
+app.include_router(setting_router, prefix="/api/v2")  # Settings
 
 
 
