@@ -1,4 +1,8 @@
 import logging
+DEBUG = logging.DEBUG
+INFO = logging.INFO
+WARNING = logging.WARNING
+ERROR = logging.ERROR
 # logging全局唯一配置
 logging.basicConfig(
     level = logging.INFO,
