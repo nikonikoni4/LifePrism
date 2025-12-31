@@ -516,9 +516,12 @@ class DataProcessingService:
         
         使用 category_id 和 sub_category_id 进行合并（而非名称）
         
+        注意: filtered_data 和 classified_app_df 中的 app/title 已经在数据清洗阶段
+        （EventTransformer）全部格式化为小写，无需再次转换。
+        
         Args:
-            filtered_data: 过滤后的事件数据
-            classified_app_df: 分类结果数据
+            filtered_data: 过滤后的事件数据（app/title 已小写化）
+            classified_app_df: 分类结果数据（app/title 已小写化）
             
         Returns:
             pd.DataFrame: 合并后的数据
@@ -538,13 +541,10 @@ class DataProcessingService:
         multi_purpose = classified_app_df[classified_app_df['is_multipurpose_app'] == 1].copy()
         
         # 处理单用途应用：只按 app 匹配
+        # 注意: app 已在数据清洗阶段小写化，直接使用原字段匹配
         if not single_purpose.empty:
-            # 转换为小写以匹配
-            single_purpose['app_lower'] = single_purpose['app'].str.lower()
-            filtered_data['app_lower'] = filtered_data['app'].str.lower()
-            
             # 只保留需要的列，避免列名冲突
-            merge_cols = ['app_lower', 'category_id', 'sub_category_id']
+            merge_cols = ['app', 'category_id', 'sub_category_id']
             if 'link_to_goal_id' in single_purpose.columns:
                 merge_cols.append('link_to_goal_id')
             single_merge = single_purpose[merge_cols].rename(
@@ -558,7 +558,7 @@ class DataProcessingService:
             # 合并单用途应用的分类
             filtered_data = filtered_data.merge(
                 single_merge,
-                on='app_lower',
+                on='app',
                 how='left'
             )
             
@@ -578,17 +578,10 @@ class DataProcessingService:
             logger.info(f"    ✓ 合并了 {mask_single.sum()} 个单用途应用的分类")
         
         # 处理多用途应用：按 (app, title) 匹配
+        # 注意: app 和 title 已在数据清洗阶段小写化，直接使用原字段匹配
         if not multi_purpose.empty:
-            # 转换为小写以匹配
-            multi_purpose['app_lower'] = multi_purpose['app'].str.lower()
-            multi_purpose['title_lower'] = multi_purpose['title'].str.lower()
-            
-            if 'app_lower' not in filtered_data.columns:
-                filtered_data['app_lower'] = filtered_data['app'].str.lower()
-            filtered_data['title_lower'] = filtered_data['title'].str.lower()
-            
             # 只保留需要的列
-            merge_cols = ['app_lower', 'title_lower', 'category_id', 'sub_category_id']
+            merge_cols = ['app', 'title', 'category_id', 'sub_category_id']
             if 'link_to_goal_id' in multi_purpose.columns:
                 merge_cols.append('link_to_goal_id')
             multi_merge = multi_purpose[merge_cols].rename(
@@ -602,7 +595,7 @@ class DataProcessingService:
             # 合并多用途应用的分类
             filtered_data = filtered_data.merge(
                 multi_merge,
-                on=['app_lower', 'title_lower'],
+                on=['app', 'title'],
                 how='left'
             )
             
@@ -620,12 +613,6 @@ class DataProcessingService:
             filtered_data = filtered_data.drop(columns=drop_cols)
             
             logger.info(f"    ✓ 合并了 {mask_multi.sum()} 个多用途应用的分类")
-        
-        # 清理临时列
-        if 'app_lower' in filtered_data.columns:
-            filtered_data = filtered_data.drop(columns=['app_lower'])
-        if 'title_lower' in filtered_data.columns:
-            filtered_data = filtered_data.drop(columns=['title_lower'])
         
         # 统计
         total_classified = filtered_data['category_id'].notna().sum()
