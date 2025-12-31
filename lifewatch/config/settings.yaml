@@ -1,9 +1,9 @@
 user_name: test_user
-provider: toongyi
+provider: 阿里云百炼 (Aliyun)
 model: qwen-plus
 input_tokens_cost: 0.0008
 output_tokens_cost: 0.002
-classification_mode: classify_simple
+classification_mode: classify_graph
 long_log_threshold: 600
 multi_purpose_app_names:
 - chrome

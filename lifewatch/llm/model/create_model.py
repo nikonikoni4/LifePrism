@@ -1,0 +1,130 @@
+from langchain_community.chat_models import ChatTongyi
+import langchain_community.llms.tongyi as llms_tongyi_module
+import langchain_community.chat_models.tongyi as chat_tongyi_module
+import logging
+from lifewatch.config import settings
+logger = logging.getLogger(__name__)
+
+
+# =========================================
+# 火山引擎豆包
+# =========================================
+from langchain_community.chat_models import VolcEngineMaasChat
+
+def create_VolcEngineMaasModel(
+    model_name: str = "doubao-1-5-pro-32k-250115",
+    temperature: float = 0.2,
+    enable_streaming: bool = False,
+    volc_engine_maas_ak: str = None,
+    volc_engine_maas_sk: str = None,
+    volc_engine_maas_endpoint: str = None,
+):
+    """
+    创建火山引擎豆包 Chat 模型
+    
+    Args:
+        model_name: 模型名称，可选模型包括:
+            - doubao-1-5-pro-32k-250115 (默认)
+            - doubao-1-5-lite-32k-250115
+            - doubao-pro-256k
+            - 更多模型请参考火山引擎方舟平台
+        temperature: 温度参数，控制生成的随机性 (0.0-1.0)
+        enable_streaming: 是否启用流式输出
+        volc_engine_maas_ak: 火山引擎 Access Key (可选，也可通过环境变量 VOLC_ACCESSKEY 设置)
+        volc_engine_maas_sk: 火山引擎 Secret Key (可选，也可通过环境变量 VOLC_SECRETKEY 设置)
+        volc_engine_maas_endpoint: 火山引擎 endpoint ID (可选，也可通过环境变量 VOLC_ENDPOINT 设置)
+    
+    Returns:
+        VolcEngineMaasChat: 火山引擎 Chat 模型实例
+    """
+    # 构建参数字典
+    kwargs = {
+        "model": model_name,
+        "temperature": temperature,
+        "streaming": enable_streaming,
+    }
+    
+    # 可选参数：如果提供了 AK/SK，则使用；否则依赖环境变量
+    if volc_engine_maas_ak:
+        kwargs["volc_engine_maas_ak"] = volc_engine_maas_ak
+    if volc_engine_maas_sk:
+        kwargs["volc_engine_maas_sk"] = volc_engine_maas_sk
+    if volc_engine_maas_endpoint:
+        kwargs["volc_engine_maas_endpoint"] = volc_engine_maas_endpoint
+    
+    return VolcEngineMaasChat(**kwargs)
+
+
+
+
+
+
+# =========================================
+# 阿里云百炼
+# =========================================
+# Monkey patch check_response 来修复 langchain-community 的 bug
+# 原始函数在抛出 HTTPError 时传入了 DashScope Response 对象,导致 KeyError: 'request'
+
+def _patched_check_response(resp):
+    """修复后的 check_response,在抛出异常前打印真实错误信息
+    
+    注意: resp 可能是两种类型:
+    - 对象类型 (有 status_code 属性): 成功的响应或某些错误响应
+    - dict 类型: 流式响应的 chunk 或某些 API 返回格式
+    """
+    # 根据 resp 类型获取 status_code
+    if isinstance(resp, dict):
+        status_code = resp.get('status_code', 200)  # dict 没有 status_code 时默认为成功
+        get_value = lambda key, default='unknown': resp.get(key, default)
+    else:
+        status_code = getattr(resp, 'status_code', 200)
+        get_value = lambda key, default='unknown': getattr(resp, key, resp.get(key, default) if hasattr(resp, 'get') else default)
+    
+    if status_code != 200:
+        # 打印真实的 API 错误信息
+        error_info = (
+            f"\n{'='*60}\n"
+            f"通义千问 API 调用失败!\n"
+            f"  status_code: {get_value('status_code')}\n"
+            f"  code: {get_value('code')}\n"
+            f"  message: {get_value('message')}\n"
+            f"{'='*60}\n"
+        )
+        logger.error(error_info)
+        print(error_info)  # 确保在终端显示
+        
+        # 抛出一个自定义异常,避免 HTTPError 的 bug
+        raise RuntimeError(
+            f"通义千问 API 错误: status_code={get_value('status_code')}, "
+            f"code={get_value('code')}, message={get_value('message')}"
+        )
+    return resp
+
+# 应用 monkey patch 到两个模块
+llms_tongyi_module.check_response = _patched_check_response
+chat_tongyi_module.check_response = _patched_check_response
+
+def create_ChatTongyiModel( model_name="qwen-plus",
+                            temperature=0.2,
+                            enable_search=True,
+                            enable_thinking=False,
+                            enable_streaming = False):
+    return ChatTongyi(
+        model=model_name,  # 指定使用 qwen-plus 模型，也可以改为 'qwen-max' 或 'qwen-turbo'
+        temperature=temperature,
+        dashscope_api_key=settings.api_key,
+        streaming=enable_streaming,
+        model_kwargs={
+            "enable_search": enable_search,
+            "enable_thinking": enable_thinking
+        }
+        # streaming=True # 如果需要流式输出，可以开启此选项
+    )
+if __name__ == "__main__":
+    model = create_ChatTongyiModel()
+    message = [
+        {"role": "system", "content": "你是一个翻译专家"},
+        {"role": "user", "content": "today is a good day"}
+    ]
+    result = model.invoke(message)
+    print(result)

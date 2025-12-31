@@ -172,8 +172,7 @@ class DataProcessingService:
             filtered_data, classify_state = clean_activitywatch_data(
                 start_time=start_time,
                 end_time=end_time,
-                # category_map_cache_df=category_map_cache_df
-                category_map_cache_df=None
+                category_map_cache_df=category_map_cache_df
             )
             total_events = len(filtered_data) + (len(classify_state.log_items) if classify_state.log_items else 0)
             filtered_events = len(filtered_data)

@@ -1,6 +1,9 @@
 """
 功能介绍: 接受aw的数据,依据单和多用途提取需要识别的item(重复内容跳过)
-TODO: 合并成一个单独的类
+
+包含两个版本:
+- clean_activitywatch_data: 原始版本（保留兼容）
+- clean_activitywatch_data_v2: 重构版本（组件化架构）
 """
 import pandas as pd
 from datetime import datetime, timedelta
@@ -13,8 +16,18 @@ from lifewatch.config import LOCAL_TIMEZONE
 from lifewatch.config.settings_manager import settings
 from lifewatch.config.database import get_table_columns
 from lifewatch.llm.llm_classify import AppInFo, LogItem, classifyState
-from lifewatch.utils import get_logger,DEBUG
-logger = get_logger(__name__,DEBUG)
+from lifewatch.utils import get_logger, DEBUG
+
+# 导入重构组件
+from lifewatch.processors.components import (
+    CategoryCache,
+    EventTransformer,
+    CacheMatcher,
+    ClassifyCollector,
+)
+from lifewatch.processors.models import ProcessedEvent
+
+logger = get_logger(__name__, DEBUG)
 
 
 def create_dict_from_table_columns(table_name: str, values: dict = None) -> dict:
@@ -75,7 +88,7 @@ def convert_utc_to_local(utc_timestamp_str: str, target_tz: str ) -> str:
 
 
 
-def clean_activitywatch_data(
+def clean_activitywatch_data_old(
     start_time: datetime, 
     end_time: datetime, 
     category_map_cache_df: pd.DataFrame
@@ -134,10 +147,14 @@ def clean_activitywatch_data(
             category_map_cache_df.get('state', 1) == 1
         ].copy() if 'state' in category_map_cache_df.columns else category_map_cache_df.copy()
         logger.debug(f"过滤后的 valid_df 长度: {len(valid_df)}")
-        # 获取已存在的单一用途的应用集合
-        categorized_single_purpose_apps = set(valid_df['app'].unique())
+        # 获取已存在的单一用途的应用集合（只包含 is_multipurpose_app == 0 的）
+        single_purpose_df = valid_df[valid_df['is_multipurpose_app'] == 0]
+        categorized_single_purpose_apps = set(single_purpose_df['app'].unique())
+        # 获取已存在的多用途应用集合（只包含 is_multipurpose_app == 1 的）
+        multi_purpose_df = valid_df[valid_df['is_multipurpose_app'] == 1]
+        categorized_multipurpose_apps = set(multi_purpose_df['app'].unique())
         # 获取非单一用途的title集合
-        categorized_mutilpurpose_titles = set(valid_df[valid_df['is_multipurpose_app'] == 1]['title'].unique())
+        categorized_mutilpurpose_titles = set(multi_purpose_df['title'].unique())
         
         # 创建 app -> (category_id, sub_category_id, link_to_goal_id) 映射
         app_category_map: Dict[str, tuple] = {}
@@ -162,14 +179,16 @@ def clean_activitywatch_data(
                     title_category_map[title_val] = (cat_id, sub_cat_id, goal_id)
         
         # 创建 app -> app_description 映射，用于复用已有的应用描述
+        # 注意：统一转为小写，以匹配后续事件处理中的 app_name.lower()
         app_description_map: Dict[str, str] = {}
         for _, row in category_map_cache_df.iterrows():
-            app = row.get('app', '')
+            app = row.get('app', '').lower()  # 统一转为小写
             desc = row.get('app_description', '')
             if app and desc and app not in app_description_map:
                 app_description_map[app] = desc
     else:
         categorized_single_purpose_apps = set()
+        categorized_multipurpose_apps = set()  # 新增
         categorized_mutilpurpose_titles = set()
         app_category_map = {}
         title_category_map = {}
@@ -220,8 +239,8 @@ def clean_activitywatch_data(
                         filtered_event['link_to_goal_id'] = cat_ids[2] if len(cat_ids) > 2 else None
                         logger.debug(f"✅ 成功获取分类数据: category_id={cat_ids[0]}, sub_category_id={cat_ids[1]}, link_to_goal_id={cat_ids[2] if len(cat_ids) > 2 else None}")
                 
-                # 2.app已经被分类 但 app是多用途的 ： 根据title进行分类
-                elif app_name in categorized_single_purpose_apps and title and title in categorized_mutilpurpose_titles:
+                # 2.多用途app已经被分类 且 对应的title也有分类记录 ： 根据title获取分类
+                elif app_name in categorized_multipurpose_apps and title and title in categorized_mutilpurpose_titles:
                     # 对于多应用场景，根据title匹配分类数据
                     cat_ids = title_category_map.get(title)
                     if cat_ids:
@@ -310,17 +329,331 @@ def clean_activitywatch_data(
     return filtered_events_df, classify_state
 
 
-if __name__ == "__main__":
-    from datetime import timedelta
-    # 测试时间范围
-    end_time = datetime.now()
-    start_time = end_time - timedelta(minutes=1)
+# ============================================================================
+# 重构版本 - 组件化架构
+# ============================================================================
+
+def _events_to_dataframe(events: List[ProcessedEvent]) -> pd.DataFrame:
+    """
+    将 ProcessedEvent 列表转换为 DataFrame
     
-    # 测试数据库功能
-    category_map_cache_df = LWBaseDataProvider().load_category_map_cache()
-    print(category_map_cache_df)
-    # 测试数据清洗功能
-    filtered_events_df, classify_state = clean_activitywatch_data(start_time, end_time, category_map_cache_df)
-    print(f"过滤后事件数: {len(filtered_events_df)}")
-    print(f"待分类应用: {list(classify_state.app_registry.keys())}")
-    print(f"待分类日志项数: {len(classify_state.log_items)}")
+    Args:
+        events: ProcessedEvent 列表
+        
+    Returns:
+        包含事件数据的 DataFrame
+    """
+    if not events: 
+        return pd.DataFrame(columns=get_table_columns('user_app_behavior_log'))
+    print(events[0].to_dict().keys())
+    return pd.DataFrame([event.to_dict() for event in events])
+
+
+
+def clean_activitywatch_data(
+    start_time: datetime, 
+    end_time: datetime, 
+    category_map_cache_df: pd.DataFrame
+) -> Tuple[pd.DataFrame, classifyState]:
+    """
+    完整的数据清洗流程（重构版本 - 组件化架构）
+    
+    与原版本 clean_activitywatch_data 功能相同，但使用组件化设计：
+    - CategoryCache: 缓存索引管理
+    - EventTransformer: 事件转换与标准化
+    - CacheMatcher: 缓存匹配策略
+    - ClassifyCollector: 待分类项收集
+    
+    Args:
+        start_time: 开始时间 (datetime 对象)
+        end_time: 结束时间 (datetime 对象)
+        category_map_cache_df: 分类缓存 DataFrame
+    
+    Returns:
+        Tuple[pd.DataFrame, classifyState]:
+            - filtered_events_df: 清洗后的事件数据 DataFrame
+            - classify_state: 包含待分类应用信息的 classifyState 对象
+    """
+    # 1. 获取原始数据
+    raw_events = processor_aw_data_provider.get_window_events(
+        start_time=start_time,
+        end_time=end_time
+    )
+    logger.info(f"🧹 开始数据清洗流程 (v2)...")
+    logger.info(f"📥 原始数据: {len(raw_events)} 个事件")
+    
+    # 2. 初始化组件
+    cache = CategoryCache(category_map_cache_df)
+    transformer = EventTransformer()
+    matcher = CacheMatcher(cache)
+    collector = ClassifyCollector(cache)
+    
+    logger.debug(f"📦 缓存统计: {cache.get_stats()}")
+    
+    # 3. 转换事件
+    events, removed_count = transformer.transform_batch(raw_events)
+    logger.debug(f"🔄 事件转换完成: 有效 {len(events)}, 过滤 {removed_count}")
+    
+    # 4. 匹配缓存 & 收集待分类项
+    for event in events:
+        matcher.match(event) # 匹配后的数据标记 cache_matched = True
+        collector.collect(event)
+    
+    # 5. 构建输出
+    filtered_events_df = _events_to_dataframe(events)
+    classify_state = collector.build_state()
+    
+    # 6. 日志统计
+    match_stats = matcher.get_stats()
+    collect_stats = collector.get_stats()
+    
+    logger.info(f"📊 过滤统计: 总事件 {len(raw_events)} -> 保留 {len(events)} -> 删除 {removed_count}")
+    logger.info(f"📊 缓存匹配: 命中 {match_stats['matched']}, 未命中 {match_stats['missed']}")
+    logger.info(f"📊 待分类统计: 总项目 {collect_stats['total']} -> 单用途 {collect_stats['single']} -> 多用途 {collect_stats['multi']}")
+    logger.info(f"📊 应用注册表: {collect_stats['apps']} 个应用")
+    
+    return filtered_events_df, classify_state
+
+
+
+
+if __name__ == "__main__":
+    def test_v1_and_v2():
+        from datetime import timedelta
+    
+        # 测试时间范围
+        end_time = datetime.now()
+        start_time = end_time - timedelta(hours=24)  # 测试24小时数据
+        
+        # 加载缓存数据
+        category_map_cache_df = LWBaseDataProvider().load_category_map_cache()
+        print(f"缓存数据: {len(category_map_cache_df)} 行")
+        
+        print("\n" + "="*60)
+        print("测试原版本 (v1)")
+        print("="*60)
+        filtered_events_df_v1, classify_state_v1 = clean_activitywatch_data_old(
+            start_time, end_time, category_map_cache_df
+        )
+        print(f"过滤后事件数: {len(filtered_events_df_v1)}")
+        print(f"待分类应用: {list(classify_state_v1.app_registry.keys())}")
+        print(f"待分类日志项数: {len(classify_state_v1.log_items)}")
+        
+        print("\n" + "="*60)
+        print("测试重构版本 (v2)")
+        print("="*60)
+        filtered_events_df_v2, classify_state_v2 = clean_activitywatch_data(
+            start_time, end_time, category_map_cache_df
+        )
+        print(f"过滤后事件数: {len(filtered_events_df_v2)}")
+        print(f"待分类应用: {list(classify_state_v2.app_registry.keys())}")
+        print(f"待分类日志项数: {len(classify_state_v2.log_items)}")
+        
+        # 对比结果
+        print("\n" + "="*60)
+        print("结果对比")
+        print("="*60)
+        print(f"事件数一致: {len(filtered_events_df_v1) == len(filtered_events_df_v2)}")
+        print(f"待分类数一致: {len(classify_state_v1.log_items) == len(classify_state_v2.log_items)}")
+        print(f"应用数一致: {len(classify_state_v1.app_registry) == len(classify_state_v2.app_registry)}")
+        
+        # 详细对比应用
+        v1_apps = set(classify_state_v1.app_registry.keys())
+        v2_apps = set(classify_state_v2.app_registry.keys())
+        if v1_apps != v2_apps:
+            print(f"v1 独有: {v1_apps - v2_apps}")
+            print(f"v2 独有: {v2_apps - v1_apps}")
+        else:
+            print("应用集合完全一致 [OK]")
+
+    def special_test():
+        """
+        特殊测试：使用模拟数据测试数据清洗组件
+        
+        测试 category_map_cache_df 数据：
+        | id | app | title | description | 分类 | 单/多用途 |
+        | :--- | :--- | :--- | :--- | :--- | :--- |
+        | 1 | single_app0 | None | None | None | 单用途 | (非法数据: 无title)
+        | 2 | single_app1 | None | single_app1_des | None | 单用途 |
+        | 3 | single_app2 | single_app2_title | None | None | 单用途 |
+        | 4 | single_app3 | single_app3_title | single_app3_des | None | 单用途 |
+        | 5 | single_app4 | single_app4_title | single_app4_des | (cat-work, sub-coding, goal-project) | 单用途 |
+        | 6 | multi_app0 | None | None | None | 多用途 | (非法数据: 无title)
+        | 7 | multi_app1 | None | multi_app1_des | None | 多用途 | (非法数据: 无title)
+        | 8 | multi_app2 | multi_app2_title | None | None | 多用途 |
+        | 9 | multi_app3 | multi_app3_title | multi_app3_des | None | 多用途 |
+        | 10 | multi_app4 | multi_app4_title | multi_app4_des | (cat-entertainment, sub-tv, None) | 多用途 |
+        """
+        import pandas as pd
+        from lifewatch.processors.components import (
+            CategoryCache, EventTransformer, CacheMatcher, ClassifyCollector
+        )
+        from lifewatch.processors.models import ProcessedEvent
+        
+        print("\n" + "="*70)
+        print("特殊测试: 模拟数据测试")
+        print("="*70)
+        
+        # ========================================
+        # 1. 构建模拟的 category_map_cache_df
+        # ========================================
+        cache_data = [
+            # id=1: 单用途，无title无description无分类 (边界)
+            {
+                'id': 1, 'app': 'single_app0', 'title': None, 
+                'is_multipurpose_app': 0, 'app_description': None,
+                'category_id': None, 'sub_category_id': None, 'link_to_goal_id': None,
+                'state': 1
+            },
+            # id=2: 单用途，无title有description无分类
+            {
+                'id': 2, 'app': 'single_app1', 'title': None,
+                'is_multipurpose_app': 0, 'app_description': 'single_app1_des',
+                'category_id': None, 'sub_category_id': None, 'link_to_goal_id': None,
+                'state': 1
+            },
+            # id=3: 单用途，有title无description无分类
+            {
+                'id': 3, 'app': 'single_app2', 'title': 'single_app2_title',
+                'is_multipurpose_app': 0, 'app_description': None,
+                'category_id': None, 'sub_category_id': None, 'link_to_goal_id': None,
+                'state': 1
+            },
+            # id=4: 单用途，有title有description无分类
+            {
+                'id': 4, 'app': 'single_app3', 'title': 'single_app3_title',
+                'is_multipurpose_app': 0, 'app_description': 'single_app3_des',
+                'category_id': None, 'sub_category_id': None, 'link_to_goal_id': None,
+                'state': 1
+            },
+            # id=5: 单用途，完整数据，有分类
+            {
+                'id': 5, 'app': 'single_app4', 'title': 'single_app4_title',
+                'is_multipurpose_app': 0, 'app_description': 'single_app4_des',
+                'category_id': 'cat-work', 'sub_category_id': 'sub-coding', 'link_to_goal_id': 'goal-project',
+                'state': 1
+            },
+            # id=6: 多用途，无title无description无分类 (边界)
+            {
+                'id': 6, 'app': 'multi_app0', 'title': None,
+                'is_multipurpose_app': 1, 'app_description': None,
+                'category_id': None, 'sub_category_id': None, 'link_to_goal_id': None,
+                'state': 1
+            },
+            # id=7: 多用途，无title有description无分类
+            {
+                'id': 7, 'app': 'multi_app1', 'title': None,
+                'is_multipurpose_app': 1, 'app_description': 'multi_app1_des',
+                'category_id': None, 'sub_category_id': None, 'link_to_goal_id': None,
+                'state': 1
+            },
+            # id=8: 多用途，有title无description无分类
+            {
+                'id': 8, 'app': 'multi_app2', 'title': 'multi_app2_title',
+                'is_multipurpose_app': 1, 'app_description': None,
+                'category_id': None, 'sub_category_id': None, 'link_to_goal_id': None,
+                'state': 1
+            },
+            # id=9: 多用途，有title有description无分类
+            {
+                'id': 9, 'app': 'multi_app3', 'title': 'multi_app3_title',
+                'is_multipurpose_app': 1, 'app_description': 'multi_app3_des',
+                'category_id': None, 'sub_category_id': None, 'link_to_goal_id': None,
+                'state': 1
+            },
+            # id=10: 多用途，完整数据，有分类
+            {
+                'id': 10, 'app': 'multi_app4', 'title': 'multi_app4_title',
+                'is_multipurpose_app': 1, 'app_description': 'multi_app4_des',
+                'category_id': 'cat-entertainment', 'sub_category_id': 'sub-tv', 'link_to_goal_id': None,
+                'state': 1
+            },
+        ]
+        category_map_cache_df = pd.DataFrame(cache_data)
+        
+        print("\n[1] 构建的 category_map_cache_df:")
+        print(category_map_cache_df[['id', 'app', 'title', 'is_multipurpose_app', 'category_id']].to_string())
+        
+        # ========================================
+        # 2. 测试 CategoryCache 构建
+        # ========================================
+        print("\n[2] 测试 CategoryCache 构建:")
+        cache = CategoryCache(category_map_cache_df)
+        stats = cache.get_stats()
+        print(f"  缓存统计: {stats}")
+        
+        # 验证单用途缓存 (只有 id=5 有有效分类)
+        print(f"\n  单用途 single_app4 缓存命中: {cache.is_single_purpose_cached('single_app4')}")
+        print(f"  单用途 single_app4 分类: {cache.get_single_purpose_category('single_app4')}")
+        print(f"  单用途 single_app0 缓存命中: {cache.is_single_purpose_cached('single_app0')}")  # 无分类
+        print(f"  单用途 single_app1 描述复用: '{cache.get_app_description('single_app1')}'")
+        
+        # 验证多用途缓存 (只有 id=10 有有效分类)
+        print(f"\n  多用途 multi_app4 + title 缓存命中: {cache.is_multipurpose_title_cached('multi_app4', 'multi_app4_title')}")
+        print(f"  多用途 multi_app4 + title 分类: {cache.get_multipurpose_category('multi_app4', 'multi_app4_title')}")
+        print(f"  多用途 multi_app0 缓存命中: {cache.is_multipurpose_app_cached('multi_app0')}")  # 无title
+        print(f"  多用途 multi_app1 描述复用: '{cache.get_app_description('multi_app1')}'")
+        
+        # ========================================
+        # 3. 测试 CacheMatcher
+        # ========================================
+        print("\n[3] 测试 CacheMatcher:")
+        matcher = CacheMatcher(cache)
+        
+        # 测试事件列表
+        test_events = [
+            # 单用途，有缓存分类
+            ProcessedEvent(id='e1', app='single_app4', title='any_title', is_multipurpose=False,
+                          start_time='2025-12-31 09:00:00', end_time='2025-12-31 09:05:00', duration=300),
+            # 单用途，无缓存分类
+            ProcessedEvent(id='e2', app='single_app1', title='any_title', is_multipurpose=False,
+                          start_time='2025-12-31 09:05:00', end_time='2025-12-31 09:10:00', duration=300),
+            # 单用途，完全新应用
+            ProcessedEvent(id='e3', app='new_single_app', title='new_title', is_multipurpose=False,
+                          start_time='2025-12-31 09:10:00', end_time='2025-12-31 09:15:00', duration=300),
+            # 多用途，有缓存分类
+            ProcessedEvent(id='e4', app='multi_app4', title='multi_app4_title', is_multipurpose=True,
+                          start_time='2025-12-31 09:15:00', end_time='2025-12-31 09:20:00', duration=300),
+            # 多用途，app在缓存但title不在
+            ProcessedEvent(id='e5', app='multi_app4', title='new_title_for_multi_app4', is_multipurpose=True,
+                          start_time='2025-12-31 09:20:00', end_time='2025-12-31 09:25:00', duration=300),
+            # 多用途，完全新应用
+            ProcessedEvent(id='e6', app='new_multi_app', title='new_multi_title', is_multipurpose=True,
+                          start_time='2025-12-31 09:25:00', end_time='2025-12-31 09:30:00', duration=300),
+        ]
+        
+        for event in test_events:
+            matcher.match(event)
+            status = "HIT" if event.cache_matched else "MISS"
+            print(f"  [{status}] {event.app} | title={event.title[:25]}... | cat={event.category_id}")
+        
+        print(f"\n  匹配统计: {matcher.get_stats()}")
+        
+        # ========================================
+        # 4. 测试 ClassifyCollector
+        # ========================================
+        print("\n[4] 测试 ClassifyCollector:")
+        collector = ClassifyCollector(cache)
+        
+        for event in test_events:
+            collector.collect(event)
+        
+        state = collector.build_state()
+        print(f"  收集统计: {collector.get_stats()}")
+        print(f"  待分类应用: {list(state.app_registry.keys())}")
+        print(f"  待分类日志项数: {len(state.log_items)}")
+        
+        print("\n  待分类日志项详情:")
+        for item in state.log_items:
+            app_info = state.app_registry.get(item.app)
+            multi_str = "多用途" if app_info and app_info.is_multipurpose else "单用途"
+            desc = app_info.description if app_info else ""
+            print(f"    id={item.id} | {multi_str} | app={item.app} | title={item.title} | desc='{desc}'")
+        
+        print("\n" + "="*70)
+        print("测试完成!")
+        print("="*70)
+    
+    # 运行测试
+    test_v1_and_v2()
+    # special_test()
