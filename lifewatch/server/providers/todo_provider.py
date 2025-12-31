@@ -47,7 +47,7 @@ class TodoProvider(LWBaseDataProvider):
                     sql = """
                     SELECT * FROM todo_list 
                     WHERE date = ? 
-                       OR (cross_day = 1 AND completed = 0 AND date < ?)
+                       OR (cross_day = 1 AND state = 'active' AND date < ?)
                     ORDER BY order_index ASC
                     """
                     cursor.execute(sql, (date, date))
@@ -116,14 +116,15 @@ class TodoProvider(LWBaseDataProvider):
                 next_order = cursor.fetchone()[0]
                 
                 # 插入数据
-                columns = ['order_index', 'content', 'color', 'completed', 
+                columns = ['order_index', 'pool_order_index', 'content', 'color', 'state', 
                           'link_to_goal_id', 'date', 'expected_finished_at', 
                           'actual_finished_at', 'cross_day']
                 values = [
                     next_order,
+                    data.get('pool_order_index'),
                     data.get('content'),
                     data.get('color', '#FFFFFF'),
-                    0,  # completed
+                    data.get('state', 'active'),
                     data.get('link_to_goal_id'),
                     data.get('date'),
                     data.get('expected_finished_at'),
@@ -169,11 +170,12 @@ class TodoProvider(LWBaseDataProvider):
                 set_clauses = []
                 values = []
                 for key, value in data.items():
-                    if key in ['content', 'color', 'completed', 'link_to_goal_id',
-                              'expected_finished_at', 'actual_finished_at', 'cross_day']:
+                    if key in ['content', 'color', 'state', 'link_to_goal_id',
+                              'date', 'expected_finished_at', 'actual_finished_at', 
+                              'cross_day', 'pool_order_index']:
                         set_clauses.append(f"{key} = ?")
                         # 处理布尔值
-                        if key in ['completed', 'cross_day']:
+                        if key == 'cross_day':
                             values.append(1 if value else 0)
                         else:
                             values.append(value)
@@ -249,6 +251,74 @@ class TodoProvider(LWBaseDataProvider):
                 
         except Exception as e:
             logger.error(f"重排序任务失败: {e}")
+            return False
+    
+    # ==================== Task Pool 操作 ====================
+    
+    def get_todos_by_state(self, state: str) -> List[Dict[str, Any]]:
+        """
+        根据状态获取任务列表
+        
+        Args:
+            state: 任务状态 ('active', 'completed', 'inactive')
+        
+        Returns:
+            List[Dict]: 任务列表
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # 对于 inactive 状态（任务池），按 pool_order_index 排序
+                if state == 'inactive':
+                    sql = """
+                    SELECT * FROM todo_list 
+                    WHERE state = ?
+                    ORDER BY pool_order_index ASC, id ASC
+                    """
+                else:
+                    sql = """
+                    SELECT * FROM todo_list 
+                    WHERE state = ?
+                    ORDER BY order_index ASC
+                    """
+                
+                cursor.execute(sql, (state,))
+                
+                columns = [description[0] for description in cursor.description]
+                rows = cursor.fetchall()
+                
+                return [dict(zip(columns, row)) for row in rows]
+                
+        except Exception as e:
+            logger.error(f"获取任务列表失败 (state={state}): {e}")
+            return []
+    
+    def reorder_pool_todos(self, todo_ids: List[int]) -> bool:
+        """
+        批量更新任务池排序 (pool_order_index)
+        
+        Args:
+            todo_ids: 任务 ID 列表（按新顺序排列）
+        
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                for index, todo_id in enumerate(todo_ids):
+                    cursor.execute(
+                        "UPDATE todo_list SET pool_order_index = ? WHERE id = ?",
+                        (index, todo_id)
+                    )
+                
+                logger.info(f"重排序任务池 {len(todo_ids)} 个任务成功")
+                return True
+                
+        except Exception as e:
+            logger.error(f"重排序任务池失败: {e}")
             return False
     
     # ==================== SubTodoList 操作 ====================

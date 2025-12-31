@@ -17,6 +17,7 @@ from lifewatch.server.schemas.goal_schemas import (
     CreateSubTodoRequest,
     UpdateSubTodoRequest,
     ReorderSubTodoRequest,
+    ReorderPoolTodoRequest,
     # Plan Schemas
     WeeklyPlanResponse,
     MonthlyPlanItem,
@@ -85,6 +86,34 @@ async def reorder_todos(request: ReorderTodoRequest):
     success = todo_service.reorder_todos(request)
     if not success:
         raise HTTPException(status_code=500, detail="重排序任务失败")
+    return {"success": True}
+
+
+# ============================================================================
+# Task Pool 接口
+# ============================================================================
+
+@router.get("/todos/pool", response_model=TodoListResponse)
+async def get_pool_todos():
+    """
+    获取任务池任务列表
+    
+    返回所有状态为 inactive 的任务，按 pool_order_index 排序
+    """
+    return todo_service.get_pool_todos()
+
+
+@router.post("/todos/pool/reorder")
+async def reorder_pool_todos(request: ReorderPoolTodoRequest):
+    """
+    重排序任务池任务
+    
+    请求体:
+    - **todo_ids**: 任务 ID 列表（按新顺序排列）
+    """
+    success = todo_service.reorder_pool_todos(request.todo_ids)
+    if not success:
+        raise HTTPException(status_code=500, detail="重排序任务池失败")
     return {"success": True}
 
 

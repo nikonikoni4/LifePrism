@@ -67,11 +67,12 @@ def get_todos(date: str, include_cross_day: bool = True) -> TodoListResponse:
         items.append(TodoListItem(
             id=todo['id'],
             order_index=todo['order_index'],
+            pool_order_index=todo.get('pool_order_index'),
             content=todo['content'],
             color=todo['color'] or '#FFFFFF',
-            completed=bool(todo['completed']),
+            state=todo.get('state', 'active'),
             link_to_goal_id=todo['link_to_goal_id'],
-            date=todo['date'],
+            date=todo.get('date'),
             expected_finished_at=todo['expected_finished_at'],
             actual_finished_at=todo['actual_finished_at'],
             cross_day=bool(todo['cross_day']),
@@ -111,11 +112,12 @@ def get_todo_detail(todo_id: int) -> Optional[TodoListItem]:
     return TodoListItem(
         id=todo['id'],
         order_index=todo['order_index'],
+        pool_order_index=todo.get('pool_order_index'),
         content=todo['content'],
         color=todo['color'] or '#FFFFFF',
-        completed=bool(todo['completed']),
+        state=todo.get('state', 'active'),
         link_to_goal_id=todo['link_to_goal_id'],
-        date=todo['date'],
+        date=todo.get('date'),
         expected_finished_at=todo['expected_finished_at'],
         actual_finished_at=todo['actual_finished_at'],
         cross_day=bool(todo['cross_day']),
@@ -137,6 +139,7 @@ def create_todo(request: CreateTodoRequest) -> Optional[TodoListItem]:
         'content': request.content,
         'date': request.date,
         'color': request.color,
+        'state': request.state,
         'link_to_goal_id': request.link_to_goal_id,
         'expected_finished_at': request.expected_finished_at,
         'cross_day': request.cross_day
@@ -160,24 +163,29 @@ def update_todo(todo_id: int, request: UpdateTodoRequest) -> Optional[TodoListIt
         Optional[TodoListItem]: 更新后的任务，失败返回 None
     """
     # 构建更新数据（只包含非 None 字段）
-    data = {}
-    if request.content is not None:
-        data['content'] = request.content
-    if request.color is not None:
-        data['color'] = request.color
-    if request.completed is not None:
-        data['completed'] = request.completed
-        # 完成时自动填充 actual_finished_at
-        if request.completed:
+    # Use exclude_unset=True so we can distinguish between "unset" and "set to None"
+    update_data = request.model_dump(exclude_unset=True)
+    data = update_data.copy()
+
+    # Handle side effects
+    
+    # 1. State changes -> actual_finished_at
+    if 'state' in update_data:
+        if update_data['state'] == 'completed':
             data['actual_finished_at'] = datetime.now().strftime('%Y-%m-%d')
-        else:
+        elif update_data['state'] in ['active', 'inactive']:
             data['actual_finished_at'] = None
-    if request.link_to_goal_id is not None:
-        data['link_to_goal_id'] = request.link_to_goal_id
-    if request.expected_finished_at is not None:
-        data['expected_finished_at'] = request.expected_finished_at
-    if request.cross_day is not None:
-        data['cross_day'] = request.cross_day
+
+    # 2. expected_finished_at -> cross_day
+    if update_data.get('expected_finished_at'):
+        data['cross_day'] = True
+
+    # 3. Explicit cross_day overwrites implicit one
+    if 'cross_day' in update_data:
+        data['cross_day'] = update_data['cross_day']
+        # If manually turning off cross_day, clear expected_finished_at
+        if not update_data['cross_day']:
+            data['expected_finished_at'] = None
     
     success = todo_provider.update_todo(todo_id, data)
     if success:
@@ -209,6 +217,65 @@ def reorder_todos(request: ReorderTodoRequest) -> bool:
         bool: 是否成功
     """
     return todo_provider.reorder_todos(request.todo_ids)
+
+
+# ============================================================================
+# Task Pool 服务
+# ============================================================================
+
+def get_pool_todos() -> TodoListResponse:
+    """
+    获取任务池中的所有任务（state='inactive'）
+    
+    Returns:
+        TodoListResponse: 任务列表响应
+    """
+    todos_data = todo_provider.get_todos_by_state('inactive')
+    
+    items = []
+    for todo in todos_data:
+        # 获取子任务
+        sub_todos_data = todo_provider.get_sub_todos_by_parent(todo['id'])
+        sub_items = [
+            SubTodoListItem(
+                id=sub['id'],
+                order_index=sub['order_index'],
+                parent_id=sub['parent_id'],
+                content=sub['content'],
+                completed=bool(sub['completed'])
+            )
+            for sub in sub_todos_data
+        ]
+        
+        items.append(TodoListItem(
+            id=todo['id'],
+            order_index=todo['order_index'],
+            pool_order_index=todo.get('pool_order_index'),
+            content=todo['content'],
+            color=todo['color'] or '#FFFFFF',
+            state=todo.get('state', 'inactive'),
+            link_to_goal_id=todo['link_to_goal_id'],
+            date=todo.get('date'),
+            expected_finished_at=todo['expected_finished_at'],
+            actual_finished_at=todo['actual_finished_at'],
+            cross_day=bool(todo['cross_day']),
+            sub_items=sub_items if sub_items else None
+        ))
+    
+    return TodoListResponse(daily_focus_content=None, items=items)
+
+
+def reorder_pool_todos(todo_ids: List[int]) -> bool:
+    """
+    重排序任务池任务
+    
+    Args:
+        todo_ids: 任务 ID 列表（按新顺序排列）
+    
+    Returns:
+        bool: 是否成功
+    """
+    return todo_provider.reorder_pool_todos(todo_ids)
 
 
 # ============================================================================
@@ -406,9 +473,8 @@ def get_weekly_plan(year: int, month: int, week_num: int) -> WeeklyPlanResponse:
         todos_response = get_todos(date_str, include_cross_day=False)
         todo_list = todos_response.items
         
-        # 计算完成率
         total = len(todo_list)
-        completed = sum(1 for t in todo_list if t.completed)
+        completed = sum(1 for t in todo_list if t.state == 'completed')
         completion_rate = (completed / total) if total > 0 else 0.0
         
         items.append(DailyPlanItem(
@@ -464,7 +530,7 @@ def get_monthly_plan(year: int, month: int) -> MonthlyPlanItem:
             date_str = current.strftime('%Y-%m-%d')
             todos = todo_provider.get_todos_by_date(date_str, include_cross_day=False)
             total_todos += len(todos)
-            completed_todos += sum(1 for t in todos if t.get('completed'))
+            completed_todos += sum(1 for t in todos if t.get('state') == 'completed')
             current += timedelta(days=1)
         
         completion_rate = (completed_todos / total_todos) if total_todos > 0 else 0.0

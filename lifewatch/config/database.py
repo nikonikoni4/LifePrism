@@ -280,7 +280,12 @@ TODO_LIST_CONFIG = {
         'order_index': {
             'type': 'INTEGER',
             'constraints': ['NOT NULL', 'DEFAULT 0'],
-            'comment': '排序索引，用于拖拽排序'
+            'comment': '每天todolist的排序索引，用于拖拽排序'
+        },
+        'pool_order_index': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '任务池的排序索引（仅 inactive 状态时使用）'
         },
         'content': {
             'type': 'TEXT',
@@ -292,10 +297,10 @@ TODO_LIST_CONFIG = {
             'constraints': ['DEFAULT "#FFFFFF"'],
             'comment': '任务颜色（十六进制格式）'
         },
-        'completed': {
-            'type': 'INTEGER',
-            'constraints': ['DEFAULT 0'],
-            'comment': '是否完成（0: 未完成, 1: 已完成）'
+        'state': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT "active"'],
+            'comment': '任务状态（active: 激活, completed: 已完成, inactive: 任务池中）'
         },
         'link_to_goal_id': {
             'type': 'TEXT',
@@ -304,8 +309,8 @@ TODO_LIST_CONFIG = {
         },
         'date': {
             'type': 'TEXT',
-            'constraints': ['NOT NULL'],
-            'comment': '任务日期（YYYY-MM-DD格式，用于日历筛选）'
+            'constraints': [],
+            'comment': '任务日期（YYYY-MM-DD格式，inactive状态可为空）'
         },
         'expected_finished_at': {
             'type': 'TEXT',
@@ -320,14 +325,15 @@ TODO_LIST_CONFIG = {
         'cross_day': {
             'type': 'INTEGER',
             'constraints': ['DEFAULT 0'],
-            'comment': '是否开启跨天追踪（0: 否, 1: 是），开启后在未完成前会持续显示'
+            'comment': '是否开启跨天追踪（0: 否, 1: 是），长期任务，非一天完成，主要用于review判断，当设置了expected_finished_at后，默认开启'
         }
     },
     'table_constraints': [],
     'indexes': [
         {'name': 'idx_todo_list_date', 'columns': ['date']},
-        {'name': 'idx_todo_list_cross_day_completed', 'columns': ['cross_day', 'completed']},
-        {'name': 'idx_todo_list_link_to_goal_id', 'columns': ['link_to_goal_id']}
+        {'name': 'idx_todo_list_cross_day_state', 'columns': ['cross_day', 'state']},
+        {'name': 'idx_todo_list_link_to_goal_id', 'columns': ['link_to_goal_id']},
+        {'name': 'idx_todo_list_state', 'columns': ['state']}
     ],
     'timestamps': True  # 自动添加 created_at
 }

@@ -32,12 +32,13 @@ class TodoListItem(BaseModel):
     当开启跨天追踪(cross_day=True)后，在未完成之前都会显示
     """
     id: int = Field(..., description="唯一标识符 id")
-    order_index: int = Field(..., description="排序索引")
+    order_index: int = Field(..., description="每天todolist的排序索引")
+    pool_order_index: Optional[int] = Field(default=None, description="任务池排序索引")
     content: str = Field(..., description="任务内容")
     color: str = Field(default="#FFFFFF", description="任务颜色（十六进制格式）")
-    completed: bool = Field(default=False, description="是否完成")
+    state: str = Field(default="active", description="任务状态（active/completed/inactive）")
     link_to_goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
-    date: str = Field(..., description="任务日期 YYYY-MM-DD")
+    date: Optional[str] = Field(default=None, description="任务日期 YYYY-MM-DD（inactive状态可为空）")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期 YYYY-MM-DD")
     actual_finished_at: Optional[str] = Field(default=None, description="实际完成日期 YYYY-MM-DD")
     cross_day: bool = Field(default=False, description="是否开启跨天追踪")
@@ -64,8 +65,9 @@ class TodoListQueryRequest(BaseModel):
 class CreateTodoRequest(BaseModel):
     """创建任务请求"""
     content: str = Field(..., description="任务内容")
-    date: str = Field(..., description="任务日期 YYYY-MM-DD")
+    date: Optional[str] = Field(default=None, description="任务日期 YYYY-MM-DD（inactive状态可为空）")
     color: str = Field(default="#FFFFFF", description="任务颜色")
+    state: str = Field(default="active", description="任务状态（active/inactive）")
     link_to_goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期 YYYY-MM-DD")
     cross_day: bool = Field(default=False, description="是否开启跨天追踪")
@@ -75,8 +77,9 @@ class UpdateTodoRequest(BaseModel):
     """更新任务请求（部分更新）"""
     content: Optional[str] = Field(default=None, description="任务内容")
     color: Optional[str] = Field(default=None, description="任务颜色")
-    completed: Optional[bool] = Field(default=None, description="是否完成")
+    state: Optional[str] = Field(default=None, description="任务状态（active/completed/inactive）")
     link_to_goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
+    date: Optional[str] = Field(default=None, description="任务日期 YYYY-MM-DD")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期")
     cross_day: Optional[bool] = Field(default=None, description="是否开启跨天追踪")
 
@@ -102,6 +105,11 @@ class ReorderSubTodoRequest(BaseModel):
     """子任务重排序请求"""
     parent_id: int = Field(..., description="父任务 ID")
     sub_todo_ids: List[int] = Field(..., description="子任务 ID 列表（按新顺序排列）")
+
+
+class ReorderPoolTodoRequest(BaseModel):
+    """任务池重排序请求"""
+    todo_ids: List[int] = Field(..., description="任务 ID 列表（按新顺序排列）")
 
 
 # ============================================================================
