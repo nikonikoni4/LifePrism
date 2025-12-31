@@ -55,8 +55,9 @@ export const todoApi = {
     // 创建任务
     createTodo: async (data: {
         content: string;
-        date: string;
+        date?: string | null;
         color?: string;
+        state?: 'active' | 'inactive';
         linkToGoalId?: string | null;
         expectedFinishedAt?: string | null;
         crossDay?: boolean;
@@ -74,8 +75,9 @@ export const todoApi = {
     updateTodo: async (id: number, data: Partial<{
         content: string;
         color: string;
-        completed: boolean;
+        state: 'active' | 'completed' | 'inactive';
         linkToGoalId: string | null;
+        date: string | null;
         expectedFinishedAt: string | null;
         crossDay: boolean;
     }>): Promise<TodoItem> => {
@@ -148,6 +150,25 @@ export const todoApi = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parent_id: parentId, sub_todo_ids: subTodoIds })
+        });
+        return res.ok;
+    },
+
+    // ============ Task Pool API ============
+
+    // 获取任务池任务列表
+    getPoolTodos: async (): Promise<TodoListResponse> => {
+        const res = await fetch(`${API_BASE}/todos/pool`);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 重排序任务池任务
+    reorderPoolTodos: async (todoIds: number[]): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/todos/pool/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ todo_ids: todoIds })
         });
         return res.ok;
     }

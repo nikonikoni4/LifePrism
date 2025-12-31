@@ -107,14 +107,16 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({
             <button
                 onClick={(e) => {
                     e.stopPropagation();
-                    onUpdate(todo.id, { completed: !todo.completed });
+                    const currentState = 'state' in todo ? (todo as any).state : 'active';
+                    const newState = currentState === 'completed' ? 'active' : 'completed';
+                    onUpdate(todo.id, { state: newState } as any);
                 }}
-                className={`w-5 h-5 rounded-lg border-[1.5px] flex items-center justify-center transition-all flex-shrink-0 ${todo.completed
+                className={`w-5 h-5 rounded-lg border-[1.5px] flex items-center justify-center transition-all flex-shrink-0 ${'state' in todo && (todo as any).state === 'completed'
                     ? 'bg-slate-800 border-slate-800'
                     : 'border-slate-300 bg-white/50 hover:border-blue-400'
                     }`}
             >
-                {todo.completed && <Check size={12} className="text-white" strokeWidth={3} />}
+                {'state' in todo && (todo as any).state === 'completed' && <Check size={12} className="text-white" strokeWidth={3} />}
             </button>
 
             {/* Text Input - Direct Edit */}
@@ -123,7 +125,9 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({
                     type="text"
                     value={content}
                     onChange={(e) => onUpdate(todo.id, { content: e.target.value })}
-                    className={`w-full bg-transparent border-none outline-none text-sm font-medium p-0 ${todo.completed ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-700'
+                    className={`w-full bg-transparent border-none outline-none text-sm font-medium p-0 ${'state' in todo && (todo as any).state === 'completed'
+                        ? 'text-slate-400 line-through decoration-slate-300'
+                        : 'text-slate-700'
                         }`}
                 />
             </div>
@@ -209,7 +213,7 @@ const TodoTabView: React.FC<TodoTabViewProps> = ({ initialDate, onDateUsed }) =>
 
     // Filter items based on Date
     const filteredL1Items = useMemo(() => {
-        return items.filter(t => t.date === selectedDate || (t.crossDay && !t.completed));
+        return items.filter(t => t.date === selectedDate || (t.crossDay && t.state !== 'completed'));
     }, [items, selectedDate]);
 
     const selectedL1Item = useMemo(() => {
@@ -627,18 +631,20 @@ const TodoTabView: React.FC<TodoTabViewProps> = ({ initialDate, onDateUsed }) =>
 
                             {/* 5. Status Toggle */}
                             <div
-                                onClick={() => handleUpdateL1(selectedL1Item.id, { completed: !selectedL1Item.completed })}
-                                className={`p-2.5 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all ${selectedL1Item.completed
+                                onClick={() => handleUpdateL1(selectedL1Item.id, {
+                                    state: selectedL1Item.state === 'completed' ? 'active' : 'completed'
+                                } as any)}
+                                className={`p-2.5 rounded-xl border flex flex-col gap-1 cursor-pointer transition-all ${selectedL1Item.state === 'completed'
                                     ? 'bg-green-50/50 border-green-200 hover:bg-green-100'
                                     : 'bg-slate-50/50 border-slate-100 hover:bg-white hover:shadow-sm hover:border-blue-200'
                                     }`}
                             >
-                                <div className={`flex items-center gap-1.5 ${selectedL1Item.completed ? 'text-green-600' : 'text-slate-400'}`}>
-                                    {selectedL1Item.completed ? <CheckCircle size={11} /> : <Activity size={11} />}
+                                <div className={`flex items-center gap-1.5 ${selectedL1Item.state === 'completed' ? 'text-green-600' : 'text-slate-400'}`}>
+                                    {selectedL1Item.state === 'completed' ? <CheckCircle size={11} /> : <Activity size={11} />}
                                     <span className="text-[8px] font-bold uppercase tracking-wider">状态</span>
                                 </div>
-                                <span className={`text-[10px] font-bold truncate ${selectedL1Item.completed ? 'text-green-700' : 'text-slate-700'}`}>
-                                    {selectedL1Item.completed ? '完成' : '进行中'}
+                                <span className={`text-[10px] font-bold truncate ${selectedL1Item.state === 'completed' ? 'text-green-700' : 'text-slate-700'}`}>
+                                    {selectedL1Item.state === 'completed' ? '完成' : '进行中'}
                                 </span>
                             </div>
                         </div>

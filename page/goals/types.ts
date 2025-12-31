@@ -14,11 +14,12 @@ export interface SubTodoItem {
 export interface TodoItem {
     id: number;
     orderIndex: number;
+    poolOrderIndex: number | null;
     content: string;
     color: string;
-    completed: boolean;
+    state: 'active' | 'completed' | 'inactive';
     linkToGoalId: string | null;
-    date: string;
+    date: string | null;
     expectedFinishedAt: string | null;
     actualFinishedAt: string | null;
     crossDay: boolean;
