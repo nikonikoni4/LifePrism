@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Target,
     Plus,
@@ -113,7 +114,162 @@ const getWeeksInMonth = (year: number, month: number): WeekData[] => {
     return weeks;
 };
 
+// --- Droppable Day Container ---
+// Wraps each day's execution area to make it a drop target
+interface DroppableDayProps {
+    date: string;
+    children: React.ReactNode;
+}
 
+const DroppableDay: React.FC<DroppableDayProps> = ({ date, children }) => {
+    const { setNodeRef, isOver } = useDroppable({ id: `day-${date}` });
+    return (
+        <div
+            ref={setNodeRef}
+            className={`flex-1 p-5 bg-white transition-all ${isOver ? 'ring-2 ring-blue-300 ring-inset bg-blue-50/30' : ''}`}
+        >
+            {children}
+        </div>
+    );
+};
+
+// --- Droppable Pool Container ---
+// Makes the task pool a drop target for returning tasks
+interface DroppablePoolProps {
+    children: React.ReactNode;
+}
+
+const DroppablePool: React.FC<DroppablePoolProps> = ({ children }) => {
+    const { setNodeRef, isOver } = useDroppable({ id: 'task-pool' });
+    return (
+        <div
+            ref={setNodeRef}
+            className={`flex-1 overflow-y-auto px-3 py-2 transition-all ${isOver ? 'ring-2 ring-amber-300 ring-inset bg-amber-50/30' : ''}`}
+            style={{ scrollbarWidth: 'thin' }}
+        >
+            {children}
+        </div>
+    );
+};
+
+// --- Sortable Execution Item ---
+// Used for tasks in the weekly view's Execution area
+interface SortableExecutionItemProps {
+    task: TodoItem;
+    onToggle: (id: number) => void;
+    onDelete: (id: number) => void;
+}
+
+const SortableExecutionItem: React.FC<SortableExecutionItemProps> = ({ task, onToggle, onDelete }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: task.id });
+
+    const style: React.CSSProperties = {
+        transform: CSS.Translate.toString(transform),
+        transition: isDragging ? undefined : transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 50 : 'auto',
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={`group flex items-center gap-3 ${isDragging ? 'shadow-lg' : ''}`}
+        >
+            {/* Drag Handle */}
+            <div
+                {...attributes}
+                {...listeners}
+                className="p-1 text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:text-slate-500 transition-all"
+            >
+                <GripVertical size={14} />
+            </div>
+            <button
+                onClick={() => onToggle(task.id)}
+                className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors flex-shrink-0 ${task.state === 'completed' ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 hover:border-blue-500'
+                    }`}
+            >
+                {task.state === 'completed' && <Check size={12} className="text-white" strokeWidth={3} />}
+            </button>
+            <span className={`text-sm font-medium truncate flex-1 ${task.state === 'completed' ? 'text-slate-300 line-through' : 'text-slate-600'}`}>
+                {task.content}
+            </span>
+            <button
+                onClick={() => onDelete(task.id)}
+                className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+            >
+                <Trash2 size={14} />
+            </button>
+        </div>
+    );
+};
+
+// --- Sortable Pool Item ---
+// Used for tasks in the Task Pool
+interface SortablePoolItemProps {
+    task: TodoItem;
+    isSelected: boolean;
+    onClick: () => void;
+    onDelete: () => void;
+}
+
+const SortablePoolItem: React.FC<SortablePoolItemProps> = ({ task, isSelected, onClick, onDelete }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: task.id });
+
+    const style: React.CSSProperties = {
+        transform: CSS.Translate.toString(transform),
+        transition: isDragging ? undefined : transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 50 : 'auto',
+        backgroundColor: task.color || '#FFFFFF',
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            onClick={onClick}
+            className={`group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all border-2 ${isSelected
+                ? 'border-blue-400 shadow-md'
+                : 'border-transparent hover:border-slate-200'
+                } ${isDragging ? 'shadow-xl' : ''}`}
+        >
+            <div
+                {...attributes}
+                {...listeners}
+                className="text-slate-300 flex-shrink-0 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+                <GripVertical size={14} />
+            </div>
+            <div className="w-5 h-5 rounded-full border-2 border-slate-300 flex-shrink-0" />
+            <span className="text-sm font-medium text-slate-700 flex-1">
+                {task.content}
+            </span>
+            <Trash2
+                size={14}
+                className="text-slate-300 flex-shrink-0 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all cursor-pointer"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                }}
+            />
+        </div>
+    );
+};
 
 const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
     // View type: 'week' (detailed) or 'month' (card grid)
@@ -466,9 +622,55 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
         const isToPool = overId === 'task-pool' || taskPoolItems.some(t => t.id === Number(overId));
         const targetDate = overId.startsWith('day-') ? overId.replace('day-', '') : null;
 
+        // Check if dropping onto another task (for reordering within same container)
+        const overItemId = Number(overId);
+        const isOverPoolItem = taskPoolItems.some(t => t.id === overItemId);
+        const overItemDayDate = weeklyPlanData?.items.find(d => d.todoList.some(t => t.id === overItemId))?.date;
+
         try {
+            // Case 1: Pool internal reordering
+            if (isFromPool && (isOverPoolItem || overId === 'task-pool')) {
+                if (isOverPoolItem && activeId !== overItemId) {
+                    const oldIndex = taskPoolItems.findIndex(t => t.id === activeId);
+                    const newIndex = taskPoolItems.findIndex(t => t.id === overItemId);
+                    if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+                        const newOrder = arrayMove(taskPoolItems, oldIndex, newIndex);
+                        // Optimistic update
+                        setTaskPoolItems(newOrder);
+                        await todoApi.reorderPoolTodos(newOrder.map(t => t.id));
+                    }
+                }
+                return;
+            }
+
+            // Case 2: Same day internal reordering
+            if (!isFromPool && sourceDate && overItemDayDate === sourceDate && activeId !== overItemId) {
+                const dayData = weeklyPlanData?.items.find(d => d.date === sourceDate);
+                if (dayData) {
+                    const oldIndex = dayData.todoList.findIndex(t => t.id === activeId);
+                    const newIndex = dayData.todoList.findIndex(t => t.id === overItemId);
+                    if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+                        const newOrder = arrayMove(dayData.todoList, oldIndex, newIndex);
+                        // Optimistic update
+                        setWeeklyPlanData(prev => {
+                            if (!prev) return prev;
+                            return {
+                                ...prev,
+                                items: prev.items.map(day =>
+                                    day.date === sourceDate
+                                        ? { ...day, todoList: newOrder }
+                                        : day
+                                )
+                            };
+                        });
+                        await todoApi.reorderTodos(newOrder.map(t => t.id));
+                    }
+                }
+                return;
+            }
+
+            // Case 3: Pool -> Day (cross-container)
             if (isFromPool && targetDate) {
-                // Pool -> Day: Change state to active and set date
                 const item = taskPoolItems.find(t => t.id === activeId);
                 if (item) {
                     // Optimistic update
@@ -488,7 +690,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                     await todoApi.updateTodo(activeId, { state: 'active', date: targetDate });
                 }
             } else if (!isFromPool && isToPool) {
-                // Day -> Pool: Change state to inactive
+                // Case 4: Day -> Pool (cross-container)
                 const item = weeklyPlanData?.items.flatMap(d => d.todoList).find(t => t.id === activeId);
                 if (item) {
                     // Optimistic update
@@ -507,7 +709,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                     await todoApi.updateTodo(activeId, { state: 'inactive', date: null });
                 }
             } else if (!isFromPool && targetDate && sourceDate !== targetDate) {
-                // Day -> Different Day: Change date
+                // Case 5: Day -> Different Day (cross-container)
                 const item = weeklyPlanData?.items.flatMap(d => d.todoList).find(t => t.id === activeId);
                 if (item) {
                     // Optimistic update
@@ -537,6 +739,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             fetchTaskPool();
         }
     };
+
 
     // ============================================================================
     // Focus Content Handlers with Debounced Save
@@ -882,46 +1085,40 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                             </div>
                         </div>
 
-                        {/* Pool Task List - Scrollable */}
-                        <div className="flex-1 overflow-y-auto px-3 py-2" style={{ scrollbarWidth: 'thin' }}>
+                        {/* Pool Task List - Scrollable with DroppablePool */}
+                        <DroppablePool>
                             {isLoadingPool ? (
                                 <div className="flex items-center justify-center py-8">
                                     <Loader2 size={20} className="text-amber-500 animate-spin" />
                                 </div>
                             ) : taskPoolItems.length === 0 ? (
                                 <div className="text-center py-8 text-slate-400 text-sm">
-                                    任务池为空
+                                    任务池为空，拖拽任务到这里
                                 </div>
                             ) : (
                                 <SortableContext items={taskPoolItems.map(t => t.id)} strategy={verticalListSortingStrategy}>
                                     <div className="space-y-2">
                                         {taskPoolItems.map(task => (
-                                            <div
+                                            <SortablePoolItem
                                                 key={task.id}
+                                                task={task}
+                                                isSelected={selectedPoolTask?.id === task.id}
                                                 onClick={() => setSelectedPoolTask(task)}
-                                                className={`group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all border-2 ${selectedPoolTask?.id === task.id
-                                                    ? 'border-blue-400 shadow-md'
-                                                    : 'border-transparent hover:border-slate-200'
-                                                    }`}
-                                                style={{ backgroundColor: task.color || '#FFFFFF' }}
-                                            >
-                                                <GripVertical size={14} className="text-slate-300 flex-shrink-0 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                <div className="w-5 h-5 rounded-full border-2 border-slate-300 flex-shrink-0" />
-                                                <span className="text-sm font-medium text-slate-700 flex-1">
-                                                    {task.content}
-                                                </span>
-                                                <Trash2 size={14} className="text-slate-300 flex-shrink-0 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all cursor-pointer"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        // Handle delete
-                                                    }}
-                                                />
-                                            </div>
+                                                onDelete={async () => {
+                                                    setTaskPoolItems(prev => prev.filter(t => t.id !== task.id));
+                                                    try {
+                                                        await todoApi.deleteTodo(task.id);
+                                                    } catch (error) {
+                                                        console.error('Failed to delete pool task:', error);
+                                                        fetchTaskPool();
+                                                    }
+                                                }}
+                                            />
                                         ))}
                                     </div>
                                 </SortableContext>
                             )}
-                        </div>
+                        </DroppablePool>
                     </div>
                 )}
 
@@ -1280,57 +1477,49 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
 
                                                 {viewMode === 'compact' ? (
                                                     /* COMPACT LAYOUT - Stacked & Denser */
-                                                    <div className="flex flex-col p-4 gap-4 h-full">
-                                                        {/* Intent Area */}
-                                                        <div className="flex flex-col gap-1.5">
-                                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Focus</span>
-                                                            <textarea
-                                                                className="w-full h-16 p-3 bg-slate-50 rounded-xl border border-slate-100 resize-none outline-none text-slate-700 font-medium leading-relaxed placeholder-slate-300 text-xs focus:bg-white focus:border-blue-200 transition-all no-scrollbar"
-                                                                placeholder={`Focus for ${day.name}...`}
-                                                                value={dailyFocuses[day.date] || ''}
-                                                                onChange={(e) => updateDailyFocus(day.date, e.target.value)}
-                                                            />
-                                                        </div>
-
-                                                        {/* Tasks Area */}
-                                                        <div className="flex flex-col gap-2">
-                                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tasks</span>
-                                                            <div className="space-y-2">
-                                                                {dayTodos.map(todo => (
-                                                                    <div key={todo.id} className="group flex items-start gap-2">
-                                                                        <button
-                                                                            onClick={() => toggleTodo(todo.id)}
-                                                                            className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${todo.state === 'completed' ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 hover:border-blue-500'
-                                                                                }`}
-                                                                        >
-                                                                            {todo.state === 'completed' && <Check size={10} className="text-white" strokeWidth={4} />}
-                                                                        </button>
-                                                                        <span className={`text-xs font-medium truncate flex-1 leading-tight ${todo.state === 'completed' ? 'text-slate-300 line-through' : 'text-slate-600'}`}>
-                                                                            {todo.content}
-                                                                        </span>
-                                                                        <button
-                                                                            onClick={() => deleteTodo(todo.id)}
-                                                                            className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"
-                                                                        >
-                                                                            <Trash2 size={12} />
-                                                                        </button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                            {/* Compact Add Input */}
-                                                            <div className="mt-3 pt-3 border-t border-dashed border-slate-100 flex items-center gap-2">
-                                                                <Plus size={14} className="text-slate-400" />
-                                                                <input
-                                                                    type="text"
-                                                                    value={newTodoInput[day.date] || ''}
-                                                                    onChange={(e) => setNewTodoInput({ ...newTodoInput, [day.date]: e.target.value })}
-                                                                    onKeyDown={(e) => e.key === 'Enter' && addTodo(day.date)}
-                                                                    placeholder="Add..."
-                                                                    className="flex-1 bg-transparent text-xs font-medium outline-none text-slate-700 placeholder-slate-300"
+                                                    <DroppableDay date={day.date}>
+                                                        <div className="flex flex-col gap-4 h-full">
+                                                            {/* Intent Area */}
+                                                            <div className="flex flex-col gap-1.5">
+                                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Focus</span>
+                                                                <textarea
+                                                                    className="w-full h-16 p-3 bg-slate-50 rounded-xl border border-slate-100 resize-none outline-none text-slate-700 font-medium leading-relaxed placeholder-slate-300 text-xs focus:bg-white focus:border-blue-200 transition-all no-scrollbar"
+                                                                    placeholder={`Focus for ${day.name}...`}
+                                                                    value={dailyFocuses[day.date] || ''}
+                                                                    onChange={(e) => updateDailyFocus(day.date, e.target.value)}
                                                                 />
                                                             </div>
+
+                                                            {/* Tasks Area */}
+                                                            <div className="flex flex-col gap-2">
+                                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tasks</span>
+                                                                <SortableContext items={dayTodos.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                                                    <div className="space-y-2">
+                                                                        {dayTodos.map(todo => (
+                                                                            <SortableExecutionItem
+                                                                                key={todo.id}
+                                                                                task={todo}
+                                                                                onToggle={toggleTodo}
+                                                                                onDelete={deleteTodo}
+                                                                            />
+                                                                        ))}
+                                                                    </div>
+                                                                </SortableContext>
+                                                                {/* Compact Add Input */}
+                                                                <div className="mt-3 pt-3 border-t border-dashed border-slate-100 flex items-center gap-2">
+                                                                    <Plus size={14} className="text-slate-400" />
+                                                                    <input
+                                                                        type="text"
+                                                                        value={newTodoInput[day.date] || ''}
+                                                                        onChange={(e) => setNewTodoInput({ ...newTodoInput, [day.date]: e.target.value })}
+                                                                        onKeyDown={(e) => e.key === 'Enter' && addTodo(day.date)}
+                                                                        placeholder="Add..."
+                                                                        className="flex-1 bg-transparent text-xs font-medium outline-none text-slate-700 placeholder-slate-300"
+                                                                    />
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    </DroppableDay>
                                                 ) : (
                                                     /* DETAIL LAYOUT */
                                                     <div className="flex flex-col">
@@ -1356,29 +1545,19 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                                                                     Execution
                                                                 </span>
                                                             </div>
-                                                            <div className="flex-1 p-5 bg-white">
-                                                                <div className="space-y-3">
-                                                                    {dayTodos.map(todo => (
-                                                                        <div key={todo.id} className="group flex items-center gap-3">
-                                                                            <button
-                                                                                onClick={() => toggleTodo(todo.id)}
-                                                                                className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors flex-shrink-0 ${todo.state === 'completed' ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 hover:border-blue-500'
-                                                                                    }`}
-                                                                            >
-                                                                                {todo.state === 'completed' && <Check size={12} className="text-white" strokeWidth={3} />}
-                                                                            </button>
-                                                                            <span className={`text-sm font-medium truncate flex-1 ${todo.state === 'completed' ? 'text-slate-300 line-through' : 'text-slate-600'}`}>
-                                                                                {todo.content}
-                                                                            </span>
-                                                                            <button
-                                                                                onClick={() => deleteTodo(todo.id)}
-                                                                                className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                                                            >
-                                                                                <Trash2 size={14} />
-                                                                            </button>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
+                                                            <DroppableDay date={day.date}>
+                                                                <SortableContext items={dayTodos.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                                                    <div className="space-y-3">
+                                                                        {dayTodos.map(todo => (
+                                                                            <SortableExecutionItem
+                                                                                key={todo.id}
+                                                                                task={todo}
+                                                                                onToggle={toggleTodo}
+                                                                                onDelete={deleteTodo}
+                                                                            />
+                                                                        ))}
+                                                                    </div>
+                                                                </SortableContext>
 
                                                                 <div className="mt-4 pt-3 border-t border-dashed border-slate-100 flex items-center gap-2">
                                                                     <Plus size={16} className="text-slate-400" />
@@ -1399,7 +1578,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                                                                         </button>
                                                                     )}
                                                                 </div>
-                                                            </div>
+                                                            </DroppableDay>
                                                         </div>
                                                     </div>
                                                 )}
@@ -1414,18 +1593,19 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             </div>
 
             {/* DragOverlay for drag preview */}
-            <DragOverlay>
-                {
-                    activeDragItem ? (
-                        <div className="flex items-center gap-2 px-3 py-2 bg-white border-2 border-blue-300 rounded-lg shadow-lg opacity-90">
-                            <GripVertical size={12} className="text-blue-400" />
+            {createPortal(
+                <DragOverlay>
+                    {activeDragItem ? (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-white border-2 border-blue-300 rounded-lg shadow-lg opacity-90 cursor-grabbing">
+                            <div className="w-2 h-2 rounded-full bg-slate-300" />
                             <span className="text-sm font-medium text-slate-700 truncate max-w-[200px]">
                                 {activeDragItem.content}
                             </span>
                         </div>
-                    ) : null
-                }
-            </DragOverlay>
+                    ) : null}
+                </DragOverlay>,
+                document.body
+            )}
         </DndContext>
     );
 };
