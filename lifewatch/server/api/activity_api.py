@@ -142,7 +142,7 @@ async def get_activity_logs(
         50, 
         description="每页数量", 
         ge=1, 
-        le=200
+        le=3000
     )
 ) -> ActivityLogsResponse:
     """
