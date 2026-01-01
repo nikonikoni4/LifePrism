@@ -154,6 +154,38 @@ const DroppableFolder: React.FC<DroppableFolderProps> = ({ folderId, children, i
     );
 };
 
+// --- Droppable Folder Header ---
+// Makes the folder header itself a drop target with visual feedback
+interface DroppableFolderHeaderProps {
+    folderId: string;
+    children: React.ReactNode;
+}
+
+const DroppableFolderHeader: React.FC<DroppableFolderHeaderProps> = ({ folderId, children }) => {
+    const { setNodeRef, isOver } = useDroppable({
+        id: `folder-header-${folderId}`,
+        data: { type: 'folder', folderId }
+    });
+
+    return (
+        <div
+            ref={setNodeRef}
+            className={`group flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all duration-200 ${isOver
+                ? 'bg-blue-100 ring-2 ring-blue-400 shadow-md'
+                : 'hover:bg-slate-50'
+                }`}
+        >
+            {children}
+            {/* Drop indicator badge */}
+            {isOver && (
+                <span className="ml-auto text-[10px] text-blue-600 bg-blue-200 px-2 py-0.5 rounded-full font-medium animate-pulse">
+                    放入
+                </span>
+            )}
+        </div>
+    );
+};
+
 // --- Droppable Root Container ---
 interface DroppableRootProps {
     children: React.ReactNode;
@@ -332,8 +364,8 @@ const TaskPoolTree: React.FC<TaskPoolTreeProps> = ({
 
                     return (
                         <div key={folder.id} className="mb-1">
-                            {/* Folder Header */}
-                            <div className="group flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
+                            {/* Folder Header - Now a droppable zone */}
+                            <DroppableFolderHeader folderId={folder.id}>
                                 {/* Expand/Collapse */}
                                 <button
                                     onClick={() => onToggleFolder(folder.id)}
@@ -387,7 +419,7 @@ const TaskPoolTree: React.FC<TaskPoolTreeProps> = ({
                                 >
                                     <Trash2 size={12} />
                                 </button>
-                            </div>
+                            </DroppableFolderHeader>
 
                             {/* Folder Content */}
                             <AnimatePresence initial={false}>

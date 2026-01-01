@@ -715,10 +715,14 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             ? (dragDataFolderId ?? taskFolders.find(f => f.todoIds.includes(activeId))?.id ?? null)
             : null;
 
-        // Determine target - now checking for folder- prefix and pool-root
+        // Determine target - now checking for folder- prefix (and folder-header-) and pool-root
         const isToPoolRoot = overId === 'pool-root' || overId === 'task-pool';
-        const isToFolder = overId.startsWith('folder-');
-        const targetFolderId = isToFolder ? overId.replace('folder-', '') : null;
+        const isToFolderContent = overId.startsWith('folder-') && !overId.startsWith('folder-header-');
+        const isToFolderHeader = overId.startsWith('folder-header-');
+        const isToFolder = isToFolderContent || isToFolderHeader;
+        const targetFolderId = isToFolderHeader
+            ? overId.replace('folder-header-', '')
+            : (isToFolderContent ? overId.replace('folder-', '') : null);
         const isToPool = isToPoolRoot || isToFolder || taskPoolItems.some(t => t.id === Number(overId));
         const targetDate = overId.startsWith('day-') ? overId.replace('day-', '') : null;
 
@@ -733,11 +737,30 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                 ? taskFolders.find(f => f.todoIds.includes(overItemId))?.id || null
                 : null;
 
-            // Case 1: Pool internal - either reordering or moving between folders
-            if (isFromPool && isOverPoolItem && activeId !== overItemId) {
-                // If source and target are in the same container (same folder or both root)
-                if (sourceFolderId === overItemFolderId) {
-                    // Same container reordering
+            // =====================================================================
+            // POOL DRAG-DROP LOGIC
+            // Priority: 
+            //   1. Same container (same folder or both root) → internal reordering
+            //   2. Different containers → folder-level move (ignore item-level drops)
+            // =====================================================================
+
+            if (isFromPool) {
+                // Determine effective target folder:
+                // - If dropping on folder droppable zone → targetFolderId
+                // - If dropping on pool item in a folder → overItemFolderId
+                // - If dropping on pool-root → null (root)
+                const effectiveTargetFolderId = isToFolder
+                    ? targetFolderId
+                    : (isOverPoolItem ? overItemFolderId : null);
+                const isToPoolRootArea = isToPoolRoot || (isOverPoolItem && !overItemFolderId);
+
+                // Check if this is INTERNAL reordering (same container)
+                const isSameContainer =
+                    (sourceFolderId === effectiveTargetFolderId) ||
+                    (sourceFolderId === null && isToPoolRootArea);
+
+                if (isSameContainer && isOverPoolItem && activeId !== overItemId) {
+                    // CASE A: Same container internal reordering
                     const oldIndex = taskPoolItems.findIndex(t => t.id === activeId);
                     const newIndex = taskPoolItems.findIndex(t => t.id === overItemId);
                     if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
@@ -745,8 +768,17 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                         setTaskPoolItems(newOrder);
                         await todoApi.reorderPoolTodos(newOrder.map(t => t.id));
                     }
-                } else {
-                    // Moving between different folders/root via dropping on an item
+                    return;
+                }
+
+                // CASE B: Moving to different container (folder-level move)
+                // This handles: root→folder, folder→root, folder→different folder
+                const needsMove =
+                    (isToFolder && targetFolderId !== sourceFolderId) ||
+                    (isToPoolRootArea && sourceFolderId !== null) ||
+                    (isOverPoolItem && effectiveTargetFolderId !== sourceFolderId);
+
+                if (needsMove) {
                     // Remove from source
                     if (sourceFolderId) {
                         setTaskFolders(prev => prev.map(f =>
@@ -758,56 +790,19 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                         setRootTodoIds(prev => prev.filter(id => id !== activeId));
                     }
 
-                    // Add to target folder/root (where over item is)
-                    if (overItemFolderId) {
+                    // Add to target
+                    const finalTargetFolderId = isToFolder ? targetFolderId : effectiveTargetFolderId;
+                    if (finalTargetFolderId) {
                         setTaskFolders(prev => prev.map(f =>
-                            f.id === overItemFolderId
+                            f.id === finalTargetFolderId
                                 ? { ...f, todoIds: [...f.todoIds, activeId] }
                                 : f
                         ));
                     } else {
                         setRootTodoIds(prev => [...prev, activeId]);
                     }
+                    return;
                 }
-                return;
-            }
-
-            // Case 1.5: Dropping on pool-root explicitly
-            if (isFromPool && isToPoolRoot && sourceFolderId) {
-                // Moving from folder to root
-                setTaskFolders(prev => prev.map(f =>
-                    f.id === sourceFolderId
-                        ? { ...f, todoIds: f.todoIds.filter(id => id !== activeId) }
-                        : f
-                ));
-                setRootTodoIds(prev => [...prev, activeId]);
-                return;
-            }
-
-            // Case 1.5: Pool item moving to different folder or root
-            if (isFromPool && (isToFolder || isToPoolRoot)) {
-                // Remove from source folder/root
-                if (sourceFolderId) {
-                    setTaskFolders(prev => prev.map(f =>
-                        f.id === sourceFolderId
-                            ? { ...f, todoIds: f.todoIds.filter(id => id !== activeId) }
-                            : f
-                    ));
-                } else {
-                    setRootTodoIds(prev => prev.filter(id => id !== activeId));
-                }
-
-                // Add to target folder/root
-                if (targetFolderId) {
-                    setTaskFolders(prev => prev.map(f =>
-                        f.id === targetFolderId
-                            ? { ...f, todoIds: [...f.todoIds, activeId] }
-                            : f
-                    ));
-                } else {
-                    setRootTodoIds(prev => [...prev, activeId]);
-                }
-                return;
             }
 
             // Case 2: Same day internal reordering
