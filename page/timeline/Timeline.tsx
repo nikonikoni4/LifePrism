@@ -460,7 +460,7 @@ const Timeline: React.FC = () => {
                     end_time: endTime,
                     sort_by: 'start_time',
                     sort_order: 'asc',
-                    page_size: 200,
+                    page_size: 3000,
                 });
                 setActivityLogs(response.data);
             } catch (err) {
