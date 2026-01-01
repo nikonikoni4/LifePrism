@@ -16,6 +16,8 @@ DISABLED_CATEGORY_COLOR = '#D1D5DB'
 # Tailwind CSS 500 → 300 系列颜色映射
 # 用于 Timeline 缩略图的柔和颜色显示
 # ⚠️ 维护说明：如果前端调色盘变动，需同步更新此映射表
+# ⚠️ 前端同步：frontend/page/timeline/Timeline.tsx 中有相同的映射表
+#    用于非缩略图模式的分类颜色计算，需保持两边一致
 # @see frontend/page/category/components/CategorySettingsTab.tsx
 TAILWIND_500_TO_300 = {
     '#EF4444': '#FCA5A5',  # red-300

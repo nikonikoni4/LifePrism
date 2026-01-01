@@ -155,7 +155,13 @@ async def get_activity_logs(
     - 支持分页
     
     **返回数据：**
-    - 活动事件列表（包含时间、应用、标题、分类等）
+    - 活动事件列表（包含时间、应用、标题、分类ID等）
+    
+    **颜色说明：**
+    - 本接口只返回 category_id，不返回颜色值
+    - Timeline 非缩略图模式的分类颜色由前端自行计算
+    - 前端使用 /category/tree 获取分类颜色，并通过 softenColor 函数转换为柔和色
+    - @see frontend/page/timeline/Timeline.tsx 中的 TAILWIND_500_TO_300 映射表
     
     **示例：**
     - `/api/v2/activity/logs?start_time=2025-12-19 00:00:00&end_time=2025-12-19 23:59:59`

@@ -182,3 +182,8 @@ class TimelineProvider(LWBaseDataProvider):
         """
         affected_rows = self.db.delete("timeline_custom_block", where={"id": block_id})
         return affected_rows > 0
+
+
+if __name__ == "__main__":
+    timeline_provider = TimelineProvider()
+    print(timeline_provider.get_timeline_events_by_date("2025-12-31", "pc")[-10:])
