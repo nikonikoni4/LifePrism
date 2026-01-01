@@ -30,6 +30,13 @@ from lifewatch.server.schemas.goal_schemas import (
     UpdateGoalRequest,
     ReorderGoalRequest,
     ActiveGoalNamesResponse,
+    # Folder Schemas
+    TaskPoolFolderItem,
+    TaskPoolFolderListResponse,
+    CreateFolderRequest,
+    UpdateFolderRequest,
+    ReorderFoldersRequest,
+    MoveTodoToFolderRequest,
 )
 from lifewatch.server.services import todo_service
 from lifewatch.server.services.goal_service import goal_service
@@ -114,6 +121,94 @@ async def reorder_pool_todos(request: ReorderPoolTodoRequest):
     success = todo_service.reorder_pool_todos(request.todo_ids)
     if not success:
         raise HTTPException(status_code=500, detail="重排序任务池失败")
+    return {"success": True}
+
+
+# ============================================================================
+# Task Pool Folder 接口
+# ============================================================================
+
+@router.get("/pool/folders", response_model=TaskPoolFolderListResponse)
+async def get_folders():
+    """
+    获取所有任务池文件夹
+    """
+    return todo_service.get_folders()
+
+
+@router.post("/pool/folders", response_model=TaskPoolFolderItem)
+async def create_folder(request: CreateFolderRequest):
+    """
+    创建文件夹
+    
+    请求体:
+    - **name**: 文件夹名称（必需）
+    """
+    result = todo_service.create_folder(request)
+    if not result:
+        raise HTTPException(status_code=500, detail="创建文件夹失败")
+    return result
+
+
+@router.post("/pool/folders/reorder")
+async def reorder_folders(request: ReorderFoldersRequest):
+    """
+    重排序文件夹
+    
+    请求体:
+    - **folder_ids**: 文件夹 ID 列表（按新顺序排列）
+    """
+    success = todo_service.reorder_folders(request)
+    if not success:
+        raise HTTPException(status_code=500, detail="重排序文件夹失败")
+    return {"success": True}
+
+
+@router.patch("/pool/folders/{folder_id}", response_model=TaskPoolFolderItem)
+async def update_folder(
+    folder_id: int = Path(..., description="文件夹 ID"),
+    request: UpdateFolderRequest = ...
+):
+    """
+    更新文件夹
+    
+    请求体（所有字段可选）:
+    - **name**: 文件夹名称
+    - **is_expanded**: 是否展开
+    """
+    result = todo_service.update_folder(folder_id, request)
+    if not result:
+        raise HTTPException(status_code=404, detail="文件夹不存在或更新失败")
+    return result
+
+
+@router.delete("/pool/folders/{folder_id}")
+async def delete_folder(
+    folder_id: int = Path(..., description="文件夹 ID")
+):
+    """
+    删除文件夹（文件夹内任务会移动到根级别）
+    """
+    success = todo_service.delete_folder(folder_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="文件夹不存在")
+    return {"success": True}
+
+
+@router.patch("/todos/{todo_id}/move")
+async def move_todo_to_folder(
+    todo_id: int = Path(..., description="任务 ID"),
+    request: MoveTodoToFolderRequest = ...
+):
+    """
+    移动任务到文件夹
+    
+    请求体:
+    - **folder_id**: 目标文件夹 ID（null 表示移出到根级别）
+    """
+    success = todo_service.move_todo_to_folder(todo_id, request)
+    if not success:
+        raise HTTPException(status_code=404, detail="任务不存在或移动失败")
     return {"success": True}
 
 

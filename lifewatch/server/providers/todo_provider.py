@@ -118,7 +118,7 @@ class TodoProvider(LWBaseDataProvider):
                 # 插入数据
                 columns = ['order_index', 'pool_order_index', 'content', 'color', 'state', 
                           'link_to_goal_id', 'date', 'expected_finished_at', 
-                          'actual_finished_at', 'cross_day']
+                          'actual_finished_at', 'cross_day', 'folder_id']
                 values = [
                     next_order,
                     data.get('pool_order_index'),
@@ -129,7 +129,8 @@ class TodoProvider(LWBaseDataProvider):
                     data.get('date'),
                     data.get('expected_finished_at'),
                     data.get('actual_finished_at'),
-                    1 if data.get('cross_day') else 0
+                    1 if data.get('cross_day') else 0,
+                    data.get('folder_id')
                 ]
                 
                 placeholders = ', '.join(['?' for _ in columns])
@@ -172,7 +173,7 @@ class TodoProvider(LWBaseDataProvider):
                 for key, value in data.items():
                     if key in ['content', 'color', 'state', 'link_to_goal_id',
                               'date', 'expected_finished_at', 'actual_finished_at', 
-                              'cross_day', 'pool_order_index']:
+                              'cross_day', 'pool_order_index', 'folder_id']:
                         set_clauses.append(f"{key} = ?")
                         # 处理布尔值
                         if key == 'cross_day':
@@ -320,6 +321,33 @@ class TodoProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error(f"重排序任务池失败: {e}")
             return False
+    
+    def move_todo_to_folder(self, todo_id: int, folder_id: Optional[int]) -> bool:
+        """
+        移动任务到指定文件夹
+        
+        Args:
+            todo_id: 任务 ID
+            folder_id: 目标文件夹 ID（None 表示移到根级别）
+        
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE todo_list SET folder_id = ? WHERE id = ?",
+                    (folder_id, todo_id)
+                )
+                success = cursor.rowcount > 0
+                if success:
+                    logger.info(f"移动任务 {todo_id} 到文件夹 {folder_id}")
+                return success
+        except Exception as e:
+            logger.error(f"移动任务失败: {e}")
+            return False
+    
     
     # ==================== SubTodoList 操作 ====================
     

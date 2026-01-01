@@ -326,6 +326,11 @@ TODO_LIST_CONFIG = {
             'type': 'INTEGER',
             'constraints': ['DEFAULT 0'],
             'comment': '是否开启跨天追踪（0: 否, 1: 是），长期任务，非一天完成，主要用于review判断，当设置了expected_finished_at后，默认开启'
+        },
+        'folder_id': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '所属任务池文件夹 ID（NULL 表示根级别，仅 inactive 状态使用）'
         }
     },
     'table_constraints': [],
@@ -637,6 +642,40 @@ TIMELINE_CUSTOM_BLOCK_CONFIG = {
 }
 
 
+# 任务池文件夹表配置
+TASK_POOL_FOLDER_CONFIG = {
+    'table_name': 'task_pool_folder',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键'
+        },
+        'name': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '文件夹名称'
+        },
+        'order_index': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '文件夹排序索引'
+        },
+        'is_expanded': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 1'],
+            'comment': '是否展开（0: 折叠, 1: 展开）'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_task_pool_folder_order', 'columns': ['order_index']}
+    ],
+    'timestamps': True
+}
+
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'category_map_cache': category_map_cache_CONFIG,
@@ -651,6 +690,7 @@ TABLE_CONFIGS = {
     'goal': GOAL_CONFIG,
     'chat_session': CHAT_SESSION_CONFIG,
     'timeline_custom_block': TIMELINE_CUSTOM_BLOCK_CONFIG,
+    'task_pool_folder': TASK_POOL_FOLDER_CONFIG,
 }
 
 

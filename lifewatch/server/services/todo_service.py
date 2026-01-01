@@ -24,8 +24,16 @@ from lifewatch.server.schemas.goal_schemas import (
     MonthlyPlanItem,
     UpsertDailyFocusRequest,
     UpsertWeeklyFocusRequest,
+    # Folder Schemas
+    TaskPoolFolderItem,
+    TaskPoolFolderListResponse,
+    CreateFolderRequest,
+    UpdateFolderRequest,
+    ReorderFoldersRequest,
+    MoveTodoToFolderRequest,
 )
 from lifewatch.server.providers.todo_provider import todo_provider
+from lifewatch.server.providers.folder_provider import folder_provider
 
 
 # ============================================================================
@@ -76,6 +84,7 @@ def get_todos(date: str, include_cross_day: bool = True) -> TodoListResponse:
             expected_finished_at=todo['expected_finished_at'],
             actual_finished_at=todo['actual_finished_at'],
             cross_day=bool(todo['cross_day']),
+            folder_id=todo.get('folder_id'),
             sub_items=sub_items if sub_items else None
         ))
     
@@ -121,6 +130,7 @@ def get_todo_detail(todo_id: int) -> Optional[TodoListItem]:
         expected_finished_at=todo['expected_finished_at'],
         actual_finished_at=todo['actual_finished_at'],
         cross_day=bool(todo['cross_day']),
+        folder_id=todo.get('folder_id'),
         sub_items=sub_items if sub_items else None
     )
 
@@ -259,6 +269,7 @@ def get_pool_todos() -> TodoListResponse:
             expected_finished_at=todo['expected_finished_at'],
             actual_finished_at=todo['actual_finished_at'],
             cross_day=bool(todo['cross_day']),
+            folder_id=todo.get('folder_id'),
             sub_items=sub_items if sub_items else None
         ))
     
@@ -276,6 +287,125 @@ def reorder_pool_todos(todo_ids: List[int]) -> bool:
         bool: 是否成功
     """
     return todo_provider.reorder_pool_todos(todo_ids)
+
+
+# ============================================================================
+# Task Pool Folder 服务
+# ============================================================================
+
+def get_folders() -> TaskPoolFolderListResponse:
+    """
+    获取所有任务池文件夹
+    
+    Returns:
+        TaskPoolFolderListResponse: 文件夹列表响应
+    """
+    folders_data = folder_provider.get_all_folders()
+    
+    items = [
+        TaskPoolFolderItem(
+            id=f['id'],
+            name=f['name'],
+            order_index=f['order_index'],
+            is_expanded=f['is_expanded']
+        )
+        for f in folders_data
+    ]
+    
+    return TaskPoolFolderListResponse(items=items)
+
+
+def create_folder(request: CreateFolderRequest) -> TaskPoolFolderItem:
+    """
+    创建文件夹
+    
+    Args:
+        request: 创建文件夹请求
+    
+    Returns:
+        TaskPoolFolderItem: 新创建的文件夹，失败返回 None
+    """
+    new_id = folder_provider.create_folder(request.name)
+    if new_id:
+        folder = folder_provider.get_folder_by_id(new_id)
+        if folder:
+            return TaskPoolFolderItem(
+                id=folder['id'],
+                name=folder['name'],
+                order_index=folder['order_index'],
+                is_expanded=folder['is_expanded']
+            )
+    return None
+
+
+def update_folder(folder_id: int, request: UpdateFolderRequest) -> TaskPoolFolderItem:
+    """
+    更新文件夹
+    
+    Args:
+        folder_id: 文件夹 ID
+        request: 更新请求
+    
+    Returns:
+        TaskPoolFolderItem: 更新后的文件夹，失败返回 None
+    """
+    data = {}
+    if request.name is not None:
+        data['name'] = request.name
+    if request.is_expanded is not None:
+        data['is_expanded'] = request.is_expanded
+    
+    success = folder_provider.update_folder(folder_id, data)
+    if success:
+        folder = folder_provider.get_folder_by_id(folder_id)
+        if folder:
+            return TaskPoolFolderItem(
+                id=folder['id'],
+                name=folder['name'],
+                order_index=folder['order_index'],
+                is_expanded=folder['is_expanded']
+            )
+    return None
+
+
+def delete_folder(folder_id: int) -> bool:
+    """
+    删除文件夹
+    
+    Args:
+        folder_id: 文件夹 ID
+    
+    Returns:
+        bool: 是否成功
+    """
+    return folder_provider.delete_folder(folder_id)
+
+
+def reorder_folders(request: ReorderFoldersRequest) -> bool:
+    """
+    重排序文件夹
+    
+    Args:
+        request: 重排序请求
+    
+    Returns:
+        bool: 是否成功
+    """
+    return folder_provider.reorder_folders(request.folder_ids)
+
+
+def move_todo_to_folder(todo_id: int, request: MoveTodoToFolderRequest) -> bool:
+    """
+    移动任务到文件夹
+    
+    Args:
+        todo_id: 任务 ID
+        request: 移动请求
+    
+    Returns:
+        bool: 是否成功
+    """
+    return todo_provider.move_todo_to_folder(todo_id, request.folder_id)
 
 
 # ============================================================================

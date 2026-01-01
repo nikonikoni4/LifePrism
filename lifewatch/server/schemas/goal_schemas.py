@@ -42,6 +42,7 @@ class TodoListItem(BaseModel):
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期 YYYY-MM-DD")
     actual_finished_at: Optional[str] = Field(default=None, description="实际完成日期 YYYY-MM-DD")
     cross_day: bool = Field(default=False, description="是否开启跨天追踪")
+    folder_id: Optional[int] = Field(default=None, description="所属任务池文件夹 ID")
     # 嵌套子任务（可选，用于响应时包含子任务）
     sub_items: Optional[List[SubTodoListItem]] = Field(default=None, description="子任务列表")
 
@@ -110,6 +111,44 @@ class ReorderSubTodoRequest(BaseModel):
 class ReorderPoolTodoRequest(BaseModel):
     """任务池重排序请求"""
     todo_ids: List[int] = Field(..., description="任务 ID 列表（按新顺序排列）")
+
+
+# ============================================================================
+# Task Pool Folder Schemas
+# ============================================================================
+
+class TaskPoolFolderItem(BaseModel):
+    """任务池文件夹项"""
+    id: int = Field(..., description="文件夹 ID")
+    name: str = Field(..., description="文件夹名称")
+    order_index: int = Field(..., description="排序索引")
+    is_expanded: bool = Field(default=True, description="是否展开")
+
+
+class TaskPoolFolderListResponse(BaseModel):
+    """文件夹列表响应"""
+    items: List[TaskPoolFolderItem] = Field(default=[], description="文件夹列表")
+
+
+class CreateFolderRequest(BaseModel):
+    """创建文件夹请求"""
+    name: str = Field(..., description="文件夹名称")
+
+
+class UpdateFolderRequest(BaseModel):
+    """更新文件夹请求"""
+    name: Optional[str] = Field(default=None, description="文件夹名称")
+    is_expanded: Optional[bool] = Field(default=None, description="是否展开")
+
+
+class ReorderFoldersRequest(BaseModel):
+    """文件夹重排序请求"""
+    folder_ids: List[int] = Field(..., description="文件夹 ID 列表（按新顺序）")
+
+
+class MoveTodoToFolderRequest(BaseModel):
+    """移动任务到文件夹请求"""
+    folder_id: Optional[int] = Field(default=None, description="目标文件夹 ID（NULL 移出到根级别）")
 
 
 # ============================================================================
