@@ -740,7 +740,17 @@ REWARD_CONFIG = {
         'milestones': {
             'type': 'TEXT',
             'constraints': ['DEFAULT NULL'],
-            'comment': '里程碑，json格式'
+            'comment': """
+            里程碑，json格式
+            {
+                "1": {
+                    "order_index": "", # 排序索引
+                    "content": "", # 内容
+                    "state": "", # 状态 0: 未达成, 1: 已达成
+                    "finish_time": "" # 完成时间 YY-MM-DD
+                }
+            }
+            """
         },
         'order_index': {
             'type': 'INTEGER',

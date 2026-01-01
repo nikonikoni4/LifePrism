@@ -5,6 +5,7 @@ Reward 服务层 - Reward 奖励业务逻辑
 """
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+import json
 
 from lifewatch.server.schemas.goal_schemas import (
     RewardItem,
@@ -13,6 +14,7 @@ from lifewatch.server.schemas.goal_schemas import (
     UpdateRewardRequest,
     RewardHistoryPoint,
     RewardStatsResponse,
+    MilestoneItem,
 )
 from lifewatch.server.providers.reward_provider import reward_provider
 from lifewatch.server.providers.goal_stats_provider import goal_stats_provider
@@ -37,12 +39,32 @@ class RewardService:
         """
         将数据库记录转换为 RewardItem
         """
+        # 解析 milestones JSON
+        milestones = []
+        milestones_json = item.get('milestones')
+        if milestones_json:
+            try:
+                milestones_data = json.loads(milestones_json)
+                for key, value in milestones_data.items():
+                    milestones.append(MilestoneItem(
+                        id=key,
+                        content=value.get('content', ''),
+                        state=value.get('state', 0),
+                        finish_time=value.get('finish_time'),
+                        order_index=value.get('order_index', int(key) if key.isdigit() else 0)
+                    ))
+                # 按 order_index 排序
+                milestones.sort(key=lambda m: m.order_index)
+            except json.JSONDecodeError:
+                logger.warning(f"解析 milestones JSON 失败: {milestones_json}")
+        
         return RewardItem(
             id=item['id'],
             goal_id=item['goal_id'],
             name=item['name'],
             start_time=item.get('start_time', ''),
             target_hours=item.get('target_hours', 0),
+            milestones=milestones,
             order_index=item.get('order_index', 0),
             created_at=item.get('created_at', '')
         )
@@ -146,6 +168,7 @@ class RewardService:
             'name': request.name,
             'start_time': request.start_time,
             'target_hours': request.target_hours,
+            'milestones': request.milestones,
         }
         
         reward_id = reward_provider.create_reward(data)
@@ -177,6 +200,8 @@ class RewardService:
             update_data['start_time'] = request.start_time
         if 'target_hours' in explicitly_set_fields:
             update_data['target_hours'] = request.target_hours
+        if 'milestones' in explicitly_set_fields:
+            update_data['milestones'] = request.milestones
         
         if not update_data:
             # 没有要更新的字段，直接返回当前数据
@@ -199,6 +224,103 @@ class RewardService:
             bool: 是否成功
         """
         return reward_provider.delete_reward(reward_id)
+    
+    def update_milestone_state(self, reward_id: int, milestone_id: str, state: int) -> Optional[RewardItem]:
+        """
+        更新里程碑状态，并实现自动交换逻辑：
+        当后面的里程碑被点亮，但前面有未点亮的 (state=0)，则交换位置
+        
+        例如：1(state=1), 2(state=1), 3(state=0), 4(state=1)
+        第一个 state=0 是 3，第一个在它之后的 state=1 是 4
+        所以 3 和 4 的 order_index 交换
+        
+        Args:
+            reward_id: 奖励 ID
+            milestone_id: 里程碑 ID
+            state: 新状态 0: 未达成, 1: 已达成
+        
+        Returns:
+            Optional[RewardItem]: 更新后的奖励，失败返回 None
+        """
+        reward = reward_provider.get_reward_by_id(reward_id)
+        if not reward:
+            logger.warning(f"奖励 {reward_id} 不存在")
+            return None
+        
+        milestones_json = reward.get('milestones')
+        if not milestones_json:
+            logger.warning(f"奖励 {reward_id} 没有里程碑")
+            return None
+        
+        try:
+            milestones_data = json.loads(milestones_json)
+        except json.JSONDecodeError:
+            logger.error(f"解析 milestones JSON 失败: {milestones_json}")
+            return None
+        
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        # 更新目标里程碑状态
+        if milestone_id not in milestones_data:
+            logger.warning(f"里程碑 {milestone_id} 不存在")
+            return None
+        
+        milestones_data[milestone_id]['state'] = state
+        if state == 1:
+            milestones_data[milestone_id]['finish_time'] = today
+        else:
+            milestones_data[milestone_id]['finish_time'] = None
+        
+        # 转换为列表并按 order_index 排序
+        milestones_list = []
+        for k, v in milestones_data.items():
+            milestones_list.append({
+                'id': k,
+                'content': v.get('content', ''),
+                'state': v.get('state', 0),
+                'finish_time': v.get('finish_time'),
+                'order_index': v.get('order_index', int(k) if k.isdigit() else 0)
+            })
+        milestones_list.sort(key=lambda m: m['order_index'])
+        
+        # 实现交换逻辑：
+        # 找到第一个 state == 0 的节点
+        # 然后找到它之后第一个 state == 1 的节点
+        # 交换它们的 order_index
+        first_incomplete_idx = None
+        for i, m in enumerate(milestones_list):
+            if m['state'] == 0:
+                first_incomplete_idx = i
+                break
+        
+        if first_incomplete_idx is not None:
+            # 检查后面是否有已完成的 (state == 1)
+            for j in range(first_incomplete_idx + 1, len(milestones_list)):
+                if milestones_list[j]['state'] == 1:
+                    # 交换 order_index
+                    old_order_i = milestones_list[first_incomplete_idx]['order_index']
+                    old_order_j = milestones_list[j]['order_index']
+                    milestones_list[first_incomplete_idx]['order_index'] = old_order_j
+                    milestones_list[j]['order_index'] = old_order_i
+                    logger.info(f"交换里程碑位置: {milestones_list[first_incomplete_idx]['id']} 和 {milestones_list[j]['id']}")
+                    break
+        
+        # 重新构建 JSON
+        new_milestones = {}
+        for m in milestones_list:
+            mid = m['id']
+            new_milestones[mid] = {
+                'content': m['content'],
+                'state': m['state'],
+                'finish_time': m['finish_time'],
+                'order_index': m['order_index']
+            }
+        
+        success = reward_provider.update_reward(reward_id, {'milestones': json.dumps(new_milestones)})
+        if not success:
+            return None
+        
+        return self.get_reward_detail(reward_id)
 
 
 # 创建全局单例

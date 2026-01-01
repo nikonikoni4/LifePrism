@@ -11,6 +11,7 @@ from lifewatch.server.schemas.goal_schemas import (
     CreateRewardRequest,
     UpdateRewardRequest,
     RewardStatsResponse,
+    UpdateMilestoneStateRequest,
 )
 from lifewatch.server.services.reward_service import reward_service
 
@@ -110,3 +111,24 @@ async def delete_reward(
     if not success:
         raise HTTPException(status_code=404, detail="奖励不存在或删除失败")
     return {"success": True, "message": "奖励已删除"}
+
+
+@router.patch("/rewards/{reward_id}/milestones/{milestone_id}", response_model=RewardItem)
+async def update_milestone_state(
+    reward_id: int = Path(..., description="奖励 ID"),
+    milestone_id: str = Path(..., description="里程碑 ID"),
+    request: UpdateMilestoneStateRequest = ...
+):
+    """
+    更新里程碑状态（点亮/取消）
+    
+    请求体:
+    - **state**: 0 = 未达成, 1 = 已达成
+    
+    此接口会自动处理里程碑位置交换逻辑：
+    当后面的里程碑被点亮但前面有未点亮的，会交换它们的位置
+    """
+    item = reward_service.update_milestone_state(reward_id, milestone_id, request.state)
+    if not item:
+        raise HTTPException(status_code=404, detail="奖励或里程碑不存在")
+    return item

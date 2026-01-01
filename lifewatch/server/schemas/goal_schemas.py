@@ -292,6 +292,15 @@ class ActiveGoalNamesResponse(BaseModel):
 # ============================================================================
 
 
+class MilestoneItem(BaseModel):
+    """里程碑项"""
+    id: str = Field(..., description="唯一标识符")
+    content: str = Field(..., description="里程碑内容")
+    state: int = Field(default=0, description="状态 0: 未达成, 1: 已达成")
+    finish_time: Optional[str] = Field(default=None, description="完成时间 YYYY-MM-DD")
+    order_index: int = Field(default=0, description="排序索引")
+
+
 class RewardItem(BaseModel):
     """奖励项"""
     id: int = Field(..., description="唯一标识符 id")
@@ -299,6 +308,7 @@ class RewardItem(BaseModel):
     name: str = Field(..., description="奖励名称")
     start_time: str = Field(..., description="开始时间 YYYY-MM-DD")
     target_hours: int = Field(default=0, description="达成奖励所需的累计小时数")
+    milestones: List[MilestoneItem] = Field(default=[], description="里程碑列表")
     order_index: int = Field(default=0, description="排序索引")
     created_at: str = Field(default="", description="创建时间")
 
@@ -319,6 +329,7 @@ class CreateRewardRequest(BaseModel):
     name: str = Field(..., description="奖励名称")
     start_time: str = Field(..., description="开始时间 YYYY-MM-DD")
     target_hours: int = Field(default=0, description="达成奖励所需的累计小时数")
+    milestones: Optional[str] = Field(default=None, description="里程碑 JSON 字符串")
 
 
 class UpdateRewardRequest(BaseModel):
@@ -327,6 +338,12 @@ class UpdateRewardRequest(BaseModel):
     name: Optional[str] = Field(default=None, description="奖励名称")
     start_time: Optional[str] = Field(default=None, description="开始时间 YYYY-MM-DD")
     target_hours: Optional[int] = Field(default=None, description="达成奖励所需的累计小时数")
+    milestones: Optional[str] = Field(default=None, description="里程碑 JSON 字符串")
+
+
+class UpdateMilestoneStateRequest(BaseModel):
+    """更新里程碑状态请求"""
+    state: int = Field(..., description="状态 0: 未达成, 1: 已达成")
 
 
 # ============================================================================

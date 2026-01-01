@@ -115,12 +115,13 @@ class RewardProvider(LWBaseDataProvider):
                 next_order = cursor.fetchone()[0]
                 
                 # 构建插入数据
-                columns = ['goal_id', 'name', 'start_time', 'target_hours', 'order_index']
+                columns = ['goal_id', 'name', 'start_time', 'target_hours', 'milestones', 'order_index']
                 values = [
                     data.get('goal_id'),
                     data.get('name'),
                     data.get('start_time'),
                     data.get('target_hours', 0),
+                    data.get('milestones'),
                     next_order
                 ]
                 
@@ -159,7 +160,7 @@ class RewardProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
                 
                 # 允许更新的字段
-                allowed_fields = ['goal_id', 'name', 'start_time', 'target_hours', 'order_index']
+                allowed_fields = ['goal_id', 'name', 'start_time', 'target_hours', 'milestones', 'order_index']
                 
                 set_clauses = []
                 values = []
