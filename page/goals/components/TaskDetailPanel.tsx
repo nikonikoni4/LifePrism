@@ -81,9 +81,9 @@ const SortableSubTaskItem: React.FC<SortableSubTaskProps> = ({ subItem, onUpdate
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute left-2 top-1/2 -translate-y-1/2 cursor-grab text-slate-300 hover:text-slate-400 p-1 rounded-md hover:bg-slate-100/50 transition-all"
+                className="absolute left-1 top-1/2 -translate-y-1/2 cursor-grab text-slate-300 hover:text-slate-600 p-2 px-2.5 rounded-xl hover:bg-slate-200/50 transition-all flex items-center justify-center z-10"
             >
-                <GripVertical size={14} />
+                <GripVertical size={18} />
             </div>
 
             {/* Checkbox */}
@@ -93,8 +93,8 @@ const SortableSubTaskItem: React.FC<SortableSubTaskProps> = ({ subItem, onUpdate
                     onUpdate(subItem.id, { completed: !subItem.completed });
                 }}
                 className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${subItem.completed
-                        ? 'bg-green-500 border-green-500 text-white shadow-md'
-                        : 'border-slate-300 hover:border-green-400 text-transparent hover:text-green-300'
+                    ? 'bg-green-500 border-green-500 text-white shadow-md'
+                    : 'border-slate-300 hover:border-green-400 text-transparent hover:text-green-300'
                     }`}
             >
                 {subItem.completed && <CheckCircle size={12} />}

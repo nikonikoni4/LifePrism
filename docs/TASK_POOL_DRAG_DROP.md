@@ -163,5 +163,3 @@ const handleDragEnd = async (event: DragEndEvent) => {
 
 - [ ] 文件夹结构持久化到后端
 - [ ] 支持文件夹拖拽排序
-- [ ] 支持多选拖拽
-- [ ] 键盘快捷键支持

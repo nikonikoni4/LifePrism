@@ -83,16 +83,16 @@ const SortablePoolTreeItem: React.FC<SortablePoolTreeItemProps> = ({ task, isSel
             ref={setNodeRef}
             style={style}
             onClick={onClick}
-            className={`group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-all ${isDragging ? 'opacity-50 shadow-lg ring-2 ring-blue-300' : ''
+            className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${isDragging ? 'opacity-50 shadow-lg ring-2 ring-blue-300' : ''
                 } ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}
         >
-            {/* Drag Handle */}
+            {/* Drag Handle - Significantly enlarged hit area */}
             <div
                 {...attributes}
                 {...listeners}
-                className="cursor-grab text-slate-300 hover:text-slate-500 transition-colors"
+                className="p-2 px-2.5 -ml-2 -my-2.5 cursor-grab text-slate-300 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all flex items-center justify-center z-10"
             >
-                <GripVertical size={14} />
+                <GripVertical size={18} />
             </div>
 
             {/* Checkbox Circle */}

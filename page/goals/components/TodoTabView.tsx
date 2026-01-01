@@ -98,9 +98,9 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute left-3 top-1/2 -translate-y-1/2 p-1 text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:text-slate-500 transition-all z-20"
+                className="absolute left-1 top-1/2 -translate-y-1/2 p-2 px-2.5 text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:text-slate-600 hover:bg-slate-200/50 rounded-xl transition-all z-20 flex items-center justify-center"
             >
-                <GripVertical size={14} />
+                <GripVertical size={18} />
             </div>
 
             {/* Completion Checkbox */}

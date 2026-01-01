@@ -188,9 +188,9 @@ const SortableExecutionItem: React.FC<SortableExecutionItemProps> = ({ task, onT
             <div
                 {...attributes}
                 {...listeners}
-                className="p-1 text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:text-slate-500 transition-all"
+                className="p-2 px-2.5 -ml-2 -my-2 text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all flex items-center justify-center z-10"
             >
-                <GripVertical size={14} />
+                <GripVertical size={18} />
             </div>
             <button
                 onClick={() => onToggle(task.id)}
@@ -252,9 +252,9 @@ const SortablePoolItem: React.FC<SortablePoolItemProps> = ({ task, isSelected, o
             <div
                 {...attributes}
                 {...listeners}
-                className="text-slate-300 flex-shrink-0 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-2 px-2.5 -ml-2 -my-3 text-slate-300 flex-shrink-0 cursor-grab opacity-0 group-hover:opacity-100 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all flex items-center justify-center z-10"
             >
-                <GripVertical size={14} />
+                <GripVertical size={18} />
             </div>
             <div className="w-5 h-5 rounded-full border-2 border-slate-300 flex-shrink-0" />
             <span className="text-sm font-medium text-slate-700 flex-1">
