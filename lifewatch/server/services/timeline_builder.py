@@ -303,7 +303,7 @@ def build_time_overview_from_df(
     
     root_data['details'] = {}
     
-    # 构建 Level 2 (Sub-category)
+    # 构建 Level 2 (动态层级：有子分类时构建子分类层，无子分类时直接构建 App 层)
     categories = df['category_id'].dropna().unique()
     
     for category_id in categories:
@@ -314,42 +314,58 @@ def build_time_overview_from_df(
         # 从分类表查找名称（不再从 DataFrame 读取）
         category_name = category_name_map.get(str(category_id), "Uncategorized")
         
-        cat_data = _build_category_level_data(
-            cat_df,
-            group_field='sub_category_id',
-            name_field='sub_category',
-            title=f"{category_name} Details",
-            sub_title=f"Detailed breakdown of {category_name}",
-            is_main_category=False,
-            range_start=range_start,
-            range_end=range_end,
-            include_idle=False  # 子分类层不显示空闲时间
-        )
-        
-        cat_data['details'] = {}
-        root_data['details'][category_name] = cat_data
-        
-        # 构建 Level 3 (Apps)
+        # 检测该主分类下是否有子分类
         sub_categories = cat_df['sub_category_id'].dropna().unique()
-        for sub_cat_id in sub_categories:
-            sub_df = cat_df[cat_df['sub_category_id'] == sub_cat_id]
-            if sub_df.empty:
-                continue
-            
-            # 从分类表查找名称（不再从 DataFrame 读取）
-            sub_cat_name = sub_category_name_map.get(str(sub_cat_id), "Uncategorized")
-            
+        
+        if len(sub_categories) == 0:
+            # 无子分类 → 直接构建 App 层作为 Level 2
             app_data = _build_app_level_data(
-                sub_df,
-                title=f"{sub_cat_name} Apps",
-                sub_title=f"Top applications in {sub_cat_name}",
-                parent_sub_category_id=str(sub_cat_id),
+                cat_df,
+                title=f"{category_name} Apps",
+                sub_title=f"Top applications in {category_name}",
+                parent_category_id=str(category_id),  # 使用主分类 ID 作为颜色基准
                 range_start=range_start,
                 range_end=range_end,
-                include_idle=False  # 应用层不显示空闲时间
+                include_idle=False
+            )
+            root_data['details'][category_name] = app_data
+        else:
+            # 有子分类 → 正常构建子分类层
+            cat_data = _build_category_level_data(
+                cat_df,
+                group_field='sub_category_id',
+                name_field='sub_category',
+                title=f"{category_name} Details",
+                sub_title=f"Detailed breakdown of {category_name}",
+                is_main_category=False,
+                range_start=range_start,
+                range_end=range_end,
+                include_idle=False  # 子分类层不显示空闲时间
             )
             
-            cat_data['details'][sub_cat_name] = app_data
+            cat_data['details'] = {}
+            root_data['details'][category_name] = cat_data
+            
+            # 构建 Level 3 (Apps)
+            for sub_cat_id in sub_categories:
+                sub_df = cat_df[cat_df['sub_category_id'] == sub_cat_id]
+                if sub_df.empty:
+                    continue
+                
+                # 从分类表查找名称（不再从 DataFrame 读取）
+                sub_cat_name = sub_category_name_map.get(str(sub_cat_id), "Uncategorized")
+                
+                app_data = _build_app_level_data(
+                    sub_df,
+                    title=f"{sub_cat_name} Apps",
+                    sub_title=f"Top applications in {sub_cat_name}",
+                    parent_sub_category_id=str(sub_cat_id),
+                    range_start=range_start,
+                    range_end=range_end,
+                    include_idle=False  # 应用层不显示空闲时间
+                )
+                
+                cat_data['details'][sub_cat_name] = app_data
     
     return _dict_to_time_overview_data(root_data)
 
@@ -461,19 +477,37 @@ def _build_app_level_data(
     df: pd.DataFrame, 
     title: str, 
     sub_title: str,
-    parent_sub_category_id: str,
+    parent_sub_category_id: str = None,
+    parent_category_id: str = None,
     range_start: datetime = None,
     range_end: datetime = None,
     include_idle: bool = True  # 是否包含空闲时间
 ) -> Dict:
-    """构建应用级别数据（Top 5 + Other，包含 top 3 titles）"""
+    """构建应用级别数据（Top 5 + Other，包含 top 3 titles）
+    
+    Args:
+        df: 数据 DataFrame
+        title: 标题
+        sub_title: 副标题
+        parent_sub_category_id: 父子分类 ID（用于获取颜色基准，有子分类时使用）
+        parent_category_id: 父主分类 ID（用于获取颜色基准，无子分类时使用）
+        range_start: 时间范围开始
+        range_end: 时间范围结束
+        include_idle: 是否包含空闲时间
+    """
     stats = df.groupby('app')['duration_minutes'].sum().sort_values(ascending=False)
     total_minutes = stats.sum()
     
     top_5 = stats.head(5)
     other_value = stats.iloc[5:].sum() if len(stats) > 5 else 0
     
-    base_color = color_manager.get_sub_category_color(parent_sub_category_id)
+    # 根据传入的参数决定使用主分类或子分类颜色作为基准
+    if parent_sub_category_id:
+        base_color = color_manager.get_sub_category_color(parent_sub_category_id)
+    elif parent_category_id:
+        base_color = color_manager.get_main_category_color(parent_category_id)
+    else:
+        base_color = "#5B8FF9"  # 默认颜色
     
     pie_data = []
     bar_keys = []
