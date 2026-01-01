@@ -71,17 +71,26 @@ const SortableSubTaskItem: React.FC<SortableSubTaskProps> = ({ subItem, onUpdate
         position: 'relative'
     };
 
+    // Auto-resize textarea logic for subtask
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+    React.useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+    }, [subItem.content]);
+
     return (
         <div
             ref={setNodeRef}
             style={style}
-            className={`group relative flex items-center gap-3 py-3 pr-3 pl-10 rounded-2xl border transition-colors duration-200 mb-2 cursor-pointer border-transparent hover:border-slate-200 hover:shadow-sm bg-white ${isDragging ? 'shadow-xl' : ''}`}
+            className={`group relative flex items-start gap-3 py-3 pr-3 pl-10 rounded-2xl border transition-colors duration-200 mb-2 cursor-pointer border-transparent hover:border-slate-200 hover:shadow-sm bg-white ${isDragging ? 'shadow-xl' : ''}`}
         >
             {/* Drag Handle */}
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute left-1 top-1/2 -translate-y-1/2 cursor-grab text-slate-300 hover:text-slate-600 p-2 px-2.5 rounded-xl hover:bg-slate-200/50 transition-all flex items-center justify-center z-10"
+                className="absolute left-1 top-3 p-2 px-2.5 rounded-xl text-slate-300 hover:text-slate-600 hover:bg-slate-200/50 transition-all flex items-center justify-center z-10 cursor-grab active:cursor-grabbing mt-0.5"
             >
                 <GripVertical size={18} />
             </div>
@@ -92,7 +101,7 @@ const SortableSubTaskItem: React.FC<SortableSubTaskProps> = ({ subItem, onUpdate
                     e.stopPropagation();
                     onUpdate(subItem.id, { completed: !subItem.completed });
                 }}
-                className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${subItem.completed
+                className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all mt-0.5 ${subItem.completed
                     ? 'bg-green-500 border-green-500 text-white shadow-md'
                     : 'border-slate-300 hover:border-green-400 text-transparent hover:text-green-300'
                     }`}
@@ -100,15 +109,19 @@ const SortableSubTaskItem: React.FC<SortableSubTaskProps> = ({ subItem, onUpdate
                 {subItem.completed && <CheckCircle size={12} />}
             </button>
 
-            {/* Content */}
-            <input
-                type="text"
-                value={subItem.content}
-                onChange={(e) => onUpdate(subItem.id, { content: e.target.value })}
-                onClick={(e) => e.stopPropagation()}
-                className={`flex-1 text-sm font-medium outline-none bg-transparent transition-colors ${subItem.completed ? 'text-slate-400 line-through' : 'text-slate-700'
-                    }`}
-            />
+            {/* Content Textarea */}
+            <div className="flex-1 min-w-0">
+                <textarea
+                    ref={textareaRef}
+                    rows={1}
+                    value={subItem.content}
+                    onChange={(e) => onUpdate(subItem.id, { content: e.target.value })}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`w-full text-sm font-medium outline-none bg-transparent transition-colors resize-none overflow-hidden ${subItem.completed ? 'text-slate-400 line-through' : 'text-slate-700'
+                        }`}
+                    style={{ minHeight: '20px' }}
+                />
+            </div>
 
             {/* Delete Button */}
             <button
@@ -116,7 +129,7 @@ const SortableSubTaskItem: React.FC<SortableSubTaskProps> = ({ subItem, onUpdate
                     e.stopPropagation();
                     onDelete(subItem.id);
                 }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all mt-[-2px]"
             >
                 <Trash2 size={14} />
             </button>
@@ -150,6 +163,15 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 }) => {
     const [subTaskInput, setSubTaskInput] = useState('');
     const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+
+    // Auto-resize textarea logic for Task Name
+    const taskNameRef = React.useRef<HTMLTextAreaElement>(null);
+    React.useEffect(() => {
+        if (taskNameRef.current) {
+            taskNameRef.current.style.height = 'auto';
+            taskNameRef.current.style.height = taskNameRef.current.scrollHeight + 'px';
+        }
+    }, [task.content]);
 
     // DnD sensors for sub-tasks
     const sensors = useSensors(
@@ -193,11 +215,12 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             {/* Task Name (Header) */}
             <div className="mb-6">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Task Name</label>
-                <input
-                    type="text"
+                <textarea
+                    ref={taskNameRef}
+                    rows={1}
                     value={task.content}
                     onChange={(e) => onUpdateTask(task.id, { content: e.target.value })}
-                    className="w-full text-2xl font-bold text-slate-800 outline-none bg-transparent border-b border-transparent focus:border-slate-200 transition-all pb-1 placeholder-slate-300"
+                    className="w-full text-2xl font-bold text-slate-800 outline-none bg-transparent border-b border-transparent focus:border-slate-200 transition-all pb-1 placeholder-slate-300 resize-none overflow-hidden"
                 />
             </div>
 

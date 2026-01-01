@@ -84,27 +84,27 @@ const SortablePoolTreeItem: React.FC<SortablePoolTreeItemProps> = ({ task, isSel
             ref={setNodeRef}
             style={style}
             onClick={onClick}
-            className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${isDragging ? 'opacity-50 shadow-lg ring-2 ring-blue-300' : ''
+            className={`group flex items-start gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${isDragging ? 'opacity-50 shadow-lg ring-2 ring-blue-300' : ''
                 } ${isSelected ? 'ring-2 ring-blue-400 border-blue-400 shadow-md z-10' : 'border-transparent hover:border-slate-200 hover:shadow-sm'}`}
         >
             {/* Drag Handle - Significantly enlarged hit area */}
             <div
                 {...attributes}
                 {...listeners}
-                className="p-2 px-2.5 -ml-2 -my-2.5 cursor-grab text-slate-300 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all flex items-center justify-center z-10"
+                className="p-2 px-2.5 -ml-2 cursor-grab text-slate-300 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all flex items-center justify-center z-10 mt-[-6px]"
             >
                 <GripVertical size={18} />
             </div>
 
             {/* Checkbox Circle */}
             {task.state === 'completed' ? (
-                <CheckCircle2 size={16} className="text-green-500 flex-shrink-0" />
+                <CheckCircle2 size={16} className="text-green-500 flex-shrink-0 mt-[3px]" />
             ) : (
-                <Circle size={16} className="text-slate-300 flex-shrink-0" />
+                <Circle size={16} className="text-slate-300 flex-shrink-0 mt-[3px]" />
             )}
 
             {/* Content */}
-            <span className={`flex-1 text-sm truncate ${task.state === 'completed' ? 'text-slate-400 line-through' : 'text-slate-700'
+            <span className={`flex-1 text-sm break-words whitespace-pre-wrap ${task.state === 'completed' ? 'text-slate-400 line-through' : 'text-slate-700'
                 }`}>
                 {task.content}
             </span>
@@ -115,7 +115,7 @@ const SortablePoolTreeItem: React.FC<SortablePoolTreeItemProps> = ({ task, isSel
                     e.stopPropagation();
                     onDelete();
                 }}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all"
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all mt-[-2px]"
             >
                 <Trash2 size={12} />
             </button>

@@ -84,12 +84,21 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({
 
     const content = 'content' in todo ? todo.content : '';
 
+    // Auto-resize textarea logic
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+    }, [content]);
+
     return (
         <div
             ref={setNodeRef}
             style={style}
             onClick={() => onSelect && onSelect(todo.id)}
-            className={`group relative flex items-center gap-3 py-3 pr-3 pl-10 rounded-2xl border transition-colors duration-200 mb-2 cursor-pointer ${isActive
+            className={`group relative flex items-start gap-3 py-3 pr-3 pl-10 rounded-2xl border transition-colors duration-200 mb-2 cursor-pointer ${isActive
                 ? 'ring-2 ring-blue-400 border-blue-400 shadow-md z-10'
                 : 'border-transparent hover:border-slate-200 hover:shadow-sm'
                 } ${isSubItem ? 'bg-white' : ''} ${isDragging ? 'shadow-xl' : ''}`}
@@ -98,7 +107,7 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute left-1 top-1/2 -translate-y-1/2 p-2 px-2.5 text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:text-slate-600 hover:bg-slate-200/50 rounded-xl transition-all z-20 flex items-center justify-center"
+                className="absolute left-1 top-3 p-2 px-2.5 text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:text-slate-600 hover:bg-slate-200/50 rounded-xl transition-all z-20 flex items-center justify-center mt-0.5"
             >
                 <GripVertical size={18} />
             </div>
@@ -111,7 +120,7 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({
                     const newState = currentState === 'completed' ? 'active' : 'completed';
                     onUpdate(todo.id, { state: newState } as any);
                 }}
-                className={`w-5 h-5 rounded-lg border-[1.5px] flex items-center justify-center transition-all flex-shrink-0 ${'state' in todo && (todo as any).state === 'completed'
+                className={`w-5 h-5 rounded-lg border-[1.5px] flex items-center justify-center transition-all flex-shrink-0 mt-0.5 ${'state' in todo && (todo as any).state === 'completed'
                     ? 'bg-slate-800 border-slate-800'
                     : 'border-slate-300 bg-white/50 hover:border-blue-400'
                     }`}
@@ -119,16 +128,18 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({
                 {'state' in todo && (todo as any).state === 'completed' && <Check size={12} className="text-white" strokeWidth={3} />}
             </button>
 
-            {/* Text Input - Direct Edit */}
+            {/* Text Input - Direct Edit via Textarea */}
             <div className="flex-1 min-w-0">
-                <input
-                    type="text"
+                <textarea
+                    ref={textareaRef}
                     value={content}
+                    rows={1}
                     onChange={(e) => onUpdate(todo.id, { content: e.target.value })}
-                    className={`w-full bg-transparent border-none outline-none text-sm font-medium p-0 ${'state' in todo && (todo as any).state === 'completed'
+                    className={`w-full bg-transparent border-none outline-none text-sm font-medium p-0 resize-none overflow-hidden ${'state' in todo && (todo as any).state === 'completed'
                         ? 'text-slate-400 line-through decoration-slate-300'
                         : 'text-slate-700'
                         }`}
+                    style={{ minHeight: '20px' }}
                 />
             </div>
 
@@ -138,7 +149,7 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({
                     e.stopPropagation();
                     onDelete(todo.id);
                 }}
-                className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-all"
+                className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-all mt-[-2px]"
             >
                 <Trash2 size={14} />
             </button>

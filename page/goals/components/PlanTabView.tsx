@@ -194,29 +194,29 @@ const SortableExecutionItem: React.FC<SortableExecutionItemProps> = ({ task, onT
         <div
             ref={setNodeRef}
             style={style}
-            className={`group flex items-center gap-3 px-3 py-2 rounded-xl border transition-all ${isDragging ? 'shadow-lg' : 'border-transparent hover:border-slate-200 hover:shadow-sm'}`}
+            className={`group flex items-start gap-3 px-3 py-2 rounded-xl border transition-all ${isDragging ? 'shadow-lg' : 'border-transparent hover:border-slate-200 hover:shadow-sm'}`}
         >
             {/* Drag Handle */}
             <div
                 {...attributes}
                 {...listeners}
-                className="p-2 px-2.5 -ml-2 -my-2 text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all flex items-center justify-center z-10"
+                className="p-2 px-2.5 -ml-2 cursor-grab text-slate-300 opacity-0 group-hover:opacity-100 active:cursor-grabbing hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all flex items-center justify-center z-10 mt-[-7px]"
             >
                 <GripVertical size={18} />
             </div>
             <button
                 onClick={() => onToggle(task.id)}
-                className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors flex-shrink-0 ${task.state === 'completed' ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 hover:border-blue-500'
+                className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors flex-shrink-0 mt-[1px] ${task.state === 'completed' ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 hover:border-blue-500'
                     }`}
             >
                 {task.state === 'completed' && <Check size={12} className="text-white" strokeWidth={3} />}
             </button>
-            <span className={`text-sm font-medium truncate flex-1 ${task.state === 'completed' ? 'text-slate-300 line-through' : 'text-slate-600'}`}>
+            <span className={`text-sm font-medium break-words whitespace-pre-wrap flex-1 ${task.state === 'completed' ? 'text-slate-300 line-through' : 'text-slate-600'}`}>
                 {task.content}
             </span>
             <button
                 onClick={() => onDelete(task.id)}
-                className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all mt-[-3px]"
             >
                 <Trash2 size={14} />
             </button>
@@ -256,7 +256,7 @@ const SortablePoolItem: React.FC<SortablePoolItemProps> = ({ task, isSelected, o
             ref={setNodeRef}
             style={style}
             onClick={onClick}
-            className={`group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all border-2 ${isSelected
+            className={`group flex items-start gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all border-2 ${isSelected
                 ? 'border-blue-400 shadow-md'
                 : 'border-transparent hover:border-slate-200'
                 } ${isDragging ? 'shadow-xl' : ''}`}
@@ -264,17 +264,17 @@ const SortablePoolItem: React.FC<SortablePoolItemProps> = ({ task, isSelected, o
             <div
                 {...attributes}
                 {...listeners}
-                className="p-2 px-2.5 -ml-2 -my-3 text-slate-300 flex-shrink-0 cursor-grab opacity-0 group-hover:opacity-100 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all flex items-center justify-center z-10"
+                className="p-2 px-2.5 -ml-2 text-slate-300 flex-shrink-0 cursor-grab opacity-0 group-hover:opacity-100 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all flex items-center justify-center z-10 mt-[-6px]"
             >
                 <GripVertical size={18} />
             </div>
-            <div className="w-5 h-5 rounded-full border-2 border-slate-300 flex-shrink-0" />
-            <span className="text-sm font-medium text-slate-700 flex-1">
+            <div className="w-5 h-5 rounded-full border-2 border-slate-300 flex-shrink-0 mt-[1px]" />
+            <span className="text-sm font-medium text-slate-700 flex-1 break-words whitespace-pre-wrap">
                 {task.content}
             </span>
             <Trash2
                 size={14}
-                className="text-slate-300 flex-shrink-0 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all cursor-pointer"
+                className="text-slate-300 flex-shrink-0 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all cursor-pointer mt-[3px]"
                 onClick={(e) => {
                     e.stopPropagation();
                     onDelete();
@@ -1748,11 +1748,11 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                 <DragOverlay>
                     {activeDragItem ? (
                         <div
-                            className="flex items-center gap-2 px-3 py-2 border-2 border-blue-300 rounded-lg shadow-lg opacity-90 cursor-grabbing"
+                            className="flex items-start gap-2 px-3 py-2 border-2 border-blue-300 rounded-lg shadow-lg opacity-90 cursor-grabbing bg-white max-w-[300px]"
                             style={{ backgroundColor: activeDragItem.color || '#FFFFFF' }}
                         >
-                            <div className="w-2 h-2 rounded-full bg-slate-300" />
-                            <span className="text-sm font-medium text-slate-700 truncate max-w-[200px]">
+                            <div className="w-2 h-2 rounded-full bg-slate-300 flex-shrink-0 mt-1.5" />
+                            <span className="text-sm font-medium text-slate-700 break-words whitespace-pre-wrap">
                                 {activeDragItem.content}
                             </span>
                         </div>
