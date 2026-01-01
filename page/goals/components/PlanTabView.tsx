@@ -49,9 +49,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { planApi, todoApi, goalApi } from '../api';
-import { TodoItem, SubTodoItem, WeeklyPlanResponse, MonthlyPlanResponse, DailyPlanItem, WeeklyPlanItem, ActiveGoalItem } from '../types';
+import { TodoItem, SubTodoItem, WeeklyPlanResponse, MonthlyPlanResponse, DailyPlanItem, WeeklyPlanItem, ActiveGoalItem, TaskFolder } from '../types';
 import DateTreeSelector from './DateTreeSelector';
 import TaskDetailPanel from './TaskDetailPanel';
+import TaskPoolTree from './TaskPoolTree';
 
 // --- Types ---
 interface WeekData {
@@ -353,6 +354,14 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
     const [isLoadingPool, setIsLoadingPool] = useState(false);
     const [poolInput, setPoolInput] = useState('');
     const [activeGoals, setActiveGoals] = useState<ActiveGoalItem[]>([]);
+    // Selected goal for new tasks
+    const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+
+    // ============================================================================
+    // Task Pool Folder State (临时状态，不持久化)
+    // ============================================================================
+    const [taskFolders, setTaskFolders] = useState<TaskFolder[]>([]);
+    const [rootTodoIds, setRootTodoIds] = useState<number[]>([]);
 
     // DnD state
     const [activeDragItem, setActiveDragItem] = useState<TodoItem | null>(null);
@@ -458,8 +467,8 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
         }
     }, [showTaskPool, fetchTaskPool]);
 
-    // Create task in pool (inactive state)
-    const handleCreatePoolTask = async (content: string) => {
+    // Create task in pool (inactive state) - supports folder and goal linking
+    const handleCreatePoolTask = async (content: string, folderId: string | null) => {
         if (!content.trim()) return;
         setPoolInput('');
         try {
@@ -467,13 +476,86 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                 content,
                 state: 'inactive',
                 date: null,
-                color: '#FFFFFF'
+                color: '#FFFFFF',
+                linkToGoalId: selectedGoalId || undefined
             });
             setTaskPoolItems(prev => [...prev, newItem]);
+
+            // Add to folder or root
+            if (folderId) {
+                setTaskFolders(prev => prev.map(f =>
+                    f.id === folderId
+                        ? { ...f, todoIds: [...f.todoIds, newItem.id] }
+                        : f
+                ));
+            } else {
+                setRootTodoIds(prev => [...prev, newItem.id]);
+            }
         } catch (error) {
             console.error('Failed to create pool task:', error);
         }
     };
+
+    // ============================================================================
+    // Folder Management Handlers (临时状态，不持久化)
+    // ============================================================================
+
+    const handleCreateFolder = (name: string) => {
+        const newFolder: TaskFolder = {
+            id: `folder-${Date.now()}`,
+            name,
+            isExpanded: true,
+            todoIds: []
+        };
+        setTaskFolders(prev => [...prev, newFolder]);
+    };
+
+    const handleToggleFolder = (folderId: string) => {
+        setTaskFolders(prev => prev.map(f =>
+            f.id === folderId ? { ...f, isExpanded: !f.isExpanded } : f
+        ));
+    };
+
+    const handleDeleteFolder = (folderId: string) => {
+        const folder = taskFolders.find(f => f.id === folderId);
+        if (folder) {
+            // Move folder's todos to root
+            setRootTodoIds(prev => [...prev, ...folder.todoIds]);
+        }
+        setTaskFolders(prev => prev.filter(f => f.id !== folderId));
+    };
+
+    const handleDeletePoolTask = async (taskId: number) => {
+        // Remove from folder or root tracking
+        setTaskFolders(prev => prev.map(f => ({
+            ...f,
+            todoIds: f.todoIds.filter(id => id !== taskId)
+        })));
+        setRootTodoIds(prev => prev.filter(id => id !== taskId));
+
+        // Remove from main list
+        setTaskPoolItems(prev => prev.filter(t => t.id !== taskId));
+
+        try {
+            await todoApi.deleteTodo(taskId);
+        } catch (error) {
+            console.error('Failed to delete pool task:', error);
+            fetchTaskPool();
+        }
+    };
+
+    // Sync rootTodoIds when taskPoolItems changes (for newly fetched items)
+    useEffect(() => {
+        // Find all task IDs that are not in any folder
+        const folderTaskIds = new Set(taskFolders.flatMap(f => f.todoIds));
+        const newRootIds = taskPoolItems
+            .map(t => t.id)
+            .filter(id => !folderTaskIds.has(id) && !rootTodoIds.includes(id));
+
+        if (newRootIds.length > 0) {
+            setRootTodoIds(prev => [...prev, ...newRootIds]);
+        }
+    }, [taskPoolItems, taskFolders]);
 
     // Fetch active goals for TaskDetailPanel
     const fetchActiveGoals = useCallback(async () => {
@@ -613,7 +695,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
     };
 
     const handleDragEnd = async (event: DragEndEvent) => {
-        const { active, over } = event;
+        const { active, over, delta } = event;
         setActiveDragItem(null);
 
         if (!over) return;
@@ -627,8 +709,17 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             ? weeklyPlanData?.items.find(d => d.todoList.some(t => t.id === activeId))?.date
             : null;
 
-        // Determine target
-        const isToPool = overId === 'task-pool' || taskPoolItems.some(t => t.id === Number(overId));
+        // Find source folder of the task (if from pool) - prefer drag data, fallback to lookup
+        const dragDataFolderId = active.data.current?.folderId as string | null | undefined;
+        const sourceFolderId = isFromPool
+            ? (dragDataFolderId ?? taskFolders.find(f => f.todoIds.includes(activeId))?.id ?? null)
+            : null;
+
+        // Determine target - now checking for folder- prefix and pool-root
+        const isToPoolRoot = overId === 'pool-root' || overId === 'task-pool';
+        const isToFolder = overId.startsWith('folder-');
+        const targetFolderId = isToFolder ? overId.replace('folder-', '') : null;
+        const isToPool = isToPoolRoot || isToFolder || taskPoolItems.some(t => t.id === Number(overId));
         const targetDate = overId.startsWith('day-') ? overId.replace('day-', '') : null;
 
         // Check if dropping onto another task (for reordering within same container)
@@ -637,17 +728,84 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
         const overItemDayDate = weeklyPlanData?.items.find(d => d.todoList.some(t => t.id === overItemId))?.date;
 
         try {
-            // Case 1: Pool internal reordering
-            if (isFromPool && (isOverPoolItem || overId === 'task-pool')) {
-                if (isOverPoolItem && activeId !== overItemId) {
+            // Determine the folder of the over item (if it's a pool item)
+            const overItemFolderId = isOverPoolItem
+                ? taskFolders.find(f => f.todoIds.includes(overItemId))?.id || null
+                : null;
+
+            // Case 1: Pool internal - either reordering or moving between folders
+            if (isFromPool && isOverPoolItem && activeId !== overItemId) {
+                // If source and target are in the same container (same folder or both root)
+                if (sourceFolderId === overItemFolderId) {
+                    // Same container reordering
                     const oldIndex = taskPoolItems.findIndex(t => t.id === activeId);
                     const newIndex = taskPoolItems.findIndex(t => t.id === overItemId);
                     if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
                         const newOrder = arrayMove(taskPoolItems, oldIndex, newIndex);
-                        // Optimistic update
                         setTaskPoolItems(newOrder);
                         await todoApi.reorderPoolTodos(newOrder.map(t => t.id));
                     }
+                } else {
+                    // Moving between different folders/root via dropping on an item
+                    // Remove from source
+                    if (sourceFolderId) {
+                        setTaskFolders(prev => prev.map(f =>
+                            f.id === sourceFolderId
+                                ? { ...f, todoIds: f.todoIds.filter(id => id !== activeId) }
+                                : f
+                        ));
+                    } else {
+                        setRootTodoIds(prev => prev.filter(id => id !== activeId));
+                    }
+
+                    // Add to target folder/root (where over item is)
+                    if (overItemFolderId) {
+                        setTaskFolders(prev => prev.map(f =>
+                            f.id === overItemFolderId
+                                ? { ...f, todoIds: [...f.todoIds, activeId] }
+                                : f
+                        ));
+                    } else {
+                        setRootTodoIds(prev => [...prev, activeId]);
+                    }
+                }
+                return;
+            }
+
+            // Case 1.5: Dropping on pool-root explicitly
+            if (isFromPool && isToPoolRoot && sourceFolderId) {
+                // Moving from folder to root
+                setTaskFolders(prev => prev.map(f =>
+                    f.id === sourceFolderId
+                        ? { ...f, todoIds: f.todoIds.filter(id => id !== activeId) }
+                        : f
+                ));
+                setRootTodoIds(prev => [...prev, activeId]);
+                return;
+            }
+
+            // Case 1.5: Pool item moving to different folder or root
+            if (isFromPool && (isToFolder || isToPoolRoot)) {
+                // Remove from source folder/root
+                if (sourceFolderId) {
+                    setTaskFolders(prev => prev.map(f =>
+                        f.id === sourceFolderId
+                            ? { ...f, todoIds: f.todoIds.filter(id => id !== activeId) }
+                            : f
+                    ));
+                } else {
+                    setRootTodoIds(prev => prev.filter(id => id !== activeId));
+                }
+
+                // Add to target folder/root
+                if (targetFolderId) {
+                    setTaskFolders(prev => prev.map(f =>
+                        f.id === targetFolderId
+                            ? { ...f, todoIds: [...f.todoIds, activeId] }
+                            : f
+                    ));
+                } else {
+                    setRootTodoIds(prev => [...prev, activeId]);
                 }
                 return;
             }
@@ -682,6 +840,17 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             if (isFromPool && targetDate) {
                 const item = taskPoolItems.find(t => t.id === activeId);
                 if (item) {
+                    // Remove from folder/root tracking
+                    if (sourceFolderId) {
+                        setTaskFolders(prev => prev.map(f =>
+                            f.id === sourceFolderId
+                                ? { ...f, todoIds: f.todoIds.filter(id => id !== activeId) }
+                                : f
+                        ));
+                    } else {
+                        setRootTodoIds(prev => prev.filter(id => id !== activeId));
+                    }
+
                     // Optimistic update
                     setTaskPoolItems(prev => prev.filter(t => t.id !== activeId));
                     setWeeklyPlanData(prev => {
@@ -699,9 +868,13 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                     await todoApi.updateTodo(activeId, { state: 'active', date: targetDate });
                 }
             } else if (!isFromPool && isToPool) {
-                // Case 4: Day -> Pool (cross-container)
+                // Case 4: Day -> Pool (cross-container) - detect folder vs root using horizontal displacement
                 const item = weeklyPlanData?.items.flatMap(d => d.todoList).find(t => t.id === activeId);
                 if (item) {
+                    // Check horizontal displacement to determine target
+                    // delta.x > 30px suggests dropping into a folder (if hovering over folder area)
+                    const dropTargetFolderId = (targetFolderId && Math.abs(delta.x) > 30) ? targetFolderId : null;
+
                     // Optimistic update
                     setWeeklyPlanData(prev => {
                         if (!prev) return prev;
@@ -714,6 +887,17 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                         };
                     });
                     setTaskPoolItems(prev => [...prev, { ...item, state: 'inactive', date: null }]);
+
+                    // Add to folder or root
+                    if (dropTargetFolderId) {
+                        setTaskFolders(prev => prev.map(f =>
+                            f.id === dropTargetFolderId
+                                ? { ...f, todoIds: [...f.todoIds, activeId] }
+                                : f
+                        ));
+                    } else {
+                        setRootTodoIds(prev => [...prev, activeId]);
+                    }
 
                     await todoApi.updateTodo(activeId, { state: 'inactive', date: null });
                 }
@@ -1065,69 +1249,43 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                             </button>
                         </div>
 
-                        {/* Goal Selector */}
-                        <div className="px-4 py-3 border-b border-slate-100">
-                            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200 shadow-sm">
-                                <Target size={14} className="text-slate-400" />
-                                <span className="text-sm text-slate-600">目标</span>
-                                <span className="text-sm font-medium text-slate-700">无</span>
-                                <ChevronDown size={14} className="text-slate-400 ml-auto" />
-                            </div>
-                        </div>
-
-                        {/* Pool Input */}
+                        {/* Goal Selector - Functional dropdown */}
                         <div className="px-4 py-3 border-b border-slate-100">
                             <div className="relative">
-                                <input
-                                    type="text"
-                                    value={poolInput}
-                                    onChange={(e) => setPoolInput(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            handleCreatePoolTask(poolInput);
-                                        }
-                                    }}
-                                    placeholder="Type to create a task..."
-                                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 pl-8 text-sm font-medium outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-slate-400 shadow-sm"
-                                />
-                                <Plus size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <select
+                                    value={selectedGoalId || ''}
+                                    onChange={(e) => setSelectedGoalId(e.target.value || null)}
+                                    className="w-full appearance-none bg-white border border-slate-200 rounded-lg px-3 py-2 pl-8 text-sm font-medium outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm cursor-pointer"
+                                >
+                                    <option value="">无目标</option>
+                                    {activeGoals.map(goal => (
+                                        <option key={goal.id} value={goal.id}>{goal.name}</option>
+                                    ))}
+                                </select>
+                                <Target size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                             </div>
                         </div>
 
-                        {/* Pool Task List - Scrollable with DroppablePool */}
-                        <DroppablePool>
-                            {isLoadingPool ? (
-                                <div className="flex items-center justify-center py-8">
-                                    <Loader2 size={20} className="text-blue-500 animate-spin" />
-                                </div>
-                            ) : taskPoolItems.length === 0 ? (
-                                <div className="text-center py-8 text-slate-400 text-sm">
-                                    任务池为空，拖拽任务到这里
-                                </div>
-                            ) : (
-                                <SortableContext items={taskPoolItems.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                                    <div className="space-y-2">
-                                        {taskPoolItems.map(task => (
-                                            <SortablePoolItem
-                                                key={task.id}
-                                                task={task}
-                                                isSelected={selectedPoolTask?.id === task.id}
-                                                onClick={() => setSelectedPoolTask(task)}
-                                                onDelete={async () => {
-                                                    setTaskPoolItems(prev => prev.filter(t => t.id !== task.id));
-                                                    try {
-                                                        await todoApi.deleteTodo(task.id);
-                                                    } catch (error) {
-                                                        console.error('Failed to delete pool task:', error);
-                                                        fetchTaskPool();
-                                                    }
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                </SortableContext>
-                            )}
-                        </DroppablePool>
+                        {/* Task Pool Tree Component */}
+                        {isLoadingPool ? (
+                            <div className="flex items-center justify-center py-8">
+                                <Loader2 size={20} className="text-blue-500 animate-spin" />
+                            </div>
+                        ) : (
+                            <TaskPoolTree
+                                folders={taskFolders}
+                                rootTodoIds={rootTodoIds}
+                                allTasks={taskPoolItems}
+                                selectedTaskId={selectedPoolTask?.id || null}
+                                onSelectTask={(task) => setSelectedPoolTask(task)}
+                                onCreateFolder={handleCreateFolder}
+                                onToggleFolder={handleToggleFolder}
+                                onDeleteFolder={handleDeleteFolder}
+                                onCreateTask={handleCreatePoolTask}
+                                onDeleteTask={handleDeletePoolTask}
+                            />
+                        )}
                     </div>
                 )}
 

@@ -261,3 +261,27 @@ export interface TokenUsage {
     outputTokens: number;
     processedRecords: number;
 }
+
+// ============================================================================
+// Task Pool Folder Types (任务池文件夹结构)
+// ============================================================================
+
+/**
+ * 任务池文件夹定义
+ * 支持一级文件夹结构
+ */
+export interface TaskFolder {
+    id: string;          // 临时ID，如 'folder-1704067200000'
+    name: string;        // 文件夹名称
+    isExpanded: boolean; // 展开状态
+    todoIds: number[];   // 文件夹内的todo ID列表
+}
+
+/**
+ * 任务池树结构数据
+ * 管理文件夹和根级别的todo组织
+ */
+export interface TaskPoolTreeData {
+    folders: TaskFolder[];      // 所有文件夹
+    rootTodoIds: number[];      // 根级别的todo ID（无文件夹）
+}
