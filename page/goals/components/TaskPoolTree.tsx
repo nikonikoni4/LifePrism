@@ -58,7 +58,7 @@ const chevronVariants = {
 interface SortablePoolTreeItemProps {
     task: TodoItem;
     isSelected: boolean;
-    folderId: string | null;
+    folderId: number | null;
     onClick: () => void;
     onDelete: () => void;
 }
@@ -76,6 +76,7 @@ const SortablePoolTreeItem: React.FC<SortablePoolTreeItemProps> = ({ task, isSel
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
+        backgroundColor: task.color || '#FFFFFF',
     };
 
     return (
@@ -84,7 +85,7 @@ const SortablePoolTreeItem: React.FC<SortablePoolTreeItemProps> = ({ task, isSel
             style={style}
             onClick={onClick}
             className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${isDragging ? 'opacity-50 shadow-lg ring-2 ring-blue-300' : ''
-                } ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}
+                } ${isSelected ? 'ring-2 ring-blue-400 border-blue-400 shadow-md z-10' : 'border-transparent hover:border-slate-200 hover:shadow-sm'}`}
         >
             {/* Drag Handle - Significantly enlarged hit area */}
             <div
@@ -124,7 +125,7 @@ const SortablePoolTreeItem: React.FC<SortablePoolTreeItemProps> = ({ task, isSel
 
 // --- Droppable Folder Container ---
 interface DroppableFolderProps {
-    folderId: string;
+    folderId: number;
     children: React.ReactNode;
     isEmpty: boolean;
 }
@@ -157,7 +158,7 @@ const DroppableFolder: React.FC<DroppableFolderProps> = ({ folderId, children, i
 // --- Droppable Folder Header ---
 // Makes the folder header itself a drop target with visual feedback
 interface DroppableFolderHeaderProps {
-    folderId: string;
+    folderId: number;
     children: React.ReactNode;
 }
 
@@ -219,20 +220,18 @@ const DroppableRoot: React.FC<DroppableRootProps> = ({ children }) => {
 // --- Main Component Props ---
 interface TaskPoolTreeProps {
     folders: TaskFolder[];
-    rootTodoIds: number[];
-    allTasks: TodoItem[];
+    allTasks: TodoItem[];  // 任务通过 folderId 属性关联文件夹
     selectedTaskId: number | null;
     onSelectTask: (task: TodoItem | null) => void;
     onCreateFolder: (name: string) => void;
-    onToggleFolder: (folderId: string) => void;
-    onDeleteFolder: (folderId: string) => void;
-    onCreateTask: (content: string, folderId: string | null) => void;
+    onToggleFolder: (folderId: number) => void;
+    onDeleteFolder: (folderId: number) => void;
+    onCreateTask: (content: string, folderId: number | null) => void;
     onDeleteTask: (taskId: number) => void;
 }
 
 const TaskPoolTree: React.FC<TaskPoolTreeProps> = ({
     folders,
-    rootTodoIds,
     allTasks,
     selectedTaskId,
     onSelectTask,
@@ -246,21 +245,16 @@ const TaskPoolTree: React.FC<TaskPoolTreeProps> = ({
     const [isAddingFolder, setIsAddingFolder] = useState(false);
     const [rootInput, setRootInput] = useState('');
     const [folderInputs, setFolderInputs] = useState<Record<string, string>>({});
-    const [activeFolderInput, setActiveFolderInput] = useState<string | null>(null);
+    const [activeFolderInput, setActiveFolderInput] = useState<number | null>(null);
 
-    // Get task by ID
-    const getTaskById = (id: number): TodoItem | undefined => {
-        return allTasks.find(t => t.id === id);
-    };
-
-    // Get tasks for folder
+    // Get tasks for a specific folder (by folderId)
     const getFolderTasks = (folder: TaskFolder): TodoItem[] => {
-        return folder.todoIds.map(id => getTaskById(id)).filter((t): t is TodoItem => t !== undefined);
+        return allTasks.filter(t => t.folderId === folder.id);
     };
 
-    // Get root tasks
+    // Get root tasks (folderId is null)
     const getRootTasks = (): TodoItem[] => {
-        return rootTodoIds.map(id => getTaskById(id)).filter((t): t is TodoItem => t !== undefined);
+        return allTasks.filter(t => t.folderId === null);
     };
 
     // Handle folder creation
@@ -281,7 +275,7 @@ const TaskPoolTree: React.FC<TaskPoolTreeProps> = ({
     };
 
     // Handle folder task creation
-    const handleCreateFolderTask = (folderId: string) => {
+    const handleCreateFolderTask = (folderId: number) => {
         const input = folderInputs[folderId];
         if (input?.trim()) {
             onCreateTask(input.trim(), folderId);

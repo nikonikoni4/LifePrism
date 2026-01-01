@@ -48,11 +48,22 @@ import {
     useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { planApi, todoApi, goalApi } from '../api';
+import { planApi, todoApi, goalApi, folderApi } from '../api';
 import { TodoItem, SubTodoItem, WeeklyPlanResponse, MonthlyPlanResponse, DailyPlanItem, WeeklyPlanItem, ActiveGoalItem, TaskFolder } from '../types';
 import DateTreeSelector from './DateTreeSelector';
 import TaskDetailPanel from './TaskDetailPanel';
 import TaskPoolTree from './TaskPoolTree';
+
+// --- Constants ---
+const TODO_COLORS = [
+    '#FFFFFF', // White
+    '#E0F2FE', // Blue
+    '#DCFCE7', // Green
+    '#FEF3C7', // Amber
+    '#FAE8FF', // Purple
+    '#FEE2E2', // Red
+    '#F3F4F6'  // Grey
+];
 
 // --- Types ---
 interface WeekData {
@@ -176,13 +187,14 @@ const SortableExecutionItem: React.FC<SortableExecutionItemProps> = ({ task, onT
         transition: isDragging ? undefined : transition,
         opacity: isDragging ? 0.5 : 1,
         zIndex: isDragging ? 50 : 'auto',
+        backgroundColor: task.color || '#FFFFFF',
     };
 
     return (
         <div
             ref={setNodeRef}
             style={style}
-            className={`group flex items-center gap-3 ${isDragging ? 'shadow-lg' : ''}`}
+            className={`group flex items-center gap-3 px-3 py-2 rounded-xl border transition-all ${isDragging ? 'shadow-lg' : 'border-transparent hover:border-slate-200 hover:shadow-sm'}`}
         >
             {/* Drag Handle */}
             <div
@@ -358,10 +370,9 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
     const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
 
     // ============================================================================
-    // Task Pool Folder State (临时状态，不持久化)
+    // Task Pool Folder State (通过 API 持久化)
     // ============================================================================
     const [taskFolders, setTaskFolders] = useState<TaskFolder[]>([]);
-    const [rootTodoIds, setRootTodoIds] = useState<number[]>([]);
 
     // DnD state
     const [activeDragItem, setActiveDragItem] = useState<TodoItem | null>(null);
@@ -451,8 +462,13 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
     const fetchTaskPool = useCallback(async () => {
         setIsLoadingPool(true);
         try {
-            const data = await todoApi.getPoolTodos();
-            setTaskPoolItems(data.items || []);
+            // 同时获取任务和文件夹数据
+            const [todosData, foldersData] = await Promise.all([
+                todoApi.getPoolTodos(),
+                folderApi.getFolders()
+            ]);
+            setTaskPoolItems(todosData.items || []);
+            setTaskFolders(foldersData || []);
         } catch (error) {
             console.error('Failed to fetch task pool:', error);
         } finally {
@@ -468,28 +484,28 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
     }, [showTaskPool, fetchTaskPool]);
 
     // Create task in pool (inactive state) - supports folder and goal linking
-    const handleCreatePoolTask = async (content: string, folderId: string | null) => {
+    const handleCreatePoolTask = async (content: string, folderId: number | null) => {
         if (!content.trim()) return;
         setPoolInput('');
+        // Pick a random color (excluding white for better visibility)
+        const colorOptions = TODO_COLORS.slice(1);
+        const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
         try {
             const newItem = await todoApi.createTodo({
                 content,
                 state: 'inactive',
                 date: null,
-                color: '#FFFFFF',
+                color: randomColor,
                 linkToGoalId: selectedGoalId || undefined
             });
-            setTaskPoolItems(prev => [...prev, newItem]);
 
-            // Add to folder or root
-            if (folderId) {
-                setTaskFolders(prev => prev.map(f =>
-                    f.id === folderId
-                        ? { ...f, todoIds: [...f.todoIds, newItem.id] }
-                        : f
-                ));
+            // 如果指定了文件夹，将任务移动到该文件夹
+            if (folderId !== null) {
+                await todoApi.moveTodoToFolder(newItem.id, folderId);
+                // 更新本地状态以反映文件夹归属
+                setTaskPoolItems(prev => [...prev, { ...newItem, folderId }]);
             } else {
-                setRootTodoIds(prev => [...prev, newItem.id]);
+                setTaskPoolItems(prev => [...prev, newItem]);
             }
         } catch (error) {
             console.error('Failed to create pool task:', error);
@@ -497,43 +513,58 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
     };
 
     // ============================================================================
-    // Folder Management Handlers (临时状态，不持久化)
+    // Folder Management Handlers (通过 API 持久化)
     // ============================================================================
 
-    const handleCreateFolder = (name: string) => {
-        const newFolder: TaskFolder = {
-            id: `folder-${Date.now()}`,
-            name,
-            isExpanded: true,
-            todoIds: []
-        };
-        setTaskFolders(prev => [...prev, newFolder]);
-    };
-
-    const handleToggleFolder = (folderId: string) => {
-        setTaskFolders(prev => prev.map(f =>
-            f.id === folderId ? { ...f, isExpanded: !f.isExpanded } : f
-        ));
-    };
-
-    const handleDeleteFolder = (folderId: string) => {
-        const folder = taskFolders.find(f => f.id === folderId);
-        if (folder) {
-            // Move folder's todos to root
-            setRootTodoIds(prev => [...prev, ...folder.todoIds]);
+    const handleCreateFolder = async (name: string) => {
+        try {
+            const newFolder = await folderApi.createFolder(name);
+            setTaskFolders(prev => [...prev, newFolder]);
+        } catch (error) {
+            console.error('Failed to create folder:', error);
         }
+    };
+
+    const handleToggleFolder = async (folderId: number) => {
+        // 先进行乐观更新
+        const folder = taskFolders.find(f => f.id === folderId);
+        if (!folder) return;
+
+        const newExpandedState = !folder.isExpanded;
+        setTaskFolders(prev => prev.map(f =>
+            f.id === folderId ? { ...f, isExpanded: newExpandedState } : f
+        ));
+
+        try {
+            await folderApi.updateFolder(folderId, { isExpanded: newExpandedState });
+        } catch (error) {
+            console.error('Failed to update folder:', error);
+            // 回滚
+            setTaskFolders(prev => prev.map(f =>
+                f.id === folderId ? { ...f, isExpanded: !newExpandedState } : f
+            ));
+        }
+    };
+
+    const handleDeleteFolder = async (folderId: number) => {
+        // 乐观更新：文件夹内的任务的 folderId 会被后端自动设为 null
         setTaskFolders(prev => prev.filter(f => f.id !== folderId));
+        // 同时更新本地任务的 folderId
+        setTaskPoolItems(prev => prev.map(t =>
+            t.folderId === folderId ? { ...t, folderId: null } : t
+        ));
+
+        try {
+            await folderApi.deleteFolder(folderId);
+        } catch (error) {
+            console.error('Failed to delete folder:', error);
+            // 发生错误时重新获取数据
+            fetchTaskPool();
+        }
     };
 
     const handleDeletePoolTask = async (taskId: number) => {
-        // Remove from folder or root tracking
-        setTaskFolders(prev => prev.map(f => ({
-            ...f,
-            todoIds: f.todoIds.filter(id => id !== taskId)
-        })));
-        setRootTodoIds(prev => prev.filter(id => id !== taskId));
-
-        // Remove from main list
+        // 乐观更新：从列表中移除
         setTaskPoolItems(prev => prev.filter(t => t.id !== taskId));
 
         try {
@@ -543,19 +574,6 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             fetchTaskPool();
         }
     };
-
-    // Sync rootTodoIds when taskPoolItems changes (for newly fetched items)
-    useEffect(() => {
-        // Find all task IDs that are not in any folder
-        const folderTaskIds = new Set(taskFolders.flatMap(f => f.todoIds));
-        const newRootIds = taskPoolItems
-            .map(t => t.id)
-            .filter(id => !folderTaskIds.has(id) && !rootTodoIds.includes(id));
-
-        if (newRootIds.length > 0) {
-            setRootTodoIds(prev => [...prev, ...newRootIds]);
-        }
-    }, [taskPoolItems, taskFolders]);
 
     // Fetch active goals for TaskDetailPanel
     const fetchActiveGoals = useCallback(async () => {
@@ -709,10 +727,11 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             ? weeklyPlanData?.items.find(d => d.todoList.some(t => t.id === activeId))?.date
             : null;
 
-        // Find source folder of the task (if from pool) - prefer drag data, fallback to lookup
-        const dragDataFolderId = active.data.current?.folderId as string | null | undefined;
+        // Find source folder of the task (if from pool) - prefer drag data, fallback to task.folderId
+        const dragDataFolderId = active.data.current?.folderId as number | null | undefined;
+        const taskItem = taskPoolItems.find(t => t.id === activeId);
         const sourceFolderId = isFromPool
-            ? (dragDataFolderId ?? taskFolders.find(f => f.todoIds.includes(activeId))?.id ?? null)
+            ? (dragDataFolderId !== undefined ? dragDataFolderId : (taskItem?.folderId ?? null))
             : null;
 
         // Determine target - now checking for folder- prefix (and folder-header-) and pool-root
@@ -720,9 +739,10 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
         const isToFolderContent = overId.startsWith('folder-') && !overId.startsWith('folder-header-');
         const isToFolderHeader = overId.startsWith('folder-header-');
         const isToFolder = isToFolderContent || isToFolderHeader;
-        const targetFolderId = isToFolderHeader
+        const targetFolderIdStr = isToFolderHeader
             ? overId.replace('folder-header-', '')
             : (isToFolderContent ? overId.replace('folder-', '') : null);
+        const targetFolderId = targetFolderIdStr ? Number(targetFolderIdStr) : null;
         const isToPool = isToPoolRoot || isToFolder || taskPoolItems.some(t => t.id === Number(overId));
         const targetDate = overId.startsWith('day-') ? overId.replace('day-', '') : null;
 
@@ -733,15 +753,14 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
 
         try {
             // Determine the folder of the over item (if it's a pool item)
-            const overItemFolderId = isOverPoolItem
-                ? taskFolders.find(f => f.todoIds.includes(overItemId))?.id || null
-                : null;
+            const overPoolItem = taskPoolItems.find(t => t.id === overItemId);
+            const overItemFolderId = isOverPoolItem ? (overPoolItem?.folderId ?? null) : null;
 
             // =====================================================================
             // POOL DRAG-DROP LOGIC
             // Priority: 
             //   1. Same container (same folder or both root) → internal reordering
-            //   2. Different containers → folder-level move (ignore item-level drops)
+            //   2. Different containers → folder-level move with API call
             // =====================================================================
 
             if (isFromPool) {
@@ -752,7 +771,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                 const effectiveTargetFolderId = isToFolder
                     ? targetFolderId
                     : (isOverPoolItem ? overItemFolderId : null);
-                const isToPoolRootArea = isToPoolRoot || (isOverPoolItem && !overItemFolderId);
+                const isToPoolRootArea = isToPoolRoot || (isOverPoolItem && overItemFolderId === null);
 
                 // Check if this is INTERNAL reordering (same container)
                 const isSameContainer =
@@ -779,28 +798,16 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                     (isOverPoolItem && effectiveTargetFolderId !== sourceFolderId);
 
                 if (needsMove) {
-                    // Remove from source
-                    if (sourceFolderId) {
-                        setTaskFolders(prev => prev.map(f =>
-                            f.id === sourceFolderId
-                                ? { ...f, todoIds: f.todoIds.filter(id => id !== activeId) }
-                                : f
-                        ));
-                    } else {
-                        setRootTodoIds(prev => prev.filter(id => id !== activeId));
-                    }
-
-                    // Add to target
+                    // Determine final target folder ID
                     const finalTargetFolderId = isToFolder ? targetFolderId : effectiveTargetFolderId;
-                    if (finalTargetFolderId) {
-                        setTaskFolders(prev => prev.map(f =>
-                            f.id === finalTargetFolderId
-                                ? { ...f, todoIds: [...f.todoIds, activeId] }
-                                : f
-                        ));
-                    } else {
-                        setRootTodoIds(prev => [...prev, activeId]);
-                    }
+
+                    // 乐观更新本地状态
+                    setTaskPoolItems(prev => prev.map(t =>
+                        t.id === activeId ? { ...t, folderId: finalTargetFolderId } : t
+                    ));
+
+                    // 调用 API 持久化
+                    await todoApi.moveTodoToFolder(activeId, finalTargetFolderId);
                     return;
                 }
             }
@@ -835,18 +842,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             if (isFromPool && targetDate) {
                 const item = taskPoolItems.find(t => t.id === activeId);
                 if (item) {
-                    // Remove from folder/root tracking
-                    if (sourceFolderId) {
-                        setTaskFolders(prev => prev.map(f =>
-                            f.id === sourceFolderId
-                                ? { ...f, todoIds: f.todoIds.filter(id => id !== activeId) }
-                                : f
-                        ));
-                    } else {
-                        setRootTodoIds(prev => prev.filter(id => id !== activeId));
-                    }
-
-                    // Optimistic update
+                    // Optimistic update - 从 pool 移除，添加到 day
                     setTaskPoolItems(prev => prev.filter(t => t.id !== activeId));
                     setWeeklyPlanData(prev => {
                         if (!prev) return prev;
@@ -854,7 +850,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                             ...prev,
                             items: prev.items.map(day =>
                                 day.date === targetDate
-                                    ? { ...day, todoList: [...day.todoList, { ...item, state: 'active', date: targetDate }] }
+                                    ? { ...day, todoList: [...day.todoList, { ...item, state: 'active', date: targetDate, folderId: null }] }
                                     : day
                             )
                         };
@@ -868,7 +864,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                 if (item) {
                     // Check horizontal displacement to determine target
                     // delta.x > 30px suggests dropping into a folder (if hovering over folder area)
-                    const dropTargetFolderId = (targetFolderId && Math.abs(delta.x) > 30) ? targetFolderId : null;
+                    const dropTargetFolderId = (targetFolderId !== null && Math.abs(delta.x) > 30) ? targetFolderId : null;
 
                     // Optimistic update
                     setWeeklyPlanData(prev => {
@@ -881,20 +877,13 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                             }))
                         };
                     });
-                    setTaskPoolItems(prev => [...prev, { ...item, state: 'inactive', date: null }]);
+                    setTaskPoolItems(prev => [...prev, { ...item, state: 'inactive', date: null, folderId: dropTargetFolderId }]);
 
-                    // Add to folder or root
-                    if (dropTargetFolderId) {
-                        setTaskFolders(prev => prev.map(f =>
-                            f.id === dropTargetFolderId
-                                ? { ...f, todoIds: [...f.todoIds, activeId] }
-                                : f
-                        ));
-                    } else {
-                        setRootTodoIds(prev => [...prev, activeId]);
-                    }
-
+                    // 调用 API 更新状态，如果有目标文件夹也移动
                     await todoApi.updateTodo(activeId, { state: 'inactive', date: null });
+                    if (dropTargetFolderId !== null) {
+                        await todoApi.moveTodoToFolder(activeId, dropTargetFolderId);
+                    }
                 }
             } else if (!isFromPool && targetDate && sourceDate !== targetDate) {
                 // Case 5: Day -> Different Day (cross-container)
@@ -1270,7 +1259,6 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                         ) : (
                             <TaskPoolTree
                                 folders={taskFolders}
-                                rootTodoIds={rootTodoIds}
                                 allTasks={taskPoolItems}
                                 selectedTaskId={selectedPoolTask?.id || null}
                                 onSelectTask={(task) => setSelectedPoolTask(task)}
@@ -1758,7 +1746,10 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             {createPortal(
                 <DragOverlay>
                     {activeDragItem ? (
-                        <div className="flex items-center gap-2 px-3 py-2 bg-white border-2 border-blue-300 rounded-lg shadow-lg opacity-90 cursor-grabbing">
+                        <div
+                            className="flex items-center gap-2 px-3 py-2 border-2 border-blue-300 rounded-lg shadow-lg opacity-90 cursor-grabbing"
+                            style={{ backgroundColor: activeDragItem.color || '#FFFFFF' }}
+                        >
                             <div className="w-2 h-2 rounded-full bg-slate-300" />
                             <span className="text-sm font-medium text-slate-700 truncate max-w-[200px]">
                                 {activeDragItem.content}

@@ -297,7 +297,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                         <span className="text-[8px] font-bold uppercase tracking-wider">颜色</span>
                     </div>
                     <div className="flex gap-1">
-                        {TODO_COLORS.slice(0, 5).map(c => (
+                        {TODO_COLORS.map(c => (
                             <button
                                 key={c}
                                 onClick={() => onUpdateTask(task.id, { color: c })}

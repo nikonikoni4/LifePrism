@@ -171,6 +171,70 @@ export const todoApi = {
             body: JSON.stringify({ todo_ids: todoIds })
         });
         return res.ok;
+    },
+
+    // 移动任务到文件夹
+    moveTodoToFolder: async (todoId: number, folderId: number | null): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/todos/${todoId}/move`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder_id: folderId })
+        });
+        return res.ok;
+    }
+};
+
+// ============================================================================
+// Folder API - 任务池文件夹接口
+// ============================================================================
+
+import { TaskFolder, TaskFolderListResponse } from './types';
+
+export const folderApi = {
+    // 获取所有文件夹
+    getFolders: async (): Promise<TaskFolder[]> => {
+        const res = await fetch(`${API_BASE}/pool/folders`);
+        const data = await res.json();
+        const result = toCamelCase(data) as TaskFolderListResponse;
+        return result.items;
+    },
+
+    // 创建文件夹
+    createFolder: async (name: string): Promise<TaskFolder> => {
+        const res = await fetch(`${API_BASE}/pool/folders`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 更新文件夹
+    updateFolder: async (id: number, data: Partial<{ name: string; isExpanded: boolean }>): Promise<TaskFolder> => {
+        const res = await fetch(`${API_BASE}/pool/folders/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toSnakeCase(data))
+        });
+        const result = await res.json();
+        return toCamelCase(result);
+    },
+
+    // 删除文件夹
+    deleteFolder: async (id: number): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/pool/folders/${id}`, { method: 'DELETE' });
+        return res.ok;
+    },
+
+    // 重排序文件夹
+    reorderFolders: async (folderIds: number[]): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/pool/folders/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder_ids: folderIds })
+        });
+        return res.ok;
     }
 };
 
