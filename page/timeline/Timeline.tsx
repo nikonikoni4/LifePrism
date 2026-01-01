@@ -311,6 +311,109 @@ const adjustBrightness = (hex: string, percent: number): string => {
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 };
 
+// ============================================================================
+// 非缩略图模式的分类颜色处理
+// ============================================================================
+//
+// 【设计说明】
+// 非缩略图模式（事件详情视图）中，每个事件块的背景色基于其主分类颜色显示。
+// 
+// 【颜色来源】
+// - /activity/logs API 只返回 category_id，不返回颜色值
+// - 前端通过 /category/tree 获取分类列表（含原始颜色，Tailwind 500 系列）
+// - 前端使用下方的 softenColor 函数将颜色转换为柔和版本（Tailwind 300 系列）
+// - 这与缩略图模式（后端 timeline_provider 返回柔和颜色）保持视觉一致
+//
+// 【维护说明】
+// - 颜色映射表需与后端 category_color_provider.py 的 TAILWIND_500_TO_300 保持同步
+// - @see lifewatch/server/providers/category_color_provider.py
+// ============================================================================
+
+/**
+ * Tailwind CSS 500 → 300 系列颜色映射
+ * 与后端 category_color_provider.py 的 TAILWIND_500_TO_300 保持一致
+ * ⚠️ 维护说明：如果调色盘变动，需同步更新此映射表
+ */
+const TAILWIND_500_TO_300: Record<string, string> = {
+    '#EF4444': '#FCA5A5',  // red-300
+    '#F97316': '#FDBA74',  // orange-300
+    '#EAB308': '#FCD34D',  // yellow-300
+    '#22C55E': '#86EFAC',  // green-300
+    '#14B8A6': '#5EEAD4',  // teal-300
+    '#06B6D4': '#67E8F9',  // cyan-300
+    '#3B82F6': '#93C5FD',  // blue-300
+    '#6366F1': '#A5B4FC',  // indigo-300
+    '#A855F7': '#C4B5FD',  // purple-300
+    '#EC4899': '#F9A8D4',  // pink-300
+};
+
+/** 
+ * 将颜色转换为柔和版本（Tailwind 300 系列）
+ * 与后端 category_color_provider.py 的 _soften_color 逻辑保持一致
+ */
+const softenColor = (hex: string): string => {
+    // 1. 优先使用 Tailwind 500→300 映射表
+    const normalizedColor = hex.toUpperCase();
+    if (TAILWIND_500_TO_300[normalizedColor]) {
+        return TAILWIND_500_TO_300[normalizedColor];
+    }
+
+    // 2. 备用方案：动态计算柔和色（与后端参数一致）
+    const color = hex.replace('#', '');
+    if (color.length !== 6) return hex;
+
+    try {
+        const r = parseInt(color.slice(0, 2), 16) / 255;
+        const g = parseInt(color.slice(2, 4), 16) / 255;
+        const b = parseInt(color.slice(4, 6), 16) / 255;
+
+        // RGB to HSL
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        let h = 0, s = 0;
+        const l = (max + min) / 2;
+
+        if (max !== min) {
+            const d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            switch (max) {
+                case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+                case g: h = ((b - r) / d + 2) / 6; break;
+                case b: h = ((r - g) / d + 4) / 6; break;
+            }
+        }
+
+        // 调整：与后端 _soften_color 参数一致
+        // 亮度提高到 0.70 ~ 0.78 范围
+        let newL = 0.70 + (l * 0.1);
+        newL = Math.min(0.78, Math.max(0.65, newL));
+
+        // 饱和度降低到原来的 55% ~ 70%
+        let newS = s * 0.60;
+        newS = Math.max(0.25, Math.min(0.55, newS));
+
+        // HSL to RGB
+        const hue2rgb = (p: number, q: number, t: number) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1 / 6) return p + (q - p) * 6 * t;
+            if (t < 1 / 2) return q;
+            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+            return p;
+        };
+
+        const q = newL < 0.5 ? newL * (1 + newS) : newL + newS - newL * newS;
+        const p = 2 * newL - q;
+        const rNew = hue2rgb(p, q, h + 1 / 3);
+        const gNew = hue2rgb(p, q, h);
+        const bNew = hue2rgb(p, q, h - 1 / 3);
+
+        return `#${Math.round(rNew * 255).toString(16).padStart(2, '0')}${Math.round(gNew * 255).toString(16).padStart(2, '0')}${Math.round(bNew * 255).toString(16).padStart(2, '0')}`;
+    } catch {
+        return hex;
+    }
+};
+
 const ThumbnailBlock: React.FC<ThumbnailBlockProps> = ({
     blockData,
     height,
@@ -459,6 +562,33 @@ const Timeline: React.FC = () => {
 
     const HOUR_HEIGHT = hourHeight;
     const zoomPercentage = Math.round((hourHeight / DEFAULT_HOUR_HEIGHT) * 100);
+
+    // =========================================================================
+    // 非缩略图模式：分类颜色计算
+    // 颜色由前端基于 category_id 自行计算，与后端 timeline_provider 的柔和颜色保持一致
+    // @see 上方的 TAILWIND_500_TO_300 映射表和 softenColor 函数
+    // =========================================================================
+
+    /** 主分类颜色映射表（category_id -> 原始颜色 500 系列） */
+    const categoryColorMap = useMemo(() => {
+        const map = new Map<string, string>();
+        categories.forEach(cat => {
+            if (cat.color) {
+                map.set(cat.id, cat.color);
+            }
+        });
+        return map;
+    }, [categories]);
+
+    /** 
+     * 获取事件的柔和分类颜色（用于非缩略图模式）
+     * 将原始 500 系列颜色转换为 300 系列柔和颜色
+     */
+    const getEventCategoryColor = useCallback((log: ActivityLogItem): string | null => {
+        if (!log.category_id) return null;
+        const color = categoryColorMap.get(log.category_id);
+        return color ? softenColor(color) : null;
+    }, [categoryColorMap]);
 
     // =========================================================================
     // 数据获取
@@ -1133,18 +1263,32 @@ const Timeline: React.FC = () => {
                                                                 const isSelected = selectedEventId === log.id;
                                                                 const isHovered = hoveredEventId === log.id;
 
+                                                                // 获取该事件的分类颜色
+                                                                const categoryColor = getEventCategoryColor(log);
+                                                                const hasCategoryColor = !!categoryColor;
+
                                                                 return (
                                                                     <div
                                                                         key={`${log.id}-${hour}`}
                                                                         className={`absolute top-1 bottom-1 rounded border cursor-pointer transition-all overflow-hidden ${isSelected
-                                                                            ? 'bg-indigo-100 border-indigo-400 ring-2 ring-indigo-300 z-20'
+                                                                            ? 'ring-2 ring-indigo-300 z-20'
                                                                             : isHovered
-                                                                                ? 'bg-gray-100 border-gray-400 z-10'
-                                                                                : 'bg-gray-200 border-gray-300 hover:bg-gray-100'
+                                                                                ? 'z-10'
+                                                                                : ''
                                                                             }`}
                                                                         style={{
                                                                             left: style.left,
                                                                             width: style.width,
+                                                                            backgroundColor: isSelected
+                                                                                ? (hasCategoryColor ? adjustBrightness(categoryColor, 20) : '#E0E7FF')
+                                                                                : isHovered
+                                                                                    ? (hasCategoryColor ? adjustBrightness(categoryColor, 10) : '#F3F4F6')
+                                                                                    : (categoryColor || '#E5E7EB'),
+                                                                            borderColor: isSelected
+                                                                                ? (hasCategoryColor ? adjustBrightness(categoryColor, -30) : '#818CF8')
+                                                                                : isHovered
+                                                                                    ? (hasCategoryColor ? adjustBrightness(categoryColor, -20) : '#9CA3AF')
+                                                                                    : (hasCategoryColor ? adjustBrightness(categoryColor, -15) : '#D1D5DB'),
                                                                         }}
                                                                         onClick={() => {
                                                                             setSelectedTimeRange(null);
