@@ -78,6 +78,101 @@ const formatTime = (time: number): string => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 };
 
+/** 将活动日志按小时分组 */
+const groupLogsByHour = (logs: ActivityLogItem[]): Map<number, ActivityLogItem[]> => {
+    const grouped = new Map<number, ActivityLogItem[]>();
+    for (let hour = 0; hour < 24; hour++) {
+        grouped.set(hour, []);
+    }
+
+    logs.forEach(log => {
+        const startDate = new Date(log.start_time);
+        const endDate = new Date(log.end_time);
+        const startHour = startDate.getHours();
+        const endHour = endDate.getHours();
+
+        // 事件可能跨越多个小时，每个小时都添加一份引用
+        for (let hour = startHour; hour <= Math.min(endHour, 23); hour++) {
+            grouped.get(hour)?.push(log);
+        }
+    });
+
+    return grouped;
+};
+
+/** 计算事件在小时行内的水平位置和宽度 */
+const getHourEventStyle = (log: ActivityLogItem, hour: number): { left: string; width: string; startMinute: number; endMinute: number } => {
+    const startDate = new Date(log.start_time);
+    const endDate = new Date(log.end_time);
+
+    // 计算在当前小时内的开始位置（0-60分钟映射到0-100%）
+    let startMinute = 0;
+    if (startDate.getHours() === hour) {
+        startMinute = startDate.getMinutes() + startDate.getSeconds() / 60;
+    }
+
+    // 计算在当前小时内的结束位置
+    let endMinute = 60;
+    if (endDate.getHours() === hour) {
+        endMinute = endDate.getMinutes() + endDate.getSeconds() / 60;
+    }
+
+    const left = (startMinute / 60) * 100;
+    const width = Math.max(((endMinute - startMinute) / 60) * 100, 0.5); // 最小宽度0.5%
+
+    return { left: `${left}%`, width: `${width}%`, startMinute, endMinute };
+};
+
+/** 事件悬停浮窗组件 */
+interface EventTooltipProps {
+    event: ActivityLogItem;
+    position: { x: number; y: number };
+}
+
+const EventTooltip: React.FC<EventTooltipProps> = ({ event, position }) => {
+    const startDate = new Date(event.start_time);
+    const endDate = new Date(event.end_time);
+
+    const formatTimeStr = (date: Date) => {
+        return date.toTimeString().slice(0, 8);
+    };
+
+    const formatDurationStr = (seconds: number) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        if (hours > 0) {
+            return `${hours}h ${minutes}m ${secs}s`;
+        }
+        return `${minutes}m ${secs}s`;
+    };
+
+    return (
+        <div
+            className="fixed z-[100] bg-amber-50 border border-amber-300 rounded-md shadow-lg p-3 text-xs pointer-events-none"
+            style={{
+                left: `${position.x + 10}px`,
+                top: `${position.y + 10}px`,
+                minWidth: '200px',
+                maxWidth: '320px',
+            }}
+        >
+            <div className="grid gap-y-1" style={{ gridTemplateColumns: 'auto 1fr' }}>
+                <span className="font-bold text-amber-800 pr-3">Start</span>
+                <span className="text-amber-900">{formatTimeStr(startDate)}</span>
+                <span className="font-bold text-amber-800 pr-3">Stop</span>
+                <span className="text-amber-900">{formatTimeStr(endDate)}</span>
+                <span className="font-bold text-amber-800 pr-3">Duration</span>
+                <span className="text-amber-900">{formatDurationStr(event.duration)}</span>
+                <span className="font-bold text-amber-800 pr-3">App</span>
+                <span className="text-amber-900 truncate" title={event.app}>{event.app}</span>
+                <span className="font-bold text-amber-800 pr-3">Title</span>
+                <span className="text-amber-900 truncate" title={event.title}>{event.title}</span>
+            </div>
+        </div>
+    );
+};
+
 // ============================================================================
 // 缩略图块组件
 // ============================================================================
@@ -332,6 +427,8 @@ const Timeline: React.FC = () => {
     // === 选中状态 ===
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [selectedTimeRange, setSelectedTimeRange] = useState<SelectedTimeRange | null>(null);
+    const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
+    const [mousePosition, setMousePosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
     // === Overview 面板状态 ===
     const [overviewData, setOverviewData] = useState<TimeOverviewData | null>(null);
@@ -1006,47 +1103,84 @@ const Timeline: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* Events */}
-                                {activityLogs
-                                    .filter((log) => {
+                                {/* 水平小时行布局 */}
+                                {(() => {
+                                    const filteredLogs = activityLogs.filter((log) => {
                                         const durationMinutes = log.duration / 60;
                                         return durationMinutes >= minDurationFilter;
-                                    })
-                                    .map((log) => {
-                                        const style = getEventStyle(log);
-                                        return (
-                                            <div
-                                                key={log.id}
-                                                style={{ top: style.top, height: style.height }}
-                                                className={style.className}
-                                                onClick={() => {
-                                                    // 点击事件时清除时间范围选择，以显示事件详情
-                                                    setSelectedTimeRange(null);
-                                                    setOverviewData(null);
-                                                    setSelectedEventId(log.id);
-                                                }}
-                                            >
-                                                <div className="font-bold truncate">{log.title}</div>
-                                                {parseInt(style.height) > 30 && (
-                                                    <div className="flex items-center justify-between mt-1">
-                                                        <div className="flex items-center gap-1 opacity-80">
-                                                            <span className="text-[10px]">
-                                                                {formatTime(style.startTime)} - {formatTime(style.endTime)}
-                                                            </span>
-                                                            {log.sub_category && (
-                                                                <>
-                                                                    <span className="mx-0.5">•</span>
-                                                                    <span className="text-[10px] font-medium opacity-100 bg-black/5 px-1.5 rounded-sm">
-                                                                        {log.sub_category}
-                                                                    </span>
-                                                                </>
-                                                            )}
+                                    });
+                                    const groupedLogs = groupLogsByHour(filteredLogs);
+                                    const hoveredEvent = hoveredEventId ? activityLogs.find(e => e.id === hoveredEventId) : null;
+
+                                    return (
+                                        <>
+                                            {/* 24小时行 */}
+                                            {Array.from({ length: 24 }, (_, hour) => {
+                                                const hourLogs = groupedLogs.get(hour) || [];
+                                                return (
+                                                    <div
+                                                        key={hour}
+                                                        className="absolute left-36 right-4"
+                                                        style={{
+                                                            top: `${hour * HOUR_HEIGHT}px`,
+                                                            height: `${HOUR_HEIGHT}px`,
+                                                        }}
+                                                    >
+                                                        {/* 小时行内的事件 */}
+                                                        <div className="relative h-full">
+                                                            {hourLogs.map((log) => {
+                                                                const style = getHourEventStyle(log, hour);
+                                                                const isSelected = selectedEventId === log.id;
+                                                                const isHovered = hoveredEventId === log.id;
+
+                                                                return (
+                                                                    <div
+                                                                        key={`${log.id}-${hour}`}
+                                                                        className={`absolute top-1 bottom-1 rounded border cursor-pointer transition-all overflow-hidden ${isSelected
+                                                                            ? 'bg-indigo-100 border-indigo-400 ring-2 ring-indigo-300 z-20'
+                                                                            : isHovered
+                                                                                ? 'bg-gray-100 border-gray-400 z-10'
+                                                                                : 'bg-gray-200 border-gray-300 hover:bg-gray-100'
+                                                                            }`}
+                                                                        style={{
+                                                                            left: style.left,
+                                                                            width: style.width,
+                                                                        }}
+                                                                        onClick={() => {
+                                                                            setSelectedTimeRange(null);
+                                                                            setOverviewData(null);
+                                                                            setSelectedEventId(log.id);
+                                                                        }}
+                                                                        onMouseEnter={(e) => {
+                                                                            setHoveredEventId(log.id);
+                                                                            setMousePosition({ x: e.clientX, y: e.clientY });
+                                                                        }}
+                                                                        onMouseMove={(e) => {
+                                                                            setMousePosition({ x: e.clientX, y: e.clientY });
+                                                                        }}
+                                                                        onMouseLeave={() => {
+                                                                            setHoveredEventId(null);
+                                                                        }}
+                                                                    >
+                                                                        {/* 尽可能显示文字，CSS truncate 会自动处理溢出 */}
+                                                                        <div className="px-0.5 text-[14px] font-medium text-gray-700 truncate h-full flex items-center whitespace-nowrap overflow-hidden">
+                                                                            {log.app?.split('.')[0] || log.title?.slice(0, 10)}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                                );
+                                            })}
+
+                                            {/* 浮窗 */}
+                                            {hoveredEvent && (
+                                                <EventTooltip event={hoveredEvent} position={mousePosition} />
+                                            )}
+                                        </>
+                                    );
+                                })()}
                             </>
                         )}
                     </div>
