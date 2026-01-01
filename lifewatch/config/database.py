@@ -2,7 +2,6 @@
 数据库配置模块
 定义数据库表结构的完整元数据
 """
-# 应用程序用途分类表配置
 category_map_cache_CONFIG = {
     'table_name': 'category_map_cache',
     'columns': {
@@ -674,7 +673,87 @@ TASK_POOL_FOLDER_CONFIG = {
     'timestamps': True
 }
 
+GOAL_STATS_CONFIG = {
+    'table_name': 'goal_stats',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键'
+        },
+        'goal_id': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '目标ID'
+        },
+        'date': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '日期'
+        },
+        'time_spent': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '今天在该目标上花费的时间'
+        },
+        'completed_todo_count': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '今天完成的该目标的待办事项数量'
+        },
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_goal_stats_goal_id', 'columns': ['goal_id']}
+    ],
+    'timestamps': True
+}
 
+REWARD_CONFIG = {
+    'table_name': 'reward',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键'
+        },
+        'start_time': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '开始时间'
+        },
+        'goal_id': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '关联的目标ID'
+        },
+        'name': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '奖励名称（如：Buy a mechanical keyboard）'
+        },
+        'target_hours': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '达成奖励所需的目标累计小时数'
+        },
+        'milestones': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '里程碑，json格式'
+        },
+        'order_index': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '排序索引'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_reward_goal_id', 'columns': ['goal_id']}
+    ],
+    'timestamps': True
+}
 
 # 所有表配置的映射
 TABLE_CONFIGS = {
@@ -691,6 +770,8 @@ TABLE_CONFIGS = {
     'chat_session': CHAT_SESSION_CONFIG,
     'timeline_custom_block': TIMELINE_CUSTOM_BLOCK_CONFIG,
     'task_pool_folder': TASK_POOL_FOLDER_CONFIG,
+    'goal_stats': GOAL_STATS_CONFIG,
+    'reward': REWARD_CONFIG
 }
 
 

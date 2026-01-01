@@ -292,7 +292,57 @@ class ActiveGoalNamesResponse(BaseModel):
 # ============================================================================
 
 
+class RewardItem(BaseModel):
+    """奖励项"""
+    id: int = Field(..., description="唯一标识符 id")
+    goal_id: str = Field(..., description="关联的目标 ID")
+    name: str = Field(..., description="奖励名称")
+    start_time: str = Field(..., description="开始时间 YYYY-MM-DD")
+    target_hours: int = Field(default=0, description="达成奖励所需的累计小时数")
+    order_index: int = Field(default=0, description="排序索引")
+    created_at: str = Field(default="", description="创建时间")
+
+
+class RewardListResponse(BaseModel):
+    """奖励列表响应"""
+    items: List[RewardItem] = Field(default=[], description="奖励列表")
+
 
 # ============================================================================
 # reward Request Schemas (预留)
 # ============================================================================
+
+
+class CreateRewardRequest(BaseModel):
+    """创建奖励请求"""
+    goal_id: str = Field(..., description="关联的目标 ID")
+    name: str = Field(..., description="奖励名称")
+    start_time: str = Field(..., description="开始时间 YYYY-MM-DD")
+    target_hours: int = Field(default=0, description="达成奖励所需的累计小时数")
+
+
+class UpdateRewardRequest(BaseModel):
+    """更新奖励请求（部分更新）"""
+    goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
+    name: Optional[str] = Field(default=None, description="奖励名称")
+    start_time: Optional[str] = Field(default=None, description="开始时间 YYYY-MM-DD")
+    target_hours: Optional[int] = Field(default=None, description="达成奖励所需的累计小时数")
+
+
+# ============================================================================
+# Reward Stats Schemas (用于 Momentum Tracker)
+# ============================================================================
+
+
+class RewardHistoryPoint(BaseModel):
+    """奖励历史数据点（用于图表显示）"""
+    date: str = Field(..., description="日期（MM-DD 格式）")
+    cumulative_time_spent: int = Field(default=0, description="累积时间花费（分钟）")
+    cumulative_todo_count: int = Field(default=0, description="累积完成待办数")
+
+
+class RewardStatsResponse(BaseModel):
+    """奖励统计响应"""
+    reward: RewardItem = Field(..., description="奖励信息")
+    goal_name: str = Field(..., description="关联的目标名称")
+    history: List[RewardHistoryPoint] = Field(default=[], description="历史累积数据")

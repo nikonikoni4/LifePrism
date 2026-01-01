@@ -11,6 +11,7 @@ from .usage import router as usage_router
 from .goal_api import router as goal_router
 from .chatbot_api import router as chatbot_router
 from .setting_api import router as setting_router
+from .reward_api import router as reward_router
 
 __all__ = [
     "dashboard_router",
@@ -25,6 +26,7 @@ __all__ = [
     "goal_router",
     "chatbot_router",
     "setting_router",
+    "reward_router",
 ]
 
 

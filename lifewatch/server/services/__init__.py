@@ -17,6 +17,7 @@ from . import timeline_service
 from . import usage_service
 from . import todo_service
 from . import goal_service
+from . import reward_service
 
 # 创建懒加载单例实例（首次访问时才初始化）
 activity_service = LazySingleton(ActivityService)
@@ -31,6 +32,7 @@ __all__ = [
     "usage_service",
     "todo_service",
     "goal_service",
+    "reward_service",
 ]
 
 
