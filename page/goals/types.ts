@@ -172,6 +172,29 @@ export interface DailyPlan {
     content: string;
 }
 
+export interface RewardItem {
+    id: number;
+    goalId: string;
+    name: string;
+    startTime: string;
+    targetHours: number;
+    orderIndex: number;
+    createdAt: string;
+}
+
+export interface RewardHistoryPoint {
+    date: string;
+    cumulativeTimeSpent: number;  // 累积分钟数
+    cumulativeTodoCount: number;  // 累积完成数
+}
+
+export interface RewardStatsResponse {
+    reward: RewardItem;
+    goalName: string;
+    history: RewardHistoryPoint[];
+}
+
+// 保留旧的 RewardRecord 用于兼容
 export interface RewardRecord {
     goalId: string;
     rewardContent: string;

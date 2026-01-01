@@ -1,5 +1,5 @@
 
-import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse, CreateGoalRequest, UpdateGoalRequest, GoalListResponse, CategoryTreeResponse, ActiveGoalNamesResponse } from "./types";
+import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, RewardItem, RewardStatsResponse, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse, CreateGoalRequest, UpdateGoalRequest, GoalListResponse, CategoryTreeResponse, ActiveGoalNamesResponse } from "./types";
 
 const API_BASE = '/api/v2/goal';
 
@@ -368,6 +368,72 @@ export const categoryApi = {
         const res = await fetch(`${CATEGORY_API_BASE}/tree?depth=${depth}`);
         const data = await res.json();
         return toCamelCase(data);
+    }
+};
+
+// ============================================================================
+// Reward API - 真实后端接口
+// ============================================================================
+
+export const rewardApi = {
+    // 获取所有奖励列表
+    getRewards: async (): Promise<RewardItem[]> => {
+        const res = await fetch(`${API_BASE}/rewards`);
+        const data = await res.json();
+        const result = toCamelCase(data);
+        return result.items || [];
+    },
+
+    // 获取单个奖励详情
+    getRewardDetail: async (id: number): Promise<RewardItem> => {
+        const res = await fetch(`${API_BASE}/rewards/${id}`);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 获取奖励统计数据（含历史累积数据）
+    getRewardStats: async (id: number): Promise<RewardStatsResponse> => {
+        const res = await fetch(`${API_BASE}/rewards/${id}/stats`);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 创建奖励
+    createReward: async (data: {
+        goalId: string;
+        name: string;
+        startTime: string;
+        targetHours?: number;
+    }): Promise<RewardItem> => {
+        const res = await fetch(`${API_BASE}/rewards`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toSnakeCase(data))
+        });
+        const result = await res.json();
+        return toCamelCase(result);
+    },
+
+    // 更新奖励
+    updateReward: async (id: number, data: Partial<{
+        goalId: string;
+        name: string;
+        startTime: string;
+        targetHours: number;
+    }>): Promise<RewardItem> => {
+        const res = await fetch(`${API_BASE}/rewards/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toSnakeCase(data))
+        });
+        const result = await res.json();
+        return toCamelCase(result);
+    },
+
+    // 删除奖励
+    deleteReward: async (id: number): Promise<boolean> => {
+        const res = await fetch(`${API_BASE}/rewards/${id}`, { method: 'DELETE' });
+        return res.ok;
     }
 };
 
