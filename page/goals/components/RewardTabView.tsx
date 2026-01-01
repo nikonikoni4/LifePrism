@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Plus, Gift, Target, X, Edit2, Trash2, Loader2, Calendar, Clock } from 'lucide-react';
+import { Trophy, Plus, Gift, Target, X, Edit2, Trash2, Loader2, Calendar, Clock, GripVertical, Flag, Check } from 'lucide-react';
 import {
     AreaChart,
     Area,
@@ -14,21 +14,166 @@ import {
     ComposedChart,
     Bar
 } from 'recharts';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { rewardApi, goalApi } from '../api';
-import { RewardItem, RewardStatsResponse, RewardHistoryPoint, ActiveGoalNamesResponse } from '../types';
+import { RewardItem, RewardStatsResponse, RewardHistoryPoint, ActiveGoalNamesResponse, MilestoneItem } from '../types';
 
 interface ActiveGoalItem {
     id: string;
     name: string;
 }
 
+// 编辑时使用的里程碑类型（不需要 finishTime）
+interface EditableMilestone {
+    id: string;
+    content: string;
+    orderIndex: number;
+}
+
+// 可排序里程碑编辑项
+const SortableMilestoneEditItem: React.FC<{
+    milestone: EditableMilestone;
+    onUpdate: (id: string, content: string) => void;
+    onDelete: (id: string) => void;
+}> = ({ milestone, onUpdate, onDelete }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: milestone.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className="flex items-center gap-2 bg-slate-50 rounded-xl p-3 border border-slate-200 group"
+        >
+            <div
+                {...attributes}
+                {...listeners}
+                className="cursor-grab text-slate-300 hover:text-slate-500 p-1"
+            >
+                <GripVertical size={16} />
+            </div>
+            <Flag size={14} className="text-orange-400 flex-shrink-0" />
+            <input
+                type="text"
+                value={milestone.content}
+                onChange={(e) => onUpdate(milestone.id, e.target.value)}
+                placeholder="Milestone description..."
+                className="flex-1 bg-transparent border-none outline-none text-sm text-slate-700 font-medium"
+            />
+            <button
+                onClick={() => onDelete(milestone.id)}
+                className="p-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+                <Trash2 size={14} />
+            </button>
+        </div>
+    );
+};
+
+// 里程碑编辑器组件
+const MilestoneEditor: React.FC<{
+    milestones: EditableMilestone[];
+    onChange: (milestones: EditableMilestone[]) => void;
+}> = ({ milestones, onChange }) => {
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    const handleAdd = () => {
+        const newId = `m-${Date.now()}`;
+        const maxOrder = milestones.length > 0 ? Math.max(...milestones.map(m => m.orderIndex)) : -1;
+        onChange([...milestones, { id: newId, content: '', orderIndex: maxOrder + 1 }]);
+    };
+
+    const handleUpdate = (id: string, content: string) => {
+        onChange(milestones.map(m => m.id === id ? { ...m, content } : m));
+    };
+
+    const handleDelete = (id: string) => {
+        onChange(milestones.filter(m => m.id !== id));
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (over && active.id !== over.id) {
+            const oldIndex = milestones.findIndex(m => m.id === active.id);
+            const newIndex = milestones.findIndex(m => m.id === over.id);
+            const newMilestones = arrayMove(milestones, oldIndex, newIndex);
+            // 更新 orderIndex
+            onChange(newMilestones.map((m, i) => ({ ...m, orderIndex: i })));
+        }
+    };
+
+    return (
+        <div className="space-y-3">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <Flag size={12} />
+                Milestones
+            </label>
+
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={milestones.map(m => m.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {milestones.map(milestone => (
+                            <SortableMilestoneEditItem
+                                key={milestone.id}
+                                milestone={milestone}
+                                onUpdate={handleUpdate}
+                                onDelete={handleDelete}
+                            />
+                        ))}
+                    </div>
+                </SortableContext>
+            </DndContext>
+
+            <button
+                type="button"
+                onClick={handleAdd}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+                <Plus size={14} />
+                Add Milestone
+            </button>
+        </div>
+    );
+};
+
 interface RewardFormModalProps {
     isOpen: boolean;
     mode: 'add' | 'edit';
-    initialData?: { goalId: string; name: string; startTime: string; targetHours: number };
+    initialData?: { goalId: string; name: string; startTime: string; targetHours: number; milestones: EditableMilestone[] };
     goals: ActiveGoalItem[];
     onClose: () => void;
-    onSave: (data: { goalId: string; name: string; startTime: string; targetHours: number }) => void;
+    onSave: (data: { goalId: string; name: string; startTime: string; targetHours: number; milestones: EditableMilestone[] }) => void;
 }
 
 const RewardFormModal: React.FC<RewardFormModalProps> = ({
@@ -43,6 +188,7 @@ const RewardFormModal: React.FC<RewardFormModalProps> = ({
     const [name, setName] = useState('');
     const [startTime, setStartTime] = useState('');
     const [targetHours, setTargetHours] = useState(0);
+    const [milestones, setMilestones] = useState<EditableMilestone[]>([]);
 
     useEffect(() => {
         if (isOpen) {
@@ -50,6 +196,7 @@ const RewardFormModal: React.FC<RewardFormModalProps> = ({
             setName(initialData?.name || '');
             setStartTime(initialData?.startTime || new Date().toISOString().split('T')[0]);
             setTargetHours(initialData?.targetHours || 0);
+            setMilestones(initialData?.milestones || []);
         }
     }, [isOpen, initialData]);
 
@@ -58,7 +205,7 @@ const RewardFormModal: React.FC<RewardFormModalProps> = ({
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-md transition-opacity" onClick={onClose} />
-            <div className="relative w-full max-w-2xl bg-white rounded-[2rem] shadow-2xl border border-white/50 p-8 md:p-10 animate-in zoom-in-95 duration-200">
+            <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-[2rem] shadow-2xl border border-white/50 p-8 md:p-10 animate-in zoom-in-95 duration-200">
                 <div className="absolute top-6 right-6">
                     <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
                         <X size={20} />
@@ -131,9 +278,12 @@ const RewardFormModal: React.FC<RewardFormModalProps> = ({
                         </div>
                     </div>
 
+                    {/* Milestones Editor */}
+                    <MilestoneEditor milestones={milestones} onChange={setMilestones} />
+
                     <div className="flex justify-end pt-4">
                         <button
-                            onClick={() => onSave({ goalId, name, startTime, targetHours })}
+                            onClick={() => onSave({ goalId, name, startTime, targetHours, milestones })}
                             disabled={!goalId || !name || !startTime}
                             className="w-full md:w-auto px-10 py-4 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-blue-200 hover:shadow-2xl hover:scale-[1.02] active:scale-95"
                         >
@@ -144,6 +294,67 @@ const RewardFormModal: React.FC<RewardFormModalProps> = ({
             </div>
         </div>,
         document.body
+    );
+};
+
+// 里程碑横轴组件
+const MilestoneAxis: React.FC<{
+    milestones: MilestoneItem[];
+    onToggle: (id: string, newState: number) => void;
+}> = ({ milestones, onToggle }) => {
+    if (milestones.length === 0) return null;
+
+    // 按 orderIndex 排序显示
+    const sortedMilestones = [...milestones].sort((a, b) => a.orderIndex - b.orderIndex);
+
+    return (
+        <div className="mb-6 p-4 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-100">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                <Flag size={12} />
+                Milestones
+            </div>
+            <div className="flex items-center w-full overflow-x-auto py-2">
+                {sortedMilestones.map((milestone, index) => (
+                    <React.Fragment key={milestone.id}>
+                        {/* 连接线 */}
+                        {index > 0 && (
+                            <div className={`flex-1 min-w-[20px] h-0.5 transition-colors ${sortedMilestones[index - 1].state === 1 ? 'bg-green-400' : 'bg-slate-200'
+                                }`} />
+                        )}
+
+                        {/* 里程碑节点 */}
+                        <div className="flex flex-col items-center flex-shrink-0 group">
+                            <button
+                                onClick={() => onToggle(milestone.id, milestone.state === 1 ? 0 : 1)}
+                                className={`relative w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-300 hover:scale-110 ${milestone.state === 1
+                                        ? 'bg-green-500 border-green-600 text-white shadow-lg shadow-green-200'
+                                        : 'bg-white border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-500'
+                                    }`}
+                                title={milestone.content}
+                            >
+                                {milestone.state === 1 ? (
+                                    <Check size={18} strokeWidth={3} />
+                                ) : (
+                                    <span className="text-xs font-bold">{index + 1}</span>
+                                )}
+                            </button>
+
+                            {/* 内容 tooltip */}
+                            <div className="mt-2 max-w-[100px] text-center">
+                                <p className="text-[10px] text-slate-500 font-medium truncate" title={milestone.content}>
+                                    {milestone.content || `Milestone ${index + 1}`}
+                                </p>
+                                {milestone.finishTime && (
+                                    <p className="text-[9px] text-green-500 font-medium mt-0.5">
+                                        {milestone.finishTime}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </React.Fragment>
+                ))}
+            </div>
+        </div>
     );
 };
 
@@ -159,7 +370,7 @@ const RewardTabView: React.FC = () => {
     // Form state
     const [formMode, setFormMode] = useState<'idle' | 'add' | 'edit'>('idle');
     const [editingReward, setEditingReward] = useState<RewardItem | null>(null);
-    const [initialFormData, setInitialFormData] = useState<{ goalId: string; name: string; startTime: string; targetHours: number }>({ goalId: '', name: '', startTime: '', targetHours: 0 });
+    const [initialFormData, setInitialFormData] = useState<{ goalId: string; name: string; startTime: string; targetHours: number; milestones: EditableMilestone[] }>({ goalId: '', name: '', startTime: '', targetHours: 0, milestones: [] });
 
     // Load rewards and goals
     const loadData = useCallback(async () => {
@@ -207,11 +418,34 @@ const RewardTabView: React.FC = () => {
         }
     }, [selectedRewardId, loadStats]);
 
+    // 将 MilestoneItem[] 转换为 EditableMilestone[]
+    const convertToEditableMilestones = (milestones: MilestoneItem[]): EditableMilestone[] => {
+        return milestones.map(m => ({
+            id: m.id,
+            content: m.content,
+            orderIndex: m.orderIndex
+        }));
+    };
+
+    // 将 EditableMilestone[] 转换为 JSON 字符串
+    const convertMilestonesToJson = (milestones: EditableMilestone[]): string => {
+        const obj: Record<string, { content: string; state: number; finish_time: null; order_index: number }> = {};
+        milestones.forEach(m => {
+            obj[m.id] = {
+                content: m.content,
+                state: 0,
+                finish_time: null,
+                order_index: m.orderIndex
+            };
+        });
+        return JSON.stringify(obj);
+    };
+
     // Handlers
     const handleAddNew = () => {
         setFormMode('add');
         setEditingReward(null);
-        setInitialFormData({ goalId: '', name: '', startTime: new Date().toISOString().split('T')[0], targetHours: 0 });
+        setInitialFormData({ goalId: '', name: '', startTime: new Date().toISOString().split('T')[0], targetHours: 0, milestones: [] });
     };
 
     const handleEdit = (reward: RewardItem, e: React.MouseEvent) => {
@@ -222,7 +456,8 @@ const RewardTabView: React.FC = () => {
             goalId: reward.goalId,
             name: reward.name,
             startTime: reward.startTime,
-            targetHours: reward.targetHours
+            targetHours: reward.targetHours,
+            milestones: convertToEditableMilestones(reward.milestones || [])
         });
     };
 
@@ -242,23 +477,44 @@ const RewardTabView: React.FC = () => {
         }
     };
 
-    const handleSave = async (data: { goalId: string; name: string; startTime: string; targetHours: number }) => {
+    const handleSave = async (data: { goalId: string; name: string; startTime: string; targetHours: number; milestones: EditableMilestone[] }) => {
         try {
+            const milestonesJson = data.milestones.length > 0 ? convertMilestonesToJson(data.milestones) : undefined;
+
             if (formMode === 'add') {
                 const newReward = await rewardApi.createReward({
                     goalId: data.goalId,
                     name: data.name,
                     startTime: data.startTime,
-                    targetHours: data.targetHours
+                    targetHours: data.targetHours,
+                    milestones: milestonesJson
                 });
                 setRewards(prev => [...prev, newReward]);
                 setSelectedRewardId(newReward.id);
             } else if (formMode === 'edit' && editingReward) {
+                // 保持已有里程碑的 state 和 finish_time
+                let finalMilestonesJson: string | undefined;
+                if (data.milestones.length > 0) {
+                    const existingMilestones = editingReward.milestones || [];
+                    const obj: Record<string, any> = {};
+                    data.milestones.forEach(m => {
+                        const existing = existingMilestones.find(em => em.id === m.id);
+                        obj[m.id] = {
+                            content: m.content,
+                            state: existing?.state || 0,
+                            finish_time: existing?.finishTime || null,
+                            order_index: m.orderIndex
+                        };
+                    });
+                    finalMilestonesJson = JSON.stringify(obj);
+                }
+
                 const updated = await rewardApi.updateReward(editingReward.id, {
                     goalId: data.goalId,
                     name: data.name,
                     startTime: data.startTime,
-                    targetHours: data.targetHours
+                    targetHours: data.targetHours,
+                    milestones: finalMilestonesJson
                 });
                 setRewards(prev => prev.map(r => r.id === updated.id ? updated : r));
             }
@@ -273,6 +529,25 @@ const RewardTabView: React.FC = () => {
     const handleCloseForm = () => {
         setFormMode('idle');
         setEditingReward(null);
+    };
+
+    // 处理里程碑状态切换
+    const handleMilestoneToggle = async (milestoneId: string, newState: number) => {
+        if (!selectedRewardId) return;
+
+        try {
+            const updated = await rewardApi.updateMilestoneState(selectedRewardId, milestoneId, newState);
+            setRewards(prev => prev.map(r => r.id === updated.id ? updated : r));
+            // 也更新 selectedStats 中的 reward
+            if (selectedStats) {
+                setSelectedStats({
+                    ...selectedStats,
+                    reward: updated
+                });
+            }
+        } catch (error) {
+            console.error('Failed to update milestone state:', error);
+        }
     };
 
     const selectedReward = rewards.find(r => r.id === selectedRewardId);
@@ -333,6 +608,8 @@ const RewardTabView: React.FC = () => {
                 {rewards.map((reward) => {
                     const goal = goals.find(g => g.id === reward.goalId);
                     const isSelected = selectedRewardId === reward.id;
+                    const milestonesCount = reward.milestones?.length || 0;
+                    const completedMilestones = reward.milestones?.filter(m => m.state === 1).length || 0;
 
                     return (
                         <div
@@ -382,7 +659,7 @@ const RewardTabView: React.FC = () => {
                                 <span>{goal?.name || 'Unknown Goal'}</span>
                             </div>
 
-                            {/* Start Time and Target Hours Display */}
+                            {/* Start Time, Target Hours, and Milestones Display */}
                             <div className={`mt-4 pt-4 border-t ${isSelected ? 'border-blue-200' : 'border-slate-100'} flex flex-wrap gap-4`}>
                                 <div className={`flex items-center gap-1.5 text-xs ${isSelected ? 'text-blue-500' : 'text-slate-400'}`}>
                                     <Calendar size={12} />
@@ -392,6 +669,12 @@ const RewardTabView: React.FC = () => {
                                     <div className={`flex items-center gap-1.5 text-xs ${isSelected ? 'text-blue-500' : 'text-slate-400'}`}>
                                         <Clock size={12} />
                                         <span>{reward.targetHours}h target</span>
+                                    </div>
+                                )}
+                                {milestonesCount > 0 && (
+                                    <div className={`flex items-center gap-1.5 text-xs ${isSelected ? 'text-blue-500' : 'text-slate-400'}`}>
+                                        <Flag size={12} />
+                                        <span>{completedMilestones}/{milestonesCount} milestones</span>
                                     </div>
                                 )}
                             </div>
@@ -422,6 +705,14 @@ const RewardTabView: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Milestone Axis */}
+                    {selectedReward.milestones && selectedReward.milestones.length > 0 && (
+                        <MilestoneAxis
+                            milestones={selectedReward.milestones}
+                            onToggle={handleMilestoneToggle}
+                        />
+                    )}
 
                     {statsLoading ? (
                         <div className="flex items-center justify-center h-[300px]">

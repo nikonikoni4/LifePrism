@@ -172,12 +172,22 @@ export interface DailyPlan {
     content: string;
 }
 
+// 里程碑类型
+export interface MilestoneItem {
+    id: string;
+    content: string;
+    state: number;  // 0: 未达成, 1: 已达成
+    finishTime: string | null;
+    orderIndex: number;
+}
+
 export interface RewardItem {
     id: number;
     goalId: string;
     name: string;
     startTime: string;
     targetHours: number;
+    milestones: MilestoneItem[];
     orderIndex: number;
     createdAt: string;
 }

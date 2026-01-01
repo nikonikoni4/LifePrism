@@ -1,5 +1,5 @@
 
-import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, RewardItem, RewardStatsResponse, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse, CreateGoalRequest, UpdateGoalRequest, GoalListResponse, CategoryTreeResponse, ActiveGoalNamesResponse } from "./types";
+import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, RewardItem, RewardStatsResponse, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse, CreateGoalRequest, UpdateGoalRequest, GoalListResponse, CategoryTreeResponse, ActiveGoalNamesResponse, MilestoneItem } from "./types";
 
 const API_BASE = '/api/v2/goal';
 
@@ -404,6 +404,7 @@ export const rewardApi = {
         name: string;
         startTime: string;
         targetHours?: number;
+        milestones?: string;  // JSON 字符串
     }): Promise<RewardItem> => {
         const res = await fetch(`${API_BASE}/rewards`, {
             method: 'POST',
@@ -420,6 +421,7 @@ export const rewardApi = {
         name: string;
         startTime: string;
         targetHours: number;
+        milestones: string;  // JSON 字符串
     }>): Promise<RewardItem> => {
         const res = await fetch(`${API_BASE}/rewards/${id}`, {
             method: 'PATCH',
@@ -434,6 +436,21 @@ export const rewardApi = {
     deleteReward: async (id: number): Promise<boolean> => {
         const res = await fetch(`${API_BASE}/rewards/${id}`, { method: 'DELETE' });
         return res.ok;
+    },
+
+    // 更新里程碑状态（点亮/取消）
+    updateMilestoneState: async (
+        rewardId: number,
+        milestoneId: string,
+        state: number
+    ): Promise<RewardItem> => {
+        const res = await fetch(`${API_BASE}/rewards/${rewardId}/milestones/${milestoneId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state })
+        });
+        const result = await res.json();
+        return toCamelCase(result);
     }
 };
 
