@@ -1032,7 +1032,8 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             date: date,
             expectedFinishedAt: null,
             actualFinishedAt: null,
-            crossDay: false
+            crossDay: false,
+            folderId: null
         };
 
         // 乐观更新：立即添加到本地
