@@ -491,10 +491,19 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
 
     // Task detail handlers for TaskDetailPanel
     const handleUpdatePoolTask = async (id: number, updates: Partial<TodoItem>) => {
+        // Build final updates including side effects (sync with backend logic)
+        const finalUpdates = { ...updates };
+        if (updates.expectedFinishedAt) {
+            finalUpdates.crossDay = true;
+        }
+        if (updates.crossDay === false) {
+            finalUpdates.expectedFinishedAt = null;
+        }
+
         // Optimistic update
-        setTaskPoolItems(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+        setTaskPoolItems(prev => prev.map(t => t.id === id ? { ...t, ...finalUpdates } : t));
         if (selectedPoolTask?.id === id) {
-            setSelectedPoolTask(prev => prev ? { ...prev, ...updates } : null);
+            setSelectedPoolTask(prev => prev ? { ...prev, ...finalUpdates } : null);
         }
         try {
             await todoApi.updateTodo(id, updates);
@@ -1006,14 +1015,14 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                                     setSelectedPoolTask(null);
                                 }}
                                 className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all group ${showTaskPool
-                                    ? 'bg-amber-500 text-white border-2 border-amber-500 shadow-lg'
-                                    : 'bg-white border-2 border-slate-200 text-slate-700 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600'
+                                    ? 'bg-blue-500 text-white border-2 border-blue-500 shadow-lg'
+                                    : 'bg-white border-2 border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600'
                                     }`}
                             >
-                                <Inbox size={16} className={showTaskPool ? 'text-white' : 'text-slate-400 group-hover:text-amber-500 transition-colors'} />
+                                <Inbox size={16} className={showTaskPool ? 'text-white' : 'text-slate-400 group-hover:text-blue-500 transition-colors'} />
                                 <span>任务池</span>
                                 {taskPoolItems.length > 0 && (
-                                    <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${showTaskPool ? 'bg-white/30 text-white' : 'bg-amber-100 text-amber-600'}`}>
+                                    <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${showTaskPool ? 'bg-white/30 text-white' : 'bg-blue-100 text-blue-600'}`}>
                                         {taskPoolItems.length}
                                     </span>
                                 )}
@@ -1038,13 +1047,13 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
 
                 {/* Task Pool Drawer - Left side, pushes main content */}
                 {showTaskPool && viewType === 'week' && (
-                    <div className="w-80 border-r border-slate-200 bg-white flex flex-col flex-shrink-0 transition-all duration-300">
+                    <div className="w-80 border-r border-slate-200 bg-slate-50 flex flex-col flex-shrink-0 transition-all duration-300">
                         {/* Drawer Header */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
                             <div className="flex items-center gap-2">
-                                <Inbox size={18} className="text-amber-500" />
+                                <Inbox size={18} className="text-blue-500" />
                                 <span className="font-bold text-slate-700">任务池</span>
-                                <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600">
+                                <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600">
                                     {taskPoolItems.length}
                                 </span>
                             </div>
@@ -1058,7 +1067,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
 
                         {/* Goal Selector */}
                         <div className="px-4 py-3 border-b border-slate-100">
-                            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200">
+                            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200 shadow-sm">
                                 <Target size={14} className="text-slate-400" />
                                 <span className="text-sm text-slate-600">目标</span>
                                 <span className="text-sm font-medium text-slate-700">无</span>
@@ -1079,7 +1088,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                                         }
                                     }}
                                     placeholder="Type to create a task..."
-                                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 pl-8 text-sm font-medium outline-none focus:border-amber-300 focus:ring-2 focus:ring-amber-100 transition-all placeholder:text-slate-400"
+                                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 pl-8 text-sm font-medium outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-slate-400 shadow-sm"
                                 />
                                 <Plus size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                             </div>
@@ -1089,7 +1098,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                         <DroppablePool>
                             {isLoadingPool ? (
                                 <div className="flex items-center justify-center py-8">
-                                    <Loader2 size={20} className="text-amber-500 animate-spin" />
+                                    <Loader2 size={20} className="text-blue-500 animate-spin" />
                                 </div>
                             ) : taskPoolItems.length === 0 ? (
                                 <div className="text-center py-8 text-slate-400 text-sm">

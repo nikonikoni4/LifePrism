@@ -223,9 +223,18 @@ const TodoTabView: React.FC<TodoTabViewProps> = ({ initialDate, onDateUsed }) =>
     // --- Handlers ---
 
     const handleUpdateL1 = async (id: number, updates: Partial<TodoItem>) => {
+        // Build final updates including side effects (sync with backend logic)
+        const finalUpdates = { ...updates };
+        if (updates.expectedFinishedAt) {
+            finalUpdates.crossDay = true;
+        }
+        if (updates.crossDay === false) {
+            finalUpdates.expectedFinishedAt = null;
+        }
+
         // 乐观更新
         setItems(prev => prev.map(item =>
-            item.id === id ? { ...item, ...updates } : item
+            item.id === id ? { ...item, ...finalUpdates } : item
         ));
         try {
             await todoApi.updateTodo(id, updates);
