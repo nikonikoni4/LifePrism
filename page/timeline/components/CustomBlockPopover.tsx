@@ -92,9 +92,11 @@ const CustomBlockPopover: React.FC<CustomBlockPopoverProps> = ({
             // 创建新块时的默认值
             // 如果有 initialTime，使用它作为开始时间，结束时间为开始时间 +1 小时
             const startTime = initialTime || '08:00';
-            const [h, m] = startTime.split(':').map(Number);
-            const endHour = Math.min(h + 1, 23);
-            const endTime = `${String(endHour).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+            // 结束时间默认为当前时间
+            const now = new Date();
+            const endH = now.getHours();
+            const endM = now.getMinutes();
+            const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
 
             setFormData({
                 content: '',
