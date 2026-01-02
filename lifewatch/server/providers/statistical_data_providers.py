@@ -383,7 +383,10 @@ class ServerLWDataProvider(LWBaseDataProvider):
         title: str | None,
         is_multipurpose_app: bool,
         category_id: str,
-        sub_category_id: str | None = None
+        sub_category_id: str | None = None,
+        goal_id: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None
     ) -> int:
         """
         根据 app 和可选的 title 批量更新日志分类
@@ -398,37 +401,61 @@ class ServerLWDataProvider(LWBaseDataProvider):
             is_multipurpose_app: 是否为多用途应用
             category_id: 主分类ID
             sub_category_id: 子分类ID（可选）
+            goal_id: 目标ID（None=不修改, ''=清除, 'goal-xxx'=设置）
+            start_date: 开始日期 YYYY-MM-DD（可选）
+            end_date: 结束日期 YYYY-MM-DD（可选）
         
         Returns:
             int: 成功更新的数量
         """
+        # 构建 SET 子句
+        set_parts = ["category_id = ?", "sub_category_id = ?"]
+        params = [category_id, sub_category_id]
+        
+        # goal_id 处理：None=不修改，""=清除，"goal-xxx"=设置
+        if goal_id is not None:
+            set_parts.append("link_to_goal_id = ?")
+            # ""空字符串转换为 None（清除）
+            params.append(goal_id if goal_id else None)
+        
         # 构建 WHERE 条件
+        where_parts = ["app = ?"]
+        where_params = [app]
+        
         if is_multipurpose_app:
             # 多用途应用：匹配 app + title
             if title is None:
                 raise ValueError("多用途应用必须提供 title 参数")
-            sql = """
-            UPDATE user_app_behavior_log 
-            SET category_id = ?, sub_category_id = ?
-            WHERE app = ? AND title = ?
-            """
-            params = (category_id, sub_category_id, app, title)
-        else:
-            # 单用途应用：仅匹配 app
-            sql = """
-            UPDATE user_app_behavior_log 
-            SET category_id = ?, sub_category_id = ?
-            WHERE app = ?
-            """
-            params = (category_id, sub_category_id, app)
+            where_parts.append("title = ?")
+            where_params.append(title)
+        
+        # 日期范围过滤
+        if start_date:
+            where_parts.append("DATE(start_time) >= ?")
+            where_params.append(start_date)
+        if end_date:
+            where_parts.append("DATE(start_time) <= ?")
+            where_params.append(end_date)
+        
+        sql = f"""
+        UPDATE user_app_behavior_log 
+        SET {", ".join(set_parts)}
+        WHERE {" AND ".join(where_parts)}
+        """
+        
+        all_params = params + where_params
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, params)
+            cursor.execute(sql, all_params)
             conn.commit()
             updated_count = cursor.rowcount
         
-        logger.info(f"根据 app='{app}' {'+ title' if is_multipurpose_app else ''} 更新了 {updated_count} 条日志")
+        date_range_msg = ""
+        if start_date or end_date:
+            date_range_msg = f" (范围: {start_date or '开始'} ~ {end_date or '至今'})"
+        
+        logger.info(f"根据 app='{app}' {'+ title' if is_multipurpose_app else ''}{date_range_msg} 更新了 {updated_count} 条日志")
         return updated_count
 
 
@@ -660,11 +687,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
     def update_category_map_cache_by_id(
         self, 
         record_id: str,
-        category_id: str | None = None,
-        sub_category_id: str | None = None,
-        state: int | None = None,
-        app_description: str | None = None,
-        title_analysis: str | None = None
+        update_fields: dict
     ) -> bool:
         """
         通过 ID 更新单条 category_map_cache 记录的分类
@@ -675,11 +698,10 @@ class ServerLWDataProvider(LWBaseDataProvider):
         
         Args:
             record_id: 记录 ID（格式：m-xxx 或 s-xxx）
-            category_id: 新的主分类ID（可选，为空时不修改）
-            sub_category_id: 新的子分类ID
-            state: 新状态（由 Service 层根据目标分类计算，可选）
-            app_description: 应用程序描述（可选，为空时不修改）
-            title_analysis: 标题分析结果（可选，仅对 multi_purpose 有效）
+            update_fields: 需要更新的字段字典
+                - 字段存在且值为 None：将该字段设为 NULL（清空）
+                - 字段存在且值非 None：更新为新值
+                - 字段不存在：不更新该字段
         
         Returns:
             bool: 是否更新成功
@@ -693,30 +715,22 @@ class ServerLWDataProvider(LWBaseDataProvider):
             logger.error(f"无效的 record_id 格式: {record_id}")
             return False
         
-        # 动态构建 SET 子句
+        # 动态构建 SET 子句 - 使用 'key in dict' 而不是 'is not None'
         set_parts = []
         params = []
         
-        if category_id is not None:
-            set_parts.append("category_id = ?")
-            params.append(category_id)
+        # 可更新的字段列表
+        updatable_fields = ['category_id', 'sub_category_id', 'state', 'app_description', 'link_to_goal_id']
         
-        if sub_category_id is not None:
-            set_parts.append("sub_category_id = ?")
-            params.append(sub_category_id)
-        
-        if state is not None:
-            set_parts.append("state = ?")
-            params.append(state)
-        
-        if app_description is not None:
-            set_parts.append("app_description = ?")
-            params.append(app_description)
+        for field in updatable_fields:
+            if field in update_fields:
+                set_parts.append(f"{field} = ?")
+                params.append(update_fields[field])  # 值可以是 None，表示清空
         
         # title_analysis 只对 multi_purpose 表有效
-        if title_analysis is not None and table_name == 'multi_purpose_map_cache':
+        if 'title_analysis' in update_fields and table_name == 'multi_purpose_map_cache':
             set_parts.append("title_analysis = ?")
-            params.append(title_analysis)
+            params.append(update_fields['title_analysis'])
         
         # 如果没有任何字段需要更新，返回 False
         if not set_parts:
@@ -739,10 +753,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
     def batch_update_category_map_cache_by_ids(
         self, 
         record_ids: list[str],
-        category_id: str | None = None,
-        sub_category_id: str | None = None,
-        state: int | None = None,
-        app_description: str | None = None
+        update_fields: dict
     ) -> int:
         """
         批量通过 ID 更新 category_map_cache 记录的分类
@@ -753,10 +764,10 @@ class ServerLWDataProvider(LWBaseDataProvider):
         
         Args:
             record_ids: 记录的 ID 列表（格式：m-xxx 或 s-xxx）
-            category_id: 新的主分类ID（可选，为空时不修改）
-            sub_category_id: 新的子分类ID
-            state: 新状态（由 Service 层根据目标分类计算，可选）
-            app_description: 应用程序描述（可选，为空时不修改）
+            update_fields: 需要更新的字段字典
+                - 字段存在且值为 None：将该字段设为 NULL（清空）
+                - 字段存在且值非 None：更新为新值
+                - 字段不存在：不更新该字段
         
         Returns:
             int: 成功更新的数量
@@ -768,25 +779,17 @@ class ServerLWDataProvider(LWBaseDataProvider):
         multi_ids = [rid for rid in record_ids if rid.startswith('m-')]
         single_ids = [rid for rid in record_ids if rid.startswith('s-')]
         
-        # 动态构建 SET 子句
+        # 动态构建 SET 子句 - 使用 'key in dict' 而不是 'is not None'
         set_parts = []
         base_params = []
         
-        if category_id is not None:
-            set_parts.append("category_id = ?")
-            base_params.append(category_id)
+        # 可更新的字段列表
+        updatable_fields = ['category_id', 'sub_category_id', 'state', 'app_description', 'link_to_goal_id']
         
-        if sub_category_id is not None:
-            set_parts.append("sub_category_id = ?")
-            base_params.append(sub_category_id)
-        
-        if state is not None:
-            set_parts.append("state = ?")
-            base_params.append(state)
-        
-        if app_description is not None:
-            set_parts.append("app_description = ?")
-            base_params.append(app_description)
+        for field in updatable_fields:
+            if field in update_fields:
+                set_parts.append(f"{field} = ?")
+                base_params.append(update_fields[field])  # 值可以是 None，表示清空
         
         # 如果没有任何字段需要更新，返回 0
         if not set_parts:

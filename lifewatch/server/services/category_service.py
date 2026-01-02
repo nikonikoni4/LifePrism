@@ -1144,6 +1144,7 @@ class CategoryService:
             CategoryMapCacheItem,
             CategoryMapCacheResponse
         )
+        from lifewatch.server.services.goal_service import goal_service
         import math
         
         try:
@@ -1166,9 +1167,11 @@ class CategoryService:
                     # 映射 category_id 和 sub_category_id 到名称
                     category_id = row.get('category_id')
                     sub_category_id = row.get('sub_category_id')
+                    goal_id = row.get('link_to_goal_id')
                     
                     category_name = self.category_name_map.get(str(category_id), None) if category_id else None
                     sub_category_name = self.sub_category_name_map.get(str(sub_category_id), None) if sub_category_id else None
+                    goal_name = goal_service.get_goal_name(str(goal_id)) if goal_id else None
                     
                     items.append(CategoryMapCacheItem(
                         id=str(row['id']),
@@ -1180,6 +1183,8 @@ class CategoryService:
                         sub_category=sub_category_name,
                         category_id=str(category_id) if category_id else None,
                         sub_category_id=str(sub_category_id) if sub_category_id else None,
+                        link_to_goal_id=str(goal_id) if goal_id else None,
+                        link_to_goal=goal_name,
                         is_multipurpose_app=bool(row.get('is_multipurpose_app', 0)),
                         state=int(row.get('state', 1)),
                         created_at=str(row.get('created_at')) if row.get('created_at') else None
@@ -1221,37 +1226,30 @@ class CategoryService:
     def update_category_map_cache(
         self, 
         record_id: str, 
-        category_id: str | None = None, 
-        sub_category_id: str | None = None,
-        app_description: str | None = None,
-        title_analysis: str | None = None
+        update_fields: dict
     ) -> bool:
         """
         更新 category_map_cache 记录的分类
         
         Args:
             record_id: 记录ID（格式：m-xxx 或 s-xxx）
-            category_id: 新的主分类ID（可选，为空时不修改）
-            sub_category_id: 新的子分类ID
-            app_description: 应用程序描述（可选，为空时不修改）
-            title_analysis: 标题分析结果（可选，为空时不修改）
+            update_fields: 需要更新的字段字典，使用 'key in dict' 判断是否需要更新
+                - 字段存在且值为 None：将该字段设为 NULL（清空）
+                - 字段存在且值非 None：更新为新值
+                - 字段不存在：不更新该字段
         
         Returns:
             bool: 是否更新成功
         """
         try:
-            # 只有当 category_id 不为空时才获取目标分类的状态
-            state = None
-            if category_id is not None:
-                state = self._get_category_state_from_cache(category_id)
+            # 只有当 category_id 在 update_fields 中且不为空时才获取目标分类的状态
+            if 'category_id' in update_fields and update_fields['category_id'] is not None:
+                state = self._get_category_state_from_cache(update_fields['category_id'])
+                update_fields['state'] = state
             
             result = self.server_lw_data_provider.update_category_map_cache_by_id(
                 record_id=record_id,
-                category_id=category_id,
-                sub_category_id=sub_category_id,
-                state=state,
-                app_description=app_description,
-                title_analysis=title_analysis
+                update_fields=update_fields
             )
             
             if result:
@@ -1268,34 +1266,30 @@ class CategoryService:
     def batch_update_category_map_cache(
         self,
         record_ids: list[str],
-        category_id: str | None = None,
-        sub_category_id: str | None = None,
-        app_description: str | None = None
+        update_fields: dict
     ) -> int:
         """
         批量更新 category_map_cache 记录的分类
         
         Args:
             record_ids: 记录ID列表（格式：m-xxx 或 s-xxx）
-            category_id: 新的主分类ID（可选，为空时不修改）
-            sub_category_id: 新的子分类ID
-            app_description: 应用程序描述（可选，为空时不修改）
+            update_fields: 需要更新的字段字典，使用 'key in dict' 判断是否需要更新
+                - 字段存在且值为 None：将该字段设为 NULL（清空）
+                - 字段存在且值非 None：更新为新值
+                - 字段不存在：不更新该字段
         
         Returns:
             int: 成功更新的数量
         """
         try:
-            # 只有当 category_id 不为空时才获取目标分类的状态
-            state = None
-            if category_id is not None:
-                state = self._get_category_state_from_cache(category_id)
+            # 只有当 category_id 在 update_fields 中且不为空时才获取目标分类的状态
+            if 'category_id' in update_fields and update_fields['category_id'] is not None:
+                state = self._get_category_state_from_cache(update_fields['category_id'])
+                update_fields['state'] = state
             
             count = self.server_lw_data_provider.batch_update_category_map_cache_by_ids(
                 record_ids=record_ids,
-                category_id=category_id,
-                sub_category_id=sub_category_id,
-                state=state,
-                app_description=app_description
+                update_fields=update_fields
             )
             
             logger.info(f"批量更新 {count} 条 category_map_cache 记录的分类")

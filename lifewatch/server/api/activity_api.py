@@ -350,7 +350,10 @@ async def update_logs_by_cache(
     title: Optional[str] = Query(None, description="窗口标题（多用途应用时必填）"),
     is_multipurpose_app: bool = Query(..., description="是否为多用途应用"),
     category_id: str = Query(..., description="主分类ID"),
-    sub_category_id: Optional[str] = Query(None, description="子分类ID")
+    sub_category_id: Optional[str] = Query(None, description="子分类ID"),
+    goal_id: Optional[str] = Query(None, description="目标ID（None=不修改, ''=清除, 'goal-xxx'=设置）"),
+    start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD（可选）"),
+    end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD（可选）")
 ) -> StandardResponse:
     """
     根据缓存匹配条件批量更新日志分类
@@ -365,6 +368,9 @@ async def update_logs_by_cache(
     - is_multipurpose_app: 是否为多用途应用
     - category_id: 主分类ID
     - sub_category_id: 子分类ID（可选）
+    - goal_id: 目标ID（None=不修改, ''=清除, 'goal-xxx'=设置）
+    - start_date: 开始日期 YYYY-MM-DD（可选，用于限制更新范围）
+    - end_date: 结束日期 YYYY-MM-DD（可选，用于限制更新范围）
     
     **返回：**
     - success: 是否成功
@@ -383,7 +389,10 @@ async def update_logs_by_cache(
             title=title,
             is_multipurpose_app=is_multipurpose_app,
             category_id=category_id,
-            sub_category_id=sub_category_id
+            sub_category_id=sub_category_id,
+            goal_id=goal_id,
+            start_date=start_date,
+            end_date=end_date
         )
         
         return StandardResponse(

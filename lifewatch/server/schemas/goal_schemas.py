@@ -285,6 +285,20 @@ class ActiveGoalNamesResponse(BaseModel):
     items: List[ActiveGoalItem] = Field(default=[], description="活跃目标列表")
 
 
+class GoalWithCategoryItem(BaseModel):
+    """绑定了分类的目标项（用于 Map Cache 编辑）"""
+    id: str = Field(..., description="目标 ID")
+    name: str = Field(..., description="目标名称")
+    link_to_category_id: str = Field(..., description="关联的分类 ID")
+    link_to_sub_category_id: Optional[str] = Field(default=None, description="关联的子分类 ID")
+
+
+class GoalsWithCategoryResponse(BaseModel):
+    """绑定了分类的目标列表响应"""
+    items: List[GoalWithCategoryItem] = Field(default=[], description="目标列表")
+
+
+
 
 
 # ============================================================================

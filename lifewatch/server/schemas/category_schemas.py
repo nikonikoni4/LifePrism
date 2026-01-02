@@ -264,6 +264,9 @@ class CategoryMapCacheItem(BaseModel):
     # 分类 ID（原始值）
     category_id: str | None = Field(default=None, description="主分类ID（原始值）")
     sub_category_id: str | None = Field(default=None, description="子分类ID（原始值）")
+    # Goal 关联
+    link_to_goal_id: str | None = Field(default=None, description="关联的目标ID")
+    link_to_goal: str | None = Field(default=None, description="关联的目标名称（通过 ID 映射）")
     # 其他字段
     is_multipurpose_app: bool = Field(default=False, description="是否为多用途应用")
     state: int = Field(default=1, description="记录状态（1: 有效, 0: 无效）")
@@ -281,6 +284,8 @@ class CategoryMapCacheItem(BaseModel):
                 "sub_category": "视频",
                 "category_id": "entertainment",
                 "sub_category_id": "video",
+                "link_to_goal_id": "goal-123",
+                "link_to_goal": "学习 Python",
                 "is_multipurpose_app": True,
                 "state": 1,
                 "created_at": "2025-12-22T10:30:00"
@@ -327,6 +332,7 @@ class UpdateCategoryMapCacheRequest(BaseModel):
     sub_category_id: str | None = Field(default=None, description="新的子分类ID")
     app_description: str | None = Field(default=None, description="应用程序描述，为空时不修改")
     title_analysis: str | None = Field(default=None, description="标题分析结果，为空时不修改")
+    link_to_goal_id: str | None = Field(default=None, description="新的关联目标ID，为空时不修改")
     
     class Config:
         json_schema_extra = {
@@ -335,7 +341,8 @@ class UpdateCategoryMapCacheRequest(BaseModel):
                 "category_id": "cat-124",
                 "sub_category_id": "subcat-124",
                 "app_description": "Microsoft Edge 浏览器",
-                "title_analysis": "用户正在浏览视频网站"
+                "title_analysis": "用户正在浏览视频网站",
+                "link_to_goal_id": "goal-123"
             }
         }
 
@@ -346,6 +353,7 @@ class BatchUpdateCategoryMapCacheRequest(BaseModel):
     category_id: str | None = Field(default=None, description="新的主分类ID，为空时不修改")
     sub_category_id: str | None = Field(default=None, description="新的子分类ID")
     app_description: str | None = Field(default=None, description="应用程序描述，为空时不修改")
+    link_to_goal_id: str | None = Field(default=None, description="新的关联目标ID，为空时不修改")
     class Config:
         json_schema_extra = {
             "example": {

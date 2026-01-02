@@ -74,6 +74,20 @@ class GoalService:
             return None
         return category_service.sub_category_name_map.get(str(sub_category_id))
     
+    def get_goal_name(self, goal_id: str) -> Optional[str]:
+        """
+        根据目标 ID 获取目标名称
+        
+        Args:
+            goal_id: 目标ID
+            
+        Returns:
+            Optional[str]: 目标名称，如果不存在则返回 None
+        """
+        if not goal_id:
+            return None
+        return self.goal_name_map.get(str(goal_id))
+    
     def _convert_db_item_to_goal_item(self, item: Dict[str, Any]) -> GoalItem:
         """
         将数据库记录转换为 GoalItem，同时将分类 ID 转换为名称
@@ -290,6 +304,29 @@ class GoalService:
             Optional[str]: 目标名称，不存在返回 None
         """
         return self.goal_name_map.get(str(goal_id))
+    
+    def get_goals_with_category(self):
+        """
+        获取所有绑定了分类的进行中目标（用于 Map Cache 编辑界面）
+        
+        Returns:
+            GoalsWithCategoryResponse: 绑定了分类的目标列表
+        """
+        from lifewatch.server.schemas.goal_schemas import GoalWithCategoryItem, GoalsWithCategoryResponse
+        
+        items = self.goal_provider.get_active_goals_with_category()
+        
+        goal_items = [
+            GoalWithCategoryItem(
+                id=item['id'],
+                name=item['name'],
+                link_to_category_id=item['link_to_category_id'],
+                link_to_sub_category_id=item.get('link_to_sub_category_id')
+            )
+            for item in items
+        ]
+        
+        return GoalsWithCategoryResponse(items=goal_items)
 
 
 # 创建全局单例

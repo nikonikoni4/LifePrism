@@ -307,6 +307,34 @@ class GoalProvider(LWBaseDataProvider):
             logger.error(f"获取活跃目标列表失败: {e}")
             return []
     
+    def get_active_goals_with_category(self) -> List[Dict[str, Any]]:
+        """
+        获取所有绑定了分类的进行中目标（用于 Map Cache 编辑界面）
+        
+        只返回 link_to_category_id 不为空的目标
+        
+        Returns:
+            List[Dict]: 目标列表，包含 id, name, link_to_category_id, link_to_sub_category_id
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, name, link_to_category_id, link_to_sub_category_id 
+                    FROM goal 
+                    WHERE status = 'active' AND link_to_category_id IS NOT NULL
+                    ORDER BY order_index ASC
+                """)
+                
+                columns = [description[0] for description in cursor.description]
+                rows = cursor.fetchall()
+                
+                return [dict(zip(columns, row)) for row in rows]
+                
+        except Exception as e:
+            logger.error(f"获取绑定分类的活跃目标列表失败: {e}")
+            return []
+    
     def get_goals_linked_to_category(self, category_id: str) -> List[Dict[str, Any]]:
         """
         获取关联到特定分类的所有目标

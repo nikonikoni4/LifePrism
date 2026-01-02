@@ -411,21 +411,28 @@ async def batch_update_category_map_cache(
     批量更新 category_map_cache 记录的分类
     
     - 更新时会自动同步目标分类的 state 状态
-    - category_id 和 app_description 至少需要提供一个
+    - 使用 exclude_unset 区分"未传递字段"和"传递了 null 想清空"
     """
-    # 参数校验：category_id 和 app_description 不能同时为空
-    if request.category_id is None and request.app_description is None:
+    # 使用 exclude_unset=True 获取前端实际传递的字段
+    update_fields = request.model_dump(exclude_unset=True)
+    
+    # 提取 ids 并移除（不属于更新字段）
+    record_ids = update_fields.pop('ids', [])
+    
+    logger.info(f"批量更新记录 {record_ids}，传递的字段: {update_fields}")
+    
+    # 参数校验：至少需要一个可更新的字段
+    updatable_fields = {'category_id', 'sub_category_id', 'app_description', 'link_to_goal_id'}
+    if not any(field in update_fields for field in updatable_fields):
         raise HTTPException(
             status_code=400, 
-            detail="参数错误：category_id 和 app_description 不能同时为空"
+            detail="参数错误：至少需要提供一个更新字段（category_id、sub_category_id、app_description、link_to_goal_id）"
         )
     
     try:
         count = category_service.batch_update_category_map_cache(
-            record_ids=request.ids,
-            category_id=request.category_id,
-            sub_category_id=request.sub_category_id,
-            app_description=request.app_description
+            record_ids=record_ids,
+            update_fields=update_fields
         )
         return StandardResponse(
             success=True,
@@ -446,22 +453,30 @@ async def update_category_map_cache(
     更新单条 category_map_cache 记录的分类
     
     - 更新时会自动同步目标分类的 state 状态
-    - category_id、app_description、title_analysis 至少需要提供一个
+    - 使用 exclude_unset 区分"未传递字段"和"传递了 null 想清空"
+    - 例如：传 {"link_to_goal_id": null} 会将 link_to_goal_id 设为 NULL
     """
-    # 参数校验：category_id、app_description、title_analysis 不能同时为空
-    if request.category_id is None and request.app_description is None and request.title_analysis is None:
+    # 使用 exclude_unset=True 获取前端实际传递的字段
+    # 这样可以区分 "没传这个字段" 和 "传了 null 想清空"
+    update_fields = request.model_dump(exclude_unset=True)
+    
+    # 移除 id 字段（路径参数已提供）
+    update_fields.pop('id', None)
+    
+    logger.info(f"更新记录 {record_id}，传递的字段: {update_fields}")
+    
+    # 参数校验：至少需要一个可更新的字段
+    updatable_fields = {'category_id', 'sub_category_id', 'app_description', 'title_analysis', 'link_to_goal_id'}
+    if not any(field in update_fields for field in updatable_fields):
         raise HTTPException(
             status_code=400, 
-            detail="参数错误：category_id、app_description、title_analysis 不能同时为空"
+            detail="参数错误：至少需要提供一个更新字段（category_id、sub_category_id、app_description、title_analysis、link_to_goal_id）"
         )
     
     try:
         success = category_service.update_category_map_cache(
             record_id=record_id,
-            category_id=request.category_id,
-            sub_category_id=request.sub_category_id,
-            app_description=request.app_description,
-            title_analysis=request.title_analysis
+            update_fields=update_fields
         )
         if not success:
             raise HTTPException(status_code=404, detail=f"记录 ID={record_id} 不存在")

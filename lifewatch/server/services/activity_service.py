@@ -221,7 +221,10 @@ class ActivityService:
         title: str | None,
         is_multipurpose_app: bool,
         category_id: str,
-        sub_category_id: str | None = None
+        sub_category_id: str | None = None,
+        goal_id: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None
     ) -> int:
         """
         根据 app 和可选的 title 批量更新日志分类
@@ -236,6 +239,9 @@ class ActivityService:
             is_multipurpose_app: 是否为多用途应用
             category_id: 主分类ID
             sub_category_id: 子分类ID（可选）
+            goal_id: 目标ID（None=不修改, ''=清除, 'goal-xxx'=设置）
+            start_date: 开始日期 YYYY-MM-DD（可选）
+            end_date: 结束日期 YYYY-MM-DD（可选）
         
         Returns:
             int: 成功更新的数量
@@ -245,7 +251,10 @@ class ActivityService:
             title=title,
             is_multipurpose_app=is_multipurpose_app,
             category_id=category_id,
-            sub_category_id=sub_category_id
+            sub_category_id=sub_category_id,
+            goal_id=goal_id,
+            start_date=start_date,
+            end_date=end_date
         )
 
 

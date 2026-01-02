@@ -30,6 +30,7 @@ from lifewatch.server.schemas.goal_schemas import (
     UpdateGoalRequest,
     ReorderGoalRequest,
     ActiveGoalNamesResponse,
+    GoalsWithCategoryResponse,
     # Folder Schemas
     TaskPoolFolderItem,
     TaskPoolFolderListResponse,
@@ -466,6 +467,18 @@ async def get_active_goal_names():
     返回 status='active' 的目标的 id 和 name
     """
     return goal_service.get_active_goal_names()
+
+
+@router.get("/goals/with-category", response_model=GoalsWithCategoryResponse)
+async def get_goals_with_category():
+    """
+    获取所有绑定了分类的进行中目标（用于 Map Cache 编辑界面）
+    
+    仅返回 link_to_category_id 不为空的目标
+    包含 id, name, link_to_category_id, link_to_sub_category_id
+    """
+    return goal_service.get_goals_with_category()
+
 
 
 @router.get("/goals/{goal_id}", response_model=GoalItem)
