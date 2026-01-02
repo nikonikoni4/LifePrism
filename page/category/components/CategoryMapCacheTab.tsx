@@ -4,7 +4,7 @@
  * 展示和管理 category_map_cache 表的 AI 分类元数据
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Trash2, ChevronLeft, ChevronRight, Loader2, Edit3, X, Save, Globe, AppWindow, HelpCircle } from 'lucide-react';
 import { CategoryTreeItem } from '../../common/types';
 import { CategoryMapCacheItem } from '../types';
@@ -80,10 +80,14 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
             setError(null);
 
             try {
+                // 根据筛选类型设置 is_multipurpose_app 参数
+                const is_multipurpose_app = appTypeFilter === 'all' ? undefined : appTypeFilter === 'multi';
+
                 const response = await CategoryMapCacheAPI.getList({
                     page: currentPage,
                     page_size: pageSize,
                     search: debouncedSearch || undefined,
+                    is_multipurpose_app: is_multipurpose_app,
                 });
 
                 setRecords(response.data);
@@ -100,14 +104,10 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
         };
 
         fetchData();
-    }, [currentPage, pageSize, debouncedSearch]);
+    }, [currentPage, pageSize, debouncedSearch, appTypeFilter]);
 
-    // 根据应用类型筛选本地过滤
-    const filteredRecords = useMemo(() => {
-        if (appTypeFilter === 'all') return records;
-        if (appTypeFilter === 'multi') return records.filter(r => r.is_multipurpose_app);
-        return records.filter(r => !r.is_multipurpose_app);
-    }, [records, appTypeFilter]);
+    // 已经在后端筛选，直接使用 records
+    const filteredRecords = records;
 
     // 全选/取消全选
     const handleSelectAll = () => {

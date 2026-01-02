@@ -229,6 +229,7 @@ export const CategoryMapCacheAPI = {
         page_size?: number;
         search?: string;
         state?: number;
+        is_multipurpose_app?: boolean;
     } = {}): Promise<CategoryMapCacheResponse> {
         const searchParams = new URLSearchParams();
 
@@ -243,6 +244,9 @@ export const CategoryMapCacheAPI = {
         }
         if (params.state !== undefined) {
             searchParams.set('state', params.state.toString());
+        }
+        if (params.is_multipurpose_app !== undefined) {
+            searchParams.set('is_multipurpose_app', params.is_multipurpose_app.toString());
         }
 
         const response = await fetch(`${API_BASE}/category_map?${searchParams.toString()}`);
