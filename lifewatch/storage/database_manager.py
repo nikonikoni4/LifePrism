@@ -531,6 +531,144 @@ class DatabaseManager:
         """
         return self.delete(table_name, where={id_column: id_value})
     
+    # ==================== 高级查询操作 ====================
+    
+    def query_advanced(self, 
+                       table_name: str, 
+                       columns: List[str] = None,
+                       conditions: List[Tuple[str, str, Any]] = None,
+                       order_by: str = None,
+                       limit: int = None) -> pd.DataFrame:
+        """
+        高级查询方法，支持多种比较操作符
+        
+        Args:
+            table_name: 表名
+            columns: 要查询的列名列表，None 表示所有列
+            conditions: 条件列表，格式为 [(column, operator, value), ...]
+                       支持的操作符: '=', '!=', '>', '<', '>=', '<=', 'LIKE', 'IN', 'NOT IN', 'BETWEEN'
+                       示例: [('date', '>=', '2024-01-01'), ('state', '=', '1')]
+                       BETWEEN 示例: [('date', 'BETWEEN', ('2024-01-01', '2024-01-31'))]
+                       IN 示例: [('state', 'IN', ['0', '1'])]
+            order_by: 排序字段，例如 'date DESC'
+            limit: 限制返回行数
+            
+        Returns:
+            pd.DataFrame: 查询结果
+            
+        Example:
+            df = db.query_advanced('daily_report', 
+                                   columns=['date', 'state'],
+                                   conditions=[
+                                       ('date', '>=', '2024-01-01'),
+                                       ('date', '<=', '2024-01-31'),
+                                       ('state', '=', '1')
+                                   ],
+                                   order_by='date ASC')
+        """
+        try:
+            # 构建 SQL 语句
+            select_cols = ', '.join(columns) if columns else '*'
+            sql = f"SELECT {select_cols} FROM {table_name}"
+            params = []
+            
+            # 添加 WHERE 子句
+            if conditions:
+                where_clauses = []
+                for col, op, value in conditions:
+                    op_upper = op.upper()
+                    
+                    if op_upper == 'BETWEEN':
+                        # BETWEEN 需要两个值
+                        if isinstance(value, (tuple, list)) and len(value) == 2:
+                            where_clauses.append(f"{col} BETWEEN ? AND ?")
+                            params.extend(value)
+                        else:
+                            raise ValueError(f"BETWEEN 操作符需要一个包含两个值的元组: {value}")
+                    
+                    elif op_upper in ('IN', 'NOT IN'):
+                        # IN 需要值列表
+                        if isinstance(value, (list, tuple)):
+                            placeholders = ', '.join(['?' for _ in value])
+                            where_clauses.append(f"{col} {op_upper} ({placeholders})")
+                            params.extend(value)
+                        else:
+                            raise ValueError(f"IN/NOT IN 操作符需要一个列表: {value}")
+                    
+                    elif op_upper in ('=', '!=', '>', '<', '>=', '<=', 'LIKE'):
+                        where_clauses.append(f"{col} {op} ?")
+                        params.append(value)
+                    
+                    else:
+                        raise ValueError(f"不支持的操作符: {op}")
+                
+                sql += " WHERE " + " AND ".join(where_clauses)
+            
+            # 添加 ORDER BY 子句
+            if order_by:
+                sql += f" ORDER BY {order_by}"
+            
+            # 添加 LIMIT 子句
+            if limit:
+                sql += f" LIMIT {limit}"
+            
+            with self.get_connection() as conn:
+                df = pd.read_sql_query(sql, conn, params=params)
+                logger.debug(f"高级查询成功，返回 {len(df)} 行数据")
+                return df if not df.empty else pd.DataFrame()
+                
+        except Exception as e:
+            logger.error(f"高级查询失败: {e}")
+            raise
+    
+    def execute_raw(self, 
+                    sql: str, 
+                    params: tuple = None,
+                    fetch: bool = True) -> Optional[pd.DataFrame]:
+        """
+        执行原始 SQL 语句
+        
+        用于复杂查询或需要精细控制的场景
+        
+        Args:
+            sql: SQL 语句
+            params: 参数元组
+            fetch: 是否返回查询结果（SELECT 用 True，INSERT/UPDATE/DELETE 用 False）
+            
+        Returns:
+            pd.DataFrame: 查询结果（fetch=True 时）
+            None: 无返回（fetch=False 时）
+            
+        Example:
+            # 查询
+            df = db.execute_raw(
+                "SELECT * FROM daily_report WHERE date BETWEEN ? AND ?",
+                ('2024-01-01', '2024-01-31')
+            )
+            
+            # 更新
+            db.execute_raw(
+                "UPDATE daily_report SET state = ? WHERE date = ?",
+                ('1', '2024-01-01'),
+                fetch=False
+            )
+        """
+        try:
+            with self.get_connection() as conn:
+                if fetch:
+                    df = pd.read_sql_query(sql, conn, params=params)
+                    logger.debug(f"原始 SQL 查询成功，返回 {len(df)} 行数据")
+                    return df if not df.empty else pd.DataFrame()
+                else:
+                    cursor = conn.cursor()
+                    cursor.execute(sql, params or ())
+                    logger.debug(f"原始 SQL 执行成功，影响 {cursor.rowcount} 行")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"原始 SQL 执行失败: {e}")
+            raise
+    
     def truncate(self, table_name: str):
         """
         清空表（删除所有记录）
@@ -549,9 +687,3 @@ class DatabaseManager:
             raise
 
 
-
-if __name__ == "__main__":
-    # 测试数据库功能
-    db = DatabaseManager()
-    stats = db.get_database_stats()
-    print("数据库统计:", stats)

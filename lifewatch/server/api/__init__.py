@@ -12,6 +12,7 @@ from .goal_api import router as goal_router
 from .chatbot_api import router as chatbot_router
 from .setting_api import router as setting_router
 from .reward_api import router as reward_router
+from .report_api import router as report_router
 
 __all__ = [
     "dashboard_router",
@@ -27,6 +28,6 @@ __all__ = [
     "chatbot_router",
     "setting_router",
     "reward_router",
+    "report_router",
 ]
-
 

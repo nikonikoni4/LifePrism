@@ -873,6 +873,69 @@ REWARD_CONFIG = {
     'timestamps': True
 }
 
+# report 界面数据库保存
+# daily report
+daily_report_config = {
+    'table_name': 'daily_report',
+    'columns': {
+        'date': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY', 'NOT NULL'],
+            'comment': '日期 YYYY-MM-DD'
+        },
+        'sunburst_data': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '旭日图数据 (TimeOverviewData JSON)'
+        },
+        'todo_data': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': 'Todo统计数据 (TodoStatsData JSON)'
+        },
+        'goal_data': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': 'Goal进度数据 (GoalProgressData[] JSON)'
+        },
+        'daily_trend_data': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '24小时趋势数据 (TimeDistributionPoint[] JSON)'
+        },
+        'state': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT 0'],
+            'comment': '数据状态 (0: 未完成, 1: 已完成)'
+        },
+        'data_version': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 1'],
+            'comment': '数据格式版本号'
+        },
+        'ai_summary': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': 'AI总结'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_daily_report_date', 'columns': ['date']}
+    ],
+    'timestamps': True
+}
+
+
+
+
+
+
+
+
+
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'category_map_cache': category_map_cache_CONFIG,
@@ -891,7 +954,8 @@ TABLE_CONFIGS = {
     'timeline_custom_block': TIMELINE_CUSTOM_BLOCK_CONFIG,
     'task_pool_folder': TASK_POOL_FOLDER_CONFIG,
     'goal_stats': GOAL_STATS_CONFIG,
-    'reward': REWARD_CONFIG
+    'reward': REWARD_CONFIG,
+    'daily_report': daily_report_config,
 }
 
 

@@ -1,0 +1,260 @@
+"""
+Report 数据提供者
+提供 Daily Report 的数据库操作
+
+重构版本：使用 DatabaseManager 内置的 CRUD 方法
+"""
+import json
+from typing import Optional, List, Dict, Any
+
+from lifewatch.storage import LWBaseDataProvider
+from lifewatch.utils import get_logger
+
+logger = get_logger(__name__)
+
+
+class ReportProvider(LWBaseDataProvider):
+    """
+    报告数据提供者
+    
+    继承 LWBaseDataProvider，提供 Daily Report 的 CRUD 操作
+    使用 DatabaseManager 内置方法进行数据库操作
+    """
+    
+    TABLE_NAME = 'daily_report'
+    ID_COLUMN = 'date'
+    
+    # JSON 字段列表
+    JSON_FIELDS = ['sunburst_data', 'todo_data', 'goal_data', 'daily_trend_data']
+    
+    def __init__(self, db_manager=None):
+        super().__init__(db_manager)
+    
+    # ==================== 辅助方法 ====================
+    
+    def _serialize_json_fields(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """将 JSON 字段序列化为字符串"""
+        result = data.copy()
+        for field in self.JSON_FIELDS:
+            if field in result and result[field] is not None:
+                result[field] = json.dumps(result[field], ensure_ascii=False)
+        return result
+    
+    def _deserialize_json_fields(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        """将 JSON 字符串字段反序列化为对象"""
+        if not row:
+            return row
+        result = row.copy()
+        for field in self.JSON_FIELDS:
+            if field in result and result[field] is not None:
+                try:
+                    result[field] = json.loads(result[field])
+                except (json.JSONDecodeError, TypeError):
+                    result[field] = None
+        return result
+    
+    def _df_to_dict_list(self, df) -> List[Dict[str, Any]]:
+        """将 DataFrame 转换为带 JSON 反序列化的字典列表"""
+        if df.empty:
+            return []
+        
+        results = []
+        for _, row in df.iterrows():
+            item = row.to_dict()
+            results.append(self._deserialize_json_fields(item))
+        return results
+    
+    # ==================== CRUD 操作 ====================
+    
+    def get_daily_report(self, date: str) -> Optional[Dict[str, Any]]:
+        """
+        按日期获取日报告
+        
+        Args:
+            date: 日期 YYYY-MM-DD
+        
+        Returns:
+            Optional[Dict]: 报告数据，不存在返回 None
+        """
+        try:
+            result = self.db.get_by_id(self.TABLE_NAME, self.ID_COLUMN, date)
+            if result:
+                return self._deserialize_json_fields(result)
+            return None
+        except Exception as e:
+            logger.error(f"获取日报告 {date} 失败: {e}")
+            return None
+    
+    def upsert_daily_report(self, date: str, data: Dict[str, Any]) -> bool:
+        """
+        创建或更新日报告 (UPSERT)
+        
+        Args:
+            date: 日期 YYYY-MM-DD
+            data: 报告数据（只更新非 None 字段）
+        
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            # 检查是否已存在
+            exists = self.db.get_by_id(self.TABLE_NAME, self.ID_COLUMN, date) is not None
+            
+            if exists:
+                # UPDATE - 只更新传入的非 None 字段
+                update_data = {k: v for k, v in data.items() if v is not None}
+                if not update_data:
+                    return True
+                
+                # 序列化 JSON 字段
+                update_data = self._serialize_json_fields(update_data)
+                
+                rows_affected = self.db.update_by_id(
+                    self.TABLE_NAME, 
+                    self.ID_COLUMN, 
+                    date, 
+                    update_data
+                )
+                
+                if rows_affected > 0:
+                    logger.info(f"更新日报告 {date} 成功")
+                return True
+            else:
+                # INSERT
+                insert_data = {self.ID_COLUMN: date}
+                insert_data.update({k: v for k, v in data.items() if v is not None})
+                
+                # 序列化 JSON 字段
+                insert_data = self._serialize_json_fields(insert_data)
+                
+                self.db.insert(self.TABLE_NAME, insert_data)
+                logger.info(f"创建日报告 {date} 成功")
+                return True
+                
+        except Exception as e:
+            logger.error(f"保存日报告 {date} 失败: {e}")
+            return False
+    
+    def update_report_state(self, date: str, state: str) -> bool:
+        """
+        更新报告状态
+        
+        Args:
+            date: 日期 YYYY-MM-DD
+            state: 状态 ("0": 未完成, "1": 已完成)
+        
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            rows_affected = self.db.update_by_id(
+                self.TABLE_NAME,
+                self.ID_COLUMN,
+                date,
+                {'state': state}
+            )
+            
+            success = rows_affected > 0
+            if success:
+                logger.info(f"更新日报告 {date} 状态为 {state}")
+            return success
+            
+        except Exception as e:
+            logger.error(f"更新日报告 {date} 状态失败: {e}")
+            return False
+    
+    def delete_daily_report(self, date: str) -> bool:
+        """
+        删除日报告
+        
+        Args:
+            date: 日期 YYYY-MM-DD
+        
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            rows_affected = self.db.delete_by_id(
+                self.TABLE_NAME,
+                self.ID_COLUMN,
+                date
+            )
+            
+            success = rows_affected > 0
+            if success:
+                logger.info(f"删除日报告 {date} 成功")
+            return success
+            
+        except Exception as e:
+            logger.error(f"删除日报告 {date} 失败: {e}")
+            return False
+    
+    def get_reports_in_range(
+        self,
+        start_date: str,
+        end_date: str
+    ) -> List[Dict[str, Any]]:
+        """
+        获取日期范围内的报告列表
+        
+        Args:
+            start_date: 开始日期 YYYY-MM-DD
+            end_date: 结束日期 YYYY-MM-DD
+        
+        Returns:
+            List[Dict]: 报告列表
+        """
+        try:
+            df = self.db.query_advanced(
+                self.TABLE_NAME,
+                conditions=[
+                    (self.ID_COLUMN, '>=', start_date),
+                    (self.ID_COLUMN, '<=', end_date)
+                ],
+                order_by=f'{self.ID_COLUMN} ASC'
+            )
+            
+            return self._df_to_dict_list(df)
+            
+        except Exception as e:
+            logger.error(f"获取日期范围 {start_date} 至 {end_date} 报告失败: {e}")
+            return []
+    
+    def get_completed_report_dates(
+        self,
+        start_date: str,
+        end_date: str
+    ) -> List[str]:
+        """
+        获取日期范围内已完成的报告日期列表
+        
+        Args:
+            start_date: 开始日期 YYYY-MM-DD
+            end_date: 结束日期 YYYY-MM-DD
+        
+        Returns:
+            List[str]: 日期列表
+        """
+        try:
+            df = self.db.query_advanced(
+                self.TABLE_NAME,
+                columns=[self.ID_COLUMN],
+                conditions=[
+                    (self.ID_COLUMN, '>=', start_date),
+                    (self.ID_COLUMN, '<=', end_date),
+                    ('state', '=', '1')
+                ],
+                order_by=f'{self.ID_COLUMN} ASC'
+            )
+            
+            if df.empty:
+                return []
+            return df[self.ID_COLUMN].tolist()
+            
+        except Exception as e:
+            logger.error(f"获取已完成报告日期失败: {e}")
+            return []
+
+
+# 创建全局单例
+report_provider = ReportProvider()
