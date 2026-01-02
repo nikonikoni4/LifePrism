@@ -16,7 +16,6 @@ from lifewatch.server.schemas.category_schemas import (
 )
 from lifewatch.server.providers.category_color_provider import color_manager
 from lifewatch.utils import get_logger
-from lifewatch.utils.common_utils import is_multipurpose_app
 from datetime import datetime
 import uuid
 
@@ -808,7 +807,7 @@ class CategoryService:
             self.db.update_by_id('category', 'id', category_id, {'state': state})
             logger.info(f"成功切换分类 '{category_id}' 状态为 {state}")
             
-            # 同步更新 category_map_cache 表的 state
+            # 同步更新 single_purpose_category_map和 multi_purpose_category_map 表的 state
             if state == 0:
                 # 禁用：将该分类下所有记录的 state 置为 0
                 self._disable_category_map_records_by_category(category_id)
@@ -863,7 +862,7 @@ class CategoryService:
             self.db.update_by_id('sub_category', 'id', sub_id, {'state': state})
             logger.info(f"成功切换子分类 '{sub_id}' 状态为 {state}")
             
-            # 同步更新 category_map_cache 表的 state
+            # 同步更新 single_purpose_category_map和 multi_purpose_category_map 表的 state
             if state == 0:
                 # 禁用：将该子分类下所有记录的 state 置为 0
                 self._disable_category_map_records_by_sub_category(sub_id)
@@ -892,45 +891,69 @@ class CategoryService:
     
     def _disable_category_map_records_by_category(self, category_id: str):
         """
-        禁用主分类时，将 category_map_cache 中该分类的所有记录 state 置为 0
+        禁用主分类时，将 multi_purpose_map_cache 和 single_purpose_map_cache 中该分类的所有记录 state 置为 0
         """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
+                total_affected = 0
+                
+                # 更新 multi_purpose_map_cache 表
                 cursor.execute("""
-                    UPDATE category_map_cache 
+                    UPDATE multi_purpose_map_cache 
                     SET state = 0, updated_at = CURRENT_TIMESTAMP
                     WHERE category_id = ?
                 """, (category_id,))
-                affected = cursor.rowcount
+                total_affected += cursor.rowcount
+                
+                # 更新 single_purpose_map_cache 表
+                cursor.execute("""
+                    UPDATE single_purpose_map_cache 
+                    SET state = 0, updated_at = CURRENT_TIMESTAMP
+                    WHERE category_id = ?
+                """, (category_id,))
+                total_affected += cursor.rowcount
+                
                 conn.commit()
-                logger.info(f"禁用分类 '{category_id}' 时，置 {affected} 条 category_map_cache 记录为无效")
+                logger.info(f"禁用分类 '{category_id}' 时，置 {total_affected} 条记录为无效")
         except Exception as e:
             logger.error(f"禁用分类记录失败: {e}")
             raise
     
     def _disable_category_map_records_by_sub_category(self, sub_category_id: str):
         """
-        禁用子分类时，将 category_map_cache 中该子分类的所有记录 state 置为 0
+        禁用子分类时，将 multi_purpose_map_cache 和 single_purpose_map_cache 中该子分类的所有记录 state 置为 0
         """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
+                total_affected = 0
+                
+                # 更新 multi_purpose_map_cache 表
                 cursor.execute("""
-                    UPDATE category_map_cache 
+                    UPDATE multi_purpose_map_cache 
                     SET state = 0, updated_at = CURRENT_TIMESTAMP
                     WHERE sub_category_id = ?
                 """, (sub_category_id,))
-                affected = cursor.rowcount
+                total_affected += cursor.rowcount
+                
+                # 更新 single_purpose_map_cache 表
+                cursor.execute("""
+                    UPDATE single_purpose_map_cache 
+                    SET state = 0, updated_at = CURRENT_TIMESTAMP
+                    WHERE sub_category_id = ?
+                """, (sub_category_id,))
+                total_affected += cursor.rowcount
+                
                 conn.commit()
-                logger.info(f"禁用子分类 '{sub_category_id}' 时，置 {affected} 条 category_map_cache 记录为无效")
+                logger.info(f"禁用子分类 '{sub_category_id}' 时，置 {total_affected} 条记录为无效")
         except Exception as e:
             logger.error(f"禁用子分类记录失败: {e}")
             raise
     
     def _enable_category_map_records_by_category(self, category_id: str):
         """
-        启用主分类时，恢复 category_map_cache 中符合条件的记录
+        启用主分类时，恢复 multi_purpose_map_cache 和 single_purpose_map_cache 中符合条件的记录
         
         恢复条件：主分类启用 AND 子分类也启用
         恢复前：删除同 (app, title) 中 created_at 更晚的记录
@@ -945,48 +968,65 @@ class CategoryService:
                 """, (category_id,))
                 sub_categories = {row[0]: row[1] for row in cursor.fetchall()}
                 
-                # 获取该分类下所有待恢复的记录
-                cursor.execute("""
-                    SELECT app, title, sub_category_id, created_at 
-                    FROM category_map_cache 
-                    WHERE category_id = ? AND state = 0
-                """, (category_id,))
-                records = cursor.fetchall()
-                
                 total_enabled = 0
                 total_deleted = 0
                 
-                for app, title, sub_cat_id, created_at in records:
-                    # 检查子分类是否也启用
-                    sub_state = sub_categories.get(sub_cat_id, 1)  # 默认启用
+                # 处理 multi_purpose_map_cache 表
+                cursor.execute("""
+                    SELECT id, app, title, sub_category_id, created_at 
+                    FROM multi_purpose_map_cache 
+                    WHERE category_id = ? AND state = 0
+                """, (category_id,))
+                multi_records = cursor.fetchall()
+                
+                for record_id, app, title, sub_cat_id, created_at in multi_records:
+                    sub_state = sub_categories.get(sub_cat_id, 1)
                     if sub_state == 0:
-                        # 子分类还是禁用状态，不恢复
                         continue
                     
-                    # 根据应用类型选择删除条件
-                    # 单分类应用：只匹配 app 删除（同一 app 只有一个分类）
-                    # 多分类应用：匹配 app + title 删除（同一 app 不同 title 可能有不同分类）
                     if created_at:
-                        if is_multipurpose_app(app):
-                            # 多分类应用：删除同 (app, title) 中 created_at 更晚的记录
-                            cursor.execute("""
-                                DELETE FROM category_map_cache 
-                                WHERE app = ? AND title = ? AND created_at > ?
-                            """, (app, title, created_at))
-                        else:
-                            # 单分类应用：删除同 app 中 created_at 更晚的记录
-                            cursor.execute("""
-                                DELETE FROM category_map_cache 
-                                WHERE app = ? AND created_at > ?
-                            """, (app, created_at))
+                        # 多分类应用：删除同 (app, title) 中 created_at 更晚的记录
+                        cursor.execute("""
+                            DELETE FROM multi_purpose_map_cache 
+                            WHERE app = ? AND title = ? AND created_at > ?
+                        """, (app, title, created_at))
                         total_deleted += cursor.rowcount
                     
                     # 恢复该记录
                     cursor.execute("""
-                        UPDATE category_map_cache 
+                        UPDATE multi_purpose_map_cache 
                         SET state = 1, updated_at = CURRENT_TIMESTAMP
-                        WHERE app = ? AND title = ? AND category_id = ?
-                    """, (app, title, category_id))
+                        WHERE id = ?
+                    """, (record_id,))
+                    total_enabled += cursor.rowcount
+                
+                # 处理 single_purpose_map_cache 表
+                cursor.execute("""
+                    SELECT id, app, sub_category_id, created_at 
+                    FROM single_purpose_map_cache 
+                    WHERE category_id = ? AND state = 0
+                """, (category_id,))
+                single_records = cursor.fetchall()
+                
+                for record_id, app, sub_cat_id, created_at in single_records:
+                    sub_state = sub_categories.get(sub_cat_id, 1)
+                    if sub_state == 0: 
+                        continue
+                    
+                    if created_at:
+                        # 单分类应用：删除同 app 中 created_at 更晚的记录
+                        cursor.execute("""
+                            DELETE FROM single_purpose_map_cache 
+                            WHERE app = ? AND created_at > ?
+                        """, (app, created_at))
+                        total_deleted += cursor.rowcount
+                    
+                    # 恢复该记录
+                    cursor.execute("""
+                        UPDATE single_purpose_map_cache 
+                        SET state = 1, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """, (record_id,))
                     total_enabled += cursor.rowcount
                 
                 conn.commit()
@@ -998,7 +1038,7 @@ class CategoryService:
     
     def _enable_category_map_records_by_sub_category(self, sub_category_id: str, category_id: str):
         """
-        启用子分类时，恢复 category_map_cache 中符合条件的记录
+        启用子分类时，恢复 multi_purpose_map_cache 和 single_purpose_map_cache 中符合条件的记录
         
         恢复条件：主分类启用 AND 子分类启用
         恢复前：删除同 (app, title) 中 created_at 更晚的记录
@@ -1017,42 +1057,57 @@ class CategoryService:
                     logger.info(f"主分类 '{category_id}' 仍处于禁用状态，跳过恢复子分类记录")
                     return
                 
-                # 获取该子分类下所有待恢复的记录
-                cursor.execute("""
-                    SELECT app, title, created_at 
-                    FROM category_map_cache 
-                    WHERE sub_category_id = ? AND state = 0
-                """, (sub_category_id,))
-                records = cursor.fetchall()
-                
                 total_enabled = 0
                 total_deleted = 0
                 
-                for app, title, created_at in records:
-                    # 根据应用类型选择删除条件
-                    # 单分类应用：只匹配 app 删除（同一 app 只有一个分类）
-                    # 多分类应用：匹配 app + title 删除（同一 app 不同 title 可能有不同分类）
+                # 处理 multi_purpose_map_cache 表
+                cursor.execute("""
+                    SELECT id, app, title, created_at 
+                    FROM multi_purpose_map_cache 
+                    WHERE sub_category_id = ? AND state = 0
+                """, (sub_category_id,))
+                multi_records = cursor.fetchall()
+                
+                for record_id, app, title, created_at in multi_records:
                     if created_at:
-                        if is_multipurpose_app(app):
-                            # 多分类应用：删除同 (app, title) 中 created_at 更晚的记录
-                            cursor.execute("""
-                                DELETE FROM category_map_cache 
-                                WHERE app = ? AND title = ? AND created_at > ?
-                            """, (app, title, created_at))
-                        else:
-                            # 单分类应用：删除同 app 中 created_at 更晚的记录
-                            cursor.execute("""
-                                DELETE FROM category_map_cache 
-                                WHERE app = ? AND created_at > ?
-                            """, (app, created_at))
+                        # 多分类应用：删除同 (app, title) 中 created_at 更晚的记录
+                        cursor.execute("""
+                            DELETE FROM multi_purpose_map_cache 
+                            WHERE app = ? AND title = ? AND created_at > ?
+                        """, (app, title, created_at))
                         total_deleted += cursor.rowcount
                     
                     # 恢复该记录
                     cursor.execute("""
-                        UPDATE category_map_cache 
+                        UPDATE multi_purpose_map_cache 
                         SET state = 1, updated_at = CURRENT_TIMESTAMP
-                        WHERE app = ? AND title = ? AND sub_category_id = ?
-                    """, (app, title, sub_category_id))
+                        WHERE id = ?
+                    """, (record_id,))
+                    total_enabled += cursor.rowcount
+                
+                # 处理 single_purpose_map_cache 表
+                cursor.execute("""
+                    SELECT id, app, created_at 
+                    FROM single_purpose_map_cache 
+                    WHERE sub_category_id = ? AND state = 0
+                """, (sub_category_id,))
+                single_records = cursor.fetchall()
+                
+                for record_id, app, created_at in single_records:
+                    if created_at:
+                        # 单分类应用：删除同 app 中 created_at 更晚的记录
+                        cursor.execute("""
+                            DELETE FROM single_purpose_map_cache 
+                            WHERE app = ? AND created_at > ?
+                        """, (app, created_at))
+                        total_deleted += cursor.rowcount
+                    
+                    # 恢复该记录
+                    cursor.execute("""
+                        UPDATE single_purpose_map_cache 
+                        SET state = 1, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """, (record_id,))
                     total_enabled += cursor.rowcount
                 
                 conn.commit()

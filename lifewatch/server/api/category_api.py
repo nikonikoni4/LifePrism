@@ -439,7 +439,7 @@ async def batch_update_category_map_cache(
 
 @router.put("/category_map/{record_id}", response_model=StandardResponse, summary="更新分类缓存记录")
 async def update_category_map_cache(
-    record_id: int = Path(..., description="记录ID"),
+    record_id: str = Path(..., description="记录ID（格式：m-xxx 或 s-xxx）"),
     request: UpdateCategoryMapCacheRequest = ...
 ):
     """
@@ -499,7 +499,7 @@ async def batch_delete_category_map_cache(
 
 @router.delete("/category_map/{record_id}", response_model=StandardResponse, summary="删除分类缓存记录")
 async def delete_category_map_cache(
-    record_id: int = Path(..., description="记录ID")
+    record_id: str = Path(..., description="记录ID（格式：m-xxx 或 s-xxx）")
 ):
     """
     删除单条 category_map_cache 记录

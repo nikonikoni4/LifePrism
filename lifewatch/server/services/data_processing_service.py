@@ -361,7 +361,7 @@ class DataProcessingService:
         # 保存 token 使用数据（使用 filtered_events 作为 result_items_count）
         self._save_tokens_usage(result, filtered_events)
         
-        # 转换为 DataFrame 格式（适配 category_map_cache 表结构）
+        # 转换为 DataFrame 格式（适配 category_map 表结构）
         # 按 app 分组处理：单用途应用只保存一条，多用途应用保存所有 title
         classified_records = []
         app_groups = {}  # {app: [items]}

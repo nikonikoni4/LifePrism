@@ -864,7 +864,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
     def batch_delete_category_map_cache_by_ids(
         self, 
         record_ids: list[str]
-    ) -> int:
+    ) -> int:  
         """
         批量通过 ID 删除 category_map_cache 记录
         

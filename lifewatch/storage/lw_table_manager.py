@@ -81,7 +81,7 @@ class LWTableManager:
                 "created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
             )
             # 只有首次创建时添加updated_at，某些表不需要
-            if table_name == 'category_map_cache':
+            if table_name == 'single_purpose_map_cache' or table_name == 'multi_purpose_map_cache':
                 column_definitions.append(
                     "updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
                 )
@@ -110,40 +110,6 @@ class LWTableManager:
             cursor.execute(create_index_sql)
             logger.debug(f"索引 '{index_name}' 创建成功")
     
-    def get_database_stats(self) -> Dict:
-        """
-        获取 LifeWatch 数据库统计信息
-        
-        Returns:
-            Dict: 包含以下统计信息：
-                - database_file: 数据库文件路径
-                - {table_name}_rows: 各表行数
-                - unique_apps: 唯一应用数量
-        """
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                stats = {
-                    'database_file': self.db.DB_PATH
-                }
-                
-                # 获取每个表的统计信息
-                for table_name in TABLE_CONFIGS.keys():
-                    cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-                    count = cursor.fetchone()[0]
-                    stats[f'{table_name}_rows'] = count
-                
-                # 额外统计：唯一应用数量
-                cursor.execute("SELECT COUNT(DISTINCT app) FROM category_map_cache")
-                stats['unique_apps'] = cursor.fetchone()[0]
-                
-                return stats
-                
-        except Exception as e:
-            logger.error(f"获取数据库统计失败: {e}")    
-            return {'database_file': self.db.DB_PATH, 'error': str(e)}
-
 
 # ==================== 便捷函数 ====================
 
@@ -156,9 +122,3 @@ def init_database():
     LWTableManager().init_database()
 
 
-if __name__ == "__main__":
-    # 测试表结构管理器
-    manager = LWTableManager()
-    manager.init_database()
-    stats = manager.get_database_stats()
-    print("数据库统计:", stats)

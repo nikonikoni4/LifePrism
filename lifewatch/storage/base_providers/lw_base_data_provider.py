@@ -213,110 +213,110 @@ class LWBaseDataProvider:
     
     # ==================== category_map_cache 表 ====================
     
-    def load_category_map_cache(
-        self, 
-        page: Optional[int] = None, 
-        page_size: Optional[int] = None,
-        search: Optional[str] = None,
-        category_id: Optional[str] = None,
-        sub_category_id: Optional[str] = None,
-        state: Optional[int] = None,
-        is_multipurpose_app: Optional[bool] = None
-    ) -> Optional[pd.DataFrame] | tuple[Optional[pd.DataFrame], int]:
-        """
-        获取应用分类数据
+    # def load_category_map_cache(
+    #     self, 
+    #     page: Optional[int] = None, 
+    #     page_size: Optional[int] = None,
+    #     search: Optional[str] = None,
+    #     category_id: Optional[str] = None,
+    #     sub_category_id: Optional[str] = None,
+    #     state: Optional[int] = None,
+    #     is_multipurpose_app: Optional[bool] = None
+    # ) -> Optional[pd.DataFrame] | tuple[Optional[pd.DataFrame], int]:
+    #     """
+    #     获取应用分类数据
         
-        Args:
-            page: 页码（从1开始，可选）
-            page_size: 每页数量（可选）
-            search: 搜索关键词（匹配 app 或 title，可选）
-            category_id: 按主分类 ID 筛选（可选）
-            sub_category_id: 按子分类 ID 筛选（可选）
-            state: 按状态筛选（可选）
-            is_multipurpose_app: 按多用途应用筛选（可选）
+    #     Args:
+    #         page: 页码（从1开始，可选）
+    #         page_size: 每页数量（可选）
+    #         search: 搜索关键词（匹配 app 或 title，可选）
+    #         category_id: 按主分类 ID 筛选（可选）
+    #         sub_category_id: 按子分类 ID 筛选（可选）
+    #         state: 按状态筛选（可选）
+    #         is_multipurpose_app: 按多用途应用筛选（可选）
         
-        Returns:
-            - 无分页参数时: Optional[pd.DataFrame]
-            - 有分页参数时: tuple[Optional[pd.DataFrame], int] (数据, 总数)
+    #     Returns:
+    #         - 无分页参数时: Optional[pd.DataFrame]
+    #         - 有分页参数时: tuple[Optional[pd.DataFrame], int] (数据, 总数)
             
-            DataFrame 包含以下列：
-                - id（自增主键）
-                - app, title, is_multipurpose_app
-                - app_description, title_analysis
-                - category_id, sub_category_id
-                - state, created_at
-        """
-        # 查询列（包含 id 主键）
-        columns = [
-            'id', 'app', 'title', 'is_multipurpose_app',
-            'app_description', 'title_analysis',
-            'category_id', 'sub_category_id', 'link_to_goal_id',
-            'state', 'created_at'
-        ]
+    #         DataFrame 包含以下列：
+    #             - id（自增主键）
+    #             - app, title, is_multipurpose_app
+    #             - app_description, title_analysis
+    #             - category_id, sub_category_id
+    #             - state, created_at
+    #     """
+    #     # 查询列（包含 id 主键）
+    #     columns = [
+    #         'id', 'app', 'title', 'is_multipurpose_app',
+    #         'app_description', 'title_analysis',
+    #         'category_id', 'sub_category_id', 'link_to_goal_id',
+    #         'state', 'created_at'
+    #     ]
         
-        # 构建 WHERE 条件
-        where_conditions = []
-        params = []
+    #     # 构建 WHERE 条件
+    #     where_conditions = []
+    #     params = []
         
-        if search:
-            where_conditions.append("(app LIKE ? OR title LIKE ?)")
-            params.extend([f"%{search}%", f"%{search}%"])
+    #     if search:
+    #         where_conditions.append("(app LIKE ? OR title LIKE ?)")
+    #         params.extend([f"%{search}%", f"%{search}%"])
         
-        if category_id is not None:
-            where_conditions.append("category_id = ?")
-            params.append(category_id)
+    #     if category_id is not None:
+    #         where_conditions.append("category_id = ?")
+    #         params.append(category_id)
         
-        if sub_category_id is not None:
-            where_conditions.append("sub_category_id = ?")
-            params.append(sub_category_id)
+    #     if sub_category_id is not None:
+    #         where_conditions.append("sub_category_id = ?")
+    #         params.append(sub_category_id)
         
-        if state is not None:
-            where_conditions.append("state = ?")
-            params.append(state)
+    #     if state is not None:
+    #         where_conditions.append("state = ?")
+    #         params.append(state)
         
-        if is_multipurpose_app is not None:
-            where_conditions.append("is_multipurpose_app = ?")
-            params.append(1 if is_multipurpose_app else 0)
+    #     if is_multipurpose_app is not None:
+    #         where_conditions.append("is_multipurpose_app = ?")
+    #         params.append(1 if is_multipurpose_app else 0)
         
-        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+    #     where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
         
-        # 无分页参数时，保持原有行为
-        if page is None or page_size is None:
-            if where_conditions:
-                # 有筛选条件时使用原生 SQL
-                columns_str = ", ".join(columns)
-                sql = f"SELECT {columns_str} FROM category_map_cache WHERE {where_clause}"
-                with self.db.get_connection() as conn:
-                    df = pd.read_sql_query(sql, conn, params=params)
-                return df if not df.empty else None
-            else:
-                df = self.db.query('category_map_cache', columns=columns)
-                return df if not df.empty else None
+    #     # 无分页参数时，保持原有行为
+    #     if page is None or page_size is None:
+    #         if where_conditions:
+    #             # 有筛选条件时使用原生 SQL
+    #             columns_str = ", ".join(columns)
+    #             sql = f"SELECT {columns_str} FROM category_map_cache WHERE {where_clause}"
+    #             with self.db.get_connection() as conn:
+    #                 df = pd.read_sql_query(sql, conn, params=params)
+    #             return df if not df.empty else None
+    #         else:
+    #             df = self.db.query('category_map_cache', columns=columns)
+    #             return df if not df.empty else None
         
-        # 有分页参数时，返回 (数据, 总数)
-        columns_str = ", ".join(columns)
+    #     # 有分页参数时，返回 (数据, 总数)
+    #     columns_str = ", ".join(columns)
         
-        # 查询总数
-        count_sql = f"SELECT COUNT(*) FROM category_map_cache WHERE {where_clause}"
+    #     # 查询总数
+    #     count_sql = f"SELECT COUNT(*) FROM category_map_cache WHERE {where_clause}"
         
-        # 查询数据
-        offset = (page - 1) * page_size
-        data_sql = f"""
-        SELECT {columns_str} 
-        FROM category_map_cache 
-        WHERE {where_clause}
-        ORDER BY created_at DESC
-        LIMIT ? OFFSET ?
-        """
+    #     # 查询数据
+    #     offset = (page - 1) * page_size
+    #     data_sql = f"""
+    #     SELECT {columns_str} 
+    #     FROM category_map_cache 
+    #     WHERE {where_clause}
+    #     ORDER BY created_at DESC
+    #     LIMIT ? OFFSET ?
+    #     """
         
-        with self.db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(count_sql, params)
-            total = cursor.fetchone()[0]
+    #     with self.db.get_connection() as conn:
+    #         cursor = conn.cursor()
+    #         cursor.execute(count_sql, params)
+    #         total = cursor.fetchone()[0]
             
-            df = pd.read_sql_query(data_sql, conn, params=params + [page_size, offset])
+    #         df = pd.read_sql_query(data_sql, conn, params=params + [page_size, offset])
         
-        return (df if not df.empty else None, total)
+    #     return (df if not df.empty else None, total)
     
     def load_category_map_cache_V2(
         self, 
@@ -457,24 +457,6 @@ class LWBaseDataProvider:
         
         return (df if not df.empty else None, total)
     
-    def get_existing_apps(self) -> Set[str]:
-        """
-        获取已存在的单一用途应用集合
-        
-        Returns:
-            Set[str]: 应用名称集合（不包括多用途应用）
-        """
-        try:
-            df = self.db.query('category_map_cache', 
-                              columns=['app'],
-                              where={'is_multipurpose_app': 0})
-            existing_apps = set(df['app'].dropna().tolist()) if not df.empty else set()
-            logger.info(f"从数据库获取到 {len(existing_apps)} 个已有应用")
-            return existing_apps
-        except Exception as e:
-            logger.error(f"获取已有应用失败: {e}")
-            return set()
-    
     def save_category_map_cache_V2(self, cache_df: pd.DataFrame) -> int:
         """
         保存app分类缓存数据到 multi_purpose_map_cache 表 和 single_purpose_map_cache 表
@@ -545,39 +527,39 @@ class LWBaseDataProvider:
             logger.error(f"保存AI元数据失败: {e}")
             return 0
 
-    def save_category_map_cache(self, ai_metadata_df: pd.DataFrame) -> int:
-        """
-        保存AI元数据到 category_map_cache 表
+    # def save_category_map_cache(self, ai_metadata_df: pd.DataFrame) -> int:
+    #     """
+    #     保存AI元数据到 category_map_cache 表
         
-        使用 UPSERT 策略：已存在的应用会被更新，新应用会被插入
+    #     使用 UPSERT 策略：已存在的应用会被更新，新应用会被插入
         
-        Args:
-            ai_metadata_df: AI元数据DataFrame，应包含以下字段：
-                - app: 应用名称（必需）
-                - title: 应用标题（必需）
-                - is_multipurpose_app: 是否多用途应用（可选）
-                - app_description: 应用描述（可选）
-                - title_analysis: 标题描述（可选）
-                - category_id: 主分类ID（可选）
-                - sub_category_id: 子分类ID（可选）
-                - category: [已弃用] 分类名称，保留用于调试
-                - sub_category: [已弃用] 子分类名称，保留用于调试
+    #     Args:
+    #         ai_metadata_df: AI元数据DataFrame，应包含以下字段：
+    #             - app: 应用名称（必需）
+    #             - title: 应用标题（必需）
+    #             - is_multipurpose_app: 是否多用途应用（可选）
+    #             - app_description: 应用描述（可选）
+    #             - title_analysis: 标题描述（可选）
+    #             - category_id: 主分类ID（可选）
+    #             - sub_category_id: 子分类ID（可选）
+    #             - category: [已弃用] 分类名称，保留用于调试
+    #             - sub_category: [已弃用] 子分类名称，保留用于调试
         
-        Returns:
-            int: 受影响的行数
-        """
-        try:
-            data_list = ai_metadata_df.to_dict('records')
+    #     Returns:
+    #         int: 受影响的行数
+    #     """
+    #     try:
+    #         data_list = ai_metadata_df.to_dict('records')
             
-            # 使用 (app, title,state) 作为冲突列，因为是复合主键
-            affected = self.db.upsert_many('category_map_cache', 
-                                       data_list, 
-                                       conflict_columns=['app', 'title','state'])
-            logger.info(f"成功保存 {len(data_list)} 行AI元数据到数据库")
-            return affected
-        except Exception as e:
-            logger.error(f"保存AI元数据失败: {e}")
-            raise
+    #         # 使用 (app, title,state) 作为冲突列，因为是复合主键
+    #         affected = self.db.upsert_many('category_map_cache', 
+    #                                    data_list, 
+    #                                    conflict_columns=['app', 'title','state'])
+    #         logger.info(f"成功保存 {len(data_list)} 行AI元数据到数据库")
+    #         return affected
+    #     except Exception as e:
+    #         logger.error(f"保存AI元数据失败: {e}")
+    #         raise
     
     # ==================== category 表 ====================
     

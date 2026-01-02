@@ -183,7 +183,7 @@ class DatabaseManager:
             pd.DataFrame: 查询结果
             
         Example:
-            df = db.query('category_map_cache', 
+            df = db.query('single_purpose_map_cache', 
                          columns=['app', 'category'],
                          where={'is_multipurpose_app': 0},
                          order_by='app ASC',
@@ -334,7 +334,7 @@ class DatabaseManager:
             
             # 对于有更新时间戳的表，自动更新 updated_at
             config = get_table_config(table_name)
-            if config.get('timestamps') and table_name == 'category_map_cache':
+            if config.get('timestamps') and (table_name == 'single_purpose_map_cache' or table_name == 'multi_purpose_map_cache'):
                 update_str += ", updated_at = CURRENT_TIMESTAMP"
             
             # 构建 ON CONFLICT 子句
@@ -394,7 +394,7 @@ class DatabaseManager:
             
             # 自动更新时间戳
             config = get_table_config(table_name)
-            if config.get('timestamps') and table_name == 'category_map_cache':
+            if config.get('timestamps') and (table_name == 'single_purpose_map_cache' or table_name == 'multi_purpose_map_cache'):
                 update_str += ", updated_at = CURRENT_TIMESTAMP"
             
             # 构建 ON CONFLICT 子句
