@@ -34,7 +34,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
     const [pageSize] = useState(50);
 
     // 选择状态
-    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isProcessing, setIsProcessing] = useState(false);
 
     // 单条编辑状态
@@ -119,7 +119,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
     };
 
     // 单选切换
-    const handleSelectOne = (id: number) => {
+    const handleSelectOne = (id: string) => {
         const newSelected = new Set(selectedIds);
         if (newSelected.has(id)) {
             newSelected.delete(id);
@@ -257,7 +257,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
     };
 
     // 单条删除
-    const handleDelete = async (recordId: number) => {
+    const handleDelete = async (recordId: string) => {
         if (!confirm('确定要删除这条记录吗？')) return;
 
         try {

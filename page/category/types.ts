@@ -74,7 +74,7 @@ export interface ActivityRecord {
 
 /** CategoryMapCache 表项 */
 export interface CategoryMapCacheItem {
-    id: number;
+    id: string;
     app: string;
     app_description: string | null;
     title: string;
@@ -107,7 +107,7 @@ export interface UpdateCategoryMapCacheRequest {
 
 /** 批量更新 CategoryMapCache 记录请求 */
 export interface BatchUpdateCategoryMapCacheRequest {
-    ids: number[];
+    ids: string[];
     category_id?: string | null;
     sub_category_id?: string | null;
     app_description?: string | null;

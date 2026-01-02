@@ -261,7 +261,7 @@ export const CategoryMapCacheAPI = {
      * @param data 更新数据
      * @returns 标准响应
      */
-    async update(recordId: number, data: UpdateCategoryMapCacheRequest): Promise<StandardResponse> {
+    async update(recordId: string, data: UpdateCategoryMapCacheRequest): Promise<StandardResponse> {
         const response = await fetch(`${API_BASE}/category_map/${recordId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -301,7 +301,7 @@ export const CategoryMapCacheAPI = {
      * @param recordId 记录ID
      * @returns 标准响应
      */
-    async delete(recordId: number): Promise<StandardResponse> {
+    async delete(recordId: string): Promise<StandardResponse> {
         const response = await fetch(`${API_BASE}/category_map/${recordId}`, {
             method: 'DELETE',
         });
@@ -319,7 +319,7 @@ export const CategoryMapCacheAPI = {
      * @param ids 记录ID列表
      * @returns 标准响应
      */
-    async batchDelete(ids: number[]): Promise<StandardResponse> {
+    async batchDelete(ids: string[]): Promise<StandardResponse> {
         const response = await fetch(`${API_BASE}/category_map/batch`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
