@@ -634,9 +634,8 @@ const Timeline: React.FC = () => {
         overviewCache.current.clear();
     }, [currentDate, thumbnailConfig.enabled, thumbnailConfig.hourGranularity, thumbnailConfig.categoryLevel]);
 
-    // 获取自定义时间块数据
+    // 获取自定义时间块数据（两种模式都需要加载，用于显示用户备注）
     const fetchCustomBlocks = useCallback(async () => {
-        if (!thumbnailConfig.enabled) return;
         setCustomBlocksLoading(true);
         try {
             const blocks = await CustomBlockAPI.getByDate(currentDate);
@@ -647,16 +646,15 @@ const Timeline: React.FC = () => {
         } finally {
             setCustomBlocksLoading(false);
         }
-    }, [currentDate, thumbnailConfig.enabled]);
+    }, [currentDate]);
 
     useEffect(() => {
         fetchCustomBlocks();
     }, [fetchCustomBlocks]);
 
-    // 获取当天待办事项（用于自定义时间块绑定下拉）
+    // 获取当天待办事项（用于自定义时间块绑定下拉，两种模式都需要）
     useEffect(() => {
         const fetchTodos = async () => {
-            if (!thumbnailConfig.enabled) return;
             try {
                 const response = await todoApi.getTodos(currentDate, true);
                 // 转换为 TodoSelectItem 格式
@@ -670,7 +668,7 @@ const Timeline: React.FC = () => {
             }
         };
         fetchTodos();
-    }, [currentDate, thumbnailConfig.enabled]);
+    }, [currentDate]);
 
     // 获取非缩略图模式的活动日志
     useEffect(() => {
@@ -1127,18 +1125,16 @@ const Timeline: React.FC = () => {
                         {/* Label Area - 标签区域背景（用于显示自定义块标签） */}
                         <div className="absolute left-16 top-0 bottom-0 w-20 bg-white/50 z-0" />
 
-                        {/* 自定义时间块层 - 在标签区域和内容区域之下，作为底层背景 */}
-                        {thumbnailConfig.enabled && (
-                            <CustomBlockLayer
-                                currentDate={currentDate}
-                                blocks={customBlocks}
-                                hourHeight={HOUR_HEIGHT}
-                                categories={categories}
-                                todos={todos}
-                                onUpdate={fetchCustomBlocks}
-                                isLoading={customBlocksLoading}
-                            />
-                        )}
+                        {/* 自定义时间块层 - 用户备注层，在两种模式下都显示 */}
+                        <CustomBlockLayer
+                            currentDate={currentDate}
+                            blocks={customBlocks}
+                            hourHeight={HOUR_HEIGHT}
+                            categories={categories}
+                            todos={todos}
+                            onUpdate={fetchCustomBlocks}
+                            isLoading={customBlocksLoading}
+                        />
 
                         {/* Major Grid Lines */}
                         {majorTicks.map((t) => (

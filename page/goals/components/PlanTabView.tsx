@@ -292,6 +292,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
     const today = new Date();
     // Use YYYY-MM format for selectedMonth to match DateTreeSelector
     const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const todayDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
     const [viewMode, setViewMode] = useState<'detail' | 'compact'>('detail');
@@ -1605,11 +1606,12 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
 
                                         // 3 up (span 4), 4 down (span 3)
                                         const compactColSpan = index < 3 ? 'xl:col-span-4' : 'xl:col-span-3';
+                                        const isToday = day.date === todayDateStr;
 
                                         return (
-                                            <div key={day.date} className={`bg-white rounded-[1.5rem] border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow ${viewMode === 'compact' ? `flex flex-col ${compactColSpan}` : ''}`}>
+                                            <div key={day.date} className={`bg-white rounded-[1.5rem] border ${isToday ? 'border-blue-400 ring-4 ring-blue-50' : 'border-slate-200'} overflow-hidden shadow-sm hover:shadow-md transition-shadow ${viewMode === 'compact' ? `flex flex-col ${compactColSpan}` : ''}`}>
                                                 {/* Row 0: Day Header */}
-                                                <div className="bg-slate-50/80 border-b border-slate-200 px-4 py-3 flex items-center justify-between backdrop-blur-sm">
+                                                <div className={`border-b px-4 py-3 flex items-center justify-between backdrop-blur-sm ${isToday ? 'bg-blue-50/50 border-blue-100' : 'bg-slate-50/80 border-slate-200'}`}>
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-sm font-bold text-slate-800">{day.name}</span>
                                                         <span className="text-[10px] font-mono font-medium text-slate-400">{day.date}</span>
@@ -1674,9 +1676,9 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                                                 ) : (
                                                     /* DETAIL LAYOUT */
                                                     <div className="flex flex-col">
-                                                        <div className="flex border-b border-slate-100 min-h-[100px]">
-                                                            <div className="w-32 md:w-40 flex-shrink-0 bg-slate-50 border-r border-slate-100 flex items-center justify-center p-4">
-                                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center leading-relaxed">
+                                                        <div className={`flex border-b min-h-[100px] ${isToday ? 'border-blue-100' : 'border-slate-100'}`}>
+                                                            <div className={`w-32 md:w-40 flex-shrink-0 border-r flex items-center justify-center p-4 ${isToday ? 'bg-blue-50/50 border-blue-100' : 'bg-slate-50 border-slate-100'}`}>
+                                                                <span className={`text-[10px] font-black uppercase tracking-widest text-center leading-relaxed ${isToday ? 'text-blue-400' : 'text-slate-400'}`}>
                                                                     Focus<br />Intent
                                                                 </span>
                                                             </div>
@@ -1691,8 +1693,8 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
                                                         </div>
 
                                                         <div className="flex min-h-[120px]">
-                                                            <div className="w-32 md:w-40 flex-shrink-0 bg-slate-50 border-r border-slate-100 flex items-center justify-center p-4">
-                                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center leading-relaxed">
+                                                            <div className={`w-32 md:w-40 flex-shrink-0 border-r flex items-center justify-center p-4 ${isToday ? 'bg-blue-50/50 border-blue-100' : 'bg-slate-50 border-slate-100'}`}>
+                                                                <span className={`text-[10px] font-black uppercase tracking-widest text-center leading-relaxed ${isToday ? 'text-blue-400' : 'text-slate-400'}`}>
                                                                     Execution
                                                                 </span>
                                                             </div>

@@ -107,7 +107,7 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute left-1 top-3 p-2 px-2.5 text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:text-slate-600 hover:bg-slate-200/50 rounded-xl transition-all z-20 flex items-center justify-center mt-0.5"
+                className="absolute left-1 top-1 p-2 px-2.5 text-slate-300 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing hover:text-slate-600 hover:bg-slate-200/50 rounded-xl transition-all z-20 flex items-center justify-center mt-0.5"
             >
                 <GripVertical size={18} />
             </div>
