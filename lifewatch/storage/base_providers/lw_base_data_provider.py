@@ -336,6 +336,41 @@ class LWBaseDataProvider:
             logger.error(f"获取已有应用失败: {e}")
             return set()
     
+    def save_category_map_cache_V2(self, cache_df: pd.DataFrame) -> int:
+        """
+        保存app分类缓存数据到 multi_purpose_map_cache 表 和 single_purpose_map_cache 表
+        
+        使用 UPSERT 策略：已存在的应用会被更新，新应用会被插入
+        
+        Args:
+            cache_df: app分类缓存数据
+            包含字段：
+            - app: 应用名称（必需）
+            - title: 应用标题（必需）
+            - state: 状态
+            - app_description: 应用描述（可选）
+            - title_analysis: 标题描述（可选）
+            - category_id: 主分类ID（可选） 
+            - sub_category_id: 子分类ID（可选）
+            - link_to_goal_id: 关联目标ID（可选）
+            - is_multipurpose_app: 是否多用途应用（可选）
+        Returns:
+            int: 受影响的行数
+        """
+        multi_purpose_data = cache_df[cache_df['is_multipurpose_app'] == 1].drop(columns=['is_multipurpose_app','category','sub_category']).to_dict('records')
+        single_purpose_data = cache_df[cache_df['is_multipurpose_app'] == 0].drop(columns=['is_multipurpose_app','title_analysis','category','sub_category']).to_dict('records')
+        try:
+            if single_purpose_data:
+                # 保存单用途 'app', 'state' 为key
+                affected = self.db.upsert_many('single_purpose_map_cache', single_purpose_data, conflict_columns=['app', 'state'])
+            if multi_purpose_data:
+                # 保存多用途 'app', 'title','state' 为key
+                affected = self.db.upsert_many('multi_purpose_map_cache', multi_purpose_data, conflict_columns=['app', 'title','state'])
+            return affected
+        except Exception as e:
+            logger.error(f"保存AI元数据失败: {e}")
+            return 0
+
     def save_category_map_cache(self, ai_metadata_df: pd.DataFrame) -> int:
         """
         保存AI元数据到 category_map_cache 表
@@ -643,3 +678,9 @@ class LWBaseDataProvider:
         except Exception as e:
             logger.error(f"保存会话 {session_id} 的 token 使用数据失败: {e}")
             raise
+
+
+if __name__ == "__main__":
+    lw_base_data_provider = LWBaseDataProvider()
+    data = lw_base_data_provider.get_activity_logs(date="2025-12-31")[0][:10]
+    print(data)

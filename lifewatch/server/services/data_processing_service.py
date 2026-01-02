@@ -91,7 +91,7 @@ class DataProcessingService:
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
                 if classified_app_df is not None and not classified_app_df.empty:
-                    self.server_lw_data_provider.save_category_map_cache(classified_app_df)
+                    self.server_lw_data_provider.save_category_map_cache_V2(classified_app_df)
                     classified_apps = len(classified_app_df)
                     logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
                     
@@ -190,7 +190,7 @@ class DataProcessingService:
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
                 if classified_app_df is not None and not classified_app_df.empty:
-                    self.server_lw_data_provider.save_category_map_cache(classified_app_df)
+                    self.server_lw_data_provider.save_category_map_cache_V2(classified_app_df)
                     classified_apps = len(classified_app_df)
                     logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
                     

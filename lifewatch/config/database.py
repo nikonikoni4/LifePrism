@@ -2,6 +2,114 @@
 数据库配置模块
 定义数据库表结构的完整元数据
 """
+"""
+2026-1-2
+重构cache表,将原来的表分为两个表
+1. multi_purpose_app_cache
+2. single_purpose_map_cache
+"""
+MULTI_PURPOSE_MAP_CACHE_CONFIG = {
+    'table_name': 'multi_purpose_map_cache',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键，用于删除操作'
+        },
+        'app': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '应用程序的文件名（例如：chrome.exe）'
+        },
+        'title': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '应用程序的标题（例如：Google Chrome）'
+        },
+        'app_description': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '应用程序的描述'
+        },
+        'title_analysis': { 
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '应用程序title的描述'
+        },
+        'category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '主分类ID（关联 category.id）'
+        },
+        'sub_category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '子分类ID（关联 sub_category.id）'
+        },
+        'state': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 1'],
+            'comment': '记录状态（1: 有效, 0: 无效/分类被禁用）'
+        },
+        'link_to_goal_id': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '关联的goal_id'
+        }
+    },
+    'table_constraints': ['UNIQUE (app, title, state)'],  # 唯一约束：保证数据不重复
+    'indexes': [],
+    'timestamps': True  # 自动添加 created_at, updated_at
+}
+
+SINGLE_PURPOSE_MAP_CACHE_CONFIG= {
+    'table_name': 'single_purpose_map_cache',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键，用于删除操作'
+        },
+        'app': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '应用程序的文件名（例如：chrome.exe）'
+        },
+        'title': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '应用程序的标题（例如：Google Chrome）'
+        },
+        'app_description': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '应用程序的描述'
+        },
+        'category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '主分类ID（关联 category.id）'
+        },
+        'sub_category_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '子分类ID（关联 sub_category.id）'
+        },
+        'state': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 1'],
+            'comment': '记录状态（1: 有效, 0: 无效/分类被禁用）'
+        },
+        'link_to_goal_id': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '关联的goal_id'
+        }
+    },
+    'table_constraints': ['UNIQUE (app, state)'],  # 唯一约束：保证数据不重复
+    'indexes': [],
+    'timestamps': True  # 自动添加 created_at, updated_at
+}
 category_map_cache_CONFIG = {
     'table_name': 'category_map_cache',
     'columns': {
@@ -768,6 +876,8 @@ REWARD_CONFIG = {
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'category_map_cache': category_map_cache_CONFIG,
+    'multi_purpose_map_cache': MULTI_PURPOSE_MAP_CACHE_CONFIG,
+    'single_purpose_map_cache': SINGLE_PURPOSE_MAP_CACHE_CONFIG,
     'user_app_behavior_log': USER_APP_BEHAVIOR_LOG_CONFIG,
     'category': CATEGORY_CONFIG,
     'sub_category': SUB_CATEGORY_CONFIG,
