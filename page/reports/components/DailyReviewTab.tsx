@@ -4,13 +4,15 @@
  * 每日总结 Tab 组件
  */
 
-import React, { useState, useMemo } from 'react';
-import { Calendar } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Calendar, RefreshCw } from 'lucide-react';
 import TimeOverviewWidget from './TimeOverviewWidget';
 import TimeDistributionChart from './TimeDistributionChart';
 import GoalProgressCard from './GoalProgressCard';
 import TodoStatsCard from './TodoStatsCard';
 import AISummaryCard from './AISummaryCard';
+import { ReportsAPI } from '../api';
+import { DailyReportData } from '../types';
 import { getMockDailyReport } from '../mockData';
 
 interface DailyReviewTabProps {
@@ -24,10 +26,44 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({ className = '' }) => {
         return today.toISOString().split('T')[0];
     });
 
-    // 获取 Mock 数据
-    const reportData = useMemo(() => {
-        return getMockDailyReport(selectedDate);
+    // 数据状态
+    const [reportData, setReportData] = useState<DailyReportData | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // 加载报告数据
+    const fetchReport = useCallback(async (forceRefresh: boolean = false) => {
+        if (forceRefresh) {
+            setRefreshing(true);
+        } else {
+            setLoading(true);
+        }
+        setError(null);
+
+        try {
+            const data = await ReportsAPI.getDailyReport(selectedDate, forceRefresh);
+            setReportData(data);
+        } catch (err) {
+            console.error('获取日报告失败:', err);
+            setError(err instanceof Error ? err.message : '获取数据失败');
+            // 出错时使用 mock 数据
+            setReportData(getMockDailyReport(selectedDate));
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, [selectedDate]);
+
+    // 日期变化时重新加载
+    useEffect(() => {
+        fetchReport(false);
+    }, [fetchReport]);
+
+    // 强制刷新处理
+    const handleForceRefresh = () => {
+        fetchReport(true);
+    };
 
     const formatDisplayDate = (dateStr: string) => {
         const date = new Date(dateStr);
@@ -40,9 +76,24 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({ className = '' }) => {
         return date.toLocaleDateString('zh-CN', options);
     };
 
+    // Loading 状态
+    if (loading && !reportData) {
+        return (
+            <div className={`flex items-center justify-center h-96 ${className}`}>
+                <div className="flex flex-col items-center gap-3">
+                    <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+                    <p className="text-slate-500">加载中...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // 使用 mock 数据作为后备
+    const displayData = reportData || getMockDailyReport(selectedDate);
+
     return (
         <div className={`space-y-6 ${className}`}>
-            {/* Date Selector */}
+            {/* Date Selector & Refresh Button */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-50 text-blue-500 rounded-xl">
@@ -55,13 +106,50 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({ className = '' }) => {
                         <p className="text-xs text-slate-400">每日总结</p>
                     </div>
                 </div>
-                <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:outline-none cursor-pointer"
-                />
+
+                <div className="flex items-center gap-3">
+                    {/* 强制刷新按钮 */}
+                    <button
+                        onClick={handleForceRefresh}
+                        disabled={refreshing}
+                        className={`
+                            flex items-center gap-2 px-4 py-2 
+                            bg-gradient-to-r from-blue-500 to-indigo-500 
+                            text-white text-sm font-medium rounded-xl
+                            hover:from-blue-600 hover:to-indigo-600
+                            focus:ring-2 focus:ring-blue-300 focus:outline-none
+                            disabled:opacity-60 disabled:cursor-not-allowed
+                            transition-all duration-200
+                            shadow-sm hover:shadow-md
+                        `}
+                    >
+                        <RefreshCw
+                            size={16}
+                            className={refreshing ? 'animate-spin' : ''}
+                        />
+                        {refreshing ? '刷新中...' : '重新计算'}
+                    </button>
+
+                    {/* 日期选择器 */}
+                    <input
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:outline-none cursor-pointer"
+                    />
+                </div>
             </div>
+
+            {/* Error Message */}
+            {error && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+                    <div className="text-amber-500">⚠️</div>
+                    <div>
+                        <p className="text-sm font-medium text-amber-800">数据加载失败</p>
+                        <p className="text-xs text-amber-600">{error}（已使用演示数据）</p>
+                    </div>
+                </div>
+            )}
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -69,27 +157,25 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({ className = '' }) => {
                 <div className="lg:col-span-8 space-y-6">
                     {/* Time Distribution Line Chart */}
                     <TimeDistributionChart
-                        data={reportData.timeDistribution}
-                        categories={reportData.categories}
-                        title="时间分布折线图"
+                        data={displayData.timeDistribution}
+                        categories={displayData.categories}
+                        title="时间分布堆积图"
                         subtitle="展示 0~24h 内不同类别的分段使用趋势"
                         height={260}
                     />
                 </div>
                 <div className="lg:col-span-4 space-y-6">
-
                     {/* Todo Stats */}
                     <TodoStatsCard
-                        stats={reportData.todoStats}
+                        stats={displayData.todoStats}
                         title="Todo 统计"
                         className="h-[380px]"
                     />
                 </div>
                 <div className="lg:col-span-8 space-y-6">
-
                     {/* Sunburst Chart */}
                     <TimeOverviewWidget
-                        data={reportData.timeOverview}
+                        data={displayData.timeOverview}
                         chartHeight="h-[450px]"
                     />
                 </div>
@@ -97,18 +183,17 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({ className = '' }) => {
                 <div className="lg:col-span-4 space-y-6">
                     {/* Goal Progress */}
                     <GoalProgressCard
-                        goals={reportData.goalProgress}
+                        goals={displayData.goalProgress}
                         title="Goal 进度跟踪"
                         height="600px"
                     />
                 </div>
 
                 <div className="lg:col-span-12 space-y-6">
-
                     {/* AI Summary */}
                     <AISummaryCard
                         title="AI 智能总结"
-                        content={reportData.aiSummary}
+                        content={displayData.aiSummary || '暂无 AI 总结数据'}
                     />
                 </div>
             </div>

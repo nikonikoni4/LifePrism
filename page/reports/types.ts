@@ -187,13 +187,6 @@ export interface ChartSegment {
     title?: string;  // app层的标题显示
 }
 
-/** 柱状图配置项 */
-export interface BarConfig {
-    key: string;
-    label: string;
-    color: string;
-}
-
 /** Time Overview 完整数据 (递归结构) */
 export interface TimeOverviewData {
     title: string;
@@ -201,7 +194,7 @@ export interface TimeOverviewData {
     totalTrackedMinutes: number;
     totalRangeMinutes?: number;  // 时间范围总分钟数（用于计算百分比的分母）
     pieData: ChartSegment[];
-    barKeys: BarConfig[];
     barData: Array<Record<string, any>>;
     details?: Record<string, TimeOverviewData>;
 }
+
