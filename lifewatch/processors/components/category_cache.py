@@ -200,5 +200,5 @@ if __name__ == '__main__':
     from lifewatch.storage import LWBaseDataProvider
     lw_data_provider = LWBaseDataProvider()
     
-    category_cache = CategoryCache(lw_data_provider.load_category_map_cache())
+    category_cache = CategoryCache(lw_data_provider.load_category_map_cache_V2())
     print(category_cache.get_stats())

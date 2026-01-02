@@ -12,9 +12,9 @@ MULTI_PURPOSE_MAP_CACHE_CONFIG = {
     'table_name': 'multi_purpose_map_cache',
     'columns': {
         'id': {
-            'type': 'INTEGER',
-            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
-            'comment': '自增主键，用于删除操作'
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '唯一标识符（格式：m-{uuid[:8]}）'
         },
         'app': {
             'type': 'TEXT',
@@ -66,9 +66,9 @@ SINGLE_PURPOSE_MAP_CACHE_CONFIG= {
     'table_name': 'single_purpose_map_cache',
     'columns': {
         'id': {
-            'type': 'INTEGER',
-            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
-            'comment': '自增主键，用于删除操作'
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '唯一标识符（格式：s-{uuid[:8]}）'
         },
         'app': {
             'type': 'TEXT',

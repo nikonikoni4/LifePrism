@@ -426,7 +426,7 @@ if __name__ == "__main__":
         start_time = end_time - timedelta(hours=24)  # 测试24小时数据
         
         # 加载缓存数据
-        category_map_cache_df = LWBaseDataProvider().load_category_map_cache()
+        category_map_cache_df = LWBaseDataProvider().load_category_map_cache_V2()
         print(f"缓存数据: {len(category_map_cache_df)} 行")
         
         print("\n" + "="*60)

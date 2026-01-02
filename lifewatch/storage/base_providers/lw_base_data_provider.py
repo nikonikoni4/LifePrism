@@ -318,6 +318,145 @@ class LWBaseDataProvider:
         
         return (df if not df.empty else None, total)
     
+    def load_category_map_cache_V2(
+        self, 
+        page: Optional[int] = None, 
+        page_size: Optional[int] = None,
+        search: Optional[str] = None,
+        category_id: Optional[str] = None,
+        sub_category_id: Optional[str] = None,
+        state: Optional[int] = None,
+        is_multipurpose_app: Optional[bool] = None
+    ) -> Optional[pd.DataFrame] | tuple[Optional[pd.DataFrame], int]:
+        """
+        获取应用分类数据（V2版本，从 multi_purpose_map_cache 和 single_purpose_map_cache 读取）
+        
+        使用 UNION ALL 将两个表的数据合并查询，输出格式与 load_category_map_cache 相同。
+        
+        Args:
+            page: 页码（从1开始，可选）
+            page_size: 每页数量（可选）
+            search: 搜索关键词（匹配 app 或 title，可选）
+            category_id: 按主分类 ID 筛选（可选）
+            sub_category_id: 按子分类 ID 筛选（可选）
+            state: 按状态筛选（可选）
+            is_multipurpose_app: 按多用途应用筛选（可选）
+        
+        Returns:
+            - 无分页参数时: Optional[pd.DataFrame]
+            - 有分页参数时: tuple[Optional[pd.DataFrame], int] (数据, 总数)
+            
+            DataFrame 包含以下列：
+                - id（自增主键）
+                - app, title, is_multipurpose_app
+                - app_description, title_analysis
+                - category_id, sub_category_id
+                - state, created_at
+        """
+        # 构建 UNION ALL 视图查询
+        # multi_purpose_map_cache: is_multipurpose_app = 1, 有 title_analysis
+        # single_purpose_map_cache: is_multipurpose_app = 0, 无 title_analysis (用 NULL 填充)
+        # id 已经是 TEXT 格式（m-xxx 或 s-xxx），直接读取
+        union_query = """
+        SELECT 
+            id,
+            app,
+            title,
+            1 as is_multipurpose_app,
+            app_description,
+            title_analysis,
+            category_id,
+            sub_category_id,
+            link_to_goal_id,
+            state,
+            created_at
+        FROM multi_purpose_map_cache
+        
+        UNION ALL
+        
+        SELECT 
+            id,
+            app,
+            title,
+            0 as is_multipurpose_app,
+            app_description,
+            NULL as title_analysis,
+            category_id,
+            sub_category_id,
+            link_to_goal_id,
+            state,
+            created_at
+        FROM single_purpose_map_cache
+        """
+        
+        # 构建 WHERE 条件
+        where_conditions = []
+        params = []
+        
+        if search:
+            where_conditions.append("(app LIKE ? OR title LIKE ?)")
+            params.extend([f"%{search}%", f"%{search}%"])
+        
+        if category_id is not None:
+            where_conditions.append("category_id = ?")
+            params.append(category_id)
+        
+        if sub_category_id is not None:
+            where_conditions.append("sub_category_id = ?")
+            params.append(sub_category_id)
+        
+        if state is not None:
+            where_conditions.append("state = ?")
+            params.append(state)
+        
+        if is_multipurpose_app is not None:
+            where_conditions.append("is_multipurpose_app = ?")
+            params.append(1 if is_multipurpose_app else 0)
+        
+        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+        
+        # 无分页参数时，保持原有行为
+        if page is None or page_size is None:
+            sql = f"""
+            SELECT * FROM (
+                {union_query}
+            ) AS combined
+            WHERE {where_clause}
+            """
+            with self.db.get_connection() as conn:
+                df = pd.read_sql_query(sql, conn, params=params)
+            return df if not df.empty else None
+        
+        # 有分页参数时，返回 (数据, 总数)
+        
+        # 查询总数
+        count_sql = f"""
+        SELECT COUNT(*) FROM (
+            {union_query}
+        ) AS combined
+        WHERE {where_clause}
+        """
+        
+        # 查询数据
+        offset = (page - 1) * page_size
+        data_sql = f"""
+        SELECT * FROM (
+            {union_query}
+        ) AS combined
+        WHERE {where_clause}
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+        """
+        
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(count_sql, params)
+            total = cursor.fetchone()[0]
+            
+            df = pd.read_sql_query(data_sql, conn, params=params + [page_size, offset])
+        
+        return (df if not df.empty else None, total)
+    
     def get_existing_apps(self) -> Set[str]:
         """
         获取已存在的单一用途应用集合
@@ -341,6 +480,7 @@ class LWBaseDataProvider:
         保存app分类缓存数据到 multi_purpose_map_cache 表 和 single_purpose_map_cache 表
         
         使用 UPSERT 策略：已存在的应用会被更新，新应用会被插入
+        ID 格式：m-{uuid[:8]} 表示多用途应用，s-{uuid[:8]} 表示单用途应用
         
         Args:
             cache_df: app分类缓存数据
@@ -357,15 +497,49 @@ class LWBaseDataProvider:
         Returns:
             int: 受影响的行数
         """
-        multi_purpose_data = cache_df[cache_df['is_multipurpose_app'] == 1].drop(columns=['is_multipurpose_app','category','sub_category']).to_dict('records')
-        single_purpose_data = cache_df[cache_df['is_multipurpose_app'] == 0].drop(columns=['is_multipurpose_app','title_analysis','category','sub_category']).to_dict('records')
+        import uuid
+        
+        # 分离多用途和单用途数据
+        multi_df = cache_df[cache_df['is_multipurpose_app'] == 1].copy()
+        single_df = cache_df[cache_df['is_multipurpose_app'] == 0].copy()
+        
+        # 删除不需要的列
+        drop_cols_multi = ['is_multipurpose_app', 'category', 'sub_category']
+        drop_cols_single = ['is_multipurpose_app', 'title_analysis', 'category', 'sub_category']
+        
+        multi_df = multi_df.drop(columns=[c for c in drop_cols_multi if c in multi_df.columns])
+        single_df = single_df.drop(columns=[c for c in drop_cols_single if c in single_df.columns])
+        
+        # 为没有 id 的记录生成新 ID
+        if not multi_df.empty:
+            if 'id' not in multi_df.columns or multi_df['id'].isna().all():
+                multi_df['id'] = [f"m-{str(uuid.uuid4())[:8]}" for _ in range(len(multi_df))]
+            else:
+                # 只为空的 id 生成新值
+                multi_df['id'] = multi_df['id'].apply(
+                    lambda x: f"m-{str(uuid.uuid4())[:8]}" if pd.isna(x) or x == '' else x
+                )
+        
+        if not single_df.empty:
+            if 'id' not in single_df.columns or single_df['id'].isna().all():
+                single_df['id'] = [f"s-{str(uuid.uuid4())[:8]}" for _ in range(len(single_df))]
+            else:
+                # 只为空的 id 生成新值
+                single_df['id'] = single_df['id'].apply(
+                    lambda x: f"s-{str(uuid.uuid4())[:8]}" if pd.isna(x) or x == '' else x
+                )
+        
+        multi_purpose_data = multi_df.to_dict('records') if not multi_df.empty else []
+        single_purpose_data = single_df.to_dict('records') if not single_df.empty else []
+        
+        affected = 0
         try:
             if single_purpose_data:
-                # 保存单用途 'app', 'state' 为key
-                affected = self.db.upsert_many('single_purpose_map_cache', single_purpose_data, conflict_columns=['app', 'state'])
+                # 保存单用途，'app', 'state' 为冲突键
+                affected += self.db.upsert_many('single_purpose_map_cache', single_purpose_data, conflict_columns=['app', 'state'])
             if multi_purpose_data:
-                # 保存多用途 'app', 'title','state' 为key
-                affected = self.db.upsert_many('multi_purpose_map_cache', multi_purpose_data, conflict_columns=['app', 'title','state'])
+                # 保存多用途，'app', 'title', 'state' 为冲突键
+                affected += self.db.upsert_many('multi_purpose_map_cache', multi_purpose_data, conflict_columns=['app', 'title', 'state'])
             return affected
         except Exception as e:
             logger.error(f"保存AI元数据失败: {e}")

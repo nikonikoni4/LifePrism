@@ -252,7 +252,7 @@ class CategoryMapCacheItem(BaseModel):
     注意：category 和 sub_category 是通过 ID 映射得到的名称，而非直接从表中读取
     """
     # 主键
-    id: int = Field(..., description="记录唯一标识（自增主键）")
+    id: str = Field(..., description="记录唯一标识（格式：m-xxx 或 s-xxx）")
     # 核心展示字段
     app: str = Field(..., description="应用程序名称（如 chrome.exe）")
     app_description: str | None = Field(default=None, description="应用程序描述（AI 生成）")
@@ -272,7 +272,7 @@ class CategoryMapCacheItem(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "id": 1,
+                "id": "m-a1b2c3d4",
                 "app": "msedge.exe",
                 "app_description": "Microsoft Edge 浏览器，用于网页浏览",
                 "title": "YouTube - 首页",
@@ -322,7 +322,7 @@ class CategoryMapCacheResponse(BaseModel):
 
 class UpdateCategoryMapCacheRequest(BaseModel):
     """更新 category_map_cache 记录请求"""
-    id: int = Field(..., description="记录ID")
+    id: str = Field(..., description="记录ID（格式：m-xxx 或 s-xxx）")
     category_id: str | None = Field(default=None, description="新的主分类ID，为空时不修改")
     sub_category_id: str | None = Field(default=None, description="新的子分类ID")
     app_description: str | None = Field(default=None, description="应用程序描述，为空时不修改")
@@ -331,7 +331,7 @@ class UpdateCategoryMapCacheRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "id": 1,
+                "id": "m-a1b2c3d4",
                 "category_id": "cat-124",
                 "sub_category_id": "subcat-124",
                 "app_description": "Microsoft Edge 浏览器",
@@ -342,14 +342,14 @@ class UpdateCategoryMapCacheRequest(BaseModel):
 
 class BatchUpdateCategoryMapCacheRequest(BaseModel):
     """批量更新 category_map_cache 记录请求"""
-    ids: List[int] = Field(..., description="记录ID列表", min_length=1)
+    ids: List[str] = Field(..., description="记录ID列表", min_length=1)
     category_id: str | None = Field(default=None, description="新的主分类ID，为空时不修改")
     sub_category_id: str | None = Field(default=None, description="新的子分类ID")
     app_description: str | None = Field(default=None, description="应用程序描述，为空时不修改")
     class Config:
         json_schema_extra = {
             "example": {
-                "ids": [1, 2, 3],
+                "ids": ["m-a1b2c3d4", "s-e5f6g7h8"],
                 "category_id": "cat-124",
                 "sub_category_id": "subcat-124",
                 "app_description": "Microsoft Edge 浏览器"
@@ -359,23 +359,23 @@ class BatchUpdateCategoryMapCacheRequest(BaseModel):
 
 class DeleteCategoryMapCacheRequest(BaseModel):
     """删除 category_map_cache 记录请求"""
-    id: int = Field(..., description="记录ID")
+    id: str = Field(..., description="记录ID（格式：m-xxx 或 s-xxx）")
 
     class Config:
         json_schema_extra = {
             "example": {
-                "id": 1
+                "id": "m-a1b2c3d4"
             }
         }
 
 
 class BatchDeleteCategoryMapCacheRequest(BaseModel):
     """批量删除 category_map_cache 记录请求"""
-    ids: List[int] = Field(..., description="记录ID列表", min_length=1)
+    ids: List[str] = Field(..., description="记录ID列表", min_length=1)
 
     class Config:
         json_schema_extra = {
             "example": {
-                "ids": [1, 2, 3]
+                "ids": ["m-a1b2c3d4", "s-e5f6g7h8"]
             }
         }

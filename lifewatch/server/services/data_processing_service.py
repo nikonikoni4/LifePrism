@@ -67,7 +67,7 @@ class DataProcessingService:
             
             # 1-2. 获取 ActivityWatch 数据并清洗
             logger.info("步骤 1-2/6: 获取 ActivityWatch 数据并清洗...")
-            category_map_cache_df = self.server_lw_data_provider.load_category_map_cache()  # 获取已缓存的分类结果
+            category_map_cache_df = self.server_lw_data_provider.load_category_map_cache_V2()  # 获取已缓存的分类结果
             filtered_data, classify_state = clean_activitywatch_data(
                 start_time=start_time,
                 end_time=end_time, 
@@ -168,7 +168,7 @@ class DataProcessingService:
             
             # 1-2. 获取 ActivityWatch 数据并清洗
             logger.info("步骤 1-2/6: 获取 ActivityWatch 数据并清洗...")
-            category_map_cache_df = self.server_lw_data_provider.load_category_map_cache()
+            category_map_cache_df = self.server_lw_data_provider.load_category_map_cache_V2()
             filtered_data, classify_state = clean_activitywatch_data(
                 start_time=start_time,
                 end_time=end_time,

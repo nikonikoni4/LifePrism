@@ -1069,7 +1069,8 @@ class CategoryService:
         page: int = 1,
         page_size: int = 50,
         search: str | None = None,
-        state: int | None = None
+        state: int | None = None,
+        is_multipurpose_app: bool | None = None
     ):
         """
         获取 category_map_cache 列表
@@ -1079,6 +1080,7 @@ class CategoryService:
             page_size: 每页数量
             search: 搜索关键词
             state: 状态筛选
+            is_multipurpose_app: 应用类型筛选（True=多用途, False=单用途）
         
         Returns:
             CategoryMapCacheResponse: 分页响应
@@ -1091,11 +1093,12 @@ class CategoryService:
         
         try:
             # 调用 base provider 的分页查询
-            result = self.server_lw_data_provider.load_category_map_cache(
+            result = self.server_lw_data_provider.load_category_map_cache_V2(
                 page=page,
                 page_size=page_size,
                 search=search,
-                state=state
+                state=state,
+                is_multipurpose_app=is_multipurpose_app
             )
             
             # 分页查询返回 (df, total) 元组
@@ -1113,7 +1116,7 @@ class CategoryService:
                     sub_category_name = self.sub_category_name_map.get(str(sub_category_id), None) if sub_category_id else None
                     
                     items.append(CategoryMapCacheItem(
-                        id=int(row['id']),
+                        id=str(row['id']),
                         app=row['app'],
                         app_description=row.get('app_description'),
                         title=row['title'],
@@ -1162,7 +1165,7 @@ class CategoryService:
     
     def update_category_map_cache(
         self, 
-        record_id: int, 
+        record_id: str, 
         category_id: str | None = None, 
         sub_category_id: str | None = None,
         app_description: str | None = None,
@@ -1172,7 +1175,7 @@ class CategoryService:
         更新 category_map_cache 记录的分类
         
         Args:
-            record_id: 记录ID
+            record_id: 记录ID（格式：m-xxx 或 s-xxx）
             category_id: 新的主分类ID（可选，为空时不修改）
             sub_category_id: 新的子分类ID
             app_description: 应用程序描述（可选，为空时不修改）
@@ -1209,7 +1212,7 @@ class CategoryService:
     
     def batch_update_category_map_cache(
         self,
-        record_ids: list[int],
+        record_ids: list[str],
         category_id: str | None = None,
         sub_category_id: str | None = None,
         app_description: str | None = None
@@ -1218,7 +1221,7 @@ class CategoryService:
         批量更新 category_map_cache 记录的分类
         
         Args:
-            record_ids: 记录ID列表
+            record_ids: 记录ID列表（格式：m-xxx 或 s-xxx）
             category_id: 新的主分类ID（可选，为空时不修改）
             sub_category_id: 新的子分类ID
             app_description: 应用程序描述（可选，为空时不修改）
@@ -1247,12 +1250,12 @@ class CategoryService:
             logger.error(f"批量更新 category_map_cache 记录失败: {e}")
             raise
     
-    def delete_category_map_cache(self, record_id: int) -> bool:
+    def delete_category_map_cache(self, record_id: str) -> bool:
         """
         删除 category_map_cache 记录
         
         Args:
-            record_id: 记录ID
+            record_id: 记录ID（格式：m-xxx 或 s-xxx）
         
         Returns:
             bool: 是否删除成功
@@ -1271,12 +1274,12 @@ class CategoryService:
             logger.error(f"删除 category_map_cache 记录失败: {e}")
             raise
     
-    def batch_delete_category_map_cache(self, record_ids: list[int]) -> int:
+    def batch_delete_category_map_cache(self, record_ids: list[str]) -> int:
         """
         批量删除 category_map_cache 记录
         
         Args:
-            record_ids: 记录ID列表
+            record_ids: 记录ID列表（格式：m-xxx 或 s-xxx）
         
         Returns:
             int: 成功删除的数量
@@ -1317,3 +1320,9 @@ if __name__ == "__main__":
     )
     import json
     print(json.dumps(category_state.model_dump(), indent=4, ensure_ascii=False))
+if __name__ == "__main__":
+    test_service = CategoryService()
+    data = test_service.get_category_map_cache_list()
+    import json
+    print("=========")
+    print(json.dumps(data.model_dump(), indent=4, ensure_ascii=False))

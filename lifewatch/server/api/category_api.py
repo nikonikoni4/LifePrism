@@ -380,11 +380,12 @@ async def get_category_map_cache_list(
     page_size: int = Query(default=50, ge=1, le=200, description="每页数量"),
     search: Optional[str] = Query(default=None, description="搜索关键词（匹配 app 或 title）"),
     state: Optional[int] = Query(default=None, ge=0, le=1, description="按状态筛选"),
+    is_multipurpose_app: Optional[bool] = Query(default=None, description="按应用类型筛选（true=多用途, false=单用途）"),
 ):
     """
     获取 category_map_cache 分类缓存列表
     
-    支持分页、搜索和状态筛选
+    支持分页、搜索、状态筛选和应用类型筛选
     """
     try:
         # 调用 Service 层获取数据
@@ -392,7 +393,8 @@ async def get_category_map_cache_list(
             page=page,
             page_size=page_size,
             search=search,
-            state=state
+            state=state,
+            is_multipurpose_app=is_multipurpose_app
         )
         return result
     except Exception as e:

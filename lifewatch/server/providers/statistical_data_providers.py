@@ -659,7 +659,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
     
     def update_category_map_cache_by_id(
         self, 
-        record_id: int,
+        record_id: str,
         category_id: str | None = None,
         sub_category_id: str | None = None,
         state: int | None = None,
@@ -669,17 +669,30 @@ class ServerLWDataProvider(LWBaseDataProvider):
         """
         通过 ID 更新单条 category_map_cache 记录的分类
         
+        根据 ID 前缀判断操作哪个表：
+        - m-xxx: multi_purpose_map_cache
+        - s-xxx: single_purpose_map_cache
+        
         Args:
-            record_id: 记录的自增主键 ID
+            record_id: 记录 ID（格式：m-xxx 或 s-xxx）
             category_id: 新的主分类ID（可选，为空时不修改）
             sub_category_id: 新的子分类ID
             state: 新状态（由 Service 层根据目标分类计算，可选）
             app_description: 应用程序描述（可选，为空时不修改）
-            title_analysis: 标题分析结果（可选，为空时不修改）
+            title_analysis: 标题分析结果（可选，仅对 multi_purpose 有效）
         
         Returns:
             bool: 是否更新成功
         """
+        # 根据 ID 前缀判断表名
+        if record_id.startswith('m-'):
+            table_name = 'multi_purpose_map_cache'
+        elif record_id.startswith('s-'):
+            table_name = 'single_purpose_map_cache'
+        else:
+            logger.error(f"无效的 record_id 格式: {record_id}")
+            return False
+        
         # 动态构建 SET 子句
         set_parts = []
         params = []
@@ -700,7 +713,8 @@ class ServerLWDataProvider(LWBaseDataProvider):
             set_parts.append("app_description = ?")
             params.append(app_description)
         
-        if title_analysis is not None:
+        # title_analysis 只对 multi_purpose 表有效
+        if title_analysis is not None and table_name == 'multi_purpose_map_cache':
             set_parts.append("title_analysis = ?")
             params.append(title_analysis)
         
@@ -711,7 +725,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
         params.append(record_id)
         
         sql = f"""
-        UPDATE category_map_cache 
+        UPDATE {table_name} 
         SET {", ".join(set_parts)}
         WHERE id = ?
         """
@@ -724,7 +738,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
     
     def batch_update_category_map_cache_by_ids(
         self, 
-        record_ids: list[int],
+        record_ids: list[str],
         category_id: str | None = None,
         sub_category_id: str | None = None,
         state: int | None = None,
@@ -733,8 +747,12 @@ class ServerLWDataProvider(LWBaseDataProvider):
         """
         批量通过 ID 更新 category_map_cache 记录的分类
         
+        根据 ID 前缀分组后分别操作对应的表：
+        - m-xxx: multi_purpose_map_cache
+        - s-xxx: single_purpose_map_cache
+        
         Args:
-            record_ids: 记录的 ID 列表
+            record_ids: 记录的 ID 列表（格式：m-xxx 或 s-xxx）
             category_id: 新的主分类ID（可选，为空时不修改）
             sub_category_id: 新的子分类ID
             state: 新状态（由 Service 层根据目标分类计算，可选）
@@ -746,60 +764,96 @@ class ServerLWDataProvider(LWBaseDataProvider):
         if not record_ids:
             return 0
         
+        # 按 ID 前缀分组
+        multi_ids = [rid for rid in record_ids if rid.startswith('m-')]
+        single_ids = [rid for rid in record_ids if rid.startswith('s-')]
+        
         # 动态构建 SET 子句
         set_parts = []
-        params = []
+        base_params = []
         
         if category_id is not None:
             set_parts.append("category_id = ?")
-            params.append(category_id)
+            base_params.append(category_id)
         
         if sub_category_id is not None:
             set_parts.append("sub_category_id = ?")
-            params.append(sub_category_id)
+            base_params.append(sub_category_id)
         
         if state is not None:
             set_parts.append("state = ?")
-            params.append(state)
+            base_params.append(state)
         
         if app_description is not None:
             set_parts.append("app_description = ?")
-            params.append(app_description)
+            base_params.append(app_description)
         
         # 如果没有任何字段需要更新，返回 0
         if not set_parts:
             return 0
         
-        # 添加 record_ids 参数
-        params.extend(record_ids)
-        
-        placeholders = ",".join("?" * len(record_ids))
-        sql = f"""
-        UPDATE category_map_cache 
-        SET {", ".join(set_parts)}
-        WHERE id IN ({placeholders})
-        """
+        total_updated = 0
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, params)
+            
+            # 更新 multi_purpose_map_cache 表
+            if multi_ids:
+                params = base_params.copy()
+                params.extend(multi_ids)
+                placeholders = ",".join("?" * len(multi_ids))
+                sql = f"""
+                UPDATE multi_purpose_map_cache 
+                SET {", ".join(set_parts)}
+                WHERE id IN ({placeholders})
+                """
+                cursor.execute(sql, params)
+                total_updated += cursor.rowcount
+            
+            # 更新 single_purpose_map_cache 表
+            if single_ids:
+                params = base_params.copy()
+                params.extend(single_ids)
+                placeholders = ",".join("?" * len(single_ids))
+                sql = f"""
+                UPDATE single_purpose_map_cache 
+                SET {", ".join(set_parts)}
+                WHERE id IN ({placeholders})
+                """
+                cursor.execute(sql, params)
+                total_updated += cursor.rowcount
+            
             conn.commit()
-            return cursor.rowcount
+        
+        return total_updated
     
     def delete_category_map_cache_by_id(
         self, 
-        record_id: int
+        record_id: str
     ) -> bool:
         """
         通过 ID 删除单条 category_map_cache 记录
         
+        根据 ID 前缀判断操作哪个表：
+        - m-xxx: multi_purpose_map_cache
+        - s-xxx: single_purpose_map_cache
+        
         Args:
-            record_id: 记录的自增主键 ID
+            record_id: 记录 ID（格式：m-xxx 或 s-xxx）
         
         Returns:
             bool: 是否删除成功
         """
-        sql = "DELETE FROM category_map_cache WHERE id = ?"
+        # 根据 ID 前缀判断表名
+        if record_id.startswith('m-'):
+            table_name = 'multi_purpose_map_cache'
+        elif record_id.startswith('s-'):
+            table_name = 'single_purpose_map_cache'
+        else:
+            logger.error(f"无效的 record_id 格式: {record_id}")
+            return False
+        
+        sql = f"DELETE FROM {table_name} WHERE id = ?"
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -809,13 +863,17 @@ class ServerLWDataProvider(LWBaseDataProvider):
     
     def batch_delete_category_map_cache_by_ids(
         self, 
-        record_ids: list[int]
+        record_ids: list[str]
     ) -> int:
         """
         批量通过 ID 删除 category_map_cache 记录
         
+        根据 ID 前缀分组后分别操作对应的表：
+        - m-xxx: multi_purpose_map_cache
+        - s-xxx: single_purpose_map_cache
+        
         Args:
-            record_ids: 记录的 ID 列表
+            record_ids: 记录的 ID 列表（格式：m-xxx 或 s-xxx）
         
         Returns:
             int: 成功删除的数量
@@ -823,14 +881,32 @@ class ServerLWDataProvider(LWBaseDataProvider):
         if not record_ids:
             return 0
         
-        placeholders = ",".join("?" * len(record_ids))
-        sql = f"DELETE FROM category_map_cache WHERE id IN ({placeholders})"
+        # 按 ID 前缀分组
+        multi_ids = [rid for rid in record_ids if rid.startswith('m-')]
+        single_ids = [rid for rid in record_ids if rid.startswith('s-')]
+        
+        total_deleted = 0
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, record_ids)
+            
+            # 删除 multi_purpose_map_cache 表中的记录
+            if multi_ids:
+                placeholders = ",".join("?" * len(multi_ids))
+                sql = f"DELETE FROM multi_purpose_map_cache WHERE id IN ({placeholders})"
+                cursor.execute(sql, multi_ids)
+                total_deleted += cursor.rowcount
+            
+            # 删除 single_purpose_map_cache 表中的记录
+            if single_ids:
+                placeholders = ",".join("?" * len(single_ids))
+                sql = f"DELETE FROM single_purpose_map_cache WHERE id IN ({placeholders})"
+                cursor.execute(sql, single_ids)
+                total_deleted += cursor.rowcount
+            
             conn.commit()
-            return cursor.rowcount
+        
+        return total_deleted
 
 
 if __name__ == "__main__":

@@ -120,7 +120,7 @@ if __name__ == "__main__":
     from lifewatch.processors.models.processed_event import ProcessedEvent
     from lifewatch.storage import LWBaseDataProvider
     lw_data_provider = LWBaseDataProvider()
-    cache = CategoryCache(lw_data_provider.load_category_map_cache())
+    cache = CategoryCache(lw_data_provider.load_category_map_cache_V2())
     print(cache.is_multipurpose_title_cached("msedge", "lifewatchai"))
     matcher = CacheMatcher(cache)
     event = ProcessedEvent(id=1,app="msedge", title="lifewatchai", is_multipurpose=1, start_time="2025-12-31 08:38:00", end_time="2025-12-31 08:38:00", duration=10)
