@@ -6,9 +6,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { CalendarDays, TrendingUp } from 'lucide-react';
-import TimeOverviewWidget from '../../common/TimeOverviewWidget';
+import TimeOverviewWidget from './TimeOverviewWidget';
 import TimeDistributionChart from './TimeDistributionChart';
 import GoalProgressCard from './GoalProgressCard';
+import TodoStatsCard from './TodoStatsCard';
 import AISummaryCard from './AISummaryCard';
 import { getMockWeeklyReport } from '../mockData';
 
@@ -37,7 +38,7 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
     // 默认使用本周
     const [weekOffset, setWeekOffset] = useState<number>(0);
 
-    const { startDate, endDate } = useMemo(() => {
+    const { start: startDate, end: endDate } = useMemo(() => {
         const today = new Date();
         today.setDate(today.getDate() + weekOffset * 7);
         return getWeekRange(today);
@@ -82,8 +83,8 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
                         onClick={() => setWeekOffset(0)}
                         disabled={weekOffset === 0}
                         className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${weekOffset === 0
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
                             }`}
                     >
                         本周
@@ -109,52 +110,37 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
                         categories={reportData.categories}
                         title="周度趋势折线图"
                         subtitle="展示周一至周日各分类的每日时长波动"
-                        height={280}
+                        height={260}
                     />
-
-                    {/* Sunburst Chart */}
-                    <TimeOverviewWidget
-                        data={reportData.timeOverview}
-                        chartHeight="h-[350px]"
+                </div>
+                <div className="lg:col-span-4 space-y-6">
+                    {/* Weekly Todo Stats */}
+                    <TodoStatsCard
+                        stats={reportData.todoStats}
+                        title="任务完成度"
+                        subTitle="本周 Todo 整体达成率"
+                        className="h-[380px]"
                     />
                 </div>
 
-                {/* Right Column - Stats & AI */}
+                <div className="lg:col-span-8 space-y-6">
+                    {/* Sunburst Chart */}
+                    <TimeOverviewWidget
+                        data={reportData.timeOverview}
+                        chartHeight="h-[450px]"
+                    />
+                </div>
+
                 <div className="lg:col-span-4 space-y-6">
                     {/* Weekly Goal Progress */}
                     <GoalProgressCard
                         goals={reportData.goalProgress}
                         title="本周 Goal 复盘"
+                        height="600px"
                     />
+                </div>
 
-                    {/* Task Completion Rate */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-2 bg-emerald-50 text-emerald-500 rounded-xl">
-                                <TrendingUp size={18} />
-                            </div>
-                            <h3 className="text-base font-bold text-slate-800">任务完成度</h3>
-                        </div>
-
-                        <div className="text-center py-4">
-                            <div className="inline-flex items-baseline gap-1">
-                                <span className="text-5xl font-bold font-mono text-emerald-500">
-                                    {reportData.taskCompletionRate.toFixed(1)}
-                                </span>
-                                <span className="text-2xl font-bold text-slate-400">%</span>
-                            </div>
-                            <p className="text-sm text-slate-400 mt-2">本周 Todo 整体达成率</p>
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-700"
-                                style={{ width: `${reportData.taskCompletionRate}%` }}
-                            />
-                        </div>
-                    </div>
-
+                <div className="lg:col-span-12 space-y-6">
                     {/* AI Summary */}
                     <AISummaryCard
                         title="AI 规律总结"

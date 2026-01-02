@@ -225,6 +225,7 @@ export const getMockDailyReport = (date: string): DailyReportData => ({
         total: 16,
         completed: 10,
         pending: 6,
+        procrastinationRate: 15.5
     },
     aiSummary: `📊 **今日效率分析**
 
@@ -258,7 +259,12 @@ export const getMockWeeklyReport = (startDate: string, endDate: string): WeeklyR
         timeInvested: g.timeInvested * 7,
         todoCompleted: Math.min(g.todoCompleted + 2, g.todoTotal),
     })),
-    taskCompletionRate: 78.5,
+    todoStats: {
+        total: 112,
+        completed: 88,
+        pending: 24,
+        procrastinationRate: 12.5
+    },
     aiSummary: `📈 **本周规律总结**
 
 本周累计有效时间 **52小时18分钟**，较上周增长 12%。
@@ -299,16 +305,17 @@ export const getMockMonthlyReport = (month: string): MonthlyReportData => {
             todoTotal: g.todoTotal * 4,
             todoCompleted: g.todoCompleted * 4 + Math.floor(Math.random() * 5),
         })),
-        todoTracking: {
-            completionRate: 82.3,
-            totalCompleted: 156,
-            totalPending: 34,
-            carryOverItems: [
-                { id: 101, content: '完善产品文档', goalName: '完成项目重构' },
-                { id: 102, content: '准备季度复盘报告', goalName: undefined },
-                { id: 103, content: '学习 Rust 基础', goalName: '学习 TypeScript 进阶' },
-            ]
+        todoStats: {
+            total: 190,
+            completed: 156,
+            pending: 34,
+            procrastinationRate: 8.2
         },
+        carryOverItems: [
+            { id: 101, content: '完善产品文档', goalName: '完成项目重构' },
+            { id: 102, content: '准备季度复盘报告', goalName: undefined },
+            { id: 103, content: '学习 Rust 基础', goalName: '学习 TypeScript 进阶' },
+        ],
         aiSummary: `🗓️ **${mon}月全局复盘**
 
 本月累计追踪 **218小时35分钟**，日均活跃 7.2 小时。

@@ -4,7 +4,6 @@
  * 报告统计相关类型定义
  */
 
-import { TimeOverviewData } from '../common/types';
 
 // ============================================================================
 // Common Types
@@ -51,6 +50,7 @@ export interface TodoStatsData {
     total: number;
     completed: number;
     pending: number;
+    procrastinationRate: number;
 }
 
 /** 热力图单日数据 */
@@ -107,8 +107,8 @@ export interface WeeklyReportData {
     timeOverview: TimeOverviewData;
     /** 周度 Goal 进度 */
     goalProgress: GoalProgressData[];
-    /** 任务完成率 */
-    taskCompletionRate: number;
+    /** Todo 统计数据 */
+    todoStats: TodoStatsData;
     /** AI 规律总结 */
     aiSummary: string;
 }
@@ -128,7 +128,13 @@ export interface MonthlyReportData {
     /** 月度 Goal 投入 */
     goalProgress: GoalProgressData[];
     /** 月度 Todo 追踪 */
-    todoTracking: MonthlyTodoTracking;
+    todoStats: TodoStatsData;
+    /** 需滚动事项 (保留原始追踪结构中的事项) */
+    carryOverItems: Array<{
+        id: number;
+        content: string;
+        goalName?: string;
+    }>;
     /** AI 全局总结 */
     aiSummary: string;
 }
@@ -170,4 +176,32 @@ export interface ReportResponse {
         productivity: TrendData;
         focusTime: TrendData;
     };
+}
+
+/** 饼图/旭日图数据项 */
+export interface ChartSegment {
+    key: string;
+    name: string;
+    value: number;
+    color: string;
+    title?: string;  // app层的标题显示
+}
+
+/** 柱状图配置项 */
+export interface BarConfig {
+    key: string;
+    label: string;
+    color: string;
+}
+
+/** Time Overview 完整数据 (递归结构) */
+export interface TimeOverviewData {
+    title: string;
+    subTitle: string;
+    totalTrackedMinutes: number;
+    totalRangeMinutes?: number;  // 时间范围总分钟数（用于计算百分比的分母）
+    pieData: ChartSegment[];
+    barKeys: BarConfig[];
+    barData: Array<Record<string, any>>;
+    details?: Record<string, TimeOverviewData>;
 }

@@ -135,8 +135,8 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
                     <button
                         onClick={() => setSelectedCategory(null)}
                         className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${selectedCategory === null
-                                ? 'bg-slate-800 text-white'
-                                : 'bg-gray-50 text-slate-600 hover:bg-gray-100'
+                            ? 'bg-slate-800 text-white'
+                            : 'bg-gray-50 text-slate-600 hover:bg-gray-100'
                             }`}
                     >
                         全部
@@ -146,8 +146,8 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
                             key={cat.key}
                             onClick={() => setSelectedCategory(cat.key)}
                             className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all flex items-center gap-1.5 ${selectedCategory === cat.key
-                                    ? 'bg-white border-2 shadow-sm'
-                                    : 'bg-gray-50 border border-transparent hover:bg-gray-100'
+                                ? 'bg-white border-2 shadow-sm'
+                                : 'bg-gray-50 border border-transparent hover:bg-gray-100'
                                 }`}
                             style={{
                                 borderColor: selectedCategory === cat.key ? cat.color : undefined
@@ -163,77 +163,80 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
                 </div>
             </div>
 
-            {/* Weekday Headers */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
-                {WEEKDAYS.map((day, i) => (
-                    <div
-                        key={i}
-                        className="text-center text-[10px] font-bold text-slate-400 uppercase py-1"
-                    >
-                        {day}
-                    </div>
-                ))}
-            </div>
+            {/* Calendar Part Container */}
+            <div className="max-w-[350px] mx-auto">
+                {/* Weekday Headers */}
+                <div className="grid grid-cols-7 gap-1.5 mb-2">
+                    {WEEKDAYS.map((day, i) => (
+                        <div
+                            key={i}
+                            className="text-center text-[10px] font-bold text-slate-400 uppercase py-1"
+                        >
+                            {day}
+                        </div>
+                    ))}
+                </div>
 
-            {/* Calendar Grid */}
-            <div className="space-y-1">
-                {weeks.map((week, weekIndex) => (
-                    <div key={weekIndex} className="grid grid-cols-7 gap-1">
-                        {week.map((day, dayIndex) => {
-                            if (!day) {
+                {/* Calendar Grid */}
+                <div className="space-y-1.5">
+                    {weeks.map((week, weekIndex) => (
+                        <div key={weekIndex} className="grid grid-cols-7 gap-1.5">
+                            {week.map((day, dayIndex) => {
+                                if (!day) {
+                                    return (
+                                        <div
+                                            key={dayIndex}
+                                            className="aspect-square rounded-md"
+                                        />
+                                    );
+                                }
+
+                                const value = getValue(day);
+                                const dateNum = parseInt(day.date.split('-')[2]);
+
                                 return (
                                     <div
                                         key={dayIndex}
-                                        className="aspect-square rounded-lg"
-                                    />
-                                );
-                            }
+                                        className="aspect-square rounded-md flex flex-col items-center justify-center relative group cursor-pointer transition-transform hover:scale-105"
+                                        style={{
+                                            backgroundColor: getHeatColor(value, maxValue, selectedColor)
+                                        }}
+                                    >
+                                        <span className="text-[10px] font-medium text-slate-600">
+                                            {dateNum}
+                                        </span>
 
-                            const value = getValue(day);
-                            const dateNum = parseInt(day.date.split('-')[2]);
-
-                            return (
-                                <div
-                                    key={dayIndex}
-                                    className="aspect-square rounded-lg flex flex-col items-center justify-center relative group cursor-pointer transition-transform hover:scale-105"
-                                    style={{
-                                        backgroundColor: getHeatColor(value, maxValue, selectedColor)
-                                    }}
-                                >
-                                    <span className="text-xs font-medium text-slate-600">
-                                        {dateNum}
-                                    </span>
-
-                                    {/* Tooltip */}
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                        <div className="bg-slate-800 text-white px-3 py-2 rounded-lg text-xs whitespace-nowrap shadow-lg">
-                                            <div className="font-bold mb-1">{day.date}</div>
-                                            <div>{formatTime(value)}</div>
-                                            {day.categoryBreakdown && !selectedCategory && (
-                                                <div className="mt-1 pt-1 border-t border-slate-600 space-y-0.5">
-                                                    {categories.map(cat => {
-                                                        const catValue = day.categoryBreakdown?.[cat.key] || 0;
-                                                        if (catValue === 0) return null;
-                                                        return (
-                                                            <div key={cat.key} className="flex items-center gap-1.5">
-                                                                <div
-                                                                    className="w-1.5 h-1.5 rounded-full"
-                                                                    style={{ backgroundColor: cat.color }}
-                                                                />
-                                                                <span>{cat.name}: {formatTime(catValue)}</span>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
+                                        {/* Tooltip */}
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                            <div className="bg-slate-800 text-white px-3 py-2 rounded-lg text-xs whitespace-nowrap shadow-lg">
+                                                <div className="font-bold mb-1">{day.date}</div>
+                                                <div>{formatTime(value)}</div>
+                                                {day.categoryBreakdown && !selectedCategory && (
+                                                    <div className="mt-1 pt-1 border-t border-slate-600 space-y-0.5">
+                                                        {categories.map(cat => {
+                                                            const catValue = day.categoryBreakdown?.[cat.key] || 0;
+                                                            if (catValue === 0) return null;
+                                                            return (
+                                                                <div key={cat.key} className="flex items-center gap-1.5">
+                                                                    <div
+                                                                        className="w-1.5 h-1.5 rounded-full"
+                                                                        style={{ backgroundColor: cat.color }}
+                                                                    />
+                                                                    <span>{cat.name}: {formatTime(catValue)}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
                                         </div>
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ))}
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {/* Legend */}

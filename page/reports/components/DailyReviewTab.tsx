@@ -6,7 +6,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Calendar } from 'lucide-react';
-import TimeOverviewWidget from '../../common/TimeOverviewWidget';
+import TimeOverviewWidget from './TimeOverviewWidget';
 import TimeDistributionChart from './TimeDistributionChart';
 import GoalProgressCard from './GoalProgressCard';
 import TodoStatsCard from './TodoStatsCard';
@@ -75,27 +75,35 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({ className = '' }) => {
                         subtitle="展示 0~24h 内不同类别的分段使用趋势"
                         height={260}
                     />
+                </div>
+                <div className="lg:col-span-4 space-y-6">
+
+                    {/* Todo Stats */}
+                    <TodoStatsCard
+                        stats={reportData.todoStats}
+                        title="Todo 统计"
+                        className="h-[380px]"
+                    />
+                </div>
+                <div className="lg:col-span-8 space-y-6">
 
                     {/* Sunburst Chart */}
                     <TimeOverviewWidget
                         data={reportData.timeOverview}
-                        chartHeight="h-[350px]"
+                        chartHeight="h-[450px]"
                     />
                 </div>
-
                 {/* Right Column - Stats & AI */}
                 <div className="lg:col-span-4 space-y-6">
                     {/* Goal Progress */}
                     <GoalProgressCard
                         goals={reportData.goalProgress}
                         title="Goal 进度跟踪"
+                        height="600px"
                     />
+                </div>
 
-                    {/* Todo Stats */}
-                    <TodoStatsCard
-                        stats={reportData.todoStats}
-                        title="Todo 统计"
-                    />
+                <div className="lg:col-span-12 space-y-6">
 
                     {/* AI Summary */}
                     <AISummaryCard
