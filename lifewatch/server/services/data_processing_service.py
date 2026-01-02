@@ -338,10 +338,35 @@ class DataProcessingService:
         classify_mode = settings.classification_mode
         logger.info(f"  使用分类模式: {classify_mode}")
         
+        # 构建 goals 列表（用于 LLM 分类时的 goal 关联）
+        # 格式: [{goal: 目标名称, category: 主分类名称, sub_category: 子分类名称}, ...]
+        from lifewatch.llm.llm_classify.schemas import Goal as LLMGoal
+        goals_for_llm = []
+        for g in goal_provider.get_active_goals_for_classify():
+            # 根据 ID 查找分类名称
+            cat_name = None
+            sub_cat_name = None
+            if g.get('link_to_category_id'):
+                cat_row = category[category['id'] == g['link_to_category_id']]
+                if not cat_row.empty:
+                    cat_name = cat_row.iloc[0]['name']
+            if g.get('link_to_sub_category_id'):
+                sub_row = sub_category[sub_category['id'] == g['link_to_sub_category_id']]
+                if not sub_row.empty:
+                    sub_cat_name = sub_row.iloc[0]['name']
+            
+            goals_for_llm.append(LLMGoal(
+                goal=g['name'],
+                category=cat_name,
+                sub_category=sub_cat_name
+            ))
+        
+        logger.info(f"  ✓ 构建 goals 列表，共 {len(goals_for_llm)} 个活跃目标（已过滤被禁用分类）")
+        
         # 初始化 LLMClassify 分类器
         classifier = LLMClassify(
             classify_mode=classify_mode,
-            goal=None,
+            goal=goals_for_llm,
             category_tree=category_tree
         )
         
