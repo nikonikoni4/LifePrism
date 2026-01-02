@@ -208,5 +208,5 @@ def flatten_sections(guide: UserGuide) -> list[GuideSection]:
 
 if __name__ == "__main__":
     guide = load_user_guide()
-    print(guide.get_section_as_markdown("goal-matching"))
+    print(guide.get_children_summary("faq"))
     
