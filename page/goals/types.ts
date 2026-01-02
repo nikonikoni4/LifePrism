@@ -146,6 +146,18 @@ export interface ActiveGoalNamesResponse {
     items: ActiveGoalItem[];
 }
 
+// Goal with Category Types (用于 Map Cache 编辑下拉选择)
+export interface GoalWithCategoryItem {
+    id: string;
+    name: string;
+    linkToCategoryId: string;
+    linkToSubCategoryId: string | null;
+}
+
+export interface GoalsWithCategoryResponse {
+    items: GoalWithCategoryItem[];
+}
+
 // Category Types (匹配后端 CategoryTreeItem)
 export interface SubCategoryTreeItem {
     id: string;

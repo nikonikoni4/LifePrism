@@ -5,10 +5,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Search, Trash2, ChevronLeft, ChevronRight, Loader2, Edit3, X, Save, Globe, AppWindow, HelpCircle } from 'lucide-react';
+import { Search, Trash2, ChevronLeft, ChevronRight, Loader2, Edit3, X, Save, Globe, AppWindow, HelpCircle, Target, Calendar } from 'lucide-react';
 import { CategoryTreeItem } from '../../common/types';
 import { CategoryMapCacheItem } from '../types';
 import { CategoryMapCacheAPI } from '../api';
+import { goalApi } from '../../goals/api';
+import { GoalWithCategoryItem } from '../../goals/types';
 
 interface CategoryMapCacheTabProps {
     categories: CategoryTreeItem[];
@@ -44,7 +46,11 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
         title_analysis: '',
         category_id: '',
         sub_category_id: '',
+        link_to_goal_id: '',
     });
+
+    // 目标列表（用于下拉选择）
+    const [goalsWithCategory, setGoalsWithCategory] = useState<GoalWithCategoryItem[]>([]);
 
     // 批量编辑弹窗
     const [showBatchEditModal, setShowBatchEditModal] = useState(false);
@@ -62,7 +68,31 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
         is_multipurpose_app: boolean;
         category_id: string;
         sub_category_id: string | null;
+        link_to_goal_id?: string | null;
     } | null>(null);
+    // 同步日期范围
+    const [syncDateRange, setSyncDateRange] = useState<{
+        start_date: string;
+        end_date: string;
+        sync_goal: boolean;
+    }>({
+        start_date: '',
+        end_date: '',
+        sync_goal: false,
+    });
+
+    // 加载目标列表
+    useEffect(() => {
+        const fetchGoals = async () => {
+            try {
+                const response = await goalApi.getGoalsWithCategory();
+                setGoalsWithCategory(response.items);
+            } catch (err) {
+                console.error('Failed to fetch goals:', err);
+            }
+        };
+        fetchGoals();
+    }, []);
 
     // 防抖搜索
     useEffect(() => {
@@ -137,16 +167,36 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
             title_analysis: record.title_analysis || '',
             category_id: record.category_id || '',
             sub_category_id: record.sub_category_id || '',
+            link_to_goal_id: record.link_to_goal_id || '',
         });
+    };
+
+    // 处理目标选择变化（自动锁定分类）
+    const handleGoalChange = (goalId: string) => {
+        if (!goalId) {
+            // 清除目标时不改变分类
+            setEditForm(prev => ({ ...prev, link_to_goal_id: '' }));
+            return;
+        }
+        const selectedGoal = goalsWithCategory.find(g => g.id === goalId);
+        if (selectedGoal) {
+            setEditForm(prev => ({
+                ...prev,
+                link_to_goal_id: goalId,
+                category_id: selectedGoal.linkToCategoryId,
+                sub_category_id: selectedGoal.linkToSubCategoryId || '',
+            }));
+        }
     };
 
     // 保存单条编辑
     const handleSaveEdit = async () => {
         if (!editingRecord) return;
 
-        // 检测是否修改了分类
+        // 检测是否修改了分类或目标
         const categoryChanged = editForm.category_id !== (editingRecord.category_id || '') ||
             editForm.sub_category_id !== (editingRecord.sub_category_id || '');
+        const goalChanged = editForm.link_to_goal_id !== (editingRecord.link_to_goal_id || '');
 
         try {
             setIsProcessing(true);
@@ -155,6 +205,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                 title_analysis: editForm.title_analysis || null,
                 category_id: editForm.category_id || null,
                 sub_category_id: editForm.sub_category_id || null,
+                link_to_goal_id: editForm.link_to_goal_id || null,
             });
 
             // 更新本地状态
@@ -166,21 +217,27 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                         title_analysis: editForm.title_analysis || null,
                         category_id: editForm.category_id || null,
                         sub_category_id: editForm.sub_category_id || null,
+                        link_to_goal_id: editForm.link_to_goal_id || null,
+                        link_to_goal: goalsWithCategory.find(g => g.id === editForm.link_to_goal_id)?.name || null,
                         category: categories.find(c => c.id === editForm.category_id)?.name || null,
                         sub_category: categories.find(c => c.id === editForm.category_id)?.subcategories?.find(s => s.id === editForm.sub_category_id)?.name || null,
                     }
                     : r
             ));
 
-            // 如果分类发生变化，弹出同步确认窗口
-            if (categoryChanged && editForm.category_id) {
+            // 如果分类或目标发生变化，弹出同步确认窗口
+            if ((categoryChanged || goalChanged) && editForm.category_id) {
                 setPendingSyncData({
                     app: editingRecord.app,
                     title: editingRecord.title,
                     is_multipurpose_app: editingRecord.is_multipurpose_app,
                     category_id: editForm.category_id,
                     sub_category_id: editForm.sub_category_id || null,
+                    // 如果目标发生变化，需要正确传递 link_to_goal_id
+                    // 空字符串 "" 表示清空，非空值表示设置，undefined 表示不修改
+                    link_to_goal_id: goalChanged ? (editForm.link_to_goal_id || '') : undefined,
                 });
+                setSyncDateRange({ start_date: '', end_date: '', sync_goal: goalChanged });
                 setShowSyncConfirmModal(true);
             }
 
@@ -199,7 +256,12 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
 
         try {
             setIsProcessing(true);
-            const result = await CategoryMapCacheAPI.updateLogsByCache(pendingSyncData);
+            const result = await CategoryMapCacheAPI.updateLogsByCache({
+                ...pendingSyncData,
+                goal_id: syncDateRange.sync_goal ? pendingSyncData.link_to_goal_id : undefined,
+                start_date: syncDateRange.start_date || undefined,
+                end_date: syncDateRange.end_date || undefined,
+            });
             const updatedCount = result.data?.updated_count || 0;
             alert(`成功同步更新 ${updatedCount} 条日志记录`);
         } catch (err) {
@@ -209,6 +271,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
             setIsProcessing(false);
             setShowSyncConfirmModal(false);
             setPendingSyncData(null);
+            setSyncDateRange({ start_date: '', end_date: '', sync_goal: false });
         }
     };
 
@@ -596,7 +659,8 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                                             sub_category_id: '',
                                         }));
                                     }}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                    disabled={!!editForm.link_to_goal_id}
                                 >
                                     <option value="">-- 请选择 --</option>
                                     {categories.map(cat => (
@@ -610,7 +674,8 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                                     <select
                                         value={editForm.sub_category_id}
                                         onChange={(e) => setEditForm(prev => ({ ...prev, sub_category_id: e.target.value }))}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                        disabled={!!editForm.link_to_goal_id}
                                     >
                                         <option value="">-- 请选择 --</option>
                                         {categories.find(c => c.id === editForm.category_id)?.subcategories?.map(sub => (
@@ -619,6 +684,34 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                                     </select>
                                 </div>
                             )}
+
+                            {/* 关联目标 */}
+                            <div className="border-t border-gray-100 pt-4 mt-4">
+                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
+                                    <Target size={14} className="text-indigo-500" />
+                                    关联目标
+                                </label>
+                                <select
+                                    value={editForm.link_to_goal_id}
+                                    onChange={(e) => handleGoalChange(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                                >
+                                    <option value="">-- 不关联目标 --</option>
+                                    {goalsWithCategory.map(goal => (
+                                        <option key={goal.id} value={goal.id}>{goal.name}</option>
+                                    ))}
+                                </select>
+                                {editForm.link_to_goal_id && (
+                                    <p className="text-xs text-indigo-600 mt-1">
+                                        💡 已自动锁定为该目标绑定的分类
+                                    </p>
+                                )}
+                                {goalsWithCategory.length === 0 && (
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        提示：仅显示已绑定分类的进行中目标
+                                    </p>
+                                )}
+                            </div>
                         </div>
                         <div className="flex gap-3 mt-6">
                             <button
@@ -719,10 +812,10 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
             {/* Sync Confirm Modal */}
             {showSyncConfirmModal && pendingSyncData && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-2xl shadow-xl p-6 w-96">
+                    <div className="bg-white rounded-2xl shadow-xl p-6 w-[420px]">
                         <h3 className="text-lg font-bold text-slate-900 mb-4">同步更新日志</h3>
                         <p className="text-sm text-slate-600 mb-2">
-                            您已修改了该缓存记录的分类。
+                            您已修改了该缓存记录的分类{pendingSyncData.link_to_goal_id !== undefined ? '和目标' : ''}。
                         </p>
                         <p className="text-sm text-slate-600 mb-4">
                             {pendingSyncData.is_multipurpose_app ? (
@@ -731,6 +824,51 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                                 <>是否将所有 <span className="font-semibold text-slate-800">{pendingSyncData.app}</span> 应用的日志数据也更新为相同分类？</>
                             )}
                         </p>
+
+                        {/* 日期范围选择 */}
+                        <div className="space-y-3 mb-4">
+                            <div className="flex items-center gap-2">
+                                <Calendar size={14} className="text-slate-400" />
+                                <span className="text-sm font-medium text-slate-700">同步日期范围（可选）</span>
+                            </div>
+                            <div className="flex gap-2">
+                                <div className="flex-1">
+                                    <label className="text-xs text-slate-500 mb-1 block">开始日期</label>
+                                    <input
+                                        type="date"
+                                        value={syncDateRange.start_date}
+                                        onChange={(e) => setSyncDateRange(prev => ({ ...prev, start_date: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-xs text-slate-500 mb-1 block">结束日期</label>
+                                    <input
+                                        type="date"
+                                        value={syncDateRange.end_date}
+                                        onChange={(e) => setSyncDateRange(prev => ({ ...prev, end_date: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-400">留空则更新所有历史日志</p>
+                        </div>
+
+                        {/* 目标同步选项 */}
+                        {pendingSyncData.link_to_goal_id !== undefined && (
+                            <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={syncDateRange.sync_goal}
+                                        onChange={(e) => setSyncDateRange(prev => ({ ...prev, sync_goal: e.target.checked }))}
+                                        className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <span className="text-sm text-indigo-700">同时更新日志的关联目标</span>
+                                </label>
+                            </div>
+                        )}
+
                         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
                             <p className="text-xs text-amber-700">
                                 <span className="font-semibold">提示：</span>

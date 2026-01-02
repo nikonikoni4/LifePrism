@@ -1,5 +1,5 @@
 
-import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, RewardItem, RewardStatsResponse, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse, CreateGoalRequest, UpdateGoalRequest, GoalListResponse, CategoryTreeResponse, ActiveGoalNamesResponse, MilestoneItem } from "./types";
+import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, RewardItem, RewardStatsResponse, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse, CreateGoalRequest, UpdateGoalRequest, GoalListResponse, CategoryTreeResponse, ActiveGoalNamesResponse, GoalsWithCategoryResponse, MilestoneItem } from "./types";
 
 const API_BASE = '/api/v2/goal';
 
@@ -353,6 +353,13 @@ export const goalApi = {
     // 获取活跃目标名称列表（用于下拉选择）
     getActiveGoalNames: async (): Promise<ActiveGoalNamesResponse> => {
         const res = await fetch(`${API_BASE}/goals/active-names`);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    // 获取绑定了分类的活跃目标列表（用于 Map Cache 编辑）
+    getGoalsWithCategory: async (): Promise<GoalsWithCategoryResponse> => {
+        const res = await fetch(`${API_BASE}/goals/with-category`);
         const data = await res.json();
         return toCamelCase(data);
     }

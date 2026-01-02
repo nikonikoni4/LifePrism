@@ -349,6 +349,9 @@ export const CategoryMapCacheAPI = {
         is_multipurpose_app: boolean;
         category_id: string;
         sub_category_id?: string | null;
+        goal_id?: string | null;  // null=不修改, ""=清除, "goal-xxx"=设置
+        start_date?: string;      // 可选，YYYY-MM-DD 格式
+        end_date?: string;        // 可选，YYYY-MM-DD 格式
     }): Promise<StandardResponse> {
         const searchParams = new URLSearchParams();
         searchParams.set('app', params.app);
@@ -360,6 +363,16 @@ export const CategoryMapCacheAPI = {
         }
         if (params.sub_category_id) {
             searchParams.set('sub_category_id', params.sub_category_id);
+        }
+        // goal_id: null=不修改（不传参数）, ""=清除, "goal-xxx"=设置
+        if (params.goal_id !== null && params.goal_id !== undefined) {
+            searchParams.set('goal_id', params.goal_id);
+        }
+        if (params.start_date) {
+            searchParams.set('start_date', params.start_date);
+        }
+        if (params.end_date) {
+            searchParams.set('end_date', params.end_date);
         }
 
         const ACTIVITY_API_BASE = 'http://localhost:8000/api/v2/activity';

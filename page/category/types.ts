@@ -83,6 +83,8 @@ export interface CategoryMapCacheItem {
     sub_category: string | null;
     category_id: string | null;
     sub_category_id: string | null;
+    link_to_goal_id: string | null;
+    link_to_goal: string | null;
     is_multipurpose_app: boolean;
     state: number;
     created_at: string | null;
@@ -103,6 +105,7 @@ export interface UpdateCategoryMapCacheRequest {
     sub_category_id?: string | null;
     app_description?: string | null;
     title_analysis?: string | null;
+    link_to_goal_id?: string | null;
 }
 
 /** 批量更新 CategoryMapCache 记录请求 */
