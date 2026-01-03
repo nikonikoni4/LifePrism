@@ -349,14 +349,57 @@ def _events_to_dataframe(events: List[ProcessedEvent]) -> pd.DataFrame:
     return pd.DataFrame([event.to_dict() for event in events])
 
 
+def _process_events_batch(
+    raw_events: List[Dict],
+    cache: 'CategoryCache',
+    transformer: 'EventTransformer',
+    matcher: 'CacheMatcher',
+    collector: 'ClassifyCollector'
+) -> Tuple[List[ProcessedEvent], int]:
+    """
+    处理一批原始事件数据
+    
+    执行以下操作：
+    1. 转换事件（时间戳标准化、短活动过滤）
+    2. 匹配缓存分类
+    3. 收集待分类项
+    
+    Args:
+        raw_events: 原始事件列表（来自 ActivityWatch）
+        cache: CategoryCache 实例
+        transformer: EventTransformer 实例
+        matcher: CacheMatcher 实例
+        collector: ClassifyCollector 实例
+    
+    Returns:
+        Tuple[List[ProcessedEvent], int]:
+            - events: 处理后的事件列表
+            - removed_count: 被过滤的事件数量
+    """
+    # 1. 转换事件
+    events, removed_count = transformer.transform_batch(raw_events)
+    
+    # 2. 匹配缓存 & 收集待分类项
+    for event in events:
+        matcher.match(event)  # 匹配后的数据标记 cache_matched = True
+        collector.collect(event)
+    
+    return events, removed_count
+
+
+
+# 默认批次大小：50,000 条事件
+DEFAULT_BATCH_SIZE = 50000
+
 
 def clean_activitywatch_data(
     start_time: datetime, 
     end_time: datetime, 
-    category_map_cache_df: pd.DataFrame
+    category_map_cache_df: pd.DataFrame,
+    batch_size: int = DEFAULT_BATCH_SIZE
 ) -> Tuple[pd.DataFrame, classifyState]:
     """
-    完整的数据清洗流程（重构版本 - 组件化架构）
+    完整的数据清洗流程（重构版本 - 组件化架构 + 分批处理）
     
     与原版本 clean_activitywatch_data 功能相同，但使用组件化设计：
     - CategoryCache: 缓存索引管理
@@ -364,25 +407,30 @@ def clean_activitywatch_data(
     - CacheMatcher: 缓存匹配策略
     - ClassifyCollector: 待分类项收集
     
+    支持分批处理大数据量，避免内存问题。
+    
     Args:
         start_time: 开始时间 (datetime 对象)
         end_time: 结束时间 (datetime 对象)
         category_map_cache_df: 分类缓存 DataFrame
+        batch_size: 每批处理的事件数量，默认 50,000
     
     Returns:
         Tuple[pd.DataFrame, classifyState]:
             - filtered_events_df: 清洗后的事件数据 DataFrame
             - classify_state: 包含待分类应用信息的 classifyState 对象
     """
+    logger.info(f"🧹 开始数据清洗流程 (v2)...")
+    
     # 1. 获取原始数据
     raw_events = processor_aw_data_provider.get_window_events(
         start_time=start_time,
         end_time=end_time
     )
-    logger.info(f"🧹 开始数据清洗流程 (v2)...")
-    logger.info(f"📥 原始数据: {len(raw_events)} 个事件")
+    total_events = len(raw_events)
+    logger.info(f"📥 原始数据: {total_events} 个事件")
     
-    # 2. 初始化组件
+    # 2. 初始化组件（全局共享，跨批次累积状态）
     cache = CategoryCache(category_map_cache_df)
     transformer = EventTransformer()
     matcher = CacheMatcher(cache)
@@ -390,24 +438,48 @@ def clean_activitywatch_data(
     
     logger.debug(f"📦 缓存统计: {cache.get_stats()}")
     
-    # 3. 转换事件
-    events, removed_count = transformer.transform_batch(raw_events)
-    logger.debug(f"🔄 事件转换完成: 有效 {len(events)}, 过滤 {removed_count}")
+    # 3. 分批处理
+    all_events: List[ProcessedEvent] = []
+    total_removed = 0
     
-    # 4. 匹配缓存 & 收集待分类项
-    for event in events:
-        matcher.match(event) # 匹配后的数据标记 cache_matched = True
-        collector.collect(event)
+    if total_events <= batch_size:
+        # 数据量较小，直接处理
+        events, removed_count = _process_events_batch(
+            raw_events, cache, transformer, matcher, collector
+        )
+        all_events = events
+        total_removed = removed_count
+        logger.debug(f"🔄 事件转换完成: 有效 {len(events)}, 过滤 {removed_count}")
+    else:
+        # 数据量较大，分批处理
+        num_batches = (total_events + batch_size - 1) // batch_size
+        logger.info(f"📦 数据量较大，分 {num_batches} 批处理 (每批 {batch_size} 条)")
+        
+        for batch_idx in range(num_batches):
+            batch_start = batch_idx * batch_size
+            batch_end = min(batch_start + batch_size, total_events)
+            batch_events = raw_events[batch_start:batch_end]
+            
+            events, removed_count = _process_events_batch(
+                batch_events, cache, transformer, matcher, collector
+            )
+            all_events.extend(events)
+            total_removed += removed_count
+            
+            logger.debug(
+                f"  批次 {batch_idx + 1}/{num_batches}: "
+                f"处理 {len(batch_events)} 条, 有效 {len(events)}, 过滤 {removed_count}"
+            )
     
-    # 5. 构建输出
-    filtered_events_df = _events_to_dataframe(events)
+    # 4. 构建输出
+    filtered_events_df = _events_to_dataframe(all_events)
     classify_state = collector.build_state()
     
-    # 6. 日志统计
+    # 5. 日志统计
     match_stats = matcher.get_stats()
     collect_stats = collector.get_stats()
     
-    logger.info(f"📊 过滤统计: 总事件 {len(raw_events)} -> 保留 {len(events)} -> 删除 {removed_count}")
+    logger.info(f"📊 过滤统计: 总事件 {total_events} -> 保留 {len(all_events)} -> 删除 {total_removed}")
     logger.info(f"📊 缓存匹配: 命中 {match_stats['matched']}, 未命中 {match_stats['missed']}")
     logger.info(f"📊 待分类统计: 总项目 {collect_stats['total']} -> 单用途 {collect_stats['single']} -> 多用途 {collect_stats['multi']}")
     logger.info(f"📊 应用注册表: {collect_stats['apps']} 个应用")

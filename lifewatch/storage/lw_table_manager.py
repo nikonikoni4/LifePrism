@@ -81,7 +81,7 @@ class LWTableManager:
                 "created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
             )
             # 只有首次创建时添加updated_at，某些表不需要
-            if table_name == 'single_purpose_map_cache' or table_name == 'multi_purpose_map_cache':
+            if table_name == 'single_purpose_map_cache' or table_name == 'multi_purpose_map_cache' or table_name == 'daily_report' or table_name == "weekly_report" or table_name == "monthly_report":
                 column_definitions.append(
                     "updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
                 )

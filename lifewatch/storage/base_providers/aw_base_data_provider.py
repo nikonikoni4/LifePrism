@@ -123,7 +123,8 @@ class AWBaseDataProvider:
         self,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-        hours: Optional[int] = None
+        hours: Optional[int] = None,
+        limit: int = 500000
     ) -> List[Dict]:
         """
         获取窗口事件
@@ -132,6 +133,7 @@ class AWBaseDataProvider:
             start_time: 开始时间（本地时间）
             end_time: 结束时间（本地时间）
             hours: 获取最近 N 小时的数据
+            limit: 最大返回条数，默认 500,000
             
         Returns:
             List[Dict]: 窗口事件列表
@@ -171,7 +173,7 @@ class AWBaseDataProvider:
             logger.warning("未找到窗口事件存储桶")
             return []
         
-        events = self._get_events(bucket_key, start_time_str, end_time_str)
+        events = self._get_events(bucket_key, start_time_str, end_time_str, limit=limit)
         logger.info(f"获取到 {len(events)} 个窗口事件")
         
         return events
@@ -188,7 +190,7 @@ class AWBaseDataProvider:
         bucket_key: str,
         start_time: str,
         end_time: str,
-        limit: int = 10000
+        limit: int = 500000
     ) -> List[Dict]:
         """获取指定存储桶的事件数据"""
         with self.db.get_connection() as conn:

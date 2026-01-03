@@ -1026,6 +1026,11 @@ monthly_report_config = {
             'type': 'TEXT',
             'constraints': ['DEFAULT NULL'],
             'comment': 'AI总结'
+        },
+        "heatmap_data": {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '热力图数据 (HeatmapDataItem[] JSON)'
         }
     },
     'table_constraints': [],

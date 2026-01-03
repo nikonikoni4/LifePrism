@@ -784,9 +784,9 @@ def _calc_heatmap_data(start_date: str, end_date: str) -> List[HeatmapDataItem]:
         df['date'] = df['start_dt'].dt.date
         df['duration_minutes'] = (df['end_dt'] - df['start_dt']).dt.total_seconds() / 60
         
-        # 按日期和分类聚合
-        daily_totals = defaultdict(int)
-        daily_breakdown = defaultdict(lambda: defaultdict(int))
+        # 按日期和分类聚合（使用 float 累加保持精度）
+        daily_totals = defaultdict(float)
+        daily_breakdown = defaultdict(lambda: defaultdict(float))
         
         for _, row in df.iterrows():
             row_date = row['date']
@@ -795,7 +795,7 @@ def _calc_heatmap_data(start_date: str, end_date: str) -> List[HeatmapDataItem]:
             minutes = row['duration_minutes']
             
             daily_totals[row_date] += minutes
-            daily_breakdown[row_date][cat_name] += int(minutes)
+            daily_breakdown[row_date][cat_name] += minutes
         
         # 构建结果
         start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
@@ -807,10 +807,14 @@ def _calc_heatmap_data(start_date: str, end_date: str) -> List[HeatmapDataItem]:
             current_date = start_dt + timedelta(days=i)
             date_str = current_date.strftime('%Y-%m-%d')
             
+            # 最终输出时取整
+            breakdown = daily_breakdown.get(current_date, {})
+            breakdown_int = {k: int(v) for k, v in breakdown.items()} if breakdown else None
+            
             result.append(HeatmapDataItem(
                 date=date_str,
                 total_minutes=int(daily_totals.get(current_date, 0)),
-                category_breakdown=dict(daily_breakdown.get(current_date, {})) or None
+                category_breakdown=breakdown_int
             ))
         
         return result
@@ -1099,3 +1103,83 @@ def _monthly_dict_to_response(
         state=data.get('state', '0'),
         data_version=data.get('data_version', 1)
     )
+
+
+def test_compare_weekly_and_monthly_trend():
+    """
+    测试 _calc_weekly_trend 和 _calc_monthly_trend 计算同一周数据时的结果是否一致
+    
+    用于调试月视图和周视图数据不一致的问题
+    """
+    # 使用 2025-12-29 ~ 2026-01-04 这一周进行测试（包含 12-31）
+    week_start = '2025-12-29'  # 周一
+    week_end = '2026-01-04'    # 周日
+    
+    print("=" * 60)
+    print("测试 _calc_weekly_trend vs _calc_monthly_trend")
+    print("=" * 60)
+    print(f"测试日期范围: {week_start} ~ {week_end}")
+    print()
+    
+    # 1. 计算周趋势
+    print("1. _calc_weekly_trend 结果:")
+    weekly_result = _calc_weekly_trend(week_start, week_end)
+    
+    # 提取周四（12-31）的数据进行重点比较
+    weekly_dec_31 = None
+    for day in weekly_result:
+        print(f"   {day}")
+        if day.get('date') == '2025-12-31':
+            weekly_dec_31 = day
+    
+    print()
+    
+    # 2. 计算月趋势（只取 12 月的最后几天）
+    print("2. _calc_monthly_trend 结果 (2025-12-29 ~ 2025-12-31):")
+    monthly_result = _calc_monthly_trend('2025-12-29', '2025-12-31')
+    
+    monthly_dec_31 = None
+    for day in monthly_result:
+        print(f"   {day}")
+        if day.get('label') == '31':
+            monthly_dec_31 = day
+    
+    print()
+    
+    # 3. 比较 12-31 的数据
+    print("3. 重点对比 2025-12-31 的数据:")
+    print(f"   周视图 (12-31): {weekly_dec_31}")
+    print(f"   月视图 (31):    {monthly_dec_31}")
+    
+    if weekly_dec_31 and monthly_dec_31:
+        print()
+        print("4. 分类对比:")
+        # 获取所有分类键（排除 label 和 date）
+        weekly_cats = {k: v for k, v in weekly_dec_31.items() if k not in ['label', 'date']}
+        monthly_cats = {k: v for k, v in monthly_dec_31.items() if k != 'label'}
+        
+        all_cats = set(weekly_cats.keys()) | set(monthly_cats.keys())
+        
+        has_diff = False
+        for cat in sorted(all_cats):
+            w_val = weekly_cats.get(cat, 0)
+            m_val = monthly_cats.get(cat, 0)
+            diff = w_val - m_val
+            status = "✅" if diff == 0 else "❌"
+            if diff != 0:
+                has_diff = True
+            print(f"   {status} {cat}: 周={w_val}分钟, 月={m_val}分钟, 差异={diff}分钟 ({diff/60:.2f}小时)")
+        
+        if has_diff:
+            print()
+            print("⚠️ 发现数据差异！需要进一步调查原因。")
+        else:
+            print()
+            print("✅ 数据一致！")
+    
+    print()
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    test_compare_weekly_and_monthly_trend()
