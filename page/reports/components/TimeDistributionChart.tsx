@@ -1,14 +1,14 @@
 /**
  * Time Distribution Chart Component
  * 
- * 时间分布折线图/面积图组件
+ * 时间分布折线图
  */
 
 import React, { useState } from 'react';
 import {
     ResponsiveContainer,
-    AreaChart,
-    Area,
+    LineChart,
+    Line,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -111,8 +111,8 @@ const TimeDistributionChart: React.FC<TimeDistributionChartProps> = ({
                                 key={cat.key}
                                 onClick={() => toggleCategory(cat.key)}
                                 className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all flex items-center gap-1.5 ${isActive
-                                        ? 'bg-white border border-gray-200 shadow-sm'
-                                        : 'bg-gray-50 border border-transparent opacity-50'
+                                    ? 'bg-white border border-gray-200 shadow-sm'
+                                    : 'bg-gray-50 border border-transparent opacity-50'
                                     }`}
                             >
                                 <div
@@ -129,19 +129,7 @@ const TimeDistributionChart: React.FC<TimeDistributionChartProps> = ({
             {/* Chart */}
             <div style={{ height }}>
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                        <defs>
-                            {categories.map((cat) => (
-                                <linearGradient
-                                    key={cat.key}
-                                    id={`gradient-${cat.key}`}
-                                    x1="0" y1="0" x2="0" y2="1"
-                                >
-                                    <stop offset="5%" stopColor={cat.color} stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor={cat.color} stopOpacity={0.05} />
-                                </linearGradient>
-                            ))}
-                        </defs>
+                    <LineChart data={data} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                         <CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="3 3" />
                         <XAxis
                             dataKey="label"
@@ -161,20 +149,20 @@ const TimeDistributionChart: React.FC<TimeDistributionChartProps> = ({
 
                         {categories.map((cat) => (
                             visibleCategories.has(cat.key) && (
-                                <Area
+                                <Line
                                     key={cat.key}
                                     type="monotone"
                                     dataKey={cat.key}
                                     name={cat.name}
-                                    stackId="1"
                                     stroke={cat.color}
-                                    fill={`url(#gradient-${cat.key})`}
                                     strokeWidth={2}
+                                    dot={{ fill: cat.color, strokeWidth: 0, r: 3 }}
+                                    activeDot={{ r: 5, strokeWidth: 0 }}
                                     animationDuration={800}
                                 />
                             )
                         ))}
-                    </AreaChart>
+                    </LineChart>
                 </ResponsiveContainer>
             </div>
         </div>
