@@ -10,7 +10,12 @@ from lifewatch.server.schemas.report_schemas import (
     DailyReportListResponse,
     WeeklyReportResponse,
 )
-from lifewatch.server.services.report_service import report_service, weekly_report_service
+from lifewatch.server.services.report_service import (
+    get_daily_report as service_get_daily_report,
+    get_weekly_report as service_get_weekly_report,
+    _daily_dict_to_response,
+    _weekly_dict_to_response,
+)
 from lifewatch.server.providers.report_provider import report_provider, weekly_report_provider
 
 router = APIRouter(prefix="/report", tags=["Report"])
@@ -38,7 +43,7 @@ async def get_daily_report(
     - **goal_data**: Goal 进度追踪
     - **daily_trend_data**: 24小时时间趋势
     """
-    return report_service.get_daily_report(date, force_refresh)
+    return service_get_daily_report(date, force_refresh)
 
 
 @router.delete("/daily/{date}")
@@ -71,7 +76,7 @@ async def get_daily_reports_in_range(
     # 转换为响应模型
     items = []
     for report in reports:
-        items.append(report_service._dict_to_response(report))
+        items.append(_daily_dict_to_response(report))
     
     return DailyReportListResponse(items=items, total=len(items))
 
@@ -112,7 +117,7 @@ async def get_weekly_report(
     - **goal_data**: Goal 进度追踪（整周）
     - **daily_trend_data**: 每日时间趋势（周一~周日）
     """
-    return weekly_report_service.get_weekly_report(week_start_date, force_refresh)
+    return service_get_weekly_report(week_start_date, force_refresh)
 
 
 @router.delete("/weekly/{week_start_date}")
@@ -151,7 +156,7 @@ async def get_weekly_reports_in_range(
         if week_start:
             start_dt = datetime.strptime(week_start, '%Y-%m-%d')
             week_end = (start_dt + timedelta(days=6)).strftime('%Y-%m-%d')
-            items.append(weekly_report_service._dict_to_response(report, week_start, week_end))
+            items.append(_weekly_dict_to_response(report, week_start, week_end))
     
     return {"items": items, "total": len(items)}
 

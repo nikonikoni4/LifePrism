@@ -927,6 +927,56 @@ daily_report_config = {
 }
 
 
+weekly_report_config = {
+    'table_name': 'weekly_report',
+    'columns': {
+        'date': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY', 'NOT NULL'],
+            'comment': '日期 YYYY-MM-DD'
+        },
+        'sunburst_data': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '旭日图数据 (TimeOverviewData JSON)'
+        },
+        'todo_data': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': 'Todo统计数据 (TodoStatsData JSON)'
+        },
+        'goal_data': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': 'Goal进度数据 (GoalProgressData[] JSON)'
+        },
+        'daily_trend_data': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '24小时趋势数据 (TimeDistributionPoint[] JSON)'
+        },
+        'state': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT 0'],
+            'comment': '数据状态 (0: 未完成, 1: 已完成)'
+        },
+        'data_version': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 1'],
+            'comment': '数据格式版本号'
+        },
+        'ai_summary': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': 'AI总结'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_daily_report_date', 'columns': ['date']}
+    ],
+    'timestamps': True
+}
 
 
 
@@ -956,6 +1006,7 @@ TABLE_CONFIGS = {
     'goal_stats': GOAL_STATS_CONFIG,
     'reward': REWARD_CONFIG,
     'daily_report': daily_report_config,
+    'weekly_report': weekly_report_config,
 }
 
 
