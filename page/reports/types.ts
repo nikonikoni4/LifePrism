@@ -90,7 +90,7 @@ export interface DailyReportData {
     goalProgress: GoalProgressData[];
     /** Todo 统计 */
     todoStats: TodoStatsData;
-    /** AI 智能总结 */
+    /** AI 总结 */
     aiSummary: string;
 }
 

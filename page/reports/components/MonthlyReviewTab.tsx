@@ -255,7 +255,8 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
                     {/* AI Summary */}
                     <AISummaryCard
                         title="AI 全局总结"
-                        content={displayData.aiSummary || '暂无 AI 总结数据'}
+                        date={`${selectedMonth}-01`}
+                        content={displayData.aiSummary}
                     />
                 </div>
             </div>

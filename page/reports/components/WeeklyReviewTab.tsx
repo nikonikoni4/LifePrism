@@ -228,7 +228,8 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
                     {/* AI Summary */}
                     <AISummaryCard
                         title="AI 规律总结"
-                        content={displayData.aiSummary || '暂无 AI 总结数据'}
+                        date={startDate}
+                        content={displayData.aiSummary}
                     />
                 </div>
             </div>

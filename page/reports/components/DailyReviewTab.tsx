@@ -192,8 +192,9 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({ className = '' }) => {
                 <div className="lg:col-span-12 space-y-6">
                     {/* AI Summary */}
                     <AISummaryCard
-                        title="AI 智能总结"
-                        content={displayData.aiSummary || '暂无 AI 总结数据'}
+                        title="AI 总结"
+                        date={selectedDate}
+                        content={displayData.aiSummary}
                     />
                 </div>
             </div>

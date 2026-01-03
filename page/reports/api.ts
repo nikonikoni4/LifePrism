@@ -48,6 +48,7 @@ interface DailyReportAPIResponse {
         }>;
     }> | null;
     daily_trend_data: Array<Record<string, any>> | null;
+    ai_summary: string | null;
     state: string;
     data_version: number;
 }
@@ -154,7 +155,7 @@ function transformDailyReportResponse(response: DailyReportAPIResponse): DailyRe
             pending: todoStats.pending,
             procrastinationRate: todoStats.procrastination_rate,
         },
-        aiSummary: '', // 目前后端没有返回 AI 总结
+        aiSummary: response.ai_summary || '',
     };
 }
 
@@ -677,5 +678,42 @@ export const ReportsAPI = {
     }): Promise<Blob> {
         // TODO: 实现真实 API 调用
         throw new Error('Not implemented');
+    },
+
+    /**
+     * 获取 AI 总结
+     */
+    async getAISummary(date: string, options: string[] = ['all']): Promise<{
+        content: string;
+        tokensUsage: {
+            inputTokens: number;
+            outputTokens: number;
+            totalTokens: number;
+        };
+    }> {
+        const response = await fetch(`${API_BASE}/report/daily/ai_summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                date,
+                options,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`获取 AI 总结失败: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return {
+            content: data.content,
+            tokensUsage: {
+                inputTokens: data.tokens_usage.input_tokens,
+                outputTokens: data.tokens_usage.output_tokens,
+                totalTokens: data.tokens_usage.total_tokens,
+            },
+        };
     },
 };
