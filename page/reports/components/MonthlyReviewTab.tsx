@@ -4,13 +4,16 @@
  * 每月总结 Tab 组件
  */
 
-import React, { useState, useMemo } from 'react';
-import { CalendarRange, ArrowRight, AlertCircle } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { CalendarRange, RefreshCw } from 'lucide-react';
 import TimeOverviewWidget from './TimeOverviewWidget';
 import CalendarHeatmap from './CalendarHeatmap';
 import GoalProgressCard from './GoalProgressCard';
 import TodoStatsCard from './TodoStatsCard';
 import AISummaryCard from './AISummaryCard';
+import TimeDistributionChart from './TimeDistributionChart';
+import { ReportsAPI } from '../api';
+import { MonthlyReportData } from '../types';
 import { getMockMonthlyReport } from '../mockData';
 
 interface MonthlyReviewTabProps {
@@ -24,10 +27,53 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
         return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
     });
 
-    // 获取 Mock 数据
-    const reportData = useMemo(() => {
-        return getMockMonthlyReport(selectedMonth);
+    // 数据状态
+    const [reportData, setReportData] = useState<MonthlyReportData | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // 加载报告数据
+    const fetchReport = useCallback(async (forceRefresh: boolean = false) => {
+        if (forceRefresh) {
+            setRefreshing(true);
+        } else {
+            setLoading(true);
+        }
+        setError(null);
+
+        try {
+            const data = await ReportsAPI.getMonthlyReport(selectedMonth, forceRefresh);
+            setReportData(data);
+        } catch (err) {
+            console.error('获取月报告失败:', err);
+            setError(err instanceof Error ? err.message : '获取数据失败');
+            // 出错时使用 mock 数据
+            setReportData(getMockMonthlyReport(selectedMonth));
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, [selectedMonth]);
+
+    // 月份变化时重新加载
+    useEffect(() => {
+        fetchReport(false);
+    }, [fetchReport]);
+
+    // 强制刷新处理
+    const handleForceRefresh = () => {
+        fetchReport(true);
+    };
+
+    // 从热力图数据生成趋势数据
+    const trendData = useMemo(() => {
+        if (!reportData) return [];
+        return reportData.heatmapData.map(day => ({
+            label: day.date.split('-')[2],
+            ...(day.categoryBreakdown || {})
+        }));
+    }, [reportData]);
 
     const formatMonthDisplay = (month: string) => {
         const [year, mon] = month.split('-');
@@ -61,14 +107,30 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
         return selectedMonth === currentMonth;
     };
 
-    const formatTime = (minutes: number) => {
-        const hours = Math.floor(minutes / 60);
-        return `${hours}h`;
-    };
+    // Loading 状态
+    if (loading && !reportData) {
+        return (
+            <div className={`flex items-center justify-center h-96 ${className}`}>
+                <div className="flex flex-col items-center gap-3">
+                    <RefreshCw className="w-8 h-8 text-purple-500 animate-spin" />
+                    <p className="text-slate-500">加载中...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // 使用 mock 数据作为后备
+    const displayData = reportData || getMockMonthlyReport(selectedMonth);
+
+    // 从热力图数据生成显示用趋势数据
+    const displayTrendData = displayData.heatmapData.map(day => ({
+        label: day.date.split('-')[2],
+        ...(day.categoryBreakdown || {})
+    }));
 
     return (
         <div className={`space-y-6 ${className}`}>
-            {/* Month Selector */}
+            {/* Month Selector & Refresh Button */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-50 text-purple-500 rounded-xl">
@@ -82,6 +144,28 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* 强制刷新按钮 */}
+                    <button
+                        onClick={handleForceRefresh}
+                        disabled={refreshing}
+                        className={`
+                            flex items-center gap-2 px-4 py-2 
+                            bg-gradient-to-r from-purple-500 to-pink-500 
+                            text-white text-sm font-medium rounded-xl
+                            hover:from-purple-600 hover:to-pink-600
+                            focus:ring-2 focus:ring-purple-300 focus:outline-none
+                            disabled:opacity-60 disabled:cursor-not-allowed
+                            transition-all duration-200
+                            shadow-sm hover:shadow-md
+                        `}
+                    >
+                        <RefreshCw
+                            size={16}
+                            className={refreshing ? 'animate-spin' : ''}
+                        />
+                        {refreshing ? '刷新中...' : '重新计算'}
+                    </button>
+
                     <button
                         onClick={handlePrevMonth}
                         className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-100 transition-colors"
@@ -109,14 +193,35 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
                 </div>
             </div>
 
+            {/* Error Message */}
+            {error && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+                    <div className="text-amber-500">⚠️</div>
+                    <div>
+                        <p className="text-sm font-medium text-amber-800">数据加载失败</p>
+                        <p className="text-xs text-amber-600">{error}（已使用演示数据）</p>
+                    </div>
+                </div>
+            )}
+
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Monthly Trend Chart */}
+                <div className="lg:col-span-12">
+                    <TimeDistributionChart
+                        data={displayTrendData}
+                        categories={displayData.categories}
+                        title="月度时间分布趋势"
+                        height={300}
+                    />
+                </div>
+
                 {/* Left Column - Charts */}
                 <div className="lg:col-span-8">
                     {/* Calendar Heatmap */}
                     <CalendarHeatmap
-                        data={reportData.heatmapData}
-                        categories={reportData.categories}
+                        data={displayData.heatmapData}
+                        categories={displayData.categories}
                         month={selectedMonth}
                         title="月度活跃热力图"
                         className="h-full"
@@ -126,7 +231,7 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
                 <div className="lg:col-span-4">
                     {/* Monthly Todo Stats */}
                     <TodoStatsCard
-                        stats={reportData.todoStats}
+                        stats={displayData.todoStats}
                         title="月度 Todo 追踪"
                         subTitle="本月任务整体达成率"
                         className="h-full"
@@ -136,7 +241,7 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
                 <div className="lg:col-span-8">
                     {/* Sunburst Chart */}
                     <TimeOverviewWidget
-                        data={reportData.timeOverview}
+                        data={displayData.timeOverview}
                         chartHeight="h-[500px]"
                         className="h-[600px]"
                     />
@@ -145,7 +250,7 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
                 <div className="lg:col-span-4">
                     {/* Monthly Goal Investment */}
                     <GoalProgressCard
-                        goals={reportData.goalProgress}
+                        goals={displayData.goalProgress}
                         title="月度 Goal 投入"
                         height="h-[600px]"
                     />
@@ -155,7 +260,7 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
                     {/* AI Summary */}
                     <AISummaryCard
                         title="AI 全局总结"
-                        content={reportData.aiSummary}
+                        content={displayData.aiSummary || '暂无 AI 总结数据'}
                     />
                 </div>
             </div>
