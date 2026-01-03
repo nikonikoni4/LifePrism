@@ -174,7 +174,8 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
     
     weekly_report_provider.upsert_weekly_report(week_start_date, report_data)
     
-    # 5. 返回报告数据
+    # 5. 返回报告数据（保留已有的 ai_summary）
+    existing_ai_summary = cached.get('ai_summary') if cached else None
     return WeeklyReportResponse(
         week_start_date=week_start_date,
         week_end_date=week_end_date,
@@ -182,6 +183,7 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
         todo_data=todo_data,
         goal_data=goal_data,
         daily_trend_data=daily_trend_data,
+        ai_summary=existing_ai_summary,
         state=state,
         data_version=1
     )
@@ -259,7 +261,8 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
     
     monthly_report_provider.upsert_monthly_report(month_start_date, report_data)
     
-    # 5. 返回报告数据
+    # 5. 返回报告数据（保留已有的 ai_summary）
+    existing_ai_summary = cached.get('ai_summary') if cached else None
     return MonthlyReportResponse(
         month_start_date=month_start_date,
         month_end_date=month_end_date,
@@ -268,6 +271,7 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
         goal_data=goal_data,
         daily_trend_data=daily_trend_data,
         heatmap_data=heatmap_data,
+        ai_summary=existing_ai_summary,
         state=state,
         data_version=1
     )
@@ -307,6 +311,110 @@ async def get_daily_ai_summary(date: str, options: List[str]) -> dict:
         logger.info(f"已保存 AI 总结到日报告 {date}")
     except Exception as e:
         logger.error(f"保存 AI 总结失败: {e}")
+    
+    return result
+
+
+async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, options: List[str]) -> dict:
+    """
+    获取周 AI 总结（异步版本）
+    
+    调用 LLM 生成每周活动的智能分析总结，并保存到 weekly_report 表
+    
+    Args:
+        week_start_date: 周开始日期 YYYY-MM-DD（周一）
+        week_end_date: 周结束日期 YYYY-MM-DD（周日）
+        options: 总结选项列表
+            - behavior_stats: 各时段的主分类和子分类的占比统计
+            - longest_activities: 各时段内最长的活动记录
+            - goal_time_spent: 各目标花费的时间
+            - user_notes: 用户手动添加的时间块备注
+            - tasks: 本周重点内容
+            - all: 所有选项
+        
+    Returns:
+        dict: 包含 content 和 tokens_usage 的字典
+            - content: AI 生成的总结内容
+            - tokens_usage: Token 使用量统计
+    """
+    from lifewatch.llm.llm_classify.function.report_summary import multi_days_summary
+    
+    logger.info(f"生成周 AI 总结 {week_start_date} ~ {week_end_date}, options={options}")
+    
+    start_time = f"{week_start_date} 00:00:00"
+    end_time = f"{week_end_date} 23:59:59"
+    
+    result = await multi_days_summary(
+        start_time=start_time,
+        end_time=end_time,
+        split_count=7,  # 周报按7天分割
+        options=options
+    )
+    
+    # 保存 AI 总结到 weekly_report 表
+    try:
+        weekly_report_provider.upsert_weekly_report(week_start_date, {
+            'ai_summary': result['content']
+        })
+        logger.info(f"已保存 AI 总结到周报告 {week_start_date}")
+    except Exception as e:
+        logger.error(f"保存周 AI 总结失败: {e}")
+    
+    return result
+
+
+async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, options: List[str]) -> dict:
+    """
+    获取月 AI 总结（异步版本）
+    
+    调用 LLM 生成每月活动的智能分析总结，并保存到 monthly_report 表
+    
+    Args:
+        month_start_date: 月开始日期 YYYY-MM-01
+        month_end_date: 月结束日期 YYYY-MM-DD（月末）
+        options: 总结选项列表
+            - behavior_stats: 各时段的主分类和子分类的占比统计
+            - longest_activities: 各时段内最长的活动记录
+            - goal_time_spent: 各目标花费的时间
+            - user_notes: 用户手动添加的时间块备注
+            - tasks: 本月重点内容
+            - all: 所有选项
+        
+    Returns:
+        dict: 包含 content 和 tokens_usage 的字典
+            - content: AI 生成的总结内容
+            - tokens_usage: Token 使用量统计
+    """
+    from lifewatch.llm.llm_classify.function.report_summary import multi_days_summary
+    
+    logger.info(f"生成月 AI 总结 {month_start_date} ~ {month_end_date}, options={options}")
+    
+    start_time = f"{month_start_date} 00:00:00"
+    end_time = f"{month_end_date} 23:59:59"
+    
+    # 计算天数用于 split_count
+    start_dt = datetime.strptime(month_start_date, '%Y-%m-%d')
+    end_dt = datetime.strptime(month_end_date, '%Y-%m-%d')
+    days = (end_dt - start_dt).days + 1
+    
+    # 月报分割为4段（约每周一段）
+    split_count = min(4, days)
+    
+    result = await multi_days_summary(
+        start_time=start_time,
+        end_time=end_time,
+        split_count=split_count,
+        options=options
+    )
+    
+    # 保存 AI 总结到 monthly_report 表
+    try:
+        monthly_report_provider.upsert_monthly_report(month_start_date, {
+            'ai_summary': result['content']
+        })
+        logger.info(f"已保存 AI 总结到月报告 {month_start_date}")
+    except Exception as e:
+        logger.error(f"保存月 AI 总结失败: {e}")
     
     return result
 
@@ -1106,6 +1214,7 @@ def _weekly_dict_to_response(
         todo_data=todo_data,
         goal_data=goal_data,
         daily_trend_data=data.get('daily_trend_data'),
+        ai_summary=data.get('ai_summary'),
         state=data.get('state', '0'),
         data_version=data.get('data_version', 1)
     )
@@ -1141,6 +1250,7 @@ def _monthly_dict_to_response(
         goal_data=goal_data,
         daily_trend_data=data.get('daily_trend_data'),
         heatmap_data=heatmap_data,
+        ai_summary=data.get('ai_summary'),
         state=data.get('state', '0'),
         data_version=data.get('data_version', 1)
     )

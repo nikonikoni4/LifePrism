@@ -121,6 +121,7 @@ class WeeklyReportResponse(BaseModel):
     todo_data: Optional[TodoStatsData] = Field(default=None, description="Todo 统计数据")
     goal_data: Optional[List[GoalProgressData]] = Field(default=None, description="Goal 进度数据")
     daily_trend_data: Optional[List[Dict[str, Any]]] = Field(default=None, description="每日趋势数据（7天）")
+    ai_summary: Optional[str] = Field(default=None, description="AI 总结内容")
     state: str = Field(default="0", description="数据状态 (0: 未完成, 1: 已完成)")
     data_version: int = Field(default=1, description="数据格式版本号")
 
@@ -160,6 +161,7 @@ class MonthlyReportResponse(BaseModel):
     goal_data: Optional[List[GoalProgressData]] = Field(default=None, description="Goal 进度数据")
     daily_trend_data: Optional[List[Dict[str, Any]]] = Field(default=None, description="每日趋势数据（按天）")
     heatmap_data: Optional[List[HeatmapDataItem]] = Field(default=None, description="热力图数据")
+    ai_summary: Optional[str] = Field(default=None, description="AI 总结内容")
     state: str = Field(default="0", description="数据状态 (0: 未完成, 1: 已完成)")
     data_version: int = Field(default=1, description="数据格式版本号")
 
@@ -198,8 +200,28 @@ class AISummaryResponse(BaseModel):
 
 
 class AISummaryRequest(BaseModel):
-    """AI 总结请求"""
+    """AI 总结请求 - 日报"""
     date: str = Field(..., description="日期 YYYY-MM-DD")
+    options: Optional[List[str]] = Field(
+        default=["all"], 
+        description="总结选项列表，如 behavior_stats, longest_activities, goal_time_spent, user_notes, tasks"
+    )
+
+
+class WeeklyAISummaryRequest(BaseModel):
+    """AI 总结请求 - 周报"""
+    week_start_date: str = Field(..., description="周开始日期 YYYY-MM-DD（周一）")
+    week_end_date: str = Field(..., description="周结束日期 YYYY-MM-DD（周日）")
+    options: Optional[List[str]] = Field(
+        default=["all"], 
+        description="总结选项列表，如 behavior_stats, longest_activities, goal_time_spent, user_notes, tasks"
+    )
+
+
+class MonthlyAISummaryRequest(BaseModel):
+    """AI 总结请求 - 月报"""
+    month_start_date: str = Field(..., description="月开始日期 YYYY-MM-01")
+    month_end_date: str = Field(..., description="月结束日期 YYYY-MM-DD（月末）")
     options: Optional[List[str]] = Field(
         default=["all"], 
         description="总结选项列表，如 behavior_stats, longest_activities, goal_time_spent, user_notes, tasks"
