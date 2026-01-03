@@ -1,7 +1,7 @@
 """
 Report API - 报告接口
 
-提供日报告和周报告的 RESTful API
+提供日报告、周报告和月报告的 RESTful API
 """
 from fastapi import APIRouter, Query, HTTPException, Path
 
@@ -9,14 +9,17 @@ from lifewatch.server.schemas.report_schemas import (
     DailyReportResponse,
     DailyReportListResponse,
     WeeklyReportResponse,
+    MonthlyReportResponse,
 )
 from lifewatch.server.services.report_service import (
     get_daily_report as service_get_daily_report,
     get_weekly_report as service_get_weekly_report,
+    get_monthly_report as service_get_monthly_report,
     _daily_dict_to_response,
     _weekly_dict_to_response,
+    _monthly_dict_to_response,
 )
-from lifewatch.server.providers.report_provider import report_provider, weekly_report_provider
+from lifewatch.server.providers.report_provider import daily_report_provider, weekly_report_provider, monthly_report_provider
 
 router = APIRouter(prefix="/report", tags=["Report"])
 
@@ -55,7 +58,7 @@ async def delete_daily_report(
     
     删除指定日期的报告缓存，下次访问时会重新计算
     """
-    success = report_provider.delete_daily_report(date)
+    success = daily_report_provider.delete_daily_report(date)
     if not success:
         raise HTTPException(status_code=404, detail="报告不存在")
     return {"success": True}
@@ -71,7 +74,7 @@ async def get_daily_reports_in_range(
     
     返回已缓存的报告数据，不会触发重新计算
     """
-    reports = report_provider.get_reports_in_range(start_date, end_date)
+    reports = daily_report_provider.get_reports_in_range(start_date, end_date)
     
     # 转换为响应模型
     items = []
@@ -91,7 +94,7 @@ async def get_completed_report_dates(
     
     用于前端显示哪些日期有可用的报告数据
     """
-    dates = report_provider.get_completed_report_dates(start_date, end_date)
+    dates = daily_report_provider.get_completed_report_dates(start_date, end_date)
     return {"dates": dates}
 
 
@@ -157,6 +160,76 @@ async def get_weekly_reports_in_range(
             start_dt = datetime.strptime(week_start, '%Y-%m-%d')
             week_end = (start_dt + timedelta(days=6)).strftime('%Y-%m-%d')
             items.append(_weekly_dict_to_response(report, week_start, week_end))
+    
+    return {"items": items, "total": len(items)}
+
+
+# ============================================================================
+# Monthly Report 接口
+# ============================================================================
+
+@router.get("/monthly", response_model=MonthlyReportResponse)
+async def get_monthly_report(
+    month: str = Query(..., description="月份 YYYY-MM"),
+    force_refresh: bool = Query(default=False, description="是否强制重新计算数据")
+):
+    """
+    获取月报告
+    
+    - 如果缓存存在且 state='1'，直接返回缓存数据
+    - 否则重新计算所有板块数据并缓存
+    - **force_refresh=True** 时强制重新计算，忽略缓存
+    
+    返回数据包含:
+    - **sunburst_data**: 旭日图/时间分布数据（整月聚合）
+    - **todo_data**: Todo 完成统计（整月累计）
+    - **goal_data**: Goal 进度追踪（整月）
+    - **daily_trend_data**: 每日时间趋势（1日~末日）
+    - **heatmap_data**: 热力图数据（每日总分钟数和分类分解）
+    """
+    return service_get_monthly_report(month, force_refresh)
+
+
+@router.delete("/monthly/{month_start_date}")
+async def delete_monthly_report(
+    month_start_date: str = Path(..., description="月开始日期 YYYY-MM-01")
+):
+    """
+    删除月报告缓存
+    
+    删除指定月的报告缓存，下次访问时会重新计算
+    """
+    success = monthly_report_provider.delete_monthly_report(month_start_date)
+    if not success:
+        raise HTTPException(status_code=404, detail="月报告不存在")
+    return {"success": True}
+
+
+@router.get("/monthly/range")
+async def get_monthly_reports_in_range(
+    start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="结束日期 YYYY-MM-DD")
+):
+    """
+    获取日期范围内的月报告列表
+    
+    返回已缓存的月报告数据，不会触发重新计算
+    """
+    import calendar
+    from datetime import datetime
+    
+    reports = monthly_report_provider.get_reports_in_range(start_date, end_date)
+    
+    # 转换为响应模型
+    items = []
+    for report in reports:
+        month_start = report.get('date', '')
+        if month_start:
+            # 计算月结束日期
+            dt = datetime.strptime(month_start, '%Y-%m-%d')
+            last_day = calendar.monthrange(dt.year, dt.month)[1]
+            month_end = f"{dt.year}-{dt.month:02d}-{last_day:02d}"
+            items.append(_monthly_dict_to_response(report, month_start, month_end))
     
     return {"items": items, "total": len(items)}
 

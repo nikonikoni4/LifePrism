@@ -16,14 +16,16 @@ import pandas as pd
 from lifewatch.server.schemas.report_schemas import (
     DailyReportResponse,
     WeeklyReportResponse,
+    MonthlyReportResponse,
     TimeOverviewData,
     ChartSegment,
     BarConfig,
     TodoStatsData,
     GoalProgressData,
     GoalTodoItem,
+    HeatmapDataItem,
 )
-from lifewatch.server.providers.report_provider import report_provider, weekly_report_provider
+from lifewatch.server.providers.report_provider import daily_report_provider, weekly_report_provider, monthly_report_provider
 from lifewatch.server.providers.todo_provider import todo_provider
 from lifewatch.server.providers.goal_provider import goal_provider
 from lifewatch.server.providers import server_lw_data_provider
@@ -53,7 +55,7 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
         DailyReportResponse: 日报告数据
     """
     # 1. 查询缓存
-    cached = report_provider.get_daily_report(date)
+    cached = daily_report_provider.get_daily_report(date)
     
     # 2. 判断是否需要重新计算
     need_recalc = (
@@ -92,7 +94,7 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
         'state': state
     }
     
-    report_provider.upsert_daily_report(date, report_data)
+    daily_report_provider.upsert_daily_report(date, report_data)
     
     # 5. 返回报告数据
     return DailyReportResponse(
@@ -178,6 +180,92 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
         todo_data=todo_data,
         goal_data=goal_data,
         daily_trend_data=daily_trend_data,
+        state=state,
+        data_version=1
+    )
+
+
+def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse:
+    """
+    获取月报告
+    
+    逻辑:
+    1. 查询缓存
+    2. 判断是否需要重新计算 (force_refresh 或 state != '1' 或无缓存)
+    3. 需要时重新计算并保存
+    4. 返回报告数据
+    
+    Args:
+        month: 月份 YYYY-MM
+        force_refresh: 是否强制重新计算
+        
+    Returns:
+        MonthlyReportResponse: 月报告数据
+    """
+    import calendar
+    
+    # 解析月份，计算月初和月末日期
+    year, mon = map(int, month.split('-'))
+    month_start_date = f"{year}-{mon:02d}-01"
+    last_day = calendar.monthrange(year, mon)[1]
+    month_end_date = f"{year}-{mon:02d}-{last_day:02d}"
+    
+    # 1. 查询缓存
+    cached = monthly_report_provider.get_monthly_report(month_start_date)
+    
+    # 2. 判断是否需要重新计算
+    need_recalc = (
+        force_refresh  # 强制刷新
+        or cached is None  # 无缓存
+        or cached.get('state') != '1'  # 未完成状态
+    )
+    
+    if not need_recalc and cached:
+        logger.info(f"返回缓存的月报告 {month}")
+        return _monthly_dict_to_response(cached, month_start_date, month_end_date)
+    
+    # 3. 重新计算各板块数据
+    logger.info(f"重新计算月报告 {month_start_date} ~ {month_end_date}")
+    
+    # 计算月份总分钟数
+    total_range_minutes = last_day * 24 * 60
+    
+    sunburst_data = _calc_sunburst_data(
+        start_date=month_start_date, 
+        end_date=month_end_date,
+        title="本月时间分布",
+        total_range_minutes=total_range_minutes
+    )
+    todo_data = _calc_todo_stats(start_date=month_start_date, end_date=month_end_date)
+    goal_data = _calc_goal_progress(start_date=month_start_date, end_date=month_end_date)
+    daily_trend_data = _calc_monthly_trend(month_start_date, month_end_date)
+    heatmap_data = _calc_heatmap_data(month_start_date, month_end_date)
+    
+    # 4. 保存到数据库
+    # 判断状态：只有当今天的日期晚于月结束日期时，才标记为已完成
+    today = datetime.now().strftime('%Y-%m-%d')
+    state = '1' if today > month_end_date else '0'
+    
+    report_data = {
+        'sunburst_data': sunburst_data.model_dump() if sunburst_data else None,
+        'todo_data': todo_data.model_dump() if todo_data else None,
+        'goal_data': [g.model_dump() for g in goal_data] if goal_data else None,
+        'daily_trend_data': daily_trend_data,
+        'heatmap_data': [h.model_dump() for h in heatmap_data] if heatmap_data else None,
+        'state': state
+    }
+    
+    monthly_report_provider.upsert_monthly_report(month_start_date, report_data)
+    
+    # 5. 返回报告数据
+    return MonthlyReportResponse(
+        month_start_date=month_start_date,
+        month_end_date=month_end_date,
+        sunburst_data=sunburst_data,
+        todo_data=todo_data,
+        goal_data=goal_data,
+        daily_trend_data=daily_trend_data,
+        heatmap_data=heatmap_data,
         state=state,
         data_version=1
     )
@@ -579,7 +667,7 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
         
         for i in range(7):
             current_date = start_dt + timedelta(days=i)
-            data_point = {'label': weekday_names[i]}
+            data_point = {'label': weekday_names[i], 'date': str(current_date)}
             
             # 为所有分类设置值（没有数据的为 0）
             for cat_name in all_categories:
@@ -592,6 +680,144 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"计算周趋势数据失败: {e}")
         return _build_empty_weekly_trend()
+
+
+def _calc_monthly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """
+    计算月度每日趋势数据（月报专用）
+    
+    返回格式: [{'label': '1', 'work': 120, 'entertainment': 60, ...}, ...]
+    label 为日期的天数（1, 2, 3, ...）
+    """
+    try:
+        start_time = f"{start_date} 00:00:00"
+        end_time = f"{end_date} 23:59:59"
+        
+        df = server_lw_data_provider.load_user_app_behavior_log(
+            start_time=start_time,
+            end_time=end_time
+        )
+        
+        if df is None or df.empty:
+            return _build_empty_monthly_trend(start_date, end_date)
+        
+        # 获取分类名称映射
+        categories_df = server_lw_data_provider.load_categories()
+        category_name_map = {}
+        if categories_df is not None and not categories_df.empty:
+            category_name_map = {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
+        
+        # 预处理时间
+        df['start_dt'] = pd.to_datetime(df['start_time'])
+        df['end_dt'] = pd.to_datetime(df['end_time'])
+        df['date'] = df['start_dt'].dt.date
+        df['duration_minutes'] = (df['end_dt'] - df['start_dt']).dt.total_seconds() / 60
+        
+        # 按日期和分类聚合
+        daily_data = defaultdict(lambda: defaultdict(int))
+        
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+        
+        for _, row in df.iterrows():
+            row_date = row['date']
+            cat_id = str(row['category_id']) if pd.notna(row['category_id']) else 'unknown'
+            cat_name = category_name_map.get(cat_id, 'Uncategorized')
+            minutes = row['duration_minutes']
+            
+            daily_data[row_date][cat_name] += minutes
+        
+        # 收集所有出现过的分类名称
+        all_categories = set()
+        for day_data in daily_data.values():
+            all_categories.update(day_data.keys())
+        
+        # 构建结果 - 整月数据
+        result = []
+        days = (end_dt - start_dt).days + 1
+        
+        for i in range(days):
+            current_date = start_dt + timedelta(days=i)
+            day_of_month = current_date.day
+            data_point = {'label': str(day_of_month)}
+            
+            # 为所有分类设置值（没有数据的为 0）
+            for cat_name in all_categories:
+                data_point[cat_name] = int(daily_data[current_date].get(cat_name, 0))
+            
+            result.append(data_point)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"计算月趋势数据失败: {e}")
+        return _build_empty_monthly_trend(start_date, end_date)
+
+
+def _calc_heatmap_data(start_date: str, end_date: str) -> List[HeatmapDataItem]:
+    """
+    计算热力图数据（月报专用）
+    
+    为每一天计算总追踪分钟数和分类分解
+    """
+    try:
+        start_time = f"{start_date} 00:00:00"
+        end_time = f"{end_date} 23:59:59"
+        
+        df = server_lw_data_provider.load_user_app_behavior_log(
+            start_time=start_time,
+            end_time=end_time
+        )
+        
+        if df is None or df.empty:
+            return _build_empty_heatmap(start_date, end_date)
+        
+        # 获取分类名称映射
+        categories_df = server_lw_data_provider.load_categories()
+        category_name_map = {}
+        if categories_df is not None and not categories_df.empty:
+            category_name_map = {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
+        
+        # 预处理时间
+        df['start_dt'] = pd.to_datetime(df['start_time'])
+        df['end_dt'] = pd.to_datetime(df['end_time'])
+        df['date'] = df['start_dt'].dt.date
+        df['duration_minutes'] = (df['end_dt'] - df['start_dt']).dt.total_seconds() / 60
+        
+        # 按日期和分类聚合
+        daily_totals = defaultdict(int)
+        daily_breakdown = defaultdict(lambda: defaultdict(int))
+        
+        for _, row in df.iterrows():
+            row_date = row['date']
+            cat_id = str(row['category_id']) if pd.notna(row['category_id']) else 'unknown'
+            cat_name = category_name_map.get(cat_id, 'Uncategorized')
+            minutes = row['duration_minutes']
+            
+            daily_totals[row_date] += minutes
+            daily_breakdown[row_date][cat_name] += int(minutes)
+        
+        # 构建结果
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+        days = (end_dt - start_dt).days + 1
+        
+        result = []
+        for i in range(days):
+            current_date = start_dt + timedelta(days=i)
+            date_str = current_date.strftime('%Y-%m-%d')
+            
+            result.append(HeatmapDataItem(
+                date=date_str,
+                total_minutes=int(daily_totals.get(current_date, 0)),
+                category_breakdown=dict(daily_breakdown.get(current_date, {})) or None
+            ))
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"计算热力图数据失败: {e}")
+        return _build_empty_heatmap(start_date, end_date)
 
 
 # ==================== 辅助构建函数 ====================
@@ -758,6 +984,31 @@ def _build_empty_weekly_trend() -> List[Dict[str, Any]]:
     return [{'label': name} for name in weekday_names]
 
 
+def _build_empty_monthly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """构建空的月趋势数据"""
+    start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+    end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+    days = (end_dt - start_dt).days + 1
+    return [{'label': str(i + 1)} for i in range(days)]
+
+
+def _build_empty_heatmap(start_date: str, end_date: str) -> List[HeatmapDataItem]:
+    """构建空的热力图数据"""
+    start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+    end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+    days = (end_dt - start_dt).days + 1
+    
+    result = []
+    for i in range(days):
+        current_date = start_dt + timedelta(days=i)
+        result.append(HeatmapDataItem(
+            date=current_date.strftime('%Y-%m-%d'),
+            total_minutes=0,
+            category_breakdown=None
+        ))
+    return result
+
+
 # ==================== 缓存数据转换函数 ====================
 
 def _daily_dict_to_response(data: Dict[str, Any]) -> DailyReportResponse:
@@ -810,6 +1061,41 @@ def _weekly_dict_to_response(
         todo_data=todo_data,
         goal_data=goal_data,
         daily_trend_data=data.get('daily_trend_data'),
+        state=data.get('state', '0'),
+        data_version=data.get('data_version', 1)
+    )
+
+
+def _monthly_dict_to_response(
+    data: Dict[str, Any], 
+    month_start_date: str, 
+    month_end_date: str
+) -> MonthlyReportResponse:
+    """将数据库记录转换为月报告响应模型"""
+    sunburst_data = None
+    if data.get('sunburst_data'):
+        sunburst_data = TimeOverviewData(**data['sunburst_data'])
+    
+    todo_data = None
+    if data.get('todo_data'):
+        todo_data = TodoStatsData(**data['todo_data'])
+    
+    goal_data = None
+    if data.get('goal_data'):
+        goal_data = [GoalProgressData(**g) for g in data['goal_data']]
+    
+    heatmap_data = None
+    if data.get('heatmap_data'):
+        heatmap_data = [HeatmapDataItem(**h) for h in data['heatmap_data']]
+    
+    return MonthlyReportResponse(
+        month_start_date=month_start_date,
+        month_end_date=month_end_date,
+        sunburst_data=sunburst_data,
+        todo_data=todo_data,
+        goal_data=goal_data,
+        daily_trend_data=data.get('daily_trend_data'),
+        heatmap_data=heatmap_data,
         state=data.get('state', '0'),
         data_version=data.get('data_version', 1)
     )

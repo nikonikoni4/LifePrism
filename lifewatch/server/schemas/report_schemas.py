@@ -137,3 +137,43 @@ class WeeklyReportQueryRequest(BaseModel):
     """查询周报告请求"""
     week_start_date: str = Field(..., description="周开始日期 YYYY-MM-DD（周一）")
     force_refresh: bool = Field(default=False, description="是否强制重新计算数据")
+
+
+# ============================================================================
+# Monthly Report 请求/响应 Schemas
+# ============================================================================
+
+class HeatmapDataItem(BaseModel):
+    """热力图单日数据"""
+    date: str = Field(..., description="日期 YYYY-MM-DD")
+    total_minutes: int = Field(..., description="当日总追踪分钟数")
+    category_breakdown: Optional[Dict[str, int]] = Field(default=None, description="分类时间分解（分类名 -> 分钟数）")
+
+
+class MonthlyReportResponse(BaseModel):
+    """月报告响应"""
+    month_start_date: str = Field(..., description="月开始日期 YYYY-MM-01")
+    month_end_date: str = Field(..., description="月结束日期 YYYY-MM-DD（月末）")
+    sunburst_data: Optional[TimeOverviewData] = Field(default=None, description="旭日图数据")
+    todo_data: Optional[TodoStatsData] = Field(default=None, description="Todo 统计数据")
+    goal_data: Optional[List[GoalProgressData]] = Field(default=None, description="Goal 进度数据")
+    daily_trend_data: Optional[List[Dict[str, Any]]] = Field(default=None, description="每日趋势数据（按天）")
+    heatmap_data: Optional[List[HeatmapDataItem]] = Field(default=None, description="热力图数据")
+    state: str = Field(default="0", description="数据状态 (0: 未完成, 1: 已完成)")
+    data_version: int = Field(default=1, description="数据格式版本号")
+
+
+class UpsertMonthlyReportRequest(BaseModel):
+    """创建/更新月报告请求 (部分更新)"""
+    sunburst_data: Optional[TimeOverviewData] = Field(default=None, description="旭日图数据")
+    todo_data: Optional[TodoStatsData] = Field(default=None, description="Todo 统计数据")
+    goal_data: Optional[List[GoalProgressData]] = Field(default=None, description="Goal 进度数据")
+    daily_trend_data: Optional[List[Dict[str, Any]]] = Field(default=None, description="每日趋势数据")
+    heatmap_data: Optional[List[HeatmapDataItem]] = Field(default=None, description="热力图数据")
+    state: Optional[str] = Field(default=None, description="数据状态")
+
+
+class MonthlyReportQueryRequest(BaseModel):
+    """查询月报告请求"""
+    month: str = Field(..., description="月份 YYYY-MM")
+    force_refresh: bool = Field(default=False, description="是否强制重新计算数据")
