@@ -11,6 +11,7 @@ from lifewatch.server.schemas.report_schemas import (
     DailyReportResponse,
     TimeOverviewData,
     ChartSegment,
+    BarConfig,
     TodoStatsData,
     GoalProgressData,
     GoalTodoItem,
@@ -19,7 +20,7 @@ from lifewatch.server.providers.report_provider import report_provider
 from lifewatch.server.providers.todo_provider import todo_provider
 from lifewatch.server.providers.goal_provider import goal_provider
 from lifewatch.server.providers import server_lw_data_provider
-from lifewatch.server.providers.category_color_provider import color_manager
+from lifewatch.server.providers.category_color_provider import color_manager, get_log_color
 from lifewatch.utils import get_logger
 
 logger = get_logger(__name__)
@@ -77,12 +78,16 @@ class ReportService:
         daily_trend_data = self._calc_daily_trend(date)
         
         # 4. 保存到数据库
+        # 判断状态：只有当今天的日期晚于报告日期时，才标记为已完成
+        today = datetime.now().strftime('%Y-%m-%d')
+        state = '1' if today > date else '0'
+        
         report_data = {
             'sunburst_data': sunburst_data.model_dump() if sunburst_data else None,
             'todo_data': todo_data.model_dump() if todo_data else None,
             'goal_data': [g.model_dump() for g in goal_data] if goal_data else None,
             'daily_trend_data': daily_trend_data,
-            'state': '1'  # 标记为已完成
+            'state': state  # 只有报告日期已过才标记为已完成
         }
         
         report_provider.upsert_daily_report(date, report_data)
@@ -94,7 +99,7 @@ class ReportService:
             todo_data=todo_data,
             goal_data=goal_data,
             daily_trend_data=daily_trend_data,
-            state='1',
+            state=state,
             data_version=1
         )
     
@@ -102,9 +107,9 @@ class ReportService:
     
     def _calc_sunburst_data(self, date: str) -> Optional[TimeOverviewData]:
         """
-        计算旭日图数据
+        计算旭日图数据（三层嵌套结构：Category → SubCategory → App）
         
-        复用 activity_stats_builder 的逻辑，但简化为 report 需要的格式（无柱状图）
+        参考首页 activity_stats_builder 的 build_time_overview 实现
         """
         try:
             # 加载数据
@@ -129,45 +134,211 @@ class ReportService:
             if categories_df is not None and not categories_df.empty:
                 category_name_map = {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
             
-            # 按分类聚合
-            stats = df.groupby('category_id').agg({
-                'duration_minutes': 'sum'
-            }).reset_index()
-            stats.columns = ['id', 'minutes']
-            stats = stats.sort_values('minutes', ascending=False)
+            sub_categories_df = server_lw_data_provider.load_sub_categories()
+            sub_category_name_map = {}
+            if sub_categories_df is not None and not sub_categories_df.empty:
+                sub_category_name_map = {str(row['id']): row['name'] for _, row in sub_categories_df.iterrows()}
             
-            total_minutes = int(stats['minutes'].sum())
+            # 构建 Level 1 (Category)
+            root_data = self._build_category_level(df, category_name_map, is_main_category=True)
             
-            # 构建饼图数据
-            pie_data = []
-            for _, row in stats.iterrows():
-                cat_id = str(row['id']) if pd.notna(row['id']) else "unknown"
-                name = category_name_map.get(cat_id, "Uncategorized")
-                minutes = int(row['minutes'])
-                item_color = color_manager.get_main_category_color(cat_id)
-                
-                pie_data.append(ChartSegment(
-                    key=cat_id,
-                    name=name,
-                    value=minutes,
-                    color=item_color
-                ))
-            
+            total_minutes = int(df['duration_minutes'].sum())
             hours = total_minutes // 60
             mins = total_minutes % 60
+            
+            # 构建 Level 2 & 3 (SubCategory → App)
+            details = {}
+            categories = df['category_id'].dropna().unique()
+            
+            for category_id in categories:
+                cat_df = df[df['category_id'] == category_id]
+                if cat_df.empty:
+                    continue
+                
+                category_name = category_name_map.get(str(category_id), "Uncategorized")
+                
+                # 检测该主分类下是否有子分类
+                sub_categories = cat_df['sub_category_id'].dropna().unique()
+                
+                if len(sub_categories) == 0:
+                    # 无子分类 → 直接构建 App 层
+                    app_data = self._build_app_level(
+                        cat_df,
+                        title=f"{category_name} Apps",
+                        sub_title=f"Top applications in {category_name}",
+                        parent_category_id=str(category_id)
+                    )
+                    details[category_name] = app_data
+                else:
+                    # 有子分类 → 正常构建子分类层
+                    cat_data = self._build_category_level(
+                        cat_df, 
+                        sub_category_name_map, 
+                        is_main_category=False,
+                        group_field='sub_category_id'
+                    )
+                    cat_data_details = {}
+                    
+                    # Level 3 (Apps)
+                    for sub_cat_id in sub_categories:
+                        sub_df = cat_df[cat_df['sub_category_id'] == sub_cat_id]
+                        if sub_df.empty:
+                            continue
+                        
+                        sub_cat_name = sub_category_name_map.get(str(sub_cat_id), "Uncategorized")
+                        
+                        app_data = self._build_app_level(
+                            sub_df,
+                            title=f"{sub_cat_name} Apps",
+                            sub_title=f"Top applications in {sub_cat_name}",
+                            parent_sub_category_id=str(sub_cat_id)
+                        )
+                        cat_data_details[sub_cat_name] = app_data
+                    
+                    cat_data.details = cat_data_details if cat_data_details else None
+                    details[category_name] = cat_data
             
             return TimeOverviewData(
                 title="今日时间分布",
                 sub_title=f"共计 {hours} 小时 {mins} 分钟",
                 total_tracked_minutes=total_minutes,
                 total_range_minutes=1440,  # 24小时
-                pie_data=pie_data,
-                details=None  # report 界面不需要钻取
+                pie_data=root_data.pie_data,
+                bar_keys=root_data.bar_keys,
+                bar_data=root_data.bar_data,
+                details=details if details else None
             )
             
         except Exception as e:
             logger.error(f"计算旭日图数据失败: {e}")
             return self._build_empty_sunburst(date)
+    
+    def _build_category_level(
+        self, 
+        df: pd.DataFrame, 
+        name_map: dict, 
+        is_main_category: bool,
+        group_field: str = 'category_id'
+    ) -> TimeOverviewData:
+        """构建分类级别数据"""
+        stats = df.groupby(group_field).agg({
+            'duration_minutes': 'sum'
+        }).reset_index()
+        stats.columns = ['id', 'minutes']
+        stats = stats.sort_values('minutes', ascending=False)
+        
+        total_minutes = int(stats['minutes'].sum())
+        
+        pie_data = []
+        bar_keys = []
+        
+        for _, row in stats.iterrows():
+            cat_id = str(row['id']) if pd.notna(row['id']) else "unknown"
+            name = name_map.get(cat_id, "Uncategorized")
+            minutes = int(row['minutes'])
+            
+            if is_main_category:
+                item_color = color_manager.get_main_category_color(cat_id)
+            else:
+                item_color = color_manager.get_sub_category_color(cat_id)
+            
+            pie_data.append(ChartSegment(
+                key=cat_id,
+                name=name,
+                value=minutes,
+                color=item_color,
+                title=""
+            ))
+            
+            bar_keys.append(BarConfig(
+                key=cat_id,
+                label=name,
+                color=item_color
+            ))
+        
+        return TimeOverviewData(
+            title="",
+            sub_title="",
+            total_tracked_minutes=total_minutes,
+            pie_data=pie_data,
+            bar_keys=bar_keys,
+            bar_data=None,
+            details=None
+        )
+    
+    def _build_app_level(
+        self,
+        df: pd.DataFrame,
+        title: str,
+        sub_title: str,
+        parent_sub_category_id: str = None,
+        parent_category_id: str = None
+    ) -> TimeOverviewData:
+        """构建应用级别数据（Top 5 + Other）"""
+        stats = df.groupby('app')['duration_minutes'].sum().sort_values(ascending=False)
+        total_minutes = int(stats.sum())
+        
+        top_5 = stats.head(5)
+        other_value = stats.iloc[5:].sum() if len(stats) > 5 else 0
+        
+        # 根据传入的参数决定使用主分类或子分类颜色作为基准
+        if parent_sub_category_id:
+            base_color = color_manager.get_sub_category_color(parent_sub_category_id)
+        elif parent_category_id:
+            base_color = color_manager.get_main_category_color(parent_category_id)
+        else:
+            base_color = "#5B8FF9"  # 默认颜色
+        
+        pie_data = []
+        bar_keys = []
+        
+        for i, (app_name, minutes) in enumerate(top_5.items()):
+            # 为每个 App 生成随机浅色
+            app_color = get_log_color(base_color)
+            
+            # 获取该应用的 top 3 titles
+            app_df = df[df['app'] == app_name]
+            title_stats = app_df.groupby('title')['duration_minutes'].sum().sort_values(ascending=False).head(3)
+            top_titles = "-split-".join(title_stats.index.tolist())
+            
+            pie_data.append(ChartSegment(
+                key=app_name,
+                name=app_name,
+                value=int(minutes),
+                color=app_color,
+                title=top_titles
+            ))
+            
+            bar_keys.append(BarConfig(
+                key=app_name,
+                label=app_name,
+                color=app_color
+            ))
+        
+        if other_value > 0:
+            other_color = "#9CA3AF"
+            pie_data.append(ChartSegment(
+                key="Other",
+                name="Other Apps",
+                value=int(other_value),
+                color=other_color,
+                title=""
+            ))
+            bar_keys.append(BarConfig(
+                key="Other",
+                label="Other",
+                color=other_color
+            ))
+        
+        return TimeOverviewData(
+            title=title,
+            sub_title=sub_title,
+            total_tracked_minutes=total_minutes,
+            pie_data=pie_data,
+            bar_keys=bar_keys,
+            bar_data=None,
+            details=None
+        )
     
     def _calc_todo_stats(self, date: str) -> TodoStatsData:
         """
@@ -400,3 +571,590 @@ class ReportService:
 
 # 创建全局单例
 report_service = ReportService()
+
+
+class WeeklyReportService:
+    """
+    周报告服务类
+    
+    提供周报告的获取和计算逻辑
+    """
+    
+    def __init__(self):
+        # 延迟导入避免循环依赖
+        pass
+    
+    # ==================== 主要接口 ====================
+    
+    def get_weekly_report(self, week_start_date: str, force_refresh: bool) -> 'WeeklyReportResponse':
+        """
+        获取周报告
+        
+        逻辑:
+        1. 查询缓存
+        2. 判断是否需要重新计算 (force_refresh 或 state != '1' 或无缓存)
+        3. 需要时重新计算并保存
+        4. 返回报告数据
+        
+        Args:
+            week_start_date: 周开始日期 YYYY-MM-DD（周一）
+            force_refresh: 是否强制重新计算
+            
+        Returns:
+            WeeklyReportResponse: 周报告数据
+        """
+        from lifewatch.server.providers.report_provider import weekly_report_provider
+        from lifewatch.server.schemas.report_schemas import WeeklyReportResponse
+        
+        # 计算周结束日期（周日）
+        from datetime import datetime, timedelta
+        start_dt = datetime.strptime(week_start_date, '%Y-%m-%d')
+        end_dt = start_dt + timedelta(days=6)
+        week_end_date = end_dt.strftime('%Y-%m-%d')
+        
+        # 1. 查询缓存
+        cached = weekly_report_provider.get_weekly_report(week_start_date)
+        
+        # 2. 判断是否需要重新计算
+        need_recalc = (
+            force_refresh  # 强制刷新
+            or cached is None  # 无缓存
+            or cached.get('state') != '1'  # 未完成状态
+        )
+        
+        if not need_recalc and cached:
+            logger.info(f"返回缓存的周报告 {week_start_date}")
+            return self._dict_to_response(cached, week_start_date, week_end_date)
+        
+        # 3. 重新计算各板块数据
+        logger.info(f"重新计算周报告 {week_start_date} ~ {week_end_date}")
+        
+        sunburst_data = self._calc_sunburst_data(week_start_date, week_end_date)
+        todo_data = self._calc_todo_stats(week_start_date, week_end_date)
+        goal_data = self._calc_goal_progress(week_start_date, week_end_date)
+        daily_trend_data = self._calc_daily_trend(week_start_date, week_end_date)
+        
+        # 4. 保存到数据库
+        # 判断状态：只有当今天的日期晚于周结束日期时，才标记为已完成
+        today = datetime.now().strftime('%Y-%m-%d')
+        state = '1' if today > week_end_date else '0'
+        
+        report_data = {
+            'sunburst_data': sunburst_data.model_dump() if sunburst_data else None,
+            'todo_data': todo_data.model_dump() if todo_data else None,
+            'goal_data': [g.model_dump() for g in goal_data] if goal_data else None,
+            'daily_trend_data': daily_trend_data,
+            'state': state
+        }
+        
+        weekly_report_provider.upsert_weekly_report(week_start_date, report_data)
+        
+        # 5. 返回报告数据
+        return WeeklyReportResponse(
+            week_start_date=week_start_date,
+            week_end_date=week_end_date,
+            sunburst_data=sunburst_data,
+            todo_data=todo_data,
+            goal_data=goal_data,
+            daily_trend_data=daily_trend_data,
+            state=state,
+            data_version=1
+        )
+    
+    # ==================== 数据计算方法 ====================
+    
+    def _calc_sunburst_data(self, start_date: str, end_date: str) -> Optional[TimeOverviewData]:
+        """
+        计算一周的旭日图数据（三层嵌套结构：Category → SubCategory → App）
+        
+        从 user_app_behavior_log 加载整周数据并聚合
+        """
+        try:
+            # 加载整周数据
+            start_time = f"{start_date} 00:00:00"
+            end_time = f"{end_date} 23:59:59"
+            df = server_lw_data_provider.load_user_app_behavior_log(
+                start_time=start_time, 
+                end_time=end_time
+            )
+            
+            if df is None or df.empty:
+                return self._build_empty_sunburst(start_date, end_date)
+            
+            # 预计算时长（分钟）
+            df['start_dt'] = pd.to_datetime(df['start_time'])
+            df['end_dt'] = pd.to_datetime(df['end_time'])
+            df['duration_minutes'] = (df['end_dt'] - df['start_dt']).dt.total_seconds() / 60
+            
+            # 获取分类名称映射
+            categories_df = server_lw_data_provider.load_categories()
+            category_name_map = {}
+            if categories_df is not None and not categories_df.empty:
+                category_name_map = {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
+            
+            sub_categories_df = server_lw_data_provider.load_sub_categories()
+            sub_category_name_map = {}
+            if sub_categories_df is not None and not sub_categories_df.empty:
+                sub_category_name_map = {str(row['id']): row['name'] for _, row in sub_categories_df.iterrows()}
+            
+            # 构建 Level 1 (Category)
+            root_data = self._build_category_level(df, category_name_map, is_main_category=True)
+            
+            total_minutes = int(df['duration_minutes'].sum())
+            hours = total_minutes // 60
+            mins = total_minutes % 60
+            
+            # 构建 Level 2 & 3 (SubCategory → App)
+            details = {}
+            categories = df['category_id'].dropna().unique()
+            
+            for category_id in categories:
+                cat_df = df[df['category_id'] == category_id]
+                if cat_df.empty:
+                    continue
+                
+                category_name = category_name_map.get(str(category_id), "Uncategorized")
+                
+                # 检测该主分类下是否有子分类
+                sub_categories = cat_df['sub_category_id'].dropna().unique()
+                
+                if len(sub_categories) == 0:
+                    # 无子分类 → 直接构建 App 层
+                    app_data = self._build_app_level(
+                        cat_df,
+                        title=f"{category_name} Apps",
+                        sub_title=f"Top applications in {category_name}",
+                        parent_category_id=str(category_id)
+                    )
+                    details[category_name] = app_data
+                else:
+                    # 有子分类 → 正常构建子分类层
+                    cat_data = self._build_category_level(
+                        cat_df, 
+                        sub_category_name_map, 
+                        is_main_category=False,
+                        group_field='sub_category_id'
+                    )
+                    cat_data_details = {}
+                    
+                    # Level 3 (Apps)
+                    for sub_cat_id in sub_categories:
+                        sub_df = cat_df[cat_df['sub_category_id'] == sub_cat_id]
+                        if sub_df.empty:
+                            continue
+                        
+                        sub_cat_name = sub_category_name_map.get(str(sub_cat_id), "Uncategorized")
+                        
+                        app_data = self._build_app_level(
+                            sub_df,
+                            title=f"{sub_cat_name} Apps",
+                            sub_title=f"Top applications in {sub_cat_name}",
+                            parent_sub_category_id=str(sub_cat_id)
+                        )
+                        cat_data_details[sub_cat_name] = app_data
+                    
+                    cat_data.details = cat_data_details if cat_data_details else None
+                    details[category_name] = cat_data
+            
+            return TimeOverviewData(
+                title="本周时间分布",
+                sub_title=f"共计 {hours} 小时 {mins} 分钟",
+                total_tracked_minutes=total_minutes,
+                total_range_minutes=10080,  # 7 * 24 * 60 = 10080 分钟
+                pie_data=root_data.pie_data,
+                bar_keys=root_data.bar_keys,
+                bar_data=root_data.bar_data,
+                details=details if details else None
+            )
+            
+        except Exception as e:
+            logger.error(f"计算周旭日图数据失败: {e}")
+            return self._build_empty_sunburst(start_date, end_date)
+    
+    def _build_category_level(
+        self, 
+        df: pd.DataFrame, 
+        name_map: dict, 
+        is_main_category: bool,
+        group_field: str = 'category_id'
+    ) -> TimeOverviewData:
+        """构建分类级别数据"""
+        stats = df.groupby(group_field).agg({
+            'duration_minutes': 'sum'
+        }).reset_index()
+        stats.columns = ['id', 'minutes']
+        stats = stats.sort_values('minutes', ascending=False)
+        
+        total_minutes = int(stats['minutes'].sum())
+        
+        pie_data = []
+        bar_keys = []
+        
+        for _, row in stats.iterrows():
+            cat_id = str(row['id']) if pd.notna(row['id']) else "unknown"
+            name = name_map.get(cat_id, "Uncategorized")
+            minutes = int(row['minutes'])
+            
+            if is_main_category:
+                item_color = color_manager.get_main_category_color(cat_id)
+            else:
+                item_color = color_manager.get_sub_category_color(cat_id)
+            
+            pie_data.append(ChartSegment(
+                key=cat_id,
+                name=name,
+                value=minutes,
+                color=item_color,
+                title=""
+            ))
+            
+            bar_keys.append(BarConfig(
+                key=cat_id,
+                label=name,
+                color=item_color
+            ))
+        
+        return TimeOverviewData(
+            title="",
+            sub_title="",
+            total_tracked_minutes=total_minutes,
+            pie_data=pie_data,
+            bar_keys=bar_keys,
+            bar_data=None,
+            details=None
+        )
+    
+    def _build_app_level(
+        self,
+        df: pd.DataFrame,
+        title: str,
+        sub_title: str,
+        parent_sub_category_id: str = None,
+        parent_category_id: str = None
+    ) -> TimeOverviewData:
+        """构建应用级别数据（Top 5 + Other）"""
+        stats = df.groupby('app')['duration_minutes'].sum().sort_values(ascending=False)
+        total_minutes = int(stats.sum())
+        
+        top_5 = stats.head(5)
+        other_value = stats.iloc[5:].sum() if len(stats) > 5 else 0
+        
+        # 根据传入的参数决定使用主分类或子分类颜色作为基准
+        if parent_sub_category_id:
+            base_color = color_manager.get_sub_category_color(parent_sub_category_id)
+        elif parent_category_id:
+            base_color = color_manager.get_main_category_color(parent_category_id)
+        else:
+            base_color = "#5B8FF9"  # 默认颜色
+        
+        pie_data = []
+        bar_keys = []
+        
+        for i, (app_name, minutes) in enumerate(top_5.items()):
+            # 为每个 App 生成随机浅色
+            app_color = get_log_color(base_color)
+            
+            # 获取该应用的 top 3 titles
+            app_df = df[df['app'] == app_name]
+            title_stats = app_df.groupby('title')['duration_minutes'].sum().sort_values(ascending=False).head(3)
+            top_titles = "-split-".join(title_stats.index.tolist())
+            
+            pie_data.append(ChartSegment(
+                key=app_name,
+                name=app_name,
+                value=int(minutes),
+                color=app_color,
+                title=top_titles
+            ))
+            
+            bar_keys.append(BarConfig(
+                key=app_name,
+                label=app_name,
+                color=app_color
+            ))
+        
+        if other_value > 0:
+            other_color = "#9CA3AF"
+            pie_data.append(ChartSegment(
+                key="Other",
+                name="Other Apps",
+                value=int(other_value),
+                color=other_color,
+                title=""
+            ))
+            bar_keys.append(BarConfig(
+                key="Other",
+                label="Other",
+                color=other_color
+            ))
+        
+        return TimeOverviewData(
+            title=title,
+            sub_title=sub_title,
+            total_tracked_minutes=total_minutes,
+            pie_data=pie_data,
+            bar_keys=bar_keys,
+            bar_data=None,
+            details=None
+        )
+    
+    def _calc_todo_stats(self, start_date: str, end_date: str) -> TodoStatsData:
+        """
+        计算一周的 Todo 统计数据
+        """
+        try:
+            from datetime import datetime, timedelta
+            
+            # 遍历一周每天的数据
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            
+            total = 0
+            completed = 0
+            procrastination = 0
+            
+            for i in range(7):
+                current_date = (start_dt + timedelta(days=i)).strftime('%Y-%m-%d')
+                todos = todo_provider.get_todos_by_date(current_date, include_cross_day=False)
+                
+                total += len(todos)
+                completed += sum(1 for t in todos if t.get('state') == 'completed')
+                
+                # 计算拖延：未完成且超过预期日期
+                procrastination += sum(1 for t in todos if
+                    t.get('state') != 'completed' and
+                    t.get('expected_finished_at') and
+                    t['expected_finished_at'] < current_date
+                )
+            
+            pending = total - completed
+            rate = (procrastination / total * 100) if total > 0 else 0
+            
+            return TodoStatsData(
+                total=total,
+                completed=completed,
+                pending=pending,
+                procrastination_rate=round(rate, 1)
+            )
+            
+        except Exception as e:
+            logger.error(f"计算周 Todo 统计失败: {e}")
+            return TodoStatsData(total=0, completed=0, pending=0, procrastination_rate=0)
+    
+    def _calc_goal_progress(self, start_date: str, end_date: str) -> List[GoalProgressData]:
+        """
+        计算一周的 Goal 进度数据
+        
+        时间投入从 user_app_behavior_log 实时计算整周
+        """
+        try:
+            from datetime import datetime, timedelta
+            
+            # 获取所有活跃目标
+            goals = goal_provider.get_active_goals()
+            if not goals:
+                return []
+            
+            result = []
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            
+            for goal in goals:
+                goal_id = goal['id']
+                
+                # 收集整周的待办
+                goal_todos = []
+                for i in range(7):
+                    current_date = (start_dt + timedelta(days=i)).strftime('%Y-%m-%d')
+                    all_todos = todo_provider.get_todos_by_date(current_date, include_cross_day=True)
+                    day_goal_todos = [t for t in all_todos if t.get('link_to_goal_id') == goal_id]
+                    
+                    # 避免重复添加（跨天任务可能重复）
+                    existing_ids = {t['id'] for t in goal_todos}
+                    for t in day_goal_todos:
+                        if t['id'] not in existing_ids:
+                            goal_todos.append(t)
+                
+                # 计算时间投入（整周）
+                time_invested = self._calc_goal_time_invested(goal_id, start_date, end_date)
+                
+                # 构建待办列表
+                todo_list = [
+                    GoalTodoItem(
+                        id=t['id'],
+                        content=t['content'],
+                        completed=t.get('state') == 'completed'
+                    )
+                    for t in goal_todos
+                ]
+                
+                result.append(GoalProgressData(
+                    goal_id=goal_id,
+                    goal_name=goal.get('name', ''),
+                    goal_color=goal.get('color', '#5B8FF9'),
+                    time_invested=time_invested,
+                    todo_total=len(goal_todos),
+                    todo_completed=sum(1 for t in goal_todos if t.get('state') == 'completed'),
+                    todo_list=todo_list
+                ))
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"计算周 Goal 进度失败: {e}")
+            return []
+    
+    def _calc_goal_time_invested(self, goal_id: str, start_date: str, end_date: str) -> int:
+        """
+        计算目标在日期范围内的时间投入（分钟）
+        
+        从 user_app_behavior_log 中查询 link_to_goal_id 匹配的记录
+        """
+        try:
+            start_time = f"{start_date} 00:00:00"
+            end_time = f"{end_date} 23:59:59"
+            
+            df = server_lw_data_provider.load_user_app_behavior_log(
+                start_time=start_time,
+                end_time=end_time
+            )
+            
+            if df is None or df.empty:
+                return 0
+            
+            # 筛选关联到该目标的记录
+            goal_df = df[df['link_to_goal_id'] == goal_id]
+            
+            if goal_df.empty:
+                return 0
+            
+            # 计算时长
+            goal_df = goal_df.copy()
+            goal_df['start_dt'] = pd.to_datetime(goal_df['start_time'])
+            goal_df['end_dt'] = pd.to_datetime(goal_df['end_time'])
+            goal_df['duration_minutes'] = (goal_df['end_dt'] - goal_df['start_dt']).dt.total_seconds() / 60
+            
+            return int(goal_df['duration_minutes'].sum())
+            
+        except Exception as e:
+            logger.error(f"计算目标 {goal_id} 周时间投入失败: {e}")
+            return 0
+    
+    def _calc_daily_trend(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        """
+        计算每日趋势数据（7天每天的时间分布）
+        
+        返回格式: [{'label': '周一', 'work': 120, 'entertainment': 60, ...}, ...]
+        """
+        try:
+            from datetime import datetime, timedelta
+            
+            start_time = f"{start_date} 00:00:00"
+            end_time = f"{end_date} 23:59:59"
+            
+            df = server_lw_data_provider.load_user_app_behavior_log(
+                start_time=start_time,
+                end_time=end_time
+            )
+            
+            if df is None or df.empty:
+                return self._build_empty_weekly_trend()
+            
+            # 获取分类名称映射
+            categories_df = server_lw_data_provider.load_categories()
+            category_name_map = {}
+            if categories_df is not None and not categories_df.empty:
+                category_name_map = {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
+            
+            # 预处理时间
+            df['start_dt'] = pd.to_datetime(df['start_time'])
+            df['end_dt'] = pd.to_datetime(df['end_time'])
+            df['date'] = df['start_dt'].dt.date
+            df['duration_minutes'] = (df['end_dt'] - df['start_dt']).dt.total_seconds() / 60
+            
+            # 按日期和分类聚合
+            from collections import defaultdict
+            daily_data = defaultdict(lambda: defaultdict(int))
+            
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+            
+            for _, row in df.iterrows():
+                row_date = row['date']
+                cat_id = str(row['category_id']) if pd.notna(row['category_id']) else 'unknown'
+                cat_name = category_name_map.get(cat_id, 'other')
+                minutes = row['duration_minutes']
+                
+                daily_data[row_date][cat_name] += minutes
+            
+            # 收集所有出现过的分类名称
+            all_categories = set()
+            for day_data in daily_data.values():
+                all_categories.update(day_data.keys())
+            
+            # 构建结果 - 7天数据
+            weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+            result = []
+            
+            for i in range(7):
+                current_date = start_dt + timedelta(days=i)
+                data_point = {'label': weekday_names[i]}
+                
+                # 为所有分类设置值（没有数据的为 0）
+                for cat_name in all_categories:
+                    data_point[cat_name] = int(daily_data[current_date].get(cat_name, 0))
+                
+                result.append(data_point)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"计算周趋势数据失败: {e}")
+            return self._build_empty_weekly_trend()
+    
+    # ==================== 辅助方法 ====================
+    
+    def _build_empty_sunburst(self, start_date: str, end_date: str) -> TimeOverviewData:
+        """构建空的周旭日图数据"""
+        return TimeOverviewData(
+            title="本周时间分布",
+            sub_title=f"暂无 {start_date} ~ {end_date} 的活动数据",
+            total_tracked_minutes=0,
+            total_range_minutes=10080,
+            pie_data=[],
+            details=None
+        )
+    
+    def _build_empty_weekly_trend(self) -> List[Dict[str, Any]]:
+        """构建空的周趋势数据"""
+        weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        return [{'label': name} for name in weekday_names]
+    
+    def _dict_to_response(self, data: Dict[str, Any], week_start_date: str, week_end_date: str) -> 'WeeklyReportResponse':
+        """将数据库记录转换为响应模型"""
+        from lifewatch.server.schemas.report_schemas import WeeklyReportResponse
+        
+        sunburst_data = None
+        if data.get('sunburst_data'):
+            sunburst_data = TimeOverviewData(**data['sunburst_data'])
+        
+        todo_data = None
+        if data.get('todo_data'):
+            todo_data = TodoStatsData(**data['todo_data'])
+        
+        goal_data = None
+        if data.get('goal_data'):
+            goal_data = [GoalProgressData(**g) for g in data['goal_data']]
+        
+        return WeeklyReportResponse(
+            week_start_date=week_start_date,
+            week_end_date=week_end_date,
+            sunburst_data=sunburst_data,
+            todo_data=todo_data,
+            goal_data=goal_data,
+            daily_trend_data=data.get('daily_trend_data'),
+            state=data.get('state', '0'),
+            data_version=data.get('data_version', 1)
+        )
+
+
+# 创建全局单例
+weekly_report_service = WeeklyReportService()
+

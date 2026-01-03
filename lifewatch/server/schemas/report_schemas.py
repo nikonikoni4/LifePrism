@@ -18,16 +18,25 @@ class ChartSegment(BaseModel):
     name: str = Field(..., description="分类名称")
     value: int = Field(..., description="时间值（分钟）")
     color: str = Field(..., description="颜色（十六进制）")
-    title: Optional[str] = Field(default=None, description="app层的标题显示")
+    title: Optional[str] = Field(default="", description="app层的标题显示")
+
+
+class BarConfig(BaseModel):
+    """柱状图配置项"""
+    key: str = Field(..., description="数据键")
+    label: str = Field(..., description="图例标签")
+    color: str = Field(..., description="颜色（十六进制格式）")
 
 
 class TimeOverviewData(BaseModel):
-    """旭日图完整数据 (递归结构，无柱状图)"""
+    """旭日图完整数据 (递归结构，支持三层钻取)"""
     title: str = Field(..., description="标题")
     sub_title: str = Field(..., description="副标题")
     total_tracked_minutes: int = Field(..., description="总追踪分钟数")
     total_range_minutes: Optional[int] = Field(default=None, description="时间范围总分钟数")
     pie_data: List[ChartSegment] = Field(default=[], description="饼图数据")
+    bar_keys: Optional[List[BarConfig]] = Field(default=None, description="柱状图配置")
+    bar_data: Optional[List[Dict[str, Any]]] = Field(default=None, description="时间分布数据")
     details: Optional[Dict[str, "TimeOverviewData"]] = Field(default=None, description="钻取详情")
 
 
@@ -97,3 +106,34 @@ class DailyReportListResponse(BaseModel):
     """日报告列表响应"""
     items: List[DailyReportResponse] = Field(default=[], description="报告列表")
     total: int = Field(default=0, description="总数")
+
+
+# ============================================================================
+# Weekly Report 请求/响应 Schemas
+# ============================================================================
+
+class WeeklyReportResponse(BaseModel):
+    """周报告响应"""
+    week_start_date: str = Field(..., description="周开始日期 YYYY-MM-DD（周一）")
+    week_end_date: str = Field(..., description="周结束日期 YYYY-MM-DD（周日）")
+    sunburst_data: Optional[TimeOverviewData] = Field(default=None, description="旭日图数据")
+    todo_data: Optional[TodoStatsData] = Field(default=None, description="Todo 统计数据")
+    goal_data: Optional[List[GoalProgressData]] = Field(default=None, description="Goal 进度数据")
+    daily_trend_data: Optional[List[Dict[str, Any]]] = Field(default=None, description="每日趋势数据（7天）")
+    state: str = Field(default="0", description="数据状态 (0: 未完成, 1: 已完成)")
+    data_version: int = Field(default=1, description="数据格式版本号")
+
+
+class UpsertWeeklyReportRequest(BaseModel):
+    """创建/更新周报告请求 (部分更新)"""
+    sunburst_data: Optional[TimeOverviewData] = Field(default=None, description="旭日图数据")
+    todo_data: Optional[TodoStatsData] = Field(default=None, description="Todo 统计数据")
+    goal_data: Optional[List[GoalProgressData]] = Field(default=None, description="Goal 进度数据")
+    daily_trend_data: Optional[List[Dict[str, Any]]] = Field(default=None, description="每日趋势数据")
+    state: Optional[str] = Field(default=None, description="数据状态")
+
+
+class WeeklyReportQueryRequest(BaseModel):
+    """查询周报告请求"""
+    week_start_date: str = Field(..., description="周开始日期 YYYY-MM-DD（周一）")
+    force_refresh: bool = Field(default=False, description="是否强制重新计算数据")
