@@ -19,8 +19,10 @@ export type ReportTabType = 'daily' | 'weekly' | 'monthly';
 export interface TimeDistributionPoint {
     /** 时间标签 (e.g., "0", "6", "12" for daily; "Mon", "Tue" for weekly) */
     label: string;
+    /** 日期 YYYY-MM-DD (Optional, for weekly/monthly trends) */
+    date?: string;
     /** 各分类的时间数据 (分钟) */
-    [categoryKey: string]: string | number;
+    [categoryKey: string]: string | number | undefined;
 }
 
 /** 分类配置 */

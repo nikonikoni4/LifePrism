@@ -51,18 +51,31 @@ const generateDailyDistribution = (): TimeDistributionPoint[] => {
 /** 生成周度趋势数据 */
 const generateWeeklyTrend = (): TimeDistributionPoint[] => {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return days.map(day => ({
-        label: day,
-        work: day === 'Sat' || day === 'Sun'
-            ? Math.floor(Math.random() * 60 + 30)
-            : Math.floor(Math.random() * 180 + 300),
-        study: Math.floor(Math.random() * 90 + 60),
-        entertainment: day === 'Sat' || day === 'Sun'
-            ? Math.floor(Math.random() * 120 + 60)
-            : Math.floor(Math.random() * 60 + 30),
-        life: Math.floor(Math.random() * 60 + 30),
-        other: Math.floor(Math.random() * 30 + 10),
-    }));
+    const today = new Date();
+    // Assuming today is somewhere in the week, let's just generate a week ending today or starting today.
+    // To match backend logic somewhat, let's just create 7 dummy dates
+    const start = new Date();
+    start.setDate(start.getDate() - start.getDay() + 1); // Set to Monday
+
+    return days.map((day, index) => {
+        const date = new Date(start);
+        date.setDate(start.getDate() + index);
+        const dateStr = date.toISOString().split('T')[0];
+
+        return {
+            label: day,
+            date: dateStr,
+            work: day === 'Sat' || day === 'Sun'
+                ? Math.floor(Math.random() * 60 + 30)
+                : Math.floor(Math.random() * 180 + 300),
+            study: Math.floor(Math.random() * 90 + 60),
+            entertainment: day === 'Sat' || day === 'Sun'
+                ? Math.floor(Math.random() * 120 + 60)
+                : Math.floor(Math.random() * 60 + 30),
+            life: Math.floor(Math.random() * 60 + 30),
+            other: Math.floor(Math.random() * 30 + 10),
+        };
+    });
 };
 
 /** 生成热力图数据 (一个月) */

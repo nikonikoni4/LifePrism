@@ -31,7 +31,7 @@ interface TimeDistributionChartProps {
 /** 自定义 Tooltip */
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-        const total = payload.reduce((sum: number, entry: any) => sum + (entry.value || 0), 0);
+        const total = payload.reduce((sum: number, entry: any) => sum + (Number(entry.value) || 0), 0).toFixed(1);
 
         return (
             <div className="bg-white p-4 border border-gray-100 shadow-xl rounded-2xl text-sm">
@@ -45,12 +45,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                             />
                             <span className="text-slate-500 font-medium">{entry.name}</span>
                         </div>
-                        <span className="font-mono font-bold text-slate-700">{entry.value}m</span>
+                        <span className="font-mono font-bold text-slate-700">{entry.value}h</span>
                     </div>
                 ))}
                 <div className="mt-2 pt-2 border-t border-gray-100 flex justify-between">
                     <span className="text-slate-500 font-medium">合计</span>
-                    <span className="font-mono font-bold text-slate-800">{total}m</span>
+                    <span className="font-mono font-bold text-slate-800">{total}h</span>
                 </div>
             </div>
         );
@@ -67,6 +67,21 @@ const TimeDistributionChart: React.FC<TimeDistributionChartProps> = ({
     className = '',
     height = 280
 }) => {
+    // 将分钟转换为小时
+    const processedData = React.useMemo(() => {
+        return data.map(item => {
+            const newItem = { ...item };
+            categories.forEach(cat => {
+                const val = newItem[cat.key];
+                if (val !== undefined && val !== null) {
+                    // 保留一位小数
+                    newItem[cat.key] = Number((Number(val) / 60).toFixed(1));
+                }
+            });
+            return newItem;
+        });
+    }, [data, categories]);
+
     const [visibleCategories, setVisibleCategories] = useState<Set<string>>(
         new Set(categories.map(c => c.key))
     );
@@ -129,21 +144,39 @@ const TimeDistributionChart: React.FC<TimeDistributionChartProps> = ({
             {/* Chart */}
             <div style={{ height }}>
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                    <LineChart data={processedData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                         <CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="3 3" />
                         <XAxis
                             dataKey="label"
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: '#94A3B8', fontSize: 11, fontWeight: 500 }}
-                            dy={10}
+                            tick={({ x, y, payload }) => {
+                                const item = processedData[payload.index];
+                                const dateStr = item?.['date'] as string;
+                                // Format date: MM-DD
+                                const formattedDate = dateStr ? dateStr.split('-').slice(1).join('-') : '';
+
+                                return (
+                                    <g transform={`translate(${x},${y})`}>
+                                        <text x={0} y={0} dy={16} textAnchor="middle" fill="#94A3B8" fontSize={11} fontWeight={500}>
+                                            {payload.value}
+                                        </text>
+                                        {formattedDate && (
+                                            <text x={0} y={0} dy={32} textAnchor="middle" fill="#CBD5E1" fontSize={10}>
+                                                {formattedDate}
+                                            </text>
+                                        )}
+                                    </g>
+                                );
+                            }}
+                            height={50}
                         />
                         <YAxis
                             axisLine={false}
                             tickLine={false}
                             tick={{ fill: '#94A3B8', fontSize: 11 }}
                             tickCount={5}
-                            unit="m"
+                            unit="h"
                         />
                         <Tooltip content={<CustomTooltip />} />
 
