@@ -6,7 +6,8 @@ from typing import Annotated
 from langchain.tools import tool
 
 from lifewatch.llm.llm_classify.providers.llm_lw_data_provider import llm_lw_data_provider
-
+from lifewatch.utils import get_logger,DEBUG
+logger = get_logger(__name__,DEBUG)
 
 def _format_seconds(seconds: int) -> str:
     """将秒数格式化为可读时间"""
@@ -272,13 +273,15 @@ def get_multi_days_stats(
             behavior_stats = llm_lw_data_provider.get_segment_category_stats(start_time, end_time, segment_count=1,idle = False)
             prompt_parts.append(f"\n{section_num}. 用户行为统计")
             prompt_parts.append(_format_segment_category_stats(behavior_stats))
+            logger.debug(f"behavior_stats: {len(prompt_parts[-1])}")
             section_num += 1
 
         # 1. 目标花费时间
         if fetch_all or "goal_trend" in fetch_options:
             goal_trend = llm_lw_data_provider.get_daily_goal_trend(start_time, end_time)
             prompt_parts.append(f"\n{section_num}. 在goal上花费的时间")
-            prompt_parts.append(goal_trend)
+            prompt_parts.append(goal_trend if goal_trend else "  - 暂无数据")
+            logger.debug(f"goal_trend: {len(prompt_parts[-1])}")
             section_num += 1
         
 
@@ -286,14 +289,16 @@ def get_multi_days_stats(
         if fetch_all or "tasks" in fetch_options:
             summary = llm_lw_data_provider.get_focus_and_todos(start_time=start_time, end_time=end_time)
             prompt_parts.append(f"\n{section_num}. 每日重点与任务")
-            prompt_parts.append(summary)
+            prompt_parts.append(summary if summary else "  - 暂无数据")
+            logger.debug(f"summary: {len(prompt_parts[-1])}")
             section_num += 1
         
         # 3. 分类投入时间趋势
         if fetch_all or "category_trend" in fetch_options:
             category_trend = llm_lw_data_provider.get_daily_category_trend(start_time, end_time)
             prompt_parts.append(f"\n{section_num}. 分类占比")
-            prompt_parts.append(category_trend)
+            prompt_parts.append(category_trend if category_trend else "  - 暂无数据")
+            logger.debug(f"category_trend: {len(prompt_parts[-1])}")
             section_num += 1
         
         # 4. 用户备注
@@ -301,6 +306,7 @@ def get_multi_days_stats(
             notes = llm_lw_data_provider.get_user_focus_notes(start_time, end_time)
             prompt_parts.append(f"\n{section_num}. 用户备注")
             prompt_parts.append(_format_user_notes(notes))
+            logger.debug(f"notes: {len(prompt_parts[-1])}")
             section_num += 1
         
         # 5. 电脑使用时间分析（作息推断）
@@ -315,6 +321,7 @@ def get_multi_days_stats(
                 lines = usage_schedule.strip().split('\n')
                 formatted_schedule = "\n".join([f"  {line}" for line in lines])
                 prompt_parts.append(formatted_schedule)
+                logger.debug(f"usage_schedule: {len(prompt_parts[-1])}")
             else:
                 prompt_parts.append("  - 暂无数据")
             section_num += 1
@@ -336,9 +343,11 @@ if __name__ == "__main__":
     # print(result)
     result = get_multi_days_stats.invoke(
         input = {
-            "start_time": "2025-12-25 00:00:00",
-            "end_time": "2026-01-03 23:59:59",
+            "start_time": "2025-11-01 00:00:00",
+            "end_time": "2025-12-01 00:00:00",
             "options": ["all"]
         }
     )
     print(result)
+    summary = llm_lw_data_provider.get_focus_and_todos(start_time="2025-11-01 00:00:00", end_time="2025-12-01 00:00:00")
+    print(summary)
