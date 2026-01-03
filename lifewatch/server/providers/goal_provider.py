@@ -368,8 +368,9 @@ class GoalProvider(LWBaseDataProvider):
         
         只返回满足以下条件的目标：
         1. 目标状态为 active
-        2. 关联的主分类未被禁用（category.state != 0 或未关联分类）
-        3. 关联的子分类未被禁用（sub_category.state != 0 或未关联子分类）
+        2. 目标必须绑定了主分类（link_to_category_id IS NOT NULL）
+        3. 关联的主分类未被禁用（category.state != 0）
+        4. 关联的子分类未被禁用（sub_category.state != 0 或未关联子分类）
         
         Returns:
             List[Dict]: 包含 id, name, link_to_category_id, link_to_sub_category_id 的目标列表
@@ -380,10 +381,11 @@ class GoalProvider(LWBaseDataProvider):
                 cursor.execute("""
                     SELECT g.id, g.name, g.link_to_category_id, g.link_to_sub_category_id 
                     FROM goal g
-                    LEFT JOIN category c ON g.link_to_category_id = c.id
+                    INNER JOIN category c ON g.link_to_category_id = c.id
                     LEFT JOIN sub_category sc ON g.link_to_sub_category_id = sc.id
                     WHERE g.status = 'active' 
-                      AND (c.state IS NULL OR c.state != 0)
+                      AND g.link_to_category_id IS NOT NULL
+                      AND c.state != 0
                       AND (sc.state IS NULL OR sc.state != 0)
                     ORDER BY g.order_index ASC
                 """)
