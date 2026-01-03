@@ -4,13 +4,15 @@
  * 每周总结 Tab 组件
  */
 
-import React, { useState, useMemo } from 'react';
-import { CalendarDays, TrendingUp } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { CalendarDays, RefreshCw } from 'lucide-react';
 import TimeOverviewWidget from './TimeOverviewWidget';
 import TimeDistributionChart from './TimeDistributionChart';
 import GoalProgressCard from './GoalProgressCard';
 import TodoStatsCard from './TodoStatsCard';
 import AISummaryCard from './AISummaryCard';
+import { ReportsAPI } from '../api';
+import { WeeklyReportData } from '../types';
 import { getMockWeeklyReport } from '../mockData';
 
 interface WeeklyReviewTabProps {
@@ -38,16 +40,50 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
     // 默认使用本周
     const [weekOffset, setWeekOffset] = useState<number>(0);
 
+    // 数据状态
+    const [reportData, setReportData] = useState<WeeklyReportData | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
     const { start: startDate, end: endDate } = useMemo(() => {
         const today = new Date();
         today.setDate(today.getDate() + weekOffset * 7);
         return getWeekRange(today);
     }, [weekOffset]);
 
-    // 获取 Mock 数据
-    const reportData = useMemo(() => {
-        return getMockWeeklyReport(startDate, endDate);
+    // 加载报告数据
+    const fetchReport = useCallback(async (forceRefresh: boolean = false) => {
+        if (forceRefresh) {
+            setRefreshing(true);
+        } else {
+            setLoading(true);
+        }
+        setError(null);
+
+        try {
+            const data = await ReportsAPI.getWeeklyReport(startDate, forceRefresh);
+            setReportData(data);
+        } catch (err) {
+            console.error('获取周报告失败:', err);
+            setError(err instanceof Error ? err.message : '获取数据失败');
+            // 出错时使用 mock 数据
+            setReportData(getMockWeeklyReport(startDate, endDate));
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, [startDate, endDate]);
+
+    // 周变化时重新加载
+    useEffect(() => {
+        fetchReport(false);
+    }, [fetchReport]);
+
+    // 强制刷新处理
+    const handleForceRefresh = () => {
+        fetchReport(true);
+    };
 
     const formatWeekDisplay = (start: string, end: string) => {
         const startDate = new Date(start);
@@ -57,9 +93,24 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
         return `${startMonth} - ${endMonth}`;
     };
 
+    // Loading 状态
+    if (loading && !reportData) {
+        return (
+            <div className={`flex items-center justify-center h-96 ${className}`}>
+                <div className="flex flex-col items-center gap-3">
+                    <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+                    <p className="text-slate-500">加载中...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // 使用 mock 数据作为后备
+    const displayData = reportData || getMockWeeklyReport(startDate, endDate);
+
     return (
         <div className={`space-y-6 ${className}`}>
-            {/* Week Selector */}
+            {/* Week Selector & Refresh Button */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-indigo-50 text-indigo-500 rounded-xl">
@@ -73,6 +124,28 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* 强制刷新按钮 */}
+                    <button
+                        onClick={handleForceRefresh}
+                        disabled={refreshing}
+                        className={`
+                            flex items-center gap-2 px-4 py-2 
+                            bg-gradient-to-r from-indigo-500 to-purple-500 
+                            text-white text-sm font-medium rounded-xl
+                            hover:from-indigo-600 hover:to-purple-600
+                            focus:ring-2 focus:ring-indigo-300 focus:outline-none
+                            disabled:opacity-60 disabled:cursor-not-allowed
+                            transition-all duration-200
+                            shadow-sm hover:shadow-md
+                        `}
+                    >
+                        <RefreshCw
+                            size={16}
+                            className={refreshing ? 'animate-spin' : ''}
+                        />
+                        {refreshing ? '刷新中...' : '重新计算'}
+                    </button>
+
                     <button
                         onClick={() => setWeekOffset(prev => prev - 1)}
                         className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-100 transition-colors"
@@ -83,7 +156,7 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
                         onClick={() => setWeekOffset(0)}
                         disabled={weekOffset === 0}
                         className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${weekOffset === 0
-                            ? 'bg-blue-500 text-white'
+                            ? 'bg-indigo-500 text-white'
                             : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
                             }`}
                     >
@@ -100,14 +173,25 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
                 </div>
             </div>
 
+            {/* Error Message */}
+            {error && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+                    <div className="text-amber-500">⚠️</div>
+                    <div>
+                        <p className="text-sm font-medium text-amber-800">数据加载失败</p>
+                        <p className="text-xs text-amber-600">{error}（已使用演示数据）</p>
+                    </div>
+                </div>
+            )}
+
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Left Column - Charts */}
                 <div className="lg:col-span-8 space-y-6">
                     {/* Weekly Trend Line Chart */}
                     <TimeDistributionChart
-                        data={reportData.weeklyTrend}
-                        categories={reportData.categories}
+                        data={displayData.weeklyTrend}
+                        categories={displayData.categories}
                         title="周度趋势折线图"
                         subtitle="展示周一至周日各分类的每日时长波动"
                         height={260}
@@ -116,7 +200,7 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
                 <div className="lg:col-span-4 space-y-6">
                     {/* Weekly Todo Stats */}
                     <TodoStatsCard
-                        stats={reportData.todoStats}
+                        stats={displayData.todoStats}
                         title="任务完成度"
                         subTitle="本周 Todo 整体达成率"
                         className="h-[380px]"
@@ -126,7 +210,7 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
                 <div className="lg:col-span-8 space-y-6">
                     {/* Sunburst Chart */}
                     <TimeOverviewWidget
-                        data={reportData.timeOverview}
+                        data={displayData.timeOverview}
                         chartHeight="h-[450px]"
                     />
                 </div>
@@ -134,7 +218,7 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
                 <div className="lg:col-span-4 space-y-6">
                     {/* Weekly Goal Progress */}
                     <GoalProgressCard
-                        goals={reportData.goalProgress}
+                        goals={displayData.goalProgress}
                         title="本周 Goal 复盘"
                         height="600px"
                     />
@@ -144,7 +228,7 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
                     {/* AI Summary */}
                     <AISummaryCard
                         title="AI 规律总结"
-                        content={reportData.aiSummary}
+                        content={displayData.aiSummary || '暂无 AI 总结数据'}
                     />
                 </div>
             </div>
@@ -153,3 +237,4 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
 };
 
 export default WeeklyReviewTab;
+
