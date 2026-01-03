@@ -1,6 +1,6 @@
 user_name: test_user
 provider: 阿里云百炼 (Aliyun)
-model: qwen-plus
+model: qwen-plus-2025-07-28
 input_tokens_cost: 0.0008
 output_tokens_cost: 0.002
 classification_mode: classify_graph

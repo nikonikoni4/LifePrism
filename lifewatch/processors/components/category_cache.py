@@ -6,7 +6,7 @@ import pandas as pd
 from typing import Dict, Set, Tuple, Optional
 from lifewatch.utils import get_logger, DEBUG
 
-logger = get_logger(__name__, DEBUG)
+logger = get_logger(__name__,)
 
 
 class CategoryCache:

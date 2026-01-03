@@ -6,7 +6,7 @@ from lifewatch.processors.models.processed_event import ProcessedEvent
 from lifewatch.processors.components.category_cache import CategoryCache
 from lifewatch.utils import get_logger, DEBUG
 
-logger = get_logger(__name__, DEBUG)
+logger = get_logger(__name__)
 
 
 class CacheMatcher:

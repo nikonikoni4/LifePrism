@@ -11,7 +11,7 @@ from lifewatch.config import LOCAL_TIMEZONE
 from lifewatch.config.settings_manager import settings
 from lifewatch.utils import is_multipurpose_app, get_logger, DEBUG
 
-logger = get_logger(__name__, DEBUG)
+logger = get_logger(__name__)
 
 
 class EventTransformer:

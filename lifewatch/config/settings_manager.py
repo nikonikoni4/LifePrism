@@ -318,4 +318,4 @@ def get_all_settings() -> Dict[str, Any]:
 
 
 if __name__ == '__main__':
-    print(settings.lw_db_path)
+    print(settings.model)

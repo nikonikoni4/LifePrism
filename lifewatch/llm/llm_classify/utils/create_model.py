@@ -48,13 +48,13 @@ def _patched_check_response(resp):
 llms_tongyi_module.check_response = _patched_check_response
 chat_tongyi_module.check_response = _patched_check_response
 
-def create_ChatTongyiModel( model_name="qwen-plus",
+def create_ChatTongyiModel(
                             temperature=0.2,
                             enable_search=True,
                             enable_thinking=False,
                             enable_streaming = False):
     return ChatTongyi(
-        model=model_name,  # 指定使用 qwen-plus 模型，也可以改为 'qwen-max' 或 'qwen-turbo'
+        model=settings.model,  # 指定使用 qwen-plus 模型，也可以改为 'qwen-max' 或 'qwen-turbo'
         temperature=temperature,
         dashscope_api_key=settings.api_key,
         streaming=enable_streaming,

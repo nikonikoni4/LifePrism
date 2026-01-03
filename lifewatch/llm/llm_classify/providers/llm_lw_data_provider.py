@@ -32,6 +32,91 @@ class LLMLWDataProvider(LWBaseDataProvider):
     
     # ==================== LLM 专用方法 ====================
     
+    def get_pc_active_time(self, start_time: str, end_time: str) -> Optional[str]:
+        """
+        分析以2小时为单位的电脑活跃时间占比
+        
+        将一天24小时分成12个2小时的时间段（0-2h, 2-4h, ..., 22-24h），
+        计算每个时间段内电脑活跃时间占该时间段总时长的比例。
+        
+        Args:
+            start_time: 开始时间 YYYY-MM-DD HH:MM:SS
+            end_time: 结束时间 YYYY-MM-DD HH:MM:SS
+        
+        Returns:
+            str: 格式化的活跃时间占比，例如：
+                 "0~24h内电脑活跃时间占比：0.1 0 0 0 0 0.2 0.5 0.8 0.9 0.7 0.3 0.1"
+        """
+        from datetime import datetime, timedelta
+        
+        # 解析时间
+        range_start = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        range_end = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+        
+        # 加载事件数据
+        df = self._load_events_in_range(start_time, end_time)
+        
+        # 初始化12个2小时时间段的活跃时间（秒）
+        # 索引0代表0-2h，索引1代表2-4h，...，索引11代表22-24h
+        segment_active_seconds = [0] * 12
+        segment_total_seconds = [0] * 12
+        
+        # 遍历时间范围内的每一天
+        current_date = range_start.date()
+        end_date = range_end.date()
+        
+        while current_date <= end_date:
+            # 计算当天的实际开始和结束时间
+            day_start = datetime.combine(current_date, datetime.min.time())
+            day_end = day_start + timedelta(days=1)
+            
+            # 如果是第一天，从 range_start 开始
+            if current_date == range_start.date():
+                day_start = range_start
+            
+            # 如果是最后一天，到 range_end 结束
+            if current_date == range_end.date():
+                day_end = range_end
+            
+            # 计算每个2小时时间段在当天的实际时长
+            for i in range(12):
+                segment_start_hour = i * 2
+                segment_end_hour = (i + 1) * 2
+                
+                segment_start = datetime.combine(current_date, datetime.min.time()) + timedelta(hours=segment_start_hour)
+                segment_end = datetime.combine(current_date, datetime.min.time()) + timedelta(hours=segment_end_hour)
+                
+                # 计算与当天实际时间范围的交集
+                actual_start = max(segment_start, day_start)
+                actual_end = min(segment_end, day_end)
+                
+                if actual_start < actual_end:
+                    segment_duration = (actual_end - actual_start).total_seconds()
+                    segment_total_seconds[i] += segment_duration
+                    
+                    # 计算该时间段内的活跃时间
+                    if not df.empty:
+                        segment_df = slice_events_by_time_range(df, actual_start, actual_end)
+                        if not segment_df.empty:
+                            active_seconds = segment_df['duration_minutes'].sum() * 60
+                            segment_active_seconds[i] += active_seconds
+            
+            # 移动到下一天
+            current_date += timedelta(days=1)
+        
+        # 计算每个时间段的活跃占比
+        ratios = []
+        for i in range(12):
+            if segment_total_seconds[i] > 0:
+                ratio = segment_active_seconds[i] / segment_total_seconds[i]
+                ratios.append(f"{ratio:.1f}")
+            else:
+                ratios.append("0.0")
+        
+        # 格式化输出
+        ratio_str = " ".join(ratios)
+        return f"0~24h内电脑活跃时间占比：{ratio_str}"
+    
     def _load_events_in_range(self, start_time: str, end_time: str) -> pd.DataFrame:
         """
         加载指定时间范围的事件数据
@@ -224,7 +309,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
         if idle_seconds > 0:
             categories.append({
                 "id": "idle",
-                "name": "空闲",
+                "name": "电脑空闲时间",
                 "duration": idle_seconds,
                 "percentage": round(idle_seconds / segment_total_seconds * 100, 2)
             })
@@ -334,7 +419,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
             if idle_seconds > 0:
                 categories.append({
                     "id": "idle",
-                    "name": "空闲",
+                    "name": "电脑空闲时间",
                     "duration": idle_seconds,
                     "percentage": round(idle_seconds / seg_total * 100, 2)
                 })
@@ -825,18 +910,21 @@ class LLMLWDataProvider(LWBaseDataProvider):
         
         return "\n".join(output_lines).strip()
 
-    def get_focus_and_todos(self, start_time: str, end_time: str) -> Optional[str]:
+    def get_focus_and_todos(self, date:str = None, start_time: str = None, end_time: str = None) -> Optional[str]:
         """
         获取指定日期范围的重点内容和待办事项
         
         Args:
-            start_time: 开始日期 YYYY-MM-DD
-            end_time: 结束日期 YYYY-MM-DD
+            date: 日期 YYYY-MM-DD
+            start_time: 开始时间 HH:MM:SS
+            end_time: 结束时间 HH:MM:SS
         
         Returns:
             str: 格式化的每日摘要，包含重点和待办
         """
         from collections import defaultdict
+        if not date and not start_time and not end_time:
+            raise ValueError("date, start_time, end_time must be provided")
         
         # 按日期存储数据
         daily_data = defaultdict(lambda: {"focus": "无", "todos": []})
@@ -846,7 +934,13 @@ class LLMLWDataProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
                 
                 # 1. 获取重点内容
-                cursor.execute(
+                if date : 
+                    cursor.execute(
+                    "SELECT date, content FROM daily_focus WHERE date = ? ORDER BY date",
+                    (date,)
+                )
+                else:
+                    cursor.execute(
                     "SELECT date, content FROM daily_focus WHERE date BETWEEN ? AND ? ORDER BY date",
                     (start_time, end_time)
                 )
@@ -855,7 +949,13 @@ class LLMLWDataProvider(LWBaseDataProvider):
                         daily_data[date]["focus"] = content
                 
                 # 2. 获取待办事项
-                cursor.execute(
+                if date : 
+                    cursor.execute(
+                    "SELECT date, content, state FROM todo_list WHERE state != 'inactive' AND date = ? ORDER BY date",
+                    (date,)
+                )
+                else:
+                    cursor.execute(
                     "SELECT date, content, state FROM todo_list WHERE state != 'inactive' AND date BETWEEN ? AND ? ORDER BY date",
                     (start_time, end_time)
                 )

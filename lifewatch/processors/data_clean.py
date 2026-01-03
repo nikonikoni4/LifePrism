@@ -27,7 +27,7 @@ from lifewatch.processors.components import (
 )
 from lifewatch.processors.models import ProcessedEvent
 
-logger = get_logger(__name__, DEBUG)
+logger = get_logger(__name__)
 
 
 def create_dict_from_table_columns(table_name: str, values: dict = None) -> dict:

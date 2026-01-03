@@ -8,7 +8,7 @@ from lifewatch.processors.components.category_cache import CategoryCache
 from lifewatch.llm.llm_classify import AppInFo, LogItem, classifyState
 from lifewatch.utils import get_logger, DEBUG
 
-logger = get_logger(__name__, DEBUG)
+logger = get_logger(__name__)
 
 
 class ClassifyCollector:
