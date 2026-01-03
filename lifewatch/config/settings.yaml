@@ -1,4 +1,4 @@
-user_name: test_user
+user_name: nico
 provider: 阿里云百炼 (Aliyun)
 model: qwen-plus-2025-07-28
 input_tokens_cost: 0.0008

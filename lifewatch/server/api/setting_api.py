@@ -66,3 +66,24 @@ async def check_api_key_status():
         "configured": is_configured,
         "message": "API Key 已配置" if is_configured else "API Key 未配置"
     }
+
+
+@router.post("/test-connection")
+async def test_llm_connection():
+    """
+    测试 LLM 连接
+    
+    发送一个简单的测试请求到 LLM，验证 API Key 和模型配置是否正确。
+    
+    Returns:
+        - success: bool, 是否连接成功
+        - message: str, 结果信息
+        - model_response: str, 模型的回复内容（成功时）
+    """
+    from lifewatch.llm.llm_classify.function.test_connect import test_connect
+    
+    try:
+        result = await test_connect()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"连接测试失败: {str(e)}")
