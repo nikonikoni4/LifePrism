@@ -4,7 +4,7 @@
  * 每月总结 Tab 组件
  */
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarRange, RefreshCw } from 'lucide-react';
 import TimeOverviewWidget from './TimeOverviewWidget';
 import CalendarHeatmap from './CalendarHeatmap';
@@ -66,14 +66,7 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
         fetchReport(true);
     };
 
-    // 从热力图数据生成趋势数据
-    const trendData = useMemo(() => {
-        if (!reportData) return [];
-        return reportData.heatmapData.map(day => ({
-            label: day.date.split('-')[2],
-            ...(day.categoryBreakdown || {})
-        }));
-    }, [reportData]);
+
 
     const formatMonthDisplay = (month: string) => {
         const [year, mon] = month.split('-');
@@ -122,11 +115,13 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
     // 使用 mock 数据作为后备
     const displayData = reportData || getMockMonthlyReport(selectedMonth);
 
-    // 从热力图数据生成显示用趋势数据
-    const displayTrendData = displayData.heatmapData.map(day => ({
-        label: day.date.split('-')[2],
-        ...(day.categoryBreakdown || {})
-    }));
+    // 使用后端返回的趋势数据（如果没有则从热力图生成 fallback）
+    const displayTrendData = displayData.monthlyTrend && displayData.monthlyTrend.length > 0
+        ? displayData.monthlyTrend
+        : displayData.heatmapData.map(day => ({
+            label: day.date.split('-')[2],
+            ...(day.categoryBreakdown || {})
+        }));
 
     return (
         <div className={`space-y-6 ${className}`}>

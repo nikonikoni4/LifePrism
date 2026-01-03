@@ -306,10 +306,18 @@ export const getMockWeeklyReport = (startDate: string, endDate: string): WeeklyR
 
 export const getMockMonthlyReport = (month: string): MonthlyReportData => {
     const [year, mon] = month.split('-').map(Number);
+    const heatmapData = generateHeatmapData(year, mon);
+
+    // 从热力图数据生成月度趋势数据
+    const monthlyTrend: TimeDistributionPoint[] = heatmapData.map(day => ({
+        label: day.date.split('-')[2],
+        ...(day.categoryBreakdown || {})
+    }));
 
     return {
         month,
-        heatmapData: generateHeatmapData(year, mon),
+        monthlyTrend,
+        heatmapData,
         categories: MOCK_CATEGORIES,
         timeOverview: generateSunburstData('monthly'),
         goalProgress: generateGoalProgress().map(g => ({

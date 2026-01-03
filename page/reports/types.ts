@@ -121,6 +121,8 @@ export interface WeeklyReportData {
 
 export interface MonthlyReportData {
     month: string;  // YYYY-MM
+    /** 月度每日趋势数据（用于折线图） */
+    monthlyTrend: TimeDistributionPoint[];
     /** 热力图数据 */
     heatmapData: HeatmapDay[];
     /** 热力图分类选择器 */

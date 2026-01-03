@@ -5,6 +5,7 @@
  */
 
 import { DailyReportData, WeeklyReportData, MonthlyReportData, ReportResponse, DateRangeType } from './types';
+import { ReportCacheService } from '../../services/reportCacheService';
 
 const API_BASE = 'http://localhost:8000/api/v2';
 
@@ -64,7 +65,7 @@ function transformDailyReportResponse(response: DailyReportAPIResponse): DailyRe
     })) || [];
 
     // 转换时间分布数据（24小时趋势）
-    const timeDistribution = response.daily_trend_data?.map(point => {
+    const timeDistribution: TimeDistributionPoint[] = response.daily_trend_data?.map(point => {
         const result: Record<string, any> = { label: point.label };
         // 复制所有分类数据
         for (const key of Object.keys(point)) {
@@ -213,7 +214,7 @@ function transformWeeklyReportResponse(response: WeeklyReportAPIResponse): Weekl
     })) || [];
 
     // 转换周趋势数据（7天每天的分布）
-    const weeklyTrend = response.daily_trend_data?.map(point => {
+    const weeklyTrend: TimeDistributionPoint[] = response.daily_trend_data?.map(point => {
         const result: Record<string, any> = { label: point.label };
         for (const key of Object.keys(point)) {
             if (key !== 'label') {
@@ -439,11 +440,23 @@ function transformMonthlyReportResponse(response: MonthlyReportAPIResponse): Mon
         categoryBreakdown: item.category_breakdown,
     })) || [];
 
+    // 转换月度趋势数据（用于折线图）
+    const monthlyTrend: TimeDistributionPoint[] = response.daily_trend_data?.map(point => {
+        const result: Record<string, any> = { label: point.label };
+        for (const key of Object.keys(point)) {
+            if (key !== 'label') {
+                result[key] = point[key];
+            }
+        }
+        return result;
+    }) || [];
+
     // 从 month_start_date 提取 YYYY-MM 格式的月份
     const month = response.month_start_date.substring(0, 7);
 
     return {
         month,
+        monthlyTrend,
         heatmapData,
         categories,
         timeOverview,
@@ -467,6 +480,17 @@ export const ReportsAPI = {
      * 获取日报告
      */
     async getDailyReport(date: string, forceRefresh: boolean = false): Promise<DailyReportData> {
+        // 如果不是强制刷新,先尝试从缓存获取
+        if (!forceRefresh) {
+            const cachedData = ReportCacheService.getDailyReport(date);
+            if (cachedData) {
+                console.log(`[API] 从缓存加载日报告: ${date}`);
+                return cachedData;
+            }
+        }
+
+        // 缓存未命中或强制刷新,调用 API
+        console.log(`[API] 从服务器加载日报告: ${date}`);
         const params = new URLSearchParams({
             date,
             force_refresh: String(forceRefresh),
@@ -479,7 +503,13 @@ export const ReportsAPI = {
         }
 
         const data: DailyReportAPIResponse = await response.json();
-        return transformDailyReportResponse(data);
+        const transformedData = transformDailyReportResponse(data);
+
+        // 缓存结果
+        ReportCacheService.cacheDailyReport(date, transformedData);
+        console.log(`[API] 已缓存日报告: ${date}`);
+
+        return transformedData;
     },
 
     /**
@@ -493,6 +523,10 @@ export const ReportsAPI = {
         if (!response.ok) {
             throw new Error(`删除日报告失败: ${response.statusText}`);
         }
+
+        // 同时删除本地缓存
+        ReportCacheService.removeDailyReport(date);
+        console.log(`[API] 已删除日报告缓存: ${date}`);
     },
 
     /**
@@ -518,6 +552,17 @@ export const ReportsAPI = {
      * 获取周报告
      */
     async getWeeklyReport(weekStartDate: string, forceRefresh: boolean = false): Promise<WeeklyReportData> {
+        // 如果不是强制刷新,先尝试从缓存获取
+        if (!forceRefresh) {
+            const cachedData = ReportCacheService.getWeeklyReport(weekStartDate);
+            if (cachedData) {
+                console.log(`[API] 从缓存加载周报告: ${weekStartDate}`);
+                return cachedData;
+            }
+        }
+
+        // 缓存未命中或强制刷新,调用 API
+        console.log(`[API] 从服务器加载周报告: ${weekStartDate}`);
         const params = new URLSearchParams({
             week_start_date: weekStartDate,
             force_refresh: String(forceRefresh),
@@ -530,7 +575,13 @@ export const ReportsAPI = {
         }
 
         const data: WeeklyReportAPIResponse = await response.json();
-        return transformWeeklyReportResponse(data);
+        const transformedData = transformWeeklyReportResponse(data);
+
+        // 缓存结果
+        ReportCacheService.cacheWeeklyReport(weekStartDate, transformedData);
+        console.log(`[API] 已缓存周报告: ${weekStartDate}`);
+
+        return transformedData;
     },
 
     /**
@@ -544,12 +595,27 @@ export const ReportsAPI = {
         if (!response.ok) {
             throw new Error(`删除周报告失败: ${response.statusText}`);
         }
+
+        // 同时删除本地缓存
+        ReportCacheService.removeWeeklyReport(weekStartDate);
+        console.log(`[API] 已删除周报告缓存: ${weekStartDate}`);
     },
 
     /**
      * 获取月报告
      */
     async getMonthlyReport(month: string, forceRefresh: boolean = false): Promise<MonthlyReportData> {
+        // 如果不是强制刷新,先尝试从缓存获取
+        if (!forceRefresh) {
+            const cachedData = ReportCacheService.getMonthlyReport(month);
+            if (cachedData) {
+                console.log(`[API] 从缓存加载月报告: ${month}`);
+                return cachedData;
+            }
+        }
+
+        // 缓存未命中或强制刷新,调用 API
+        console.log(`[API] 从服务器加载月报告: ${month}`);
         const params = new URLSearchParams({
             month,
             force_refresh: String(forceRefresh),
@@ -562,7 +628,13 @@ export const ReportsAPI = {
         }
 
         const data: MonthlyReportAPIResponse = await response.json();
-        return transformMonthlyReportResponse(data);
+        const transformedData = transformMonthlyReportResponse(data);
+
+        // 缓存结果
+        ReportCacheService.cacheMonthlyReport(month, transformedData);
+        console.log(`[API] 已缓存月报告: ${month}`);
+
+        return transformedData;
     },
 
     /**
@@ -576,6 +648,10 @@ export const ReportsAPI = {
         if (!response.ok) {
             throw new Error(`删除月报告失败: ${response.statusText}`);
         }
+
+        // 同时删除本地缓存
+        ReportCacheService.removeMonthlyReport(monthStartDate);
+        console.log(`[API] 已删除月报告缓存: ${monthStartDate}`);
     },
 
     /**
