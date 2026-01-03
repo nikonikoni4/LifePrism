@@ -81,7 +81,7 @@ else:
 在 `norm_chat` 节点中验证工具调用：
 
 ```python
-VALID_TOOLS = {"get_user_behavior_stats"}
+VALID_TOOLS = {"get_daily_stats"}
 
 if tool_name not in VALID_TOOLS:
     raise LLMParseError(f"未知工具: {tool_name}")
@@ -106,7 +106,7 @@ class ChatBotSchemas(BaseModel):
 
 | 工具名 | 功能 |
 |--------|------|
-| `get_user_behavior_stats` | 获取用户行为统计数据 |
+| `get_daily_stats` | 获取用户行为统计数据 |
 
 ## 相关文件
 

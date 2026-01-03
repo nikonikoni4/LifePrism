@@ -167,7 +167,7 @@ if __name__ == "__main__":
     # 通过环境变量判断是否为开发模式
     # 开发时设置 LIFEWATCH_DEV=1，打包后默认为生产模式
     is_dev_mode = os.environ.get("LIFEWATCH_DEV", "0") == "1"
-    is_dev_mode = True
+    is_dev_mode = False
     if is_dev_mode:
         # 开发模式：启用热重载
         uvicorn.run(
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     else:
         # 生产模式：禁用热重载，启动极快
         uvicorn.run(
-            app,  # 直接传入 app 对象，不使用字符串
+            app,  # 直接传入 app 对象，不使用字符串 
             host="0.0.0.0",
             port=8000,
             log_level="info"

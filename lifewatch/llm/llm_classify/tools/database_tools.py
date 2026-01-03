@@ -104,19 +104,21 @@ def _format_user_notes(notes: list) -> str:
     return "\n".join(lines)
 
 
-def _format_daily_focus(content: str) -> str:
-    """格式化今日重点内容"""
+def _format_daily_summary(content: str) -> str:
+    """格式化每日重点与任务"""
     if not content:
-        return "  - 暂无今日重点"
-    return f"  - {content}"
+        return "  - 暂无数据"
+    # 增加缩进，使输出整齐
+    lines = content.strip().split('\n')
+    return "\n".join([f"  {line}" for line in lines])
 
 
 @tool
-def get_user_behavior_stats(
+def get_daily_stats(
     start_time: Annotated[str, "开始时间 YYYY-MM-DD HH:MM:SS"],
     end_time: Annotated[str, "结束时间 YYYY-MM-DD HH:MM:SS"],
     split_count: Annotated[int, "切分时间段,把时间分成n个时间段,以获得更加详细的行为统计,长时段split_count应该更大,短时段split_count应该更小"],
-    options: Annotated[list, "可选参数,stats,category_distribution,longest_activities,goal_time_spent,user_notes,today_focus,all"] = None
+    options: Annotated[list, "可选参数,stats,category_distribution,longest_activities,goal_time_spent,user_notes,tasks,all"] = None
 ) -> str:
     """
     获取时间段小于24h的用户行为统计摘要数据，也可作为数据查询接口
@@ -177,7 +179,7 @@ def get_user_behavior_stats(
             prompt_parts.append(_format_longest_activities(activities))
             section_num += 1
         
-        # 4. 目标花费时间
+        # 4. 目标花费时间和趋势
         if fetch_all or "goal_time_spent" in fetch_options:
             goal_time = llm_lw_data_provider.get_goal_time_spent(
                 start_time=start_time,
@@ -197,25 +199,79 @@ def get_user_behavior_stats(
             prompt_parts.append(_format_user_notes(notes))
             section_num += 1
         
-        # 6. 今日重点内容
-        if fetch_all or "today_focus" in fetch_options:
-            # 从 start_time 提取日期
-            date = start_time.split(" ")[0]  # YYYY-MM-DD
-            daily_focus = llm_lw_data_provider.get_daily_focus(date=date)
-            prompt_parts.append(f"\n{section_num}. 今日重点")
-            prompt_parts.append(_format_daily_focus(daily_focus))
+        # 6. 今日重点与任务
+        if fetch_all or "tasks" in fetch_options:
+            daily_summary = llm_lw_data_provider.get_focus_and_todos(start_time=start_time, end_time=end_time)
+            prompt_parts.append(f"\n{section_num}. 今日重点与任务")
+            prompt_parts.append(_format_daily_summary(daily_summary))
 
         return "\n".join(prompt_parts)
         
     except Exception as e:
         return f"获取用户行为统计失败: {str(e)}"
 
+@tool
+def get_multi_days_stats(
+    start_time: Annotated[str, "开始时间 YYYY-MM-DD HH:MM:SS"],
+    end_time: Annotated[str, "结束时间 YYYY-MM-DD HH:MM:SS"],
+    options: Annotated[list, "可选参数,goal_trend,tasks,category_trend,user_notes,all"] = None
+) -> str:
+    """
+    获取多天用户行为统计摘要数据，也可作为数据查询接口
+    """
+    try:
+        # 解析 options，默认返回全部
+        if options is None or "all" in options:
+            fetch_all = True
+            fetch_options = set()
+        else:
+            fetch_all = False
+            fetch_options = set(options)
+        
+        prompt_parts = []
+        prompt_parts.append(f"用户行为统计（{start_time} 至 {end_time}）\n")
+        
+        section_num = 1
+        
+        # 1. 目标花费时间
+        if fetch_all or "goal_trend" in fetch_options:
+            goal_trend = llm_lw_data_provider.get_daily_goal_trend(start_time, end_time)
+            prompt_parts.append(f"\n{section_num}. 在goal上花费的时间")
+            prompt_parts.append(goal_trend)
+            section_num += 1
+        
+
+        # 2. 每日重点与任务
+        if fetch_all or "tasks" in fetch_options:
+            summary = llm_lw_data_provider.get_focus_and_todos(start_time, end_time)
+            prompt_parts.append(f"\n{section_num}. 每日重点与任务")
+            prompt_parts.append(summary)
+            section_num += 1
+        
+        # 3. 分类占比
+        if fetch_all or "category_trend" in fetch_options:
+            category_trend = llm_lw_data_provider.get_daily_category_trend(start_time, end_time)
+            prompt_parts.append(f"\n{section_num}. 分类占比")
+            prompt_parts.append(category_trend)
+            section_num += 1
+        
+        # 4. 用户备注
+        if fetch_all or "user_notes" in fetch_options:
+            notes = llm_lw_data_provider.get_user_focus_notes(start_time, end_time)
+            prompt_parts.append(f"\n{section_num}. 用户备注")
+            prompt_parts.append(_format_user_notes(notes))
+            section_num += 1
+        
+        return "\n".join(prompt_parts)
+        
+    except Exception as e:
+        return f"获取用户行为统计失败: {str(e)}"
 
 if __name__ == "__main__":
-    result = get_user_behavior_stats.invoke(
+    result = get_multi_days_stats.invoke(
         input = {
-            "start_time": "2025-12-30 08:00:00",
-            "end_time": "2025-12-30 12:00:00",
+            "start_time": "2025-12-25 00:00:00",
+            "end_time": "2025-12-30 23:59:59",
             "split_count": 2,
             "options": ["all"]
         }

@@ -18,7 +18,7 @@ import logging
 from langchain_core.messages import HumanMessage, AIMessage,AIMessageChunk,ToolMessage
 from langgraph.graph import StateGraph
 from langgraph.types import RetryPolicy
-from lifewatch.llm.llm_classify.tools.database_tools import get_user_behavior_stats
+from lifewatch.llm.llm_classify.tools.database_tools import get_daily_stats,get_multi_days_stats
 logger = get_logger(__name__,logging.DEBUG)
 class LLMParseError(Exception):
     """
@@ -430,7 +430,7 @@ class ChatBot:
         }
     
     # 可用工具集合（用于验证 LLM 返回的工具调用）
-    VALID_TOOLS = {"get_user_behavior_stats"}
+    VALID_TOOLS = {"get_daily_stats","get_multi_days_stats"}
     
     async def norm_chat(self, main_state: ChatBotSchemas) -> ChatBotSchemas:
         # 当前的时间
@@ -441,7 +441,7 @@ class ChatBot:
             history_messages=history_messages,
             custom_prompt=f"当前时间: {current_time}"
         )
-        llm_with_tool = self.llm_streaming.bind_tools([get_user_behavior_stats])
+        llm_with_tool = self.llm_streaming.bind_tools([get_daily_stats,get_multi_days_stats])
         logger.debug(f"[norm_chat] 调用 LLM (with tools)...")
         try:
             result = await llm_with_tool.ainvoke(prompt)
@@ -479,7 +479,8 @@ class ChatBot:
         
         # 2. 工具映射表
         tool_map = {
-            "get_user_behavior_stats": get_user_behavior_stats
+            "get_daily_stats": get_daily_stats,
+            "get_multi_days_stats": get_multi_days_stats
         }
         
         # 3. 执行所有工具调用
