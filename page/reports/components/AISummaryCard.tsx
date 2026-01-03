@@ -1,7 +1,7 @@
 /**
  * AI Summary Card Component
  * 
- * AI 总结卡片组件，支持加载状态和生成按钮
+ * AI 总结卡片组件，支持日报/周报/月报的 AI 总结生成
  */
 
 import React, { useState, useEffect } from 'react';
@@ -9,10 +9,21 @@ import { Sparkles, RefreshCw, Loader2 } from 'lucide-react';
 import { MarkdownRenderer } from '../../common';
 import { ReportsAPI } from '../api';
 
+// 报告类型
+type ReportType = 'daily' | 'weekly' | 'monthly';
+
 interface AISummaryCardProps {
     title?: string;
     content?: string;
-    date: string;
+    reportType: ReportType;
+    // 日报需要的参数
+    date?: string;
+    // 周报需要的参数
+    weekStartDate?: string;
+    weekEndDate?: string;
+    // 月报需要的参数
+    monthStartDate?: string;
+    monthEndDate?: string;
     className?: string;
     onSummaryGenerated?: (content: string) => void;
 }
@@ -20,7 +31,12 @@ interface AISummaryCardProps {
 const AISummaryCard: React.FC<AISummaryCardProps> = ({
     title = 'AI 总结',
     content: initialContent = '',
+    reportType,
     date,
+    weekStartDate,
+    weekEndDate,
+    monthStartDate,
+    monthEndDate,
     className = '',
     onSummaryGenerated
 }) => {
@@ -38,12 +54,50 @@ const AISummaryCard: React.FC<AISummaryCardProps> = ({
         setContent(initialContent);
     }, [initialContent]);
 
+    // 根据报告类型获取描述文本
+    const getDescriptionText = () => {
+        switch (reportType) {
+            case 'daily':
+                return '今日活动';
+            case 'weekly':
+                return '本周活动';
+            case 'monthly':
+                return '本月活动';
+            default:
+                return '活动';
+        }
+    };
+
     const handleGenerateSummary = async () => {
         setIsLoading(true);
         setError(null);
 
         try {
-            const result = await ReportsAPI.getAISummary(date, ['all']);
+            let result: { content: string; tokensUsage: { inputTokens: number; outputTokens: number; totalTokens: number } };
+
+            switch (reportType) {
+                case 'daily':
+                    if (!date) {
+                        throw new Error('日报需要提供 date 参数');
+                    }
+                    result = await ReportsAPI.getAISummary(date, ['all']);
+                    break;
+                case 'weekly':
+                    if (!weekStartDate || !weekEndDate) {
+                        throw new Error('周报需要提供 weekStartDate 和 weekEndDate 参数');
+                    }
+                    result = await ReportsAPI.getWeeklyAISummary(weekStartDate, weekEndDate, ['all']);
+                    break;
+                case 'monthly':
+                    if (!monthStartDate || !monthEndDate) {
+                        throw new Error('月报需要提供 monthStartDate 和 monthEndDate 参数');
+                    }
+                    result = await ReportsAPI.getMonthlyAISummary(monthStartDate, monthEndDate, ['all']);
+                    break;
+                default:
+                    throw new Error('未知的报告类型');
+            }
+
             setContent(result.content);
             setTokensUsage(result.tokensUsage);
             onSummaryGenerated?.(result.content);
@@ -83,7 +137,7 @@ const AISummaryCard: React.FC<AISummaryCardProps> = ({
                 暂无 AI 总结
             </h4>
             <p className="text-xs text-slate-500 mb-4">
-                点击下方按钮，让 AI 为您生成今日活动总结
+                点击下方按钮，让 AI 为您生成{getDescriptionText()}总结
             </p>
             <button
                 onClick={handleGenerateSummary}
@@ -159,3 +213,4 @@ const AISummaryCard: React.FC<AISummaryCardProps> = ({
 };
 
 export default AISummaryCard;
+

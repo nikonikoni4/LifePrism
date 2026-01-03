@@ -199,6 +199,7 @@ interface WeeklyReportAPIResponse {
         }>;
     }> | null;
     daily_trend_data: Array<Record<string, any>> | null;
+    ai_summary: string | null;
     state: string;
     data_version: number;
 }
@@ -304,7 +305,7 @@ function transformWeeklyReportResponse(response: WeeklyReportAPIResponse): Weekl
             pending: todoStats.pending,
             procrastinationRate: todoStats.procrastination_rate,
         },
-        aiSummary: '', // 目前后端没有返回 AI 总结
+        aiSummary: response.ai_summary || '',
     };
 }
 
@@ -353,6 +354,7 @@ interface MonthlyReportAPIResponse {
         total_minutes: number;
         category_breakdown?: Record<string, number>;
     }> | null;
+    ai_summary: string | null;
     state: string;
     data_version: number;
 }
@@ -469,7 +471,7 @@ function transformMonthlyReportResponse(response: MonthlyReportAPIResponse): Mon
             procrastinationRate: todoStats.procrastination_rate,
         },
         carryOverItems: [], // 后端暂无此数据
-        aiSummary: '', // 目前后端没有返回 AI 总结
+        aiSummary: response.ai_summary || '',
     };
 }
 
@@ -484,13 +486,19 @@ export const ReportsAPI = {
         // 如果不是强制刷新,先尝试从缓存获取
         if (!forceRefresh) {
             const cachedData = ReportCacheService.getDailyReport(date);
-            if (cachedData) {
+            // 只有当缓存存在且包含 AI 总结时才使用缓存
+            // 如果缓存没有 AI 总结，则从后端获取完整数据（后端可能已有 AI 总结）
+            if (cachedData && cachedData.aiSummary) {
                 console.log(`[API] 从缓存加载日报告: ${date}`);
                 return cachedData;
             }
+            // 如果缓存存在但没有 AI 总结，记录日志并继续从后端获取
+            if (cachedData) {
+                console.log(`[API] 缓存中的日报告缺少 AI 总结，从后端同步: ${date}`);
+            }
         }
 
-        // 缓存未命中或强制刷新,调用 API
+        // 缓存未命中或强制刷新或缓存缺少 AI 总结,调用 API
         console.log(`[API] 从服务器加载日报告: ${date}`);
         const params = new URLSearchParams({
             date,
@@ -556,13 +564,19 @@ export const ReportsAPI = {
         // 如果不是强制刷新,先尝试从缓存获取
         if (!forceRefresh) {
             const cachedData = ReportCacheService.getWeeklyReport(weekStartDate);
-            if (cachedData) {
+            // 只有当缓存存在且包含 AI 总结时才使用缓存
+            // 如果缓存没有 AI 总结，则从后端获取完整数据（后端可能已有 AI 总结）
+            if (cachedData && cachedData.aiSummary) {
                 console.log(`[API] 从缓存加载周报告: ${weekStartDate}`);
                 return cachedData;
             }
+            // 如果缓存存在但没有 AI 总结，记录日志并继续从后端获取
+            if (cachedData) {
+                console.log(`[API] 缓存中的周报告缺少 AI 总结，从后端同步: ${weekStartDate}`);
+            }
         }
 
-        // 缓存未命中或强制刷新,调用 API
+        // 缓存未命中或强制刷新或缓存缺少 AI 总结,调用 API
         console.log(`[API] 从服务器加载周报告: ${weekStartDate}`);
         const params = new URLSearchParams({
             week_start_date: weekStartDate,
@@ -583,6 +597,29 @@ export const ReportsAPI = {
         console.log(`[API] 已缓存周报告: ${weekStartDate}`);
 
         return transformedData;
+    },
+
+    /**
+     * 后台同步周报告的 AI 总结
+     */
+    async syncWeeklyAISummaryInBackground(weekStartDate: string): Promise<void> {
+        try {
+            console.log(`[API] 后台检查周报告 AI 总结: ${weekStartDate}`);
+            const params = new URLSearchParams({
+                week_start_date: weekStartDate,
+                force_refresh: 'false',
+            });
+            const response = await fetch(`${API_BASE}/report/weekly?${params}`);
+            if (response.ok) {
+                const data: WeeklyReportAPIResponse = await response.json();
+                if (data.ai_summary) {
+                    this.updateWeeklyAISummaryCache(weekStartDate, data.ai_summary);
+                    console.log(`[API] 后台同步周报告 AI 总结成功: ${weekStartDate}`);
+                }
+            }
+        } catch (error) {
+            console.warn(`[API] 后台同步周报告 AI 总结失败:`, error);
+        }
     },
 
     /**
@@ -609,13 +646,19 @@ export const ReportsAPI = {
         // 如果不是强制刷新,先尝试从缓存获取
         if (!forceRefresh) {
             const cachedData = ReportCacheService.getMonthlyReport(month);
-            if (cachedData) {
+            // 只有当缓存存在且包含 AI 总结时才使用缓存
+            // 如果缓存没有 AI 总结，则从后端获取完整数据（后端可能已有 AI 总结）
+            if (cachedData && cachedData.aiSummary) {
                 console.log(`[API] 从缓存加载月报告: ${month}`);
                 return cachedData;
             }
+            // 如果缓存存在但没有 AI 总结，记录日志并继续从后端获取
+            if (cachedData) {
+                console.log(`[API] 缓存中的月报告缺少 AI 总结，从后端同步: ${month}`);
+            }
         }
 
-        // 缓存未命中或强制刷新,调用 API
+        // 缓存未命中或强制刷新或缓存缺少 AI 总结,调用 API
         console.log(`[API] 从服务器加载月报告: ${month}`);
         const params = new URLSearchParams({
             month,
@@ -636,6 +679,29 @@ export const ReportsAPI = {
         console.log(`[API] 已缓存月报告: ${month}`);
 
         return transformedData;
+    },
+
+    /**
+     * 后台同步月报告的 AI 总结
+     */
+    async syncMonthlyAISummaryInBackground(month: string): Promise<void> {
+        try {
+            console.log(`[API] 后台检查月报告 AI 总结: ${month}`);
+            const params = new URLSearchParams({
+                month,
+                force_refresh: 'false',
+            });
+            const response = await fetch(`${API_BASE}/report/monthly?${params}`);
+            if (response.ok) {
+                const data: MonthlyReportAPIResponse = await response.json();
+                if (data.ai_summary) {
+                    this.updateMonthlyAISummaryCache(month, data.ai_summary);
+                    console.log(`[API] 后台同步月报告 AI 总结成功: ${month}`);
+                }
+            }
+        } catch (error) {
+            console.warn(`[API] 后台同步月报告 AI 总结失败:`, error);
+        }
     },
 
     /**
@@ -707,7 +773,7 @@ export const ReportsAPI = {
         }
 
         const data = await response.json();
-        return {
+        const result = {
             content: data.content,
             tokensUsage: {
                 inputTokens: data.tokens_usage.input_tokens,
@@ -715,5 +781,134 @@ export const ReportsAPI = {
                 totalTokens: data.tokens_usage.total_tokens,
             },
         };
+
+        // 更新前端缓存中的 AI 总结
+        this.updateDailyAISummaryCache(date, result.content);
+
+        return result;
+    },
+
+    /**
+     * 更新日报告缓存中的 AI 总结
+     */
+    updateDailyAISummaryCache(date: string, aiSummary: string): void {
+        const cached = ReportCacheService.getDailyReport(date);
+        if (cached) {
+            cached.aiSummary = aiSummary;
+            ReportCacheService.cacheDailyReport(date, cached);
+            console.log(`[API] 已更新日报告缓存中的 AI 总结: ${date}`);
+        }
+    },
+
+    /**
+     * 获取周 AI 总结
+     */
+    async getWeeklyAISummary(weekStartDate: string, weekEndDate: string, options: string[] = ['all']): Promise<{
+        content: string;
+        tokensUsage: {
+            inputTokens: number;
+            outputTokens: number;
+            totalTokens: number;
+        };
+    }> {
+        const response = await fetch(`${API_BASE}/report/weekly/ai_summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                week_start_date: weekStartDate,
+                week_end_date: weekEndDate,
+                options,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`获取周 AI 总结失败: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const result = {
+            content: data.content,
+            tokensUsage: {
+                inputTokens: data.tokens_usage.input_tokens,
+                outputTokens: data.tokens_usage.output_tokens,
+                totalTokens: data.tokens_usage.total_tokens,
+            },
+        };
+
+        // 更新前端缓存中的 AI 总结
+        this.updateWeeklyAISummaryCache(weekStartDate, result.content);
+
+        return result;
+    },
+
+    /**
+     * 更新周报告缓存中的 AI 总结
+     */
+    updateWeeklyAISummaryCache(weekStartDate: string, aiSummary: string): void {
+        const cached = ReportCacheService.getWeeklyReport(weekStartDate);
+        if (cached) {
+            cached.aiSummary = aiSummary;
+            ReportCacheService.cacheWeeklyReport(weekStartDate, cached);
+            console.log(`[API] 已更新周报告缓存中的 AI 总结: ${weekStartDate}`);
+        }
+    },
+
+    /**
+     * 获取月 AI 总结
+     */
+    async getMonthlyAISummary(monthStartDate: string, monthEndDate: string, options: string[] = ['all']): Promise<{
+        content: string;
+        tokensUsage: {
+            inputTokens: number;
+            outputTokens: number;
+            totalTokens: number;
+        };
+    }> {
+        const response = await fetch(`${API_BASE}/report/monthly/ai_summary`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                month_start_date: monthStartDate,
+                month_end_date: monthEndDate,
+                options,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`获取月 AI 总结失败: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const result = {
+            content: data.content,
+            tokensUsage: {
+                inputTokens: data.tokens_usage.input_tokens,
+                outputTokens: data.tokens_usage.output_tokens,
+                totalTokens: data.tokens_usage.total_tokens,
+            },
+        };
+
+        // 更新前端缓存中的 AI 总结
+        // 从 monthStartDate 提取月份 (YYYY-MM)
+        const month = monthStartDate.substring(0, 7);
+        this.updateMonthlyAISummaryCache(month, result.content);
+
+        return result;
+    },
+
+    /**
+     * 更新月报告缓存中的 AI 总结
+     */
+    updateMonthlyAISummaryCache(month: string, aiSummary: string): void {
+        const cached = ReportCacheService.getMonthlyReport(month);
+        if (cached) {
+            cached.aiSummary = aiSummary;
+            ReportCacheService.cacheMonthlyReport(month, cached);
+            console.log(`[API] 已更新月报告缓存中的 AI 总结: ${month}`);
+        }
     },
 };

@@ -10,7 +10,8 @@ import {
     UpdateSettingsRequest,
     UpdateApiKeyRequest,
     UpdateApiKeyResponse,
-    ApiKeyStatusResponse
+    ApiKeyStatusResponse,
+    TestConnectionResponse
 } from './types';
 
 const API_BASE = 'http://localhost:8000/api/v2';
@@ -69,6 +70,21 @@ export const SettingsAPI = {
         const response = await fetch(`${API_BASE}/settings/api-key/status`);
         if (!response.ok) {
             throw new Error(`检查 API Key 状态失败: ${response.statusText}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * 测试 LLM 连接
+     */
+    async testConnection(): Promise<TestConnectionResponse> {
+        const response = await fetch(`${API_BASE}/settings/test-connection`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `连接测试失败: ${response.statusText}`);
         }
         return response.json();
     },

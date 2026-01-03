@@ -60,3 +60,10 @@ export interface ApiKeyStatusResponse {
     configured: boolean;
     message: string;
 }
+
+/** LLM 连接测试响应 */
+export interface TestConnectionResponse {
+    success: boolean;
+    message: string;
+    model_response: string | null;
+}

@@ -91,11 +91,22 @@ const SettingsPage: React.FC = () => {
     }, []);
 
     // Handlers
-    const handleTestConnection = () => {
+    const handleTestConnection = async () => {
         setApiStatus('testing');
-        setTimeout(() => {
-            setApiStatus('success');
-        }, 1500);
+        try {
+            const result = await SettingsAPI.testConnection();
+            if (result.success) {
+                setApiStatus('success');
+                setSuccessMessage(`连接成功: ${result.model_response || 'LLM 响应正常'}`);
+                setTimeout(() => setSuccessMessage(null), 5000);
+            } else {
+                setApiStatus('error');
+                setError(result.message || '连接测试失败');
+            }
+        } catch (err) {
+            setApiStatus('error');
+            setError(err instanceof Error ? err.message : '连接测试失败，请检查配置');
+        }
     };
 
     const handleCheckPath = () => {
@@ -201,8 +212,8 @@ const SettingsPage: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">System Settings</h1>
-                    <p className="text-slate-500 mt-1 font-medium">Configure your digital extension and intelligence engine.</p>
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">系统设置</h1>
+                    <p className="text-slate-500 mt-1 font-medium">配置您的API。</p>
                 </div>
                 <button
                     onClick={handleSaveAll}
@@ -214,7 +225,7 @@ const SettingsPage: React.FC = () => {
                     ) : (
                         <Save size={18} />
                     )}
-                    <span>{isSaving ? 'Saving...' : 'Save Configuration'}</span>
+                    <span>{isSaving ? '保存中...' : '保存配置'}</span>
                 </button>
             </div>
 
@@ -224,10 +235,10 @@ const SettingsPage: React.FC = () => {
                     <div className="p-2.5 bg-gray-50 rounded-xl text-slate-600">
                         <User size={20} />
                     </div>
-                    <h2 className="text-lg font-bold text-slate-800">User Profile</h2>
+                    <h2 className="text-lg font-bold text-slate-800">用户资料</h2>
                 </div>
                 <div className="max-w-md">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Display Nickname</label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">显示昵称</label>
                     <input
                         type="text"
                         value={nickname}
@@ -243,14 +254,14 @@ const SettingsPage: React.FC = () => {
                     <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600">
                         <Cpu size={20} />
                     </div>
-                    <h2 className="text-lg font-bold text-slate-800">Intelligence Engine (LLM)</h2>
+                    <h2 className="text-lg font-bold text-slate-800">API 设置</h2>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Provider & Model */}
                     <div className="space-y-6">
                         <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Provider</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">服务商</label>
                             <select
                                 value={provider}
                                 onChange={(e) => setProvider(e.target.value)}
@@ -263,7 +274,7 @@ const SettingsPage: React.FC = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Model Name</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">模型名称</label>
                             <input
                                 type="text"
                                 value={modelName}
@@ -276,14 +287,14 @@ const SettingsPage: React.FC = () => {
                     {/* API Key & Test */}
                     <div className="space-y-6">
                         <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">API Key</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">API 密钥</label>
                             <div className="relative">
                                 <input
                                     type={showKey ? "text" : "password"}
                                     value={apiKey}
                                     onChange={(e) => setApiKey(e.target.value)}
                                     onBlur={handleApiKeyBlur}
-                                    placeholder="Enter your API key..."
+                                    placeholder="输入您的 API 密钥..."
                                     className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl pl-4 pr-12 py-3 text-slate-800 font-mono text-sm outline-none transition-all"
                                 />
                                 <button
@@ -293,7 +304,7 @@ const SettingsPage: React.FC = () => {
                                     {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                             </div>
-                            <p className="text-xs text-slate-400 mt-2">API Key will be securely saved when you leave this field.</p>
+                            <p className="text-xs text-slate-400 mt-2">离开此字段时，API 密钥将被安全保存。</p>
                         </div>
 
                         <div className="flex items-center gap-4">
@@ -312,11 +323,11 @@ const SettingsPage: React.FC = () => {
                                 ) : (
                                     <Zap size={14} />
                                 )}
-                                {apiStatus === 'testing' ? 'Testing...' : apiStatus === 'success' ? 'Connected' : 'Test Connection'}
+                                {apiStatus === 'testing' ? '测试中...' : apiStatus === 'success' ? '已连接' : '测试连接'}
                             </button>
                             {apiStatus === 'error' && (
                                 <span className="text-xs text-red-500 font-medium flex items-center gap-1">
-                                    <AlertCircle size={12} /> Connection Failed
+                                    <AlertCircle size={12} /> 连接失败
                                 </span>
                             )}
                         </div>
@@ -326,11 +337,11 @@ const SettingsPage: React.FC = () => {
                 {/* Cost Estimation */}
                 <div className="mt-8 pt-6 border-t border-dashed border-gray-100">
                     <h3 className="text-xs font-bold text-slate-500 mb-4 flex items-center gap-2">
-                        Cost Estimation (Per 1k Tokens, ¥)
+                        成本估算 (每 1k Token, ¥)
                     </h3>
                     <div className="grid grid-cols-2 gap-4 max-w-lg">
                         <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                            <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Input Cost</label>
+                            <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">输入成本</label>
                             <input
                                 type="number"
                                 step="0.0001"
@@ -340,7 +351,7 @@ const SettingsPage: React.FC = () => {
                             />
                         </div>
                         <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                            <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Output Cost</label>
+                            <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">输出成本</label>
                             <input
                                 type="number"
                                 step="0.0001"
@@ -359,13 +370,13 @@ const SettingsPage: React.FC = () => {
                     <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600">
                         <LayoutGrid size={20} />
                     </div>
-                    <h2 className="text-lg font-bold text-slate-800">Classification Logic</h2>
+                    <h2 className="text-lg font-bold text-slate-800">分类逻辑</h2>
                 </div>
 
                 <div className="space-y-8">
                     {/* Mode Selection */}
                     <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 block">Classification Mode</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 block">分类模式</label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <button
                                 onClick={() => setClassificationMode('simple')}
@@ -375,10 +386,10 @@ const SettingsPage: React.FC = () => {
                                     }`}
                             >
                                 <div className="flex justify-between items-start mb-1">
-                                    <span className={`font-bold ${classificationMode === 'simple' ? 'text-blue-700' : 'text-slate-700'}`}>Simple Mode</span>
+                                    <span className={`font-bold ${classificationMode === 'simple' ? 'text-blue-700' : 'text-slate-700'}`}>极简模式</span>
                                     {classificationMode === 'simple' && <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5" />}
                                 </div>
-                                <p className="text-xs text-slate-500 leading-relaxed">Uses fewer tokens. Categorizes based on app name and window title keywords. Faster and cheaper.</p>
+                                <p className="text-xs text-slate-500 leading-relaxed">消耗较少 Token。基于应用名称和窗口标题关键字进行分类。更快且更便宜。</p>
                             </button>
 
                             <button
@@ -389,30 +400,30 @@ const SettingsPage: React.FC = () => {
                                     }`}
                             >
                                 <div className="flex justify-between items-start mb-1">
-                                    <span className={`font-bold ${classificationMode === 'complex' ? 'text-purple-700' : 'text-slate-700'}`}>Deep Context Mode</span>
+                                    <span className={`font-bold ${classificationMode === 'complex' ? 'text-purple-700' : 'text-slate-700'}`}>复杂模式</span>
                                     {classificationMode === 'complex' && <div className="w-2 h-2 rounded-full bg-purple-500 mt-1.5" />}
                                 </div>
-                                <p className="text-xs text-slate-500 leading-relaxed">Analyzes full window titles and context. Highly accurate for browsers but consumes more tokens.</p>
+                                <p className="text-xs text-slate-500 leading-relaxed">分析完整的窗口标题和上下文。对浏览器准确率更高一些，但消耗更多 Token。</p>
                             </button>
                         </div>
                     </div>
 
                     {/* Long Log Threshold */}
                     <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Long Activity Threshold (seconds)</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">长活动阈值 (秒)</label>
                         <input
                             type="number"
                             value={longLogThreshold}
                             onChange={(e) => setLongLogThreshold(parseInt(e.target.value) || 0)}
                             className="w-32 bg-gray-50 border border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-50/50 rounded-xl px-4 py-3 text-slate-800 font-bold outline-none transition-all"
                         />
-                        <p className="text-xs text-slate-400 mt-2">Activities longer than this will be marked as long activities.</p>
+                        <p className="text-xs text-slate-400 mt-2">超过此时间的活动将被标记为长活动。</p>
                     </div>
 
                     {/* Browser Apps List */}
                     <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Multi-Purpose Applications</label>
-                        <p className="text-xs text-slate-500 mb-3">Define which applications should use title info for classification (browsers, etc.).</p>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">多用途应用程序</label>
+                        <p className="text-xs text-slate-500 mb-3">定义哪些应用程序应使用标题信息进行分类（浏览器等）。</p>
 
                         <div className="bg-gray-50 border border-gray-200 rounded-xl p-2 flex flex-wrap gap-2 min-h-[50px]">
                             {browserApps.map(app => (
@@ -428,7 +439,7 @@ const SettingsPage: React.FC = () => {
                                 value={newBrowserApp}
                                 onChange={(e) => setNewBrowserApp(e.target.value)}
                                 onKeyDown={addBrowserApp}
-                                placeholder="Type app name & Enter..."
+                                placeholder="输入应用名称并回车..."
                                 className="flex-1 bg-transparent text-xs font-medium text-slate-700 outline-none min-w-[120px] px-2"
                             />
                         </div>
@@ -442,12 +453,12 @@ const SettingsPage: React.FC = () => {
                     <div className="p-2.5 bg-orange-50 rounded-xl text-orange-500">
                         <Database size={20} />
                     </div>
-                    <h2 className="text-lg font-bold text-slate-800">Storage & Sources</h2>
+                    <h2 className="text-lg font-bold text-slate-800">存储与数据源</h2>
                 </div>
 
                 <div className="space-y-6">
                     <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">ActivityWatch DB Path</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">ActivityWatch 数据库路径</label>
                         <div className="flex gap-3">
                             <input
                                 type="text"
@@ -472,7 +483,7 @@ const SettingsPage: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">LifeWatch DB Path</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">LifeWatch 数据库路径</label>
                         <input
                             type="text"
                             value={lwPath}
@@ -482,7 +493,7 @@ const SettingsPage: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Chat DB Path</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">聊天数据库路径</label>
                         <input
                             type="text"
                             value={chatPath}
@@ -499,13 +510,13 @@ const SettingsPage: React.FC = () => {
                     <div className="p-2.5 bg-green-50 rounded-xl text-green-600">
                         <Filter size={20} />
                     </div>
-                    <h2 className="text-lg font-bold text-slate-800">Data Hygiene</h2>
+                    <h2 className="text-lg font-bold text-slate-800">数据清洗</h2>
                 </div>
 
                 <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
                     <div className="flex-1">
-                        <h4 className="text-sm font-bold text-slate-700">Short Duration Filter</h4>
-                        <p className="text-xs text-slate-400 mt-1">Ignore window switches or activities that last less than this duration to reduce noise.</p>
+                        <h4 className="text-sm font-bold text-slate-700">短时过滤</h4>
+                        <p className="text-xs text-slate-400 mt-1">忽略持续时间小于此值的窗口切换或活动，以减少噪音。</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
@@ -531,7 +542,7 @@ const SettingsPage: React.FC = () => {
                             <Plus size={14} />
                         </button>
 
-                        <span className="text-xs font-bold text-slate-400 uppercase ml-1">Seconds</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase ml-1">秒</span>
                     </div>
                 </div>
             </section>

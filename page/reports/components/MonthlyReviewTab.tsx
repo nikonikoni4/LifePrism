@@ -16,6 +16,13 @@ import { ReportsAPI } from '../api';
 import { MonthlyReportData } from '../types';
 import { getMockMonthlyReport } from '../mockData';
 
+/** 获取月份的结束日期 */
+const getMonthEndDate = (month: string): string => {
+    const [year, mon] = month.split('-').map(Number);
+    const lastDay = new Date(year, mon, 0).getDate();
+    return `${year}-${String(mon).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+};
+
 interface MonthlyReviewTabProps {
     className?: string;
 }
@@ -255,7 +262,9 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
                     {/* AI Summary */}
                     <AISummaryCard
                         title="AI 全局总结"
-                        date={`${selectedMonth}-01`}
+                        reportType="monthly"
+                        monthStartDate={`${selectedMonth}-01`}
+                        monthEndDate={getMonthEndDate(selectedMonth)}
                         content={displayData.aiSummary}
                     />
                 </div>
