@@ -96,13 +96,15 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
     
     daily_report_provider.upsert_daily_report(date, report_data)
     
-    # 5. 返回报告数据
+    # 5. 返回报告数据（保留已有的 ai_summary）
+    existing_ai_summary = cached.get('ai_summary') if cached else None
     return DailyReportResponse(
         date=date,
         sunburst_data=sunburst_data,
         todo_data=todo_data,
         goal_data=goal_data,
         daily_trend_data=daily_trend_data,
+        ai_summary=existing_ai_summary,
         state=state,
         data_version=1
     )
@@ -269,6 +271,44 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
         state=state,
         data_version=1
     )
+
+
+async def get_daily_ai_summary(date: str, options: List[str]) -> dict:
+    """
+    获取每日 AI 总结（异步版本）
+    
+    调用 LLM 生成每日活动的智能分析总结，并保存到 daily_report 表
+    
+    Args:
+        date: 日期 YYYY-MM-DD
+        options: 总结选项列表
+            - behavior_stats: 各时段的主分类和子分类的占比统计
+            - longest_activities: 各时段内最长的活动记录
+            - goal_time_spent: 各目标花费的时间
+            - user_notes: 用户手动添加的时间块备注
+            - tasks: 今日重点内容
+            - all: 所有选项
+        
+    Returns:
+        dict: 包含 content 和 tokens_usage 的字典
+            - content: AI 生成的总结内容
+            - tokens_usage: Token 使用量统计
+    """
+    from lifewatch.llm.llm_classify.function.report_summary import daily_summary
+    
+    logger.info(f"生成每日 AI 总结 {date}, options={options}")
+    result = await daily_summary(date=date, options=options)
+    
+    # 保存 AI 总结到 daily_report 表
+    try:
+        daily_report_provider.upsert_daily_report(date, {
+            'ai_summary': result['content']
+        })
+        logger.info(f"已保存 AI 总结到日报告 {date}")
+    except Exception as e:
+        logger.error(f"保存 AI 总结失败: {e}")
+    
+    return result
 
 
 # ==================== 通用数据计算函数 ====================
@@ -1035,6 +1075,7 @@ def _daily_dict_to_response(data: Dict[str, Any]) -> DailyReportResponse:
         todo_data=todo_data,
         goal_data=goal_data,
         daily_trend_data=data.get('daily_trend_data'),
+        ai_summary=data.get('ai_summary'),
         state=data.get('state', '0'),
         data_version=data.get('data_version', 1)
     )

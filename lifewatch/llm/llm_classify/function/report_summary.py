@@ -3,12 +3,13 @@ from lifewatch.llm.llm_classify.utils import create_ChatTongyiModel
 from lifewatch.llm.llm_classify.tools.database_tools import get_daily_stats,get_multi_days_stats
 from lifewatch.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
-def daily_summary(date : str, options : list):
+async def daily_summary(date : str, options : list):
     """
-    生成每日总结
+    生成每日总结（异步版本）
     
     Args:
         date: 日期字符串，格式 YYYY-MM-DD
@@ -29,20 +30,26 @@ def daily_summary(date : str, options : list):
     llm = create_ChatTongyiModel(temperature=0.5)
     start_time = date + " 00:00:00"
     end_time = date + " 23:59:59"
-    result = get_daily_stats.invoke(
-        input = {
+    
+    # 在线程池中运行同步的工具调用，避免阻塞事件循环
+    result = await asyncio.to_thread(
+        get_daily_stats.invoke,
+        {
             "start_time": start_time,
             "end_time": end_time,
             "split_count": 4, 
             "options": options
         }
     )
+    
     prompt_template = daily_summary_template(input_variables=["user_data", "options"])
-    input = prompt_template.format(
+    prompt_input = prompt_template.format(
         options=options,
         user_data=result,
     )
-    output = llm.invoke(input=input)
+    
+    # 使用异步调用 LLM
+    output = await llm.ainvoke(input=prompt_input)
     
     # 提取 tokens 使用量
     tokens_usage = {
@@ -59,19 +66,22 @@ def daily_summary(date : str, options : list):
             'total_tokens': token_usage.get('total_tokens', 0)
         }
     
-    # 保存 tokens 使用量到数据库
+    # 保存 tokens 使用量到数据库（在线程池中运行）
     session_id = f"summary-{date}"
     try:
-        provider = LWBaseDataProvider()
-        usage_data = {
-            'input_tokens': tokens_usage['input_tokens'],
-            'output_tokens': tokens_usage['output_tokens'],
-            'total_tokens': tokens_usage['total_tokens'],
-            'search_count': 0,
-            'result_items_count': 0,
-            'mode': 'summary'
-        }
-        provider.upsert_session_tokens_usage(session_id, usage_data)
+        def save_tokens():
+            provider = LWBaseDataProvider()
+            usage_data = {
+                'input_tokens': tokens_usage['input_tokens'],
+                'output_tokens': tokens_usage['output_tokens'],
+                'total_tokens': tokens_usage['total_tokens'],
+                'search_count': 0,
+                'result_items_count': 0,
+                'mode': 'summary'
+            }
+            provider.upsert_session_tokens_usage(session_id, usage_data)
+        
+        await asyncio.to_thread(save_tokens)
         logger.info(f"已保存每日总结的 tokens 使用量: {session_id}, total_tokens={tokens_usage['total_tokens']}")
     except Exception as e:
         logger.error(f"保存 tokens 使用量失败: {e}")
@@ -81,9 +91,9 @@ def daily_summary(date : str, options : list):
         'tokens_usage': tokens_usage
     }
 
-def multi_days_summary(start_time : str, end_time : str, split_count : int, options : list):
+async def multi_days_summary(start_time : str, end_time : str, split_count : int, options : list):
     """
-    生成多日总结
+    生成多日总结（异步版本）
     
     Args:
         start_time: 开始时间字符串，格式 YYYY-MM-DD HH:MM:SS
@@ -100,20 +110,26 @@ def multi_days_summary(start_time : str, end_time : str, split_count : int, opti
                 - total_tokens: 总 token 数量
     """
     llm = create_ChatTongyiModel(temperature=0.5)
-    result = get_multi_days_stats.invoke(
-        input = {
+    
+    # 在线程池中运行同步的工具调用
+    result = await asyncio.to_thread(
+        get_multi_days_stats.invoke,
+        {
             "start_time": start_time,
             "end_time": end_time,
             "split_count": split_count, 
             "options": options
         }
     )
+    
     prompt_template = multi_days_summary_template(input_variables=["user_data", "options"])
-    input = prompt_template.format(
+    prompt_input = prompt_template.format(
         options=options,
         user_data=result,
     )
-    output = llm.invoke(input=input)
+    
+    # 使用异步调用 LLM
+    output = await llm.ainvoke(input=prompt_input)
     
     # 提取 tokens 使用量
     tokens_usage = {
@@ -131,22 +147,24 @@ def multi_days_summary(start_time : str, end_time : str, split_count : int, opti
         }
     
     # 保存 tokens 使用量到数据库
-    # 从时间字符串中提取日期部分
     start_date = start_time.split(' ')[0]
     end_date = end_time.split(' ')[0]
     session_id = f"summary-{start_date}_to_{end_date}"
     
     try:
-        provider = LWBaseDataProvider()
-        usage_data = {
-            'input_tokens': tokens_usage['input_tokens'],
-            'output_tokens': tokens_usage['output_tokens'],
-            'total_tokens': tokens_usage['total_tokens'],
-            'search_count': 0,
-            'result_items_count': 0,
-            'mode': 'summary'
-        }
-        provider.upsert_session_tokens_usage(session_id, usage_data)
+        def save_tokens():
+            provider = LWBaseDataProvider()
+            usage_data = {
+                'input_tokens': tokens_usage['input_tokens'],
+                'output_tokens': tokens_usage['output_tokens'],
+                'total_tokens': tokens_usage['total_tokens'],
+                'search_count': 0,
+                'result_items_count': 0,
+                'mode': 'summary'
+            }
+            provider.upsert_session_tokens_usage(session_id, usage_data)
+        
+        await asyncio.to_thread(save_tokens)
         logger.info(f"已保存多日总结的 tokens 使用量: {session_id}, total_tokens={tokens_usage['total_tokens']}")
     except Exception as e:
         logger.error(f"保存 tokens 使用量失败: {e}")
@@ -157,6 +175,9 @@ def multi_days_summary(start_time : str, end_time : str, split_count : int, opti
     }
 
 if __name__ == '__main__':
-    result = daily_summary(date="2025-12-28", options=["all"])
-    print(result["content"])
-    print(result["tokens_usage"])
+    async def main():
+        result = await daily_summary(date="2025-12-28", options=["all"])
+        print(result["content"])
+        print(result["tokens_usage"])
+    
+    asyncio.run(main())

@@ -328,7 +328,8 @@ class LLMLWDataProvider(LWBaseDataProvider):
         self, 
         start_time: str, 
         end_time: str,
-        segment_count: int
+        segment_count: int,
+        idle:bool=True,
     ) -> List[Dict[str, Any]]:
         """
         获取分段统计与分类占比（统一输出）
@@ -337,6 +338,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
             start_time: 开始时间 YYYY-MM-DD HH:MM:SS
             end_time: 结束时间 YYYY-MM-DD HH:MM:SS
             segment_count: 切分段数
+            idle: 是否包含空闲时间
         
         Returns:
             List[Dict]: 每段的统计数据，包含：
@@ -380,6 +382,11 @@ class LLMLWDataProvider(LWBaseDataProvider):
                 seg_df['duration_seconds'] = seg_df['duration_minutes'] * 60
                 total_active = int(seg_df['duration_seconds'].sum())
                 
+                # 确定分母
+                calc_base = seg_total if idle else total_active
+                if calc_base == 0:
+                    calc_base = 1
+                
                 # 主分类统计
                 cat_stats = seg_df.groupby('category_id').agg({
                     'duration_seconds': 'sum'
@@ -392,7 +399,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
                         "id": cat_id,
                         "name": category_name_map.get(cat_id, "未分类"),
                         "duration": duration,
-                        "percentage": round(duration / seg_total * 100, 2)
+                        "percentage": round(duration / calc_base * 100, 2)
                     })
                 
                 # 子分类统计
@@ -411,18 +418,19 @@ class LLMLWDataProvider(LWBaseDataProvider):
                         "name": sub_info[0],
                         "category_id": sub_info[1],
                         "duration": duration,
-                        "percentage": round(duration / seg_total * 100, 2)
+                        "percentage": round(duration / calc_base * 100, 2)
                     })
             
             # 添加空闲时间
-            idle_seconds = max(0, seg_total - total_active)
-            if idle_seconds > 0:
-                categories.append({
-                    "id": "idle",
-                    "name": "电脑空闲时间",
-                    "duration": idle_seconds,
-                    "percentage": round(idle_seconds / seg_total * 100, 2)
-                })
+            if idle:
+                idle_seconds = max(0, seg_total - total_active)
+                if idle_seconds > 0:
+                    categories.append({
+                        "id": "idle",
+                        "name": "电脑空闲时间",
+                        "duration": idle_seconds,
+                        "percentage": round(idle_seconds / seg_total * 100, 2)
+                    })
             
             # 按时长排序
             categories.sort(key=lambda x: x['duration'], reverse=True)

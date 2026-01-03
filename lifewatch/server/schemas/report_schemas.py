@@ -77,6 +77,7 @@ class DailyReportResponse(BaseModel):
     todo_data: Optional[TodoStatsData] = Field(default=None, description="Todo 统计数据")
     goal_data: Optional[List[GoalProgressData]] = Field(default=None, description="Goal 进度数据")
     daily_trend_data: Optional[List[Dict[str, Any]]] = Field(default=None, description="24小时趋势数据")
+    ai_summary: Optional[str] = Field(default=None, description="AI 总结内容")
     state: str = Field(default="0", description="数据状态 (0: 未完成, 1: 已完成)")
     data_version: int = Field(default=1, description="数据格式版本号")
 
@@ -177,3 +178,29 @@ class MonthlyReportQueryRequest(BaseModel):
     """查询月报告请求"""
     month: str = Field(..., description="月份 YYYY-MM")
     force_refresh: bool = Field(default=False, description="是否强制重新计算数据")
+
+
+# ============================================================================
+# AI Summary 请求/响应 Schemas
+# ============================================================================
+
+class TokenUsage(BaseModel):
+    """Token 使用量统计"""
+    input_tokens: int = Field(..., description="输入 token 数量")
+    output_tokens: int = Field(..., description="输出 token 数量")
+    total_tokens: int = Field(..., description="总 token 数量")
+
+
+class AISummaryResponse(BaseModel):
+    """AI 总结响应"""
+    content: str = Field(..., description="AI 生成的总结内容")
+    tokens_usage: TokenUsage = Field(..., description="Token 使用量统计")
+
+
+class AISummaryRequest(BaseModel):
+    """AI 总结请求"""
+    date: str = Field(..., description="日期 YYYY-MM-DD")
+    options: Optional[List[str]] = Field(
+        default=["all"], 
+        description="总结选项列表，如 behavior_stats, longest_activities, goal_time_spent, user_notes, tasks"
+    )

@@ -247,6 +247,7 @@ def get_multi_days_stats(
     """
     获取多天用户行为统计摘要数据，也可作为数据查询接口
     options: 可选参数列表
+     - behavior_stats: 用户行为统计
      - goal_trend: 目标时间投入趋势
      - tasks: 每日重点与任务
      - category_trend: 不同分类投入时间趋势
@@ -267,7 +268,12 @@ def get_multi_days_stats(
         prompt_parts.append(f"用户行为统计（{start_time} 至 {end_time}）\n")
         
         section_num = 1
-        
+        if fetch_all or "behavior_stats" in fetch_options:
+            behavior_stats = llm_lw_data_provider.get_segment_category_stats(start_time, end_time, segment_count=1,idle = False)
+            prompt_parts.append(f"\n{section_num}. 用户行为统计")
+            prompt_parts.append(_format_segment_category_stats(behavior_stats))
+            section_num += 1
+
         # 1. 目标花费时间
         if fetch_all or "goal_trend" in fetch_options:
             goal_trend = llm_lw_data_provider.get_daily_goal_trend(start_time, end_time)
@@ -283,7 +289,7 @@ def get_multi_days_stats(
             prompt_parts.append(summary)
             section_num += 1
         
-        # 3. 分类占比
+        # 3. 分类投入时间趋势
         if fetch_all or "category_trend" in fetch_options:
             category_trend = llm_lw_data_provider.get_daily_category_trend(start_time, end_time)
             prompt_parts.append(f"\n{section_num}. 分类占比")
@@ -336,4 +342,3 @@ if __name__ == "__main__":
         }
     )
     print(result)
-    print(llm_lw_data_provider.get_focus_and_todos("2026-01-01"))
