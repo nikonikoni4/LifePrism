@@ -445,6 +445,7 @@ class ChatBot:
         logger.debug(f"[norm_chat] 调用 LLM (with tools)...")
         try:
             result = await llm_with_tool.ainvoke(prompt)
+            logger.debug(f"[norm_chat] LLM 返回 result: {result}")
             logger.debug(f"[norm_chat] LLM 返回 result type: {type(result)}")
         except Exception as e:
             logger.error(f"[norm_chat] LLM 调用失败: {e}")
@@ -698,7 +699,7 @@ class ChatBot:
                 version="v2"  # 使用 v2 版本的事件格式
             ):
                 event_type = event.get("event", "")
-                logger.debug(f"[chat_stream_with_status] 收到事件: type={event_type}, name={event.get('name', 'N/A')}")
+                # logger.debug(f"[chat_stream_with_status] 收到事件: type={event_type}, name={event.get('name', 'N/A')}")
                 
                 # 节点开始事件
                 if event_type == "on_chain_start":

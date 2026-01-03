@@ -239,6 +239,120 @@ class LLMLWDataProvider(LWBaseDataProvider):
             "sub_categories": sub_categories
         }
 
+    def get_segment_category_stats(
+        self, 
+        start_time: str, 
+        end_time: str,
+        segment_count: int
+    ) -> List[Dict[str, Any]]:
+        """
+        获取分段统计与分类占比（统一输出）
+        
+        Args:
+            start_time: 开始时间 YYYY-MM-DD HH:MM:SS
+            end_time: 结束时间 YYYY-MM-DD HH:MM:SS
+            segment_count: 切分段数
+        
+        Returns:
+            List[Dict]: 每段的统计数据，包含：
+                - segment_start: 开始时间
+                - segment_end: 结束时间
+                - segment_total_seconds: 分段总时长
+                - categories: 主分类列表（含 idle）
+                - sub_categories: 子分类列表
+        """
+        # 解析时间
+        range_start = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        range_end = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+        
+        # 加载全部事件
+        df = self._load_events_in_range(start_time, end_time)
+        
+        # 获取分类名称映射
+        category_name_map, sub_category_name_map = self._get_category_name_maps()
+        
+        # 计算每段时长
+        total_seconds = (range_end - range_start).total_seconds()
+        segment_seconds = total_seconds / segment_count
+        
+        results = []
+        for i in range(segment_count):
+            seg_start = range_start + timedelta(seconds=i * segment_seconds)
+            seg_end = range_start + timedelta(seconds=(i + 1) * segment_seconds)
+            seg_total = int(segment_seconds)
+            
+            # 切割事件到分段范围
+            seg_df = slice_events_by_time_range(df, seg_start, seg_end)
+            
+            categories = []
+            sub_categories = []
+            
+            if seg_df.empty:
+                total_active = 0
+            else:
+                # 转换为秒
+                seg_df = seg_df.copy()
+                seg_df['duration_seconds'] = seg_df['duration_minutes'] * 60
+                total_active = int(seg_df['duration_seconds'].sum())
+                
+                # 主分类统计
+                cat_stats = seg_df.groupby('category_id').agg({
+                    'duration_seconds': 'sum'
+                }).reset_index()
+                
+                for _, row in cat_stats.iterrows():
+                    cat_id = str(row['category_id']) if pd.notna(row['category_id']) else "uncategorized"
+                    duration = int(row['duration_seconds'])
+                    categories.append({
+                        "id": cat_id,
+                        "name": category_name_map.get(cat_id, "未分类"),
+                        "duration": duration,
+                        "percentage": round(duration / seg_total * 100, 2)
+                    })
+                
+                # 子分类统计
+                sub_cat_stats = seg_df.groupby('sub_category_id').agg({
+                    'duration_seconds': 'sum'
+                }).reset_index()
+                
+                for _, row in sub_cat_stats.iterrows():
+                    sub_id = str(row['sub_category_id']) if pd.notna(row['sub_category_id']) else None
+                    if sub_id is None or sub_id == "None":
+                        continue
+                    duration = int(row['duration_seconds'])
+                    sub_info = sub_category_name_map.get(sub_id, ("未分类", ""))
+                    sub_categories.append({
+                        "id": sub_id,
+                        "name": sub_info[0],
+                        "category_id": sub_info[1],
+                        "duration": duration,
+                        "percentage": round(duration / seg_total * 100, 2)
+                    })
+            
+            # 添加空闲时间
+            idle_seconds = max(0, seg_total - total_active)
+            if idle_seconds > 0:
+                categories.append({
+                    "id": "idle",
+                    "name": "空闲",
+                    "duration": idle_seconds,
+                    "percentage": round(idle_seconds / seg_total * 100, 2)
+                })
+            
+            # 按时长排序
+            categories.sort(key=lambda x: x['duration'], reverse=True)
+            sub_categories.sort(key=lambda x: x['duration'], reverse=True)
+            
+            results.append({
+                "segment_start": seg_start.strftime("%Y-%m-%d %H:%M:%S"),
+                "segment_end": seg_end.strftime("%Y-%m-%d %H:%M:%S"),
+                "segment_total_seconds": seg_total,
+                "categories": categories,
+                "sub_categories": sub_categories
+            })
+        
+        return results
+
     def get_longest_activities(
         self, 
         start_time: str, 
@@ -614,6 +728,103 @@ class LLMLWDataProvider(LWBaseDataProvider):
         
         return results
 
+    def get_computer_usage_schedule(self, start_date: str, end_date: str) -> Optional[str]:
+        """
+        分析电脑使用时间以推断可能的作息时间
+        
+        每天的分析从 4:00 开始（而非 0:00），这样可以更准确地反映实际作息。
+        例如：凌晨 2:00 的活动会被归入前一天。
+        
+        Args:
+            start_date: 开始日期 YYYY-MM-DD
+            end_date: 结束日期 YYYY-MM-DD
+        
+        Returns:
+            str: 格式化的每日电脑使用时间分析
+                格式示例：
+                2026-01-03:
+                  - 最早记录在 08:30，活动为 Chrome - 查看邮件
+                  - 最晚记录在 23:45，活动为 VSCode - 编写代码
+        """
+        from collections import defaultdict
+        from datetime import datetime, timedelta
+        
+        # 解析日期
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        
+        # 扩展查询范围：从 start_date 的 4:00 开始，到 end_date+1 的 4:00 结束
+        query_start = start_dt + timedelta(hours=4)
+        query_end = end_dt + timedelta(days=1, hours=4)
+        
+        # 加载事件数据
+        df = self._load_events_in_range(
+            query_start.strftime("%Y-%m-%d %H:%M:%S"),
+            query_end.strftime("%Y-%m-%d %H:%M:%S")
+        )
+        
+        if df.empty:
+            return None
+        
+        # 按"逻辑日期"分组（4:00 作为分界点）
+        # 如果时间 < 4:00，归入前一天；否则归入当天
+        def get_logical_date(dt):
+            if dt.hour < 4:
+                return (dt - timedelta(days=1)).date()
+            else:
+                return dt.date()
+        
+        df = df.copy()
+        df['logical_date'] = df['start_dt'].apply(get_logical_date)
+        
+        # 按逻辑日期分组，找出每天的最早和最晚记录
+        daily_schedule = defaultdict(lambda: {"earliest": None, "latest": None})
+        
+        for _, row in df.iterrows():
+            logical_date = row['logical_date']
+            start_dt = row['start_dt']
+            
+            # 构建活动描述
+            app = row.get('app', '未知应用')
+            title = row.get('title', '')
+            if title and len(title) > 50:
+                title = title[:50] + "..."
+            activity = f"{app} - {title}" if title else app
+            
+            record = {
+                "time": start_dt,
+                "activity": activity
+            }
+            
+            # 更新最早记录
+            if daily_schedule[logical_date]["earliest"] is None or start_dt < daily_schedule[logical_date]["earliest"]["time"]:
+                daily_schedule[logical_date]["earliest"] = record
+            
+            # 更新最晚记录
+            if daily_schedule[logical_date]["latest"] is None or start_dt > daily_schedule[logical_date]["latest"]["time"]:
+                daily_schedule[logical_date]["latest"] = record
+        
+        # 格式化输出
+        output_lines = []
+        
+        for date in sorted(daily_schedule.keys()):
+            schedule = daily_schedule[date]
+            output_lines.append(f"{date.strftime('%Y-%m-%d')}:")
+            
+            if schedule["earliest"]:
+                earliest_time = schedule["earliest"]["time"].strftime("%H:%M")
+                earliest_activity = schedule["earliest"]["activity"]
+                output_lines.append(f"  - 最早记录在 {earliest_time}，活动为 {earliest_activity}")
+            
+            if schedule["latest"]:
+                latest_time = schedule["latest"]["time"].strftime("%H:%M")
+                latest_activity = schedule["latest"]["activity"]
+                output_lines.append(f"  - 最晚记录在 {latest_time}，活动为 {latest_activity}")
+            
+            output_lines.append("")  # 空行分隔
+        
+        return "\n".join(output_lines).strip()
+
     def get_focus_and_todos(self, start_time: str, end_time: str) -> Optional[str]:
         """
         获取指定日期范围的重点内容和待办事项
@@ -688,7 +899,9 @@ class LLMLWDataProvider(LWBaseDataProvider):
 llm_lw_data_provider = LazySingleton(LLMLWDataProvider)
 
 if __name__ == "__main__":
-    print("=== 重点与待办统计 ===")
+    print("=== 电脑使用时间分析（作息推断） ===")
+    print(llm_lw_data_provider.get_computer_usage_schedule("2025-12-25", "2025-12-30"))
+    print("\n=== 重点与待办统计 ===")
     print(llm_lw_data_provider.get_focus_and_todos("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
     print("=== 目标时长统计 ===")
     print(llm_lw_data_provider.get_daily_goal_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
@@ -696,3 +909,6 @@ if __name__ == "__main__":
     print(llm_lw_data_provider.get_daily_category_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
     print("\n=== 用户备注 ===")
     print(llm_lw_data_provider.get_user_focus_notes("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
+    print("\n=== 电脑使用时间分析（作息推断） ===")
+    print(llm_lw_data_provider.get_computer_usage_schedule("2025-12-25", "2025-12-30"))
+    

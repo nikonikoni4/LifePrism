@@ -23,41 +23,40 @@ def _format_seconds(seconds: int) -> str:
         return f"{hours}小时"
 
 
-def _format_stats(stats: list) -> str:
-    """格式化分段统计数据"""
-    if not stats:
+def _format_segment_category_stats(segments_data: list) -> str:
+    """格式化分段统计与分类占比数据（统一输出）
+    
+    Args:
+        segments_data: 包含每个时段的统计和分类信息的列表
+    
+    Returns:
+        格式化的字符串，每个时段包含时间范围和分类占比，子分类嵌套在主分类下
+    """
+    if not segments_data:
         return "  - 暂无数据"
     
     lines = []
-    for i, seg in enumerate(stats, 1):
+    for i, seg in enumerate(segments_data, 1):
+        # 时段标题
         lines.append(f"  - 时段{i}（{seg['segment_start']} 至 {seg['segment_end']}）")
-        lines.append(f"    - 活跃时间: {_format_seconds(seg['active_seconds'])}（{seg['active_percentage']}%）")
-        lines.append(f"    - 空闲时间: {_format_seconds(seg['idle_seconds'])}（{seg['idle_percentage']}%）")
-    return "\n".join(lines)
-
-
-def _format_category_distribution(dist: dict) -> str:
-    """格式化分类占比数据"""
-    if not dist:
-        return "  - 暂无数据"
-    
-    lines = []
-    total_seconds = dist.get("segment_total_seconds", 0)
-    lines.append(f"  - 统计时长: {_format_seconds(total_seconds)}")
-    
-    # 主分类
-    categories = dist.get("categories", [])
-    if categories:
-        lines.append("  - 主分类占比:")
-        for cat in categories:
-            lines.append(f"    - {cat['name']}: {_format_seconds(cat['duration'])}（{cat['percentage']}%）")
-    
-    # 子分类
-    sub_categories = dist.get("sub_categories", [])
-    if sub_categories:
-        lines.append("  - 子分类占比:")
-        for sub in sub_categories:
-            lines.append(f"    - {sub['name']}: {_format_seconds(sub['duration'])}（{sub['percentage']}%）")
+        
+        # 主分类占比
+        categories = seg.get('categories', [])
+        sub_categories = seg.get('sub_categories', [])
+        
+        if categories:
+            lines.append("    - 主分类占比:")
+            
+            # 为每个主分类找到对应的子分类
+            for cat in categories:
+                cat_id = cat['id']
+                lines.append(f"      - {cat['name']}: {_format_seconds(cat['duration'])}（{cat['percentage']}%）")
+                
+                # 找到属于这个主分类的子分类
+                if sub_categories and cat_id != 'idle':  # 空闲没有子分类
+                    related_subs = [sub for sub in sub_categories if sub.get('category_id') == cat_id]
+                    for sub in related_subs:
+                        lines.append(f"         - {sub['name']}: {_format_seconds(sub['duration'])}（{sub['percentage']}%）")
     
     return "\n".join(lines)
 
@@ -118,18 +117,17 @@ def get_daily_stats(
     start_time: Annotated[str, "开始时间 YYYY-MM-DD HH:MM:SS"],
     end_time: Annotated[str, "结束时间 YYYY-MM-DD HH:MM:SS"],
     split_count: Annotated[int, "切分时间段,把时间分成n个时间段,以获得更加详细的行为统计,长时段split_count应该更大,短时段split_count应该更小"],
-    options: Annotated[list, "可选参数,stats,category_distribution,longest_activities,goal_time_spent,user_notes,tasks,all"] = None
+    options: Annotated[list, "可选参数,category_stats,longest_activities,goal_time_spent,user_notes,tasks,all"] = None
 ) -> str:
     """
     获取时间段小于24h的用户行为统计摘要数据，也可作为数据查询接口
     
     返回指定时间段内的完整统计（格式化文本）：
-    - stats: 各时段的活跃/空闲统计
-    - category_distribution: 主分类和子分类的占比
+    - category_stats: 各时段的主分类和子分类的占比统计
     - longest_activities: 各时段内最长的活动记录
     - goal_time_spent: 各目标花费的时间
     - user_notes: 用户手动添加的时间块备注
-    - today_focus: 今日重点内容
+    - tasks: 今日重点内容
     """
     try:
         # 解析 options，默认返回全部
@@ -145,25 +143,15 @@ def get_daily_stats(
         
         section_num = 1
         
-        # 1. 分段统计
-        if fetch_all or "stats" in fetch_options:
-            stats = llm_lw_data_provider.get_stats_by_time_segments(
+        # 1. 分段统计与分类占比（统一输出）
+        if fetch_all or "category_stats" in fetch_options:
+            segments_data = llm_lw_data_provider.get_segment_category_stats(
                 start_time=start_time,
                 end_time=end_time,
                 segment_count=split_count
             )
-            prompt_parts.append(f"{section_num}. 分段活跃统计")
-            prompt_parts.append(_format_stats(stats))
-            section_num += 1
-        
-        # 2. 分类占比
-        if fetch_all or "category_distribution" in fetch_options:
-            distribution = llm_lw_data_provider.get_category_distribution(
-                start_time=start_time,
-                end_time=end_time
-            )
-            prompt_parts.append(f"\n{section_num}. 分类时间占比")
-            prompt_parts.append(_format_category_distribution(distribution))
+            prompt_parts.append(f"{section_num}. 分段活跃统计与分类占比")
+            prompt_parts.append(_format_segment_category_stats(segments_data))
             section_num += 1
         
         # 3. 最长活动
@@ -214,10 +202,17 @@ def get_daily_stats(
 def get_multi_days_stats(
     start_time: Annotated[str, "开始时间 YYYY-MM-DD HH:MM:SS"],
     end_time: Annotated[str, "结束时间 YYYY-MM-DD HH:MM:SS"],
-    options: Annotated[list, "可选参数,goal_trend,tasks,category_trend,user_notes,all"] = None
+    options: Annotated[list, "可选参数,goal_trend,tasks,category_trend,user_notes,usage_schedule,all"] = None
 ) -> str:
     """
     获取多天用户行为统计摘要数据，也可作为数据查询接口
+    options: 可选参数列表
+     - goal_trend: 目标时间投入趋势
+     - tasks: 每日重点与任务
+     - category_trend: 不同分类投入时间趋势
+     - user_notes: 用户备注
+     - usage_schedule: 电脑使用时间分析（作息推断）
+     - all: 返回全部
     """
     try:
         # 解析 options，默认返回全部
@@ -262,17 +257,41 @@ def get_multi_days_stats(
             prompt_parts.append(_format_user_notes(notes))
             section_num += 1
         
+        # 5. 电脑使用时间分析（作息推断）
+        if fetch_all or "usage_schedule" in fetch_options:
+            # 从时间字符串中提取日期部分
+            start_date = start_time.split()[0]  # YYYY-MM-DD
+            end_date = end_time.split()[0]  # YYYY-MM-DD
+            usage_schedule = llm_lw_data_provider.get_computer_usage_schedule(start_date, end_date)
+            prompt_parts.append(f"\n{section_num}. 电脑使用时间分析（作息推断）")
+            if usage_schedule:
+                # 增加缩进，使输出整齐
+                lines = usage_schedule.strip().split('\n')
+                formatted_schedule = "\n".join([f"  {line}" for line in lines])
+                prompt_parts.append(formatted_schedule)
+            else:
+                prompt_parts.append("  - 暂无数据")
+            section_num += 1
+        
         return "\n".join(prompt_parts)
         
     except Exception as e:
         return f"获取用户行为统计失败: {str(e)}"
 
 if __name__ == "__main__":
+    result = get_daily_stats.invoke(
+        input = {
+            "start_time": "2025-12-30 00:00:00",
+            "end_time": "2025-12-30 23:59:59",
+            "split_count": 2,
+            "options": ["all"]
+        }
+    )
+    print(result)
     result = get_multi_days_stats.invoke(
         input = {
             "start_time": "2025-12-25 00:00:00",
-            "end_time": "2025-12-30 23:59:59",
-            "split_count": 2,
+            "end_time": "2026-01-03 23:59:59",
             "options": ["all"]
         }
     )
