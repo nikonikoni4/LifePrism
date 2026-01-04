@@ -25,9 +25,11 @@ const getMonthEndDate = (month: string): string => {
 
 interface MonthlyReviewTabProps {
     className?: string;
+    /** 点击图表数据点时跳转到日报告的回调 */
+    onNavigateToDaily?: (date: string) => void;
 }
 
-const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) => {
+const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '', onNavigateToDaily }) => {
     // 默认使用本月
     const [selectedMonth, setSelectedMonth] = useState<string>(() => {
         const today = new Date();
@@ -214,7 +216,9 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '' }) =
                         data={displayTrendData}
                         categories={displayData.categories}
                         title="月度时间分布趋势"
+                        subtitle="点击数据点可查看当日详情"
                         height={300}
+                        onDataPointClick={onNavigateToDaily}
                     />
                 </div>
 

@@ -17,14 +17,33 @@ import { getMockDailyReport } from '../mockData';
 
 interface DailyReviewTabProps {
     className?: string;
+    /** 从外部导航传入的初始日期 (YYYY-MM-DD) */
+    initialDate?: string;
+    /** 当 initialDate 被使用后的回调 */
+    onDateUsed?: () => void;
 }
 
-const DailyReviewTab: React.FC<DailyReviewTabProps> = ({ className = '' }) => {
-    // 默认使用今天的日期
+const DailyReviewTab: React.FC<DailyReviewTabProps> = ({
+    className = '',
+    initialDate,
+    onDateUsed
+}) => {
+    // 默认使用今天的日期，如果有外部传入的日期则使用它
     const [selectedDate, setSelectedDate] = useState<string>(() => {
+        if (initialDate) {
+            return initialDate;
+        }
         const today = new Date();
         return today.toISOString().split('T')[0];
     });
+
+    // 当 initialDate 变化时更新日期并通知父组件
+    React.useEffect(() => {
+        if (initialDate && initialDate !== selectedDate) {
+            setSelectedDate(initialDate);
+            onDateUsed?.();
+        }
+    }, [initialDate, selectedDate, onDateUsed]);
 
     // 数据状态
     const [reportData, setReportData] = useState<DailyReportData | null>(null);

@@ -4,7 +4,7 @@
  * 报告统计页面 - 提供每日、每周、每月总结
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { FileBarChart } from 'lucide-react';
 import DailyReviewTab from './components/DailyReviewTab';
 import WeeklyReviewTab from './components/WeeklyReviewTab';
@@ -13,12 +13,28 @@ import { ReportTabType } from './types';
 
 const ReportsPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<ReportTabType>('daily');
+    // 用于从周/月视图跳转到日视图时设置的日期
+    const [selectedDailyDate, setSelectedDailyDate] = useState<string | null>(null);
 
     const tabs = [
         { id: 'daily' as ReportTabType, label: '每日总结', emoji: '📅' },
         { id: 'weekly' as ReportTabType, label: '每周总结', emoji: '📊' },
         { id: 'monthly' as ReportTabType, label: '每月总结', emoji: '📈' },
     ];
+
+    /** 从周/月视图跳转到日报告 */
+    const handleNavigateToDaily = useCallback((date: string) => {
+        setSelectedDailyDate(date);
+        setActiveTab('daily');
+    }, []);
+
+    /** 当用户手动切换 tab 时，清除导航日期 */
+    const handleTabChange = useCallback((tabId: ReportTabType) => {
+        if (tabId !== 'daily') {
+            setSelectedDailyDate(null);
+        }
+        setActiveTab(tabId);
+    }, []);
 
     return (
         <div className="fixed inset-0 lg:left-64 flex flex-col animate-fade-in bg-[#F1F5F9] overflow-hidden">
@@ -45,10 +61,10 @@ const ReportsPage: React.FC = () => {
                         return (
                             <button
                                 key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
+                                onClick={() => handleTabChange(tab.id)}
                                 className={`py-2 text-xs font-bold uppercase tracking-widest transition-all relative flex items-center gap-2 ${isActive
-                                        ? 'text-purple-600'
-                                        : 'text-slate-400 hover:text-slate-600'
+                                    ? 'text-purple-600'
+                                    : 'text-slate-400 hover:text-slate-600'
                                     }`}
                             >
                                 <span>{tab.emoji}</span>
@@ -65,9 +81,18 @@ const ReportsPage: React.FC = () => {
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto p-6 no-scrollbar">
                 <div className="max-w-7xl mx-auto">
-                    {activeTab === 'daily' && <DailyReviewTab />}
-                    {activeTab === 'weekly' && <WeeklyReviewTab />}
-                    {activeTab === 'monthly' && <MonthlyReviewTab />}
+                    {activeTab === 'daily' && (
+                        <DailyReviewTab
+                            initialDate={selectedDailyDate || undefined}
+                            onDateUsed={() => setSelectedDailyDate(null)}
+                        />
+                    )}
+                    {activeTab === 'weekly' && (
+                        <WeeklyReviewTab onNavigateToDaily={handleNavigateToDaily} />
+                    )}
+                    {activeTab === 'monthly' && (
+                        <MonthlyReviewTab onNavigateToDaily={handleNavigateToDaily} />
+                    )}
                 </div>
             </main>
         </div>
@@ -75,3 +100,4 @@ const ReportsPage: React.FC = () => {
 };
 
 export default ReportsPage;
+

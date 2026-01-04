@@ -217,9 +217,12 @@ function transformWeeklyReportResponse(response: WeeklyReportAPIResponse): Weekl
 
     // 转换周趋势数据（7天每天的分布）
     const weeklyTrend: TimeDistributionPoint[] = response.daily_trend_data?.map(point => {
-        const result: Record<string, any> = { label: point.label };
+        const result: Record<string, any> = {
+            label: point.label,
+            date: point.date  // 保留日期字段用于图表点击导航
+        };
         for (const key of Object.keys(point)) {
-            if (key !== 'label') {
+            if (key !== 'label' && key !== 'date') {
                 result[key] = point[key];
             }
         }
@@ -445,9 +448,12 @@ function transformMonthlyReportResponse(response: MonthlyReportAPIResponse): Mon
 
     // 转换月度趋势数据（用于折线图）
     const monthlyTrend: TimeDistributionPoint[] = response.daily_trend_data?.map(point => {
-        const result: Record<string, any> = { label: point.label };
+        const result: Record<string, any> = {
+            label: point.label,
+            date: point.date  // 保留日期字段用于图表点击导航
+        };
         for (const key of Object.keys(point)) {
-            if (key !== 'label') {
+            if (key !== 'label' && key !== 'date') {
                 result[key] = point[key];
             }
         }

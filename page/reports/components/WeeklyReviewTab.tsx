@@ -17,6 +17,8 @@ import { getMockWeeklyReport } from '../mockData';
 
 interface WeeklyReviewTabProps {
     className?: string;
+    /** 点击图表数据点时跳转到日报告的回调 */
+    onNavigateToDaily?: (date: string) => void;
 }
 
 /** 获取指定日期所在周的起止日期 */
@@ -36,7 +38,7 @@ const getWeekRange = (date: Date): { start: string; end: string } => {
     };
 };
 
-const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => {
+const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '', onNavigateToDaily }) => {
     // 默认使用本周
     const [weekOffset, setWeekOffset] = useState<number>(0);
 
@@ -193,8 +195,9 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '' }) => 
                         data={displayData.weeklyTrend}
                         categories={displayData.categories}
                         title="周度趋势折线图"
-                        subtitle="展示周一至周日各分类的每日时长波动"
+                        subtitle="展示周一至周日各分类的每日时长波动，点击数据点可查看当日详情"
                         height={260}
+                        onDataPointClick={onNavigateToDaily}
                     />
                 </div>
                 <div className="lg:col-span-4 space-y-6">

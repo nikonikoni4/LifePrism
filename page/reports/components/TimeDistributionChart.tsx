@@ -26,6 +26,8 @@ interface TimeDistributionChartProps {
     xAxisLabel?: string;
     className?: string;
     height?: number;
+    /** 点击数据点时的回调，参数为对应日期 (YYYY-MM-DD) */
+    onDataPointClick?: (date: string) => void;
 }
 
 /** 自定义 Tooltip */
@@ -65,7 +67,8 @@ const TimeDistributionChart: React.FC<TimeDistributionChartProps> = ({
     subtitle,
     xAxisLabel,
     className = '',
-    height = 280
+    height = 280,
+    onDataPointClick
 }) => {
     // 将分钟转换为小时
     const processedData = React.useMemo(() => {
@@ -142,9 +145,28 @@ const TimeDistributionChart: React.FC<TimeDistributionChartProps> = ({
             </div>
 
             {/* Chart */}
-            <div style={{ height }}>
+            <div style={{ height }} className={onDataPointClick ? 'cursor-pointer' : ''}>
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={processedData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                    <LineChart
+                        data={processedData}
+                        margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
+                        onClick={(e) => {
+                            console.log('[TimeDistributionChart] onClick triggered', e);
+                            if (onDataPointClick && e && e.activeTooltipIndex !== undefined) {
+                                const index = parseInt(String(e.activeTooltipIndex), 10);
+                                const clickedData = processedData[index];
+                                console.log('[TimeDistributionChart] clickedData:', clickedData);
+                                const date = clickedData?.date as string;
+                                console.log('[TimeDistributionChart] date:', date);
+                                if (date) {
+                                    console.log('[TimeDistributionChart] Navigating to date:', date);
+                                    onDataPointClick(date);
+                                } else {
+                                    console.warn('[TimeDistributionChart] No date found in data point:', clickedData);
+                                }
+                            }
+                        }}
+                    >
                         <CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="3 3" />
                         <XAxis
                             dataKey="label"
@@ -190,7 +212,12 @@ const TimeDistributionChart: React.FC<TimeDistributionChartProps> = ({
                                     stroke={cat.color}
                                     strokeWidth={2}
                                     dot={{ fill: cat.color, strokeWidth: 0, r: 3 }}
-                                    activeDot={{ r: 5, strokeWidth: 0 }}
+                                    activeDot={{
+                                        r: onDataPointClick ? 7 : 5,
+                                        strokeWidth: onDataPointClick ? 2 : 0,
+                                        stroke: onDataPointClick ? '#fff' : undefined,
+                                        style: onDataPointClick ? { cursor: 'pointer', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' } : undefined
+                                    }}
                                     animationDuration={800}
                                 />
                             )
