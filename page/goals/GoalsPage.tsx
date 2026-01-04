@@ -131,7 +131,11 @@ const GoalsPage: React.FC = () => {
                     />
                 )}
 
-                {activeTab !== 'todo' && activeTab !== 'plan' && (
+                {/* Being Tab - Full width without container constraints */}
+                {activeTab === 'being' && <BeingTabView />}
+
+                {/* Other tabs with container constraints */}
+                {activeTab !== 'todo' && activeTab !== 'plan' && activeTab !== 'being' && (
                     <div className="flex-1 overflow-y-auto p-0 no-scrollbar">
                         <div className="max-w-6xl mx-auto p-2 h-full">
                             {/* Goal Tab Logic: Toggle between List and Detail */}
@@ -148,7 +152,6 @@ const GoalsPage: React.FC = () => {
                             )}
 
                             {activeTab === 'reward' && <RewardTabView />}
-                            {activeTab === 'being' && <BeingTabView />}
                         </div>
                     </div>
                 )}

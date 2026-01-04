@@ -328,3 +328,130 @@ export interface TaskFolder {
 export interface TaskFolderListResponse {
     items: TaskFolder[];
 }
+
+// ============================================================================
+// Being Types (时间悖论测试 - 与后端 API 对齐)
+// ============================================================================
+
+/** 测试模式类型 */
+export type BeingMode = 'past' | 'present' | 'future';
+
+// ==================== Past (我曾经是谁?) ====================
+
+/** 评判项 */
+export interface JudgeItem {
+    judge: string;  // (+/0/-)
+    reason: string;
+    time: string;
+}
+
+/** 我曾经是谁的问题项 */
+export interface WhoWasIItem {
+    id: number;
+    content: string;
+    judgeItems?: JudgeItem[];
+}
+
+/** 积极过去重构项 */
+export interface PositivePastReframingItem {
+    id: number;
+    negativePast: string;
+    positiveTakeaways: string;
+    howPositiveTakeawaysHelpMe: string;
+}
+
+/** Past 模式响应数据 */
+export interface WhoWasIData {
+    whoWasIItems: WhoWasIItem[];
+    positivePastReframingItems: PositivePastReframingItem[];
+}
+
+// ==================== Present (我现在是谁?) ====================
+
+/** 我现在是谁项 */
+export interface WhoAmIItem {
+    id: number;
+    whoAmI: string;
+}
+
+/** 现在是什么时候项 */
+export interface WhatTimeItem {
+    id: number;
+    whatTime: string;
+}
+
+/** 我现在在哪里项 */
+export interface WhereAmIItem {
+    id: number;
+    whereAmI: string;
+}
+
+/** 我现在感觉如何项 */
+export interface HowAmIFeelingItem {
+    id: number;
+    howAmIFeeling: string;
+}
+
+/** Present 模式响应数据 */
+export interface WhoAmIData {
+    whoAmIItems: WhoAmIItem[];
+    whatTimeItems: WhatTimeItem[];
+    whereAmIItems: WhereAmIItem[];
+    howAmIFeelingItems: HowAmIFeelingItem[];
+}
+
+// ==================== Future (我未来会成为什么样的人?) ====================
+
+/** 我未来会成为什么样的人项 */
+export interface WhoIWantToBeItem {
+    id: number;
+    whoIWantToBe: string;
+}
+
+/** 具体目标项 */
+export interface SpecificGoalsItem {
+    id: number;
+    specificGoals: string;
+    whenWillIReachThem: string;
+}
+
+/** Future 模式响应数据 */
+export interface WhoIWantToBeData {
+    whoIWantToBeItems: WhoIWantToBeItem[];
+    specificGoalsItems: SpecificGoalsItem[];
+}
+
+// ==================== API 响应类型 ====================
+
+/** 测试记录响应 */
+export interface BeingTestResponse {
+    id: number;
+    userId: number;
+    mode: BeingMode;
+    version: number;
+    content: WhoWasIData | WhoAmIData | WhoIWantToBeData;
+    aiAbstract: string | null;
+    createdAt: string | null;
+    updatedAt: string | null;
+}
+
+/** 版本简要信息 */
+export interface BeingVersionInfo {
+    id: number;
+    version: number;
+    createdAt: string | null;
+    updatedAt: string | null;
+    hasAiAbstract: boolean;
+}
+
+/** 版本列表响应 */
+export interface BeingVersionListResponse {
+    mode: BeingMode;
+    versions: BeingVersionInfo[];
+}
+
+/** 操作成功响应 */
+export interface BeingSuccessResponse {
+    success: boolean;
+    message: string;
+}

@@ -759,3 +759,147 @@ export const MOCK_USAGE_HISTORY: TokenUsage[] = [
     { date: '11-30', inputTokens: 7500, outputTokens: 3200, processedRecords: 210 },
     { date: '12-01', inputTokens: 5800, outputTokens: 2400, processedRecords: 168 },
 ];
+
+// ============================================================================
+// Being API - 时间悖论测试接口
+// ============================================================================
+
+import {
+    BeingMode,
+    BeingTestResponse,
+    BeingVersionListResponse,
+    BeingSuccessResponse,
+    WhoWasIData,
+    WhoAmIData,
+    WhoIWantToBeData
+} from './types';
+
+const BEING_API_BASE = '/api/v2/being';
+
+export const beingApi = {
+    /**
+     * 获取最新版本测试
+     * @param mode 模式 (past/present/future)
+     * @param userId 用户 ID，默认为 1
+     */
+    getLatestTest: async (mode: BeingMode, userId: number = 1): Promise<BeingTestResponse | null> => {
+        try {
+            const res = await fetch(`${BEING_API_BASE}/${mode}?user_id=${userId}`);
+            if (res.status === 404) {
+                return null;
+            }
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            return toCamelCase(data);
+        } catch (error) {
+            console.error(`[beingApi] getLatestTest failed:`, error);
+            return null;
+        }
+    },
+
+    /**
+     * 获取版本列表
+     * @param mode 模式 (past/present/future)
+     * @param userId 用户 ID，默认为 1
+     */
+    getVersions: async (mode: BeingMode, userId: number = 1): Promise<BeingVersionListResponse> => {
+        const res = await fetch(`${BEING_API_BASE}/${mode}/versions?user_id=${userId}`);
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    /**
+     * 获取指定版本测试
+     * @param mode 模式 (past/present/future)
+     * @param version 版本号
+     * @param userId 用户 ID，默认为 1
+     */
+    getTestByVersion: async (mode: BeingMode, version: number, userId: number = 1): Promise<BeingTestResponse | null> => {
+        try {
+            const res = await fetch(`${BEING_API_BASE}/${mode}/${version}?user_id=${userId}`);
+            if (res.status === 404) {
+                return null;
+            }
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            return toCamelCase(data);
+        } catch (error) {
+            console.error(`[beingApi] getTestByVersion failed:`, error);
+            return null;
+        }
+    },
+
+    /**
+     * 创建新版本测试
+     * @param mode 模式 (past/present/future)
+     * @param content 测试内容
+     * @param userId 用户 ID，默认为 1
+     */
+    createTest: async (
+        mode: BeingMode,
+        content: WhoWasIData | WhoAmIData | WhoIWantToBeData,
+        userId: number = 1
+    ): Promise<BeingTestResponse> => {
+        const res = await fetch(`${BEING_API_BASE}/${mode}?user_id=${userId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: toSnakeCase(content) })
+        });
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    /**
+     * 更新指定版本测试
+     * @param mode 模式 (past/present/future)
+     * @param version 版本号
+     * @param content 测试内容
+     * @param userId 用户 ID，默认为 1
+     */
+    updateTest: async (
+        mode: BeingMode,
+        version: number,
+        content: WhoWasIData | WhoAmIData | WhoIWantToBeData,
+        userId: number = 1
+    ): Promise<BeingSuccessResponse> => {
+        const res = await fetch(`${BEING_API_BASE}/${mode}/${version}?user_id=${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: toSnakeCase(content) })
+        });
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    /**
+     * 删除指定版本测试
+     * @param mode 模式 (past/present/future)
+     * @param version 版本号
+     * @param userId 用户 ID，默认为 1
+     */
+    deleteTest: async (mode: BeingMode, version: number, userId: number = 1): Promise<BeingSuccessResponse> => {
+        const res = await fetch(`${BEING_API_BASE}/${mode}/${version}?user_id=${userId}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        return toCamelCase(data);
+    },
+
+    /**
+     * 生成 AI 总结 (功能待实现)
+     * @param mode 模式 (past/present/future)
+     * @param version 版本号
+     * @param userId 用户 ID，默认为 1
+     */
+    generateAiAbstract: async (mode: BeingMode, version: number, userId: number = 1): Promise<BeingSuccessResponse> => {
+        const res = await fetch(`${BEING_API_BASE}/${mode}/${version}/ai-abstract?user_id=${userId}`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        return toCamelCase(data);
+    }
+};
