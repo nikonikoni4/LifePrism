@@ -777,7 +777,7 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
         )
         
         if df is None or df.empty:
-            return _build_empty_weekly_trend()
+            return _build_empty_weekly_trend(start_date)
         
         # 获取分类名称映射
         categories_df = server_lw_data_provider.load_categories()
@@ -827,7 +827,7 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
         
     except Exception as e:
         logger.error(f"计算周趋势数据失败: {e}")
-        return _build_empty_weekly_trend()
+        return _build_empty_weekly_trend(start_date)
 
 
 def _calc_monthly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
@@ -887,7 +887,7 @@ def _calc_monthly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
         for i in range(days):
             current_date = start_dt + timedelta(days=i)
             day_of_month = current_date.day
-            data_point = {'label': str(day_of_month)}
+            data_point = {'label': str(day_of_month), 'date': str(current_date)}
             
             # 为所有分类设置值（没有数据的为 0）
             for cat_name in all_categories:
@@ -1130,18 +1130,23 @@ def _build_empty_hourly_trend() -> List[Dict[str, Any]]:
     return [{'label': str(h)} for h in range(24)]
 
 
-def _build_empty_weekly_trend() -> List[Dict[str, Any]]:
+def _build_empty_weekly_trend(start_date: str = None) -> List[Dict[str, Any]]:
     """构建空的周趋势数据"""
     weekday_names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    if start_date:
+        from datetime import datetime, timedelta
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+        return [{'label': name, 'date': str(start_dt + timedelta(days=i))} for i, name in enumerate(weekday_names)]
     return [{'label': name} for name in weekday_names]
 
 
 def _build_empty_monthly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """构建空的月趋势数据"""
+    from datetime import datetime, timedelta
     start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
     end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
     days = (end_dt - start_dt).days + 1
-    return [{'label': str(i + 1)} for i in range(days)]
+    return [{'label': str(i + 1), 'date': str(start_dt + timedelta(days=i))} for i in range(days)]
 
 
 def _build_empty_heatmap(start_date: str, end_date: str) -> List[HeatmapDataItem]:

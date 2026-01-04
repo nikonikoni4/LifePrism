@@ -1011,11 +1011,6 @@ monthly_report_config = {
             'constraints': ['DEFAULT NULL'],
             'comment': '24小时趋势数据 (TimeDistributionPoint[] JSON)'
         },
-        'heatmap_data': {
-            'type': 'TEXT',
-            'constraints': ['DEFAULT NULL'],
-            'comment': '热力图数据 (HeatmapDataItem[] JSON)'
-        },
         'state': {
             'type': 'TEXT',
             'constraints': ['DEFAULT 0'],
@@ -1044,9 +1039,49 @@ monthly_report_config = {
     'timestamps': True,
     'update_at': True
 }
-
-
-
+"""时间悖论里的测试，过去，现在，未来"""
+TIME_PARADOXES_CONFIG={
+    
+    'table_name':'time_paradoxes',
+    'columns':{
+        'id':{
+            'type':'INTEGER',
+            'constraints':['PRIMARY KEY','NOT NULL'],
+            'comment':'ID'
+        },
+        'user_id':{
+            'type':'INTEGER',
+            'constraints':['NOT NULL'],
+            'comment':'用户ID'
+        },
+        'version':{
+            'type':'INTEGER',
+            'constraints':['NOT NULL'],
+            'comment':'版本号'
+        },
+        'mode':{
+            'type':'TEXT',
+            'constraints':['NOT NULL'],
+            'comment':'模式（past/present/future）'
+        },
+        'content':{
+            'type':'TEXT',
+            'constraints':['NOT NULL'],
+            'comment':'具体测试内容'
+        },
+        'ai_abstract':{
+            'type':'TEXT',
+            'constraints':['DEFAULT NULL'],
+            'comment':'AI总结'
+        }
+    },
+    'table_constraints':['UNIQUE(user_id,mode,version)'],
+    'indexes':[
+        {'name':'idx_time_paradoxes_user_id_mode_version','columns':['user_id','mode','version']}
+    ],
+    'timestamps':True,
+    'update_at':True
+}
 
 
 
@@ -1074,6 +1109,7 @@ TABLE_CONFIGS = {
     'daily_report': daily_report_config,
     'weekly_report': weekly_report_config,
     'monthly_report': monthly_report_config,
+    'time_paradoxes': TIME_PARADOXES_CONFIG,
 }
 
 
