@@ -61,7 +61,7 @@ class LWTableManager:
         table_constraints = config.get('table_constraints', [])
         indexes = config.get('indexes', [])
         timestamps = config.get('timestamps', False)
-        
+        update_at = config.get('update_at', False)
         # 1. 构建列定义
         column_definitions = []
         for col_name, col_config in columns.items():
@@ -80,11 +80,10 @@ class LWTableManager:
             column_definitions.append(
                 "created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
             )
-            # 只有首次创建时添加updated_at，某些表不需要
-            if table_name == 'single_purpose_map_cache' or table_name == 'multi_purpose_map_cache' or table_name == 'daily_report' or table_name == "weekly_report" or table_name == "monthly_report":
-                column_definitions.append(
-                    "updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
-                )
+        if update_at:
+            column_definitions.append(
+                "updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
+            )
         
         # 3. 添加表级约束
         all_constraints = column_definitions + table_constraints

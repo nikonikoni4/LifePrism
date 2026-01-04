@@ -59,7 +59,8 @@ MULTI_PURPOSE_MAP_CACHE_CONFIG = {
     },
     'table_constraints': ['UNIQUE (app, title, state)'],  # 唯一约束：保证数据不重复
     'indexes': [],
-    'timestamps': True  # 自动添加 created_at, updated_at
+    'timestamps': True,  # 自动添加 created_at, updated_at
+    'update_at': True
 }
 
 SINGLE_PURPOSE_MAP_CACHE_CONFIG= {
@@ -108,7 +109,8 @@ SINGLE_PURPOSE_MAP_CACHE_CONFIG= {
     },
     'table_constraints': ['UNIQUE (app, state)'],  # 唯一约束：保证数据不重复
     'indexes': [],
-    'timestamps': True  # 自动添加 created_at, updated_at
+    'timestamps': True,  # 自动添加 created_at, updated_at
+    'update_at': True
 }
 category_map_cache_CONFIG = {
     'table_name': 'category_map_cache',
@@ -923,7 +925,8 @@ daily_report_config = {
     'indexes': [
         {'name': 'idx_daily_report_date', 'columns': ['date']}
     ],
-    'timestamps': True
+    'timestamps': True,
+    'update_at': True
 }
 
 
@@ -975,7 +978,8 @@ weekly_report_config = {
     'indexes': [
         {'name': 'idx_daily_report_date', 'columns': ['date']}
     ],
-    'timestamps': True
+    'timestamps': True,
+    'update_at': True
 }
 
 
@@ -1037,7 +1041,8 @@ monthly_report_config = {
     'indexes': [
         {'name': 'idx_daily_report_date', 'columns': ['date']}
     ],
-    'timestamps': True
+    'timestamps': True,
+    'update_at': True
 }
 
 
