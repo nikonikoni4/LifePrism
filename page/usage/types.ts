@@ -3,7 +3,7 @@
  * 
  * API 使用量和费用追踪相关类型定义
  * 
- * 对应后端 schema: lifewatch/server/schemas/usage_schemas.py
+ * 对应后端 schema: lifeprism/server/schemas/usage_schemas.py
  */
 
 // ============================================================================

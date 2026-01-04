@@ -101,7 +101,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
     // 功能模式列表
     const FEATURE_MODES: FeatureMode[] = [
         { id: 'default', name: '正常聊天', icon: <MessageCircle size={16} /> },
-        { id: 'lifewatch', name: 'LifeWatch 功能讲解', icon: <BookOpen size={16} /> },
+        { id: 'lifeprism', name: 'LifeWatch 功能讲解', icon: <BookOpen size={16} /> },
     ];
 
     const scrollToBottom = () => {

@@ -37,7 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, onChatToggle
           <div className="w-10 h-10 bg-morandi-blue rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-morandi-blue/20 shadow-lg">
             L
           </div>
-          <span className="hidden lg:block font-bold text-xl tracking-tight text-slate-800">LifeWatchAI</span>
+          <span className="hidden lg:block font-bold text-xl tracking-tight text-slate-800">LifePrism</span>
         </div>
       </div>
 

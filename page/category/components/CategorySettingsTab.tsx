@@ -8,7 +8,7 @@
  * 后端 Timeline 缩略图使用对应的 200 系列颜色映射。
  * 
  * 如果更换调色盘（不再使用 Tailwind 500 系列），请同步更新：
- * @see lifewatch/server/providers/category_color_provider.py 中的 TAILWIND_500_TO_300 映射表
+ * @see lifeprism/server/providers/category_color_provider.py 中的 TAILWIND_500_TO_300 映射表
  * 后端有备用方案（动态计算柔和色），但 Tailwind 映射效果更好。
  */
 

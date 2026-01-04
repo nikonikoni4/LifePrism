@@ -326,7 +326,7 @@ const adjustBrightness = (hex: string, percent: number): string => {
 //
 // 【维护说明】
 // - 颜色映射表需与后端 category_color_provider.py 的 TAILWIND_500_TO_300 保持同步
-// - @see lifewatch/server/providers/category_color_provider.py
+// - @see lifeprism/server/providers/category_color_provider.py
 // ============================================================================
 
 /**

@@ -3,7 +3,7 @@
  * 
  * API 使用量相关接口
  * 
- * 对应后端 API: lifewatch/server/api/usage.py
+ * 对应后端 API: lifeprism/server/api/usage.py
  */
 
 import { UsageStatsResponse } from './types';

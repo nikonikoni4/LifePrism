@@ -76,7 +76,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
         return (
             <div className="max-w-7xl mx-auto">
                 <header className="mb-6">
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifeWatchAI</h1>
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifePrism</h1>
                     <p className="text-slate-500 mt-1 font-medium">愿此行, 终抵群星</p>
                 </header>
                 <div className="flex items-center justify-center h-96">
@@ -91,7 +91,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
         return (
             <div className="max-w-7xl mx-auto">
                 <header className="mb-6">
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifeWatchAI</h1>
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifePrism</h1>
                     <p className="text-slate-500 mt-1 font-medium">愿此行, 终抵群星</p>
                 </header>
                 <div className="flex flex-col items-center justify-center h-96 text-red-500 gap-4">
@@ -112,7 +112,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
         <div className="max-w-7xl mx-auto">
             {/* Page Header */}
             <header className="mb-6">
-                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifeWatchAI</h1>
+                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifePrism</h1>
                 <p className="text-slate-500 mt-1 font-medium">愿此行, 终抵群星</p>
             </header>
 
@@ -161,7 +161,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
             </div>
 
             <div className="mt-16 text-center border-t border-gray-200 pt-8 pb-4">
-                <p className="text-slate-400 text-sm font-medium">© 2024 LifeWatchAI. Crafted with Gemini.</p>
+                <p className="text-slate-400 text-sm font-medium">© 2024 LifePrism. Crafted with Gemini.</p>
             </div>
         </div>
     );
