@@ -18,6 +18,7 @@ from lifewatch.server.api import (
     setting_router,
     reward_router,
     report_router,
+    being_router,
 )
 from lifewatch.storage.lw_table_manager import init_database
 from lifewatch.server.providers.category_color_provider import initialize_category_colors
@@ -117,6 +118,7 @@ app.include_router(chatbot_router, prefix="/api/v2")  # Chatbot
 app.include_router(setting_router, prefix="/api/v2")  # Settings
 app.include_router(reward_router, prefix="/api/v2")  # Reward
 app.include_router(report_router, prefix="/api/v2")  # Report 日报告
+app.include_router(being_router, prefix="/api/v2")  # Being 时间悖论测试
 
 
 

@@ -2,7 +2,7 @@
 # ===============================
 # 我曾经是谁？的测试schemas
 # ===============================
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel,Field
 class JudgeItem(BaseModel): 
     judge: str = Field(..., description="判断（+/0/-）") 
@@ -64,3 +64,44 @@ class WhoIWantToBeResponse(BaseModel):
     version:int = Field(...,description="版本")
     who_i_want_to_be_items:List[WhoIWantToBeItem]
     specific_goals_items:List[SpecificGoalsItem]
+
+
+
+# ==================== 请求/响应模型 ====================
+
+class BeingTestContent(BaseModel):
+    """测试内容基类"""
+    content: Dict[str, Any] = Field(..., description="测试内容 JSON")
+
+
+class BeingTestResponse(BaseModel):
+    """测试记录响应"""
+    id: int = Field(..., description="记录 ID")
+    user_id: int = Field(..., description="用户 ID")
+    mode: str = Field(..., description="模式 (past/present/future)")
+    version: int = Field(..., description="版本号")
+    content: Dict[str, Any] = Field(..., description="测试内容")
+    ai_abstract: Optional[str] = Field(None, description="AI 总结")
+    created_at: Optional[str] = Field(None, description="创建时间")
+    updated_at: Optional[str] = Field(None, description="更新时间")
+
+
+class VersionInfo(BaseModel):
+    """版本简要信息"""
+    id: int = Field(..., description="记录 ID")
+    version: int = Field(..., description="版本号")
+    created_at: Optional[str] = Field(None, description="创建时间")
+    updated_at: Optional[str] = Field(None, description="更新时间")
+    has_ai_abstract: bool = Field(False, description="是否有 AI 总结")
+
+
+class VersionListResponse(BaseModel):
+    """版本列表响应"""
+    mode: str = Field(..., description="模式")
+    versions: List[VersionInfo] = Field(..., description="版本列表")
+
+
+class SuccessResponse(BaseModel):
+    """操作成功响应"""
+    success: bool = Field(..., description="是否成功")
+    message: str = Field(..., description="消息")
