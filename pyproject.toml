@@ -1,11 +1,11 @@
-# pyproject.toml - LifeWatch-AI 项目配置
+# pyproject.toml - LifePrism 项目配置
 
 [build-system]
 requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lifewatch"
+name = "lifeprism"
 version = "0.1.0"
 description = "AI-powered software monitoring and classification system"
 requires-python = ">=3.8"
@@ -27,4 +27,4 @@ dev = [
     "pytest>=6.0",
 ]
 [tool.setuptools]
-packages = ["lifewatch"]
+packages = ["lifeprism"]
