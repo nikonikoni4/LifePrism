@@ -80,10 +80,10 @@ class LWTableManager:
             column_definitions.append(
                 "created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
             )
-        if update_at:
-            column_definitions.append(
-                "updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
-            )
+            if update_at:
+                column_definitions.append(
+                    "updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
+                ) 
         
         # 3. 添加表级约束
         all_constraints = column_definitions + table_constraints
