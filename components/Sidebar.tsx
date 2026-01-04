@@ -34,8 +34,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, onChatToggle
       {/* Logo Area */}
       <div className="px-4 lg:px-8 mb-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-morandi-blue rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-morandi-blue/20 shadow-lg">
-            L
+          <div className="w-10 h-10 overflow-hidden">
+            <img
+              src="/lifeprism.svg"
+              alt="LifePrism Logo"
+              className="w-full h-full object-cover"
+            />
           </div>
           <span className="hidden lg:block font-bold text-xl tracking-tight text-slate-800">LifePrism</span>
         </div>
