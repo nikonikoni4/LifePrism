@@ -65,6 +65,8 @@ const TODO_COLORS = [
     '#F3F4F6'  // Grey
 ];
 
+
+
 // --- Types ---
 interface WeekData {
     id: string;
@@ -1017,6 +1019,10 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
         const text = newTodoInput[date];
         if (!text?.trim()) return;
 
+        // Randomly select a color from TODO_COLORS (excluding white)
+        const colorOptions = TODO_COLORS.slice(1);
+        const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+
         // 清空输入框
         setNewTodoInput(prev => ({ ...prev, [date]: '' }));
 
@@ -1027,7 +1033,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             orderIndex: 999,
             poolOrderIndex: null,
             content: text,
-            color: '#FFFFFF',
+            color: randomColor,
             state: 'active',
             linkToGoalId: null,
             date: date,
@@ -1054,7 +1060,7 @@ const PlanTabView: React.FC<PlanTabViewProps> = ({ onNavigateToTodo }) => {
             const newTodo = await todoApi.createTodo({
                 content: text,
                 date: date,
-                color: '#FFFFFF',
+                color: randomColor,
                 crossDay: false
             });
 
