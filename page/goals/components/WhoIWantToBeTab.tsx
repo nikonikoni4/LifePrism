@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Rocket,
   Target,
@@ -8,7 +8,7 @@ import {
   Trash2,
   BookOpen,
   Sparkles,
-  Zap,
+  Compass,
   Loader2,
   Check,
   ChevronDown,
@@ -44,6 +44,9 @@ const WhoIWantToBeTab: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
+
+  // 防止 StrictMode 重复请求
+  const hasFetched = useRef(false);
 
   // 加载最新版本数据
   const loadLatestData = useCallback(async () => {
@@ -86,7 +89,10 @@ const WhoIWantToBeTab: React.FC = () => {
     }
   };
 
+  // 初始加载 - 使用 hasFetched 防止重复请求
   useEffect(() => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
     loadLatestData();
   }, [loadLatestData]);
 
@@ -157,55 +163,78 @@ const WhoIWantToBeTab: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-full w-full flex items-center justify-center">
+      <div className="h-full w-full flex items-center justify-center" style={{ backgroundColor: '#FDFBF9' }}>
         <div className="flex flex-col items-center gap-4">
-          <Loader2 size={32} className="text-indigo-400 animate-spin" />
-          <p className="text-slate-500 font-medium">加载中...</p>
+          <Loader2 size={32} className="animate-spin" style={{ color: '#A89F91' }} />
+          <p className="font-medium" style={{ color: '#9B9590' }}>加载中...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full overflow-y-auto no-scrollbar pb-20 px-4 md:px-12 pt-6 animate-fade-in font-sans">
+    <div
+      className="h-full w-full overflow-y-auto no-scrollbar pb-24 px-6 md:px-16 pt-8 animate-fade-in font-sans"
+      style={{ backgroundColor: '#FDFBF9' }}
+    >
 
       {/* Header */}
-      <div className="max-w-3xl mx-auto text-center mb-12">
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <div className="inline-flex items-center justify-center p-3 bg-indigo-50 rounded-full text-indigo-500 shadow-sm border border-indigo-100">
-            <Rocket size={20} />
+      <div className="max-w-2xl mx-auto text-center mb-16">
+        <div className="flex items-center justify-center gap-4 mb-6">
+          <div
+            className="inline-flex items-center justify-center w-12 h-12 rounded-full"
+            style={{ backgroundColor: '#F3F0EB', color: '#9A8F80' }}
+          >
+            <Compass size={22} strokeWidth={1.5} />
           </div>
 
           {/* Version Selector */}
           <div className="relative">
             <button
               onClick={() => setShowVersionDropdown(!showVersionDropdown)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-full text-sm font-medium text-indigo-600 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-all duration-200"
+              style={{
+                backgroundColor: '#F5F3EE',
+                color: '#7A746B',
+                border: '1px solid #E8E4DD'
+              }}
             >
               {version ? `版本 ${version}` : '新版本'}
-              <ChevronDown size={16} className={`transition-transform ${showVersionDropdown ? 'rotate-180' : ''}`} />
+              <ChevronDown size={16} className={`transition-transform duration-200 ${showVersionDropdown ? 'rotate-180' : ''}`} />
             </button>
 
             {showVersionDropdown && (
-              <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-xl border border-indigo-100 overflow-hidden z-50 min-w-[160px]">
+              <div
+                className="absolute top-full mt-2 left-0 rounded-2xl overflow-hidden z-50 min-w-[160px]"
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  boxShadow: '0 10px 40px -10px rgba(139, 126, 109, 0.2)',
+                  border: '1px solid #E8E4DD'
+                }}
+              >
                 {versions.length > 0 ? (
                   versions.map(v => (
                     <button
                       key={v.id}
                       onClick={() => loadVersion(v.version)}
-                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-indigo-50 transition-colors flex items-center justify-between ${v.version === version ? 'bg-indigo-50 font-medium' : ''}`}
+                      className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between"
+                      style={{
+                        backgroundColor: v.version === version ? '#F5F3EE' : 'transparent',
+                        color: '#5C574F'
+                      }}
                     >
                       <span>版本 {v.version}</span>
-                      {v.version === version && <Check size={14} className="text-indigo-500" />}
+                      {v.version === version && <Check size={14} style={{ color: '#A89F91' }} />}
                     </button>
                   ))
                 ) : (
-                  <div className="px-4 py-3 text-sm text-slate-400">暂无历史版本</div>
+                  <div className="px-4 py-3 text-sm" style={{ color: '#9B9590' }}>暂无历史版本</div>
                 )}
-                <div className="border-t border-indigo-100">
+                <div style={{ borderTop: '1px solid #E8E4DD' }}>
                   <button
                     onClick={handleCreateNew}
-                    className="w-full px-4 py-2.5 text-left text-sm text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center gap-2"
+                    className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center gap-2"
+                    style={{ color: '#8B7355' }}
                   >
                     <Plus size={14} />
                     创建新版本
@@ -217,34 +246,56 @@ const WhoIWantToBeTab: React.FC = () => {
 
           <button
             onClick={loadLatestData}
-            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            className="p-2.5 rounded-xl transition-all duration-200"
+            style={{ color: '#A89F91' }}
             title="刷新"
           >
             <RefreshCw size={18} />
           </button>
         </div>
 
-        <h2 className="text-3xl md:text-4xl font-bold text-slate-800 tracking-tight mb-4">Architecting Your Future</h2>
-        <p className="text-slate-500 text-lg leading-relaxed font-medium">
-          Define the identity you are stepping into and the milestones that mark the path.
+        <h2
+          className="text-3xl md:text-4xl font-semibold tracking-tight mb-4"
+          style={{ color: '#3D3A36' }}
+        >
+          构建你的未来
+        </h2>
+        <p className="text-lg leading-relaxed" style={{ color: '#9B9590' }}>
+          定义你正在迈向的身份，以及标记道路的里程碑。
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto space-y-12">
+      <div className="max-w-2xl mx-auto space-y-12">
 
         {/* Section 1: Future Identity */}
-        <section className="bg-white rounded-[2.5rem] p-8 md:p-12 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-indigo-50 relative overflow-hidden">
-          {/* Decorative soft gradients */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-50/40 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-50/40 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none"></div>
+        <section
+          className="rounded-[2rem] p-8 md:p-10 relative overflow-hidden"
+          style={{
+            backgroundColor: '#FFFFFF',
+            boxShadow: '0 4px 30px -8px rgba(139, 126, 109, 0.12)',
+            border: '1px solid #F0EDE8'
+          }}
+        >
+          {/* Subtle warm gradient overlay */}
+          <div
+            className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-25"
+            style={{ backgroundColor: '#EDE8E0' }}
+          />
+          <div
+            className="absolute bottom-0 left-0 w-48 h-48 rounded-full blur-3xl -ml-10 -mb-10 pointer-events-none opacity-20"
+            style={{ backgroundColor: '#E8EDE6' }}
+          />
 
-          <div className="relative z-10 mb-10 flex items-center gap-5 border-b border-slate-50 pb-6">
-            <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm">
-              <Sparkles size={26} strokeWidth={1.5} />
+          <div className="relative z-10 mb-8 flex items-center gap-4 pb-6" style={{ borderBottom: '1px solid #F5F3EE' }}>
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center"
+              style={{ backgroundColor: '#F5F3EE', color: '#A89F91' }}
+            >
+              <Sparkles size={22} strokeWidth={1.5} />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-800">Future Identity</h3>
-              <p className="text-slate-400 text-sm font-medium mt-1">Who will you become?</p>
+              <h3 className="text-lg font-semibold" style={{ color: '#3D3A36' }}>未来的身份</h3>
+              <p className="text-sm mt-0.5" style={{ color: '#9B9590' }}>你将成为谁？</p>
             </div>
           </div>
 
@@ -252,21 +303,45 @@ const WhoIWantToBeTab: React.FC = () => {
             {data.whoIWantToBeItems.map((item, index) => (
               <div key={item.id} className="group transition-all duration-300">
                 <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs shadow-sm shrink-0">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium shrink-0"
+                    style={{ backgroundColor: '#F5F3EE', color: '#A89F91' }}
+                  >
                     {index + 1}
                   </div>
                   <div className="flex-1 relative">
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm pl-4 pointer-events-none select-none">I will become a...</span>
+                    <span
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-sm pointer-events-none select-none"
+                      style={{ color: '#C5B9A8' }}
+                    >
+                      我将成为...
+                    </span>
                     <input
                       type="text"
                       value={item.whoIWantToBe}
                       onChange={(e) => handleIdentityChange(item.id, e.target.value)}
-                      className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-transparent focus:border-indigo-200 rounded-2xl py-4 pl-36 pr-12 text-slate-700 font-bold outline-none transition-all placeholder-slate-300 shadow-sm focus:shadow-md focus:ring-4 focus:ring-indigo-50"
-                      placeholder="visionary leader..."
+                      className="w-full rounded-xl py-4 pl-28 pr-12 text-base font-medium outline-none transition-all duration-200"
+                      style={{
+                        backgroundColor: '#FAF9F7',
+                        color: '#3D3A36',
+                        border: '1px solid transparent'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.backgroundColor = '#FFFFFF';
+                        e.target.style.border = '1px solid #E8E4DD';
+                        e.target.style.boxShadow = '0 2px 12px -4px rgba(139, 126, 109, 0.15)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.backgroundColor = '#FAF9F7';
+                        e.target.style.border = '1px solid transparent';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                      placeholder="有远见的领导者..."
                     />
                     <button
                       onClick={() => removeIdentity(item.id)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200"
+                      style={{ color: '#C5B9A8' }}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -275,78 +350,131 @@ const WhoIWantToBeTab: React.FC = () => {
               </div>
             ))}
 
-            <div className="pl-12 pt-2">
+            <div className="pl-12 pt-3">
               <button
                 onClick={addIdentity}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all border border-transparent hover:border-indigo-200 border-dashed tracking-wider uppercase"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
+                style={{
+                  color: '#A89F91',
+                  border: '1px dashed #D9D4CC'
+                }}
               >
-                <Plus size={14} /> Add Identity Statement
+                <Plus size={16} /> 添加身份宣言
               </button>
             </div>
           </div>
         </section>
 
-        {/* Section 2: Specific Goals */}
-        <section className="space-y-8">
-          <div className="flex items-center gap-5 px-2">
-            <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
-              <Target size={26} strokeWidth={1.5} />
+        {/* Section 2: Concrete Milestones */}
+        <section className="space-y-6">
+          <div className="flex items-center gap-4 px-2 mb-8">
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center"
+              style={{ backgroundColor: '#F2F5F0', color: '#8A9A7E' }}
+            >
+              <Target size={22} strokeWidth={1.5} />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-800">Concrete Milestones</h3>
-              <p className="text-slate-400 text-sm font-medium mt-1">Tangible targets and deadlines.</p>
+              <h3 className="text-lg font-semibold" style={{ color: '#3D3A36' }}>具体的里程碑</h3>
+              <p className="text-sm mt-0.5" style={{ color: '#9B9590' }}>切实的目标和期限</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6">
+          <div className="space-y-5">
             {data.specificGoalsItems.map((item, index) => (
-              <div key={item.id} className="bg-white rounded-[2rem] p-6 md:p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-emerald-50/50 hover:border-emerald-200 hover:shadow-lg transition-all group relative">
+              <div
+                key={item.id}
+                className="rounded-[2rem] p-6 md:p-8 relative group transition-all duration-300"
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  boxShadow: '0 2px 20px -6px rgba(139, 126, 109, 0.1)',
+                  border: '1px solid #F0EDE8'
+                }}
+              >
                 <button
                   onClick={() => removeGoal(item.id)}
-                  className="absolute top-6 right-6 p-2 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                  className="absolute top-6 right-6 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200"
+                  style={{ color: '#C5B9A8' }}
                 >
                   <Trash2 size={18} />
                 </button>
 
-                <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
+                {/* Vertical Stack */}
+                <div className="space-y-5">
                   {/* Goal Input */}
-                  <div className="flex-1 w-full space-y-2">
-                    <label className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest">
-                      <Zap size={14} className="text-emerald-400" /> Specific Goal
+                  <div className="space-y-3">
+                    <label
+                      className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: '#9B9590' }}
+                    >
+                      <Rocket size={14} style={{ color: '#A89F91' }} /> 具体目标
                     </label>
                     <textarea
                       value={item.specificGoals}
                       onChange={(e) => handleGoalChange(item.id, 'specificGoals', e.target.value)}
-                      className="w-full bg-slate-50 focus:bg-white border border-transparent focus:border-emerald-200 rounded-2xl p-4 text-slate-800 font-bold leading-relaxed resize-none outline-none transition-all placeholder-slate-300 text-lg min-h-[100px]"
-                      placeholder="What exactly do you want to achieve?"
+                      className="w-full rounded-xl p-4 text-base leading-relaxed resize-none outline-none transition-all duration-200 min-h-[90px]"
+                      style={{
+                        backgroundColor: '#FAF9F7',
+                        color: '#3D3A36',
+                        border: '1px solid transparent'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.backgroundColor = '#FFFFFF';
+                        e.target.style.border = '1px solid #E8E4DD';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.backgroundColor = '#FAF9F7';
+                        e.target.style.border = '1px solid transparent';
+                      }}
+                      placeholder="你具体想要实现什么？"
                     />
                   </div>
 
                   {/* Timeline Input */}
-                  <div className="w-full md:w-1/3 space-y-2">
-                    <label className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest">
-                      <Calendar size={14} className="text-blue-400" /> Deadline
+                  <div className="space-y-3">
+                    <label
+                      className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: '#9B9590' }}
+                    >
+                      <Calendar size={14} style={{ color: '#9AADB8' }} /> 期限
                     </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={item.whenWillIReachThem}
-                        onChange={(e) => handleGoalChange(item.id, 'whenWillIReachThem', e.target.value)}
-                        className="w-full bg-slate-50 focus:bg-white border border-transparent focus:border-blue-200 rounded-2xl p-4 text-slate-700 font-mono font-medium outline-none transition-all placeholder-slate-300"
-                        placeholder="e.g. Dec 2025"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      value={item.whenWillIReachThem}
+                      onChange={(e) => handleGoalChange(item.id, 'whenWillIReachThem', e.target.value)}
+                      className="w-full md:w-1/2 rounded-xl p-4 text-base outline-none transition-all duration-200"
+                      style={{
+                        backgroundColor: '#F7FAFB',
+                        color: '#3D3A36',
+                        border: '1px solid transparent',
+                        fontFamily: "'SF Mono', 'Monaco', monospace"
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.backgroundColor = '#FFFFFF';
+                        e.target.style.border = '1px solid #D8E5EA';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.backgroundColor = '#F7FAFB';
+                        e.target.style.border = '1px solid transparent';
+                      }}
+                      placeholder="例如：2025年12月"
+                    />
                   </div>
                 </div>
               </div>
             ))}
 
+            {/* Add Goal Button */}
             <button
               onClick={addGoal}
-              className="w-full py-6 rounded-[2rem] border-2 border-dashed border-slate-200 text-slate-400 font-bold hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center gap-2"
+              className="w-full py-6 rounded-[2rem] font-medium flex flex-col items-center justify-center gap-2 transition-all duration-300"
+              style={{
+                border: '2px dashed #D9D4CC',
+                color: '#A89F91'
+              }}
             >
-              <Plus size={24} />
-              <span>Add New Milestone</span>
+              <Plus size={22} />
+              <span>添加新里程碑</span>
             </button>
           </div>
         </section>
@@ -356,12 +484,13 @@ const WhoIWantToBeTab: React.FC = () => {
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className={`px-10 py-5 rounded-2xl font-bold shadow-[0_10px_20px_-5px_rgba(15,23,42,0.3)] hover:shadow-[0_15px_25px_-5px_rgba(15,23,42,0.4)] hover:-translate-y-1 transition-all flex items-center gap-3 text-sm tracking-wide ${saveStatus === 'success'
-                ? 'bg-emerald-600 text-white'
-                : saveStatus === 'error'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-slate-900 text-white'
-              } ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}
+            className="px-10 py-4 rounded-2xl font-semibold transition-all duration-300 flex items-center gap-3 text-base"
+            style={{
+              backgroundColor: saveStatus === 'success' ? '#7A9A6D' : saveStatus === 'error' ? '#B07070' : '#5C574F',
+              color: '#FFFFFF',
+              boxShadow: '0 8px 24px -8px rgba(92, 87, 79, 0.35)',
+              opacity: isSaving ? 0.7 : 1
+            }}
           >
             {isSaving ? (
               <>
@@ -381,7 +510,7 @@ const WhoIWantToBeTab: React.FC = () => {
             ) : (
               <>
                 <BookOpen size={18} />
-                <span>Save Future Self</span>
+                <span>保存未来愿景</span>
               </>
             )}
           </button>
