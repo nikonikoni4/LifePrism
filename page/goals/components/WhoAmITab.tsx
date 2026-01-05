@@ -13,19 +13,16 @@ import {
   Check,
   ChevronDown,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Palette
 } from 'lucide-react';
 import { beingApi } from '../api';
 import {
   WhoAmIData,
-  WhoAmIItem,
-  WhatTimeItem,
-  WhereAmIItem,
-  HowAmIFeelingItem,
   BeingVersionInfo
 } from '../types';
 
-// --- 默认初始数据 ---
+// --- Types & Constants ---
 const INITIAL_DATA: WhoAmIData = {
   whoAmIItems: [
     { id: 1, whoAmI: "" },
@@ -49,17 +46,194 @@ const INITIAL_DATA: WhoAmIData = {
   ]
 };
 
-// --- Calming Question Section Component ---
+// --- Theme Definition ---
+interface ThemeType {
+  id: string;
+  name: string;
+  colors: {
+    bg: string;
+    cardBg: string;
+    textMain: string;
+    textSub: string;
+    textMuted: string;
+    border: string;
+    inputBg: string;
+    inputHoverBg: string;
+    inputFocusBg: string;
+    inputPlaceholder: string;
+    inputRing: string;
+    actionBtnBg: string;
+    actionBtnText: string;
+    actionBtnBorder: string;
+    danger: string;
+    success: string;
+    primaryBtnBg: string;
+    primaryBtnText: string;
+    glowColor: string;
+    sections: {
+      iconBg: string;
+      iconColor: string;
+    }[];
+  }
+}
+
+const THEMES: Record<string, ThemeType> = {
+  soft: {
+    id: 'soft',
+    name: '雅致',
+    colors: {
+      bg: '#FDFBF9',
+      cardBg: '#FFFFFF',
+      textMain: '#2C2A26',
+      textSub: '#5C574F',
+      textMuted: '#8B7E74',
+      border: '#E8E4DD',
+      inputBg: '#FAF9F7',
+      inputHoverBg: '#F5F5F5',
+      inputFocusBg: '#FFFFFF',
+      inputPlaceholder: '#A89F91',
+      inputRing: 'rgba(139, 126, 109, 0.12)',
+      actionBtnBg: '#F5F3EE',
+      actionBtnText: '#5C574F',
+      actionBtnBorder: '#E8E4DD',
+      danger: '#B07070',
+      success: '#7A9A6D',
+      primaryBtnBg: '#5C574F',
+      primaryBtnText: '#FFFFFF',
+      glowColor: '#F5EFE6',
+      sections: [
+        { iconBg: '#FBF6EE', iconColor: '#AF9164' },
+        { iconBg: '#F5F3EE', iconColor: '#89968E' },
+        { iconBg: '#F3F5F4', iconColor: '#7A8C86' },
+        { iconBg: '#FBF5F5', iconColor: '#AC908C' }
+      ]
+    }
+  },
+  balanced: {
+    id: 'balanced',
+    name: '温润',
+    colors: {
+      bg: '#F7F6F5', // Stone-50ish, cleaner than soft, warmer than contrast
+      cardBg: '#FFFFFF',
+      textMain: '#292524', // Stone-800
+      textSub: '#44403C',  // Stone-700
+      textMuted: '#78716C', // Stone-500
+      border: '#E7E5E4',   // Stone-200
+      inputBg: '#F5F5F4',  // Stone-100
+      inputHoverBg: '#E7E5E4',
+      inputFocusBg: '#FFFFFF',
+      inputPlaceholder: '#A8A29E',
+      inputRing: 'rgba(68, 64, 60, 0.1)',
+      actionBtnBg: '#FFFFFF',
+      actionBtnText: '#44403C',
+      actionBtnBorder: '#E7E5E4',
+      danger: '#DC2626',
+      success: '#16A34A',
+      primaryBtnBg: '#44403C',
+      primaryBtnText: '#FFFFFF',
+      glowColor: '#E7E5E4',
+      sections: [
+        { iconBg: '#FFF7ED', iconColor: '#C2410C' }, // Orange-ish/Stone blend
+        { iconBg: '#F0FDF4', iconColor: '#15803D' }, // Green
+        { iconBg: '#ECFEFF', iconColor: '#0E7490' }, // Cyan
+        { iconBg: '#FFF1F2', iconColor: '#BE123C' }  // Rose
+      ]
+    }
+  },
+  contrast: {
+    id: 'contrast',
+    name: '清晰',
+    colors: {
+      bg: '#F2F4F6',
+      cardBg: '#FFFFFF',
+      textMain: '#111827',
+      textSub: '#374151',
+      textMuted: '#6B7280',
+      border: '#D1D5DB',
+      inputBg: '#F3F4F6',
+      inputHoverBg: '#E5E7EB',
+      inputFocusBg: '#FFFFFF',
+      inputPlaceholder: '#9CA3AF',
+      inputRing: 'rgba(0, 0, 0, 0.1)',
+      actionBtnBg: '#FFFFFF',
+      actionBtnText: '#111827',
+      actionBtnBorder: '#D1D5DB',
+      danger: '#DC2626',
+      success: '#16A34A',
+      primaryBtnBg: '#111827',
+      primaryBtnText: '#FFFFFF',
+      glowColor: '#E5E7EB',
+      sections: [
+        { iconBg: '#FEF3C7', iconColor: '#B45309' },
+        { iconBg: '#D1FAE5', iconColor: '#047857' },
+        { iconBg: '#CFFAFE', iconColor: '#0891B2' },
+        { iconBg: '#FCE7F3', iconColor: '#BE185D' }
+      ]
+    }
+  },
+  dark: {
+    id: 'dark',
+    name: '暗夜',
+    colors: {
+      bg: '#18181B',
+      cardBg: '#27272A',
+      textMain: '#F4F4F5',
+      textSub: '#A1A1AA',
+      textMuted: '#71717A',
+      border: '#3F3F46',
+      inputBg: '#3F3F46',
+      inputHoverBg: '#52525B',
+      inputFocusBg: '#27272A',
+      inputPlaceholder: '#71717A',
+      inputRing: 'rgba(255, 255, 255, 0.1)',
+      actionBtnBg: '#3F3F46',
+      actionBtnText: '#E4E4E7',
+      actionBtnBorder: '#52525B',
+      danger: '#EF4444',
+      success: '#22C55E',
+      primaryBtnBg: '#E4E4E7',
+      primaryBtnText: '#18181B',
+      glowColor: '#3F3F46',
+      sections: [
+        { iconBg: 'rgba(196, 165, 116, 0.15)', iconColor: '#E6C995' },
+        { iconBg: 'rgba(155, 168, 160, 0.15)', iconColor: '#B8C0B8' },
+        { iconBg: 'rgba(138, 160, 154, 0.15)', iconColor: '#A8BCB6' },
+        { iconBg: 'rgba(191, 165, 160, 0.15)', iconColor: '#D0B0B0' }
+      ]
+    }
+  }
+};
+
+// --- Theme Context Hook (Local simplified) ---
+const useTheme = () => {
+  const [themeId, setThemeId] = useState<string>(() => {
+    return localStorage.getItem('whoAmI_theme') || 'contrast';
+  });
+
+  const setTheme = (id: string) => {
+    if (THEMES[id]) {
+      setThemeId(id);
+      localStorage.setItem('whoAmI_theme', id);
+    }
+  };
+
+  return {
+    theme: THEMES[themeId],
+    currentThemeId: themeId,
+    setTheme
+  };
+};
+
+// --- Question Block Component ---
 interface QuestionBlockProps {
   title: string;
   subtitle: string;
   icon: React.ReactNode;
-  iconBg: string;
-  iconColor: string;
+  sectionIndex: number; // 0-3 to pick color from theme
   items: { id: number; value: string }[];
   placeholder: string;
   inputPrefix: string;
-  inputBg: string;
+  theme: ThemeType;
   onChange: (id: number, val: string) => void;
   onAdd: () => void;
   onDelete: (id: number) => void;
@@ -69,45 +243,49 @@ const QuestionBlock: React.FC<QuestionBlockProps> = ({
   title,
   subtitle,
   icon,
-  iconBg,
-  iconColor,
+  sectionIndex,
   items,
   placeholder,
   inputPrefix,
-  inputBg,
+  theme,
   onChange,
   onAdd,
   onDelete
 }) => {
+  const colors = theme.colors;
+  const sectionColors = theme.colors.sections[sectionIndex] || theme.colors.sections[0];
+
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ backgroundColor: iconBg, color: iconColor }}
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-300"
+          style={{ backgroundColor: sectionColors.iconBg, color: sectionColors.iconColor }}
         >
           {icon}
         </div>
         <div>
-          <h3 className="text-base font-semibold" style={{ color: '#3D3A36' }}>{title}</h3>
-          <p className="text-sm" style={{ color: '#9B9590' }}>{subtitle}</p>
+          <h3 className="text-base font-semibold transition-colors duration-300" style={{ color: colors.textMain }}>{title}</h3>
+          <p className="text-sm transition-colors duration-300" style={{ color: colors.textSub }}>{subtitle}</p>
         </div>
       </div>
 
+      {/* Items */}
       <div className="space-y-3">
         {items.map((item, index) => (
           <div key={item.id} className="group transition-all duration-300">
             <div className="flex items-center gap-3">
               <span
-                className="text-sm font-medium w-5 text-center shrink-0"
-                style={{ color: '#C5B9A8' }}
+                className="text-sm font-medium w-5 text-center shrink-0 transition-colors duration-300"
+                style={{ color: colors.textMuted }}
               >
                 {index + 1}
               </span>
               <div className="flex-1 relative">
                 <span
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-sm pointer-events-none select-none"
-                  style={{ color: '#C5B9A8' }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-sm pointer-events-none select-none transition-colors duration-300"
+                  style={{ color: colors.textMuted }}
                 >
                   {inputPrefix}
                 </span>
@@ -117,26 +295,36 @@ const QuestionBlock: React.FC<QuestionBlockProps> = ({
                   onChange={(e) => onChange(item.id, e.target.value)}
                   className="w-full rounded-xl py-3.5 pl-20 pr-10 text-base outline-none transition-all duration-200"
                   style={{
-                    backgroundColor: inputBg,
-                    color: '#3D3A36',
+                    backgroundColor: colors.inputBg,
+                    color: colors.textMain,
                     border: '1px solid transparent'
                   }}
                   onFocus={(e) => {
-                    e.target.style.backgroundColor = '#FFFFFF';
-                    e.target.style.border = '1px solid #E8E4DD';
-                    e.target.style.boxShadow = '0 2px 12px -4px rgba(139, 126, 109, 0.12)';
+                    e.target.style.backgroundColor = colors.inputFocusBg;
+                    e.target.style.border = `1px solid ${colors.border}`;
+                    e.target.style.boxShadow = `0 2px 12px -4px ${colors.inputRing}`;
                   }}
                   onBlur={(e) => {
-                    e.target.style.backgroundColor = inputBg;
+                    e.target.style.backgroundColor = colors.inputBg;
                     e.target.style.border = '1px solid transparent';
                     e.target.style.boxShadow = 'none';
+                  }}
+                  onMouseEnter={(e) => {
+                    if (document.activeElement !== e.target) {
+                      e.target.style.backgroundColor = colors.inputHoverBg;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (document.activeElement !== e.target) {
+                      e.target.style.backgroundColor = colors.inputBg;
+                    }
                   }}
                   placeholder={placeholder}
                 />
                 <button
                   onClick={() => onDelete(item.id)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200"
-                  style={{ color: '#C5B9A8' }}
+                  style={{ color: colors.textMuted }}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -148,10 +336,10 @@ const QuestionBlock: React.FC<QuestionBlockProps> = ({
         <div className="pl-8 pt-2">
           <button
             onClick={onAdd}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 hover:opacity-80"
             style={{
-              color: '#A89F91',
-              border: '1px dashed #D9D4CC'
+              color: colors.textMuted,
+              border: `1px dashed ${colors.border}`
             }}
           >
             <Plus size={14} /> 添加
@@ -162,6 +350,7 @@ const QuestionBlock: React.FC<QuestionBlockProps> = ({
   );
 };
 
+// --- Main Component ---
 const WhoAmITab: React.FC = () => {
   const [data, setData] = useState<WhoAmIData>(INITIAL_DATA);
   const [version, setVersion] = useState<number | null>(null);
@@ -170,6 +359,10 @@ const WhoAmITab: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
+  const [showThemeDropdown, setShowThemeDropdown] = useState(false);
+
+  const { theme, currentThemeId, setTheme } = useTheme();
+  const colors = theme.colors;
 
   // 防止 StrictMode 重复请求
   const hasFetched = useRef(false);
@@ -303,10 +496,10 @@ const WhoAmITab: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-full w-full flex items-center justify-center" style={{ backgroundColor: '#FDFBF9' }}>
+      <div className="h-full w-full flex items-center justify-center transition-colors duration-300" style={{ backgroundColor: colors.bg }}>
         <div className="flex flex-col items-center gap-4">
-          <Loader2 size={32} className="animate-spin" style={{ color: '#A89F91' }} />
-          <p className="font-medium" style={{ color: '#9B9590' }}>加载中...</p>
+          <Loader2 size={32} className="animate-spin" style={{ color: colors.textMuted }} />
+          <p className="font-medium" style={{ color: colors.textSub }}>加载中...</p>
         </div>
       </div>
     );
@@ -314,16 +507,16 @@ const WhoAmITab: React.FC = () => {
 
   return (
     <div
-      className="h-full w-full overflow-y-auto no-scrollbar pb-24 px-6 md:px-16 pt-8 animate-fade-in font-sans"
-      style={{ backgroundColor: '#FDFBF9' }}
+      className="h-full w-full overflow-y-auto no-scrollbar pb-24 px-6 md:px-16 pt-8 animate-fade-in font-sans transition-colors duration-300"
+      style={{ backgroundColor: colors.bg }}
     >
 
       {/* Header */}
       <div className="max-w-2xl mx-auto text-center mb-16">
-        <div className="flex items-center justify-center gap-4 mb-6">
+        <div className="flex items-center justify-center gap-3 mb-6">
           <div
-            className="inline-flex items-center justify-center w-12 h-12 rounded-full"
-            style={{ backgroundColor: '#F5F3EE', color: '#A89F91' }}
+            className="inline-flex items-center justify-center w-12 h-12 rounded-full transition-colors duration-300"
+            style={{ backgroundColor: colors.actionBtnBg, color: colors.actionBtnText }}
           >
             <Anchor size={22} strokeWidth={1.5} />
           </div>
@@ -331,12 +524,15 @@ const WhoAmITab: React.FC = () => {
           {/* Version Selector */}
           <div className="relative">
             <button
-              onClick={() => setShowVersionDropdown(!showVersionDropdown)}
+              onClick={() => {
+                setShowVersionDropdown(!showVersionDropdown);
+                setShowThemeDropdown(false);
+              }}
               className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-all duration-200"
               style={{
-                backgroundColor: '#F5F3EE',
-                color: '#7A746B',
-                border: '1px solid #E8E4DD'
+                backgroundColor: colors.actionBtnBg,
+                color: colors.actionBtnText,
+                border: `1px solid ${colors.actionBtnBorder}`
               }}
             >
               {version ? `版本 ${version}` : '新版本'}
@@ -347,34 +543,36 @@ const WhoAmITab: React.FC = () => {
               <div
                 className="absolute top-full mt-2 left-0 rounded-2xl overflow-hidden z-50 min-w-[160px]"
                 style={{
-                  backgroundColor: '#FFFFFF',
-                  boxShadow: '0 10px 40px -10px rgba(139, 126, 109, 0.2)',
-                  border: '1px solid #E8E4DD'
+                  backgroundColor: colors.cardBg,
+                  boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+                  border: `1px solid ${colors.border}`
                 }}
               >
-                {versions.length > 0 ? (
-                  versions.map(v => (
-                    <button
-                      key={v.id}
-                      onClick={() => loadVersion(v.version)}
-                      className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between"
-                      style={{
-                        backgroundColor: v.version === version ? '#F5F3EE' : 'transparent',
-                        color: '#5C574F'
-                      }}
-                    >
-                      <span>版本 {v.version}</span>
-                      {v.version === version && <Check size={14} style={{ color: '#A89F91' }} />}
-                    </button>
-                  ))
-                ) : (
-                  <div className="px-4 py-3 text-sm" style={{ color: '#9B9590' }}>暂无历史版本</div>
-                )}
-                <div style={{ borderTop: '1px solid #E8E4DD' }}>
+                <div className="max-h-[240px] overflow-y-auto no-scrollbar">
+                  {versions.length > 0 ? (
+                    versions.map(v => (
+                      <button
+                        key={v.id}
+                        onClick={() => loadVersion(v.version)}
+                        className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between hover:bg-opacity-50"
+                        style={{
+                          backgroundColor: v.version === version ? colors.actionBtnBg : 'transparent',
+                          color: colors.textSub
+                        }}
+                      >
+                        <span>版本 {v.version}</span>
+                        {v.version === version && <Check size={14} style={{ color: colors.textMain }} />}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-sm" style={{ color: colors.textMuted }}>暂无历史版本</div>
+                  )}
+                </div>
+                <div style={{ borderTop: `1px solid ${colors.border}` }}>
                   <button
                     onClick={handleCreateNew}
-                    className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center gap-2"
-                    style={{ color: '#8B7355' }}
+                    className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center gap-2 hover:opacity-80"
+                    style={{ color: colors.sections[0].iconColor }}
                   >
                     <Plus size={14} />
                     创建新版本
@@ -384,10 +582,58 @@ const WhoAmITab: React.FC = () => {
             )}
           </div>
 
+          {/* Theme Selector */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowThemeDropdown(!showThemeDropdown);
+                setShowVersionDropdown(false);
+              }}
+              className="p-2.5 rounded-xl transition-all duration-200 border"
+              style={{
+                backgroundColor: colors.actionBtnBg,
+                color: colors.actionBtnText,
+                borderColor: colors.actionBtnBorder
+              }}
+              title="切换主题"
+            >
+              <Palette size={18} />
+            </button>
+
+            {showThemeDropdown && (
+              <div
+                className="absolute top-full mt-2 left-0 rounded-2xl overflow-hidden z-50 min-w-[140px]"
+                style={{
+                  backgroundColor: colors.cardBg,
+                  boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+                  border: `1px solid ${colors.border}`
+                }}
+              >
+                {Object.values(THEMES).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setTheme(t.id);
+                      setShowThemeDropdown(false);
+                    }}
+                    className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between hover:bg-opacity-50"
+                    style={{
+                      backgroundColor: currentThemeId === t.id ? colors.actionBtnBg : 'transparent',
+                      color: colors.textSub
+                    }}
+                  >
+                    <span>{t.name}</span>
+                    {currentThemeId === t.id && <Check size={14} style={{ color: colors.textMain }} />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={loadLatestData}
             className="p-2.5 rounded-xl transition-all duration-200"
-            style={{ color: '#A89F91' }}
+            style={{ color: colors.textMuted }}
             title="刷新"
           >
             <RefreshCw size={18} />
@@ -395,29 +641,29 @@ const WhoAmITab: React.FC = () => {
         </div>
 
         <h2
-          className="text-3xl md:text-4xl font-semibold tracking-tight mb-4"
-          style={{ color: '#3D3A36' }}
+          className="text-3xl md:text-4xl font-semibold tracking-tight mb-4 transition-colors duration-300"
+          style={{ color: colors.textMain }}
         >
           锚定当下
         </h2>
-        <p className="text-lg leading-relaxed" style={{ color: '#9B9590' }}>
+        <p className="text-lg leading-relaxed transition-colors duration-300" style={{ color: colors.textSub }}>
           一次真实的自我检视，扎根于身份、环境与情绪。
         </p>
       </div>
 
       {/* Single Unified Card */}
       <div
-        className="max-w-2xl mx-auto rounded-[2rem] p-8 md:p-10 relative overflow-hidden"
+        className="max-w-2xl mx-auto rounded-[2rem] p-8 md:p-10 relative overflow-hidden transition-all duration-300"
         style={{
-          backgroundColor: '#FFFFFF',
-          boxShadow: '0 4px 30px -8px rgba(139, 126, 109, 0.12)',
-          border: '1px solid #F0EDE8'
+          backgroundColor: colors.cardBg,
+          boxShadow: `0 4px 30px -8px ${colors.inputRing}`,
+          border: `1px solid ${colors.border}`
         }}
       >
-        {/* Subtle warm gradient overlay */}
+        {/* Subtle glow overlay */}
         <div
-          className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-20"
-          style={{ backgroundColor: '#F5EFE6' }}
+          className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-20 transition-colors duration-300"
+          style={{ backgroundColor: colors.glowColor }}
         />
 
         <div className="relative z-10 space-y-10">
@@ -427,69 +673,65 @@ const WhoAmITab: React.FC = () => {
             title="我现在是谁？"
             subtitle="角色、状态或隐喻"
             icon={<Fingerprint size={20} strokeWidth={1.5} />}
-            iconBg="#FBF6EE"
-            iconColor="#C4A574"
+            sectionIndex={0}
             items={data.whoAmIItems.map(i => ({ id: i.id, value: i.whoAmI }))}
             placeholder="一个探索者、一个学习者..."
             inputPrefix="我是..."
-            inputBg="#FAF9F7"
+            theme={theme}
             onChange={handleWhoAmIChange}
             onAdd={addWhoAmI}
             onDelete={delWhoAmI}
           />
 
           {/* Divider */}
-          <div style={{ height: '1px', backgroundColor: '#F0EDE8' }} />
+          <div style={{ height: '1px', backgroundColor: colors.border }} className="transition-colors duration-300" />
 
           {/* 2. What Time */}
           <QuestionBlock
             title="现在是什么时刻？"
             subtitle="人生阶段、季节或字面时间"
             icon={<Clock size={20} strokeWidth={1.5} />}
-            iconBg="#F5F3EE"
-            iconColor="#9BA8A0"
+            sectionIndex={1}
             items={data.whatTimeItems.map(i => ({ id: i.id, value: i.whatTime }))}
             placeholder="成长的时刻、转变的季节..."
             inputPrefix="是..."
-            inputBg="#F9FAF8"
+            theme={theme}
             onChange={handleTimeChange}
             onAdd={addTime}
             onDelete={delTime}
           />
 
           {/* Divider */}
-          <div style={{ height: '1px', backgroundColor: '#F0EDE8' }} />
+          <div style={{ height: '1px', backgroundColor: colors.border }} className="transition-colors duration-300" />
 
           {/* 3. Where Am I */}
           <QuestionBlock
             title="我在哪里？"
             subtitle="环境、感官或精神状态"
             icon={<MapPin size={20} strokeWidth={1.5} />}
-            iconBg="#F3F5F4"
-            iconColor="#8AA09A"
+            sectionIndex={2}
             items={data.whereAmIItems.map(i => ({ id: i.id, value: i.whereAmI }))}
             placeholder="在家中、在思考中、在路上..."
             inputPrefix="在..."
-            inputBg="#F8FAF9"
+            theme={theme}
             onChange={handleWhereChange}
             onAdd={addWhere}
             onDelete={delWhere}
           />
 
           {/* Divider */}
-          <div style={{ height: '1px', backgroundColor: '#F0EDE8' }} />
+          <div style={{ height: '1px', backgroundColor: colors.border }} className="transition-colors duration-300" />
 
           {/* 4. Feelings */}
           <QuestionBlock
             title="我的感受如何？"
             subtitle="真实的情绪、身体感受"
             icon={<Heart size={20} strokeWidth={1.5} />}
-            iconBg="#FBF5F5"
-            iconColor="#BFA5A0"
+            sectionIndex={3}
             items={data.howAmIFeelingItems.map(i => ({ id: i.id, value: i.howAmIFeeling }))}
             placeholder="平静、期待、有些疲惫..."
             inputPrefix="感到..."
-            inputBg="#FCF9F9"
+            theme={theme}
             onChange={handleFeelingChange}
             onAdd={addFeeling}
             onDelete={delFeeling}
@@ -505,9 +747,9 @@ const WhoAmITab: React.FC = () => {
           disabled={isSaving}
           className="px-10 py-4 rounded-2xl font-semibold transition-all duration-300 flex items-center gap-3 text-base"
           style={{
-            backgroundColor: saveStatus === 'success' ? '#7A9A6D' : saveStatus === 'error' ? '#B07070' : '#5C574F',
-            color: '#FFFFFF',
-            boxShadow: '0 8px 24px -8px rgba(92, 87, 79, 0.35)',
+            backgroundColor: saveStatus === 'success' ? colors.success : saveStatus === 'error' ? colors.danger : colors.primaryBtnBg,
+            color: colors.primaryBtnText,
+            boxShadow: '0 8px 24px -8px rgba(0,0,0, 0.25)',
             opacity: isSaving ? 0.7 : 1
           }}
         >
