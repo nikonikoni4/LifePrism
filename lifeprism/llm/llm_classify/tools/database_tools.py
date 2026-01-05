@@ -332,15 +332,15 @@ def get_multi_days_stats(
         return f"获取用户行为统计失败: {str(e)}"
 
 if __name__ == "__main__":
-    # result = get_daily_stats.invoke(
-    #     input = {
-    #         "start_time": "2025-12-30 00:00:00",
-    #         "end_time": "2025-12-30 23:59:59",
-    #         "split_count": 2,
-    #         "options": ["all"]
-    #     }
-    # )
-    # print(result)
+    result = get_daily_stats.invoke(
+        input = {
+            "start_time": "2025-12-30 00:00:00",
+            "end_time": "2025-12-30 23:59:59",
+            "split_count": 2,
+            "options": ["all"]
+        }
+    )
+    print(result)
     result = get_multi_days_stats.invoke(
         input = {
             "start_time": "2025-11-01 00:00:00",

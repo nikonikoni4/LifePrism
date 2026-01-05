@@ -941,6 +941,12 @@ class LLMLWDataProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 
+                # 转换日期时间格式为日期格式（如果需要）
+                if start_time and end_time:
+                    # 从 "YYYY-MM-DD HH:MM:SS" 提取 "YYYY-MM-DD"
+                    start_date = start_time.split()[0] if ' ' in start_time else start_time
+                    end_date = end_time.split()[0] if ' ' in end_time else end_time
+                
                 # 1. 获取重点内容
                 if date : 
                     cursor.execute(
@@ -950,7 +956,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
                 else:
                     cursor.execute(
                     "SELECT date, content FROM daily_focus WHERE date BETWEEN ? AND ? ORDER BY date",
-                    (start_time, end_time)
+                    (start_date, end_date)
                 )
                 for date, content in cursor.fetchall():
                     if content:
@@ -965,7 +971,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
                 else:
                     cursor.execute(
                     "SELECT date, content, state FROM todo_list WHERE state != 'inactive' AND date BETWEEN ? AND ? ORDER BY date",
-                    (start_time, end_time)
+                    (start_date, end_date)
                 )
                 for date, content, state in cursor.fetchall():
                     # 转换状态显示，根据用户要求使用 completed/not completed
@@ -1004,19 +1010,157 @@ class LLMLWDataProvider(LWBaseDataProvider):
             logger.error(f"获取重点与待办内容失败: {e}")
             return None
 
+    def get_logs_by_time(self, date: str) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        按时间段（每小时）获取活动日志
+        
+        每个小时内筛选时长大于1分钟的日志，按时长降序排序，最多返回3条。
+        如果某个小时没有数据，则不返回该时间段。
+        
+        Args:
+            date: 日期 YYYY-MM-DD
+        
+        Returns:
+            Dict[str, List[Dict]]: 按小时分组的日志数据
+                格式: {
+                    "08:00-09:00": [
+                        {
+                            "start_time": "2026-01-05 08:15:30",
+                            "end_time": "2026-01-05 08:25:30",
+                            "duration": 600,  # 秒
+                            "app": "Chrome",
+                            "title": "..."
+                        },
+                        ...
+                    ],
+                    ...
+                }
+        """
+        from datetime import datetime, timedelta
+        from collections import defaultdict
+        
+        # 解析日期
+        date_obj = datetime.strptime(date, "%Y-%m-%d")
+        
+        # 获取当天所有活动日志，包含 category_id 用于统计
+        logs, _ = self.get_activity_logs(
+            date=date,
+            query_fields=["id", "start_time", "end_time", "duration", "app", "title", "category_id"],
+            order_by="start_time",
+            order_desc=False  # 升序排序
+        )
+        
+        if not logs:
+            return {}
+        
+        # 获取分类名称映射
+        category_name_map, _ = self._get_category_name_maps()
+        
+        # 按小时分组
+        hourly_logs = defaultdict(list)
+        
+        for log in logs:
+            # 筛选时长大于1分钟（60秒）的记录
+            duration = log.get('duration', 0)
+            if duration <= 60:
+                continue
+            
+            # 解析开始时间，确定所属小时
+            start_time_str = log.get('start_time', '')
+            try:
+                start_dt = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                # 如果时间格式不匹配，尝试其他格式或跳过
+                continue
+            
+            # 构建小时段标识，例如 "08:00-09:00"
+            hour_start = start_dt.replace(minute=0, second=0, microsecond=0)
+            hour_end = hour_start + timedelta(hours=1)
+            hour_key = f"{hour_start.strftime('%H:%M')}-{hour_end.strftime('%H:%M')}"
+            
+            # 添加到对应小时段
+            hourly_logs[hour_key].append(log)
+        
+        # 对每个小时段的日志进行处理
+        result = {}
+        for hour_key in sorted(hourly_logs.keys()):
+            logs_in_hour = hourly_logs[hour_key]
+            
+            # 按时长降序排序，选择top3
+            sorted_logs = sorted(logs_in_hour, key=lambda x: x.get('duration', 0), reverse=True)
+            top3_logs = sorted_logs[:3]
+            
+            # 计算该小时的主分类统计
+            category_stats = defaultdict(int)
+            for log in logs_in_hour:
+                category_id = log.get('category_id')
+                if category_id:
+                    category_id = str(category_id)
+                    category_stats[category_id] += log.get('duration', 0)
+            
+            # 转换为带名称的统计列表
+            category_list = []
+            for cat_id, total_duration in category_stats.items():
+                category_list.append({
+                    "id": cat_id,
+                    "name": category_name_map.get(cat_id, "未分类"),
+                    "duration": total_duration
+                })
+            
+            # 按时长降序排序
+            category_list.sort(key=lambda x: x['duration'], reverse=True)
+            
+            # 移除 category_id 字段，只保留需要的字段
+            cleaned_logs = []
+            for log in top3_logs:
+                cleaned_logs.append({
+                    "id": log.get("id"),
+                    "start_time": log.get("start_time"),
+                    "end_time": log.get("end_time"),
+                    "duration": log.get("duration"),
+                    "app": log.get("app"),
+                    "title": log.get("title")
+                })
+            
+            result[hour_key] = {
+                "logs": cleaned_logs,
+                "category_stats": category_list
+            }
+        
+        return result
+
+
 llm_lw_data_provider = LazySingleton(LLMLWDataProvider)
 
 if __name__ == "__main__":
-    print("=== 电脑使用时间分析（作息推断） ===")
-    print(llm_lw_data_provider.get_computer_usage_schedule("2025-12-25", "2025-12-30"))
-    print("\n=== 重点与待办统计 ===")
-    print(llm_lw_data_provider.get_focus_and_todos("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
-    print("=== 目标时长统计 ===")
-    print(llm_lw_data_provider.get_daily_goal_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
-    print("\n=== 主分类时长统计 ===")
-    print(llm_lw_data_provider.get_daily_category_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
-    print("\n=== 用户备注 ===")
-    print(llm_lw_data_provider.get_user_focus_notes("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
-    print("\n=== 电脑使用时间分析（作息推断） ===")
-    print(llm_lw_data_provider.get_computer_usage_schedule("2025-12-25", "2025-12-30"))
+    # print("=== 电脑使用时间分析（作息推断） ===")
+    # print(llm_lw_data_provider.get_computer_usage_schedule("2025-12-25", "2025-12-30"))
+    print("\n=== 按小时分段获取活动日志 ===")
+    try:
+        hourly_logs = llm_lw_data_provider.get_logs_by_time("2026-01-05")
+        print(f"找到 {len(hourly_logs)} 个时间段的数据")
+        
+        for hour_key in sorted(hourly_logs.keys()):
+            logs = hourly_logs[hour_key]
+            print(f"\n时间段 {hour_key} ({len(logs)} 条记录):")
+            for i, log in enumerate(logs, 1):
+                duration_min = log.get('duration', 0) // 60
+                print(f"  {i}. [{duration_min}分钟] {log.get('app', 'Unknown')}")
+                if log.get('title'):
+                    print(f"     标题: {log.get('title', '')[:60]}")
+    except Exception as e:
+        print(f"错误: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # print("\n=== 重点与待办统计 ===")
+    # print(llm_lw_data_provider.get_focus_and_todos(start_time="2026-01-01 00:00:00", end_time="2026-01-05 23:59:59"))
+    # print("=== 目标时长统计 ===")
+    # print(llm_lw_data_provider.get_daily_goal_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
+    # print("\n=== 主分类时长统计 ===")
+    # print(llm_lw_data_provider.get_daily_category_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
+    # print("\n=== 用户备注 ===")
+    # print(llm_lw_data_provider.get_user_focus_notes("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
+    # print("\n=== 电脑使用时间分析（作息推断） ===")
+    # print(llm_lw_data_provider.get_computer_usage_schedule("2025-12-25", "2025-12-30"))
     
