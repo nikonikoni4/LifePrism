@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus,
@@ -8,7 +7,13 @@ import {
   AlertCircle,
   Trash2,
   RefreshCw,
-  BookOpen
+  BookOpen,
+  Palette,
+  History,
+  Gift,
+  Sparkles,
+  FileQuestion,
+  RotateCcw
 } from 'lucide-react';
 import { beingApi } from '../api';
 import {
@@ -18,7 +23,7 @@ import {
   BeingVersionInfo
 } from '../types';
 
-// --- 默认初始数据 ---
+// --- Default Initial Data ---
 const INITIAL_DATA: WhoWasIData = {
   whoWasIItems: [
     { id: 1, content: "", judgeItems: [] },
@@ -32,78 +37,464 @@ const INITIAL_DATA: WhoWasIData = {
   ]
 };
 
-// --- 手绘装饰组件 ---
-const LeafDecoration: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
-  <svg className={className} style={style} width="40" height="50" viewBox="0 0 40 50" fill="none">
-    <path d="M20 5 C10 15, 5 30, 20 45 C35 30, 30 15, 20 5" stroke="#7A9A6D" strokeWidth="2" fill="#A8C99B" opacity="0.6" />
-    <path d="M20 10 L20 40" stroke="#7A9A6D" strokeWidth="1.5" />
-    <path d="M15 20 L20 25 M25 15 L20 20 M15 30 L20 35 M25 28 L20 32" stroke="#7A9A6D" strokeWidth="1" />
-  </svg>
-);
+// --- Theme Definition (Matched with WhoAmITab) ---
+interface ThemeType {
+  id: string;
+  name: string;
+  colors: {
+    bg: string;
+    cardBg: string;
+    textMain: string;
+    textSub: string;
+    textMuted: string;
+    border: string;
+    inputBg: string;
+    inputHoverBg: string;
+    inputFocusBg: string;
+    inputPlaceholder: string;
+    inputRing: string;
+    actionBtnBg: string;
+    actionBtnText: string;
+    actionBtnBorder: string;
+    danger: string;
+    success: string;
+    primaryBtnBg: string;
+    primaryBtnText: string;
+    glowColor: string;
+    sections: {
+      iconBg: string;
+      iconColor: string;
+    }[];
+  }
+}
 
-const PlantPot: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
-  <svg className={className} style={style} width="50" height="70" viewBox="0 0 50 70" fill="none">
-    {/* Pot */}
-    <path d="M12 45 L38 45 L35 65 L15 65 Z" fill="#C4825A" stroke="#9A6B4A" strokeWidth="1.5" />
-    <ellipse cx="25" cy="45" rx="13" ry="4" fill="#D4956B" />
-    {/* Plant stems */}
-    <path d="M22 45 C20 35, 15 30, 12 20" stroke="#5D7A4F" strokeWidth="2" fill="none" />
-    <path d="M25 45 C25 35, 28 25, 25 15" stroke="#6A8A5A" strokeWidth="2" fill="none" />
-    <path d="M28 45 C30 35, 35 30, 38 22" stroke="#5D7A4F" strokeWidth="2" fill="none" />
-    {/* Leaves */}
-    <ellipse cx="12" cy="18" rx="6" ry="10" fill="#8AB87A" transform="rotate(-20 12 18)" />
-    <ellipse cx="25" cy="12" rx="5" ry="8" fill="#9AC88A" />
-    <ellipse cx="38" cy="20" rx="6" ry="9" fill="#8AB87A" transform="rotate(25 38 20)" />
-  </svg>
-);
+const THEMES: Record<string, ThemeType> = {
+  soft: {
+    id: 'soft',
+    name: '雅致',
+    colors: {
+      bg: '#FDFBF9',
+      cardBg: '#FFFFFF',
+      textMain: '#2C2A26',
+      textSub: '#5C574F',
+      textMuted: '#8B7E74',
+      border: '#E8E4DD',
+      inputBg: '#FAF9F7',
+      inputHoverBg: '#F5F5F5',
+      inputFocusBg: '#FFFFFF',
+      inputPlaceholder: '#A89F91',
+      inputRing: 'rgba(139, 126, 109, 0.12)',
+      actionBtnBg: '#F5F3EE',
+      actionBtnText: '#5C574F',
+      actionBtnBorder: '#E8E4DD',
+      danger: '#B07070',
+      success: '#7A9A6D',
+      primaryBtnBg: '#5C574F',
+      primaryBtnText: '#FFFFFF',
+      glowColor: '#F5EFE6',
+      sections: [
+        { iconBg: '#FBF6EE', iconColor: '#AF9164' },
+        { iconBg: '#F5F3EE', iconColor: '#89968E' },
+        { iconBg: '#F3F5F4', iconColor: '#7A8C86' },
+        { iconBg: '#FBF5F5', iconColor: '#AC908C' }
+      ]
+    }
+  },
+  balanced: {
+    id: 'balanced',
+    name: '温润',
+    colors: {
+      bg: '#F7F6F5',
+      cardBg: '#FFFFFF',
+      textMain: '#292524',
+      textSub: '#44403C',
+      textMuted: '#78716C',
+      border: '#E7E5E4',
+      inputBg: '#F5F5F4',
+      inputHoverBg: '#E7E5E4',
+      inputFocusBg: '#FFFFFF',
+      inputPlaceholder: '#A8A29E',
+      inputRing: 'rgba(68, 64, 60, 0.1)',
+      actionBtnBg: '#FFFFFF',
+      actionBtnText: '#44403C',
+      actionBtnBorder: '#E7E5E4',
+      danger: '#DC2626',
+      success: '#16A34A',
+      primaryBtnBg: '#44403C',
+      primaryBtnText: '#FFFFFF',
+      glowColor: '#E7E5E4',
+      sections: [
+        { iconBg: '#FFF7ED', iconColor: '#C2410C' },
+        { iconBg: '#F0FDF4', iconColor: '#15803D' },
+        { iconBg: '#ECFEFF', iconColor: '#0E7490' },
+        { iconBg: '#FFF1F2', iconColor: '#BE123C' }
+      ]
+    }
+  },
+  contrast: {
+    id: 'contrast',
+    name: '清晰',
+    colors: {
+      bg: '#F2F4F6',
+      cardBg: '#FFFFFF',
+      textMain: '#111827',
+      textSub: '#374151',
+      textMuted: '#6B7280',
+      border: '#D1D5DB',
+      inputBg: '#F3F4F6',
+      inputHoverBg: '#E5E7EB',
+      inputFocusBg: '#FFFFFF',
+      inputPlaceholder: '#9CA3AF',
+      inputRing: 'rgba(0, 0, 0, 0.1)',
+      actionBtnBg: '#FFFFFF',
+      actionBtnText: '#111827',
+      actionBtnBorder: '#D1D5DB',
+      danger: '#DC2626',
+      success: '#16A34A',
+      primaryBtnBg: '#111827',
+      primaryBtnText: '#FFFFFF',
+      glowColor: '#E5E7EB',
+      sections: [
+        { iconBg: '#FEF3C7', iconColor: '#B45309' },
+        { iconBg: '#D1FAE5', iconColor: '#047857' },
+        { iconBg: '#CFFAFE', iconColor: '#0891B2' },
+        { iconBg: '#FCE7F3', iconColor: '#BE185D' }
+      ]
+    }
+  },
+  dark: {
+    id: 'dark',
+    name: '暗夜',
+    colors: {
+      bg: '#18181B',
+      cardBg: '#27272A',
+      textMain: '#F4F4F5',
+      textSub: '#A1A1AA',
+      textMuted: '#71717A',
+      border: '#3F3F46',
+      inputBg: '#3F3F46',
+      inputHoverBg: '#52525B',
+      inputFocusBg: '#27272A',
+      inputPlaceholder: '#71717A',
+      inputRing: 'rgba(255, 255, 255, 0.1)',
+      actionBtnBg: '#3F3F46',
+      actionBtnText: '#E4E4E7',
+      actionBtnBorder: '#52525B',
+      danger: '#EF4444',
+      success: '#22C55E',
+      primaryBtnBg: '#E4E4E7',
+      primaryBtnText: '#18181B',
+      glowColor: '#3F3F46',
+      sections: [
+        { iconBg: 'rgba(196, 165, 116, 0.15)', iconColor: '#E6C995' },
+        { iconBg: 'rgba(155, 168, 160, 0.15)', iconColor: '#B8C0B8' },
+        { iconBg: 'rgba(138, 160, 154, 0.15)', iconColor: '#A8BCB6' },
+        { iconBg: 'rgba(191, 165, 160, 0.15)', iconColor: '#D0B0B0' }
+      ]
+    }
+  }
+};
 
-const CoffeeCup: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
-  <svg className={className} style={style} width="45" height="45" viewBox="0 0 45 45" fill="none">
-    {/* Saucer */}
-    <ellipse cx="22" cy="38" rx="18" ry="5" fill="#E8DDD0" stroke="#C4B8A8" strokeWidth="1" />
-    {/* Cup body */}
-    <path d="M8 18 L10 35 L34 35 L36 18 Z" fill="#F5EDE4" stroke="#C4B8A8" strokeWidth="1.5" />
-    {/* Handle */}
-    <path d="M36 22 C42 22, 42 32, 36 32" stroke="#C4B8A8" strokeWidth="2" fill="none" />
-    {/* Coffee */}
-    <ellipse cx="22" cy="20" rx="12" ry="4" fill="#8B7355" />
-    {/* Steam */}
-    <path d="M18 12 C16 8, 20 6, 18 2" stroke="#C4B8A8" strokeWidth="1.5" fill="none" opacity="0.5" />
-    <path d="M24 10 C22 6, 26 4, 24 0" stroke="#C4B8A8" strokeWidth="1.5" fill="none" opacity="0.5" />
-  </svg>
-);
+// --- Theme Context Hook ---
+const useTheme = () => {
+  const [themeId, setThemeId] = useState<string>(() => {
+    return localStorage.getItem('whoAmI_theme') || 'contrast';
+  });
 
-const RibbonBanner: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
-  <div className={`relative ${className}`}>
-    {/* Left ribbon end */}
-    <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-6 h-full">
-      <svg viewBox="0 0 24 40" className="w-full h-full">
-        <path d="M24 0 L4 0 C0 0, 0 4, 4 8 L8 20 L4 32 C0 36, 0 40, 4 40 L24 40" fill="#B8A891" stroke="#9A8A71" strokeWidth="1" />
-      </svg>
+  const setTheme = (id: string) => {
+    if (THEMES[id]) {
+      setThemeId(id);
+      localStorage.setItem('whoAmI_theme', id);
+    }
+  };
+
+  return {
+    theme: THEMES[themeId],
+    currentThemeId: themeId,
+    setTheme
+  };
+};
+
+// --- Question Block Component ---
+interface QuestionBlockProps {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  sectionIndex: number;
+  items: { id: number; value: string }[];
+  placeholder: string;
+  inputPrefix: string;
+  theme: ThemeType;
+  onChange: (id: number, val: string) => void;
+  onAdd: () => void;
+  onDelete: (id: number) => void;
+}
+
+const QuestionBlock: React.FC<QuestionBlockProps> = ({
+  title,
+  subtitle,
+  icon,
+  sectionIndex,
+  items,
+  placeholder,
+  inputPrefix,
+  theme,
+  onChange,
+  onAdd,
+  onDelete
+}) => {
+  const colors = theme.colors;
+  const sectionColors = theme.colors.sections[sectionIndex] || theme.colors.sections[0];
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-300"
+          style={{ backgroundColor: sectionColors.iconBg, color: sectionColors.iconColor }}
+        >
+          {icon}
+        </div>
+        <div>
+          <h3 className="text-base font-semibold transition-colors duration-300" style={{ color: colors.textMain }}>{title}</h3>
+          <p className="text-sm transition-colors duration-300" style={{ color: colors.textSub }}>{subtitle}</p>
+        </div>
+      </div>
+
+      {/* Items */}
+      <div className="space-y-3">
+        {items.map((item, index) => (
+          <div key={item.id} className="group transition-all duration-300">
+            <div className="flex items-center gap-3">
+              <span
+                className="text-sm font-medium w-5 text-center shrink-0 transition-colors duration-300"
+                style={{ color: colors.textMuted }}
+              >
+                {index + 1}
+              </span>
+              <div className="flex-1 relative">
+                <span
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-sm pointer-events-none select-none transition-colors duration-300"
+                  style={{ color: colors.textMuted }}
+                >
+                  {inputPrefix}
+                </span>
+                <input
+                  type="text"
+                  value={item.value}
+                  onChange={(e) => onChange(item.id, e.target.value)}
+                  className="w-full rounded-xl py-3.5 pl-20 pr-10 text-base outline-none transition-all duration-200"
+                  style={{
+                    backgroundColor: colors.inputBg,
+                    color: colors.textMain,
+                    border: '1px solid transparent'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.backgroundColor = colors.inputFocusBg;
+                    e.target.style.border = `1px solid ${colors.border}`;
+                    e.target.style.boxShadow = `0 2px 12px -4px ${colors.inputRing}`;
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.backgroundColor = colors.inputBg;
+                    e.target.style.border = '1px solid transparent';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                  onMouseEnter={(e) => {
+                    if (document.activeElement !== e.target) {
+                      e.target.style.backgroundColor = colors.inputHoverBg;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (document.activeElement !== e.target) {
+                      e.target.style.backgroundColor = colors.inputBg;
+                    }
+                  }}
+                  placeholder={placeholder}
+                />
+                <button
+                  onClick={() => onDelete(item.id)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200"
+                  style={{ color: colors.textMuted }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <div className="pl-8 pt-2">
+          <button
+            onClick={onAdd}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 hover:opacity-80"
+            style={{
+              color: colors.textMuted,
+              border: `1px dashed ${colors.border}`
+            }}
+          >
+            <Plus size={14} /> 添加
+          </button>
+        </div>
+      </div>
     </div>
-    {/* Main banner */}
-    <div
-      className="px-8 py-4 text-center relative z-10"
-      style={{
-        background: 'linear-gradient(180deg, #C9BBAA 0%, #B8A891 50%, #A89A81 100%)',
-        borderTop: '2px solid #A89A71',
-        borderBottom: '2px solid #8A7A61',
-        boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.2), inset 0 -2px 4px rgba(0,0,0,0.1)'
-      }}
-    >
-      {children}
-    </div>
-    {/* Right ribbon end */}
-    <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-6 h-full">
-      <svg viewBox="0 0 24 40" className="w-full h-full">
-        <path d="M0 0 L20 0 C24 0, 24 4, 20 8 L16 20 L20 32 C24 36, 24 40, 20 40 L0 40" fill="#B8A891" stroke="#9A8A71" strokeWidth="1" />
-      </svg>
-    </div>
-  </div>
-);
+  );
+};
 
-// --- Component ---
+// --- Reframing Block Component ---
+interface ReframingBlockProps {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  sectionIndex: number;
+  items: PositivePastReframingItem[];
+  theme: ThemeType;
+  onChange: (id: number, field: keyof PositivePastReframingItem, val: string) => void;
+  onAdd: () => void;
+  onDelete: (id: number) => void;
+}
 
+const ReframingBlock: React.FC<ReframingBlockProps> = ({
+  title,
+  subtitle,
+  icon,
+  sectionIndex,
+  items,
+  theme,
+  onChange,
+  onAdd,
+  onDelete
+}) => {
+  const colors = theme.colors;
+  const sectionColors = theme.colors.sections[sectionIndex] || theme.colors.sections[0];
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-300"
+          style={{ backgroundColor: sectionColors.iconBg, color: sectionColors.iconColor }}
+        >
+          {icon}
+        </div>
+        <div>
+          <h3 className="text-base font-semibold transition-colors duration-300" style={{ color: colors.textMain }}>{title}</h3>
+          <p className="text-sm transition-colors duration-300" style={{ color: colors.textSub }}>{subtitle}</p>
+        </div>
+      </div>
+
+      {/* Items */}
+      <div className="space-y-6">
+        {items.map((item, index) => (
+          <div
+            key={item.id}
+            className="p-5 rounded-2xl space-y-4 group transition-all duration-300 relative"
+            style={{ backgroundColor: colors.inputBg }}
+          >
+            {/* Index Label */}
+            <div className="absolute left-0 top-6 -translate-x-full pr-3 hidden md:block">
+              <span className="text-sm font-medium" style={{ color: colors.textMuted }}>{index + 1}</span>
+            </div>
+
+            {/* Delete Button */}
+            <button
+              onClick={() => onDelete(item.id)}
+              className="absolute right-4 top-4 p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200"
+              style={{ color: colors.textMuted }}
+            >
+              <Trash2 size={16} />
+            </button>
+
+            {/* Fields */}
+            <div className="space-y-4">
+              {/* Negative Past */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <FileQuestion size={14} style={{ color: colors.textSub }} />
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: colors.textMuted }}>过去的事件</span>
+                </div>
+                <textarea
+                  value={item.negativePast}
+                  onChange={(e) => onChange(item.id, 'negativePast', e.target.value)}
+                  className="w-full rounded-xl p-3 text-sm outline-none transition-all duration-200 resize-none"
+                  rows={2}
+                  style={{
+                    backgroundColor: colors.cardBg,
+                    color: colors.textMain,
+                    border: `1px solid ${colors.border}`
+                  }}
+                  placeholder="描述一段困难经历..."
+                  onFocus={(e) => e.target.style.borderColor = colors.textMuted}
+                  onBlur={(e) => e.target.style.borderColor = colors.border}
+                />
+              </div>
+
+              {/* Positive Takeaways */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Gift size={14} style={{ color: theme.colors.success }} />
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: colors.textMuted }}>隐藏的礼物</span>
+                </div>
+                <textarea
+                  value={item.positiveTakeaways}
+                  onChange={(e) => onChange(item.id, 'positiveTakeaways', e.target.value)}
+                  className="w-full rounded-xl p-3 text-sm outline-none transition-all duration-200 resize-none"
+                  rows={2}
+                  style={{
+                    backgroundColor: colors.cardBg,
+                    color: colors.textMain,
+                    border: `1px solid ${colors.border}`
+                  }}
+                  placeholder="收获了什么力量或教训？"
+                  onFocus={(e) => e.target.style.borderColor = colors.textMuted}
+                  onBlur={(e) => e.target.style.borderColor = colors.border}
+                />
+              </div>
+
+              {/* How it helps */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={14} style={{ color: theme.colors.sections[0].iconColor }} />
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: colors.textMuted }}>今日的智慧</span>
+                </div>
+                <textarea
+                  value={item.howPositiveTakeawaysHelpMe}
+                  onChange={(e) => onChange(item.id, 'howPositiveTakeawaysHelpMe', e.target.value)}
+                  className="w-full rounded-xl p-3 text-sm outline-none transition-all duration-200 resize-none"
+                  rows={2}
+                  style={{
+                    backgroundColor: colors.cardBg,
+                    color: colors.textMain,
+                    border: `1px solid ${colors.border}`
+                  }}
+                  placeholder="如何帮助你继续前行？"
+                  onFocus={(e) => e.target.style.borderColor = colors.textMuted}
+                  onBlur={(e) => e.target.style.borderColor = colors.border}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <div className="pt-2">
+          <button
+            onClick={onAdd}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 hover:opacity-80"
+            style={{
+              color: colors.textMuted,
+              border: `1px dashed ${colors.border}`
+            }}
+          >
+            <Plus size={14} /> 添加新故事
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Main Component ---
 const WhoWasITab: React.FC = () => {
   const [data, setData] = useState<WhoWasIData>(INITIAL_DATA);
   const [version, setVersion] = useState<number | null>(null);
@@ -112,11 +503,15 @@ const WhoWasITab: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
+  const [showThemeDropdown, setShowThemeDropdown] = useState(false);
 
-  // 防止 StrictMode 重复请求
+  const { theme, currentThemeId, setTheme } = useTheme();
+  const colors = theme.colors;
+
+  // Prevent StrictMode double fetch
   const hasFetched = useRef(false);
 
-  // 加载最新版本数据
+  // Load latest data
   const loadLatestData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -139,7 +534,7 @@ const WhoWasITab: React.FC = () => {
     }
   }, []);
 
-  // 加载指定版本
+  // Load specific version
   const loadVersion = async (ver: number) => {
     setIsLoading(true);
     setShowVersionDropdown(false);
@@ -162,7 +557,7 @@ const WhoWasITab: React.FC = () => {
     loadLatestData();
   }, [loadLatestData]);
 
-  // 保存数据
+  // Save data
   const handleSave = async () => {
     setIsSaving(true);
     setSaveStatus('idle');
@@ -186,7 +581,7 @@ const WhoWasITab: React.FC = () => {
     }
   };
 
-  // 创建新版本
+  // Create new version
   const handleCreateNew = async () => {
     setIsSaving(true);
     try {
@@ -259,10 +654,10 @@ const WhoWasITab: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-full w-full flex items-center justify-center" style={{ backgroundColor: '#E8E0D4' }}>
+      <div className="h-full w-full flex items-center justify-center transition-colors duration-300" style={{ backgroundColor: colors.bg }}>
         <div className="flex flex-col items-center gap-4">
-          <Loader2 size={32} className="animate-spin" style={{ color: '#7A6B5A' }} />
-          <p className="font-medium" style={{ color: '#7A6B5A', fontFamily: "'Ma Shan Zheng', cursive" }}>加载中...</p>
+          <Loader2 size={32} className="animate-spin" style={{ color: colors.textMuted }} />
+          <p className="font-medium" style={{ color: colors.textSub }}>加载中...</p>
         </div>
       </div>
     );
@@ -270,399 +665,237 @@ const WhoWasITab: React.FC = () => {
 
   return (
     <div
-      className="h-full w-full overflow-y-auto no-scrollbar relative"
-      style={{
-        background: 'linear-gradient(135deg, #D4C4B0 0%, #E8DCC8 50%, #D8CDB8 100%)',
-        fontFamily: "'Ma Shan Zheng', 'Noto Serif SC', serif"
-      }}
+      className="h-full w-full overflow-y-auto no-scrollbar pb-24 px-6 md:px-16 pt-8 animate-fade-in font-sans transition-colors duration-300"
+      style={{ backgroundColor: colors.bg }}
     >
-      {/* Google Font Import */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600&display=swap');
-        
-        .journal-page {
-          background: linear-gradient(to right, 
-            #F5EDE0 0%, 
-            #FDF8F0 2%, 
-            #FDF8F0 98%, 
-            #E8DFD0 100%
-          );
-          box-shadow: 
-            -8px 0 20px rgba(0,0,0,0.15),
-            8px 0 20px rgba(0,0,0,0.1),
-            inset 3px 0 10px rgba(0,0,0,0.05);
-        }
+      {/* Header */}
+      <div className="max-w-2xl mx-auto text-center mb-16">
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <div
+            className="inline-flex items-center justify-center w-12 h-12 rounded-full transition-colors duration-300"
+            style={{ backgroundColor: colors.actionBtnBg, color: colors.actionBtnText }}
+          >
+            <History size={22} strokeWidth={1.5} />
+          </div>
 
-        .notebook-line {
-          background-image: repeating-linear-gradient(
-            transparent,
-            transparent 31px,
-            #C9BDA8 31px,
-            #C9BDA8 32px
-          );
-        }
-
-        .handwriting-input {
-          background: transparent;
-          border: none;
-          border-bottom: 2px solid #B8A890;
-          font-family: 'Ma Shan Zheng', cursive;
-          font-size: 1.25rem;
-          color: #4A4035;
-          outline: none;
-          transition: border-color 0.2s;
-        }
-
-        .handwriting-input:focus {
-          border-bottom-color: #8B7355;
-        }
-
-        .handwriting-input::placeholder {
-          color: #B8A890;
-          font-style: italic;
-        }
-
-        .handwriting-textarea {
-          background: transparent;
-          border: none;
-          border-bottom: 2px dashed #C9BDA8;
-          font-family: 'Ma Shan Zheng', cursive;
-          font-size: 1.1rem;
-          color: #4A4035;
-          outline: none;
-          resize: none;
-          line-height: 2;
-        }
-
-        .handwriting-textarea:focus {
-          border-bottom-color: #8B7355;
-        }
-
-        .paper-edge-left {
-          background: linear-gradient(to right, #C4B8A8 0%, transparent 100%);
-        }
-
-        .paper-edge-right {
-          background: linear-gradient(to left, #C4B8A8 0%, transparent 100%);
-        }
-      `}</style>
-
-      {/* 日记本外框装饰 */}
-      <div className="absolute inset-0 pointer-events-none">
-        {/* 左侧装饰 */}
-        <PlantPot className="absolute left-4 top-20" style={{ opacity: 0.8 }} />
-        <LeafDecoration className="absolute left-8 top-1/3" style={{ opacity: 0.6, transform: 'rotate(-15deg)' }} />
-        <LeafDecoration className="absolute left-6 bottom-32" style={{ opacity: 0.5, transform: 'rotate(10deg) scale(0.8)' }} />
-
-        {/* 右侧装饰 */}
-        <CoffeeCup className="absolute right-6 top-24" style={{ opacity: 0.8 }} />
-        <PlantPot className="absolute right-8 top-1/2" style={{ opacity: 0.7, transform: 'scale(0.9)' }} />
-        <LeafDecoration className="absolute right-4 bottom-40" style={{ opacity: 0.6, transform: 'rotate(20deg)' }} />
-      </div>
-
-      {/* 日记本主体 */}
-      <div className="relative max-w-4xl mx-auto my-8 px-4">
-        <div className="journal-page rounded-lg p-8 md:p-12 min-h-[calc(100vh-4rem)] relative">
-
-          {/* 纸张边缘装饰线 */}
-          <div className="absolute left-12 top-0 bottom-0 w-px bg-red-300 opacity-40"></div>
-          <div className="absolute left-14 top-0 bottom-0 w-px bg-red-300 opacity-30"></div>
-
-          {/* 版本选择器 - 右上角 */}
-          <div className="absolute top-4 right-4 flex items-center gap-2">
+          {/* Version Selector */}
+          <div className="relative">
             <button
-              onClick={loadLatestData}
-              className="p-2 rounded-full transition-all duration-200 hover:bg-amber-100"
-              style={{ color: '#7A6B5A' }}
-              title="刷新"
+              onClick={() => {
+                setShowVersionDropdown(!showVersionDropdown);
+                setShowThemeDropdown(false);
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-all duration-200"
+              style={{
+                backgroundColor: colors.actionBtnBg,
+                color: colors.actionBtnText,
+                border: `1px solid ${colors.actionBtnBorder}`
+              }}
             >
-              <RefreshCw size={18} />
+              {version ? `版本 ${version}` : '新版本'}
+              <ChevronDown size={16} className={`transition-transform duration-200 ${showVersionDropdown ? 'rotate-180' : ''}`} />
             </button>
-            <div className="relative">
-              <button
-                onClick={() => setShowVersionDropdown(!showVersionDropdown)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all duration-200"
+
+            {showVersionDropdown && (
+              <div
+                className="absolute top-full mt-2 left-0 rounded-2xl overflow-hidden z-50 min-w-[160px]"
                 style={{
-                  backgroundColor: 'rgba(184, 168, 144, 0.3)',
-                  color: '#5A4A3A',
-                  border: '1px solid #C9BDA8'
+                  backgroundColor: colors.cardBg,
+                  boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+                  border: `1px solid ${colors.border}`
                 }}
               >
-                {version ? `版本 ${version}` : '新版本'}
-                <ChevronDown size={14} className={`transition-transform duration-200 ${showVersionDropdown ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showVersionDropdown && (
-                <div
-                  className="absolute top-full mt-2 right-0 rounded-xl overflow-hidden z-50 min-w-[140px]"
-                  style={{
-                    backgroundColor: '#FDF8F0',
-                    boxShadow: '0 8px 24px -8px rgba(90, 74, 58, 0.3)',
-                    border: '1px solid #C9BDA8'
-                  }}
-                >
+                <div className="max-h-[240px] overflow-y-auto no-scrollbar">
                   {versions.length > 0 ? (
                     versions.map(v => (
                       <button
                         key={v.id}
                         onClick={() => loadVersion(v.version)}
-                        className="w-full px-4 py-2.5 text-left text-sm transition-colors flex items-center justify-between hover:bg-amber-50"
-                        style={{ color: '#5A4A3A' }}
+                        className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between hover:bg-opacity-50"
+                        style={{
+                          backgroundColor: v.version === version ? colors.actionBtnBg : 'transparent',
+                          color: colors.textSub
+                        }}
                       >
                         <span>版本 {v.version}</span>
-                        {v.version === version && <Check size={14} style={{ color: '#7A9A6D' }} />}
+                        {v.version === version && <Check size={14} style={{ color: colors.textMain }} />}
                       </button>
                     ))
                   ) : (
-                    <div className="px-4 py-2.5 text-sm" style={{ color: '#9A8A7A' }}>暂无历史版本</div>
+                    <div className="px-4 py-3 text-sm" style={{ color: colors.textMuted }}>暂无历史版本</div>
                   )}
-                  <div style={{ borderTop: '1px solid #D9CDB8' }}>
-                    <button
-                      onClick={handleCreateNew}
-                      className="w-full px-4 py-2.5 text-left text-sm transition-colors flex items-center gap-2 hover:bg-amber-50"
-                      style={{ color: '#7A6B5A' }}
-                    >
-                      <Plus size={14} />
-                      创建新版本
-                    </button>
-                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* 主标题 */}
-          <div className="text-center mb-12 pt-8">
-            <h1
-              className="text-4xl md:text-5xl font-bold mb-4"
-              style={{
-                color: '#4A3A2A',
-                fontFamily: "'Ma Shan Zheng', cursive",
-                textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
-              }}
-            >
-              改变你对过去的态度：
-            </h1>
-          </div>
-
-          {/* 第一部分：我曾经是谁 */}
-          <div className="mb-12 pl-16">
-            <h2
-              className="text-2xl mb-6"
-              style={{
-                color: '#5A4A3A',
-                fontFamily: "'Ma Shan Zheng', cursive"
-              }}
-            >
-              测试："我曾经是谁？"
-            </h2>
-
-            <div className="space-y-4">
-              {data.whoWasIItems.map((item, index) => (
-                <div key={item.id} className="flex items-center gap-4 group">
-                  <span
-                    className="text-lg font-medium"
-                    style={{ color: '#8B7355', fontFamily: "'Ma Shan Zheng', cursive" }}
-                  >
-                    我曾经:
-                  </span>
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      value={item.content}
-                      onChange={(e) => handleWhoWasIChange(item.id, e.target.value)}
-                      className="handwriting-input w-full py-2"
-                      placeholder="胆小、被成绩定义、害怕冲突..."
-                    />
-                    <button
-                      onClick={() => handleDeleteStatement(item.id)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                      style={{ color: '#B8A890' }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              <button
-                onClick={handleAddStatement}
-                className="inline-flex items-center gap-2 px-4 py-2 mt-2 text-sm transition-all duration-200 rounded-lg hover:bg-amber-50"
-                style={{
-                  color: '#8B7355',
-                  border: '1px dashed #C9BDA8',
-                  fontFamily: "'Ma Shan Zheng', cursive"
-                }}
-              >
-                <Plus size={16} /> 添加回忆
-              </button>
-            </div>
-          </div>
-
-          {/* 横幅分隔 */}
-          <div className="my-12 flex justify-center">
-            <RibbonBanner className="max-w-2xl w-full">
-              <p
-                className="text-lg"
-                style={{
-                  color: '#4A3A2A',
-                  fontFamily: "'Ma Shan Zheng', cursive",
-                  textShadow: '1px 1px 2px rgba(255,255,255,0.3)'
-                }}
-              >
-                放下过去，努力向前，并不意味着遗忘过去，这只意味着和过去和解
-              </p>
-            </RibbonBanner>
-          </div>
-
-          {/* 第二部分：积极重构过去清单 */}
-          <div className="pl-16">
-            <h2
-              className="text-2xl mb-4"
-              style={{
-                color: '#5A4A3A',
-                fontFamily: "'Ma Shan Zheng', cursive"
-              }}
-            >
-              积极重构过去清单
-            </h2>
-            <p
-              className="mb-8"
-              style={{
-                color: '#7A6B5A',
-                fontFamily: "'Noto Serif SC', serif",
-                fontSize: '1rem'
-              }}
-            >
-              请列出三件在你生活里发生的重要的负面事件：
-            </p>
-
-            <div className="space-y-10">
-              {data.positivePastReframingItems.map((item, index) => (
-                <div key={item.id} className="relative group">
-                  <div className="space-y-4">
-                    {/* 事件 */}
-                    <div className="flex items-start gap-4">
-                      <span
-                        className="text-lg font-medium shrink-0 pt-2"
-                        style={{ color: '#8B7355', fontFamily: "'Ma Shan Zheng', cursive" }}
-                      >
-                        事件 {index + 1}:
-                      </span>
-                      <div className="flex-1">
-                        <textarea
-                          value={item.negativePast}
-                          onChange={(e) => handleReframeChange(item.id, 'negativePast', e.target.value)}
-                          className="handwriting-textarea w-full min-h-[60px]"
-                          placeholder="描述过去的一段困难经历..."
-                        />
-                      </div>
-                    </div>
-
-                    {/* 隐藏的礼物 */}
-                    <div className="flex items-start gap-4 ml-8">
-                      <span
-                        className="text-base font-medium shrink-0 pt-2"
-                        style={{ color: '#7A9A6D', fontFamily: "'Ma Shan Zheng', cursive" }}
-                      >
-                        🌱 隐藏的礼物:
-                      </span>
-                      <div className="flex-1">
-                        <textarea
-                          value={item.positiveTakeaways}
-                          onChange={(e) => handleReframeChange(item.id, 'positiveTakeaways', e.target.value)}
-                          className="handwriting-textarea w-full min-h-[50px]"
-                          placeholder="这段经历让你收获了什么力量或教训？"
-                        />
-                      </div>
-                    </div>
-
-                    {/* 今日的智慧 */}
-                    <div className="flex items-start gap-4 ml-8">
-                      <span
-                        className="text-base font-medium shrink-0 pt-2"
-                        style={{ color: '#9AADB8', fontFamily: "'Ma Shan Zheng', cursive" }}
-                      >
-                        ✨ 今日的智慧:
-                      </span>
-                      <div className="flex-1">
-                        <textarea
-                          value={item.howPositiveTakeawaysHelpMe}
-                          onChange={(e) => handleReframeChange(item.id, 'howPositiveTakeawaysHelpMe', e.target.value)}
-                          className="handwriting-textarea w-full min-h-[50px]"
-                          placeholder="这些收获如何帮助你无畏前行？"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 删除按钮 */}
+                <div style={{ borderTop: `1px solid ${colors.border}` }}>
                   <button
-                    onClick={() => handleDeleteReframe(item.id)}
-                    className="absolute -right-2 top-0 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
-                    style={{ color: '#C5A090' }}
+                    onClick={handleCreateNew}
+                    className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center gap-2 hover:opacity-80"
+                    style={{ color: colors.sections[0].iconColor }}
                   >
-                    <Trash2 size={18} />
+                    <Plus size={14} />
+                    创建新版本
                   </button>
                 </div>
-              ))}
+              </div>
+            )}
+          </div>
 
-              {/* 添加新故事按钮 */}
-              <button
-                onClick={handleAddReframe}
-                className="w-full py-4 rounded-lg flex flex-col items-center justify-center gap-2 transition-all duration-200 hover:bg-amber-50"
+          {/* Theme Selector */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowThemeDropdown(!showThemeDropdown);
+                setShowVersionDropdown(false);
+              }}
+              className="p-2.5 rounded-xl transition-all duration-200 border"
+              style={{
+                backgroundColor: colors.actionBtnBg,
+                color: colors.actionBtnText,
+                borderColor: colors.actionBtnBorder
+              }}
+              title="切换主题"
+            >
+              <Palette size={18} />
+            </button>
+
+            {showThemeDropdown && (
+              <div
+                className="absolute top-full mt-2 left-0 rounded-2xl overflow-hidden z-50 min-w-[140px]"
                 style={{
-                  border: '2px dashed #C9BDA8',
-                  color: '#8B7355',
-                  fontFamily: "'Ma Shan Zheng', cursive"
+                  backgroundColor: colors.cardBg,
+                  boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+                  border: `1px solid ${colors.border}`
                 }}
               >
-                <Plus size={20} />
-                <span>添加新故事</span>
-              </button>
-            </div>
+                {Object.values(THEMES).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setTheme(t.id);
+                      setShowThemeDropdown(false);
+                    }}
+                    className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between hover:bg-opacity-50"
+                    style={{
+                      backgroundColor: currentThemeId === t.id ? colors.actionBtnBg : 'transparent',
+                      color: colors.textSub
+                    }}
+                  >
+                    <span>{t.name}</span>
+                    {currentThemeId === t.id && <Check size={14} style={{ color: colors.textMain }} />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* 保存按钮 */}
-          <div className="flex justify-center pt-12 pb-8">
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="px-10 py-4 rounded-xl font-semibold transition-all duration-300 flex items-center gap-3 text-lg"
-              style={{
-                backgroundColor: saveStatus === 'success' ? '#7A9A6D' : saveStatus === 'error' ? '#B07070' : '#6A5A4A',
-                color: '#FDF8F0',
-                boxShadow: '0 6px 20px -6px rgba(90, 74, 58, 0.4)',
-                opacity: isSaving ? 0.7 : 1,
-                fontFamily: "'Ma Shan Zheng', cursive"
-              }}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 size={20} className="animate-spin" />
-                  <span>保存中...</span>
-                </>
-              ) : saveStatus === 'success' ? (
-                <>
-                  <Check size={20} />
-                  <span>保存成功</span>
-                </>
-              ) : saveStatus === 'error' ? (
-                <>
-                  <AlertCircle size={20} />
-                  <span>保存失败</span>
-                </>
-              ) : (
-                <>
-                  <BookOpen size={20} />
-                  <span>保存回忆</span>
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={loadLatestData}
+            className="p-2.5 rounded-xl transition-all duration-200"
+            style={{ color: colors.textMuted }}
+            title="刷新"
+          >
+            <RefreshCw size={18} />
+          </button>
+        </div>
+
+        <h2
+          className="text-3xl md:text-4xl font-semibold tracking-tight mb-4 transition-colors duration-300"
+          style={{ color: colors.textMain }}
+        >
+          回溯过往
+        </h2>
+        <p className="text-lg leading-relaxed transition-colors duration-300" style={{ color: colors.textSub }}>
+          放下过去，努力向前，并不意味着遗忘，而是与过去和解。
+        </p>
+      </div>
+
+      {/* Unified Card */}
+      <div
+        className="max-w-2xl mx-auto rounded-[2rem] p-8 md:p-10 relative overflow-hidden transition-all duration-300"
+        style={{
+          backgroundColor: colors.cardBg,
+          boxShadow: `0 4px 30px -8px ${colors.inputRing}`,
+          border: `1px solid ${colors.border}`
+        }}
+      >
+        {/* Subtle glow overlay */}
+        <div
+          className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-20 transition-colors duration-300"
+          style={{ backgroundColor: colors.glowColor }}
+        />
+
+        <div className="relative z-10 space-y-10">
+
+          {/* 1. Who Was I */}
+          <QuestionBlock
+            title="我曾经是谁？"
+            subtitle="回忆过去的角色、状态"
+            icon={<FileQuestion size={20} strokeWidth={1.5} />}
+            sectionIndex={1}
+            items={data.whoWasIItems.map(item => ({ id: item.id, value: item.content }))}
+            placeholder="胆小、被成绩定义、害怕冲突..."
+            inputPrefix="我曾经..."
+            theme={theme}
+            onChange={handleWhoWasIChange}
+            onAdd={handleAddStatement}
+            onDelete={handleDeleteStatement}
+          />
+
+          {/* Divider */}
+          <div style={{ height: '1px', backgroundColor: colors.border }} className="transition-colors duration-300" />
+
+          {/* 2. Positive Reframing */}
+          <ReframingBlock
+            title="积极重构过去"
+            subtitle="寻找困难经历背后的礼物"
+            icon={<RotateCcw size={20} strokeWidth={1.5} />}
+            sectionIndex={0}
+            items={data.positivePastReframingItems}
+            theme={theme}
+            onChange={handleReframeChange}
+            onAdd={handleAddReframe}
+            onDelete={handleDeleteReframe}
+          />
 
         </div>
       </div>
+
+      {/* Footer Action */}
+      <div className="flex justify-center pt-12 pb-8">
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="px-10 py-4 rounded-2xl font-semibold transition-all duration-300 flex items-center gap-3 text-base"
+          style={{
+            backgroundColor: saveStatus === 'success' ? colors.success : saveStatus === 'error' ? colors.danger : colors.primaryBtnBg,
+            color: colors.primaryBtnText,
+            boxShadow: '0 8px 24px -8px rgba(0,0,0, 0.25)',
+            opacity: isSaving ? 0.7 : 1
+          }}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              <span>保存中...</span>
+            </>
+          ) : saveStatus === 'success' ? (
+            <>
+              <Check size={18} />
+              <span>保存成功</span>
+            </>
+          ) : saveStatus === 'error' ? (
+            <>
+              <AlertCircle size={18} />
+              <span>保存失败</span>
+            </>
+          ) : (
+            <>
+              <BookOpen size={18} />
+              <span>保存回忆</span>
+            </>
+          )}
+        </button>
+      </div>
+
     </div>
   );
 };
