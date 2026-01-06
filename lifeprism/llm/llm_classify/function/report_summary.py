@@ -181,3 +181,7 @@ if __name__ == '__main__':
         print(result["tokens_usage"])
     
     asyncio.run(main())
+
+
+async def daily_summary_V2(date : str, options : list):
+    

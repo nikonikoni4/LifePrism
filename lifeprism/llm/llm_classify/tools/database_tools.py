@@ -11,8 +11,9 @@ from lifeprism.llm.llm_classify.utils.data_base_format import(
      _format_longest_activities,
      _format_goal_time_spent,
      _format_user_notes,
-     _format_daily_summary,
-     format_behavior_logs_lines
+     format_focus_and_todos,
+     format_behavior_logs_lines,
+     format_pc_active_time
 )
 from lifeprism.utils import get_logger,DEBUG
 logger = get_logger(__name__,DEBUG)
@@ -25,7 +26,7 @@ def get_daily_stats(
     start_time: Annotated[str, "开始时间 YYYY-MM-DD HH:MM:SS"],
     end_time: Annotated[str, "结束时间 YYYY-MM-DD HH:MM:SS"],
     split_count: Annotated[int, "切分时间段,把时间分成n个时间段,以获得更加详细的行为统计,长时段split_count应该更大,短时段split_count应该更小"],
-    options: Annotated[list, "可选参数,pc_active_time,behavior_stats,goal_time_spent,user_notes,tasks,all"] = None
+    options: Annotated[list, "可选参数,pc_active_time,behavior_stats,goal_time_spent,user_notes,tasks,all"] = ["all"]
 ) -> str:
     """
     获取时间段小于24h的用户行为统计摘要数据，也可作为数据查询接口
@@ -58,7 +59,7 @@ def get_daily_stats(
             )
             if pc_active_time:
                 prompt_parts.append(f"{section_num}. 电脑使用时间占比")
-                prompt_parts.append(pc_active_time)
+                prompt_parts.append(format_pc_active_time(pc_active_time))
                 section_num += 1
 
         # 2. 分段统计与分类占比（包含主要活动记录）
@@ -121,7 +122,7 @@ def get_daily_stats(
             daily_todo_and_focus = llm_lw_data_provider.get_focus_and_todos(date=date)
             if daily_todo_and_focus:
                 prompt_parts.append(f"\n{section_num}. 今日重点与任务")
-                prompt_parts.append(_format_daily_summary(daily_todo_and_focus))
+                prompt_parts.append(format_focus_and_todos(daily_todo_and_focus))
                 section_num += 1
 
         return "\n".join(prompt_parts)
@@ -284,30 +285,10 @@ def query_psychological_assessment() -> List[Dict]:
 
 
 if __name__ == "__main__":
-    # result = get_daily_stats.invoke(
-    #     input = {
-    #         "start_time": "2025-12-30 00:00:00",
-    #         "end_time": "2025-12-30 23:59:59",
-    #         "split_count": 2,
-    #         "options": ["all"]
-    #     }
-    # )
-    # print(result)
-    # result = get_multi_days_stats.invoke(
-    #     input = {
-    #         "start_time": "2025-11-01 00:00:00",
-    #         "end_time": "2025-12-01 00:00:00",
-    #         "options": ["all"]
-    #     }
-    # )
-    # print(result)
-    # summary = llm_lw_data_provider.get_focus_and_todos(start_time="2025-11-01 00:00:00", end_time="2025-12-01 00:00:00")
-    # print(summary)
-
-    print(query_behavior_logs.invoke(
+    print(get_daily_stats.invoke(
         input = {
-            "start_time": "2026-01-05 00:00:00",
-            "end_time": "2026-01-05 23:59:59",
-            "limit": 5
+            "start_time": "2025-12-30 00:00:00",
+            "end_time": "2025-12-30 23:59:59",
+            "split_count": 2,
         }
     ))
