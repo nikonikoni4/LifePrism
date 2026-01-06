@@ -2,128 +2,20 @@
 数据库相关的 LLM 工具
 原则：查询功能应该能够解决一个业务问题，而不是分散的让llm查询
 """
-from typing import Annotated
+from typing import Annotated,Optional,List,Dict
 from langchain.tools import tool
-
 from lifeprism.llm.llm_classify.providers.llm_lw_data_provider import llm_lw_data_provider
+from lifeprism.llm.llm_classify.utils.data_base_format import(
+     _format_seconds,
+     _format_segment_category_stats,
+     _format_longest_activities,
+     _format_goal_time_spent,
+     _format_user_notes,
+     _format_daily_summary,
+     format_behavior_logs_lines
+)
 from lifeprism.utils import get_logger,DEBUG
 logger = get_logger(__name__,DEBUG)
-
-def _format_seconds(seconds: int) -> str:
-    """将秒数格式化为可读时间"""
-    if seconds < 60:
-        return f"{seconds}秒"
-    elif seconds < 3600:
-        minutes = seconds // 60
-        return f"{minutes}分钟"
-    else:
-        hours = seconds // 3600
-        minutes = (seconds % 3600) // 60
-        if minutes > 0:
-            return f"{hours}小时{minutes}分钟"
-        return f"{hours}小时"
-
-
-def _format_segment_category_stats(segments_data: list, activities_by_segment: dict = None) -> str:
-    """格式化分段统计与分类占比数据（统一输出，包含主要活动记录）
-    
-    Args:
-        segments_data: 包含每个时段的统计和分类信息的列表
-        activities_by_segment: 按时段索引组织的活动记录字典 {segment_index: [activities]}
-    
-    Returns:
-        格式化的字符串，每个时段包含时间范围、分类占比和主要活动记录，子分类嵌套在主分类下
-    """
-    if not segments_data:
-        return "  - 暂无数据"
-    
-    lines = []
-    for i, seg in enumerate(segments_data, 1):
-        # 时段标题
-        lines.append(f"  - 时段{i}（{seg['segment_start']} 至 {seg['segment_end']}）")
-        
-        # 主分类占比
-        categories = seg.get('categories', [])
-        sub_categories = seg.get('sub_categories', [])
-        
-        if categories:
-            lines.append("    - 分类占比:")
-            
-            # 为每个主分类找到对应的子分类
-            for cat in categories:
-                cat_id = cat['id']
-                lines.append(f"      - {cat['name']}: {_format_seconds(cat['duration'])}（{cat['percentage']}%）")
-                
-                # 找到属于这个主分类的子分类
-                if sub_categories and cat_id != 'idle':  # 空闲没有子分类
-                    related_subs = [sub for sub in sub_categories if sub.get('category_id') == cat_id]
-                    for sub in related_subs:
-                        lines.append(f"         - {sub['name']}: {_format_seconds(sub['duration'])}（{sub['percentage']}%）")
-        
-        # 主要活动记录
-        if activities_by_segment and i in activities_by_segment:
-            activities = activities_by_segment[i]
-            if activities:
-                lines.append("    - 主要活动记录:")
-                for act in activities:
-                    title = act.get('title', '未知')
-                    app = act.get('app', '未知')
-                    duration = _format_seconds(act.get('duration_seconds', 0))
-                    lines.append(f"      - {title}（{app}）: {duration}")
-    
-    return "\n".join(lines)
-
-
-def _format_longest_activities(activities: list) -> str:
-    """格式化最长活动数据"""
-    if not activities:
-        return "  - 暂无数据"
-    
-    lines = []
-    for act in activities:
-        title = act.get('title', '未知')
-        app = act.get('app', '未知')
-        duration = _format_seconds(act.get('duration_seconds', 0))
-        lines.append(f"  - {title}（{app}）: {duration}")
-    return "\n".join(lines)
-
-
-def _format_goal_time_spent(goals: dict) -> str:
-    """格式化目标时间花费数据"""
-    if not goals:
-        return "  - 暂无目标时间记录"
-    
-    lines = []
-    for goal_id, info in goals.items():
-        name = info.get('name', '未知目标')
-        duration = _format_seconds(info.get('duration_seconds', 0))
-        lines.append(f"  - {name}: {duration}")
-    return "\n".join(lines)
-
-
-def _format_user_notes(notes: list) -> str:
-    """格式化用户备注数据"""
-    if not notes:
-        return "  - 暂无用户备注"
-    
-    lines = []
-    for note in notes:
-        start = note.get('start_time', '')
-        end = note.get('end_time', '')
-        content = note.get('content', '')
-        duration = note.get('duration_minutes', 0)
-        lines.append(f"  - [{start} ~ {end}]（{duration}分钟）: {content}")
-    return "\n".join(lines)
-
-
-def _format_daily_summary(content: str) -> str:
-    """格式化每日重点与任务"""
-    if not content:
-        return "  - 暂无数据"
-    # 增加缩进，使输出整齐
-    lines = content.strip().split('\n')
-    return "\n".join([f"  {line}" for line in lines])
-
 
 # 修改此处的option时需要同步修改
 # lifeprism\llm\custom_prompt\chatbot_prompt\summary_prompt.py 中的
@@ -331,23 +223,91 @@ def get_multi_days_stats(
     except Exception as e:
         return f"获取用户行为统计失败: {str(e)}"
 
+
+# ================================================
+# 新工具
+# ================================================
+
+@tool
+def query_behavior_logs(
+    start_time: str,
+    end_time: str,
+    limit: Optional[int] = 10,
+    order_by: str = "duration DESC"
+) -> List[Dict]:
+    """
+    查询用户行为日志，获取指定时间范围内的应用使用记录。当需要仔细了解某个时间段的活动时，可以使用此工具。
+    注意：一条电脑行为通常较短，一个小时内可能会产生大量数据，谨慎选择感兴趣的时间段调用分析。
+    Args:
+        start_time: 开始时间，格式 YYYY-MM-DD HH:MM:SS
+        end_time: 结束时间，格式 YYYY-MM-DD HH:MM:SS
+        limit: 返回记录数限制，默认10条，最大20条
+        order_by: 排序方式，默认按时长降序 "duration DESC"
+    返回示例:
+        22:27 ~ 22:28 (1m) antigravity - lifewatch-ai - antigravity - llm_lw_data_provider.py [工作/学习/编程] {完成lifewatch项目}
+    """
+    return format_behavior_logs_lines(llm_lw_data_provider.query_behavior_logs(
+        start_time=start_time,
+        end_time=end_time,
+        limit=limit,
+        order_by=order_by
+    ))
+
+
+
+@tool
+def query_goals() -> List[Dict]:
+    """
+    查询用户设置的目标。
+    Returns:
+        目标列表
+    """
+    return llm_lw_data_provider.query_goals()
+
+
+@tool
+def query_psychological_assessment() -> List[Dict]:
+    """
+    查询用户的心理测评数据（过去/现在/未来的自我探索）。
+    
+    Returns:
+        心理测评结果列表，每条记录包含:
+        - mode: 模式 (past/present/future)
+        - mode_name: 模式中文名称 (我曾经是谁/我现在是谁/我要成为什么样的人)
+        - ai_abstract: AI总结内容
+    """ 
+    return llm_lw_data_provider.query_time_paradoxes()
+
+
+
+
+
+
 if __name__ == "__main__":
-    result = get_daily_stats.invoke(
+    # result = get_daily_stats.invoke(
+    #     input = {
+    #         "start_time": "2025-12-30 00:00:00",
+    #         "end_time": "2025-12-30 23:59:59",
+    #         "split_count": 2,
+    #         "options": ["all"]
+    #     }
+    # )
+    # print(result)
+    # result = get_multi_days_stats.invoke(
+    #     input = {
+    #         "start_time": "2025-11-01 00:00:00",
+    #         "end_time": "2025-12-01 00:00:00",
+    #         "options": ["all"]
+    #     }
+    # )
+    # print(result)
+    # summary = llm_lw_data_provider.get_focus_and_todos(start_time="2025-11-01 00:00:00", end_time="2025-12-01 00:00:00")
+    # print(summary)
+
+    print(query_behavior_logs.invoke(
         input = {
-            "start_time": "2025-12-30 00:00:00",
-            "end_time": "2025-12-30 23:59:59",
-            "split_count": 2,
-            "options": ["all"]
+            "start_time": "2026-01-05 00:00:00",
+            "end_time": "2026-01-05 23:59:59",
+            "limit": 5
         }
-    )
-    print(result)
-    result = get_multi_days_stats.invoke(
-        input = {
-            "start_time": "2025-11-01 00:00:00",
-            "end_time": "2025-12-01 00:00:00",
-            "options": ["all"]
-        }
-    )
-    print(result)
-    summary = llm_lw_data_provider.get_focus_and_todos(start_time="2025-11-01 00:00:00", end_time="2025-12-01 00:00:00")
-    print(summary)
+    ))
