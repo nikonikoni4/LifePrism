@@ -4,7 +4,7 @@ LLM 模块专用数据提供者
 """
 import pandas as pd
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
 
 from lifeprism.storage import LWBaseDataProvider
@@ -21,6 +21,13 @@ class LLMLWDataProvider(LWBaseDataProvider):
     继承 LWBaseDataProvider，添加 LLM 分类流程专用的数据库操作
     """
     
+    # time_paradoxes mode 中文映射
+    MODE_MAP = {
+        "past": "我曾经是谁",
+        "present": "我现在是谁",
+        "future": "我要成为什么样的人"
+    }
+    
     def __init__(self, db_manager=None):
         """
         初始化 LLM 数据提供者
@@ -29,10 +36,191 @@ class LLMLWDataProvider(LWBaseDataProvider):
             db_manager: DatabaseManager 实例，None 则使用全局单例
         """
         super().__init__(db_manager)
+        
+        # 缓存映射（延迟初始化）
+        self._category_map: Optional[Dict[str, str]] = None      # category_id -> name
+        self._sub_category_map: Optional[Dict[str, str]] = None  # sub_category_id -> name
+        self._goal_map: Optional[Dict[str, str]] = None          # goal_id -> name
     
-    # ==================== LLM 专用方法 ====================
+    # ==================== 缓存映射方法 ====================
     
-    def get_pc_active_time(self, start_time: str, end_time: str) -> Optional[str]:
+    def _ensure_category_maps(self) -> Tuple[Dict[str, str], Dict[str, str]]:
+        """
+        确保分类映射已初始化（延迟加载，带缓存）
+        
+        Returns:
+            Tuple: (category_map, sub_category_map)
+        """
+        if self._category_map is None or self._sub_category_map is None:
+            self._category_map = {}
+            self._sub_category_map = {}
+            
+            # 加载主分类
+            categories_df = self.load_categories()
+            if categories_df is not None and not categories_df.empty:
+                self._category_map = {
+                    str(row['id']): row['name'] 
+                    for _, row in categories_df.iterrows()
+                }
+            
+            # 加载子分类
+            sub_categories_df = self.load_sub_categories()
+            if sub_categories_df is not None and not sub_categories_df.empty:
+                self._sub_category_map = {
+                    str(row['id']): row['name'] 
+                    for _, row in sub_categories_df.iterrows()
+                }
+            
+            logger.debug(f"分类映射已加载: {len(self._category_map)} 个主分类, {len(self._sub_category_map)} 个子分类")
+        
+        return self._category_map, self._sub_category_map
+    
+    def _ensure_goal_map(self) -> Dict[str, str]:
+        """
+        确保目标映射已初始化（延迟加载，带缓存）
+        
+        Returns:
+            Dict: goal_id -> goal_name 映射
+        """
+        if self._goal_map is None:
+            self._goal_map = {}
+            
+            goals_df = self.db.query('goal', columns=['id', 'name'])
+            if not goals_df.empty:
+                self._goal_map = {
+                    str(row['id']): row['name'] 
+                    for _, row in goals_df.iterrows()
+                }
+            
+            logger.debug(f"目标映射已加载: {len(self._goal_map)} 个目标")
+        
+        return self._goal_map
+    
+    def get_category_name(self, category_id: str) -> str:
+        """获取主分类名称"""
+        category_map, _ = self._ensure_category_maps()
+        return category_map.get(str(category_id), "未知分类")
+    
+    def get_sub_category_name(self, sub_category_id: str) -> str:
+        """获取子分类名称"""
+        _, sub_category_map = self._ensure_category_maps()
+        return sub_category_map.get(str(sub_category_id), "未知子分类")
+    
+    def get_goal_name(self, goal_id: str) -> str:
+        """获取目标名称"""
+        goal_map = self._ensure_goal_map()
+        return goal_map.get(str(goal_id), "")
+    
+    # ==================== 基础查询方法 ====================
+    
+    def query_behavior_logs(
+        self,
+        start_time: str,
+        end_time: str,
+        limit: int = None,
+        order_by: str = "start_time DESC"
+    ) -> List[Dict]:
+        """
+        查询用户行为日志
+        
+        Args:
+            start_time: 开始时间 YYYY-MM-DD HH:MM:SS
+            end_time: 结束时间 YYYY-MM-DD HH:MM:SS
+            limit: 返回记录数限制
+            order_by: 排序方式，默认按开始时间降序
+            
+        Returns:
+            List[Dict]: 包含以下字段:
+                - start_time: 开始时间
+                - end_time: 结束时间
+                - duration: 持续时间(秒)
+                - app: 应用名称
+                - title: 窗口标题
+                - category_name: 主分类名称
+                - sub_category_name: 子分类名称
+                - goal_name: 目标名称（如无则为空字符串）
+        """
+        try:
+            df = self.db.query_advanced(
+                table_name='user_app_behavior_log',
+                columns=['start_time', 'end_time', 'duration', 'app', 'title', 
+                         'category_id', 'sub_category_id', 'link_to_goal_id'],
+                conditions=[
+                    ('start_time', '>=', start_time),
+                    ('end_time', '<=', end_time)
+                ],
+                order_by=order_by,
+                limit=limit
+            )
+            
+            if df.empty:
+                return []
+            
+            # 确保映射已加载
+            self._ensure_category_maps()
+            self._ensure_goal_map()
+            
+            results = []
+            for _, row in df.iterrows():
+                results.append({
+                    'start_time': row['start_time'],
+                    'end_time': row['end_time'],
+                    'duration': row['duration'],
+                    'app': row['app'],
+                    'title': row['title'],
+                    'category_name': self.get_category_name(row.get('category_id', '')),
+                    'sub_category_name': self.get_sub_category_name(row.get('sub_category_id', '')),
+                    'goal_name': self.get_goal_name(row.get('link_to_goal_id', ''))
+                })
+            
+            logger.debug(f"查询行为日志: {start_time} ~ {end_time}, 返回 {len(results)} 条记录")
+            return results
+            
+        except Exception as e:
+            logger.error(f"查询行为日志失败: {e}")
+            return []
+    
+    def query_goals(self) -> List[str]:
+        """
+        查询所有 active 状态的目标名称，并刷新 goal_id -> name 映射缓存
+        
+        Returns:
+            List[str]: active 状态的目标名称列表
+        """
+        try:
+            df = self.db.query(
+                table_name='goal',
+                columns=['id', 'name', 'status'],
+                order_by='order_index ASC'
+            )
+            
+            if df.empty:
+                self._goal_map = {}
+                return []
+            
+            # 刷新缓存（包含所有目标）
+            self._goal_map = {
+                str(row['id']): row['name'] 
+                for _, row in df.iterrows()
+            }
+            
+            # 只返回 active 状态的目标名称
+            active_goal_names = [
+                row['name']
+                for _, row in df.iterrows()
+                if row['status'] == 'active'
+            ]
+            
+            logger.debug(f"查询目标: 返回 {len(active_goal_names)} 个 active 目标")
+            return active_goal_names
+            
+        except Exception as e:
+            logger.error(f"查询目标失败: {e}")
+            return []
+    
+    # ==================== stats专用方法 ====================
+    
+    def get_pc_active_time(self, start_time: str, end_time: str) -> List[float]:
         """
         分析以2小时为单位的电脑活跃时间占比
         
@@ -44,8 +232,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
             end_time: 结束时间 YYYY-MM-DD HH:MM:SS
         
         Returns:
-            str: 格式化的活跃时间占比，例如：
-                 "0~24h内电脑活跃时间占比：0.1 0 0 0 0 0.2 0.5 0.8 0.9 0.7 0.3 0.1"
+            List[float]: 12个时间段的活跃占比列表，每个值为0.0-1.0之间的浮点数
         """
         from datetime import datetime, timedelta
         
@@ -109,13 +296,11 @@ class LLMLWDataProvider(LWBaseDataProvider):
         for i in range(12):
             if segment_total_seconds[i] > 0:
                 ratio = segment_active_seconds[i] / segment_total_seconds[i]
-                ratios.append(f"{ratio:.1f}")
+                ratios.append(round(ratio, 2))
             else:
-                ratios.append("0.0")
+                ratios.append(0.0)
         
-        # 格式化输出
-        ratio_str = " ".join(ratios)
-        return f"0~24h内电脑活跃时间占比：{ratio_str}"
+        return ratios
     
     def _load_events_in_range(self, start_time: str, end_time: str) -> pd.DataFrame:
         """
@@ -141,20 +326,17 @@ class LLMLWDataProvider(LWBaseDataProvider):
     
     def _get_category_name_maps(self) -> tuple[Dict[str, str], Dict[str, tuple]]:
         """
-        获取分类名称映射
+        获取分类名称映射（兼容旧接口，内部使用缓存）
         
         Returns:
             tuple: (主分类 id->name 映射, 子分类 id->(name, category_id) 映射)
         """
-        category_map = {}
+        # 使用缓存的映射
+        category_map, sub_category_map_simple = self._ensure_category_maps()
+        
+        # 为了兼容旧接口，需要将 sub_category_map 转换为 (name, category_id) 格式
+        # 但这需要额外查询 category_id，所以我们需要重新加载子分类数据
         sub_category_map = {}
-        
-        # 主分类
-        categories_df = self.load_categories()
-        if categories_df is not None and not categories_df.empty:
-            category_map = {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
-        
-        # 子分类
         sub_categories_df = self.load_sub_categories()
         if sub_categories_df is not None and not sub_categories_df.empty:
             sub_category_map = {
@@ -564,27 +746,24 @@ class LLMLWDataProvider(LWBaseDataProvider):
             'duration_seconds': 'sum'
         }).reset_index()
         
-        # 获取 goal 名称
+        # 确保 goal 映射已加载
+        self._ensure_goal_map()
+        
+        # 获取 goal 名称（使用缓存）
         results = {}
         for _, row in goal_stats.iterrows():
             gid = str(row['link_to_goal_id'])
             duration = int(row['duration_seconds'])
-            
-            # 查询 goal 名称
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT name FROM goal WHERE id = ?", (gid,))
-                goal_row = cursor.fetchone()
-                goal_name = goal_row[0] if goal_row else "未知目标"
+            goal_name = self.get_goal_name(gid)
             
             results[gid] = {
-                "name": goal_name,
+                "name": goal_name if goal_name else "未知目标",
                 "duration_seconds": duration
             }
         
         return results
 
-    def get_daily_goal_trend(self, start_time: str, end_time: str) -> Optional[str]:
+    def get_daily_goal_trend(self, start_time: str, end_time: str) -> Optional[List[Dict[str, Any]]]:
         """
         获取指定日期范围内每天的目标完成情况
         
@@ -595,7 +774,13 @@ class LLMLWDataProvider(LWBaseDataProvider):
             end_time: 结束日期 YYYY-MM-DD HH:MM:SS
         
         Returns:
-            str: 格式化的每日目标统计
+            List[Dict]: 每个目标的统计数据，包含：
+                - goal_id: 目标ID
+                - goal_name: 目标名称
+                - total_seconds: 总时长（秒）
+                - date_range_start: 开始日期
+                - date_range_end: 结束日期
+                - daily_durations: {date_str: duration_seconds} 每日时长字典
         """
         from collections import defaultdict
         from datetime import datetime, timedelta
@@ -632,55 +817,41 @@ class LLMLWDataProvider(LWBaseDataProvider):
             duration = int(row['duration_seconds'])
             goal_daily_stats[goal_id][date] += duration
         
-        # 获取目标名称
-        goal_names = {}
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                for goal_id in goal_daily_stats.keys():
-                    cursor.execute("SELECT name FROM goal WHERE id = ?", (goal_id,))
-                    goal_row = cursor.fetchone()
-                    goal_names[goal_id] = goal_row[0] if goal_row else "未知目标"
-        except Exception as e:
-            logger.error(f"获取目标名称失败: {e}")
-            return None
+        # 确保 goal 映射已加载
+        self._ensure_goal_map()
         
-        # 格式化输出
-        output_lines = []
-        
-        for goal_id in sorted(goal_daily_stats.keys(), key=lambda x: goal_names.get(x, "")):
-            goal_name = goal_names[goal_id]
+        # 构建结果
+        results = []
+        for goal_id in sorted(goal_daily_stats.keys(), key=lambda x: self.get_goal_name(x) or ""):
             daily_durations = goal_daily_stats[goal_id]
+            goal_name = self.get_goal_name(goal_id) or "未知目标"
             
             # 计算总时长
             total_seconds = sum(daily_durations.values())
-            total_hours = total_seconds // 3600
-            total_minutes = (total_seconds % 3600) // 60
-            total_str = f"{total_hours}h {total_minutes}m" if total_hours > 0 else f"{total_minutes}m"
             
             # 获取日期范围
             dates = sorted(daily_durations.keys())
             date_range_start = dates[0].strftime("%Y-%m-%d")
             date_range_end = dates[-1].strftime("%Y-%m-%d")
             
-            # 构建每日时长列表
-            daily_list = []
-            for date in dates:
-                seconds = daily_durations[date]
-                hours = seconds // 3600
-                minutes = (seconds % 3600) // 60
-                time_str = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
-                daily_list.append(f"{date.strftime('%Y-%m-%d')}: {time_str}")
+            # 转换日期为字符串键
+            daily_durations_str = {
+                date.strftime("%Y-%m-%d"): duration
+                for date, duration in daily_durations.items()
+            }
             
-            # 输出格式
-            output_lines.append(f"- {goal_name}: 总时长 {total_str}; 从{date_range_start}~{date_range_end}每天时长为：")
-            for daily_item in daily_list:
-                output_lines.append(f"  {daily_item}")
-            output_lines.append("")  # 空行分隔
+            results.append({
+                "goal_id": goal_id,
+                "goal_name": goal_name,
+                "total_seconds": total_seconds,
+                "date_range_start": date_range_start,
+                "date_range_end": date_range_end,
+                "daily_durations": daily_durations_str
+            })
         
-        return "\n".join(output_lines).strip()
+        return results
 
-    def get_daily_category_trend(self, start_time: str, end_time: str) -> Optional[str]:
+    def get_daily_category_trend(self, start_time: str, end_time: str) -> Optional[List[Dict[str, Any]]]:
         """
         获取指定日期范围内每天的主分类时长统计
         
@@ -691,7 +862,13 @@ class LLMLWDataProvider(LWBaseDataProvider):
             end_time: 结束日期 YYYY-MM-DD HH:MM:SS
         
         Returns:
-            str: 格式化的每日主分类统计
+            List[Dict]: 每个分类的统计数据，包含：
+                - category_id: 分类ID
+                - category_name: 分类名称
+                - total_seconds: 总时长（秒）
+                - date_range_start: 开始日期
+                - date_range_end: 结束日期
+                - daily_durations: {date_str: duration_seconds} 每日时长字典
         """
         from collections import defaultdict
         from datetime import datetime
@@ -728,43 +905,39 @@ class LLMLWDataProvider(LWBaseDataProvider):
             duration = int(row['duration_seconds'])
             category_daily_stats[category_id][date] += duration
         
-        # 获取分类名称
-        category_name_map, _ = self._get_category_name_maps()
+        # 确保分类映射已加载
+        self._ensure_category_maps()
         
-        # 格式化输出
-        output_lines = []
-        
-        for category_id in sorted(category_daily_stats.keys(), key=lambda x: category_name_map.get(x, "未分类")):
-            category_name = category_name_map.get(category_id, "未分类")
+        # 构建结果
+        results = []
+        for category_id in sorted(category_daily_stats.keys(), key=lambda x: self.get_category_name(x)):
             daily_durations = category_daily_stats[category_id]
+            category_name = self.get_category_name(category_id)
             
             # 计算总时长
             total_seconds = sum(daily_durations.values())
-            total_hours = total_seconds // 3600
-            total_minutes = (total_seconds % 3600) // 60
-            total_str = f"{total_hours}h {total_minutes}m" if total_hours > 0 else f"{total_minutes}m"
             
             # 获取日期范围
             dates = sorted(daily_durations.keys())
             date_range_start = dates[0].strftime("%Y-%m-%d")
             date_range_end = dates[-1].strftime("%Y-%m-%d")
             
-            # 构建每日时长列表
-            daily_list = []
-            for date in dates:
-                seconds = daily_durations[date]
-                hours = seconds // 3600
-                minutes = (seconds % 3600) // 60
-                time_str = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
-                daily_list.append(f"{date.strftime('%Y-%m-%d')}: {time_str}")
+            # 转换日期为字符串键
+            daily_durations_str = {
+                date.strftime("%Y-%m-%d"): duration
+                for date, duration in daily_durations.items()
+            }
             
-            # 输出格式
-            output_lines.append(f"- {category_name}: 总时长 {total_str}; 从{date_range_start}~{date_range_end}每天时长为：")
-            for daily_item in daily_list:
-                output_lines.append(f"  {daily_item}")
-            output_lines.append("")  # 空行分隔
+            results.append({
+                "category_id": category_id,
+                "category_name": category_name,
+                "total_seconds": total_seconds,
+                "date_range_start": date_range_start,
+                "date_range_end": date_range_end,
+                "daily_durations": daily_durations_str
+            })
         
-        return "\n".join(output_lines).strip()
+        return results
 
     def get_user_focus_notes(
         self, 
@@ -821,7 +994,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
         
         return results
 
-    def get_computer_usage_schedule(self, start_date: str, end_date: str) -> Optional[str]:
+    def get_computer_usage_schedule(self, start_date: str, end_date: str) -> Optional[List[Dict[str, Any]]]:
         """
         分析电脑使用时间以推断可能的作息时间
         
@@ -833,11 +1006,12 @@ class LLMLWDataProvider(LWBaseDataProvider):
             end_date: 结束日期 YYYY-MM-DD
         
         Returns:
-            str: 格式化的每日电脑使用时间分析
-                格式示例：
-                2026-01-03:
-                  - 最早记录在 08:30，活动为 Chrome - 查看邮件
-                  - 最晚记录在 23:45，活动为 VSCode - 编写代码
+            List[Dict]: 每日电脑使用时间统计，包含：
+                - date: 日期字符串
+                - earliest_time: 最早活动时间 HH:MM
+                - earliest_activity: 最早活动描述
+                - latest_time: 最晚活动时间 HH:MM
+                - latest_activity: 最晚活动描述
         """
         from collections import defaultdict
         from datetime import datetime, timedelta
@@ -897,38 +1071,39 @@ class LLMLWDataProvider(LWBaseDataProvider):
             if daily_schedule[logical_date]["latest"] is None or start_dt > daily_schedule[logical_date]["latest"]["time"]:
                 daily_schedule[logical_date]["latest"] = record
         
-        # 格式化输出
-        output_lines = []
-        
+        # 构建结果
+        results = []
         for date in sorted(daily_schedule.keys()):
             schedule = daily_schedule[date]
-            output_lines.append(f"{date.strftime('%Y-%m-%d')}:")
+            result = {"date": date.strftime("%Y-%m-%d")}
             
             if schedule["earliest"]:
-                earliest_time = schedule["earliest"]["time"].strftime("%H:%M")
-                earliest_activity = schedule["earliest"]["activity"]
-                output_lines.append(f"  - 最早记录在 {earliest_time}，活动为 {earliest_activity}")
+                result["earliest_time"] = schedule["earliest"]["time"].strftime("%H:%M")
+                result["earliest_activity"] = schedule["earliest"]["activity"]
             
             if schedule["latest"]:
-                latest_time = schedule["latest"]["time"].strftime("%H:%M")
-                latest_activity = schedule["latest"]["activity"]
-                output_lines.append(f"  - 最晚记录在 {latest_time}，活动为 {latest_activity}")
+                result["latest_time"] = schedule["latest"]["time"].strftime("%H:%M")
+                result["latest_activity"] = schedule["latest"]["activity"]
             
-            output_lines.append("")  # 空行分隔
+            results.append(result)
         
-        return "\n".join(output_lines).strip()
+        return results
 
-    def get_focus_and_todos(self, date:str = None, start_time: str = None, end_time: str = None) -> Optional[str]:
+    def get_focus_and_todos(self, date:str = None, start_time: str = None, end_time: str = None) -> Optional[List[Dict[str, Any]]]:
         """
         获取指定日期范围的重点内容和待办事项
         
         Args:
             date: 日期 YYYY-MM-DD
-            start_time: 开始时间 HH:MM:SS
-            end_time: 结束时间 HH:MM:SS
+            start_time: 开始时间 YYYY-MM-DD HH:MM:SS
+            end_time: 结束时间 YYYY-MM-DD HH:MM:SS
         
         Returns:
-            str: 格式化的每日摘要，包含重点和待办
+            List[Dict]: 每日摘要数据，包含：
+                - date: 日期
+                - focus: 重点内容
+                - todos: 待办事项列表
+                - completion_rate: 完成率（0-100）
         """
         from collections import defaultdict
         if not date and not start_time and not end_time:
@@ -958,9 +1133,9 @@ class LLMLWDataProvider(LWBaseDataProvider):
                     "SELECT date, content FROM daily_focus WHERE date BETWEEN ? AND ? ORDER BY date",
                     (start_date, end_date)
                 )
-                for date, content in cursor.fetchall():
+                for date_str, content in cursor.fetchall():
                     if content:
-                        daily_data[date]["focus"] = content
+                        daily_data[date_str]["focus"] = content
                 
                 # 2. 获取待办事项
                 if date : 
@@ -973,38 +1148,38 @@ class LLMLWDataProvider(LWBaseDataProvider):
                     "SELECT date, content, state FROM todo_list WHERE state != 'inactive' AND date BETWEEN ? AND ? ORDER BY date",
                     (start_date, end_date)
                 )
-                for date, content, state in cursor.fetchall():
-                    # 转换状态显示，根据用户要求使用 completed/not completed
+                for date_str, content, state in cursor.fetchall():
                     is_completed = state == 'completed'
-                    state_display = "completed" if is_completed else "not completed"
-                    daily_data[date]["todos"].append({
-                        "text": f"{content} {state_display}",
+                    daily_data[date_str]["todos"].append({
+                        "content": content,
+                        "state": state,
                         "completed": is_completed
                     })
             
             if not daily_data:
                 return None
                 
-            # 格式化输出
-            output_lines = []
-            for date in sorted(daily_data.keys()):
-                data = daily_data[date]
-                output_lines.append(f"date: {date}")
-                output_lines.append(f"- focus : {data['focus']}")
-                
+            # 构建结果
+            results = []
+            for date_str in sorted(daily_data.keys()):
+                data = daily_data[date_str]
                 todos = data["todos"]
+                
+                # 计算完成率
                 if todos:
                     completed_count = sum(1 for t in todos if t["completed"])
-                    rate = int(completed_count / len(todos) * 100)
-                    output_lines.append(f"- todos: {rate}%")
-                    for i, todo in enumerate(todos, 1):
-                        output_lines.append(f"  {i}. {todo['text']}")
+                    completion_rate = int(completed_count / len(todos) * 100)
                 else:
-                    output_lines.append("- todos:")
-                    output_lines.append("  (无待办事项)")
-                output_lines.append("") # 换行分隔
+                    completion_rate = 0
+                
+                results.append({
+                    "date": date_str,
+                    "focus": data["focus"],
+                    "todos": todos,
+                    "completion_rate": completion_rate
+                })
             
-            return "\n".join(output_lines).strip()
+            return results
             
         except Exception as e:
             logger.error(f"获取重点与待办内容失败: {e}")
@@ -1129,38 +1304,69 @@ class LLMLWDataProvider(LWBaseDataProvider):
         
         return result
 
+    def query_time_paradoxes(self) -> List[Dict]:
+        """
+        查询用户的时间悖论测试结果（每个 mode 的最新版本）
+        
+        Args:
+            user_id: 用户ID，默认为1
+                
+            Returns:
+                List[Dict]: 包含:
+                    - mode: 模式（past/present/future）
+                    - mode_name: 模式中文名称
+                    - ai_abstract: AI总结
+            """
+        user_id = 1 # 默认用户ID
+        try:
+            results = []
+            
+            for mode in ['past', 'present', 'future']:
+                # 查询每个 mode 的最新版本
+                df = self.db.query_advanced(
+                    table_name='time_paradoxes',
+                    columns=['mode', 'ai_abstract', 'version'],
+                    conditions=[
+                        ('user_id', '=', user_id),
+                        ('mode', '=', mode)
+                    ],
+                    order_by='version DESC',
+                    limit=1
+                )
+                
+                if not df.empty:
+                    row = df.iloc[0]
+                    results.append({
+                        'mode': mode,
+                        'mode_name': self.MODE_MAP.get(mode, mode),
+                        'ai_abstract': row.get('ai_abstract', '')
+                    })
+            
+            logger.debug(f"查询时间悖论: user_id={user_id}, 返回 {len(results)} 条记录")
+            return results
+            
+        except Exception as e:
+            logger.error(f"查询时间悖论失败: {e}")
+            return []
 
 llm_lw_data_provider = LazySingleton(LLMLWDataProvider)
 
 if __name__ == "__main__":
-    # print("=== 电脑使用时间分析（作息推断） ===")
-    # print(llm_lw_data_provider.get_computer_usage_schedule("2025-12-25", "2025-12-30"))
-    print("\n=== 按小时分段获取活动日志 ===")
-    try:
-        hourly_logs = llm_lw_data_provider.get_logs_by_time("2026-01-05")
-        print(f"找到 {len(hourly_logs)} 个时间段的数据")
-        
-        for hour_key in sorted(hourly_logs.keys()):
-            logs = hourly_logs[hour_key]
-            print(f"\n时间段 {hour_key} ({len(logs)} 条记录):")
-            for i, log in enumerate(logs, 1):
-                duration_min = log.get('duration', 0) // 60
-                print(f"  {i}. [{duration_min}分钟] {log.get('app', 'Unknown')}")
-                if log.get('title'):
-                    print(f"     标题: {log.get('title', '')[:60]}")
-    except Exception as e:
-        print(f"错误: {e}")
-        import traceback
-        traceback.print_exc()
+    from lifeprism.llm.llm_classify.utils.data_base_format import (
+        format_hourly_logs,
+        format_daily_goal_trend,
+        format_daily_category_trend,
+        format_computer_usage_schedule,
+        format_focus_and_todos
+    )
     
-    # print("\n=== 重点与待办统计 ===")
-    # print(llm_lw_data_provider.get_focus_and_todos(start_time="2026-01-01 00:00:00", end_time="2026-01-05 23:59:59"))
-    # print("=== 目标时长统计 ===")
-    # print(llm_lw_data_provider.get_daily_goal_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
-    # print("\n=== 主分类时长统计 ===")
-    # print(llm_lw_data_provider.get_daily_category_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
-    # print("\n=== 用户备注 ===")
-    # print(llm_lw_data_provider.get_user_focus_notes("2025-12-25 00:00:00", "2025-12-30 23:59:59"))
-    # print("\n=== 电脑使用时间分析（作息推断） ===")
-    # print(llm_lw_data_provider.get_computer_usage_schedule("2025-12-25", "2025-12-30"))
+    print(format_hourly_logs(llm_lw_data_provider.get_logs_by_time("2026-01-05")))
+    print("\n=== 重点与待办统计 ===")
+    print(format_focus_and_todos(llm_lw_data_provider.get_focus_and_todos(start_time="2026-01-01 00:00:00", end_time="2026-01-05 23:59:59")))
+    print("=== 目标时长统计 ===")
+    print(format_daily_goal_trend(llm_lw_data_provider.get_daily_goal_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59")))
+    print("\n=== 主分类时长统计 ===")
+    print(format_daily_category_trend(llm_lw_data_provider.get_daily_category_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59")))
+    print("\n=== 电脑使用时间分析（作息推断） ===")
+    print(format_computer_usage_schedule(llm_lw_data_provider.get_computer_usage_schedule("2025-12-25", "2025-12-30")))
     
