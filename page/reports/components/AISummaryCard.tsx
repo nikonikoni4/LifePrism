@@ -80,19 +80,19 @@ const AISummaryCard: React.FC<AISummaryCardProps> = ({
                     if (!date) {
                         throw new Error('日报需要提供 date 参数');
                     }
-                    result = await ReportsAPI.getAISummary(date, ['all']);
+                    result = await ReportsAPI.getAISummary(date, 'complex');
                     break;
                 case 'weekly':
                     if (!weekStartDate || !weekEndDate) {
                         throw new Error('周报需要提供 weekStartDate 和 weekEndDate 参数');
                     }
-                    result = await ReportsAPI.getWeeklyAISummary(weekStartDate, weekEndDate, ['all']);
+                    result = await ReportsAPI.getWeeklyAISummary(weekStartDate, weekEndDate, 'complex');
                     break;
                 case 'monthly':
                     if (!monthStartDate || !monthEndDate) {
                         throw new Error('月报需要提供 monthStartDate 和 monthEndDate 参数');
                     }
-                    result = await ReportsAPI.getMonthlyAISummary(monthStartDate, monthEndDate, ['all']);
+                    result = await ReportsAPI.getMonthlyAISummary(monthStartDate, monthEndDate, 'complex');
                     break;
                 default:
                     throw new Error('未知的报告类型');

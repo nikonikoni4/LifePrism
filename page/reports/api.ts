@@ -755,7 +755,7 @@ export const ReportsAPI = {
     /**
      * 获取 AI 总结
      */
-    async getAISummary(date: string, options: string[] = ['all']): Promise<{
+    async getAISummary(date: string, pattern: string = 'complex'): Promise<{
         content: string;
         tokensUsage: {
             inputTokens: number;
@@ -770,7 +770,7 @@ export const ReportsAPI = {
             },
             body: JSON.stringify({
                 date,
-                options,
+                pattern,
             }),
         });
 
@@ -809,7 +809,7 @@ export const ReportsAPI = {
     /**
      * 获取周 AI 总结
      */
-    async getWeeklyAISummary(weekStartDate: string, weekEndDate: string, options: string[] = ['all']): Promise<{
+    async getWeeklyAISummary(weekStartDate: string, weekEndDate: string, pattern: string = 'complex'): Promise<{
         content: string;
         tokensUsage: {
             inputTokens: number;
@@ -825,7 +825,7 @@ export const ReportsAPI = {
             body: JSON.stringify({
                 week_start_date: weekStartDate,
                 week_end_date: weekEndDate,
-                options,
+                pattern,
             }),
         });
 
@@ -864,7 +864,7 @@ export const ReportsAPI = {
     /**
      * 获取月 AI 总结
      */
-    async getMonthlyAISummary(monthStartDate: string, monthEndDate: string, options: string[] = ['all']): Promise<{
+    async getMonthlyAISummary(monthStartDate: string, monthEndDate: string, pattern: string = 'complex'): Promise<{
         content: string;
         tokensUsage: {
             inputTokens: number;
@@ -880,7 +880,7 @@ export const ReportsAPI = {
             body: JSON.stringify({
                 month_start_date: monthStartDate,
                 month_end_date: monthEndDate,
-                options,
+                pattern,
             }),
         });
 
