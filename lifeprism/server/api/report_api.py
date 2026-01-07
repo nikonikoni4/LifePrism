@@ -57,6 +57,7 @@ async def get_daily_report(
     return service_get_daily_report(date, force_refresh)
 
 
+@router.post("/daily/ai_summary", response_model=AISummaryResponse)
 async def get_daily_ai_summary(
     request: AISummaryRequest
 ):
@@ -67,18 +68,16 @@ async def get_daily_ai_summary(
     
     请求体参数:
     - **date**: 日期 YYYY-MM-DD
-    - **options**: 总结选项列表（可选，默认 ["all"]）
-      - behavior_stats: 各时段的主分类和子分类的占比统计
-      - longest_activities: 各时段内最长的活动记录
-      - goal_time_spent: 各目标花费的时间
-      - user_notes: 用户手动添加的时间块备注
-      - tasks: 今日重点内容
+    - **pattern**: 总结模式（可选，默认 "complex"）
+      - complex: 复杂模式，包含更多统计信息
+      - simple: 简单模式，只包含基本统计信息
     
     返回:
     - **content**: AI 生成的总结内容
     - **tokens_usage**: Token 使用量统计
     """
-    result = await service_get_daily_ai_summary(request.date, request.options)
+    
+    result = await service_get_daily_ai_summary(request.date, request.pattern)
     return AISummaryResponse(
         content=result['content'],
         tokens_usage=TokenUsage(
@@ -175,7 +174,7 @@ async def get_weekly_ai_summary(
     请求体参数:
     - **week_start_date**: 周开始日期 YYYY-MM-DD（周一）
     - **week_end_date**: 周结束日期 YYYY-MM-DD（周日）
-    - **options**: 总结选项列表（可选，默认 ["all"]）
+    - **pattern**: 总结模式（可选，默认 "complex"）
     
     返回:
     - **content**: AI 生成的总结内容
@@ -184,7 +183,7 @@ async def get_weekly_ai_summary(
     result = await service_get_weekly_ai_summary(
         request.week_start_date, 
         request.week_end_date, 
-        request.options
+        request.pattern
     )
     return AISummaryResponse(
         content=result['content'],
@@ -275,7 +274,7 @@ async def get_monthly_ai_summary(
     请求体参数:
     - **month_start_date**: 月开始日期 YYYY-MM-01
     - **month_end_date**: 月结束日期 YYYY-MM-DD（月末）
-    - **options**: 总结选项列表（可选，默认 ["all"]）
+    - **pattern**: 总结模式（可选，默认 "complex"）
     
     返回:
     - **content**: AI 生成的总结内容
@@ -284,7 +283,7 @@ async def get_monthly_ai_summary(
     result = await service_get_monthly_ai_summary(
         request.month_start_date, 
         request.month_end_date, 
-        request.options
+        request.pattern
     )
     return AISummaryResponse(
         content=result['content'],

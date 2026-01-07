@@ -202,19 +202,19 @@ class AISummaryResponse(BaseModel):
 class AISummaryRequest(BaseModel):
     """AI 总结请求 - 日报"""
     date: str = Field(..., description="日期 YYYY-MM-DD")
-    options: Optional[List[str]] = Field(
-        default=["all"], 
-        description="总结选项列表，如 behavior_stats, longest_activities, goal_time_spent, user_notes, tasks"
+    pattern: Optional[str] = Field(
+        default="complex", 
+        description="总结模式，如 complex, simple"
     )
 
-
+ 
 class WeeklyAISummaryRequest(BaseModel):
     """AI 总结请求 - 周报"""
     week_start_date: str = Field(..., description="周开始日期 YYYY-MM-DD（周一）")
     week_end_date: str = Field(..., description="周结束日期 YYYY-MM-DD（周日）")
-    options: Optional[List[str]] = Field(
-        default=["all"], 
-        description="总结选项列表，如 behavior_stats, longest_activities, goal_time_spent, user_notes, tasks"
+    pattern: Optional[str] = Field(
+        default="complex", 
+        description="总结模式，如 complex, simple"
     )
 
 
@@ -222,7 +222,7 @@ class MonthlyAISummaryRequest(BaseModel):
     """AI 总结请求 - 月报"""
     month_start_date: str = Field(..., description="月开始日期 YYYY-MM-01")
     month_end_date: str = Field(..., description="月结束日期 YYYY-MM-DD（月末）")
-    options: Optional[List[str]] = Field(
-        default=["all"], 
-        description="总结选项列表，如 behavior_stats, longest_activities, goal_time_spent, user_notes, tasks"
+    pattern: Optional[str] = Field(
+        default="complex", 
+        description="总结模式，如 complex, simple"
     )

@@ -277,7 +277,7 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
     )
 
 
-async def get_daily_ai_summary(date: str, options: List[str]) -> dict:
+async def get_daily_ai_summary(date: str, pattern: str) -> dict:
     """
     获取每日 AI 总结（异步版本）
     
@@ -285,13 +285,9 @@ async def get_daily_ai_summary(date: str, options: List[str]) -> dict:
     
     Args:
         date: 日期 YYYY-MM-DD
-        options: 总结选项列表
-            - behavior_stats: 各时段的主分类和子分类的占比统计
-            - longest_activities: 各时段内最长的活动记录
-            - goal_time_spent: 各目标花费的时间
-            - user_notes: 用户手动添加的时间块备注
-            - tasks: 今日重点内容
-            - all: 所有选项
+        pattern: 总结模式
+            - complex: 复杂模式，包含更多统计信息
+            - simple: 简单模式，只包含基本统计信息
         
     Returns:
         dict: 包含 content 和 tokens_usage 的字典
@@ -300,8 +296,8 @@ async def get_daily_ai_summary(date: str, options: List[str]) -> dict:
     """
     from lifeprism.llm.llm_classify.function.report_summary import daily_summary
     
-    logger.info(f"生成每日 AI 总结 {date}, options={options}")
-    result = await daily_summary(date=date, options=options)
+    logger.info(f"生成每日 AI 总结 {date}, pattern={pattern}")
+    result = await daily_summary(date=date, pattern=pattern)
     
     # 保存 AI 总结到 daily_report 表
     try:
@@ -315,7 +311,7 @@ async def get_daily_ai_summary(date: str, options: List[str]) -> dict:
     return result
 
 
-async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, options: List[str]) -> dict:
+async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, pattern: List[str]) -> dict:
     """
     获取周 AI 总结（异步版本）
     
@@ -324,13 +320,9 @@ async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, option
     Args:
         week_start_date: 周开始日期 YYYY-MM-DD（周一）
         week_end_date: 周结束日期 YYYY-MM-DD（周日）
-        options: 总结选项列表
-            - behavior_stats: 各时段的主分类和子分类的占比统计
-            - longest_activities: 各时段内最长的活动记录
-            - goal_time_spent: 各目标花费的时间
-            - user_notes: 用户手动添加的时间块备注
-            - tasks: 本周重点内容
-            - all: 所有选项
+        pattern: 总结模式
+            - complex: 复杂模式，包含更多统计信息
+            - simple: 简单模式，只包含基本统计信息
         
     Returns:
         dict: 包含 content 和 tokens_usage 的字典
@@ -339,7 +331,7 @@ async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, option
     """
     from lifeprism.llm.llm_classify.function.report_summary import multi_days_summary
     
-    logger.info(f"生成周 AI 总结 {week_start_date} ~ {week_end_date}, options={options}")
+    logger.info(f"生成周 AI 总结 {week_start_date} ~ {week_end_date}, pattern={pattern}")
     
     start_time = f"{week_start_date} 00:00:00"
     end_time = f"{week_end_date} 23:59:59"
@@ -348,7 +340,7 @@ async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, option
         start_time=start_time,
         end_time=end_time,
         split_count=7,  # 周报按7天分割
-        options=options
+        pattern=pattern
     )
     
     # 保存 AI 总结到 weekly_report 表
@@ -363,7 +355,7 @@ async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, option
     return result
 
 
-async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, options: List[str]) -> dict:
+async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, pattern: List[str]) -> dict:
     """
     获取月 AI 总结（异步版本）
     
@@ -372,7 +364,7 @@ async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, opt
     Args:
         month_start_date: 月开始日期 YYYY-MM-01
         month_end_date: 月结束日期 YYYY-MM-DD（月末）
-        options: 总结选项列表
+        pattern: 总结选项列表
             - behavior_stats: 各时段的主分类和子分类的占比统计
             - longest_activities: 各时段内最长的活动记录
             - goal_time_spent: 各目标花费的时间
@@ -387,7 +379,7 @@ async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, opt
     """
     from lifeprism.llm.llm_classify.function.report_summary import multi_days_summary
     
-    logger.info(f"生成月 AI 总结 {month_start_date} ~ {month_end_date}, options={options}")
+    logger.info(f"生成月 AI 总结 {month_start_date} ~ {month_end_date}, pattern={pattern}")
     
     start_time = f"{month_start_date} 00:00:00"
     end_time = f"{month_end_date} 23:59:59"
@@ -404,7 +396,7 @@ async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, opt
         start_time=start_time,
         end_time=end_time,
         split_count=split_count,
-        options=options
+        pattern=pattern
     )
     
     # 保存 AI 总结到 monthly_report 表
