@@ -885,6 +885,11 @@ daily_report_config = {
             'constraints': ['PRIMARY KEY', 'NOT NULL'],
             'comment': '日期 YYYY-MM-DD'
         },
+        'comparison': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '与前一天的环比对比 (ComparisonStatsData JSON)'
+        },
         'sunburst_data': {
             'type': 'TEXT',
             'constraints': ['DEFAULT NULL'],
@@ -943,6 +948,11 @@ weekly_report_config = {
             'constraints': ['PRIMARY KEY', 'NOT NULL'],
             'comment': '日期 YYYY-MM-DD'
         },
+        'comparison': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '与前一周的环比对比 (ComparisonStatsData JSON)'
+        },
         'sunburst_data': {
             'type': 'TEXT',
             'constraints': ['DEFAULT NULL'],
@@ -995,6 +1005,11 @@ monthly_report_config = {
             'type': 'TEXT',
             'constraints': ['PRIMARY KEY', 'NOT NULL'],
             'comment': '日期 YYYY-MM-DD'
+        },
+        'comparison': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '与前一个月的环比对比 (ComparisonStatsData JSON)'
         },
         'sunburst_data': {
             'type': 'TEXT',

@@ -337,4 +337,3 @@ async def get_monthly_reports_in_range(
             items.append(_monthly_dict_to_response(report, month_start, month_end))
     
     return {"items": items, "total": len(items)}
-

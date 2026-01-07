@@ -81,6 +81,13 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
     goal_data = _calc_goal_progress(start_date=date, end_date=date)
     daily_trend_data = _calc_hourly_trend(date)
     
+    # 计算环比对比数据（与前一天对比）
+    comparison_data = _calc_comparison_data(
+        current_start=f"{date} 00:00:00",
+        current_end=f"{date} 23:59:59",
+        period_type="daily"
+    )
+    
     # 4. 保存到数据库
     # 判断状态：只有当今天的日期晚于报告日期时，才标记为已完成
     today = datetime.now().strftime('%Y-%m-%d')
@@ -104,6 +111,7 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
         todo_data=todo_data,
         goal_data=goal_data,
         daily_trend_data=daily_trend_data,
+        comparison_data=comparison_data,
         ai_summary=existing_ai_summary,
         state=state,
         data_version=1
@@ -159,6 +167,13 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
     goal_data = _calc_goal_progress(start_date=week_start_date, end_date=week_end_date)
     daily_trend_data = _calc_weekly_trend(week_start_date, week_end_date)
     
+    # 计算环比对比数据（与上一周对比）
+    comparison_data = _calc_comparison_data(
+        current_start=f"{week_start_date} 00:00:00",
+        current_end=f"{week_end_date} 23:59:59",
+        period_type="weekly"
+    )
+    
     # 4. 保存到数据库
     # 判断状态：只有当今天的日期晚于周结束日期时，才标记为已完成
     today = datetime.now().strftime('%Y-%m-%d')
@@ -183,6 +198,7 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
         todo_data=todo_data,
         goal_data=goal_data,
         daily_trend_data=daily_trend_data,
+        comparison_data=comparison_data,
         ai_summary=existing_ai_summary,
         state=state,
         data_version=1
@@ -245,6 +261,13 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
     daily_trend_data = _calc_monthly_trend(month_start_date, month_end_date)
     heatmap_data = _calc_heatmap_data(month_start_date, month_end_date)
     
+    # 计算环比对比数据（与上一月对比）
+    comparison_data = _calc_comparison_data(
+        current_start=f"{month_start_date} 00:00:00",
+        current_end=f"{month_end_date} 23:59:59",
+        period_type="monthly"
+    )
+    
     # 4. 保存到数据库
     # 判断状态：只有当今天的日期晚于月结束日期时，才标记为已完成
     today = datetime.now().strftime('%Y-%m-%d')
@@ -271,6 +294,7 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
         goal_data=goal_data,
         daily_trend_data=daily_trend_data,
         heatmap_data=heatmap_data,
+        comparison_data=comparison_data,
         ai_summary=existing_ai_summary,
         state=state,
         data_version=1
@@ -409,6 +433,96 @@ async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, pat
         logger.error(f"保存月 AI 总结失败: {e}")
     
     return result
+
+
+def _calc_comparison_data(
+    current_start: str,
+    current_end: str,
+    period_type: str = "daily"
+):
+    """
+    计算环比对比数据（内部函数）
+    
+    Args:
+        current_start: 当前周期开始时间 YYYY-MM-DD HH:MM:SS
+        current_end: 当前周期结束时间 YYYY-MM-DD HH:MM:SS
+        period_type: 周期类型 ("daily", "weekly", "monthly")
+        
+    Returns:
+        ComparisonData: 环比对比数据
+    """
+    from lifeprism.server.schemas.report_schemas import (
+        ComparisonData,
+        CategoryComparisonItem,
+        GoalComparisonItem
+    )
+    from lifeprism.server.providers.reward_provider import reward_provider
+    import calendar
+    
+    # 解析当前周期时间
+    current_start_dt = datetime.strptime(current_start, "%Y-%m-%d %H:%M:%S")
+    current_end_dt = datetime.strptime(current_end, "%Y-%m-%d %H:%M:%S")
+    
+    # 根据周期类型计算上一周期时间
+    if period_type == "daily":
+        # 日报：上一天
+        previous_start_dt = current_start_dt - timedelta(days=1)
+        previous_end_dt = current_end_dt - timedelta(days=1)
+    elif period_type == "weekly":
+        # 周报：上一周
+        previous_start_dt = current_start_dt - timedelta(days=7)
+        previous_end_dt = current_end_dt - timedelta(days=7)
+    elif period_type == "monthly":
+        # 月报：上一月
+        year = current_start_dt.year
+        month = current_start_dt.month
+        if month == 1:
+            prev_year = year - 1
+            prev_month = 12
+        else:
+            prev_year = year
+            prev_month = month - 1
+        prev_last_day = calendar.monthrange(prev_year, prev_month)[1]
+        previous_start_dt = datetime(prev_year, prev_month, 1, 0, 0, 0)
+        previous_end_dt = datetime(prev_year, prev_month, prev_last_day, 23, 59, 59)
+    else:
+        # 默认：按时间跨度计算
+        duration = current_end_dt - current_start_dt
+        previous_end_dt = current_start_dt
+        previous_start_dt = previous_end_dt - duration
+    
+    previous_start = previous_start_dt.strftime("%Y-%m-%d %H:%M:%S")
+    previous_end = previous_end_dt.strftime("%Y-%m-%d %H:%M:%S")
+    
+    logger.info(f"计算环比对比数据: {current_start} ~ {current_end} vs {previous_start} ~ {previous_end}")
+    
+    # 调用 provider 获取原始数据
+    raw_data = reward_provider.get_period_comparison(
+        current_start=current_start,
+        current_end=current_end,
+        previous_start=previous_start,
+        previous_end=previous_end
+    )
+    
+    # 转换为 Schema 格式
+    category_items = [
+        CategoryComparisonItem(**item)
+        for item in raw_data.get('category_comparison', [])
+    ]
+    
+    goal_items = [
+        GoalComparisonItem(**item)
+        for item in raw_data.get('goal_comparison', [])
+    ]
+    
+    return ComparisonData(
+        current_start=current_start,
+        current_end=current_end,
+        previous_start=previous_start,
+        previous_end=previous_end,
+        category_comparison=category_items,
+        goal_comparison=goal_items
+    )
 
 
 # ==================== 通用数据计算函数 ====================

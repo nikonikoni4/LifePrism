@@ -77,6 +77,7 @@ class DailyReportResponse(BaseModel):
     todo_data: Optional[TodoStatsData] = Field(default=None, description="Todo 统计数据")
     goal_data: Optional[List[GoalProgressData]] = Field(default=None, description="Goal 进度数据")
     daily_trend_data: Optional[List[Dict[str, Any]]] = Field(default=None, description="24小时趋势数据")
+    comparison_data: Optional["ComparisonData"] = Field(default=None, description="与前一天的环比对比数据")
     ai_summary: Optional[str] = Field(default=None, description="AI 总结内容")
     state: str = Field(default="0", description="数据状态 (0: 未完成, 1: 已完成)")
     data_version: int = Field(default=1, description="数据格式版本号")
@@ -121,6 +122,7 @@ class WeeklyReportResponse(BaseModel):
     todo_data: Optional[TodoStatsData] = Field(default=None, description="Todo 统计数据")
     goal_data: Optional[List[GoalProgressData]] = Field(default=None, description="Goal 进度数据")
     daily_trend_data: Optional[List[Dict[str, Any]]] = Field(default=None, description="每日趋势数据（7天）")
+    comparison_data: Optional["ComparisonData"] = Field(default=None, description="与上一周的环比对比数据")
     ai_summary: Optional[str] = Field(default=None, description="AI 总结内容")
     state: str = Field(default="0", description="数据状态 (0: 未完成, 1: 已完成)")
     data_version: int = Field(default=1, description="数据格式版本号")
@@ -161,6 +163,7 @@ class MonthlyReportResponse(BaseModel):
     goal_data: Optional[List[GoalProgressData]] = Field(default=None, description="Goal 进度数据")
     daily_trend_data: Optional[List[Dict[str, Any]]] = Field(default=None, description="每日趋势数据（按天）")
     heatmap_data: Optional[List[HeatmapDataItem]] = Field(default=None, description="热力图数据")
+    comparison_data: Optional["ComparisonData"] = Field(default=None, description="与上一月的环比对比数据")
     ai_summary: Optional[str] = Field(default=None, description="AI 总结内容")
     state: str = Field(default="0", description="数据状态 (0: 未完成, 1: 已完成)")
     data_version: int = Field(default=1, description="数据格式版本号")
@@ -226,3 +229,44 @@ class MonthlyAISummaryRequest(BaseModel):
         default="complex", 
         description="总结模式，如 complex, simple"
     )
+
+
+# ============================================================================
+# 环比对比 请求/响应 Schemas
+# ============================================================================
+
+class CategoryComparisonItem(BaseModel):
+    """单个分类的环比数据"""
+    category_id: str = Field(..., description="分类 ID")
+    category_name: str = Field(..., description="分类名称")
+    current_duration: int = Field(..., description="当前周期时长（秒）")
+    previous_duration: int = Field(..., description="上一周期时长（秒）")
+    change_seconds: int = Field(..., description="变化秒数")
+    change_percentage: Optional[float] = Field(default=None, description="变化百分比（新增时为 null）")
+
+
+class GoalComparisonItem(BaseModel):
+    """单个目标的环比数据"""
+    goal_id: str = Field(..., description="目标 ID")
+    goal_name: str = Field(..., description="目标名称")
+    current_duration: int = Field(..., description="当前周期时长（秒）")
+    previous_duration: int = Field(..., description="上一周期时长（秒）")
+    change_seconds: int = Field(..., description="变化秒数")
+
+
+class ComparisonData(BaseModel):
+    """完整的环比对比数据"""
+    current_start: str = Field(..., description="当前周期开始时间")
+    current_end: str = Field(..., description="当前周期结束时间")
+    previous_start: str = Field(..., description="上一周期开始时间")
+    previous_end: str = Field(..., description="上一周期结束时间")
+    category_comparison: List[CategoryComparisonItem] = Field(default=[], description="分类对比列表")
+    goal_comparison: List[GoalComparisonItem] = Field(default=[], description="目标对比列表")
+
+
+class ComparisonQueryRequest(BaseModel):
+    """环比查询请求"""
+    current_start: str = Field(..., description="当前周期开始时间 YYYY-MM-DD HH:MM:SS")
+    current_end: str = Field(..., description="当前周期结束时间 YYYY-MM-DD HH:MM:SS")
+    previous_start: str = Field(..., description="上一周期开始时间 YYYY-MM-DD HH:MM:SS")
+    previous_end: str = Field(..., description="上一周期结束时间 YYYY-MM-DD HH:MM:SS")
