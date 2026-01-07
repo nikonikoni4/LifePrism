@@ -1,46 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LifePrism</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LifePrism</title>
+  <link rel="icon" type="image/png" href="/lifeprism_square.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            morandi: {
+              blue: '#5B8FF9',
+              orange: '#FA8C16',
+              grey: '#BFBFBF',
+              bg: '#F3F4F6',
+              surface: '#FFFFFF',
+            }
+          },
+          borderRadius: {
+            'xl': '1rem', // 16px
+            '2xl': '1.25rem', // 20px
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.2s ease-out forwards',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0', transform: 'translateY(-4px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
             },
-            colors: {
-              morandi: {
-                blue: '#5B8FF9',
-                orange: '#FA8C16',
-                grey: '#BFBFBF',
-                bg: '#F3F4F6',
-                surface: '#FFFFFF',
-              }
-            },
-            borderRadius: {
-              'xl': '1rem', // 16px
-              '2xl': '1.25rem', // 20px
-            },
-            animation: {
-              'fade-in': 'fadeIn 0.2s ease-out forwards',
-            },
-            keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0', transform: 'translateY(-4px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
-              },
-            },
-          }
+          },
         }
       }
-    </script>
-    <link rel="stylesheet" href="/src/styles/scrollbar.css">
+    }
+  </script>
+  <link rel="stylesheet" href="/src/styles/scrollbar.css">
   <!-- 
   NOTE: Import Maps 与 Vite 冲突,已注释
   <script type="importmap">
@@ -57,8 +61,10 @@
 </script>
   -->
 </head>
-  <body class="bg-[#F3F4F6] text-slate-800 antialiased">
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+
+<body class="bg-[#F3F4F6] text-slate-800 antialiased">
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
 </html>

@@ -11,9 +11,10 @@ import TimeDistributionChart from './TimeDistributionChart';
 import GoalProgressCard from './GoalProgressCard';
 import TodoStatsCard from './TodoStatsCard';
 import AISummaryCard from './AISummaryCard';
+import TrendComparisonCard from './TrendComparisonCard';
 import { ReportsAPI } from '../api';
 import { DailyReportData } from '../types';
-import { getMockDailyReport } from '../mockData';
+import { getMockDailyReport, getMockComparisonData } from '../mockData';
 
 interface DailyReviewTabProps {
     className?: string;
@@ -110,6 +111,13 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({
     // 使用 mock 数据作为后备
     const displayData = reportData || getMockDailyReport(selectedDate);
 
+    // 计算对比日期 (昨天)
+    const prevDate = new Date(selectedDate);
+    prevDate.setDate(prevDate.getDate() - 1);
+    const prevDateStr = prevDate.toISOString().split('T')[0];
+    // 生成对比 mock 数据
+    const comparisonData = getMockComparisonData(selectedDate, selectedDate, prevDateStr, prevDateStr);
+
     return (
         <div className={`space-y-6 ${className}`}>
             {/* Date Selector & Refresh Button */}
@@ -172,6 +180,14 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* 环比对比组件 (新增) */}
+                <div className="lg:col-span-12">
+                    <TrendComparisonCard
+                        data={comparisonData}
+                        title="今日环比趋势"
+                    />
+                </div>
+
                 {/* Left Column - Charts */}
                 <div className="lg:col-span-8 space-y-6">
                     {/* Time Distribution Line Chart */}

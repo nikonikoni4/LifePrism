@@ -12,7 +12,10 @@ import {
     CategoryConfig,
     TimeDistributionPoint,
     GoalProgressData,
-    HeatmapDay
+    HeatmapDay,
+    ComparisonData,
+    CategoryComparisonItem,
+    GoalComparisonItem
 } from './types';
 
 // ============================================================================
@@ -363,5 +366,166 @@ export const getMockMonthlyReport = (month: string): MonthlyReportData => {
 • 保持当前的健身节奏
 
 你本月的表现非常出色！继续保持这样的势头！🌟`,
+    };
+};
+
+// ============================================================================
+// Comparison Mock Data (环比对比)
+// ============================================================================
+
+/** 生成环比对比 Mock 数据 */
+export const getMockComparisonData = (
+    currentStart: string,
+    currentEnd: string,
+    previousStart: string,
+    previousEnd: string
+): ComparisonData => {
+    // 生成分类对比数据（带子分类）
+    const categoryComparison: CategoryComparisonItem[] = [
+        {
+            categoryId: 'cat-work',
+            categoryName: '工作',
+            categoryColor: '#5B8FF9',
+            currentDuration: 302400,  // 84h in seconds
+            previousDuration: 270000, // 75h in seconds
+            changeSeconds: 32400,     // +9h
+            changePercentage: 12,
+            children: [
+                {
+                    categoryId: 'cat-work-coding',
+                    categoryName: '编程开发',
+                    categoryColor: '#748FFC',
+                    currentDuration: 180000,
+                    previousDuration: 162000,
+                    changeSeconds: 18000,
+                    changePercentage: 11.1,
+                },
+                {
+                    categoryId: 'cat-work-meeting',
+                    categoryName: '会议沟通',
+                    categoryColor: '#91A7FF',
+                    currentDuration: 72000,
+                    previousDuration: 64800,
+                    changeSeconds: 7200,
+                    changePercentage: 11.1,
+                },
+                {
+                    categoryId: 'cat-work-docs',
+                    categoryName: '文档撰写',
+                    categoryColor: '#BAC8FF',
+                    currentDuration: 50400,
+                    previousDuration: 43200,
+                    changeSeconds: 7200,
+                    changePercentage: 16.7,
+                },
+            ]
+        },
+        {
+            categoryId: 'cat-study',
+            categoryName: '学习',
+            categoryColor: '#61DDAA',
+            currentDuration: 108000,  // 30h in seconds
+            previousDuration: 86400,  // 24h in seconds
+            changeSeconds: 21600,     // +6h
+            changePercentage: 25,
+            children: [
+                {
+                    categoryId: 'cat-study-reading',
+                    categoryName: '阅读',
+                    categoryColor: '#7FE7BA',
+                    currentDuration: 43200,
+                    previousDuration: 36000,
+                    changeSeconds: 7200,
+                    changePercentage: 20,
+                },
+                {
+                    categoryId: 'cat-study-course',
+                    categoryName: '课程学习',
+                    categoryColor: '#A3F0CC',
+                    currentDuration: 36000,
+                    previousDuration: 28800,
+                    changeSeconds: 7200,
+                    changePercentage: 25,
+                },
+                {
+                    categoryId: 'cat-study-practice',
+                    categoryName: '实践练习',
+                    categoryColor: '#C6F5DB',
+                    currentDuration: 28800,
+                    previousDuration: 21600,
+                    changeSeconds: 7200,
+                    changePercentage: 33.3,
+                },
+            ]
+        },
+        {
+            categoryId: 'cat-entertainment',
+            categoryName: '娱乐',
+            categoryColor: '#F6BD16',
+            currentDuration: 57600,   // 16h in seconds
+            previousDuration: 72000,  // 20h in seconds
+            changeSeconds: -14400,    // -4h
+            changePercentage: -20,
+            children: [
+                {
+                    categoryId: 'cat-entertainment-games',
+                    categoryName: '游戏',
+                    categoryColor: '#FFD666',
+                    currentDuration: 28800,
+                    previousDuration: 43200,
+                    changeSeconds: -14400,
+                    changePercentage: -33.3,
+                },
+                {
+                    categoryId: 'cat-entertainment-video',
+                    categoryName: '视频',
+                    categoryColor: '#FFE89A',
+                    currentDuration: 28800,
+                    previousDuration: 28800,
+                    changeSeconds: 0,
+                    changePercentage: 0,
+                },
+            ]
+        },
+    ];
+
+    // 生成目标对比数据
+    const goalComparison: GoalComparisonItem[] = [
+        {
+            goalId: 'goal-1',
+            goalName: '项目重构',
+            goalColor: '#5B8FF9',
+            currentDuration: 151200,  // 42h
+            previousDuration: 126000, // 35h
+            changeSeconds: 25200,     // +7h
+            changePercentage: 20,
+        },
+        {
+            goalId: 'goal-2',
+            goalName: 'TypeScript 学习',
+            goalColor: '#61DDAA',
+            currentDuration: 54000,   // 15h
+            previousDuration: 43200,  // 12h
+            changeSeconds: 10800,     // +3h
+            changePercentage: 25,
+        },
+        {
+            goalId: 'goal-3',
+            goalName: '健身计划',
+            goalColor: '#F6BD16',
+            currentDuration: 25200,   // 7h
+            previousDuration: 21600,  // 6h
+            changeSeconds: 3600,      // +1h
+            changePercentage: 16.7,
+        },
+    ];
+
+    return {
+        currentStart,
+        currentEnd,
+        previousStart,
+        previousEnd,
+        categoryComparison,
+        goalComparison,
     };
 };

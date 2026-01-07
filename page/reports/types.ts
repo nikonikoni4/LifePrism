@@ -202,3 +202,61 @@ export interface TimeOverviewData {
     details?: Record<string, TimeOverviewData>;
 }
 
+// ============================================================================
+// Comparison Types (环比对比)
+// ============================================================================
+
+/** 单个分类的环比数据 */
+export interface CategoryComparisonItem {
+    /** 分类 ID */
+    categoryId: string;
+    /** 分类名称 */
+    categoryName: string;
+    /** 分类颜色 */
+    categoryColor?: string;
+    /** 当前周期时长（秒） */
+    currentDuration: number;
+    /** 上一周期时长（秒） */
+    previousDuration: number;
+    /** 变化秒数 */
+    changeSeconds: number;
+    /** 变化百分比（新增时为 null） */
+    changePercentage: number | null;
+    /** 子分类对比数据 */
+    children?: CategoryComparisonItem[];
+}
+
+/** 单个目标的环比数据 */
+export interface GoalComparisonItem {
+    /** 目标 ID */
+    goalId: string;
+    /** 目标名称 */
+    goalName: string;
+    /** 目标颜色 */
+    goalColor?: string;
+    /** 当前周期时长（秒） */
+    currentDuration: number;
+    /** 上一周期时长（秒） */
+    previousDuration: number;
+    /** 变化秒数 */
+    changeSeconds: number;
+    /** 变化百分比 */
+    changePercentage?: number | null;
+}
+
+/** 完整的环比对比数据 */
+export interface ComparisonData {
+    /** 当前周期开始时间 */
+    currentStart: string;
+    /** 当前周期结束时间 */
+    currentEnd: string;
+    /** 上一周期开始时间 */
+    previousStart: string;
+    /** 上一周期结束时间 */
+    previousEnd: string;
+    /** 分类对比列表 */
+    categoryComparison: CategoryComparisonItem[];
+    /** 目标对比列表 */
+    goalComparison: GoalComparisonItem[];
+}
+
