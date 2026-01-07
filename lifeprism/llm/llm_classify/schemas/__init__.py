@@ -8,11 +8,13 @@ from .classify_shemas import (
     Goal,
     classifyStateLogitems
 )
-
 __all__ = [
     "classifyState",
     "LogItem",
     "AppInFo",
     "Goal",
-    "classifyStateLogitems"
+    "classifyStateLogitems",
+    "NodeDefinition",
+    "ExecutionPlan",
+    "Context"
 ]
