@@ -52,8 +52,10 @@ def format_segment_category_stats(segments_data: list, activities_by_segment: di
                         lines.append(f"         - {sub['name']}: {format_seconds(sub['duration'])}（{sub['percentage']}%）")
         
         # 主要活动记录
-        if activities_by_segment and i in activities_by_segment:
-            activities = activities_by_segment[i]
+        # 注意：activities_by_segment 使用 0-based segment_index，而 enumerate 从 1 开始
+        segment_key = i - 1  # 将 1-based 的 i 转换为 0-based 的 segment_index
+        if activities_by_segment and segment_key in activities_by_segment:
+            activities = activities_by_segment[segment_key]
             if activities:
                 lines.append("    - 主要活动记录:")
                 for act in activities:
