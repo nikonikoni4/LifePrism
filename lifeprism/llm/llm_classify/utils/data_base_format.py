@@ -1,6 +1,6 @@
 
 
-def _format_seconds(seconds: int) -> str:
+def format_seconds(seconds: int) -> str:
     """将秒数格式化为可读时间"""
     if seconds < 60:
         return f"{seconds}秒"
@@ -15,7 +15,7 @@ def _format_seconds(seconds: int) -> str:
         return f"{hours}小时"
 
 
-def _format_segment_category_stats(segments_data: list, activities_by_segment: dict = None) -> str:
+def format_segment_category_stats(segments_data: list, activities_by_segment: dict = None) -> str:
     """格式化分段统计与分类占比数据（统一输出，包含主要活动记录）
     
     Args:
@@ -43,13 +43,13 @@ def _format_segment_category_stats(segments_data: list, activities_by_segment: d
             # 为每个主分类找到对应的子分类
             for cat in categories:
                 cat_id = cat['id']
-                lines.append(f"      - {cat['name']}: {_format_seconds(cat['duration'])}（{cat['percentage']}%）")
+                lines.append(f"      - {cat['name']}: {format_seconds(cat['duration'])}（{cat['percentage']}%）")
                 
                 # 找到属于这个主分类的子分类
                 if sub_categories and cat_id != 'idle':  # 空闲没有子分类
                     related_subs = [sub for sub in sub_categories if sub.get('category_id') == cat_id]
                     for sub in related_subs:
-                        lines.append(f"         - {sub['name']}: {_format_seconds(sub['duration'])}（{sub['percentage']}%）")
+                        lines.append(f"         - {sub['name']}: {format_seconds(sub['duration'])}（{sub['percentage']}%）")
         
         # 主要活动记录
         if activities_by_segment and i in activities_by_segment:
@@ -59,13 +59,13 @@ def _format_segment_category_stats(segments_data: list, activities_by_segment: d
                 for act in activities:
                     title = act.get('title', '未知')
                     app = act.get('app', '未知')
-                    duration = _format_seconds(act.get('duration_seconds', 0))
+                    duration = format_seconds(act.get('duration_seconds', 0))
                     lines.append(f"      - {title}（{app}）: {duration}")
     
     return "\n".join(lines)
 
 
-def _format_longest_activities(activities: list) -> str:
+def format_longest_activities(activities: list) -> str:
     """格式化最长活动数据"""
     if not activities:
         return "  - 暂无数据"
@@ -74,12 +74,12 @@ def _format_longest_activities(activities: list) -> str:
     for act in activities:
         title = act.get('title', '未知')
         app = act.get('app', '未知')
-        duration = _format_seconds(act.get('duration_seconds', 0))
+        duration = format_seconds(act.get('duration_seconds', 0))
         lines.append(f"  - {title}（{app}）: {duration}")
     return "\n".join(lines)
 
 
-def _format_goal_time_spent(goals: dict) -> str:
+def format_goal_time_spent(goals: dict) -> str:
     """格式化目标时间花费数据"""
     if not goals:
         return "  - 暂无目标时间记录"
@@ -87,12 +87,12 @@ def _format_goal_time_spent(goals: dict) -> str:
     lines = []
     for goal_id, info in goals.items():
         name = info.get('name', '未知目标')
-        duration = _format_seconds(info.get('duration_seconds', 0))
+        duration = format_seconds(info.get('duration_seconds', 0))
         lines.append(f"  - {name}: {duration}")
     return "\n".join(lines)
 
 
-def _format_user_notes(notes: list) -> str:
+def format_user_notes(notes: list) -> str:
     """格式化用户备注数据"""
     if not notes:
         return "  - 暂无用户备注"
@@ -279,36 +279,35 @@ def format_daily_category_trend(category_trends: list) -> str:
 
 def format_computer_usage_schedule(schedule_data: list) -> str:
     """
-    格式化电脑使用作息时间
+    格式化电脑使用作息时间为表格格式
     
     Args:
         schedule_data: 作息时间数据列表
     
     Returns:
-        str: 格式化的每日电脑使用时间分析
+        str: 格式化的每日电脑使用时间表格
     """
     if not schedule_data:
         return "暂无电脑使用记录"
     
-    output_lines = []
+    # 表头
+    output_lines = [
+        "| 日期 | 最早记录时间 | 最早活动 | 最晚记录时间 | 最晚活动 |",
+        "|------|-------------|----------|-------------|----------|"
+    ]
     
     for day_data in schedule_data:
-        date = day_data.get('date', '')
-        output_lines.append(f"{date}:")
+        date = day_data.get('date', '-')
+        earliest_time = day_data.get('earliest_time', '-')
+        earliest_activity = day_data.get('earliest_activity', '-')
+        latest_time = day_data.get('latest_time', '-')
+        latest_activity = day_data.get('latest_activity', '-')
         
-        if 'earliest_time' in day_data:
-            earliest_time = day_data['earliest_time']
-            earliest_activity = day_data.get('earliest_activity', '')
-            output_lines.append(f"  - 最早记录在 {earliest_time}，活动为 {earliest_activity}")
-        
-        if 'latest_time' in day_data:
-            latest_time = day_data['latest_time']
-            latest_activity = day_data.get('latest_activity', '')
-            output_lines.append(f"  - 最晚记录在 {latest_time}，活动为 {latest_activity}")
-        
-        output_lines.append("")  # 空行分隔
+        output_lines.append(
+            f"| {date} | {earliest_time} | {earliest_activity} | {latest_time} | {latest_activity} |"
+        )
     
-    return "\n".join(output_lines).strip()
+    return "\n".join(output_lines)
 
 
 def format_focus_and_todos(daily_data: list) -> str:
@@ -481,3 +480,83 @@ def format_behavior_logs_lines(logs: list) -> str:
         lines.append(" ".join(line_parts))
     
     return "\n".join(lines)
+
+
+def format_daily_breakdown(breakdown_data: list) -> str:
+    """
+    格式化每日分解数据为表格形式
+    
+    Args:
+        breakdown_data: get_daily_breakdown 返回的数据列表
+    
+    Returns:
+        str: 表格格式的每日分解数据
+    """
+    if not breakdown_data:
+        return "暂无每日数据"
+    
+    # 收集所有分类名称
+    all_categories = set()
+    for day in breakdown_data:
+        for cat in day.get('categories', []):
+            all_categories.add(cat['name'])
+    
+    # 取前3个主要分类（按总时长排序）
+    category_totals = {}
+    for day in breakdown_data:
+        for cat in day.get('categories', []):
+            name = cat['name']
+            category_totals[name] = category_totals.get(name, 0) + cat.get('duration_seconds', 0)
+    
+    top_categories = sorted(category_totals.keys(), key=lambda x: category_totals[x], reverse=True)[:3]
+    
+    # 表头
+    header_parts = ["日期", "使用时长"]
+    header_parts.extend(top_categories)
+    header_parts.extend(["电脑启用", "电脑结束"])
+    
+    output_lines = [" | ".join(header_parts)]
+    output_lines.append("|".join(["---"] * len(header_parts)))
+    
+    for day in breakdown_data:
+        date = day.get('date', '-')
+        total_hours = day.get('total_duration_hours', 0)
+        pc_start = day.get('pc_start_time', '-')
+        pc_end = day.get('pc_end_time', '-')
+        
+        # 获取分类占比
+        cat_map = {cat['name']: cat['percentage'] for cat in day.get('categories', [])}
+        
+        row_parts = [date, f"{total_hours}h"]
+        for cat_name in top_categories:
+            percentage = cat_map.get(cat_name, 0)
+            row_parts.append(f"{percentage}%")
+        row_parts.extend([pc_start, pc_end])
+        
+        output_lines.append(" | ".join(row_parts))
+    
+    return "\n".join(output_lines)
+
+
+def format_daily_summaries(summaries: list) -> str:
+    """
+    格式化每日 AI 摘要
+    
+    Args:
+        summaries: get_daily_summaries 返回的摘要列表
+    
+    Returns:
+        str: 格式化的每日摘要
+    """
+    if not summaries:
+        return "暂无每日摘要"
+    
+    lines = []
+    for item in summaries:
+        date = item.get('date', '')
+        abstract = item.get('ai_summary_abstract', '')
+        if abstract:
+            lines.append(f"- {date}: {abstract}")
+    
+    return "\n".join(lines) if lines else "暂无每日摘要"
+

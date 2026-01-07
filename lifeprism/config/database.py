@@ -919,6 +919,11 @@ daily_report_config = {
             'type': 'TEXT',
             'constraints': ['DEFAULT NULL'],
             'comment': 'AI总结'
+        },
+        "ai_summary_abstract": {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': 'AI总结摘要'
         }
     },
     'table_constraints': [],

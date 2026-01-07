@@ -118,7 +118,9 @@ class LLMLWDataProvider(LWBaseDataProvider):
         start_time: str,
         end_time: str,
         limit: int = None,
-        order_by: str = "start_time DESC"
+        order_by: str = "start_time DESC",
+        category_id: Optional[str] = None,
+        sub_category_id: Optional[str] = None
     ) -> List[Dict]:
         """
         查询用户行为日志
@@ -128,6 +130,8 @@ class LLMLWDataProvider(LWBaseDataProvider):
             end_time: 结束时间 YYYY-MM-DD HH:MM:SS
             limit: 返回记录数限制
             order_by: 排序方式，默认按开始时间降序
+            category_id: 主分类ID，用于筛选特定分类的记录
+            sub_category_id: 子分类ID，用于筛选特定子分类的记录
             
         Returns:
             List[Dict]: 包含以下字段:
@@ -141,14 +145,23 @@ class LLMLWDataProvider(LWBaseDataProvider):
                 - goal_name: 目标名称（如无则为空字符串）
         """
         try:
+            # 构建查询条件
+            conditions = [
+                ('start_time', '>=', start_time),
+                ('end_time', '<=', end_time)
+            ]
+            
+            # 添加分类筛选条件
+            if category_id:
+                conditions.append(('category_id', '=', category_id))
+            if sub_category_id:
+                conditions.append(('sub_category_id', '=', sub_category_id))
+            
             df = self.db.query_advanced(
                 table_name='user_app_behavior_log',
                 columns=['start_time', 'end_time', 'duration', 'app', 'title', 
                          'category_id', 'sub_category_id', 'link_to_goal_id'],
-                conditions=[
-                    ('start_time', '>=', start_time),
-                    ('end_time', '<=', end_time)
-                ],
+                conditions=conditions,
                 order_by=order_by,
                 limit=limit
             )
@@ -1347,6 +1360,157 @@ class LLMLWDataProvider(LWBaseDataProvider):
             
         except Exception as e:
             logger.error(f"查询时间悖论失败: {e}")
+            return []
+
+    # ==================== 周报/月报规律性总结专用方法 ====================
+    
+    def get_daily_breakdown(
+        self, 
+        start_date: str, 
+        end_date: str
+    ) -> List[Dict[str, Any]]:
+        """
+        获取每日分解数据，包含使用时长、分类占比、电脑启用/结束时间
+        
+        Args:
+            start_date: 开始日期 YYYY-MM-DD
+            end_date: 结束日期 YYYY-MM-DD
+        
+        Returns:
+            List[Dict]: 每天的分解数据，包含：
+                - date: 日期
+                - total_duration_hours: 总使用时长（小时）
+                - categories: 分类占比列表 [{name, percentage}]
+                - pc_start_time: 电脑启用时间 HH:MM
+                - pc_end_time: 电脑结束时间 HH:MM
+        """
+        from datetime import datetime, timedelta
+        
+        # 获取电脑使用时间表（包含启用/结束时间）
+        usage_schedule = self.get_computer_usage_schedule(start_date, end_date)
+        usage_map = {item['date']: item for item in usage_schedule}
+        
+        results = []
+        current_date = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        
+        while current_date <= end_dt:
+            date_str = current_date.strftime("%Y-%m-%d")
+            
+            # 获取当天的分类分布
+            day_start = f"{date_str} 00:00:00"
+            day_end = f"{date_str} 23:59:59"
+            
+            distribution = self.get_category_distribution(day_start, day_end)
+            
+            # 提取主分类占比（排除 idle）
+            categories = []
+            total_active_seconds = 0
+            for cat in distribution.get('categories', []):
+                if cat['id'] != 'idle':
+                    categories.append({
+                        'name': cat['name'],
+                        'percentage': cat['percentage'],
+                        'duration_seconds': cat['duration']
+                    })
+                    total_active_seconds += cat['duration']
+            
+            # 获取电脑启用/结束时间
+            usage_info = usage_map.get(date_str, {})
+            
+            results.append({
+                'date': date_str,
+                'total_duration_hours': round(total_active_seconds / 3600, 1),
+                'categories': categories,
+                'pc_start_time': usage_info.get('earliest_time', '-'),
+                'pc_end_time': usage_info.get('latest_time', '-')
+            })
+            
+            current_date += timedelta(days=1)
+        
+        return results
+    
+    def get_weekly_focus(
+        self,
+        year: int,
+        month: int,
+        week_num: int
+    ) -> Optional[str]:
+        """
+        获取指定周的焦点内容
+        
+        Args:
+            year: 年份
+            month: 月份（1-12）
+            week_num: 周序号（1-4）
+        
+        Returns:
+            Optional[str]: 周焦点内容，不存在返回 None
+        """
+        try:
+            df = self.db.query_advanced(
+                table_name='weekly_focus',
+                columns=['content'],
+                conditions=[
+                    ('year', '=', year),
+                    ('month', '=', month),
+                    ('week_num', '=', week_num)
+                ],
+                limit=1
+            )
+            
+            if not df.empty:
+                return df.iloc[0]['content']
+            return None
+            
+        except Exception as e:
+            logger.error(f"获取周焦点失败: {e}")
+            return None
+    
+    def get_daily_summaries(
+        self,
+        start_date: str,
+        end_date: str
+    ) -> List[Dict[str, Any]]:
+        """
+        获取每日报告的 AI 摘要列表
+        
+        Args:
+            start_date: 开始日期 YYYY-MM-DD
+            end_date: 结束日期 YYYY-MM-DD
+        
+        Returns:
+            List[Dict]: 每天的摘要数据，包含：
+                - date: 日期
+                - ai_summary_abstract: AI 摘要
+        """
+        try:
+            df = self.db.query_advanced(
+                table_name='daily_report',
+                columns=['date', 'ai_summary_abstract'],
+                conditions=[
+                    ('date', '>=', start_date),
+                    ('date', '<=', end_date)
+                ],
+                order_by='date ASC'
+            )
+            
+            if df.empty:
+                return []
+            
+            results = []
+            for _, row in df.iterrows():
+                summary = row.get('ai_summary_abstract')
+                if summary:  # 只返回有摘要的日期
+                    results.append({
+                        'date': row['date'],
+                        'ai_summary_abstract': summary
+                    })
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"获取每日摘要失败: {e}")
             return []
 
 llm_lw_data_provider = LazySingleton(LLMLWDataProvider)

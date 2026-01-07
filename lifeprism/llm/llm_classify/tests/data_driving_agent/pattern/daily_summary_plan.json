@@ -1,0 +1,69 @@
+{
+    "simple": {
+        "task": "总结 {date} 我做了什么",
+        "tools_limit": {
+            "get_daily_stats": 1,
+            "query_behavior_logs": 5,
+            "query_goals": 1,
+            "query_psychological_assessment": 1
+        },
+        "nodes": [
+            {
+                "node_name": "收集统计数据",
+                "task_prompt": "请调用 get_daily_stats 获取 {date} 的电脑使用统计数据。",
+                "tools": [
+                    "get_daily_stats"
+                ]
+            },
+            {
+                "node_name": "获取行为日志",
+                "task_prompt": "根据核心统计数据中的活跃时间段分布，调用 query_behavior_logs 简单了解 {date} 的使用记录。作为数据补充",
+                "tools": [
+                    "query_behavior_logs"
+                ]
+            },
+            {
+                "node_name": "生成简要总结",
+                "task_prompt": "根据统计数据，生成 {date} 的简要行为总结。",
+                "tools": null
+            }
+        ]
+    },
+    "complex": {
+        "task": "总结 {date} 我做了什么",
+        "tools_limit": {
+            "get_daily_stats": 1,
+            "query_behavior_logs": 10,
+            "query_goals": 1,
+            "query_psychological_assessment": 1
+        },
+        "nodes": [
+            {
+                "node_name": "收集核心统计数据",
+                "task_prompt": "请调用 get_daily_stats 获取 {date} 的电脑使用统计数据，同时调用 query_goals 获取用户设定的目标信息，以及 query_psychological_assessment 获取心理测评数据。这些数据将用于分析任务完成情况、行为规律和心理状态关联性。",
+                "tools": [
+                    "get_daily_stats",
+                    "query_goals",
+                    "query_psychological_assessment"
+                ]
+            },
+            {
+                "node_name": "获取详细行为日志",
+                "task_prompt": "根据核心统计数据中的活跃时间段分布，调用 query_behavior_logs 查询 {date} 的详细应用使用记录。重点关注用户备注标记的时段、工作类应用集中使用时段，以及可能与目标关联的时间块，用于分时段行为推断。",
+                "tools": [
+                    "query_behavior_logs"
+                ]
+            },
+            {
+                "node_name": "生成行为总结",
+                "task_prompt": "整合所有收集的数据，按照每日总结格式生成 {date} 的行为摘要。需包含：\n1) 分时段行为推断（结合应用记录与用户备注）\n2) 作息规律分析\n3) 目标任务完成情况评估\n4) 综合亮点总结\n\n注意使用 '可能' '推测' 等限定词，明确标注数据局限性，并给出具体可行的改进建议。",
+                "tools": null
+            }
+        ]
+    },
+    "custom": {
+        "task": "{custom_task}",
+        "tools_limit": null,
+        "nodes": []
+    }
+}

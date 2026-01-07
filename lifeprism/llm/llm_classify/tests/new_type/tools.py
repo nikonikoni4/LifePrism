@@ -6,7 +6,7 @@ from typing import Optional, List, Dict
 data_provider = DataProvider()
 
 
-def _format_user_notes(notes: list) -> str:
+def format_user_notes(notes: list) -> str:
     """格式化用户备注数据"""
     if not notes:
         return "  - 暂无用户备注"
@@ -189,5 +189,5 @@ def get_user_focus_notes(start_time: str, end_time: str) -> List[Dict]:
         get_user_focus_notes("2026-01-05 00:00:00", "2026-01-05 23:59:59")
     """
     custom_block = data_provider.get_user_focus_notes(start_time=start_time, end_time=end_time)
-    return _format_user_notes(custom_block)
+    return format_user_notes(custom_block)
 

@@ -12,7 +12,16 @@ from lifeprism.llm.llm_classify.tools.database_tools import (
 
 
 class Executor:
-    def __init__(self, plan: ExecutionPlan, user_message: str):
+    # 默认工具调用次数限制
+    DEFAULT_TOOLS_USAGE_LIMIT = {
+        "get_daily_stats": 1,
+        "get_multi_days_stats": 1,
+        "query_behavior_logs": 10,
+        "query_goals": 1,
+        "query_psychological_assessment": 1
+    }
+
+    def __init__(self, plan: ExecutionPlan, user_message: str, tools_limit: dict[str, int] | None = None):
         self.plan = plan
         self.context = Context(messages=[HumanMessage(content=user_message)])
         self.tools_map = {
@@ -22,13 +31,12 @@ class Executor:
             "query_goals": query_goals,
             "query_psychological_assessment": query_psychological_assessment
         }
-        self.tools_usage_limit = {
-            "get_daily_stats": 1,
-            "get_multi_days_stats": 1,
-            "query_behavior_logs": 10,
-            "query_goals": 1,
-            "query_psychological_assessment": 1
-        }
+        # 保存初始工具限制配置，用于 reset
+        # 先使用默认配置，再用 tools_limit 中的值覆盖
+        self._initial_tools_limit = self.DEFAULT_TOOLS_USAGE_LIMIT.copy()
+        if tools_limit:
+            self._initial_tools_limit.update(tools_limit)
+        self.tools_usage_limit = self._initial_tools_limit.copy()
         # tokens 使用统计
         self.tokens_usage = {
             'input_tokens': 0,
@@ -37,13 +45,8 @@ class Executor:
         }
 
     def reset_tools_limit(self):
-        self.tools_usage_limit = {
-            "get_daily_stats": 1,
-            "get_multi_days_stats": 1,
-            "query_behavior_logs": 10,
-            "query_goals": 1,
-            "query_psychological_assessment": 1
-        }
+        """重置工具调用次数限制为初始配置"""
+        self.tools_usage_limit = self._initial_tools_limit.copy()
     
     def reset_tokens_usage(self):
         """重置 tokens 使用统计"""
@@ -301,9 +304,9 @@ class Executor:
         }
 
 if __name__ == "__main__":
-    from plans import get_daily_summary_plan
-    plan = get_daily_summary_plan("2026-01-05")
-    executor = Executor(plan, "总结 2026-01-05 的使用情况")
+    from lifeprism.llm.llm_classify.tests.data_driving_agent.plans import get_daily_summary_plan
+    plan,tools_limit = get_daily_summary_plan("2026-01-05",json_path=r"D:\desktop\软件开发\LifeWatch-AI\lifeprism\llm\llm_classify\tests\data_driving_agent\pattern\daily_summary_plan.json",pattern_name="simple")
+    executor = Executor(plan, "总结 2026-01-05 的使用情况",tools_limit=tools_limit)
     result = executor.execute()
     
     # 格式化输出

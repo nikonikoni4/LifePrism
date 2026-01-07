@@ -1,46 +1,46 @@
 """
 预定义的执行计划
 """
+import json
+from pathlib import Path
 from schemas import ExecutionPlan, NodeDefinition
+from typing import Literal
+# 获取当前文件所在目录
+_CURRENT_DIR = Path(__file__).parent
+_PATTERN_DIR = _CURRENT_DIR / "pattern"
 
 
-def get_daily_summary_plan(date: str) -> ExecutionPlan:
+def get_daily_summary_plan(date: str,json_path: Path, pattern_name: Literal["simple", "complex", "custom"] = "complex") -> tuple[ExecutionPlan, dict[str, int] | None]:
     """
-    获取每日总结的执行计划：这个大概3w tokens
+    获取每日总结的执行计划
     
     Args:
         date: 日期，格式 YYYY-MM-DD
+        pattern_name: 执行计划模式名称，可选值: "simple", "complex", "custom"
     
     Returns:
         ExecutionPlan: 执行计划
     """
-    return ExecutionPlan(
-        task=f"总结 {date} 我做了什么",
-        nodes=[
-            NodeDefinition(
-                node_name="收集核心统计数据",
-                task_prompt=f"""请调用 get_daily_stats 获取 {date} 的电脑使用统计数据，同时调用 query_goals 获取用户设定的目标信息，以及 query_psychological_assessment 获取心理测评数据。这些数据将用于分析任务完成情况、行为规律和心理状态关联性。""",
-                tools=["get_daily_stats", "query_goals", "query_psychological_assessment"]
-            ),
-            NodeDefinition(
-                node_name="获取详细行为日志",
-                task_prompt=f"""根据核心统计数据中的活跃时间段分布，调用 query_behavior_logs 查询 {date} 的详细应用使用记录。重点关注用户备注标记的时段、工作类应用集中使用时段，以及可能与目标关联的时间块，用于分时段行为推断。""",
-                tools=["query_behavior_logs"]
-            ),
-            NodeDefinition(
-                node_name="生成行为总结",
-                task_prompt=f"""整合所有收集的数据，按照每日总结格式生成 {date} 的行为摘要。需包含：
-1) 分时段行为推断（结合应用记录与用户备注）
-2) 作息规律分析
-3) 目标任务完成情况评估
-4) 综合亮点总结
-
-注意使用 '可能' '推测' 等限定词，明确标注数据局限性，并给出具体可行的改进建议。""",
-                tools=None,
-
-            )
-        ]
-    )
+    if isinstance(json_path, str):
+        json_path = Path(json_path)
+    if not json_path.exists():
+        raise FileNotFoundError(f"JSON 文件不存在: {json_path}")
+    # 读取 JSON 模板
+    with open(json_path, "r", encoding="utf-8") as f:
+        all_patterns = json.load(f)
+    
+    # 获取指定的 pattern
+    if pattern_name not in all_patterns:
+        raise ValueError(f"未知的 pattern_name: {pattern_name}，可用: {list(all_patterns.keys())}")
+    
+    plan_data = all_patterns[pattern_name]
+    
+    # 替换日期占位符
+    plan_json_str = json.dumps(plan_data, ensure_ascii=False)
+    plan_json_str = plan_json_str.replace("{date}", date)
+    plan_data = json.loads(plan_json_str)
+    tools_limit = plan_data.pop("tools_limit", None)
+    return ExecutionPlan(**plan_data),tools_limit
 
 
 def get_weekly_summary_plan(start_date: str, end_date: str) -> ExecutionPlan:
