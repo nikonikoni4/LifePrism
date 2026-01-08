@@ -18,3 +18,5 @@ localpycs
 其他文件
 skills
 test
+.agent
+.pytest_cache
