@@ -19,7 +19,9 @@ from langchain_core.messages import HumanMessage, AIMessage,AIMessageChunk,ToolM
 from langgraph.graph import StateGraph
 from langgraph.types import RetryPolicy
 from lifeprism.llm.llm_classify.tools.database_tools import get_daily_stats,get_multi_days_stats
+from lifeprism.config.settings_manager import settings
 logger = get_logger(__name__,logging.DEBUG)
+
 class LLMParseError(Exception):
     """
     LLM 输出解析错误 - 可重试
@@ -259,7 +261,7 @@ class ChatBot:
     @asynccontextmanager
     async def create_with_persistence(
         cls,
-        db_path: Union[str, Path] = r"lifeprism\llm\llm_classify\chat\chat_history.db"
+        db_path: Union[str, Path] = settings.chat_db_path
     ) -> AsyncGenerator["ChatBot", None]:
         """
         异步上下文管理器工厂方法：创建使用 AsyncSqliteSaver 持久化的 ChatBot 实例。
