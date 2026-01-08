@@ -13,7 +13,7 @@ interface ChatPanelProps {
 const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidthChange }) => {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<ChatMessage[]>([
-        { id: 'init', role: 'model', text: "你好！我是 LifeWatch AI 助手。我可以帮助你分析时间使用情况、提供生产力建议。有什么可以帮你的吗？" }
+        { id: 'init', role: 'model', text: "你好！我是 LifePrism助手。我可以帮助你分析时间使用情况、提供生产力建议。有什么可以帮你的吗？" }
     ]);
     const [isTyping, setIsTyping] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
@@ -267,7 +267,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
     const handleNewChat = () => {
         setCurrentSessionId(null);
         setMessages([
-            { id: 'init', role: 'model', text: "你好！我是 LifeWatch AI 助手。我可以帮助你分析时间使用情况、提供生产力建议。有什么可以帮你的吗？" }
+            { id: 'init', role: 'model', text: "你好！我是 LifePrism助手。我可以帮助你分析时间使用情况、提供生产力建议。有什么可以帮你的吗？" }
         ]);
         setShowHistory(false);
     };
