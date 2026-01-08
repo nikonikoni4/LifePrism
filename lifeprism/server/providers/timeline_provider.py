@@ -72,6 +72,12 @@ class TimelineProvider(LWBaseDataProvider):
         Returns:
             dict: 创建后的完整记录（含 id 和时间戳）
         """
+        # 将 ISO 格式的时间（带 T）转换为标准格式（用空格分隔）
+        if 'start_time' in data and data['start_time']:
+            data['start_time'] = data['start_time'].replace('T', ' ')
+        if 'end_time' in data and data['end_time']:
+            data['end_time'] = data['end_time'].replace('T', ' ')
+        
         self.db.insert("timeline_custom_block", data)
         
         # 查询刚插入的记录（按创建时间倒序取最新一条）
@@ -108,9 +114,9 @@ class TimelineProvider(LWBaseDataProvider):
         Returns:
             list[dict]: 时间块列表
         """
-        # 使用 start_time 的日期部分过滤
-        start_of_day = f"{date}T00:00:00"
-        end_of_day = f"{date}T23:59:59"
+        # 使用 start_time 的日期部分过滤（使用空格分隔的时间格式）
+        start_of_day = f"{date} 00:00:00"
+        end_of_day = f"{date} 23:59:59"
         
         # 使用原生 SQL 查询时间范围
         sql = """
@@ -143,6 +149,12 @@ class TimelineProvider(LWBaseDataProvider):
             - todo_id, category_id, sub_category_id 允许设置为 None（清除绑定）
             - 其他字段（content, start_time 等）不接受 None 值
         """
+        # 将 ISO 格式的时间（带 T）转换为标准格式（用空格分隔）
+        if 'start_time' in data and data['start_time']:
+            data['start_time'] = data['start_time'].replace('T', ' ')
+        if 'end_time' in data and data['end_time']:
+            data['end_time'] = data['end_time'].replace('T', ' ')
+        
         # 可清空的字段列表（这些字段允许显式设置为 None）
         nullable_fields = {'todo_id', 'category_id', 'sub_category_id'}
         
