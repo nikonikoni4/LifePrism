@@ -176,17 +176,23 @@ def format_pc_active_time(ratios: list) -> str:
     格式化电脑活跃时间占比
     
     Args:
-        ratios: 12个时间段的活跃占比列表
+        ratios: 24个时间段的活跃占比列表
     
     Returns:
-        str: 格式化的活跃时间占比字符串
+        str: 格式化的活跃时间占比字符串，每行一个时间段
+        格式示例：
+        电脑使用时间：
+         - 0~1 : 0
+         - 1~2 : 0.5
     """
-    if not ratios or len(ratios) != 12:
+    if not ratios or len(ratios) != 24:
         return "数据格式错误"
     
-    ratio_strs = [f"{r:.1f}" for r in ratios]
-    ratio_str = " ".join(ratio_strs)
-    return f"0~24h内电脑活跃时间占比：{ratio_str}"
+    lines = ["电脑使用时间："]
+    for i, ratio in enumerate(ratios):
+        lines.append(f" - {i}~{i+1} : {ratio}")
+    
+    return "\n".join(lines)
 
 
 def format_daily_goal_trend(goal_trends: list) -> str:
@@ -312,12 +318,13 @@ def format_computer_usage_schedule(schedule_data: list) -> str:
     return "\n".join(output_lines)
 
 
-def format_focus_and_todos(daily_data: list) -> str:
+def format_focus_and_todos(daily_data: list, show_completion_status: bool = True) -> str:
     """
     格式化重点与待办事项
     
     Args:
         daily_data: 每日数据列表
+        show_completion_status: 是否显示任务完成状态，默认 True
     
     Returns:
         str: 格式化的每日摘要
@@ -333,16 +340,20 @@ def format_focus_and_todos(daily_data: list) -> str:
         todos = day_data.get('todos', [])
         completion_rate = day_data.get('completion_rate', 0)
         
-        output_lines.append(f"date: {date}")
+        # output_lines.append(f"date: {date}")
         output_lines.append(f"- focus : {focus}")
         
         if todos:
-            output_lines.append(f"- todos: {completion_rate}%")
+            if show_completion_status:
+                output_lines.append(f"- todos: {completion_rate}%")
             for i, todo in enumerate(todos, 1):
                 content = todo.get('content', '')
-                state = todo.get('state', '')
-                state_display = "completed" if state == 'completed' else "not completed"
-                output_lines.append(f"  {i}. {content} {state_display}")
+                if show_completion_status:
+                    state = todo.get('state', '')
+                    state_display = "completed" if state == 'completed' else "not completed"
+                    output_lines.append(f"  {i}. {content} {state_display}")
+                else:
+                    output_lines.append(f"  {i}. {content}")
         else:
             output_lines.append("- todos:")
             output_lines.append("  (无待办事项)")

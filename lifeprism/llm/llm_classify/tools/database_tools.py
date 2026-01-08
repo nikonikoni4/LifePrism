@@ -19,6 +19,11 @@ from lifeprism.llm.llm_classify.utils.data_base_format import(
      format_daily_breakdown,
      format_daily_summaries
 )
+from datetime import datetime, timedelta
+from lifeprism.llm.llm_classify.aggregator.daily_data_aggregator import (
+    aggregate_behavior_timeline,
+    format_behavior_timeline
+)
 from lifeprism.utils import get_logger,DEBUG
 logger = get_logger(__name__,DEBUG)
 
@@ -174,7 +179,7 @@ def get_daily_stats(
                     activities_by_segment[segment_index].append(act)
             
             if segments_data and activities_by_segment:
-                prompt_parts.append(f"{section_num}. 分段活跃统计与分类占比")
+                prompt_parts.append(f"{section_num}. 行为数据统计")
                 prompt_parts.append(format_segment_category_stats(segments_data, activities_by_segment))
                 section_num += 1
         
@@ -211,7 +216,6 @@ def get_daily_stats(
         
         # 6. 与前一天的环比对比
         if fetch_all or "comparison" in fetch_options:
-            from datetime import datetime, timedelta
             # 计算前一天的时间范围
             current_start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
             current_end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
@@ -330,7 +334,6 @@ def get_multi_days_stats(
         
         # 6. 与前一个周期的环比对比
         if fetch_all or "comparison" in fetch_options:
-            from datetime import datetime
             # 计算前一个相同周期的时间范围
             current_start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
             current_end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
@@ -366,7 +369,7 @@ def query_behavior_logs(
     end_time: str,
     limit: Optional[int] = 10,
     order_by: str = "duration DESC",
-    category_id: Optional[str] = None,
+    category_id: Optional[str] = None, 
     sub_category_id: Optional[str] = None
 ) -> List[Dict]:
     """
@@ -382,7 +385,8 @@ def query_behavior_logs(
     返回示例:
         22:27 ~ 22:28 (1m) antigravity - lifewatch-ai - antigravity - llm_lw_data_provider.py [工作/学习/编程] {完成lifewatch项目}
     """
-    return format_behavior_logs_lines(llm_lw_data_provider.query_behavior_logs(
+    result = f"下面是从{start_time}到{end_time} 按照{order_by}排序的使用记录：\n"
+    result += format_behavior_logs_lines(llm_lw_data_provider.query_behavior_logs(
         start_time=start_time,
         end_time=end_time,
         limit=limit,
@@ -390,6 +394,7 @@ def query_behavior_logs(
         category_id=category_id,
         sub_category_id=sub_category_id
     ))
+    return result
 
 
 
@@ -471,14 +476,173 @@ def query_weekly_focus(
     content = llm_lw_data_provider.get_weekly_focus(year, month, week_num)
     return content if content else "暂无周焦点"
 
+# ================================================
+# 新增获取某天的备注，todo用于判断用户今天在干嘛
+# ================================================
+
+@tool
+def query_daily_notes(
+    start_date: Annotated[str, "开始时间 YYYY-MM-DD"],
+    end_date: Annotated[str, "结束时间 YYYY-MM-DD"]
+) -> str:
+    """
+    获取用户某天的备注和todo，当总结当天没有备注或用户todo时，作为补充推断分析
+    """
+    from datetime import datetime,timedelta
+    start_date = datetime.strptime(start_date, "%Y-%m-%d")
+    end_date = datetime.strptime(end_date, "%Y-%m-%d")
+    prompt_parts = []
+    while start_date <= end_date:
+        prompt_parts.append(f"- {start_date.strftime('%Y-%m-%d')}: ")
+        notes = llm_lw_data_provider.get_user_focus_notes(start_date.strftime('%Y-%m-%d %H:%M:%S'), end_date.strftime('%Y-%m-%d %H:%M:%S'))
+        if notes:
+            prompt_parts.append(" 用户备注：")
+            prompt_parts.append(format_user_notes(notes))
+        else:
+            prompt_parts.append(" 暂无用户备注")
+        start_date += timedelta(days=1)
+    return "\n".join(prompt_parts) 
+
+@tool
+def query_daily_todos(
+    start_date: Annotated[str, "开始时间 YYYY-MM-DD"],
+    end_date: Annotated[str, "结束时间 YYYY-MM-DD"],
+) -> str:
+    """
+    获取用户某天的todoList，当总结当天没有备注或用户todo时，作为补充推断分析
+    """
+    from datetime import datetime,timedelta
+    start_date = datetime.strptime(start_date, "%Y-%m-%d")
+    end_date = datetime.strptime(end_date, "%Y-%m-%d")
+    prompt_parts = []
+    while start_date <= end_date:
+        prompt_parts.append(f"- {start_date.strftime('%Y-%m-%d')}: ")
+        daily_todo_and_focus = llm_lw_data_provider.get_focus_and_todos(date=start_date.strftime('%Y-%m-%d'))
+        if daily_todo_and_focus:
+            prompt_parts.append(" 用户todo与重点：")
+            prompt_parts.append(format_focus_and_todos(daily_todo_and_focus, False))
+        else:
+            
+            prompt_parts.append(" 暂无todo与重点")
+        start_date += timedelta(days=1)
+    return "\n".join(prompt_parts) 
+
+
+# ================================================
+# 时间窗口分析工具
+# ================================================
+
+@tool
+def query_behavior_timeline(
+    start_time: Annotated[str, "开始时间 YYYY-MM-DD HH:MM:SS"],
+    end_time: Annotated[str, "结束时间 YYYY-MM-DD HH:MM:SS"],
+    output_limit: Annotated[int, "输出记录数限制，默认20条"] = 20,
+    # min_duration: Annotated[int, "最小时长阈值(秒)，合并后时长小于此值的记录将被过滤，默认30秒"] = 30,
+    # category_id: Optional[str] = None,
+    # sub_category_id: Optional[str] = None
+) -> str:
+    """
+    查询时间窗口内按时间顺序出现的行为记录，并合并连续相同的 app+title。
+    
+    适用场景：
+    - 需要了解用户在某个时段内活动的时间顺序
+    - 需要看到活动的切换模式（推断工作流程）
+    - 需要合并碎片化的记录以获得更清晰的视图
+
+    Args:
+        start_time: 开始时间，格式 YYYY-MM-DD HH:MM:SS
+        end_time: 结束时间，格式 YYYY-MM-DD HH:MM:SS
+        output_limit: 输出记录数限制，默认20条。
+    建议：
+        1. 不建议获取超过2h的数据，否则会因为数据量过大导致数据截断
+        2. output_limit设置建议：每1h获取output_limit在20~30条以内,以此类推。
+    返回示例:
+        查询时间: 14:00 ~ 16:00，合并后 25 条，过滤 3 条短记录，因数量限制排除 5 条：
+          - 14:00 ~ 14:15 (15m) VSCode - project/main.py [工作/编程] (x3)
+          - 14:15 ~ 14:30 (15m) Chrome - Stack Overflow [工作/查资料]
+    """
+    # category_id: 可选，主分类ID，用于筛选特定分类的记录
+    # sub_category_id: 可选，子分类ID，用于筛选特定子分类的记录
+    # min_duration: 最小时长阈值(秒)，合并后时长小于此值的记录将被过滤，默认30秒
+    min_duration = 30
+    category_id = None
+    sub_category_id = None
+    try:
+        # 1. 查询所有日志（不限制条数，按时间正序）
+        logs = llm_lw_data_provider.query_behavior_logs(
+            start_time=start_time,
+            end_time=end_time,
+            limit=None,  # 不限制条数
+            order_by="start_time ASC",  # 按时间正序
+            category_id=category_id,
+            sub_category_id=sub_category_id
+        )
+        
+        if not logs:
+            return f"查询时间: {start_time} ~ {end_time}，暂无行为记录"
+        
+        # 2. 聚合数据（合并连续相同的 app+title，并过滤短记录）
+        merged_logs, raw_count, total_count, filtered_count, excluded_count = aggregate_behavior_timeline(
+            logs=logs,
+            output_limit=output_limit,
+            min_duration=min_duration
+        )
+        
+        # 3. 格式化输出
+        result = format_behavior_timeline(
+            merged_logs=merged_logs,
+            start_time=start_time,
+            end_time=end_time,
+            raw_count=raw_count,
+            total_count=total_count,
+            filtered_count=filtered_count,
+            excluded_count=excluded_count
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"查询行为时间线失败: {e}")
+        return f"查询失败: {str(e)}"
+
 
 if __name__ == "__main__":
-    # 测试 get_multi_days_stats 的 comparison 选项
-    print(get_multi_days_stats.invoke(
+    # 测试 query_behavior_timeline 时间线分析工具
+    print("=" * 60)
+    print("测试 query_behavior_timeline (min_duration=30s)")
+    print("=" * 60)
+    result = query_behavior_timeline.invoke(
         input = {
-            "start_time": "2026-01-01 00:00:00",
-            "end_time": "2026-01-06 23:59:59",
-            "options": ["comparison"]
+            "start_time": "2026-01-03 12:00:00", 
+            "end_time": "2026-01-03 13:00:00",
+            "output_limit": 20,
+            "min_duration": 30  # 过滤掉小于30秒的记录
         }
-    ))
+    )
+    print(result)
 
+    result = query_daily_todos.invoke(
+        input = {
+            "start_date": "2026-01-03", 
+            "end_date": "2026-01-03",
+        }
+    )
+    print(result)
+
+    result = get_daily_stats.invoke(
+        input = {
+            "start_time": "2026-01-03 00:00:00", 
+            "end_time": "2026-01-03 23:59:59",
+            "split_count" : 4,
+            "options":["all"]
+        }
+    )
+    print(result)
+
+    result = get_daily_breakdown.invoke(
+        input = {
+            "start_date": "2026-01-07", 
+            "end_date": "2026-01-07",
+        }
+    )
+    print(result)

@@ -28,7 +28,7 @@ async def daily_summary(date : str, pattern ="complex"):
     """
     # 获取执行计划和工具限制
     plan, tools_limit = get_daily_summary_plan(date,json_path, pattern)
-    
+    print(plan)
     # 创建异步执行器并执行
     executor = AsyncExecutor(
         plan=plan,

@@ -235,9 +235,9 @@ class LLMLWDataProvider(LWBaseDataProvider):
     
     def get_pc_active_time(self, start_time: str, end_time: str) -> List[float]:
         """
-        分析以2小时为单位的电脑活跃时间占比
+        分析以1小时为单位的电脑活跃时间占比
         
-        将一天24小时分成12个2小时的时间段（0-2h, 2-4h, ..., 22-24h），
+        将一天24小时分成24个1小时的时间段（0-1h, 1-2h, ..., 23-24h），
         计算每个时间段内电脑活跃时间占该时间段总时长的比例。
         
         Args:
@@ -245,7 +245,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
             end_time: 结束时间 YYYY-MM-DD HH:MM:SS
         
         Returns:
-            List[float]: 12个时间段的活跃占比列表，每个值为0.0-1.0之间的浮点数
+            List[float]: 24个时间段的活跃占比列表，每个值为0.0-1.0之间的浮点数
         """
         from datetime import datetime, timedelta
         
@@ -256,10 +256,10 @@ class LLMLWDataProvider(LWBaseDataProvider):
         # 加载事件数据
         df = self._load_events_in_range(start_time, end_time)
         
-        # 初始化12个2小时时间段的活跃时间（秒）
-        # 索引0代表0-2h，索引1代表2-4h，...，索引11代表22-24h
-        segment_active_seconds = [0] * 12
-        segment_total_seconds = [0] * 12
+        # 初始化24个1小时时间段的活跃时间（秒）
+        # 索引0代表0-1h，索引1代表1-2h，...，索引23代表23-24h
+        segment_active_seconds = [0] * 24
+        segment_total_seconds = [0] * 24
         
         # 遍历时间范围内的每一天
         current_date = range_start.date()
@@ -278,10 +278,10 @@ class LLMLWDataProvider(LWBaseDataProvider):
             if current_date == range_end.date():
                 day_end = range_end
             
-            # 计算每个2小时时间段在当天的实际时长
-            for i in range(12):
-                segment_start_hour = i * 2
-                segment_end_hour = (i + 1) * 2
+            # 计算每个1小时时间段在当天的实际时长
+            for i in range(24):
+                segment_start_hour = i
+                segment_end_hour = i + 1
                 
                 segment_start = datetime.combine(current_date, datetime.min.time()) + timedelta(hours=segment_start_hour)
                 segment_end = datetime.combine(current_date, datetime.min.time()) + timedelta(hours=segment_end_hour)
@@ -306,7 +306,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
         
         # 计算每个时间段的活跃占比
         ratios = []
-        for i in range(12):
+        for i in range(24):
             if segment_total_seconds[i] > 0:
                 ratio = segment_active_seconds[i] / segment_total_seconds[i]
                 ratios.append(round(ratio, 2))
@@ -1086,16 +1086,26 @@ class LLMLWDataProvider(LWBaseDataProvider):
         
         # 构建结果
         results = []
-        for date in sorted(daily_schedule.keys()):
-            schedule = daily_schedule[date]
-            result = {"date": date.strftime("%Y-%m-%d")}
+        for logical_date in sorted(daily_schedule.keys()):
+            schedule = daily_schedule[logical_date]
+            result = {"date": logical_date.strftime("%Y-%m-%d")}
             
             if schedule["earliest"]:
-                result["earliest_time"] = schedule["earliest"]["time"].strftime("%H:%M")
+                t = schedule["earliest"]["time"]
+                time_str = t.strftime("%H:%M")
+                # 如果实际日期晚于逻辑日期，说明是次日凌晨
+                if t.date() > logical_date:
+                    time_str = f"(+1 day) {time_str}"
+                result["earliest_time"] = time_str
                 result["earliest_activity"] = schedule["earliest"]["activity"]
             
             if schedule["latest"]:
-                result["latest_time"] = schedule["latest"]["time"].strftime("%H:%M")
+                t = schedule["latest"]["time"]
+                time_str = t.strftime("%H:%M")
+                # 如果实际日期晚于逻辑日期，说明是次日凌晨
+                if t.date() > logical_date:
+                    time_str = f"(+1 day) {time_str}"
+                result["latest_time"] = time_str
                 result["latest_activity"] = schedule["latest"]["activity"]
             
             results.append(result)
@@ -1397,9 +1407,12 @@ class LLMLWDataProvider(LWBaseDataProvider):
         while current_date <= end_dt:
             date_str = current_date.strftime("%Y-%m-%d")
             
-            # 获取当天的分类分布
-            day_start = f"{date_str} 00:00:00"
-            day_end = f"{date_str} 23:59:59"
+            # 获取当天的分类分布 (遵循逻辑一天: 04:00 ~ 次日 04:00)
+            # 这与 get_computer_usage_schedule 的逻辑保持一致
+            logical_start = current_date + timedelta(hours=4)
+            logical_end = current_date + timedelta(days=1, hours=4)
+            day_start = logical_start.strftime("%Y-%m-%d %H:%M:%S")
+            day_end = logical_end.strftime("%Y-%m-%d %H:%M:%S")
             
             distribution = self.get_category_distribution(day_start, day_end)
             
