@@ -243,6 +243,7 @@ class CategoryComparisonItem(BaseModel):
     previous_duration: int = Field(..., description="上一周期时长（秒）")
     change_seconds: int = Field(..., description="变化秒数")
     change_percentage: Optional[float] = Field(default=None, description="变化百分比（新增时为 null）")
+    children: Optional[List["CategoryComparisonItem"]] = Field(default=None, description="子分类对比列表")
 
 
 class GoalComparisonItem(BaseModel):

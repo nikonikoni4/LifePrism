@@ -66,7 +66,15 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
     
     if not need_recalc and cached:
         logger.info(f"返回缓存的日报告 {date}")
-        return _daily_dict_to_response(cached)
+        # 环比数据始终实时计算（不缓存）
+        comparison_data = _calc_comparison_data(
+            current_start=f"{date} 00:00:00",
+            current_end=f"{date} 23:59:59",
+            period_type="daily"
+        )
+        response = _daily_dict_to_response(cached)
+        response.comparison_data = comparison_data
+        return response
     
     # 3. 重新计算各板块数据
     logger.info(f"重新计算日报告 {date}")
@@ -152,7 +160,15 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
     
     if not need_recalc and cached:
         logger.info(f"返回缓存的周报告 {week_start_date}")
-        return _weekly_dict_to_response(cached, week_start_date, week_end_date)
+        # 环比数据始终实时计算（不缓存）
+        comparison_data = _calc_comparison_data(
+            current_start=f"{week_start_date} 00:00:00",
+            current_end=f"{week_end_date} 23:59:59",
+            period_type="weekly"
+        )
+        response = _weekly_dict_to_response(cached, week_start_date, week_end_date)
+        response.comparison_data = comparison_data
+        return response
     
     # 3. 重新计算各板块数据
     logger.info(f"重新计算周报告 {week_start_date} ~ {week_end_date}")
@@ -242,7 +258,15 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
     
     if not need_recalc and cached:
         logger.info(f"返回缓存的月报告 {month}")
-        return _monthly_dict_to_response(cached, month_start_date, month_end_date)
+        # 环比数据始终实时计算（不缓存）
+        comparison_data = _calc_comparison_data(
+            current_start=f"{month_start_date} 00:00:00",
+            current_end=f"{month_end_date} 23:59:59",
+            period_type="monthly"
+        )
+        response = _monthly_dict_to_response(cached, month_start_date, month_end_date)
+        response.comparison_data = comparison_data
+        return response
     
     # 3. 重新计算各板块数据
     logger.info(f"重新计算月报告 {month_start_date} ~ {month_end_date}")

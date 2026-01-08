@@ -253,8 +253,7 @@ class RewardProvider(LWBaseDataProvider):
             current_goals = llm_lw_data_provider.get_goal_time_spent(current_start, current_end)
             previous_goals = llm_lw_data_provider.get_goal_time_spent(previous_start, previous_end)
             
-            # 构建分类对比数据
-            category_comparison = []
+            # ========== 构建主分类对比数据 ==========
             current_cats = {
                 cat['id']: cat for cat in current_dist.get('categories', []) 
                 if cat['id'] not in ('idle', 'uncategorized') and cat['name'] != '未分类'
@@ -264,7 +263,25 @@ class RewardProvider(LWBaseDataProvider):
                 if cat['id'] not in ('idle', 'uncategorized') and cat['name'] != '未分类'
             }
             
+            # ========== 构建子分类对比数据（按 category_id 分组）==========
+            current_sub_cats = {}  # category_id -> { sub_id: sub_info }
+            for sub in current_dist.get('sub_categories', []):
+                cat_id = sub.get('category_id', '')
+                if cat_id:
+                    if cat_id not in current_sub_cats:
+                        current_sub_cats[cat_id] = {}
+                    current_sub_cats[cat_id][sub['id']] = sub
+            
+            previous_sub_cats = {}  # category_id -> { sub_id: sub_info }
+            for sub in previous_dist.get('sub_categories', []):
+                cat_id = sub.get('category_id', '')
+                if cat_id:
+                    if cat_id not in previous_sub_cats:
+                        previous_sub_cats[cat_id] = {}
+                    previous_sub_cats[cat_id][sub['id']] = sub
+            
             all_cat_ids = set(current_cats.keys()) | set(previous_cats.keys())
+            category_comparison = []
             
             for cat_id in all_cat_ids:
                 prev_cat = previous_cats.get(cat_id, {})
@@ -281,19 +298,52 @@ class RewardProvider(LWBaseDataProvider):
                 else:
                     change_percentage = None  # 新增分类
                 
+                # 构建子分类列表
+                children = []
+                curr_subs = current_sub_cats.get(cat_id, {})
+                prev_subs = previous_sub_cats.get(cat_id, {})
+                all_sub_ids = set(curr_subs.keys()) | set(prev_subs.keys())
+                
+                for sub_id in all_sub_ids:
+                    prev_sub = prev_subs.get(sub_id, {})
+                    curr_sub = curr_subs.get(sub_id, {})
+                    
+                    sub_name = curr_sub.get('name') or prev_sub.get('name', '未知子分类')
+                    sub_prev_duration = prev_sub.get('duration', 0)
+                    sub_curr_duration = curr_sub.get('duration', 0)
+                    sub_change_seconds = sub_curr_duration - sub_prev_duration
+                    
+                    if sub_prev_duration > 0:
+                        sub_change_percentage = round((sub_change_seconds / sub_prev_duration) * 100, 1)
+                    else:
+                        sub_change_percentage = None
+                    
+                    children.append({
+                        'category_id': sub_id,
+                        'category_name': sub_name,
+                        'current_duration': sub_curr_duration,
+                        'previous_duration': sub_prev_duration,
+                        'change_seconds': sub_change_seconds,
+                        'change_percentage': sub_change_percentage
+                    })
+                
+                # 按变化量排序子分类
+                children.sort(key=lambda x: abs(x['change_seconds']), reverse=True)
+                
                 category_comparison.append({
                     'category_id': cat_id,
                     'category_name': cat_name,
                     'current_duration': curr_duration,
                     'previous_duration': prev_duration,
                     'change_seconds': change_seconds,
-                    'change_percentage': change_percentage
+                    'change_percentage': change_percentage,
+                    'children': children if children else None
                 })
             
             # 按变化量排序（变化大的在前）
             category_comparison.sort(key=lambda x: abs(x['change_seconds']), reverse=True)
             
-            # 构建目标对比数据
+            # ========== 构建目标对比数据 ==========
             goal_comparison = []
             all_goal_ids = set(current_goals.keys()) | set(previous_goals.keys())
             
