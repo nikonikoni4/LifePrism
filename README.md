@@ -1,23 +1,25 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+<img width="100%" alt="LifePrism Poster" src="public/branding/LifePrism_poster.png" />
 </div>
 
-# Run and deploy your AI Studio app
+# front-of-lifePrism
 
-This contains everything you need to run your app locally.
+LifePrism的前端部分
 
-View your app in AI Studio: https://ai.studio/apps/drive/1lg-tAHMtg2l5RPydCJezEAXMJnps_oDs
+## 📊 前段开发状态
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+| 页面 | 状态 | 说明 |
+|------|------|------|
+| Home | ✅ 已完成 | 首页仪表盘 |
+| Timeline | ✅ 已完成 | 时间线视图 |
+| Category | ✅ 已完成 | 分类管理 |
+| Usage | ✅ 已完成 | API 使用量追踪 |
+| Goals | 🚀 即将完成 | 目标管理 |
+| Chatbot | ✅ 已完成 | 聊天机器人 |
+| Reports | 🚀 即将完成 | 报告统计 |
+| Settings | ✅ 已完成 | 设置页面 |
+| diary | 🚧 待开发 | 日记界面 | 
+| doing | 🚧 待开发 | 任务视图 |
 
 ## License
 
