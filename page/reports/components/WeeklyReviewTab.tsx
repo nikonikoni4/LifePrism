@@ -11,9 +11,10 @@ import TimeDistributionChart from './TimeDistributionChart';
 import GoalProgressCard from './GoalProgressCard';
 import TodoStatsCard from './TodoStatsCard';
 import AISummaryCard from './AISummaryCard';
+import TrendComparisonCard from './TrendComparisonCard';
 import { ReportsAPI } from '../api';
 import { WeeklyReportData } from '../types';
-import { getMockWeeklyReport } from '../mockData';
+import { getMockWeeklyReport, getMockComparisonData } from '../mockData';
 
 interface WeeklyReviewTabProps {
     className?: string;
@@ -110,6 +111,18 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '', onNav
     // 使用 mock 数据作为后备
     const displayData = reportData || getMockWeeklyReport(startDate, endDate);
 
+    // 计算对比日期 (上周)
+    const prevStartDate = new Date(startDate);
+    prevStartDate.setDate(prevStartDate.getDate() - 7);
+    const prevStartStr = prevStartDate.toISOString().split('T')[0];
+
+    const prevEndDate = new Date(endDate);
+    prevEndDate.setDate(prevEndDate.getDate() - 7);
+    const prevEndStr = prevEndDate.toISOString().split('T')[0];
+
+    // 生成对比 mock 数据
+    const comparisonData = getMockComparisonData(startDate, endDate, prevStartStr, prevEndStr);
+
     return (
         <div className={`space-y-6 ${className}`}>
             {/* Week Selector & Refresh Button */}
@@ -188,6 +201,7 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '', onNav
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
                 {/* Left Column - Charts */}
                 <div className="lg:col-span-8 space-y-6">
                     {/* Weekly Trend Line Chart */}
@@ -207,6 +221,14 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '', onNav
                         title="任务完成度"
                         subTitle="本周 Todo 整体达成率"
                         className="h-[380px]"
+                    />
+                </div>
+
+                {/* 环比对比组件 (新增) */}
+                <div className="lg:col-span-12">
+                    <TrendComparisonCard
+                        data={comparisonData}
+                        title="本周环比趋势"
                     />
                 </div>
 

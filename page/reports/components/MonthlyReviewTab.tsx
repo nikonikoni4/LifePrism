@@ -12,9 +12,10 @@ import GoalProgressCard from './GoalProgressCard';
 import TodoStatsCard from './TodoStatsCard';
 import AISummaryCard from './AISummaryCard';
 import TimeDistributionChart from './TimeDistributionChart';
+import TrendComparisonCard from './TrendComparisonCard';
 import { ReportsAPI } from '../api';
 import { MonthlyReportData } from '../types';
-import { getMockMonthlyReport } from '../mockData';
+import { getMockMonthlyReport, getMockComparisonData } from '../mockData';
 
 /** 获取月份的结束日期 */
 const getMonthEndDate = (month: string): string => {
@@ -132,6 +133,20 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '', onN
             ...(day.categoryBreakdown || {})
         }));
 
+    // 计算对比日期 (上月)
+    const currentStart = `${selectedMonth}-01`;
+    const currentEnd = getMonthEndDate(selectedMonth);
+
+    const [currYear, currMonth] = selectedMonth.split('-').map(Number);
+    const prevDate = new Date(currYear, currMonth - 2, 1);
+    const prevYear = prevDate.getFullYear();
+    const prevMonthVal = prevDate.getMonth() + 1;
+    const prevMonthStr = `${prevYear}-${String(prevMonthVal).padStart(2, '0')}`;
+    const prevStart = `${prevMonthStr}-01`;
+    const prevEnd = getMonthEndDate(prevMonthStr);
+
+    const comparisonData = getMockComparisonData(currentStart, currentEnd, prevStart, prevEnd);
+
     return (
         <div className={`space-y-6 ${className}`}>
             {/* Month Selector & Refresh Button */}
@@ -210,6 +225,7 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '', onN
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
                 {/* Monthly Trend Chart */}
                 <div className="lg:col-span-12">
                     <TimeDistributionChart
@@ -243,7 +259,13 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '', onN
                         className="h-full"
                     />
                 </div>
-
+                {/* 环比对比组件 (新增) */}
+                <div className="lg:col-span-12">
+                    <TrendComparisonCard
+                        data={comparisonData}
+                        title="本月环比趋势"
+                    />
+                </div>
                 <div className="lg:col-span-8">
                     {/* Sunburst Chart */}
                     <TimeOverviewWidget
@@ -252,6 +274,8 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '', onN
                         className="h-[600px]"
                     />
                 </div>
+
+
 
                 <div className="lg:col-span-4">
                     {/* Monthly Goal Investment */}

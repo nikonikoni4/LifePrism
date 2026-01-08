@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, RefreshCw } from 'lucide-react';
+import { Calendar, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import TimeOverviewWidget from './TimeOverviewWidget';
 import TimeDistributionChart from './TimeDistributionChart';
 import GoalProgressCard from './GoalProgressCard';
@@ -157,13 +157,39 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({
                         {refreshing ? '刷新中...' : '重新计算'}
                     </button>
 
-                    {/* 日期选择器 */}
-                    <input
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:outline-none cursor-pointer"
-                    />
+                    {/* 日期选择区域 */}
+                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-1">
+                        <button
+                            onClick={() => {
+                                const date = new Date(selectedDate);
+                                date.setDate(date.getDate() - 1);
+                                setSelectedDate(date.toISOString().split('T')[0]);
+                            }}
+                            className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-500 hover:text-blue-500 transition-all focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            title="前一天"
+                        >
+                            <ChevronLeft size={18} />
+                        </button>
+
+                        <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="px-2 py-1 bg-transparent border-none text-sm font-medium focus:ring-0 cursor-pointer text-slate-700 outline-none h-full"
+                        />
+
+                        <button
+                            onClick={() => {
+                                const date = new Date(selectedDate);
+                                date.setDate(date.getDate() + 1);
+                                setSelectedDate(date.toISOString().split('T')[0]);
+                            }}
+                            className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-500 hover:text-blue-500 transition-all focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            title="后一天"
+                        >
+                            <ChevronRight size={18} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -180,13 +206,7 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* 环比对比组件 (新增) */}
-                <div className="lg:col-span-12">
-                    <TrendComparisonCard
-                        data={comparisonData}
-                        title="今日环比趋势"
-                    />
-                </div>
+
 
                 {/* Left Column - Charts */}
                 <div className="lg:col-span-8 space-y-6">
@@ -205,6 +225,13 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({
                         stats={displayData.todoStats}
                         title="Todo 统计"
                         className="h-[380px]"
+                    />
+                </div>
+                {/* 环比对比组件 (新增) */}
+                <div className="lg:col-span-12">
+                    <TrendComparisonCard
+                        data={comparisonData}
+                        title="今日环比趋势"
                     />
                 </div>
                 <div className="lg:col-span-8 space-y-6">
