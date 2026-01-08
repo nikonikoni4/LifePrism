@@ -77,7 +77,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
             <div className="max-w-7xl mx-auto">
                 <header className="mb-6">
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifePrism</h1>
-                    <p className="text-slate-500 mt-1 font-medium">愿此行, 终抵群星</p>
+                    <p className="text-slate-500 mt-1 font-medium">Refract Your Day, Reflect Your Life</p>
                 </header>
                 <div className="flex items-center justify-center h-96">
                     <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
@@ -92,7 +92,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
             <div className="max-w-7xl mx-auto">
                 <header className="mb-6">
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifePrism</h1>
-                    <p className="text-slate-500 mt-1 font-medium">愿此行, 终抵群星</p>
+                    <p className="text-slate-500 mt-1 font-medium">Refract Your Day, Reflect Your Life</p>
                 </header>
                 <div className="flex flex-col items-center justify-center h-96 text-red-500 gap-4">
                     <AlertCircle className="w-12 h-12" />
@@ -113,7 +113,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
             {/* Page Header */}
             <header className="mb-6">
                 <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifePrism</h1>
-                <p className="text-slate-500 mt-1 font-medium">愿此行, 终抵群星</p>
+                <p className="text-slate-500 mt-1 font-medium">Refract Your Day, Reflect Your Life</p>
             </header>
 
             {/* Activity Summary Header */}
