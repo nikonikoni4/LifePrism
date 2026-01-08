@@ -59,6 +59,14 @@ class NodeDefinition(BaseModel):
     - llm-first: LLM先执行，可选调用工具。适用于需要先推理再行动的场景
     - tool-first: 工具先执行，然后LLM分析结果。适用于需要先获取数据再分析的场景
     - planning: 规划节点，生成子计划并递归执行（暂未实现）
+    
+    数据流说明:
+    - 输入：
+        - data_in_thread: 指定输入数据来源线程ID，None表示使用parent_thread_id
+        - data_in_slice: 指定消息切片范围 [start, end)。None时取最后一条消息
+    - 输出：
+        - data_out_thread: 指定输出数据的目标线程ID，None表示不输出
+        - data_out: 是否将结果输出到父（输出）线程
     """
     
     # ===== 核心标识 =====
@@ -69,10 +77,7 @@ class NodeDefinition(BaseModel):
     
     # ===== 线程配置 =====
     thread_id: str = Field(description="当前节点的线程ID")
-    parent_thread_id: str | None = Field(
-        default=None, 
-        description="父线程ID，用于确定合并目标。主线程节点为None"
-    )
+
     
     # ===== LLM 配置 =====
     task_prompt: str = Field(
@@ -111,6 +116,10 @@ class NodeDefinition(BaseModel):
     )
     
     # ===== 数据输出配置 =====
+    data_out_thread: str | None = Field(
+        default=None, 
+        description="输出数据目标线程ID，用于确定合并目标。主线程节点为None"
+    )
     data_out: bool = Field(
         default=False, 
         description="是否将结果输出到父线程"
@@ -185,7 +194,7 @@ def create_node_definition_schema(
         node_name=(str, Field(description="节点名称")),
         task_prompt=(str, Field(default="", description="LLM的任务描述")),
         thread_id=(str, Field(description="线程ID")),
-        parent_thread_id=(str | None, Field(default=None, description="父线程ID")),
+        data_out_thread=(str | None, Field(default=None, description="父线程ID")),
         # 工具配置
         tools=(list[str] | None, Field(default=None, description="可调用的工具列表")),
         enable_tool_loop=(bool, Field(default=False, description="是否启用工具调用循环")),

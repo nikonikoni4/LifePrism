@@ -11,7 +11,9 @@ from lifeprism.llm.llm_classify.tools.database_tools import (
     get_multi_days_stats,
     query_behavior_logs,
     query_goals,
-    query_psychological_assessment
+    query_psychological_assessment,
+    query_daily_todos,
+    query_behavior_timeline
 )
 from typing import Callable
 from lifeprism.utils import get_logger,DEBUG
@@ -27,6 +29,7 @@ class Executor:
     """
     
     # 默认工具调用次数限制
+    # 未在此处声明的工具默认有 1 次调用机会
     DEFAULT_TOOLS_USAGE_LIMIT = {
         "get_daily_stats": 1,
         "get_multi_days_stats": 1,
@@ -34,6 +37,9 @@ class Executor:
         "query_goals": 1,
         "query_psychological_assessment": 1
     }
+    
+    # 未声明工具的默认调用次数
+    DEFAULT_TOOL_USAGE_COUNT = 1
 
     def __init__(
         self, 
@@ -62,7 +68,9 @@ class Executor:
             "get_multi_days_stats": get_multi_days_stats,
             "query_behavior_logs": query_behavior_logs,
             "query_goals": query_goals,
-            "query_psychological_assessment": query_psychological_assessment
+            "query_psychological_assessment": query_psychological_assessment,
+            "query_daily_todos": query_daily_todos,
+            "query_behavior_timeline": query_behavior_timeline
         }
         
         # 工具使用限制
@@ -104,25 +112,25 @@ class Executor:
             raise ValueError(f"线程 {thread_id} 不存在")
         self.context["messages"][thread_id].append(message)
 
-    def _create_thread(self, thread_id: str, parent_thread_id: str | None = None, node: NodeDefinition | None = None) -> None:
+    def _create_thread(self, thread_id: str, data_out_thread: str | None = None, node: NodeDefinition | None = None) -> None:
         """
         创建新线程，并根据 node 的 data_in 配置注入初始消息
         
         Args:
             thread_id: 新线程ID
-            parent_thread_id: 父线程ID
+            data_out_thread: 父线程ID
             node: 节点定义，用于获取 data_in 配置
         """
         if thread_id in self.context["messages"]:
             return  # 线程已存在，直接返回
         
         self.context["messages"][thread_id] = []
-        self.context["thread_meta"][thread_id] = {"parent_thread": parent_thread_id}
+        self.context["thread_meta"][thread_id] = {"parent_thread": data_out_thread}
         
         # 处理 data_in：注入初始消息到新线程
         if node is not None:
-            # 确定数据来源线程：优先使用 data_in_thread，否则使用 parent_thread_id
-            source_thread = node.data_in_thread or parent_thread_id
+            # 确定数据来源线程：优先使用 data_in_thread，否则使用 data_out_thread
+            source_thread = node.data_in_thread or data_out_thread
             
             if source_thread and source_thread in self.context["messages"]:
                 source_msgs = self.context["messages"][source_thread]
@@ -191,13 +199,15 @@ class Executor:
                 raise ValueError(f"工具 {tool} 不存在，可用工具: {list(self.tools_map.keys())}")
 
     def _can_use_tool(self, tool_name: str) -> bool:
-        """判断指定工具是否还能调用"""
-        return self.tools_usage_limit.get(tool_name, 0) > 0
+        """判断指定工具是否还能调用（未声明的工具默认有 DEFAULT_TOOL_USAGE_COUNT 次调用机会）"""
+        return self.tools_usage_limit.get(tool_name, self.DEFAULT_TOOL_USAGE_COUNT) > 0
     
     def _consume_tool_usage(self, tool_name: str) -> None:
-        """消耗一次工具调用次数"""
-        if tool_name in self.tools_usage_limit:
-            self.tools_usage_limit[tool_name] -= 1
+        """消耗一次工具调用次数（未声明的工具会被初始化后再消耗）"""
+        if tool_name not in self.tools_usage_limit:
+            # 未声明的工具，初始化为默认次数
+            self.tools_usage_limit[tool_name] = self.DEFAULT_TOOL_USAGE_COUNT
+        self.tools_usage_limit[tool_name] -= 1
 
     def _has_available_tools(self, tools: list[str] | None) -> bool:
         """检查是否还有可用的工具调用次数"""
@@ -347,6 +357,10 @@ class Executor:
         单次 LLM 调用（可能包含一次工具调用）
         """
         prompt = self._get_prompt(node)
+        print("="*20) 
+        print(node.node_name)
+        print(prompt)
+        print("="*20)
         result = llm.invoke(prompt)
         self._accumulate_tokens(result)
         self._add_message_to_thread(node.thread_id, result)
@@ -498,10 +512,10 @@ class Executor:
 
         content = None
         for node in self.plan.nodes:
-            # 确保线程存在，使用节点定义的 parent_thread_id
+            # 确保线程存在，使用节点定义的 data_out_thread
             if node.thread_id not in self.context["messages"]:
-                # 优先使用节点定义的 parent_thread_id，否则默认为 main_thread_id
-                parent_id = node.parent_thread_id if node.parent_thread_id else self.main_thread_id
+                # 优先使用节点定义的 data_out_thread，否则默认为 main_thread_id
+                parent_id = node.data_out_thread if node.data_out_thread else self.main_thread_id
                 self._create_thread(node.thread_id, parent_id, node)
             
             # 使用处理器分发
@@ -510,7 +524,7 @@ class Executor:
                 raise ValueError(f"未知节点类型: {node.node_type}")
             
             content = handler(node)
-            
+            print(content)
             # 如果节点设置了 data_out，合并到父线程
             if node.data_out:
                 self._merge_data_out_to_parent(node.thread_id)
@@ -534,9 +548,10 @@ if __name__ == "__main__":
     # 创建测试计划 - 使用 llm_auto 和 query 节点
     # 
     from lifeprism.llm.llm_classify.tests.data_driving_agent_v2.load_plans import load_plan_from_template
-    plan,tools_limit= load_plan_from_template(json_path=r"D:\desktop\软件开发\LifeWatch-AI\lifeprism\llm\llm_classify\tests\data_driving_agent_v2\patterns\test_plan.json",
-                        pattern_name="test1",date = "2026-01-03")
-    executor = Executor(plan, "请帮我总结 2026-01-03 的使用情况",tools_limit=tools_limit)
+    date = "2026-01-02"
+    plan,tools_limit= load_plan_from_template(json_path=r"D:\desktop\软件开发\LifeWatch-AI\lifeprism\llm\llm_classify\tests\data_driving_agent_v2\patterns\daily_summary_plan.json",
+                        pattern_name="complex",date = date)
+    executor = Executor(plan, f"请帮我总结 {date} 的使用情况",tools_limit=tools_limit)
     result = executor.execute()
     
     # 格式化输出

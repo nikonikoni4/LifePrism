@@ -57,9 +57,9 @@ def save_plan_as_template(
         # 确保 thread_id 存在
         if "thread_id" not in node:
             node["thread_id"] = "main"
-        # 确保 parent_thread_id 字段存在（用于多级嵌套）
-        if "parent_thread_id" not in node:
-            node["parent_thread_id"] = None
+        # 确保 data_out_thread 字段存在（用于多级嵌套）
+        if "data_out_thread" not in node:
+            node["data_out_thread"] = None
         # 确保 tools 字段存在（即使是 None）
         if "tools" not in node:
             node["tools"] = None
@@ -173,7 +173,7 @@ if __name__ == "__main__":
                 initial_tool_name="get_daily_stats",
                 initial_tool_args={"date": "2026-01-05"},
                 thread_id="main",
-                parent_thread_id=None,  # 主线程，无父线程
+                data_out_thread=None,  # 主线程，无父线程
                 data_out=False
             ),
             NodeDefinition(
@@ -181,7 +181,7 @@ if __name__ == "__main__":
                 node_name="生成总结",
                 task_prompt="根据上述统计数据，生成用户行为总结",
                 thread_id="main",
-                parent_thread_id=None,  # 主线程，无父线程
+                data_out_thread=None,  # 主线程，无父线程
                 enable_tool_loop=False,
                 data_out=True,
                 data_out_description="用户行为总结: "

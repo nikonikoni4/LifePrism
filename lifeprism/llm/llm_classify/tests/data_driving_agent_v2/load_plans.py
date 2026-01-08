@@ -385,14 +385,14 @@ if __name__ == "__main__":
                 "node_name": "主线程节点",
                 "task_prompt": "这是一个测试",
                 "thread_id": "main",
-                "parent_thread_id": None  # 主线程，无父线程
+                "data_out_thread": None  # 主线程，无父线程
             },
             {
                 "node_type": "llm-first",
                 "node_name": "子线程节点",
                 "task_prompt": "查询详细数据",
                 "thread_id": "sub_1",
-                "parent_thread_id": "main",
+                "data_out_thread": "main",
                 "data_in_thread": None,  # 使用父线程作为数据来源
                 "data_in_slice": [-2, None],  # 取父线程最后2条消息
                 "tools": ["query_behavior_logs"],

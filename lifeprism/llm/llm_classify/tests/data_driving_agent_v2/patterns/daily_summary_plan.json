@@ -1,0 +1,62 @@
+{
+    "complex": {
+        "task": "总结{date}这一天我做了什么",
+        "nodes": [
+            {
+                "node_type": "tool-first",
+                "node_name": "具体时间分析方案",
+                "task_prompt": "依据用户电脑使用数据和用户行为统计数据,为了进一步推断用户在具体时间的行为,给出3~5个小于1.5h的时间段用于仔细分析。要求：1. 直接给出时间段，不需要分析 2. 若在行为统计分析中的主要活动记录和用户备注能够对应上，则不要选择用户备注的时间段。3. 重点关注电脑使用频率高，但信息量少的区域。",
+                "thread_id": "q1",
+                "data_out_thread": "main",
+                "initial_tool_name": "get_daily_stats",
+                "initial_tool_args": {
+                    "start_time": "{date} 00:00:00",
+                    "end_time": "{date} 23:59:59",
+                    "split_count": 6,
+                    "options": [
+                        "pc_active_time",
+                        "behavior_stats",
+                        "user_notes"
+                    ]
+                },
+                "data_out": false,
+                "data_out_description": "用户行为统计数据: "
+            },
+            {
+                "node_type": "llm-first",
+                "node_name": "开启新线程，调用时间线",
+                "task_prompt": "依据上面给出的需要调用的时间段，调用query_behavior_timeline",
+                "thread_id": "q2",
+                "data_in_thread": "q1",
+                "data_in_slice": [
+                    -1,
+                    null
+                ],
+                "data_out_thread": "q1",
+                "data_out": false,
+                "tools": [
+                    "query_behavior_timeline"
+                ]
+            },
+            {
+                "node_type": "tool-first",
+                "node_name": "小时间窗口分析",
+                "task_prompt": "根据用户todo和时间线数据，推断用户在这段时间内可能在做什么事情。要求：1. 总结简单直接，2. 推断过程简单回答。3. 对于关键的数据需要给出，但不能过多。",
+                "thread_id": "q2",
+                "data_out_thread": "q1",
+                "initial_tool_name": "query_daily_todos",
+                "initial_tool_args": {
+                    "start_date": "{date}",
+                    "end_date": "{date}"
+                },
+                "data_out": true,
+                "data_out_description": "仔细的分时段总结: "
+            }
+        ],
+        "tools_limit": {
+            "query_behavior_timeline": 5,
+            "query_behavior_logs": 5,
+            "query_daily_todos": 5
+        }
+    }
+}

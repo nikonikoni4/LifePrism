@@ -9,7 +9,7 @@ from lifeprism.llm.llm_classify.data_driving_agent.async_executor import AsyncEx
 from typing import Literal
 from lifeprism.llm.llm_classify.providers.llm_lw_data_provider import llm_lw_data_provider
 logger = logging.getLogger(__name__)
-json_path = r"D:\desktop\软件开发\LifeWatch-AI\lifeprism\llm\custom_prompt\skills\user_behavior_summary\pattern\daily_summary_plan.json"
+json_path = "lifeprism/llm/custom_prompt/skills/user_behavior_summary/pattern/daily_summary_plan.json"
 
 async def daily_summary(date : str, pattern ="complex"):
     """
@@ -28,7 +28,6 @@ async def daily_summary(date : str, pattern ="complex"):
     """
     # 获取执行计划和工具限制
     plan, tools_limit = get_daily_summary_plan(date,json_path, pattern)
-    print(plan)
     # 创建异步执行器并执行
     executor = AsyncExecutor(
         plan=plan,

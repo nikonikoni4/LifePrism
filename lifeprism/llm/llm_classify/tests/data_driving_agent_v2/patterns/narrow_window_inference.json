@@ -1,0 +1,41 @@
+{
+    "小窗口时间分析": {
+        "task": "测试llm能否从时间顺序语言中推断出用户在做什么 {data}",
+        "nodes": [
+            {
+                "node_type": "tool-first",
+                "node_name": "获取用户的todo",
+                "task_prompt": "",
+                "thread_id": "q1",
+                "data_out_thread": null,
+                "initial_tool_name": "query_daily_todos",
+                "initial_tool_args": {
+                    "start_date": "2026-01-04",
+                    "end_date": "2026-01-04"
+                },
+                "data_out": false,
+                "data_out_description": "用户todo: "
+            },
+            {
+                "node_type": "tool-first",
+                "node_name": "小时间窗口分析",
+                "task_prompt": "根据用户todo和时间线数据，推断用户在这段时间内可能在做什么事情。要求：1. 总结简单直接，2. 推断过程简单回答。3. 对于关键的数据需要给出，但不能过多。",
+                "thread_id": "q1",
+                "data_out_thread": null,
+                "initial_tool_name": "query_behavior_timeline",
+                "initial_tool_args": {
+                    "start_time": "2026-01-04 15:00:00",
+                    "end_time": "2026-01-04 16:00:00",
+                    "output_limit": 20
+                },
+                "data_out": true,
+                "data_out_description": "用户行为时间线分析: "
+            }
+        ],
+        "tools_limit": {
+            "query_behavior_timeline": 5,
+            "query_behavior_logs": 5,
+            "query_daily_todos": 5
+        }
+    }
+}

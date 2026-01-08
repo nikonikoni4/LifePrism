@@ -7,7 +7,7 @@
                 "node_name": "获取统计数据",
                 "task_prompt": "",
                 "thread_id": "main",
-                "parent_thread_id": null,
+                "data_out_thread": null,
                 "initial_tool_name": "get_daily_stats",
                 "initial_tool_args": {
                     "start_time": "2026-01-03 00:00:00",
@@ -22,7 +22,7 @@
                 "node_name": "分析需要详细查询数据的时段",
                 "task_prompt": "为了了解用户当天都做了什么，你需要根据上述统计数据，判断哪些时段需要详细查询的数据，最多可以选择5个时段（能够查询的数据是电脑使用时的app + app的title类型的数据），并给出你想从这段时间内获取什么信息。\n 下面是一些参考的重点时段：1. 用户备注的时段。2. 用户电脑使用活跃的时段。3. 一些本应该休息的时段但电脑使用时间却异常长的时段。\n 注意：1. 每次查询时段的时间需要限制在2h以内，不能出现重复的时段。2. 输出时要输出你需要查询的时段和你想要从这段时间内获取什么信息。",
                 "thread_id": "main",
-                "parent_thread_id": null,
+                "data_out_thread": null,
                 "enable_tool_loop": false,
                 "data_out": false,
                 "data_out_description": "详细时段查询数据: "
@@ -32,7 +32,7 @@
                 "node_name": "详细查询",
                 "task_prompt": "依据上一步的查询要求,按要求调用query_behavior_logs进行数据查询。不能重复查询已经总结或查询过的时段",
                 "thread_id": "query-behavior-logs-thread",
-                "parent_thread_id": "main",
+                "data_out_thread": "main",
                 "tools": [
                     "query_behavior_logs"
                 ],
@@ -48,7 +48,7 @@
                 "node_name": "总结查询的内容",
                 "task_prompt": "每个时间段的查询结果，总结出每个时间段的使用情况，推测用户的行为",
                 "thread_id": "query-behavior-logs-thread",
-                "parent_thread_id": "main",
+                "data_out_thread": "main",
                 "enable_tool_loop": false,
                 "data_out": true,
                 "data_out_description": "每个时间段的使用情况: "
@@ -58,7 +58,7 @@
                 "node_name": "获取用户目标",
                 "task_prompt": "",
                 "thread_id": "main",
-                "parent_thread_id": null,
+                "data_out_thread": null,
                 "initial_tool_name": "query_goals",
                 "initial_tool_args": {},
                 "data_out": false,
@@ -69,7 +69,7 @@
                 "node_name": "获取心理评估数据",
                 "task_prompt": "",
                 "thread_id": "main",
-                "parent_thread_id": null,
+                "data_out_thread": null,
                 "initial_tool_name": "query_psychological_assessment",
                 "initial_tool_args": {},
                 "data_out": false,
@@ -80,7 +80,7 @@
                 "node_name": "编写总结报告",
                 "task_prompt": "你是一个AI助手，专门分析用户电脑使用数据生成行为摘要。基于上述统计数据、用户目标、心理评估数据，分时段总结，生成 {date} 的每日总结：\n\n输出必须包含以下章节：\n- 🕒 分时段行为推断（结合分类统计和用户备注，推断每个时段的主要活动，不要泛泛得说编码，学习等太过宽泛的行为推测，尽可能结合用户的目标，todo等内容）\n- ⏱️ 使用规律与作息分析（分析电脑使用时间，推断作息特点）\n- 🎯 任务完成情况分析（分析任务完成率，给出反馈和建议）\n- 🧩 综合总结（概括今天的主要活动和亮点）\n\n严格遵循重要原则：\n1. 保持谦逊，使用'可能'、'推测'等词汇\n2. 不要过度解读数据\n3. 承认数据局限性（例如：数据仅来自电脑使用记录，不代表全部活动；不包括线下活动、手机使用等）\n4. 数据驱动，基于具体数据不臆测\n",
                 "thread_id": "main",
-                "parent_thread_id": "main",
+                "data_out_thread": "main",
                 "enable_tool_loop": false,
                 "data_out": true,
                 "data_out_description": "总结报告: "
@@ -91,65 +91,6 @@
             "query_behavior_logs": 10,
             "query_goals": 1,
             "query_psychological_assessment": 1
-        }
-    },
-    "test2": {
-        "task": "每日行为总结 {date}",
-        "nodes": [
-            {
-                "node_type": "tool-first",
-                "node_name": "简单总结电脑使用情况",
-                "task_prompt": "你当前拥有工具请根据用户电脑使用数据和行为统计数据,",
-                "thread_id": "q1",
-                "parent_thread_id": "main",
-                "initial_tool_name": "get_daily_stats",
-                "initial_tool_args": {
-                    "start_time": "2026-01-03 00:00:00",
-                    "end_time": "2026-01-03 23:59:59",
-                    "split_count": 4,
-                    "options": [
-                        "pc_active_time",
-                        "behavior_stats",
-                        "user_notes"
-                    ]
-                },
-                "enable_tool_loop": false,
-                "data_out": true,
-                "data_out_description": "用户电脑使用情况: "
-            }
-        ],
-        "tools_limit": {
-            "query_goals": 1
-        }
-    },
-    "test3_tool_loop": {
-        "task": "深度分析 {date}",
-        "nodes": [
-            {
-                "node_type": "tool-first",
-                "node_name": "获取数据并深度分析",
-                "task_prompt": "分析今天的电脑使用情况，如需更多细节可查询行为日志",
-                "thread_id": "main",
-                "parent_thread_id": null,
-                "initial_tool_name": "get_daily_stats",
-                "initial_tool_args": {
-                    "start_time": "2026-01-03 00:00:00",
-                    "end_time": "2026-01-03 23:59:59",
-                    "split_count": 4
-                },
-                "tools": [
-                    "query_behavior_logs",
-                    "query_goals"
-                ],
-                "enable_tool_loop": true,
-                "data_out": true,
-                "data_out_description": "深度分析结果: "
-            }
-        ],
-        "tools_limit": {
-            "get_daily_stats": 1,
-            "query_behavior_logs": 5,
-            "query_goals": 1
         }
     }
 }
