@@ -111,12 +111,14 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({
     // 使用 mock 数据作为后备
     const displayData = reportData || getMockDailyReport(selectedDate);
 
-    // 计算对比日期 (昨天)
-    const prevDate = new Date(selectedDate);
-    prevDate.setDate(prevDate.getDate() - 1);
-    const prevDateStr = prevDate.toISOString().split('T')[0];
-    // 生成对比 mock 数据
-    const comparisonData = getMockComparisonData(selectedDate, selectedDate, prevDateStr, prevDateStr);
+    // 使用后端返回的 comparisonData，如果没有则 fallback 到 mock 数据
+    const comparisonData = displayData.comparisonData || (() => {
+        // 计算对比日期 (昨天)
+        const prevDate = new Date(selectedDate);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevDateStr = prevDate.toISOString().split('T')[0];
+        return getMockComparisonData(selectedDate, selectedDate, prevDateStr, prevDateStr);
+    })();
 
     return (
         <div className={`space-y-6 ${className}`}>

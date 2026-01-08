@@ -63,11 +63,11 @@ const formatDailyAverage = (seconds: number, days: number = 7): string => {
  */
 const getTrendIcon = (changeSeconds: number) => {
     if (changeSeconds > 0) {
-        return { Icon: TrendingUp, color: '#FFD60A', bgColor: 'rgba(255, 214, 10, 0.15)' };
+        return { Icon: TrendingUp, color: '#F59E0B', bgColor: '#FFFBEB' }; // amber-500, amber-50
     } else if (changeSeconds < 0) {
-        return { Icon: TrendingDown, color: '#FF6B6B', bgColor: 'rgba(255, 107, 107, 0.15)' };
+        return { Icon: TrendingDown, color: '#EF4444', bgColor: '#FEF2F2' }; // red-500, red-50
     }
-    return { Icon: Minus, color: '#64748B', bgColor: 'rgba(100, 116, 139, 0.15)' };
+    return { Icon: Minus, color: '#64748B', bgColor: '#F8FAFC' }; // slate-500, slate-50
 };
 
 /**
@@ -87,7 +87,7 @@ const TrendItem: React.FC<{
         <div
             className={`
                 flex items-start gap-3 py-3 px-4 rounded-xl transition-all duration-200
-                hover:bg-white/5 cursor-default
+                hover:bg-gray-50 cursor-default
                 ${isChild ? 'ml-4' : ''}
             `}
         >
@@ -102,7 +102,7 @@ const TrendItem: React.FC<{
             {/* 内容 */}
             <div className="flex-1 min-w-0">
                 {/* 名称 */}
-                <p className="text-white/80 text-sm font-medium truncate">
+                <p className="text-slate-600 text-sm font-medium truncate">
                     {name}
                 </p>
 
@@ -111,14 +111,14 @@ const TrendItem: React.FC<{
                     <span className="text-xl font-bold">
                         {formatDuration(currentDuration)}
                     </span>
-                    <span className="text-xs text-white/50 ml-1">
+                    <span className="text-xs text-slate-400 ml-1">
                         /{formatDailyAverage(currentDuration)}
                     </span>
                 </p>
 
                 {/* 变化百分比 */}
                 {changePercentage !== null && changePercentage !== undefined && (
-                    <p className="text-xs text-white/40 mt-0.5">
+                    <p className="text-xs text-slate-400 mt-0.5">
                         {changeSeconds >= 0 ? '+' : ''}{formatDuration(changeSeconds)}
                         {' '}
                         ({changePercentage > 0 ? '+' : ''}{changePercentage.toFixed(1)}%)
@@ -144,18 +144,18 @@ const CategoryColumn: React.FC<{
             {/* 主分类 Header */}
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors mb-2"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors mb-2"
             >
                 <div
                     className="w-3 h-3 rounded-full flex-shrink-0"
                     style={{ backgroundColor: mainColor }}
                 />
-                <span className="text-white font-semibold text-sm flex-1 text-left truncate">
+                <span className="text-slate-700 font-semibold text-sm flex-1 text-left truncate">
                     {category.categoryName}
                 </span>
                 <ChevronRight
                     size={16}
-                    className={`text-white/50 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                    className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                 />
             </button>
 
@@ -197,9 +197,9 @@ const GoalsColumn: React.FC<{
     return (
         <div className="flex flex-col min-w-[200px] max-w-[280px]">
             {/* Header */}
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 mb-2">
-                <BarChart3 size={16} className="text-white/70" />
-                <span className="text-white font-semibold text-sm">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-50 mb-2">
+                <BarChart3 size={16} className="text-slate-500" />
+                <span className="text-slate-700 font-semibold text-sm">
                     Goals 目标
                 </span>
             </div>
@@ -225,7 +225,7 @@ const GoalsColumn: React.FC<{
  * 分隔线
  */
 const Divider: React.FC = () => (
-    <div className="w-px bg-gradient-to-b from-transparent via-white/20 to-transparent mx-2 self-stretch" />
+    <div className="w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent mx-2 self-stretch" />
 );
 
 /**
@@ -239,26 +239,26 @@ const TrendComparisonCard: React.FC<TrendComparisonCardProps> = ({
     return (
         <div
             className={`
-                bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f0f23]
-                rounded-2xl shadow-xl border border-white/10
+                bg-white
+                rounded-2xl shadow-sm border border-gray-100
                 overflow-hidden
                 ${className}
             `}
         >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white/10 rounded-xl">
-                        <TrendingUp size={20} className="text-yellow-400" />
+                    <div className="p-2 bg-indigo-50 text-indigo-500 rounded-xl">
+                        <TrendingUp size={20} />
                     </div>
                     <div>
-                        <h3 className="text-white font-bold text-lg">{title}</h3>
-                        <p className="text-white/40 text-xs mt-0.5">
+                        <h3 className="text-slate-800 font-bold text-lg">{title}</h3>
+                        <p className="text-slate-400 text-xs mt-0.5">
                             {data.currentStart} ~ {data.currentEnd} vs {data.previousStart} ~ {data.previousEnd}
                         </p>
                     </div>
                 </div>
-                <ChevronRight size={22} className="text-white/50" />
+                <ChevronRight size={22} className="text-slate-300" />
             </div>
 
             {/* Content - 横向滚动区域 */}

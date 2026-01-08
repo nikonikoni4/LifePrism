@@ -4,7 +4,7 @@
  * 报告统计相关接口
  */
 
-import { DailyReportData, WeeklyReportData, MonthlyReportData, ReportResponse, DateRangeType } from './types';
+import { DailyReportData, WeeklyReportData, MonthlyReportData, ReportResponse, DateRangeType, ComparisonData } from './types';
 import { ReportCacheService } from '../../services/reportCacheService';
 
 const API_BASE = 'http://localhost:8000/api/v2';
@@ -48,6 +48,35 @@ interface DailyReportAPIResponse {
         }>;
     }> | null;
     daily_trend_data: Array<Record<string, any>> | null;
+    comparison_data: {
+        current_start: string;
+        current_end: string;
+        previous_start: string;
+        previous_end: string;
+        category_comparison: Array<{
+            category_id: string;
+            category_name: string;
+            current_duration: number;
+            previous_duration: number;
+            change_seconds: number;
+            change_percentage?: number | null;
+            children?: Array<{
+                category_id: string;
+                category_name: string;
+                current_duration: number;
+                previous_duration: number;
+                change_seconds: number;
+                change_percentage?: number | null;
+            }>;
+        }>;
+        goal_comparison: Array<{
+            goal_id: string;
+            goal_name: string;
+            current_duration: number;
+            previous_duration: number;
+            change_seconds: number;
+        }>;
+    } | null;
     ai_summary: string | null;
     state: string;
     data_version: number;
@@ -143,6 +172,37 @@ function transformDailyReportResponse(response: DailyReportAPIResponse): DailyRe
         procrastinationRate: 0,
     };
 
+    // 转换环比对比数据
+    const comparisonData: ComparisonData | undefined = response.comparison_data ? {
+        currentStart: response.comparison_data.current_start,
+        currentEnd: response.comparison_data.current_end,
+        previousStart: response.comparison_data.previous_start,
+        previousEnd: response.comparison_data.previous_end,
+        categoryComparison: response.comparison_data.category_comparison.map(cat => ({
+            categoryId: cat.category_id,
+            categoryName: cat.category_name,
+            currentDuration: cat.current_duration,
+            previousDuration: cat.previous_duration,
+            changeSeconds: cat.change_seconds,
+            changePercentage: cat.change_percentage ?? null,
+            children: cat.children?.map(child => ({
+                categoryId: child.category_id,
+                categoryName: child.category_name,
+                currentDuration: child.current_duration,
+                previousDuration: child.previous_duration,
+                changeSeconds: child.change_seconds,
+                changePercentage: child.change_percentage ?? null,
+            })),
+        })),
+        goalComparison: response.comparison_data.goal_comparison.map(goal => ({
+            goalId: goal.goal_id,
+            goalName: goal.goal_name,
+            currentDuration: goal.current_duration,
+            previousDuration: goal.previous_duration,
+            changeSeconds: goal.change_seconds,
+        })),
+    } : undefined;
+
     return {
         date: response.date,
         timeDistribution,
@@ -155,6 +215,7 @@ function transformDailyReportResponse(response: DailyReportAPIResponse): DailyRe
             pending: todoStats.pending,
             procrastinationRate: todoStats.procrastination_rate,
         },
+        comparisonData,
         aiSummary: response.ai_summary || '',
     };
 }
@@ -199,6 +260,35 @@ interface WeeklyReportAPIResponse {
         }>;
     }> | null;
     daily_trend_data: Array<Record<string, any>> | null;
+    comparison_data: {
+        current_start: string;
+        current_end: string;
+        previous_start: string;
+        previous_end: string;
+        category_comparison: Array<{
+            category_id: string;
+            category_name: string;
+            current_duration: number;
+            previous_duration: number;
+            change_seconds: number;
+            change_percentage?: number | null;
+            children?: Array<{
+                category_id: string;
+                category_name: string;
+                current_duration: number;
+                previous_duration: number;
+                change_seconds: number;
+                change_percentage?: number | null;
+            }>;
+        }>;
+        goal_comparison: Array<{
+            goal_id: string;
+            goal_name: string;
+            current_duration: number;
+            previous_duration: number;
+            change_seconds: number;
+        }>;
+    } | null;
     ai_summary: string | null;
     state: string;
     data_version: number;
@@ -295,6 +385,37 @@ function transformWeeklyReportResponse(response: WeeklyReportAPIResponse): Weekl
         procrastination_rate: 0,
     };
 
+    // 转换环比对比数据
+    const comparisonData: ComparisonData | undefined = response.comparison_data ? {
+        currentStart: response.comparison_data.current_start,
+        currentEnd: response.comparison_data.current_end,
+        previousStart: response.comparison_data.previous_start,
+        previousEnd: response.comparison_data.previous_end,
+        categoryComparison: response.comparison_data.category_comparison.map(cat => ({
+            categoryId: cat.category_id,
+            categoryName: cat.category_name,
+            currentDuration: cat.current_duration,
+            previousDuration: cat.previous_duration,
+            changeSeconds: cat.change_seconds,
+            changePercentage: cat.change_percentage ?? null,
+            children: cat.children?.map(child => ({
+                categoryId: child.category_id,
+                categoryName: child.category_name,
+                currentDuration: child.current_duration,
+                previousDuration: child.previous_duration,
+                changeSeconds: child.change_seconds,
+                changePercentage: child.change_percentage ?? null,
+            })),
+        })),
+        goalComparison: response.comparison_data.goal_comparison.map(goal => ({
+            goalId: goal.goal_id,
+            goalName: goal.goal_name,
+            currentDuration: goal.current_duration,
+            previousDuration: goal.previous_duration,
+            changeSeconds: goal.change_seconds,
+        })),
+    } : undefined;
+
     return {
         startDate: response.week_start_date,
         endDate: response.week_end_date,
@@ -308,6 +429,7 @@ function transformWeeklyReportResponse(response: WeeklyReportAPIResponse): Weekl
             pending: todoStats.pending,
             procrastinationRate: todoStats.procrastination_rate,
         },
+        comparisonData,
         aiSummary: response.ai_summary || '',
     };
 }
@@ -357,6 +479,35 @@ interface MonthlyReportAPIResponse {
         total_minutes: number;
         category_breakdown?: Record<string, number>;
     }> | null;
+    comparison_data: {
+        current_start: string;
+        current_end: string;
+        previous_start: string;
+        previous_end: string;
+        category_comparison: Array<{
+            category_id: string;
+            category_name: string;
+            current_duration: number;
+            previous_duration: number;
+            change_seconds: number;
+            change_percentage?: number | null;
+            children?: Array<{
+                category_id: string;
+                category_name: string;
+                current_duration: number;
+                previous_duration: number;
+                change_seconds: number;
+                change_percentage?: number | null;
+            }>;
+        }>;
+        goal_comparison: Array<{
+            goal_id: string;
+            goal_name: string;
+            current_duration: number;
+            previous_duration: number;
+            change_seconds: number;
+        }>;
+    } | null;
     ai_summary: string | null;
     state: string;
     data_version: number;
@@ -463,6 +614,37 @@ function transformMonthlyReportResponse(response: MonthlyReportAPIResponse): Mon
     // 从 month_start_date 提取 YYYY-MM 格式的月份
     const month = response.month_start_date.substring(0, 7);
 
+    // 转换环比对比数据
+    const comparisonData: ComparisonData | undefined = response.comparison_data ? {
+        currentStart: response.comparison_data.current_start,
+        currentEnd: response.comparison_data.current_end,
+        previousStart: response.comparison_data.previous_start,
+        previousEnd: response.comparison_data.previous_end,
+        categoryComparison: response.comparison_data.category_comparison.map(cat => ({
+            categoryId: cat.category_id,
+            categoryName: cat.category_name,
+            currentDuration: cat.current_duration,
+            previousDuration: cat.previous_duration,
+            changeSeconds: cat.change_seconds,
+            changePercentage: cat.change_percentage ?? null,
+            children: cat.children?.map(child => ({
+                categoryId: child.category_id,
+                categoryName: child.category_name,
+                currentDuration: child.current_duration,
+                previousDuration: child.previous_duration,
+                changeSeconds: child.change_seconds,
+                changePercentage: child.change_percentage ?? null,
+            })),
+        })),
+        goalComparison: response.comparison_data.goal_comparison.map(goal => ({
+            goalId: goal.goal_id,
+            goalName: goal.goal_name,
+            currentDuration: goal.current_duration,
+            previousDuration: goal.previous_duration,
+            changeSeconds: goal.change_seconds,
+        })),
+    } : undefined;
+
     return {
         month,
         monthlyTrend,
@@ -477,6 +659,7 @@ function transformMonthlyReportResponse(response: MonthlyReportAPIResponse): Mon
             procrastinationRate: todoStats.procrastination_rate,
         },
         carryOverItems: [], // 后端暂无此数据
+        comparisonData,
         aiSummary: response.ai_summary || '',
     };
 }

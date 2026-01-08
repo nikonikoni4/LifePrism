@@ -111,17 +111,19 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '', onNav
     // 使用 mock 数据作为后备
     const displayData = reportData || getMockWeeklyReport(startDate, endDate);
 
-    // 计算对比日期 (上周)
-    const prevStartDate = new Date(startDate);
-    prevStartDate.setDate(prevStartDate.getDate() - 7);
-    const prevStartStr = prevStartDate.toISOString().split('T')[0];
+    // 使用后端返回的 comparisonData，如果没有则 fallback 到 mock 数据
+    const comparisonData = displayData.comparisonData || (() => {
+        // 计算对比日期 (上周)
+        const prevStartDate = new Date(startDate);
+        prevStartDate.setDate(prevStartDate.getDate() - 7);
+        const prevStartStr = prevStartDate.toISOString().split('T')[0];
 
-    const prevEndDate = new Date(endDate);
-    prevEndDate.setDate(prevEndDate.getDate() - 7);
-    const prevEndStr = prevEndDate.toISOString().split('T')[0];
+        const prevEndDate = new Date(endDate);
+        prevEndDate.setDate(prevEndDate.getDate() - 7);
+        const prevEndStr = prevEndDate.toISOString().split('T')[0];
 
-    // 生成对比 mock 数据
-    const comparisonData = getMockComparisonData(startDate, endDate, prevStartStr, prevEndStr);
+        return getMockComparisonData(startDate, endDate, prevStartStr, prevEndStr);
+    })();
 
     return (
         <div className={`space-y-6 ${className}`}>

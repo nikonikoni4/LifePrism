@@ -133,19 +133,22 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '', onN
             ...(day.categoryBreakdown || {})
         }));
 
-    // 计算对比日期 (上月)
-    const currentStart = `${selectedMonth}-01`;
-    const currentEnd = getMonthEndDate(selectedMonth);
+    // 使用后端返回的 comparisonData，如果没有则 fallback 到 mock 数据
+    const comparisonData = displayData.comparisonData || (() => {
+        // 计算对比日期 (上月)
+        const currentStart = `${selectedMonth}-01`;
+        const currentEnd = getMonthEndDate(selectedMonth);
 
-    const [currYear, currMonth] = selectedMonth.split('-').map(Number);
-    const prevDate = new Date(currYear, currMonth - 2, 1);
-    const prevYear = prevDate.getFullYear();
-    const prevMonthVal = prevDate.getMonth() + 1;
-    const prevMonthStr = `${prevYear}-${String(prevMonthVal).padStart(2, '0')}`;
-    const prevStart = `${prevMonthStr}-01`;
-    const prevEnd = getMonthEndDate(prevMonthStr);
+        const [currYear, currMonth] = selectedMonth.split('-').map(Number);
+        const prevDate = new Date(currYear, currMonth - 2, 1);
+        const prevYear = prevDate.getFullYear();
+        const prevMonthVal = prevDate.getMonth() + 1;
+        const prevMonthStr = `${prevYear}-${String(prevMonthVal).padStart(2, '0')}`;
+        const prevStart = `${prevMonthStr}-01`;
+        const prevEnd = getMonthEndDate(prevMonthStr);
 
-    const comparisonData = getMockComparisonData(currentStart, currentEnd, prevStart, prevEnd);
+        return getMockComparisonData(currentStart, currentEnd, prevStart, prevEnd);
+    })();
 
     return (
         <div className={`space-y-6 ${className}`}>

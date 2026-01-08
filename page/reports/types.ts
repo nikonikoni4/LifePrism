@@ -90,6 +90,8 @@ export interface DailyReportData {
     goalProgress: GoalProgressData[];
     /** Todo 统计 */
     todoStats: TodoStatsData;
+    /** 环比对比数据 */
+    comparisonData?: ComparisonData;
     /** AI 总结 */
     aiSummary: string;
 }
@@ -111,6 +113,8 @@ export interface WeeklyReportData {
     goalProgress: GoalProgressData[];
     /** Todo 统计数据 */
     todoStats: TodoStatsData;
+    /** 环比对比数据 */
+    comparisonData?: ComparisonData;
     /** AI 规律总结 */
     aiSummary: string;
 }
@@ -139,6 +143,8 @@ export interface MonthlyReportData {
         content: string;
         goalName?: string;
     }>;
+    /** 环比对比数据 */
+    comparisonData?: ComparisonData;
     /** AI 全局总结 */
     aiSummary: string;
 }
