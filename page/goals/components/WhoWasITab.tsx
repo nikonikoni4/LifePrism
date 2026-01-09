@@ -14,7 +14,8 @@ import {
   Sparkles,
   FileQuestion,
   RotateCcw,
-  Quote
+  Quote,
+  Eye
 } from 'lucide-react';
 import { beingApi } from '../api';
 import {
@@ -195,6 +196,10 @@ const THEMES: Record<string, ThemeType> = {
     }
   }
 };
+
+
+
+
 
 // --- Theme Context Hook ---
 const useTheme = () => {
@@ -495,6 +500,139 @@ const ReframingBlock: React.FC<ReframingBlockProps> = ({
   );
 };
 
+// --- Review Block Component ---
+interface ReviewBlockProps {
+  items: WhoWasIItem[];
+  theme: ThemeType;
+  onJudge: (id: number, judge: '+' | '0' | '-') => void;
+}
+
+const ReviewBlock: React.FC<ReviewBlockProps> = ({ items, theme, onJudge }) => {
+  const colors = theme.colors;
+  const sectionColors = theme.colors.sections[2];
+
+  // Calculate statistics
+  const stats = items.reduce(
+    (acc, item) => {
+      const latestJudge = item.judgeItems && item.judgeItems.length > 0
+        ? item.judgeItems[item.judgeItems.length - 1].judge
+        : null;
+      if (latestJudge === '+') acc.positive++;
+      else if (latestJudge === '-') acc.negative++;
+      else if (latestJudge === '0') acc.neutral++;
+      return acc;
+    },
+    { positive: 0, negative: 0, neutral: 0 }
+  );
+
+  const score = stats.positive - stats.negative;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-300"
+          style={{ backgroundColor: sectionColors.iconBg, color: sectionColors.iconColor }}
+        >
+          <Eye size={20} strokeWidth={1.5} />
+        </div>
+        <div>
+          <h3 className="text-base font-semibold transition-colors duration-300" style={{ color: colors.textMain }}>审视过去</h3>
+          <p className="text-sm transition-colors duration-300" style={{ color: colors.textSub }}>对过去的态度进行评价</p>
+        </div>
+      </div>
+
+      {/* Statistics Card */}
+      <div
+        className="p-6 rounded-2xl transition-all duration-300"
+        style={{ backgroundColor: colors.inputBg, border: `1px solid ${colors.border}` }}
+      >
+        <h4 className="text-sm font-semibold mb-4 transition-colors duration-300" style={{ color: colors.textSub }}>评价统计</h4>
+        <div className="grid grid-cols-4 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold transition-colors duration-300" style={{ color: colors.success }}>+{stats.positive}</div>
+            <div className="text-xs mt-1 transition-colors duration-300" style={{ color: colors.textMuted }}>积极</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold transition-colors duration-300" style={{ color: colors.textMuted }}>0 {stats.neutral}</div>
+            <div className="text-xs mt-1 transition-colors duration-300" style={{ color: colors.textMuted }}>中性</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold transition-colors duration-300" style={{ color: colors.danger }}>-{stats.negative}</div>
+            <div className="text-xs mt-1 transition-colors duration-300" style={{ color: colors.textMuted }}>消极</div>
+          </div>
+          <div className="text-center">
+            <div
+              className="text-2xl font-bold transition-colors duration-300"
+              style={{ color: score >= 0 ? colors.success : colors.danger }}
+            >
+              {score >= 0 ? '+' : ''}{score}
+            </div>
+            <div className="text-xs mt-1 transition-colors duration-300" style={{ color: colors.textMuted }}>总分</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Items List */}
+      <div className="space-y-3">
+        {items.map((item, index) => {
+          const latestJudge = item.judgeItems && item.judgeItems.length > 0
+            ? item.judgeItems[item.judgeItems.length - 1].judge
+            : null;
+
+          return (
+            <div key={item.id} className="group transition-all duration-300">
+              <div className="flex items-center gap-3">
+                <span
+                  className="text-sm font-medium w-5 text-center shrink-0 transition-colors duration-300"
+                  style={{ color: colors.textMuted }}
+                >
+                  {index + 1}
+                </span>
+                <div
+                  className="flex-1 rounded-xl py-3.5 px-4 transition-all duration-200"
+                  style={{
+                    backgroundColor: colors.inputBg,
+                    color: colors.textMain,
+                    border: `1px solid ${colors.border}`
+                  }}
+                >
+                  <span className="text-sm font-medium transition-colors duration-300" style={{ color: colors.textMuted }}>我曾经...</span>
+                  <span className="ml-2">{item.content || '(未填写)'}</span>
+                </div>
+                <select
+                  value={latestJudge || ''}
+                  onChange={(e) => onJudge(item.id, e.target.value as '+' | '0' | '-')}
+                  className="px-4 py-2 rounded-xl text-sm font-medium outline-none transition-all duration-200"
+                  style={{
+                    backgroundColor: colors.cardBg,
+                    color: colors.textMain,
+                    border: `1px solid ${colors.border}`
+                  }}
+                >
+                  <option value="">未评价</option>
+                  <option value="+">+ 积极</option>
+                  <option value="0">0 中性</option>
+                  <option value="-">- 消极</option>
+                </select>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Note */}
+      <div
+        className="p-4 rounded-xl text-sm leading-relaxed transition-all duration-300"
+        style={{ backgroundColor: colors.sections[0].iconBg, color: colors.textSub }}
+      >
+        <strong>提示：</strong>请根据每个答案是否体现积极态度进行评价。建议在完成测试两周后再进行评价，以观察态度变化。
+      </div>
+    </div>
+  );
+};
+
 // --- Main Component ---
 const WhoWasITab: React.FC = () => {
   const [data, setData] = useState<WhoWasIData>(INITIAL_DATA);
@@ -505,6 +643,9 @@ const WhoWasITab: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
+
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'who' | 'reframe' | 'review'>('who');
 
   const { theme, currentThemeId, setTheme } = useTheme();
   const colors = theme.colors;
@@ -670,6 +811,33 @@ const WhoWasITab: React.FC = () => {
     setData(prev => ({
       ...prev,
       positivePastReframingItems: prev.positivePastReframingItems.filter(item => item.id !== id)
+    }));
+  };
+
+  // Tab Switching Handler
+  const handleTabChange = (tab: 'who' | 'reframe' | 'review') => {
+    setActiveTab(tab);
+  };
+
+  // Judge Handler
+  const handleJudge = (id: number, judge: '+' | '0' | '-') => {
+    setData(prev => ({
+      ...prev,
+      whoWasIItems: prev.whoWasIItems.map(item =>
+        item.id === id
+          ? {
+            ...item,
+            judgeItems: [
+              ...(item.judgeItems || []),
+              {
+                judge,
+                reason: '',
+                time: new Date().toISOString()
+              }
+            ]
+          }
+          : item
+      )
     }));
   };
 
@@ -839,15 +1007,15 @@ const WhoWasITab: React.FC = () => {
           回溯过往
         </h2>
         <p className="text-lg leading-relaxed transition-colors duration-300" style={{ color: colors.textSub }}>
-          放下过去，努力向前，并不意味着遗忘，而是与过去和解。
+          改变你对过去的态度
         </p>
       </div>
 
-      {/* 4:6 Layout Container */}
-      <div className="max-w-7xl mx-auto mb-12">
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* Left: Psychological Hint Block (40%) */}
-          <div className="w-full lg:w-[40%] lg:sticky lg:top-8">
+      {/* Single Column Layout Container */}
+      <div className="max-w-2xl mx-auto mb-12">
+        <div className="flex flex-col gap-8">
+          {/* Top: Psychological Hint Block */}
+          <div className="w-full">
             <div
               className="p-8 rounded-3xl relative overflow-hidden transition-all duration-300"
               style={{
@@ -864,67 +1032,154 @@ const WhoWasITab: React.FC = () => {
                   <Sparkles size={20} />
                   心理提示
                 </h3>
-                <p className="text-base leading-relaxed text-justify transition-colors duration-300" style={{ color: colors.textMain }}>
-                  <span className="font-semibold block mb-3 text-lg">
-                    你不能改变你的过去，但你可以改变你对过去的态度。
-                  </span>
-                  在开始主动重构你的过去之前，请先完成这份 "我曾经是谁" 的测试。这份测试包括了同一个问题：我曾经是谁？但这个问题会被连续问 20 次。即使你不能回答所有的提问，也不用担心，但请务必花时间尝试这一练习。请列出 20 项最重要的可以描述你之前行事方式的答案。除了你自己之外，其他人不会看到你的答案，所以你也没有必要把自己描述得比真实情况更差或者更好。但请记得把答案留下来，因为在几周之后你需要重新回顾答案。
-                </p>
+                {activeTab === 'who' ? (
+                  <p className="text-base leading-relaxed text-justify transition-colors duration-300" style={{ color: colors.textMain }}>
+                    <span className="font-semibold block mb-3 text-lg">
+                      你不能改变你的过去，但你可以改变你对过去的态度。
+                    </span>
+                    在开始主动重构你的过去之前，请先完成这份 "我曾经是谁" 的测试。这份测试包括了同一个问题：我曾经是谁？但这个问题会被连续问 20 次。即使你不能回答所有的提问，也不用担心，但请务必花时间尝试这一练习。请列出 20 项最重要的可以描述你之前行事方式的答案。除了你自己之外，其他人不会看到你的答案，所以你也没有必要把自己描述得比真实情况更差或者更好。但请记得把答案留下来，因为在几周之后你需要重新回顾答案。
+                  </p>
+                ) : activeTab === 'reframe' ? (
+                  <p className="text-base leading-relaxed text-justify transition-colors duration-300" style={{ color: colors.textMain }}>
+                    在你完成 "我曾经是谁" 测试之后，请接着完成下一页的积极重构过去清单。你可以选择任何你想要的三件事，但你应该选择那些依然能让你联想起消极情绪，比如内疚、羞耻、被侮辱、伤心或者恐惧的事件。请记住，这些事情都已经过去了。它们并不能决定你的今天。而你有能力改变你的态度。请相信，重新解构你的过去，并不是对回忆中可能出现的其他人的不尊重。相反，这才是真正的尊重。重新建构你的过去，只不过是让你可以控制过去，而不是让过去控制你。
+                  </p>
+                ) : (
+                  <p className="text-base leading-relaxed text-justify transition-colors duration-300" style={{ color: colors.textMain }}>
+                    在你完成两周之后，请再把之前的答案拿出来。在两张 20 题的答案上，如果答案体现了对待过去的积极态度，请你在旁边写上 "+"，如果体现的态度是中性的，请写上 "0"，如果体现的是对待过去的消极态度，请标上 "-"。请分别数出两张列表上 "+" 号和 "-" 号的数目。在每一次答案的计算中，用 "+" 的出现次数减去 "-" 的出现次数。在两周之内，你的分数应该出现上升，变得更加积极。如果没有，也不用绝望。你的过去不是一夜之间发生的，所以改变通常也需要时间。当你结束一天的时候，请确信改变会发生，而且当你改变之后，你将会把自己的心态往积极的方向调整，进入更快乐的时间段。请记住，我们正在改变你生活中的大河的流向，而每一次微小的尝试如果假以时日都能带来显著的变化。而且无论你的得分如何，每天完成一份感恩清单都可能让你的心情变得更好，改善你的健康。
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Right: Unified Card (60%) */}
-          <div className="w-full lg:w-[60%]">
+          {/* Tab Switcher */}
+          <div className="flex justify-center">
             <div
-              className="rounded-[2rem] p-8 md:p-10 relative overflow-hidden transition-all duration-300"
-              style={{
-                backgroundColor: colors.cardBg,
-                boxShadow: `0 4px 30px -8px ${colors.inputRing}`,
-                border: `1px solid ${colors.border}`
-              }}
+              className="p-1 rounded-2xl flex items-center relative"
+              style={{ backgroundColor: colors.inputBg }}
             >
-              {/* Subtle glow overlay */}
-              <div
-                className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-20 transition-colors duration-300"
-                style={{ backgroundColor: colors.glowColor }}
-              />
-
-              <div className="relative z-10 space-y-10">
-
-                {/* 1. Who Was I */}
-                <QuestionBlock
-                  title="我曾经是谁？"
-                  subtitle="回忆过去的角色、状态"
-                  icon={<FileQuestion size={20} strokeWidth={1.5} />}
-                  sectionIndex={1}
-                  items={data.whoWasIItems.map(item => ({ id: item.id, value: item.content }))}
-                  placeholder="胆小、被成绩定义、害怕冲突..."
-                  inputPrefix="我曾经..."
-                  theme={theme}
-                  onChange={handleWhoWasIChange}
-                  onAdd={handleAddStatement}
-                  onDelete={handleDeleteStatement}
-                />
-
-                {/* Divider */}
-                <div style={{ height: '1px', backgroundColor: colors.border }} className="transition-colors duration-300" />
-
-                {/* 2. Positive Reframing */}
-                <ReframingBlock
-                  title="积极重构过去"
-                  subtitle="寻找困难经历背后的礼物"
-                  icon={<RotateCcw size={20} strokeWidth={1.5} />}
-                  sectionIndex={0}
-                  items={data.positivePastReframingItems}
-                  theme={theme}
-                  onChange={handleReframeChange}
-                  onAdd={handleAddReframe}
-                  onDelete={handleDeleteReframe}
-                />
-
-              </div>
+              <button
+                onClick={() => handleTabChange('who')}
+                className={`relative z-10 px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2 ${activeTab === 'who' ? 'shadow-sm' : ''}`}
+                style={{
+                  color: activeTab === 'who' ? colors.textMain : colors.textMuted,
+                  backgroundColor: activeTab === 'who' ? colors.cardBg : 'transparent'
+                }}
+              >
+                <FileQuestion size={16} />
+                我曾经是谁
+              </button>
+              <button
+                onClick={() => handleTabChange('reframe')}
+                className={`relative z-10 px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2 ${activeTab === 'reframe' ? 'shadow-sm' : ''}`}
+                style={{
+                  color: activeTab === 'reframe' ? colors.textMain : colors.textMuted,
+                  backgroundColor: activeTab === 'reframe' ? colors.cardBg : 'transparent'
+                }}
+              >
+                <RotateCcw size={16} />
+                积极重构
+              </button>
+              <button
+                onClick={() => handleTabChange('review')}
+                className={`relative z-10 px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2 ${activeTab === 'review' ? 'shadow-sm' : ''}`}
+                style={{
+                  color: activeTab === 'review' ? colors.textMain : colors.textMuted,
+                  backgroundColor: activeTab === 'review' ? colors.cardBg : 'transparent'
+                }}
+              >
+                <Eye size={16} />
+                审视过去
+              </button>
             </div>
+          </div>
+
+          {/* Bottom: Tab Content */}
+          <div className="w-full relative">
+            {activeTab === 'who' ? (
+              <div
+                className="rounded-[2rem] p-8 md:p-10 relative overflow-hidden transition-all duration-300"
+                style={{
+                  backgroundColor: colors.cardBg,
+                  boxShadow: `0 4px 30px -8px ${colors.inputRing}`,
+                  border: `1px solid ${colors.border}`
+                }}
+              >
+                {/* Subtle glow overlay */}
+                <div
+                  className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-20 transition-colors duration-300"
+                  style={{ backgroundColor: colors.glowColor }}
+                />
+
+                <div className="relative z-10">
+                  <QuestionBlock
+                    title="我曾经是谁？"
+                    subtitle="回忆过去的角色、状态"
+                    icon={<FileQuestion size={20} strokeWidth={1.5} />}
+                    sectionIndex={1}
+                    items={data.whoWasIItems.map(item => ({ id: item.id, value: item.content }))}
+                    placeholder="胆小、被成绩定义、害怕冲突..."
+                    inputPrefix="我曾经..."
+                    theme={theme}
+                    onChange={handleWhoWasIChange}
+                    onAdd={handleAddStatement}
+                    onDelete={handleDeleteStatement}
+                  />
+                </div>
+              </div>
+            ) : activeTab === 'reframe' ? (
+              <div
+                className="rounded-[2rem] p-8 md:p-10 relative overflow-hidden transition-all duration-300"
+                style={{
+                  backgroundColor: colors.cardBg,
+                  boxShadow: `0 4px 30px -8px ${colors.inputRing}`,
+                  border: `1px solid ${colors.border}`
+                }}
+              >
+                {/* Subtle glow overlay */}
+                <div
+                  className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-20 transition-colors duration-300"
+                  style={{ backgroundColor: colors.glowColor }}
+                />
+
+                <div className="relative z-10">
+                  <ReframingBlock
+                    title="积极重构过去"
+                    subtitle="寻找困难经历背后的礼物"
+                    icon={<RotateCcw size={20} strokeWidth={1.5} />}
+                    sectionIndex={0}
+                    items={data.positivePastReframingItems}
+                    theme={theme}
+                    onChange={handleReframeChange}
+                    onAdd={handleAddReframe}
+                    onDelete={handleDeleteReframe}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div
+                className="rounded-[2rem] p-8 md:p-10 relative overflow-hidden transition-all duration-300"
+                style={{
+                  backgroundColor: colors.cardBg,
+                  boxShadow: `0 4px 30px -8px ${colors.inputRing}`,
+                  border: `1px solid ${colors.border}`
+                }}
+              >
+                {/* Subtle glow overlay */}
+                <div
+                  className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-20 transition-colors duration-300"
+                  style={{ backgroundColor: colors.glowColor }}
+                />
+
+                <div className="relative z-10">
+                  <ReviewBlock
+                    items={data.whoWasIItems}
+                    theme={theme}
+                    onJudge={handleJudge}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
