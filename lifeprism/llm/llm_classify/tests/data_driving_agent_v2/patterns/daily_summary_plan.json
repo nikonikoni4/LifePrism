@@ -51,12 +51,56 @@
                 },
                 "data_out": true,
                 "data_out_description": "仔细的分时段总结: "
+            },
+            {
+                "node_type": "tool-first",
+                "node_name": "作息分析",
+                "task_prompt": "你需要依据电脑使用时间表来判断是否需要调用工具query_behavior_timeline来具体了解用户最后1h的使用情况。 \n ## 当满足一下情况时需要调用工具：\n 1. 最晚使用时间超过23:59:59\n 2. 并且最后使用的1h内这段时间用户没有任\n 3. 若不满足1，2则返回'' ## 调用时间说明\n 调用时间窗口为最后使用的1h",
+                "thread_id": "q3",
+                "initial_tool_name": "get_daily_breakdown",
+                "initial_tool_args": {
+                    "start_date": "{date}",
+                    "end_date": "{date}"
+                },
+                "tools": [
+                    "query_behavior_timeline"
+                ]
+            },
+            {
+                "node_type": "llm-first",
+                "node_name": "分析作息时间",
+                "task_prompt": "依据上述电脑使用时间表和timeline数据（如果有的话），推测作者的作息时间，若出现晚睡情况（超过23:59）需要结合timeline数据说明用户最后1h做了什么。",
+                "thread_id": "q3",
+                "data_out_thread": "q1",
+                "data_out": true,
+                "data_out_description": "作息分析: "
+            },
+            {
+                "node_type": "tool-first",
+                "node_name": "总的分析",
+                "task_prompt": "结合用户行为统计数据，用户行为时间线分析，用户作息时间分析，今日重点与任务，目标时间投入，与前一天的对比数据等数据进行总和分析。按照每日总结格式生成 {date} 的行为摘要。需包含：1) 分时段行为推断（结合应用记录，其他具体的时间线分析与用户备注）2） 作息规律分析 3) 目标任务完成情况评估 4) 综合总结 。注意使用 '可能' '推测' 等限定词，明确标注数据局限性。",
+                "thread_id": "q1",
+                "data_out_thread": "q1",
+                "initial_tool_name": "get_daily_stats",
+                "initial_tool_args": {
+                    "start_time": "{date} 00:00:00",
+                    "end_time": "{date} 23:59:59",
+                    "split_count": 6,
+                    "options": [
+                        "goal_time_spent",
+                        "tasks",
+                        "comparison"
+                    ]
+                },
+                "data_out": true,
+                "data_out_description": "行为摘要: "
             }
         ],
         "tools_limit": {
-            "query_behavior_timeline": 5,
+            "query_behavior_timeline": 10,
             "query_behavior_logs": 5,
-            "query_daily_todos": 5
+            "query_daily_todos": 2,
+            "get_daily_stats": 2
         }
     }
 }

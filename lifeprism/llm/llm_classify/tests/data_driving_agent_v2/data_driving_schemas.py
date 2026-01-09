@@ -45,7 +45,6 @@ class Context(TypedDict):
     """
     messages: dict[str, list[AIMessage | HumanMessage | ToolMessage]]  # thread_id : messages
     data_out: dict[str, Any]  # thread_id : 输出内容 {role: 'assistant', content: ...}
-    thread_meta: dict[str, ThreadMeta]  # thread_id : 元信息
 
 
 # ============================================================================

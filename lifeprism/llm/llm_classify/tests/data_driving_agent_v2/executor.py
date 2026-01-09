@@ -13,7 +13,8 @@ from lifeprism.llm.llm_classify.tools.database_tools import (
     query_goals,
     query_psychological_assessment,
     query_daily_todos,
-    query_behavior_timeline
+    query_behavior_timeline,
+    get_daily_breakdown
 )
 from typing import Callable
 from lifeprism.utils import get_logger,DEBUG
@@ -57,9 +58,6 @@ class Executor:
                 main_thread_id: [HumanMessage(content=user_message)]
             },
             "data_out": {},
-            "thread_meta": {
-                main_thread_id: {"parent_thread": None}
-            }
         }
         
         # 工具映射
@@ -70,7 +68,8 @@ class Executor:
             "query_goals": query_goals,
             "query_psychological_assessment": query_psychological_assessment,
             "query_daily_todos": query_daily_todos,
-            "query_behavior_timeline": query_behavior_timeline
+            "query_behavior_timeline": query_behavior_timeline,
+            "get_daily_breakdown": get_daily_breakdown
         }
         
         # 工具使用限制
@@ -112,25 +111,22 @@ class Executor:
             raise ValueError(f"线程 {thread_id} 不存在")
         self.context["messages"][thread_id].append(message)
 
-    def _create_thread(self, thread_id: str, data_out_thread: str | None = None, node: NodeDefinition | None = None) -> None:
+    def _create_thread(self, thread_id: str, node: NodeDefinition | None = None) -> None:
         """
         创建新线程，并根据 node 的 data_in 配置注入初始消息
         
         Args:
             thread_id: 新线程ID
-            data_out_thread: 父线程ID
             node: 节点定义，用于获取 data_in 配置
         """
         if thread_id in self.context["messages"]:
             return  # 线程已存在，直接返回
         
         self.context["messages"][thread_id] = []
-        self.context["thread_meta"][thread_id] = {"parent_thread": data_out_thread}
-        
         # 处理 data_in：注入初始消息到新线程
         if node is not None:
-            # 确定数据来源线程：优先使用 data_in_thread，否则使用 data_out_thread
-            source_thread = node.data_in_thread or data_out_thread
+            # 确定数据来源线程：优先使用 data_in_thread，否则默认为 main
+            source_thread = node.data_in_thread or self.main_thread_id
             
             if source_thread and source_thread in self.context["messages"]:
                 source_msgs = self.context["messages"][source_thread]
@@ -157,15 +153,21 @@ class Executor:
             "content": f"{description}{content}" if description else content
         }
 
-    def _merge_data_out_to_parent(self, child_thread_id: str) -> None:
-        """将子线程的 data_out 合并到父线程的 messages"""
+    def _merge_data_out(self, child_thread_id: str, target_thread_id: str) -> None:
+        """
+        将子线程的 data_out 合并到目标线程的 messages
+        
+        Args:
+            child_thread_id: 子线程ID（数据来源）
+            target_thread_id: 目标线程ID（由节点的 data_out_thread 决定）
+        """
         if child_thread_id not in self.context["data_out"]:
             return
         
-        parent_id = self.context["thread_meta"].get(child_thread_id, {}).get("parent_thread")
-        if parent_id and parent_id in self.context["messages"]:
+        if target_thread_id and target_thread_id in self.context["messages"]:
             data = self.context["data_out"][child_thread_id]
-            self._add_message_to_thread(parent_id, AIMessage(content=data["content"]))
+            self._add_message_to_thread(target_thread_id, AIMessage(content=data["content"]))
+            logger.debug(f"    → data_out: 从 '{child_thread_id}' 合并到 '{target_thread_id}'")
 
     # =========================================================================
     # 工具管理方法
@@ -261,12 +263,9 @@ class Executor:
 
     def _get_prompt(self, node: NodeDefinition) -> str:
         """构建节点的 prompt"""
-        tools_limit_prompt = self._tools_limit_prompt(node.tools)
         return f"""
 # 历史消息
 {self.get_history(node.thread_id)}
-# 工具可调用次数限制，请合理安排工具调用:
-{tools_limit_prompt}
 # 你需要按照下面要求完成任务：
 {node.task_prompt}
 """
@@ -512,11 +511,9 @@ class Executor:
 
         content = None
         for node in self.plan.nodes:
-            # 确保线程存在，使用节点定义的 data_out_thread
+            # 确保线程存在
             if node.thread_id not in self.context["messages"]:
-                # 优先使用节点定义的 data_out_thread，否则默认为 main_thread_id
-                parent_id = node.data_out_thread if node.data_out_thread else self.main_thread_id
-                self._create_thread(node.thread_id, parent_id, node)
+                self._create_thread(node.thread_id, node)
             
             # 使用处理器分发
             handler = self._node_handlers.get(node.node_type)
@@ -525,9 +522,11 @@ class Executor:
             
             content = handler(node)
             print(content)
-            # 如果节点设置了 data_out，合并到父线程
+            # 如果节点设置了 data_out，根据 data_out_thread 合并到目标线程
             if node.data_out:
-                self._merge_data_out_to_parent(node.thread_id)
+                # 目标线程由 data_out_thread 决定，若没有则默认为 main
+                target_thread = node.data_out_thread if node.data_out_thread else self.main_thread_id
+                self._merge_data_out(node.thread_id, target_thread)
         
         logger.info(f"\n计划执行完成！")
         logger.info(f"📊 Tokens 使用统计: 输入={self.tokens_usage['input_tokens']}, "
