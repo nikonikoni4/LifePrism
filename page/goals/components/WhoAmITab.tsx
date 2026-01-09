@@ -311,12 +311,12 @@ const QuestionBlock: React.FC<QuestionBlockProps> = ({
                   }}
                   onMouseEnter={(e) => {
                     if (document.activeElement !== e.target) {
-                      e.target.style.backgroundColor = colors.inputHoverBg;
+                      (e.target as HTMLInputElement).style.backgroundColor = colors.inputHoverBg;
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (document.activeElement !== e.target) {
-                      e.target.style.backgroundColor = colors.inputBg;
+                      (e.target as HTMLInputElement).style.backgroundColor = colors.inputBg;
                     }
                   }}
                   placeholder={placeholder}
@@ -457,6 +457,26 @@ const WhoAmITab: React.FC = () => {
     }
   };
 
+  // Delete version
+  const handleDeleteVersion = async (verToDelete: number) => {
+    if (!window.confirm(`确定要删除版本 ${verToDelete} 吗？此操作无法撤销。`)) return;
+
+    try {
+      await beingApi.deleteTest('present', verToDelete);
+
+      // If deleted current version, reload everything (which fetches latest)
+      if (version === verToDelete) {
+        await loadLatestData();
+      } else {
+        // Just refresh list
+        const versionList = await beingApi.getVersions('present');
+        setVersions(versionList.versions);
+      }
+    } catch (error) {
+      console.error('[WhoAmITab] Delete version failed:', error);
+    }
+  };
+
   // --- Handlers ---
   const handleWhoAmIChange = (id: number, val: string) => {
     setData(prev => ({
@@ -551,18 +571,32 @@ const WhoAmITab: React.FC = () => {
                 <div className="max-h-[240px] overflow-y-auto no-scrollbar">
                   {versions.length > 0 ? (
                     versions.map(v => (
-                      <button
+                      <div
                         key={v.id}
-                        onClick={() => loadVersion(v.version)}
-                        className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between hover:bg-opacity-50"
+                        className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between group hover:bg-opacity-50"
                         style={{
                           backgroundColor: v.version === version ? colors.actionBtnBg : 'transparent',
                           color: colors.textSub
                         }}
                       >
-                        <span>版本 {v.version}</span>
-                        {v.version === version && <Check size={14} style={{ color: colors.textMain }} />}
-                      </button>
+                        <button
+                          onClick={() => loadVersion(v.version)}
+                          className="flex-1 text-left flex items-center justify-between"
+                        >
+                          <span>版本 {v.version}</span>
+                          {v.version === version && <Check size={14} style={{ color: colors.textMain }} />}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteVersion(v.version);
+                          }}
+                          className="ml-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-all"
+                          title="删除此版本"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     ))
                   ) : (
                     <div className="px-4 py-3 text-sm" style={{ color: colors.textMuted }}>暂无历史版本</div>

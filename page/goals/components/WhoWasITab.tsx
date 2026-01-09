@@ -13,7 +13,8 @@ import {
   Gift,
   Sparkles,
   FileQuestion,
-  RotateCcw
+  RotateCcw,
+  Quote
 } from 'lucide-react';
 import { beingApi } from '../api';
 import {
@@ -291,23 +292,23 @@ const QuestionBlock: React.FC<QuestionBlockProps> = ({
                     border: '1px solid transparent'
                   }}
                   onFocus={(e) => {
-                    e.target.style.backgroundColor = colors.inputFocusBg;
-                    e.target.style.border = `1px solid ${colors.border}`;
-                    e.target.style.boxShadow = `0 2px 12px -4px ${colors.inputRing}`;
+                    (e.target as HTMLInputElement).style.backgroundColor = colors.inputFocusBg;
+                    (e.target as HTMLInputElement).style.border = `1px solid ${colors.border}`;
+                    (e.target as HTMLInputElement).style.boxShadow = `0 2px 12px -4px ${colors.inputRing}`;
                   }}
                   onBlur={(e) => {
-                    e.target.style.backgroundColor = colors.inputBg;
-                    e.target.style.border = '1px solid transparent';
-                    e.target.style.boxShadow = 'none';
+                    (e.target as HTMLInputElement).style.backgroundColor = colors.inputBg;
+                    (e.target as HTMLInputElement).style.border = '1px solid transparent';
+                    (e.target as HTMLInputElement).style.boxShadow = 'none';
                   }}
                   onMouseEnter={(e) => {
                     if (document.activeElement !== e.target) {
-                      e.target.style.backgroundColor = colors.inputHoverBg;
+                      (e.target as HTMLInputElement).style.backgroundColor = colors.inputHoverBg;
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (document.activeElement !== e.target) {
-                      e.target.style.backgroundColor = colors.inputBg;
+                      (e.target as HTMLInputElement).style.backgroundColor = colors.inputBg;
                     }
                   }}
                   placeholder={placeholder}
@@ -599,6 +600,26 @@ const WhoWasITab: React.FC = () => {
     }
   };
 
+  // Delete version
+  const handleDeleteVersion = async (verToDelete: number) => {
+    if (!window.confirm(`确定要删除版本 ${verToDelete} 吗？此操作无法撤销。`)) return;
+
+    try {
+      await beingApi.deleteTest('past', verToDelete);
+
+      // If deleted current version, reload everything (which fetches latest)
+      if (version === verToDelete) {
+        await loadLatestData();
+      } else {
+        // Just refresh list
+        const versionList = await beingApi.getVersions('past');
+        setVersions(versionList.versions);
+      }
+    } catch (error) {
+      console.error('[WhoWasITab] Delete version failed:', error);
+    }
+  };
+
   // Handlers
   const handleWhoWasIChange = (id: number, val: string) => {
     setData(prev => ({
@@ -708,18 +729,32 @@ const WhoWasITab: React.FC = () => {
                 <div className="max-h-[240px] overflow-y-auto no-scrollbar">
                   {versions.length > 0 ? (
                     versions.map(v => (
-                      <button
+                      <div
                         key={v.id}
-                        onClick={() => loadVersion(v.version)}
-                        className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between hover:bg-opacity-50"
+                        className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between group hover:bg-opacity-50"
                         style={{
                           backgroundColor: v.version === version ? colors.actionBtnBg : 'transparent',
                           color: colors.textSub
                         }}
                       >
-                        <span>版本 {v.version}</span>
-                        {v.version === version && <Check size={14} style={{ color: colors.textMain }} />}
-                      </button>
+                        <button
+                          onClick={() => loadVersion(v.version)}
+                          className="flex-1 text-left flex items-center justify-between"
+                        >
+                          <span>版本 {v.version}</span>
+                          {v.version === version && <Check size={14} style={{ color: colors.textMain }} />}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteVersion(v.version);
+                          }}
+                          className="ml-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-all"
+                          title="删除此版本"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     ))
                   ) : (
                     <div className="px-4 py-3 text-sm" style={{ color: colors.textMuted }}>暂无历史版本</div>
@@ -808,54 +843,89 @@ const WhoWasITab: React.FC = () => {
         </p>
       </div>
 
-      {/* Unified Card */}
-      <div
-        className="max-w-2xl mx-auto rounded-[2rem] p-8 md:p-10 relative overflow-hidden transition-all duration-300"
-        style={{
-          backgroundColor: colors.cardBg,
-          boxShadow: `0 4px 30px -8px ${colors.inputRing}`,
-          border: `1px solid ${colors.border}`
-        }}
-      >
-        {/* Subtle glow overlay */}
-        <div
-          className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-20 transition-colors duration-300"
-          style={{ backgroundColor: colors.glowColor }}
-        />
+      {/* 4:6 Layout Container */}
+      <div className="max-w-7xl mx-auto mb-12">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* Left: Psychological Hint Block (40%) */}
+          <div className="w-full lg:w-[40%] lg:sticky lg:top-8">
+            <div
+              className="p-8 rounded-3xl relative overflow-hidden transition-all duration-300"
+              style={{
+                backgroundColor: colors.sections[0].iconBg,
+                border: `1px solid ${colors.sections[0].iconColor}20`
+              }}
+            >
+              <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none transition-colors duration-300">
+                <Quote size={100} style={{ color: colors.sections[0].iconColor }} />
+              </div>
 
-        <div className="relative z-10 space-y-10">
+              <div className="relative z-10">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2 transition-colors duration-300" style={{ color: colors.sections[0].iconColor }}>
+                  <Sparkles size={20} />
+                  心理提示
+                </h3>
+                <p className="text-base leading-relaxed text-justify transition-colors duration-300" style={{ color: colors.textMain }}>
+                  <span className="font-semibold block mb-3 text-lg">
+                    你不能改变你的过去，但你可以改变你对过去的态度。
+                  </span>
+                  在开始主动重构你的过去之前，请先完成这份 "我曾经是谁" 的测试。这份测试包括了同一个问题：我曾经是谁？但这个问题会被连续问 20 次。即使你不能回答所有的提问，也不用担心，但请务必花时间尝试这一练习。请列出 20 项最重要的可以描述你之前行事方式的答案。除了你自己之外，其他人不会看到你的答案，所以你也没有必要把自己描述得比真实情况更差或者更好。但请记得把答案留下来，因为在几周之后你需要重新回顾答案。
+                </p>
+              </div>
+            </div>
+          </div>
 
-          {/* 1. Who Was I */}
-          <QuestionBlock
-            title="我曾经是谁？"
-            subtitle="回忆过去的角色、状态"
-            icon={<FileQuestion size={20} strokeWidth={1.5} />}
-            sectionIndex={1}
-            items={data.whoWasIItems.map(item => ({ id: item.id, value: item.content }))}
-            placeholder="胆小、被成绩定义、害怕冲突..."
-            inputPrefix="我曾经..."
-            theme={theme}
-            onChange={handleWhoWasIChange}
-            onAdd={handleAddStatement}
-            onDelete={handleDeleteStatement}
-          />
+          {/* Right: Unified Card (60%) */}
+          <div className="w-full lg:w-[60%]">
+            <div
+              className="rounded-[2rem] p-8 md:p-10 relative overflow-hidden transition-all duration-300"
+              style={{
+                backgroundColor: colors.cardBg,
+                boxShadow: `0 4px 30px -8px ${colors.inputRing}`,
+                border: `1px solid ${colors.border}`
+              }}
+            >
+              {/* Subtle glow overlay */}
+              <div
+                className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-20 transition-colors duration-300"
+                style={{ backgroundColor: colors.glowColor }}
+              />
 
-          {/* Divider */}
-          <div style={{ height: '1px', backgroundColor: colors.border }} className="transition-colors duration-300" />
+              <div className="relative z-10 space-y-10">
 
-          {/* 2. Positive Reframing */}
-          <ReframingBlock
-            title="积极重构过去"
-            subtitle="寻找困难经历背后的礼物"
-            icon={<RotateCcw size={20} strokeWidth={1.5} />}
-            sectionIndex={0}
-            items={data.positivePastReframingItems}
-            theme={theme}
-            onChange={handleReframeChange}
-            onAdd={handleAddReframe}
-            onDelete={handleDeleteReframe}
-          />
+                {/* 1. Who Was I */}
+                <QuestionBlock
+                  title="我曾经是谁？"
+                  subtitle="回忆过去的角色、状态"
+                  icon={<FileQuestion size={20} strokeWidth={1.5} />}
+                  sectionIndex={1}
+                  items={data.whoWasIItems.map(item => ({ id: item.id, value: item.content }))}
+                  placeholder="胆小、被成绩定义、害怕冲突..."
+                  inputPrefix="我曾经..."
+                  theme={theme}
+                  onChange={handleWhoWasIChange}
+                  onAdd={handleAddStatement}
+                  onDelete={handleDeleteStatement}
+                />
 
+                {/* Divider */}
+                <div style={{ height: '1px', backgroundColor: colors.border }} className="transition-colors duration-300" />
+
+                {/* 2. Positive Reframing */}
+                <ReframingBlock
+                  title="积极重构过去"
+                  subtitle="寻找困难经历背后的礼物"
+                  icon={<RotateCcw size={20} strokeWidth={1.5} />}
+                  sectionIndex={0}
+                  items={data.positivePastReframingItems}
+                  theme={theme}
+                  onChange={handleReframeChange}
+                  onAdd={handleAddReframe}
+                  onDelete={handleDeleteReframe}
+                />
+
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

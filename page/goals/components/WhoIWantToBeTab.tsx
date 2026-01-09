@@ -302,12 +302,11 @@ const WhoIWantToBeTab: React.FC = () => {
       console.error('[WhoIWantToBeTab] Save failed:', error);
       setSaveStatus('error');
       setTimeout(() => setSaveStatus('idle'), 3000);
-    } finally {
       setIsSaving(false);
     }
   };
 
-  // 创建新版本
+  // Create new version
   const handleCreateNew = async () => {
     setIsSaving(true);
     try {
@@ -322,6 +321,26 @@ const WhoIWantToBeTab: React.FC = () => {
       setSaveStatus('error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Delete version
+  const handleDeleteVersion = async (verToDelete: number) => {
+    if (!window.confirm(`确定要删除版本 ${verToDelete} 吗？此操作无法撤销。`)) return;
+
+    try {
+      await beingApi.deleteTest('future', verToDelete);
+
+      // If deleted current version, reload everything (which fetches latest)
+      if (version === verToDelete) {
+        await loadLatestData();
+      } else {
+        // Just refresh list
+        const versionList = await beingApi.getVersions('future');
+        setVersions(versionList.versions);
+      }
+    } catch (error) {
+      console.error('[WhoIWantToBeTab] Delete version failed:', error);
     }
   };
 
@@ -405,18 +424,32 @@ const WhoIWantToBeTab: React.FC = () => {
                 <div className="max-h-[240px] overflow-y-auto no-scrollbar">
                   {versions.length > 0 ? (
                     versions.map(v => (
-                      <button
+                      <div
                         key={v.id}
-                        onClick={() => loadVersion(v.version)}
-                        className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between hover:bg-opacity-50"
+                        className="w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between group hover:bg-opacity-50"
                         style={{
                           backgroundColor: v.version === version ? colors.actionBtnBg : 'transparent',
                           color: colors.textSub
                         }}
                       >
-                        <span>版本 {v.version}</span>
-                        {v.version === version && <Check size={14} style={{ color: colors.textMain }} />}
-                      </button>
+                        <button
+                          onClick={() => loadVersion(v.version)}
+                          className="flex-1 text-left flex items-center justify-between"
+                        >
+                          <span>版本 {v.version}</span>
+                          {v.version === version && <Check size={14} style={{ color: colors.textMain }} />}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteVersion(v.version);
+                          }}
+                          className="ml-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-all"
+                          title="删除此版本"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     ))
                   ) : (
                     <div className="px-4 py-3 text-sm" style={{ color: colors.textMuted }}>暂无历史版本</div>
@@ -567,23 +600,23 @@ const WhoIWantToBeTab: React.FC = () => {
                         border: '1px solid transparent'
                       }}
                       onFocus={(e) => {
-                        e.target.style.backgroundColor = colors.inputFocusBg;
-                        e.target.style.border = `1px solid ${colors.border}`;
-                        e.target.style.boxShadow = `0 2px 12px -4px ${colors.inputRing}`;
+                        (e.target as HTMLInputElement).style.backgroundColor = colors.inputFocusBg;
+                        (e.target as HTMLInputElement).style.border = `1px solid ${colors.border}`;
+                        (e.target as HTMLInputElement).style.boxShadow = `0 2px 12px -4px ${colors.inputRing}`;
                       }}
                       onBlur={(e) => {
-                        e.target.style.backgroundColor = colors.inputBg;
-                        e.target.style.border = '1px solid transparent';
-                        e.target.style.boxShadow = 'none';
+                        (e.target as HTMLInputElement).style.backgroundColor = colors.inputBg;
+                        (e.target as HTMLInputElement).style.border = '1px solid transparent';
+                        (e.target as HTMLInputElement).style.boxShadow = 'none';
                       }}
                       onMouseEnter={(e) => {
                         if (document.activeElement !== e.target) {
-                          e.target.style.backgroundColor = colors.inputHoverBg;
+                          (e.target as HTMLInputElement).style.backgroundColor = colors.inputHoverBg;
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (document.activeElement !== e.target) {
-                          e.target.style.backgroundColor = colors.inputBg;
+                          (e.target as HTMLInputElement).style.backgroundColor = colors.inputBg;
                         }
                       }}
                       placeholder="有远见的领导者..."
@@ -669,21 +702,21 @@ const WhoIWantToBeTab: React.FC = () => {
                         border: '1px solid transparent'
                       }}
                       onFocus={(e) => {
-                        e.target.style.backgroundColor = colors.inputFocusBg;
-                        e.target.style.border = `1px solid ${colors.border}`;
+                        (e.target as HTMLTextAreaElement).style.backgroundColor = colors.inputFocusBg;
+                        (e.target as HTMLTextAreaElement).style.border = `1px solid ${colors.border}`;
                       }}
                       onBlur={(e) => {
-                        e.target.style.backgroundColor = colors.inputBg;
-                        e.target.style.border = '1px solid transparent';
+                        (e.target as HTMLTextAreaElement).style.backgroundColor = colors.inputBg;
+                        (e.target as HTMLTextAreaElement).style.border = '1px solid transparent';
                       }}
                       onMouseEnter={(e) => {
                         if (document.activeElement !== e.target) {
-                          e.target.style.backgroundColor = colors.inputHoverBg;
+                          (e.target as HTMLTextAreaElement).style.backgroundColor = colors.inputHoverBg;
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (document.activeElement !== e.target) {
-                          e.target.style.backgroundColor = colors.inputBg;
+                          (e.target as HTMLTextAreaElement).style.backgroundColor = colors.inputBg;
                         }
                       }}
                       placeholder="你具体想要实现什么？"
@@ -710,21 +743,21 @@ const WhoIWantToBeTab: React.FC = () => {
                         fontFamily: "'SF Mono', 'Monaco', monospace"
                       }}
                       onFocus={(e) => {
-                        e.target.style.backgroundColor = colors.inputFocusBg;
-                        e.target.style.border = `1px solid ${colors.border}`;
+                        (e.target as HTMLInputElement).style.backgroundColor = colors.inputFocusBg;
+                        (e.target as HTMLInputElement).style.border = `1px solid ${colors.border}`;
                       }}
                       onBlur={(e) => {
-                        e.target.style.backgroundColor = colors.inputBg;
-                        e.target.style.border = '1px solid transparent';
+                        (e.target as HTMLInputElement).style.backgroundColor = colors.inputBg;
+                        (e.target as HTMLInputElement).style.border = '1px solid transparent';
                       }}
                       onMouseEnter={(e) => {
                         if (document.activeElement !== e.target) {
-                          e.target.style.backgroundColor = colors.inputHoverBg;
+                          (e.target as HTMLInputElement).style.backgroundColor = colors.inputHoverBg;
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (document.activeElement !== e.target) {
-                          e.target.style.backgroundColor = colors.inputBg;
+                          (e.target as HTMLInputElement).style.backgroundColor = colors.inputBg;
                         }
                       }}
                       placeholder="例如：2025年12月"
