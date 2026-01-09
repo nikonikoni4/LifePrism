@@ -36,7 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, onChatToggle
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 overflow-hidden">
             <img
-              src="/lifeprism.svg"
+              src="public/branding/lifeprism.svg"
               alt="LifePrism Logo"
               className="w-full h-full object-cover"
             />
