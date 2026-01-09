@@ -527,8 +527,8 @@ def format_daily_breakdown(breakdown_data: list) -> str:
     header_parts = ["日期", "使用时长"]
     header_parts.extend(top_categories)
     header_parts.extend(["电脑启用", "电脑结束"])
-    
-    output_lines = [" | ".join(header_parts)]
+    output_lines = ["电脑使用时间表: "]
+    output_lines.append(" | ".join(header_parts))
     output_lines.append("|".join(["---"] * len(header_parts)))
     
     for day in breakdown_data:

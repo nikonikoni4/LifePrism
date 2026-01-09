@@ -127,7 +127,8 @@ class Executor:
         if node is not None:
             # 确定数据来源线程：优先使用 data_in_thread，否则默认为 main
             source_thread = node.data_in_thread or self.main_thread_id
-            
+            if not node.data_in_thread:
+                logger.warning(f"    ⚠️  data_in: 节点 '{node.node_name}' 没有指定 data_in_thread，使用默认的 main 线程")
             if source_thread and source_thread in self.context["messages"]:
                 source_msgs = self.context["messages"][source_thread]
                 
@@ -525,6 +526,8 @@ class Executor:
             # 如果节点设置了 data_out，根据 data_out_thread 合并到目标线程
             if node.data_out:
                 # 目标线程由 data_out_thread 决定，若没有则默认为 main
+                if not node.data_out_thread:
+                    logger.warning(f"    ⚠️  data_out: 节点 '{node.node_name}' 没有指定 data_out_thread，使用默认的 main 线程")
                 target_thread = node.data_out_thread if node.data_out_thread else self.main_thread_id
                 self._merge_data_out(node.thread_id, target_thread)
         

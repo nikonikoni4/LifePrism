@@ -4,7 +4,7 @@ from lifeprism.llm.llm_classify.tools.database_tools import get_daily_stats,get_
 from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
 import logging
 import asyncio
-from lifeprism.llm.llm_classify.data_driving_agent.load_plans import get_daily_summary_plan
+from lifeprism.llm.llm_classify.data_driving_agent.load_plans import load_plan_from_template
 from lifeprism.llm.llm_classify.data_driving_agent.async_executor import AsyncExecutor
 from typing import Literal
 from lifeprism.llm.llm_classify.providers.llm_lw_data_provider import llm_lw_data_provider
@@ -27,7 +27,7 @@ async def daily_summary(date : str, pattern ="complex"):
                 - total_tokens: 总 token 数量
     """
     # 获取执行计划和工具限制
-    plan, tools_limit = get_daily_summary_plan(date,json_path, pattern)
+    plan, tools_limit = load_plan_from_template(json_path, pattern,date=date)
     # 创建异步执行器并执行
     executor = AsyncExecutor(
         plan=plan,
