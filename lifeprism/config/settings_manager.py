@@ -40,11 +40,11 @@ class SettingsManager:
         'input_tokens_cost': 0.0,
         'output_tokens_cost': 0.0,
         'classification_mode': 'classify_graph',
-        'long_log_threshold': 3600,
+        'long_log_threshold': 600,
         'multi_purpose_app_names': ['chrome', 'msedge', 'firefox'],
-        'aw_db_path': '',
-        'lw_db_path': '',
-        'chat_db_path': '',
+        'aw_db_path': '~/AppData/Local/activitywatch/activitywatch/aw-server/peewee-sqlite.v2.db',
+        'lw_db_path': '~/AppData/Local/lifeprism/data/lifewatch_ai.db',
+        'chat_db_path': '~/AppData/Local/lifeprism/data/chat_history.db',
         'data_cleaning_threshold': 10,
     }
     
@@ -66,7 +66,7 @@ class SettingsManager:
             with open(self._config_path, 'r', encoding='utf-8') as f:
                 self._config = yaml.safe_load(f) or {}
         else:
-            self._config = {}
+            self._config = self.DEFAULTS.copy()
             # 如果配置文件不存在，创建默认配置
             self._save_config()
     
@@ -276,15 +276,15 @@ class SettingsManager:
     
     @property
     def aw_db_path(self) -> str:
-        return self.get('aw_db_path')
+        return os.path.expanduser(self.get('aw_db_path')) if self.get('aw_db_path') else ''
     
     @property
     def lw_db_path(self) -> str:
-        return self.get('lw_db_path')
+        return os.path.expanduser(self.get('lw_db_path')) if self.get('lw_db_path') else ''
     
     @property
     def chat_db_path(self) -> str:
-        return self.get('chat_db_path')
+        return os.path.expanduser(self.get('chat_db_path')) if self.get('chat_db_path') else ''
     
     @property
     def data_cleaning_threshold(self) -> int:

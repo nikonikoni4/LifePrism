@@ -11,6 +11,8 @@ import os
 for db_path in [settings.lw_db_path, settings.chat_db_path]:
     if db_path and not os.path.exists(db_path):
         print(f"Creating database file: {db_path}")
+        # 确保目录存在
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
         with open(db_path, 'w') as f:
             pass
 
