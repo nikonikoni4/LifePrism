@@ -13,8 +13,6 @@ requires-python = ">=3.8"
 # 项目依赖
 dependencies = [
     "requests>=2.25.0",
-    "DrissionPage>=4.0.0",
-    "duckduckgo-search>=3.0.0",
     # LangGraph 会话持久化依赖
     "langgraph>=1.0.0",
     "langgraph-checkpoint-sqlite>=3.0.0",

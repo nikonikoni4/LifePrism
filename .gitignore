@@ -5,7 +5,6 @@ activitywatch
 .trae
 __pycache__
 test
-*.png
 技术文档.md
 docs
 *-info
