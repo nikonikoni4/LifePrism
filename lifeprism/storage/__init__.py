@@ -4,6 +4,15 @@
 from .database_manager import DatabaseManager
 from lifeprism.config.settings_manager import settings
 # ==================== 全局单例实例 ====================
+import os
+
+# 检查并创建数据库文件（如果不存在）
+# 防止 readonly 模式下因文件不存在导致连接失败
+for db_path in [settings.lw_db_path, settings.chat_db_path]:
+    if db_path and not os.path.exists(db_path):
+        print(f"Creating database file: {db_path}")
+        with open(db_path, 'w') as f:
+            pass
 
 # LifeWatch 数据库（读写，使用连接池）
 lw_db_manager = DatabaseManager(
