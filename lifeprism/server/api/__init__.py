@@ -16,11 +16,7 @@ from .report_api import router as report_router
 from .being_api import router as being_router
 
 __all__ = [
-    "dashboard_router",
-    "behavior_router",
-    "categories_router",
     "sync_router",
-    "activity_summary_router",
     "category_v2_router",
     "activity_v2_router",
     "timeline_v2_router",

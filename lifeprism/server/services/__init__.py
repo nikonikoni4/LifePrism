@@ -10,7 +10,7 @@ from lifeprism.utils import LazySingleton
 
 # V2 Service 单例（有状态或需要缓存的服务）
 from .activity_service import ActivityService
-from .category_service import CategoryService, category_service
+from .category_service import category_service
 
 # V2 纯函数服务模块
 from . import timeline_service

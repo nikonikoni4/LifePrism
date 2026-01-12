@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+requests
+pandas
+pydantic
+langgraph>=1.0.0
+langgraph-checkpoint-sqlite>=3.0.0
+aiosqlite==0.21.0
+langchain-core
+langchain-openai
+python-multipart
+python-pptx
