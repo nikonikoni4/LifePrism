@@ -18,6 +18,18 @@
     ```bash
     cd LifePrism
     pip install -r requirements.txt
+    pip install -e .
+    ```
+
+    ```bash
+    cd frontend
+    npm install
+    npm run dev
+    ```
+
+    ```bash
+    cd lifeprism/server
+    python main.py
     ```
 
 4. 启动
