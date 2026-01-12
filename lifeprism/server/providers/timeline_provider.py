@@ -4,7 +4,7 @@ Timeline 数据提供者
 为 Timeline 模块提供专用的数据加载方法
 """
 from lifeprism.storage import LWBaseDataProvider
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger, LazySingleton
 logger = get_logger(__name__)
 
 
@@ -195,6 +195,9 @@ class TimelineProvider(LWBaseDataProvider):
         affected_rows = self.db.delete("timeline_custom_block", where={"id": block_id})
         return affected_rows > 0
 
+
+
+timeline_provider = LazySingleton(TimelineProvider)
 
 if __name__ == "__main__":
     timeline_provider = TimelineProvider()

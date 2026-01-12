@@ -5,7 +5,7 @@ import pandas as pd
 from typing import Optional
 from datetime import datetime
 from lifeprism.storage import LWBaseDataProvider
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger, LazySingleton
 from lifeprism.config.database import get_table_columns
 
 logger = get_logger(__name__)
@@ -910,6 +910,10 @@ class ServerLWDataProvider(LWBaseDataProvider):
             conn.commit()
         
         return total_deleted
+
+
+
+server_lw_data_provider = LazySingleton(ServerLWDataProvider)
 
 
 if __name__ == "__main__":

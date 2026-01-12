@@ -5,7 +5,7 @@
 from typing import Optional, List, Dict, Any
 
 from lifeprism.storage import LWBaseDataProvider
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger,LazySingleton
 
 logger = get_logger(__name__)
 
@@ -207,4 +207,4 @@ class FolderProvider(LWBaseDataProvider):
 
 
 # 单例模式
-folder_provider = FolderProvider()
+folder_provider = LazySingleton(FolderProvider)

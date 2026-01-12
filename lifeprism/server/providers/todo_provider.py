@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from lifeprism.storage import LWBaseDataProvider
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger, LazySingleton
 
 logger = get_logger(__name__)
 
@@ -725,5 +725,5 @@ class TodoProvider(LWBaseDataProvider):
 
 
 # 创建全局单例
-todo_provider = TodoProvider()
+todo_provider = LazySingleton(TodoProvider)
 

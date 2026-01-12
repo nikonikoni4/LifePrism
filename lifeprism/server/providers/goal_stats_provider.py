@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
 from lifeprism.storage import LWBaseDataProvider
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger, LazySingleton
 
 logger = get_logger(__name__)
 
@@ -370,4 +370,4 @@ class GoalStatsProvider(LWBaseDataProvider):
 
 
 # 创建全局单例
-goal_stats_provider = GoalStatsProvider()
+goal_stats_provider = LazySingleton(GoalStatsProvider)

@@ -7,7 +7,7 @@ from datetime import datetime
 import uuid
 
 from lifeprism.storage import LWBaseDataProvider
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger, LazySingleton
 
 logger = get_logger(__name__)
 
@@ -401,5 +401,5 @@ class GoalProvider(LWBaseDataProvider):
 
 
 # 创建全局单例
-goal_provider = GoalProvider()
+goal_provider = LazySingleton(GoalProvider)
 

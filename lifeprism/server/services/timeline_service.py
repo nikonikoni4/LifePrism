@@ -95,13 +95,10 @@ from lifeprism.server.schemas.timeline_schemas import (
     UserCustomBlockResponse,
     UserCustomBlockListResponse,
 )
-from lifeprism.server.providers.timeline_provider import TimelineProvider
-from lifeprism.server.services.category_service import CategoryService
+from lifeprism.server.providers.timeline_provider import timeline_provider
 from lifeprism.server.providers.todo_provider import todo_provider
+from lifeprism.server.services.category_service import category_service
 
-# 创建 provider 和 service 实例
-_timeline_provider = TimelineProvider()
-_category_service = CategoryService()
 
 
 def _enrich_block_record(record: dict) -> dict:
@@ -124,9 +121,9 @@ def _enrich_block_record(record: dict) -> dict:
     category_name = None
     sub_category_name = None
     if category_id:
-        category_name = _category_service.category_name_map.get(category_id)
+        category_name = category_service.category_name_map.get(category_id)
     if sub_category_id:
-        sub_category_name = _category_service.sub_category_name_map.get(sub_category_id)
+        sub_category_name = category_service.sub_category_name_map.get(sub_category_id)
     
     # 获取 todo 内容（如果绑定了）
     todo_id = record.get('todo_id')
@@ -156,7 +153,7 @@ def create_custom_block(data: UserCustomBlockCreate) -> UserCustomBlockResponse:
     Returns:
         UserCustomBlockResponse: 创建后的记录（含名称和颜色）
     """
-    record = _timeline_provider.create_custom_block(data.model_dump())
+    record = timeline_provider.create_custom_block(data.model_dump())
     enriched_record = _enrich_block_record(record)
     return UserCustomBlockResponse(data=UserCustomBlock(**enriched_record))
 
@@ -174,7 +171,7 @@ def get_custom_block(block_id: int) -> UserCustomBlockResponse:
     Raises:
         ValueError: 如果记录不存在
     """
-    record = _timeline_provider.get_custom_block_by_id(block_id)
+    record = timeline_provider.get_custom_block_by_id(block_id)
     if not record:
         raise ValueError(f"Custom block with id {block_id} not found")
     enriched_record = _enrich_block_record(record)
@@ -191,7 +188,7 @@ def get_custom_blocks_by_date(date: str) -> UserCustomBlockListResponse:
     Returns:
         UserCustomBlockListResponse: 时间块列表（每条含名称和颜色）
     """
-    records = _timeline_provider.get_custom_blocks_by_date(date)
+    records = timeline_provider.get_custom_blocks_by_date(date)
     blocks = [UserCustomBlock(**_enrich_block_record(r)) for r in records]
     return UserCustomBlockListResponse(data=blocks, total=len(blocks))
 
@@ -210,7 +207,7 @@ def update_custom_block(block_id: int, data: UserCustomBlockUpdate) -> UserCusto
     Raises:
         ValueError: 如果记录不存在
     """
-    record = _timeline_provider.update_custom_block(block_id, data.model_dump(exclude_unset=True))
+    record = timeline_provider.update_custom_block(block_id, data.model_dump(exclude_unset=True))
     if not record:
         raise ValueError(f"Custom block with id {block_id} not found")
     enriched_record = _enrich_block_record(record)
@@ -227,5 +224,5 @@ def delete_custom_block(block_id: int) -> bool:
     Returns:
         bool: 是否删除成功
     """
-    return _timeline_provider.delete_custom_block(block_id)
+    return timeline_provider.delete_custom_block(block_id)
 

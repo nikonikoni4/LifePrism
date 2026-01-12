@@ -5,7 +5,7 @@ Reward 数据提供者
 from typing import Optional, List, Dict, Any
 
 from lifeprism.storage import LWBaseDataProvider
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger, LazySingleton
 
 logger = get_logger(__name__)
 
@@ -381,4 +381,4 @@ class RewardProvider(LWBaseDataProvider):
 
 
 # 创建全局单例
-reward_provider = RewardProvider()
+reward_provider = LazySingleton(RewardProvider)
