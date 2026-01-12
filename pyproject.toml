@@ -18,6 +18,8 @@ dependencies = [
     "uvicorn",
     "tomlkit",
     "langchain_community",
+    "langchain",
+    "dashscope",
     "toon_python",
     "pandas",
     "pydantic",
