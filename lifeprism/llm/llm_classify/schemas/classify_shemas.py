@@ -1,8 +1,5 @@
-
-from bokeh.core.validation.decorators import warning
 from pydantic import BaseModel,Field
 from typing import Annotated
-import operator
 
 def remain_old_value(old_value,new_value):
     if old_value:

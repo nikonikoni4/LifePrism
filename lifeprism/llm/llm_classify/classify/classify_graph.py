@@ -17,7 +17,6 @@ from lifeprism.llm.llm_classify.utils import (
     parse_classification_result,
     extract_json_from_response,
     parse_token_usage,
-    test_for_llm_class_state
     )
 import json
 import logging
@@ -221,7 +220,7 @@ class ClassifyGraph:
         }
 
     # router 1 
-    # @test_for_llm_class_state(TEST_FLAG)
+
     def router_by_multi_purpose(self,state: classifyState):
         """
         软件分类路由,单用途和多用途分开处理
@@ -260,7 +259,7 @@ class ClassifyGraph:
         return send_list
     
     # node superstape2: 单用途分类 -> result_items
-    # @test_for_llm_class_state(TEST_FLAG)
+
     def single_classify(self,state: classifyStateLogitems) -> classifyState:
         """
         单用途app分类（分批处理，每批最多 MAX_LOG_ITEMS 条）
@@ -343,13 +342,13 @@ class ClassifyGraph:
         }
  
     # node supperstep2 多用途分类(空节点) ->classifyStateLogitems
-    # @test_for_llm_class_state(TEST_FLAG)
+
     def multi_classify(self,state:classifyStateLogitems)->classifyStateLogitems:
         # 空节点，后续接上多分类路由
         # 私有变量传递不能中断传递，而同超步的single_class返回主状态，这里更新不会影响到单应用分支
         return state 
     # router_by_duration_for_multi
-    # @test_for_llm_class_state(TEST_FLAG)
+
     def router_by_duration_for_multi(self, state: classifyStateLogitems):
         """
         多用途应用按时长路由，短时长和长时长分开处理
@@ -377,7 +376,7 @@ class ClassifyGraph:
         
         return send_list
     # node supperstep 3 :多用途短时长分类->{result_items}
-    # @test_for_llm_class_state(TEST_FLAG)
+
     def multi_classify_short(self,state:classifyStateLogitems) -> classifyState:
         """
         短时长多用途分类（分批处理，每批最多 MAX_LOG_ITEMS 条）
@@ -449,7 +448,7 @@ class ClassifyGraph:
         }
 
     # node supperstep 3 :获取title_analysis->{title_analysis_results}
-    # @test_for_llm_class_state(TEST_FLAG)
+
     def get_titles(self,state:classifyStateLogitems)->classifyStateLogitems:
         system_message = SystemMessage(content="""
         你是一个通过网络搜索分析的助手,依据网络搜索结果和title分析用户的活动，要求结果在30字以内
@@ -467,7 +466,7 @@ class ClassifyGraph:
         }
 
     # node supperstep 4 : 多分类长时间 {result_items}
-    # @test_for_llm_class_state(TEST_FLAG)
+
     def multi_classify_long(self,state:classifyStateLogitems)->classifyState:
         """
         长时长多用途分类（分批处理，每批最多 MAX_LOG_ITEMS 条）
