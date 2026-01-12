@@ -13,6 +13,14 @@ requires-python = ">=3.8"
 # 项目依赖
 dependencies = [
     "requests>=2.25.0",
+    "fastapi",
+    "uvicorn",
+    "pandas",
+    "pydantic",
+    "python-multipart",
+    # LLM & LangChain
+    "langchain-core",
+    "langchain-openai",
     # LangGraph 会话持久化依赖
     "langgraph>=1.0.0",
     "langgraph-checkpoint-sqlite>=3.0.0",
