@@ -9,4 +9,3 @@ aiosqlite==0.21.0
 langchain-core
 langchain-openai
 python-multipart
-python-pptx
