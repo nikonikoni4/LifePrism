@@ -13,7 +13,7 @@
     git clone --recursive https://github.com/nikonikoni4/LifePrism.git
     ```
 
-3. 配置环境
+3. 配置环境(建议创建新的环境)
 
     ```bash
     cd LifePrism
