@@ -6,20 +6,32 @@
 ## 快速开始
 
 1. [下载activitywatch（电脑端数据来源）](https://github.com/ActivityWatch/activitywatch.git)
-2. 配置环境
 
-3. 启动
+2. clone 仓库
+
+    ```bash
+    git clone --recursive https://github.com/nikonikoni4/LifePrism.git
+    ```
+
+3. 配置环境
+
+    ```bash
+    cd LifePrism
+    pip install -r requirements.txt
+    ```
+
+4. 启动
 
     ```bash
     .\run.bat
     ``` 
 
-4. 访问 http://localhost:3000/ 
+5. 访问 http://localhost:3000/ 
 
-5. 点击setting 修改数据库地址
+6. 点击setting 修改数据库地址
     - activitywacth地址："C:\Users\yourname\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
 
-6. 配置API
+7. 配置API
     - 目前只支持阿里云的API：https://cn.aliyun.com/
 
 ## Tokens 用量说明
