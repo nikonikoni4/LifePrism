@@ -1,11 +1,23 @@
 from lifeprism.llm.custom_prompt.chatbot_prompt.summary_prompt import daily_summary_template,multi_days_summary_template
 from lifeprism.llm.llm_classify.utils import create_ChatTongyiModel
-from lifeprism.llm.llm_classify.tools.database_tools import get_daily_stats,get_multi_days_stats
+from lifeprism.llm.llm_classify.tools.database_tools import (
+    get_daily_stats,
+    get_multi_days_stats,
+    query_behavior_timeline,
+    query_daily_todos,
+    get_daily_breakdown,
+    query_behavior_logs,
+    query_goals,
+    query_psychological_assessment,
+    query_daily_notes,
+    query_daily_summaries,
+    query_weekly_focus
+)
 from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
 import logging
 import asyncio
-from lifeprism.llm.llm_classify.data_driving_agent.load_plans import load_plan_from_template
-from lifeprism.llm.llm_classify.data_driving_agent.async_executor import AsyncExecutor
+from lifeprism.llm.llm_linear_executor.llm_linear_executor.load_plans import load_plan_from_template
+from lifeprism.llm.llm_linear_executor.llm_linear_executor.executor import Executor
 from typing import Literal
 from lifeprism.llm.llm_classify.providers.llm_lw_data_provider import llm_lw_data_provider
 logger = logging.getLogger(__name__)
@@ -27,14 +39,35 @@ async def daily_summary(date : str, pattern ="complex"):
                 - total_tokens: 总 token 数量
     """
     # 获取执行计划和工具限制
-    plan, tools_limit = load_plan_from_template(json_path, pattern,date=date)
+    plan = load_plan_from_template(json_path, pattern,date=date)
+    
+    # 准备工具映射
+    tools_map = {
+        "get_daily_stats": get_daily_stats,
+        "get_multi_days_stats": get_multi_days_stats,
+        "query_behavior_timeline": query_behavior_timeline,
+        "query_daily_todos": query_daily_todos,
+        "get_daily_breakdown": get_daily_breakdown,
+        "query_behavior_logs": query_behavior_logs,
+        "query_goals": query_goals,
+        "query_psychological_assessment": query_psychological_assessment,
+        "query_daily_notes": query_daily_notes,
+        "query_daily_summaries": query_daily_summaries,
+        "query_weekly_focus": query_weekly_focus
+    }
+
+    # 创建 LLM 工厂
+    def llm_factory():
+         return create_ChatTongyiModel(temperature=0.5)
+
     # 创建异步执行器并执行
-    executor = AsyncExecutor(
+    executor = Executor(
         plan=plan,
         user_message=f"总结 {date} 的使用情况",
-        tools_limit=tools_limit
+        tools_map=tools_map,
+        llm_factory=llm_factory
     )
-    result = await executor.execute()
+    result = await executor.aexecute()
     
     # 保存 tokens 使用量到数据库
     session_id = f"summary-{date}"
@@ -232,7 +265,7 @@ async def multi_days_summary(start_time : str, end_time : str, split_count : int
 
 if __name__ == '__main__':
     async def main():
-        result = await daily_summary(date="2025-12-28", options=["all"])
+        result = await daily_summary(date="2025-12-28", pattern="complex")
         print(result["content"])
         print(result["tokens_usage"])
     

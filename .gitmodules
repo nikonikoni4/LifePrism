@@ -4,5 +4,6 @@
 [submodule "lifeprism/llm/custom_prompt"]
 	path = lifeprism/llm/custom_prompt
 	url = https://github.com/nikonikoni4/lifeprism_custom_prompt.git
-
- 
+[submodule "lifeprism/llm/llm_linear_executor"]
+	path = lifeprism/llm/llm_linear_executor
+	url = https://github.com/nikonikoni4/llm_linear_executor.git
