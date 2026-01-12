@@ -17,7 +17,6 @@
 
     ```bash
     cd LifePrism
-    pip install -r requirements.txt
     pip install -e .
     ```
 
@@ -32,19 +31,16 @@
     python main.py
     ```
 
-4. 启动
-
-    ```bash
-    .\run.bat
-    ``` 
-
 5. 访问 http://localhost:3000/ 
 
-6. 点击setting 修改数据库地址
+6. 点击setting 查看当前地址是否存在着activitywacth的数据库
     - activitywacth地址："C:\Users\yourname\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
 
 7. 配置API
     - 目前只支持阿里云的API：https://cn.aliyun.com/
+
+8. 配置分类
+    - 点击category 添加新的分类
 
 ## Tokens 用量说明
 
