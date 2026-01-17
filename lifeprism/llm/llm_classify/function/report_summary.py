@@ -24,8 +24,8 @@ from lifeprism.llm.llm_classify.providers.llm_lw_data_provider import llm_lw_dat
 from lifeprism.llm.llm_linear_executor.llm_linear_executor.llm_factory import create_llm_factory
 from lifeprism.config import settings 
 logger = logging.getLogger(__name__)
-daily_json_path = "lifeprism/llm/custom_prompt/skills/user_behavior_summary/pattern/daily_summary_plan.json"
-multi_days_json_path = "lifeprism/llm/custom_prompt/skills/user_behavior_summary/pattern/weekly_summary_plan.json"
+daily_json_path = "lifeprism/llm/custom_prompt/workflow/daily_summary_plan.json"
+multi_days_json_path = "lifeprism/llm/custom_prompt/workflow/weekly_summary_plan.json"
 
 async def daily_summary(date : str, pattern ="complex"):
     """
