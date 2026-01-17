@@ -17,7 +17,9 @@ from lifeprism.llm.llm_classify.utils.data_base_format import(
      format_computer_usage_schedule,
      format_daily_goal_trend,
      format_daily_breakdown,
-     format_daily_summaries
+     format_daily_summaries,
+     format_daily_category_trend,
+     format_goal_stats
 )
 from datetime import datetime, timedelta
 from lifeprism.llm.llm_classify.aggregator.daily_data_aggregator import (
@@ -127,7 +129,7 @@ def get_daily_stats(
     - tasks: 今日重点内容
     - comparison: 与前一天的环比对比
     """
-    try:
+    try: 
         # 解析 options，默认返回全部
         if options is None or "all" in options:
             fetch_all = True
@@ -178,7 +180,7 @@ def get_daily_stats(
                         activities_by_segment[segment_index] = []
                     activities_by_segment[segment_index].append(act)
             
-            if segments_data and activities_by_segment:
+            if segments_data:
                 prompt_parts.append(f"{section_num}. 行为数据统计")
                 prompt_parts.append(format_segment_category_stats(segments_data, activities_by_segment))
                 section_num += 1
@@ -294,13 +296,14 @@ def get_multi_days_stats(
         if fetch_all or "tasks" in fetch_options:
             summary = llm_lw_data_provider.get_focus_and_todos(start_time=start_time, end_time=end_time)
             prompt_parts.append(f"\n{section_num}. 每日重点与任务")
-            prompt_parts.append(summary if summary else "  - 暂无数据")
+            prompt_parts.append(format_focus_and_todos(summary) if summary else "  - 暂无数据")
             logger.debug(f"summary: {len(prompt_parts[-1])}")
             section_num += 1
         
         # 3. 分类投入时间趋势
         if fetch_all or "category_trend" in fetch_options:
             category_trend = llm_lw_data_provider.get_daily_category_trend(start_time, end_time)
+            category_trend = format_daily_category_trend(category_trend)
             prompt_parts.append(f"\n{section_num}. 分类占比")
             prompt_parts.append(category_trend if category_trend else "  - 暂无数据")
             logger.debug(f"category_trend: {len(prompt_parts[-1])}")
@@ -396,6 +399,22 @@ def query_behavior_logs(
     ))
     return result
 
+
+
+
+
+
+
+@tool
+def query_goal_time_distribution(
+    start_time: Annotated[str, "开始时间 YYYY-MM-DD HH:MM:SS"],
+    end_time: Annotated[str, "结束时间 YYYY-MM-DD HH:MM:SS"]
+) -> str:
+    """
+    查询一段时间内用户在各个目标上的时间投入分布。
+    """
+    stats = llm_lw_data_provider.query_goal_stats(start_time, end_time)
+    return format_goal_stats(stats)
 
 
 @tool
@@ -494,7 +513,12 @@ def query_daily_notes(
     prompt_parts = []
     while start_date <= end_date:
         prompt_parts.append(f"- {start_date.strftime('%Y-%m-%d')}: ")
-        notes = llm_lw_data_provider.get_user_focus_notes(start_date.strftime('%Y-%m-%d %H:%M:%S'), end_date.strftime('%Y-%m-%d %H:%M:%S'))
+        # 查询当天全天的时间范围
+        current_day_end = start_date + timedelta(days=1) - timedelta(seconds=1)
+        notes = llm_lw_data_provider.get_user_focus_notes(
+            start_date.strftime('%Y-%m-%d %H:%M:%S'), 
+            current_day_end.strftime('%Y-%m-%d %H:%M:%S')
+        )
         if notes:
             prompt_parts.append(" 用户备注：")
             prompt_parts.append(format_user_notes(notes))

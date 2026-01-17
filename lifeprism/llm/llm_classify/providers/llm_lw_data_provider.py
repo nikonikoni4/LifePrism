@@ -1526,6 +1526,42 @@ class LLMLWDataProvider(LWBaseDataProvider):
             logger.error(f"获取每日摘要失败: {e}")
             return []
 
+
+
+    def query_goal_stats(self, start_time: str, end_time: str) -> List[Dict[str, Any]]:
+        """
+        查询指定时间段内各目标的时间投入统计
+        
+        Args:
+            start_time: 开始时间 YYYY-MM-DD HH:MM:SS
+            end_time: 结束时间 YYYY-MM-DD HH:MM:SS
+            
+        Returns:
+            List[Dict]: 包含 name, duration, percentage
+        """
+        # 复用 get_goal_time_spent 获取原始数据
+        raw_data = self.get_goal_time_spent(start_time, end_time)
+        
+        if not raw_data:
+            return []
+            
+        total_duration = sum(d['duration_seconds'] for d in raw_data.values())
+        
+        stats = []
+        for gid, info in raw_data.items():
+            duration = info['duration_seconds']
+            percentage = round(duration / total_duration * 100, 1) if total_duration > 0 else 0
+            stats.append({
+                "name": info['name'],
+                "duration": duration,
+                "percentage": percentage
+            })
+            
+        # 按时长降序排序
+        stats.sort(key=lambda x: x['duration'], reverse=True)
+        
+        return stats
+
 llm_lw_data_provider = LazySingleton(LLMLWDataProvider)
 
 if __name__ == "__main__":

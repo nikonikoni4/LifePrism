@@ -94,6 +94,22 @@ def format_goal_time_spent(goals: dict) -> str:
     return "\n".join(lines)
 
 
+def format_goal_stats(goal_stats: list) -> str:
+    """格式化目标投入统计"""
+    if not goal_stats:
+        return "在此期间没有检测到与目标相关的活动。"
+        
+    lines = []
+    lines.append(f"目标投入统计：")
+    for item in goal_stats:
+        name = item['name']
+        duration_str = format_seconds(item['duration'])
+        pct = item['percentage']
+        lines.append(f"- {name}: {duration_str} ({pct}%)")
+        
+    return "\n".join(lines)
+
+
 def format_user_notes(notes: list) -> str:
     """格式化用户备注数据"""
     if not notes:
