@@ -4,7 +4,8 @@
 date : 2025.12.17 
 """
 # Date: 2025/12/17
-from lifeprism.llm.llm_classify.schemas.classify_shemas import classifyState,Goal,AppInFo,classifyStateLogitems
+from httpcore import __name
+from lifeprism.llm.llm_classify.schemas.classify_shemas import classifyState,Goal,AppInFo,classifyStateLogitems,LogItem
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import SystemMessage, HumanMessage,AIMessage
 from lifeprism.llm.llm_classify.utils import (
@@ -550,52 +551,90 @@ class ClassifyGraph:
         }
 
 if __name__ == "__main__":
-    from lifeprism.llm.llm_classify.classify.data_loader import get_real_data,filter_by_duration,deduplicate_log_items
+    # 简易测试用例
+    print("=== 开始运行简易测试用例 ===")
     
-    def get_state(hours = 36) -> tuple:
-        state, goals, category_tree = get_real_data(hours=hours)
-        state = filter_by_duration(state, min_duration=60)
-        state = deduplicate_log_items(state)
-        #print(f"\n去重后的日志（前10条）:")
-        for item in state.log_items[:10]:
-            multipurpose = "多用途" if state.app_registry[item.app].is_multipurpose else "单用途"
-            #print(f"  {item.app} ({multipurpose}) | {item.title} | {item.duration}s")
+    # 1. 定义测试数据
+
+    
+    mock_category_tree = {
+        "学习": ["编程", "阅读"],
+        "娱乐": ["视频", "游戏", "社交"],
+        "工作": ["会议", "文档"]
+    }
+
+    # 2. 构造应用注册表 (AppInfo)
+    # 模拟已知应用，部分带有描述，部分没有（测试描述生成暂不涉及，这里模拟已有描述以加快测试）
+    mock_app_registry = {
+        "Code.exe": AppInFo(
+            description="Visual Studio Code - 代码编辑器", 
+            is_multipurpose=False,
+            titles=["main.py - Visual Studio Code"]
+        ),
+        "Chrome.exe": AppInFo(
+            description="Google Chrome - 网页浏览器", 
+            is_multipurpose=True, # 多用途应用，需要根据Title分析
+            titles=[]
+        ),
+        "WeChat.exe": AppInFo(
+            description="微信 - 社交软件", 
+            is_multipurpose=False,
+            titles=["微信"]
+        )
+    }
+
+    # 3. 构造日志条目 (LogItem)
+    mock_log_items = [
+        # 单用途：编程 -> 预期：学习/编程
+        LogItem(id=1, app="Code.exe", duration=1200, title="classify_graph.py - LifePrism"),
+        # 多用途：学习/编程 -> 预期：学习/阅读 或 学习/编程
+        LogItem(id=2, app="Chrome.exe", duration=300, title="LangGraph Documentation - Google Chrome"),
+        # 多用途：娱乐/视频 -> 预期：娱乐/视频
+        LogItem(id=3, app="Chrome.exe", duration=600, title="Bilibili - 搞笑视频 - Google Chrome"),
+        # 单用途：娱乐/社交 -> 预期：娱乐/社交
+        LogItem(id=4, app="WeChat.exe", duration=100, title="微信")
+    ]
+
+    # 4. 初始化状态
+    initial_state = classifyState(
+        app_registry=mock_app_registry,
+        log_items=mock_log_items
+    )
+ 
+    # 5. 初始化图并运行
+    try:
+        classifier = ClassifyGraph([],category_tree=mock_category_tree)
+        config = {"configurable": {"thread_id": "test-thread-simple-001"}}
         
-        # 测试过滤功能
-        #print(f"\n测试过滤功能（只保留 duration >= 60 秒的记录）:")
-        #print(f"  - 过滤后 log_items: {len(state.log_items)} 条")
-        #print(f"  - 过滤后 app_registry: {len(state.app_registry)} 个应用")
-        return state, goals, category_tree
-    
-    main_state, goals, category_tree = get_state(hours=18)
-    llm_classify = ClassifyGraph(goal=goals, category_tree=category_tree)
-    config = {"configurable": {"thread_id": "thread-1"}}
-    output = llm_classify.app.invoke(main_state, config)
-    print(output)
-    if "result_items" in output:
-        result_items = output["result_items"]
-        print("\n" + "="*80)
-        print("📝 分类结果")
-        print("="*80)
-        print(f"  共 {len(result_items)} 条记录")
-        print("-"*80)
-        for item in result_items:
-            goal_str = f"🎯 {item.link_to_goal}" if item.link_to_goal else ""
-            category_str = f"{item.category or '未分类'}/{item.sub_category or '-'}"
-            print(f"  [{item.id}] {item.app:<15} | {category_str:<20} | {item.duration:>5}s | {goal_str}")
-            if item.title:
-                print(f"        └─ 标题: {item.title[:55]}{'...' if len(item.title) > 55 else ''}")
-            if item.title_analysis:
-                print(f"        └─ 分析: {item.title_analysis[:55]}{'...' if len(item.title_analysis) > 55 else ''}")
-        print("="*80)
-    
-    # 计算并格式化输出 tokens
-    tokens_usage = llm_classify.get_total_tokens_usage()
-    print("\n" + "="*50)
-    print("📊 Token 使用统计")
-    print("="*50)
-    print(f"  输入 tokens:  {tokens_usage['input_tokens']:,}")
-    print(f"  输出 tokens:  {tokens_usage['output_tokens']:,}")
-    print(f"  总 tokens:    {tokens_usage['total_tokens']:,}")
-    print(f"  搜索次数:     {tokens_usage['search_count']}")
-    print("="*50)
+        print("正在调用分类工作流...")
+        output = classifier.app.invoke(initial_state, config)
+
+        # 6. 输出结果
+        print("\n" + "="*60)
+        print("📝 测试分类结果")
+        print("="*60)
+        
+        if "result_items" in output and output["result_items"]:
+            result_items = output["result_items"]
+            # 按ID排序
+            result_items.sort(key=lambda x: x.id)
+            
+            for item in result_items:
+                category_info = f"{item.category or 'None'}/{item.sub_category or 'None'}"
+                goal_link = f" (关联目标: {item.link_to_goal})" if item.link_to_goal else ""
+                print(f"[ID:{item.id}] App: {item.app}")
+                print(f"      Title: {item.title}")
+                print(f"      结果: {category_info}{goal_link}")
+                if item.title_analysis:
+                    print(f"      分析: {item.title_analysis}")
+                print("-" * 60)
+        else:
+            print("❌ 未返回 result_items，请检查执行日志。")
+
+        # 7. Token 统计
+        print("\nToken Usage:", classifier.get_total_tokens_usage())
+
+    except Exception as e:
+        print(f"❌ 测试运行出错: {e}")
+        import traceback
+        traceback.print_exc()

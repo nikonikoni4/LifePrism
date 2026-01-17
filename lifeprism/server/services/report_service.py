@@ -359,7 +359,7 @@ async def get_daily_ai_summary(date: str, pattern: str) -> dict:
     return result
 
 
-async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, pattern: List[str]) -> dict:
+async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, pattern: str) -> dict:
     """
     获取周 AI 总结（异步版本）
     
@@ -368,9 +368,7 @@ async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, patter
     Args:
         week_start_date: 周开始日期 YYYY-MM-DD（周一）
         week_end_date: 周结束日期 YYYY-MM-DD（周日）
-        pattern: 总结模式
-            - complex: 复杂模式，包含更多统计信息
-            - simple: 简单模式，只包含基本统计信息
+        pattern: 总结模式，可选值: "simple", "complex", "custom"
         
     Returns:
         dict: 包含 content 和 tokens_usage 的字典
@@ -381,13 +379,9 @@ async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, patter
     
     logger.info(f"生成周 AI 总结 {week_start_date} ~ {week_end_date}, pattern={pattern}")
     
-    start_time = f"{week_start_date} 00:00:00"
-    end_time = f"{week_end_date} 23:59:59"
-    
     result = await multi_days_summary(
-        start_time=start_time,
-        end_time=end_time,
-        split_count=7,  # 周报按7天分割
+        start_date=week_start_date,
+        end_date=week_end_date,
         pattern=pattern
     )
     
@@ -403,7 +397,7 @@ async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, patter
     return result
 
 
-async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, pattern: List[str]) -> dict:
+async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, pattern: str = "custom") -> dict:
     """
     获取月 AI 总结（异步版本）
     
@@ -412,13 +406,7 @@ async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, pat
     Args:
         month_start_date: 月开始日期 YYYY-MM-01
         month_end_date: 月结束日期 YYYY-MM-DD（月末）
-        pattern: 总结选项列表
-            - behavior_stats: 各时段的主分类和子分类的占比统计
-            - longest_activities: 各时段内最长的活动记录
-            - goal_time_spent: 各目标花费的时间
-            - user_notes: 用户手动添加的时间块备注
-            - tasks: 本月重点内容
-            - all: 所有选项
+        pattern: 总结模式，可选值: "simple", "complex", "custom"
         
     Returns:
         dict: 包含 content 和 tokens_usage 的字典
@@ -429,21 +417,9 @@ async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, pat
     
     logger.info(f"生成月 AI 总结 {month_start_date} ~ {month_end_date}, pattern={pattern}")
     
-    start_time = f"{month_start_date} 00:00:00"
-    end_time = f"{month_end_date} 23:59:59"
-    
-    # 计算天数用于 split_count
-    start_dt = datetime.strptime(month_start_date, '%Y-%m-%d')
-    end_dt = datetime.strptime(month_end_date, '%Y-%m-%d')
-    days = (end_dt - start_dt).days + 1
-    
-    # 月报分割为4段（约每周一段）
-    split_count = min(4, days)
-    
     result = await multi_days_summary(
-        start_time=start_time,
-        end_time=end_time,
-        split_count=split_count,
+        start_date=month_start_date,
+        end_date=month_end_date,
         pattern=pattern
     )
     

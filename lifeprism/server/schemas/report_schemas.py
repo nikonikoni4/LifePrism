@@ -216,8 +216,8 @@ class WeeklyAISummaryRequest(BaseModel):
     week_start_date: str = Field(..., description="周开始日期 YYYY-MM-DD（周一）")
     week_end_date: str = Field(..., description="周结束日期 YYYY-MM-DD（周日）")
     pattern: Optional[str] = Field(
-        default="complex", 
-        description="总结模式，如 complex, simple"
+        default="custom", 
+        description="总结模式，可选值: simple, complex, custom"
     )
 
 
@@ -227,7 +227,7 @@ class MonthlyAISummaryRequest(BaseModel):
     month_end_date: str = Field(..., description="月结束日期 YYYY-MM-DD（月末）")
     pattern: Optional[str] = Field(
         default="complex", 
-        description="总结模式，如 complex, simple"
+        description="总结模式，可选值: simple, complex, custom"
     )
 
 
