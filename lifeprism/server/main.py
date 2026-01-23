@@ -24,7 +24,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
-_step_start = _log_startup_time("✓ 核心库导入 (contextlib, fastapi, logging)", _step_start)
+_step_start = _log_startup_time("[OK] Core imports (contextlib, fastapi, logging)", _step_start)
 
 # ==================== API 路由导入 ====================
 print("[STARTUP] 正在导入 API 路由模块...")
@@ -73,7 +73,7 @@ _import_start = time.perf_counter()
 from lifeprism.server.api import being_router
 _log_startup_time("  - being_router", _import_start)
 
-_step_start = _log_startup_time("✓ API 路由模块导入完成", _step_start)
+_step_start = _log_startup_time("[OK] API routers imported", _step_start)
 
 # ==================== 数据库模块导入 ====================
 print("[STARTUP] 正在导入数据库模块...")
@@ -85,7 +85,7 @@ _import_start = time.perf_counter()
 from lifeprism.server.providers.category_color_provider import initialize_category_colors
 _log_startup_time("  - category_color_provider.initialize_category_colors", _import_start)
 
-_step_start = _log_startup_time("✓ 数据库模块导入完成", _step_start)
+_step_start = _log_startup_time("[OK] Database modules imported", _step_start)
 
 logger = logging.getLogger(__name__)
 
@@ -107,20 +107,20 @@ async def lifespan(app: FastAPI):
     try:
         _init_start = time.perf_counter()
         init_database()
-        _log_startup_time("✓ 数据库表结构初始化 (init_database)", _init_start)
+        _log_startup_time("[OK] Database tables init (init_database)", _init_start)
         
         _color_start = time.perf_counter()
         initialize_category_colors()
-        _log_startup_time("✓ 分类颜色初始化 (initialize_category_colors)", _color_start)
+        _log_startup_time("[OK] Category colors init (initialize_category_colors)", _color_start)
         
         _total_lifespan = (time.perf_counter() - _startup_timer) * 1000
         print(f"\n{'='*60}")
-        print(f"[STARTUP] ✅ 应用初始化完成！总耗时: {_total_lifespan:.2f}ms")
+        print(f"[STARTUP] [DONE] App init complete! Total: {_total_lifespan:.2f}ms")
         print(f"{'='*60}\n")
         
-        logger.info("✅ 数据库初始化成功")
+        logger.info("[DONE] Database initialized successfully")
     except Exception as e:
-        logger.error(f"❌ 数据库初始化失败: {e}")
+        logger.error(f"[ERROR] Database init failed: {e}")
         raise
     
     # 初始化 ChatBot 服务（可选，延迟初始化也可以）
@@ -169,7 +169,7 @@ app = FastAPI(
     真实数据实现将在第二阶段完成。
     """,
 )
-_log_startup_time("✓ FastAPI 应用实例创建", _app_start)
+_log_startup_time("[OK] FastAPI app created", _app_start)
 
 # 配置 CORS 中间件（允许前端跨域访问）
 _cors_start = time.perf_counter()
@@ -189,7 +189,7 @@ app.add_middleware(
     allow_methods=["*"],  # 允许所有 HTTP 方法
     allow_headers=["*"],  # 允许所有请求头
 )
-_log_startup_time("✓ CORS 中间件配置", _cors_start)
+_log_startup_time("[OK] CORS middleware configured", _cors_start)
 
 # ==================== 注册 API 路由 ====================
 print("[STARTUP] 正在注册 API 路由...")
@@ -207,7 +207,7 @@ app.include_router(reward_router, prefix="/api/v2")  # Reward
 app.include_router(report_router, prefix="/api/v2")  # Report 日报告
 app.include_router(being_router, prefix="/api/v2")  # Being 时间悖论测试
 
-_log_startup_time("✓ API 路由注册完成 (共 11 个路由)", _router_start)
+_log_startup_time("[OK] API routers registered (11 routers)", _router_start)
 
 # 模块加载阶段总结
 _module_load_total = (time.perf_counter() - _startup_timer) * 1000
