@@ -25,7 +25,7 @@ from langgraph.types import Send,RetryPolicy
 from langgraph.store.memory import InMemoryStore
 import time
 import uuid
-MAX_LOG_ITEMS = 15
+MAX_LOG_ITEMS = 10
 MAX_TITLE_ITEMS = 5
 TEST_FLAG = False
 
@@ -326,11 +326,14 @@ class ClassifyGraph:
             
             # 打印原始响应内容以便调试
             #print(f"\n=== LLM 原始响应 (批次 {batch_num}) ===")
-            #print(result.content)
+            #print(result.content) 
             #print("=== 响应结束 ===\n")
             
             # 解析 JSON 结果（先清理可能的代码块标记）
             clean_content = extract_json_from_response(result.content)
+            if not clean_content:
+                logger.error(f"single_classify 批次 {batch_num} LLM返回空内容，原始响应: {result.content[:200] if result.content else 'None'}")
+                raise ValueError(f"LLM returned empty content in single_classify batch {batch_num}")
             classification_result = json.loads(clean_content)
             logger.info(f"single_classify 批次 {batch_num} 成功获取分类结果")
             
@@ -437,6 +440,9 @@ class ClassifyGraph:
             
             # 解析 JSON 结果（先清理可能的代码块标记）
             clean_content = extract_json_from_response(result.content)
+            if not clean_content:
+                logger.error(f"multi_classify_short 批次 {batch_num} LLM返回空内容，原始响应: {result.content[:200] if result.content else 'None'}")
+                raise ValueError(f"LLM returned empty content in multi_classify_short batch {batch_num}")
             classification_result = json.loads(clean_content)
             logger.info(f"multi_classify_short 批次 {batch_num} 成功获取分类结果")
             
@@ -539,6 +545,9 @@ class ClassifyGraph:
             
             # 解析 JSON 结果（先清理可能的代码块标记）
             clean_content = extract_json_from_response(result.content)
+            if not clean_content:
+                logger.error(f"multi_classify_long 批次 {batch_num} LLM返回空内容，原始响应: {result.content[:200] if result.content else 'None'}")
+                raise ValueError(f"LLM returned empty content in multi_classify_long batch {batch_num}")
             classification_result = json.loads(clean_content)
             logger.info(f"multi_classify_long 批次 {batch_num} 成功获取分类结果")
             
