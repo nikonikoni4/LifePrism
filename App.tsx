@@ -13,10 +13,12 @@ import GoalsPage from './page/goals/GoalsPage';
 import ReportsPage from './page/reports/ReportsPage';
 import SettingsPage from './page/settings/SettingsPage';
 
+
 function App() {
   const [chatDisplayMode, setChatDisplayMode] = useState<ChatDisplayMode>('hidden');
   const [chatPanelWidth, setChatPanelWidth] = useState(0); // 聊天面板宽度
   const [isLargeScreen, setIsLargeScreen] = useState(false); // 是否为大屏幕
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // 侧边栏折叠状态
   const [currentPage, setCurrentPage] = useState('home');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -90,11 +92,13 @@ function App() {
         currentPage={currentPage}
         onNavigate={setCurrentPage}
         onChatToggle={() => setChatDisplayMode(prev => prev === 'hidden' ? 'sidebar' : 'hidden')}
+        isCollapsed={isSidebarCollapsed}
+        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
 
       {/* Main Content Area (Center) */}
       <main
-        className="lg:ml-64 p-6 lg:p-10 min-h-screen transition-all duration-300 ease-in-out"
+        className={`p-6 lg:p-10 min-h-screen transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}
         style={{ marginRight: isLargeScreen && chatPanelWidth > 0 ? `${chatPanelWidth}px` : undefined }}
       >
         {currentPage === 'home' && <Home onNavigate={setCurrentPage} />}
@@ -103,6 +107,7 @@ function App() {
         {currentPage === 'goals' && <GoalsPage />}
         {currentPage === 'reports' && <ReportsPage />}
         {currentPage === 'usage' && <UsagePage />}
+
         {currentPage === 'settings' && <SettingsPage />}
       </main>
 

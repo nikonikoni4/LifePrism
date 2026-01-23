@@ -6,7 +6,7 @@ import PlanTabView from './components/PlanTabView';
 import GoalTabView from './components/GoalTabView';
 import GoalDetailView from './components/GoalDetailView';
 import RewardTabView from './components/RewardTabView';
-import BeingTabView from './components/BeingTabView';
+// import BeingTabView from './components/BeingTabView';
 import { UserGoal } from './types';
 
 type TabType = 'todo' | 'plan' | 'goal' | 'reward' | 'being';
@@ -56,7 +56,7 @@ const GoalsPage: React.FC = () => {
         { id: 'plan', label: 'Plan' },
         { id: 'goal', label: 'Goal' },
         { id: 'reward', label: 'Reward' },
-        { id: 'being', label: 'Being' },
+        // { id: 'being', label: 'Being' },
     ];
 
     return (
@@ -132,7 +132,7 @@ const GoalsPage: React.FC = () => {
                 )}
 
                 {/* Being Tab - Full width without container constraints */}
-                {activeTab === 'being' && <BeingTabView />}
+                {/* {activeTab === 'being' && <BeingTabView />} */}
 
                 {/* Other tabs with container constraints */}
                 {activeTab !== 'todo' && activeTab !== 'plan' && activeTab !== 'being' && (
