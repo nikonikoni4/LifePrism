@@ -15,6 +15,7 @@ from lifeprism.llm.llm_classify.tools.database_tools import (
     query_goal_time_distribution
 )
 from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
+import os
 import logging
 import asyncio
 from lifeprism.llm.llm_linear_executor.llm_linear_executor.os_plan import load_plan_from_template
@@ -24,8 +25,24 @@ from lifeprism.llm.llm_classify.providers.llm_lw_data_provider import llm_lw_dat
 from lifeprism.llm.llm_linear_executor.llm_linear_executor.llm_factory import create_llm_factory
 from lifeprism.config import settings 
 logger = logging.getLogger(__name__)
-daily_json_path = "lifeprism/llm/custom_prompt/workflow/daily_summary_plan.json"
-multi_days_json_path = "lifeprism/llm/custom_prompt/workflow/weekly_summary_plan.json"
+def get_workflow_path(default_path):
+    # Check default path first
+    if os.path.exists(default_path):
+        return default_path
+    
+    # Check customData path if default doesn't exist
+    custom_data_path = os.environ.get("CUSTOM_DATA_PATH")
+    if custom_data_path:
+        filename = os.path.basename(default_path)
+        custom_path = os.path.join(custom_data_path, "workflow", filename)
+        if os.path.exists(custom_path):
+            logger.info(f"Using custom workflow path: {custom_path}")
+            return custom_path
+            
+    return default_path
+
+daily_json_path = get_workflow_path("lifeprism/llm/custom_prompt/workflow/daily_summary_plan.json")
+multi_days_json_path = get_workflow_path("lifeprism/llm/custom_prompt/workflow/weekly_summary_plan.json")
 
 async def daily_summary(date : str, pattern ="complex"):
     """
