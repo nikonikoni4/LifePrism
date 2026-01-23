@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { initCacheCleanup } from './utils/cacheManager';
+import './src/styles/main.css';
 
 // 初始化缓存清理
 initCacheCleanup();
