@@ -21,3 +21,5 @@ test
 .pytest_cache
 simple-llm-workflow
 my_notes
+pyinstaller-dist
+build
