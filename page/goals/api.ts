@@ -1,7 +1,7 @@
 
 import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, RewardItem, RewardStatsResponse, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse, CreateGoalRequest, UpdateGoalRequest, GoalListResponse, CategoryTreeResponse, ActiveGoalNamesResponse, GoalsWithCategoryResponse, MilestoneItem } from "./types";
 
-const API_BASE = '/api/v2/goal';
+const API_BASE = 'http://localhost:8000/api/v2/goal';
 
 // ============================================================================
 // TodoList API - 真实后端接口
@@ -282,7 +282,7 @@ export const planApi = {
 // Goal API - 真实后端接口
 // ============================================================================
 
-const CATEGORY_API_BASE = '/api/v2/category';
+const CATEGORY_API_BASE = 'http://localhost:8000/api/v2/category';
 
 export const goalApi = {
     // 获取目标列表
@@ -774,7 +774,7 @@ import {
     WhoIWantToBeData
 } from './types';
 
-const BEING_API_BASE = '/api/v2/being';
+const BEING_API_BASE = 'http://localhost:8000/api/v2/being';
 
 export const beingApi = {
     /**
