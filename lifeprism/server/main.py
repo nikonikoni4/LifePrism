@@ -2,26 +2,91 @@
 LifeWatch Server - FastAPI 主应用程序
 """
 
+# ==================== 启动时间追踪 ====================
+import time
+_startup_timer = time.perf_counter()
+
+def _log_startup_time(step_name: str, start_time: float) -> float:
+    """记录启动步骤耗时并返回当前时间"""
+    current = time.perf_counter()
+    elapsed = (current - start_time) * 1000  # 转换为毫秒
+    total = (current - _startup_timer) * 1000
+    print(f"[STARTUP] {step_name}: {elapsed:.2f}ms (累计: {total:.2f}ms)")
+    return current
+
+_step_start = _startup_timer
+print(f"\n{'='*60}")
+print("[STARTUP] 开始追踪服务器启动时间...")
+print(f"{'='*60}")
+
+# ==================== 核心库导入 ====================
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+_step_start = _log_startup_time("✓ 核心库导入 (contextlib, fastapi, logging)", _step_start)
 
-from lifeprism.server.api import (
-    sync_router,
-    category_v2_router, 
-    activity_v2_router, 
-    timeline_v2_router,
-    usage_router,
-    goal_router,
-    chatbot_router,
-    setting_router,
-    reward_router,
-    report_router,
-    being_router,
-)
+# ==================== API 路由导入 ====================
+print("[STARTUP] 正在导入 API 路由模块...")
+_import_start = time.perf_counter()
+
+from lifeprism.server.api import sync_router
+_log_startup_time("  - sync_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import category_v2_router
+_log_startup_time("  - category_v2_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import activity_v2_router
+_log_startup_time("  - activity_v2_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import timeline_v2_router
+_log_startup_time("  - timeline_v2_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import usage_router
+_log_startup_time("  - usage_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import goal_router
+_log_startup_time("  - goal_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import chatbot_router
+_log_startup_time("  - chatbot_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import setting_router
+_log_startup_time("  - setting_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import reward_router
+_log_startup_time("  - reward_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import report_router
+_log_startup_time("  - report_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import being_router
+_log_startup_time("  - being_router", _import_start)
+
+_step_start = _log_startup_time("✓ API 路由模块导入完成", _step_start)
+
+# ==================== 数据库模块导入 ====================
+print("[STARTUP] 正在导入数据库模块...")
+_import_start = time.perf_counter()
 from lifeprism.storage.lw_table_manager import init_database
+_log_startup_time("  - lw_table_manager.init_database", _import_start)
+
+_import_start = time.perf_counter()
 from lifeprism.server.providers.category_color_provider import initialize_category_colors
+_log_startup_time("  - category_color_provider.initialize_category_colors", _import_start)
+
+_step_start = _log_startup_time("✓ 数据库模块导入完成", _step_start)
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,11 +98,26 @@ async def lifespan(app: FastAPI):
     在应用启动时初始化数据库
     注：数据库连接池清理由 DatabaseManager 的 atexit 处理
     """
+    print(f"\n{'='*60}")
+    print("[STARTUP] 进入 lifespan - 应用初始化阶段")
+    print(f"{'='*60}")
+    
     # 启动时：初始化数据库表结构
     logger.info("正在初始化 LifeWatch 数据库...")
     try:
+        _init_start = time.perf_counter()
         init_database()
+        _log_startup_time("✓ 数据库表结构初始化 (init_database)", _init_start)
+        
+        _color_start = time.perf_counter()
         initialize_category_colors()
+        _log_startup_time("✓ 分类颜色初始化 (initialize_category_colors)", _color_start)
+        
+        _total_lifespan = (time.perf_counter() - _startup_timer) * 1000
+        print(f"\n{'='*60}")
+        print(f"[STARTUP] ✅ 应用初始化完成！总耗时: {_total_lifespan:.2f}ms")
+        print(f"{'='*60}\n")
+        
         logger.info("✅ 数据库初始化成功")
     except Exception as e:
         logger.error(f"❌ 数据库初始化失败: {e}")
@@ -56,8 +136,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"ChatBot 服务关闭时出现警告: {e}")
 
+# ==================== 创建 FastAPI 应用实例 ====================
+print("[STARTUP] 正在创建 FastAPI 应用实例...")
+_app_start = time.perf_counter()
 
-# 创建 FastAPI 应用实例
 app = FastAPI(
     lifespan=lifespan,  # 添加生命周期管理
     title="LifeWatch API",
@@ -87,8 +169,10 @@ app = FastAPI(
     真实数据实现将在第二阶段完成。
     """,
 )
+_log_startup_time("✓ FastAPI 应用实例创建", _app_start)
 
 # 配置 CORS 中间件（允许前端跨域访问）
+_cors_start = time.perf_counter()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -105,10 +189,13 @@ app.add_middleware(
     allow_methods=["*"],  # 允许所有 HTTP 方法
     allow_headers=["*"],  # 允许所有请求头
 )
+_log_startup_time("✓ CORS 中间件配置", _cors_start)
 
-# 注册 API 路由
+# ==================== 注册 API 路由 ====================
+print("[STARTUP] 正在注册 API 路由...")
+_router_start = time.perf_counter()
+
 app.include_router(sync_router, prefix="/api/v2")
-# V2 API 路由
 app.include_router(category_v2_router, prefix="/api/v2")
 app.include_router(activity_v2_router, prefix="/api/v2")
 app.include_router(timeline_v2_router, prefix="/api/v2")  # 已包含 /api/v2/timeline 前缀
@@ -119,6 +206,15 @@ app.include_router(setting_router, prefix="/api/v2")  # Settings
 app.include_router(reward_router, prefix="/api/v2")  # Reward
 app.include_router(report_router, prefix="/api/v2")  # Report 日报告
 app.include_router(being_router, prefix="/api/v2")  # Being 时间悖论测试
+
+_log_startup_time("✓ API 路由注册完成 (共 11 个路由)", _router_start)
+
+# 模块加载阶段总结
+_module_load_total = (time.perf_counter() - _startup_timer) * 1000
+print(f"\n{'='*60}")
+print(f"[STARTUP] 模块加载阶段完成！总耗时: {_module_load_total:.2f}ms")
+print(f"[STARTUP] (数据库初始化将在 uvicorn 启动后的 lifespan 阶段执行)")
+print(f"{'='*60}\n")
 
 
 
