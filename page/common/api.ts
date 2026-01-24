@@ -11,8 +11,10 @@ import {
     ActivityLogsResponse,
     ActivityLogsParams
 } from './types';
+import { createApiV2UrlGetter } from '../../services/apiConfig';
 
-const API_BASE = 'http://localhost:8000/api/v2';
+// 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
+const getApiBase = createApiV2UrlGetter();
 
 // ============================================================================
 // Category API
@@ -26,7 +28,7 @@ export const CategoryAPI = {
      * @returns 分类树数据
      */
     async getTree(depth: number = 2): Promise<CategoryTreeItem[]> {
-        const response = await fetch(`${API_BASE}/category/tree?depth=${depth}`);
+        const response = await fetch(`${getApiBase()}/category/tree?depth=${depth}`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch category tree: ${response.statusText}`);
@@ -76,7 +78,7 @@ export const ActivityLogsAPI = {
             searchParams.set('page_size', params.page_size.toString());
         }
 
-        const response = await fetch(`${API_BASE}/activity/logs?${searchParams.toString()}`);
+        const response = await fetch(`${getApiBase()}/activity/logs?${searchParams.toString()}`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch activity logs: ${response.statusText}`);
@@ -91,7 +93,7 @@ export const ActivityLogsAPI = {
         params.set('category_id', categoryId);
         if (subCategoryId) params.set('sub_category_id', subCategoryId);
 
-        const response = await fetch(`${API_BASE}/activity/manage/logs/${logId}/category?${params.toString()}`, {
+        const response = await fetch(`${getApiBase()}/activity/manage/logs/${logId}/category?${params.toString()}`, {
             method: 'PATCH',
         });
         if (!response.ok) throw new Error(`Failed to update category: ${response.statusText}`);
@@ -105,7 +107,7 @@ export const ActivityLogsAPI = {
         params.set('category_id', categoryId);
         if (subCategoryId) params.set('sub_category_id', subCategoryId);
 
-        const response = await fetch(`${API_BASE}/activity/manage/logs/batch-category?${params.toString()}`, {
+        const response = await fetch(`${getApiBase()}/activity/manage/logs/batch-category?${params.toString()}`, {
             method: 'POST',
         });
         if (!response.ok) throw new Error(`Failed to batch update: ${response.statusText}`);
@@ -114,7 +116,7 @@ export const ActivityLogsAPI = {
 
     /** 删除单条日志 */
     async deleteLog(logId: string): Promise<{ success: boolean; message: string }> {
-        const response = await fetch(`${API_BASE}/activity/manage/logs/${logId}`, {
+        const response = await fetch(`${getApiBase()}/activity/manage/logs/${logId}`, {
             method: 'DELETE',
         });
         if (!response.ok) throw new Error(`Failed to delete log: ${response.statusText}`);
@@ -126,7 +128,7 @@ export const ActivityLogsAPI = {
         const params = new URLSearchParams();
         logIds.forEach(id => params.append('log_ids', id));
 
-        const response = await fetch(`${API_BASE}/activity/manage/logs/batch?${params.toString()}`, {
+        const response = await fetch(`${getApiBase()}/activity/manage/logs/batch?${params.toString()}`, {
             method: 'DELETE',
         });
         if (!response.ok) throw new Error(`Failed to batch delete: ${response.statusText}`);

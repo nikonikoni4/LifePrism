@@ -8,8 +8,10 @@ import {
     TimelineStatsResponse,
     TimelineTimeOverviewResponse,
 } from './types';
+import { createApiV2UrlGetter } from '../../services/apiConfig';
 
-const API_BASE = 'http://localhost:8000/api/v2';
+// 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
+const getApiBase = createApiV2UrlGetter();
 
 // ============================================================================
 // Timeline V2 API - 缩略图相关
@@ -35,7 +37,7 @@ export const TimelineAPIV2 = {
             category_level: categoryLevel,
         });
 
-        const response = await fetch(`${API_BASE}/timeline/stats?${params.toString()}`);
+        const response = await fetch(`${getApiBase()}/timeline/stats?${params.toString()}`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch timeline stats: ${response.statusText}`);
@@ -65,7 +67,7 @@ export const TimelineAPIV2 = {
             end_hour: endHour.toString(),
         });
 
-        const response = await fetch(`${API_BASE}/timeline/overview?${params.toString()}`);
+        const response = await fetch(`${getApiBase()}/timeline/overview?${params.toString()}`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch timeline overview: ${response.statusText}`);

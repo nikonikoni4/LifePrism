@@ -1,7 +1,9 @@
 
 import { ActivityData, AppUsage, GoalItem, TimeDistribution, SubCategoryData, TimelineEvent, CategoryDef, ActivityRecord, TokenUsage, UserGoal, DailyPlan, RewardRecord, RewardItem, RewardStatsResponse, IdentityBeing, TodoItem, SubTodoItem, TodoListResponse, SubTodoListResponse, WeeklyPlanResponse, MonthlyPlanResponse, CreateGoalRequest, UpdateGoalRequest, GoalListResponse, CategoryTreeResponse, ActiveGoalNamesResponse, GoalsWithCategoryResponse, MilestoneItem } from "./types";
+import { createApiV2UrlGetter } from "../../services/apiConfig";
 
-const API_BASE = 'http://localhost:8000/api/v2/goal';
+// 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
+const getApiBase = createApiV2UrlGetter('/goal');
 
 // ============================================================================
 // TodoList API - 真实后端接口
@@ -40,14 +42,14 @@ const toSnakeCase = (data: any): any => {
 export const todoApi = {
     // 获取任务列表
     getTodos: async (date: string, includeCrossDay = true): Promise<TodoListResponse> => {
-        const res = await fetch(`${API_BASE}/todos?date=${date}&include_cross_day=${includeCrossDay}`);
+        const res = await fetch(`${getApiBase()}/todos?date=${date}&include_cross_day=${includeCrossDay}`);
         const data = await res.json();
         return toCamelCase(data);
     },
 
     // 获取任务详情
     getTodoDetail: async (id: number): Promise<TodoItem> => {
-        const res = await fetch(`${API_BASE}/todos/${id}`);
+        const res = await fetch(`${getApiBase()}/todos/${id}`);
         const data = await res.json();
         return toCamelCase(data);
     },
@@ -62,7 +64,7 @@ export const todoApi = {
         expectedFinishedAt?: string | null;
         crossDay?: boolean;
     }): Promise<TodoItem> => {
-        const res = await fetch(`${API_BASE}/todos`, {
+        const res = await fetch(`${getApiBase()}/todos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(toSnakeCase(data))
@@ -81,7 +83,7 @@ export const todoApi = {
         expectedFinishedAt: string | null;
         crossDay: boolean;
     }>): Promise<TodoItem> => {
-        const res = await fetch(`${API_BASE}/todos/${id}`, {
+        const res = await fetch(`${getApiBase()}/todos/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(toSnakeCase(data))
@@ -92,13 +94,13 @@ export const todoApi = {
 
     // 删除任务
     deleteTodo: async (id: number): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/todos/${id}`, { method: 'DELETE' });
+        const res = await fetch(`${getApiBase()}/todos/${id}`, { method: 'DELETE' });
         return res.ok;
     },
 
     // 重排序任务
     reorderTodos: async (todoIds: number[]): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/todos/reorder`, {
+        const res = await fetch(`${getApiBase()}/todos/reorder`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ todo_ids: todoIds })
@@ -108,14 +110,14 @@ export const todoApi = {
 
     // 获取子任务列表
     getSubTodos: async (parentId: number): Promise<SubTodoListResponse> => {
-        const res = await fetch(`${API_BASE}/todos/${parentId}/subtodos`);
+        const res = await fetch(`${getApiBase()}/todos/${parentId}/subtodos`);
         const data = await res.json();
         return toCamelCase(data);
     },
 
     // 创建子任务
     createSubTodo: async (parentId: number, content: string): Promise<SubTodoItem> => {
-        const res = await fetch(`${API_BASE}/subtodos`, {
+        const res = await fetch(`${getApiBase()}/subtodos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parent_id: parentId, content })
@@ -129,7 +131,7 @@ export const todoApi = {
         content: string;
         completed: boolean;
     }>): Promise<SubTodoItem> => {
-        const res = await fetch(`${API_BASE}/subtodos/${id}`, {
+        const res = await fetch(`${getApiBase()}/subtodos/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(toSnakeCase(data))
@@ -140,13 +142,13 @@ export const todoApi = {
 
     // 删除子任务
     deleteSubTodo: async (id: number): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/subtodos/${id}`, { method: 'DELETE' });
+        const res = await fetch(`${getApiBase()}/subtodos/${id}`, { method: 'DELETE' });
         return res.ok;
     },
 
     // 重排序子任务
     reorderSubTodos: async (parentId: number, subTodoIds: number[]): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/subtodos/reorder`, {
+        const res = await fetch(`${getApiBase()}/subtodos/reorder`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parent_id: parentId, sub_todo_ids: subTodoIds })
@@ -158,14 +160,14 @@ export const todoApi = {
 
     // 获取任务池任务列表
     getPoolTodos: async (): Promise<TodoListResponse> => {
-        const res = await fetch(`${API_BASE}/todos/pool`);
+        const res = await fetch(`${getApiBase()}/todos/pool`);
         const data = await res.json();
         return toCamelCase(data);
     },
 
     // 重排序任务池任务
     reorderPoolTodos: async (todoIds: number[]): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/todos/pool/reorder`, {
+        const res = await fetch(`${getApiBase()}/todos/pool/reorder`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ todo_ids: todoIds })
@@ -175,7 +177,7 @@ export const todoApi = {
 
     // 移动任务到文件夹
     moveTodoToFolder: async (todoId: number, folderId: number | null): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/todos/${todoId}/move`, {
+        const res = await fetch(`${getApiBase()}/todos/${todoId}/move`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ folder_id: folderId })
@@ -193,7 +195,7 @@ import { TaskFolder, TaskFolderListResponse } from './types';
 export const folderApi = {
     // 获取所有文件夹
     getFolders: async (): Promise<TaskFolder[]> => {
-        const res = await fetch(`${API_BASE}/pool/folders`);
+        const res = await fetch(`${getApiBase()}/pool/folders`);
         const data = await res.json();
         const result = toCamelCase(data) as TaskFolderListResponse;
         return result.items;
@@ -201,7 +203,7 @@ export const folderApi = {
 
     // 创建文件夹
     createFolder: async (name: string): Promise<TaskFolder> => {
-        const res = await fetch(`${API_BASE}/pool/folders`, {
+        const res = await fetch(`${getApiBase()}/pool/folders`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name })
@@ -212,7 +214,7 @@ export const folderApi = {
 
     // 更新文件夹
     updateFolder: async (id: number, data: Partial<{ name: string; isExpanded: boolean }>): Promise<TaskFolder> => {
-        const res = await fetch(`${API_BASE}/pool/folders/${id}`, {
+        const res = await fetch(`${getApiBase()}/pool/folders/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(toSnakeCase(data))
@@ -223,13 +225,13 @@ export const folderApi = {
 
     // 删除文件夹
     deleteFolder: async (id: number): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/pool/folders/${id}`, { method: 'DELETE' });
+        const res = await fetch(`${getApiBase()}/pool/folders/${id}`, { method: 'DELETE' });
         return res.ok;
     },
 
     // 重排序文件夹
     reorderFolders: async (folderIds: number[]): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/pool/folders/reorder`, {
+        const res = await fetch(`${getApiBase()}/pool/folders/reorder`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ folder_ids: folderIds })
@@ -245,21 +247,21 @@ export const folderApi = {
 export const planApi = {
     // 获取周计划
     getWeeklyPlan: async (year: number, month: number, weekNum: number): Promise<WeeklyPlanResponse> => {
-        const res = await fetch(`${API_BASE}/plan/weekly?year=${year}&month=${month}&week_num=${weekNum}`);
+        const res = await fetch(`${getApiBase()}/plan/weekly?year=${year}&month=${month}&week_num=${weekNum}`);
         const data = await res.json();
         return toCamelCase(data);
     },
 
     // 获取月计划
     getMonthlyPlan: async (year: number, month: number): Promise<MonthlyPlanResponse> => {
-        const res = await fetch(`${API_BASE}/plan/monthly?year=${year}&month=${month}`);
+        const res = await fetch(`${getApiBase()}/plan/monthly?year=${year}&month=${month}`);
         const data = await res.json();
         return toCamelCase(data);
     },
 
     // 更新日焦点
     upsertDailyFocus: async (date: string, content: string): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/plan/daily-focus`, {
+        const res = await fetch(`${getApiBase()}/plan/daily-focus`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ date, content })
@@ -269,7 +271,7 @@ export const planApi = {
 
     // 更新周焦点
     upsertWeeklyFocus: async (year: number, month: number, weekNum: number, content: string): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/plan/weekly-focus`, {
+        const res = await fetch(`${getApiBase()}/plan/weekly-focus`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ year, month, week_num: weekNum, content })
@@ -282,7 +284,8 @@ export const planApi = {
 // Goal API - 真实后端接口
 // ============================================================================
 
-const CATEGORY_API_BASE = 'http://localhost:8000/api/v2/category';
+// 分类 API getter
+const getCategoryApiBase = createApiV2UrlGetter('/category');
 
 export const goalApi = {
     // 获取目标列表
@@ -299,7 +302,7 @@ export const goalApi = {
         if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString());
 
         const queryString = queryParams.toString();
-        const url = queryString ? `${API_BASE}/goals?${queryString}` : `${API_BASE}/goals`;
+        const url = queryString ? `${getApiBase()}/goals?${queryString}` : `${getApiBase()}/goals`;
         const res = await fetch(url);
         const data = await res.json();
         return toCamelCase(data);
@@ -307,14 +310,14 @@ export const goalApi = {
 
     // 获取目标详情
     getGoalDetail: async (id: string): Promise<UserGoal> => {
-        const res = await fetch(`${API_BASE}/goals/${id}`);
+        const res = await fetch(`${getApiBase()}/goals/${id}`);
         const data = await res.json();
         return toCamelCase(data);
     },
 
     // 创建目标
     createGoal: async (data: CreateGoalRequest): Promise<UserGoal> => {
-        const res = await fetch(`${API_BASE}/goals`, {
+        const res = await fetch(`${getApiBase()}/goals`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(toSnakeCase(data))
@@ -325,7 +328,7 @@ export const goalApi = {
 
     // 更新目标
     updateGoal: async (id: string, data: UpdateGoalRequest): Promise<UserGoal> => {
-        const res = await fetch(`${API_BASE}/goals/${id}`, {
+        const res = await fetch(`${getApiBase()}/goals/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(toSnakeCase(data))
@@ -336,13 +339,13 @@ export const goalApi = {
 
     // 删除目标
     deleteGoal: async (id: string): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/goals/${id}`, { method: 'DELETE' });
+        const res = await fetch(`${getApiBase()}/goals/${id}`, { method: 'DELETE' });
         return res.ok;
     },
 
     // 重排序目标
     reorderGoals: async (goalIds: string[]): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/goals/reorder`, {
+        const res = await fetch(`${getApiBase()}/goals/reorder`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ goal_ids: goalIds })
@@ -352,14 +355,14 @@ export const goalApi = {
 
     // 获取活跃目标名称列表（用于下拉选择）
     getActiveGoalNames: async (): Promise<ActiveGoalNamesResponse> => {
-        const res = await fetch(`${API_BASE}/goals/active-names`);
+        const res = await fetch(`${getApiBase()}/goals/active-names`);
         const data = await res.json();
         return toCamelCase(data);
     },
 
     // 获取绑定了分类的活跃目标列表（用于 Map Cache 编辑）
     getGoalsWithCategory: async (): Promise<GoalsWithCategoryResponse> => {
-        const res = await fetch(`${API_BASE}/goals/with-category`);
+        const res = await fetch(`${getApiBase()}/goals/with-category`);
         const data = await res.json();
         return toCamelCase(data);
     }
@@ -372,7 +375,7 @@ export const goalApi = {
 export const categoryApi = {
     // 获取分类树形结构
     getCategoryTree: async (depth: number = 2): Promise<CategoryTreeResponse> => {
-        const res = await fetch(`${CATEGORY_API_BASE}/tree?depth=${depth}`);
+        const res = await fetch(`${getCategoryApiBase()}/tree?depth=${depth}`);
         const data = await res.json();
         return toCamelCase(data);
     }
@@ -385,7 +388,7 @@ export const categoryApi = {
 export const rewardApi = {
     // 获取所有奖励列表
     getRewards: async (): Promise<RewardItem[]> => {
-        const res = await fetch(`${API_BASE}/rewards`);
+        const res = await fetch(`${getApiBase()}/rewards`);
         const data = await res.json();
         const result = toCamelCase(data);
         return result.items || [];
@@ -393,14 +396,14 @@ export const rewardApi = {
 
     // 获取单个奖励详情
     getRewardDetail: async (id: number): Promise<RewardItem> => {
-        const res = await fetch(`${API_BASE}/rewards/${id}`);
+        const res = await fetch(`${getApiBase()}/rewards/${id}`);
         const data = await res.json();
         return toCamelCase(data);
     },
 
     // 获取奖励统计数据（含历史累积数据）
     getRewardStats: async (id: number): Promise<RewardStatsResponse> => {
-        const res = await fetch(`${API_BASE}/rewards/${id}/stats`);
+        const res = await fetch(`${getApiBase()}/rewards/${id}/stats`);
         const data = await res.json();
         return toCamelCase(data);
     },
@@ -413,7 +416,7 @@ export const rewardApi = {
         targetHours?: number;
         milestones?: string;  // JSON 字符串
     }): Promise<RewardItem> => {
-        const res = await fetch(`${API_BASE}/rewards`, {
+        const res = await fetch(`${getApiBase()}/rewards`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(toSnakeCase(data))
@@ -430,7 +433,7 @@ export const rewardApi = {
         targetHours: number;
         milestones: string;  // JSON 字符串
     }>): Promise<RewardItem> => {
-        const res = await fetch(`${API_BASE}/rewards/${id}`, {
+        const res = await fetch(`${getApiBase()}/rewards/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(toSnakeCase(data))
@@ -441,7 +444,7 @@ export const rewardApi = {
 
     // 删除奖励
     deleteReward: async (id: number): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/rewards/${id}`, { method: 'DELETE' });
+        const res = await fetch(`${getApiBase()}/rewards/${id}`, { method: 'DELETE' });
         return res.ok;
     },
 
@@ -451,7 +454,7 @@ export const rewardApi = {
         milestoneId: string,
         state: number
     ): Promise<RewardItem> => {
-        const res = await fetch(`${API_BASE}/rewards/${rewardId}/milestones/${milestoneId}`, {
+        const res = await fetch(`${getApiBase()}/rewards/${rewardId}/milestones/${milestoneId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ state })
@@ -774,7 +777,8 @@ import {
     WhoIWantToBeData
 } from './types';
 
-const BEING_API_BASE = 'http://localhost:8000/api/v2/being';
+// Being API getter
+const getBeingApiBase = createApiV2UrlGetter('/being');
 
 export const beingApi = {
     /**
@@ -784,7 +788,7 @@ export const beingApi = {
      */
     getLatestTest: async (mode: BeingMode, userId: number = 1): Promise<BeingTestResponse | null> => {
         try {
-            const res = await fetch(`${BEING_API_BASE}/${mode}?user_id=${userId}`);
+            const res = await fetch(`${getBeingApiBase()}/${mode}?user_id=${userId}`);
             if (res.status === 404) {
                 return null;
             }
@@ -805,7 +809,7 @@ export const beingApi = {
      * @param userId 用户 ID，默认为 1
      */
     getVersions: async (mode: BeingMode, userId: number = 1): Promise<BeingVersionListResponse> => {
-        const res = await fetch(`${BEING_API_BASE}/${mode}/versions?user_id=${userId}`);
+        const res = await fetch(`${getBeingApiBase()}/${mode}/versions?user_id=${userId}`);
         const data = await res.json();
         return toCamelCase(data);
     },
@@ -818,7 +822,7 @@ export const beingApi = {
      */
     getTestByVersion: async (mode: BeingMode, version: number, userId: number = 1): Promise<BeingTestResponse | null> => {
         try {
-            const res = await fetch(`${BEING_API_BASE}/${mode}/${version}?user_id=${userId}`);
+            const res = await fetch(`${getBeingApiBase()}/${mode}/${version}?user_id=${userId}`);
             if (res.status === 404) {
                 return null;
             }
@@ -844,7 +848,7 @@ export const beingApi = {
         content: WhoWasIData | WhoAmIData | WhoIWantToBeData,
         userId: number = 1
     ): Promise<BeingTestResponse> => {
-        const res = await fetch(`${BEING_API_BASE}/${mode}?user_id=${userId}`, {
+        const res = await fetch(`${getBeingApiBase()}/${mode}?user_id=${userId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: toSnakeCase(content) })
@@ -866,7 +870,7 @@ export const beingApi = {
         content: WhoWasIData | WhoAmIData | WhoIWantToBeData,
         userId: number = 1
     ): Promise<BeingSuccessResponse> => {
-        const res = await fetch(`${BEING_API_BASE}/${mode}/${version}?user_id=${userId}`, {
+        const res = await fetch(`${getBeingApiBase()}/${mode}/${version}?user_id=${userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: toSnakeCase(content) })
@@ -882,7 +886,7 @@ export const beingApi = {
      * @param userId 用户 ID，默认为 1
      */
     deleteTest: async (mode: BeingMode, version: number, userId: number = 1): Promise<BeingSuccessResponse> => {
-        const res = await fetch(`${BEING_API_BASE}/${mode}/${version}?user_id=${userId}`, {
+        const res = await fetch(`${getBeingApiBase()}/${mode}/${version}?user_id=${userId}`, {
             method: 'DELETE'
         });
         const data = await res.json();
@@ -896,7 +900,7 @@ export const beingApi = {
      * @param userId 用户 ID，默认为 1
      */
     generateAiAbstract: async (mode: BeingMode, version: number, userId: number = 1): Promise<BeingSuccessResponse> => {
-        const res = await fetch(`${BEING_API_BASE}/${mode}/${version}/ai-abstract?user_id=${userId}`, {
+        const res = await fetch(`${getBeingApiBase()}/${mode}/${version}/ai-abstract?user_id=${userId}`, {
             method: 'POST'
         });
         const data = await res.json();

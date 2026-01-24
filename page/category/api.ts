@@ -17,8 +17,10 @@ import {
     UpdateCategoryMapCacheRequest,
     BatchUpdateCategoryMapCacheRequest
 } from './types';
+import { createApiV2UrlGetter } from '../../services/apiConfig';
 
-const API_BASE = 'http://localhost:8000/api/v2/category';
+// 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
+const getApiBase = createApiV2UrlGetter('/category');
 
 /**
  * Category V2 API Client
@@ -31,7 +33,7 @@ export const CategoryAPI = {
      * @returns 分类树数据
      */
     async getTree(depth: number = 2): Promise<CategoryTreeItem[]> {
-        const response = await fetch(`${API_BASE}/tree?depth=${depth}`);
+        const response = await fetch(`${getApiBase()}/tree?depth=${depth}`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch category tree: ${response.statusText}`);
@@ -48,7 +50,7 @@ export const CategoryAPI = {
      * @returns 创建的分类
      */
     async createCategory(request: CreateCategoryRequest): Promise<CategoryTreeItem> {
-        const response = await fetch(`${API_BASE}/manage`, {
+        const response = await fetch(`${getApiBase()}/manage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),
@@ -69,7 +71,7 @@ export const CategoryAPI = {
      * @returns 更新后的分类
      */
     async updateCategory(categoryId: string, request: UpdateCategoryRequest): Promise<CategoryTreeItem> {
-        const response = await fetch(`${API_BASE}/manage/${categoryId}`, {
+        const response = await fetch(`${getApiBase()}/manage/${categoryId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),
@@ -90,7 +92,7 @@ export const CategoryAPI = {
      * @returns 标准响应
      */
     async deleteCategory(categoryId: string, reassignTo: string = 'other'): Promise<StandardResponse> {
-        const response = await fetch(`${API_BASE}/manage/${categoryId}`, {
+        const response = await fetch(`${getApiBase()}/manage/${categoryId}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reassign_to: reassignTo }),
@@ -111,7 +113,7 @@ export const CategoryAPI = {
      * @returns 创建的子分类
      */
     async createSubCategory(parentId: string, request: CreateSubCategoryRequest): Promise<SubCategoryTreeItem> {
-        const response = await fetch(`${API_BASE}/manage/${parentId}/sub`, {
+        const response = await fetch(`${getApiBase()}/manage/${parentId}/sub`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),
@@ -137,7 +139,7 @@ export const CategoryAPI = {
         subId: string,
         request: UpdateSubCategoryRequest
     ): Promise<SubCategoryTreeItem> {
-        const response = await fetch(`${API_BASE}/manage/${parentId}/sub/${subId}`, {
+        const response = await fetch(`${getApiBase()}/manage/${parentId}/sub/${subId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),
@@ -158,7 +160,7 @@ export const CategoryAPI = {
      * @returns 标准响应
      */
     async deleteSubCategory(parentId: string, subId: string): Promise<StandardResponse> {
-        const response = await fetch(`${API_BASE}/manage/${parentId}/sub/${subId}`, {
+        const response = await fetch(`${getApiBase()}/manage/${parentId}/sub/${subId}`, {
             method: 'DELETE',
         });
 
@@ -177,7 +179,7 @@ export const CategoryAPI = {
      * @returns 更新后的分类
      */
     async toggleCategoryState(categoryId: string, state: number): Promise<CategoryTreeItem> {
-        const response = await fetch(`${API_BASE}/manage/${categoryId}/state`, {
+        const response = await fetch(`${getApiBase()}/manage/${categoryId}/state`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ state }),
@@ -199,7 +201,7 @@ export const CategoryAPI = {
      * @returns 更新后的子分类
      */
     async toggleSubCategoryState(parentId: string, subId: string, state: number): Promise<SubCategoryTreeItem> {
-        const response = await fetch(`${API_BASE}/manage/${parentId}/sub/${subId}/state`, {
+        const response = await fetch(`${getApiBase()}/manage/${parentId}/sub/${subId}/state`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ state }),
@@ -249,7 +251,7 @@ export const CategoryMapCacheAPI = {
             searchParams.set('is_multipurpose_app', params.is_multipurpose_app.toString());
         }
 
-        const response = await fetch(`${API_BASE}/category_map?${searchParams.toString()}`);
+        const response = await fetch(`${getApiBase()}/category_map?${searchParams.toString()}`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch category map cache: ${response.statusText}`);
@@ -266,7 +268,7 @@ export const CategoryMapCacheAPI = {
      * @returns 标准响应
      */
     async update(recordId: string, data: UpdateCategoryMapCacheRequest): Promise<StandardResponse> {
-        const response = await fetch(`${API_BASE}/category_map/${recordId}`, {
+        const response = await fetch(`${getApiBase()}/category_map/${recordId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: recordId, ...data }),
@@ -286,7 +288,7 @@ export const CategoryMapCacheAPI = {
      * @returns 标准响应
      */
     async batchUpdate(data: BatchUpdateCategoryMapCacheRequest): Promise<StandardResponse> {
-        const response = await fetch(`${API_BASE}/category_map/batch`, {
+        const response = await fetch(`${getApiBase()}/category_map/batch`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -306,7 +308,7 @@ export const CategoryMapCacheAPI = {
      * @returns 标准响应
      */
     async delete(recordId: string): Promise<StandardResponse> {
-        const response = await fetch(`${API_BASE}/category_map/${recordId}`, {
+        const response = await fetch(`${getApiBase()}/category_map/${recordId}`, {
             method: 'DELETE',
         });
 
@@ -324,7 +326,7 @@ export const CategoryMapCacheAPI = {
      * @returns 标准响应
      */
     async batchDelete(ids: string[]): Promise<StandardResponse> {
-        const response = await fetch(`${API_BASE}/category_map/batch`, {
+        const response = await fetch(`${getApiBase()}/category_map/batch`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids }),
@@ -375,8 +377,8 @@ export const CategoryMapCacheAPI = {
             searchParams.set('end_date', params.end_date);
         }
 
-        const ACTIVITY_API_BASE = 'http://localhost:8000/api/v2/activity';
-        const response = await fetch(`${ACTIVITY_API_BASE}/manage/logs/update-by-cache?${searchParams.toString()}`, {
+        const getActivityApiBase = createApiV2UrlGetter('/activity');
+        const response = await fetch(`${getActivityApiBase()}/manage/logs/update-by-cache?${searchParams.toString()}`, {
             method: 'POST',
         });
 

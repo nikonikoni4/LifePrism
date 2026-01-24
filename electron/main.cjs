@@ -90,6 +90,20 @@ ipcMain.handle('get-custom-data-path', () => getCustomDataPath());
 // IPC: 获取应用是否打包
 ipcMain.handle('is-packaged', () => app.isPackaged);
 
+// IPC: 获取配置文件
+ipcMain.handle('get-config', () => {
+    const configPath = path.join(getCustomDataPath(), 'config', 'config.json');
+    try {
+        if (fs.existsSync(configPath)) {
+            const content = fs.readFileSync(configPath, 'utf-8');
+            return JSON.parse(content);
+        }
+    } catch (e) {
+        console.log('[Electron] 读取配置文件失败:', e);
+    }
+    return null;
+});
+
 app.whenReady().then(() => {
     console.log('[Electron] 应用启动中...');
     console.log(`[Electron] CustomData 路径: ${getCustomDataPath()}`);

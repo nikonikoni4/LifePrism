@@ -5,7 +5,10 @@
  * 例如：摘要生成、内容总结等
  */
 
-const API_BASE = 'http://localhost:8000/api/v1';
+import { createApiV1UrlGetter } from './apiConfig';
+
+// 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
+const getApiBase = createApiV1UrlGetter();
 
 /**
  * 发送消息到 Gemini API（流式响应）
@@ -15,7 +18,7 @@ const API_BASE = 'http://localhost:8000/api/v1';
  */
 export async function* sendMessageToGemini(message: string): AsyncGenerator<string, void, unknown> {
     try {
-        const response = await fetch(`${API_BASE}/ai/chat`, {
+        const response = await fetch(`${getApiBase()}/ai/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -58,7 +61,7 @@ export async function* sendMessageToGemini(message: string): AsyncGenerator<stri
  */
 export async function sendMessageToGeminiSync(message: string): Promise<string> {
     try {
-        const response = await fetch(`${API_BASE}/ai/chat`, {
+        const response = await fetch(`${getApiBase()}/ai/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

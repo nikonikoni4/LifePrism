@@ -3,7 +3,10 @@
  * 负责与后端同步 ActivityWatch 数据
  */
 
-const API_BASE_URL = 'http://localhost:8000/api/v2';
+import { createApiV2UrlGetter } from './apiConfig';
+
+// 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
+const getApiBaseUrl = createApiV2UrlGetter();
 
 export interface SyncRequest {
     auto_classify?: boolean;
@@ -37,7 +40,7 @@ export interface SyncResponse {
  */
 export async function incrementalSync(autoClassify: boolean = true): Promise<SyncResponse> {
     try {
-        const response = await fetch(`${API_BASE_URL}/sync/activitywatch`, {
+        const response = await fetch(`${getApiBaseUrl()}/sync/activitywatch`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -68,7 +71,7 @@ export async function syncActivityWatchDataByTimeRange(
     request: SyncTimeRangeRequest
 ): Promise<SyncResponse> {
     try {
-        const response = await fetch(`${API_BASE_URL}/sync/activitywatch/timerange`, {
+        const response = await fetch(`${getApiBaseUrl()}/sync/activitywatch/timerange`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

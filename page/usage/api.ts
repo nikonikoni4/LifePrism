@@ -7,8 +7,10 @@
  */
 
 import { UsageStatsResponse } from './types';
+import { createApiV2UrlGetter } from '../../services/apiConfig';
 
-const API_BASE = 'http://localhost:8000/api/v2';
+// 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
+const getApiBase = createApiV2UrlGetter();
 
 // ============================================================================
 // Usage API
@@ -26,7 +28,7 @@ export const UsageAPI = {
      * // 返回 2025-12-20 当天的使用总览，以及从 2025-12-14 到 2025-12-20 的7天趋势
      */
     async getUsageStats(date: string): Promise<UsageStatsResponse> {
-        const response = await fetch(`${API_BASE}/usage/stats?date=${date}`);
+        const response = await fetch(`${getApiBase()}/usage/stats?date=${date}`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch usage stats: ${response.statusText}`);

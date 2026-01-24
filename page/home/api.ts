@@ -5,8 +5,10 @@
  */
 
 import { ActivityStatsResponse, ActivityStatsParams, CategoryTreeItem } from './types';
+import { createApiV2UrlGetter } from '../../services/apiConfig';
 
-const API_BASE = 'http://localhost:8000/api/v2';
+// 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
+const getApiBase = createApiV2UrlGetter();
 
 /**
  * Activity API
@@ -39,7 +41,7 @@ export const ActivityAPI = {
             searchParams.set('sub_category_id', params.sub_category_id);
         }
 
-        const response = await fetch(`${API_BASE}/activity/stats?${searchParams.toString()}`);
+        const response = await fetch(`${getApiBase()}/activity/stats?${searchParams.toString()}`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch activity stats: ${response.statusText}`);
@@ -103,7 +105,7 @@ export const CategoryAPI = {
      * 获取所有分类（带子分类）
      */
     async getAllCategories(): Promise<CategoryTreeItem[]> {
-        const response = await fetch('http://localhost:8000/api/v2/category/tree?depth=2');
+        const response = await fetch(`${getApiBase()}/category/tree?depth=2`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch categories: ${response.statusText}`);
@@ -123,7 +125,7 @@ export const SyncAPI = {
      * 增量同步（从数据库最新时间开始同步到现在）
      */
     async incrementalSync(autoClassify: boolean = true): Promise<any> {
-        const response = await fetch('http://localhost:8000/api/v2/sync/activitywatch', {
+        const response = await fetch(`${getApiBase()}/sync/activitywatch`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -148,7 +150,7 @@ export const SyncAPI = {
         end_time: string;
         auto_classify?: boolean;
     }): Promise<any> {
-        const response = await fetch('http://localhost:8000/api/v2/sync/activitywatch/timerange', {
+        const response = await fetch(`${getApiBase()}/sync/activitywatch/timerange`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -11,8 +11,10 @@ import {
     UserCustomBlockListResponse,
     UserCustomBlockResponse,
 } from './types';
+import { createApiV2UrlGetter } from '../../../services/apiConfig';
 
-const API_BASE = 'http://localhost:8000/api/v2';
+// 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
+const getApiBase = createApiV2UrlGetter();
 
 export const CustomBlockAPI = {
     /**
@@ -22,7 +24,7 @@ export const CustomBlockAPI = {
      * @returns 创建的时间块（包含服务端生成的 id、category/sub_category 名称、color）
      */
     async create(data: UserCustomBlockCreate): Promise<UserCustomBlock> {
-        const response = await fetch(`${API_BASE}/timeline/custom-blocks`, {
+        const response = await fetch(`${getApiBase()}/timeline/custom-blocks`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -46,7 +48,7 @@ export const CustomBlockAPI = {
      */
     async getByDate(date: string): Promise<UserCustomBlock[]> {
         const params = new URLSearchParams({ date });
-        const response = await fetch(`${API_BASE}/timeline/custom-blocks?${params.toString()}`);
+        const response = await fetch(`${getApiBase()}/timeline/custom-blocks?${params.toString()}`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch custom blocks: ${response.statusText}`);
@@ -63,7 +65,7 @@ export const CustomBlockAPI = {
      * @returns 时间块数据
      */
     async getById(blockId: number): Promise<UserCustomBlock> {
-        const response = await fetch(`${API_BASE}/timeline/custom-blocks/${blockId}`);
+        const response = await fetch(`${getApiBase()}/timeline/custom-blocks/${blockId}`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch custom block: ${response.statusText}`);
@@ -81,7 +83,7 @@ export const CustomBlockAPI = {
      * @returns 更新后的时间块
      */
     async update(blockId: number, data: UserCustomBlockUpdate): Promise<UserCustomBlock> {
-        const response = await fetch(`${API_BASE}/timeline/custom-blocks/${blockId}`, {
+        const response = await fetch(`${getApiBase()}/timeline/custom-blocks/${blockId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -104,7 +106,7 @@ export const CustomBlockAPI = {
      * @returns 删除成功状态
      */
     async delete(blockId: number): Promise<boolean> {
-        const response = await fetch(`${API_BASE}/timeline/custom-blocks/${blockId}`, {
+        const response = await fetch(`${getApiBase()}/timeline/custom-blocks/${blockId}`, {
             method: 'DELETE',
         });
 

@@ -6,8 +6,10 @@
 
 import { DailyReportData, WeeklyReportData, MonthlyReportData, ReportResponse, DateRangeType, ComparisonData } from './types';
 import { ReportCacheService } from '../../services/reportCacheService';
+import { createApiV2UrlGetter } from '../../services/apiConfig';
 
-const API_BASE = 'http://localhost:8000/api/v2';
+// 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
+const getApiBase = createApiV2UrlGetter();
 
 /**
  * Daily Report API 响应类型（后端返回格式）
@@ -694,7 +696,7 @@ export const ReportsAPI = {
             force_refresh: String(forceRefresh),
         });
 
-        const response = await fetch(`${API_BASE}/report/daily?${params}`);
+        const response = await fetch(`${getApiBase()}/report/daily?${params}`);
 
         if (!response.ok) {
             throw new Error(`获取日报告失败: ${response.statusText}`);
@@ -714,7 +716,7 @@ export const ReportsAPI = {
      * 删除日报告缓存
      */
     async deleteDailyReport(date: string): Promise<void> {
-        const response = await fetch(`${API_BASE}/report/daily/${date}`, {
+        const response = await fetch(`${getApiBase()}/report/daily/${date}`, {
             method: 'DELETE',
         });
 
@@ -736,7 +738,7 @@ export const ReportsAPI = {
             end_date: endDate,
         });
 
-        const response = await fetch(`${API_BASE}/report/daily/completed-dates?${params}`);
+        const response = await fetch(`${getApiBase()}/report/daily/completed-dates?${params}`);
 
         if (!response.ok) {
             throw new Error(`获取已完成报告日期失败: ${response.statusText}`);
@@ -772,7 +774,7 @@ export const ReportsAPI = {
             force_refresh: String(forceRefresh),
         });
 
-        const response = await fetch(`${API_BASE}/report/weekly?${params}`);
+        const response = await fetch(`${getApiBase()}/report/weekly?${params}`);
 
         if (!response.ok) {
             throw new Error(`获取周报告失败: ${response.statusText}`);
@@ -798,7 +800,7 @@ export const ReportsAPI = {
                 week_start_date: weekStartDate,
                 force_refresh: 'false',
             });
-            const response = await fetch(`${API_BASE}/report/weekly?${params}`);
+            const response = await fetch(`${getApiBase()}/report/weekly?${params}`);
             if (response.ok) {
                 const data: WeeklyReportAPIResponse = await response.json();
                 if (data.ai_summary) {
@@ -815,7 +817,7 @@ export const ReportsAPI = {
      * 删除周报告缓存
      */
     async deleteWeeklyReport(weekStartDate: string): Promise<void> {
-        const response = await fetch(`${API_BASE}/report/weekly/${weekStartDate}`, {
+        const response = await fetch(`${getApiBase()}/report/weekly/${weekStartDate}`, {
             method: 'DELETE',
         });
 
@@ -854,7 +856,7 @@ export const ReportsAPI = {
             force_refresh: String(forceRefresh),
         });
 
-        const response = await fetch(`${API_BASE}/report/monthly?${params}`);
+        const response = await fetch(`${getApiBase()}/report/monthly?${params}`);
 
         if (!response.ok) {
             throw new Error(`获取月报告失败: ${response.statusText}`);
@@ -880,7 +882,7 @@ export const ReportsAPI = {
                 month,
                 force_refresh: 'false',
             });
-            const response = await fetch(`${API_BASE}/report/monthly?${params}`);
+            const response = await fetch(`${getApiBase()}/report/monthly?${params}`);
             if (response.ok) {
                 const data: MonthlyReportAPIResponse = await response.json();
                 if (data.ai_summary) {
@@ -897,7 +899,7 @@ export const ReportsAPI = {
      * 删除月报告缓存
      */
     async deleteMonthlyReport(monthStartDate: string): Promise<void> {
-        const response = await fetch(`${API_BASE}/report/monthly/${monthStartDate}`, {
+        const response = await fetch(`${getApiBase()}/report/monthly/${monthStartDate}`, {
             method: 'DELETE',
         });
 
@@ -946,7 +948,7 @@ export const ReportsAPI = {
             totalTokens: number;
         };
     }> {
-        const response = await fetch(`${API_BASE}/report/daily/ai_summary`, {
+        const response = await fetch(`${getApiBase()}/report/daily/ai_summary`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1000,7 +1002,7 @@ export const ReportsAPI = {
             totalTokens: number;
         };
     }> {
-        const response = await fetch(`${API_BASE}/report/weekly/ai_summary`, {
+        const response = await fetch(`${getApiBase()}/report/weekly/ai_summary`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1055,7 +1057,7 @@ export const ReportsAPI = {
             totalTokens: number;
         };
     }> {
-        const response = await fetch(`${API_BASE}/report/monthly/ai_summary`, {
+        const response = await fetch(`${getApiBase()}/report/monthly/ai_summary`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

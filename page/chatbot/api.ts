@@ -5,8 +5,10 @@
  */
 
 import { ChatSession, ModelConfig, SSEEvent, ChatMessage, TokenUsage } from './types';
+import { createApiV2UrlGetter } from '../../services/apiConfig';
 
-const API_BASE = 'http://localhost:8000/api/v2/chatbot';
+// 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
+const getApiBase = createApiV2UrlGetter('/chatbot');
 
 // ============================================================================
 // 会话管理
@@ -16,7 +18,9 @@ const API_BASE = 'http://localhost:8000/api/v2/chatbot';
  * 获取会话列表
  */
 export async function getSessions(page = 1, pageSize = 20): Promise<{ items: ChatSession[], total: number }> {
-    const response = await fetch(`${API_BASE}/sessions?page=${page}&page_size=${pageSize}`);
+    const apiUrl = getApiBase();
+    console.log(`[Chatbot API DEBUG] getSessions 正在调用 - API Base URL: ${apiUrl}`);
+    const response = await fetch(`${apiUrl}/sessions?page=${page}&page_size=${pageSize}`);
     if (!response.ok) {
         throw new Error(`Failed to get sessions: ${response.statusText}`);
     }
@@ -38,7 +42,7 @@ export async function getSessions(page = 1, pageSize = 20): Promise<{ items: Cha
  * 更新会话名称
  */
 export async function updateSessionName(sessionId: string, name: string): Promise<boolean> {
-    const response = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+    const response = await fetch(`${getApiBase()}/sessions/${sessionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
@@ -50,7 +54,7 @@ export async function updateSessionName(sessionId: string, name: string): Promis
  * 删除会话
  */
 export async function deleteSession(sessionId: string): Promise<boolean> {
-    const response = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+    const response = await fetch(`${getApiBase()}/sessions/${sessionId}`, {
         method: 'DELETE',
     });
     return response.ok;
@@ -60,7 +64,7 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
  * 获取会话历史
  */
 export async function getChatHistory(sessionId: string): Promise<ChatMessage[]> {
-    const response = await fetch(`${API_BASE}/sessions/${sessionId}/history`);
+    const response = await fetch(`${getApiBase()}/sessions/${sessionId}/history`);
     if (!response.ok) {
         throw new Error(`Failed to get chat history: ${response.statusText}`);
     }
@@ -81,7 +85,7 @@ export async function getChatHistory(sessionId: string): Promise<ChatMessage[]> 
  * 获取模型配置
  */
 export async function getModelConfig(): Promise<ModelConfig> {
-    const response = await fetch(`${API_BASE}/config`);
+    const response = await fetch(`${getApiBase()}/config`);
     if (!response.ok) {
         throw new Error(`Failed to get model config: ${response.statusText}`);
     }
@@ -100,7 +104,7 @@ export async function updateModelConfig(config: Partial<ModelConfig>): Promise<M
     if (config.enableSearch !== undefined) body.enable_search = config.enableSearch;
     if (config.enableThinking !== undefined) body.enable_thinking = config.enableThinking;
 
-    const response = await fetch(`${API_BASE}/config`, {
+    const response = await fetch(`${getApiBase()}/config`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -125,7 +129,7 @@ export async function updateModelConfig(config: Partial<ModelConfig>): Promise<M
  * @param sessionId 会话 ID
  */
 export async function getTokenUsage(sessionId: string): Promise<TokenUsage> {
-    const response = await fetch(`${API_BASE}/sessions/${sessionId}/tokens`);
+    const response = await fetch(`${getApiBase()}/sessions/${sessionId}/tokens`);
     if (!response.ok) {
         // 如果接口不存在或失败，返回默认值
         return {
@@ -178,7 +182,7 @@ export async function sendMessageStream(
     onEvent: (event: SSEEvent) => void,
     signal?: AbortSignal
 ): Promise<void> {
-    const response = await fetch(`${API_BASE}/chat/stream`, {
+    const response = await fetch(`${getApiBase()}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
