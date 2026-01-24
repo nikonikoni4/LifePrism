@@ -258,9 +258,73 @@ async def health_check():
     }
 
 
+def is_port_available(port: int) -> bool:
+    """检查端口是否可用"""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            # 使用 0.0.0.0 与 uvicorn 绑定地址一致
+            s.bind(('0.0.0.0', port))
+            return True
+        except OSError:
+            return False
+
+
+def find_available_port(config_path: str = None) -> int:
+    """从配置文件读取端口，若被占用则自动递增"""
+    import json
+    
+    default_port = 8000
+    fallback_list = [8000, 8001, 8002, 8003, 8004]
+    
+    # 尝试读取配置文件
+    if config_path:
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                server_config = config.get('server', {})
+                default_port = server_config.get('backendPort', 8000)
+                fallback_list = server_config.get('portFallbackList', fallback_list)
+                # 确保用户配置的端口在列表最前面
+                if default_port not in fallback_list:
+                    fallback_list = [default_port] + fallback_list
+                else:
+                    fallback_list = [default_port] + [p for p in fallback_list if p != default_port]
+                print(f"[STARTUP] 从配置文件读取端口配置: 首选端口={default_port}, 备用列表={fallback_list}")
+        except Exception as e:
+            print(f"[STARTUP] 读取配置文件失败，使用默认端口: {e}")
+    
+    # 按顺序尝试端口
+    for port in fallback_list:
+        if is_port_available(port):
+            print(f"[STARTUP] 端口 {port} 可用")
+            return port
+        else:
+            print(f"[STARTUP] 端口 {port} 被占用，尝试下一个...")
+    
+    # 所有端口都被占用，返回默认端口（让 uvicorn 报错）
+    print(f"[STARTUP] 警告：所有备用端口都被占用，将尝试使用端口 {default_port}")
+    return default_port
+
+
 if __name__ == "__main__":
     import uvicorn
     import os
+    
+    # 获取配置文件路径
+    # 逻辑：首先尝试读取打包后的相对路径，若不存在则使用默认配置（不读取文件）
+    # 打包后路径：resources/customData/config/config.json
+    config_path = os.path.join(os.path.dirname(__file__), "resources", "customData", "config", "config.json")
+    
+    if os.path.exists(config_path):
+        print(f"[STARTUP] 找到配置文件: {config_path}")
+        port = find_available_port(config_path)
+    else:
+        # 配置文件不存在，使用默认配置（源代码开发模式）
+        print(f"[STARTUP] 配置文件不存在 ({config_path})，使用默认端口配置")
+        port = find_available_port(None)  # 使用函数内置的默认值
+    
+    print(f"[STARTUP] 后端将在端口 {port} 启动")
     
     # 通过环境变量判断是否为开发模式
     # 开发时设置 LIFEWATCH_DEV=1，打包后默认为生产模式
@@ -271,7 +335,7 @@ if __name__ == "__main__":
         uvicorn.run(
             "lifeprism.server.main:app",
             host="0.0.0.0",
-            port=8000,
+            port=port,
             reload=True,
             reload_dirs=["lifeprism"],  # 只监控 Python 代码目录
             reload_excludes=["__pycache__", "*.pyc", ".git","*.db","lifeprism.egg-info"],
@@ -282,6 +346,6 @@ if __name__ == "__main__":
         uvicorn.run(
             app,  # 直接传入 app 对象，不使用字符串 
             host="0.0.0.0",
-            port=8000,
+            port=port,
             log_level="info"
         )
