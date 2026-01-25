@@ -8,6 +8,7 @@ API Key 读取优先级:
 """
 
 import os
+import sys
 import yaml
 import keyring
 from pathlib import Path
@@ -25,6 +26,7 @@ class SettingsManager:
     _instance: Optional['SettingsManager'] = None
     _config: Dict[str, Any] = {}
     _config_path: Path
+    _custom_data_path: Path
     
     # 环境变量映射 (yaml_key -> env_var_name)
     ENV_VAR_MAPPING = {
@@ -56,9 +58,45 @@ class SettingsManager:
     
     def _initialize(self) -> None:
         """初始化配置管理器"""
-        # 配置文件路径
-        self._config_path = Path(__file__).parent / 'settings.yaml'
+
+        # 判断是否是开发环境
+        is_dev = not getattr(sys, 'frozen', False)
+
+        if is_dev:
+            # 开发环境：使用 lifeprism/config/settings.yaml
+            self._config_path = Path(__file__).parent / 'settings.yaml'
+        else:
+            # 打包环境：使用 customData/config/config.yaml
+            self._custom_data_path = self._resolve_custom_data_path()
+            self._config_path = self._custom_data_path / 'config' / 'config.yaml'
+        
         self._load_config()
+    
+    def _resolve_custom_data_path(self) -> Path:
+        """
+        解析 customData 目录的路径
+        
+        优先级:
+        1. 环境变量 CUSTOM_DATA_PATH (由 Electron 传入)
+        2. 基于 sys.executable 推算 (打包环境后备)
+        3. 开发环境: frontend/customData
+        """
+        # 1. 优先使用 Electron 传入的环境变量
+        custom_data_env = os.environ.get('CUSTOM_DATA_PATH')
+        if custom_data_env:
+            return Path(custom_data_env)
+        
+        # 2. 打包环境：基于 exe 位置推算
+        if getattr(sys, 'frozen', False):
+            # sys.executable = .../resources/backend/lifeprism-backend.exe
+            backend_dir = Path(sys.executable).parent   # .../resources/backend
+            resources_dir = backend_dir.parent          # .../resources
+            return resources_dir / 'customData'
+        
+        # 3. 开发环境
+        project_root = Path(__file__).parent.parent.parent
+        return project_root / 'frontend' / 'customData'
+            
     
     def _load_config(self) -> None:
         """从 YAML 文件加载配置"""
@@ -289,6 +327,11 @@ class SettingsManager:
     @property
     def data_cleaning_threshold(self) -> int:
         return self.get('data_cleaning_threshold')
+    
+    @property
+    def custom_data_path(self) -> Path:
+        """获取 customData 目录的绝对路径"""
+        return self._custom_data_path
 
 
 # 全局单例实例

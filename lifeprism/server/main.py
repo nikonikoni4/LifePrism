@@ -275,8 +275,7 @@ def find_available_port(config_path: str = None) -> int:
     import json
     
     default_port = 8000
-    fallback_list = [8000, 8001, 8002, 8003, 8004]
-    
+    fallback_list = [8000, 8001, 8002, 8003, 8004] # 默认端口列表
     # 尝试读取配置文件
     if config_path:
         try:
@@ -310,19 +309,19 @@ def find_available_port(config_path: str = None) -> int:
 if __name__ == "__main__":
     import uvicorn
     import os
-    
-    # 获取配置文件路径
-    # 逻辑：首先尝试读取打包后的相对路径，若不存在则使用默认配置（不读取文件）
-    # 打包后路径：resources/customData/config/config.json
-    config_path = os.path.join(os.path.dirname(__file__), "resources", "customData", "config", "config.json")
-    
-    if os.path.exists(config_path):
-        print(f"[STARTUP] 找到配置文件: {config_path}")
-        port = find_available_port(config_path)
+    import sys
+
+    # 判断是否为打包环境
+    is_dev = getattr(sys, 'frozen', False)
+
+    if is_dev:
+        # 打包环境
+        config_path = os.path.join(os.path.dirname(__file__), "resources", "customData", "config", "config.json")
     else:
-        # 配置文件不存在，使用默认配置（源代码开发模式）
-        print(f"[STARTUP] 配置文件不存在 ({config_path})，使用默认端口配置")
-        port = find_available_port(None)  # 使用函数内置的默认值
+        # 开发环境
+        config_path = None
+    
+    port = find_available_port(config_path)
     
     print(f"[STARTUP] 后端将在端口 {port} 启动")
     

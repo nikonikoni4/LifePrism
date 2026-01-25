@@ -24,25 +24,37 @@ from typing import Literal
 from lifeprism.llm.llm_classify.providers.llm_lw_data_provider import llm_lw_data_provider
 from lifeprism.llm.llm_linear_executor.llm_linear_executor.llm_factory import create_llm_factory
 from lifeprism.config import settings 
-logger = logging.getLogger(__name__)
-def get_workflow_path(default_path):
-    # Check default path first
-    if os.path.exists(default_path):
-        return default_path
-    
-    # Check customData path if default doesn't exist
-    custom_data_path = os.environ.get("CUSTOM_DATA_PATH")
-    if custom_data_path:
-        filename = os.path.basename(default_path)
-        custom_path = os.path.join(custom_data_path, "workflow", filename)
-        if os.path.exists(custom_path):
-            logger.info(f"Using custom workflow path: {custom_path}")
-            return custom_path
-            
-    return default_path
+import sys
+from pathlib import Path
 
-daily_json_path = get_workflow_path("lifeprism/llm/custom_prompt/workflow/daily_summary_plan.json")
-multi_days_json_path = get_workflow_path("lifeprism/llm/custom_prompt/workflow/weekly_summary_plan.json")
+logger = logging.getLogger(__name__)
+
+def get_workflow_path(filename: str) -> str:
+    """
+    获取 workflow 文件的路径
+    
+    优先级:
+    1. customData/workflow 中的自定义文件（用户可修改）
+    2. 内置的默认 workflow 文件
+    
+    Args:
+        filename: workflow 文件名，如 "daily_summary_plan.json"
+    
+    Returns:
+        str: workflow 文件的绝对路径
+    """
+    # 判断是否是开发环境
+    is_dev = not getattr(sys, 'frozen', False)
+    if is_dev:
+        path = "lifeprism/llm/custom_prompt/workflow"
+        # 开发环境：使用 lifeprism/config/settings.yaml
+        return str(Path(path) / filename)
+    else:
+        # 打包环境：使用 customData/config/config.yaml
+        return str(settings.custom_data_path / 'workflow' / filename)
+# 初始化 workflow 路径
+daily_json_path = get_workflow_path("daily_summary_plan.json")
+multi_days_json_path = get_workflow_path("weekly_summary_plan.json")
 
 async def daily_summary(date : str, pattern ="complex"):
     """
