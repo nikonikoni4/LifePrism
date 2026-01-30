@@ -33,12 +33,48 @@
   --color-morandi-bg: #F3F4F6;
   --color-morandi-surface: #FFFFFF;
 
+  /* Aurora Theme Colors */
+  --color-aurora-primary: #8B5CF6;
+  --color-aurora-primaryHover: #7C3AED;
+  /* Violet 600 */
+  --color-aurora-secondary: #EC4899;
+  --color-aurora-text-primary: #0F172A;
+  --color-aurora-text-secondary: #475569;
+  /* Slate 600 */
+  --color-aurora-text-muted: #64748B;
+  --color-aurora-text-subtle: #94A3B8;
+  --color-aurora-bg: #F8FAFC;
+
+  /* Aurora Gradients */
+  --background-image-gradient-aurora: linear-gradient(135deg, #8B5CF6 0%, #D946EF 100%);
+  --background-image-gradient-subtle: linear-gradient(180deg, #F8FAFC 0%, #EFF6FF 100%);
+
+  /* Shadows */
+  --shadow-soft-sm: 0 1px 2px 0 rgba(139, 92, 246, 0.05);
+  --shadow-soft-md: 0 4px 6px -1px rgba(139, 92, 246, 0.1), 0 2px 4px -1px rgba(139, 92, 246, 0.06);
+  --shadow-soft-lg: 0 10px 15px -3px rgba(139, 92, 246, 0.1), 0 4px 6px -2px rgba(139, 92, 246, 0.05);
+  --shadow-inner-light: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+
+  /* Fonts */
+  --font-heading: 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
   /* 圆角 */
   --radius-xl: 1rem;
   --radius-2xl: 1.25rem;
 
   /* 动画 */
   --animate-fade-in: fade-in 0.2s ease-out forwards;
+}
+
+/* Custom Utilities */
+.aurora-bg {
+  background-color: var(--color-aurora-bg);
+  background-image:
+    radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.05) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(217, 70, 239, 0.05) 0px, transparent 50%);
 }
 
 /* 自定义关键帧动画 */

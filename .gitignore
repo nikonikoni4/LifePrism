@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 docs
 release
+
+other_project
+my-ui-kit

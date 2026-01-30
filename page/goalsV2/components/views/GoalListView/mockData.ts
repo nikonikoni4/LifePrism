@@ -1,0 +1,1 @@
+export { INITIAL_GOALS } from '../../../hooks/useGoalStore';

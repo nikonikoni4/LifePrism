@@ -1,0 +1,1 @@
+export type { Goal } from '../../shared/types';

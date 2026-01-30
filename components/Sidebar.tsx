@@ -11,7 +11,8 @@ import {
   User,
   Tag,
   DollarSign,
-  PanelLeft
+  PanelLeft,
+  FlaskConical
 } from 'lucide-react';
 
 
@@ -30,9 +31,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, onChatToggle
     { id: 'timeline', icon: Clock, label: 'Timeline' },
     { id: 'category', icon: Tag, label: 'Category' },
     { id: 'goals', icon: Target, label: 'Goals' },
+    { id: 'goalsV2', icon: Target, label: 'Goals V2' },
     { id: 'reports', icon: FileBarChart, label: 'Reports' },
     { id: 'usage', icon: DollarSign, label: 'Usage' },
     { id: 'settings', icon: Settings, label: 'Settings' },
+    { id: 'test', icon: FlaskConical, label: 'Test Lab' },
   ];
 
   return (
