@@ -3,9 +3,8 @@ import React from 'react';
 import { DualPaneLayout } from '../layout/DualPaneLayout';
 import { TaskPoolView } from '../views/TaskPoolView/TaskPoolView';
 import { CalendarView } from '../views/CalendarView/CalendarView';
-import { CrossAreaDndProvider, DragItemData, DropAreaData } from '../shared/components/dragDrop';
+import { CrossAreaDndProvider, DragItemData, DropAreaData, TodoItemType } from '@my-ui-kit/core';
 import { useTaskPoolStore } from '../../hooks/useTaskPoolStore';
-import { TodoItem as TodoItemType } from '../shared/components/todoItem/types';
 
 export const PoolCalendarCombo: React.FC = () => {
   const { tasks, scheduleTask, moveTaskToPool } = useTaskPoolStore();

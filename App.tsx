@@ -12,6 +12,7 @@ import Home from './page/home/Home';
 import CategoryPage from './page/category/CategoryPage';
 import GoalsPage from './page/goals/GoalsPage';
 import { GoalPage } from './page/goalsV2/GoalPage';
+import { HabitPage } from './page/habits/HabitPage';
 import ReportsPage from './page/reports/ReportsPage';
 import SettingsPage from './page/settings/SettingsPage';
 
@@ -142,6 +143,7 @@ function App() {
             {currentPage === 'category' && <CategoryPage />}
             {currentPage === 'goals' && <GoalsPage />}
             {currentPage === 'goalsV2' && <GoalPage />}
+            {currentPage === 'habits' && <HabitPage />}
             {currentPage === 'reports' && <ReportsPage />}
             {currentPage === 'usage' && <UsagePage />}
 

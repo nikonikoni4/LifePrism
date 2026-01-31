@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { PlanDocEditorViewProps } from './types';
-import { MarkdownEditor } from '../../../../shared/components/markdownEditor';
+import { MarkdownEditor } from '@my-ui-kit/core';
 
 export const PlanDocEditorView: React.FC<PlanDocEditorViewProps> = ({
     content,

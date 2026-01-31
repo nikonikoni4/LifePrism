@@ -2,7 +2,7 @@
  * CalendarView 组件类型定义
  */
 
-import type { TodoItem } from '../../shared/components/todoItem/types';
+import type { TodoItemType as TodoItem } from '@my-ui-kit/core';
 
 export interface DateCellData {
     date: string;        // YYYY-MM-DD

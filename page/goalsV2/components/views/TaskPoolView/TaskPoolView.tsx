@@ -6,8 +6,7 @@ import { useTaskPoolStore } from '../../../hooks/useTaskPoolStore';
 import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';
-import { TodoItem as TodoItemComponent } from '../../shared/components/todoItem/TodoItem';
-import { DraggableItem, DroppablePoolRoot } from '../../shared/components/dragDrop';
+import { TodoItem as TodoItemComponent, DraggableItem, DroppablePoolRoot } from '@my-ui-kit/core';
 import { viewBackground } from '../../shared/backgroundStyles';
 import type { TaskPoolViewProps, TodoItem } from './types';
 
@@ -74,7 +73,7 @@ const TaskTree: React.FC<{
                                         <div className="absolute -left-1 top-0 bottom-0 w-1 bg-violet-400 rounded-full" />
                                     )}
                                     <TodoItemComponent
-                                        todo={task}
+                                        item={task}
                                         onUpdate={onUpdate}
                                         onDelete={onDelete}
                                         showDate={true}
@@ -84,7 +83,7 @@ const TaskTree: React.FC<{
                             </DraggableItem>
                         ) : (
                             <TodoItemComponent
-                                todo={task}
+                                item={task}
                                 onUpdate={onUpdate}
                                 onDelete={onDelete}
                             />

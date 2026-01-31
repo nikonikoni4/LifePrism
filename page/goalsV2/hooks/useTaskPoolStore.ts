@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { TodoItem } from '../components/shared/components/todoItem/types';
+import { TodoItemType as TodoItem } from '@my-ui-kit/core';
 import { INITIAL_POOL_TASKS } from '../components/views/TaskPoolView/mockData';
 
 // Re-export type for consumers

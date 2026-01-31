@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import GlassCalendar from '../../shared/components/calendar/calendar';
+import { GlassCalendar, DateRange } from '@my-ui-kit/core';
 import { DateGrid } from './components/DateGrid';
 import { viewBackground } from '../../shared/backgroundStyles';
 import type { CalendarViewProps } from './types';
-import type { DateRange } from '../../shared/components/calendar/types';
 
 export const CalendarView: React.FC<CalendarViewProps> = () => {
     // 默认日期范围：今天到7天后

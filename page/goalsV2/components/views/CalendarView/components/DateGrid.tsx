@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
 import { Plus, GripVertical } from 'lucide-react';
-import { DroppableDateCell, DraggableItem } from '../../../shared/components/dragDrop';
+import { DroppableDateCell, DraggableItem, TodoItemType as TodoItem } from '@my-ui-kit/core';
 import { useTaskPoolStore } from '../../../../hooks/useTaskPoolStore';
 import { useGoalPageContext } from '../../../../context/GoalPageContext';
-import type { TodoItem } from '../../../shared/components/todoItem/types';
 
 interface DateGridProps {
     startDate: Date;

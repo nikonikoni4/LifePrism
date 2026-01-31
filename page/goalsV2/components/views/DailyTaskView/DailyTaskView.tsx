@@ -4,8 +4,7 @@ import { useGoalPageContext } from '../../../context/GoalPageContext';
 import { useTaskPoolStore } from '../../../hooks/useTaskPoolStore';
 import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
-import { TodoItemTreeDetailed } from '../../shared/components/todoItem/TodoItemTreeDetailed';
-import { TodoItem } from '../../shared/components/todoItem/types';
+import { TodoItemTreeDetailed, TodoItemType as TodoItem } from '@my-ui-kit/core';
 import { DailyTaskHeader, DailyTaskToolbar, TaskInputBox } from './components';
 
 /**
