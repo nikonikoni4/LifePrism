@@ -12,7 +12,8 @@ import {
   Tag,
   DollarSign,
   PanelLeft,
-  FlaskConical
+  FlaskConical,
+  Zap
 } from 'lucide-react';
 
 
@@ -32,6 +33,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, onChatToggle
     { id: 'category', icon: Tag, label: 'Category' },
     { id: 'goals', icon: Target, label: 'Goals' },
     { id: 'goalsV2', icon: Target, label: 'Goals V2' },
+    { id: 'habits', icon: Zap, label: '习惯' },
     { id: 'reports', icon: FileBarChart, label: 'Reports' },
     { id: 'usage', icon: DollarSign, label: 'Usage' },
     { id: 'settings', icon: Settings, label: 'Settings' },
