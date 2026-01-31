@@ -1,3 +1,6 @@
+/**
+ * 核心业务实体类型定义
+ */
 
 export type ThemeKey = 'indigo' | 'rose' | 'amber' | 'emerald' | 'violet' | 'cyan';
 
@@ -6,6 +9,12 @@ export interface MilestoneItem {
     content: string;
     state: number; // 0: Pending, 1: Completed
     finishTime: string | null;
+    orderIndex: number;
+}
+
+export interface EditableMilestone {
+    id: string;
+    content: string;
     orderIndex: number;
 }
 

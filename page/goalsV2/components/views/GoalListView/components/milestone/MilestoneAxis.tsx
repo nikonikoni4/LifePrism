@@ -1,6 +1,6 @@
 import React from 'react';
 import { Flag, Check } from 'lucide-react';
-import { MilestoneItem } from './types';
+import { MilestoneItem } from '../../../../../types';
 
 export interface MilestoneAxisProps {
     milestones: MilestoneItem[];

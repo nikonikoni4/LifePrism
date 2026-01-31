@@ -2,7 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Check, ArrowUpRight } from 'lucide-react';
-import { Goal } from '../../../shared/types';
+import { Goal } from '../../../../types';
 import { THEMES } from '../../../../hooks/useGoalStore';
 
 interface GoalCardProps {

@@ -11,7 +11,7 @@ import { GoalPlanCombo } from './components/combinations/GoalPlanCombo';
 import { PlanPoolCombo } from './components/combinations/PlanPoolCombo';
 import { PoolCalendarCombo } from './components/combinations/PoolCalendarCombo';
 import { CalendarDailyCombo } from './components/combinations/CalendarDailyCombo';
-import { ViewMode, ActiveTab } from './components/shared/types';
+import { ViewMode, ActiveTab } from './types';
 import { GoalProvider } from './hooks/useGoalStore';
 import { PlanDocProvider } from './hooks/usePlanDocStore';
 import { TaskPoolProvider } from './hooks/useTaskPoolStore';

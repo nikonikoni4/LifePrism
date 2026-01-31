@@ -5,11 +5,10 @@ import {
   Check, ChevronDown, ChevronUp, RefreshCw, 
   ArrowUpRight, Quote, HeartHandshake, History, FileText, X, Palette
 } from 'lucide-react';
-import { Goal, ThemeKey, MilestoneItem } from '../../../shared/types';
+import { Goal, ThemeKey, MilestoneItem, EditableMilestone } from '../../../../types';
 import { THEMES, PAST_VALUES, PAST_COMMITMENTS } from '../../../../hooks/useGoalStore';
 import MilestoneEditor from './milestone/MilestoneEditor';
 import { convertToEditableMilestones } from './milestone/utils';
-import { EditableMilestone } from './milestone/types';
 
 const SuggestionBox = ({ items, onSelect, onClose, themeColor }: { items: string[], onSelect: (val: string) => void, onClose: () => void, themeColor: string }) => (
   <motion.div 

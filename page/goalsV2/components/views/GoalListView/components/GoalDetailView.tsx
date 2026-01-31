@@ -5,7 +5,7 @@ import {
   Clock, ChevronLeft, RefreshCw,
   MoreVertical, Sun, Moon, Coffee, Zap, Pencil
 } from 'lucide-react';
-import { Goal, JournalEntry, ThemeKey } from '../../../shared/types';
+import { Goal, JournalEntry, ThemeKey } from '../../../../types';
 import { THEMES } from '../../../../hooks/useGoalStore';
 import { viewBackground } from '../../../shared/backgroundStyles';
 import MilestoneAxis from './milestone/MilestoneAxis';

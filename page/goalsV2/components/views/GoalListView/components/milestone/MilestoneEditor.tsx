@@ -17,7 +17,7 @@ import {
     useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { EditableMilestone } from './types';
+import { EditableMilestone } from '../../../../../types';
 
 interface SortableMilestoneEditItemProps {
     milestone: EditableMilestone;

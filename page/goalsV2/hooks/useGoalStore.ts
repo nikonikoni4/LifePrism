@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Goal, ThemeKey } from '../components/shared/types';
+import { Goal, ThemeKey } from '../types';
 
 // Constants
 export const THEMES: Record<string, { label: string; gradient: string; title: string; progressBg: string; meta: string; container: string; button: string; timelineLine: string; tag: string }> = {

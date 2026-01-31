@@ -1,5 +1,5 @@
 
-import { TodoItem } from './types';
+import { TodoItem } from '../../../types';
 
 export const INITIAL_POOL_TASKS: TodoItem[] = [
     {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useGoalPageContext } from '../../../context/GoalPageContext';
 import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
-import { PlanDoc } from '../../shared/types';
+import { PlanDoc } from '../../../types';
 import { Plus, ChevronDown, FileText, Target, MoreVertical, Trash2, Copy, Archive } from 'lucide-react';
 import { PlanDocEditorView } from './components/PlanDocEditorView/PlanDocEditorView';
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';

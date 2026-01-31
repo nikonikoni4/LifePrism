@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActiveTab, ViewMode } from '../shared/types';
+import { ActiveTab, ViewMode } from '../../types';
 import { Target, FileText, Layers, Calendar, CheckSquare, Columns, Maximize, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface CapsuleNavProps {

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { useGoalStore } from '../../../hooks/useGoalStore';
 import { useGoalPageContext } from '../../../context/GoalPageContext';
-import { Goal } from '../../shared/types';
+import { Goal } from '../../../types';
 import { viewBackground } from '../../shared/backgroundStyles';
 import GoalCard from './components/GoalCard';
 import AddGoalModal from './components/AddGoalModal';

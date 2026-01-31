@@ -8,7 +8,7 @@ import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';
 import { TodoItem as TodoItemComponent, DraggableItem, DroppablePoolRoot } from '@my-ui-kit/core';
 import { viewBackground } from '../../shared/backgroundStyles';
-import type { TaskPoolViewProps, TodoItem } from './types';
+import type { TaskPoolViewProps, TodoItem } from '../../../types';
 
 /**
  * 构建任务树：将扁平列表转换为树形结构

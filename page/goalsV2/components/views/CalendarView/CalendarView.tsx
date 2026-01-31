@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCalendar, DateRange } from '@my-ui-kit/core';
 import { DateGrid } from './components/DateGrid';
 import { viewBackground } from '../../shared/backgroundStyles';
-import type { CalendarViewProps } from './types';
+import type { CalendarViewProps } from '../../../types';
 
 export const CalendarView: React.FC<CalendarViewProps> = () => {
     // 默认日期范围：今天到7天后

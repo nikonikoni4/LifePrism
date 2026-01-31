@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { PlanDoc } from '../components/shared/types';
+import { PlanDoc } from '../types';
 
 const INITIAL_PLANS: PlanDoc[] = [
     {
