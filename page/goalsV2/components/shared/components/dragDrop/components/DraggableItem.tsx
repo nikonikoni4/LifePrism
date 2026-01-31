@@ -8,7 +8,7 @@
  */
 
 import React, { forwardRef } from 'react';
-import { useSortable } from '@dnd-kit/sortable';
+import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import type { DraggableItemProps, DragSourceType } from '../types';
 
@@ -52,9 +52,8 @@ function DraggableItemInner<T>(
         listeners,
         setNodeRef,
         transform,
-        transition,
         isDragging,
-    } = useSortable({
+    } = useDraggable({
         id,
         disabled,
         data: {
@@ -66,10 +65,10 @@ function DraggableItemInner<T>(
         },
     });
 
-    const style: React.CSSProperties = {
-        transform: CSS.Transform.toString(transform),
-        transition: isDragging ? undefined : transition,
-    };
+    // 当使用 DragOverlay 时，原始元素不应该移动
+    // 只有 DragOverlay 负责显示跟随鼠标的预览
+    // 拖拽时原始元素保持原位，仅通过 draggingClassName 改变样式
+    const style: React.CSSProperties = {};
 
     // 合并 ref
     const mergedRef = React.useCallback(
@@ -166,12 +165,10 @@ export function useDraggableData<T>(options: {
         listeners,
         setNodeRef,
         transform,
-        transition,
         isDragging,
-        isSorting,
         over,
         active,
-    } = useSortable({
+    } = useDraggable({
         id: options.id,
         disabled: options.disabled,
         data: {
@@ -184,8 +181,7 @@ export function useDraggableData<T>(options: {
     });
 
     const style: React.CSSProperties = {
-        transform: CSS.Transform.toString(transform),
-        transition: isDragging ? undefined : transition,
+        transform: CSS.Translate.toString(transform),
     };
 
     return {
@@ -194,7 +190,6 @@ export function useDraggableData<T>(options: {
         listeners,
         setNodeRef,
         isDragging,
-        isSorting,
         over,
         active,
         // 预处理的样式

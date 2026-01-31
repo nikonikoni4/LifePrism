@@ -33,7 +33,7 @@ export const PoolCalendarCombo: React.FC = () => {
     const affectedTaskIds = [task.id, ...getChildTaskIds(task.id)];
 
     if (dropArea.type === 'date-cell' && dropArea.payload?.date) {
-      // Drop on a specific date (From Pool or another Date)
+      // Drop on a specific date (From Pool or another Date in Calendar)
       // 父任务和所有子任务都安排到该日期
       affectedTaskIds.forEach(id => {
         scheduleTask(id, dropArea.payload.date!);
@@ -57,12 +57,27 @@ export const PoolCalendarCombo: React.FC = () => {
       );
     }
 
+    // 根据来源显示不同样式
+    const isFromCalendar = dragItem.source === 'calendar';
+
     return (
-      <div className="bg-white/90 backdrop-blur rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] border border-indigo-100 p-3 w-64 rotate-2 ring-2 ring-indigo-500/20">
+      <div className={`
+        bg-white/90 backdrop-blur rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)]
+        border p-3 w-64 rotate-2 ring-2
+        ${isFromCalendar
+          ? 'border-violet-100 ring-violet-500/20'
+          : 'border-indigo-100 ring-indigo-500/20'
+        }
+      `}>
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+          <div className={`w-2 h-2 rounded-full animate-pulse ${isFromCalendar ? 'bg-violet-500' : 'bg-indigo-500'}`} />
           <span className="text-sm font-bold text-slate-700 truncate">{dragItem.payload.content}</span>
         </div>
+        {isFromCalendar && dragItem.payload.scheduledDate && (
+          <div className="mt-1 text-[10px] text-violet-500 font-medium">
+            从 {dragItem.payload.scheduledDate} 移动
+          </div>
+        )}
       </div>
     );
   };

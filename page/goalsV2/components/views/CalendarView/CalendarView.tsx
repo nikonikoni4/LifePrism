@@ -3,7 +3,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-reac
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassCalendar from '../../shared/components/calendar/calendar';
 import { DateGrid } from './components/DateGrid';
-import { viewBackground } from '../../shared/background';
+import { viewBackground } from '../../shared/backgroundStyles';
 import type { CalendarViewProps } from './types';
 import type { DateRange } from '../../shared/components/calendar/types';
 

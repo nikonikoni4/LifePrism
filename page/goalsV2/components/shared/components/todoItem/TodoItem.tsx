@@ -53,6 +53,9 @@ interface TodoItemProps {
     dragType?: string;
     /** 拖拽来源，用于跨区域拖拽识别，如 'task-pool', 'calendar' */
     dragSource?: string;
+
+    /** 禁用内部的 sortable 功能（当外层已经用 DraggableItem 包裹时使用） */
+    disableSortable?: boolean;
 }
 
 export const TodoItem: React.FC<TodoItemProps> = ({
@@ -66,6 +69,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({
     showEditButton = false,
     dragType,
     dragSource,
+    disableSortable = false,
 }) => {
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [showDetailEditor, setShowDetailEditor] = useState(false);
@@ -86,6 +90,8 @@ export const TodoItem: React.FC<TodoItemProps> = ({
         isDragging,
     } = useSortable({
         id: todo.id,
+        // 禁用 sortable 功能（当外层已经用 DraggableItem 包裹时）
+        disabled: disableSortable,
         // 传递拖拽元数据，使 CrossAreaDndProvider 能够识别拖拽项
         data: dragType || dragSource ? {
             type: dragType,

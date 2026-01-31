@@ -11,7 +11,9 @@ import {
     Pencil,
     Palette,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Plus,
+    Target
 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -45,6 +47,11 @@ interface TodoItemDetailedProps {
     onUpdate: (id: number, updates: Partial<TodoItemType>) => void;
     onSelect?: (id: number) => void;
     onDelete: (id: number) => void;
+    onAddChild?: (parentId: number) => void;
+
+    // Optional display data
+    goalName?: string;
+    planName?: string;
 
     // Optional display flags
     showSource?: boolean;
@@ -65,6 +72,9 @@ export const TodoItemDetailed: React.FC<TodoItemDetailedProps> = ({
     onUpdate,
     onSelect,
     onDelete,
+    onAddChild,
+    goalName,
+    planName,
     showSource = true,
     showDate = true
 }) => {
@@ -351,6 +361,22 @@ export const TodoItemDetailed: React.FC<TodoItemDetailedProps> = ({
                             </div>
                         )}
 
+                        {/* Goal Tag */}
+                        {goalName && (
+                            <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 font-semibold border border-purple-100">
+                                <Target size={10} />
+                                <span>{goalName}</span>
+                            </div>
+                        )}
+
+                        {/* Plan Tag */}
+                        {(planName || (todo.sourceType === 'plan_doc' && showSource)) && (
+                            <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold border border-blue-100">
+                                <FileText size={10} />
+                                <span>{planName || 'Plan'}</span>
+                            </div>
+                        )}
+
                         {/* Delay Status Badge */}
                         {delayStatus && (
                             <div className={`
@@ -375,14 +401,6 @@ export const TodoItemDetailed: React.FC<TodoItemDetailedProps> = ({
                                 </span>
                             </div>
                         )}
-
-                        {/* Source Pill */}
-                        {todo.sourceType === 'plan_doc' && showSource && (
-                            <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold border border-blue-100">
-                                <FileText size={10} />
-                                <span>Plan</span>
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -400,6 +418,20 @@ export const TodoItemDetailed: React.FC<TodoItemDetailedProps> = ({
 
                 {/* Hover Actions */}
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                    {/* Add Child Button */}
+                    {onAddChild && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onAddChild(todo.id);
+                            }}
+                            className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                            title="添加子项"
+                        >
+                            <Plus size={14} />
+                        </button>
+                    )}
+
                     {/* Color Picker Button */}
                     <div className="relative" ref={colorPickerRef}>
                         <button

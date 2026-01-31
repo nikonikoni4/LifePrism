@@ -7,8 +7,8 @@ import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';
 import { TodoItem as TodoItemComponent } from '../../shared/components/todoItem/TodoItem';
-import { DraggableItem } from '../../shared/components/dragDrop';
-import { viewBackground } from '../../shared/background';
+import { DraggableItem, DroppablePoolRoot } from '../../shared/components/dragDrop';
+import { viewBackground } from '../../shared/backgroundStyles';
 import type { TaskPoolViewProps, TodoItem } from './types';
 
 /**
@@ -50,46 +50,60 @@ const TaskTree: React.FC<{
     onDelete: (id: number) => void;
     disableInternalDnd?: boolean;
 }> = ({ tasks, onUpdate, onDelete, disableInternalDnd }) => {
+    // 判断任务是否已安排（scheduled状态）
+    const isScheduled = (task: TodoItem) => task.state === 'scheduled';
+
     return (
         <>
-            {tasks.map(task => (
-                <div key={task.id}>
-                    {disableInternalDnd ? (
-                        <DraggableItem
-                            id={task.id}
-                            type="task"
-                            source="task-pool"
-                            data={task}
-                        >
+            {tasks.map(task => {
+                const scheduled = isScheduled(task);
+
+                return (
+                    <div key={task.id}>
+                        {disableInternalDnd ? (
+                            <DraggableItem
+                                id={`pool-${task.id}`}
+                                type="task"
+                                source="task-pool"
+                                data={task}
+                                className={scheduled ? 'opacity-50' : ''}
+                            >
+                                {/* 已安排任务的样式标记 */}
+                                <div className="relative">
+                                    {scheduled && (
+                                        <div className="absolute -left-1 top-0 bottom-0 w-1 bg-violet-400 rounded-full" />
+                                    )}
+                                    <TodoItemComponent
+                                        todo={task}
+                                        onUpdate={onUpdate}
+                                        onDelete={onDelete}
+                                        showDate={true}
+                                        disableSortable={true}
+                                    />
+                                </div>
+                            </DraggableItem>
+                        ) : (
                             <TodoItemComponent
                                 todo={task}
                                 onUpdate={onUpdate}
                                 onDelete={onDelete}
-                                dragType="task"
-                                dragSource="task-pool"
                             />
-                        </DraggableItem>
-                    ) : (
-                        <TodoItemComponent
-                            todo={task}
-                            onUpdate={onUpdate}
-                            onDelete={onDelete}
-                        />
-                    )}
+                        )}
 
-                    {/* 递归渲染子任务 */}
-                    {task.children && task.children.length > 0 && (
-                        <div className="ml-6 mt-1">
-                            <TaskTree
-                                tasks={task.children}
-                                onUpdate={onUpdate}
-                                onDelete={onDelete}
-                                disableInternalDnd={disableInternalDnd}
-                            />
-                        </div>
-                    )}
-                </div>
-            ))}
+                        {/* 递归渲染子任务 - 子任务也继承父任务的scheduled样式 */}
+                        {task.children && task.children.length > 0 && (
+                            <div className={`ml-6 mt-1 ${scheduled ? 'opacity-50' : ''}`}>
+                                <TaskTree
+                                    tasks={task.children}
+                                    onUpdate={onUpdate}
+                                    onDelete={onDelete}
+                                    disableInternalDnd={disableInternalDnd}
+                                />
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
         </>
     );
 };
@@ -192,24 +206,26 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                 </div>
             </div>
 
-            {/* 任务列表 */}
-            <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-                {filteredTasks.length === 0 ? (
-                    <div className="h-full flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="text-6xl mb-4 opacity-20">📋</div>
-                            <div className="text-sm font-medium text-slate-400">暂无任务</div>
+            {/* 任务列表 - DroppablePoolRoot 需要覆盖整个滚动区域 */}
+            <DroppablePoolRoot className="flex-1 overflow-y-auto scrollbar-hide">
+                <div className="p-6 min-h-full">
+                    {filteredTasks.length === 0 ? (
+                        <div className="h-full flex items-center justify-center min-h-[200px]">
+                            <div className="text-center">
+                                <div className="text-6xl mb-4 opacity-20">📋</div>
+                                <div className="text-sm font-medium text-slate-400">暂无任务</div>
+                            </div>
                         </div>
-                    </div>
-                ) : (
-                    <TaskTree
-                        tasks={filteredTasks}
-                        onUpdate={updateTask}
-                        onDelete={deleteTask}
-                        disableInternalDnd={disableInternalDnd}
-                    />
-                )}
-            </div>
+                    ) : (
+                        <TaskTree
+                            tasks={filteredTasks}
+                            onUpdate={updateTask}
+                            onDelete={deleteTask}
+                            disableInternalDnd={disableInternalDnd}
+                        />
+                    )}
+                </div>
+            </DroppablePoolRoot>
         </div>
     );
 };

@@ -4,7 +4,7 @@ import { Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { useGoalStore } from '../../../hooks/useGoalStore';
 import { useGoalPageContext } from '../../../context/GoalPageContext';
 import { Goal } from '../../shared/types';
-import { viewBackground } from '../../shared/background';
+import { viewBackground } from '../../shared/backgroundStyles';
 import GoalCard from './components/GoalCard';
 import AddGoalModal from './components/AddGoalModal';
 import GoalDetailView from './components/GoalDetailView';

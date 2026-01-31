@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import {
     DndContext,
@@ -50,6 +50,12 @@ interface TodoItemTreeDetailedProps {
     showSource?: boolean;
     /** 是否显示日期标签 */
     showDate?: boolean;
+    /** 添加子项回调 */
+    onAddChild?: (parentId: number) => void;
+    /** 根据 goalId 获取 Goal 名称 */
+    getGoalName?: (goalId: string | null) => string | undefined;
+    /** 根据 planDocId 获取 Plan 名称 */
+    getPlanName?: (planDocId: string | null) => string | undefined;
 }
 
 interface TodoItemNodeProps {
@@ -66,6 +72,9 @@ interface TodoItemNodeProps {
     showSource?: boolean;
     showDate?: boolean;
     renderChildren: () => React.ReactNode;
+    onAddChild?: (parentId: number) => void;
+    goalName?: string;
+    planName?: string;
 }
 
 // ============================================================================
@@ -96,6 +105,9 @@ const TodoItemNodeDetailed: React.FC<TodoItemNodeProps> = ({
     showSource,
     showDate,
     renderChildren,
+    onAddChild,
+    goalName,
+    planName,
 }) => {
     const hasChildren = item.children && item.children.length > 0;
     const indent = Math.min(level, maxIndentLevel) * INDENT_PX;
@@ -144,6 +156,9 @@ const TodoItemNodeDetailed: React.FC<TodoItemNodeProps> = ({
                         onSelect={onSelect}
                         showSource={showSource}
                         showDate={showDate}
+                        onAddChild={onAddChild}
+                        goalName={goalName}
+                        planName={planName}
                     />
                 </div>
             </div>
@@ -190,11 +205,21 @@ export const TodoItemTreeDetailed: React.FC<TodoItemTreeDetailedProps> = ({
     onExpandChange,
     showSource = true,
     showDate = true,
+    onAddChild,
+    getGoalName,
+    getPlanName,
 }) => {
     // 展开状态管理
     const [expandedIds, setExpandedIds] = useState<Set<number>>(() => {
         return defaultExpandedIds || new Set();
     });
+
+    // 同步外部传入的 defaultExpandedIds 变化
+    useEffect(() => {
+        if (defaultExpandedIds) {
+            setExpandedIds(defaultExpandedIds);
+        }
+    }, [defaultExpandedIds]);
 
     const toggleExpand = useCallback((id: number) => {
         setExpandedIds(prev => {
@@ -239,6 +264,9 @@ export const TodoItemTreeDetailed: React.FC<TodoItemTreeDetailedProps> = ({
                 onSelect={onSelect}
                 showSource={showSource}
                 showDate={showDate}
+                onAddChild={onAddChild}
+                goalName={getGoalName?.(item.goalId)}
+                planName={getPlanName?.(item.planDocId)}
                 renderChildren={() =>
                     item.children && item.children.length > 0
                         ? renderItems(item.children, currentLevel + 1)

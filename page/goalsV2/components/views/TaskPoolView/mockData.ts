@@ -24,7 +24,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
     {
         id: 102,
         content: "Learn Hooks",
-        parentId: 101,
+        parentId: "101",
         goalId: "1",
         planDocId: "p1",
         sourceType: "plan_doc",
@@ -43,7 +43,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
     {
         id: 103,
         content: "Master useEffect",
-        parentId: 102,
+        parentId: "102",
         goalId: "1",
         planDocId: "p1",
         sourceType: "plan_doc",
@@ -62,7 +62,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
     {
         id: 104,
         content: "Understand useContext",
-        parentId: 102,
+        parentId: "102",
         goalId: "1",
         planDocId: "p1",
         sourceType: "plan_doc",
@@ -100,7 +100,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
     {
         id: 202,
         content: "Easy Run 5k",
-        parentId: 201,
+        parentId: "201",
         goalId: "2",
         planDocId: "p3",
         sourceType: "plan_doc",
@@ -119,7 +119,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
     {
         id: 203,
         content: "Interval Training",
-        parentId: 201,
+        parentId: "201",
         goalId: "2",
         planDocId: "p3",
         sourceType: "plan_doc",

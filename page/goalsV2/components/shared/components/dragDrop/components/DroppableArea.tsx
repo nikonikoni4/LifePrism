@@ -104,7 +104,7 @@ export function DroppableDateCell({
             accepts={['task']}
             hoverClassName="bg-violet-100 border-violet-400 ring-2 ring-violet-300 shadow-lg"
             hoverHint={`放置到 ${date}`}
-            className={`min-h-[80px] ${className}`}
+            className={`min-h-[80px] flex flex-col ${className}`}
             {...props}
         >
             {children}
@@ -159,9 +159,9 @@ export function DroppablePoolRoot({
             id="pool-root"
             type="pool-root"
             accepts={['task']}
-            hoverClassName="bg-emerald-100 border-emerald-400 shadow-inner"
+            hoverClassName="bg-emerald-50/80 ring-2 ring-emerald-400/50 ring-inset"
             hoverHint="放置到任务池"
-            className={`min-h-[60px] border-2 border-dashed border-transparent rounded-lg ${className}`}
+            className={`h-full ${className}`}
             {...props}
         >
             {children}

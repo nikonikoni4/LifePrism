@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { Plus } from 'lucide-react';
-import { DroppableDateCell } from '../../../shared/components/dragDrop';
+import { Plus, GripVertical } from 'lucide-react';
+import { DroppableDateCell, DraggableItem } from '../../../shared/components/dragDrop';
 import { useTaskPoolStore } from '../../../../hooks/useTaskPoolStore';
+import { useGoalPageContext } from '../../../../context/GoalPageContext';
 import type { TodoItem } from '../../../shared/components/todoItem/types';
 
 interface DateGridProps {
@@ -29,19 +30,30 @@ const generateDateRange = (start: Date, end: Date): string[] => {
  */
 export const DateGrid: React.FC<DateGridProps> = ({ startDate, endDate }) => {
     const { tasks } = useTaskPoolStore();
+    const { selectedDate, setSelectedDate } = useGoalPageContext();
 
     const dates = useMemo(() => generateDateRange(startDate, endDate), [startDate, endDate]);
 
-    // 按日期分组任务（仅父任务）
+    // 按日期分组任务（只显示被直接拖动的任务，不显示因父任务拖动而跟随的子任务）
     const tasksByDate = useMemo(() => {
         const map = new Map<string, TodoItem[]>();
 
         tasks.forEach(task => {
-            if (task.scheduledDate && !task.parentId) {
-                if (!map.has(task.scheduledDate)) {
-                    map.set(task.scheduledDate, []);
+            if (task.scheduledDate) {
+                // 检查父任务是否也是 scheduled 状态
+                const parentTask = task.parentId
+                    ? tasks.find(t => t.id === Number(task.parentId))
+                    : null;
+                const parentIsScheduled = parentTask && parentTask.state === 'scheduled';
+
+                // 只显示：没有父任务 或 父任务不是scheduled状态的任务
+                // 这样可以区分"被直接拖动的任务"和"因父任务拖动而跟随的子任务"
+                if (!task.parentId || !parentIsScheduled) {
+                    if (!map.has(task.scheduledDate)) {
+                        map.set(task.scheduledDate, []);
+                    }
+                    map.get(task.scheduledDate)!.push(task);
                 }
-                map.get(task.scheduledDate)!.push(task);
             }
         });
 
@@ -74,24 +86,32 @@ export const DateGrid: React.FC<DateGridProps> = ({ startDate, endDate }) => {
                         const monthDay = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
                         const today = isToday(date);
                         const weekend = isWeekend(dateObj);
+                        const isSelected = selectedDate.toISOString().split('T')[0] === date;
+
+                        const handleDateClick = () => {
+                            setSelectedDate(dateObj);
+                        };
 
                         return (
                             <DroppableDateCell
                                 key={date}
                                 id={`date-${date}`}
                                 date={date}
-                                className="w-[200px] h-[360px] flex-shrink-0"
+                                className="w-[200px] h-[360px] flex-shrink-0 rounded-2xl"
                             >
                                 {/* 日期卡片 - 参考taskCalendar的磨砂玻璃设计 */}
-                                <div className={`
-                                    group/cell relative h-full rounded-2xl p-3.5 flex flex-col
-                                    transition-all duration-300 ease-out overflow-hidden
+                                <div
+                                    onClick={handleDateClick}
+                                    className={`
+                                    group/cell relative flex-1 rounded-2xl p-3.5 flex flex-col cursor-pointer
+                                    transition-all duration-300 ease-out
                                     bg-white border border-slate-200/60
                                     shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)]
                                     hover:shadow-[0_12px_40px_-8px_rgba(0,0,0,0.12)]
                                     hover:border-slate-300/80
                                     hover:translate-y-[-2px]
                                     ${today ? 'ring-2 ring-blue-400/60 shadow-[0_8px_30px_-6px_rgba(59,130,246,0.25)]' : ''}
+                                    ${isSelected && !today ? 'ring-2 ring-emerald-400/60 shadow-[0_8px_30px_-6px_rgba(16,185,129,0.25)]' : ''}
                                     ${weekend ? 'bg-slate-50/80' : ''}
                                 `}>
                                     {/* 顶部反光效果 - 参考taskCalendar */}
@@ -136,11 +156,11 @@ export const DateGrid: React.FC<DateGridProps> = ({ startDate, endDate }) => {
                                         {dateTasks.length === 0 ? (
                                             /* 空状态 - 参考taskCalendar的添加提示 */
                                             <div
-                                                className="flex flex-col items-center justify-center h-full 
-                                                    opacity-0 group-hover/cell:opacity-100 
+                                                className="flex flex-col items-center justify-center h-full
+                                                    opacity-0 group-hover/cell:opacity-100
                                                     transition-opacity duration-300 cursor-pointer"
                                             >
-                                                <div className="w-10 h-10 rounded-xl bg-slate-100 border-2 border-dashed border-slate-200 
+                                                <div className="w-10 h-10 rounded-xl bg-slate-100 border-2 border-dashed border-slate-200
                                                     flex items-center justify-center mb-2
                                                     group-hover/cell:border-slate-300 group-hover/cell:bg-slate-50
                                                     transition-all duration-300">
@@ -151,31 +171,44 @@ export const DateGrid: React.FC<DateGridProps> = ({ startDate, endDate }) => {
                                                 </span>
                                             </div>
                                         ) : (
-                                            /* 任务卡片列表 - 参考taskCalendar的任务样式 */
+                                            /* 任务卡片列表 - 支持拖拽 */
                                             dateTasks.map(task => (
-                                                <div
+                                                <DraggableItem
                                                     key={task.id}
-                                                    className="
-                                                        group/task relative px-2.5 py-2 rounded-xl text-xs font-medium cursor-pointer
-                                                        transition-all duration-200
-                                                        bg-slate-50 text-slate-700
-                                                        border border-slate-100
-                                                        hover:bg-slate-100 hover:border-slate-200
-                                                        hover:shadow-sm hover:scale-[1.01]
-                                                        active:scale-[0.99]
-                                                    "
-                                                    title={task.content}
+                                                    id={`calendar-${task.id}`}
+                                                    type="task"
+                                                    source="calendar"
+                                                    data={task}
+                                                    draggingClassName="opacity-50 shadow-xl scale-105"
                                                 >
-                                                    <div className="flex items-center gap-2">
-                                                        {/* 状态指示器 */}
-                                                        <div className={`
-                                                            w-2 h-2 rounded-full flex-shrink-0 
-                                                            ${task.state == "completed" ? 'bg-emerald-400' : 'bg-blue-400'}
-                                                            shadow-sm
-                                                        `} />
-                                                        <span className="truncate">{task.content}</span>
+                                                    <div
+                                                        className="
+                                                            group/task relative px-2.5 py-2 rounded-xl text-xs font-medium cursor-grab
+                                                            transition-all duration-200
+                                                            bg-slate-50 text-slate-700
+                                                            border border-slate-100
+                                                            hover:bg-slate-100 hover:border-slate-200
+                                                            hover:shadow-sm hover:scale-[1.01]
+                                                            active:cursor-grabbing active:scale-[0.99]
+                                                        "
+                                                        title={task.content}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            {/* 拖拽手柄 */}
+                                                            <GripVertical
+                                                                size={12}
+                                                                className="text-slate-300 opacity-0 group-hover/task:opacity-100 transition-opacity flex-shrink-0"
+                                                            />
+                                                            {/* 状态指示器 */}
+                                                            <div className={`
+                                                                w-2 h-2 rounded-full flex-shrink-0
+                                                                ${task.state == "completed" ? 'bg-emerald-400' : 'bg-violet-400'}
+                                                                shadow-sm
+                                                            `} />
+                                                            <span className="truncate">{task.content}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                </DraggableItem>
                                             ))
                                         )}
                                     </div>

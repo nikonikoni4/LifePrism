@@ -6,7 +6,7 @@ import { PlanDoc } from '../../shared/types';
 import { Plus, ChevronDown, FileText, Target, MoreVertical, Trash2, Copy, Archive } from 'lucide-react';
 import { PlanDocEditorView } from './components/PlanDocEditorView/PlanDocEditorView';
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';
-import { viewBackground } from '../../shared/background';
+import { viewBackground } from '../../shared/backgroundStyles';
 
 export const PlanDocListView: React.FC = () => {
     const { selectedGoalId, setSelectedGoalId, selectedPlanDocId, setSelectedPlanDocId } = useGoalPageContext();

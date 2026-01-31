@@ -8,7 +8,7 @@
  * - 事件处理封装
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
     DndContext,
     DragOverlay,
@@ -140,6 +140,9 @@ export function CrossAreaDndProvider<TDrag = unknown, TDrop = unknown>({
         overArea: null,
     });
 
+    // 使用 ref 同步存储最新的 overArea，避免 React 状态异步更新导致的问题
+    const overAreaRef = useRef<DropAreaData<TDrop> | null>(null);
+
     // 传感器配置
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -157,9 +160,18 @@ export function CrossAreaDndProvider<TDrag = unknown, TDrop = unknown>({
     );
 
     // 碰撞检测策略：优先使用指针位置，其次使用矩形相交
+    // 当检测到 pool-root 时优先返回，解决从日历拖回任务池时只有边缘才能成功的问题
     const collisionDetection: CollisionDetection = useCallback((args) => {
         const pointerCollisions = pointerWithin(args);
         if (pointerCollisions.length > 0) {
+            // 优先返回 pool-root 类型的碰撞（如果存在）
+            // 这样从日历拖拽到任务池中间区域也能正确检测
+            const poolRootCollision = pointerCollisions.find(
+                c => c.data?.droppableContainer?.data?.current?.type === 'pool-root'
+            );
+            if (poolRootCollision) {
+                return [poolRootCollision];
+            }
             return pointerCollisions;
         }
         return rectIntersection(args);
@@ -187,6 +199,9 @@ export function CrossAreaDndProvider<TDrag = unknown, TDrop = unknown>({
     const handleDragOver = useCallback((event: DragOverEvent) => {
         const dropArea = extractDropAreaData<TDrop>(event.over);
 
+        // 同步更新 ref，确保 handleDragEnd 能获取到最新值
+        overAreaRef.current = dropArea;
+
         setDragState(prev => ({
             ...prev,
             overArea: dropArea,
@@ -205,10 +220,13 @@ export function CrossAreaDndProvider<TDrag = unknown, TDrop = unknown>({
     // 拖拽结束处理
     const handleDragEnd = useCallback((event: DragEndEvent) => {
         const dragItem = extractDragItemData<TDrag>(event.active);
-        const dropArea = extractDropAreaData<TDrop>(event.over);
+        // 优先使用 ref 中存储的 overArea，确保高亮显示和实际判定一致
+        // ref 是同步更新的，不会有 React 状态异步更新的问题
+        const dropArea = overAreaRef.current || extractDropAreaData<TDrop>(event.over);
         const isCrossArea = isCrossAreaDrop(dragItem, dropArea);
 
-        // 重置状态
+        // 重置状态和 ref
+        overAreaRef.current = null;
         setDragState({
             isDragging: false,
             activeItem: null,
