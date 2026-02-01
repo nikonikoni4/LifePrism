@@ -9,6 +9,7 @@ import { Goal, ThemeKey, MilestoneItem, EditableMilestone } from '../../../../ty
 import { THEMES, PAST_VALUES, PAST_COMMITMENTS } from '../../../../hooks/useGoalStore';
 import MilestoneEditor from './milestone/MilestoneEditor';
 import { convertToEditableMilestones } from './milestone/utils';
+import CategoryFilter, { CategoryFilterValue } from '../../../../../common/CategoryFilter';
 
 const SuggestionBox = ({ items, onSelect, onClose, themeColor }: { items: string[], onSelect: (val: string) => void, onClose: () => void, themeColor: string }) => (
   <motion.div
@@ -216,20 +217,16 @@ const AddGoalModal: React.FC<AddGoalModalProps> = ({ isOpen, onClose, onSave, go
                       <div className="grid grid-cols-2 gap-4">
                          <div className="space-y-2">
                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">分类</label>
-                          <div className="relative">
-                            <select
-                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none transition-all font-medium"
-                              value={form.category}
-                              onChange={e => setForm({...form, category: e.target.value})}
-                            >
-                                <option value="" disabled>选择分类...</option>
-                                <option value="Work">工作</option>
-                                <option value="Learn">学习</option>
-                                <option value="Health">健康</option>
-                                <option value="Life">生活</option>
-                            </select>
-                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                          </div>
+                          <CategoryFilter
+                            value={{
+                              categoryId: form.category || null,
+                              subCategoryId: null,
+                              color: null,
+                            }}
+                            onChange={(val: CategoryFilterValue) => setForm({...form, category: val.categoryId || ''})}
+                            buttonClassName="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium flex items-center gap-2"
+                            showLabel={true}
+                          />
                         </div>
                         <div className="space-y-2">
                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">已投入时间</label>
