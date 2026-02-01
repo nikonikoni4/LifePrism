@@ -104,6 +104,7 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
         <>
             {/* Filter Button */}
             <button
+                type="button"
                 onClick={handleOpenDialog}
                 className={buttonClassName || defaultButtonClass}
                 style={hasFilter && value.color ? {
