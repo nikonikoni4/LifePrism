@@ -135,7 +135,7 @@ export const PlanDocListView: React.FC = () => {
         setIsCreateDialogOpen(true);
     };
 
-    const handleCreateDoc = (title: string) => {
+    const handleCreateDoc = async (title: string) => {
         const newDoc: PlanDoc = {
             id: title,  // 使用 title 作为 id
             goalId: selectedGoalId,
@@ -145,8 +145,19 @@ export const PlanDocListView: React.FC = () => {
             updatedAt: new Date().toISOString(),
             status: 'active'
         };
+
+        // 先添加到内存 store（乐观更新）
         addPlanDoc(newDoc);
         setSelectedPlanDocId(newDoc.id);
+
+        // 调用后端 API 创建（会同时创建 md 文件）
+        try {
+            await planDocApi.createPlanDoc(newDoc);
+        } catch (error) {
+            console.error('Failed to create plan doc:', error);
+            // 可选：失败时从 store 中移除
+            deletePlanDoc(newDoc.id);
+        }
     };
 
     const handleDeleteDoc = () => {
