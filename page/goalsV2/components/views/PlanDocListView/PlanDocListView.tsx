@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useGoalPageContext } from '../../../context/GoalPageContext';
 import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
 import { PlanDoc } from '../../../types';
-import { Plus, ChevronDown, FileText, Target, MoreVertical, Trash2, Copy, Archive } from 'lucide-react';
+import { planDocApi } from '../../../api';
+import { Plus, ChevronDown, FileText, Target, MoreVertical, Trash2, Copy, Archive, Save } from 'lucide-react';
 import { PlanDocEditorView } from './components/PlanDocEditorView/PlanDocEditorView';
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';
 import { InputDialog } from '../../shared/components/InputDialog';
@@ -18,6 +19,15 @@ export const PlanDocListView: React.FC = () => {
 
     // Local content state for editing to avoid laggy context updates on every keystroke
     const [localContent, setLocalContent] = useState('');
+
+    // Save state
+    const [isSaving, setIsSaving] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+    // Refs for auto-save on doc switch
+    const prevDocIdRef = useRef<string | null>(null);
+    const prevContentRef = useRef<string>('');
+    const hasUnsavedChangesRef = useRef(false);
 
     // Dialog state for creating new plan doc
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -48,15 +58,68 @@ export const PlanDocListView: React.FC = () => {
     useEffect(() => {
         if (selectedDoc) {
             setLocalContent(selectedDoc.content);
+            setHasUnsavedChanges(false);
         } else {
             setLocalContent('');
+            setHasUnsavedChanges(false);
         }
     }, [selectedDoc?.id]); // Only when ID changes
 
+    // Keep refs in sync
+    useEffect(() => {
+        hasUnsavedChangesRef.current = hasUnsavedChanges;
+        prevContentRef.current = localContent;
+    }, [hasUnsavedChanges, localContent]);
+
+    // Auto-save when switching documents
+    useEffect(() => {
+        const prevId = prevDocIdRef.current;
+        const currentId = selectedDoc?.id || null;
+
+        // If switching from a doc that had unsaved changes, save it
+        if (prevId && prevId !== currentId && hasUnsavedChangesRef.current) {
+            planDocApi.updatePlanDoc(prevId, { content: prevContentRef.current }).catch(err => {
+                console.error('Auto-save on doc switch failed:', err);
+            });
+        }
+
+        prevDocIdRef.current = currentId;
+    }, [selectedDoc?.id]);
+
+    // Auto-save when leaving page (beforeunload)
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            if (hasUnsavedChangesRef.current && selectedDoc) {
+                // Use sendBeacon for reliable save on page unload
+                const url = `/api/v2/goal/plan-docs/${selectedDoc.id}`;
+                const data = JSON.stringify({ content: prevContentRef.current });
+                navigator.sendBeacon(url, new Blob([data], { type: 'application/json' }));
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [selectedDoc?.id]);
+
+    // Save handler
+    const handleSave = async () => {
+        if (!selectedDoc || !hasUnsavedChanges) return;
+        setIsSaving(true);
+        try {
+            await planDocApi.updatePlanDoc(selectedDoc.id, { content: localContent });
+            setHasUnsavedChanges(false);
+        } catch (error) {
+            console.error('Save failed:', error);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleContentChange = (newContent: string) => {
         setLocalContent(newContent);
+        setHasUnsavedChanges(true);
 
-        // Auto-save immediately to store for now
+        // Update in-memory store for UI sync
         if (selectedDoc) {
             updatePlanDoc({ ...selectedDoc, content: newContent, updatedAt: new Date().toISOString() });
         }
@@ -74,7 +137,7 @@ export const PlanDocListView: React.FC = () => {
 
     const handleCreateDoc = (title: string) => {
         const newDoc: PlanDoc = {
-            id: Date.now().toString(),
+            id: title,  // 使用 title 作为 id
             goalId: selectedGoalId,
             title: title,
             content: '# New Plan\n',
@@ -183,6 +246,19 @@ export const PlanDocListView: React.FC = () => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 shrink-0">
+                    <button
+                        onClick={handleSave}
+                        disabled={!hasUnsavedChanges || isSaving}
+                        className={`p-2 rounded-xl border shadow-sm transition-all ${
+                            hasUnsavedChanges
+                                ? 'bg-indigo-500 border-indigo-400 text-white hover:bg-indigo-600'
+                                : 'bg-white border-slate-100 text-slate-300 cursor-not-allowed'
+                        }`}
+                        title={isSaving ? 'Saving...' : 'Save'}
+                    >
+                        <Save size={18} />
+                    </button>
+
                     <button
                         onClick={handleOpenCreateDialog}
                         className="p-2 rounded-xl bg-white border border-slate-100 shadow-sm text-slate-400 hover:text-indigo-500 hover:border-indigo-100 hover:shadow-md transition-all"
