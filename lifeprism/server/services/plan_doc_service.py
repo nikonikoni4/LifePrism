@@ -190,6 +190,12 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
     Returns:
         Optional[PlanDocItem]: 更新后的计划书，失败返回 None
     """
+    # 先检查文档是否存在
+    existing = plan_doc_provider.get_plan_doc_by_id(doc_id)
+    if not existing:
+        logger.warning(f"计划书 {doc_id} 不存在")
+        return None
+
     update_data = {}
     explicitly_set_fields = request.model_fields_set
 
@@ -200,12 +206,7 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
 
     # 更新数据库 meta（如果有需要更新的字段）
     if update_data:
-        success = plan_doc_provider.update_plan_doc(doc_id, update_data)
-        if not success:
-            # 检查文档是否存在
-            existing = plan_doc_provider.get_plan_doc_by_id(doc_id)
-            if not existing:
-                return None
+        plan_doc_provider.update_plan_doc(doc_id, update_data)
 
     # 更新文件内容
     if 'content' in explicitly_set_fields:

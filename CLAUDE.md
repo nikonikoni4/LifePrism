@@ -51,7 +51,84 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    ```
    
    **缓存一致性**：有缓存的 service 必须提供 `_refresh_cache()` 方法，在 CRUD 操作后调用以保持缓存与数据库同步
-5. **重要**：该项目涉及到的所有用户可修改的“名称”字段，比如类别名称，目标名称，习惯名称，任务todo名称等都不能作为key，必须使用唯一的用户不可修改的id作为唯一标识
+5. **ID 优先原则**：用户可修改的"名称"字段（如分类名称、目标名称、习惯名称、任务内容等）不能作为数据查找、匹配或关联的依据，必须使用系统生成的、用户不可修改的 `id` 作为唯一标识。
+
+   **适用范围**：
+   - 涉及实体间关联的场景（如 Todo 关联 Goal、Cache 关联 Category）
+   - 涉及数据查找/匹配的场景（如根据条件获取某条记录）
+   - 涉及缓存 key 设计的场景
+
+   **不适用的场景**：
+   - 纯展示用途（UI 显示名称）
+   - 数据库 UNIQUE 约束（防止用户创建重复名称，这是业务约束，与数据关联无关）
+   - 搜索功能（用户按名称搜索是合理的，但返回结果后的后续操作应基于 id）
+   - **外部系统边界转换**（如 LLM 分类输出）：LLM 只能输出人类可读的 `name`，后端需要将其转换为 `id` 存储。这是外部边界的必要转换，转换后数据库存储的仍是 `id`。
+     ```python
+     # ✅ 正确：LLM 边界转换（data_processing_service.py）
+     # LLM 输出: { category: "工作", link_to_goal: "学习英语" }
+     # 转换为 id 后存储
+     category_name_to_id = {cat['name']: cat['id'] for cat in categories}
+     goal_name_to_id = {g['name']: g['id'] for g in goals}
+
+     cat_id = category_name_to_id.get(llm_result.category)  # name → id
+     goal_id = goal_name_to_id.get(llm_result.link_to_goal)  # name → id
+
+     # 最终存储的是 id
+     record = {'category_id': cat_id, 'link_to_goal_id': goal_id}
+     ```
+     **注意**：此场景需要对 LLM 输出的 name 进行校验，确保其存在于系统中，否则应记录警告或回退处理。
+
+   **数据库层约束**：
+   ```
+   ✅ 正确：
+   - PRIMARY KEY 必须是 id（如 goal-xxx, cat-xxx）
+   - 外键字段存储 id（如 link_to_goal_id, category_id）
+   - name 字段可设置 UNIQUE 约束（业务需要）
+
+   ❌ 错误：
+   - 用 name 作为外键关联字段
+   - 用 name 作为 PRIMARY KEY
+   ```
+
+   **后端层约束**：
+   ```python
+   # ✅ 正确：用 id 查找/匹配
+   goal = goal_provider.get_goal_by_id("goal-abc123")
+   cache = cache_provider.get_by_category_id("cat-xxx")
+
+   # ❌ 错误：用 name 查找/匹配（用户改名后关联断裂）
+   goal = goal_provider.get_goal_by_name("学习英语")
+
+   # ✅ 正确：缓存 key 用 id
+   goal_name_map = {"goal-abc123": "学习英语"}  # id → name
+
+   # ❌ 错误：缓存 key 用 name
+   goal_id_map = {"学习英语": "goal-abc123"}  # name → id
+
+   # ✅ 正确：API 关联参数用 id
+   class CreateTodoRequest:
+       link_to_goal_id: str  # 存 "goal-abc123"
+
+   # ❌ 错误：API 关联参数用 name
+   class CreateTodoRequest:
+       link_to_goal_name: str  # 存 "学习英语"
+   ```
+
+   **前端层约束**：
+   ```typescript
+   // ✅ 正确：存储和传递 id
+   const todo = { linkToGoalId: "goal-abc123" }
+   await api.createTodo({ link_to_goal_id: selectedGoal.id })
+
+   // ❌ 错误：存储和传递 name
+   const todo = { linkToGoalName: "学习英语" }
+   await api.createTodo({ link_to_goal_name: selectedGoal.name })
+
+   // ✅ 正确：name 仅用于展示
+   <span>{goal.name}</span>
+   ```
+
+   **核心原因**：`name` 是用户可随时修改的，如果用 `name` 做关联/查找，用户修改名称后原有关联会断裂，导致数据不一致
 
 ## Project Overview
 
