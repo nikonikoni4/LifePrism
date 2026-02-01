@@ -1,10 +1,12 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Goal, ThemeKey } from '../types';
+import { goalsV2Api } from '../api';
 
 // Constants
-export const THEMES: Record<string, { label: string; gradient: string; title: string; progressBg: string; meta: string; container: string; button: string; timelineLine: string; tag: string }> = {
+export const THEMES: Record<string, { label: string; accentColor: string; gradient: string; title: string; progressBg: string; meta: string; container: string; button: string; timelineLine: string; tag: string }> = {
     indigo: {
         label: 'Indigo',
+        accentColor: '#6366f1',
         gradient: 'from-indigo-500/10 to-indigo-600/10',
         title: 'text-indigo-900',
         progressBg: 'bg-indigo-500',
@@ -16,6 +18,7 @@ export const THEMES: Record<string, { label: string; gradient: string; title: st
     },
     rose: {
         label: 'Rose',
+        accentColor: '#f43f5e',
         gradient: 'from-rose-500/10 to-rose-600/10',
         title: 'text-rose-900',
         progressBg: 'bg-rose-500',
@@ -27,6 +30,7 @@ export const THEMES: Record<string, { label: string; gradient: string; title: st
     },
     amber: {
         label: 'Amber',
+        accentColor: '#f59e0b',
         gradient: 'from-amber-500/10 to-amber-600/10',
         title: 'text-amber-900',
         progressBg: 'bg-amber-500',
@@ -38,6 +42,7 @@ export const THEMES: Record<string, { label: string; gradient: string; title: st
     },
     emerald: {
         label: 'Emerald',
+        accentColor: '#10b981',
         gradient: 'from-emerald-500/10 to-emerald-600/10',
         title: 'text-emerald-900',
         progressBg: 'bg-emerald-500',
@@ -49,6 +54,7 @@ export const THEMES: Record<string, { label: string; gradient: string; title: st
     },
     violet: {
         label: 'Violet',
+        accentColor: '#8b5cf6',
         gradient: 'from-violet-500/10 to-violet-600/10',
         title: 'text-violet-900',
         progressBg: 'bg-violet-500',
@@ -60,6 +66,7 @@ export const THEMES: Record<string, { label: string; gradient: string; title: st
     },
     cyan: {
         label: 'Cyan',
+        accentColor: '#06b6d4',
         gradient: 'from-cyan-500/10 to-cyan-600/10',
         title: 'text-cyan-900',
         progressBg: 'bg-cyan-500',
@@ -87,89 +94,128 @@ export const PAST_COMMITMENTS = [
     "I will track my progress every Sunday."
 ];
 
-export const INITIAL_GOALS: Goal[] = [
-    {
-        id: '1',
-        title: 'Master React & Frontend Architecture',
-        category: 'Career',
-        theme: 'indigo',
-        timeInvested: '42',
-        unit: 'HRS',
-        startDate: '01.15',
-        endDate: '06.30',
-        value: 'To become a world-class engineer.',
-        commitment: 'Code daily.',
-        details: 'Deep dive into React 19, Server Components, and advanced patterns.',
-        status: 'active',
-        milestones: [
-            { id: 'm1', content: 'Complete React Docs', state: 1, finishTime: '01.20', orderIndex: 0 },
-            { id: 'm2', content: 'Build 3 Practice Apps', state: 0, finishTime: null, orderIndex: 1 },
-            { id: 'm3', content: 'Contribute to Open Source', state: 0, finishTime: null, orderIndex: 2 }
-        ],
-        journal: [
-            { id: 'j1', date: 'Jan 15', time: '09:00 AM', content: 'Started the journey. Feeling excited!', mood: 'joy', duration: 2, tags: ['Start'] },
-            { id: 'j2', date: 'Jan 16', time: '08:30 PM', content: 'Struggled with useEffect today, but made progress.', mood: 'frustrated', duration: 3, tags: ['Learning'] }
-        ]
-    },
-    {
-        id: '2',
-        title: 'Run a Half Marathon',
-        category: 'Health',
-        theme: 'rose',
-        timeInvested: '15',
-        unit: 'HRS',
-        startDate: '02.01',
-        endDate: '05.15',
-        value: 'To push my physical limits.',
-        commitment: 'Run 4x a week.',
-        details: 'Follow the 12-week training plan.',
-        status: 'active',
-        milestones: [
-            { id: 'm1', content: 'Run 5k without stopping', state: 1, finishTime: '02.10', orderIndex: 0 },
-            { id: 'm2', content: 'Run 10k', state: 0, finishTime: null, orderIndex: 1 }
-        ],
-        journal: []
-    }
-];
-
 interface GoalStoreContextType {
     goals: Goal[];
-    addGoal: (goal: Goal) => void;
-    updateGoal: (goal: Goal) => void;
-    deleteGoal: (id: string) => void;
-    toggleGoalStatus: (id: string) => void;
+    isLoading: boolean;
+    error: string | null;
+    fetchGoals: () => Promise<void>;
+    addGoal: (goal: Goal) => Promise<void>;
+    updateGoal: (goal: Goal) => Promise<void>;
+    deleteGoal: (id: string) => Promise<void>;
+    toggleGoalStatus: (id: string) => Promise<void>;
+    updateMilestoneState: (goalId: string, milestoneId: string, state: number) => Promise<void>;
 }
 
 const GoalStoreContext = createContext<GoalStoreContextType | undefined>(undefined);
 
 export const GoalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [goals, setGoals] = useState<Goal[]>(INITIAL_GOALS);
+    const [goals, setGoals] = useState<Goal[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const addGoal = (goal: Goal) => {
-        setGoals(prev => [...prev, goal]);
+    const fetchGoals = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const data = await goalsV2Api.getGoals();
+            setGoals(data);
+        } catch (err) {
+            console.error('[GoalStore] Failed to fetch goals:', err);
+            setError(err instanceof Error ? err.message : 'Failed to fetch goals');
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    // Fetch goals on mount
+    useEffect(() => {
+        fetchGoals();
+    }, [fetchGoals]);
+
+    const addGoal = async (goal: Goal) => {
+        setError(null);
+        try {
+            const created = await goalsV2Api.createGoal(goal);
+            setGoals(prev => [...prev, created]);
+        } catch (err) {
+            console.error('[GoalStore] Failed to create goal:', err);
+            setError(err instanceof Error ? err.message : 'Failed to create goal');
+            throw err;
+        }
     };
 
-    const updateGoal = (updatedGoal: Goal) => {
-        setGoals(prev => prev.map(g => g.id === updatedGoal.id ? updatedGoal : g));
+    const updateGoal = async (updatedGoal: Goal) => {
+        setError(null);
+        try {
+            const updated = await goalsV2Api.updateGoal(updatedGoal.id, updatedGoal);
+            setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
+        } catch (err) {
+            console.error('[GoalStore] Failed to update goal:', err);
+            setError(err instanceof Error ? err.message : 'Failed to update goal');
+            throw err;
+        }
     };
 
-    const deleteGoal = (id: string) => {
-        setGoals(prev => prev.filter(g => g.id !== id));
-    };
-
-    const toggleGoalStatus = (id: string) => {
-        setGoals(prev => prev.map(g => {
-            if (g.id === id) {
-                return { ...g, status: g.status === 'active' ? 'completed' : 'active' };
+    const deleteGoal = async (id: string) => {
+        setError(null);
+        try {
+            const success = await goalsV2Api.deleteGoal(id);
+            if (success) {
+                setGoals(prev => prev.filter(g => g.id !== id));
+            } else {
+                throw new Error('Delete operation failed');
             }
-            return g;
-        }));
+        } catch (err) {
+            console.error('[GoalStore] Failed to delete goal:', err);
+            setError(err instanceof Error ? err.message : 'Failed to delete goal');
+            throw err;
+        }
+    };
+
+    const toggleGoalStatus = async (id: string) => {
+        setError(null);
+        const goal = goals.find(g => g.id === id);
+        if (!goal) return;
+
+        const newStatus = goal.status === 'active' ? 'completed' : 'active';
+        try {
+            const updated = await goalsV2Api.updateGoal(id, { status: newStatus });
+            setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
+        } catch (err) {
+            console.error('[GoalStore] Failed to toggle goal status:', err);
+            setError(err instanceof Error ? err.message : 'Failed to toggle goal status');
+            throw err;
+        }
+    };
+
+    const updateMilestoneState = async (goalId: string, milestoneId: string, state: number) => {
+        setError(null);
+        try {
+            const updated = await goalsV2Api.updateMilestoneState(goalId, milestoneId, state);
+            setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
+        } catch (err) {
+            console.error('[GoalStore] Failed to update milestone:', err);
+            setError(err instanceof Error ? err.message : 'Failed to update milestone');
+            throw err;
+        }
     };
 
     // Use React.createElement to avoid JSX in .ts file
     return React.createElement(
         GoalStoreContext.Provider,
-        { value: { goals, addGoal, updateGoal, deleteGoal, toggleGoalStatus } },
+        {
+            value: {
+                goals,
+                isLoading,
+                error,
+                fetchGoals,
+                addGoal,
+                updateGoal,
+                deleteGoal,
+                toggleGoalStatus,
+                updateMilestoneState
+            }
+        },
         children
     );
 };
