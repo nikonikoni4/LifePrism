@@ -3,7 +3,6 @@ Plan Doc 数据提供者
 提供 Plan Doc 计划书的数据库操作
 """
 from typing import Optional, List, Dict, Any
-import uuid
 
 from lifeprism.storage import LWBaseDataProvider
 from lifeprism.utils import get_logger, LazySingleton
@@ -82,17 +81,20 @@ class PlanDocProvider(LWBaseDataProvider):
         创建新计划书
 
         Args:
-            data: 计划书数据
+            data: 计划书数据，title 将作为 id 使用
 
         Returns:
-            Optional[str]: 新计划书 ID (格式: plandoc-xxx)，失败返回 None
+            Optional[str]: 新计划书 ID (即 title)，失败返回 None
         """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # 生成唯一 ID
-                doc_id = f"plandoc-{str(uuid.uuid4())[:8]}"
+                # 使用 title 作为 id（title 不可修改，作为唯一标识）
+                doc_id = data.get('title', '')
+                if not doc_id:
+                    logger.error("创建计划书失败: title 不能为空")
+                    return None
 
                 # 获取当前目标下最大 order_index
                 cursor.execute(
@@ -108,7 +110,7 @@ class PlanDocProvider(LWBaseDataProvider):
                 values = [
                     doc_id,
                     data.get('goal_id'),
-                    data.get('title'),
+                    doc_id,  # title 与 id 相同
                     data.get('status', 'active'),
                     next_order
                 ]
