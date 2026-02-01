@@ -198,6 +198,7 @@ export function mapBackendGoalToFrontend(backend: BackendGoalItem): Goal {
         milestones,
         journal,
         daysStarted: backend.days_started || undefined,
+        trackTimeAutomatically: backend.track_time_automatically,
     };
 }
 
@@ -429,7 +430,7 @@ export interface BackendPlanDocListResponse {
 }
 
 export interface CreatePlanDocApiRequest {
-    goal_id: string;
+    goal_id: string | null;
     title: string;
     content?: string;
 }
@@ -458,7 +459,7 @@ function mapBackendPlanDocToFrontend(backend: BackendPlanDocItem): PlanDoc {
 
 function mapFrontendPlanDocToCreateRequest(frontend: Partial<PlanDoc>): CreatePlanDocApiRequest {
     return {
-        goal_id: frontend.goalId || '',
+        goal_id: frontend.goalId || null,
         title: frontend.title || '',
         content: frontend.content || '',
     };

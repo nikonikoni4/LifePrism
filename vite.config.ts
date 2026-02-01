@@ -26,6 +26,10 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        '@my-ui-kit/core': path.resolve(__dirname, './my-ui-kit/ui-kit'),
+        // Force single React instance to avoid "Invalid hook call" errors
+        'react': path.resolve(__dirname, './node_modules/react'),
+        'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
       }
     }
   };
