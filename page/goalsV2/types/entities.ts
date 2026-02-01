@@ -34,6 +34,7 @@ export interface Goal {
     category: string;
     theme: ThemeKey;
     timeInvested: string;
+    trackTimeAutomatically: boolean;
     unit: string;
     startDate: string;
     endDate: string;
@@ -48,7 +49,7 @@ export interface Goal {
 
 export interface PlanDoc {
     id: string;
-    goalId: string;
+    goalId: string | null;
     title: string;
     content: string;
     createdAt: string;

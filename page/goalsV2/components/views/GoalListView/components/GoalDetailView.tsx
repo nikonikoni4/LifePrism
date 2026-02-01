@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Clock, ChevronLeft, RefreshCw,
-  MoreVertical, Sun, Moon, Coffee, Zap, Pencil, Target
+  MoreVertical, Sun, Moon, Coffee, Zap, Pencil, Target, ChevronDown, Check
 } from 'lucide-react';
 import { Goal, JournalEntry, ThemeKey } from '../../../../types';
 import { THEMES } from '../../../../hooks/useGoalStore';
@@ -12,6 +12,7 @@ import MilestoneAxis from './milestone/MilestoneAxis';
 import { CategoryLabel } from './GoalCard';
 import { formatDateForDisplay } from '../../../../api';
 import JournalEntryModal from './JournalEntryModal';
+import { DropdownMenu, DropdownItem } from '../../../shared/components/DropdownMenu';
 
 // --- Reflection Timeline Component ---
 const ReflectionTimeline = ({ entries, theme }: { entries: JournalEntry[], theme: ThemeKey | string }) => {
@@ -94,6 +95,8 @@ interface GoalDetailViewProps {
 const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate, onMilestoneToggle, onAddJournal, theme }) => {
   const themeConfig = THEMES[theme] || THEMES.indigo;
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
+  const [isEditingTime, setIsEditingTime] = useState(false);
+  const [editedTimeInvested, setEditedTimeInvested] = useState(goal.timeInvested);
 
   const handleMilestoneToggle = async (id: string, newState: number) => {
     if (!goal.milestones) return;
@@ -131,6 +134,47 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate
       }
     }
   };
+
+  const handleTrackModeChange = (autoTrack: boolean) => {
+    onUpdate({
+      ...goal,
+      trackTimeAutomatically: autoTrack
+    });
+  };
+
+  const handleTimeInvestedSave = () => {
+    if (editedTimeInvested !== goal.timeInvested) {
+      onUpdate({
+        ...goal,
+        timeInvested: editedTimeInvested
+      });
+    }
+    setIsEditingTime(false);
+  };
+
+  const handleTimeInvestedKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTimeInvestedSave();
+    } else if (e.key === 'Escape') {
+      setEditedTimeInvested(goal.timeInvested);
+      setIsEditingTime(false);
+    }
+  };
+
+  const trackModeItems: DropdownItem[] = [
+    {
+      id: 'auto',
+      label: '自动追踪',
+      icon: goal.trackTimeAutomatically ? <Check size={14} /> : undefined,
+      onClick: () => handleTrackModeChange(true),
+    },
+    {
+      id: 'manual',
+      label: '手动记录',
+      icon: !goal.trackTimeAutomatically ? <Check size={14} /> : undefined,
+      onClick: () => handleTrackModeChange(false),
+    },
+  ];
 
   return (
     <motion.div
@@ -177,8 +221,38 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate
           {/* Stats Cards */}
           <div className="grid grid-cols-2 gap-4 mb-8">
             <div className="bg-white rounded-[1.25rem] border border-slate-100 p-5">
-              <div className="text-2xl font-bold text-slate-800 tabular-nums mb-1">{goal.timeInvested}</div>
-              <div className="text-xs font-medium text-slate-400">总投入小时</div>
+              {isEditingTime && !goal.trackTimeAutomatically ? (
+                <input
+                  type="text"
+                  value={editedTimeInvested}
+                  onChange={(e) => setEditedTimeInvested(e.target.value)}
+                  onBlur={handleTimeInvestedSave}
+                  onKeyDown={handleTimeInvestedKeyDown}
+                  autoFocus
+                  className="text-2xl font-bold text-slate-800 tabular-nums mb-1 w-full bg-transparent border-b-2 border-indigo-500 outline-none"
+                />
+              ) : (
+                <div
+                  className={`text-2xl font-bold text-slate-800 tabular-nums mb-1 ${!goal.trackTimeAutomatically ? 'cursor-pointer hover:text-indigo-600' : ''}`}
+                  onClick={() => !goal.trackTimeAutomatically && setIsEditingTime(true)}
+                >
+                  {goal.timeInvested}
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-400">总投入小时</span>
+                <DropdownMenu
+                  trigger={
+                    <button className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">
+                      {goal.trackTimeAutomatically ? '自动' : '手动'}
+                      <ChevronDown size={10} />
+                    </button>
+                  }
+                  items={trackModeItems}
+                  align="left"
+                  width="w-36"
+                />
+              </div>
             </div>
             <div className="bg-white rounded-[1.25rem] border border-slate-100 p-5">
               <div className="text-2xl font-bold text-slate-800 tabular-nums mb-1">{goal.daysStarted || 0}</div>
