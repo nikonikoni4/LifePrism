@@ -469,10 +469,10 @@ async def update_milestone_state(
     更新里程碑状态
 
     请求体:
-    - **completed**: 是否完成
+    - **state**: 状态 (0: 未达成, 1: 已达成)
     """
-    success = goal_service.update_milestone_state(goal_id, milestone_id, request.completed)
-    if not success:
+    result = goal_service.update_milestone(goal_id, milestone_id, request.state)
+    if not result:
         raise HTTPException(status_code=404, detail="目标或里程碑不存在")
     return {"success": True}
 
