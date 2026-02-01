@@ -30,6 +30,7 @@ from lifeprism.server.providers.todo_provider import todo_provider
 from lifeprism.server.providers.goal_provider import goal_provider
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
+from lifeprism.server.services.category_service import category_service
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -557,16 +558,9 @@ def _calc_sunburst_data(
         df['end_dt'] = pd.to_datetime(df['end_time'])
         df['duration_minutes'] = (df['end_dt'] - df['start_dt']).dt.total_seconds() / 60
         
-        # 获取分类名称映射
-        categories_df = server_lw_data_provider.load_categories()
-        category_name_map = {}
-        if categories_df is not None and not categories_df.empty:
-            category_name_map = {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
-        
-        sub_categories_df = server_lw_data_provider.load_sub_categories()
-        sub_category_name_map = {}
-        if sub_categories_df is not None and not sub_categories_df.empty:
-            sub_category_name_map = {str(row['id']): row['name'] for _, row in sub_categories_df.iterrows()}
+        # 获取分类名称映射（使用 CategoryService 缓存）
+        category_name_map = category_service.category_name_map
+        sub_category_name_map = category_service.sub_category_name_map
         
         # 构建 Level 1 (Category)
         root_data = _build_category_level(df, category_name_map, is_main_category=True)
@@ -815,11 +809,8 @@ def _calc_hourly_trend(date: str) -> List[Dict[str, Any]]:
         if df is None or df.empty:
             return _build_empty_hourly_trend()
         
-        # 获取分类名称映射
-        categories_df = server_lw_data_provider.load_categories()
-        category_name_map = {}
-        if categories_df is not None and not categories_df.empty:
-            category_name_map = {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
+        # 获取分类名称映射（使用 CategoryService 缓存）
+        category_name_map = category_service.category_name_map
         
         # 预处理时间
         df['start_dt'] = pd.to_datetime(df['start_time'])
@@ -885,11 +876,8 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
         if df is None or df.empty:
             return _build_empty_weekly_trend(start_date)
         
-        # 获取分类名称映射
-        categories_df = server_lw_data_provider.load_categories()
-        category_name_map = {}
-        if categories_df is not None and not categories_df.empty:
-            category_name_map = {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
+        # 获取分类名称映射（使用 CategoryService 缓存）
+        category_name_map = category_service.category_name_map
         
         # 预处理时间
         df['start_dt'] = pd.to_datetime(df['start_time'])
@@ -955,11 +943,8 @@ def _calc_monthly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
         if df is None or df.empty:
             return _build_empty_monthly_trend(start_date, end_date)
         
-        # 获取分类名称映射
-        categories_df = server_lw_data_provider.load_categories()
-        category_name_map = {}
-        if categories_df is not None and not categories_df.empty:
-            category_name_map = {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
+        # 获取分类名称映射（使用 CategoryService 缓存）
+        category_name_map = category_service.category_name_map
         
         # 预处理时间
         df['start_dt'] = pd.to_datetime(df['start_time'])
@@ -1026,11 +1011,8 @@ def _calc_heatmap_data(start_date: str, end_date: str) -> List[HeatmapDataItem]:
         if df is None or df.empty:
             return _build_empty_heatmap(start_date, end_date)
         
-        # 获取分类名称映射
-        categories_df = server_lw_data_provider.load_categories()
-        category_name_map = {}
-        if categories_df is not None and not categories_df.empty:
-            category_name_map = {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
+        # 获取分类名称映射（使用 CategoryService 缓存）
+        category_name_map = category_service.category_name_map
         
         # 预处理时间
         df['start_dt'] = pd.to_datetime(df['start_time'])

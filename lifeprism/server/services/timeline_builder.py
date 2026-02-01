@@ -22,25 +22,20 @@ from lifeprism.server.schemas.activity_schemas import (
 )
 from lifeprism.server.providers import timeline_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color, get_timeline_category_color
+from lifeprism.server.services.category_service import category_service
 
 
 # ============================================================================
-# 分类名称查找辅助函数
+# 分类名称查找辅助函数（使用 CategoryService 缓存）
 # ============================================================================
 
 def _get_category_name_map() -> Dict[str, str]:
-    """获取主分类 ID -> 名称映射（从 category 表加载）"""
-    categories_df = timeline_provider.load_categories()
-    if categories_df is None or categories_df.empty:
-        return {}
-    return {str(row['id']): row['name'] for _, row in categories_df.iterrows()}
+    """获取主分类 ID -> 名称映射（使用 CategoryService 缓存）"""
+    return category_service.category_name_map
 
 def _get_sub_category_name_map() -> Dict[str, str]:
-    """获取子分类 ID -> 名称映射（从 sub_category 表加载）"""
-    sub_categories_df = timeline_provider.load_sub_categories()
-    if sub_categories_df is None or sub_categories_df.empty:
-        return {}
-    return {str(row['id']): row['name'] for _, row in sub_categories_df.iterrows()}
+    """获取子分类 ID -> 名称映射（使用 CategoryService 缓存）"""
+    return category_service.sub_category_name_map
 
 
 # ============================================================================
