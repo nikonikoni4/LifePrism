@@ -25,7 +25,7 @@ from lifeprism.server.schemas.report_schemas import (
     GoalTodoItem,
     HeatmapDataItem,
 )
-from lifeprism.server.providers.report_provider import daily_report_provider, weekly_report_provider, monthly_report_provider
+from lifeprism.server.providers.report_provider import daily_report_provider, weekly_report_provider, monthly_report_provider, comparison_data_provider
 from lifeprism.server.providers.todo_provider import todo_provider
 from lifeprism.server.providers.goal_provider import goal_provider
 from lifeprism.server.providers import server_lw_data_provider
@@ -443,12 +443,12 @@ def _calc_comparison_data(
 ):
     """
     计算环比对比数据（内部函数）
-    
+
     Args:
         current_start: 当前周期开始时间 YYYY-MM-DD HH:MM:SS
         current_end: 当前周期结束时间 YYYY-MM-DD HH:MM:SS
         period_type: 周期类型 ("daily", "weekly", "monthly")
-        
+
     Returns:
         ComparisonData: 环比对比数据
     """
@@ -457,13 +457,12 @@ def _calc_comparison_data(
         CategoryComparisonItem,
         GoalComparisonItem
     )
-    from lifeprism.server.providers.reward_provider import reward_provider
     import calendar
-    
+
     # 解析当前周期时间
     current_start_dt = datetime.strptime(current_start, "%Y-%m-%d %H:%M:%S")
     current_end_dt = datetime.strptime(current_end, "%Y-%m-%d %H:%M:%S")
-    
+
     # 根据周期类型计算上一周期时间
     if period_type == "daily":
         # 日报：上一天
@@ -491,31 +490,31 @@ def _calc_comparison_data(
         duration = current_end_dt - current_start_dt
         previous_end_dt = current_start_dt
         previous_start_dt = previous_end_dt - duration
-    
+
     previous_start = previous_start_dt.strftime("%Y-%m-%d %H:%M:%S")
     previous_end = previous_end_dt.strftime("%Y-%m-%d %H:%M:%S")
-    
+
     logger.info(f"计算环比对比数据: {current_start} ~ {current_end} vs {previous_start} ~ {previous_end}")
-    
+
     # 调用 provider 获取原始数据
-    raw_data = reward_provider.get_period_comparison(
+    raw_data = comparison_data_provider.get_period_comparison(
         current_start=current_start,
         current_end=current_end,
         previous_start=previous_start,
         previous_end=previous_end
     )
-    
+
     # 转换为 Schema 格式
     category_items = [
         CategoryComparisonItem(**item)
         for item in raw_data.get('category_comparison', [])
     ]
-    
+
     goal_items = [
         GoalComparisonItem(**item)
         for item in raw_data.get('goal_comparison', [])
     ]
-    
+
     return ComparisonData(
         current_start=current_start,
         current_end=current_end,

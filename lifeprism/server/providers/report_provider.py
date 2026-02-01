@@ -682,3 +682,192 @@ class MonthlyReportProvider(LWBaseDataProvider):
 
 # 创建全局单例
 monthly_report_provider = MonthlyReportProvider()
+
+
+class ComparisonDataProvider(LWBaseDataProvider):
+    """
+    环比数据提供者
+
+    提供分类和目标的环比对比数据计算
+    """
+
+    def __init__(self, db_manager=None):
+        super().__init__(db_manager)
+
+    def get_period_comparison(
+        self,
+        current_start: str,
+        current_end: str,
+        previous_start: str,
+        previous_end: str
+    ) -> Dict[str, Any]:
+        """
+        获取两个时间段的环比对比数据
+
+        Args:
+            current_start: 当前周期开始时间 YYYY-MM-DD HH:MM:SS
+            current_end: 当前周期结束时间 YYYY-MM-DD HH:MM:SS
+            previous_start: 上一周期开始时间 YYYY-MM-DD HH:MM:SS
+            previous_end: 上一周期结束时间 YYYY-MM-DD HH:MM:SS
+
+        Returns:
+            Dict: 包含 category_comparison 和 goal_comparison 的字典
+        """
+        try:
+            category_comparison = self._calc_category_comparison(
+                current_start, current_end, previous_start, previous_end
+            )
+            goal_comparison = self._calc_goal_comparison(
+                current_start, current_end, previous_start, previous_end
+            )
+
+            return {
+                'category_comparison': category_comparison,
+                'goal_comparison': goal_comparison
+            }
+        except Exception as e:
+            logger.error(f"计算环比数据失败: {e}")
+            return {
+                'category_comparison': [],
+                'goal_comparison': []
+            }
+
+    def _calc_category_comparison(
+        self,
+        current_start: str,
+        current_end: str,
+        previous_start: str,
+        previous_end: str
+    ) -> List[Dict[str, Any]]:
+        """计算分类环比数据"""
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # 查询当前周期分类时长
+                cursor.execute("""
+                    SELECT category_id, SUM(duration) as total_duration
+                    FROM user_app_behavior_log
+                    WHERE start_time >= ? AND start_time <= ? AND category_id IS NOT NULL
+                    GROUP BY category_id
+                """, (current_start, current_end))
+                current_data = {str(row[0]): int(row[1]) for row in cursor.fetchall()}
+
+                # 查询上一周期分类时长
+                cursor.execute("""
+                    SELECT category_id, SUM(duration) as total_duration
+                    FROM user_app_behavior_log
+                    WHERE start_time >= ? AND start_time <= ? AND category_id IS NOT NULL
+                    GROUP BY category_id
+                """, (previous_start, previous_end))
+                previous_data = {str(row[0]): int(row[1]) for row in cursor.fetchall()}
+
+                # 查询分类名称
+                cursor.execute("SELECT id, name FROM category")
+                category_names = {str(row[0]): row[1] for row in cursor.fetchall()}
+
+            # 合并所有分类 ID
+            all_category_ids = set(current_data.keys()) | set(previous_data.keys())
+
+            result = []
+            for cat_id in all_category_ids:
+                current_duration = current_data.get(cat_id, 0)
+                previous_duration = previous_data.get(cat_id, 0)
+                change_seconds = current_duration - previous_duration
+
+                # 计算变化百分比
+                if previous_duration > 0:
+                    change_percentage = round((current_duration - previous_duration) / previous_duration * 100, 1)
+                elif current_duration > 0:
+                    change_percentage = None  # 新增时为 null
+                else:
+                    change_percentage = None
+
+                result.append({
+                    'category_id': cat_id,
+                    'category_name': category_names.get(cat_id, '未知分类'),
+                    'current_duration': current_duration,
+                    'previous_duration': previous_duration,
+                    'change_seconds': change_seconds,
+                    'change_percentage': change_percentage
+                })
+
+            # 按当前时长降序排序
+            result.sort(key=lambda x: x['current_duration'], reverse=True)
+            return result
+
+        except Exception as e:
+            logger.error(f"计算分类环比数据失败: {e}")
+            return []
+
+    def _calc_goal_comparison(
+        self,
+        current_start: str,
+        current_end: str,
+        previous_start: str,
+        previous_end: str
+    ) -> List[Dict[str, Any]]:
+        """计算目标环比数据"""
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # 查询当前周期目标时长
+                cursor.execute("""
+                    SELECT link_to_goal_id, SUM(duration) as total_duration
+                    FROM user_app_behavior_log
+                    WHERE start_time >= ? AND start_time <= ? AND link_to_goal_id IS NOT NULL
+                    GROUP BY link_to_goal_id
+                """, (current_start, current_end))
+                current_data = {str(row[0]): int(row[1]) for row in cursor.fetchall()}
+
+                # 查询上一周期目标时长
+                cursor.execute("""
+                    SELECT link_to_goal_id, SUM(duration) as total_duration
+                    FROM user_app_behavior_log
+                    WHERE start_time >= ? AND start_time <= ? AND link_to_goal_id IS NOT NULL
+                    GROUP BY link_to_goal_id
+                """, (previous_start, previous_end))
+                previous_data = {str(row[0]): int(row[1]) for row in cursor.fetchall()}
+
+                # 查询目标名称
+                cursor.execute("SELECT id, name FROM goal")
+                goal_names = {str(row[0]): row[1] for row in cursor.fetchall()}
+
+            # 合并所有目标 ID
+            all_goal_ids = set(current_data.keys()) | set(previous_data.keys())
+
+            result = []
+            for goal_id in all_goal_ids:
+                current_duration = current_data.get(goal_id, 0)
+                previous_duration = previous_data.get(goal_id, 0)
+                change_seconds = current_duration - previous_duration
+
+                # 计算变化百分比
+                if previous_duration > 0:
+                    change_percentage = round((current_duration - previous_duration) / previous_duration * 100, 1)
+                elif current_duration > 0:
+                    change_percentage = None  # 新增时为 null
+                else:
+                    change_percentage = None
+
+                result.append({
+                    'goal_id': goal_id,
+                    'goal_name': goal_names.get(goal_id, '未知目标'),
+                    'current_duration': current_duration,
+                    'previous_duration': previous_duration,
+                    'change_seconds': change_seconds,
+                    'change_percentage': change_percentage
+                })
+
+            # 按当前时长降序排序
+            result.sort(key=lambda x: x['current_duration'], reverse=True)
+            return result
+
+        except Exception as e:
+            logger.error(f"计算目标环比数据失败: {e}")
+            return []
+
+
+# 创建全局单例
+comparison_data_provider = ComparisonDataProvider()
