@@ -136,22 +136,28 @@ class GoalProvider(LWBaseDataProvider):
                 
                 # 构建插入数据
                 columns = [
-                    'id', 'name', 'abstract', 'content', 'color',
-                    'link_to_category_id', 'link_to_sub_category_id', 'link_to_reward_id',
-                    'expected_finished_at', 'expected_hours',
+                    'id', 'name', 'content', 'color',
+                    'link_to_category_id', 'link_to_sub_category_id',
+                    'start_date', 'expected_finished_at',
+                    'value', 'commitment', 'time_unit', 'time_invested',
+                    'track_time_automatically', 'milestones',
                     'status', 'order_index'
                 ]
                 values = [
                     goal_id,
                     data.get('name'),
-                    data.get('abstract'),
                     data.get('content', ''),
-                    data.get('color', '#FFFFFF'),
+                    data.get('color', '#5B8FF9'),
                     data.get('link_to_category_id'),
                     data.get('link_to_sub_category_id'),
-                    data.get('link_to_reward_id'),
+                    data.get('start_date'),
                     data.get('expected_finished_at'),
-                    data.get('expected_hours'),
+                    data.get('value'),
+                    data.get('commitment'),
+                    data.get('time_unit', 'HRS'),
+                    data.get('time_invested', 0),
+                    1 if data.get('track_time_automatically', True) else 0,
+                    data.get('milestones', '[]'),
                     data.get('status', 'active'),
                     next_order
                 ]
@@ -191,11 +197,12 @@ class GoalProvider(LWBaseDataProvider):
                 
                 # 允许更新的字段
                 allowed_fields = [
-                    'name', 'abstract', 'content', 'color',
-                    'link_to_category_id', 'link_to_sub_category_id', 'link_to_reward_id',
-                    'expected_finished_at', 'expected_hours',
-                    'actual_finished_at', 'actual_hours',
-                    'completion_rate', 'status', 'order_index'
+                    'name', 'content', 'color',
+                    'link_to_category_id', 'link_to_sub_category_id',
+                    'start_date', 'expected_finished_at',
+                    'value', 'commitment', 'time_unit', 'time_invested',
+                    'track_time_automatically', 'milestones',
+                    'status', 'order_index'
                 ]
                 
                 set_clauses = []

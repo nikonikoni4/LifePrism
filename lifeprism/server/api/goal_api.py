@@ -31,16 +31,22 @@ from lifeprism.server.schemas.goal_schemas import (
     ReorderGoalRequest,
     ActiveGoalNamesResponse,
     GoalsWithCategoryResponse,
-    # Folder Schemas
-    TaskPoolFolderItem,
-    TaskPoolFolderListResponse,
-    CreateFolderRequest,
-    UpdateFolderRequest,
-    ReorderFoldersRequest,
-    MoveTodoToFolderRequest,
+    UpdateMilestoneStateRequest,
+    # Journal Schemas
+    JournalEntry,
+    JournalListResponse,
+    CreateJournalRequest,
+    UpdateJournalRequest,
+    # PlanDoc Schemas
+    PlanDocItem,
+    PlanDocListResponse,
+    CreatePlanDocRequest,
+    UpdatePlanDocRequest,
 )
 from lifeprism.server.services import todo_service
 from lifeprism.server.services.goal_service import goal_service
+from lifeprism.server.services.journal_service import journal_service
+from lifeprism.server.services.plan_doc_service import plan_doc_service
 
 router = APIRouter(prefix="/goal", tags=["Goal - TodoList"])
 
@@ -115,101 +121,13 @@ async def get_pool_todos():
 async def reorder_pool_todos(request: ReorderPoolTodoRequest):
     """
     重排序任务池任务
-    
+
     请求体:
     - **todo_ids**: 任务 ID 列表（按新顺序排列）
     """
     success = todo_service.reorder_pool_todos(request.todo_ids)
     if not success:
         raise HTTPException(status_code=500, detail="重排序任务池失败")
-    return {"success": True}
-
-
-# ============================================================================
-# Task Pool Folder 接口
-# ============================================================================
-
-@router.get("/pool/folders", response_model=TaskPoolFolderListResponse)
-async def get_folders():
-    """
-    获取所有任务池文件夹
-    """
-    return todo_service.get_folders()
-
-
-@router.post("/pool/folders", response_model=TaskPoolFolderItem)
-async def create_folder(request: CreateFolderRequest):
-    """
-    创建文件夹
-    
-    请求体:
-    - **name**: 文件夹名称（必需）
-    """
-    result = todo_service.create_folder(request)
-    if not result:
-        raise HTTPException(status_code=500, detail="创建文件夹失败")
-    return result
-
-
-@router.post("/pool/folders/reorder")
-async def reorder_folders(request: ReorderFoldersRequest):
-    """
-    重排序文件夹
-    
-    请求体:
-    - **folder_ids**: 文件夹 ID 列表（按新顺序排列）
-    """
-    success = todo_service.reorder_folders(request)
-    if not success:
-        raise HTTPException(status_code=500, detail="重排序文件夹失败")
-    return {"success": True}
-
-
-@router.patch("/pool/folders/{folder_id}", response_model=TaskPoolFolderItem)
-async def update_folder(
-    folder_id: int = Path(..., description="文件夹 ID"),
-    request: UpdateFolderRequest = ...
-):
-    """
-    更新文件夹
-    
-    请求体（所有字段可选）:
-    - **name**: 文件夹名称
-    - **is_expanded**: 是否展开
-    """
-    result = todo_service.update_folder(folder_id, request)
-    if not result:
-        raise HTTPException(status_code=404, detail="文件夹不存在或更新失败")
-    return result
-
-
-@router.delete("/pool/folders/{folder_id}")
-async def delete_folder(
-    folder_id: int = Path(..., description="文件夹 ID")
-):
-    """
-    删除文件夹（文件夹内任务会移动到根级别）
-    """
-    success = todo_service.delete_folder(folder_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="文件夹不存在")
-    return {"success": True}
-
-
-@router.patch("/todos/{todo_id}/move")
-async def move_todo_to_folder(
-    todo_id: int = Path(..., description="任务 ID"),
-    request: MoveTodoToFolderRequest = ...
-):
-    """
-    移动任务到文件夹
-    
-    请求体:
-    - **folder_id**: 目标文件夹 ID（null 表示移出到根级别）
-    """
-    success = todo_service.move_todo_to_folder(todo_id, request)
-    if not success:
-        raise HTTPException(status_code=404, detail="任务不存在或移动失败")
     return {"success": True}
 
 
@@ -428,16 +346,18 @@ async def get_goals(
 async def create_goal(request: CreateGoalRequest):
     """
     创建新目标
-    
+
     请求体:
     - **name**: 目标名称（必需）
-    - **abstract**: 目标摘要/别名（可选）
     - **content**: 目标详细内容（可选）
     - **color**: 目标颜色（可选，默认 #5B8FF9）
-    - **link_to_category**: 关联分类 ID（可选）
-    - **link_to_sub_category**: 关联子分类 ID（可选）
+    - **link_to_category_id**: 关联分类 ID（可选）
+    - **link_to_sub_category_id**: 关联子分类 ID（可选）
+    - **start_date**: 开始日期（可选）
     - **expected_finished_at**: 预计完成时间（可选）
-    - **expected_hours**: 预计耗时小时数（可选）
+    - **value**: 价值观/意义描述（可选）
+    - **commitment**: 承诺/行动计划（可选）
+    - **track_time_automatically**: 是否自动追踪时间（可选，默认 true）
     """
     result = goal_service.create_goal(request)
     if not result:
@@ -501,19 +421,19 @@ async def update_goal(
 ):
     """
     更新目标（部分更新）
-    
+
     请求体（所有字段可选）:
     - **name**: 目标名称
-    - **abstract**: 目标摘要/别名
     - **content**: 目标详细内容
     - **color**: 目标颜色
-    - **link_to_category**: 关联分类 ID
-    - **link_to_sub_category**: 关联子分类 ID
+    - **link_to_category_id**: 关联分类 ID
+    - **link_to_sub_category_id**: 关联子分类 ID
+    - **start_date**: 开始日期
     - **expected_finished_at**: 预计完成时间
-    - **expected_hours**: 预计耗时
     - **actual_finished_at**: 实际完成时间
-    - **actual_hours**: 实际耗时
-    - **completion_rate**: 完成度 (0-1)
+    - **value**: 价值观/意义描述
+    - **commitment**: 承诺/行动计划
+    - **track_time_automatically**: 是否自动追踪时间
     - **status**: 目标状态
     """
     result = goal_service.update_goal(goal_id, request)
@@ -533,4 +453,205 @@ async def delete_goal(
     if not success:
         raise HTTPException(status_code=404, detail="目标不存在")
     return {"success": True}
+
+
+# ============================================================================
+# Milestone 接口
+# ============================================================================
+
+@router.patch("/goals/{goal_id}/milestones/{milestone_id}")
+async def update_milestone_state(
+    goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)"),
+    milestone_id: str = Path(..., description="里程碑 ID"),
+    request: UpdateMilestoneStateRequest = ...
+):
+    """
+    更新里程碑状态
+
+    请求体:
+    - **completed**: 是否完成
+    """
+    success = goal_service.update_milestone_state(goal_id, milestone_id, request.completed)
+    if not success:
+        raise HTTPException(status_code=404, detail="目标或里程碑不存在")
+    return {"success": True}
+
+
+# ============================================================================
+# Journal 接口
+# ============================================================================
+
+@router.get("/journals", response_model=JournalListResponse)
+async def get_journals(
+    goal_id: Optional[str] = Query(default=None, description="按目标筛选"),
+    start_date: Optional[str] = Query(default=None, description="开始日期 (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(default=None, description="结束日期 (YYYY-MM-DD)"),
+    page: int = Query(default=1, ge=1, description="页码"),
+    page_size: int = Query(default=20, ge=1, le=100, description="每页数量")
+):
+    """
+    获取日志列表
+
+    - **goal_id**: 按目标筛选（可选）
+    - **start_date**: 开始日期（可选）
+    - **end_date**: 结束日期（可选）
+    - **page**: 页码，从1开始
+    - **page_size**: 每页数量，最大100
+    """
+    return journal_service.get_journals(goal_id, start_date, end_date, page, page_size)
+
+
+@router.post("/journals", response_model=JournalEntry)
+async def create_journal(request: CreateJournalRequest):
+    """
+    创建新日志
+
+    请求体:
+    - **goal_id**: 关联目标 ID（必需）
+    - **title**: 日志标题（必需）
+    - **content**: 日志内容（可选）
+    - **journal_date**: 日志日期（可选，默认今天）
+    - **mood**: 心情（可选）
+    - **tags**: 标签列表（可选）
+    """
+    result = journal_service.create_journal(request)
+    if not result:
+        raise HTTPException(status_code=500, detail="创建日志失败")
+    return result
+
+
+@router.get("/journals/{journal_id}", response_model=JournalEntry)
+async def get_journal_detail(
+    journal_id: str = Path(..., description="日志 ID (格式: journal-xxx)")
+):
+    """
+    获取日志详情
+    """
+    result = journal_service.get_journal_detail(journal_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="日志不存在")
+    return result
+
+
+@router.patch("/journals/{journal_id}", response_model=JournalEntry)
+async def update_journal(
+    journal_id: str = Path(..., description="日志 ID (格式: journal-xxx)"),
+    request: UpdateJournalRequest = ...
+):
+    """
+    更新日志（部分更新）
+
+    请求体（所有字段可选）:
+    - **title**: 日志标题
+    - **content**: 日志内容
+    - **journal_date**: 日志日期
+    - **mood**: 心情
+    - **tags**: 标签列表
+    """
+    result = journal_service.update_journal(journal_id, request)
+    if not result:
+        raise HTTPException(status_code=404, detail="日志不存在或更新失败")
+    return result
+
+
+@router.delete("/journals/{journal_id}")
+async def delete_journal(
+    journal_id: str = Path(..., description="日志 ID (格式: journal-xxx)")
+):
+    """
+    删除日志
+    """
+    success = journal_service.delete_journal(journal_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="日志不存在")
+    return {"success": True}
+
+
+# ============================================================================
+# PlanDoc 接口
+# ============================================================================
+
+@router.get("/plan-docs", response_model=PlanDocListResponse)
+async def get_plan_docs(
+    goal_id: Optional[str] = Query(default=None, description="按目标筛选"),
+    doc_type: Optional[str] = Query(default=None, description="按类型筛选 (weekly, monthly, quarterly, yearly, custom)"),
+    page: int = Query(default=1, ge=1, description="页码"),
+    page_size: int = Query(default=20, ge=1, le=100, description="每页数量")
+):
+    """
+    获取计划文档列表
+
+    - **goal_id**: 按目标筛选（可选）
+    - **doc_type**: 按类型筛选（可选）
+    - **page**: 页码，从1开始
+    - **page_size**: 每页数量，最大100
+    """
+    return plan_doc_service.get_plan_docs(goal_id, doc_type, page, page_size)
+
+
+@router.post("/plan-docs", response_model=PlanDocItem)
+async def create_plan_doc(request: CreatePlanDocRequest):
+    """
+    创建新计划文档
+
+    请求体:
+    - **goal_id**: 关联目标 ID（必需）
+    - **title**: 文档标题（必需）
+    - **doc_type**: 文档类型（必需）: weekly, monthly, quarterly, yearly, custom
+    - **content**: 文档内容（可选）
+    - **period_start**: 周期开始日期（可选）
+    - **period_end**: 周期结束日期（可选）
+    """
+    result = plan_doc_service.create_plan_doc(request)
+    if not result:
+        raise HTTPException(status_code=500, detail="创建计划文档失败")
+    return result
+
+
+@router.get("/plan-docs/{doc_id}", response_model=PlanDocItem)
+async def get_plan_doc_detail(
+    doc_id: str = Path(..., description="计划文档 ID (格式: plandoc-xxx)")
+):
+    """
+    获取计划文档详情
+    """
+    result = plan_doc_service.get_plan_doc_detail(doc_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="计划文档不存在")
+    return result
+
+
+@router.patch("/plan-docs/{doc_id}", response_model=PlanDocItem)
+async def update_plan_doc(
+    doc_id: str = Path(..., description="计划文档 ID (格式: plandoc-xxx)"),
+    request: UpdatePlanDocRequest = ...
+):
+    """
+    更新计划文档（部分更新）
+
+    请求体（所有字段可选）:
+    - **title**: 文档标题
+    - **doc_type**: 文档类型
+    - **content**: 文档内容
+    - **period_start**: 周期开始日期
+    - **period_end**: 周期结束日期
+    """
+    result = plan_doc_service.update_plan_doc(doc_id, request)
+    if not result:
+        raise HTTPException(status_code=404, detail="计划文档不存在或更新失败")
+    return result
+
+
+@router.delete("/plan-docs/{doc_id}")
+async def delete_plan_doc(
+    doc_id: str = Path(..., description="计划文档 ID (格式: plandoc-xxx)")
+):
+    """
+    删除计划文档
+    """
+    success = plan_doc_service.delete_plan_doc(doc_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="计划文档不存在")
+    return {"success": True}
+
 

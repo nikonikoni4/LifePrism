@@ -42,7 +42,6 @@ class TodoListItem(BaseModel):
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期 YYYY-MM-DD")
     actual_finished_at: Optional[str] = Field(default=None, description="实际完成日期 YYYY-MM-DD")
     cross_day: bool = Field(default=False, description="是否开启跨天追踪")
-    folder_id: Optional[int] = Field(default=None, description="所属任务池文件夹 ID")
     # 嵌套子任务（可选，用于响应时包含子任务）
     sub_items: Optional[List[SubTodoListItem]] = Field(default=None, description="子任务列表")
 
@@ -114,44 +113,6 @@ class ReorderPoolTodoRequest(BaseModel):
 
 
 # ============================================================================
-# Task Pool Folder Schemas
-# ============================================================================
-
-class TaskPoolFolderItem(BaseModel):
-    """任务池文件夹项"""
-    id: int = Field(..., description="文件夹 ID")
-    name: str = Field(..., description="文件夹名称")
-    order_index: int = Field(..., description="排序索引")
-    is_expanded: bool = Field(default=True, description="是否展开")
-
-
-class TaskPoolFolderListResponse(BaseModel):
-    """文件夹列表响应"""
-    items: List[TaskPoolFolderItem] = Field(default=[], description="文件夹列表")
-
-
-class CreateFolderRequest(BaseModel):
-    """创建文件夹请求"""
-    name: str = Field(..., description="文件夹名称")
-
-
-class UpdateFolderRequest(BaseModel):
-    """更新文件夹请求"""
-    name: Optional[str] = Field(default=None, description="文件夹名称")
-    is_expanded: Optional[bool] = Field(default=None, description="是否展开")
-
-
-class ReorderFoldersRequest(BaseModel):
-    """文件夹重排序请求"""
-    folder_ids: List[int] = Field(..., description="文件夹 ID 列表（按新顺序）")
-
-
-class MoveTodoToFolderRequest(BaseModel):
-    """移动任务到文件夹请求"""
-    folder_id: Optional[int] = Field(default=None, description="目标文件夹 ID（NULL 移出到根级别）")
-
-
-# ============================================================================
 # Plan Schemas (预留)
 # ============================================================================
 
@@ -203,29 +164,52 @@ class UpsertWeeklyFocusRequest(BaseModel):
 
 
 # ============================================================================
-# Goal Schemas 
+# Goal Schemas
 # ============================================================================
+
+class MilestoneItem(BaseModel):
+    """里程碑项"""
+    id: str = Field(..., description="唯一标识符")
+    content: str = Field(..., description="里程碑内容")
+    state: int = Field(default=0, description="状态 0: 未达成, 1: 已达成")
+    finish_time: Optional[str] = Field(default=None, description="完成时间 YYYY-MM-DD")
+    order_index: int = Field(default=0, description="排序索引")
+
+
+class JournalEntry(BaseModel):
+    """日志条目"""
+    id: str = Field(..., description="唯一标识符")
+    date: str = Field(..., description="日期 YYYY-MM-DD")
+    time: Optional[str] = Field(default=None, description="时间 HH:MM")
+    content: str = Field(..., description="日志内容")
+    mood: str = Field(default="neutral", description="心情（joy/calm/frustrated/neutral）")
+    duration: int = Field(default=0, description="持续时间（分钟）")
+    tags: List[str] = Field(default=[], description="标签列表")
 
 
 class GoalItem(BaseModel):
     """目标项"""
     id: str = Field(..., description="唯一标识符 id（格式：goal-xxx）")
     name: str = Field(..., description="目标名称")
-    abstract: Optional[str] = Field(default=None, description="目标摘要/别名")
-    content: str = Field(default="", description="目标内容")
-    color: str = Field(default="#5B8FF9", description="目标颜色")
+    content: str = Field(default="", description="目标内容（Markdown）")
+    color: str = Field(default="#5B8FF9", description="目标颜色（十六进制）")
     created_at: str = Field(..., description="创建时间")
     # 关联内容（返回名称，非 ID）
     link_to_category: Optional[str] = Field(default=None, description="关联的分类名称")
     link_to_sub_category: Optional[str] = Field(default=None, description="关联的子分类名称")
-    link_to_reward_id: Optional[int] = Field(default=None, description="关联的奖励 id")
+    # 新增字段
+    start_date: Optional[str] = Field(default=None, description="开始日期 YYYY-MM-DD")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成时间 YYYY-MM-DD")
-    expected_hours: Optional[int] = Field(default=None, description="预计耗时（小时）")
-    actual_finished_at: Optional[str] = Field(default=None, description="实际完成时间 YYYY-MM-DD")
-    actual_hours: Optional[int] = Field(default=None, description="实际耗时（小时）")
-    completion_rate: float = Field(default=0.0, description="完成度 0-1")
+    value: Optional[str] = Field(default=None, description="价值观/意义描述")
+    commitment: Optional[str] = Field(default=None, description="承诺/行动计划")
+    time_unit: str = Field(default="HRS", description="时间单位 HRS/MINS")
+    time_invested: str = Field(default="0h 0m", description="投入时间（格式化字符串）")
+    track_time_automatically: bool = Field(default=True, description="是否自动追踪时间")
+    milestones: List[MilestoneItem] = Field(default=[], description="里程碑列表")
+    journal: List[JournalEntry] = Field(default=[], description="日志列表")
     status: str = Field(default="active", description="目标状态: active, completed, archived")
     order_index: int = Field(default=0, description="排序索引")
+    days_started: Optional[int] = Field(default=None, description="已开始天数（计算字段）")
 
 
 class GoalListResponse(BaseModel):
@@ -242,30 +226,32 @@ class GoalListResponse(BaseModel):
 class CreateGoalRequest(BaseModel):
     """创建目标请求"""
     name: str = Field(..., description="目标名称")
-    abstract: Optional[str] = Field(default=None, description="目标摘要/别名")
-    content: str = Field(default="", description="目标内容")
+    content: str = Field(default="", description="目标内容（Markdown）")
     color: str = Field(default="#5B8FF9", description="目标颜色")
     link_to_category_id: Optional[str] = Field(default=None, description="关联的分类 id")
     link_to_sub_category_id: Optional[str] = Field(default=None, description="关联的子分类 id")
-    link_to_reward_id: Optional[int] = Field(default=None, description="关联的奖励 id")
+    start_date: Optional[str] = Field(default=None, description="开始日期 YYYY-MM-DD")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成时间 YYYY-MM-DD")
-    expected_hours: Optional[int] = Field(default=None, description="预计耗时（小时）")
+    value: Optional[str] = Field(default=None, description="价值观/意义描述")
+    commitment: Optional[str] = Field(default=None, description="承诺/行动计划")
+    track_time_automatically: bool = Field(default=True, description="是否自动追踪时间")
 
 
 class UpdateGoalRequest(BaseModel):
     """更新目标请求（部分更新）"""
     name: Optional[str] = Field(default=None, description="目标名称")
-    abstract: Optional[str] = Field(default=None, description="目标摘要/别名")
-    content: Optional[str] = Field(default=None, description="目标内容")
+    content: Optional[str] = Field(default=None, description="目标内容（Markdown）")
     color: Optional[str] = Field(default=None, description="目标颜色")
     link_to_category_id: Optional[str] = Field(default=None, description="关联的分类 id")
     link_to_sub_category_id: Optional[str] = Field(default=None, description="关联的子分类 id")
-    link_to_reward_id: Optional[int] = Field(default=None, description="关联的奖励 id")
+    start_date: Optional[str] = Field(default=None, description="开始日期 YYYY-MM-DD")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成时间")
-    expected_hours: Optional[int] = Field(default=None, description="预计耗时（小时）")
-    actual_finished_at: Optional[str] = Field(default=None, description="实际完成时间")
-    actual_hours: Optional[int] = Field(default=None, description="实际耗时（小时）")
-    completion_rate: Optional[float] = Field(default=None, description="完成度 0-1")
+    value: Optional[str] = Field(default=None, description="价值观/意义描述")
+    commitment: Optional[str] = Field(default=None, description="承诺/行动计划")
+    time_invested: Optional[int] = Field(default=None, description="投入时间（分钟）")
+    time_unit: Optional[str] = Field(default=None, description="时间单位 HRS/MINS")
+    track_time_automatically: Optional[bool] = Field(default=None, description="是否自动追踪时间")
+    milestones: Optional[str] = Field(default=None, description="里程碑 JSON 字符串")
     status: Optional[str] = Field(default=None, description="目标状态")
 
 
@@ -298,82 +284,73 @@ class GoalsWithCategoryResponse(BaseModel):
     items: List[GoalWithCategoryItem] = Field(default=[], description="目标列表")
 
 
-
-
-
-# ============================================================================
-# reward Schemas (预留)
-# ============================================================================
-
-
-class MilestoneItem(BaseModel):
-    """里程碑项"""
-    id: str = Field(..., description="唯一标识符")
-    content: str = Field(..., description="里程碑内容")
-    state: int = Field(default=0, description="状态 0: 未达成, 1: 已达成")
-    finish_time: Optional[str] = Field(default=None, description="完成时间 YYYY-MM-DD")
-    order_index: int = Field(default=0, description="排序索引")
-
-
-class RewardItem(BaseModel):
-    """奖励项"""
-    id: int = Field(..., description="唯一标识符 id")
-    goal_id: str = Field(..., description="关联的目标 ID")
-    name: str = Field(..., description="奖励名称")
-    start_time: str = Field(..., description="开始时间 YYYY-MM-DD")
-    target_hours: int = Field(default=0, description="达成奖励所需的累计小时数")
-    milestones: List[MilestoneItem] = Field(default=[], description="里程碑列表")
-    order_index: int = Field(default=0, description="排序索引")
-    created_at: str = Field(default="", description="创建时间")
-
-
-class RewardListResponse(BaseModel):
-    """奖励列表响应"""
-    items: List[RewardItem] = Field(default=[], description="奖励列表")
-
-
-# ============================================================================
-# reward Request Schemas (预留)
-# ============================================================================
-
-
-class CreateRewardRequest(BaseModel):
-    """创建奖励请求"""
-    goal_id: str = Field(..., description="关联的目标 ID")
-    name: str = Field(..., description="奖励名称")
-    start_time: str = Field(..., description="开始时间 YYYY-MM-DD")
-    target_hours: int = Field(default=0, description="达成奖励所需的累计小时数")
-    milestones: Optional[str] = Field(default=None, description="里程碑 JSON 字符串")
-
-
-class UpdateRewardRequest(BaseModel):
-    """更新奖励请求（部分更新）"""
-    goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
-    name: Optional[str] = Field(default=None, description="奖励名称")
-    start_time: Optional[str] = Field(default=None, description="开始时间 YYYY-MM-DD")
-    target_hours: Optional[int] = Field(default=None, description="达成奖励所需的累计小时数")
-    milestones: Optional[str] = Field(default=None, description="里程碑 JSON 字符串")
-
-
 class UpdateMilestoneStateRequest(BaseModel):
     """更新里程碑状态请求"""
     state: int = Field(..., description="状态 0: 未达成, 1: 已达成")
 
 
 # ============================================================================
-# Reward Stats Schemas (用于 Momentum Tracker)
+# Journal Schemas
 # ============================================================================
 
 
-class RewardHistoryPoint(BaseModel):
-    """奖励历史数据点（用于图表显示）"""
-    date: str = Field(..., description="日期（MM-DD 格式）")
-    cumulative_time_spent: int = Field(default=0, description="累积时间花费（分钟）")
-    cumulative_todo_count: int = Field(default=0, description="累积完成待办数")
+class CreateJournalRequest(BaseModel):
+    """创建日志请求"""
+    goal_id: str = Field(..., description="关联的目标 ID")
+    date: str = Field(..., description="日期 YYYY-MM-DD")
+    time: Optional[str] = Field(default=None, description="时间 HH:MM")
+    content: str = Field(..., description="日志内容")
+    mood: str = Field(default="neutral", description="心情（joy/calm/frustrated/neutral）")
+    duration: int = Field(default=0, description="持续时间（分钟）")
+    tags: Optional[str] = Field(default=None, description="标签 JSON 字符串")
 
 
-class RewardStatsResponse(BaseModel):
-    """奖励统计响应"""
-    reward: RewardItem = Field(..., description="奖励信息")
-    goal_name: str = Field(..., description="关联的目标名称")
-    history: List[RewardHistoryPoint] = Field(default=[], description="历史累积数据")
+class UpdateJournalRequest(BaseModel):
+    """更新日志请求（部分更新）"""
+    date: Optional[str] = Field(default=None, description="日期 YYYY-MM-DD")
+    time: Optional[str] = Field(default=None, description="时间 HH:MM")
+    content: Optional[str] = Field(default=None, description="日志内容")
+    mood: Optional[str] = Field(default=None, description="心情")
+    duration: Optional[int] = Field(default=None, description="持续时间（分钟）")
+    tags: Optional[str] = Field(default=None, description="标签 JSON 字符串")
+
+
+class JournalListResponse(BaseModel):
+    """日志列表响应"""
+    items: List[JournalEntry] = Field(default=[], description="日志列表")
+
+
+# ============================================================================
+# PlanDoc Schemas
+# ============================================================================
+
+
+class PlanDocItem(BaseModel):
+    """计划书项"""
+    id: str = Field(..., description="唯一标识符（格式：plandoc-xxx）")
+    goal_id: str = Field(..., description="关联的目标 ID")
+    title: str = Field(..., description="计划书标题")
+    content: str = Field(default="", description="计划书内容（Markdown）")
+    status: str = Field(default="active", description="状态: active, completed, archived")
+    order_index: int = Field(default=0, description="排序索引")
+    created_at: str = Field(..., description="创建时间")
+    updated_at: Optional[str] = Field(default=None, description="更新时间")
+
+
+class PlanDocListResponse(BaseModel):
+    """计划书列表响应"""
+    items: List[PlanDocItem] = Field(default=[], description="计划书列表")
+
+
+class CreatePlanDocRequest(BaseModel):
+    """创建计划书请求"""
+    goal_id: str = Field(..., description="关联的目标 ID")
+    title: str = Field(..., description="计划书标题")
+    content: str = Field(default="", description="计划书内容（Markdown）")
+
+
+class UpdatePlanDocRequest(BaseModel):
+    """更新计划书请求（部分更新）"""
+    title: Optional[str] = Field(default=None, description="计划书标题")
+    content: Optional[str] = Field(default=None, description="计划书内容（Markdown）")
+    status: Optional[str] = Field(default=None, description="状态")

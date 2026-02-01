@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## rules
+
+### 后端server rules
+
+1. 在lifeprism\config\database.py完成数据表的配置 
+2. 在lifeprism\server\providers创建数据提供类，继承LWBaseDataProvider实现，使用LWBaseDataProvider中的db类成员实现数据库操作  
+3. 在schemas中编写前后端数据沟通的schemas 
+4. 在service创建单一service实例，采用懒加载方式lifeprism\utils\lazy_singleton.py。
+5. **重要**：该项目涉及到的所有用户可修改的“名称”字段，比如类别名称，目标名称，习惯名称，任务todo名称等都不能作为key，必须使用唯一的用户不可修改的id作为唯一标识
+
 ## Project Overview
 
 **LifeWatch-AI** (LifePrism) is an AI-powered personal time management and analysis platform that monitors user computer activity through ActivityWatch, classifies applications using LLM, and provides insights through a React frontend.
@@ -42,7 +52,7 @@ LifeWatch-AI/
 
 ## Development Commands
 
-### Frontend (React + Vite)
+### Frontend (React + Vite + Electron)
 
 ```bash
 cd frontend
@@ -58,10 +68,17 @@ npm run build
 
 # Preview production build
 npm run preview
+
+# Electron desktop app (development)
+npm run electron:dev
+
+# Electron desktop app (Windows build)
+npm run electron:build
 ```
 
 **Frontend Dev Server**: http://localhost:3000
 **API Proxy**: `/api` → `http://localhost:8000` (configured in `vite.config.ts`)
+**Electron Build Output**: `frontend/release/`
 
 ### Backend (Python + FastAPI)
 
@@ -123,7 +140,7 @@ The LLM classification uses a **sequential executor** pattern (`data_driving_age
 - **Data injection**: `data_in` config injects context from parent threads when creating new threads
 - **Data merging**: `data_out` flag merges results back to parent threads
 
-**Documentation**: `lifeprism/llm/llm_classify/data_driving_agent/README.md`
+**Documentation**: `lifeprism/llm/llm_classify/tests/data_driving_agent_v2/README.md`
 
 ### Cache Matching Strategy
 
@@ -141,20 +158,7 @@ The system uses a three-tier caching strategy to minimize LLM API calls:
 
 ### Frontend Page Structure
 
-The frontend uses a simple page-based routing system (not React Router):
-
-| Page | Component | Status | Route |
-|------|-----------|--------|-------|
-| Home | `page/home/Home` | ✅ Complete | `currentPage === 'home'` |
-| Timeline | `page/timeline/Timeline` | ✅ Complete | `currentPage === 'timeline'` |
-| Category | `page/category/CategoryPage` | ✅ Complete | `currentPage === 'category'` |
-| Goals | `page/goals/GoalsPage` | 🚧 In Progress | `currentPage === 'goals'` |
-| Chatbot | `page/chatbot/` | ✅ Complete | Overlay panel (controlled by `chatDisplayMode`) |
-| Reports | `page/reports/ReportsPage` | 🚧 In Progress | `currentPage === 'reports'` |
-| Settings | `page/settings/SettingsPage` | ✅ Complete | `currentPage === 'settings'` |
-| Usage | `page/usage/UsagePage` | ✅ Complete | `currentPage === 'usage'` |
-
-**Navigation**: Controlled by `App.tsx` state `currentPage` and `<Sidebar>` component
+The frontend uses a simple page-based routing system (not React Router). Navigation is controlled by `App.tsx` state `currentPage` and `<Sidebar>` component. Pages are located in `frontend/page/[pagename]/`.
 
 ## Configuration
 
@@ -309,23 +313,3 @@ pytest llm/llm_classify/tests/
 ```
 
 Note: Test infrastructure is still in development.
-
-## Dependencies
-
-### Backend Key Dependencies
-- `fastapi`: Web framework
-- `langgraph>=1.0.0`: LLM agent orchestration
-- `requests>=2.25.0`: HTTP client
-
-### Frontend Key Dependencies
-- `react@^19.2.1`: UI framework
-- `vite@^6.2.0`: Build tool
-- `@google/genai`: Google AI SDK
-- `echarts`, `recharts`: Data visualization
-- `framer-motion`: Animations
-- `lucide-react`: Icons
-- `react-markdown`: Markdown rendering
-
-## License
-
-Apache License 2.0 - see `LICENSE` file for details.

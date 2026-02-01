@@ -23,3 +23,5 @@ simple-llm-workflow
 my_notes
 pyinstaller-dist
 build
+debug_occupy_ports.py
+.cursor

@@ -574,15 +574,10 @@ GOAL_CONFIG = {
             'constraints': ['NOT NULL', 'UNIQUE'],
             'comment': '目标名称（唯一，用于分类时的名称-ID映射）'
         },
-        'abstract': {
-            'type': 'TEXT',
-            'constraints': [],
-            'comment': '目标摘要/别名'
-        },
         'content': {
             'type': 'TEXT',
             'constraints': ['DEFAULT ""'],
-            'comment': '目标详细内容'
+            'comment': '目标详细内容（Markdown）'
         },
         'color': {
             'type': 'TEXT',
@@ -592,42 +587,52 @@ GOAL_CONFIG = {
         'link_to_category_id': {
             'type': 'TEXT',
             'constraints': [],
-            'comment': '关联的分类 ID'
+            'comment': '关联的分类ID（用于ActivityWatch时间统计）'
         },
         'link_to_sub_category_id': {
             'type': 'TEXT',
             'constraints': [],
-            'comment': '关联的子分类 ID'
+            'comment': '关联的子分类ID'
         },
-        'link_to_reward_id': {
-            'type': 'INTEGER',
+        'start_date': {
+            'type': 'TEXT',
             'constraints': [],
-            'comment': '关联的奖励 ID'
+            'comment': '开始日期 YYYY-MM-DD'
         },
         'expected_finished_at': {
             'type': 'TEXT',
             'constraints': [],
             'comment': '预计完成时间 YYYY-MM-DD'
         },
-        'expected_hours': {
-            'type': 'INTEGER',
-            'constraints': [],
-            'comment': '预计耗时（小时）'
-        },
-        'actual_finished_at': {
+        'value': {
             'type': 'TEXT',
             'constraints': [],
-            'comment': '实际完成时间 YYYY-MM-DD'
+            'comment': '价值观/意义描述'
         },
-        'actual_hours': {
-            'type': 'INTEGER',
+        'commitment': {
+            'type': 'TEXT',
             'constraints': [],
-            'comment': '实际耗时（小时）'
+            'comment': '承诺/行动计划'
         },
-        'completion_rate': {
-            'type': 'REAL',
-            'constraints': ['DEFAULT 0.0'],
-            'comment': '完成度 0-1'
+        'time_unit': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT "HRS"'],
+            'comment': '时间单位 HRS/MINS'
+        },
+        'time_invested': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '投入时间（分钟），手动模式时使用'
+        },
+        'track_time_automatically': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 1'],
+            'comment': '是否自动追踪时间 1:是 0:否'
+        },
+        'milestones': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT "[]"'],
+            'comment': '里程碑JSON数组'
         },
         'status': {
             'type': 'TEXT',
@@ -647,6 +652,107 @@ GOAL_CONFIG = {
         {'name': 'idx_goal_order', 'columns': ['order_index']}
     ],
     'timestamps': True
+}
+
+# Goal Journal 目标日志表配置
+GOAL_JOURNAL_CONFIG = {
+    'table_name': 'goal_journal',
+    'columns': {
+        'id': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '日志唯一标识符（格式：journal-{uuid[:8]}）'
+        },
+        'goal_id': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '关联的目标ID'
+        },
+        'date': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '日期 YYYY-MM-DD'
+        },
+        'time': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '时间 HH:MM'
+        },
+        'content': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '日志内容'
+        },
+        'mood': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT "neutral"'],
+            'comment': '心情（joy/calm/frustrated/neutral）'
+        },
+        'duration': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '持续时间（分钟）'
+        },
+        'tags': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT "[]"'],
+            'comment': '标签JSON数组'
+        }
+    },
+    'table_constraints': [
+        'FOREIGN KEY (goal_id) REFERENCES goal(id) ON DELETE CASCADE'
+    ],
+    'indexes': [
+        {'name': 'idx_goal_journal_goal_id', 'columns': ['goal_id']},
+        {'name': 'idx_goal_journal_date', 'columns': ['date']}
+    ],
+    'timestamps': True
+}
+
+# Plan Doc 计划书表配置
+PLAN_DOC_CONFIG = {
+    'table_name': 'plan_doc',
+    'columns': {
+        'id': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '计划书唯一标识符（格式：plandoc-{uuid[:8]}）'
+        },
+        'goal_id': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '关联的目标ID'
+        },
+        'title': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '计划书标题'
+        },
+        'content': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT ""'],
+            'comment': '计划书内容（Markdown）'
+        },
+        'status': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT "active"'],
+            'comment': '状态: active, completed, archived'
+        },
+        'order_index': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '排序索引'
+        }
+    },
+    'table_constraints': [
+        'FOREIGN KEY (goal_id) REFERENCES goal(id) ON DELETE CASCADE'
+    ],
+    'indexes': [
+        {'name': 'idx_plan_doc_goal_id', 'columns': ['goal_id']},
+        {'name': 'idx_plan_doc_status', 'columns': ['status']}
+    ],
+    'timestamps': True,
+    'update_at': True
 }
 
 
@@ -819,61 +925,7 @@ GOAL_STATS_CONFIG = {
     'timestamps': True
 }
 
-REWARD_CONFIG = {
-    'table_name': 'reward',
-    'columns': {
-        'id': {
-            'type': 'INTEGER',
-            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
-            'comment': '自增主键'
-        },
-        'start_time': {
-            'type': 'TEXT',
-            'constraints': ['NOT NULL'],
-            'comment': '开始时间'
-        },
-        'goal_id': {
-            'type': 'TEXT',
-            'constraints': ['NOT NULL'],
-            'comment': '关联的目标ID'
-        },
-        'name': {
-            'type': 'TEXT',
-            'constraints': ['NOT NULL'],
-            'comment': '奖励名称（如：Buy a mechanical keyboard）'
-        },
-        'target_hours': {
-            'type': 'INTEGER',
-            'constraints': ['DEFAULT 0'],
-            'comment': '达成奖励所需的目标累计小时数'
-        },
-        'milestones': {
-            'type': 'TEXT',
-            'constraints': ['DEFAULT NULL'],
-            'comment': """
-            里程碑，json格式
-            {
-                "1": {
-                    "order_index": "", # 排序索引
-                    "content": "", # 内容
-                    "state": "", # 状态 0: 未达成, 1: 已达成
-                    "finish_time": "" # 完成时间 YY-MM-DD
-                }
-            }
-            """
-        },
-        'order_index': {
-            'type': 'INTEGER',
-            'constraints': ['DEFAULT 0'],
-            'comment': '排序索引'
-        }
-    },
-    'table_constraints': [],
-    'indexes': [
-        {'name': 'idx_reward_goal_id', 'columns': ['goal_id']}
-    ],
-    'timestamps': True
-}
+# REWARD_CONFIG - 已废弃，里程碑功能整合到 goal.milestones
 
 # report 界面数据库保存
 # daily report
@@ -1121,11 +1173,12 @@ TABLE_CONFIGS = {
     'daily_focus': DAILY_FOCUS_CONFIG,
     'weekly_focus': WEEKLY_FOCUS_CONFIG,
     'goal': GOAL_CONFIG,
+    'goal_journal': GOAL_JOURNAL_CONFIG,
+    'plan_doc': PLAN_DOC_CONFIG,
     'chat_session': CHAT_SESSION_CONFIG,
     'timeline_custom_block': TIMELINE_CUSTOM_BLOCK_CONFIG,
     'task_pool_folder': TASK_POOL_FOLDER_CONFIG,
     'goal_stats': GOAL_STATS_CONFIG,
-    'reward': REWARD_CONFIG,
     'daily_report': daily_report_config,
     'weekly_report': weekly_report_config,
     'monthly_report': monthly_report_config,
