@@ -769,8 +769,9 @@ class ChatbotService:
         return result
 
 
-# 创建全局单例
-chatbot_service = ChatbotService()
+# 创建懒加载单例（有运行时状态：_chatbot, _current_session_id 等）
+from lifeprism.utils import LazySingleton
+chatbot_service = LazySingleton(ChatbotService)
 
 # 保留 V1 单例供向后兼容（已弃用）
 chatbot_service_v1 = None  # 惰性初始化，避免警告

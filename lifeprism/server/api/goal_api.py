@@ -44,8 +44,8 @@ from lifeprism.server.schemas.goal_schemas import (
     UpdatePlanDocRequest,
 )
 from lifeprism.server.services import todo_service
+from lifeprism.server.services import journal_service
 from lifeprism.server.services.goal_service import goal_service
-from lifeprism.server.services.journal_service import journal_service
 from lifeprism.server.services.plan_doc_service import plan_doc_service
 
 router = APIRouter(prefix="/goal", tags=["Goal - TodoList"])

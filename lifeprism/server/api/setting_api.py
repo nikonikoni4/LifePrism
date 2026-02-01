@@ -11,7 +11,7 @@ from lifeprism.server.schemas.setting_schemas import (
     UpdateApiKeyRequest,
     UpdateApiKeyResponse,
 )
-from lifeprism.server.services.setting_service import setting_service
+from lifeprism.server.services import setting_service
 
 router = APIRouter(prefix="/settings", tags=["Settings - 配置管理"])
 

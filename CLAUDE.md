@@ -9,7 +9,48 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. 在lifeprism\config\database.py完成数据表的配置 
 2. 在lifeprism\server\providers创建数据提供类，继承LWBaseDataProvider实现，使用LWBaseDataProvider中的db类成员实现数据库操作  
 3. 在schemas中编写前后端数据沟通的schemas 
-4. 在service创建单一service实例，采用懒加载方式lifeprism\utils\lazy_singleton.py。
+4. **Service 单例模式判断规则**：在 service 中，若当前 service 涉及到状态缓存，需要创建单一 service 实例，采用懒加载方式 `lifeprism\utils\lazy_singleton.py`。若不涉及状态缓存，则直接使用纯函数模块。
+
+   **需要单例的场景（任一条件满足即需要）：**
+   
+   1. **ID → Name 名称映射缓存**：维护 `id → name` 的内存字典，供其他模块快速查找
+      - 例：`CategoryService.category_name_map`、`GoalService.goal_name_map`
+      - 原因：避免每次查名称都访问数据库，且需要保证多处访问时数据一致
+   
+   2. **实体关系映射缓存**：维护实体间关系的内存字典
+      - 例：`CategoryService.sub_to_parent_map`（子分类 → 父分类 ID）
+      - 原因：关系查询频繁，缓存可显著提升性能
+   
+   3. **原始数据 DataFrame/列表缓存**：将数据库查询结果缓存为 DataFrame 或列表
+      - 例：`CategoryService._categories_df`、`CategoryService._sub_categories_df`
+      - 原因：避免重复查询，适用于数据量小且变更不频繁的配置类数据
+   
+   4. **运行时实例状态**：维护需要跨请求保持的运行时对象或状态
+      - 例：`ChatbotService._chatbot`（LLM 实例）、`ChatbotService._current_session_id`
+      - 原因：实例创建成本高，或需要维护会话状态
+   
+   **不需要单例的场景（使用纯函数模块）：**
+   
+   1. **纯数据转换/查询**：每次调用直接访问数据库或 provider，无内存缓存
+      - 例：`timeline_service`、`usage_service`、`report_service`
+   
+   2. **仅持有 provider 引用**：类成员只有 `self.xxx_provider = xxx_provider`，无自己的缓存字典
+      - 例：`JournalService`（只有 `self.journal_provider`）
+      - 这种情况可以改为纯函数，或保持类但不必强制单例
+   
+   3. **数据库层面缓存**：缓存存储在数据库表中而非内存
+      - 例：`report_service` 的报告缓存存在 `daily_report`/`weekly_report` 表中
+   
+   **单例实现方式**：
+   ```python
+   # 在 service 模块底部
+   from lifeprism.utils import LazySingleton
+   
+   # 懒加载单例（推荐，延迟初始化）
+   category_service = LazySingleton(CategoryService)
+   ```
+   
+   **缓存一致性**：有缓存的 service 必须提供 `_refresh_cache()` 方法，在 CRUD 操作后调用以保持缓存与数据库同步
 5. **重要**：该项目涉及到的所有用户可修改的“名称”字段，比如类别名称，目标名称，习惯名称，任务todo名称等都不能作为key，必须使用唯一的用户不可修改的id作为唯一标识
 
 ## Project Overview

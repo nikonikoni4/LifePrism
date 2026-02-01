@@ -2,39 +2,35 @@
 Business logic services
 
 V2 架构：
-- Service 类通过单例导出，在 API 层复用（适用于有状态或需要缓存的服务）
-- Builder/Helper 模块作为纯函数模块导入
+- Service 类通过单例导出（适用于有状态或需要缓存的服务）
+- 纯函数模块直接导入
 """
 
-from lifeprism.utils import LazySingleton
-
-# V2 Service 单例（有状态或需要缓存的服务）
-from .activity_service import ActivityService
+# 有状态服务单例（有内存缓存或运行时状态）
 from .category_service import category_service
+from .goal_service import goal_service        # 有 goal_name_map 缓存
+from .chatbot_service import chatbot_service  # 有运行时状态
 
-# V2 纯函数服务模块
+# 纯函数服务模块（无状态缓存）
 from . import timeline_service
 from . import usage_service
 from . import todo_service
-from . import goal_service
-from . import journal_service
+from . import journal_service   # 已改为纯函数
+from . import activity_service  # 已改为纯函数
+from . import setting_service   # 已改为纯函数
 from . import plan_doc_service
 
-# 创建懒加载单例实例（首次访问时才初始化）
-activity_service = LazySingleton(ActivityService)
-
-
 __all__ = [
-    # V2 单例（有状态服务）
-    "activity_service",
+    # 有状态服务单例
     "category_service",
-    # V2 纯函数模块
+    "goal_service",
+    "chatbot_service",
+    # 纯函数模块
     "timeline_service",
     "usage_service",
     "todo_service",
-    "goal_service",
     "journal_service",
+    "activity_service",
+    "setting_service",
     "plan_doc_service",
 ]
-
-

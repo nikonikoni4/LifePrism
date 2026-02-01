@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(dir:*)",
+      "Bash(find:*)",
+      "Bash(npm run build)",
+      "Bash(npm run)",
+      "Bash(python -c \"from lifeprism.server.services.activity_stats_builder import _get_category_name_map; print\\(''activity_stats_builder OK''\\)\")",
+      "Bash(python -c:*)",
+      "WebFetch(domain:localhost)"
+    ]
+  }
+}

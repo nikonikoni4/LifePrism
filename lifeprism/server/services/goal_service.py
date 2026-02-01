@@ -503,5 +503,6 @@ class GoalService:
         return GoalsWithCategoryResponse(items=goal_items)
 
 
-# 创建全局单例
-goal_service = GoalService()
+# 创建懒加载单例（有 goal_name_map 缓存）
+from lifeprism.utils import LazySingleton
+goal_service = LazySingleton(GoalService)
