@@ -9,6 +9,7 @@ import { PlanDocEditorView } from './components/PlanDocEditorView/PlanDocEditorV
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';
 import { InputDialog } from '../../shared/components/InputDialog';
 import { viewBackground } from '../../shared/backgroundStyles';
+import { toast } from '../../../../common';
 
 const generateShortUuid = () => Math.random().toString(36).substring(2, 8);
 
@@ -78,9 +79,14 @@ export const PlanDocListView: React.FC = () => {
 
         // If switching from a doc that had unsaved changes, save it
         if (prevId && prevId !== currentId && hasUnsavedChangesRef.current) {
-            planDocApi.updatePlanDoc(prevId, { content: prevContentRef.current }).catch(err => {
-                console.error('Auto-save on doc switch failed:', err);
-            });
+            planDocApi.updatePlanDoc(prevId, { content: prevContentRef.current })
+                .then(() => {
+                    toast.success('文档已自动保存');
+                })
+                .catch(err => {
+                    console.error('Auto-save on doc switch failed:', err);
+                    toast.error('自动保存失败');
+                });
         }
 
         prevDocIdRef.current = currentId;
@@ -108,8 +114,10 @@ export const PlanDocListView: React.FC = () => {
         try {
             await planDocApi.updatePlanDoc(selectedDoc.id, { content: localContent });
             setHasUnsavedChanges(false);
+            toast.success('文档已保存');
         } catch (error) {
             console.error('Save failed:', error);
+            toast.error('保存失败');
         } finally {
             setIsSaving(false);
         }

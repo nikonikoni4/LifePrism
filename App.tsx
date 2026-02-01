@@ -16,6 +16,7 @@ import { GoalPage } from './page/goalsV2/GoalPage';
 import { HabitPage } from './page/habits/HabitPage';
 import ReportsPage from './page/reports/ReportsPage';
 import SettingsPage from './page/settings/SettingsPage';
+import { ToastContainer } from './page/common';
 
 
 function App() {
@@ -211,6 +212,9 @@ function App() {
           onWidthChange={setChatPanelWidth}
         />
       )}
+
+      {/* Toast 消息容器 */}
+      <ToastContainer />
 
     </div>
   );
