@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Clock, ChevronLeft, RefreshCw,
@@ -10,6 +10,8 @@ import { THEMES } from '../../../../hooks/useGoalStore';
 import { viewBackground } from '../../../shared/backgroundStyles';
 import MilestoneAxis from './milestone/MilestoneAxis';
 import { CategoryLabel } from './GoalCard';
+import { formatDateForDisplay } from '../../../../api';
+import JournalEntryModal from './JournalEntryModal';
 
 // --- Reflection Timeline Component ---
 const ReflectionTimeline = ({ entries, theme }: { entries: JournalEntry[], theme: ThemeKey | string }) => {
@@ -40,7 +42,7 @@ const ReflectionTimeline = ({ entries, theme }: { entries: JournalEntry[], theme
           >
             {/* Left: Date & Mood */}
             <div className="flex flex-col items-end gap-2 w-10 pt-2 shrink-0 z-10">
-              <span className="text-xs font-semibold text-slate-400">{entry.date}</span>
+              <span className="text-xs font-semibold text-slate-400">{formatDateForDisplay(entry.date)}</span>
               <MoodIcon mood={entry.mood} />
             </div>
 
@@ -85,11 +87,13 @@ interface GoalDetailViewProps {
   onClose: () => void;
   onUpdate: (goal: Goal) => void;
   onMilestoneToggle?: (goalId: string, milestoneId: string, state: number) => Promise<void>;
+  onAddJournal?: (goalId: string, journal: Omit<JournalEntry, 'id'>) => Promise<void>;
   theme: ThemeKey | string;
 }
 
-const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate, onMilestoneToggle, theme }) => {
+const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate, onMilestoneToggle, onAddJournal, theme }) => {
   const themeConfig = THEMES[theme] || THEMES.indigo;
+  const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
 
   const handleMilestoneToggle = async (id: string, newState: number) => {
     if (!goal.milestones) return;
@@ -115,6 +119,17 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate
       ...goal,
       milestones: updatedMilestones
     });
+  };
+
+  const handleJournalSave = async (journalData: Omit<JournalEntry, 'id'>) => {
+    if (onAddJournal) {
+      try {
+        await onAddJournal(goal.id, journalData);
+        setIsJournalModalOpen(false);
+      } catch (err) {
+        console.error('Failed to add journal:', err);
+      }
+    }
   };
 
   return (
@@ -156,7 +171,7 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate
               <CategoryLabel theme={goal.theme}>{goal.category}</CategoryLabel>
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">{goal.title}</h1>
-            <p className="text-slate-400 text-sm font-medium">{goal.startDate} — {goal.endDate}</p>
+            <p className="text-slate-400 text-sm font-medium">{formatDateForDisplay(goal.startDate)} — {formatDateForDisplay(goal.endDate)}</p>
           </motion.div>
 
           {/* Stats Cards */}
@@ -197,6 +212,7 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate
 
       {/* Floating Record Button */}
       <motion.button
+        onClick={() => setIsJournalModalOpen(true)}
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         whileHover={{ scale: 1.05 }}
@@ -205,6 +221,15 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate
       >
         <Pencil size={20} />
       </motion.button>
+
+      {/* Journal Entry Modal */}
+      {isJournalModalOpen && (
+        <JournalEntryModal
+          goalId={goal.id}
+          onClose={() => setIsJournalModalOpen(false)}
+          onSave={handleJournalSave}
+        />
+      )}
 
     </motion.div>
   );

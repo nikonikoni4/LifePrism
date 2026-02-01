@@ -125,9 +125,9 @@ function themeToColor(theme: ThemeKey): string {
 // ============================================================================
 
 /**
- * Convert YYYY-MM-DD to MM.DD display format
+ * Convert YYYY-MM-DD to MM.DD display format (for UI display only)
  */
-function formatDateForDisplay(dateStr: string | null): string {
+export function formatDateForDisplay(dateStr: string | null): string {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
     if (parts.length === 3) {
@@ -137,19 +137,20 @@ function formatDateForDisplay(dateStr: string | null): string {
 }
 
 /**
- * Convert MM.DD to YYYY-MM-DD for API
- * Uses current year if not specified
+ * Ensure date is in YYYY-MM-DD format for API
+ * Handles both MM.DD (legacy) and YYYY-MM-DD formats
  */
 function formatDateForApi(displayDate: string): string | null {
     if (!displayDate) return null;
+    // If already in YYYY-MM-DD format, return as is
+    if (displayDate.includes('-') && displayDate.length === 10) {
+        return displayDate;
+    }
+    // Legacy MM.DD format conversion
     const parts = displayDate.split('.');
     if (parts.length === 2) {
         const year = new Date().getFullYear();
         return `${year}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-    }
-    // If already in YYYY-MM-DD format, return as is
-    if (displayDate.includes('-')) {
-        return displayDate;
     }
     return null;
 }
@@ -160,19 +161,20 @@ function formatDateForApi(displayDate: string): string | null {
 
 /**
  * Convert backend GoalItem to frontend Goal
+ * Note: Dates are kept in YYYY-MM-DD format for date input compatibility
  */
 export function mapBackendGoalToFrontend(backend: BackendGoalItem): Goal {
     const milestones: MilestoneItem[] = (backend.milestones || []).map(m => ({
         id: m.id,
         content: m.content,
         state: m.state,
-        finishTime: m.finish_time ? formatDateForDisplay(m.finish_time) : null,
+        finishTime: m.finish_time || null,
         orderIndex: m.order_index,
     }));
 
     const journal: JournalEntry[] = (backend.journal || []).map(j => ({
         id: j.id,
-        date: formatDateForDisplay(j.date),
+        date: j.date, // Keep YYYY-MM-DD format
         time: j.time || '',
         content: j.content,
         mood: (j.mood as JournalEntry['mood']) || 'neutral',
@@ -187,8 +189,8 @@ export function mapBackendGoalToFrontend(backend: BackendGoalItem): Goal {
         theme: colorToTheme(backend.color),
         timeInvested: backend.time_invested || '0',
         unit: backend.time_unit || 'HRS',
-        startDate: formatDateForDisplay(backend.start_date),
-        endDate: formatDateForDisplay(backend.expected_finished_at),
+        startDate: backend.start_date || '', // Keep YYYY-MM-DD format
+        endDate: backend.expected_finished_at || '', // Keep YYYY-MM-DD format
         value: backend.value || '',
         commitment: backend.commitment || '',
         details: backend.content || '',
@@ -366,6 +368,42 @@ export const goalsV2Api = {
 
         const data: BackendGoalItem = await res.json();
         return mapBackendGoalToFrontend(data);
+    },
+
+    /**
+     * Create a journal entry for a goal
+     */
+    createJournal: async (goalId: string, journal: Omit<JournalEntry, 'id'>): Promise<JournalEntry> => {
+        const request = {
+            goal_id: goalId,
+            date: journal.date,
+            time: journal.time || null,
+            content: journal.content,
+            mood: journal.mood,
+            duration: journal.duration,
+            tags: journal.tags.length > 0 ? JSON.stringify(journal.tags) : null,
+        };
+
+        const res = await fetch(`${getApiBase()}/journals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+        });
+
+        if (!res.ok) {
+            throw new Error(`Failed to create journal: ${res.status}`);
+        }
+
+        const data: BackendJournalEntry = await res.json();
+        return {
+            id: data.id,
+            date: data.date,
+            time: data.time || '',
+            content: data.content,
+            mood: (data.mood as JournalEntry['mood']) || 'neutral',
+            duration: data.duration,
+            tags: data.tags || [],
+        };
     },
 };
 

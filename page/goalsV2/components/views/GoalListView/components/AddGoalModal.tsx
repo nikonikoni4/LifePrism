@@ -43,6 +43,12 @@ interface AddGoalModalProps {
   goalToEdit: Goal | null;
 }
 
+// Get today's date in YYYY-MM-DD format
+const getTodayDate = () => {
+  const today = new Date();
+  return today.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+};
+
 const AddGoalModal: React.FC<AddGoalModalProps> = ({ isOpen, onClose, onSave, goalToEdit }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showValueHistory, setShowValueHistory] = useState(false);
@@ -56,7 +62,7 @@ const AddGoalModal: React.FC<AddGoalModalProps> = ({ isOpen, onClose, onSave, go
     theme: 'indigo',
     timeInvested: '0',
     unit: 'HRS',
-    startDate: '',
+    startDate: getTodayDate(),
     endDate: '',
     value: '',
     commitment: '',
@@ -245,8 +251,7 @@ const AddGoalModal: React.FC<AddGoalModalProps> = ({ isOpen, onClose, onSave, go
                         <div className="space-y-2">
                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">开始日期</label>
                           <input
-                            type="text"
-                            placeholder="MM.DD"
+                            type="date"
                             className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
                             value={form.startDate}
                             onChange={e => setForm({...form, startDate: e.target.value})}
@@ -255,8 +260,7 @@ const AddGoalModal: React.FC<AddGoalModalProps> = ({ isOpen, onClose, onSave, go
                         <div className="space-y-2">
                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">目标日期</label>
                           <input
-                            type="text"
-                            placeholder="MM.DD"
+                            type="date"
                             className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
                             value={form.endDate}
                             onChange={e => setForm({...form, endDate: e.target.value})}

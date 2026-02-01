@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Goal, ThemeKey } from '../types';
+import { Goal, ThemeKey, JournalEntry } from '../types';
 import { goalsV2Api } from '../api';
 
 // Constants
@@ -104,6 +104,7 @@ interface GoalStoreContextType {
     deleteGoal: (id: string) => Promise<void>;
     toggleGoalStatus: (id: string) => Promise<void>;
     updateMilestoneState: (goalId: string, milestoneId: string, state: number) => Promise<void>;
+    addJournal: (goalId: string, journal: Omit<JournalEntry, 'id'>) => Promise<void>;
 }
 
 const GoalStoreContext = createContext<GoalStoreContextType | undefined>(undefined);
@@ -200,6 +201,27 @@ export const GoalProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    const addJournal = async (goalId: string, journal: Omit<JournalEntry, 'id'>) => {
+        setError(null);
+        try {
+            const createdJournal = await goalsV2Api.createJournal(goalId, journal);
+            // Update the goal's journal list locally
+            setGoals(prev => prev.map(g => {
+                if (g.id === goalId) {
+                    return {
+                        ...g,
+                        journal: [...(g.journal || []), createdJournal]
+                    };
+                }
+                return g;
+            }));
+        } catch (err) {
+            console.error('[GoalStore] Failed to add journal:', err);
+            setError(err instanceof Error ? err.message : 'Failed to add journal');
+            throw err;
+        }
+    };
+
     // Use React.createElement to avoid JSX in .ts file
     return React.createElement(
         GoalStoreContext.Provider,
@@ -213,7 +235,8 @@ export const GoalProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 updateGoal,
                 deleteGoal,
                 toggleGoalStatus,
-                updateMilestoneState
+                updateMilestoneState,
+                addJournal
             }
         },
         children

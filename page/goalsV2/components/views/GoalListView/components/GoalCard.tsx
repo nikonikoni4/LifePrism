@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Calendar, Check, ArrowUpRight, Pencil, Trash2 } from 'lucide-react';
 import { Goal } from '../../../../types';
 import { THEMES } from '../../../../hooks/useGoalStore';
+import { formatDateForDisplay } from '../../../../api';
 
 interface GoalCardProps {
   goal: Goal;
@@ -87,7 +88,7 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onClick, onToggleStatus, onEd
         {/* Date Range */}
         <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-4">
           <Calendar size={12} />
-          <span className="font-medium">{goal.startDate} — {goal.endDate}</span>
+          <span className="font-medium">{formatDateForDisplay(goal.startDate)} — {formatDateForDisplay(goal.endDate)}</span>
         </div>
 
         {/* Progress Section */}

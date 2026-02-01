@@ -10,7 +10,7 @@ import AddGoalModal from './components/AddGoalModal';
 import GoalDetailView from './components/GoalDetailView';
 
 export const GoalListView: React.FC = () => {
-  const { goals, isLoading, error, fetchGoals, addGoal, updateGoal, deleteGoal, toggleGoalStatus, updateMilestoneState } = useGoalStore();
+  const { goals, isLoading, error, fetchGoals, addGoal, updateGoal, deleteGoal, toggleGoalStatus, updateMilestoneState, addJournal } = useGoalStore();
   const { selectedGoalId, setSelectedGoalId } = useGoalPageContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
@@ -275,6 +275,7 @@ export const GoalListView: React.FC = () => {
             theme={selectedGoal.theme}
             onUpdate={handleUpdateGoal}
             onMilestoneToggle={updateMilestoneState}
+            onAddJournal={addJournal}
           />
         )}
       </AnimatePresence>
