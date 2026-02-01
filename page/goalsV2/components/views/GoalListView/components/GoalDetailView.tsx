@@ -165,13 +165,13 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate
     {
       id: 'auto',
       label: '自动追踪',
-      icon: goal.trackTimeAutomatically ? <Check size={14} /> : undefined,
+      rightLabel: goal.trackTimeAutomatically ? '✓' : undefined,
       onClick: () => handleTrackModeChange(true),
     },
     {
       id: 'manual',
       label: '手动记录',
-      icon: !goal.trackTimeAutomatically ? <Check size={14} /> : undefined,
+      rightLabel: !goal.trackTimeAutomatically ? '✓' : undefined,
       onClick: () => handleTrackModeChange(false),
     },
   ];

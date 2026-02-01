@@ -10,6 +10,7 @@ import { THEMES, PAST_VALUES, PAST_COMMITMENTS } from '../../../../hooks/useGoal
 import MilestoneEditor from './milestone/MilestoneEditor';
 import { convertToEditableMilestones } from './milestone/utils';
 import CategoryFilter, { CategoryFilterValue } from '../../../../../common/CategoryFilter';
+import { DropdownMenu, DropdownItem } from '../../../shared/components/DropdownMenu';
 
 const SuggestionBox = ({ items, onSelect, onClose, themeColor }: { items: string[], onSelect: (val: string) => void, onClose: () => void, themeColor: string }) => (
   <motion.div
@@ -62,6 +63,7 @@ const AddGoalModal: React.FC<AddGoalModalProps> = ({ isOpen, onClose, onSave, go
     category: '',
     theme: 'indigo',
     timeInvested: '0',
+    trackTimeAutomatically: true,
     unit: 'HRS',
     startDate: getTodayDate(),
     endDate: '',
@@ -229,16 +231,43 @@ const AddGoalModal: React.FC<AddGoalModalProps> = ({ isOpen, onClose, onSave, go
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">已投入时间</label>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">已投入时间</label>
+                            <DropdownMenu
+                              trigger={
+                                <button type="button" className="flex items-center gap-1 bg-slate-100 rounded-md px-2 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-200 transition-colors whitespace-nowrap">
+                                  {form.trackTimeAutomatically ? '自动' : '手动'}
+                                  <ChevronDown size={10} />
+                                </button>
+                              }
+                              items={[
+                                {
+                                  id: 'auto',
+                                  label: '自动追踪',
+                                  rightLabel: form.trackTimeAutomatically ? '✓' : undefined,
+                                  onClick: () => setForm({...form, trackTimeAutomatically: true}),
+                                },
+                                {
+                                  id: 'manual',
+                                  label: '手动记录',
+                                  rightLabel: !form.trackTimeAutomatically ? '✓' : undefined,
+                                  onClick: () => setForm({...form, trackTimeAutomatically: false}),
+                                },
+                              ]}
+                              align="left"
+                              width="w-36"
+                            />
+                          </div>
                           <div className="flex gap-2">
                             <input
                               type="text"
-                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all tabular-nums font-medium"
+                              className={`w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all tabular-nums font-medium ${form.trackTimeAutomatically ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
                               placeholder="0"
                               value={form.timeInvested}
                               onChange={e => setForm({...form, timeInvested: e.target.value})}
+                              disabled={form.trackTimeAutomatically}
                             />
-                             <span className="flex items-center justify-center bg-slate-100 rounded-xl px-3 text-xs font-bold text-slate-400">小时</span>
+                            <span className="flex items-center justify-center bg-slate-100 rounded-xl px-3 text-xs font-bold text-slate-400">小时</span>
                           </div>
                         </div>
                       </div>
