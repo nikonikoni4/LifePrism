@@ -6,7 +6,10 @@ import { PlanDoc } from '../../../types';
 import { Plus, ChevronDown, FileText, Target, MoreVertical, Trash2, Copy, Archive } from 'lucide-react';
 import { PlanDocEditorView } from './components/PlanDocEditorView/PlanDocEditorView';
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';
+import { InputDialog } from '../../shared/components/InputDialog';
 import { viewBackground } from '../../shared/backgroundStyles';
+
+const generateShortUuid = () => Math.random().toString(36).substring(2, 8);
 
 export const PlanDocListView: React.FC = () => {
     const { selectedGoalId, setSelectedGoalId, selectedPlanDocId, setSelectedPlanDocId } = useGoalPageContext();
@@ -16,23 +19,30 @@ export const PlanDocListView: React.FC = () => {
     // Local content state for editing to avoid laggy context updates on every keystroke
     const [localContent, setLocalContent] = useState('');
 
+    // Dialog state for creating new plan doc
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [defaultDocName, setDefaultDocName] = useState('');
+
     // Derived
     const selectedGoal = goals.find(g => g.id === selectedGoalId) || null;
-    const goalDocs = planDocs.filter(d => d.goalId === selectedGoalId);
+    // Show docs for selected goal, or temp docs (goalId === null) when no goal selected
+    const goalDocs = selectedGoalId
+        ? planDocs.filter(d => d.goalId === selectedGoalId)
+        : planDocs.filter(d => d.goalId === null);
     const selectedDoc = goalDocs.find(d => d.id === selectedPlanDocId) || null;
 
     // Effects
     // Select first doc when goal changes or if current selection invalid
     useEffect(() => {
-        if (selectedGoalId && goalDocs.length > 0) {
+        if (goalDocs.length > 0) {
             // If no doc selected, or selected doc is not in current goal list, select first
             if (!selectedPlanDocId || !goalDocs.find(d => d.id === selectedPlanDocId)) {
                 setSelectedPlanDocId(goalDocs[0].id);
             }
-        } else if (!selectedGoalId) {
+        } else {
             setSelectedPlanDocId(null);
         }
-    }, [selectedGoalId, goalDocs, selectedPlanDocId, setSelectedPlanDocId]);
+    }, [selectedGoalId, goalDocs.length, selectedPlanDocId, setSelectedPlanDocId]);
 
     // Sync local content when doc changes
     useEffect(() => {
@@ -52,15 +62,21 @@ export const PlanDocListView: React.FC = () => {
         }
     };
 
-    const handleCreateDoc = () => {
-        if (!selectedGoalId) {
-            alert("Please select a goal first.");
-            return;
+    const handleOpenCreateDialog = () => {
+        const uuid = generateShortUuid();
+        if (selectedGoalId && selectedGoal) {
+            setDefaultDocName(`planDoc-${selectedGoal.title}-${uuid}`);
+        } else {
+            setDefaultDocName(`planDoc-temp-${uuid}`);
         }
+        setIsCreateDialogOpen(true);
+    };
+
+    const handleCreateDoc = (title: string) => {
         const newDoc: PlanDoc = {
             id: Date.now().toString(),
             goalId: selectedGoalId,
-            title: `Untitled Plan ${goalDocs.length + 1}`,
+            title: title,
             content: '# New Plan\n',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -78,14 +94,6 @@ export const PlanDocListView: React.FC = () => {
             }
         }
     };
-
-    if (goals.length === 0) {
-        return (
-            <div className="flex-1 flex items-center justify-center text-slate-400">
-                No goals available. Create a goal first.
-            </div>
-        );
-    }
 
     // --- Dropdown Items Configuration ---
 
@@ -161,14 +169,14 @@ export const PlanDocListView: React.FC = () => {
                         <DropdownMenu
                             width="w-72"
                             trigger={
-                                <div className={`flex items-center justify-between w-full font-heading font-bold text-sm py-1 pr-2 cursor-pointer transition-colors ${selectedGoalId ? 'text-slate-700 hover:text-indigo-600' : 'text-slate-300'}`}>
+                                <div className="flex items-center justify-between w-full font-heading font-bold text-sm py-1 pr-2 cursor-pointer transition-colors text-slate-700 hover:text-indigo-600">
                                     <span className="truncate">
-                                        {selectedDoc?.title || (selectedGoalId ? (goalDocs.length === 0 ? 'No plans' : 'Select Plan') : 'Select Goal First')}
+                                        {selectedDoc?.title || (goalDocs.length === 0 ? 'No plans' : 'Select Plan')}
                                     </span>
                                     <ChevronDown size={14} className="text-slate-400 ml-2 flex-shrink-0" />
                                 </div>
                             }
-                            items={selectedGoalId ? planMenuItems : []}
+                            items={planMenuItems}
                         />
                     </div>
                 </div>
@@ -176,9 +184,8 @@ export const PlanDocListView: React.FC = () => {
                 {/* Actions */}
                 <div className="flex items-center gap-2 shrink-0">
                     <button
-                        onClick={handleCreateDoc}
-                        disabled={!selectedGoalId}
-                        className="p-2 rounded-xl bg-white border border-slate-100 shadow-sm text-slate-400 hover:text-indigo-500 hover:border-indigo-100 hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={handleOpenCreateDialog}
+                        className="p-2 rounded-xl bg-white border border-slate-100 shadow-sm text-slate-400 hover:text-indigo-500 hover:border-indigo-100 hover:shadow-md transition-all"
                         title="New Plan Doc"
                     >
                         <Plus size={18} />
@@ -206,20 +213,23 @@ export const PlanDocListView: React.FC = () => {
                     />
                 ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300 p-8 text-center">
-                        {selectedGoalId ? (
-                            <>
-                                <FileText size={48} strokeWidth={1} className="mb-4 opacity-50" />
-                                <p className="max-w-xs">No plan selected. Create a new one or select from the list.</p>
-                            </>
-                        ) : (
-                            <>
-                                <Target size={48} strokeWidth={1} className="mb-4 opacity-50" />
-                                <p className="max-w-xs">Select a goal to view its plans.</p>
-                            </>
-                        )}
+                        <FileText size={48} strokeWidth={1} className="mb-4 opacity-50" />
+                        <p className="max-w-xs">No plan selected. Create a new one or select from the list.</p>
                     </div>
                 )}
             </div>
+
+            {/* Create Plan Doc Dialog */}
+            <InputDialog
+                isOpen={isCreateDialogOpen}
+                onClose={() => setIsCreateDialogOpen(false)}
+                onConfirm={handleCreateDoc}
+                title="Create New Plan Doc"
+                placeholder="Enter plan doc name"
+                defaultValue={defaultDocName}
+                confirmText="Create"
+                cancelText="Cancel"
+            />
         </div>
     );
 };
