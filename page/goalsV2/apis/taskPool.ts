@@ -4,7 +4,7 @@
  */
 
 import { createApiV2UrlGetter } from '../../../services/apiConfig';
-import { TodoItemType as TodoItem } from '@my-ui-kit/core';
+import { TodoItem } from '../types/todo';
 import {
     BackendTaskPoolItem,
     BackendTaskPoolResponse,

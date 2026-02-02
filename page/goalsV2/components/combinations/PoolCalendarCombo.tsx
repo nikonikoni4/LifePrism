@@ -3,8 +3,9 @@ import React from 'react';
 import { DualPaneLayout } from '../layout/DualPaneLayout';
 import { TaskPoolView } from '../views/TaskPoolView/TaskPoolView';
 import { CalendarView } from '../views/CalendarView/CalendarView';
-import { CrossAreaDndProvider, DragItemData, DropAreaData, TodoItemType } from '@my-ui-kit/core';
+import { CrossAreaDndProvider, DragItemData, DropAreaData } from '@my-ui-kit/core';
 import { useTaskPoolStore } from '../../hooks/useTaskPoolStore';
+import { TodoItem } from '../../types/todo';
 
 export const PoolCalendarCombo: React.FC = () => {
   const { tasks, scheduleTask, moveTaskToPool } = useTaskPoolStore();
@@ -25,7 +26,7 @@ export const PoolCalendarCombo: React.FC = () => {
   };
 
   const handleCrossAreaDrop = (
-    dragItem: DragItemData<TodoItemType>,
+    dragItem: DragItemData<TodoItem>,
     dropArea: DropAreaData<{ date?: string }>
   ) => {
     const task = dragItem.payload;
@@ -46,7 +47,7 @@ export const PoolCalendarCombo: React.FC = () => {
     }
   };
 
-  const renderDragOverlay = (dragItem: DragItemData<TodoItemType>) => {
+  const renderDragOverlay = (dragItem: DragItemData<TodoItem>) => {
     // 防御性检查：确保 payload 存在
     if (!dragItem.payload) {
       return (

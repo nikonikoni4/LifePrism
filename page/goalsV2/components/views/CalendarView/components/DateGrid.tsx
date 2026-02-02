@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Plus, GripVertical } from 'lucide-react';
-import { DroppableDateCell, DraggableItem, TodoItemType as TodoItem } from '@my-ui-kit/core';
+import { DroppableDateCell, DraggableItem } from '@my-ui-kit/core';
+import { TodoItem } from '../../../../types/todo';
 import { useTaskPoolStore } from '../../../../hooks/useTaskPoolStore';
 import { useGoalPageContext } from '../../../../context/GoalPageContext';
 

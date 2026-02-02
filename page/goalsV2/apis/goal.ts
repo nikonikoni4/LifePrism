@@ -9,7 +9,8 @@ import {
     BackendGoalItem,
     BackendGoalListResponse,
     CreateGoalRequest,
-    UpdateGoalRequest
+    UpdateGoalRequest,
+    BackendJournalEntry
 } from '../types/backend';
 
 // API base URL getter

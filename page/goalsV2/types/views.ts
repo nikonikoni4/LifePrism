@@ -2,7 +2,7 @@
  * 视图/组件相关类型定义
  */
 
-import type { TodoItemType as TodoItem } from '@my-ui-kit/core';
+import type { TodoItem } from './todo';
 
 // ============ CalendarView ============
 
