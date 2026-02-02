@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { X, RefreshCw, Check, Loader2 } from 'lucide-react';
+import { X, RefreshCw, Check, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
 import { useTaskPoolStore } from '../../../hooks/useTaskPoolStore';
 import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
+import { useGoalPageContext } from '../../../context/GoalPageContext';
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';
 import { TodoItem as TodoItemComponent, DraggableItem, DroppablePoolRoot } from '@my-ui-kit/core';
 import { viewBackground } from '../../shared/backgroundStyles';
@@ -47,23 +48,20 @@ const TaskTree: React.FC<{
     onDelete: (id: number) => void;
     onComplete: (id: number) => void;
     disableInternalDnd?: boolean;
-}> = ({ tasks, onUpdate, onDelete, onComplete, disableInternalDnd }) => {
+    expandedIds: Set<number>;
+    onToggleExpand: (id: number) => void;
+}> = ({ tasks, onUpdate, onDelete, onComplete, disableInternalDnd, expandedIds, onToggleExpand }) => {
     // 判断任务状态
     const isScheduled = (task: TodoItem) => task.state === 'scheduled';
     const isCompleted = (task: TodoItem) => task.state === 'completed';
-
-    // 处理勾选变化
-    const handleCheckboxChange = (task: TodoItem) => {
-        if (!isCompleted(task)) {
-            onComplete(task.id);
-        }
-    };
 
     return (
         <>
             {tasks.map(task => {
                 const scheduled = isScheduled(task);
                 const completed = isCompleted(task);
+                const hasChildren = task.children && task.children.length > 0;
+                const isExpanded = expandedIds.has(task.id);
 
                 // 任务样式类名
                 const taskClassName = `${scheduled ? 'opacity-50' : ''} ${completed ? 'opacity-60' : ''}`;
@@ -87,17 +85,14 @@ const TaskTree: React.FC<{
                                         <div className="absolute -left-1 top-0 bottom-0 w-1 bg-emerald-400 rounded-full" />
                                     )}
 
-                                    {/* 自定义勾选框 */}
+                                    {/* 展开/折叠按钮 */}
                                     <button
-                                        onClick={() => handleCheckboxChange(task)}
-                                        className={`flex-shrink-0 mt-2.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
-                                            completed
-                                                ? 'bg-emerald-500 border-emerald-500 text-white'
-                                                : 'border-slate-300 hover:border-emerald-400'
+                                        onClick={() => hasChildren && onToggleExpand(task.id)}
+                                        className={`flex-shrink-0 mt-2.5 w-4 h-4 flex items-center justify-center transition-all ${
+                                            hasChildren ? 'text-slate-400 hover:text-slate-600 cursor-pointer' : 'text-transparent cursor-default'
                                         }`}
-                                        disabled={completed}
                                     >
-                                        {completed && <Check size={10} strokeWidth={3} />}
+                                        {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                                     </button>
 
                                     <div className="flex-1">
@@ -121,17 +116,14 @@ const TaskTree: React.FC<{
                                     <div className="absolute -left-1 top-0 bottom-0 w-1 bg-emerald-400 rounded-full" />
                                 )}
 
-                                {/* 自定义勾选框 */}
+                                {/* 展开/折叠按钮 */}
                                 <button
-                                    onClick={() => handleCheckboxChange(task)}
-                                    className={`flex-shrink-0 mt-2.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
-                                        completed
-                                            ? 'bg-emerald-500 border-emerald-500 text-white'
-                                            : 'border-slate-300 hover:border-emerald-400'
+                                    onClick={() => hasChildren && onToggleExpand(task.id)}
+                                    className={`flex-shrink-0 mt-2.5 w-4 h-4 flex items-center justify-center transition-all ${
+                                        hasChildren ? 'text-slate-400 hover:text-slate-600 cursor-pointer' : 'text-transparent cursor-default'
                                     }`}
-                                    disabled={completed}
                                 >
-                                    {completed && <Check size={10} strokeWidth={3} />}
+                                    {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                                 </button>
 
                                 <div className="flex-1">
@@ -145,14 +137,16 @@ const TaskTree: React.FC<{
                         )}
 
                         {/* 递归渲染子任务 */}
-                        {task.children && task.children.length > 0 && (
+                        {hasChildren && isExpanded && (
                             <div className={`ml-6 mt-1 ${scheduled || completed ? 'opacity-70' : ''}`}>
                                 <TaskTree
-                                    tasks={task.children}
+                                    tasks={task.children!}
                                     onUpdate={onUpdate}
                                     onDelete={onDelete}
                                     onComplete={onComplete}
                                     disableInternalDnd={disableInternalDnd}
+                                    expandedIds={expandedIds}
+                                    onToggleExpand={onToggleExpand}
                                 />
                             </div>
                         )}
@@ -178,10 +172,23 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
     } = useTaskPoolStore();
     const { goals } = useGoalStore();
     const { planDocs } = usePlanDocStore();
+    const { selectedGoalId, setSelectedGoalId, selectedPlanDocId, setSelectedPlanDocId } = useGoalPageContext();
 
-    const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
-    const [selectedPlanDocId, setSelectedPlanDocId] = useState<string | null>(null);
-    const [showCompleted, setShowCompleted] = useState(false);
+    const [showCompleted, setShowCompleted] = useState(true);
+    const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+
+    // 切换展开/折叠
+    const handleToggleExpand = useCallback((id: number) => {
+        setExpandedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    }, []);
 
     // 筛选任务
     const filteredTasks = useMemo(() => {
@@ -357,6 +364,8 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                             onDelete={deleteTask}
                             onComplete={completeTask}
                             disableInternalDnd={disableInternalDnd}
+                            expandedIds={expandedIds}
+                            onToggleExpand={handleToggleExpand}
                         />
                     )}
                 </div>
