@@ -1,7 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { X } from 'lucide-react';
-import { DndContext, DragOverlay } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import React, { useState, useMemo, useCallback } from 'react';
+import { X, RefreshCw, Check, Loader2 } from 'lucide-react';
 import { useTaskPoolStore } from '../../../hooks/useTaskPoolStore';
 import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
@@ -47,55 +45,113 @@ const TaskTree: React.FC<{
     tasks: TodoItem[];
     onUpdate: (id: number, updates: Partial<TodoItem>) => void;
     onDelete: (id: number) => void;
+    onComplete: (id: number) => void;
     disableInternalDnd?: boolean;
-}> = ({ tasks, onUpdate, onDelete, disableInternalDnd }) => {
-    // 判断任务是否已安排（scheduled状态）
+}> = ({ tasks, onUpdate, onDelete, onComplete, disableInternalDnd }) => {
+    // 判断任务状态
     const isScheduled = (task: TodoItem) => task.state === 'scheduled';
+    const isCompleted = (task: TodoItem) => task.state === 'completed';
+
+    // 处理勾选变化
+    const handleCheckboxChange = (task: TodoItem) => {
+        if (!isCompleted(task)) {
+            onComplete(task.id);
+        }
+    };
 
     return (
         <>
             {tasks.map(task => {
                 const scheduled = isScheduled(task);
+                const completed = isCompleted(task);
+
+                // 任务样式类名
+                const taskClassName = `${scheduled ? 'opacity-50' : ''} ${completed ? 'opacity-60' : ''}`;
 
                 return (
-                    <div key={task.id}>
+                    <div key={task.id} className="mb-1">
                         {disableInternalDnd ? (
                             <DraggableItem
                                 id={`pool-${task.id}`}
                                 type="task"
                                 source="task-pool"
                                 data={task}
-                                className={scheduled ? 'opacity-50' : ''}
+                                className={taskClassName}
                             >
-                                {/* 已安排任务的样式标记 */}
-                                <div className="relative">
+                                <div className="relative flex items-start gap-2">
+                                    {/* 状态指示条 */}
                                     {scheduled && (
                                         <div className="absolute -left-1 top-0 bottom-0 w-1 bg-violet-400 rounded-full" />
                                     )}
+                                    {completed && (
+                                        <div className="absolute -left-1 top-0 bottom-0 w-1 bg-emerald-400 rounded-full" />
+                                    )}
+
+                                    {/* 自定义勾选框 */}
+                                    <button
+                                        onClick={() => handleCheckboxChange(task)}
+                                        className={`flex-shrink-0 mt-2.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                                            completed
+                                                ? 'bg-emerald-500 border-emerald-500 text-white'
+                                                : 'border-slate-300 hover:border-emerald-400'
+                                        }`}
+                                        disabled={completed}
+                                    >
+                                        {completed && <Check size={10} strokeWidth={3} />}
+                                    </button>
+
+                                    <div className="flex-1">
+                                        <TodoItemComponent
+                                            item={task}
+                                            onUpdate={onUpdate}
+                                            onDelete={onDelete}
+                                            showDate={true}
+                                            disableSortable={true}
+                                        />
+                                    </div>
+                                </div>
+                            </DraggableItem>
+                        ) : (
+                            <div className={`relative flex items-start gap-2 ${taskClassName}`}>
+                                {/* 状态指示条 */}
+                                {scheduled && (
+                                    <div className="absolute -left-1 top-0 bottom-0 w-1 bg-violet-400 rounded-full" />
+                                )}
+                                {completed && (
+                                    <div className="absolute -left-1 top-0 bottom-0 w-1 bg-emerald-400 rounded-full" />
+                                )}
+
+                                {/* 自定义勾选框 */}
+                                <button
+                                    onClick={() => handleCheckboxChange(task)}
+                                    className={`flex-shrink-0 mt-2.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                                        completed
+                                            ? 'bg-emerald-500 border-emerald-500 text-white'
+                                            : 'border-slate-300 hover:border-emerald-400'
+                                    }`}
+                                    disabled={completed}
+                                >
+                                    {completed && <Check size={10} strokeWidth={3} />}
+                                </button>
+
+                                <div className="flex-1">
                                     <TodoItemComponent
                                         item={task}
                                         onUpdate={onUpdate}
                                         onDelete={onDelete}
-                                        showDate={true}
-                                        disableSortable={true}
                                     />
                                 </div>
-                            </DraggableItem>
-                        ) : (
-                            <TodoItemComponent
-                                item={task}
-                                onUpdate={onUpdate}
-                                onDelete={onDelete}
-                            />
+                            </div>
                         )}
 
-                        {/* 递归渲染子任务 - 子任务也继承父任务的scheduled样式 */}
+                        {/* 递归渲染子任务 */}
                         {task.children && task.children.length > 0 && (
-                            <div className={`ml-6 mt-1 ${scheduled ? 'opacity-50' : ''}`}>
+                            <div className={`ml-6 mt-1 ${scheduled || completed ? 'opacity-70' : ''}`}>
                                 <TaskTree
                                     tasks={task.children}
                                     onUpdate={onUpdate}
                                     onDelete={onDelete}
+                                    onComplete={onComplete}
                                     disableInternalDnd={disableInternalDnd}
                                 />
                             </div>
@@ -110,16 +166,32 @@ const TaskTree: React.FC<{
 export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
     disableInternalDnd = false
 }) => {
-    const { tasks, updateTask, deleteTask } = useTaskPoolStore();
+    const {
+        tasks,
+        loading,
+        syncing,
+        updateTask,
+        deleteTask,
+        syncFromPlanDoc,
+        completeTask,
+        loadTasks
+    } = useTaskPoolStore();
     const { goals } = useGoalStore();
     const { planDocs } = usePlanDocStore();
 
     const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
     const [selectedPlanDocId, setSelectedPlanDocId] = useState<string | null>(null);
+    const [showCompleted, setShowCompleted] = useState(false);
 
     // 筛选任务
     const filteredTasks = useMemo(() => {
-        let filtered = tasks.filter(t => t.state === 'pool' || t.state === 'scheduled');
+        let filtered = tasks.filter(t => {
+            // 基础状态筛选
+            if (showCompleted) {
+                return t.state === 'pool' || t.state === 'scheduled' || t.state === 'completed';
+            }
+            return t.state === 'pool' || t.state === 'scheduled';
+        });
 
         if (selectedGoalId) {
             filtered = filtered.filter(t => t.goalId === selectedGoalId);
@@ -130,13 +202,28 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
         }
 
         return buildTaskTree(filtered);
-    }, [tasks, selectedGoalId, selectedPlanDocId]);
+    }, [tasks, selectedGoalId, selectedPlanDocId, showCompleted]);
 
     // 清空筛选
     const clearFilters = () => {
         setSelectedGoalId(null);
         setSelectedPlanDocId(null);
     };
+
+    // 同步按钮点击处理
+    const handleSync = useCallback(async () => {
+        if (selectedPlanDocId) {
+            await syncFromPlanDoc(selectedPlanDocId);
+        } else {
+            // 如果没有选择计划书，提示用户
+            alert('请先选择要同步的计划书');
+        }
+    }, [selectedPlanDocId, syncFromPlanDoc]);
+
+    // 刷新任务列表
+    const handleRefresh = useCallback(async () => {
+        await loadTasks(selectedGoalId, selectedPlanDocId);
+    }, [loadTasks, selectedGoalId, selectedPlanDocId]);
 
     // 构建下拉菜单项
     const goalDropdownItems: DropdownItem[] = goals.map(goal => ({
@@ -187,6 +274,22 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                         width="w-64"
                     />
 
+                    {/* 同步按钮 */}
+                    {selectedPlanDocId && (
+                        <button
+                            onClick={handleSync}
+                            disabled={syncing}
+                            className="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-300 text-white text-sm font-medium transition-all shadow-sm hover:shadow-md flex items-center gap-2"
+                        >
+                            {syncing ? (
+                                <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                                <RefreshCw size={14} />
+                            )}
+                            {syncing ? '同步中...' : '同步'}
+                        </button>
+                    )}
+
                     {/* 清空筛选按钮 */}
                     {(selectedGoalId || selectedPlanDocId) && (
                         <button
@@ -198,21 +301,53 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                         </button>
                     )}
 
+                    {/* 显示已完成任务开关 */}
+                    <button
+                        onClick={() => setShowCompleted(!showCompleted)}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                            showCompleted
+                                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                    >
+                        <Check size={14} />
+                        {showCompleted ? '隐藏已完成' : '显示已完成'}
+                    </button>
+
                     {/* 任务计数 */}
                     <div className="ml-auto text-xs font-bold text-slate-400 tracking-wider">
-                        {filteredTasks.length} 个任务
+                        {loading ? (
+                            <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                            `${filteredTasks.length} 个任务`
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* 任务列表 - DroppablePoolRoot 需要覆盖整个滚动区域 */}
+            {/* 任务列表 */}
             <DroppablePoolRoot className="flex-1 overflow-y-auto scrollbar-hide">
                 <div className="p-6 min-h-full">
-                    {filteredTasks.length === 0 ? (
+                    {loading ? (
+                        <div className="h-full flex items-center justify-center min-h-[200px]">
+                            <div className="text-center">
+                                <Loader2 size={32} className="animate-spin text-slate-400 mx-auto mb-4" />
+                                <div className="text-sm font-medium text-slate-400">加载中...</div>
+                            </div>
+                        </div>
+                    ) : filteredTasks.length === 0 ? (
                         <div className="h-full flex items-center justify-center min-h-[200px]">
                             <div className="text-center">
                                 <div className="text-6xl mb-4 opacity-20">📋</div>
                                 <div className="text-sm font-medium text-slate-400">暂无任务</div>
+                                {selectedPlanDocId && (
+                                    <button
+                                        onClick={handleSync}
+                                        className="mt-4 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-all"
+                                    >
+                                        从计划书同步任务
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ) : (
@@ -220,6 +355,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                             tasks={filteredTasks}
                             onUpdate={updateTask}
                             onDelete={deleteTask}
+                            onComplete={completeTask}
                             disableInternalDnd={disableInternalDnd}
                         />
                     )}
