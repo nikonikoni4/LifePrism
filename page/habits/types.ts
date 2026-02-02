@@ -175,3 +175,95 @@ export interface CreateHabitForm {
     requiredCompletions: number;
   };
 }
+
+// ============================================
+// 习惯系统 V2 - 时间轴与链条类型定义
+// ============================================
+
+// 触发器类型
+export type ChainTriggerType = 'time' | 'scene' | 'event' | 'habit';
+
+// 链条节点：可以是正式习惯或自由文本提醒
+export interface HabitAnchorNode {
+  id: string;
+  habitId?: string;          // 关联已有习惯
+  customText?: string;       // 自由文本提醒（如"喝杯水"、"深呼吸3次"）
+  order: number;             // 在链条中的顺序
+}
+
+// 习惯锚点/链条（时间轴和链条共用同一数据结构）
+export interface HabitAnchor {
+  id: string;
+  triggerType: ChainTriggerType;
+  triggerDescription: string;  // "每天12:00" / "回家后" / "洗漱后" / "冥想后"
+  anchorTime?: string;         // 锚点时间 "HH:mm"（仅时间触发有）
+  linkedHabitId?: string;      // 习惯触发时，关联的前置习惯ID
+  nodes: HabitAnchorNode[];    // 节点数组，支持多个节点串联
+  createdAt: string;
+  updatedAt: string;
+}
+
+// 触发器类型配置
+export interface TriggerTypeConfig {
+  type: ChainTriggerType;
+  label: string;
+  icon: string;
+  bgColor: string;
+  borderColor: string;
+  textColor: string;
+}
+
+// 触发器类型常量
+export const TRIGGER_TYPES: TriggerTypeConfig[] = [
+  {
+    type: 'time',
+    label: '时间触发',
+    icon: '⏰',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    textColor: 'text-blue-600'
+  },
+  {
+    type: 'scene',
+    label: '场景触发',
+    icon: '🏠',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-200',
+    textColor: 'text-purple-600'
+  },
+  {
+    type: 'event',
+    label: '事件触发',
+    icon: '📋',
+    bgColor: 'bg-orange-50',
+    borderColor: 'border-orange-200',
+    textColor: 'text-orange-600'
+  },
+  {
+    type: 'habit',
+    label: '习惯触发',
+    icon: '🔗',
+    bgColor: 'bg-teal-50',
+    borderColor: 'border-teal-200',
+    textColor: 'text-teal-600'
+  }
+];
+
+// 获取触发器类型配置
+export const getTriggerTypeConfig = (type: ChainTriggerType): TriggerTypeConfig => {
+  return TRIGGER_TYPES.find(t => t.type === type) || TRIGGER_TYPES[0];
+};
+
+// 等级对应的 teal 颜色（用于时间轴）
+export const LEVEL_TEAL_COLORS: Record<number, string> = {
+  0: 'bg-teal-100',
+  1: 'bg-teal-200',
+  2: 'bg-teal-300',
+  3: 'bg-teal-400',
+  4: 'bg-teal-500'
+};
+
+// 获取等级对应的 teal 背景色
+export const getLevelTealBg = (level: number): string => {
+  return LEVEL_TEAL_COLORS[Math.min(Math.max(level, 0), 4)] || 'bg-slate-100';
+};

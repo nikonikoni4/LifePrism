@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, ChevronDown, ChevronUp, Sprout } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Sprout, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useHabitStore } from '../../../hooks/useHabitStore';
 import { useHabitPageContext } from '../../../context/HabitPageContext';
 import { Habit, CreateHabitForm, HabitStats } from '../../../types';
@@ -8,6 +8,8 @@ import HabitCard from './components/HabitCard';
 import HabitHeatmap from './components/HabitHeatmap';
 import AddHabitModal from './components/AddHabitModal';
 import HabitHistoryModal from './components/HabitHistoryModal';
+import { AnchorTimeline } from './components/AnchorTimeline';
+import { HabitChainFlow } from './components/HabitChainFlow';
 
 // Background style matching GoalsV2 - using teal instead of amber
 const viewBackground = {
@@ -93,6 +95,7 @@ export const HabitListView: React.FC = () => {
   const [historyHabitId, setHistoryHabitId] = useState<string | null>(null);
   const [isPausedExpanded, setIsPausedExpanded] = useState(false);
   const [checkedToday, setCheckedToday] = useState<Set<string>>(new Set());
+  const [isTimelinePanelOpen, setIsTimelinePanelOpen] = useState(true);
 
   // Derived state
   const activeHabits = useMemo(() =>
@@ -154,13 +157,15 @@ export const HabitListView: React.FC = () => {
   };
 
   return (
-    <div className={`h-full relative flex flex-col ${viewBackground.className}`} style={viewBackground.style}>
-      {/* Scrollable Container */}
-      <div className="flex-1 h-full overflow-y-auto p-6 md:p-8 scrollbar-hide">
+    <div className={`h-full relative flex ${viewBackground.className}`} style={viewBackground.style}>
+      {/* Main Content Area - Left Side */}
+      <div className={`flex-1 h-full overflow-y-auto p-6 md:p-8 scrollbar-hide transition-all duration-300 ${
+        isTimelinePanelOpen ? 'lg:pr-4' : ''
+      }`}>
         <motion.main
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative z-10 pb-10 max-w-5xl mx-auto"
+          className="relative z-10 pb-10 max-w-4xl"
         >
           {/* Header */}
           <header className="mb-8 flex items-end justify-between">
@@ -174,9 +179,19 @@ export const HabitListView: React.FC = () => {
               </h1>
               <p className="text-sm text-slate-400 mt-1">坚持每一天，成就更好的自己</p>
             </div>
-            <div className="hidden sm:block text-right">
-              <div className="text-sm font-medium text-slate-400 mb-1">活跃习惯</div>
-              <div className="text-3xl font-light tabular-nums text-slate-800">{activeHabits.length}</div>
+            <div className="hidden sm:flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-sm font-medium text-slate-400 mb-1">活跃习惯</div>
+                <div className="text-3xl font-light tabular-nums text-slate-800">{activeHabits.length}</div>
+              </div>
+              {/* Timeline Panel Toggle - Only visible on lg screens */}
+              <button
+                onClick={() => setIsTimelinePanelOpen(!isTimelinePanelOpen)}
+                className="hidden lg:flex items-center gap-1 px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-teal-600 hover:border-teal-200 transition-colors"
+                title={isTimelinePanelOpen ? '收起时间轴' : '展开时间轴'}
+              >
+                {isTimelinePanelOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+              </button>
             </div>
           </header>
 
@@ -185,6 +200,9 @@ export const HabitListView: React.FC = () => {
 
           {/* Today Progress Bar */}
           <TodayProgressBar stats={stats} />
+
+          {/* Habit Chain Flow - New Component */}
+          <HabitChainFlow className="mb-6" />
 
           {/* Active Habits Section */}
           <section className="mb-10">
@@ -283,6 +301,70 @@ export const HabitListView: React.FC = () => {
           <StatsFooter stats={stats} />
         </motion.main>
       </div>
+
+      {/* Right Side Panel - Timeline (Desktop Only) */}
+      <AnimatePresence>
+        {isTimelinePanelOpen && (
+          <motion.aside
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 360, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="hidden lg:block h-full border-l border-slate-100 bg-white/50 backdrop-blur-sm overflow-hidden"
+          >
+            <div className="h-full overflow-y-auto p-4 scrollbar-hide">
+              <AnchorTimeline />
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Timeline Toggle Button */}
+      <button
+        onClick={() => setIsTimelinePanelOpen(!isTimelinePanelOpen)}
+        className="lg:hidden fixed bottom-6 right-6 z-20 w-14 h-14 rounded-full bg-teal-500 text-white shadow-lg flex items-center justify-center hover:bg-teal-600 transition-colors"
+      >
+        {isTimelinePanelOpen ? <PanelRightClose size={24} /> : <PanelRightOpen size={24} />}
+      </button>
+
+      {/* Mobile Timeline Drawer */}
+      <AnimatePresence>
+        {isTimelinePanelOpen && (
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="lg:hidden fixed inset-y-0 right-0 w-[85%] max-w-sm bg-white shadow-2xl z-30 overflow-hidden"
+          >
+            <div className="h-full overflow-y-auto p-4 scrollbar-hide">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-slate-800">时间锚点</h3>
+                <button
+                  onClick={() => setIsTimelinePanelOpen(false)}
+                  className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  <PanelRightClose size={20} className="text-slate-500" />
+                </button>
+              </div>
+              <AnchorTimeline />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {isTimelinePanelOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsTimelinePanelOpen(false)}
+            className="lg:hidden fixed inset-0 bg-black/30 z-20"
+          />
+        )}
+      </AnimatePresence>
 
       {/* Add/Edit Modal */}
       <AnimatePresence>
