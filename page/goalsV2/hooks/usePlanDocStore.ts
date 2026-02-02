@@ -1,39 +1,13 @@
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { PlanDoc } from '../types';
-
-const INITIAL_PLANS: PlanDoc[] = [
-    {
-        id: 'p1',
-        goalId: '1', // Matches Master React goal
-        title: 'React Learning Roadmap',
-        content: '# React Learning Roadmap\n\n## Core Concepts\n- [ ] JSX & Rendering\n- [ ] State & Props\n- [ ] Hooks (useEffect, useState)\n\n## Advanced\n- [ ] Server Components\n- [ ] Suspense\n- [ ] Transitions',
-        createdAt: '2024-01-15',
-        updatedAt: '2024-01-16',
-        status: 'active'
-    },
-    {
-        id: 'p2',
-        goalId: '1', 
-        title: 'Project Ideas Draft',
-        content: '# Project Ideas\n\n1. Todo App with AI\n2. Weather Dashboard\n3. E-commerce Store',
-        createdAt: '2024-01-20',
-        updatedAt: '2024-01-20',
-        status: 'active'
-    },
-    {
-        id: 'p3',
-        goalId: '2', // Matches Half Marathon goal
-        title: 'Training Schedule 12-Week',
-        content: '# 12 Week Plan\n\n- Week 1: Easy runs\n- Week 2: Increase distance\n- Week 3: Interval training',
-        createdAt: '2024-02-01',
-        updatedAt: '2024-02-01',
-        status: 'active'
-    }
-];
+import { planDocApi } from '../api';
 
 interface PlanDocStoreContextType {
     planDocs: PlanDoc[];
+    isLoading: boolean;
+    error: string | null;
+    fetchPlanDocs: () => Promise<void>;
     addPlanDoc: (doc: PlanDoc) => void;
     updatePlanDoc: (doc: PlanDoc) => void;
     deletePlanDoc: (id: string) => void;
@@ -42,7 +16,28 @@ interface PlanDocStoreContextType {
 const PlanDocStoreContext = createContext<PlanDocStoreContextType | undefined>(undefined);
 
 export const PlanDocProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [planDocs, setPlanDocs] = useState<PlanDoc[]>(INITIAL_PLANS);
+    const [planDocs, setPlanDocs] = useState<PlanDoc[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchPlanDocs = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const data = await planDocApi.getPlanDocs();
+            setPlanDocs(data);
+        } catch (err) {
+            console.error('[PlanDocStore] Failed to fetch plan docs:', err);
+            setError(err instanceof Error ? err.message : 'Failed to fetch plan docs');
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    // Fetch plan docs on mount
+    useEffect(() => {
+        fetchPlanDocs();
+    }, [fetchPlanDocs]);
 
     const addPlanDoc = (doc: PlanDoc) => {
         setPlanDocs(prev => [...prev, doc]);
@@ -58,7 +53,7 @@ export const PlanDocProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     return React.createElement(
         PlanDocStoreContext.Provider,
-        { value: { planDocs, addPlanDoc, updatePlanDoc, deletePlanDoc } },
+        { value: { planDocs, isLoading, error, fetchPlanDocs, addPlanDoc, updatePlanDoc, deletePlanDoc } },
         children
     );
 };
