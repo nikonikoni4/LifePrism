@@ -27,7 +27,6 @@ export function mapBackendTaskItemToFrontend(item: BackendTaskPoolItem): TodoIte
         parentId: item.parent_id ? String(item.parent_id) : null,
         goalId: item.link_to_goal_id,
         planDocId: item.plan_doc_id,
-        sourceType: item.plan_doc_id ? 'plan_doc' : 'manual',
         sourceAnchorId: item.source_anchor_id,
         state: item.state as 'pool' | 'scheduled' | 'completed' | 'shelved',
         scheduledDate: item.date,

@@ -17,6 +17,10 @@ export default defineConfig(({ mode }) => {
           secure: false,
         },
       },
+      watch: {
+        // 排除 customData 目录，避免后端写入 md 文件时触发热重载
+        ignored: ['**/customData/**'],
+      },
     },
     plugins: [react(), tailwindcss()],
     define: {

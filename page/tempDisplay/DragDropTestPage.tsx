@@ -39,7 +39,6 @@ const createMockTodoItem = (
     parentId: parentId !== null ? String(parentId) : null,
     goalId: null,
     planDocId: null,
-    sourceType: 'manual',
     sourceAnchorId: null,
     state,
     scheduledDate,
@@ -238,7 +237,6 @@ const NestedTodoTestSection: React.FC = () => {
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
                     onSelect={setSelectedId}
-                    showSource={false}
                     showDate={false}
                 />
             </div>
@@ -272,7 +270,6 @@ const createDailyFocusTasks = (): TodoItem[] => {
             parentId: null,
             goalId: 'goal-1',
             planDocId: '1',
-            sourceType: 'plan_doc' as const,
             sourceAnchorId: 'lp:abc123',
             state: 'completed' as const,
             scheduledDate: twoDaysAgo,
@@ -291,7 +288,6 @@ const createDailyFocusTasks = (): TodoItem[] => {
             parentId: null,
             goalId: 'goal-2',
             planDocId: '1',
-            sourceType: 'plan_doc' as const,
             sourceAnchorId: 'lp:def456',
             state: 'completed' as const,
             scheduledDate: twoDaysAgo,
@@ -310,7 +306,6 @@ const createDailyFocusTasks = (): TodoItem[] => {
             parentId: null,
             goalId: null,
             planDocId: '1',
-            sourceType: 'plan_doc' as const,
             sourceAnchorId: 'lp:ghi789',
             state: 'scheduled' as const,
             scheduledDate: yesterday,
@@ -328,7 +323,6 @@ const createDailyFocusTasks = (): TodoItem[] => {
                     parentId: '503',
                     goalId: null,
                     planDocId: '1',
-                    sourceType: 'plan_doc' as const,
                     sourceAnchorId: 'lp:jkl012',
                     state: 'completed' as const,
                     scheduledDate: yesterday,
@@ -346,7 +340,6 @@ const createDailyFocusTasks = (): TodoItem[] => {
                     parentId: '503',
                     goalId: null,
                     planDocId: '1',
-                    sourceType: 'plan_doc' as const,
                     sourceAnchorId: 'lp:mno345',
                     state: 'scheduled' as const,
                     scheduledDate: today,
@@ -364,7 +357,6 @@ const createDailyFocusTasks = (): TodoItem[] => {
                     parentId: '503',
                     goalId: null,
                     planDocId: '1',
-                    sourceType: 'plan_doc' as const,
                     sourceAnchorId: 'lp:pqr678',
                     state: 'scheduled' as const,
                     scheduledDate: today,
@@ -385,7 +377,6 @@ const createDailyFocusTasks = (): TodoItem[] => {
             parentId: null,
             goalId: null,
             planDocId: '2',
-            sourceType: 'plan_doc' as const,
             sourceAnchorId: 'lp:stu901',
             state: 'scheduled' as const,
             scheduledDate: twoDaysAgo,
@@ -404,7 +395,6 @@ const createDailyFocusTasks = (): TodoItem[] => {
             parentId: null,
             goalId: null,
             planDocId: null,
-            sourceType: 'manual' as const,
             sourceAnchorId: null,
             state: 'scheduled' as const,
             scheduledDate: today,
@@ -445,7 +435,6 @@ const DailyFocusTestSection: React.FC = () => {
             parentId: String(parentId),
             goalId: null,
             planDocId: null,
-            sourceType: 'manual',
             sourceAnchorId: null,
             state: 'scheduled',
             scheduledDate: new Date().toISOString().split('T')[0],
@@ -584,7 +573,6 @@ const DailyFocusTestSection: React.FC = () => {
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
                     onSelect={setSelectedId}
-                    showSource={true}
                     showDate={true}
                     onAddChild={handleAddChild}
                     getGoalName={getGoalName}
@@ -727,7 +715,7 @@ const DragDropTestSection: React.FC = () => {
                                     draggingClassName="opacity-50 scale-105 shadow-xl"
                                 >
                                     <TodoItemComponent
-                                        todo={task}
+                                        item={task}
                                         onUpdate={() => { }}
                                         onDelete={() => { }}
                                         showDate={false}

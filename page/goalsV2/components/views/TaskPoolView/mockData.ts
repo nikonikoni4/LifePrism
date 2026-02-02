@@ -8,7 +8,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         parentId: null,
         goalId: "1",
         planDocId: "p1",
-        sourceType: "plan_doc",
+
         sourceAnchorId: "lp:react-docs",
         state: "pool",
         scheduledDate: null,
@@ -27,7 +27,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         parentId: "101",
         goalId: "1",
         planDocId: "p1",
-        sourceType: "plan_doc",
+
         sourceAnchorId: "lp:hooks",
         state: "pool",
         scheduledDate: null,
@@ -46,7 +46,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         parentId: "102",
         goalId: "1",
         planDocId: "p1",
-        sourceType: "plan_doc",
+
         sourceAnchorId: "lp:use-effect",
         state: "pool",
         scheduledDate: null,
@@ -65,7 +65,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         parentId: "102",
         goalId: "1",
         planDocId: "p1",
-        sourceType: "plan_doc",
+
         sourceAnchorId: "lp:use-context",
         state: "pool",
         scheduledDate: null,
@@ -84,7 +84,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         parentId: null,
         goalId: "2",
         planDocId: "p3",
-        sourceType: "plan_doc",
+
         sourceAnchorId: "lp:run-w1",
         state: "pool",
         scheduledDate: null,
@@ -103,7 +103,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         parentId: "201",
         goalId: "2",
         planDocId: "p3",
-        sourceType: "plan_doc",
+
         sourceAnchorId: "lp:run-5k-1",
         state: "scheduled", // Simulate one item already scheduled
         scheduledDate: "2024-02-10",
@@ -122,7 +122,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         parentId: "201",
         goalId: "2",
         planDocId: "p3",
-        sourceType: "plan_doc",
+
         sourceAnchorId: "lp:run-interval",
         state: "pool",
         scheduledDate: null,
@@ -141,7 +141,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         parentId: null,
         goalId: null,
         planDocId: null,
-        sourceType: "manual",
+
         sourceAnchorId: null,
         state: "pool",
         scheduledDate: null,

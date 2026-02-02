@@ -167,7 +167,6 @@ export const DailyTaskView: React.FC = () => {
             parentId: null,
             goalId: inputGoalId,
             planDocId: inputPlanDocId,
-            sourceType: 'manual',
             sourceAnchorId: null,
             state: 'scheduled',
             scheduledDate: dateStr,
@@ -193,7 +192,6 @@ export const DailyTaskView: React.FC = () => {
             parentId: String(parentId),
             goalId: parent?.goalId || inputGoalId,
             planDocId: parent?.planDocId || inputPlanDocId,
-            sourceType: 'manual',
             sourceAnchorId: null,
             state: 'scheduled',
             scheduledDate: dateStr,
@@ -291,7 +289,7 @@ export const DailyTaskView: React.FC = () => {
                             onDelete={handleDeleteTask}
                             onSelect={handleSelectTask}
                             onExpandChange={handleExpandChange}
-                            showSource={true}
+
                             showDate={true}
                             onAddChild={handleAddChild}
                             getGoalName={getGoalName}

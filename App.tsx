@@ -22,7 +22,7 @@ import { ToastContainer } from './page/common';
 function App() {
   // 模块切换状态
   const [currentModule, setCurrentModule] = useState<ModuleId>('lifewatch');
-  
+
   const [chatDisplayMode, setChatDisplayMode] = useState<ChatDisplayMode>('hidden');
   const [chatPanelWidth, setChatPanelWidth] = useState(0); // 聊天面板宽度
   const [isLargeScreen, setIsLargeScreen] = useState(false); // 是否为大屏幕
@@ -92,9 +92,9 @@ function App() {
     <div className="min-h-screen bg-[#F9FAFB] text-slate-800 font-sans relative">
 
       {/* 顶部悬浮模块切换 Dock */}
-      <ModuleDock 
-        currentModule={currentModule} 
-        onModuleChange={setCurrentModule} 
+      <ModuleDock
+        currentModule={currentModule}
+        onModuleChange={setCurrentModule}
       />
 
       {/* 同步状态指示器 */}
@@ -112,13 +112,21 @@ function App() {
 
       {/* 同步错误提示 */}
       {syncError && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-red-500 text-white px-4 py-2 text-center text-sm font-medium shadow-lg">
-          <span className="inline-flex items-center">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-red-500 text-white px-4 py-2 flex items-center justify-between text-sm font-medium shadow-lg">
+          <div className="flex-1 flex justify-center items-center">
             <svg className="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
             </svg>
             同步失败: {syncError}
-          </span>
+          </div>
+          <button
+            onClick={() => setSyncError(null)}
+            className="text-white/80 hover:text-white focus:outline-none transition-colors ml-4"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
 

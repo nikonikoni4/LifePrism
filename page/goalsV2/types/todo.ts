@@ -4,7 +4,6 @@ export interface TodoItem {
     parentId: string | null;
     goalId: string | null;
     planDocId: string | null;
-    sourceType: 'manual' | 'plan_doc';
     sourceAnchorId: string | null;
     state: 'pool' | 'scheduled' | 'completed' | 'shelved';
     scheduledDate: string | null;
