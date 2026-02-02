@@ -31,7 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, onChatToggle
 
     { id: 'timeline', icon: Clock, label: 'Timeline' },
     { id: 'category', icon: Tag, label: 'Category' },
-    { id: 'goals', icon: Target, label: 'Goals' },
+    // { id: 'goals', icon: Target, label: 'Goals' },
     { id: 'goalsV2', icon: Target, label: 'Goals V2' },
     { id: 'habits', icon: Zap, label: '习惯' },
     { id: 'reports', icon: FileBarChart, label: 'Reports' },
