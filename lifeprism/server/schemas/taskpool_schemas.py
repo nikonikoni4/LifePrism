@@ -5,6 +5,7 @@
 - pool: 任务池中（未分配日期）
 - scheduled: 已安排（已分配日期）
 - completed: 已完成
+- shelved: 已搁置
 """
 
 from pydantic import BaseModel, Field
@@ -23,7 +24,7 @@ class TaskPoolItem(BaseModel):
     link_to_goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
     plan_doc_id: Optional[str] = Field(default=None, description="关联的计划书 ID")
     source_anchor_id: Optional[str] = Field(default=None, description="MD 锚点标识")
-    state: str = Field(..., description="任务状态（pool/scheduled/completed）")
+    state: str = Field(..., description="任务状态（pool/scheduled/completed/shelved）")
     date: Optional[str] = Field(default=None, description="安排日期 YYYY-MM-DD")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期")
     actual_finished_at: Optional[str] = Field(default=None, description="实际完成日期")
@@ -31,6 +32,8 @@ class TaskPoolItem(BaseModel):
     order_index: int = Field(default=0, description="日历视图排序")
     pool_order_index: Optional[int] = Field(default=None, description="任务池排序")
     created_at: Optional[str] = Field(default=None, description="创建时间")
+    delay_days: Optional[int] = Field(default=None, description="延期天数")
+    delay_reason: Optional[str] = Field(default=None, description="延期/未完成原因说明")
 
 
 class TaskPoolResponse(BaseModel):
@@ -76,22 +79,49 @@ class RegenerateSummaryResponse(BaseModel):
 class UpdateTodoV2Request(BaseModel):
     """
     更新任务请求 (V2)
-    
+
     支持 MD 文件回写：当 state 变为 completed 时，
     如果任务关联了计划书且有锚点，会同步更新 MD 文件
     """
     content: Optional[str] = Field(default=None, description="任务内容")
     color: Optional[str] = Field(default=None, description="任务颜色")
-    state: Optional[Literal["pool", "scheduled", "completed"]] = Field(
-        default=None, 
+    state: Optional[Literal["pool", "scheduled", "completed", "shelved"]] = Field(
+        default=None,
         description="任务状态"
     )
     date: Optional[str] = Field(default=None, description="安排日期 YYYY-MM-DD")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期")
     parent_id: Optional[int] = Field(default=None, description="父任务 ID")
+    delay_days: Optional[int] = Field(default=None, description="延期天数")
+    delay_reason: Optional[str] = Field(default=None, description="延期/未完成原因说明")
 
 
 class UpdateTodoV2Response(BaseModel):
     """更新任务响应 (V2)"""
     item: TaskPoolItem = Field(..., description="更新后的任务")
     md_synced: bool = Field(default=False, description="是否同步了 MD 文件")
+
+
+class CreateTodoV2Request(BaseModel):
+    """
+    创建任务请求 (V2)
+
+    用于统一的 /api/v2/todos 接口
+    """
+    content: str = Field(..., description="任务内容")
+    state: Optional[Literal["pool", "scheduled", "completed", "shelved"]] = Field(
+        default="pool",
+        description="任务状态"
+    )
+    date: Optional[str] = Field(default=None, description="安排日期 YYYY-MM-DD")
+    color: Optional[str] = Field(default="#FFFFFF", description="任务颜色")
+    link_to_goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
+    plan_doc_id: Optional[str] = Field(default=None, description="关联的计划书 ID")
+    parent_id: Optional[int] = Field(default=None, description="父任务 ID")
+    expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期")
+    pool_order_index: Optional[int] = Field(default=None, description="任务池排序")
+
+
+class CreateTodoV2Response(BaseModel):
+    """创建任务响应 (V2)"""
+    item: TaskPoolItem = Field(..., description="创建的任务")

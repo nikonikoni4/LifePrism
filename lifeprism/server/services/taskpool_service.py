@@ -55,6 +55,8 @@ def _db_to_taskpool_item(db_item: Dict[str, Any]) -> TaskPoolItem:
         order_index=db_item.get('order_index', 0),
         pool_order_index=db_item.get('pool_order_index'),
         created_at=db_item.get('created_at'),
+        delay_days=db_item.get('delay_days'),
+        delay_reason=db_item.get('delay_reason'),
     )
 
 
@@ -606,10 +608,10 @@ def _render_task_tree(tasks: List[Dict], indent: int) -> List[str]:
 def regenerate_summary(plan_doc_id: str) -> bool:
     """
     重新生成系统展示区
-    
+
     Args:
         plan_doc_id: 计划书 ID
-    
+
     Returns:
         bool: 是否成功
     """
@@ -617,6 +619,91 @@ def regenerate_summary(plan_doc_id: str) -> bool:
     if content is None:
         logger.warning(f"重新生成失败：MD 文件不存在 {plan_doc_id}")
         return False
-    
+
     content = _update_system_section(content, plan_doc_id)
     return _write_plan_doc_content(plan_doc_id, content)
+
+
+# ============================================================================
+# 统一 Todos API 服务函数
+# ============================================================================
+
+def get_todos_by_date(date: str) -> TaskPoolResponse:
+    """
+    获取指定日期的任务列表
+
+    包含：
+    1. 当天 scheduled 状态的任务
+    2. 当天 completed 状态的任务
+
+    Args:
+        date: 日期（YYYY-MM-DD 格式）
+
+    Returns:
+        TaskPoolResponse: 任务列表
+    """
+    db_items = todo_provider.get_todos_by_date(date, include_cross_day=False)
+
+    # 过滤出 scheduled 和 completed 状态的任务
+    filtered_items = [
+        item for item in db_items
+        if item.get('state') in ('scheduled', 'completed')
+    ]
+
+    items = [_db_to_taskpool_item(item) for item in filtered_items]
+    return TaskPoolResponse(items=items)
+
+
+def create_todo_v2(data: Dict[str, Any]) -> Optional[TaskPoolItem]:
+    """
+    创建新任务 (V2)
+
+    Args:
+        data: 任务数据
+
+    Returns:
+        Optional[TaskPoolItem]: 创建的任务，失败返回 None
+    """
+    # 如果设置了 date 且状态为 pool，自动改为 scheduled
+    if data.get('date') and data.get('state', 'pool') == 'pool':
+        data['state'] = 'scheduled'
+
+    new_id = todo_provider.create_todo(data)
+    if not new_id:
+        return None
+
+    db_item = todo_provider.get_todo_by_id(new_id)
+    if not db_item:
+        return None
+
+    return _db_to_taskpool_item(db_item)
+
+
+def get_todo_by_id(todo_id: int) -> Optional[TaskPoolItem]:
+    """
+    获取单个任务
+
+    Args:
+        todo_id: 任务 ID
+
+    Returns:
+        Optional[TaskPoolItem]: 任务数据，不存在返回 None
+    """
+    db_item = todo_provider.get_todo_by_id(todo_id)
+    if not db_item:
+        return None
+
+    return _db_to_taskpool_item(db_item)
+
+
+def delete_todo(todo_id: int) -> bool:
+    """
+    删除任务
+
+    Args:
+        todo_id: 任务 ID
+
+    Returns:
+        bool: 是否成功
+    """
+    return todo_provider.delete_todo(todo_id)

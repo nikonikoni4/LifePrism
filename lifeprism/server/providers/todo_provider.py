@@ -115,11 +115,12 @@ class TodoProvider(LWBaseDataProvider):
                 )
                 next_order = cursor.fetchone()[0]
                 
-                # 插入数据（包含新字段 parent_id, plan_doc_id, source_anchor_id）
-                columns = ['order_index', 'pool_order_index', 'content', 'color', 'state', 
-                          'link_to_goal_id', 'date', 'expected_finished_at', 
+                # 插入数据（包含新字段 parent_id, plan_doc_id, source_anchor_id, delay_days, delay_reason）
+                columns = ['order_index', 'pool_order_index', 'content', 'color', 'state',
+                          'link_to_goal_id', 'date', 'expected_finished_at',
                           'actual_finished_at', 'cross_day', 'folder_id',
-                          'parent_id', 'plan_doc_id', 'source_anchor_id']
+                          'parent_id', 'plan_doc_id', 'source_anchor_id',
+                          'delay_days', 'delay_reason']
                 values = [
                     next_order,
                     data.get('pool_order_index'),
@@ -134,7 +135,9 @@ class TodoProvider(LWBaseDataProvider):
                     data.get('folder_id'),
                     data.get('parent_id'),
                     data.get('plan_doc_id'),
-                    data.get('source_anchor_id')
+                    data.get('source_anchor_id'),
+                    data.get('delay_days'),
+                    data.get('delay_reason')
                 ]
                 
                 placeholders = ', '.join(['?' for _ in columns])
@@ -171,14 +174,15 @@ class TodoProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # 构建 SET 子句（包含新字段 parent_id, plan_doc_id, source_anchor_id）
+                # 构建 SET 子句（包含新字段 parent_id, plan_doc_id, source_anchor_id, delay_days, delay_reason）
                 set_clauses = []
                 values = []
                 allowed_fields = [
                     'content', 'color', 'state', 'link_to_goal_id',
-                    'date', 'expected_finished_at', 'actual_finished_at', 
+                    'date', 'expected_finished_at', 'actual_finished_at',
                     'cross_day', 'pool_order_index', 'folder_id',
-                    'parent_id', 'plan_doc_id', 'source_anchor_id'
+                    'parent_id', 'plan_doc_id', 'source_anchor_id',
+                    'delay_days', 'delay_reason'
                 ]
                 for key, value in data.items():
                     if key in allowed_fields:
@@ -869,7 +873,8 @@ class TodoProvider(LWBaseDataProvider):
                         'order_index', 'pool_order_index', 'content', 'color', 'state',
                         'link_to_goal_id', 'date', 'expected_finished_at',
                         'actual_finished_at', 'cross_day',
-                        'parent_id', 'plan_doc_id', 'source_anchor_id'
+                        'parent_id', 'plan_doc_id', 'source_anchor_id',
+                        'delay_days', 'delay_reason'
                     ]
                     values = [
                         data.get('order_index', 0),
@@ -884,7 +889,9 @@ class TodoProvider(LWBaseDataProvider):
                         1 if data.get('cross_day') else 0,
                         data.get('parent_id'),
                         data.get('plan_doc_id'),
-                        data.get('source_anchor_id')
+                        data.get('source_anchor_id'),
+                        data.get('delay_days'),
+                        data.get('delay_reason')
                     ]
                     
                     placeholders = ', '.join(['?' for _ in columns])
@@ -922,7 +929,8 @@ class TodoProvider(LWBaseDataProvider):
                     'content', 'color', 'state', 'link_to_goal_id',
                     'date', 'expected_finished_at', 'actual_finished_at',
                     'cross_day', 'pool_order_index', 'order_index',
-                    'parent_id', 'plan_doc_id', 'source_anchor_id'
+                    'parent_id', 'plan_doc_id', 'source_anchor_id',
+                    'delay_days', 'delay_reason'
                 ]
                 
                 for data in updates:

@@ -77,6 +77,10 @@ _import_start = time.perf_counter()
 from lifeprism.server.api import todo_router
 _log_startup_time("  - todo_router", _import_start)
 
+_import_start = time.perf_counter()
+from lifeprism.server.api import todos_router
+_log_startup_time("  - todos_router", _import_start)
+
 _step_start = _log_startup_time("[OK] API routers imported", _step_start)
 
 # ==================== 数据库模块导入 ====================
@@ -211,8 +215,9 @@ app.include_router(setting_router, prefix="/api/v2")  # Settings
 app.include_router(report_router, prefix="/api/v2")  # Report 日报告
 app.include_router(being_router, prefix="/api/v2")  # Being 时间悖论测试
 app.include_router(taskpool_router, prefix="/api/v2")  # Task Pool
+app.include_router(todos_router, prefix="/api/v2")  # Todos 统一接口
 
-_log_startup_time("[OK] API routers registered (13 routers)", _router_start)
+_log_startup_time("[OK] API routers registered (14 routers)", _router_start)
 
 # 模块加载阶段总结
 _module_load_total = (time.perf_counter() - _startup_timer) * 1000

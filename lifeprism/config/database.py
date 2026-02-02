@@ -409,7 +409,7 @@ TODO_LIST_CONFIG = {
         'state': {
             'type': 'TEXT',
             'constraints': ['DEFAULT "pool"'],
-            'comment': '任务状态（pool: 任务池中, scheduled: 已安排, completed: 已完成）'
+            'comment': '任务状态（pool: 任务池中, scheduled: 已安排, completed: 已完成, shelved: 已搁置）'
         },
         'link_to_goal_id': {
             'type': 'TEXT',
@@ -455,6 +455,16 @@ TODO_LIST_CONFIG = {
             'type': 'TEXT',
             'constraints': ['DEFAULT NULL'],
             'comment': 'MD 锚点标识（格式：t-{uuid[:8]}）'
+        },
+        'delay_days': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '延期天数'
+        },
+        'delay_reason': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '延期/未完成原因说明'
         }
     },
     'table_constraints': [],

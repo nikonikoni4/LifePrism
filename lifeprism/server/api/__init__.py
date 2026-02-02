@@ -15,6 +15,7 @@ from .setting_api import router as setting_router
 from .report_api import router as report_router
 from .being_api import router as being_router
 from .taskpool_api import router as taskpool_router
+from .todos_api import router as todos_router
 
 __all__ = [
     "sync_router",
@@ -29,5 +30,6 @@ __all__ = [
     "report_router",
     "being_router",
     "taskpool_router",
+    "todos_router",
 ]
 
