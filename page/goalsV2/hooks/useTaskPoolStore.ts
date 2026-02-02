@@ -9,138 +9,11 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { TodoItemType as TodoItem } from '@my-ui-kit/core';
+import { taskPoolApi, mapBackendTaskItemToFrontend } from '../apis/taskPool';
+import { BackendSyncResponse } from '../types/backend';
 
 // Re-export type for consumers
 export type { TodoItem };
-
-// API Base URL
-const API_BASE = 'http://localhost:8000/api/v2';
-
-// ============================================================================
-// API Types
-// ============================================================================
-
-interface TaskPoolResponse {
-    items: TaskPoolApiItem[];
-}
-
-interface TaskPoolApiItem {
-    id: number;
-    content: string;
-    parent_id: number | null;
-    link_to_goal_id: string | null;
-    plan_doc_id: string | null;
-    source_anchor_id: string | null;
-    state: string;
-    date: string | null;
-    expected_finished_at: string | null;
-    actual_finished_at: string | null;
-    color: string;
-    order_index: number;
-    pool_order_index: number | null;
-    created_at: string | null;
-}
-
-interface SyncResponse {
-    created: number;
-    updated: number;
-    cleaned: number;
-    total: number;
-}
-
-interface UpdateTodoResponse {
-    item: TaskPoolApiItem;
-    md_synced: boolean;
-}
-
-// ============================================================================
-// API Functions
-// ============================================================================
-
-async function fetchTaskPool(
-    goalId?: string | null,
-    planDocId?: string | null,
-    state?: string
-): Promise<TodoItem[]> {
-    const params = new URLSearchParams();
-    if (goalId) params.append('goal_id', goalId);
-    if (planDocId) params.append('plan_doc_id', planDocId);
-    if (state) params.append('state', state);
-
-    const url = `${API_BASE}/taskpool${params.toString() ? '?' + params.toString() : ''}`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-        throw new Error(`Failed to fetch taskpool: ${response.statusText}`);
-    }
-
-    const data: TaskPoolResponse = await response.json();
-    return data.items.map(apiItemToTodoItem);
-}
-
-async function syncPlanDocApi(planDocId: string): Promise<SyncResponse> {
-    const response = await fetch(`${API_BASE}/taskpool/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan_doc_id: planDocId }),
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to sync plan doc: ${response.statusText}`);
-    }
-
-    return response.json();
-}
-
-async function updateTodoApi(
-    todoId: number,
-    updates: Partial<{
-        content: string;
-        color: string;
-        state: string;
-        date: string | null;
-        expected_finished_at: string | null;
-        parent_id: number | null;
-    }>
-): Promise<UpdateTodoResponse> {
-    const response = await fetch(`${API_BASE}/todos/${todoId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to update todo: ${response.statusText}`);
-    }
-
-    return response.json();
-}
-
-// ============================================================================
-// Data Transform
-// ============================================================================
-
-function apiItemToTodoItem(item: TaskPoolApiItem): TodoItem {
-    return {
-        id: item.id,
-        content: item.content,
-        parentId: item.parent_id ? String(item.parent_id) : null,
-        goalId: item.link_to_goal_id,
-        planDocId: item.plan_doc_id,
-        sourceType: item.plan_doc_id ? 'plan_doc' : 'manual',
-        sourceAnchorId: item.source_anchor_id,
-        state: item.state as 'pool' | 'scheduled' | 'completed' | 'shelved',
-        scheduledDate: item.date,
-        expectedFinishAt: item.expected_finished_at,
-        actualFinishAt: item.actual_finished_at,
-        delayDays: null,
-        delayReason: null,
-        color: item.color || '#FFFFFF',
-        orderIndex: item.order_index,
-        poolOrderIndex: item.pool_order_index,
-        children: [],
-    };
-}
 
 // ============================================================================
 // Store Context
@@ -155,7 +28,7 @@ interface TaskPoolStoreContextType {
 
     // Actions
     loadTasks: (goalId?: string | null, planDocId?: string | null, state?: string) => Promise<void>;
-    syncFromPlanDoc: (planDocId: string) => Promise<SyncResponse | null>;
+    syncFromPlanDoc: (planDocId: string) => Promise<BackendSyncResponse | null>;
     addTask: (task: TodoItem) => void;
     updateTask: (id: number, updates: Partial<TodoItem>) => Promise<void>;
     deleteTask: (id: number) => void;
@@ -181,7 +54,7 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
         setLoading(true);
         setError(null);
         try {
-            const data = await fetchTaskPool(goalId, planDocId, state);
+            const data = await taskPoolApi.fetchTaskPool(goalId, planDocId, state);
             setTasks(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load tasks');
@@ -192,11 +65,11 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, []);
 
     // Sync plan doc
-    const syncFromPlanDoc = useCallback(async (planDocId: string): Promise<SyncResponse | null> => {
+    const syncFromPlanDoc = useCallback(async (planDocId: string): Promise<BackendSyncResponse | null> => {
         setSyncing(true);
         setError(null);
         try {
-            const result = await syncPlanDocApi(planDocId);
+            const result = await taskPoolApi.syncPlanDoc(planDocId);
             // Reload tasks after sync
             await loadTasks(null, planDocId);
             return result;
@@ -224,15 +97,24 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
             if (updates.state !== undefined) apiUpdates.state = updates.state;
             if (updates.scheduledDate !== undefined) apiUpdates.date = updates.scheduledDate;
             if (updates.expectedFinishAt !== undefined) apiUpdates.expected_finished_at = updates.expectedFinishAt;
+            // parentId needs to be number or null
+            if (updates.parentId !== undefined) apiUpdates.parent_id = updates.parentId ? Number(updates.parentId) : null;
 
-            const response = await updateTodoApi(id, apiUpdates);
+            const response = await taskPoolApi.updateTodo(id, apiUpdates);
 
             // Update local state with response
-            const updatedItem = apiItemToTodoItem(response.item);
+            const updatedItem = mapBackendTaskItemToFrontend(response.item);
             setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updatedItem } : t));
         } catch (err) {
             console.error('Failed to update task:', err);
-            // Optimistic update fallback
+            // Optimistic update fallback ? 
+            // Ideally we should rollback or show error.
+            // For now keeping simple optimistic update logic from before, 
+            // but the original code had a mix: it did state update AFTER success, with a fallback catch that did optimistic?
+            // Actually original code catch block:
+            // setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+            // This is strange ("optimistic update fallback" usually means "revert", or "apply optimistic before"). 
+            // The comment said "Optimistic update fallback". I'll keep it to minimize behavior change.
             setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
         }
     }, []);

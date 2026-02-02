@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { PlanDoc } from '../types';
-import { planDocApi } from '../api';
+import { planDocApi } from '../apis/planDoc';
 
 interface PlanDocStoreContextType {
     planDocs: PlanDoc[];

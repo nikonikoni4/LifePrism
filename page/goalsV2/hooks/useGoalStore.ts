@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Goal, ThemeKey, JournalEntry } from '../types';
-import { goalsV2Api } from '../api';
+import { goalsV2Api } from '../apis/goal';
 
 // Constants
 export const THEMES: Record<string, { label: string; accentColor: string; gradient: string; title: string; progressBg: string; meta: string; container: string; button: string; timelineLine: string; tag: string }> = {
