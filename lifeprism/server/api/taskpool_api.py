@@ -1,11 +1,11 @@
 """
-Task Pool V2 API - 任务池接口
+Task Pool API - 任务池接口
 
 提供任务池的 RESTful API：
-- GET /api/v2/taskpool - 获取任务池任务
-- POST /api/v2/taskpool/sync - 同步计划书任务
-- POST /api/v2/taskpool/regenerate-summary - 重新生成系统展示区
-- PUT /api/v2/todos/{id} - 更新任务（含 MD 回写）
+- GET /taskpool - 获取任务池任务
+- POST /taskpool/sync - 同步计划书任务
+- POST /taskpool/regenerate-summary - 重新生成系统展示区
+- PUT /taskpool/todos/{id} - 更新任务（含 MD 回写）
 """
 from fastapi import APIRouter, Query, HTTPException, Path
 from typing import Optional
@@ -21,14 +21,14 @@ from lifeprism.server.schemas.taskpool_schemas import (
 )
 from lifeprism.server.services import taskpool_service
 
-router = APIRouter(prefix="/v2", tags=["Task Pool V2"])
+router = APIRouter(prefix="/taskpool", tags=["Task Pool"])
 
 
 # ============================================================================
 # 任务池接口
 # ============================================================================
 
-@router.get("/taskpool", response_model=TaskPoolResponse)
+@router.get("", response_model=TaskPoolResponse)
 async def get_taskpool(
     goal_id: Optional[str] = Query(default=None, description="按目标筛选"),
     plan_doc_id: Optional[str] = Query(default=None, description="按计划书筛选"),
@@ -54,7 +54,7 @@ async def get_taskpool(
     )
 
 
-@router.post("/taskpool/sync", response_model=SyncPlanDocResponse)
+@router.post("/sync", response_model=SyncPlanDocResponse)
 async def sync_plan_doc(request: SyncPlanDocRequest):
     """
     同步计划书任务
@@ -77,7 +77,7 @@ async def sync_plan_doc(request: SyncPlanDocRequest):
     return taskpool_service.sync_plan_doc(request.plan_doc_id)
 
 
-@router.post("/taskpool/regenerate-summary", response_model=RegenerateSummaryResponse)
+@router.post("/regenerate-summary", response_model=RegenerateSummaryResponse)
 async def regenerate_summary(request: RegenerateSummaryRequest):
     """
     重新生成系统展示区

@@ -9,6 +9,7 @@ from .activity_api import router as activity_v2_router
 from .timeline_api import router as timeline_v2_router
 from .usage import router as usage_router
 from .goal_api import router as goal_router
+from .todo_api import router as todo_router
 from .chatbot_api import router as chatbot_router
 from .setting_api import router as setting_router
 from .report_api import router as report_router
@@ -22,6 +23,7 @@ __all__ = [
     "timeline_v2_router",
     "usage_router",
     "goal_router",
+    "todo_router",
     "chatbot_router",
     "setting_router",
     "report_router",
