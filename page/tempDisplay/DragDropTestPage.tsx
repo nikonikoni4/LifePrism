@@ -16,7 +16,7 @@ import {
     type DragItemData,
     type DropAreaData,
 } from '../../my-ui-kit/ui-kit/dragDrop';
-import { TodoItem as TodoItemComponent } from '../../my-ui-kit/ui-kit/todoItem/TodoItem';
+import { TodoItem as TodoItemComponent, getRandomColor } from '../../my-ui-kit/ui-kit/todoItem/TodoItem';
 import { TodoItemDetailed } from '../../my-ui-kit/ui-kit/todoItem/TodoItemDetailed';
 import { TodoItemTree, useExpandedState } from '../../my-ui-kit/ui-kit/todoItem/TodoItemTree';
 import { TodoItemTreeDetailed } from '../../my-ui-kit/ui-kit/todoItem/TodoItemTreeDetailed';
@@ -46,7 +46,7 @@ const createMockTodoItem = (
     actualFinishAt: null,
     delayDays: null,
     delayReason: null,
-    color: '#FFFFFF',
+    color: state === 'pool' ? getRandomColor() : '#FFFFFF',
     orderIndex: id,
     poolOrderIndex: state === 'pool' ? id : null,
     children,
@@ -228,7 +228,7 @@ const NestedTodoTestSection: React.FC = () => {
             </div>
 
             {/* 任务树 */}
-            <div className="p-4 max-h-[500px] overflow-y-auto">
+            <div className="p-4 max-h-[500px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 <TodoItemTree
                     items={tasks}
                     collapsible={true}
@@ -520,7 +520,7 @@ const DailyFocusTestSection: React.FC = () => {
     const stats = countTasks(tasks);
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-md overflow-hidden">
             <div className="bg-gradient-to-r from-rose-500 to-pink-500 px-4 py-3">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
                     🎯 每日聚焦（详细版）
@@ -564,7 +564,7 @@ const DailyFocusTestSection: React.FC = () => {
             </div>
 
             {/* 详细任务列表 */}
-            <div className="p-4 max-h-[600px] overflow-y-auto">
+            <div className="p-4 max-h-[600px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 <TodoItemTreeDetailed
                     items={tasks}
                     collapsible={true}

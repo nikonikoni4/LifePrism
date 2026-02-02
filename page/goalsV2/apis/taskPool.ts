@@ -1,6 +1,7 @@
 /**
  * TaskPool API
  * /api/v2/taskpool
+ * /api/v2/todos
  */
 
 import { createApiV2UrlGetter } from '../../../services/apiConfig';
@@ -9,7 +10,8 @@ import {
     BackendTaskPoolItem,
     BackendTaskPoolResponse,
     BackendSyncResponse,
-    BackendUpdateTodoResponse
+    BackendUpdateTodoResponse,
+    BackendCreateTodoResponse
 } from '../types/backend';
 
 // API base URL getter
@@ -32,8 +34,8 @@ export function mapBackendTaskItemToFrontend(item: BackendTaskPoolItem): TodoIte
         scheduledDate: item.date,
         expectedFinishAt: item.expected_finished_at,
         actualFinishAt: item.actual_finished_at,
-        delayDays: null,
-        delayReason: null,
+        delayDays: item.delay_days,
+        delayReason: item.delay_reason,
         color: item.color || '#FFFFFF',
         orderIndex: item.order_index,
         poolOrderIndex: item.pool_order_index,
@@ -101,23 +103,10 @@ export const taskPoolApi = {
             date: string | null;
             expected_finished_at: string | null;
             parent_id: number | null;
+            delay_days: number | null;
+            delay_reason: string | null;
         }>
     ): Promise<BackendUpdateTodoResponse> => {
-        // Correct URL: /api/v2/todos/{id}
-        // Note: Check if backend uses /api/v2/todos or /api/v2/taskpool/todos?
-        // useTaskPoolStore.ts used: `${API_BASE}/todos/${todoId}` where API_BASE was .../api/v2
-        // So /api/v2/todos is correct according to previous code. 
-        // Note: standard REST might suggest /api/v2/taskpool/{id} but let's stick to legacy for now unless I see main.py
-        // In main.py: app.include_router(taskpool_router, prefix="/api")
-        // If taskpool_router has @router.put("/todos/{id}"), then it is /api/todos/{id} ??
-        // Wait. previous code: const API_BASE = 'http://localhost:8000/api/v2';
-        // fetch(`${API_BASE}/todos/${todoId}`) -> /api/v2/todos/{id}
-        // main.py has taskpool_router at /api
-        // if taskpool_router has /v2/todos ... 
-        // Let's assume previous code was correct about path structure relative to base.
-        // So: getApiBase() -> /api/v2. 
-        // path: /todos/${todoId}
-
         const response = await fetch(`${getApiBase()}/todos/${todoId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -129,5 +118,47 @@ export const taskPoolApi = {
         }
 
         return response.json();
+    },
+
+    /**
+     * Create a new todo item
+     */
+    createTodo: async (
+        data: {
+            content: string;
+            state?: string;
+            date?: string | null;
+            color?: string;
+            link_to_goal_id?: string | null;
+            plan_doc_id?: string | null;
+            parent_id?: number | null;
+            expected_finished_at?: string | null;
+            pool_order_index?: number | null;
+        }
+    ): Promise<BackendCreateTodoResponse> => {
+        const response = await fetch(`${getApiBase()}/todos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to create todo: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Delete a todo item
+     */
+    deleteTodo: async (todoId: number): Promise<void> => {
+        const response = await fetch(`${getApiBase()}/todos/${todoId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to delete todo: ${response.statusText}`);
+        }
     }
 };

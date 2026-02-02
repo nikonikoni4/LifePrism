@@ -29,9 +29,9 @@ interface TaskPoolStoreContextType {
     // Actions
     loadTasks: (goalId?: string | null, planDocId?: string | null, state?: string) => Promise<void>;
     syncFromPlanDoc: (planDocId: string) => Promise<BackendSyncResponse | null>;
-    addTask: (task: TodoItem) => void;
+    addTask: (task: TodoItem) => Promise<void>;
     updateTask: (id: number, updates: Partial<TodoItem>) => Promise<void>;
-    deleteTask: (id: number) => void;
+    deleteTask: (id: number) => Promise<void>;
     moveTaskToPool: (id: number) => Promise<void>;
     scheduleTask: (id: number, date: string) => Promise<void>;
     completeTask: (id: number) => Promise<void>;
@@ -82,9 +82,30 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
     }, [loadTasks]);
 
-    // Add task (local only for now)
-    const addTask = useCallback((task: TodoItem) => {
-        setTasks(prev => [...prev, task]);
+    // Add task via API
+    const addTask = useCallback(async (task: TodoItem) => {
+        try {
+            // Transform to API format
+            const apiData = {
+                content: task.content,
+                state: task.state,
+                date: task.scheduledDate,
+                color: task.color,
+                link_to_goal_id: task.goalId,
+                plan_doc_id: task.planDocId,
+                parent_id: task.parentId ? Number(task.parentId) : null,
+                expected_finished_at: task.expectedFinishAt,
+                pool_order_index: task.poolOrderIndex,
+            };
+
+            const response = await taskPoolApi.createTodo(apiData);
+            const createdItem = mapBackendTaskItemToFrontend(response.item);
+            setTasks(prev => [...prev, createdItem]);
+        } catch (err) {
+            console.error('Failed to create task:', err);
+            // Fallback: add locally with temp ID (for offline support)
+            setTasks(prev => [...prev, task]);
+        }
     }, []);
 
     // Update task via API
@@ -119,9 +140,16 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
     }, []);
 
-    // Delete task (local only for now)
-    const deleteTask = useCallback((id: number) => {
-        setTasks(prev => prev.filter(t => t.id !== id));
+    // Delete task via API
+    const deleteTask = useCallback(async (id: number) => {
+        try {
+            await taskPoolApi.deleteTodo(id);
+            setTasks(prev => prev.filter(t => t.id !== id));
+        } catch (err) {
+            console.error('Failed to delete task:', err);
+            // Fallback: remove locally anyway
+            setTasks(prev => prev.filter(t => t.id !== id));
+        }
     }, []);
 
     // Move task to pool

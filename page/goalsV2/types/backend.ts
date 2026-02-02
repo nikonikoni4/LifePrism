@@ -127,6 +127,8 @@ export interface BackendTaskPoolItem {
     date: string | null;
     expected_finished_at: string | null;
     actual_finished_at: string | null;
+    delay_days: number | null;
+    delay_reason: string | null;
     color: string;
     order_index: number;
     pool_order_index: number | null;
@@ -147,4 +149,8 @@ export interface BackendSyncResponse {
 export interface BackendUpdateTodoResponse {
     item: BackendTaskPoolItem;
     md_synced: boolean;
+}
+
+export interface BackendCreateTodoResponse {
+    item: BackendTaskPoolItem;
 }
