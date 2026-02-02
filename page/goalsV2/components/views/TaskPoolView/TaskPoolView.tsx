@@ -88,9 +88,8 @@ const TaskTree: React.FC<{
                                     {/* 展开/折叠按钮 */}
                                     <button
                                         onClick={() => hasChildren && onToggleExpand(task.id)}
-                                        className={`flex-shrink-0 mt-2.5 w-4 h-4 flex items-center justify-center transition-all ${
-                                            hasChildren ? 'text-slate-400 hover:text-slate-600 cursor-pointer' : 'text-transparent cursor-default'
-                                        }`}
+                                        className={`flex-shrink-0 mt-2.5 w-4 h-4 flex items-center justify-center transition-all ${hasChildren ? 'text-slate-400 hover:text-slate-600 cursor-pointer' : 'text-transparent cursor-default'
+                                            }`}
                                     >
                                         {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                                     </button>
@@ -119,9 +118,8 @@ const TaskTree: React.FC<{
                                 {/* 展开/折叠按钮 */}
                                 <button
                                     onClick={() => hasChildren && onToggleExpand(task.id)}
-                                    className={`flex-shrink-0 mt-2.5 w-4 h-4 flex items-center justify-center transition-all ${
-                                        hasChildren ? 'text-slate-400 hover:text-slate-600 cursor-pointer' : 'text-transparent cursor-default'
-                                    }`}
+                                    className={`flex-shrink-0 mt-2.5 w-4 h-4 flex items-center justify-center transition-all ${hasChildren ? 'text-slate-400 hover:text-slate-600 cursor-pointer' : 'text-transparent cursor-default'
+                                        }`}
                                 >
                                     {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                                 </button>
@@ -246,7 +244,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
 
         return docs.map(doc => ({
             id: doc.id,
-            label: doc.title,
+            label: doc.id,
             onClick: () => setSelectedPlanDocId(doc.id),
         }));
     }, [planDocs, selectedGoalId]);
@@ -274,7 +272,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                     <DropdownMenu
                         trigger={
                             <button className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:border-violet-300 text-sm font-medium text-slate-700 hover:text-violet-600 transition-all shadow-sm hover:shadow-md">
-                                {selectedPlanDoc ? selectedPlanDoc.title : '选择计划书'}
+                                {selectedPlanDoc ? selectedPlanDoc.id : '选择计划书'}
                             </button>
                         }
                         items={planDocDropdownItems}
@@ -311,11 +309,10 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                     {/* 显示已完成任务开关 */}
                     <button
                         onClick={() => setShowCompleted(!showCompleted)}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
-                            showCompleted
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${showCompleted
                                 ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
+                            }`}
                     >
                         <Check size={14} />
                         {showCompleted ? '隐藏已完成' : '显示已完成'}

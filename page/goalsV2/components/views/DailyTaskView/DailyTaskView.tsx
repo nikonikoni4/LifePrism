@@ -128,7 +128,7 @@ export const DailyTaskView: React.FC = () => {
         const filtered = inputGoalId
             ? planDocs.filter(p => p.goalId === inputGoalId)
             : planDocs;
-        return filtered.map(p => ({ id: p.id, label: p.title }));
+        return filtered.map(p => ({ id: p.id, label: p.id }));
     }, [planDocs, inputGoalId]);
 
     // 获取目标名称
@@ -140,7 +140,7 @@ export const DailyTaskView: React.FC = () => {
     // 获取计划书名称
     const getPlanName = useCallback((planDocId: string | null) => {
         if (!planDocId) return undefined;
-        return planDocs.find(p => p.id === planDocId)?.title;
+        return planDocs.find(p => p.id === planDocId)?.id;
     }, [planDocs]);
 
     // 切换全部展开/折叠

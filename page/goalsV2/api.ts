@@ -417,7 +417,6 @@ export default goalsV2Api;
 export interface BackendPlanDocItem {
     id: string;
     goal_id: string;
-    title: string;
     content: string;
     status: string;
     order_index: number;
@@ -431,12 +430,12 @@ export interface BackendPlanDocListResponse {
 
 export interface CreatePlanDocApiRequest {
     goal_id: string | null;
-    title: string;
+    id: string;
     content?: string;
 }
 
 export interface UpdatePlanDocApiRequest {
-    title?: string;
+    new_id?: string;
     content?: string;
     status?: string;
 }
@@ -449,7 +448,6 @@ function mapBackendPlanDocToFrontend(backend: BackendPlanDocItem): PlanDoc {
     return {
         id: backend.id,
         goalId: backend.goal_id,
-        title: backend.title,
         content: backend.content,
         status: (backend.status as PlanDoc['status']) || 'active',
         createdAt: backend.created_at,
@@ -460,7 +458,7 @@ function mapBackendPlanDocToFrontend(backend: BackendPlanDocItem): PlanDoc {
 function mapFrontendPlanDocToCreateRequest(frontend: Partial<PlanDoc>): CreatePlanDocApiRequest {
     return {
         goal_id: frontend.goalId || null,
-        title: frontend.title || '',
+        id: frontend.id || '',
         content: frontend.content || '',
     };
 }
@@ -468,7 +466,7 @@ function mapFrontendPlanDocToCreateRequest(frontend: Partial<PlanDoc>): CreatePl
 function mapFrontendPlanDocToUpdateRequest(frontend: Partial<PlanDoc>): UpdatePlanDocApiRequest {
     const request: UpdatePlanDocApiRequest = {};
 
-    if (frontend.title !== undefined) request.title = frontend.title;
+    // if (frontend.title !== undefined) request.title = frontend.title; // Title removed
     if (frontend.content !== undefined) request.content = frontend.content;
     if (frontend.status !== undefined) request.status = frontend.status;
 
@@ -535,8 +533,13 @@ export const planDocApi = {
     /**
      * Update an existing plan doc
      */
-    updatePlanDoc: async (docId: string, planDoc: Partial<PlanDoc>): Promise<PlanDoc> => {
+    updatePlanDoc: async (docId: string, planDoc: Partial<PlanDoc>, newId?: string): Promise<PlanDoc> => {
         const request = mapFrontendPlanDocToUpdateRequest(planDoc);
+
+        // Add new_id to request if provided (for renaming)
+        if (newId) {
+            request.new_id = newId;
+        }
 
         const res = await fetch(`${getApiBase()}/plan-docs/${docId}`, {
             method: 'PATCH',

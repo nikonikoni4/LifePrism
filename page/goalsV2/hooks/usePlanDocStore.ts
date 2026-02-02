@@ -9,8 +9,8 @@ interface PlanDocStoreContextType {
     error: string | null;
     fetchPlanDocs: () => Promise<void>;
     addPlanDoc: (doc: PlanDoc) => void;
-    updatePlanDoc: (doc: PlanDoc) => void;
-    deletePlanDoc: (id: string) => void;
+    updatePlanDoc: (doc: PlanDoc, newId?: string) => Promise<void>;
+    deletePlanDoc: (id: string) => Promise<void>;
 }
 
 const PlanDocStoreContext = createContext<PlanDocStoreContextType | undefined>(undefined);
@@ -43,12 +43,44 @@ export const PlanDocProvider: React.FC<{ children: ReactNode }> = ({ children })
         setPlanDocs(prev => [...prev, doc]);
     };
 
-    const updatePlanDoc = (updatedDoc: PlanDoc) => {
+    const updatePlanDoc = async (updatedDoc: PlanDoc, newId?: string) => {
+        setError(null);
+        // Optimistic update
         setPlanDocs(prev => prev.map(d => d.id === updatedDoc.id ? updatedDoc : d));
+
+        try {
+            // Only sync metadata fields
+            await planDocApi.updatePlanDoc(updatedDoc.id, {
+                status: updatedDoc.status
+            }, newId);
+
+            // If renamed, we need to refresh the list or manually update the ID in state because optimistic update above uses old ID
+            if (newId) {
+                setPlanDocs(prev => prev.map(d => d.id === updatedDoc.id ? { ...updatedDoc, id: newId } : d));
+            }
+
+        } catch (err) {
+            console.error('[PlanDocStore] Failed to update plan doc:', err);
+            setError(err instanceof Error ? err.message : 'Failed to update plan doc');
+            // Revert on failure could be added here
+            throw err;
+        }
     };
 
-    const deletePlanDoc = (id: string) => {
-        setPlanDocs(prev => prev.filter(d => d.id !== id));
+    const deletePlanDoc = async (id: string) => {
+        setError(null);
+        try {
+            const success = await planDocApi.deletePlanDoc(id);
+            if (success) {
+                setPlanDocs(prev => prev.filter(d => d.id !== id));
+            } else {
+                throw new Error('Delete operation failed');
+            }
+        } catch (err) {
+            console.error('[PlanDocStore] Failed to delete plan doc:', err);
+            setError(err instanceof Error ? err.message : 'Failed to delete plan doc');
+            throw err;
+        }
     };
 
     return React.createElement(

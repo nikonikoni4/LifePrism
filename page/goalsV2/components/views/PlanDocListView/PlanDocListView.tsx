@@ -4,7 +4,7 @@ import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
 import { PlanDoc } from '../../../types';
 import { planDocApi } from '../../../api';
-import { Plus, ChevronDown, FileText, Target, MoreVertical, Trash2, Copy, Archive, Save } from 'lucide-react';
+import { Plus, ChevronDown, FileText, Target, MoreVertical, Trash2, Copy, Archive, Save, PenLine } from 'lucide-react';
 import { PlanDocEditorView } from './components/PlanDocEditorView/PlanDocEditorView';
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';
 import { InputDialog } from '../../shared/components/InputDialog';
@@ -33,6 +33,10 @@ export const PlanDocListView: React.FC = () => {
     // Dialog state for creating new plan doc
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [defaultDocName, setDefaultDocName] = useState('');
+
+    // Dialog state for renaming
+    const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+    const [renameDocName, setRenameDocName] = useState('');
 
     // Derived
     const selectedGoal = goals.find(g => g.id === selectedGoalId) || null;
@@ -144,11 +148,10 @@ export const PlanDocListView: React.FC = () => {
         setIsCreateDialogOpen(true);
     };
 
-    const handleCreateDoc = async (title: string) => {
+    const handleCreateDoc = async (docId: string) => {
         const newDoc: PlanDoc = {
-            id: title,  // 使用 title 作为 id
+            id: docId,
             goalId: selectedGoalId,
-            title: title,
             content: '# New Plan\n',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -169,11 +172,38 @@ export const PlanDocListView: React.FC = () => {
         }
     };
 
-    const handleDeleteDoc = () => {
+    const handleOpenRenameDialog = () => {
+        if (selectedDoc) {
+            setRenameDocName(selectedDoc.id);
+            setIsRenameDialogOpen(true);
+        }
+    };
+
+    const handleRenameDoc = async (newId: string) => {
+        if (!selectedDoc) return;
+
+        try {
+            await updatePlanDoc(selectedDoc, newId);
+            toast.success('已重命名');
+            // Store update handles state, but we might want to ensure selection follows rename
+            setSelectedPlanDocId(newId);
+        } catch (error) {
+            console.error('Failed to rename doc:', error);
+            toast.error('重命名失败');
+        }
+    };
+
+    const handleDeleteDoc = async () => {
         if (selectedPlanDocId) {
             if (confirm('Are you sure you want to delete this plan?')) {
-                deletePlanDoc(selectedPlanDocId);
-                setSelectedPlanDocId(null);
+                try {
+                    await deletePlanDoc(selectedPlanDocId);
+                    setSelectedPlanDocId(null);
+                    toast.success('删除成功');
+                } catch (error) {
+                    console.error('Failed to delete doc:', error);
+                    toast.error('删除失败');
+                }
             }
         }
     };
@@ -182,14 +212,14 @@ export const PlanDocListView: React.FC = () => {
 
     const goalMenuItems: DropdownItem[] = goals.map(g => ({
         id: g.id,
-        label: g.title,
+        label: g.title, // Goal still has title
         onClick: () => setSelectedGoalId(g.id)
     }));
 
     const planMenuItems: DropdownItem[] = goalDocs.length > 0
         ? goalDocs.map(d => ({
             id: d.id,
-            label: d.title,
+            label: d.id,
             onClick: () => setSelectedPlanDocId(d.id)
         }))
         : [{ id: 'empty', label: 'No plans yet', onClick: () => { }, disabled: true }];
@@ -200,6 +230,13 @@ export const PlanDocListView: React.FC = () => {
             label: 'Duplicate Plan',
             icon: <Copy size={14} />,
             onClick: () => console.log('Duplicate (Mock)'),
+            disabled: !selectedPlanDocId
+        },
+        {
+            id: 'rename',
+            label: 'Rename Plan',
+            icon: <PenLine size={14} />,
+            onClick: handleOpenRenameDialog,
             disabled: !selectedPlanDocId
         },
         {
@@ -254,7 +291,7 @@ export const PlanDocListView: React.FC = () => {
                             trigger={
                                 <div className="flex items-center justify-between w-full font-heading font-bold text-sm py-1 pr-2 cursor-pointer transition-colors text-slate-700 hover:text-indigo-600">
                                     <span className="truncate">
-                                        {selectedDoc?.title || (goalDocs.length === 0 ? 'No plans' : 'Select Plan')}
+                                        {selectedDoc?.id || (goalDocs.length === 0 ? 'No plans' : 'Select Plan')}
                                     </span>
                                     <ChevronDown size={14} className="text-slate-400 ml-2 flex-shrink-0" />
                                 </div>
@@ -269,11 +306,10 @@ export const PlanDocListView: React.FC = () => {
                     <button
                         onClick={handleSave}
                         disabled={!hasUnsavedChanges || isSaving}
-                        className={`p-2 rounded-xl border shadow-sm transition-all ${
-                            hasUnsavedChanges
-                                ? 'bg-indigo-500 border-indigo-400 text-white hover:bg-indigo-600'
-                                : 'bg-white border-slate-100 text-slate-300 cursor-not-allowed'
-                        }`}
+                        className={`p-2 rounded-xl border shadow-sm transition-all ${hasUnsavedChanges
+                            ? 'bg-indigo-500 border-indigo-400 text-white hover:bg-indigo-600'
+                            : 'bg-white border-slate-100 text-slate-300 cursor-not-allowed'
+                            }`}
                         title={isSaving ? 'Saving...' : 'Save'}
                     >
                         <Save size={18} />
@@ -328,6 +364,17 @@ export const PlanDocListView: React.FC = () => {
                 placeholder="Enter plan doc name"
                 defaultValue={defaultDocName}
                 confirmText="Create"
+                cancelText="Cancel"
+            />
+            {/* Rename Plan Doc Dialog */}
+            <InputDialog
+                isOpen={isRenameDialogOpen}
+                onClose={() => setIsRenameDialogOpen(false)}
+                onConfirm={handleRenameDoc}
+                title="Rename Plan Doc"
+                placeholder="Enter new plan name"
+                defaultValue={renameDocName}
+                confirmText="Rename"
                 cancelText="Cancel"
             />
         </div>
