@@ -115,22 +115,26 @@ class TodoProvider(LWBaseDataProvider):
                 )
                 next_order = cursor.fetchone()[0]
                 
-                # 插入数据
+                # 插入数据（包含新字段 parent_id, plan_doc_id, source_anchor_id）
                 columns = ['order_index', 'pool_order_index', 'content', 'color', 'state', 
                           'link_to_goal_id', 'date', 'expected_finished_at', 
-                          'actual_finished_at', 'cross_day', 'folder_id']
+                          'actual_finished_at', 'cross_day', 'folder_id',
+                          'parent_id', 'plan_doc_id', 'source_anchor_id']
                 values = [
                     next_order,
                     data.get('pool_order_index'),
                     data.get('content'),
                     data.get('color', '#FFFFFF'),
-                    data.get('state', 'active'),
+                    data.get('state', 'pool'),
                     data.get('link_to_goal_id'),
                     data.get('date'),
                     data.get('expected_finished_at'),
                     data.get('actual_finished_at'),
                     1 if data.get('cross_day') else 0,
-                    data.get('folder_id')
+                    data.get('folder_id'),
+                    data.get('parent_id'),
+                    data.get('plan_doc_id'),
+                    data.get('source_anchor_id')
                 ]
                 
                 placeholders = ', '.join(['?' for _ in columns])
@@ -167,13 +171,17 @@ class TodoProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # 构建 SET 子句
+                # 构建 SET 子句（包含新字段 parent_id, plan_doc_id, source_anchor_id）
                 set_clauses = []
                 values = []
+                allowed_fields = [
+                    'content', 'color', 'state', 'link_to_goal_id',
+                    'date', 'expected_finished_at', 'actual_finished_at', 
+                    'cross_day', 'pool_order_index', 'folder_id',
+                    'parent_id', 'plan_doc_id', 'source_anchor_id'
+                ]
                 for key, value in data.items():
-                    if key in ['content', 'color', 'state', 'link_to_goal_id',
-                              'date', 'expected_finished_at', 'actual_finished_at', 
-                              'cross_day', 'pool_order_index', 'folder_id']:
+                    if key in allowed_fields:
                         set_clauses.append(f"{key} = ?")
                         # 处理布尔值
                         if key == 'cross_day':
@@ -722,6 +730,232 @@ class TodoProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error(f"获取月份周焦点失败: {e}")
             return []
+
+    # ==================== Task Pool V2 操作 ====================
+    
+    def get_todos_for_taskpool(
+        self,
+        goal_id: Optional[str] = None,
+        plan_doc_id: Optional[str] = None,
+        state: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        获取任务池任务（支持筛选）
+        
+        Args:
+            goal_id: 按目标筛选
+            plan_doc_id: 按计划书筛选
+            state: 按状态筛选（pool/scheduled/completed/all）
+        
+        Returns:
+            List[Dict]: 任务列表（扁平结构，前端通过 parent_id 构建树）
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # 构建查询条件
+                conditions = []
+                params = []
+                
+                if state and state != 'all':
+                    conditions.append("state = ?")
+                    params.append(state)
+                
+                if goal_id:
+                    conditions.append("link_to_goal_id = ?")
+                    params.append(goal_id)
+                
+                if plan_doc_id:
+                    conditions.append("plan_doc_id = ?")
+                    params.append(plan_doc_id)
+                
+                where_clause = " AND ".join(conditions) if conditions else "1=1"
+                
+                sql = f"""
+                SELECT * FROM todo_list 
+                WHERE {where_clause}
+                ORDER BY pool_order_index ASC, id ASC
+                """
+                
+                cursor.execute(sql, params)
+                
+                columns = [description[0] for description in cursor.description]
+                rows = cursor.fetchall()
+                
+                return [dict(zip(columns, row)) for row in rows]
+                
+        except Exception as e:
+            logger.error(f"获取任务池任务失败: {e}")
+            return []
+    
+    def get_todo_by_anchor_id(
+        self, 
+        plan_doc_id: str, 
+        source_anchor_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        根据计划书 ID 和锚点 ID 获取任务
+        
+        Args:
+            plan_doc_id: 计划书 ID
+            source_anchor_id: 锚点 ID
+        
+        Returns:
+            Optional[Dict]: 任务数据，不存在返回 None
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT * FROM todo_list WHERE plan_doc_id = ? AND source_anchor_id = ?",
+                    (plan_doc_id, source_anchor_id)
+                )
+                
+                row = cursor.fetchone()
+                if row:
+                    columns = [description[0] for description in cursor.description]
+                    return dict(zip(columns, row))
+                return None
+                
+        except Exception as e:
+            logger.error(f"获取任务失败 (anchor={source_anchor_id}): {e}")
+            return None
+    
+    def get_todos_by_plan_doc(self, plan_doc_id: str) -> List[Dict[str, Any]]:
+        """
+        获取指定计划书关联的所有任务
+        
+        Args:
+            plan_doc_id: 计划书 ID
+        
+        Returns:
+            List[Dict]: 任务列表
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT * FROM todo_list WHERE plan_doc_id = ? ORDER BY pool_order_index ASC",
+                    (plan_doc_id,)
+                )
+                
+                columns = [description[0] for description in cursor.description]
+                rows = cursor.fetchall()
+                
+                return [dict(zip(columns, row)) for row in rows]
+                
+        except Exception as e:
+            logger.error(f"获取计划书任务失败 (plan_doc={plan_doc_id}): {e}")
+            return []
+    
+    def batch_create_todos(self, todos: List[Dict[str, Any]]) -> List[int]:
+        """
+        批量创建任务
+        
+        Args:
+            todos: 任务数据列表
+        
+        Returns:
+            List[int]: 新创建的任务 ID 列表
+        """
+        new_ids = []
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                for data in todos:
+                    columns = [
+                        'order_index', 'pool_order_index', 'content', 'color', 'state',
+                        'link_to_goal_id', 'date', 'expected_finished_at',
+                        'actual_finished_at', 'cross_day',
+                        'parent_id', 'plan_doc_id', 'source_anchor_id'
+                    ]
+                    values = [
+                        data.get('order_index', 0),
+                        data.get('pool_order_index', 0),
+                        data.get('content'),
+                        data.get('color', '#FFFFFF'),
+                        data.get('state', 'pool'),
+                        data.get('link_to_goal_id'),
+                        data.get('date'),
+                        data.get('expected_finished_at'),
+                        data.get('actual_finished_at'),
+                        1 if data.get('cross_day') else 0,
+                        data.get('parent_id'),
+                        data.get('plan_doc_id'),
+                        data.get('source_anchor_id')
+                    ]
+                    
+                    placeholders = ', '.join(['?' for _ in columns])
+                    columns_str = ', '.join(columns)
+                    
+                    cursor.execute(
+                        f"INSERT INTO todo_list ({columns_str}) VALUES ({placeholders})",
+                        values
+                    )
+                    new_ids.append(cursor.lastrowid)
+                
+                logger.info(f"批量创建 {len(new_ids)} 个任务成功")
+                return new_ids
+                
+        except Exception as e:
+            logger.error(f"批量创建任务失败: {e}")
+            return new_ids
+    
+    def batch_update_todos(self, updates: List[Dict[str, Any]]) -> int:
+        """
+        批量更新任务
+        
+        Args:
+            updates: 更新数据列表，每项必须包含 'id' 字段
+        
+        Returns:
+            int: 成功更新的数量
+        """
+        updated_count = 0
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                allowed_fields = [
+                    'content', 'color', 'state', 'link_to_goal_id',
+                    'date', 'expected_finished_at', 'actual_finished_at',
+                    'cross_day', 'pool_order_index', 'order_index',
+                    'parent_id', 'plan_doc_id', 'source_anchor_id'
+                ]
+                
+                for data in updates:
+                    todo_id = data.get('id')
+                    if not todo_id:
+                        continue
+                    
+                    set_clauses = []
+                    values = []
+                    for key, value in data.items():
+                        if key in allowed_fields:
+                            set_clauses.append(f"{key} = ?")
+                            if key == 'cross_day':
+                                values.append(1 if value else 0)
+                            else:
+                                values.append(value)
+                    
+                    if not set_clauses:
+                        continue
+                    
+                    values.append(todo_id)
+                    sql = f"UPDATE todo_list SET {', '.join(set_clauses)} WHERE id = ?"
+                    
+                    cursor.execute(sql, values)
+                    if cursor.rowcount > 0:
+                        updated_count += 1
+                
+                logger.info(f"批量更新 {updated_count} 个任务成功")
+                return updated_count
+                
+        except Exception as e:
+            logger.error(f"批量更新任务失败: {e}")
+            return updated_count
 
 
 # 创建全局单例

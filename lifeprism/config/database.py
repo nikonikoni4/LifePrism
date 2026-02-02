@@ -394,7 +394,7 @@ TODO_LIST_CONFIG = {
         'pool_order_index': {
             'type': 'INTEGER',
             'constraints': ['DEFAULT NULL'],
-            'comment': '任务池的排序索引（仅 inactive 状态时使用）'
+            'comment': '任务池的排序索引（仅 pool 状态时使用）'
         },
         'content': {
             'type': 'TEXT',
@@ -408,8 +408,8 @@ TODO_LIST_CONFIG = {
         },
         'state': {
             'type': 'TEXT',
-            'constraints': ['DEFAULT "active"'],
-            'comment': '任务状态（active: 激活, completed: 已完成, inactive: 任务池中）'
+            'constraints': ['DEFAULT "pool"'],
+            'comment': '任务状态（pool: 任务池中, scheduled: 已安排, completed: 已完成）'
         },
         'link_to_goal_id': {
             'type': 'TEXT',
@@ -419,7 +419,7 @@ TODO_LIST_CONFIG = {
         'date': {
             'type': 'TEXT',
             'constraints': [],
-            'comment': '任务日期（YYYY-MM-DD格式，inactive状态可为空）'
+            'comment': '任务日期（YYYY-MM-DD格式，scheduled 状态时有值）'
         },
         'expected_finished_at': {
             'type': 'TEXT',
@@ -439,7 +439,22 @@ TODO_LIST_CONFIG = {
         'folder_id': {
             'type': 'INTEGER',
             'constraints': ['DEFAULT NULL'],
-            'comment': '所属任务池文件夹 ID（NULL 表示根级别，仅 inactive 状态使用）'
+            'comment': '[已废弃] 所属任务池文件夹 ID'
+        },
+        'parent_id': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '父任务 ID（NULL 表示根任务，支持树形结构）'
+        },
+        'plan_doc_id': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '关联的计划书 ID'
+        },
+        'source_anchor_id': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': 'MD 锚点标识（格式：t-{uuid[:8]}）'
         }
     },
     'table_constraints': [],
@@ -447,7 +462,10 @@ TODO_LIST_CONFIG = {
         {'name': 'idx_todo_list_date', 'columns': ['date']},
         {'name': 'idx_todo_list_cross_day_state', 'columns': ['cross_day', 'state']},
         {'name': 'idx_todo_list_link_to_goal_id', 'columns': ['link_to_goal_id']},
-        {'name': 'idx_todo_list_state', 'columns': ['state']}
+        {'name': 'idx_todo_list_state', 'columns': ['state']},
+        {'name': 'idx_todo_list_parent_id', 'columns': ['parent_id']},
+        {'name': 'idx_todo_list_plan_doc_id', 'columns': ['plan_doc_id']},
+        {'name': 'idx_todo_list_source_anchor_id', 'columns': ['source_anchor_id']}
     ],
     'timestamps': True  # 自动添加 created_at
 }

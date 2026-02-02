@@ -116,8 +116,7 @@ def get_plan_docs(
     if goal_id:
         items = plan_doc_provider.get_plan_docs_by_goal(goal_id)
     else:
-        # 如果没有指定 goal_id，返回空列表（或可以实现获取所有的逻辑）
-        items = []
+        items = plan_doc_provider.get_all_plan_docs()
 
     plan_doc_items = [_convert_db_item_to_plan_doc_item(item, include_content=False) for item in items]
     return PlanDocListResponse(items=plan_doc_items)

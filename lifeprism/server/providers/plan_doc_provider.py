@@ -20,6 +20,32 @@ class PlanDocProvider(LWBaseDataProvider):
     def __init__(self, db_manager=None):
         super().__init__(db_manager)
 
+    def get_all_plan_docs(self) -> List[Dict[str, Any]]:
+        """
+        获取所有计划书
+
+        Returns:
+            List[Dict]: 计划书列表，按排序索引升序排列
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT * FROM plan_doc
+                    ORDER BY order_index ASC, created_at DESC
+                    """
+                )
+
+                columns = [description[0] for description in cursor.description]
+                rows = cursor.fetchall()
+
+                return [dict(zip(columns, row)) for row in rows]
+
+        except Exception as e:
+            logger.error(f"获取所有计划书失败: {e}")
+            return []
+
     def get_plan_docs_by_goal(self, goal_id: str) -> List[Dict[str, Any]]:
         """
         获取指定目标的所有计划书

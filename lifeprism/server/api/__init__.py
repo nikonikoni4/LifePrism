@@ -13,6 +13,7 @@ from .chatbot_api import router as chatbot_router
 from .setting_api import router as setting_router
 from .report_api import router as report_router
 from .being_api import router as being_router
+from .taskpool_api import router as taskpool_router
 
 __all__ = [
     "sync_router",
@@ -25,5 +26,6 @@ __all__ = [
     "setting_router",
     "report_router",
     "being_router",
+    "taskpool_router",
 ]
 

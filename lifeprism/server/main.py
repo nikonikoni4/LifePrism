@@ -69,6 +69,10 @@ _import_start = time.perf_counter()
 from lifeprism.server.api import being_router
 _log_startup_time("  - being_router", _import_start)
 
+_import_start = time.perf_counter()
+from lifeprism.server.api import taskpool_router
+_log_startup_time("  - taskpool_router", _import_start)
+
 _step_start = _log_startup_time("[OK] API routers imported", _step_start)
 
 # ==================== 数据库模块导入 ====================
@@ -201,8 +205,9 @@ app.include_router(chatbot_router, prefix="/api/v2")  # Chatbot
 app.include_router(setting_router, prefix="/api/v2")  # Settings
 app.include_router(report_router, prefix="/api/v2")  # Report 日报告
 app.include_router(being_router, prefix="/api/v2")  # Being 时间悖论测试
+app.include_router(taskpool_router, prefix="/api")  # Task Pool V2
 
-_log_startup_time("[OK] API routers registered (11 routers)", _router_start)
+_log_startup_time("[OK] API routers registered (12 routers)", _router_start)
 
 # 模块加载阶段总结
 _module_load_total = (time.perf_counter() - _startup_timer) * 1000
@@ -319,12 +324,8 @@ if __name__ == "__main__":
     port = find_available_port(config_path)
     
     print(f"[STARTUP] 后端将在端口 {port} 启动")
-    
-    # 通过环境变量判断是否为开发模式
-    # 开发时设置 LIFEWATCH_DEV=1，打包后默认为生产模式
-    is_dev_mode = os.environ.get("LIFEWATCH_DEV", "0") == "1"
-    is_dev_mode = False
-    if is_dev_mode:
+    is_dev = True
+    if not is_dev: # 非打包环境就是开发环境
         # 开发模式：启用热重载
         uvicorn.run(
             "lifeprism.server.main:app",
@@ -342,4 +343,4 @@ if __name__ == "__main__":
             host="0.0.0.0",
             port=port,
             log_level="info"
-        )
+        ) 
