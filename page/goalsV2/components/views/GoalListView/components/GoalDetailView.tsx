@@ -9,7 +9,7 @@ import { Goal, JournalEntry, ThemeKey } from '../../../../types';
 import { THEMES } from '../../../../hooks/useGoalStore';
 import { viewBackground } from '../../../shared/backgroundStyles';
 import MilestoneAxis from './milestone/MilestoneAxis';
-import { CategoryLabel } from './GoalCard';
+import { CategoryLabel } from './GoalCardV2';
 import { formatDateForDisplay } from '../../../../api';
 import JournalEntryModal from './JournalEntryModal';
 import { DropdownMenu, DropdownItem } from '../../../shared/components/DropdownMenu';
@@ -212,7 +212,7 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate
               <div className="p-2 rounded-xl" style={{ backgroundColor: `${themeConfig.accentColor}15` }}>
                 <Target size={20} style={{ color: themeConfig.accentColor }} />
               </div>
-              <CategoryLabel theme={goal.theme}>{goal.category}</CategoryLabel>
+              <CategoryLabel>{goal.category}</CategoryLabel>
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">{goal.title}</h1>
             <p className="text-slate-400 text-sm font-medium">{formatDateForDisplay(goal.startDate)} — {formatDateForDisplay(goal.endDate)}</p>
