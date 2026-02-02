@@ -9,6 +9,14 @@ import { TodoItem as TodoItemComponent, DraggableItem, DroppablePoolRoot } from 
 import { viewBackground } from '../../shared/backgroundStyles';
 import type { TaskPoolViewProps, TodoItem } from '../../../types';
 
+// State border colors for left accent
+const STATE_BORDER_COLORS: Record<string, string> = {
+    pool: '#6366f1',      // indigo-500
+    scheduled: '#8b5cf6', // violet-500
+    completed: '#10b981', // emerald-500
+    shelved: '#9ca3af'    // gray-400
+};
+
 /**
  * 构建任务树：将扁平列表转换为树形结构
  */
@@ -67,7 +75,7 @@ const TaskTree: React.FC<{
                 const taskClassName = `${scheduled ? 'opacity-50' : ''} ${completed ? 'opacity-60' : ''}`;
 
                 return (
-                    <div key={task.id} className="mb-1">
+                    <div key={task.id} className="mb-2">
                         {disableInternalDnd ? (
                             <DraggableItem
                                 id={`pool-${task.id}`}
@@ -76,67 +84,66 @@ const TaskTree: React.FC<{
                                 data={task}
                                 className={taskClassName}
                             >
-                                <div className="relative flex items-start gap-2">
-                                    {/* 状态指示条 */}
-                                    {scheduled && (
-                                        <div className="absolute -left-1 top-0 bottom-0 w-1 bg-violet-400 rounded-full" />
-                                    )}
-                                    {completed && (
-                                        <div className="absolute -left-1 top-0 bottom-0 w-1 bg-emerald-400 rounded-full" />
-                                    )}
+                                <div
+                                    className="flex items-stretch bg-white rounded-xl border-y border-r border-slate-200/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                                    style={{ borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: '#6366f1' }}
+                                >
+                                    <div className="flex-1 flex items-start gap-2">
+                                        {/* 展开/折叠按钮 */}
+                                        <button
+                                            onClick={() => hasChildren && onToggleExpand(task.id)}
+                                            className={`flex-shrink-0 mt-3 ml-2 w-5 h-5 flex items-center justify-center transition-all rounded ${hasChildren ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer' : 'text-transparent cursor-default'
+                                                }`}
+                                        >
+                                            {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+                                        </button>
 
+                                        <div className="flex-1 min-w-0">
+                                            <TodoItemComponent
+                                                item={task}
+                                                onUpdate={onUpdate}
+                                                onDelete={onDelete}
+                                                showDate={true}
+                                                disableSortable={true}
+                                                disableCardStyle={true}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </DraggableItem>
+                        ) : (
+                            <div
+                                className={`flex items-stretch bg-white rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${taskClassName}`}
+                                style={{
+                                    border: '1px solid rgba(226, 232, 240, 0.8)',
+                                    borderLeft: `4px solid ${STATE_BORDER_COLORS[task.state] || STATE_BORDER_COLORS.pool}`
+                                }}
+                            >
+                                <div className="flex-1 flex items-start gap-2">
                                     {/* 展开/折叠按钮 */}
                                     <button
                                         onClick={() => hasChildren && onToggleExpand(task.id)}
-                                        className={`flex-shrink-0 mt-2.5 w-4 h-4 flex items-center justify-center transition-all ${hasChildren ? 'text-slate-400 hover:text-slate-600 cursor-pointer' : 'text-transparent cursor-default'
+                                        className={`flex-shrink-0 mt-3 ml-2 w-5 h-5 flex items-center justify-center transition-all rounded ${hasChildren ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer' : 'text-transparent cursor-default'
                                             }`}
                                     >
                                         {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                                     </button>
 
-                                    <div className="flex-1">
+                                    <div className="flex-1 min-w-0">
                                         <TodoItemComponent
                                             item={task}
                                             onUpdate={onUpdate}
                                             onDelete={onDelete}
-                                            showDate={true}
-                                            disableSortable={true}
+                                            disableCardStyle={true}
                                         />
                                     </div>
-                                </div>
-                            </DraggableItem>
-                        ) : (
-                            <div className={`relative flex items-start gap-2 ${taskClassName}`}>
-                                {/* 状态指示条 */}
-                                {scheduled && (
-                                    <div className="absolute -left-1 top-0 bottom-0 w-1 bg-violet-400 rounded-full" />
-                                )}
-                                {completed && (
-                                    <div className="absolute -left-1 top-0 bottom-0 w-1 bg-emerald-400 rounded-full" />
-                                )}
-
-                                {/* 展开/折叠按钮 */}
-                                <button
-                                    onClick={() => hasChildren && onToggleExpand(task.id)}
-                                    className={`flex-shrink-0 mt-2.5 w-4 h-4 flex items-center justify-center transition-all ${hasChildren ? 'text-slate-400 hover:text-slate-600 cursor-pointer' : 'text-transparent cursor-default'
-                                        }`}
-                                >
-                                    {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
-                                </button>
-
-                                <div className="flex-1">
-                                    <TodoItemComponent
-                                        item={task}
-                                        onUpdate={onUpdate}
-                                        onDelete={onDelete}
-                                    />
                                 </div>
                             </div>
                         )}
 
                         {/* 递归渲染子任务 */}
                         {hasChildren && isExpanded && (
-                            <div className={`ml-6 mt-1 ${scheduled || completed ? 'opacity-70' : ''}`}>
+                            <div className={`ml-6 mt-2 pl-4 border-l-2 border-dashed border-slate-200 ${scheduled || completed ? 'opacity-70' : ''}`}>
                                 <TaskTree
                                     tasks={task.children!}
                                     onUpdate={onUpdate}

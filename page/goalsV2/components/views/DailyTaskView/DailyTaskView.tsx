@@ -283,11 +283,10 @@ const AddChildModal: React.FC<{
                         <button
                             onClick={handleSubmit}
                             disabled={!content.trim()}
-                            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                content.trim()
+                            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${content.trim()
                                     ? 'bg-blue-500 text-white hover:bg-blue-600'
                                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                            }`}
+                                }`}
                         >
                             创建
                         </button>
@@ -322,18 +321,34 @@ export const DailyTaskView: React.FC = () => {
         parentPlanDocId: null,
     });
 
+    // 视图模式 state
+    const [viewMode, setViewMode] = useState<'daily' | 'all_uncompleted'>('daily');
+
     // 格式化日期为 YYYY-MM-DD
     const dateStr = useMemo(() => {
         return selectedDate.toISOString().split('T')[0];
     }, [selectedDate]);
 
-    // 过滤当天的任务
+    // 过滤任务
     const dailyTasks = useMemo(() => {
-        return tasks.filter(t =>
-            t.scheduledDate === dateStr &&
-            (t.state === 'scheduled' || t.state === 'completed')
-        );
-    }, [tasks, dateStr]);
+        return tasks.filter(t => {
+            // 基本条件：只要是当天任务，无论状态如何都显示
+            const isTodayTask = t.scheduledDate === dateStr;
+
+            if (viewMode === 'all_uncompleted') {
+                // 如果是"全部未完成"模式：显示 (未完成的任务) OR (今天的任务)
+                // 未完成定义: state != 'completed'
+                // 注意：shelved 状态通常也不算"待办"，但这里用户只说了"未完成"。
+                // 假设 shelved 也不显示除非是今天。
+                // 若用户意图是 "Database backlog + Today"，则只要不是 completed 都可以算未完成。
+                // 这里暂定: state != 'completed'
+                return (t.state !== 'completed') || isTodayTask;
+            } else {
+                // 默认模式：仅显示当天的 scheduled 或 completed
+                return isTodayTask && (t.state === 'scheduled' || t.state === 'completed');
+            }
+        });
+    }, [tasks, dateStr, viewMode]);
 
     // 构建树形结构
     const taskTree = useMemo(() => buildTaskTree(dailyTasks), [dailyTasks]);
@@ -390,10 +405,16 @@ export const DailyTaskView: React.FC = () => {
         }
     }, [isAllExpanded, taskTree]);
 
+    // 切换视图模式
+    const handleToggleViewMode = useCallback(() => {
+        setViewMode(prev => prev === 'daily' ? 'all_uncompleted' : 'daily');
+    }, []);
+
     // 重置
     const handleReset = useCallback(() => {
         setExpandedIds(new Set());
         setSelectedTaskId(null);
+        setViewMode('daily'); // 重置时也重置视图模式
     }, []);
 
     // 添加任务（顶级任务，通过输入框）
@@ -516,8 +537,10 @@ export const DailyTaskView: React.FC = () => {
             {/* 操作工具栏 */}
             <DailyTaskToolbar
                 isAllExpanded={isAllExpanded}
+                viewMode={viewMode}
                 onToggleExpandAll={handleToggleExpandAll}
                 onReset={handleReset}
+                onToggleViewMode={handleToggleViewMode}
             />
 
             {/* 任务输入框 */}
