@@ -86,7 +86,6 @@ def _convert_db_item_to_plan_doc_item(item: dict, include_content: bool = False)
     return PlanDocItem(
         id=item['id'],
         goal_id=item['goal_id'],
-        title=item['title'],
         content=content,
         status=item.get('status', 'active'),
         order_index=item.get('order_index', 0),
@@ -164,8 +163,8 @@ def create_plan_doc(request: CreatePlanDocRequest) -> Optional[PlanDocItem]:
         Optional[PlanDocItem]: 新创建的计划书，失败返回 None
     """
     data = {
+        'id': request.id,
         'goal_id': request.goal_id,
-        'title': request.title,
     }
 
     new_id = plan_doc_provider.create_plan_doc(data)
@@ -195,15 +194,48 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
         logger.warning(f"计划书 {doc_id} 不存在")
         return None
 
-    update_data = {}
     explicitly_set_fields = request.model_fields_set
 
-    if 'title' in explicitly_set_fields:
-        update_data['title'] = request.title
+    # 处理重命名逻辑 (当 new_id 存在时)
+    if 'new_id' in explicitly_set_fields and request.new_id and request.new_id != doc_id:
+        new_id = request.new_id
+        logger.info(f"检测到重命名操作: {doc_id} -> {new_id}")
+        
+        # 1. 检查新 ID 是否已存在
+        if plan_doc_provider.get_plan_doc_by_id(new_id):
+             logger.warning(f"重命名失败: 目标 ID {new_id} 已存在")
+             return None
+        
+        # 2. 文件层操作：另存为新文件 (保留旧文件做备份)
+        content_to_write = ""
+        if 'content' in explicitly_set_fields:
+            content_to_write = request.content
+        else:
+            content_to_write = _read_content_from_file(doc_id)
+            
+        _write_content_to_file(new_id, content_to_write)
+        
+        # 3. 数据库层操作：事务更新 ID 和级联引用
+        success = plan_doc_provider.rename_plan_doc(doc_id, new_id)
+        
+        if not success:
+            logger.error(f"数据库重命名失败，回滚文件操作 (删除 {new_id}.md)")
+            _delete_content_file(new_id)
+            return None
+            
+        # 4. 如果还有其他字段需要更新 (status)，则再更新一次新记录
+        if 'status' in explicitly_set_fields:
+             plan_doc_provider.update_plan_doc(new_id, {'status': request.status})
+             
+        return get_plan_doc_detail(new_id)
+
+    # 常规更新逻辑 (非重命名)
+    update_data = {}
+
     if 'status' in explicitly_set_fields:
         update_data['status'] = request.status
 
-    # 更新数据库 meta（如果有需要更新的字段）
+    # 更新数据库 meta
     if update_data:
         plan_doc_provider.update_plan_doc(doc_id, update_data)
 

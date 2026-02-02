@@ -116,10 +116,10 @@ class PlanDocProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # 使用 title 作为 id（title 不可修改，作为唯一标识）
-                doc_id = data.get('title', '')
+                # 使用 id 
+                doc_id = data.get('id', '')
                 if not doc_id:
-                    logger.error("创建计划书失败: title 不能为空")
+                    logger.error("创建计划书失败: id 不能为空")
                     return None
 
                 # 获取当前目标下最大 order_index
@@ -131,12 +131,11 @@ class PlanDocProvider(LWBaseDataProvider):
 
                 # 构建插入数据（content 存储在文件系统中，不存数据库）
                 columns = [
-                    'id', 'goal_id', 'title', 'status', 'order_index'
+                    'id', 'goal_id', 'status', 'order_index'
                 ]
                 values = [
                     doc_id,
                     data.get('goal_id'),
-                    doc_id,  # title 与 id 相同
                     data.get('status', 'active'),
                     next_order
                 ]
@@ -176,7 +175,7 @@ class PlanDocProvider(LWBaseDataProvider):
 
                 # 允许更新的字段（content 存储在文件系统中，不在数据库更新）
                 allowed_fields = [
-                    'title', 'status', 'order_index'
+                    'status', 'order_index'
                 ]
 
                 set_clauses = []
@@ -228,6 +227,47 @@ class PlanDocProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"删除计划书 {doc_id} 失败: {e}")
+            return False
+
+    def rename_plan_doc(self, old_id: str, new_id: str) -> bool:
+        """
+        重命名计划书（修改 ID 并级联更新关联表）
+
+        Args:
+            old_id: 旧 ID
+            new_id: 新 ID
+
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                #开启事务 (SQLite context manager does this, but being explicit helps readability)
+                
+                # 1. 更新 plan_doc 表的主键 ID 
+                cursor.execute(
+                    "UPDATE plan_doc SET id = ?, updated_at = datetime('now') WHERE id = ?",
+                    (new_id, old_id)
+                )
+                
+                if cursor.rowcount == 0:
+                    logger.warning(f"重命名失败: 计划书 {old_id} 不存在")
+                    return False
+                
+                # 2. 级联更新 todo_list 表 (Task Pool) 中的引用
+                # todo_list 表中有 plan_doc_id 字段
+                cursor.execute(
+                    "UPDATE todo_list SET plan_doc_id = ? WHERE plan_doc_id = ?",
+                    (new_id, old_id)
+                )
+                
+                logger.info(f"重命名计划书成功: {old_id} -> {new_id}, 关联任务更新数: {cursor.rowcount}")
+                return True
+
+        except Exception as e:
+            logger.error(f"重命名计划书 {old_id} -> {new_id} 失败: {e}")
             return False
 
 

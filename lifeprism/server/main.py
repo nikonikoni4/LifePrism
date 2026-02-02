@@ -324,7 +324,7 @@ if __name__ == "__main__":
     port = find_available_port(config_path)
     
     print(f"[STARTUP] 后端将在端口 {port} 启动")
-    is_dev = True
+
     if not is_dev: # 非打包环境就是开发环境
         # 开发模式：启用热重载
         uvicorn.run(

@@ -329,7 +329,6 @@ class PlanDocItem(BaseModel):
     """计划书项"""
     id: str = Field(..., description="唯一标识符（格式：plandoc-xxx）")
     goal_id: str = Field(..., description="关联的目标 ID")
-    title: str = Field(..., description="计划书标题")
     content: str = Field(default="", description="计划书内容（Markdown）")
     status: str = Field(default="active", description="状态: active, completed, archived")
     order_index: int = Field(default=0, description="排序索引")
@@ -344,13 +343,13 @@ class PlanDocListResponse(BaseModel):
 
 class CreatePlanDocRequest(BaseModel):
     """创建计划书请求"""
+    id: str = Field(..., description="计划书 ID（同时作为文件名）")
     goal_id: Optional[str] = Field(default=None, description="关联的目标 ID（可为空，表示临时文档）")
-    title: str = Field(..., description="计划书标题（同时作为 ID 和文件名）")
     content: str = Field(default="", description="计划书内容（Markdown）")
 
 
 class UpdatePlanDocRequest(BaseModel):
     """更新计划书请求（部分更新）"""
-    title: Optional[str] = Field(default=None, description="计划书标题")
+    new_id: Optional[str] = Field(default=None, description="新 ID（用于重命名）")
     content: Optional[str] = Field(default=None, description="计划书内容（Markdown）")
     status: Optional[str] = Field(default=None, description="状态")

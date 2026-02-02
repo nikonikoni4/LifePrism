@@ -741,11 +741,6 @@ PLAN_DOC_CONFIG = {
             'constraints': ['NOT NULL'],
             'comment': '关联的目标ID'
         },
-        'title': {
-            'type': 'TEXT',
-            'constraints': ['NOT NULL'],
-            'comment': '计划书标题'
-        },
         'content': {
             'type': 'TEXT',
             'constraints': ['DEFAULT ""'],
