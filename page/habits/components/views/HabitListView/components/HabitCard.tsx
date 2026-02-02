@@ -43,7 +43,7 @@ const HabitCard: React.FC<HabitCardProps> = ({
       className={`group relative bg-white rounded-[1.25rem] border transition-all duration-300 overflow-hidden ${
         isPaused
           ? 'border-slate-200 opacity-60'
-          : 'border-slate-100 hover:border-amber-200 hover:shadow-lg hover:shadow-amber-500/5'
+          : 'border-slate-100 hover:border-teal-200 hover:shadow-lg hover:shadow-teal-500/5'
       }`}
     >
       {/* Level indicator bar */}
@@ -110,7 +110,7 @@ const HabitCard: React.FC<HabitCardProps> = ({
                   {isPaused ? (
                     <button
                       onClick={() => { onResume(habit.id); setShowMenu(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:bg-amber-50"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-teal-600 hover:bg-teal-50"
                     >
                       <Play size={14} />
                       恢复
@@ -118,7 +118,7 @@ const HabitCard: React.FC<HabitCardProps> = ({
                   ) : (
                     <button
                       onClick={() => { onPause(habit.id); setShowMenu(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:bg-amber-50"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-teal-600 hover:bg-teal-50"
                     >
                       <Pause size={14} />
                       暂停
@@ -186,10 +186,10 @@ const HabitCard: React.FC<HabitCardProps> = ({
             disabled={isPaused || isCheckedToday}
             className={`w-full py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all ${
               isCheckedToday
-                ? 'bg-amber-100 text-amber-600 cursor-default'
+                ? 'bg-teal-100 text-teal-600 cursor-default'
                 : isPaused
                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                : 'bg-amber-500 text-white hover:bg-amber-600 shadow-md shadow-amber-500/25'
+                : 'bg-teal-500 text-white hover:bg-teal-600 shadow-md shadow-teal-500/25'
             }`}
           >
             <Check size={16} strokeWidth={2.5} />

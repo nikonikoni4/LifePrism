@@ -1,19 +1,75 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, ChevronDown, ChevronUp, Zap } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Sprout } from 'lucide-react';
 import { useHabitStore } from '../../../hooks/useHabitStore';
 import { useHabitPageContext } from '../../../context/HabitPageContext';
-import { Habit, CreateHabitForm } from '../../../types';
+import { Habit, CreateHabitForm, HabitStats } from '../../../types';
 import HabitCard from './components/HabitCard';
-import HabitStatsCard from './components/HabitStatsCard';
 import HabitHeatmap from './components/HabitHeatmap';
 import AddHabitModal from './components/AddHabitModal';
 import HabitHistoryModal from './components/HabitHistoryModal';
 
-// Background style matching GoalsV2
+// Background style matching GoalsV2 - using teal instead of amber
 const viewBackground = {
-  className: 'bg-gradient-to-br from-slate-50 via-amber-50/30 to-orange-50/20',
+  className: 'bg-gradient-to-br from-slate-50 via-teal-50/30 to-cyan-50/20',
   style: {}
+};
+
+// Lightweight Today Progress Bar component
+const TodayProgressBar: React.FC<{ stats: HabitStats | null }> = ({ stats }) => {
+  if (!stats) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-100 p-4 mb-6">
+        <div className="animate-pulse">
+          <div className="h-4 bg-slate-200 rounded w-1/3 mb-2" />
+          <div className="h-2 bg-slate-100 rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
+  const total = stats.todayCompleted + stats.todayPending;
+  const percent = total > 0 ? (stats.todayCompleted / total) * 100 : 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-2xl border border-slate-100 p-4 mb-6"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-slate-700">今日进度</span>
+        <span className="text-sm text-slate-500">
+          {stats.todayCompleted}/{total} · 待完成 {stats.todayPending}
+        </span>
+      </div>
+      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${percent}%` }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+          className="h-full bg-teal-500 rounded-full"
+        />
+      </div>
+    </motion.div>
+  );
+};
+
+// Stats Footer component
+const StatsFooter: React.FC<{ stats: HabitStats | null }> = ({ stats }) => {
+  if (!stats) return null;
+
+  return (
+    <div className="mt-8 pt-6 border-t border-slate-200 text-center text-sm text-slate-500">
+      <span>{stats.activeHabitsCount} 个活跃</span>
+      <span className="mx-2">·</span>
+      <span>{Math.round(stats.weeklyCompletionRate * 100)}% 本周完成率</span>
+      <span className="mx-2">·</span>
+      <span>{stats.totalCheckIns} 次累计打卡</span>
+      <span className="mx-2">·</span>
+      <span>{stats.currentStreak} 天连续</span>
+    </div>
+  );
 };
 
 export const HabitListView: React.FC = () => {
@@ -109,13 +165,14 @@ export const HabitListView: React.FC = () => {
           {/* Header */}
           <header className="mb-8 flex items-end justify-between">
             <div>
-              <div className="text-xs font-bold text-amber-500 tracking-[0.2em] mb-2 uppercase flex items-center gap-2">
-                <Zap size={12} />
+              <div className="text-xs font-bold text-teal-600 tracking-[0.2em] mb-2 uppercase flex items-center gap-2">
+                <Sprout size={12} />
                 习惯养成
               </div>
               <h1 className="text-3xl md:text-4xl font-sans font-bold text-slate-900 tracking-tight">
-                Habits<span className="text-slate-200">.</span>
+                习惯养成
               </h1>
+              <p className="text-sm text-slate-400 mt-1">坚持每一天，成就更好的自己</p>
             </div>
             <div className="hidden sm:block text-right">
               <div className="text-sm font-medium text-slate-400 mb-1">活跃习惯</div>
@@ -123,11 +180,11 @@ export const HabitListView: React.FC = () => {
             </div>
           </header>
 
-          {/* Stats Card */}
-          <HabitStatsCard stats={stats} className="mb-6" />
+          {/* Heatmap - at the top */}
+          <HabitHeatmap data={heatmapData} className="mb-6" />
 
-          {/* Heatmap */}
-          <HabitHeatmap data={heatmapData} className="mb-8" />
+          {/* Today Progress Bar */}
+          <TodayProgressBar stats={stats} />
 
           {/* Active Habits Section */}
           <section className="mb-10">
@@ -137,13 +194,13 @@ export const HabitListView: React.FC = () => {
             </div>
 
             {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[1, 2, 3].map(i => (
                   <div key={i} className="h-48 bg-white rounded-[1.25rem] animate-pulse" />
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <AnimatePresence mode="popLayout">
                   {activeHabits.map(habit => (
                     <HabitCard
@@ -165,7 +222,7 @@ export const HabitListView: React.FC = () => {
                     onClick={openAddModal}
                     whileHover={{ scale: 1.02, backgroundColor: 'rgba(241, 245, 249, 0.8)' }}
                     whileTap={{ scale: 0.98 }}
-                    className="h-48 rounded-[1.25rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-amber-500 hover:border-amber-200 transition-all group bg-slate-50/50"
+                    className="h-48 rounded-[1.25rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-teal-500 hover:border-teal-200 transition-all group bg-slate-50/50"
                   >
                     <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                       <Plus size={24} />
@@ -202,7 +259,7 @@ export const HabitListView: React.FC = () => {
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {pausedHabits.map(habit => (
                         <HabitCard
                           key={habit.id}
@@ -221,6 +278,9 @@ export const HabitListView: React.FC = () => {
               </AnimatePresence>
             </section>
           )}
+
+          {/* Stats Footer */}
+          <StatsFooter stats={stats} />
         </motion.main>
       </div>
 
