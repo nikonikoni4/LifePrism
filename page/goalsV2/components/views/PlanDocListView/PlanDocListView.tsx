@@ -11,7 +11,6 @@ import { InputDialog } from '../../shared/components/InputDialog';
 import { viewBackground } from '../../shared/backgroundStyles';
 import { toast } from '../../../../common';
 
-const generateShortUuid = () => Math.random().toString(36).substring(2, 8);
 
 export const PlanDocListView: React.FC = () => {
     const { selectedGoalId, setSelectedGoalId, selectedPlanDocId, setSelectedPlanDocId } = useGoalPageContext();
@@ -20,6 +19,7 @@ export const PlanDocListView: React.FC = () => {
 
     // Local content state for editing to avoid laggy context updates on every keystroke
     const [localContent, setLocalContent] = useState('');
+    const [isLoadingContent, setIsLoadingContent] = useState(false);
 
     // Save state
     const [isSaving, setIsSaving] = useState(false);
@@ -55,16 +55,31 @@ export const PlanDocListView: React.FC = () => {
         }
     }, [selectedGoalId, goalDocs.length, selectedPlanDocId, setSelectedPlanDocId]);
 
-    // Sync local content when doc changes
+    // Fetch full content from API when doc changes
     useEffect(() => {
-        if (selectedDoc) {
-            setLocalContent(selectedDoc.content);
-            setHasUnsavedChanges(false);
-        } else {
+        if (!selectedPlanDocId) {
             setLocalContent('');
             setHasUnsavedChanges(false);
+            return;
         }
-    }, [selectedDoc?.id]); // Only when ID changes
+
+        // Fetch full content from API
+        setIsLoadingContent(true);
+        planDocApi.getPlanDocDetail(selectedPlanDocId)
+            .then(doc => {
+                setLocalContent(doc.content);
+                setHasUnsavedChanges(false);
+                // Update store with full content
+                updatePlanDoc(doc);
+            })
+            .catch(err => {
+                console.error('Failed to load doc content:', err);
+                setLocalContent('');
+            })
+            .finally(() => {
+                setIsLoadingContent(false);
+            });
+    }, [selectedPlanDocId]); // Only when ID changes
 
     // Keep refs in sync
     useEffect(() => {
@@ -92,20 +107,8 @@ export const PlanDocListView: React.FC = () => {
         prevDocIdRef.current = currentId;
     }, [selectedDoc?.id]);
 
-    // Auto-save when leaving page (beforeunload)
-    useEffect(() => {
-        const handleBeforeUnload = () => {
-            if (hasUnsavedChangesRef.current && selectedDoc) {
-                // Use sendBeacon for reliable save on page unload
-                const url = `/api/v2/goal/plan-docs/${selectedDoc.id}`;
-                const data = JSON.stringify({ content: prevContentRef.current });
-                navigator.sendBeacon(url, new Blob([data], { type: 'application/json' }));
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [selectedDoc?.id]);
+    // Note: beforeunload auto-save removed because sendBeacon only supports POST
+    // but backend uses PATCH. Auto-save on doc switch handles most cases.
 
     // Save handler
     const handleSave = async () => {
@@ -114,6 +117,8 @@ export const PlanDocListView: React.FC = () => {
         try {
             await planDocApi.updatePlanDoc(selectedDoc.id, { content: localContent });
             setHasUnsavedChanges(false);
+            // Update store after successful save
+            updatePlanDoc({ ...selectedDoc, content: localContent, updatedAt: new Date().toISOString() });
             toast.success('文档已保存');
         } catch (error) {
             console.error('Save failed:', error);
@@ -126,19 +131,15 @@ export const PlanDocListView: React.FC = () => {
     const handleContentChange = (newContent: string) => {
         setLocalContent(newContent);
         setHasUnsavedChanges(true);
-
-        // Update in-memory store for UI sync
-        if (selectedDoc) {
-            updatePlanDoc({ ...selectedDoc, content: newContent, updatedAt: new Date().toISOString() });
-        }
+        // Note: Don't update store on every keystroke to avoid re-renders
+        // Store will be updated when save completes
     };
 
     const handleOpenCreateDialog = () => {
-        const uuid = generateShortUuid();
         if (selectedGoalId && selectedGoal) {
-            setDefaultDocName(`planDoc-${selectedGoal.title}-${uuid}`);
+            setDefaultDocName(`planDoc-${selectedGoal.title}`);
         } else {
-            setDefaultDocName(`planDoc-temp-${uuid}`);
+            setDefaultDocName(`planDoc-temp`);
         }
         setIsCreateDialogOpen(true);
     };
@@ -301,7 +302,11 @@ export const PlanDocListView: React.FC = () => {
 
             {/* Editor Body */}
             <div className="flex-1 relative group overflow-hidden z-10">
-                {selectedDoc ? (
+                {isLoadingContent ? (
+                    <div className="absolute inset-0 flex items-center justify-center text-slate-400">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                    </div>
+                ) : selectedDoc ? (
                     <PlanDocEditorView
                         content={localContent}
                         onChange={handleContentChange}
