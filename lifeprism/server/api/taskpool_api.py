@@ -58,23 +58,35 @@ async def get_taskpool(
 async def sync_plan_doc(request: SyncPlanDocRequest):
     """
     同步计划书任务
-    
+
     从指定计划书的 MD 文件中解析任务，同步到数据库。
-    
+
     处理流程：
     1. 读取 MD 文件，查找 todoblock
     2. 解析任务（支持嵌套层级）
     3. 为无锚点的任务生成锚点并写回 MD
     4. 创建/更新数据库记录
-    5. 更新系统展示区
-    
+    5. 检测并处理删除的任务
+    6. 更新系统展示区
+
+    参数说明：
+    - **plan_doc_id**: 计划书 ID
+    - **dry_run**: 预检模式，只返回差异不执行操作
+    - **confirm_delete**: 确认删除，True=删除全部待删除任务，False=保留全部
+
     返回同步统计：
     - **created**: 新创建的任务数
     - **updated**: 更新的任务数
+    - **deleted**: 删除的任务数
     - **cleaned**: 清理的锚点数
     - **total**: 该计划书关联的总任务数
+    - **to_delete**: 待删除任务列表（dry_run 模式返回）
     """
-    return taskpool_service.sync_plan_doc(request.plan_doc_id)
+    return taskpool_service.sync_plan_doc(
+        request.plan_doc_id,
+        dry_run=request.dry_run,
+        confirm_delete=request.confirm_delete
+    )
 
 
 @router.post("/regenerate-summary", response_model=RegenerateSummaryResponse)

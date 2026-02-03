@@ -213,31 +213,139 @@ class TodoProvider(LWBaseDataProvider):
     def delete_todo(self, todo_id: int) -> bool:
         """
         删除任务（子任务会级联删除）
-        
+
         Args:
             todo_id: 任务 ID
-        
+
         Returns:
             bool: 是否成功
         """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                
+
                 # 先删除子任务
                 cursor.execute("DELETE FROM sub_todo_list WHERE parent_id = ?", (todo_id,))
-                
+
                 # 再删除主任务
                 cursor.execute("DELETE FROM todo_list WHERE id = ?", (todo_id,))
-                
+
                 success = cursor.rowcount > 0
                 if success:
                     logger.info(f"删除任务 {todo_id} 成功")
                 return success
-                
+
         except Exception as e:
             logger.error(f"删除任务 {todo_id} 失败: {e}")
             return False
+
+    def delete_todo_cascade(self, todo_id: int) -> int:
+        """
+        级联删除任务及其所有子任务（todo_list 中的 parent_id 关系）
+
+        Args:
+            todo_id: 任务 ID
+
+        Returns:
+            int: 删除的总任务数（包括子任务）
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # 递归获取所有子任务 ID
+                def get_all_descendant_ids(parent_id: int) -> List[int]:
+                    cursor.execute(
+                        "SELECT id FROM todo_list WHERE parent_id = ?",
+                        (parent_id,)
+                    )
+                    child_ids = [row[0] for row in cursor.fetchall()]
+                    all_ids = list(child_ids)
+                    for child_id in child_ids:
+                        all_ids.extend(get_all_descendant_ids(child_id))
+                    return all_ids
+
+                # 获取所有要删除的 ID（包括自身）
+                all_ids = get_all_descendant_ids(todo_id)
+                all_ids.append(todo_id)
+
+                # 先删除 sub_todo_list 中的子任务
+                for tid in all_ids:
+                    cursor.execute("DELETE FROM sub_todo_list WHERE parent_id = ?", (tid,))
+
+                # 从叶子节点开始删除（反向顺序）
+                deleted_count = 0
+                for tid in reversed(all_ids):
+                    cursor.execute("DELETE FROM todo_list WHERE id = ?", (tid,))
+                    if cursor.rowcount > 0:
+                        deleted_count += 1
+
+                logger.info(f"级联删除任务 {todo_id} 成功，共删除 {deleted_count} 个任务")
+                return deleted_count
+
+        except Exception as e:
+            logger.error(f"级联删除任务 {todo_id} 失败: {e}")
+            return 0
+
+    def get_child_todos(self, parent_id: int) -> List[Dict[str, Any]]:
+        """
+        获取直接子任务列表
+
+        Args:
+            parent_id: 父任务 ID
+
+        Returns:
+            List[Dict]: 子任务列表
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT * FROM todo_list WHERE parent_id = ? ORDER BY pool_order_index ASC",
+                    (parent_id,)
+                )
+
+                columns = [description[0] for description in cursor.description]
+                rows = cursor.fetchall()
+
+                return [dict(zip(columns, row)) for row in rows]
+
+        except Exception as e:
+            logger.error(f"获取子任务列表失败 (parent_id={parent_id}): {e}")
+            return []
+
+    def batch_delete_todos(self, todo_ids: List[int]) -> int:
+        """
+        批量删除任务（不级联删除子任务）
+
+        Args:
+            todo_ids: 任务 ID 列表
+
+        Returns:
+            int: 成功删除的数量
+        """
+        if not todo_ids:
+            return 0
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+
+                deleted_count = 0
+                for todo_id in todo_ids:
+                    # 先删除 sub_todo_list 中的子任务
+                    cursor.execute("DELETE FROM sub_todo_list WHERE parent_id = ?", (todo_id,))
+                    # 再删除主任务
+                    cursor.execute("DELETE FROM todo_list WHERE id = ?", (todo_id,))
+                    if cursor.rowcount > 0:
+                        deleted_count += 1
+
+                logger.info(f"批量删除 {deleted_count} 个任务成功")
+                return deleted_count
+
+        except Exception as e:
+            logger.error(f"批量删除任务失败: {e}")
+            return 0
     
     def reorder_todos(self, todo_ids: List[int]) -> bool:
         """
