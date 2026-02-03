@@ -337,7 +337,7 @@ export const PlanDocListView: React.FC = () => {
             </div>
 
             {/* Editor Body */}
-            <div className="flex-1 relative group overflow-hidden z-10 [&_*::-webkit-scrollbar]:hidden [&_*]:[-ms-overflow-style:none] [&_*]:[scrollbar-width:none]">
+            <div className="flex-1 relative group overflow-y-auto z-10 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [&_*::-webkit-scrollbar]:hidden [&_*]:[-ms-overflow-style:none] [&_*]:[scrollbar-width:none]">
                 {isLoadingContent ? (
                     <div className="absolute inset-0 flex items-center justify-center text-slate-400">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
