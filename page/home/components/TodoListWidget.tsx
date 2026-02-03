@@ -6,8 +6,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Check, ChevronRight, Target, Loader2 } from 'lucide-react';
-import { TodoItem, TodoListResponse } from '../../goals/types';
-import { todoApi } from '../../goals/api';
+import { TodoItem } from '../../goalsV2/types/todo';
+import { taskPoolApi } from '../../goalsV2/apis/taskPool';
 
 interface TodoListWidgetProps {
     selectedDate: string;
@@ -29,9 +29,11 @@ const TodoListWidget: React.FC<TodoListWidgetProps> = ({
         const loadTodos = async () => {
             setLoading(true);
             try {
-                const response: TodoListResponse = await todoApi.getTodos(selectedDate, true);
-                setItems(response.items || []);
-                setDailyFocusContent(response.dailyFocusContent);
+                const allTodos = await taskPoolApi.fetchTaskPool(null, null, 'scheduled');
+                const todosForDate = allTodos.filter(todo => todo.scheduledDate === selectedDate);
+                setItems(todosForDate);
+                // Note: dailyFocusContent not available in V2 - set to null for now
+                setDailyFocusContent(null);
             } catch (error) {
                 console.error('Failed to load todos:', error);
             } finally {
@@ -86,19 +88,19 @@ const TodoListWidget: React.FC<TodoListWidgetProps> = ({
                             >
                                 {/* 完成状态指示器（只读） */}
                                 <div
-                                    className={`w-5 h-5 rounded-lg border-[1.5px] flex items-center justify-center flex-shrink-0 ${item.completed
+                                    className={`w-5 h-5 rounded-lg border-[1.5px] flex items-center justify-center flex-shrink-0 ${item.state === 'completed'
                                             ? 'bg-slate-800 border-slate-800'
                                             : 'border-slate-300 bg-white/50'
                                         }`}
                                 >
-                                    {item.completed && (
+                                    {item.state === 'completed' && (
                                         <Check size={12} className="text-white" strokeWidth={3} />
                                     )}
                                 </div>
 
                                 {/* 任务内容 */}
                                 <span
-                                    className={`flex-1 text-sm font-medium ${item.completed
+                                    className={`flex-1 text-sm font-medium ${item.state === 'completed'
                                             ? 'text-slate-400 line-through decoration-slate-300'
                                             : 'text-slate-700'
                                         }`}
@@ -107,7 +109,7 @@ const TodoListWidget: React.FC<TodoListWidgetProps> = ({
                                 </span>
 
                                 {/* 跨日标记 */}
-                                {item.crossDay && (
+                                {item.expectedFinishAt && item.scheduledDate !== item.expectedFinishAt && (
                                     <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
                                         跨日
                                     </span>
@@ -131,7 +133,7 @@ const TodoListWidget: React.FC<TodoListWidgetProps> = ({
                 <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50">
                     <div className="flex items-center justify-between text-sm">
                         <span className="text-slate-500 font-medium">
-                            已完成 {items.filter(i => i.completed).length} / {items.length} 项
+                            已完成 {items.filter(i => i.state === 'completed').length} / {items.length} 项
                         </span>
                         <button
                             onClick={onNavigateToGoals}

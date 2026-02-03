@@ -134,7 +134,7 @@ const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                         key={`todolist-${refreshKey}`}
                         selectedDate={selectedDate}
                         todolist={homepageData?.todolist}
-                        onNavigateToGoals={() => onNavigate?.('goals')}
+                        onNavigateToGoals={() => onNavigate?.('goalsV2')}
                     />
                 </div>
 

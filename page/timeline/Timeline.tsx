@@ -28,7 +28,7 @@ import {
 import { CustomBlockLayer, CustomBlockAPI, UserCustomBlock, TodoSelectItem } from './components';
 
 // Todo API
-import { todoApi } from '../goals/api';
+import { taskPoolApi } from '../goalsV2/apis/taskPool';
 
 // ============================================================================
 // 工具函数
@@ -656,9 +656,10 @@ const Timeline: React.FC = () => {
     useEffect(() => {
         const fetchTodos = async () => {
             try {
-                const response = await todoApi.getTodos(currentDate, true);
+                const allTodos = await taskPoolApi.fetchTaskPool(null, null, 'scheduled');
+                const todosForDate = allTodos.filter(todo => todo.scheduledDate === currentDate);
                 // 转换为 TodoSelectItem 格式
-                setTodos(response.items.map(todo => ({
+                setTodos(todosForDate.map(todo => ({
                     id: todo.id,
                     content: todo.content,
                 })));

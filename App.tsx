@@ -11,7 +11,6 @@ import { initApiConfig, isApiConfigInitialized } from './services/apiConfig';
 import UsagePage from './page/usage/UsagePage';
 import Home from './page/home/Home';
 import CategoryPage from './page/category/CategoryPage';
-import GoalsPage from './page/goals/GoalsPage';
 import { GoalPage } from './page/goalsV2/GoalPage';
 import { HabitPage } from './page/habits/HabitPage';
 import ReportsPage from './page/reports/ReportsPage';
@@ -163,7 +162,6 @@ function App() {
               {currentPage === 'home' && <Home onNavigate={setCurrentPage} />}
               {currentPage === 'timeline' && <Timeline />}
               {currentPage === 'category' && <CategoryPage />}
-              {currentPage === 'goals' && <GoalsPage />}
               {currentPage === 'goalsV2' && <GoalPage />}
               {currentPage === 'habits' && <HabitPage />}
               {currentPage === 'reports' && <ReportsPage />}

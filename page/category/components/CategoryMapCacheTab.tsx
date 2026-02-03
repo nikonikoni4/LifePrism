@@ -9,8 +9,8 @@ import { Search, Trash2, ChevronLeft, ChevronRight, Loader2, Edit3, X, Save, Glo
 import { CategoryTreeItem } from '../../common/types';
 import { CategoryMapCacheItem } from '../types';
 import { CategoryMapCacheAPI } from '../api';
-import { goalApi } from '../../goals/api';
-import { GoalWithCategoryItem } from '../../goals/types';
+import { goalsV2Api } from '../../goalsV2/apis/goal';
+import { Goal } from '../../goalsV2/types/entities';
 
 interface CategoryMapCacheTabProps {
     categories: CategoryTreeItem[];
@@ -50,7 +50,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
     });
 
     // 目标列表（用于下拉选择）
-    const [goalsWithCategory, setGoalsWithCategory] = useState<GoalWithCategoryItem[]>([]);
+    const [goalsWithCategory, setGoalsWithCategory] = useState<Goal[]>([]);
 
     // 批量编辑弹窗
     const [showBatchEditModal, setShowBatchEditModal] = useState(false);
@@ -85,8 +85,9 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
     useEffect(() => {
         const fetchGoals = async () => {
             try {
-                const response = await goalApi.getGoalsWithCategory();
-                setGoalsWithCategory(response.items);
+                const goals = await goalsV2Api.getGoals({ status: 'active' });
+                const goalsWithCat = goals.filter(g => g.category);
+                setGoalsWithCategory(goalsWithCat);
             } catch (err) {
                 console.error('Failed to fetch goals:', err);
             }
@@ -698,7 +699,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                                 >
                                     <option value="">-- 不关联目标 --</option>
                                     {goalsWithCategory.map(goal => (
-                                        <option key={goal.id} value={goal.id}>{goal.name}</option>
+                                        <option key={goal.id} value={goal.id}>{goal.title}</option>
                                     ))}
                                 </select>
                                 {editForm.link_to_goal_id && (
