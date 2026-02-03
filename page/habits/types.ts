@@ -93,46 +93,46 @@ export interface LevelConfig {
   description: string;
 }
 
-// 等级常量
+// 等级常量 - 暖色调渐变
 export const HABIT_LEVELS: LevelConfig[] = [
   {
     level: 0,
     name: '萌芽',
-    color: '#FCD34D',
-    bgColor: 'bg-amber-100',
-    borderColor: 'border-amber-200',
+    color: '#FEF3C7',  // amber-100
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-100',
     description: '习惯刚刚开始'
   },
   {
     level: 1,
     name: '生根',
-    color: '#FBBF24',
-    bgColor: 'bg-amber-200',
-    borderColor: 'border-amber-300',
+    color: '#FDE68A',  // amber-200
+    bgColor: 'bg-amber-100',
+    borderColor: 'border-amber-200',
     description: '习惯开始扎根'
   },
   {
     level: 2,
     name: '成长',
-    color: '#F59E0B',
-    bgColor: 'bg-amber-300',
-    borderColor: 'border-amber-400',
+    color: '#FCD34D',  // amber-300
+    bgColor: 'bg-amber-200',
+    borderColor: 'border-amber-300',
     description: '习惯稳定成长'
   },
   {
     level: 3,
     name: '稳固',
-    color: '#D97706',
-    bgColor: 'bg-amber-400',
-    borderColor: 'border-amber-500',
+    color: '#FBBF24',  // amber-400
+    bgColor: 'bg-amber-300',
+    borderColor: 'border-amber-400',
     description: '习惯已经稳固'
   },
   {
     level: 4,
     name: '根深蒂固',
-    color: '#B45309',
-    bgColor: 'bg-amber-500',
-    borderColor: 'border-amber-600',
+    color: '#F59E0B',  // amber-500
+    bgColor: 'bg-amber-400',
+    borderColor: 'border-amber-500',
     description: '习惯已成为本能'
   },
 ];
@@ -254,16 +254,20 @@ export const getTriggerTypeConfig = (type: ChainTriggerType): TriggerTypeConfig 
   return TRIGGER_TYPES.find(t => t.type === type) || TRIGGER_TYPES[0];
 };
 
-// 等级对应的 teal 颜色（用于时间轴）
-export const LEVEL_TEAL_COLORS: Record<number, string> = {
-  0: 'bg-teal-100',
-  1: 'bg-teal-200',
-  2: 'bg-teal-300',
-  3: 'bg-teal-400',
-  4: 'bg-teal-500'
+// 等级对应的 amber 颜色（用于时间轴）
+export const LEVEL_AMBER_COLORS: Record<number, string> = {
+  0: 'bg-amber-50',
+  1: 'bg-amber-100',
+  2: 'bg-amber-200',
+  3: 'bg-amber-300',
+  4: 'bg-amber-400'
 };
 
-// 获取等级对应的 teal 背景色
-export const getLevelTealBg = (level: number): string => {
-  return LEVEL_TEAL_COLORS[Math.min(Math.max(level, 0), 4)] || 'bg-slate-100';
+// 获取等级对应的 amber 背景色
+export const getLevelAmberBg = (level: number): string => {
+  return LEVEL_AMBER_COLORS[Math.min(Math.max(level, 0), 4)] || 'bg-stone-100';
 };
+
+// 保留旧名称以兼容
+export const LEVEL_TEAL_COLORS = LEVEL_AMBER_COLORS;
+export const getLevelTealBg = getLevelAmberBg;

@@ -36,10 +36,9 @@ export const LevelBadge: React.FC<LevelBadgeProps> = ({
   return (
     <motion.span
       whileHover={{ scale: 1.05 }}
-      className={`inline-flex items-center rounded-full font-bold tracking-wide ${config.bgColor} ${config.borderColor} border ${sizeClasses[size]} ${className}`}
-      style={{ color: config.color }}
+      className={`inline-flex items-center rounded-full font-bold tracking-wide ${config.bgColor} ${config.borderColor} border text-amber-700 ${sizeClasses[size]} ${className}`}
     >
-      <Icon size={iconSizes[size]} />
+      <Icon size={iconSizes[size]} style={{ color: config.color === '#FEF3C7' || config.color === '#FDE68A' ? '#D97706' : config.color }} />
       <span>Lv.{level}</span>
       {showName && <span className="opacity-80">· {config.name}</span>}
     </motion.span>
