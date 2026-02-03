@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { X, RefreshCw, Check, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { X, RefreshCw, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
 import { useTaskPoolStore } from '../../../hooks/useTaskPoolStore';
 import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
@@ -16,6 +17,15 @@ const STATE_BORDER_COLORS: Record<string, string> = {
     completed: '#10b981', // emerald-500
     shelved: '#9ca3af'    // gray-400
 };
+
+// 状态筛选选项
+type StateFilter = 'pool' | 'scheduled' | 'completed' | 'all';
+const STATE_FILTER_OPTIONS: { value: StateFilter; label: string; color: string }[] = [
+    { value: 'pool', label: '待处理', color: '#6366f1' },
+    { value: 'scheduled', label: '已安排', color: '#8b5cf6' },
+    { value: 'completed', label: '已完成', color: '#10b981' },
+    { value: 'all', label: '全部', color: '#64748b' },
+];
 
 /**
  * 构建任务树：将扁平列表转换为树形结构
@@ -47,121 +57,6 @@ const buildTaskTree = (tasks: TodoItem[]): TodoItem[] => {
     return roots;
 };
 
-/**
- * 递归渲染任务树
- */
-const TaskTree: React.FC<{
-    tasks: TodoItem[];
-    onUpdate: (id: number, updates: Partial<TodoItem>) => void;
-    onDelete: (id: number) => void;
-    onComplete: (id: number) => void;
-    disableInternalDnd?: boolean;
-    expandedIds: Set<number>;
-    onToggleExpand: (id: number) => void;
-}> = ({ tasks, onUpdate, onDelete, onComplete, disableInternalDnd, expandedIds, onToggleExpand }) => {
-    // 判断任务状态
-    const isScheduled = (task: TodoItem) => task.state === 'scheduled';
-    const isCompleted = (task: TodoItem) => task.state === 'completed';
-
-    return (
-        <>
-            {tasks.map(task => {
-                const scheduled = isScheduled(task);
-                const completed = isCompleted(task);
-                const hasChildren = task.children && task.children.length > 0;
-                const isExpanded = expandedIds.has(task.id);
-
-                // 任务样式类名
-                const taskClassName = `${scheduled ? 'opacity-50' : ''} ${completed ? 'opacity-60' : ''}`;
-
-                return (
-                    <div key={task.id} className="mb-2">
-                        {disableInternalDnd ? (
-                            <DraggableItem
-                                id={`pool-${task.id}`}
-                                type="task"
-                                source="task-pool"
-                                data={task}
-                                className={taskClassName}
-                            >
-                                <div
-                                    className="flex items-stretch bg-white rounded-xl border-y border-r border-slate-200/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
-                                    style={{ borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: '#6366f1' }}
-                                >
-                                    <div className="flex-1 flex items-start gap-2">
-                                        {/* 展开/折叠按钮 */}
-                                        <button
-                                            onClick={() => hasChildren && onToggleExpand(task.id)}
-                                            className={`flex-shrink-0 mt-3 ml-2 w-5 h-5 flex items-center justify-center transition-all rounded ${hasChildren ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer' : 'text-transparent cursor-default'
-                                                }`}
-                                        >
-                                            {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
-                                        </button>
-
-                                        <div className="flex-1 min-w-0">
-                                            <TodoItemComponent
-                                                item={task}
-                                                onUpdate={onUpdate}
-                                                onDelete={onDelete}
-                                                showDate={true}
-                                                disableSortable={true}
-                                                disableCardStyle={true}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </DraggableItem>
-                        ) : (
-                            <div
-                                className={`flex items-stretch bg-white rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${taskClassName}`}
-                                style={{
-                                    border: '1px solid rgba(226, 232, 240, 0.8)',
-                                    borderLeft: `4px solid ${STATE_BORDER_COLORS[task.state] || STATE_BORDER_COLORS.pool}`
-                                }}
-                            >
-                                <div className="flex-1 flex items-start gap-2">
-                                    {/* 展开/折叠按钮 */}
-                                    <button
-                                        onClick={() => hasChildren && onToggleExpand(task.id)}
-                                        className={`flex-shrink-0 mt-3 ml-2 w-5 h-5 flex items-center justify-center transition-all rounded ${hasChildren ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer' : 'text-transparent cursor-default'
-                                            }`}
-                                    >
-                                        {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
-                                    </button>
-
-                                    <div className="flex-1 min-w-0">
-                                        <TodoItemComponent
-                                            item={task}
-                                            onUpdate={onUpdate}
-                                            onDelete={onDelete}
-                                            disableCardStyle={true}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* 递归渲染子任务 */}
-                        {hasChildren && isExpanded && (
-                            <div className={`ml-6 mt-2 pl-4 border-l-2 border-dashed border-slate-200 ${scheduled || completed ? 'opacity-70' : ''}`}>
-                                <TaskTree
-                                    tasks={task.children!}
-                                    onUpdate={onUpdate}
-                                    onDelete={onDelete}
-                                    onComplete={onComplete}
-                                    disableInternalDnd={disableInternalDnd}
-                                    expandedIds={expandedIds}
-                                    onToggleExpand={onToggleExpand}
-                                />
-                            </div>
-                        )}
-                    </div>
-                );
-            })}
-        </>
-    );
-};
-
 export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
     disableInternalDnd = false
 }) => {
@@ -172,15 +67,18 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
         updateTask,
         deleteTask,
         syncFromPlanDoc,
-        completeTask,
         loadTasks
     } = useTaskPoolStore();
     const { goals } = useGoalStore();
     const { planDocs } = usePlanDocStore();
     const { selectedGoalId, setSelectedGoalId, selectedPlanDocId, setSelectedPlanDocId } = useGoalPageContext();
 
-    const [showCompleted, setShowCompleted] = useState(true);
+    // 默认筛选 pool 状态，减少初始渲染量
+    const [stateFilter, setStateFilter] = useState<StateFilter>('pool');
     const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+
+    // 虚拟滚动容器引用
+    const parentRef = useRef<HTMLDivElement>(null);
 
     // 切换展开/折叠
     const handleToggleExpand = useCallback((id: number) => {
@@ -195,14 +93,14 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
         });
     }, []);
 
-    // 筛选任务
+    // 筛选任务（构建树形结构）
     const filteredTasks = useMemo(() => {
         let filtered = tasks.filter(t => {
-            // 基础状态筛选
-            if (showCompleted) {
+            // 状态筛选
+            if (stateFilter === 'all') {
                 return t.state === 'pool' || t.state === 'scheduled' || t.state === 'completed';
             }
-            return t.state === 'pool' || t.state === 'scheduled';
+            return t.state === stateFilter;
         });
 
         if (selectedGoalId) {
@@ -214,7 +112,32 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
         }
 
         return buildTaskTree(filtered);
-    }, [tasks, selectedGoalId, selectedPlanDocId, showCompleted]);
+    }, [tasks, selectedGoalId, selectedPlanDocId, stateFilter]);
+
+    // 将树形结构展平为虚拟滚动列表（只包含可见节点）
+    const flattenedTasks = useMemo(() => {
+        const result: { task: TodoItem; depth: number }[] = [];
+
+        const flatten = (items: TodoItem[], depth: number) => {
+            items.forEach(task => {
+                result.push({ task, depth });
+                if (task.children && task.children.length > 0 && expandedIds.has(task.id)) {
+                    flatten(task.children, depth + 1);
+                }
+            });
+        };
+
+        flatten(filteredTasks, 0);
+        return result;
+    }, [filteredTasks, expandedIds]);
+
+    // 虚拟滚动配置
+    const virtualizer = useVirtualizer({
+        count: flattenedTasks.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => 60, // 每个任务项估计高度
+        overscan: 5, // 预渲染额外的项目数
+    });
 
     // 清空筛选
     const clearFilters = () => {
@@ -227,15 +150,9 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
         if (selectedPlanDocId) {
             await syncFromPlanDoc(selectedPlanDocId);
         } else {
-            // 如果没有选择计划书，提示用户
             alert('请先选择要同步的计划书');
         }
     }, [selectedPlanDocId, syncFromPlanDoc]);
-
-    // 刷新任务列表
-    const handleRefresh = useCallback(async () => {
-        await loadTasks(selectedGoalId, selectedPlanDocId);
-    }, [loadTasks, selectedGoalId, selectedPlanDocId]);
 
     // 构建下拉菜单项
     const goalDropdownItems: DropdownItem[] = goals.map(goal => ({
@@ -313,65 +230,159 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                         </button>
                     )}
 
-                    {/* 显示已完成任务开关 */}
-                    <button
-                        onClick={() => setShowCompleted(!showCompleted)}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${showCompleted
-                                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                    >
-                        <Check size={14} />
-                        {showCompleted ? '隐藏已完成' : '显示已完成'}
-                    </button>
+                    {/* 状态筛选按钮组 */}
+                    <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+                        {STATE_FILTER_OPTIONS.map(option => (
+                            <button
+                                key={option.value}
+                                onClick={() => setStateFilter(option.value)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                    stateFilter === option.value
+                                        ? 'bg-white shadow-sm'
+                                        : 'hover:bg-white/50'
+                                }`}
+                                style={{
+                                    color: stateFilter === option.value ? option.color : '#64748b'
+                                }}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
 
                     {/* 任务计数 */}
                     <div className="ml-auto text-xs font-bold text-slate-400 tracking-wider">
                         {loading ? (
                             <Loader2 size={14} className="animate-spin" />
                         ) : (
-                            `${filteredTasks.length} 个任务`
+                            `${flattenedTasks.length} 个任务`
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* 任务列表 */}
-            <DroppablePoolRoot className="flex-1 overflow-y-auto scrollbar-hide">
-                <div className="p-6 min-h-full">
-                    {loading ? (
-                        <div className="h-full flex items-center justify-center min-h-[200px]">
-                            <div className="text-center">
-                                <Loader2 size={32} className="animate-spin text-slate-400 mx-auto mb-4" />
-                                <div className="text-sm font-medium text-slate-400">加载中...</div>
+            {/* 任务列表 - 虚拟滚动 */}
+            <DroppablePoolRoot className="flex-1 overflow-hidden">
+                <div
+                    ref={parentRef}
+                    className="h-full overflow-y-auto scrollbar-hide"
+                >
+                    <div className="p-6 min-h-full">
+                        {loading ? (
+                            <div className="h-full flex items-center justify-center min-h-[200px]">
+                                <div className="text-center">
+                                    <Loader2 size={32} className="animate-spin text-slate-400 mx-auto mb-4" />
+                                    <div className="text-sm font-medium text-slate-400">加载中...</div>
+                                </div>
                             </div>
-                        </div>
-                    ) : filteredTasks.length === 0 ? (
-                        <div className="h-full flex items-center justify-center min-h-[200px]">
-                            <div className="text-center">
-                                <div className="text-6xl mb-4 opacity-20">📋</div>
-                                <div className="text-sm font-medium text-slate-400">暂无任务</div>
-                                {selectedPlanDocId && (
-                                    <button
-                                        onClick={handleSync}
-                                        className="mt-4 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-all"
-                                    >
-                                        从计划书同步任务
-                                    </button>
-                                )}
+                        ) : flattenedTasks.length === 0 ? (
+                            <div className="h-full flex items-center justify-center min-h-[200px]">
+                                <div className="text-center">
+                                    <div className="text-6xl mb-4 opacity-20">📋</div>
+                                    <div className="text-sm font-medium text-slate-400">暂无任务</div>
+                                    {selectedPlanDocId && (
+                                        <button
+                                            onClick={handleSync}
+                                            className="mt-4 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-all"
+                                        >
+                                            从计划书同步任务
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ) : (
-                        <TaskTree
-                            tasks={filteredTasks}
-                            onUpdate={updateTask}
-                            onDelete={deleteTask}
-                            onComplete={completeTask}
-                            disableInternalDnd={disableInternalDnd}
-                            expandedIds={expandedIds}
-                            onToggleExpand={handleToggleExpand}
-                        />
-                    )}
+                        ) : (
+                            <div
+                                style={{
+                                    height: `${virtualizer.getTotalSize()}px`,
+                                    width: '100%',
+                                    position: 'relative',
+                                }}
+                            >
+                                {virtualizer.getVirtualItems().map(virtualRow => {
+                                    const { task, depth } = flattenedTasks[virtualRow.index];
+                                    const hasChildren = task.children && task.children.length > 0;
+                                    const isExpanded = expandedIds.has(task.id);
+                                    const isScheduled = task.state === 'scheduled';
+                                    const isCompleted = task.state === 'completed';
+                                    const taskClassName = `${isScheduled ? 'opacity-50' : ''} ${isCompleted ? 'opacity-60' : ''}`;
+
+                                    return (
+                                        <div
+                                            key={task.id}
+                                            style={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                width: '100%',
+                                                height: `${virtualRow.size}px`,
+                                                transform: `translateY(${virtualRow.start}px)`,
+                                                paddingLeft: `${depth * 24}px`,
+                                            }}
+                                        >
+                                            {disableInternalDnd ? (
+                                                <DraggableItem
+                                                    id={`pool-${task.id}`}
+                                                    type="task"
+                                                    source="task-pool"
+                                                    data={task}
+                                                    className={taskClassName}
+                                                >
+                                                    <div
+                                                        className="flex items-stretch bg-white rounded-xl border-y border-r border-slate-200/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                                                        style={{ borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: STATE_BORDER_COLORS[task.state] || STATE_BORDER_COLORS.pool }}
+                                                    >
+                                                        <div className="flex-1 flex items-start gap-2">
+                                                            <button
+                                                                onClick={() => hasChildren && handleToggleExpand(task.id)}
+                                                                className={`flex-shrink-0 mt-3 ml-2 w-5 h-5 flex items-center justify-center transition-all rounded ${hasChildren ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer' : 'text-transparent cursor-default'}`}
+                                                            >
+                                                                {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+                                                            </button>
+                                                            <div className="flex-1 min-w-0">
+                                                                <TodoItemComponent
+                                                                    item={task}
+                                                                    onUpdate={updateTask}
+                                                                    onDelete={deleteTask}
+                                                                    showDate={true}
+                                                                    disableSortable={true}
+                                                                    disableCardStyle={true}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </DraggableItem>
+                                            ) : (
+                                                <div
+                                                    className={`flex items-stretch bg-white rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${taskClassName}`}
+                                                    style={{
+                                                        border: '1px solid rgba(226, 232, 240, 0.8)',
+                                                        borderLeft: `4px solid ${STATE_BORDER_COLORS[task.state] || STATE_BORDER_COLORS.pool}`
+                                                    }}
+                                                >
+                                                    <div className="flex-1 flex items-start gap-2">
+                                                        <button
+                                                            onClick={() => hasChildren && handleToggleExpand(task.id)}
+                                                            className={`flex-shrink-0 mt-3 ml-2 w-5 h-5 flex items-center justify-center transition-all rounded ${hasChildren ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer' : 'text-transparent cursor-default'}`}
+                                                        >
+                                                            {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+                                                        </button>
+                                                        <div className="flex-1 min-w-0">
+                                                            <TodoItemComponent
+                                                                item={task}
+                                                                onUpdate={updateTask}
+                                                                onDelete={deleteTask}
+                                                                disableCardStyle={true}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </DroppablePoolRoot>
         </div>
