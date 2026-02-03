@@ -481,47 +481,6 @@ TODO_LIST_CONFIG = {
 }
 
 
-# SubTodoList 子任务表配置
-SUB_TODO_LIST_CONFIG = {
-    'table_name': 'sub_todo_list',
-    'columns': {
-        'id': {
-            'type': 'INTEGER',
-            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
-            'comment': '自增主键'
-        },
-        'parent_id': {
-            'type': 'INTEGER',
-            'constraints': ['NOT NULL'],
-            'comment': '父任务 ID（关联 todo_list.id）'
-        },
-        'order_index': {
-            'type': 'INTEGER',
-            'constraints': ['NOT NULL', 'DEFAULT 0'],
-            'comment': '排序索引，用于拖拽排序'
-        },
-        'content': {
-            'type': 'TEXT',
-            'constraints': ['NOT NULL'],
-            'comment': '子任务内容'
-        },
-        'completed': {
-            'type': 'INTEGER',
-            'constraints': ['DEFAULT 0'],
-            'comment': '是否完成（0: 未完成, 1: 已完成）'
-        }
-    },
-    'table_constraints': [
-        'FOREIGN KEY (parent_id) REFERENCES todo_list(id) ON DELETE CASCADE'
-    ],
-    'indexes': [
-        {'name': 'idx_sub_todo_list_parent_id', 'columns': ['parent_id']},
-        {'name': 'idx_sub_todo_list_order', 'columns': ['parent_id', 'order_index']}
-    ],
-    'timestamps': True  # 自动添加 created_at
-}
-
-
 # Daily Focus 表配置（日焦点）
 DAILY_FOCUS_CONFIG = {
     'table_name': 'daily_focus',
@@ -879,39 +838,6 @@ TIMELINE_CUSTOM_BLOCK_CONFIG = {
     'timestamps': True  # 自动添加 created_at, updated_at
 }
 
-
-# 任务池文件夹表配置
-TASK_POOL_FOLDER_CONFIG = {
-    'table_name': 'task_pool_folder',
-    'columns': {
-        'id': {
-            'type': 'INTEGER',
-            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
-            'comment': '自增主键'
-        },
-        'name': {
-            'type': 'TEXT',
-            'constraints': ['NOT NULL'],
-            'comment': '文件夹名称'
-        },
-        'order_index': {
-            'type': 'INTEGER',
-            'constraints': ['DEFAULT 0'],
-            'comment': '文件夹排序索引'
-        },
-        'is_expanded': {
-            'type': 'INTEGER',
-            'constraints': ['DEFAULT 1'],
-            'comment': '是否展开（0: 折叠, 1: 展开）'
-        }
-    },
-    'table_constraints': [],
-    'indexes': [
-        {'name': 'idx_task_pool_folder_order', 'columns': ['order_index']}
-    ],
-    'timestamps': True
-}
-
 GOAL_STATS_CONFIG = {
     'table_name': 'goal_stats',
     'columns': {
@@ -1192,7 +1118,6 @@ TABLE_CONFIGS = {
     'sub_category': SUB_CATEGORY_CONFIG,
     'tokens_usage_log': TOKENS_USAGE_LOG_CONFIG,
     'todo_list': TODO_LIST_CONFIG,
-    'sub_todo_list': SUB_TODO_LIST_CONFIG,
     'daily_focus': DAILY_FOCUS_CONFIG,
     'weekly_focus': WEEKLY_FOCUS_CONFIG,
     'goal': GOAL_CONFIG,
@@ -1200,7 +1125,6 @@ TABLE_CONFIGS = {
     'plan_doc': PLAN_DOC_CONFIG,
     'chat_session': CHAT_SESSION_CONFIG,
     'timeline_custom_block': TIMELINE_CUSTOM_BLOCK_CONFIG,
-    'task_pool_folder': TASK_POOL_FOLDER_CONFIG,
     'goal_stats': GOAL_STATS_CONFIG,
     'daily_report': daily_report_config,
     'weekly_report': weekly_report_config,

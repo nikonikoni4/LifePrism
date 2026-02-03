@@ -14,7 +14,6 @@ from .chatbot_service import chatbot_service  # 有运行时状态
 # 纯函数服务模块（无状态缓存）
 from . import timeline_service
 from . import usage_service
-from . import todo_service
 from . import journal_service   # 已改为纯函数
 from . import activity_service  # 已改为纯函数
 from . import setting_service   # 已改为纯函数
@@ -29,7 +28,6 @@ __all__ = [
     # 纯函数模块
     "timeline_service",
     "usage_service",
-    "todo_service",
     "journal_service",
     "activity_service",
     "setting_service",
