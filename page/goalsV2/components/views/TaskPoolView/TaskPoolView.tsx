@@ -6,9 +6,13 @@ import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
 import { useGoalPageContext } from '../../../context/GoalPageContext';
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';
+import { SyncDeleteConfirmDialog } from '../../shared/components/SyncDeleteConfirmDialog';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog';
 import { TodoItem as TodoItemComponent, DraggableItem, DroppablePoolRoot } from '@my-ui-kit/core';
 import { viewBackground } from '../../shared/backgroundStyles';
 import type { TaskPoolViewProps, TodoItem } from '../../../types';
+import type { TodoDeletePreview } from '../../../types/backend';
+import { taskPoolApi } from '../../../apis/taskPool';
 
 // State border colors for left accent
 const STATE_BORDER_COLORS: Record<string, string> = {
@@ -66,7 +70,6 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
         syncing,
         updateTask,
         deleteTask,
-        syncFromPlanDoc,
         loadTasks
     } = useTaskPoolStore();
     const { goals } = useGoalStore();
@@ -76,6 +79,17 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
     // 默认筛选 pool 状态，减少初始渲染量
     const [stateFilter, setStateFilter] = useState<StateFilter>('pool');
     const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+
+    // 同步相关状态
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [syncPreviewData, setSyncPreviewData] = useState<{
+        toDelete: TodoDeletePreview[];
+        created: number;
+        updated: number;
+    } | null>(null);
+    const [showNoPlanDocAlert, setShowNoPlanDocAlert] = useState(false);
+    const [syncResultMessage, setSyncResultMessage] = useState<string | null>(null);
 
     // 虚拟滚动容器引用
     const parentRef = useRef<HTMLDivElement>(null);
@@ -145,14 +159,83 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
         setSelectedPlanDocId(null);
     };
 
-    // 同步按钮点击处理
+    // 同步按钮点击处理 - 新流程：先 dry_run 预检
     const handleSync = useCallback(async () => {
-        if (selectedPlanDocId) {
-            await syncFromPlanDoc(selectedPlanDocId);
-        } else {
-            alert('请先选择要同步的计划书');
+        if (!selectedPlanDocId) {
+            setShowNoPlanDocAlert(true);
+            return;
         }
-    }, [selectedPlanDocId, syncFromPlanDoc]);
+
+        setIsSyncing(true);
+        try {
+            // 1. 先执行 dry_run 预检
+            const preview = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { dry_run: true });
+
+            if (preview.to_delete && preview.to_delete.length > 0) {
+                // 有待删除任务，显示确认对话框
+                setSyncPreviewData({
+                    toDelete: preview.to_delete,
+                    created: preview.created,
+                    updated: preview.updated,
+                });
+                setShowDeleteConfirm(true);
+            } else {
+                // 无待删除任务，直接执行同步
+                const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { dry_run: false });
+                await loadTasks(null, selectedPlanDocId);
+                setSyncResultMessage(`同步完成：新增 ${result.created}，更新 ${result.updated}`);
+                setTimeout(() => setSyncResultMessage(null), 3000);
+            }
+        } catch (error) {
+            console.error('Sync failed:', error);
+            setSyncResultMessage('同步失败，请重试');
+            setTimeout(() => setSyncResultMessage(null), 3000);
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [selectedPlanDocId, loadTasks]);
+
+    // 确认删除处理
+    const handleConfirmDelete = useCallback(async () => {
+        if (!selectedPlanDocId) return;
+
+        setIsSyncing(true);
+        try {
+            const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { confirm_delete: true });
+            await loadTasks(null, selectedPlanDocId);
+            setShowDeleteConfirm(false);
+            setSyncPreviewData(null);
+            setSyncResultMessage(`同步完成：新增 ${result.created}，更新 ${result.updated}，删除 ${result.deleted}`);
+            setTimeout(() => setSyncResultMessage(null), 3000);
+        } catch (error) {
+            console.error('Sync with delete failed:', error);
+            setSyncResultMessage('同步失败，请重试');
+            setTimeout(() => setSyncResultMessage(null), 3000);
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [selectedPlanDocId, loadTasks]);
+
+    // 保留全部处理
+    const handleKeepAll = useCallback(async () => {
+        if (!selectedPlanDocId) return;
+
+        setIsSyncing(true);
+        try {
+            const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { confirm_delete: false });
+            await loadTasks(null, selectedPlanDocId);
+            setShowDeleteConfirm(false);
+            setSyncPreviewData(null);
+            setSyncResultMessage(`同步完成：新增 ${result.created}，更新 ${result.updated}（已保留 ${syncPreviewData?.toDelete.length || 0} 个任务）`);
+            setTimeout(() => setSyncResultMessage(null), 3000);
+        } catch (error) {
+            console.error('Sync with keep failed:', error);
+            setSyncResultMessage('同步失败，请重试');
+            setTimeout(() => setSyncResultMessage(null), 3000);
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [selectedPlanDocId, loadTasks, syncPreviewData]);
 
     // 构建下拉菜单项
     const goalDropdownItems: DropdownItem[] = goals.map(goal => ({
@@ -207,16 +290,23 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                     {selectedPlanDocId && (
                         <button
                             onClick={handleSync}
-                            disabled={syncing}
+                            disabled={isSyncing || syncing}
                             className="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-300 text-white text-sm font-medium transition-all shadow-sm hover:shadow-md flex items-center gap-2"
                         >
-                            {syncing ? (
+                            {(isSyncing || syncing) ? (
                                 <Loader2 size={14} className="animate-spin" />
                             ) : (
                                 <RefreshCw size={14} />
                             )}
-                            {syncing ? '同步中...' : '同步'}
+                            {(isSyncing || syncing) ? '同步中...' : '同步'}
                         </button>
+                    )}
+
+                    {/* 同步结果提示 */}
+                    {syncResultMessage && (
+                        <div className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-sm text-emerald-700">
+                            {syncResultMessage}
+                        </div>
                     )}
 
                     {/* 清空筛选按钮 */}
@@ -385,6 +475,36 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                     </div>
                 </div>
             </DroppablePoolRoot>
+
+            {/* 同步删除确认对话框 */}
+            {syncPreviewData && (
+                <SyncDeleteConfirmDialog
+                    isOpen={showDeleteConfirm}
+                    onClose={() => {
+                        setShowDeleteConfirm(false);
+                        setSyncPreviewData(null);
+                    }}
+                    onConfirmDelete={handleConfirmDelete}
+                    onKeepAll={handleKeepAll}
+                    toDelete={syncPreviewData.toDelete}
+                    syncStats={{
+                        created: syncPreviewData.created,
+                        updated: syncPreviewData.updated,
+                    }}
+                    loading={isSyncing}
+                />
+            )}
+
+            {/* 未选择计划书提示 */}
+            <ConfirmDialog
+                isOpen={showNoPlanDocAlert}
+                onClose={() => setShowNoPlanDocAlert(false)}
+                onConfirm={() => setShowNoPlanDocAlert(false)}
+                title="提示"
+                message="请先选择要同步的计划书"
+                confirmText="确定"
+                cancelText=""
+            />
         </div>
     );
 };

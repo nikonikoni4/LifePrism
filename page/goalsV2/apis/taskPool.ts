@@ -75,13 +75,24 @@ export const taskPoolApi = {
 
     /**
      * Sync plan doc to task pool
+     * @param planDocId - The plan doc ID to sync
+     * @param options - Optional parameters:
+     *   - dry_run: If true, returns preview of changes without applying them
+     *   - confirm_delete: If true, confirms deletion of tasks removed from plan doc
      */
-    syncPlanDoc: async (planDocId: string): Promise<BackendSyncResponse> => {
+    syncPlanDoc: async (
+        planDocId: string,
+        options?: { dry_run?: boolean; confirm_delete?: boolean }
+    ): Promise<BackendSyncResponse> => {
         // Correct URL: /api/v2/taskpool/sync
         const response = await fetch(`${getApiBase()}/taskpool/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plan_doc_id: planDocId }),
+            body: JSON.stringify({
+                plan_doc_id: planDocId,
+                dry_run: options?.dry_run ?? false,
+                confirm_delete: options?.confirm_delete,
+            }),
         });
 
         if (!response.ok) {

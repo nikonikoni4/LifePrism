@@ -139,11 +139,28 @@ export interface BackendTaskPoolResponse {
     items: BackendTaskPoolItem[];
 }
 
+// 待删除任务预览
+export interface TodoDeletePreview {
+    id: number;
+    content: string;
+    state: string;
+    source_anchor_id: string | null;
+}
+
 export interface BackendSyncResponse {
     created: number;
     updated: number;
+    deleted: number;
     cleaned: number;
     total: number;
+    to_delete: TodoDeletePreview[] | null;  // dry_run 模式返回
+}
+
+// 同步请求参数
+export interface SyncPlanDocRequest {
+    plan_doc_id: string;
+    dry_run?: boolean;
+    confirm_delete?: boolean;
 }
 
 export interface BackendUpdateTodoResponse {
