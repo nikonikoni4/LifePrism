@@ -103,7 +103,7 @@ export const DateGrid: React.FC<DateGridProps> = ({ startDate, endDate }) => {
                                 <div
                                     onClick={handleDateClick}
                                     className={`
-                                    group/cell relative flex-1 rounded-2xl p-3.5 flex flex-col cursor-pointer
+                                    group/cell relative flex-1 min-h-0 rounded-2xl p-3.5 flex flex-col cursor-pointer
                                     transition-all duration-300 ease-out
                                     bg-white border border-slate-200/60
                                     shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)]
@@ -152,7 +152,7 @@ export const DateGrid: React.FC<DateGridProps> = ({ startDate, endDate }) => {
                                     <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-2.5 flex-shrink-0" />
 
                                     {/* 任务列表区域 */}
-                                    <div className="flex-1 overflow-y-auto space-y-1.5 date-cell-scrollbar">
+                                    <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 date-cell-scrollbar">
                                         {dateTasks.length === 0 ? (
                                             /* 空状态 - 参考taskCalendar的添加提示 */
                                             <div
