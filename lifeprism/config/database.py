@@ -630,6 +630,11 @@ GOAL_CONFIG = {
             'type': 'INTEGER',
             'constraints': ['DEFAULT 0'],
             'comment': '排序索引'
+        },
+        'time_invested_updated_at': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '投入时间最后计算时间（ISO 8601格式），用于判断是否需要重新计算'
         }
     },
     'table_constraints': [],

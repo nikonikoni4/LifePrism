@@ -3,7 +3,7 @@ Goal 服务层 - Goal 目标业务逻辑
 
 提供 Goal 的有状态服务类，类似于 CategoryService
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 import json
 
@@ -24,6 +24,9 @@ from lifeprism.server.services.category_service import category_service
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
+
+# 投入时间自动更新阈值（小时）
+TIME_INVESTED_UPDATE_THRESHOLD_HOURS = 24
 
 
 class GoalService:
@@ -173,6 +176,95 @@ class GoalService:
         except Exception as e:
             logger.error(f"获取目标 {goal_id} 的日志失败: {e}")
             return []
+
+    def _should_update_time_invested(self, item: Dict[str, Any]) -> bool:
+        """
+        判断是否需要更新投入时间
+
+        条件：
+        1. 开启了自动追踪（track_time_automatically == 1）
+        2. 绑定了分类（link_to_category_id 不为空）
+        3. time_invested_updated_at 为空或距今超过 24 小时
+
+        Args:
+            item: 目标数据库记录
+
+        Returns:
+            bool: 是否需要更新
+        """
+        # 未开启自动追踪
+        if not item.get('track_time_automatically', 1):
+            return False
+
+        # 未绑定分类
+        if not item.get('link_to_category_id'):
+            return False
+
+        # 检查上次更新时间
+        updated_at = item.get('time_invested_updated_at')
+        if not updated_at:
+            return True
+
+        try:
+            last_update = datetime.fromisoformat(updated_at)
+            threshold = datetime.now() - timedelta(hours=TIME_INVESTED_UPDATE_THRESHOLD_HOURS)
+            return last_update < threshold
+        except Exception:
+            return True
+
+    def _auto_update_time_invested(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        自动更新目标的投入时间（如果需要）
+
+        Args:
+            item: 目标数据库记录
+
+        Returns:
+            Dict: 更新后的目标记录
+        """
+        if not self._should_update_time_invested(item):
+            return item
+
+        goal_id = item['id']
+        time_invested = self.goal_provider.calculate_time_invested(goal_id)
+        self.goal_provider.update_time_invested(goal_id, time_invested)
+
+        # 更新内存中的记录
+        item['time_invested'] = time_invested
+        item['time_invested_updated_at'] = datetime.now().isoformat()
+        logger.debug(f"自动更新目标 {goal_id} 投入时间: {time_invested} 分钟")
+
+        return item
+
+    def refresh_time_invested(self, goal_id: str) -> Optional[int]:
+        """
+        手动刷新目标的投入时间
+
+        Args:
+            goal_id: 目标 ID
+
+        Returns:
+            Optional[int]: 更新后的投入时间（分钟），失败返回 None
+        """
+        try:
+            # 检查目标是否存在
+            item = self.goal_provider.get_goal_by_id(goal_id)
+            if not item:
+                logger.warning(f"刷新投入时间失败：目标 {goal_id} 不存在")
+                return None
+
+            # 计算并更新
+            time_invested = self.goal_provider.calculate_time_invested(goal_id)
+            success = self.goal_provider.update_time_invested(goal_id, time_invested)
+
+            if success:
+                logger.info(f"手动刷新目标 {goal_id} 投入时间: {time_invested} 分钟")
+                return time_invested
+            return None
+
+        except Exception as e:
+            logger.error(f"刷新目标 {goal_id} 投入时间失败: {e}")
+            return None
     
     def get_goal_name(self, goal_id: str) -> Optional[str]:
         """
@@ -188,14 +280,19 @@ class GoalService:
             return None
         return self.goal_name_map.get(str(goal_id))
     
-    def _convert_db_item_to_goal_item(self, item: Dict[str, Any], include_journal: bool = False) -> GoalItem:
+    def _convert_db_item_to_goal_item(self, item: Dict[str, Any], include_journal: bool = False, auto_update_time: bool = True) -> GoalItem:
         """
         将数据库记录转换为 GoalItem，同时将分类 ID 转换为名称
 
         Args:
             item: 数据库记录
             include_journal: 是否包含日志列表（详情页需要）
+            auto_update_time: 是否自动更新投入时间（默认 True）
         """
+        # 自动更新投入时间（如果需要）
+        if auto_update_time:
+            item = self._auto_update_time_invested(item)
+
         category_name = self._get_category_name(item.get('link_to_category_id'))
         sub_category_name = self._get_sub_category_name(item.get('link_to_sub_category_id'))
 

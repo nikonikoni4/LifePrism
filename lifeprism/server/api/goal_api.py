@@ -191,6 +191,21 @@ async def update_milestone_state(
     return {"success": True}
 
 
+@router.post("/goals/{goal_id}/refresh-time", summary="刷新目标投入时间")
+async def refresh_goal_time_invested(
+    goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)")
+):
+    """
+    手动刷新目标的投入时间
+
+    从 user_app_behavior_log 重新计算该目标的总投入时间
+    """
+    result = goal_service.refresh_time_invested(goal_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="目标不存在或刷新失败")
+    return {"success": True, "time_invested": result}
+
+
 # ============================================================================
 # Journal 接口
 # ============================================================================

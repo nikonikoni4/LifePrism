@@ -202,7 +202,7 @@ class GoalProvider(LWBaseDataProvider):
                     'start_date', 'expected_finished_at',
                     'value', 'commitment', 'time_unit', 'time_invested',
                     'track_time_automatically', 'milestones',
-                    'status', 'order_index'
+                    'status', 'order_index', 'time_invested_updated_at'
                 ]
                 
                 set_clauses = []
@@ -398,15 +398,75 @@ class GoalProvider(LWBaseDataProvider):
                       AND (sc.state IS NULL OR sc.state != 0)
                     ORDER BY g.order_index ASC
                 """)
-                
+
                 columns = [description[0] for description in cursor.description]
                 rows = cursor.fetchall()
-                
+
                 return [dict(zip(columns, row)) for row in rows]
-                
+
         except Exception as e:
             logger.error(f"获取活跃目标列表（用于分类）失败: {e}")
             return []
+
+    def calculate_time_invested(self, goal_id: str) -> int:
+        """
+        从 user_app_behavior_log 计算目标的总投入时间
+
+        Args:
+            goal_id: 目标 ID
+
+        Returns:
+            int: 总投入时间（分钟）
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT COALESCE(SUM(duration), 0) as total_seconds
+                    FROM user_app_behavior_log
+                    WHERE link_to_goal_id = ?
+                """, (goal_id,))
+
+                result = cursor.fetchone()
+                total_seconds = int(result[0]) if result and result[0] else 0
+                # 转换为分钟
+                total_minutes = total_seconds // 60
+                return total_minutes
+
+        except Exception as e:
+            logger.error(f"计算目标 {goal_id} 投入时间失败: {e}")
+            return 0
+
+    def update_time_invested(self, goal_id: str, time_invested: int) -> bool:
+        """
+        更新目标的投入时间和更新时间戳
+
+        Args:
+            goal_id: 目标 ID
+            time_invested: 投入时间（分钟）
+
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                now = datetime.now().isoformat()
+
+                cursor.execute("""
+                    UPDATE goal
+                    SET time_invested = ?, time_invested_updated_at = ?
+                    WHERE id = ?
+                """, (time_invested, now, goal_id))
+
+                success = cursor.rowcount > 0
+                if success:
+                    logger.debug(f"更新目标 {goal_id} 投入时间: {time_invested} 分钟")
+                return success
+
+        except Exception as e:
+            logger.error(f"更新目标 {goal_id} 投入时间失败: {e}")
+            return False
 
 
 # 创建全局单例
