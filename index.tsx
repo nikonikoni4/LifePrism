@@ -1,8 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App';
-import { initCacheCleanup } from './utils/cacheManager';
-import './src/styles/main.css';
+import { initCacheCleanup } from './core/utils/cacheManager';
+import './core/styles/main.css';
 
 // 初始化缓存清理
 initCacheCleanup();
@@ -15,6 +16,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </React.StrictMode>
 );
