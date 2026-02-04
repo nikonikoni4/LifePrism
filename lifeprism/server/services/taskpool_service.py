@@ -129,9 +129,39 @@ def _generate_anchor_id() -> str:
     return f"t-{uuid.uuid4().hex[:8]}"
 
 
-# ============================================================================
-# MD 解析
-# ============================================================================
+def _ensure_todoblock_exists(content: str) -> str:
+    """
+    确保 MD 内容中存在 todoblock 标记
+
+    如果不存在，在文档末尾（系统展示区之前）添加 todoblock。
+
+    Args:
+        content: MD 文件内容
+
+    Returns:
+        str: 更新后的内容
+    """
+    # 检查是否已存在 todoblock
+    if TODOBLOCK_PATTERN.search(content):
+        return content
+
+    # 构建 todoblock
+    todoblock = "\n\n## 任务列表\n<!-- lp:todoblock -->\n\n<!-- /lp:todoblock -->\n"
+
+    # 查找系统展示区位置
+    system_start = content.find(SYSTEM_SECTION_START)
+    if system_start != -1:
+        # 在系统展示区之前插入
+        separator_pos = content.rfind('---', 0, system_start)
+        if separator_pos != -1:
+            content = content[:separator_pos].rstrip() + todoblock + content[separator_pos:]
+        else:
+            content = content[:system_start].rstrip() + todoblock + content[system_start:]
+    else:
+        # 在文档末尾添加
+        content = content.rstrip() + todoblock
+
+    return content
 
 # 正则表达式
 TODOBLOCK_PATTERN = re.compile(
@@ -572,8 +602,15 @@ def sync_plan_doc(
     # 3. 查找并解析 todoblock
     todoblock_match = TODOBLOCK_PATTERN.search(content)
     if not todoblock_match:
-        logger.info(f"计划书无 todoblock: {plan_doc_id}")
-        return result
+        logger.info(f"计划书无 todoblock，自动创建: {plan_doc_id}")
+        # 自动创建 todoblock
+        content = _ensure_todoblock_exists(content)
+        _write_plan_doc_content(plan_doc_id, content)
+        # 重新查找 todoblock
+        todoblock_match = TODOBLOCK_PATTERN.search(content)
+        if not todoblock_match:
+            logger.error(f"创建 todoblock 失败: {plan_doc_id}")
+            return result
 
     block_content = todoblock_match.group(1)
     block_start = todoblock_match.start(1)

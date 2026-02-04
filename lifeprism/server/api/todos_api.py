@@ -136,8 +136,20 @@ async def update_todo(
     - **item**: 更新后的任务
     - **md_synced**: 是否同步了 MD 文件
     """
-    # 如果设置了 date，自动将状态改为 scheduled
     updates = request.model_dump(exclude_unset=True)
+
+    # 验证：scheduled 状态必须提供 date
+    if updates.get('state') == 'scheduled':
+        # 检查是否提供了 date，或者现有任务是否已有 date
+        if not updates.get('date'):
+            existing = taskpool_service.get_todo_by_id(todo_id)
+            if not existing or not existing.date:
+                raise HTTPException(
+                    status_code=400,
+                    detail="scheduled_date is required when state is scheduled"
+                )
+
+    # 如果设置了 date，自动将状态改为 scheduled
     if 'date' in updates and updates['date'] and updates.get('state') not in ('completed', 'shelved'):
         updates['state'] = 'scheduled'
 
