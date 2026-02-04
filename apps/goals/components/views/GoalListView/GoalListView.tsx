@@ -67,6 +67,14 @@ export const GoalListView: React.FC = () => {
     }
   };
 
+  const handleTimeRefreshed = (id: string, newTimeInvested: string) => {
+    // Update the goal's timeInvested in the store
+    const goal = goals.find(g => g.id === id);
+    if (goal) {
+      updateGoal({ ...goal, timeInvested: newTimeInvested });
+    }
+  };
+
   return (
     <div className={`h-full relative flex flex-col ${viewBackground.className}`} style={viewBackground.style}>
       {/* Scrollable Container */}
@@ -172,6 +180,7 @@ export const GoalListView: React.FC = () => {
                         onClick={handleCardClick}
                         onDelete={handleDeleteGoal}
                         onToggleStatus={handleToggleStatus}
+                        onTimeRefreshed={handleTimeRefreshed}
                       />
                     ))}
 
@@ -228,6 +237,7 @@ export const GoalListView: React.FC = () => {
                               onClick={handleCardClick}
                               onDelete={handleDeleteGoal}
                               onToggleStatus={handleToggleStatus}
+                              onTimeRefreshed={handleTimeRefreshed}
                             />
                           ))}
                         </div>

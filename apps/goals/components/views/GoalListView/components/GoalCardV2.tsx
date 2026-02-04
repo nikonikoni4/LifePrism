@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Check, Trash2, Clock, Flag } from 'lucide-react';
+import { Calendar, Check, Trash2, Clock, Flag, RefreshCw } from 'lucide-react';
 import { Goal } from '../../../../types';
 import { THEMES } from '../../../../hooks/useGoalStore';
-import { formatDateForDisplay } from '../../../../api';
+import { formatDateForDisplay, goalsV2Api } from '../../../../api';
 import MilestoneProgressBar from './milestone/MilestoneProgressBar';
 
 interface GoalCardV2Props {
@@ -11,6 +11,7 @@ interface GoalCardV2Props {
   onClick: (id: string) => void;
   onDelete: (id: string) => void;
   onToggleStatus: (id: string) => void;
+  onTimeRefreshed?: (id: string, newTimeInvested: string) => void;
 }
 
 export const CategoryLabel = ({ children }: { children: React.ReactNode }) => {
@@ -26,9 +27,37 @@ const GoalCardV2: React.FC<GoalCardV2Props> = ({
   onClick,
   onDelete,
   onToggleStatus,
+  onTimeRefreshed,
 }) => {
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const isCompleted = goal.status === 'completed';
   const theme = THEMES[goal.theme] || THEMES.indigo;
+
+  // 是否显示刷新按钮：开启自动追踪且绑定了分类
+  const showRefreshButton = goal.trackTimeAutomatically && goal.category;
+
+  // 刷新投入时间
+  const handleRefreshTime = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isRefreshing) return;
+
+    setIsRefreshing(true);
+    try {
+      const result = await goalsV2Api.refreshTimeInvested(goal.id);
+      if (result.success && onTimeRefreshed) {
+        // 格式化时间
+        const minutes = result.timeInvested;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        const timeStr = goal.unit === 'MINS' ? `${minutes}m` : `${hours}h ${mins}m`;
+        onTimeRefreshed(goal.id, timeStr);
+      }
+    } catch (error) {
+      console.error('Failed to refresh time invested:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Calculate days started
   const daysStarted = goal.startDate
@@ -113,6 +142,17 @@ const GoalCardV2: React.FC<GoalCardV2Props> = ({
             <span className="text-[10px] font-medium text-slate-400 uppercase">
               {goal.unit || 'HRS'}
             </span>
+            {/* Refresh Button - only show when auto tracking is enabled and category is bound */}
+            {showRefreshButton && (
+              <button
+                onClick={handleRefreshTime}
+                disabled={isRefreshing}
+                className="ml-0.5 p-1 hover:bg-white/80 rounded transition-colors text-slate-400 hover:text-slate-600 disabled:opacity-50"
+                title="刷新投入时间"
+              >
+                <RefreshCw size={10} className={isRefreshing ? 'animate-spin' : ''} />
+              </button>
+            )}
           </div>
 
           {/* Days Started */}

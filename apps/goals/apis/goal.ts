@@ -337,4 +337,20 @@ export const goalsV2Api = {
             tags: data.tags || [],
         };
     },
+
+    /**
+     * Refresh time invested for a goal
+     * Manually triggers recalculation from behavior logs
+     */
+    refreshTimeInvested: async (goalId: string): Promise<{ success: boolean; timeInvested: number }> => {
+        const res = await fetch(`${getApiBase()}/goals/${goalId}/refresh-time`, {
+            method: 'POST',
+        });
+
+        if (!res.ok) {
+            throw new Error(`Failed to refresh time invested: ${res.status}`);
+        }
+
+        return res.json();
+    },
 };
