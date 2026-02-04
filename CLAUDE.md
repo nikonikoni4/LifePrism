@@ -8,6 +8,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 对话时除了专有名词外，需要使用中文回答
 
+### 前端 rules
+
+1. **任务池虚拟滚动 - 禁止修改**：`TaskPoolView.tsx` 使用 `@tanstack/react-virtual` 实现虚拟滚动，这是**必须保留**的性能优化方案。
+
+   **原因**：
+   - 前端一次性从后端获取所有 Todo 数据（无分页）
+   - 任务数量可能很大，普通渲染会导致严重性能问题
+   - 虚拟滚动只渲染可视区域内的元素，大幅提升性能
+
+   **已知问题**：
+   - 虚拟滚动的动态高度测量可能导致轻微的视觉重叠
+   - 这是虚拟滚动库的固有限制，不是 bug
+   - **不要尝试通过移除虚拟滚动来"修复"这个问题**
+
+   **如果需要优化**：
+   - 可以调整 `estimateSize` 的估计值
+   - 可以调整 `measureElement` 的测量逻辑
+   - 可以调整元素的 `paddingBottom` 间距
+   - **不要移除虚拟滚动改为普通列表渲染**
+
 ### 后端server rules
 
 1. 在lifeprism\config\database.py完成数据表的配置 
