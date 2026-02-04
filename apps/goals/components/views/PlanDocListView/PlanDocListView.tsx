@@ -4,10 +4,11 @@ import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
 import { PlanDoc } from '../../../types';
 import { planDocApi } from '../../../api';
-import { Plus, ChevronDown, FileText, Target, MoreVertical, Trash2, Copy, Archive, Save, PenLine } from 'lucide-react';
+import { Plus, ChevronDown, FileText, Target, MoreVertical, Trash2, Copy, Archive, Save, PenLine, RefreshCw } from 'lucide-react';
 import { PlanDocEditorView } from './components/PlanDocEditorView/PlanDocEditorView';
 import { DropdownMenu, DropdownItem } from '../../shared/components/DropdownMenu';
 import { InputDialog } from '../../shared/components/InputDialog';
+import { RefreshConflictDialog } from '../../shared/components/RefreshConflictDialog';
 import { viewBackground } from '../../shared/backgroundStyles';
 import { toast } from '../../../../../core/components';
 
@@ -37,6 +38,10 @@ export const PlanDocListView: React.FC = () => {
     // Dialog state for renaming
     const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
     const [renameDocName, setRenameDocName] = useState('');
+
+    // Dialog state for refresh conflict
+    const [isRefreshConflictDialogOpen, setIsRefreshConflictDialogOpen] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     // Derived
     const selectedGoal = goals.find(g => g.id === selectedGoalId) || null;
@@ -206,6 +211,48 @@ export const PlanDocListView: React.FC = () => {
         }
     };
 
+    // Refresh handlers
+    const handleRefreshClick = () => {
+        if (!selectedPlanDocId) return;
+
+        if (hasUnsavedChanges) {
+            // Show conflict dialog
+            setIsRefreshConflictDialogOpen(true);
+        } else {
+            // No conflict, refresh directly
+            doRefresh();
+        }
+    };
+
+    const doRefresh = async () => {
+        if (!selectedPlanDocId) return;
+
+        setIsRefreshing(true);
+        try {
+            const doc = await planDocApi.getPlanDocDetail(selectedPlanDocId);
+            setLocalContent(doc.content);
+            setHasUnsavedChanges(false);
+            updatePlanDoc(doc);
+            toast.success('已刷新');
+        } catch (err) {
+            console.error('Failed to refresh doc:', err);
+            toast.error('刷新失败');
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
+
+    const handleRefreshKeepLocal = () => {
+        // User chose to keep local changes, just close dialog
+        setIsRefreshConflictDialogOpen(false);
+    };
+
+    const handleRefreshUseFile = () => {
+        // User chose to use file content, discard local changes
+        setIsRefreshConflictDialogOpen(false);
+        doRefresh();
+    };
+
     const handleDeleteDoc = async () => {
         if (selectedPlanDocId) {
             if (confirm('Are you sure you want to delete this plan?')) {
@@ -329,6 +376,18 @@ export const PlanDocListView: React.FC = () => {
                     </button>
 
                     <button
+                        onClick={handleRefreshClick}
+                        disabled={!selectedPlanDocId || isRefreshing}
+                        className={`p-2 rounded-xl border shadow-sm transition-all ${selectedPlanDocId && !isRefreshing
+                            ? 'bg-white border-slate-100 text-slate-400 hover:text-indigo-500 hover:border-indigo-100 hover:shadow-md'
+                            : 'bg-white border-slate-100 text-slate-300 cursor-not-allowed'
+                            }`}
+                        title="Refresh from file"
+                    >
+                        <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+                    </button>
+
+                    <button
                         onClick={handleOpenCreateDialog}
                         className="p-2 rounded-xl bg-white border border-slate-100 shadow-sm text-slate-400 hover:text-indigo-500 hover:border-indigo-100 hover:shadow-md transition-all"
                         title="New Plan Doc"
@@ -389,6 +448,14 @@ export const PlanDocListView: React.FC = () => {
                 defaultValue={renameDocName}
                 confirmText="Rename"
                 cancelText="Cancel"
+            />
+            {/* Refresh Conflict Dialog */}
+            <RefreshConflictDialog
+                isOpen={isRefreshConflictDialogOpen}
+                onClose={() => setIsRefreshConflictDialogOpen(false)}
+                onKeepLocal={handleRefreshKeepLocal}
+                onUseFile={handleRefreshUseFile}
+                docName={selectedDoc?.id || ''}
             />
         </div>
     );
