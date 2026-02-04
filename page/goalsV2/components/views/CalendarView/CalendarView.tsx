@@ -87,7 +87,7 @@ export const CalendarView: React.FC<CalendarViewProps> = () => {
 
     return (
         <div className={`h-full flex flex-col ${viewBackground.className}`} style={viewBackground.style}>
-            {/* 隐藏滚动条样式 */}
+            {/* 滚动条样式 */}
             <style>{`
                 .calendar-scrollbar::-webkit-scrollbar {
                     width: 6px;
@@ -101,6 +101,20 @@ export const CalendarView: React.FC<CalendarViewProps> = () => {
                 }
                 .calendar-scrollbar::-webkit-scrollbar-thumb:hover {
                     background-color: rgba(148, 163, 184, 0.5);
+                }
+                /* 日期框内任务列表滚动条 */
+                .date-cell-scrollbar::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .date-cell-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .date-cell-scrollbar::-webkit-scrollbar-thumb {
+                    background-color: rgba(148, 163, 184, 0.25);
+                    border-radius: 2px;
+                }
+                .date-cell-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background-color: rgba(148, 163, 184, 0.45);
                 }
             `}</style>
 

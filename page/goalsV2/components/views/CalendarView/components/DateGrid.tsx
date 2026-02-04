@@ -152,7 +152,7 @@ export const DateGrid: React.FC<DateGridProps> = ({ startDate, endDate }) => {
                                     <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-2.5 flex-shrink-0" />
 
                                     {/* 任务列表区域 */}
-                                    <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-hide">
+                                    <div className="flex-1 overflow-y-auto space-y-1.5 date-cell-scrollbar">
                                         {dateTasks.length === 0 ? (
                                             /* 空状态 - 参考taskCalendar的添加提示 */
                                             <div

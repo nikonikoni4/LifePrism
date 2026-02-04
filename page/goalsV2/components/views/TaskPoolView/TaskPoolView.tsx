@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { X, RefreshCw, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
+import { X, RefreshCw, Loader2, ChevronRight, ChevronDown, GripVertical } from 'lucide-react';
 import { useTaskPoolStore } from '../../../hooks/useTaskPoolStore';
 import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
@@ -417,53 +417,53 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                                                     data={task}
                                                     className={taskClassName}
                                                 >
-                                                    <div
-                                                        className="flex items-stretch bg-white rounded-xl border-y border-r border-slate-200/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
-                                                        style={{ borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: STATE_BORDER_COLORS[task.state] || STATE_BORDER_COLORS.pool }}
-                                                    >
-                                                        <div className="flex-1 flex items-start gap-2">
-                                                            <button
-                                                                onClick={() => hasChildren && handleToggleExpand(task.id)}
-                                                                className={`flex-shrink-0 mt-3 ml-2 w-5 h-5 flex items-center justify-center transition-all rounded ${hasChildren ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer' : 'text-transparent cursor-default'}`}
-                                                            >
-                                                                {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
-                                                            </button>
-                                                            <div className="flex-1 min-w-0">
-                                                                <TodoItemComponent
-                                                                    item={task}
-                                                                    onUpdate={updateTask}
-                                                                    onDelete={deleteTask}
-                                                                    showDate={true}
-                                                                    disableSortable={true}
-                                                                    disableCardStyle={true}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </DraggableItem>
-                                            ) : (
-                                                <div
-                                                    className={`flex items-stretch bg-white rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${taskClassName}`}
-                                                    style={{
-                                                        border: '1px solid rgba(226, 232, 240, 0.8)',
-                                                        borderLeft: `4px solid ${STATE_BORDER_COLORS[task.state] || STATE_BORDER_COLORS.pool}`
-                                                    }}
-                                                >
-                                                    <div className="flex-1 flex items-start gap-2">
+                                                    <div className="flex items-start gap-1">
+                                                        {/* 展开/折叠按钮 - 放在卡片外部 */}
                                                         <button
                                                             onClick={() => hasChildren && handleToggleExpand(task.id)}
-                                                            className={`flex-shrink-0 mt-3 ml-2 w-5 h-5 flex items-center justify-center transition-all rounded ${hasChildren ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer' : 'text-transparent cursor-default'}`}
+                                                            className={`flex-shrink-0 mt-3 w-5 h-5 flex items-center justify-center transition-all rounded ${hasChildren ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer' : 'text-transparent cursor-default'}`}
                                                         >
                                                             {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                                                         </button>
-                                                        <div className="flex-1 min-w-0">
+                                                        {/* 任务卡片 */}
+                                                        <div
+                                                            className="flex-1 bg-white rounded-xl border-y border-r border-slate-200/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                                                            style={{ borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: STATE_BORDER_COLORS[task.state] || STATE_BORDER_COLORS.pool }}
+                                                        >
                                                             <TodoItemComponent
                                                                 item={task}
                                                                 onUpdate={updateTask}
                                                                 onDelete={deleteTask}
+                                                                showDate={true}
+                                                                disableSortable={true}
                                                                 disableCardStyle={true}
                                                             />
                                                         </div>
+                                                    </div>
+                                                </DraggableItem>
+                                            ) : (
+                                                <div className="flex items-start gap-1">
+                                                    {/* 展开/折叠按钮 - 放在卡片外部 */}
+                                                    <button
+                                                        onClick={() => hasChildren && handleToggleExpand(task.id)}
+                                                        className={`flex-shrink-0 mt-3 w-5 h-5 flex items-center justify-center transition-all rounded ${hasChildren ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer' : 'text-transparent cursor-default'}`}
+                                                    >
+                                                        {hasChildren && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+                                                    </button>
+                                                    {/* 任务卡片 */}
+                                                    <div
+                                                        className={`flex-1 bg-white rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${taskClassName}`}
+                                                        style={{
+                                                            border: '1px solid rgba(226, 232, 240, 0.8)',
+                                                            borderLeft: `4px solid ${STATE_BORDER_COLORS[task.state] || STATE_BORDER_COLORS.pool}`
+                                                        }}
+                                                    >
+                                                        <TodoItemComponent
+                                                            item={task}
+                                                            onUpdate={updateTask}
+                                                            onDelete={deleteTask}
+                                                            disableCardStyle={true}
+                                                        />
                                                     </div>
                                                 </div>
                                             )}
