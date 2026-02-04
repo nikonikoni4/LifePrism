@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Check, Trash2, Clock } from 'lucide-react';
+import { Calendar, Check, Trash2, Clock, Flag } from 'lucide-react';
 import { Goal } from '../../../../types';
 import { THEMES } from '../../../../hooks/useGoalStore';
 import { formatDateForDisplay } from '../../../../api';
@@ -34,6 +34,8 @@ const GoalCardV2: React.FC<GoalCardV2Props> = ({
   const daysStarted = goal.startDate
     ? Math.max(0, Math.floor((Date.now() - new Date(goal.startDate).getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
+
+  const hasMilestones = goal.milestones && goal.milestones.length > 0;
 
   return (
     <motion.div
@@ -96,11 +98,11 @@ const GoalCardV2: React.FC<GoalCardV2Props> = ({
         </div>
 
         {/* Stats Row */}
-        <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center flex-wrap gap-3 mb-3">
           {/* Time Invested */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-white/60 rounded-xl">
-            <Clock size={14} className="text-slate-400" />
-            <span className="text-lg font-bold tabular-nums text-slate-800">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/60 rounded-lg">
+            <Clock size={12} className="text-slate-400" />
+            <span className="text-sm font-bold tabular-nums text-slate-700">
               {goal.timeInvested}
             </span>
             <span className="text-[10px] font-medium text-slate-400 uppercase">
@@ -109,32 +111,35 @@ const GoalCardV2: React.FC<GoalCardV2Props> = ({
           </div>
 
           {/* Days Started */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-white/60 rounded-xl">
-            <Calendar size={14} className="text-slate-400" />
-            <span className="text-lg font-bold tabular-nums text-slate-800">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/60 rounded-lg">
+            <Calendar size={12} className="text-slate-400" />
+            <span className="text-sm font-bold tabular-nums text-slate-700">
               {daysStarted}
             </span>
             <span className="text-[10px] font-medium text-slate-400">天</span>
           </div>
 
-          {/* Milestone Progress */}
-          {goal.milestones && goal.milestones.length > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-white/60 rounded-xl">
+          {/* Date Range */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500">
+            <span className="font-medium">
+              {formatDateForDisplay(goal.startDate)} — {formatDateForDisplay(goal.endDate)}
+            </span>
+          </div>
+        </div>
+
+        {/* Milestone Progress Row */}
+        {hasMilestones && (
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-white/50 rounded-xl border border-white/60">
+            <Flag size={12} className="text-slate-400 flex-shrink-0" />
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide flex-shrink-0">里程碑</span>
+            <div className="flex-1">
               <MilestoneProgressBar
                 milestones={goal.milestones}
                 accentColor={theme.accentColor}
               />
             </div>
-          )}
-        </div>
-
-        {/* Date Range */}
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <Calendar size={12} />
-          <span className="font-medium">
-            {formatDateForDisplay(goal.startDate)} — {formatDateForDisplay(goal.endDate)}
-          </span>
-        </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );

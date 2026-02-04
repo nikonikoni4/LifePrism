@@ -192,11 +192,31 @@ export const GoalProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const updateMilestoneState = async (goalId: string, milestoneId: string, state: number) => {
         setError(null);
+
+        // Optimistic update: immediately update UI
+        const previousGoals = goals;
+        setGoals(prev => prev.map(g => {
+            if (g.id === goalId) {
+                return {
+                    ...g,
+                    milestones: (g.milestones || []).map(m =>
+                        m.id === milestoneId
+                            ? { ...m, state, finishTime: state === 1 ? new Date().toISOString().split('T')[0] : null }
+                            : m
+                    )
+                };
+            }
+            return g;
+        }));
+
         try {
             const updated = await goalsV2Api.updateMilestoneState(goalId, milestoneId, state);
+            // Sync with server response to ensure consistency
             setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
         } catch (err) {
             console.error('[GoalStore] Failed to update milestone:', err);
+            // Rollback on error
+            setGoals(previousGoals);
             setError(err instanceof Error ? err.message : 'Failed to update milestone');
             throw err;
         }
@@ -207,11 +227,18 @@ export const GoalProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const goal = goals.find(g => g.id === goalId);
         if (!goal) return;
 
+        // Optimistic update: immediately update UI
+        const previousGoals = goals;
+        setGoals(prev => prev.map(g => g.id === goalId ? { ...g, milestones } : g));
+
         try {
             const updated = await goalsV2Api.updateGoal(goalId, { milestones });
+            // Sync with server response
             setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
         } catch (err) {
             console.error('[GoalStore] Failed to update milestones:', err);
+            // Rollback on error
+            setGoals(previousGoals);
             setError(err instanceof Error ? err.message : 'Failed to update milestones');
             throw err;
         }
