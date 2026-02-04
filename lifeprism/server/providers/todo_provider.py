@@ -1,6 +1,6 @@
 """
-Goal 数据提供者
-提供 TodoList 和 SubTodoList 的数据库操作
+Todo 数据提供者
+提供 TodoList 的数据库操作（支持多层级 parent_id 关系）
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -13,9 +13,9 @@ logger = get_logger(__name__)
 
 class TodoProvider(LWBaseDataProvider):
     """
-    目标模块数据提供者
-    
-    继承 LWBaseDataProvider，提供 TodoList 和 SubTodoList 的 CRUD 操作
+    Todo 数据提供者
+
+    继承 LWBaseDataProvider，提供 TodoList 的 CRUD 操作（支持多层级 parent_id 关系）
     """
     
     def __init__(self, db_manager=None):
@@ -212,7 +212,7 @@ class TodoProvider(LWBaseDataProvider):
     
     def delete_todo(self, todo_id: int) -> bool:
         """
-        删除任务（子任务会级联删除）
+        删除任务
 
         Args:
             todo_id: 任务 ID
@@ -223,11 +223,6 @@ class TodoProvider(LWBaseDataProvider):
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-
-                # 先删除子任务
-                cursor.execute("DELETE FROM sub_todo_list WHERE parent_id = ?", (todo_id,))
-
-                # 再删除主任务
                 cursor.execute("DELETE FROM todo_list WHERE id = ?", (todo_id,))
 
                 success = cursor.rowcount > 0
@@ -268,10 +263,6 @@ class TodoProvider(LWBaseDataProvider):
                 # 获取所有要删除的 ID（包括自身）
                 all_ids = get_all_descendant_ids(todo_id)
                 all_ids.append(todo_id)
-
-                # 先删除 sub_todo_list 中的子任务
-                for tid in all_ids:
-                    cursor.execute("DELETE FROM sub_todo_list WHERE parent_id = ?", (tid,))
 
                 # 从叶子节点开始删除（反向顺序）
                 deleted_count = 0
@@ -333,9 +324,6 @@ class TodoProvider(LWBaseDataProvider):
 
                 deleted_count = 0
                 for todo_id in todo_ids:
-                    # 先删除 sub_todo_list 中的子任务
-                    cursor.execute("DELETE FROM sub_todo_list WHERE parent_id = ?", (todo_id,))
-                    # 再删除主任务
                     cursor.execute("DELETE FROM todo_list WHERE id = ?", (todo_id,))
                     if cursor.rowcount > 0:
                         deleted_count += 1
@@ -468,192 +456,6 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"移动任务失败: {e}")
             return False
     
-    
-    # ==================== SubTodoList 操作 ====================
-    
-    def get_sub_todos_by_parent(self, parent_id: int) -> List[Dict[str, Any]]:
-        """
-        获取子任务列表
-        
-        Args:
-            parent_id: 父任务 ID
-        
-        Returns:
-            List[Dict]: 子任务列表
-        """
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT * FROM sub_todo_list WHERE parent_id = ? ORDER BY order_index ASC",
-                    (parent_id,)
-                )
-                
-                columns = [description[0] for description in cursor.description]
-                rows = cursor.fetchall()
-                
-                return [dict(zip(columns, row)) for row in rows]
-                
-        except Exception as e:
-            logger.error(f"获取子任务列表失败: {e}")
-            return []
-    
-    def create_sub_todo(self, parent_id: int, content: str) -> Optional[int]:
-        """
-        创建子任务
-        
-        Args:
-            parent_id: 父任务 ID
-            content: 子任务内容
-        
-        Returns:
-            Optional[int]: 新子任务 ID，失败返回 None
-        """
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # 获取当前最大 order_index
-                cursor.execute(
-                    "SELECT COALESCE(MAX(order_index), -1) + 1 FROM sub_todo_list WHERE parent_id = ?",
-                    (parent_id,)
-                )
-                next_order = cursor.fetchone()[0]
-                
-                cursor.execute(
-                    "INSERT INTO sub_todo_list (parent_id, order_index, content, completed) VALUES (?, ?, ?, 0)",
-                    (parent_id, next_order, content)
-                )
-                
-                new_id = cursor.lastrowid
-                logger.info(f"创建子任务成功，ID: {new_id}")
-                return new_id
-                
-        except Exception as e:
-            logger.error(f"创建子任务失败: {e}")
-            return None
-    
-    def get_sub_todo_by_id(self, sub_id: int) -> Optional[Dict[str, Any]]:
-        """
-        按 ID 获取子任务
-        
-        Args:
-            sub_id: 子任务 ID
-        
-        Returns:
-            Optional[Dict]: 子任务数据
-        """
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM sub_todo_list WHERE id = ?", (sub_id,))
-                
-                row = cursor.fetchone()
-                if row:
-                    columns = [description[0] for description in cursor.description]
-                    return dict(zip(columns, row))
-                return None
-                
-        except Exception as e:
-            logger.error(f"获取子任务 {sub_id} 失败: {e}")
-            return None
-    
-    def update_sub_todo(self, sub_id: int, data: Dict[str, Any]) -> bool:
-        """
-        更新子任务
-        
-        Args:
-            sub_id: 子任务 ID
-            data: 要更新的字段
-        
-        Returns:
-            bool: 是否成功
-        """
-        try:
-            if not data:
-                return True
-            
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                set_clauses = []
-                values = []
-                for key, value in data.items():
-                    if key in ['content', 'completed']:
-                        set_clauses.append(f"{key} = ?")
-                        if key == 'completed':
-                            values.append(1 if value else 0)
-                        else:
-                            values.append(value)
-                
-                if not set_clauses:
-                    return True
-                
-                values.append(sub_id)
-                sql = f"UPDATE sub_todo_list SET {', '.join(set_clauses)} WHERE id = ?"
-                
-                cursor.execute(sql, values)
-                success = cursor.rowcount > 0
-                
-                if success:
-                    logger.info(f"更新子任务 {sub_id} 成功")
-                return success
-                
-        except Exception as e:
-            logger.error(f"更新子任务 {sub_id} 失败: {e}")
-            return False
-    
-    def delete_sub_todo(self, sub_id: int) -> bool:
-        """
-        删除子任务
-        
-        Args:
-            sub_id: 子任务 ID
-        
-        Returns:
-            bool: 是否成功
-        """
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM sub_todo_list WHERE id = ?", (sub_id,))
-                
-                success = cursor.rowcount > 0
-                if success:
-                    logger.info(f"删除子任务 {sub_id} 成功")
-                return success
-                
-        except Exception as e:
-            logger.error(f"删除子任务 {sub_id} 失败: {e}")
-            return False
-    
-    def reorder_sub_todos(self, parent_id: int, sub_ids: List[int]) -> bool:
-        """
-        批量更新子任务排序
-        
-        Args:
-            parent_id: 父任务 ID
-            sub_ids: 子任务 ID 列表（按新顺序排列）
-        
-        Returns:
-            bool: 是否成功
-        """
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                for index, sub_id in enumerate(sub_ids):
-                    cursor.execute(
-                        "UPDATE sub_todo_list SET order_index = ? WHERE id = ? AND parent_id = ?",
-                        (index, sub_id, parent_id)
-                    )
-                
-                logger.info(f"重排序 {len(sub_ids)} 个子任务成功")
-                return True
-                
-        except Exception as e:
-            logger.error(f"重排序子任务失败: {e}")
-            return False
     
     # ==================== Daily Focus 操作 ====================
     
