@@ -25,3 +25,6 @@ pyinstaller-dist
 build
 debug_occupy_ports.py
 .cursor
+.claude
+.mcp.json
+tests

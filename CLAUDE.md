@@ -4,6 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## rules
 
+### 语言
+
+对话时除了专有名词外，需要使用中文回答
+
 ### 后端server rules
 
 1. 在lifeprism\config\database.py完成数据表的配置 

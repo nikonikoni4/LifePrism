@@ -8,7 +8,36 @@
       "Bash(npm run)",
       "Bash(python -c \"from lifeprism.server.services.activity_stats_builder import _get_category_name_map; print\\(''activity_stats_builder OK''\\)\")",
       "Bash(python -c:*)",
-      "WebFetch(domain:localhost)"
+      "WebFetch(domain:localhost)",
+      "Bash(grep -r \"CategoryTreeItem\\\\|CategoryAPI\\\\|categories\" \"D:\\\\desktop\\\\软件开发\\\\LifeWatch-AI\\\\frontend\" --include=\"*.tsx\" --include=\"*.ts\" ! -path \"*/node_modules/*\" ! -path \"*/my-ui-kit/*\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: 添加通用 Toast 消息弹出组件\n\n- 新增 Toast 组件，支持 success/error/warning/info 四种类型\n- 从顶部弹出，设定时间后自动消失\n- 在 PlanDocListView 中集成，保存文档时显示提示\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: 修复计划书界面未调用API获取文档列表\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: 优化任务池视图样式和状态管理\n\n- 左侧勾选框改为展开/折叠图标\n- 默认显示已完成任务\n- 使用GoalPageContext共享状态\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(python -m py_compile:*)",
+      "Bash(python3 \"C:\\\\Users\\\\15535\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"dashboard SaaS goal tracking card inline-edit\" --design-system -p \"LifeWatch Goals\")",
+      "Bash(python \"C:\\\\Users\\\\15535\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"dashboard SaaS goal tracking card inline-edit\" --design-system -p \"LifeWatch Goals\")",
+      "Bash(git commit:*)",
+      "Bash(python scripts/search.py \"dashboard cards grid layout stats\" --domain landing -n 5)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: 重构Goals页面为可展开的内联编辑卡片\n\n- 新增GoalCardV2组件，支持展开/收起显示详情\n- 新增InlineEditableTitle/Textarea组件，支持点击编辑\n- 新增MilestoneProgressBar组件，紧凑显示里程碑进度\n- 新增ExpandedMilestoneSection组件，整合查看/编辑模式\n- 新增QuickConfigPanel组件，可折叠的配置面板\n- 新增JournalPreview组件，展示最近日志\n- 简化AddGoalModal为仅创建功能\n- 使用Accordion模式，同时只展开一个卡片\n- 保留GoalDetailView作为专注模式入口\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nstyle: 目标卡片布局改为每行一个\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(ls -la \"D:\\\\desktop\\\\软件开发\\\\LifeWatch-AI\\\\docs\\\\功能需求\\\\目标系统\"\" 2>/dev/null || echo \"Directory does not exist \")",
+      "Bash(npm install:*)",
+      "Bash(claude mcp add:*)",
+      "Bash(npx playwright install:*)",
+      "Bash(npx @modelcontextprotocol/server-playwright:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(python -m lifeprism.server.main:*)",
+      "Bash(findstr:*)",
+      "Bash(git add:*)",
+      "Bash(python test_debug_sync.py:*)",
+      "Bash(Select-String -Pattern \"PASSED|FAILED\")",
+      "Bash(tree:*)",
+      "WebSearch"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "chrome-mcp-server"
+  ]
 }
