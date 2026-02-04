@@ -138,11 +138,12 @@ export function mapFrontendGoalToCreateRequest(frontend: Partial<Goal>): CreateG
         name: frontend.title || '',
         content: frontend.details || '',
         color: frontend.theme ? themeToColor(frontend.theme) : '#6366F1',
+        link_to_category_id: frontend.category || null,
         start_date: formatDateForApi(frontend.startDate || ''),
         expected_finished_at: formatDateForApi(frontend.endDate || ''),
         value: frontend.value || null,
         commitment: frontend.commitment || null,
-        track_time_automatically: true,
+        track_time_automatically: frontend.trackTimeAutomatically ?? true,
     };
 }
 
@@ -155,12 +156,14 @@ export function mapFrontendGoalToUpdateRequest(frontend: Partial<Goal>): UpdateG
     if (frontend.title !== undefined) request.name = frontend.title;
     if (frontend.details !== undefined) request.content = frontend.details;
     if (frontend.theme !== undefined) request.color = themeToColor(frontend.theme);
+    if (frontend.category !== undefined) request.link_to_category_id = frontend.category || null;
     if (frontend.startDate !== undefined) request.start_date = formatDateForApi(frontend.startDate);
     if (frontend.endDate !== undefined) request.expected_finished_at = formatDateForApi(frontend.endDate);
     if (frontend.value !== undefined) request.value = frontend.value || null;
     if (frontend.commitment !== undefined) request.commitment = frontend.commitment || null;
     if (frontend.unit !== undefined) request.time_unit = frontend.unit;
     if (frontend.status !== undefined) request.status = frontend.status;
+    if (frontend.trackTimeAutomatically !== undefined) request.track_time_automatically = frontend.trackTimeAutomatically;
 
     if (frontend.milestones !== undefined) {
         const backendMilestones = frontend.milestones.map(m => ({
