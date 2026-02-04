@@ -149,8 +149,9 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
     const virtualizer = useVirtualizer({
         count: flattenedTasks.length,
         getScrollElement: () => parentRef.current,
-        estimateSize: () => 60, // 每个任务项估计高度
+        estimateSize: () => 80, // 每个任务项估计高度（含间距）
         overscan: 5, // 预渲染额外的项目数
+        measureElement: (element) => element.getBoundingClientRect().height, // 动态测量实际高度
     });
 
     // 清空筛选
@@ -326,11 +327,10 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                             <button
                                 key={option.value}
                                 onClick={() => setStateFilter(option.value)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                    stateFilter === option.value
-                                        ? 'bg-white shadow-sm'
-                                        : 'hover:bg-white/50'
-                                }`}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${stateFilter === option.value
+                                    ? 'bg-white shadow-sm'
+                                    : 'hover:bg-white/50'
+                                    }`}
                                 style={{
                                     color: stateFilter === option.value ? option.color : '#64748b'
                                 }}
@@ -399,14 +399,16 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                                     return (
                                         <div
                                             key={task.id}
+                                            data-index={virtualRow.index}
+                                            ref={virtualizer.measureElement}
                                             style={{
                                                 position: 'absolute',
                                                 top: 0,
                                                 left: 0,
                                                 width: '100%',
-                                                height: `${virtualRow.size}px`,
                                                 transform: `translateY(${virtualRow.start}px)`,
                                                 paddingLeft: `${depth * 24}px`,
+                                                paddingBottom: '8px', // 增加间距避免重叠
                                             }}
                                         >
                                             {disableInternalDnd ? (
