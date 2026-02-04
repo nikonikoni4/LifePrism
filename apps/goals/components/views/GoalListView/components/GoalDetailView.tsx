@@ -212,16 +212,19 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({
         {/* Quick Config Panel - Default Expanded */}
         <section className="mb-8">
           <QuickConfigPanel
+            goalId={goal.id}
             theme={displayGoal.theme}
             category={displayGoal.category}
             startDate={displayGoal.startDate}
             endDate={displayGoal.endDate}
             timeInvested={displayGoal.timeInvested}
+            trackTimeAutomatically={displayGoal.trackTimeAutomatically ?? true}
             onThemeChange={(value) => handleFieldChange('theme', value)}
             onCategoryChange={(value) => handleFieldChange('category', value)}
             onStartDateChange={(value) => handleFieldChange('startDate', value)}
             onEndDateChange={(value) => handleFieldChange('endDate', value)}
             onTimeInvestedChange={(value) => handleFieldChange('timeInvested', value)}
+            onTrackModeChange={(value) => handleFieldChange('trackTimeAutomatically', value)}
             defaultExpanded={true}
           />
         </section>
