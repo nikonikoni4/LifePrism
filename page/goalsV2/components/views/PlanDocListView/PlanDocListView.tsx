@@ -15,7 +15,7 @@ import { toast } from '../../../../common';
 export const PlanDocListView: React.FC = () => {
     const { selectedGoalId, setSelectedGoalId, selectedPlanDocId, setSelectedPlanDocId } = useGoalPageContext();
     const { goals } = useGoalStore();
-    const { planDocs, addPlanDoc, updatePlanDoc, deletePlanDoc } = usePlanDocStore();
+    const { planDocs, addPlanDoc, removePlanDocLocal, updatePlanDoc, deletePlanDoc } = usePlanDocStore();
 
     // Local content state for editing to avoid laggy context updates on every keystroke
     const [localContent, setLocalContent] = useState('');
@@ -140,15 +140,24 @@ export const PlanDocListView: React.FC = () => {
     };
 
     const handleOpenCreateDialog = () => {
+        // 生成6位随机字符
+        const randomSuffix = Math.random().toString(36).substring(2, 8);
         if (selectedGoalId && selectedGoal) {
-            setDefaultDocName(`planDoc-${selectedGoal.title}`);
+            setDefaultDocName(`${selectedGoal.title}-planDoc-${randomSuffix}`);
         } else {
-            setDefaultDocName(`planDoc-temp`);
+            setDefaultDocName(`temp-planDoc-${randomSuffix}`);
         }
         setIsCreateDialogOpen(true);
     };
 
     const handleCreateDoc = async (docId: string) => {
+        // 检查本地 store 是否已存在同 ID（避免乐观更新覆盖）
+        const existsLocally = planDocs.some(d => d.id === docId);
+        if (existsLocally) {
+            toast.error(`计划书 "${docId}" 已存在`);
+            return;
+        }
+
         const newDoc: PlanDoc = {
             id: docId,
             goalId: selectedGoalId,
@@ -165,10 +174,14 @@ export const PlanDocListView: React.FC = () => {
         // 调用后端 API 创建（会同时创建 md 文件）
         try {
             await planDocApi.createPlanDoc(newDoc);
-        } catch (error) {
+            toast.success('计划书创建成功');
+        } catch (error: any) {
             console.error('Failed to create plan doc:', error);
-            // 可选：失败时从 store 中移除
-            deletePlanDoc(newDoc.id);
+            // 失败时仅从本地 store 移除，不调用后端删除 API
+            removePlanDocLocal(newDoc.id);
+            // 显示错误信息
+            const errorMsg = error?.response?.data?.detail || error?.message || '创建失败';
+            toast.error(errorMsg);
         }
     };
 

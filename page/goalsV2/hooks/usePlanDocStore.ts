@@ -9,6 +9,7 @@ interface PlanDocStoreContextType {
     error: string | null;
     fetchPlanDocs: () => Promise<void>;
     addPlanDoc: (doc: PlanDoc) => void;
+    removePlanDocLocal: (id: string) => void;  // 仅从本地 store 移除，不调用后端
     updatePlanDoc: (doc: PlanDoc, newId?: string) => Promise<void>;
     deletePlanDoc: (id: string) => Promise<void>;
 }
@@ -41,6 +42,11 @@ export const PlanDocProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const addPlanDoc = (doc: PlanDoc) => {
         setPlanDocs(prev => [...prev, doc]);
+    };
+
+    // 仅从本地 store 移除，不调用后端 API（用于回滚乐观更新）
+    const removePlanDocLocal = (id: string) => {
+        setPlanDocs(prev => prev.filter(d => d.id !== id));
     };
 
     const updatePlanDoc = async (updatedDoc: PlanDoc, newId?: string) => {
@@ -85,7 +91,7 @@ export const PlanDocProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     return React.createElement(
         PlanDocStoreContext.Provider,
-        { value: { planDocs, isLoading, error, fetchPlanDocs, addPlanDoc, updatePlanDoc, deletePlanDoc } },
+        { value: { planDocs, isLoading, error, fetchPlanDocs, addPlanDoc, removePlanDocLocal, updatePlanDoc, deletePlanDoc } },
         children
     );
 };
