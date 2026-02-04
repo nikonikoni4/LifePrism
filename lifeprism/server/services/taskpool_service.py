@@ -887,61 +887,66 @@ def _writeback_completion_to_md(plan_doc_id: str, anchor_id: str) -> bool:
 def _update_system_section(content: str, plan_doc_id: str) -> str:
     """
     更新或添加系统展示区
-    
+
     系统展示区格式：
     ---
-    
+
     ## 任务总览
     <!-- lp:system-section -->
     > 此区域由系统自动生成，手动修改将在下次同步时被覆盖
-    
+
     - [ ] 任务 1
         - [x] 子任务 1.1
     - [x] 任务 2
+
+    NOTE: 功能暂时禁用，直接返回原内容
     """
-    # 获取该计划书的所有任务
-    todos = todo_provider.get_todos_by_plan_doc(plan_doc_id)
-    
-    if not todos:
-        # 无任务，移除系统展示区
-        system_start = content.find(SYSTEM_SECTION_START)
-        if system_start != -1:
-            # 查找 --- 分隔线
-            separator_pos = content.rfind('---', 0, system_start)
-            if separator_pos != -1:
-                content = content[:separator_pos].rstrip()
-        return content
-    
-    # 构建任务树
-    task_tree = _build_task_tree_for_summary(todos)
-    
-    # 生成 MD 内容
-    summary_lines = [
-        '',
-        '---',
-        '',
-        '## 任务总览',
-        SYSTEM_SECTION_START,
-        '> 此区域由系统自动生成，手动修改将在下次同步时被覆盖',
-        '',
-    ]
-    summary_lines.extend(_render_task_tree(task_tree, 0))
-    summary_content = '\n'.join(summary_lines)
-    
-    # 查找并替换现有系统展示区
-    system_start = content.find(SYSTEM_SECTION_START)
-    if system_start != -1:
-        # 找到 --- 分隔线位置
-        separator_pos = content.rfind('---', 0, system_start)
-        if separator_pos != -1:
-            content = content[:separator_pos].rstrip() + summary_content
-        else:
-            content = content[:system_start].rstrip() + summary_content
-    else:
-        # 添加新的系统展示区
-        content = content.rstrip() + summary_content
-    
+    # 暂时禁用任务总览生成功能，直接返回原内容
     return content
+
+    # # 获取该计划书的所有任务
+    # todos = todo_provider.get_todos_by_plan_doc(plan_doc_id)
+    #
+    # if not todos:
+    #     # 无任务，移除系统展示区
+    #     system_start = content.find(SYSTEM_SECTION_START)
+    #     if system_start != -1:
+    #         # 查找 --- 分隔线
+    #         separator_pos = content.rfind('---', 0, system_start)
+    #         if separator_pos != -1:
+    #             content = content[:separator_pos].rstrip()
+    #     return content
+    #
+    # # 构建任务树
+    # task_tree = _build_task_tree_for_summary(todos)
+    #
+    # # 生成 MD 内容
+    # summary_lines = [
+    #     '',
+    #     '---',
+    #     '',
+    #     '## 任务总览',
+    #     SYSTEM_SECTION_START,
+    #     '> 此区域由系统自动生成，手动修改将在下次同步时被覆盖',
+    #     '',
+    # ]
+    # summary_lines.extend(_render_task_tree(task_tree, 0))
+    # summary_content = '\n'.join(summary_lines)
+    #
+    # # 查找并替换现有系统展示区
+    # system_start = content.find(SYSTEM_SECTION_START)
+    # if system_start != -1:
+    #     # 找到 --- 分隔线位置
+    #     separator_pos = content.rfind('---', 0, system_start)
+    #     if separator_pos != -1:
+    #         content = content[:separator_pos].rstrip() + summary_content
+    #     else:
+    #         content = content[:system_start].rstrip() + summary_content
+    # else:
+    #     # 添加新的系统展示区
+    #     content = content.rstrip() + summary_content
+    #
+    # return content
 
 
 def _build_task_tree_for_summary(todos: List[Dict]) -> List[Dict]:
@@ -971,17 +976,20 @@ def _build_task_tree_for_summary(todos: List[Dict]) -> List[Dict]:
 
 
 def _render_task_tree(tasks: List[Dict], indent: int) -> List[str]:
-    """渲染任务树为 MD 格式（不含锚点）"""
+    """渲染任务树为 MD 格式（不含锚点）
+
+    使用 4 个空格作为缩进，确保 Markdown 渲染器正确显示层级
+    """
     lines = []
-    tabs = '\t' * indent
-    
+    spaces = '    ' * indent  # 使用 4 个空格代替 Tab
+
     for task in tasks:
         checkbox = '[x]' if task.get('state') == 'completed' else '[ ]'
-        lines.append(f"{tabs}- {checkbox} {task['content']}")
-        
+        lines.append(f"{spaces}- {checkbox} {task['content']}")
+
         if task.get('children'):
             lines.extend(_render_task_tree(task['children'], indent + 1))
-    
+
     return lines
 
 
