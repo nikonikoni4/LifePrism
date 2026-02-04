@@ -1,202 +1,126 @@
-
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Clock, ChevronLeft, RefreshCw,
-  MoreVertical, Sun, Moon, Coffee, Zap, Pencil, Target, ChevronDown, Check
+  Clock, ChevronLeft, Calendar, Target, Quote, HeartHandshake
 } from 'lucide-react';
-import { Goal, JournalEntry, ThemeKey } from '../../../../types';
+import { Goal, JournalEntry, ThemeKey, MilestoneItem } from '../../../../types';
 import { THEMES } from '../../../../hooks/useGoalStore';
-import { viewBackground } from '../../../shared/backgroundStyles';
-import MilestoneAxis from './milestone/MilestoneAxis';
 import { CategoryLabel } from './GoalCardV2';
 import { formatDateForDisplay } from '../../../../api';
-import JournalEntryModal from './JournalEntryModal';
-import { DropdownMenu, DropdownItem } from '../../../shared/components/DropdownMenu';
+import QuickConfigPanel from './QuickConfigPanel';
+import MilestoneSection from './milestone/MilestoneSection';
+import JournalPreview from './JournalPreview';
+import InlineEditableTitle from './InlineEditableTitle';
+import InlineEditableTextarea from './InlineEditableTextarea';
 
-// --- Reflection Timeline Component ---
-const ReflectionTimeline = ({ entries, theme }: { entries: JournalEntry[], theme: ThemeKey | string }) => {
-  const themeConfig = THEMES[theme] || THEMES.indigo;
-
-  const MoodIcon = ({ mood }: { mood: string }) => {
-    switch (mood) {
-      case 'joy': return <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-500 flex items-center justify-center"><Sun size={14} /></div>;
-      case 'calm': return <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center"><Coffee size={14} /></div>;
-      case 'frustrated': return <div className="w-6 h-6 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center"><Zap size={14} /></div>;
-      default: return <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center"><Moon size={14} /></div>;
-    }
-  };
-
-  return (
-    <div className="relative pl-4 pr-4 pb-20">
-      {/* Vertical Line */}
-      <div className="absolute left-[56px] top-0 bottom-0 w-px bg-slate-200" />
-
-      <div className="space-y-6">
-        {entries.map((entry, i) => (
-          <motion.div
-            key={entry.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="relative flex gap-6"
-          >
-            {/* Left: Date & Mood */}
-            <div className="flex flex-col items-end gap-2 w-10 pt-2 shrink-0 z-10">
-              <span className="text-xs font-semibold text-slate-400">{formatDateForDisplay(entry.date)}</span>
-              <MoodIcon mood={entry.mood} />
-            </div>
-
-            {/* Right: Content Card */}
-            <div className="flex-1 relative group">
-              {/* Connector */}
-              <div className="absolute left-[-25px] top-5 w-2 h-2 rounded-full bg-white border-2 border-slate-300 z-20 group-hover:border-slate-400 transition-colors" />
-
-              <div className="bg-white border border-slate-100 p-5 rounded-[1.25rem] hover:border-slate-200 hover:shadow-sm transition-all duration-200">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    {entry.tags?.map(tag => (
-                      <span key={tag} className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${themeConfig.tag}`}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <span className="text-xs font-medium text-slate-300">{entry.time}</span>
-                </div>
-
-                <p className="text-slate-700 text-sm leading-relaxed mb-3">
-                  {entry.content}
-                </p>
-
-                <div className="flex justify-end border-t border-slate-100 pt-2">
-                  <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
-                    <Clock size={10} /> +{entry.duration}h
-                  </span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// --- Goal Detail View Component ---
 interface GoalDetailViewProps {
   goal: Goal;
   onClose: () => void;
   onUpdate: (goal: Goal) => void;
   onMilestoneToggle?: (goalId: string, milestoneId: string, state: number) => Promise<void>;
+  onMilestonesChange?: (goalId: string, milestones: MilestoneItem[]) => Promise<void>;
   onAddJournal?: (goalId: string, journal: Omit<JournalEntry, 'id'>) => Promise<void>;
   theme: ThemeKey | string;
 }
 
-const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate, onMilestoneToggle, onAddJournal, theme }) => {
+const GoalDetailView: React.FC<GoalDetailViewProps> = ({
+  goal,
+  onClose,
+  onUpdate,
+  onMilestoneToggle,
+  onMilestonesChange,
+  onAddJournal,
+  theme
+}) => {
   const themeConfig = THEMES[theme] || THEMES.indigo;
-  const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
-  const [isEditingTime, setIsEditingTime] = useState(false);
-  const [editedTimeInvested, setEditedTimeInvested] = useState(goal.timeInvested);
+  const [isSaving, setIsSaving] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<Partial<Goal>>({});
 
+  // Calculate days started
+  const daysStarted = goal.startDate
+    ? Math.max(0, Math.floor((Date.now() - new Date(goal.startDate).getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  // Merge pending changes with goal for display
+  const displayGoal = { ...goal, ...pendingChanges };
+
+  // Field change handler
+  const handleFieldChange = useCallback((field: keyof Goal, value: any) => {
+    setPendingChanges(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  // Save all pending changes
+  const handleSave = async () => {
+    if (Object.keys(pendingChanges).length === 0) return;
+
+    setIsSaving(true);
+    try {
+      await onUpdate({ ...goal, ...pendingChanges });
+      setPendingChanges({});
+    } catch (err) {
+      console.error('Failed to save goal:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle milestone state toggle
   const handleMilestoneToggle = async (id: string, newState: number) => {
-    if (!goal.milestones) return;
-
-    // If API handler is provided, use it
     if (onMilestoneToggle) {
       try {
         await onMilestoneToggle(goal.id, id, newState);
       } catch (err) {
         console.error('Failed to update milestone:', err);
       }
-      return;
     }
-
-    // Fallback to local update (for backwards compatibility)
-    const updatedMilestones = goal.milestones.map(m =>
-      m.id === id
-        ? { ...m, state: newState, finishTime: newState === 1 ? new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' }) : null }
-        : m
-    );
-
-    onUpdate({
-      ...goal,
-      milestones: updatedMilestones
-    });
   };
 
-  const handleJournalSave = async (journalData: Omit<JournalEntry, 'id'>) => {
-    if (onAddJournal) {
+  // Handle milestones change (from editor modal)
+  const handleMilestonesChange = async (milestones: MilestoneItem[]) => {
+    if (onMilestonesChange) {
       try {
-        await onAddJournal(goal.id, journalData);
-        setIsJournalModalOpen(false);
+        await onMilestonesChange(goal.id, milestones);
       } catch (err) {
-        console.error('Failed to add journal:', err);
+        console.error('Failed to update milestones:', err);
       }
     }
   };
 
-  const handleTrackModeChange = (autoTrack: boolean) => {
-    onUpdate({
-      ...goal,
-      trackTimeAutomatically: autoTrack
-    });
-  };
-
-  const handleTimeInvestedSave = () => {
-    if (editedTimeInvested !== goal.timeInvested) {
-      onUpdate({
-        ...goal,
-        timeInvested: editedTimeInvested
-      });
-    }
-    setIsEditingTime(false);
-  };
-
-  const handleTimeInvestedKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleTimeInvestedSave();
-    } else if (e.key === 'Escape') {
-      setEditedTimeInvested(goal.timeInvested);
-      setIsEditingTime(false);
+  // Handle journal add
+  const handleAddJournal = async (journal: Omit<JournalEntry, 'id'>) => {
+    if (onAddJournal) {
+      await onAddJournal(goal.id, journal);
     }
   };
 
-  const trackModeItems: DropdownItem[] = [
-    {
-      id: 'auto',
-      label: '自动追踪',
-      rightLabel: goal.trackTimeAutomatically ? '✓' : undefined,
-      onClick: () => handleTrackModeChange(true),
-    },
-    {
-      id: 'manual',
-      label: '手动记录',
-      rightLabel: !goal.trackTimeAutomatically ? '✓' : undefined,
-      onClick: () => handleTrackModeChange(false),
-    },
-  ];
+  const hasPendingChanges = Object.keys(pendingChanges).length > 0;
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className={`fixed inset-0 z-50 overflow-y-auto ${viewBackground.className}`}
-      style={viewBackground.style}
+      className="fixed inset-0 z-50 overflow-y-auto"
+      style={{
+        background: `linear-gradient(135deg, ${themeConfig.accentColor}10 0%, ${themeConfig.accentColor}20 100%)`,
+      }}
     >
-
       {/* Top Nav */}
-      <div className="sticky top-0 z-40 px-6 py-4 flex justify-between items-center bg-[#F8FAFC]/80 backdrop-blur-md border-b border-slate-100">
-        <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-500">
+      <div
+        className="sticky top-0 z-40 px-6 py-4 flex justify-between items-center backdrop-blur-md border-b"
+        style={{
+          backgroundColor: `${themeConfig.accentColor}08`,
+          borderColor: `${themeConfig.accentColor}20`,
+        }}
+      >
+        <button
+          onClick={onClose}
+          className="p-2 rounded-xl hover:bg-white/50 transition-colors text-slate-500"
+        >
           <ChevronLeft size={24} />
         </button>
-        <div className="flex gap-2">
-          <button className="p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600">
-            <RefreshCw size={20} />
-          </button>
-          <button className="p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600">
-            <MoreVertical size={20} />
-          </button>
+        <div className="flex items-center gap-2">
+          <CategoryLabel>{displayGoal.category || '未分类'}</CategoryLabel>
         </div>
       </div>
 
@@ -206,105 +130,138 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({ goal, onClose, onUpdate
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="mb-8"
+            className="mb-6"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 rounded-xl" style={{ backgroundColor: `${themeConfig.accentColor}15` }}>
                 <Target size={20} style={{ color: themeConfig.accentColor }} />
               </div>
-              <CategoryLabel>{goal.category}</CategoryLabel>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">{goal.title}</h1>
-            <p className="text-slate-400 text-sm font-medium">{formatDateForDisplay(goal.startDate)} — {formatDateForDisplay(goal.endDate)}</p>
+            <InlineEditableTitle
+              value={displayGoal.title}
+              onChange={(value) => handleFieldChange('title', value)}
+              className="text-2xl font-bold leading-snug text-slate-800 mb-2"
+            />
+            <div className="flex items-center gap-1.5 text-sm text-slate-500">
+              <Calendar size={14} />
+              <span className="font-medium">
+                {formatDateForDisplay(displayGoal.startDate)} — {formatDateForDisplay(displayGoal.endDate)}
+              </span>
+            </div>
           </motion.div>
 
           {/* Stats Cards */}
           <div className="grid grid-cols-2 gap-4 mb-8">
-            <div className="bg-white rounded-[1.25rem] border border-slate-100 p-5">
-              {isEditingTime && !goal.trackTimeAutomatically ? (
-                <input
-                  type="text"
-                  value={editedTimeInvested}
-                  onChange={(e) => setEditedTimeInvested(e.target.value)}
-                  onBlur={handleTimeInvestedSave}
-                  onKeyDown={handleTimeInvestedKeyDown}
-                  autoFocus
-                  className="text-2xl font-bold text-slate-800 tabular-nums mb-1 w-full bg-transparent border-b-2 border-indigo-500 outline-none"
-                />
-              ) : (
-                <div
-                  className={`text-2xl font-bold text-slate-800 tabular-nums mb-1 ${!goal.trackTimeAutomatically ? 'cursor-pointer hover:text-indigo-600' : ''}`}
-                  onClick={() => !goal.trackTimeAutomatically && setIsEditingTime(true)}
-                >
-                  {goal.timeInvested}
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-400">总投入小时</span>
-                <DropdownMenu
-                  trigger={
-                    <button className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">
-                      {goal.trackTimeAutomatically ? '自动' : '手动'}
-                      <ChevronDown size={10} />
-                    </button>
-                  }
-                  items={trackModeItems}
-                  align="left"
-                  width="w-36"
-                />
+            <div className="bg-white/80 backdrop-blur-sm rounded-[1.25rem] border border-white/50 p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <Calendar size={16} className="text-slate-400" />
+                <span className="text-xs font-medium text-slate-400">已进行</span>
+              </div>
+              <div className="text-2xl font-bold text-slate-800 tabular-nums">
+                {daysStarted}
+                <span className="text-sm font-medium text-slate-400 ml-1">天</span>
               </div>
             </div>
-            <div className="bg-white rounded-[1.25rem] border border-slate-100 p-5">
-              <div className="text-2xl font-bold text-slate-800 tabular-nums mb-1">{goal.daysStarted || 0}</div>
-              <div className="text-xs font-medium text-slate-400">活跃天数</div>
+            <div className="bg-white/80 backdrop-blur-sm rounded-[1.25rem] border border-white/50 p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock size={16} className="text-slate-400" />
+                <span className="text-xs font-medium text-slate-400">已投入</span>
+              </div>
+              <div className="text-2xl font-bold text-slate-800 tabular-nums">
+                {displayGoal.timeInvested}
+                <span className="text-sm font-medium text-slate-400 ml-1">小时</span>
+              </div>
             </div>
           </div>
         </section>
 
+        {/* Core Drive Section */}
+        <section className="mb-8 space-y-4">
+          <InlineEditableTextarea
+            value={displayGoal.value}
+            onChange={(value) => handleFieldChange('value', value)}
+            label="价值意义"
+            icon={
+              <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500">
+                <Quote size={10} />
+              </div>
+            }
+            placeholder="这个目标对你有什么意义？"
+          />
+
+          <InlineEditableTextarea
+            value={displayGoal.commitment}
+            onChange={(value) => handleFieldChange('commitment', value)}
+            label="每日承诺"
+            icon={
+              <div className="w-6 h-6 rounded-lg bg-rose-50 flex items-center justify-center text-rose-500">
+                <HeartHandshake size={10} />
+              </div>
+            }
+            placeholder="你每天会做什么来推进这个目标？"
+          />
+        </section>
+
+        {/* Quick Config Panel - Default Expanded */}
+        <section className="mb-8">
+          <QuickConfigPanel
+            theme={displayGoal.theme}
+            category={displayGoal.category}
+            startDate={displayGoal.startDate}
+            endDate={displayGoal.endDate}
+            trackTimeAutomatically={displayGoal.trackTimeAutomatically}
+            timeInvested={displayGoal.timeInvested}
+            onThemeChange={(value) => handleFieldChange('theme', value)}
+            onCategoryChange={(value) => handleFieldChange('category', value)}
+            onStartDateChange={(value) => handleFieldChange('startDate', value)}
+            onEndDateChange={(value) => handleFieldChange('endDate', value)}
+            onTrackModeChange={(value) => handleFieldChange('trackTimeAutomatically', value)}
+            onTimeInvestedChange={(value) => handleFieldChange('timeInvested', value)}
+            defaultExpanded={true}
+          />
+        </section>
+
         {/* Milestones Section */}
-        <section className="mb-10">
-          <MilestoneAxis
+        <section className="mb-8">
+          <MilestoneSection
             milestones={goal.milestones || []}
-            onToggle={handleMilestoneToggle}
-            label="里程碑"
+            onMilestoneToggle={handleMilestoneToggle}
+            onMilestonesChange={handleMilestonesChange}
             completedClassName={`${themeConfig.progressBg} border-transparent text-white shadow-md`}
             lineCompletedClassName={themeConfig.progressBg}
           />
         </section>
 
-        {/* Journal Timeline Section */}
-        <section>
-          <div className="flex items-center justify-between px-2 mb-6">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">日志记录</h3>
-            <div className="h-px flex-1 bg-slate-200 ml-4 mr-4"></div>
-            <span className="text-xs font-semibold text-slate-400 tabular-nums">{goal.journal?.length || 0} 条</span>
-          </div>
-          <ReflectionTimeline entries={goal.journal || []} theme={goal.theme} />
+        {/* Journal Section */}
+        <section className="mb-8">
+          <JournalPreview
+            goalId={goal.id}
+            journals={goal.journal || []}
+            onAddJournal={handleAddJournal}
+            themeTag={themeConfig.tag}
+            maxDisplay={5}
+          />
         </section>
 
+        {/* Save Button - Fixed at bottom when there are pending changes */}
+        {hasPendingChanges && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 z-50"
+          >
+            <div className="max-w-3xl mx-auto">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium shadow-lg shadow-slate-900/20 hover:bg-slate-800 active:scale-[0.98] transition-all text-sm disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {isSaving ? '保存中...' : '保存更改'}
+              </button>
+            </div>
+          </motion.div>
+        )}
       </div>
-
-      {/* Floating Record Button */}
-      <motion.button
-        onClick={() => setIsJournalModalOpen(true)}
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-slate-900 text-white rounded-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center z-50 hover:bg-slate-800 transition-colors"
-      >
-        <Pencil size={20} />
-      </motion.button>
-
-      {/* Journal Entry Modal */}
-      {isJournalModalOpen && (
-        <JournalEntryModal
-          goalId={goal.id}
-          onClose={() => setIsJournalModalOpen(false)}
-          onSave={handleJournalSave}
-        />
-      )}
-
     </motion.div>
   );
 };

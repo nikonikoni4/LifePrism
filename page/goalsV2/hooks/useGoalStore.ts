@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Goal, ThemeKey, JournalEntry } from '../types';
+import { Goal, ThemeKey, JournalEntry, MilestoneItem } from '../types';
 import { goalsV2Api } from '../apis/goal';
 
 // Constants
@@ -104,6 +104,7 @@ interface GoalStoreContextType {
     deleteGoal: (id: string) => Promise<void>;
     toggleGoalStatus: (id: string) => Promise<void>;
     updateMilestoneState: (goalId: string, milestoneId: string, state: number) => Promise<void>;
+    updateMilestones: (goalId: string, milestones: MilestoneItem[]) => Promise<void>;
     addJournal: (goalId: string, journal: Omit<JournalEntry, 'id'>) => Promise<void>;
 }
 
@@ -201,6 +202,21 @@ export const GoalProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    const updateMilestones = async (goalId: string, milestones: MilestoneItem[]) => {
+        setError(null);
+        const goal = goals.find(g => g.id === goalId);
+        if (!goal) return;
+
+        try {
+            const updated = await goalsV2Api.updateGoal(goalId, { milestones });
+            setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
+        } catch (err) {
+            console.error('[GoalStore] Failed to update milestones:', err);
+            setError(err instanceof Error ? err.message : 'Failed to update milestones');
+            throw err;
+        }
+    };
+
     const addJournal = async (goalId: string, journal: Omit<JournalEntry, 'id'>) => {
         setError(null);
         try {
@@ -236,6 +252,7 @@ export const GoalProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 deleteGoal,
                 toggleGoalStatus,
                 updateMilestoneState,
+                updateMilestones,
                 addJournal
             }
         },

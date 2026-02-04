@@ -19,6 +19,7 @@ interface QuickConfigPanelProps {
   onEndDateChange: (date: string) => void;
   onTrackModeChange: (auto: boolean) => void;
   onTimeInvestedChange: (time: string) => void;
+  defaultExpanded?: boolean;
 }
 
 const QuickConfigPanel: React.FC<QuickConfigPanelProps> = ({
@@ -34,8 +35,9 @@ const QuickConfigPanel: React.FC<QuickConfigPanelProps> = ({
   onEndDateChange,
   onTrackModeChange,
   onTimeInvestedChange,
+  defaultExpanded = false,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
     <div className="border border-slate-200 rounded-xl bg-slate-50/50 overflow-hidden">

@@ -10,11 +10,10 @@ import AddGoalModal from './components/AddGoalModal';
 import GoalDetailView from './components/GoalDetailView';
 
 export const GoalListView: React.FC = () => {
-  const { goals, isLoading, error, fetchGoals, addGoal, updateGoal, deleteGoal, toggleGoalStatus, updateMilestoneState, addJournal } = useGoalStore();
+  const { goals, isLoading, error, fetchGoals, addGoal, updateGoal, deleteGoal, toggleGoalStatus, updateMilestoneState, updateMilestones, addJournal } = useGoalStore();
   const { selectedGoalId, setSelectedGoalId } = useGoalPageContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCompletedExpanded, setIsCompletedExpanded] = useState(false);
-  const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
 
   // Derived state
   const activeGoals = goals.filter(g => g.status === 'active');
@@ -22,11 +21,7 @@ export const GoalListView: React.FC = () => {
   const selectedGoal = goals.find(g => g.id === selectedGoalId) || null;
 
   // Handlers
-  const handleToggleExpand = (id: string) => {
-    setExpandedGoalId(prev => prev === id ? null : id);
-  };
-
-  const handleFocusMode = (id: string) => {
+  const handleCardClick = (id: string) => {
     setSelectedGoalId(id);
   };
 
@@ -41,8 +36,6 @@ export const GoalListView: React.FC = () => {
   const handleSaveGoal = async (goal: Goal) => {
     try {
       await addGoal(goal);
-      // Auto-expand the newly created goal
-      setExpandedGoalId(goal.id);
     } catch (err) {
       console.error('Failed to save goal:', err);
     }
@@ -68,10 +61,6 @@ export const GoalListView: React.FC = () => {
     if (window.confirm('确定要删除这个目标吗？')) {
       try {
         await deleteGoal(id);
-        // Close expanded card if it was the deleted one
-        if (expandedGoalId === id) {
-          setExpandedGoalId(null);
-        }
       } catch (err) {
         console.error('Failed to delete goal:', err);
       }
@@ -180,14 +169,9 @@ export const GoalListView: React.FC = () => {
                       <GoalCardV2
                         key={goal.id}
                         goal={goal}
-                        isExpanded={expandedGoalId === goal.id}
-                        onToggleExpand={handleToggleExpand}
-                        onUpdate={handleUpdateGoal}
+                        onClick={handleCardClick}
                         onDelete={handleDeleteGoal}
                         onToggleStatus={handleToggleStatus}
-                        onMilestoneToggle={updateMilestoneState}
-                        onAddJournal={addJournal}
-                        onFocusMode={handleFocusMode}
                       />
                     ))}
 
@@ -241,14 +225,9 @@ export const GoalListView: React.FC = () => {
                             <GoalCardV2
                               key={goal.id}
                               goal={goal}
-                              isExpanded={expandedGoalId === goal.id}
-                              onToggleExpand={handleToggleExpand}
-                              onUpdate={handleUpdateGoal}
+                              onClick={handleCardClick}
                               onDelete={handleDeleteGoal}
                               onToggleStatus={handleToggleStatus}
-                              onMilestoneToggle={updateMilestoneState}
-                              onAddJournal={addJournal}
-                              onFocusMode={handleFocusMode}
                             />
                           ))}
                         </div>
@@ -283,6 +262,7 @@ export const GoalListView: React.FC = () => {
             theme={selectedGoal.theme}
             onUpdate={handleUpdateGoal}
             onMilestoneToggle={updateMilestoneState}
+            onMilestonesChange={updateMilestones}
             onAddJournal={addJournal}
           />
         )}
