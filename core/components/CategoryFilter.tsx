@@ -94,6 +94,11 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
 
     const hasFilter = value.categoryId !== null;
 
+    // 获取选中分类的名称
+    const selectedCategoryName = hasFilter
+        ? categories.find(c => c.id === value.categoryId)?.name || '已筛选'
+        : null;
+
     const defaultButtonClass = `flex items-center justify-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm ${hasFilter
         ? 'bg-opacity-20 border-2'
         : 'bg-white border-gray-200 text-slate-600'
@@ -113,7 +118,7 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
                 } : {}}
             >
                 <Filter size={16} />
-                {showLabel && (hasFilter ? 'Filtered' : 'Filters')}
+                {showLabel && (hasFilter ? selectedCategoryName : '选择分类')}
                 {hasFilter && (
                     <span
                         onClick={handleClearFilter}

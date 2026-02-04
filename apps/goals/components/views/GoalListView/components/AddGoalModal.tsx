@@ -119,6 +119,18 @@ const AddGoalModal: React.FC<AddGoalModalProps> = ({ isOpen, onClose, onSave }) 
               />
             </div>
 
+            {/* Details */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">目标简介</label>
+              <textarea
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium resize-none"
+                placeholder="简要描述这个目标..."
+                rows={2}
+                value={form.details}
+                onChange={e => setForm({ ...form, details: e.target.value })}
+              />
+            </div>
+
             {/* Quick Settings (Collapsible) */}
             <div className="border border-slate-200 rounded-xl bg-slate-50/50 overflow-hidden">
               <button

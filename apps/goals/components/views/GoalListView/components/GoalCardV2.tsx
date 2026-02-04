@@ -90,11 +90,16 @@ const GoalCardV2: React.FC<GoalCardV2Props> = ({
           </div>
         </div>
 
-        {/* Title */}
+        {/* Title & Content */}
         <div className="mb-4">
           <h3 className={`text-lg font-semibold leading-snug ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-800'}`}>
             {goal.title}
           </h3>
+          {goal.details && (
+            <p className="mt-1.5 text-sm text-slate-500 line-clamp-2">
+              {goal.details}
+            </p>
+          )}
         </div>
 
         {/* Stats Row */}

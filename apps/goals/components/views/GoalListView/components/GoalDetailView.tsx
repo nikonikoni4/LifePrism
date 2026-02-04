@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Clock, ChevronLeft, Calendar, Target, Quote, HeartHandshake
+  Clock, ChevronLeft, Calendar, Target, Quote, HeartHandshake, FileText
 } from 'lucide-react';
 import { Goal, JournalEntry, ThemeKey, MilestoneItem } from '../../../../types';
 import { THEMES } from '../../../../hooks/useGoalStore';
@@ -142,7 +142,14 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({
               onChange={(value) => handleFieldChange('title', value)}
               className="text-2xl font-bold leading-snug text-slate-800 mb-2"
             />
-            <div className="flex items-center gap-1.5 text-sm text-slate-500">
+            {/* Details - 目标简介 */}
+            <InlineEditableTextarea
+              value={displayGoal.details}
+              onChange={(value) => handleFieldChange('details', value)}
+              placeholder="添加目标简介..."
+              rows={2}
+            />
+            <div className="flex items-center gap-1.5 text-sm text-slate-500 mt-3">
               <Calendar size={14} />
               <span className="font-medium">
                 {formatDateForDisplay(displayGoal.startDate)} — {formatDateForDisplay(displayGoal.endDate)}

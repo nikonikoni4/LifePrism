@@ -78,12 +78,18 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onClick, onToggleStatus, onEd
           </div>
         </div>
 
-        {/* Title */}
-        <h3 className={`text-lg font-semibold leading-snug mb-3 line-clamp-2 ${
+        {/* Title & Content */}
+        <h3 className={`text-lg font-semibold leading-snug mb-1 line-clamp-2 ${
           isCompleted ? 'line-through text-slate-400' : 'text-slate-800'
         }`}>
           {goal.title}
         </h3>
+        {goal.details && (
+          <p className="text-sm text-slate-500 mb-3 line-clamp-2">
+            {goal.details}
+          </p>
+        )}
+        {!goal.details && <div className="mb-3" />}
 
         {/* Date Range */}
         <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-4">
