@@ -372,13 +372,14 @@ class GoalProvider(LWBaseDataProvider):
     def get_active_goals_for_classify(self) -> List[Dict[str, Any]]:
         """
         获取所有活跃目标（用于 LLM 分类时的名称-ID映射）
-        
+
         只返回满足以下条件的目标：
         1. 目标状态为 active
-        2. 目标必须绑定了主分类（link_to_category_id IS NOT NULL）
-        3. 关联的主分类未被禁用（category.state != 0）
-        4. 关联的子分类未被禁用（sub_category.state != 0 或未关联子分类）
-        
+        2. 目标开启了自动时间追踪（track_time_automatically == 1）
+        3. 目标必须绑定了主分类（link_to_category_id IS NOT NULL）
+        4. 关联的主分类未被禁用（category.state != 0）
+        5. 关联的子分类未被禁用（sub_category.state != 0 或未关联子分类）
+
         Returns:
             List[Dict]: 包含 id, name, link_to_category_id, link_to_sub_category_id 的目标列表
         """
@@ -386,11 +387,12 @@ class GoalProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT g.id, g.name, g.link_to_category_id, g.link_to_sub_category_id 
+                    SELECT g.id, g.name, g.link_to_category_id, g.link_to_sub_category_id
                     FROM goal g
                     INNER JOIN category c ON g.link_to_category_id = c.id
                     LEFT JOIN sub_category sc ON g.link_to_sub_category_id = sc.id
-                    WHERE g.status = 'active' 
+                    WHERE g.status = 'active'
+                      AND g.track_time_automatically = 1
                       AND g.link_to_category_id IS NOT NULL
                       AND c.state != 0
                       AND (sc.state IS NULL OR sc.state != 0)

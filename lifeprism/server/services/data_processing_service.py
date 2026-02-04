@@ -302,10 +302,11 @@ class DataProcessingService:
             sub_category_name_to_id = sub_category.set_index('name')['id'].to_dict()
         
         # 构建 goal 名称到 ID 的映射（用于将 LLM 输出的 link_to_goal 名称转换为 ID）
+        # 只包含 track_time_automatically=1 且绑定了分类的目标
         if self._goal_name_to_id_cache is None:
             goals = goal_provider.get_active_goals_for_classify()
             self._goal_name_to_id_cache = {g['name']: g['id'] for g in goals}
-            logger.info(f"  ✓ 创建 goal 名称映射缓存，共 {len(self._goal_name_to_id_cache)} 个活跃目标")
+            logger.info(f"  ✓ 创建 goal 名称映射缓存，共 {len(self._goal_name_to_id_cache)} 个可自动追踪目标")
             logger.debug(f"  [DEBUG] goal_name_to_id 映射: {self._goal_name_to_id_cache}")
         goal_name_to_id = self._goal_name_to_id_cache
         
@@ -361,7 +362,7 @@ class DataProcessingService:
                 sub_category=sub_cat_name
             ))
         
-        logger.info(f"  ✓ 构建 goals 列表，共 {len(goals_for_llm)} 个活跃目标（已过滤被禁用分类）")
+        logger.info(f"  ✓ 构建 goals 列表，共 {len(goals_for_llm)} 个可自动追踪目标（已过滤被禁用分类和未开启自动追踪的目标）")
         
         # 初始化 LLMClassify 分类器
         classifier = LLMClassify(
