@@ -152,6 +152,28 @@ def get_plan_doc_detail(doc_id: str) -> Optional[PlanDocItem]:
     return _convert_db_item_to_plan_doc_item(item, include_content=True)
 
 
+def _check_plan_doc_id_exists(doc_id: str) -> tuple[bool, str]:
+    """
+    检查计划书 ID 是否已存在（数据库 + 文件系统）
+
+    Args:
+        doc_id: 计划书 ID
+
+    Returns:
+        tuple[bool, str]: (是否存在, 冲突来源描述)
+    """
+    # 检查数据库
+    if plan_doc_provider.get_plan_doc_by_id(doc_id):
+        return True, "数据库中已存在同名计划书"
+
+    # 检查文件系统
+    file_path = _get_plan_doc_path(doc_id)
+    if file_path.exists():
+        return True, "文件系统中已存在同名文件"
+
+    return False, ""
+
+
 def create_plan_doc(request: CreatePlanDocRequest) -> Optional[PlanDocItem]:
     """
     创建计划书（数据库 + 文件）
@@ -161,7 +183,16 @@ def create_plan_doc(request: CreatePlanDocRequest) -> Optional[PlanDocItem]:
 
     Returns:
         Optional[PlanDocItem]: 新创建的计划书，失败返回 None
+
+    Raises:
+        ValueError: 当 ID 已存在时抛出
     """
+    # 前置检查：ID 是否已存在
+    exists, conflict_source = _check_plan_doc_id_exists(request.id)
+    if exists:
+        logger.warning(f"创建计划书失败: {conflict_source}, ID: {request.id}")
+        raise ValueError(f"{conflict_source}: {request.id}")
+
     data = {
         'id': request.id,
         'goal_id': request.goal_id,
@@ -187,6 +218,9 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
 
     Returns:
         Optional[PlanDocItem]: 更新后的计划书，失败返回 None
+
+    Raises:
+        ValueError: 当重命名时新 ID 已存在
     """
     # 先检查文档是否存在
     existing = plan_doc_provider.get_plan_doc_by_id(doc_id)
@@ -200,24 +234,25 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
     if 'new_id' in explicitly_set_fields and request.new_id and request.new_id != doc_id:
         new_id = request.new_id
         logger.info(f"检测到重命名操作: {doc_id} -> {new_id}")
-        
-        # 1. 检查新 ID 是否已存在
-        if plan_doc_provider.get_plan_doc_by_id(new_id):
-             logger.warning(f"重命名失败: 目标 ID {new_id} 已存在")
-             return None
-        
+
+        # 1. 检查新 ID 是否已存在（数据库 + 文件系统）
+        exists, conflict_source = _check_plan_doc_id_exists(new_id)
+        if exists:
+            logger.warning(f"重命名失败: {conflict_source}, ID: {new_id}")
+            raise ValueError(f"{conflict_source}: {new_id}")
+
         # 2. 文件层操作：另存为新文件 (保留旧文件做备份)
         content_to_write = ""
         if 'content' in explicitly_set_fields:
             content_to_write = request.content
         else:
             content_to_write = _read_content_from_file(doc_id)
-            
+
         _write_content_to_file(new_id, content_to_write)
-        
+
         # 3. 数据库层操作：事务更新 ID 和级联引用
         success = plan_doc_provider.rename_plan_doc(doc_id, new_id)
-        
+
         if not success:
             logger.error(f"数据库重命名失败，回滚文件操作 (删除 {new_id}.md)")
             _delete_content_file(new_id)

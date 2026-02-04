@@ -316,10 +316,13 @@ async def create_plan_doc(request: CreatePlanDocRequest):
     - **period_start**: 周期开始日期（可选）
     - **period_end**: 周期结束日期（可选）
     """
-    result = plan_doc_service.create_plan_doc(request)
-    if not result:
-        raise HTTPException(status_code=500, detail="创建计划文档失败")
-    return result
+    try:
+        result = plan_doc_service.create_plan_doc(request)
+        if not result:
+            raise HTTPException(status_code=500, detail="创建计划文档失败")
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.get("/plan-docs/{doc_id}", response_model=PlanDocItem)
@@ -350,10 +353,13 @@ async def update_plan_doc(
     - **period_start**: 周期开始日期
     - **period_end**: 周期结束日期
     """
-    result = plan_doc_service.update_plan_doc(doc_id, request)
-    if not result:
-        raise HTTPException(status_code=404, detail="计划文档不存在或更新失败")
-    return result
+    try:
+        result = plan_doc_service.update_plan_doc(doc_id, request)
+        if not result:
+            raise HTTPException(status_code=404, detail="计划文档不存在或更新失败")
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.delete("/plan-docs/{doc_id}")
