@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, AlertTriangle, FileText, Edit3, XCircle } from 'lucide-react';
+import { X, AlertTriangle, FileText, Monitor, ArrowRight, ArrowLeft, XCircle } from 'lucide-react';
 
 interface RefreshConflictDialogProps {
     isOpen: boolean;
@@ -10,6 +10,48 @@ interface RefreshConflictDialogProps {
     onUseFile: () => void;
     docName: string;
 }
+
+// 数据流向示意图组件
+const DataFlowDiagram: React.FC<{
+    direction: 'toFile' | 'fromFile';
+    highlight: 'local' | 'file';
+}> = ({ direction, highlight }) => {
+    const isToFile = direction === 'toFile';
+    const localHighlight = highlight === 'local';
+    const fileHighlight = highlight === 'file';
+
+    return (
+        <div className="flex items-center justify-center gap-2 py-2">
+            {/* 当前窗口 */}
+            <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${localHighlight
+                ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
+                : 'bg-slate-50 border-slate-200 text-slate-500'
+                }`}>
+                <Monitor size={14} />
+                <span className="text-xs font-medium">当前窗口</span>
+            </div>
+
+            {/* 箭头 */}
+            <div className={`flex items-center ${isToFile ? 'text-indigo-500' : 'text-amber-500'
+                }`}>
+                {isToFile ? (
+                    <ArrowRight size={18} strokeWidth={2.5} />
+                ) : (
+                    <ArrowLeft size={18} strokeWidth={2.5} />
+                )}
+            </div>
+
+            {/* MD 文件 */}
+            <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${fileHighlight
+                ? 'bg-amber-100 border-amber-300 text-amber-700'
+                : 'bg-slate-50 border-slate-200 text-slate-500'
+                }`}>
+                <FileText size={14} />
+                <span className="text-xs font-medium">MD 文件</span>
+            </div>
+        </div>
+    );
+};
 
 export const RefreshConflictDialog: React.FC<RefreshConflictDialogProps> = ({
     isOpen,
@@ -74,46 +116,37 @@ export const RefreshConflictDialog: React.FC<RefreshConflictDialogProps> = ({
                             </p>
 
                             <div className="space-y-2">
-                                {/* Option 1: Keep local */}
+                                {/* Option 1: Keep local (save to file) */}
                                 <button
                                     onClick={onKeepLocal}
-                                    className="w-full flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all text-left group"
+                                    className="w-full flex flex-col p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all text-left group"
                                 >
-                                    <div className="p-2 rounded-lg bg-indigo-100 text-indigo-600 group-hover:bg-indigo-200 transition-colors">
-                                        <Edit3 size={16} />
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="font-medium text-slate-700 text-sm">保留当前窗口内容</div>
+                                        <span className="text-xs text-slate-400">取消刷新</span>
                                     </div>
-                                    <div>
-                                        <div className="font-medium text-slate-700 text-sm">保留本地修改</div>
-                                        <div className="text-xs text-slate-500 mt-0.5">取消刷新，继续编辑当前内容</div>
-                                    </div>
+                                    <DataFlowDiagram direction="toFile" highlight="local" />
                                 </button>
 
-                                {/* Option 2: Use file */}
+                                {/* Option 2: Use file (load from file) */}
                                 <button
                                     onClick={onUseFile}
-                                    className="w-full flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50/50 transition-all text-left group"
+                                    className="w-full flex flex-col p-3 rounded-xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50/30 transition-all text-left group"
                                 >
-                                    <div className="p-2 rounded-lg bg-amber-100 text-amber-600 group-hover:bg-amber-200 transition-colors">
-                                        <FileText size={16} />
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="font-medium text-slate-700 text-sm">使用文件夹内容</div>
+                                        <span className="text-xs text-slate-400">丢弃当前窗口内容</span>
                                     </div>
-                                    <div>
-                                        <div className="font-medium text-slate-700 text-sm">使用文件内容</div>
-                                        <div className="text-xs text-slate-500 mt-0.5">丢弃本地修改，加载文件系统中的最新内容</div>
-                                    </div>
+                                    <DataFlowDiagram direction="fromFile" highlight="file" />
                                 </button>
 
                                 {/* Option 3: Cancel */}
                                 <button
                                     onClick={onClose}
-                                    className="w-full flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all text-left group"
+                                    className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all text-slate-500 hover:text-slate-600"
                                 >
-                                    <div className="p-2 rounded-lg bg-slate-100 text-slate-500 group-hover:bg-slate-200 transition-colors">
-                                        <XCircle size={16} />
-                                    </div>
-                                    <div>
-                                        <div className="font-medium text-slate-700 text-sm">取消</div>
-                                        <div className="text-xs text-slate-500 mt-0.5">不做任何操作</div>
-                                    </div>
+                                    <XCircle size={14} />
+                                    <span className="text-sm">取消</span>
                                 </button>
                             </div>
                         </div>
