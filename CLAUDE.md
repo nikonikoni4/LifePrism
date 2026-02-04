@@ -134,6 +134,545 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
    **核心原因**：`name` 是用户可随时修改的，如果用 `name` 做关联/查找，用户修改名称后原有关联会断裂，导致数据不一致
 
+## 后端代码风格规范
+
+### API 设计规范
+
+#### 路由定义
+- 使用 `APIRouter` 创建路由组
+- 前缀格式：`/{module_name}`（如 `/goal`, `/category`）
+- 标签格式：`{Module}`（如 `Goal`, `Category`）
+- 使用 `summary` 参数描述端点功能
+
+#### HTTP 方法规范
+- `GET`: 获取资源（幂等）
+- `POST`: 创建资源
+- `PATCH`: 部分更新资源
+- `DELETE`: 删除资源
+
+#### 参数验证
+- 查询参数：使用 `Query()` 进行验证
+- 路径参数：使用 `Path()` 进行验证
+- 请求体：使用 Pydantic 模型
+- 提供详细的 `description` 参数说明
+
+#### 错误响应
+- 404: 资源不存在
+- 400: 参数验证失败
+- 500: 服务器内部错误
+- 错误消息格式：简洁、清晰、包含关键信息
+
+**示例**：
+```python
+from fastapi import APIRouter, Query, HTTPException, Path
+
+router = APIRouter(prefix="/goal", tags=["Goal"])
+
+@router.get("/goals", response_model=GoalListResponse, summary="获取目标列表")
+async def get_goals(
+    status: Optional[str] = Query(default=None, description="按状态筛选 (active, completed, archived)"),
+    page: int = Query(default=1, ge=1, description="页码"),
+    page_size: int = Query(default=20, ge=1, le=100, description="每页数量")
+):
+    """获取目标列表"""
+    return goal_service.get_goals(status, page, page_size)
+
+@router.get("/goals/{goal_id}", response_model=GoalItem, summary="获取目标详情")
+async def get_goal_detail(
+    goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)")
+):
+    """获取目标详情"""
+    result = goal_service.get_goal_detail(goal_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="目标不存在")
+    return result
+```
+
+### Schema 设计规范
+
+#### 请求模型
+- 命名：`Create{Entity}Request`, `Update{Entity}Request`
+- 必需字段：`Field(..., description="...")`
+- 可选字段：`Optional[T] = Field(default=None, description="...")`
+- 字段验证：使用 `ge`, `le`, `min_length` 等约束
+
+#### 响应模型
+- 命名：`{Entity}Item`, `{Entity}ListResponse`
+- 包含完整的字段信息
+- 使用 `Field(..., description="...")` 提供字段说明
+
+#### 部分更新请求
+- 所有字段都应该是 `Optional[T]`
+- 允许用户只更新需要修改的字段
+
+**示例**：
+```python
+from pydantic import BaseModel, Field
+from typing import Optional, List
+
+class CreateGoalRequest(BaseModel):
+    """创建目标请求"""
+    name: str = Field(..., description="目标名称")
+    content: str = Field(default="", description="目标内容")
+    color: str = Field(default="#5B8FF9", description="目标颜色")
+    link_to_category_id: Optional[str] = Field(default=None, description="关联分类 ID")
+
+class UpdateGoalRequest(BaseModel):
+    """更新目标请求（部分更新）"""
+    name: Optional[str] = Field(default=None, description="目标名称")
+    content: Optional[str] = Field(default=None, description="目标内容")
+    status: Optional[str] = Field(default=None, description="目标状态")
+
+class GoalItem(BaseModel):
+    """目标项"""
+    id: str = Field(..., description="唯一标识符")
+    name: str = Field(..., description="目标名称")
+    created_at: str = Field(..., description="创建时间")
+
+class GoalListResponse(BaseModel):
+    """目标列表响应"""
+    items: List[GoalItem] = Field(default=[], description="目标列表")
+    total: int = Field(default=0, description="总数")
+```
+
+### 类型注解规范
+
+#### 基本规则
+- 所有函数必须有返回类型注解
+- 所有参数必须有类型注解
+- 使用 `Optional[T]` 表示可选值
+- 使用 `Union[T1, T2]` 表示多种类型
+
+#### 常见返回类型
+- 单个对象：`Optional[Dict[str, Any]]`
+- 对象列表：`List[Dict[str, Any]]`
+- 列表 + 总数：`tuple[List[Dict[str, Any]], int]`
+- Pydantic 模型：`GoalItem`, `GoalListResponse`
+
+**示例**：
+```python
+from typing import Optional, List, Dict, Any
+
+def get_goal_by_id(self, goal_id: str) -> Optional[Dict[str, Any]]:
+    """按 ID 获取单个目标"""
+    pass
+
+def get_goals(self, page: int = 1) -> tuple[List[Dict[str, Any]], int]:
+    """获取目标列表，返回 (列表, 总数)"""
+    pass
+
+async def create_goal(request: CreateGoalRequest) -> GoalItem:
+    """创建新目标"""
+    pass
+```
+
+### 文档字符串规范
+
+#### Google 风格格式
+- 第一行：简短的功能描述
+- 空行
+- Args 部分：参数说明
+- Returns 部分：返回值说明
+- Raises 部分（可选）：异常说明
+
+#### 参数格式说明
+- ID 参数：`"目标 ID (格式: goal-xxx)"`
+- 时间参数：`"时间戳或 ISO 8601 格式"`
+- 枚举参数：`"可选值: active, completed, archived"`
+
+**示例**：
+```python
+def get_goals(
+    self,
+    status: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20
+) -> tuple[List[Dict[str, Any]], int]:
+    """
+    获取目标列表
+
+    Args:
+        status: 按状态筛选（active, completed, archived）
+        page: 页码（从1开始）
+        page_size: 每页数量
+
+    Returns:
+        tuple: (目标列表, 总数)
+    """
+    pass
+
+def create_goal(self, data: Dict[str, Any]) -> Optional[str]:
+    """
+    创建新目标
+
+    Args:
+        data: 目标数据
+
+    Returns:
+        Optional[str]: 新目标 ID (格式: goal-xxx)，失败返回 None
+    """
+    pass
+```
+
+### 日志记录规范
+
+#### 日志级别
+- `logger.info()`: 重要操作成功（创建、更新、删除）
+- `logger.warning()`: 警告信息（未找到资源、数据异常）
+- `logger.error()`: 错误信息（异常、操作失败）
+- `logger.debug()`: 调试信息（缓存刷新、中间步骤）
+
+#### 日志格式
+- 包含操作描述、关键参数、结果
+- 示例：`logger.info(f"成功创建目标: {goal_id}")`
+- 错误日志：`logger.error(f"创建目标失败: {e}")`
+
+**示例**：
+```python
+from lifeprism.utils import get_logger
+
+logger = get_logger(__name__)
+
+# 初始化时
+logger = get_logger(__name__)
+
+# 使用日志
+logger.info(f"成功创建目标: {goal_id}")
+logger.warning(f"未找到分类 {category_id}")
+logger.error(f"创建目标失败: {e}")
+logger.debug(f"刷新缓存成功，共 {count} 个目标")
+```
+
+### 错误处理分层规范
+
+#### Provider 层（数据访问层）
+- 返回 `None` 表示查询失败或资源不存在
+- 返回空列表 `[]` 表示无结果
+- 捕获异常并记录日志，不向上抛出
+
+#### Service 层（业务逻辑层）
+- 可以抛出 `ValueError` 等业务异常
+- 可以返回 `None` 表示操作失败
+- 调用 Provider 时检查返回值
+
+#### API 层（路由处理层）
+- 必须抛出 `HTTPException`
+- 状态码：404（不存在）、400（参数错误）、500（服务器错误）
+- 错误消息必须清晰、用户友好
+
+**示例**：
+```python
+# Provider 层
+def get_goal_by_id(self, goal_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM goal WHERE id = ?", (goal_id,))
+            row = cursor.fetchone()
+            if row:
+                columns = [description[0] for description in cursor.description]
+                return dict(zip(columns, row))
+            return None
+    except Exception as e:
+        logger.error(f"获取目标 {goal_id} 失败: {e}")
+        return None
+
+# Service 层
+def create_goal(self, request: CreateGoalRequest) -> Optional[GoalItem]:
+    try:
+        new_id = self.goal_provider.create_goal(data)
+        if new_id is None:
+            return None
+        self._refresh_cache()
+        return self.get_goal_detail(new_id)
+    except Exception as e:
+        logger.error(f"创建目标失败: {e}")
+        return None
+
+# API 层
+@router.post("/goals", response_model=GoalItem)
+async def create_goal(request: CreateGoalRequest):
+    try:
+        result = goal_service.create_goal(request)
+        if not result:
+            raise HTTPException(status_code=500, detail="创建目标失败")
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"创建目标失败: {str(e)}")
+```
+
+### 数据库操作规范
+
+#### 基本要求
+
+- 不能直接创建数据库对象
+- 需要使用lifeprism\storage中的基础类，通过继承或直接使用单例调用数据库对象
+
+
+#### 连接管理
+- 使用 `with self.db.get_connection() as conn:` 管理连接
+- 自动处理连接关闭和事务提交
+
+#### 参数化查询
+- 使用 `?` 作为占位符
+- 参数通过元组传递：`cursor.execute(sql, (param1, param2))`
+- 防止 SQL 注入
+
+#### 结果转换
+```python
+# 转换为字典列表
+columns = [description[0] for description in cursor.description]
+rows = cursor.fetchall()
+items = [dict(zip(columns, row)) for row in rows]
+```
+
+#### 事务处理
+- `with` 语句自动提交事务
+- 多个操作在同一 `with` 块中执行
+
+**示例**：
+```python
+def get_goals(self, status: Optional[str] = None) -> tuple[List[Dict[str, Any]], int]:
+    try:
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # 构建查询条件
+            conditions = []
+            params = []
+            if status:
+                conditions.append("status = ?")
+                params.append(status)
+
+            where_clause = ""
+            if conditions:
+                where_clause = "WHERE " + " AND ".join(conditions)
+
+            # 执行查询
+            sql = f"SELECT * FROM goal {where_clause}"
+            cursor.execute(sql, params)
+
+            # 转换为字典列表
+            columns = [description[0] for description in cursor.description]
+            rows = cursor.fetchall()
+            items = [dict(zip(columns, row)) for row in rows]
+
+            return items, len(items)
+    except Exception as e:
+        logger.error(f"获取目标列表失败: {e}")
+        return [], 0
+
+def delete_goal(self, goal_id: str) -> bool:
+    try:
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # 先清除关联
+            cursor.execute(
+                "UPDATE todo_list SET link_to_goal_id = NULL WHERE link_to_goal_id = ?",
+                (goal_id,)
+            )
+
+            # 然后删除
+            cursor.execute("DELETE FROM goal WHERE id = ?", (goal_id,))
+
+            # with 语句自动 commit
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"删除目标失败: {e}")
+        return False
+```
+
+### Service 层职责划分
+
+#### service 函数编写规则
+
+- 不能在servicer中编写函数默认值
+
+#### 有状态 Service（需要缓存）
+- 维护内存缓存（映射、DataFrame 等）
+- 必须提供 `_refresh_cache()` 方法
+- 在 CRUD 操作后调用 `_refresh_cache()`
+- 使用 `LazySingleton` 创建单例
+- 示例：`CategoryService`, `GoalService`
+
+#### 纯函数 Service（无状态）
+- 不维护任何缓存
+- 每次调用直接访问数据库
+- 可以使用纯函数模块或无状态类
+- 示例：`timeline_service`, `usage_service`
+
+#### 职责
+- 调用 Provider 获取数据
+- 实现业务逻辑
+- 数据转换和聚合
+- 缓存管理（如果有）
+
+**示例**：
+```python
+# 有状态 Service
+class GoalService:
+    """目标服务类 - 维护 goal_name_map 缓存"""
+
+    def __init__(self):
+        self.goal_provider = goal_provider
+        self.goal_name_map: Dict[str, str] = {}
+        self._refresh_cache()
+
+    def _refresh_cache(self):
+        """刷新目标名称缓存"""
+        try:
+            items, _ = self.goal_provider.get_goals(page=1, page_size=1000)
+            self.goal_name_map = {}
+            for item in items:
+                goal_id = str(item.get('id', ''))
+                name = item.get('name', '')
+                if goal_id and name:
+                    self.goal_name_map[goal_id] = name
+            logger.debug(f"刷新目标缓存成功，共 {len(self.goal_name_map)} 个目标")
+        except Exception as e:
+            logger.error(f"刷新目标缓存失败: {e}")
+
+goal_service = LazySingleton(GoalService)
+
+# 纯函数 Service
+def get_activity_stats(date: str) -> ActivityStatsResponse:
+    """获取活动统计数据"""
+    pass
+
+def get_usage_stats(date: str) -> UsageStatsResponse:
+    """获取使用统计"""
+    pass
+```
+
+### Provider 层职责
+
+#### 职责
+- 只负责数据库操作
+- 不涉及业务逻辑
+- 返回原始数据（字典或列表）
+- 继承 `LWBaseDataProvider`
+
+#### 方法命名
+- `get_xxx_by_id()`: 按 ID 获取单个记录
+- `get_xxxs()`: 获取多个记录
+- `create_xxx()`: 创建记录
+- `update_xxx()`: 更新记录
+- `delete_xxx()`: 删除记录
+
+#### 返回值
+- 单个记录：`Optional[Dict[str, Any]]`
+- 多个记录：`tuple[List[Dict[str, Any]], int]` (列表, 总数)
+- 操作结果：`bool`
+
+**示例**：
+```python
+from lifeprism.storage import LWBaseDataProvider
+
+class GoalProvider(LWBaseDataProvider):
+    """目标数据提供者"""
+
+    def __init__(self, db_manager=None):
+        super().__init__(db_manager)
+
+    def get_goal_by_id(self, goal_id: str) -> Optional[Dict[str, Any]]:
+        """按 ID 获取单个目标"""
+        pass
+
+    def get_goals(self, page: int = 1, page_size: int = 20) -> tuple[List[Dict[str, Any]], int]:
+        """获取目标列表"""
+        pass
+
+    def create_goal(self, data: Dict[str, Any]) -> Optional[str]:
+        """创建目标，返回新 ID"""
+        pass
+
+    def update_goal(self, goal_id: str, data: Dict[str, Any]) -> bool:
+        """更新目标"""
+        pass
+
+    def delete_goal(self, goal_id: str) -> bool:
+        """删除目标"""
+        pass
+
+goal_provider = LazySingleton(GoalProvider)
+```
+
+### ID 生成规范
+
+#### ID 格式
+- 格式：`{prefix}-{uuid[:8]}`
+- 示例：`goal-a1b2c3d4`, `cat-e5f6g7h8`
+
+#### 前缀列表
+- `goal-`: 目标
+- `cat-`: 分类
+- `sub-`: 子分类
+- `journal-`: 日志
+- `todo-`: 待办事项
+
+#### 生成方式
+```python
+import uuid
+
+def generate_id(prefix: str) -> str:
+    """生成带前缀的 ID"""
+    return f"{prefix}-{str(uuid.uuid4())[:8]}"
+
+# 使用示例
+goal_id = generate_id("goal")  # goal-a1b2c3d4
+```
+
+### 命名约定补充
+
+#### 缓存变量
+- 映射缓存：`_xxx_map` (如 `_category_name_map`)
+- DataFrame 缓存：`_xxx_df` (如 `_categories_df`)
+- 列表缓存：`_xxx_list` (如 `_active_goals_list`)
+
+#### 私有方法
+- 前缀：`_` (如 `_refresh_cache()`, `_convert_to_dict()`)
+
+#### 常量
+- 全大写：`CONSTANT_NAME`
+- 示例：`DEFAULT_PAGE_SIZE = 20`
+
+#### 类成员变量
+- 公共缓存：无前缀 (如 `self.category_name_map`)
+- 私有缓存：`_` 前缀 (如 `self._categories_df`)
+- 依赖注入：无前缀 (如 `self.goal_provider`)
+
+**示例**：
+```python
+class CategoryService:
+    def __init__(self):
+        # 公共缓存
+        self.category_name_map: Dict[str, str] = {}
+        self.sub_to_parent_map: Dict[str, str] = {}
+
+        # 私有缓存
+        self._categories_df = None
+        self._sub_categories_df = None
+
+        # 依赖注入
+        self.server_lw_data_provider = server_lw_data_provider
+        self.db = server_lw_data_provider.db
+
+    def _refresh_cache(self):
+        """私有方法：刷新缓存"""
+        pass
+
+    def _convert_to_dict(self, row):
+        """私有方法：转换为字典"""
+        pass
+
+# 常量
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
+```
+
 ## Project Overview
 
 **LifeWatch-AI** (LifePrism) is an AI-powered personal time management and analysis platform that monitors user computer activity through ActivityWatch, classifies applications using LLM, and provides insights through a React frontend.
@@ -142,10 +681,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 LifeWatch-AI/
-├── frontend/           # React + TypeScript + Vite frontend
-│   ├── page/          # Page components (home, timeline, category, etc.)
-│   ├── components/    # Shared React components
-│   ├── services/      # API service layer
+├── frontend/           # React + TypeScript + Vite frontend (apps/core/shell 三层架构)
+│   ├── apps/          # 应用模块层
+│   │   ├── lifewatch/ #   时间追踪核心（首页、时间线、分类、报告）
+│   │   ├── goals/     #   目标管理应用
+│   │   ├── habits/    #   习惯养成应用
+│   │   ├── mindspace/ #   思维空间（待开发）
+│   │   ├── settings/  #   设置应用
+│   │   └── addons/    #   插件扩展（待开发）
+│   ├── core/          # 核心共享层（组件、服务、类型、工具）
+│   ├── shell/         # 应用外壳层（ModuleDock 导航）
 │   └── App.tsx        # Main app with routing
 ├── lifeprism/         # Python backend package
 │   ├── server/        # FastAPI backend server
@@ -278,9 +823,31 @@ The system uses a three-tier caching strategy to minimize LLM API calls:
 - `_multipurpose_apps` + `_multipurpose_titles`: Index for multi-purpose app lookups
 - `_app_description_map`: App description cache (independent of classification)
 
-### Frontend Page Structure
+### Frontend Architecture
 
-The frontend uses a simple page-based routing system (not React Router). Navigation is controlled by `App.tsx` state `currentPage` and `<Sidebar>` component. Pages are located in `frontend/page/[pagename]/`.
+前端采用 **apps/core/shell** 三层架构：
+
+| 层次 | 目录 | 职责 |
+|------|------|------|
+| **Shell** | `shell/` | 应用外壳、ModuleDock 模块导航、全局布局 |
+| **Core** | `core/` | 跨应用共享的组件、服务、类型、工具 |
+| **Apps** | `apps/` | 独立的功能应用模块 |
+
+**应用模块**：
+- `apps/lifewatch/`: 时间追踪核心（首页、时间线、分类、使用量、报告）
+- `apps/goals/`: 目标管理（目标列表、计划书、任务池、日历、每日任务）
+- `apps/habits/`: 习惯养成（习惯列表、习惯链、锚点时间线）
+- `apps/settings/`: 全局设置
+- `apps/mindspace/`: 思维空间（待开发）
+- `apps/addons/`: 插件扩展（待开发）
+
+**核心共享**：
+- `core/components/`: 共享组件（Chatbot、Toast、CategoryFilter 等）
+- `core/services/`: 共享服务（syncService、aiService、apiConfig 等）
+- `core/types/`: 共享类型定义
+- `core/hooks/`: 共享 Hooks（useUserSettings 等）
+
+**详细文档**: `frontend/docs/组织架构.md`
 
 ## Configuration
 
@@ -379,7 +946,7 @@ The system supports two classification modes:
 
 ### Data Sync Strategy
 
-The frontend uses **incremental sync** on startup (`frontend/services/syncService.ts`):
+The frontend uses **incremental sync** on startup (`frontend/core/services/syncService.ts`):
 
 - Fetches last sync timestamp from backend
 - Only requests new/changed events since last sync
@@ -395,12 +962,19 @@ The frontend uses **incremental sync** on startup (`frontend/services/syncServic
 3. Configure `data_in`, `data_out`, `thread_id` as needed (see README)
 4. Test with existing data
 
-### Adding a New Frontend Page
+### Adding a New Frontend App
 
-1. Create component in `frontend/page/[pagename]/`
-2. Add route case in `frontend/App.tsx`
-3. Add navigation item in `frontend/components/Sidebar.tsx`
-4. Create API endpoints in `lifeprism/server/api/` if needed
+1. Create app directory in `frontend/apps/[appname]/`
+2. Create main app component `[AppName]App.tsx`
+3. Add app to `shell/ModuleDock.tsx` navigation
+4. Register route in `frontend/App.tsx`
+5. Create API endpoints in `lifeprism/server/api/` if needed
+
+### Adding a New Page to Existing App
+
+1. Create page in `frontend/apps/[appname]/pages/[pagename]/`
+2. Add route in the app's main component
+3. Add navigation in the app's sidebar/layout
 
 ### Modifying Cache Rules
 
