@@ -209,13 +209,11 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({
             category={displayGoal.category}
             startDate={displayGoal.startDate}
             endDate={displayGoal.endDate}
-            trackTimeAutomatically={displayGoal.trackTimeAutomatically}
             timeInvested={displayGoal.timeInvested}
             onThemeChange={(value) => handleFieldChange('theme', value)}
             onCategoryChange={(value) => handleFieldChange('category', value)}
             onStartDateChange={(value) => handleFieldChange('startDate', value)}
             onEndDateChange={(value) => handleFieldChange('endDate', value)}
-            onTrackModeChange={(value) => handleFieldChange('trackTimeAutomatically', value)}
             onTimeInvestedChange={(value) => handleFieldChange('timeInvested', value)}
             defaultExpanded={true}
           />

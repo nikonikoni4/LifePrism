@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Sun, Moon, Coffee, Zap, Clock, Tag, FileText } from 'lucide-react';
+import { X, Sun, Moon, Coffee, Zap, Tag, FileText } from 'lucide-react';
 import { JournalEntry } from '../../../../types';
 
 interface JournalEntryModalProps {
@@ -33,7 +33,6 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({ goalId, onClose, 
     time: getCurrentTime(),
     content: '',
     mood: 'neutral' as MoodType,
-    duration: 1,
     tags: '',
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -49,7 +48,7 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({ goalId, onClose, 
         time: form.time,
         content: form.content.trim(),
         mood: form.mood,
-        duration: form.duration,
+        duration: 0,
         tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       };
       await onSave(journalData);
@@ -150,33 +149,18 @@ const JournalEntryModal: React.FC<JournalEntryModalProps> = ({ goalId, onClose, 
             </div>
           </div>
 
-          {/* Duration & Tags */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                <Clock size={12} /> 时长 (小时)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-400 transition-all font-medium tabular-nums"
-                value={form.duration}
-                onChange={e => setForm({ ...form, duration: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                <Tag size={12} /> 标签
-              </label>
-              <input
-                type="text"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-600 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-400 transition-all font-medium"
-                placeholder="用逗号分隔"
-                value={form.tags}
-                onChange={e => setForm({ ...form, tags: e.target.value })}
-              />
-            </div>
+          {/* Tags */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <Tag size={12} /> 标签
+            </label>
+            <input
+              type="text"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-600 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-400 transition-all font-medium"
+              placeholder="用逗号分隔"
+              value={form.tags}
+              onChange={e => setForm({ ...form, tags: e.target.value })}
+            />
           </div>
 
           {/* Actions */}

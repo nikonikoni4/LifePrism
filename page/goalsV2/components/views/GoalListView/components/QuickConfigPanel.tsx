@@ -4,20 +4,17 @@ import { ChevronDown, ChevronUp, Check, Settings } from 'lucide-react';
 import { ThemeKey } from '../../../../types';
 import { THEMES } from '../../../../hooks/useGoalStore';
 import CategoryFilter, { CategoryFilterValue } from '../../../../../common/CategoryFilter';
-import { DropdownMenu } from '../../../shared/components/DropdownMenu';
 
 interface QuickConfigPanelProps {
   theme: ThemeKey;
   category: string;
   startDate: string;
   endDate: string;
-  trackTimeAutomatically: boolean;
   timeInvested: string;
   onThemeChange: (theme: ThemeKey) => void;
   onCategoryChange: (category: string) => void;
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
-  onTrackModeChange: (auto: boolean) => void;
   onTimeInvestedChange: (time: string) => void;
   defaultExpanded?: boolean;
 }
@@ -27,13 +24,11 @@ const QuickConfigPanel: React.FC<QuickConfigPanelProps> = ({
   category,
   startDate,
   endDate,
-  trackTimeAutomatically,
   timeInvested,
   onThemeChange,
   onCategoryChange,
   onStartDateChange,
   onEndDateChange,
-  onTrackModeChange,
   onTimeInvestedChange,
   defaultExpanded = false,
 }) => {
@@ -94,7 +89,7 @@ const QuickConfigPanel: React.FC<QuickConfigPanelProps> = ({
                 </div>
               </div>
 
-              {/* Category & Time Tracking */}
+              {/* Category & Time Invested */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -113,48 +108,16 @@ const QuickConfigPanel: React.FC<QuickConfigPanelProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      已投入
-                    </label>
-                    <DropdownMenu
-                      trigger={
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 bg-slate-100 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-200 transition-colors"
-                        >
-                          {trackTimeAutomatically ? '自动' : '手动'}
-                          <ChevronDown size={10} />
-                        </button>
-                      }
-                      items={[
-                        {
-                          id: 'auto',
-                          label: '自动追踪',
-                          rightLabel: trackTimeAutomatically ? '✓' : undefined,
-                          onClick: () => onTrackModeChange(true),
-                        },
-                        {
-                          id: 'manual',
-                          label: '手动记录',
-                          rightLabel: !trackTimeAutomatically ? '✓' : undefined,
-                          onClick: () => onTrackModeChange(false),
-                        },
-                      ]}
-                      align="left"
-                      width="w-32"
-                    />
-                  </div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    已投入
+                  </label>
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      className={`w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all tabular-nums font-medium ${
-                        trackTimeAutomatically ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''
-                      }`}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all tabular-nums font-medium"
                       placeholder="0"
                       value={timeInvested}
                       onChange={(e) => onTimeInvestedChange(e.target.value)}
-                      disabled={trackTimeAutomatically}
                     />
                     <span className="flex items-center justify-center bg-slate-100 rounded-lg px-2 text-[10px] font-bold text-slate-400">
                       h

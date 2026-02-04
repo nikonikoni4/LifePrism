@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Plus, ChevronRight, Sun, Moon, Coffee, Zap, Clock } from 'lucide-react';
+import { FileText, Plus, ChevronRight, Sun, Moon, Coffee, Zap } from 'lucide-react';
 import { JournalEntry } from '../../../../types';
 import { formatDateForDisplay } from '../../../../api';
 import JournalEntryModal from './JournalEntryModal';
@@ -85,12 +85,6 @@ const JournalPreview: React.FC<JournalPreviewProps> = ({
                   <span className="text-[10px] text-slate-400 font-medium">
                     {formatDateForDisplay(entry.date)}
                   </span>
-                  {entry.duration > 0 && (
-                    <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5">
-                      <Clock size={8} />
-                      +{entry.duration}h
-                    </span>
-                  )}
                   {entry.tags && entry.tags.length > 0 && (
                     <div className="flex gap-1">
                       {entry.tags.slice(0, 2).map((tag) => (
