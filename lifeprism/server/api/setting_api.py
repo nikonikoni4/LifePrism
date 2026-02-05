@@ -3,15 +3,21 @@ Settings API - 配置管理接口
 
 提供配置的读取和修改功能
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from typing import Optional
 
 from lifeprism.server.schemas.setting_schemas import (
     SettingsResponse,
     UpdateSettingsRequest,
     UpdateApiKeyRequest,
     UpdateApiKeyResponse,
+    ProviderCapabilitiesResponse,
+    ProviderListResponse,
+    ProviderInfo,
+    ProviderCapabilities,
 )
 from lifeprism.server.services import setting_service
+from lifeprism.llm.utils import get_provider_capabilities, list_providers
 
 router = APIRouter(prefix="/settings", tags=["Settings - 配置管理"])
 
@@ -44,12 +50,17 @@ async def update_settings(request: UpdateSettingsRequest):
 async def update_api_key(request: UpdateApiKeyRequest):
     """
     更新 API Key
-    
+
     API Key 会安全存储到系统密钥管理器 (Keyring)，不保存在配置文件中。
+
+    Args:
+        request.api_key: 新的 API Key
+        request.provider_id: 服务商 ID（可选），如 aliyun, openai 等
     """
     try:
-        setting_service.update_api_key(request.api_key)
-        return UpdateApiKeyResponse(success=True, message="API Key 已安全保存")
+        setting_service.update_api_key(request.api_key, request.provider_id)
+        provider_msg = f" ({request.provider_id})" if request.provider_id else ""
+        return UpdateApiKeyResponse(success=True, message=f"API Key{provider_msg} 已安全保存")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存 API Key 失败: {str(e)}")
 
@@ -72,18 +83,77 @@ async def check_api_key_status():
 async def test_llm_connection():
     """
     测试 LLM 连接
-    
+
     发送一个简单的测试请求到 LLM，验证 API Key 和模型配置是否正确。
-    
+
     Returns:
         - success: bool, 是否连接成功
         - message: str, 结果信息
         - model_response: str, 模型的回复内容（成功时）
     """
     from lifeprism.llm.function.test_connect import test_connect
-    
+
     try:
         result = await test_connect()
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"连接测试失败: {str(e)}")
+
+
+@router.get("/providers", response_model=ProviderListResponse, summary="获取所有支持的服务商列表")
+async def get_providers():
+    """
+    获取所有支持的 LLM 服务商列表
+
+    返回每个服务商的 ID、名称、能力和默认模型
+    """
+    providers_data = list_providers()
+    providers = [
+        ProviderInfo(
+            provider_id=p["provider_id"],
+            provider_name=p["provider_name"],
+            capabilities=ProviderCapabilities(**p["capabilities"]),
+            default_model=p["default_model"]
+        )
+        for p in providers_data
+    ]
+    return ProviderListResponse(providers=providers)
+
+
+@router.get("/provider-capabilities", response_model=ProviderCapabilitiesResponse, summary="获取服务商能力")
+async def get_provider_caps(
+    provider: Optional[str] = Query(default=None, description="服务商名称或 ID，不传则使用当前配置的服务商")
+):
+    """
+    获取指定服务商支持的能力
+
+    Args:
+        provider: 服务商名称或 ID，如 "aliyun", "OpenAI" 等
+
+    Returns:
+        服务商能力信息，包括是否支持 web_search、thinking 等
+    """
+    caps = get_provider_capabilities(provider)
+    return ProviderCapabilitiesResponse(**caps)
+
+
+@router.delete("/model-history", summary="删除模型历史记录")
+async def delete_model_history(
+    provider_id: str = Query(..., description="服务商 ID，如 aliyun, volcengine 等"),
+    model: str = Query(..., description="要删除的模型名称/ID")
+):
+    """
+    从指定服务商的历史记录中删除模型
+
+    Args:
+        provider_id: 服务商 ID
+        model: 模型名称/ID
+
+    Returns:
+        删除结果
+    """
+    success = setting_service.remove_model_from_history(provider_id, model)
+    if success:
+        return {"success": True, "message": f"已删除模型 {model}"}
+    else:
+        return {"success": False, "message": "模型不存在于历史记录中"}

@@ -5,7 +5,7 @@ Setting 界面的 schemas
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 
 class SettingItems(BaseModel):
@@ -17,6 +17,7 @@ class SettingItems(BaseModel):
     provider: str = Field(description="LLM Provider")
     provider_list: List[str] = Field(description="支持的模型服务商列表")
     model: str = Field(description="模型选择")
+    model_history: Dict[str, List[str]] = Field(default={}, description="按服务商存储的模型历史")
     input_tokens_cost: float = Field(description="输入token单价 /1k")
     output_tokens_cost: float = Field(description="输出token单价 /1k")
     # 分类配置
@@ -57,9 +58,39 @@ class UpdateSettingsRequest(BaseModel):
 class UpdateApiKeyRequest(BaseModel):
     """更新 API Key 请求"""
     api_key: str = Field(description="新的 API Key")
+    provider_id: Optional[str] = Field(default=None, description="服务商 ID，如 aliyun, openai 等")
 
 
 class UpdateApiKeyResponse(BaseModel):
     """更新 API Key 响应"""
     success: bool
     message: str
+
+
+class ProviderCapabilities(BaseModel):
+    """服务商能力"""
+    web_search: bool = Field(description="是否支持网络搜索")
+    thinking: bool = Field(description="是否支持深度思考")
+    streaming: bool = Field(description="是否支持流式输出")
+    tool_calling: bool = Field(description="是否支持工具调用")
+
+
+class ProviderInfo(BaseModel):
+    """服务商信息"""
+    provider_id: str = Field(description="服务商 ID")
+    provider_name: str = Field(description="服务商显示名称")
+    capabilities: ProviderCapabilities = Field(description="服务商能力")
+    default_model: str = Field(description="默认模型")
+
+
+class ProviderCapabilitiesResponse(BaseModel):
+    """获取服务商能力响应"""
+    provider_id: str
+    provider_name: str
+    capabilities: Dict[str, bool]
+    default_model: str
+
+
+class ProviderListResponse(BaseModel):
+    """获取服务商列表响应"""
+    providers: List[ProviderInfo]

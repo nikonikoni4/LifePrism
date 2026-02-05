@@ -17,7 +17,15 @@ from functools import lru_cache
 
 # Keyring 服务名称
 KEYRING_SERVICE_NAME = "lifeprism"
-KEYRING_API_KEY_USERNAME = "api_key"
+KEYRING_API_KEY_USERNAME = "api_key"  # 保留向后兼容
+
+# 服务商 ID 到 keyring 用户名的映射
+PROVIDER_KEYRING_USERNAMES = {
+    "aliyun": "api_key_aliyun",
+    "volcengine": "api_key_volcengine",
+    "openai": "api_key_openai",
+    "minimax": "api_key_minimax",
+}
 
 
 class SettingsManager:
@@ -48,6 +56,7 @@ class SettingsManager:
         'lw_db_path': '~/AppData/Local/lifeprism/data/lifewatch_ai.db',
         'chat_db_path': '~/AppData/Local/lifeprism/data/chat_history.db',
         'data_cleaning_threshold': 10,
+        'model_history': {},  # 按服务商存储的模型历史 {provider_id: [model1, model2, ...]}
     }
     
     def __new__(cls) -> 'SettingsManager':
@@ -164,23 +173,45 @@ class SettingsManager:
         return self.DEFAULTS.get(key)
     
     def _get_api_key_from_keyring(self) -> Optional[str]:
-        """从系统密钥管理器获取 API Key"""
+        """从系统密钥管理器获取 API Key（向后兼容）"""
         try:
             return keyring.get_password(KEYRING_SERVICE_NAME, KEYRING_API_KEY_USERNAME)
         except Exception:
             return None
-    
+
+    def _get_api_key_from_keyring_by_provider(self, provider_id: str) -> Optional[str]:
+        """从系统密钥管理器获取指定服务商的 API Key"""
+        try:
+            username = PROVIDER_KEYRING_USERNAMES.get(provider_id)
+            if username:
+                return keyring.get_password(KEYRING_SERVICE_NAME, username)
+            return None
+        except Exception:
+            return None
+
     def _set_api_key_to_keyring(self, api_key: str) -> bool:
-        """将 API Key 保存到系统密钥管理器"""
+        """将 API Key 保存到系统密钥管理器（向后兼容）"""
         try:
             keyring.set_password(KEYRING_SERVICE_NAME, KEYRING_API_KEY_USERNAME, api_key)
             return True
         except Exception as e:
             print(f"Warning: Failed to save API key to keyring: {e}")
             return False
-    
+
+    def _set_api_key_to_keyring_by_provider(self, provider_id: str, api_key: str) -> bool:
+        """将 API Key 保存到系统密钥管理器（按服务商）"""
+        try:
+            username = PROVIDER_KEYRING_USERNAMES.get(provider_id)
+            if username:
+                keyring.set_password(KEYRING_SERVICE_NAME, username, api_key)
+                return True
+            return False
+        except Exception as e:
+            print(f"Warning: Failed to save API key for {provider_id} to keyring: {e}")
+            return False
+
     def _delete_api_key_from_keyring(self) -> bool:
-        """从系统密钥管理器删除 API Key"""
+        """从系统密钥管理器删除 API Key（向后兼容）"""
         try:
             keyring.delete_password(KEYRING_SERVICE_NAME, KEYRING_API_KEY_USERNAME)
             return True
@@ -188,6 +219,63 @@ class SettingsManager:
             return False
         except Exception:
             return False
+
+    def _delete_api_key_from_keyring_by_provider(self, provider_id: str) -> bool:
+        """从系统密钥管理器删除指定服务商的 API Key"""
+        try:
+            username = PROVIDER_KEYRING_USERNAMES.get(provider_id)
+            if username:
+                keyring.delete_password(KEYRING_SERVICE_NAME, username)
+                return True
+            return False
+        except keyring.errors.PasswordDeleteError:
+            return False
+        except Exception:
+            return False
+
+    def get_api_key(self, provider_id: Optional[str] = None) -> Optional[str]:
+        """
+        获取 API Key
+
+        优先级:
+        1. 环境变量 LIFEWATCH_API_KEY
+        2. 按服务商存储的 keyring（如果指定了 provider_id）
+        3. 通用 keyring（向后兼容）
+
+        Args:
+            provider_id: 服务商 ID，如 "aliyun", "openai" 等
+
+        Returns:
+            API Key 或 None
+        """
+        # 1. 检查环境变量
+        env_value = os.getenv('LIFEWATCH_API_KEY')
+        if env_value:
+            return env_value
+
+        # 2. 按服务商获取
+        if provider_id:
+            provider_key = self._get_api_key_from_keyring_by_provider(provider_id)
+            if provider_key:
+                return provider_key
+
+        # 3. 向后兼容：获取通用 key
+        return self._get_api_key_from_keyring()
+
+    def set_api_key(self, api_key: str, provider_id: Optional[str] = None) -> bool:
+        """
+        设置 API Key
+
+        Args:
+            api_key: API Key 值
+            provider_id: 服务商 ID，如果为 None 则保存到通用位置
+
+        Returns:
+            是否成功
+        """
+        if provider_id:
+            return self._set_api_key_to_keyring_by_provider(provider_id, api_key)
+        return self._set_api_key_to_keyring(api_key)
     
     def set(self, key: str, value: Any, save: bool = True) -> None:
         """
@@ -338,11 +426,72 @@ class SettingsManager:
     @property
     def data_cleaning_threshold(self) -> int:
         return self.get('data_cleaning_threshold')
-    
+
     @property
     def custom_data_path(self) -> Path:
         """获取 customData 目录的绝对路径"""
         return self._custom_data_path
+
+    @property
+    def model_history(self) -> Dict[str, List[str]]:
+        """获取模型历史记录"""
+        return self.get('model_history') or {}
+
+    def get_model_history_for_provider(self, provider_id: str) -> List[str]:
+        """
+        获取指定服务商的模型历史
+
+        Args:
+            provider_id: 服务商 ID，如 "aliyun", "volcengine" 等
+
+        Returns:
+            模型名称列表
+        """
+        history = self.model_history
+        return history.get(provider_id, [])
+
+    def add_model_to_history(self, provider_id: str, model: str) -> None:
+        """
+        将模型添加到历史记录
+
+        Args:
+            provider_id: 服务商 ID
+            model: 模型名称/ID
+        """
+        if not model or not provider_id:
+            return
+
+        history = self.get('model_history') or {}
+        if provider_id not in history:
+            history[provider_id] = []
+
+        # 如果已存在，先移除再添加到最前面
+        if model in history[provider_id]:
+            history[provider_id].remove(model)
+        history[provider_id].insert(0, model)
+
+        # 限制每个服务商最多保存 10 个历史模型
+        history[provider_id] = history[provider_id][:10]
+
+        self.set('model_history', history)
+
+    def remove_model_from_history(self, provider_id: str, model: str) -> bool:
+        """
+        从历史记录中删除模型
+
+        Args:
+            provider_id: 服务商 ID
+            model: 模型名称/ID
+
+        Returns:
+            是否删除成功
+        """
+        history = self.get('model_history') or {}
+        if provider_id in history and model in history[provider_id]:
+            history[provider_id].remove(model)
+            self.set('model_history', history)
+            return True
+        return False
 
 
 # 全局单例实例
