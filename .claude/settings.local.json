@@ -37,7 +37,17 @@
       "WebSearch",
       "Bash(python:*)",
       "Bash(python3:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(git checkout:*)",
+      "WebFetch(domain:platform.minimax.io)",
+      "WebFetch(domain:python.langchain.com)",
+      "WebFetch(domain:docs.langchain.com)",
+      "WebFetch(domain:docs.byteplus.com)",
+      "WebFetch(domain:www.volcengine.com)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(pip search:*)",
+      "Bash(pip index:*)"
     ]
   },
   "enabledMcpjsonServers": [

@@ -1,50 +1,43 @@
-# developing...
+# LifePrism
 
-正在开发中....
-下面是暂时的使用方法
+LifePrism是一个专注于个人数据收集，目标管理，习惯养成，心理成长与个人记忆的综合性个人成长平台！
 
 ## 快速开始
 
-1. [下载activitywatch（电脑端数据来源）](https://github.com/ActivityWatch/activitywatch.git)
+### 前置条件
 
-2. clone 仓库
+1. 安装activityWacht
+2. 下载lifeprism
 
-    ```bash
-    git clone --recursive https://github.com/nikonikoni4/LifePrism.git
-    ```
+### 系统设定
 
-3. 配置环境(建议创建新的环境)
 
-    ```bash
-    cd LifePrism
-    pip install -e .
-    ```
 
-    ```bash
-    cd frontend
-    npm install
-    npm run dev
-    ```
+## feature
 
-    ```bash
-    cd lifeprism/server
-    python main.py
-    ```
+LifePrism包含：
 
-5. 访问 http://localhost:3000/ 
+- LifeWatch: AI驱动的个人时间管理与分析平台，分析电脑等运行数据，可自动分类，可视化展示每天所做内容，提供可视化数据报告，以及AI总结报告。
+- GoalMaster : 个人目标管理平台，提供清晰的从目标价值确认->目标创建->目标规划->任务安排->每日todo执行的链路。
+- Habits: 个人习惯追踪平台（开发中），以**“习惯堆积”**为基础，衍生出**习惯锚点**概念，以新习惯的养成应该以已有习惯为锚点为核心理念出发的个人习惯平台。
+- Mind Sapce: 个人心理空间平台（开发中），以ACT接纳承诺治疗法为核心的个人心理空间，包括心情记录，日记等基础记录功能，提供自我解构，自我价值发现，认知/情绪解离等工具。
+- My Memories：个人记忆平台（开发中），旨在打造第二自我或数字自我，以数字自我为镜，反向激励个人成长！
+- Add-on : 额外插件内容（开发中）：
+  - 规划中的插件
+    - What am I doing 插件（开发中）: 一个桌面浮窗工具，以git worktree为设计理念。GoalMaster的todo list的扩展，可依据当前的计划和todo list 指导自己当下每一分钟的工作。尤其是在当下ai普及的时代，多窗口AI调度十分消耗精力，需要一个工具帮助我们抽离具体行为，让我们知道自己当下的任务是什么！同时，在使用过程中的数据可以同步到LifeWatch的时间轴中显示，提供更加具体的数据，让我们更加了解在什么时间，做了什么事情！
+    - lifeprism skill （开发中）：支持Ai coding工具帮助我们制定目标，计划，每日todolist设定等功能。
 
-6. 点击setting 查看当前地址是否存在着activitywacth的数据库
-    - activitywacth地址："C:\Users\yourname\AppData\Local\activitywatch\activitywatch\aw-server\peewee-sqlite.v2.db"
+## Philosophy
 
-7. 配置API
-    - 目前只支持阿里云的API：https://cn.aliyun.com/
+### 为什么要做LifePrism?
 
-8. 配置分类
-    - 点击category 添加新的分类
+了解自己也总是困难的，LifePrism旨在将外显行为（个人活动）与内显行为（心理活动）结合在一起，而不是孤立的看待，让我们更加了解我们的内心活动，了解为什么我们会做出各种各样的事情，我们究竟被什么东西困住（钩住）而做出于我们价值截然相反的行为？
 
-## Tokens 用量说明
+觉察（了解自己，觉察当下）->接纳（接纳自己的不完满，才能立足当下）->价值与承诺（承诺做出符合我们价值的行为）
 
-LifePrism对于tokens的消耗特别小，下面是我使用了一个多月的情况，这里还包括我调试时产生的tokens消耗：
-总共消耗：689.4k 按照阿里云qwen-plus的单价计算，约合0.6元
+### 
 
-![alt text](/assets/image.png)
+
+
+
+

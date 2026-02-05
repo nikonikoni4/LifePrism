@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. 编写代码后，列出可能出现的问题，并建议相应的测试用例来覆盖这些问题。
 4. 当发现bug首先需要编写一个能够重现该bug的测试，然后不断修复它，直到它通过测试为止。
 5. 每次我纠正你之后，就在claude.md文件中新增加一条规则，这样就不会再发生这种情况了。
-
+6. 所有测试内容都应该在test文件夹下，并且需要编写对应的测试用例。
 
 
 ### 语言
