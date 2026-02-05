@@ -15,7 +15,7 @@ from lifeprism.utils import is_multipurpose_app
 from lifeprism.config import LOCAL_TIMEZONE
 from lifeprism.config.settings_manager import settings
 from lifeprism.config.database import get_table_columns
-from lifeprism.llm.llm_classify import AppInFo, LogItem, classifyState
+from lifeprism.llm import AppInFo, LogItem, classifyState
 from lifeprism.utils import get_logger, DEBUG
 
 # 导入重构组件

@@ -9,8 +9,8 @@ import pytz
 
 from lifeprism.server.providers import server_lw_data_provider, goal_provider
 from lifeprism.processors.data_clean import clean_activitywatch_data
-from lifeprism.llm.llm_classify.classify.main_classify import LLMClassify
-from lifeprism.llm.llm_classify.schemas import classifyState
+from lifeprism.llm.classify.main_classify import LLMClassify
+from lifeprism.llm.schemas import classifyState
 from lifeprism.config import settings,LOCAL_TIMEZONE
 
 import logging
@@ -341,7 +341,7 @@ class DataProcessingService:
         
         # 构建 goals 列表（用于 LLM 分类时的 goal 关联）
         # 格式: [{goal: 目标名称, category: 主分类名称, sub_category: 子分类名称}, ...]
-        from lifeprism.llm.llm_classify.schemas import Goal as LLMGoal
+        from lifeprism.llm.schemas import Goal as LLMGoal
         goals_for_llm = []
         for g in goal_provider.get_active_goals_for_classify():
             # 根据 ID 查找分类名称

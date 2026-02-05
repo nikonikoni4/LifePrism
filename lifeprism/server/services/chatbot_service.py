@@ -46,7 +46,7 @@ class ChatbotServiceV1:
             DeprecationWarning,
             stacklevel=2
         )
-        from lifeprism.llm.llm_classify.chat.chat_bot import ChatBot
+        from lifeprism.llm.chat.chat_bot import ChatBot
         self._ChatBot = ChatBot
         self._chatbot: Optional[Any] = None
         self._chatbot_context = None  # 异步上下文管理器
@@ -369,7 +369,7 @@ class ChatbotService:
     
     def __init__(self):
         """初始化服务"""
-        from lifeprism.llm.llm_classify.chat.chat_bot_graph import ChatBot
+        from lifeprism.llm.chat.chat_bot_graph import ChatBot
         self._ChatBot = ChatBot
         self._chatbot: Optional[Any] = None
         self._chatbot_context = None  # 异步上下文管理器

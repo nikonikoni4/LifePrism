@@ -5,7 +5,7 @@
 from typing import Dict, List, Set
 from lifeprism.processors.models.processed_event import ProcessedEvent
 from lifeprism.processors.components.category_cache import CategoryCache
-from lifeprism.llm.llm_classify import AppInFo, LogItem, classifyState
+from lifeprism.llm import AppInFo, LogItem, classifyState
 from lifeprism.utils import get_logger, DEBUG
 
 logger = get_logger(__name__)

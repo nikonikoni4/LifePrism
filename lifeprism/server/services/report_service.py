@@ -343,7 +343,7 @@ async def get_daily_ai_summary(date: str, pattern: str) -> dict:
             - content: AI 生成的总结内容
             - tokens_usage: Token 使用量统计
     """
-    from lifeprism.llm.llm_classify.function.report_summary import daily_summary
+    from lifeprism.llm.function.report_summary import daily_summary
     
     logger.info(f"生成每日 AI 总结 {date}, pattern={pattern}")
     result = await daily_summary(date=date, pattern=pattern)
@@ -376,7 +376,7 @@ async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, patter
             - content: AI 生成的总结内容
             - tokens_usage: Token 使用量统计
     """
-    from lifeprism.llm.llm_classify.function.report_summary import multi_days_summary
+    from lifeprism.llm.function.report_summary import multi_days_summary
     
     logger.info(f"生成周 AI 总结 {week_start_date} ~ {week_end_date}, pattern={pattern}")
     
@@ -414,7 +414,7 @@ async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, pat
             - content: AI 生成的总结内容
             - tokens_usage: Token 使用量统计
     """
-    from lifeprism.llm.llm_classify.function.report_summary import multi_days_summary
+    from lifeprism.llm.function.report_summary import multi_days_summary
     
     logger.info(f"生成月 AI 总结 {month_start_date} ~ {month_end_date}, pattern={pattern}")
     

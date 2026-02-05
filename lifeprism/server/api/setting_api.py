@@ -80,7 +80,7 @@ async def test_llm_connection():
         - message: str, 结果信息
         - model_response: str, 模型的回复内容（成功时）
     """
-    from lifeprism.llm.llm_classify.function.test_connect import test_connect
+    from lifeprism.llm.function.test_connect import test_connect
     
     try:
         result = await test_connect()
