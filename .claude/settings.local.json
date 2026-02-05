@@ -34,7 +34,10 @@
       "Bash(python test_debug_sync.py:*)",
       "Bash(Select-String -Pattern \"PASSED|FAILED\")",
       "Bash(tree:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(npm run dev:*)"
     ]
   },
   "enabledMcpjsonServers": [

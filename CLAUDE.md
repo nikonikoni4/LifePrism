@@ -692,6 +692,19 @@ class CategoryService:
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
 ```
+ 
+## 业务模块
+
+在这个模块中会记录一些重要的业务逻辑变更，若代码中存在与之不符合的逻辑，需要以这个模块的内容为准
+
+### goal 模块
+
+#### 用户目标追踪
+
+goal表中新增track_time_automatically字段，只有track_time_automatically == 1 ，status =="active"并且设定了分类类别的goal才能被自动追踪（数据处理时，lifeprism\server\services\data_processing_service.py 将goal传入分类器中）
+
+
+
 
 ## Project Overview
 
