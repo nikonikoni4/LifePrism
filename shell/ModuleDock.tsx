@@ -61,7 +61,7 @@ const MODULES: ModuleConfig[] = [
 // 触发区域高度
 const TRIGGER_ZONE_HEIGHT = 20;
 // 隐藏延迟时间
-const HIDE_DELAY = 300;
+const HIDE_DELAY = 50;
 
 export const ModuleDock: React.FC<ModuleDockProps> = ({
     currentModule,
@@ -101,15 +101,32 @@ export const ModuleDock: React.FC<ModuleDockProps> = ({
     // 监听鼠标位置（触发区域检测）
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
-            // 如果鼠标在顶部触发区域内
+            // 如果鼠标在顶部触发区域内，显示 Dock
             if (e.clientY <= TRIGGER_ZONE_HEIGHT) {
                 showDock();
+                return;
+            }
+
+            // 如果 Dock 可见，检测鼠标是否在 Dock 区域外
+            if (isVisible && dockRef.current) {
+                const rect = dockRef.current.getBoundingClientRect();
+                // 增加一些边距，避免过于敏感
+                const padding = 20;
+                const isOutside =
+                    e.clientX < rect.left - padding ||
+                    e.clientX > rect.right + padding ||
+                    e.clientY < rect.top - padding ||
+                    e.clientY > rect.bottom + padding;
+
+                if (isOutside) {
+                    hideDock();
+                }
             }
         };
 
         window.addEventListener('mousemove', handleMouseMove);
         return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, [showDock]);
+    }, [showDock, hideDock, isVisible]);
 
     // 清理定时器
     useEffect(() => {
