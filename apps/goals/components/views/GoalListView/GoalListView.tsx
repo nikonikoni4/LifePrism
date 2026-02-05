@@ -41,7 +41,7 @@ export const GoalListView: React.FC = () => {
     }
   };
 
-  const handleUpdateGoal = async (goal: Goal) => {
+  const handleUpdateGoal = async (goal: Partial<Goal> & { id: string }) => {
     try {
       await updateGoal(goal);
     } catch (err) {
@@ -68,11 +68,7 @@ export const GoalListView: React.FC = () => {
   };
 
   const handleTimeRefreshed = (id: string, newTimeInvested: string) => {
-    // Update the goal's timeInvested in the store
-    const goal = goals.find(g => g.id === id);
-    if (goal) {
-      updateGoal({ ...goal, timeInvested: newTimeInvested });
-    }
+    updateGoal({ id, timeInvested: newTimeInvested });
   };
 
   return (

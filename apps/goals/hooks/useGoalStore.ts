@@ -100,7 +100,7 @@ interface GoalStoreContextType {
     error: string | null;
     fetchGoals: () => Promise<void>;
     addGoal: (goal: Goal) => Promise<void>;
-    updateGoal: (goal: Goal) => Promise<void>;
+    updateGoal: (goal: Partial<Goal> & { id: string }) => Promise<void>;
     deleteGoal: (id: string) => Promise<void>;
     toggleGoalStatus: (id: string) => Promise<void>;
     updateMilestoneState: (goalId: string, milestoneId: string, state: number) => Promise<void>;
@@ -146,7 +146,7 @@ export const GoalProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
-    const updateGoal = async (updatedGoal: Goal) => {
+    const updateGoal = async (updatedGoal: Partial<Goal> & { id: string }) => {
         setError(null);
         try {
             const updated = await goalsV2Api.updateGoal(updatedGoal.id, updatedGoal);

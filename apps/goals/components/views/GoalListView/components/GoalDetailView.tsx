@@ -16,7 +16,7 @@ import InlineEditableTextarea from './InlineEditableTextarea';
 interface GoalDetailViewProps {
   goal: Goal;
   onClose: () => void;
-  onUpdate: (goal: Goal) => void;
+  onUpdate: (goal: Partial<Goal> & { id: string }) => void;
   onMilestoneToggle?: (goalId: string, milestoneId: string, state: number) => Promise<void>;
   onMilestonesChange?: (goalId: string, milestones: MilestoneItem[]) => Promise<void>;
   onAddJournal?: (goalId: string, journal: Omit<JournalEntry, 'id'>) => Promise<void>;
@@ -55,7 +55,7 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({
 
     setIsSaving(true);
     try {
-      await onUpdate({ ...goal, ...pendingChanges });
+      await onUpdate({ id: goal.id, ...pendingChanges });
       setPendingChanges({});
     } catch (err) {
       console.error('Failed to save goal:', err);
