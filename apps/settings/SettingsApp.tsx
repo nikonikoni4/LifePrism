@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     User,
     Cpu,
@@ -11,7 +11,6 @@ import {
     LayoutGrid,
     Database,
     FolderSearch,
-    Save,
     Filter,
     Plus,
     Minus,
@@ -22,13 +21,12 @@ import {
     Trash2
 } from 'lucide-react';
 import { SettingsAPI } from './api';
+import { toast } from '../../core/components';
 
 const SettingsApp: React.FC = () => {
-    // Loading & Error States
+    // Loading & Saving States
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     // 1. User Settings
     const [nickname, setNickname] = useState('');
@@ -73,6 +71,7 @@ const SettingsApp: React.FC = () => {
 
     // Refs
     const modelDropdownRef = useRef<HTMLDivElement>(null);
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // 点击外部关闭模型下拉菜单
     useEffect(() => {
@@ -91,12 +90,39 @@ const SettingsApp: React.FC = () => {
         };
     }, [showModelDropdown]);
 
+    // 防抖自动保存函数
+    const debouncedSave = useCallback((settingsToSave: Record<string, unknown>) => {
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+
+        saveTimeoutRef.current = setTimeout(async () => {
+            try {
+                setIsSaving(true);
+                await SettingsAPI.updateSettings(settingsToSave);
+                toast.success('已自动保存');
+            } catch (err) {
+                toast.error(err instanceof Error ? err.message : '保存失败');
+            } finally {
+                setIsSaving(false);
+            }
+        }, 800);
+    }, []);
+
+    // 清理定时器
+    useEffect(() => {
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, []);
+
     // Load settings on mount
     useEffect(() => {
         const loadSettings = async () => {
             try {
                 setIsLoading(true);
-                setError(null);
                 const settings = await SettingsAPI.getSettings();
 
                 // Populate state from API response
@@ -118,7 +144,7 @@ const SettingsApp: React.FC = () => {
                 setChatPath(settings.chat_db_path);
                 setFilterDuration(settings.data_cleaning_threshold);
             } catch (err) {
-                setError(err instanceof Error ? err.message : '加载配置失败');
+                toast.error(err instanceof Error ? err.message : '加载配置失败');
             } finally {
                 setIsLoading(false);
             }
@@ -127,6 +153,26 @@ const SettingsApp: React.FC = () => {
         loadSettings();
     }, []);
 
+    // 触发自动保存（收集当前所有设置）
+    const triggerAutoSave = useCallback((overrides: Record<string, unknown> = {}) => {
+        const currentSettings = {
+            user_name: nickname,
+            provider: provider,
+            model: modelName,
+            input_tokens_cost: costInput,
+            output_tokens_cost: costOutput,
+            classification_mode: classificationMode === 'complex' ? 'classify_graph' : 'classify_simple',
+            long_log_threshold: longLogThreshold,
+            multi_purpose_app_names: browserApps,
+            aw_db_path: awPath,
+            lw_db_path: lwPath,
+            chat_db_path: chatPath,
+            data_cleaning_threshold: filterDuration,
+            ...overrides,
+        };
+        debouncedSave(currentSettings);
+    }, [nickname, provider, modelName, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lwPath, chatPath, filterDuration, debouncedSave]);
+
     // Handlers
     const handleTestConnection = async () => {
         setApiStatus('testing');
@@ -134,15 +180,14 @@ const SettingsApp: React.FC = () => {
             const result = await SettingsAPI.testConnection();
             if (result.success) {
                 setApiStatus('success');
-                setSuccessMessage(`连接成功: ${result.model_response || 'LLM 响应正常'}`);
-                setTimeout(() => setSuccessMessage(null), 5000);
+                toast.success(`连接成功: ${result.model_response || 'LLM 响应正常'}`);
             } else {
                 setApiStatus('error');
-                setError(result.message || '连接测试失败');
+                toast.error(result.message || '连接测试失败');
             }
         } catch (err) {
             setApiStatus('error');
-            setError(err instanceof Error ? err.message : '连接测试失败，请检查配置');
+            toast.error(err instanceof Error ? err.message : '连接测试失败，请检查配置');
         }
     };
 
@@ -156,18 +201,23 @@ const SettingsApp: React.FC = () => {
     const addBrowserApp = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && newBrowserApp.trim()) {
             if (!browserApps.includes(newBrowserApp.trim())) {
-                setBrowserApps([...browserApps, newBrowserApp.trim()]);
+                const newApps = [...browserApps, newBrowserApp.trim()];
+                setBrowserApps(newApps);
+                triggerAutoSave({ multi_purpose_app_names: newApps });
             }
             setNewBrowserApp('');
         }
     };
 
     const removeBrowserApp = (app: string) => {
-        setBrowserApps(browserApps.filter(a => a !== app));
+        const newApps = browserApps.filter(a => a !== app);
+        setBrowserApps(newApps);
+        triggerAutoSave({ multi_purpose_app_names: newApps });
     };
 
     const handleProviderChange = (newProvider: string) => {
         setProvider(newProvider);
+        triggerAutoSave({ provider: newProvider });
         // 当选择火山引擎时显示说明弹窗
         if (newProvider.includes('火山引擎') || newProvider.toLowerCase().includes('volcengine')) {
             setShowVolcEngineModal(true);
@@ -191,7 +241,7 @@ const SettingsApp: React.FC = () => {
                 [providerId]: (prev[providerId] || []).filter(m => m !== model)
             }));
         } catch (err) {
-            setError(err instanceof Error ? err.message : '删除失败');
+            toast.error(err instanceof Error ? err.message : '删除失败');
         }
     };
 
@@ -199,36 +249,7 @@ const SettingsApp: React.FC = () => {
     const handleSelectModel = (model: string) => {
         setModelName(model);
         setShowModelDropdown(false);
-    };
-
-    const handleSaveAll = async () => {
-        try {
-            setIsSaving(true);
-            setError(null);
-            setSuccessMessage(null);
-
-            await SettingsAPI.updateSettings({
-                user_name: nickname,
-                provider: provider,
-                model: modelName,
-                input_tokens_cost: costInput,
-                output_tokens_cost: costOutput,
-                classification_mode: classificationMode === 'complex' ? 'classify_graph' : 'classify_simple',
-                long_log_threshold: longLogThreshold,
-                multi_purpose_app_names: browserApps,
-                aw_db_path: awPath,
-                lw_db_path: lwPath,
-                chat_db_path: chatPath,
-                data_cleaning_threshold: filterDuration,
-            });
-
-            setSuccessMessage('配置已保存');
-            setTimeout(() => setSuccessMessage(null), 3000);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : '保存失败');
-        } finally {
-            setIsSaving(false);
-        }
+        triggerAutoSave({ model: model });
     };
 
     const handleApiKeyBlur = async () => {
@@ -240,10 +261,9 @@ const SettingsApp: React.FC = () => {
                 // Reload to get masked version
                 const settings = await SettingsAPI.getSettings();
                 setApiKey(settings.api_key || '');
-                setSuccessMessage('API Key 已安全保存');
-                setTimeout(() => setSuccessMessage(null), 3000);
+                toast.success('API Key 已安全保存');
             } catch (err) {
-                setError('API Key 保存失败');
+                toast.error('API Key 保存失败');
             }
         }
     };
@@ -265,41 +285,18 @@ const SettingsApp: React.FC = () => {
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-20">
 
-            {/* Error/Success Messages */}
-            {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                    <span className="text-red-700 text-sm font-medium">{error}</span>
-                    <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
-                        <X size={16} />
-                    </button>
-                </div>
-            )}
-            {successMessage && (
-                <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
-                    <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
-                    <span className="text-green-700 text-sm font-medium">{successMessage}</span>
-                </div>
-            )}
-
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">系统设置</h1>
                     <p className="text-slate-500 mt-1 font-medium">配置您的API。</p>
                 </div>
-                <button
-                    onClick={handleSaveAll}
-                    disabled={isSaving}
-                    className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg shadow-slate-200 hover:bg-blue-600 hover:shadow-blue-200 transition-all active:scale-95 disabled:opacity-50"
-                >
-                    {isSaving ? (
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                        <Save size={18} />
-                    )}
-                    <span>{isSaving ? '保存中...' : '保存配置'}</span>
-                </button>
+                {isSaving && (
+                    <div className="flex items-center gap-2 text-slate-500 text-sm">
+                        <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                        <span>保存中...</span>
+                    </div>
+                )}
             </div>
 
             {/* 1. User Profile */}
@@ -316,6 +313,7 @@ const SettingsApp: React.FC = () => {
                         type="text"
                         value={nickname}
                         onChange={(e) => setNickname(e.target.value)}
+                        onBlur={() => triggerAutoSave({ user_name: nickname })}
                         className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-50/50 rounded-xl px-4 py-3 text-slate-800 font-bold outline-none transition-all"
                     />
                 </div>
@@ -354,6 +352,7 @@ const SettingsApp: React.FC = () => {
                                     value={modelName}
                                     onChange={(e) => setModelName(e.target.value)}
                                     onFocus={() => setShowModelDropdown(true)}
+                                    onBlur={() => triggerAutoSave({ model: modelName })}
                                     placeholder="输入或选择模型..."
                                     className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 pr-10 text-slate-800 font-medium outline-none transition-all"
                                 />
@@ -469,6 +468,7 @@ const SettingsApp: React.FC = () => {
                                 step="0.0001"
                                 value={costInput}
                                 onChange={(e) => setCostInput(parseFloat(e.target.value) || 0)}
+                                onBlur={() => triggerAutoSave({ input_tokens_cost: costInput })}
                                 className="w-full bg-transparent font-mono font-bold text-slate-700 outline-none"
                             />
                         </div>
@@ -479,6 +479,7 @@ const SettingsApp: React.FC = () => {
                                 step="0.0001"
                                 value={costOutput}
                                 onChange={(e) => setCostOutput(parseFloat(e.target.value) || 0)}
+                                onBlur={() => triggerAutoSave({ output_tokens_cost: costOutput })}
                                 className="w-full bg-transparent font-mono font-bold text-slate-700 outline-none"
                             />
                         </div>
@@ -501,7 +502,10 @@ const SettingsApp: React.FC = () => {
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 block">分类模式</label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <button
-                                onClick={() => setClassificationMode('simple')}
+                                onClick={() => {
+                                    setClassificationMode('simple');
+                                    triggerAutoSave({ classification_mode: 'classify_simple' });
+                                }}
                                 className={`text-left p-4 rounded-2xl border-2 transition-all ${classificationMode === 'simple'
                                     ? 'border-blue-500 bg-blue-50/30'
                                     : 'border-gray-100 hover:border-blue-200 bg-white'
@@ -515,7 +519,10 @@ const SettingsApp: React.FC = () => {
                             </button>
 
                             <button
-                                onClick={() => setClassificationMode('complex')}
+                                onClick={() => {
+                                    setClassificationMode('complex');
+                                    triggerAutoSave({ classification_mode: 'classify_graph' });
+                                }}
                                 className={`text-left p-4 rounded-2xl border-2 transition-all ${classificationMode === 'complex'
                                     ? 'border-purple-500 bg-purple-50/30'
                                     : 'border-gray-100 hover:border-purple-200 bg-white'
@@ -537,6 +544,7 @@ const SettingsApp: React.FC = () => {
                             type="number"
                             value={longLogThreshold}
                             onChange={(e) => setLongLogThreshold(parseInt(e.target.value) || 0)}
+                            onBlur={() => triggerAutoSave({ long_log_threshold: longLogThreshold })}
                             className="w-32 bg-gray-50 border border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-50/50 rounded-xl px-4 py-3 text-slate-800 font-bold outline-none transition-all"
                         />
                         <p className="text-xs text-slate-400 mt-2">超过此时间的活动将被标记为长活动。</p>
@@ -586,6 +594,7 @@ const SettingsApp: React.FC = () => {
                                 type="text"
                                 value={awPath}
                                 onChange={(e) => setAwPath(e.target.value)}
+                                onBlur={() => triggerAutoSave({ aw_db_path: awPath })}
                                 className="flex-1 bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
                             />
                             <button
@@ -610,6 +619,7 @@ const SettingsApp: React.FC = () => {
                             type="text"
                             value={lwPath}
                             onChange={(e) => setLwPath(e.target.value)}
+                            onBlur={() => triggerAutoSave({ lw_db_path: lwPath })}
                             className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
                         />
                     </div>
@@ -620,6 +630,7 @@ const SettingsApp: React.FC = () => {
                             type="text"
                             value={chatPath}
                             onChange={(e) => setChatPath(e.target.value)}
+                            onBlur={() => triggerAutoSave({ chat_db_path: chatPath })}
                             className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
                         />
                     </div>
@@ -642,7 +653,11 @@ const SettingsApp: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setFilterDuration(Math.max(0, filterDuration - 1))}
+                            onClick={() => {
+                                const newValue = Math.max(0, filterDuration - 1);
+                                setFilterDuration(newValue);
+                                triggerAutoSave({ data_cleaning_threshold: newValue });
+                            }}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-slate-500 hover:border-blue-300 hover:text-blue-600 transition-all"
                         >
                             <Minus size={14} />
@@ -653,12 +668,17 @@ const SettingsApp: React.FC = () => {
                                 type="number"
                                 value={filterDuration}
                                 onChange={(e) => setFilterDuration(parseInt(e.target.value) || 0)}
+                                onBlur={() => triggerAutoSave({ data_cleaning_threshold: filterDuration })}
                                 className="w-full text-center font-bold text-slate-800 outline-none bg-transparent"
                             />
                         </div>
 
                         <button
-                            onClick={() => setFilterDuration(filterDuration + 1)}
+                            onClick={() => {
+                                const newValue = filterDuration + 1;
+                                setFilterDuration(newValue);
+                                triggerAutoSave({ data_cleaning_threshold: newValue });
+                            }}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-slate-500 hover:border-blue-300 hover:text-blue-600 transition-all"
                         >
                             <Plus size={14} />
