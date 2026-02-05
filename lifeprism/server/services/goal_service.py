@@ -81,23 +81,20 @@ class GoalService:
             return None
         return category_service.sub_category_name_map.get(str(sub_category_id))
 
-    def _format_time_invested(self, minutes: int, time_unit: str = "HRS") -> str:
+    def _format_time_invested(self, seconds: int) -> str:
         """
-        格式化投入时间
+        格式化投入时间（秒转换为 Xh Xm 格式）
 
         Args:
-            minutes: 分钟数
-            time_unit: 时间单位 HRS/MINS
+            seconds: 秒数
 
         Returns:
-            str: 格式化后的时间字符串
+            str: 格式化后的时间字符串，如 "2h 30m"
         """
-        if time_unit == "MINS":
-            return f"{minutes}m"
-        else:
-            hours = minutes // 60
-            mins = minutes % 60
-            return f"{hours}h {mins}m"
+        total_minutes = seconds // 60
+        hours = total_minutes // 60
+        mins = total_minutes % 60
+        return f"{hours}h {mins}m"
 
     def _calculate_days_started(self, start_date: Optional[str]) -> Optional[int]:
         """
@@ -206,7 +203,7 @@ class GoalService:
             return True
 
         try:
-            last_update = datetime.fromisoformat(updated_at)
+            last_update = datetime.strptime(updated_at, "%Y-%m-%d %H:%M:%S")
             threshold = datetime.now() - timedelta(hours=TIME_INVESTED_UPDATE_THRESHOLD_HOURS)
             return last_update < threshold
         except Exception:
@@ -231,8 +228,8 @@ class GoalService:
 
         # 更新内存中的记录
         item['time_invested'] = time_invested
-        item['time_invested_updated_at'] = datetime.now().isoformat()
-        logger.debug(f"自动更新目标 {goal_id} 投入时间: {time_invested} 分钟")
+        item['time_invested_updated_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        logger.debug(f"自动更新目标 {goal_id} 投入时间: {time_invested} 秒")
 
         return item
 
@@ -244,7 +241,7 @@ class GoalService:
             goal_id: 目标 ID
 
         Returns:
-            Optional[int]: 更新后的投入时间（分钟），失败返回 None
+            Optional[int]: 更新后的投入时间（秒），失败返回 None
         """
         try:
             # 检查目标是否存在
@@ -258,7 +255,7 @@ class GoalService:
             success = self.goal_provider.update_time_invested(goal_id, time_invested)
 
             if success:
-                logger.info(f"手动刷新目标 {goal_id} 投入时间: {time_invested} 分钟")
+                logger.info(f"手动刷新目标 {goal_id} 投入时间: {time_invested} 秒")
                 return time_invested
             return None
 
@@ -302,10 +299,9 @@ class GoalService:
         # 获取日志（仅详情页需要）
         journal = self._get_journals_for_goal(item['id']) if include_journal else []
 
-        # 计算时间投入
-        time_invested_minutes = item.get('time_invested', 0) or 0
-        time_unit = item.get('time_unit', 'HRS') or 'HRS'
-        time_invested_str = self._format_time_invested(time_invested_minutes, time_unit)
+        # 计算时间投入（数据库存储秒）
+        time_invested_seconds = item.get('time_invested', 0) or 0
+        time_invested_str = self._format_time_invested(time_invested_seconds)
 
         # 计算已开始天数
         days_started = self._calculate_days_started(item.get('start_date'))
@@ -322,7 +318,6 @@ class GoalService:
             expected_finished_at=item.get('expected_finished_at'),
             value=item.get('value'),
             commitment=item.get('commitment'),
-            time_unit=time_unit,
             time_invested=time_invested_str,
             track_time_automatically=bool(item.get('track_time_automatically', 1)),
             milestones=milestones,
@@ -422,6 +417,11 @@ class GoalService:
         Returns:
             Optional[GoalItem]: 更新后的目标，失败返回 None
         """
+        # 获取当前目标信息，用于判断是否为自动追踪模式
+        current_goal = self.goal_provider.get_goal_by_id(goal_id)
+        if not current_goal:
+            return None
+
         # 构建更新数据
         # 使用 model_fields_set 来判断哪些字段是显式提供的（包括显式设置为 None 的情况）
         # 这样可以区分"未提供值"和"明确设置为 null"两种情况
@@ -446,16 +446,21 @@ class GoalService:
             update_data['value'] = request.value
         if 'commitment' in explicitly_set_fields:
             update_data['commitment'] = request.commitment
-        if 'time_invested' in explicitly_set_fields:
-            update_data['time_invested'] = request.time_invested
-        if 'time_unit' in explicitly_set_fields:
-            update_data['time_unit'] = request.time_unit
         if 'track_time_automatically' in explicitly_set_fields:
             update_data['track_time_automatically'] = 1 if request.track_time_automatically else 0
         if 'milestones' in explicitly_set_fields:
             update_data['milestones'] = request.milestones
         if 'status' in explicitly_set_fields:
             update_data['status'] = request.status
+
+        # 处理 time_invested：只有手动模式才接受前端传来的值
+        if 'time_invested' in explicitly_set_fields:
+            # 判断更新后的追踪模式（如果本次请求修改了追踪模式，使用新值；否则使用当前值）
+            is_auto_track = update_data.get('track_time_automatically', current_goal.get('track_time_automatically', 1))
+            if not is_auto_track:
+                # 手动模式：使用前端传来的值（秒）
+                update_data['time_invested'] = request.time_invested
+            # 自动模式：忽略前端传来的 time_invested
 
         success = self.goal_provider.update_goal(goal_id, update_data)
         if not success:

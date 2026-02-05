@@ -416,7 +416,7 @@ class GoalProvider(LWBaseDataProvider):
             goal_id: 目标 ID
 
         Returns:
-            int: 总投入时间（分钟）
+            int: 总投入时间（秒）
         """
         try:
             with self.db.get_connection() as conn:
@@ -429,9 +429,7 @@ class GoalProvider(LWBaseDataProvider):
 
                 result = cursor.fetchone()
                 total_seconds = int(result[0]) if result and result[0] else 0
-                # 转换为分钟
-                total_minutes = total_seconds // 60
-                return total_minutes
+                return total_seconds
 
         except Exception as e:
             logger.error(f"计算目标 {goal_id} 投入时间失败: {e}")
@@ -443,7 +441,7 @@ class GoalProvider(LWBaseDataProvider):
 
         Args:
             goal_id: 目标 ID
-            time_invested: 投入时间（分钟）
+            time_invested: 投入时间（秒）
 
         Returns:
             bool: 是否成功
@@ -451,7 +449,7 @@ class GoalProvider(LWBaseDataProvider):
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                now = datetime.now().isoformat()
+                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                 cursor.execute("""
                     UPDATE goal
