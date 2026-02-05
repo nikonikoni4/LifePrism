@@ -802,8 +802,8 @@ def update_todo_with_writeback(
     if updates.get('state') == 'completed' and existing.get('state') != 'completed':
         updates['actual_finished_at'] = datetime.now().strftime('%Y-%m-%d')
     elif updates.get('state') in ['pool', 'scheduled'] and existing.get('state') == 'completed':
-        # 不允许取消完成（根据需求文档）
-        pass  # 保持 completed 状态
+        # 允许取消完成，清除实际完成时间
+        updates['actual_finished_at'] = None
 
     # 3. 更新数据库
     success = todo_provider.update_todo(todo_id, updates)
@@ -822,6 +822,10 @@ def update_todo_with_writeback(
         # 4.1 完成状态回写
         if new_state == 'completed' and existing.get('state') != 'completed':
             md_synced = _writeback_completion_to_md(plan_doc_id, anchor_id)
+
+        # 4.2 取消完成状态回写
+        if new_state in ['pool', 'scheduled'] and existing.get('state') == 'completed':
+            md_synced = _writeback_uncomplete_to_md(plan_doc_id, anchor_id)
 
         # 4.2 内容变更回写
         if new_content and new_content != existing.get('content'):
@@ -868,15 +872,56 @@ def _writeback_completion_to_md(plan_doc_id: str, anchor_id: str) -> bool:
     new_line = f"{tabs}- [x] {task_content} <!-- lp:{anchor_id} -->"
     
     content = content.replace(old_line, new_line, 1)
-    
+
     # 更新系统展示区
     content = _update_system_section(content, plan_doc_id)
-    
+
     # 保存
     if _write_plan_doc_content(plan_doc_id, content):
         logger.info(f"回写完成状态成功: {plan_doc_id}/{anchor_id}")
         return True
-    
+
+    return False
+
+
+def _writeback_uncomplete_to_md(plan_doc_id: str, anchor_id: str) -> bool:
+    """
+    将取消完成状态回写到 MD 文件
+
+    将 - [x] xxx <!-- lp:t-xxx --> 改为 - [ ] xxx <!-- lp:t-xxx -->
+    """
+    content = _read_plan_doc_content(plan_doc_id)
+    if not content:
+        logger.warning(f"回写失败：MD 文件不存在 {plan_doc_id}")
+        return False
+
+    # 查找锚点所在行（已完成状态）
+    anchor_pattern = re.compile(
+        rf'^(\t*)-\s*\[x\]\s*(.+?)\s*<!--\s*lp:{re.escape(anchor_id)}\s*-->',
+        re.MULTILINE | re.IGNORECASE
+    )
+
+    match = anchor_pattern.search(content)
+    if not match:
+        logger.warning(f"回写失败：未找到已完成的锚点 {anchor_id}")
+        return False
+
+    # 替换 [x] 为 [ ]
+    tabs = match.group(1)
+    task_content = match.group(2)
+    old_line = match.group(0)
+    new_line = f"{tabs}- [ ] {task_content} <!-- lp:{anchor_id} -->"
+
+    content = content.replace(old_line, new_line, 1)
+
+    # 更新系统展示区
+    content = _update_system_section(content, plan_doc_id)
+
+    # 保存
+    if _write_plan_doc_content(plan_doc_id, content):
+        logger.info(f"回写取消完成状态成功: {plan_doc_id}/{anchor_id}")
+        return True
+
     return False
 
 
