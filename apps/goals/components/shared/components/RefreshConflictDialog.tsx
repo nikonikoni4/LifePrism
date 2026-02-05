@@ -6,8 +6,8 @@ import { X, AlertTriangle, FileText, Monitor, ArrowRight, ArrowLeft, XCircle } f
 interface RefreshConflictDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    onKeepLocal: () => void;
-    onUseFile: () => void;
+    onUseEditedContent: () => void;
+    onUseLocalMdContent: () => void;
     docName: string;
 }
 
@@ -56,8 +56,8 @@ const DataFlowDiagram: React.FC<{
 export const RefreshConflictDialog: React.FC<RefreshConflictDialogProps> = ({
     isOpen,
     onClose,
-    onKeepLocal,
-    onUseFile,
+    onUseEditedContent,
+    onUseLocalMdContent,
     docName
 }) => {
     useEffect(() => {
@@ -116,25 +116,23 @@ export const RefreshConflictDialog: React.FC<RefreshConflictDialogProps> = ({
                             </p>
 
                             <div className="space-y-2">
-                                {/* Option 1: Keep local (save to file) */}
                                 <button
-                                    onClick={onKeepLocal}
+                                    onClick={onUseEditedContent}
                                     className="w-full flex flex-col p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all text-left group"
                                 >
                                     <div className="flex items-center gap-2 mb-1">
-                                        <div className="font-medium text-slate-700 text-sm">保留当前窗口内容</div>
-                                        <span className="text-xs text-slate-400">取消刷新</span>
+                                        <div className="font-medium text-slate-700 text-sm">使用当前窗口所编辑的内容</div>
+                                        <span className="text-xs text-slate-400">当你在本地窗口有</span>
                                     </div>
                                     <DataFlowDiagram direction="toFile" highlight="local" />
                                 </button>
 
-                                {/* Option 2: Use file (load from file) */}
                                 <button
-                                    onClick={onUseFile}
+                                    onClick={onUseLocalMdContent}
                                     className="w-full flex flex-col p-3 rounded-xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50/30 transition-all text-left group"
                                 >
                                     <div className="flex items-center gap-2 mb-1">
-                                        <div className="font-medium text-slate-700 text-sm">使用文件夹内容</div>
+                                        <div className="font-medium text-slate-700 text-sm">使用本地MD文档的内容</div>
                                         <span className="text-xs text-slate-400">丢弃当前窗口内容</span>
                                     </div>
                                     <DataFlowDiagram direction="fromFile" highlight="file" />
