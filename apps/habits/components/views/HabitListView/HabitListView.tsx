@@ -119,7 +119,7 @@ export const HabitListView: React.FC = () => {
                 习惯养成
               </div>
               <h1 className="text-3xl md:text-4xl font-sans font-bold text-stone-900 tracking-tight">
-                习惯养成
+                习惯养成（开发中）
               </h1>
               <p className="text-sm text-stone-400 mt-1">坚持每一天，成就更好的自己</p>
             </div>

@@ -1,19 +1,116 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import Navbar from './components/Navbar';
+import BlobBackground from './components/BlobBackground';
+import BeingView from './components/being/BeingView';
+import EmotionView from './components/mood/EmotionView';
+import JournalView from './components/journal/journal';
+import CommitmentView from './components/commitment/commitment';
+import UniversalGuide from './components/shared/UniversalGuide';
+import MindSpaceHome from './components/mindSpace';
+import { getDailyQuote } from './services/geminiService';
+
+type ViewState = 'home' | 'being' | 'mood' | 'journal' | 'commitment';
 
 export const MindSpaceApp: React.FC = () => {
+    const [currentView, setCurrentView] = useState<ViewState>('home');
+    const [showGuide, setShowGuide] = useState(false);
+
+    // 获取每日引言
+    useEffect(() => {
+        const fetchQuote = async () => {
+            await getDailyQuote();
+        };
+        fetchQuote();
+    }, []);
+
+    const handleNavigate = (view: ViewState) => {
+        setCurrentView(view);
+    };
+
+    const isHome = currentView === 'home';
+
     return (
-        <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-            <div className="text-center">
-                <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-purple-500/30">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" className="w-12 h-12">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-                        <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" />
-                    </svg>
-                </div>
-                <h1 className="text-4xl font-bold text-white mb-3">MindSpace</h1>
-                <p className="text-purple-200/70 text-lg">心理与情绪空间</p>
-                <p className="text-purple-300/50 text-sm mt-4">即将推出...</p>
-            </div>
-        </main>
+        <div className="min-h-screen w-full relative overflow-hidden bg-white">
+            {/* Universal Guide Modal */}
+            <UniversalGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
+
+            {/* 全屏叠加子视图 */}
+            <AnimatePresence mode="wait">
+                {currentView === 'being' && (
+                    <motion.div
+                        key="being-view"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.05 }}
+                        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                        className="fixed inset-0 z-[100] bg-white overflow-y-auto"
+                    >
+                        <BeingView onBack={() => handleNavigate('home')} onOpenGuide={() => setShowGuide(true)} />
+                    </motion.div>
+                )}
+
+                {currentView === 'mood' && (
+                    <motion.div
+                        key="mood-view"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className="fixed inset-0 z-[100] bg-white overflow-hidden"
+                    >
+                        <EmotionView onBack={() => handleNavigate('home')} onNavigate={handleNavigate} onOpenGuide={() => setShowGuide(true)} />
+                    </motion.div>
+                )}
+
+                {currentView === 'journal' && (
+                    <motion.div
+                        key="journal-view"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                        className="fixed inset-0 z-[100] bg-white overflow-hidden"
+                    >
+                        <JournalView onBack={() => handleNavigate('home')} onOpenGuide={() => setShowGuide(true)} />
+                    </motion.div>
+                )}
+
+                {currentView === 'commitment' && (
+                    <motion.div
+                        key="commitment-view"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className="fixed inset-0 z-[100] bg-[#F2F4F1] overflow-y-auto"
+                    >
+                        <CommitmentView onBack={() => handleNavigate('home')} />
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* 全局背景和导航栏 - 首页隐藏以保持禅意美学 */}
+            {!isHome && <BlobBackground />}
+            {!isHome && <Navbar onNavigate={handleNavigate} onOpenGuide={() => setShowGuide(true)} />}
+
+            {/* 主内容区域 */}
+            <main className="w-full h-full transition-all duration-500">
+                <AnimatePresence mode="wait">
+                    {isHome && (
+                        <motion.div
+                            key="home"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.8 }}
+                            className="absolute inset-0"
+                        >
+                            <MindSpaceHome onNavigate={handleNavigate} />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </main>
+        </div>
     );
 };
