@@ -4,6 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## rules
 
+### 通用rules
+
+1. 在编写任何代码之前，请先描述你的方案，等待批准，如果需求不明确，在编写任何代码之前，务必提出澄清问题。
+2. 如果一项任务需要修改超过三个文件，先停下来，将其分解成更小的任务。
+3. 编写代码后，列出可能出现的问题，并建议相应的测试用例来覆盖这些问题。
+4. 当发现bug首先需要编写一个能够重现该bug的测试，然后不断修复它，直到它通过测试为止。
+5. 每次我纠正你之后，就在claude.md文件中新增加一条规则，这样就不会再发生这种情况了。
+
+
+
 ### 语言
 
 对话时除了专有名词外，需要使用中文回答
@@ -27,6 +37,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - 可以调整 `measureElement` 的测量逻辑
    - 可以调整元素的 `paddingBottom` 间距
    - **不要移除虚拟滚动改为普通列表渲染**
+
+2. **Todo 操作必须通过 useTaskPoolStore**：所有 Todo 的增删改操作（创建、更新、删除、状态变更）必须通过 `useTaskPoolStore` 进行，**禁止直接调用 `taskPoolApi`**。
+
+   **原因**：
+   - `useTaskPoolStore` 内置了 PlanDoc 保存 Hook（`triggerAllPlanDocSaves`）
+   - 在任何 Todo 操作前，会先触发 PlanDoc 编辑器的未保存内容保存
+   - 避免 PlanDoc 编辑器内容与 MD 文件产生冲突
+
+   **冲突场景**：
+   - 用户在 PlanDoc 编辑器修改文本（未保存）
+   - 同时在任务池勾选 todo → 后端更新 DB 和 MD 文件
+   - PlanDoc 编辑器的未保存内容与 MD 文件不同步
+
+   **正确做法**：
+   ```typescript
+   // ✅ 正确：通过 store 操作
+   const { updateTask, addTask, deleteTask } = useTaskPoolStore();
+   await updateTask(id, { state: 'completed' });
+   await addTask(newTodo);
+   await deleteTask(id);
+
+   // ❌ 错误：直接调用 API（绕过保存 Hook）
+   await taskPoolApi.updateTodo(id, { state: 'completed' });
+   await taskPoolApi.createTodo(data);
+   await taskPoolApi.deleteTodo(id);
+   ```
+
+   **相关文件**：
+   - `frontend/apps/goals/hooks/useTaskPoolStore.ts` - Todo 状态管理
+   - `frontend/apps/goals/hooks/usePlanDocSaveHook.ts` - PlanDoc 保存 Hook 注册机制
 
 ### 后端server rules
 
@@ -741,6 +781,207 @@ MAX_PAGE_SIZE = 100
 #### 用户目标追踪
 
 goal表中新增track_time_automatically字段，只有track_time_automatically == 1 ，status =="active"并且设定了分类类别的goal才能被自动追踪（数据处理时，lifeprism\server\services\data_processing_service.py 将goal传入分类器中）
+
+### 计划书 MD 文档同步规则
+
+计划书（PlanDoc）使用 Markdown 文件存储任务列表，通过 `taskpool_service.py` 实现 MD 与数据库的双向同步。
+
+#### Todoblock 格式规范
+
+**基本结构**：
+```markdown
+<!-- lp:todoblock -->
+- [ ] 任务内容 <!-- lp:t-a1b2c3d4 -->
+	- [x] 子任务 <!-- lp:t-e5f6g7h8 -->
+<!-- /lp:todoblock -->
+```
+
+**关键特性**：
+- 支持多个 todoblock，每个 block 独立解析
+- 父子关系仅在同一 block 内有效（不跨 block）
+- 若 MD 文件无 todoblock，同步时自动创建
+
+#### 锚点（Anchor）格式
+
+**格式**：`<!-- lp:t-{uuid[:8]} -->`
+
+**规则**：
+- 前缀固定为 `t-`，后跟 UUID 前 8 位十六进制字符
+- 锚点必须在任务行末尾
+- 每个任务必须有唯一锚点（用于 MD 和数据库关联）
+- 无锚点的任务在同步时自动生成
+
+#### 任务行格式
+
+**完整格式**：`{Tab缩进}- [{空格或x}] {内容} <!-- lp:t-xxx -->`
+
+**解析正则**：
+```python
+r'^(\t*)-\s*\[([ xX])\]\s*(.+?)(?:\s*<!--\s*lp:(t-[a-f0-9]+)\s*-->)?$'
+```
+
+**示例**：
+```markdown
+- [ ] 根任务 <!-- lp:t-a1b2c3d4 -->
+	- [x] 子任务 1 <!-- lp:t-e5f6g7h8 -->
+	- [ ] 子任务 2 <!-- lp:t-i9j0k1l2 -->
+		- [ ] 孙任务 <!-- lp:t-m3n4o5p6 -->
+```
+
+#### 缩进与父子关系
+
+**规则**：
+- 缩进级别 = Tab 字符数（必须用 Tab，不能用空格）
+- 0 个 Tab = 根任务，1 个 Tab = 一级子任务，以此类推
+- 父子关系仅在同一 todoblock 内有效
+
+**算法**（栈结构）：
+1. 遍历任务，弹出栈中所有 level >= 当前 level 的项
+2. 栈顶元素的 anchor_id 即为当前任务的父任务
+3. 当前任务入栈
+
+#### 状态同步规则
+
+**MD → DB（同步时）**：
+| MD Checkbox | 数据库 state | 说明 |
+|------------|-------------|------|
+| `[ ]` | 保持原状态 | 不改变 pool/scheduled |
+| `[x]` | `completed` | 设置 `actual_finished_at` |
+
+**重要限制**：同步时只能 `[ ]` → `[x]`，不能 `[x]` → `[ ]`
+
+**DB → MD（回写时）**：
+| 触发条件 | 操作 |
+|---------|------|
+| `state` 变为 `completed` | `[ ]` → `[x]` |
+| `state` 从 `completed` 变为其他 | `[x]` → `[ ]` |
+| `content` 变更 | 更新 MD 中的任务内容 |
+
+#### 同步流程（sync_plan_doc）
+
+```
+1. 验证计划书存在
+2. 读取 MD 文件
+3. 获取所有 todoblock
+4. 解析每个 block 中的任务
+5. 为无锚点的任务生成锚点并写回 MD
+6. 构建父任务映射（每个 block 独立）
+7. 获取现有任务（数据库）
+8. 检测待删除任务（DB 有但 MD 无）
+9. 处理每个任务（存在→更新，不存在→创建）
+10. 执行数据库操作
+11. 处理删除（需 confirm_delete=True）
+12. 保存 MD 文件
+```
+
+**参数**：
+- `dry_run=True`：预检模式，只返回差异不执行
+- `confirm_delete=True`：确认删除 DB 中多余的任务
+
+#### 任务创建与插入
+
+**插入策略**（`_insert_todo_to_md`）：
+- 有 `parent_anchor_id` → 插入到父任务所在的 block
+- 无 `parent_anchor_id` → 插入到第一个 todoblock
+- 缩进级别 = 父任务缩进 + 1
+- 插入位置 = 父任务的最后一个子任务之后
+
+**子任务继承**（`create_todo_v2`）：
+- 自动继承父任务的 `plan_doc_id`
+- 自动继承父任务的 `link_to_goal_id`
+
+#### 任务删除
+
+**删除流程**（`delete_todo`）：
+1. 从 MD 删除任务及其所有子任务
+2. 级联删除数据库记录
+
+**MD 删除算法**：
+1. 查找锚点所在行，记录缩进级别
+2. 删除该行
+3. 删除所有缩进级别 > 该行的后续行（子任务）
+4. 清理连续的多余空行
+
+#### 安全处理
+
+**回写前置检查**：
+- 无 `plan_doc_id` → 跳过 MD 操作
+- 无 `source_anchor_id` → 跳过 MD 操作
+- 计划书不存在 → 清除关联
+- MD 文件不存在 → 跳过 MD 操作
+- 锚点不存在 → 跳过 MD 操作
+
+#### 文件路径
+
+**计划书目录**：`get_custom_data_path() / "plan"`
+
+**文件命名**：`{plan_doc_id}.md`
+
+#### 关键数据库字段
+
+| 字段 | 说明 |
+|------|------|
+| `plan_doc_id` | 关联的计划书 ID |
+| `source_anchor_id` | MD 锚点 ID（格式：t-xxx） |
+| `parent_id` | 父任务 ID |
+| `pool_order_index` | 任务池排序（全局顺序） |
+
+#### 前端 PlanDoc 保存 Hook 机制
+
+**问题背景**：
+PlanDoc 编辑器、任务池、本地 MD 文件三者可能产生数据冲突：
+- 用户在 PlanDoc 编辑器修改文本（未保存，仅在前端 `localContent` 中）
+- 同时在任务池勾选 todo → 后端更新 DB 和 MD 文件
+- PlanDoc 编辑器的 `localContent` 与 MD 文件不同步
+
+**解决方案**：
+1. 在前端 Todo 操作前，先触发 PlanDoc 编辑器的保存，确保 MD 文件与编辑器内容同步
+2. 在 Todo 操作完成后，自动刷新 PlanDoc 编辑器内容，让用户立即看到更改
+
+**实现机制**：
+
+1. **保存 Hook 注册器**（`usePlanDocSaveHook.ts`）：
+   - `registerPlanDocSaveCallback(planDocId, callback)` - 注册保存回调
+   - `unregisterPlanDocSaveCallback(planDocId)` - 注销保存回调
+   - `triggerAllPlanDocSaves()` - 触发所有已注册的保存
+
+2. **刷新 Hook 注册器**（`usePlanDocSaveHook.ts`）：
+   - `registerPlanDocRefreshCallback(planDocId, callback)` - 注册刷新回调
+   - `unregisterPlanDocRefreshCallback(planDocId)` - 注销刷新回调
+   - `triggerAllPlanDocRefreshes()` - 触发所有已注册的刷新
+
+3. **PlanDocListView 注册回调**：
+   - 组件挂载时注册 `silentSave` 回调（静默保存，不显示 toast）
+   - 组件挂载时注册 `silentRefresh` 回调（静默刷新，不显示 toast）
+   - 组件卸载时注销所有回调
+
+4. **useTaskPoolStore 触发保存和刷新**：
+   - `addTask`、`updateTask`、`deleteTask` 操作前调用 `triggerAllPlanDocSaves()`
+   - 操作成功后调用 `triggerAllPlanDocRefreshes()`
+
+**数据流**：
+```
+用户在任务池勾选 todo
+    ↓
+useTaskPoolStore.updateTask()
+    ↓
+triggerAllPlanDocSaves()  ← 先保存所有编辑中的 PlanDoc
+    ↓
+PlanDocListView.silentSave()  ← 静默保存到后端
+    ↓
+taskPoolApi.updateTodo()  ← 执行 todo 更新
+    ↓
+后端更新 DB 和 MD 文件
+    ↓
+triggerAllPlanDocRefreshes()  ← 刷新所有 PlanDoc 编辑器
+    ↓
+PlanDocListView.silentRefresh()  ← 从后端获取最新内容
+```
+
+**相关文件**：
+- `frontend/apps/goals/hooks/usePlanDocSaveHook.ts` - 保存/刷新 Hook 注册机制
+- `frontend/apps/goals/hooks/useTaskPoolStore.ts` - Todo 状态管理（调用 `triggerAllPlanDocSaves` 和 `triggerAllPlanDocRefreshes`）
+- `frontend/apps/goals/components/views/PlanDocListView/PlanDocListView.tsx` - 注册 `silentSave` 和 `silentRefresh` 回调
 
 
 
