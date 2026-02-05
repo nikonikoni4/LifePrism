@@ -18,6 +18,7 @@ from lifeprism.server.providers.category_color_provider import color_manager
 from lifeprism.utils import get_logger
 from datetime import datetime
 import uuid
+import pandas as pd
 
 logger = get_logger(__name__)
 
@@ -435,7 +436,11 @@ class CategoryService:
             categories_df = self.db.query('category')
             max_order = 0
             if not categories_df.empty and 'order_index' in categories_df.columns:
-                max_order = categories_df['order_index'].max()
+                # 确保 order_index 是数值类型，处理可能的 bytes 类型数据
+                order_values = categories_df['order_index'].apply(
+                    lambda x: int.from_bytes(x, 'little') if isinstance(x, bytes) else (int(x) if pd.notna(x) else 0)
+                )
+                max_order = order_values.max() if not order_values.empty else 0
             
             # 插入数据
             data = {
