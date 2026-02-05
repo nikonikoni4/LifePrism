@@ -89,6 +89,10 @@ _import_start = time.perf_counter()
 from lifeprism.server.providers.category_color_provider import initialize_category_colors
 _log_startup_time("  - category_color_provider.initialize_category_colors", _import_start)
 
+_import_start = time.perf_counter()
+from lifeprism.storage.data_initializer import initialize_default_data
+_log_startup_time("  - data_initializer.initialize_default_data", _import_start)
+
 _step_start = _log_startup_time("[OK] Database modules imported", _step_start)
 
 logger = logging.getLogger(__name__)
@@ -112,7 +116,11 @@ async def lifespan(app: FastAPI):
         _init_start = time.perf_counter()
         init_database()
         _log_startup_time("[OK] Database tables init (init_database)", _init_start)
-        
+
+        _default_data_start = time.perf_counter()
+        initialize_default_data()
+        _log_startup_time("[OK] Default data init (initialize_default_data)", _default_data_start)
+
         _color_start = time.perf_counter()
         initialize_category_colors()
         _log_startup_time("[OK] Category colors init (initialize_category_colors)", _color_start)
