@@ -9,10 +9,10 @@ logger = logging.getLogger(__name__)
 
 # 默认分类配置
 DEFAULT_CATEGORIES = [
-    {'id': 'cat-work', 'name': '工作', 'color': '#5B8FF9', 'order_index': 0},
-    {'id': 'cat-study', 'name': '学习', 'color': '#5AD8A6', 'order_index': 1},
-    {'id': 'cat-entertainment', 'name': '娱乐', 'color': '#F6BD16', 'order_index': 2},
-    {'id': 'cat-other', 'name': '其他', 'color': '#E8684A', 'order_index': 3},
+    {'id': 'cat-work', 'name': '工作', 'color': '#5B8FF9'},
+    {'id': 'cat-study', 'name': '学习', 'color': '#5AD8A6'},
+    {'id': 'cat-entertainment', 'name': '娱乐', 'color': '#F6BD16'},
+    {'id': 'cat-other', 'name': '其他', 'color': '#E8684A'},
 ]
 
 # 示例目标 ID（固定，用于关联 plan_doc）
@@ -140,9 +140,9 @@ class DataInitializer:
 
                 for cat in DEFAULT_CATEGORIES:
                     cursor.execute("""
-                        INSERT INTO category (id, name, color, order_index, state)
-                        VALUES (?, ?, ?, ?, 1)
-                    """, (cat['id'], cat['name'], cat['color'], cat['order_index']))
+                        INSERT INTO category (id, name, color, state)
+                        VALUES (?, ?, ?, 1)
+                    """, (cat['id'], cat['name'], cat['color']))
 
                 logger.info(f"成功初始化 {len(DEFAULT_CATEGORIES)} 个默认分类")
 

@@ -270,11 +270,6 @@ CATEGORY_CONFIG = {
             'constraints': ['NOT NULL'],
             'comment': '分类颜色（十六进制格式，例如：#5B8FF9）'
         },
-        'order_index': {
-            'type': 'INTEGER',
-            'constraints': ['DEFAULT 0'],
-            'comment': '显示顺序索引'
-        },
         'state': {
             'type': 'INTEGER',
             'constraints': ['DEFAULT 1'],
@@ -306,11 +301,6 @@ SUB_CATEGORY_CONFIG = {
             'type': 'TEXT',
             'constraints': ['NOT NULL'],
             'comment': '子分类名称（例如：编程、会议）'
-        },
-        'order_index': {
-            'type': 'INTEGER',
-            'constraints': ['DEFAULT 0'],
-            'comment': '显示顺序索引'
         },
         'state': {
             'type': 'INTEGER',

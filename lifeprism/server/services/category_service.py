@@ -431,25 +431,14 @@ class CategoryService:
                 raise ValueError("分类名称和颜色不能为空")
             # 生成唯一ID（使用短UUID）
             category_id = f"cat-{str(uuid.uuid4())[:8]}"
-            
-            # 获取当前最大的 order_index
-            categories_df = self.db.query('category')
-            max_order = 0
-            if not categories_df.empty and 'order_index' in categories_df.columns:
-                # 确保 order_index 是数值类型，处理可能的 bytes 类型数据
-                order_values = categories_df['order_index'].apply(
-                    lambda x: int.from_bytes(x, 'little') if isinstance(x, bytes) else (int(x) if pd.notna(x) else 0)
-                )
-                max_order = order_values.max() if not order_values.empty else 0
-            
+
             # 插入数据
             data = {
                 'id': category_id,
                 'name': name,
-                'color': color,
-                'order_index': max_order + 1
+                'color': color
             }
-            
+
             self.db.insert('category', data)
             logger.info(f"成功创建分类: {category_id} - {name}")
             
@@ -586,24 +575,14 @@ class CategoryService:
             
             # 生成唯一ID
             sub_id = f"sub-{str(uuid.uuid4())[:8]}"
-            
-            # 获取当前最大的 order_index
-            sub_cats_df = self.db.query(
-                'sub_category',
-                where={'category_id': category_id}
-            )
-            max_order = 0
-            if not sub_cats_df.empty and 'order_index' in sub_cats_df.columns:
-                max_order = sub_cats_df['order_index'].max()
-            
+
             # 插入数据
             data = {
                 'id': sub_id,
                 'category_id': category_id,
-                'name': name,
-                'order_index': max_order + 1
+                'name': name
             }
-            
+
             self.db.insert('sub_category', data)
             logger.info(f"成功创建子分类: {sub_id} - {name}")
             
@@ -744,8 +723,7 @@ class CategoryService:
         # 获取子分类
         sub_cats_df = self.db.query(
             'sub_category',
-            where={'category_id': category_id},
-            order_by='order_index ASC'
+            where={'category_id': category_id}
         )
         
         subcategories = []

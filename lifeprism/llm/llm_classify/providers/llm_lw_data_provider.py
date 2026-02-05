@@ -204,7 +204,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
             df = self.db.query(
                 table_name='goal',
                 columns=['id', 'name', 'status'],
-                order_by='order_index ASC'
+                order_by='created_at ASC'
             )
             
             if df.empty:

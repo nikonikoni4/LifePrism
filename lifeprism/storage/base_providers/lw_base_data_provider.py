@@ -570,7 +570,7 @@ class LWBaseDataProvider:
         Returns:
             Optional[pd.DataFrame]: 主分类数据，为空返回 None
         """
-        df = self.db.query('category', order_by='order_index ASC')
+        df = self.db.query('category', order_by='created_at ASC')
         return df if not df.empty else None
     
     def load_sub_categories(self) -> Optional[pd.DataFrame]:
@@ -580,7 +580,7 @@ class LWBaseDataProvider:
         Returns:
             Optional[pd.DataFrame]: 子分类数据，为空返回 None
         """
-        df = self.db.query('sub_category', order_by='order_index ASC')
+        df = self.db.query('sub_category', order_by='created_at ASC')
         return df if not df.empty else None
     
     # ==================== user_app_behavior_log 表 ====================
