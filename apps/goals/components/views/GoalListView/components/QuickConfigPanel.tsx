@@ -50,9 +50,11 @@ const QuickConfigPanel: React.FC<QuickConfigPanelProps> = ({
     try {
       const result = await goalsV2Api.refreshTimeInvested(goalId);
       if (result.success) {
-        const minutes = result.timeInvested;
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
+        // 后端返回秒
+        const totalSeconds = result.timeInvested;
+        const totalMinutes = Math.floor(totalSeconds / 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
         onTimeInvestedChange(`${hours}h ${mins}m`);
       }
     } catch (error) {

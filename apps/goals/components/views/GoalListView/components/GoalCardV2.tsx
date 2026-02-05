@@ -45,11 +45,12 @@ const GoalCardV2: React.FC<GoalCardV2Props> = ({
     try {
       const result = await goalsV2Api.refreshTimeInvested(goal.id);
       if (result.success && onTimeRefreshed) {
-        // 格式化时间
-        const minutes = result.timeInvested;
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        const timeStr = goal.unit === 'MINS' ? `${minutes}m` : `${hours}h ${mins}m`;
+        // 格式化时间（后端返回秒）
+        const totalSeconds = result.timeInvested;
+        const totalMinutes = Math.floor(totalSeconds / 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        const timeStr = `${hours}h ${mins}m`;
         onTimeRefreshed(goal.id, timeStr);
       }
     } catch (error) {
@@ -138,9 +139,6 @@ const GoalCardV2: React.FC<GoalCardV2Props> = ({
             <Clock size={12} className="text-slate-400" />
             <span className="text-sm font-bold tabular-nums text-slate-700">
               {goal.timeInvested}
-            </span>
-            <span className="text-[10px] font-medium text-slate-400 uppercase">
-              {goal.unit || 'HRS'}
             </span>
             {/* Refresh Button - only show when auto tracking is enabled and category is bound */}
             {showRefreshButton && (

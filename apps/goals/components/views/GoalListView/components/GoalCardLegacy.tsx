@@ -128,9 +128,6 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onClick, onToggleStatus, onEd
                 <span className={`text-2xl font-bold tabular-nums ${isCompleted ? 'text-slate-400' : 'text-slate-800'}`}>
                   {goal.timeInvested}
                 </span>
-                <span className="text-xs font-medium text-slate-500 uppercase">
-                  {goal.unit || 'HRS'}
-                </span>
               </div>
             </div>
 

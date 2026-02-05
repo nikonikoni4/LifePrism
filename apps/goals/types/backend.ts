@@ -37,7 +37,6 @@ export interface BackendGoalItem {
     expected_finished_at: string | null;
     value: string | null;
     commitment: string | null;
-    time_unit: string;
     time_invested: string;
     track_time_automatically: boolean;
     milestones: BackendMilestoneItem[];
@@ -75,8 +74,7 @@ export interface UpdateGoalRequest {
     expected_finished_at?: string | null;
     value?: string | null;
     commitment?: string | null;
-    time_invested?: number;
-    time_unit?: string;
+    time_invested?: number;  // 秒，仅手动模式有效
     track_time_automatically?: boolean;
     milestones?: string;
     status?: string;

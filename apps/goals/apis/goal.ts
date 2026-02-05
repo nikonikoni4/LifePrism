@@ -115,8 +115,7 @@ export function mapBackendGoalToFrontend(backend: BackendGoalItem): Goal {
         title: backend.name,
         category: backend.link_to_category || '',
         theme: colorToTheme(backend.color),
-        timeInvested: backend.time_invested || '0',
-        unit: backend.time_unit || 'HRS',
+        timeInvested: backend.time_invested || '0h 0m',
         startDate: backend.start_date || '', // Keep YYYY-MM-DD format
         endDate: backend.expected_finished_at || '', // Keep YYYY-MM-DD format
         value: backend.value || '',
@@ -148,6 +147,30 @@ export function mapFrontendGoalToCreateRequest(frontend: Partial<Goal>): CreateG
 }
 
 /**
+ * Parse time string (e.g., "2h 30m", "150m", "2:30") to seconds
+ */
+function parseTimeToSeconds(timeStr: string): number {
+    if (!timeStr) return 0;
+
+    // Handle "Xh Ym" format
+    const hMatch = timeStr.match(/(\d+)\s*h/i);
+    const mMatch = timeStr.match(/(\d+)\s*m/i);
+
+    const hours = hMatch ? parseInt(hMatch[1], 10) : 0;
+    const minutes = mMatch ? parseInt(mMatch[1], 10) : 0;
+
+    // If no h/m found, try to parse as pure number (assume minutes)
+    if (!hMatch && !mMatch) {
+        const num = parseInt(timeStr, 10);
+        if (!isNaN(num)) {
+            return num * 60; // Convert minutes to seconds
+        }
+    }
+
+    return (hours * 60 + minutes) * 60; // Convert to seconds
+}
+
+/**
  * Convert frontend Goal to backend UpdateGoalRequest
  */
 export function mapFrontendGoalToUpdateRequest(frontend: Partial<Goal>): UpdateGoalRequest {
@@ -161,9 +184,10 @@ export function mapFrontendGoalToUpdateRequest(frontend: Partial<Goal>): UpdateG
     if (frontend.endDate !== undefined) request.expected_finished_at = formatDateForApi(frontend.endDate);
     if (frontend.value !== undefined) request.value = frontend.value || null;
     if (frontend.commitment !== undefined) request.commitment = frontend.commitment || null;
-    if (frontend.unit !== undefined) request.time_unit = frontend.unit;
     if (frontend.status !== undefined) request.status = frontend.status;
     if (frontend.trackTimeAutomatically !== undefined) request.track_time_automatically = frontend.trackTimeAutomatically;
+    // 手动模式下发送 time_invested（秒）
+    if (frontend.timeInvested !== undefined) request.time_invested = parseTimeToSeconds(frontend.timeInvested);
 
     if (frontend.milestones !== undefined) {
         const backendMilestones = frontend.milestones.map(m => ({

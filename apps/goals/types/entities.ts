@@ -33,9 +33,8 @@ export interface Goal {
     title: string;
     category: string;
     theme: ThemeKey;
-    timeInvested: string;
+    timeInvested: string;  // 格式化字符串，如 "2h 30m"
     trackTimeAutomatically: boolean;
-    unit: string;
     startDate: string;
     endDate: string;
     value: string;
