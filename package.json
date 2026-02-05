@@ -73,7 +73,8 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "!node_modules"
+      "!node_modules",
+      "!plan/**"
     ],
     "extraResources": [
       {
