@@ -296,15 +296,16 @@ def find_available_port(config_path: str = None) -> int:
                     fallback_list = [default_port] + [p for p in fallback_list if p != default_port]
                 print(f"[STARTUP] 从配置文件读取端口配置: 首选端口={default_port}, 备用列表={fallback_list}")
         except Exception as e:
+            logger.warning("未找到，customData/config/config.json!!")
             print(f"[STARTUP] 读取配置文件失败，使用默认端口: {e}")
     
     # 按顺序尝试端口
     for port in fallback_list:
         if is_port_available(port):
-            print(f"[STARTUP] 端口 {port} 可用")
+            logger.info(f"[STARTUP] 端口 {port} 可用")
             return port
         else:
-            print(f"[STARTUP] 端口 {port} 被占用，尝试下一个...")
+            logger.warning(f"[STARTUP] 端口 {port} 被占用，尝试下一个...")
     
     # 所有端口都被占用，返回默认端口（让 uvicorn 报错）
     print(f"[STARTUP] 警告：所有备用端口都被占用，将尝试使用端口 {default_port}")
@@ -317,20 +318,41 @@ if __name__ == "__main__":
     import sys
 
     # 判断是否为打包环境
-    is_dev = getattr(sys, 'frozen', False)
+    is_frozen = getattr(sys, 'frozen', False)
 
-    if is_dev:
-        # 打包环境
-        config_path = os.path.join(os.path.dirname(__file__), "resources", "customData", "config", "config.json")
+    if is_frozen:
+        logger.info("正在运行打包环境")
+        # 打包环境：从环境变量获取 customData 路径
+        custom_data_path = os.environ.get('CUSTOM_DATA_PATH')
+        if custom_data_path:
+            config_path = os.path.join(custom_data_path, "config", "config.json")
+        else:
+            logger.warning("找不到环境变量：CUSTOM_DATA_PATH！")
+            # 后备：基于 exe 位置推算
+            backend_dir = os.path.dirname(sys.executable)  # .../resources/backend
+            resources_dir = os.path.dirname(backend_dir)   # .../resources
+            config_path = os.path.join(resources_dir, "customData", "config", "config.json")
+
+        print(f"[STARTUP] 打包环境，配置文件路径: {config_path}")
     else:
-        # 开发环境
+        logger.info("正在运行开发环境")
+        # 开发环境：不使用配置文件
         config_path = None
-    
+        print("[STARTUP] 开发环境，使用默认端口配置")
+
     port = find_available_port(config_path)
-    
+
     print(f"[STARTUP] 后端将在端口 {port} 启动")
 
-    if not is_dev: # 非打包环境就是开发环境
+    if is_frozen:
+        # 生产模式：禁用热重载，启动极快
+        uvicorn.run(
+            app,  # 直接传入 app 对象，不使用字符串
+            host="0.0.0.0",
+            port=port,
+            log_level="info"
+        )
+    else:
         # 开发模式：启用热重载
         uvicorn.run(
             "lifeprism.server.main:app",
@@ -339,13 +361,5 @@ if __name__ == "__main__":
             reload=True,
             reload_dirs=["lifeprism"],  # 只监控 Python 代码目录
             reload_excludes=["__pycache__", "*.pyc", ".git","*.db","lifeprism.egg-info"],
-            log_level="info"
-        )
-    else:
-        # 生产模式：禁用热重载，启动极快
-        uvicorn.run(
-            app,  # 直接传入 app 对象，不使用字符串 
-            host="0.0.0.0",
-            port=port,
             log_level="info"
         ) 

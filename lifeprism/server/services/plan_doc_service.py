@@ -2,7 +2,7 @@
 PlanDoc 服务层 - Plan Doc 计划书业务逻辑
 
 设计原则：数据库只存 meta 信息，内容存 md 文件
-文件存储路径：frontend/customData/plan/{id}.md
+文件存储路径：customData/plan/{id}.md
 
 架构：纯函数模块（无内存缓存，不需要单例）
 """
@@ -16,25 +16,26 @@ from lifeprism.server.schemas.goal_schemas import (
     UpdatePlanDocRequest,
 )
 from lifeprism.server.providers.plan_doc_provider import plan_doc_provider
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger, get_custom_data_path
 
 logger = get_logger(__name__)
 
-# 计划书文件存储目录（相对于项目根目录）
-PLAN_DOC_DIR = Path("frontend/customData/plan")
 
+def _get_plan_doc_dir() -> Path:
+    """获取计划书目录路径"""
+    return get_custom_data_path() / "plan"
 
 def _ensure_plan_doc_dir():
     """确保计划书目录存在"""
     try:
-        PLAN_DOC_DIR.mkdir(parents=True, exist_ok=True)
+        _get_plan_doc_dir().mkdir(parents=True, exist_ok=True)
     except Exception as e:
         logger.error(f"创建计划书目录失败: {e}")
 
 
 def _get_plan_doc_path(doc_id: str) -> Path:
     """获取计划书文件路径"""
-    return PLAN_DOC_DIR / f"{doc_id}.md"
+    return _get_plan_doc_dir() / f"{doc_id}.md"
 
 
 def _read_content_from_file(doc_id: str) -> str:

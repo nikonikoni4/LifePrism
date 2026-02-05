@@ -1,4 +1,36 @@
-from lifeprism.config.settings_manager import settings 
+import os
+import sys
+from pathlib import Path
+
+from lifeprism.config.settings_manager import settings
+
+
+def get_custom_data_path() -> Path:
+    """
+    获取 customData 目录路径
+
+    优先级:
+    1. 环境变量 CUSTOM_DATA_PATH（由 Electron 传入）
+    2. 打包环境：基于 sys.executable 推算
+    3. 开发环境：frontend/customData
+
+    Returns:
+        Path: customData 目录的路径
+    """
+    # 1. 优先使用环境变量
+    custom_data_env = os.environ.get('CUSTOM_DATA_PATH')
+    if custom_data_env:
+        return Path(custom_data_env)
+
+    # 2. 打包环境：基于 exe 位置推算
+    if getattr(sys, 'frozen', False):
+        backend_dir = Path(sys.executable).parent   # .../resources/backend
+        resources_dir = backend_dir.parent          # .../resources
+        return resources_dir / 'customData'
+
+    # 3. 开发环境
+    return Path("frontend/customData")
+
 
 def is_multipurpose_app(app: str) -> bool:
     """

@@ -16,45 +16,47 @@ from lifeprism.llm.llm_classify.tools.database_tools import (
 )
 from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
 import os
-import logging
 import asyncio
 from lifeprism.llm.llm_linear_executor.llm_linear_executor.os_plan import load_plan_from_template
 from lifeprism.llm.llm_linear_executor.llm_linear_executor.executor import Executor
 from typing import Literal
 from lifeprism.llm.llm_classify.providers.llm_lw_data_provider import llm_lw_data_provider
 from lifeprism.llm.llm_linear_executor.llm_linear_executor.llm_factory import create_llm_factory
-from lifeprism.config import settings 
+from lifeprism.config import settings
+from lifeprism.utils import get_custom_data_path
 import sys
 from pathlib import Path
+from lifeprism.utils.logger import get_logger
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
 
 def get_workflow_path(filename: str) -> str:
     """
     获取 workflow 文件的路径
-    
+
     优先级:
     1. customData/workflow 中的自定义文件（用户可修改）
-    2. 内置的默认 workflow 文件
-    
+    2. 内置的默认 workflow 文件（开发环境）
+
     Args:
         filename: workflow 文件名，如 "daily_summary_plan.json"
-    
+
     Returns:
         str: workflow 文件的绝对路径
     """
-    # 判断是否是开发环境
-    is_dev = not getattr(sys, 'frozen', False)
-    if is_dev:
-        path = "lifeprism/llm/custom_prompt/workflow"
-        # 开发环境：使用 lifeprism/config/settings.yaml
-        return str(Path(path) / filename)
+    is_frozen = getattr(sys, 'frozen', False)
+    if is_frozen:
+        # 打包环境：使用 customData/workflow
+        return str(get_custom_data_path() / 'workflow' / filename)
     else:
-        # 打包环境：使用 customData/config/config.yaml
-        return str(settings.custom_data_path / 'workflow' / filename)
+        # 开发环境：使用内置 workflow
+        path = "lifeprism/llm/custom_prompt/workflow"
+        return str(Path(path) / filename)
 # 初始化 workflow 路径
 daily_json_path = get_workflow_path("daily_summary_plan.json")
 multi_days_json_path = get_workflow_path("weekly_summary_plan.json")
+
+
 
 async def daily_summary(date : str, pattern ="complex"):
     """
@@ -71,6 +73,10 @@ async def daily_summary(date : str, pattern ="complex"):
                 - output_tokens: 输出 token 数量
                 - total_tokens: 总 token 数量
     """
+    if not os.path.exists(daily_json_path):
+        logger.error(f"workflow 文件不存在: {daily_json_path}")
+        return {'content': None, 'tokens_usage': None}
+
     # 获取执行计划和工具限制
     plan = load_plan_from_template(daily_json_path, pattern,replacements={"{date}":date})
     
@@ -147,6 +153,10 @@ async def multi_days_summary(start_date: str, end_date: str, pattern: str = "com
                 - output_tokens: 输出 token 数量
                 - total_tokens: 总 token 数量
     """
+    if not os.path.exists(multi_days_json_path):
+        logger.error(f"workflow 文件不存在: {multi_days_json_path}")
+        return {'content': None, 'tokens_usage': None}
+
     # 获取执行计划和工具限制
     plan = load_plan_from_template(
         multi_days_json_path, 
