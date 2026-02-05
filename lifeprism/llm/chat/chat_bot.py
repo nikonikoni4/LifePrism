@@ -3,7 +3,7 @@ V1 版本聊天机器人,带记忆功能
 """
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from lifeprism.llm.utils.create_model import create_ChatTongyiModel
+from lifeprism.llm.utils.llm_factory import create_llm
 from langchain.agents import create_agent
 from langchain.tools import tool, ToolRuntime
 from langgraph.checkpoint.memory import InMemorySaver
@@ -49,7 +49,7 @@ class ChatBot:
         Args:
             checkpointer: 检查点保存器，None 时使用 InMemorySaver
         """
-        self.chat_model = create_ChatTongyiModel(
+        self.chat_model = create_llm(
             enable_search=enable_search,
             enable_streaming=enable_streaming,
             enable_thinking=enable_thinking
@@ -115,7 +115,7 @@ class ChatBot:
         Returns:
             新的 agent 实例
         """
-        self.chat_model = create_ChatTongyiModel(
+        self.chat_model = create_llm(
             enable_search=enable_search,
             enable_streaming=enable_streaming,
             enable_thinking=enable_thinking

@@ -13,7 +13,7 @@ import logging
 from langchain_core.messages import SystemMessage, HumanMessage
 from lifeprism.llm.schemas.classify_shemas import classifyState, LogItem
 from lifeprism.llm.utils import (
-    create_ChatTongyiModel,
+    create_llm,
     extract_json_from_response,
     parse_token_usage,
     format_goals_for_prompt,
@@ -45,7 +45,7 @@ class ClassifySimple:
         """
         self.goal = goal
         self.category_tree = category_tree
-        self.chat_model = create_ChatTongyiModel()
+        self.chat_model = create_llm()
         self.token_usage_list = []  # 记录 token 使用
     
     def classify(self, state: classifyState) -> dict:

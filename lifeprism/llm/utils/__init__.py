@@ -2,8 +2,18 @@
 工具类模块
 """
 from .create_model import create_ChatTongyiModel
+from .llm_factory import (
+    create_llm,
+    get_provider,
+    get_provider_id,
+    get_provider_capabilities,
+    list_providers,
+    PROVIDER_REGISTRY,
+    PROVIDER_NAME_TO_ID,
+    PROVIDER_ID_TO_NAME,
+)
 from .format_prompt_utils import (
-    format_goals_for_prompt, 
+    format_goals_for_prompt,
     format_category_tree_for_prompt,
     format_log_items_table,
     )
@@ -15,14 +25,25 @@ from .parse_utils import (
 from .split_utils import (
     split_by_duration,
     split_by_purpose,
-    
+
 )
 
 
 
 from .skill_load import get_skill_non_json_content
 __all__ = [
+    # 向后兼容
     "create_ChatTongyiModel",
+    # 新的统一工厂函数
+    "create_llm",
+    "get_provider",
+    "get_provider_id",
+    "get_provider_capabilities",
+    "list_providers",
+    "PROVIDER_REGISTRY",
+    "PROVIDER_NAME_TO_ID",
+    "PROVIDER_ID_TO_NAME",
+    # 其他工具
     "format_goals_for_prompt",
     "format_category_tree_for_prompt",
     "format_log_items_table",

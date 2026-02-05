@@ -9,7 +9,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from lifeprism.llm.custom_prompt.common_prompt import intent_router_template,norm_chat_template
 from lifeprism.llm.custom_prompt.chatbot_prompt.feature_introduce import intro_template,intro_router_template
-from lifeprism.llm.utils import create_ChatTongyiModel
+from lifeprism.llm.utils import create_llm
 import json
 import traceback
 from datetime import datetime
@@ -218,7 +218,7 @@ class ChatBot:
         用于获取新的agent
         """
         logger.debug(f"获取新的agent: enable_search={enable_search}, enable_thinking={enable_thinking}, enable_streaming={enable_streaming}, temperature={temperature}")
-        return create_ChatTongyiModel(enable_search=enable_search,
+        return create_llm(enable_search=enable_search,
                             enable_thinking=enable_thinking,
                             enable_streaming=enable_streaming,temperature=temperature)
     def update_usage(self, result):

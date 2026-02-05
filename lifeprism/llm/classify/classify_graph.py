@@ -9,10 +9,10 @@ from lifeprism.llm.schemas.classify_shemas import classifyState,Goal,AppInFo,cla
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import SystemMessage, HumanMessage,AIMessage
 from lifeprism.llm.utils import (
-    format_goals_for_prompt, 
+    format_goals_for_prompt,
     format_category_tree_for_prompt,
     format_log_items_table,
-    create_ChatTongyiModel,
+    create_llm,
     split_by_purpose,
     split_by_duration,
     parse_classification_result,
@@ -44,7 +44,7 @@ class ClassifyGraph:
         """
         self.goal = goal
         self.category_tree = category_tree
-        self.chat_model = create_ChatTongyiModel()
+        self.chat_model = create_llm()
         self.store = InMemoryStore()
         self.bulit_graph()
 
