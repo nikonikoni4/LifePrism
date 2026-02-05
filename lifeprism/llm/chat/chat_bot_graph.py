@@ -9,7 +9,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from lifeprism.llm.custom_prompt.common_prompt import intent_router_template,norm_chat_template
 from lifeprism.llm.custom_prompt.chatbot_prompt.feature_introduce import intro_template,intro_router_template
-from lifeprism.llm.utils import create_llm
+from lifeprism.llm.utils import create_llm, parse_token_usage
 import json
 import traceback
 from datetime import datetime
@@ -223,37 +223,35 @@ class ChatBot:
                             enable_streaming=enable_streaming,temperature=temperature)
     def update_usage(self, result):
         """
-        更新 token 使用量
-        
+        更新 token 使用量（使用统一的 parse_token_usage 函数）
+
         同时更新:
         - tokens_usage: 本轮对话使用量
         - session_tokens_usage: 会话累计使用量
         """
         logger.debug(f"[update_usage] result type: {type(result)}")
-        logger.debug(f"[update_usage] result: {result}")
-        
-        # 检查 result 是否有 response_metadata 属性
-        if not hasattr(result, 'response_metadata'):
-            logger.error(f"[update_usage] result 没有 response_metadata 属性! result type: {type(result)}")
-            logger.error(f"[update_usage] result 内容: {result}")
-            return
-        
-        logger.debug(f"[update_usage] response_metadata: {result.response_metadata}")
-        
-        token_usage = result.response_metadata.get("token_usage", {})
-        input_tokens = token_usage.get("input_tokens", 0)
-        output_tokens = token_usage.get("output_tokens", 0)
-        total_tokens = token_usage.get("total_tokens", 0)
-        
+
+        # 使用统一的 parse_token_usage 函数解析 token 使用量
+        usage = parse_token_usage(result)
+
+        input_tokens = usage['input_tokens']
+        output_tokens = usage['output_tokens']
+        total_tokens = usage['total_tokens']
+        search_count = usage['search_count']
+
+        logger.debug(f"[update_usage] parsed usage: input={input_tokens}, output={output_tokens}, total={total_tokens}, search={search_count}")
+
         # 更新本轮对话使用量
         self.tokens_usage[self.thread_id]["input_tokens"] += input_tokens
         self.tokens_usage[self.thread_id]["output_tokens"] += output_tokens
         self.tokens_usage[self.thread_id]["total_tokens"] += total_tokens
-        
+        self.tokens_usage[self.thread_id]["search_count"] += search_count
+
         # 更新会话累计使用量
         self.session_tokens_usage[self.thread_id]["input_tokens"] += input_tokens
         self.session_tokens_usage[self.thread_id]["output_tokens"] += output_tokens
         self.session_tokens_usage[self.thread_id]["total_tokens"] += total_tokens
+        self.session_tokens_usage[self.thread_id]["search_count"] += search_count
 
         
 
