@@ -9,8 +9,9 @@
 
 MD 解析规则：
 - 任务块：<!-- lp:todoblock --> 和 <!-- /lp:todoblock --> 之间
+- 支持多个 todoblock，每个 block 独立解析
 - 锚点格式：<!-- lp:t-xxx -->
-- 缩进规则：Tab 缩进判断父子关系
+- 缩进规则：Tab 缩进判断父子关系（仅在同一 block 内有效）
 """
 import re
 import uuid
@@ -175,6 +176,46 @@ TASK_LINE_PATTERN = re.compile(
 )
 ANCHOR_PATTERN = re.compile(r'<!--\s*lp:(t-[a-f0-9]+)\s*-->')
 SYSTEM_SECTION_START = '<!-- lp:system-section -->'
+
+
+def _get_all_todoblocks(content: str) -> List[Dict[str, Any]]:
+    """
+    获取所有 todoblock 的信息
+
+    Returns:
+        List[Dict]: 每个 block 包含:
+            - block_content: block 内容
+            - start: block 内容在原文中的起始位置
+            - end: block 内容在原文中的结束位置
+            - block_index: block 索引（从 0 开始）
+    """
+    blocks = []
+    for i, match in enumerate(TODOBLOCK_PATTERN.finditer(content)):
+        blocks.append({
+            'block_content': match.group(1),
+            'start': match.start(1),
+            'end': match.end(1),
+            'block_index': i,
+        })
+    return blocks
+
+
+def _find_anchor_in_blocks(content: str, anchor_id: str) -> Optional[int]:
+    """
+    查找锚点所在的 todoblock 索引
+
+    Args:
+        content: MD 文件内容
+        anchor_id: 锚点 ID
+
+    Returns:
+        Optional[int]: block 索引，未找到返回 None
+    """
+    blocks = _get_all_todoblocks(content)
+    for block in blocks:
+        if f"lp:{anchor_id}" in block['block_content']:
+            return block['block_index']
+    return None
 
 
 def _parse_task_line(line: str) -> Optional[Dict[str, Any]]:
@@ -368,7 +409,11 @@ def _insert_todo_to_md(
     parent_anchor_id: Optional[str] = None
 ) -> Optional[str]:
     """
-    插入新任务到 MD 文件
+    插入新任务到 MD 文件（支持多个 todoblock）
+
+    插入策略：
+    - 如果有 parent_anchor_id，插入到父任务所在的 block
+    - 如果没有 parent_anchor_id，插入到第一个 todoblock
 
     Args:
         plan_doc_id: 计划书 ID
@@ -383,15 +428,23 @@ def _insert_todo_to_md(
         logger.warning(f"插入失败：MD 文件不存在 {plan_doc_id}")
         return None
 
-    # 查找 todoblock
-    todoblock_match = TODOBLOCK_PATTERN.search(md_content)
-    if not todoblock_match:
+    # 获取所有 todoblock
+    blocks = _get_all_todoblocks(md_content)
+    if not blocks:
         logger.warning(f"插入失败：无 todoblock {plan_doc_id}")
         return None
 
-    block_content = todoblock_match.group(1)
-    block_start = todoblock_match.start(1)
-    block_end = todoblock_match.end(1)
+    # 确定目标 block
+    target_block_index = 0  # 默认第一个 block
+    if parent_anchor_id:
+        found_index = _find_anchor_in_blocks(md_content, parent_anchor_id)
+        if found_index is not None:
+            target_block_index = found_index
+
+    target_block = blocks[target_block_index]
+    block_content = target_block['block_content']
+    block_start = target_block['start']
+    block_end = target_block['end']
 
     # 生成新锚点
     new_anchor = _generate_anchor_id()
@@ -433,7 +486,7 @@ def _insert_todo_to_md(
     # 更新系统展示区并保存
     new_md_content = _update_system_section(new_md_content, plan_doc_id)
     if _write_plan_doc_content(plan_doc_id, new_md_content):
-        logger.info(f"插入任务到 MD 成功: {plan_doc_id}/{new_anchor}")
+        logger.info(f"插入任务到 MD 成功: {plan_doc_id}/{new_anchor} (block {target_block_index})")
         return new_anchor
 
     return None
@@ -485,7 +538,7 @@ def _update_todo_in_md(plan_doc_id: str, anchor_id: str, new_content: str) -> bo
 
 def _delete_todo_from_md(plan_doc_id: str, anchor_id: str) -> bool:
     """
-    从 MD 删除任务（含子任务）
+    从 MD 删除任务（含子任务，支持多个 todoblock）
 
     Args:
         plan_doc_id: 计划书 ID
@@ -499,15 +552,22 @@ def _delete_todo_from_md(plan_doc_id: str, anchor_id: str) -> bool:
         logger.warning(f"删除失败：MD 文件不存在 {plan_doc_id}")
         return False
 
-    # 查找 todoblock
-    todoblock_match = TODOBLOCK_PATTERN.search(md_content)
-    if not todoblock_match:
+    # 获取所有 todoblock
+    blocks = _get_all_todoblocks(md_content)
+    if not blocks:
         logger.warning(f"删除失败：无 todoblock {plan_doc_id}")
         return False
 
-    block_content = todoblock_match.group(1)
-    block_start = todoblock_match.start(1)
-    block_end = todoblock_match.end(1)
+    # 查找锚点所在的 block
+    target_block_index = _find_anchor_in_blocks(md_content, anchor_id)
+    if target_block_index is None:
+        logger.warning(f"删除失败：未找到锚点 {anchor_id}")
+        return False
+
+    target_block = blocks[target_block_index]
+    block_content = target_block['block_content']
+    block_start = target_block['start']
+    block_end = target_block['end']
 
     lines = block_content.split('\n')
     new_lines = []
@@ -551,7 +611,7 @@ def _delete_todo_from_md(plan_doc_id: str, anchor_id: str) -> bool:
     # 更新系统展示区并保存
     new_md_content = _update_system_section(new_md_content, plan_doc_id)
     if _write_plan_doc_content(plan_doc_id, new_md_content):
-        logger.info(f"从 MD 删除任务成功: {plan_doc_id}/{anchor_id}")
+        logger.info(f"从 MD 删除任务成功: {plan_doc_id}/{anchor_id} (block {target_block_index})")
         return True
 
     return False
@@ -567,11 +627,11 @@ def sync_plan_doc(
     confirm_delete: bool = False
 ) -> SyncPlanDocResponse:
     """
-    同步计划书任务
+    同步计划书任务（支持多个 todoblock）
 
     处理流程：
     1. 读取 MD 文件
-    2. 解析 todoblock 中的任务
+    2. 解析所有 todoblock 中的任务
     3. 为无锚点的任务生成锚点并写回 MD
     4. 创建/更新数据库记录
     5. 检测并处理删除的任务
@@ -601,70 +661,97 @@ def sync_plan_doc(
         logger.warning(f"计划书 MD 文件不存在: {plan_doc_id}")
         return result
 
-    # 3. 查找并解析 todoblock
-    todoblock_match = TODOBLOCK_PATTERN.search(content)
-    if not todoblock_match:
+    # 3. 获取所有 todoblock
+    blocks = _get_all_todoblocks(content)
+    if not blocks:
         logger.info(f"计划书无 todoblock，自动创建: {plan_doc_id}")
         # 自动创建 todoblock
         content = _ensure_todoblock_exists(content)
         _write_plan_doc_content(plan_doc_id, content)
-        # 重新查找 todoblock
-        todoblock_match = TODOBLOCK_PATTERN.search(content)
-        if not todoblock_match:
+        # 重新获取 todoblock
+        blocks = _get_all_todoblocks(content)
+        if not blocks:
             logger.error(f"创建 todoblock 失败: {plan_doc_id}")
             return result
 
-    block_content = todoblock_match.group(1)
-    block_start = todoblock_match.start(1)
-    block_end = todoblock_match.end(1)
+    # 4. 解析所有 block 中的任务，并记录需要修改的内容
+    all_parsed_tasks = []  # 所有任务（带 block_index）
+    block_modifications = {}  # block_index -> {line_index -> new_line}
 
-    # 4. 解析任务
-    parsed_tasks = _parse_todoblock(block_content)
+    for block in blocks:
+        block_content = block['block_content']
+        block_index = block['block_index']
 
-    # 5. 为无锚点的任务生成锚点
-    modified_lines = {}  # line_index -> new_line
-    for task in parsed_tasks:
-        if not task['anchor_id']:
-            new_anchor = _generate_anchor_id()
-            task['anchor_id'] = new_anchor
+        parsed_tasks = _parse_todoblock(block_content)
 
-            # 构建新行（在内容后添加锚点）
-            tabs = '\t' * task['indent_level']
-            checkbox = '[x]' if task['is_checked'] else '[ ]'
-            new_line = f"{tabs}- {checkbox} {task['content']} <!-- lp:{new_anchor} -->"
-            modified_lines[task['line_index']] = new_line
+        # 为无锚点的任务生成锚点
+        modifications = {}
+        for task in parsed_tasks:
+            # 添加 block_index 标记
+            task['block_index'] = block_index
 
-    # 6. 如果有修改，更新 MD 内容
-    if modified_lines:
-        lines = block_content.split('\n')
-        for line_index, new_line in modified_lines.items():
-            lines[line_index] = new_line
-        new_block_content = '\n'.join(lines)
-        content = content[:block_start] + new_block_content + content[block_end:]
+            if not task['anchor_id']:
+                new_anchor = _generate_anchor_id()
+                task['anchor_id'] = new_anchor
 
-    # 7. 构建父任务映射
-    parent_map = _build_parent_map(parsed_tasks)
+                # 构建新行（在内容后添加锚点）
+                tabs = '\t' * task['indent_level']
+                checkbox = '[x]' if task['is_checked'] else '[ ]'
+                new_line = f"{tabs}- {checkbox} {task['content']} <!-- lp:{new_anchor} -->"
+                modifications[task['line_index']] = new_line
 
-    # 8. 获取现有任务（用于匹配和删除检测）
+        if modifications:
+            block_modifications[block_index] = modifications
+
+        all_parsed_tasks.extend(parsed_tasks)
+
+    # 5. 如果有修改，更新 MD 内容（从后往前更新，避免位置偏移）
+    if block_modifications:
+        # 按 block_index 倒序处理
+        for block_index in sorted(block_modifications.keys(), reverse=True):
+            block = blocks[block_index]
+            block_content = block['block_content']
+            block_start = block['start']
+            block_end = block['end']
+
+            lines = block_content.split('\n')
+            for line_index, new_line in block_modifications[block_index].items():
+                lines[line_index] = new_line
+            new_block_content = '\n'.join(lines)
+
+            content = content[:block_start] + new_block_content + content[block_end:]
+
+        # 重新获取 blocks（位置已变化）
+        blocks = _get_all_todoblocks(content)
+
+    # 6. 构建父任务映射（每个 block 独立构建，然后合并）
+    # 注意：父子关系只在同一个 block 内有效
+    parent_map = {}
+    for block in blocks:
+        block_tasks = [t for t in all_parsed_tasks if t.get('block_index') == block['block_index']]
+        block_parent_map = _build_parent_map(block_tasks)
+        parent_map.update(block_parent_map)
+
+    # 7. 获取现有任务（用于匹配和删除检测）
     existing_todos = todo_provider.get_todos_by_plan_doc(plan_doc_id)
     existing_by_anchor = {t['source_anchor_id']: t for t in existing_todos if t.get('source_anchor_id')}
 
-    # 收集 MD 中存在的锚点
-    md_anchor_ids = {task['anchor_id'] for task in parsed_tasks if task['anchor_id']}
+    # 收集所有 block 中存在的锚点
+    md_anchor_ids = {task['anchor_id'] for task in all_parsed_tasks if task['anchor_id']}
 
-    # 9. 检测待删除的任务（数据库中有但 MD 中没有的）
+    # 8. 检测待删除的任务（数据库中有但 MD 中没有的）
     todos_to_delete = []
     for todo in existing_todos:
         anchor_id = todo.get('source_anchor_id')
         if anchor_id and anchor_id not in md_anchor_ids:
             todos_to_delete.append(todo)
 
-    # 10. 处理每个解析出的任务
+    # 9. 处理每个解析出的任务（使用全局 order_index）
     anchor_to_db_id = {}  # anchor_id -> db_id 映射（用于设置 parent_id）
     todos_to_create = []
     todos_to_update = []
 
-    for order_index, task in enumerate(parsed_tasks):
+    for order_index, task in enumerate(all_parsed_tasks):
         anchor_id = task['anchor_id']
         existing = existing_by_anchor.get(anchor_id)
 
@@ -707,7 +794,7 @@ def sync_plan_doc(
             })
             result.created += 1
 
-    # 11. dry_run 模式：只返回差异，不执行操作
+    # 10. dry_run 模式：只返回差异，不执行操作
     if dry_run:
         result.to_delete = [
             TodoDeletePreview(
@@ -722,7 +809,7 @@ def sync_plan_doc(
         logger.info(f"同步预检 {plan_doc_id}: to_create={result.created}, to_update={result.updated}, to_delete={len(todos_to_delete)}")
         return result
 
-    # 12. 执行数据库操作
+    # 11. 执行数据库操作
     # 先批量更新
     if todos_to_update:
         todo_provider.batch_update_todos(todos_to_update)
@@ -752,7 +839,7 @@ def sync_plan_doc(
         if parent_updates:
             todo_provider.batch_update_todos(parent_updates)
 
-    # 13. 处理删除
+    # 12. 处理删除
     if confirm_delete and todos_to_delete:
         delete_ids = [todo['id'] for todo in todos_to_delete]
         # 使用级联删除，确保子任务也被删除
@@ -761,11 +848,11 @@ def sync_plan_doc(
             result.deleted += deleted_count if deleted_count > 0 else 1
         logger.info(f"删除 {result.deleted} 个任务")
 
-    # 14. 更新系统展示区并保存 MD
+    # 13. 更新系统展示区并保存 MD
     content = _update_system_section(content, plan_doc_id)
     _write_plan_doc_content(plan_doc_id, content)
 
-    # 15. 统计总数
+    # 14. 统计总数
     result.total = len(todo_provider.get_todos_by_plan_doc(plan_doc_id))
 
     logger.info(f"同步计划书 {plan_doc_id} 完成: created={result.created}, updated={result.updated}, deleted={result.deleted}")
