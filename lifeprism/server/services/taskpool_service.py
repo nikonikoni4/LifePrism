@@ -27,12 +27,14 @@ from lifeprism.server.schemas.taskpool_schemas import (
 )
 from lifeprism.server.providers.todo_provider import todo_provider
 from lifeprism.server.providers.plan_doc_provider import plan_doc_provider
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger, get_custom_data_path
 
 logger = get_logger(__name__)
 
-# 计划书文件存储目录（与 plan_doc_service.py 保持一致）
-PLAN_DOC_DIR = Path("frontend/customData/plan")
+
+def _get_plan_doc_dir() -> Path:
+    """获取计划书目录路径（与 plan_doc_service.py 保持一致）"""
+    return get_custom_data_path() / "plan"
 
 
 # ============================================================================
@@ -97,7 +99,7 @@ def get_taskpool(
 
 def _get_plan_doc_path(doc_id: str) -> Path:
     """获取计划书 MD 文件路径"""
-    return PLAN_DOC_DIR / f"{doc_id}.md"
+    return _get_plan_doc_dir() / f"{doc_id}.md"
 
 
 def _read_plan_doc_content(doc_id: str) -> Optional[str]:
@@ -116,7 +118,7 @@ def _write_plan_doc_content(doc_id: str, content: str) -> bool:
     """写入计划书 MD 内容"""
     file_path = _get_plan_doc_path(doc_id)
     try:
-        PLAN_DOC_DIR.mkdir(parents=True, exist_ok=True)
+        _get_plan_doc_dir().mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding='utf-8')
         return True
     except Exception as e:
