@@ -73,8 +73,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "!node_modules",
-      "!plan/**"
+      "!node_modules"
     ],
     "extraResources": [
       {
@@ -89,7 +88,9 @@
         "from": "customData",
         "to": "customData",
         "filter": [
-          "**/*"
+          "**/*",
+          "!plan/*.md",
+          "plan/示例-planDoc.md"
         ]
       }
     ],
