@@ -262,7 +262,7 @@ const MindSpaceHome: React.FC<MindSpaceHomeProps> = ({ onNavigate }) => {
           <div className="w-12 h-12 border border-[#444444] rounded-full flex items-center justify-center">
              <span className="font-serif text-lg italic text-[#222222]">M</span>
           </div>
-          <span className="text-xs tracking-[0.3em] text-[#444444] uppercase">Mind Space</span>
+          <span className="text-xs tracking-[0.3em] text-[#444444] uppercase">Mind Space(开发中，部分界面完成)</span>
         </motion.div>
 
         {/* Footer Poem (New Addition) */}
