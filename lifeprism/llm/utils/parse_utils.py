@@ -115,39 +115,82 @@ def parse_classification_result(
 
 def parse_token_usage(result) -> dict:
     """
-    从 LangChain LLM 调用结果中解析 token 使用情况
-    
+    从 LangChain LLM 调用结果中解析 token 使用情况（兼容多服务商）
+
+    支持的服务商及其返回格式：
+    - 阿里云百炼: response_metadata.token_usage.{input_tokens, output_tokens, total_tokens}
+    - 火山引擎: response_metadata.token_usage.{prompt_tokens, completion_tokens, total_tokens}
+    - MiniMax: response_metadata.token_usage.{total_tokens} (只有 total)
+
     Args:
-        result: LLM invoke 返回的结果对象 (AIMessage)
-        
+        result: LLM invoke 返回的结果对象 (AIMessage/AIMessageChunk)
+
     Returns:
-        包含 token 使用信息的字典:
+        包含 token 使用信息的字典（统一格式）:
         {
             'input_tokens': int,   # 输入 token 数
             'output_tokens': int,  # 输出 token 数
             'total_tokens': int,   # 总 token 数
-            'search_count': int    # 搜索插件调用次数
+            'search_count': int    # 搜索插件调用次数（阿里云特有）
         }
-        
+
     Example:
         >>> result = chat_model.invoke(messages)
         >>> usage = parse_token_usage(result)
         >>> print(usage)
         {'input_tokens': 100, 'output_tokens': 50, 'total_tokens': 150, 'search_count': 0}
     """
-    # 从 response_metadata 中获取 token_usage
+    default_usage = {
+        'input_tokens': 0,
+        'output_tokens': 0,
+        'total_tokens': 0,
+        'search_count': 0
+    }
+
+    if result is None:
+        return default_usage
+
+    # 尝试从 response_metadata 获取
     raw_usage = {}
-    if hasattr(result, 'response_metadata'):
-        raw_usage = result.response_metadata.get('token_usage', {})
-    
-    # 解析 token 数量
-    input_tokens = raw_usage.get('input_tokens', 0)
-    output_tokens = raw_usage.get('output_tokens', 0)
-    total_tokens = raw_usage.get('total_tokens', 0)
-    
-    # 解析搜索插件调用次数 (通义千问特有)
-    search_count = raw_usage.get('plugins', {}).get('search', {}).get('count', 0)
-    
+    if hasattr(result, 'response_metadata') and result.response_metadata:
+        response_meta = result.response_metadata
+
+        # 方式1: token_usage 字段（阿里云、MiniMax、火山引擎）
+        if 'token_usage' in response_meta:
+            raw_usage = response_meta['token_usage']
+        # 方式2: usage 字段（某些 OpenAI 兼容接口）
+        elif 'usage' in response_meta:
+            raw_usage = response_meta['usage']
+
+    # 尝试从 usage_metadata 获取（流式模式下的最后一个 chunk）
+    if not raw_usage and hasattr(result, 'usage_metadata') and result.usage_metadata:
+        raw_usage = result.usage_metadata
+
+    if not raw_usage:
+        return default_usage
+
+    # 解析 token 数量（兼容不同字段名）
+    # 阿里云: input_tokens, output_tokens
+    # 火山引擎/OpenAI: prompt_tokens, completion_tokens
+    input_tokens = raw_usage.get('input_tokens') or raw_usage.get('prompt_tokens') or 0
+    output_tokens = raw_usage.get('output_tokens') or raw_usage.get('completion_tokens') or 0
+    total_tokens = raw_usage.get('total_tokens') or 0
+
+    # 如果没有 total_tokens，尝试计算
+    if total_tokens == 0 and (input_tokens > 0 or output_tokens > 0):
+        total_tokens = input_tokens + output_tokens
+
+    # 如果只有 total_tokens（MiniMax 情况），无法拆分，保持 input/output 为 0
+
+    # 解析搜索插件调用次数（阿里云特有）
+    search_count = 0
+    if isinstance(raw_usage, dict):
+        plugins = raw_usage.get('plugins', {})
+        if isinstance(plugins, dict):
+            search_info = plugins.get('search', {})
+            if isinstance(search_info, dict):
+                search_count = search_info.get('count', 0)
+
     return {
         'input_tokens': input_tokens,
         'output_tokens': output_tokens,

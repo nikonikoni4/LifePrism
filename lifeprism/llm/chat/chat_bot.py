@@ -4,6 +4,7 @@ V1 版本聊天机器人,带记忆功能
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from lifeprism.llm.utils.llm_factory import create_llm
+from lifeprism.llm.utils.parse_utils import parse_token_usage
 from langchain.agents import create_agent
 from langchain.tools import tool, ToolRuntime
 from langgraph.checkpoint.memory import InMemorySaver
@@ -190,56 +191,33 @@ class ChatBot:
         self._update_token_usage(last_message, messages, output_content)
     
     def _update_token_usage(
-        self, 
-        last_message: Any, 
-        input_text: str, 
+        self,
+        last_message: Any,
+        input_text: str,
         output_text: str
     ):
         """
-        更新 token 使用统计
-        
+        更新 token 使用统计（使用统一的 parse_token_usage 函数）
+
         流式模式下 AIMessageChunk 的结构:
         - content: 内容片段
         - response_metadata: {} (流式模式下为空)
         - usage_metadata: None 或 {'input_tokens': x, 'output_tokens': y, 'total_tokens': z}
         - chunk_position: 'first'/'middle'/'last'
-        
+
         Args:
             last_message: 最后一个响应消息（AIMessageChunk）
             input_text: 输入文本，用于估算
             output_text: 输出文本，用于估算
         """
-        # 尝试从 usage_metadata 解析（部分模型在最后一个 chunk 会包含）
+        # 使用统一的 parse_token_usage 函数解析
         if last_message is not None:
-            try:
-                # 方式1: 检查 usage_metadata 属性
-                usage_meta = getattr(last_message, 'usage_metadata', None)
-                if usage_meta is not None and isinstance(usage_meta, dict):
-                    if usage_meta.get('total_tokens', 0) > 0:
-                        self.tokens_usage = {
-                            'input_tokens': usage_meta.get('input_tokens', 0),
-                            'output_tokens': usage_meta.get('output_tokens', 0),
-                            'total_tokens': usage_meta.get('total_tokens', 0),
-                            'search_count': 0
-                        }
-                        return
-                
-                # 方式2: 检查 response_metadata (非流式调用时)
-                response_meta = getattr(last_message, 'response_metadata', {})
-                if response_meta:
-                    token_usage = response_meta.get('token_usage', {})
-                    if token_usage.get('total_tokens', 0) > 0:
-                        self.tokens_usage = {
-                            'input_tokens': token_usage.get('input_tokens', 0),
-                            'output_tokens': token_usage.get('output_tokens', 0),
-                            'total_tokens': token_usage.get('total_tokens', 0),
-                            'search_count': token_usage.get('plugins', {}).get('search', {}).get('count', 0)
-                        }
-                        return
-            except Exception:
-                pass  # 解析失败，使用估算
-        
-        # 估算 token 使用量
+            usage = parse_token_usage(last_message)
+            if usage['total_tokens'] > 0:
+                self.tokens_usage = usage
+                return
+
+        # 估算 token 使用量（当无法从响应中获取时）
         # 中文约 2 tokens/字，英文约 0.75 tokens/词
         # 这里使用粗略估算：平均 1.5 tokens/字符
         self.tokens_usage = {

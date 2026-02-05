@@ -79,17 +79,31 @@ class ChatVolcEngine(BaseChatModel):
         """同步生成"""
         openai_messages = self._convert_messages(messages)
 
+        # 分离 extra_body 参数（火山引擎特有参数需要通过 extra_body 传递）
+        extra_body = {}
+        standard_kwargs = {}
+
+        for key, value in self.model_kwargs.items():
+            if key in ("web_search", "thinking"):
+                # 火山引擎特有参数放入 extra_body
+                extra_body[key] = value
+            else:
+                standard_kwargs[key] = value
+
         # 合并参数
         request_kwargs = {
             "model": self.model,
             "messages": openai_messages,
             "temperature": self.temperature,
-            **self.model_kwargs,
+            **standard_kwargs,
             **kwargs
         }
 
         if stop:
             request_kwargs["stop"] = stop
+
+        if extra_body:
+            request_kwargs["extra_body"] = extra_body
 
         # 调用 API
         response = self.client.chat.completions.create(**request_kwargs)
@@ -97,15 +111,30 @@ class ChatVolcEngine(BaseChatModel):
         # 解析响应
         content = response.choices[0].message.content or ""
 
+        # 构建 token_usage（统一格式，兼容 parse_token_usage）
+        token_usage = {
+            "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
+            "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+            "total_tokens": response.usage.total_tokens if response.usage else 0,
+        }
+
+        # 构建 response_metadata（LangChain 标准格式）
+        response_metadata = {
+            "model": response.model,
+            "token_usage": token_usage,
+        }
+
+        # 创建带有 response_metadata 的 AIMessage
+        ai_message = AIMessage(
+            content=content,
+            response_metadata=response_metadata
+        )
+
         return ChatResult(
-            generations=[ChatGeneration(message=AIMessage(content=content))],
+            generations=[ChatGeneration(message=ai_message)],
             llm_output={
                 "model": response.model,
-                "usage": {
-                    "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                    "completion_tokens": response.usage.completion_tokens if response.usage else 0,
-                    "total_tokens": response.usage.total_tokens if response.usage else 0,
-                }
+                "usage": token_usage
             }
         )
 

@@ -78,12 +78,14 @@ class MiniMaxProvider(BaseLLMProvider):
     ) -> Dict[str, Any]:
         """
         MiniMax 参数格式:
-        - reasoning_split: True (启用推理模式)
+        - reasoning_effort: "high" (启用推理模式)
+
+        注意: MiniMax 使用 reasoning_effort 而不是 reasoning_split
         """
         model_kwargs = {}
 
         if enable_thinking and self.supports(ProviderCapability.THINKING):
-            model_kwargs["reasoning_split"] = True
+            model_kwargs["reasoning_effort"] = "high"
 
         # 合并其他 kwargs
         model_kwargs.update(kwargs.get("extra_model_kwargs", {}))
