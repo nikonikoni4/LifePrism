@@ -60,16 +60,23 @@ class SettingsManager:
         """初始化配置管理器"""
 
         # 判断是否是开发环境
-        is_dev = not getattr(sys, 'frozen', False)
+        self._is_dev = not getattr(sys, 'frozen', False)
 
-        if is_dev:
+        # 始终解析 customData 路径（开发和打包环境都需要）
+        self._custom_data_path = self._resolve_custom_data_path()
+
+        # 根据环境设置默认路径
+
+        if self._is_dev:
             # 开发环境：使用 lifeprism/config/settings.yaml
             self._config_path = Path(__file__).parent / 'settings.yaml'
         else:
             # 打包环境：使用 customData/config/config.yaml
-            self._custom_data_path = self._resolve_custom_data_path()
             self._config_path = self._custom_data_path / 'config' / 'config.yaml'
-        
+            self.DEFAULTS['lw_db_path'] = str(self._custom_data_path / 'data' / 'lifewatch_ai.db')
+            self.DEFAULTS['chat_db_path'] = str(self._custom_data_path / 'data' / 'chat_history.db')
+
+
         self._load_config()
     
     def _resolve_custom_data_path(self) -> Path:
@@ -318,11 +325,15 @@ class SettingsManager:
     
     @property
     def lw_db_path(self) -> str:
-        return os.path.expanduser(self.get('lw_db_path')) if self.get('lw_db_path') else ''
-    
+        """获取 LifeWatch 数据库路径"""
+        path = self.get('lw_db_path')
+        return os.path.expanduser(path) if path else ''
+
     @property
     def chat_db_path(self) -> str:
-        return os.path.expanduser(self.get('chat_db_path')) if self.get('chat_db_path') else ''
+        """获取聊天历史数据库路径"""
+        path = self.get('chat_db_path')
+        return os.path.expanduser(path) if path else ''
     
     @property
     def data_cleaning_threshold(self) -> int:

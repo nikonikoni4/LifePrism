@@ -154,6 +154,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
    **核心原因**：`name` 是用户可随时修改的，如果用 `name` 做关联/查找，用户修改名称后原有关联会断裂，导致数据不一致
 
+6. **外部存储路径规范**：所有外部存储的路径（如数据库、计划书 md、日志文件等）必须区分开发环境和打包环境。
+
+   **核心原则**：
+   - 开发环境：使用相对路径或项目内路径（如 `frontend/customData/`）
+   - 打包环境：使用 `lifeprism/utils/common_utils.py` 中的 `get_custom_data_path()` 获取路径
+
+   **`get_custom_data_path()` 路径优先级**：
+   1. 环境变量 `CUSTOM_DATA_PATH`（由 Electron 传入）
+   2. 打包环境：基于 `sys.executable` 推算 `resources/customData`
+   3. 开发环境：`frontend/customData`
+
+   **适用场景**：
+   - 数据库文件路径（`.db`）
+   - 计划书/文档路径（`.md`）
+   - 日志文件路径（`.log`）
+   - 用户配置文件
+   - 任何需要持久化存储的外部资源
+
+   **示例**：
+   ```python
+   from lifeprism.utils.common_utils import get_custom_data_path
+
+   # ✅ 正确：使用 get_custom_data_path 获取基础路径
+   custom_data_dir = get_custom_data_path()
+   plan_doc_path = custom_data_dir / "plans" / f"{plan_id}.md"
+   log_file_path = custom_data_dir / "logs" / "app.log"
+
+   # ❌ 错误：硬编码绝对路径
+   plan_doc_path = Path("D:/desktop/plans/plan.md")
+
+   # ❌ 错误：不区分环境直接使用相对路径
+   plan_doc_path = Path("frontend/customData/plans/plan.md")
+   ```
+
+   **注意事项**：
+   - 在 `customData` 目录下按功能创建子目录（如 `plans/`, `logs/`, `exports/`）
+   - 确保目录存在后再写入文件：`path.parent.mkdir(parents=True, exist_ok=True)`
+   - 打包后的路径结构：`resources/customData/` 与 `resources/backend/` 同级
+
 ## 后端代码风格规范
 
 ### API 设计规范
