@@ -353,21 +353,52 @@ class SettingsManager:
     def get_for_display(self) -> Dict[str, Any]:
         """
         获取用于显示的配置 (隐藏敏感信息)
-        
+
         Returns:
             用于前端显示的配置字典
         """
         config = self.get_all()
-        
+
+        # 根据当前 provider 获取对应的 API key
+        current_provider = config.get('provider', '')
+        provider_id = self._get_provider_id_from_name(current_provider)
+
+        # 优先获取当前 provider 的 API key
+        api_key = None
+        if provider_id:
+            api_key = self._get_api_key_from_keyring_by_provider(provider_id)
+        if not api_key:
+            api_key = self._get_api_key_from_keyring()
+
         # 隐藏 api_key
-        if config.get('api_key'):
-            key = config['api_key']
-            if len(key) > 8:
-                config['api_key'] = f"{key[:4]}...{key[-4:]}"
+        if api_key:
+            if len(api_key) > 8:
+                config['api_key'] = f"{api_key[:4]}...{api_key[-4:]}"
             else:
                 config['api_key'] = "***"
-        
+        else:
+            config['api_key'] = None
+
         return config
+
+    def _get_provider_id_from_name(self, provider_name: str) -> Optional[str]:
+        """
+        从 provider 显示名称获取 provider_id
+
+        Args:
+            provider_name: 显示名称，如 "阿里云百炼 (Aliyun)"
+
+        Returns:
+            provider_id，如 "aliyun"
+        """
+        # 简单映射
+        name_to_id = {
+            "阿里云百炼 (Aliyun)": "aliyun",
+            "火山引擎 (VolcEngine)": "volcengine",
+            "OpenAI": "openai",
+            "MiniMax": "minimax",
+        }
+        return name_to_id.get(provider_name)
     
     # ===================== 便捷属性访问 =====================
     
