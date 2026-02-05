@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useGoalPageContext } from '../../../context/GoalPageContext';
 import { useGoalStore } from '../../../hooks/useGoalStore';
 import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
+import { registerPlanDocSaveCallback, unregisterPlanDocSaveCallback, registerPlanDocRefreshCallback, unregisterPlanDocRefreshCallback } from '../../../hooks/usePlanDocSaveHook';
 import { PlanDoc } from '../../../types';
 import { planDocApi } from '../../../api';
 import { Plus, ChevronDown, FileText, Target, MoreVertical, Trash2, Copy, Archive, Save, PenLine, RefreshCw } from 'lucide-react';
@@ -118,6 +119,52 @@ export const PlanDocListView: React.FC = () => {
 
     // Note: beforeunload auto-save removed because sendBeacon only supports POST
     // but backend uses PATCH. Auto-save on doc switch handles most cases.
+
+    // 静默保存函数（供外部 hook 调用，不显示 toast）
+    const silentSave = useCallback(async () => {
+        if (!selectedDoc || !hasUnsavedChangesRef.current) return;
+        try {
+            await planDocApi.updatePlanDoc(selectedDoc.id, { content: prevContentRef.current });
+            setHasUnsavedChanges(false);
+            updatePlanDoc({ ...selectedDoc, content: prevContentRef.current, updatedAt: new Date().toISOString() });
+        } catch (error) {
+            console.error('Silent save failed:', error);
+            // 静默保存失败不显示 toast，避免干扰用户操作
+        }
+    }, [selectedDoc, updatePlanDoc]);
+
+    // 注册/注销 PlanDoc 保存回调
+    useEffect(() => {
+        if (selectedDoc?.id) {
+            registerPlanDocSaveCallback(selectedDoc.id, silentSave);
+            return () => {
+                unregisterPlanDocSaveCallback(selectedDoc.id);
+            };
+        }
+    }, [selectedDoc?.id, silentSave]);
+
+    // 静默刷新函数（供外部 hook 调用，不显示 toast）
+    const silentRefresh = useCallback(async () => {
+        if (!selectedPlanDocId) return;
+        try {
+            const doc = await planDocApi.getPlanDocDetail(selectedPlanDocId);
+            setLocalContent(doc.content);
+            setHasUnsavedChanges(false);
+            updatePlanDoc(doc);
+        } catch (error) {
+            console.error('Silent refresh failed:', error);
+        }
+    }, [selectedPlanDocId, updatePlanDoc]);
+
+    // 注册/注销 PlanDoc 刷新回调
+    useEffect(() => {
+        if (selectedDoc?.id) {
+            registerPlanDocRefreshCallback(selectedDoc.id, silentRefresh);
+            return () => {
+                unregisterPlanDocRefreshCallback(selectedDoc.id);
+            };
+        }
+    }, [selectedDoc?.id, silentRefresh]);
 
     // Save handler
     const handleSave = async () => {
@@ -242,12 +289,12 @@ export const PlanDocListView: React.FC = () => {
         }
     };
 
-    const handleRefreshKeepLocal = () => {
+    const handleUseEditedContent = () => {
         // User chose to keep local changes, just close dialog
         setIsRefreshConflictDialogOpen(false);
     };
 
-    const handleRefreshUseFile = () => {
+    const handleUseLocalMdContent = () => {
         // User chose to use file content, discard local changes
         setIsRefreshConflictDialogOpen(false);
         doRefresh();
@@ -453,8 +500,8 @@ export const PlanDocListView: React.FC = () => {
             <RefreshConflictDialog
                 isOpen={isRefreshConflictDialogOpen}
                 onClose={() => setIsRefreshConflictDialogOpen(false)}
-                onKeepLocal={handleRefreshKeepLocal}
-                onUseFile={handleRefreshUseFile}
+                onUseEditedContent={handleUseEditedContent}
+                onUseLocalMdContent={handleUseLocalMdContent}
                 docName={selectedDoc?.id || ''}
             />
         </div>

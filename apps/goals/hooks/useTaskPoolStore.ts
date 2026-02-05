@@ -11,6 +11,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import { TodoItemType as TodoItem } from '@my-ui-kit/core';
 import { taskPoolApi, mapBackendTaskItemToFrontend } from '../apis/taskPool';
 import { BackendSyncResponse } from '../types/backend';
+import { triggerAllPlanDocSaves, triggerAllPlanDocRefreshes } from './usePlanDocSaveHook';
 
 // Re-export type for consumers
 export type { TodoItem };
@@ -85,6 +86,9 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Add task via API
     const addTask = useCallback(async (task: TodoItem) => {
         try {
+            // 在添加 todo 前，先触发所有 PlanDoc 保存
+            await triggerAllPlanDocSaves();
+
             // Transform to API format
             const apiData = {
                 content: task.content,
@@ -101,6 +105,8 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
             const response = await taskPoolApi.createTodo(apiData);
             const createdItem = mapBackendTaskItemToFrontend(response.item);
             setTasks(prev => [...prev, createdItem]);
+            // 刷新 PlanDoc 编辑器内容
+            await triggerAllPlanDocRefreshes();
         } catch (err) {
             console.error('Failed to create task:', err);
             // Fallback: add locally with temp ID (for offline support)
@@ -111,6 +117,10 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Update task via API
     const updateTask = useCallback(async (id: number, updates: Partial<TodoItem>) => {
         try {
+            // 在更新 todo 前，先触发所有 PlanDoc 保存
+            // 确保编辑器中的未保存内容先同步到 MD 文件
+            await triggerAllPlanDocSaves();
+
             // Transform updates to API format
             const apiUpdates: Record<string, unknown> = {};
             if (updates.content !== undefined) apiUpdates.content = updates.content;
@@ -126,6 +136,8 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
             // Update local state with response
             const updatedItem = mapBackendTaskItemToFrontend(response.item);
             setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updatedItem } : t));
+            // 刷新 PlanDoc 编辑器内容
+            await triggerAllPlanDocRefreshes();
         } catch (err) {
             console.error('Failed to update task:', err);
             // Optimistic update fallback ? 
@@ -143,8 +155,13 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Delete task via API
     const deleteTask = useCallback(async (id: number) => {
         try {
+            // 在删除 todo 前，先触发所有 PlanDoc 保存
+            await triggerAllPlanDocSaves();
+
             await taskPoolApi.deleteTodo(id);
             setTasks(prev => prev.filter(t => t.id !== id));
+            // 刷新 PlanDoc 编辑器内容
+            await triggerAllPlanDocRefreshes();
         } catch (err) {
             console.error('Failed to delete task:', err);
             // Fallback: remove locally anyway
