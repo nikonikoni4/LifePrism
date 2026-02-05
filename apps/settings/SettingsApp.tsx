@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     User,
     Cpu,
@@ -16,7 +16,10 @@ import {
     Plus,
     Minus,
     X,
-    Loader2
+    Loader2,
+    Info,
+    ChevronDown,
+    Trash2
 } from 'lucide-react';
 import { SettingsAPI } from './api';
 
@@ -34,11 +37,21 @@ const SettingsApp: React.FC = () => {
     const [provider, setProvider] = useState('');
     const [providerList, setProviderList] = useState<string[]>([]);
     const [modelName, setModelName] = useState('');
+    const [modelHistory, setModelHistory] = useState<Record<string, string[]>>({});
+    const [showModelDropdown, setShowModelDropdown] = useState(false);
     const [apiKey, setApiKey] = useState('');
     const [showKey, setShowKey] = useState(false);
     const [apiStatus, setApiStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [costInput, setCostInput] = useState(0);
     const [costOutput, setCostOutput] = useState(0);
+
+    // Provider 显示名称到 ID 的映射
+    const PROVIDER_ID_MAP: Record<string, string> = {
+        "阿里云百炼 (Aliyun)": "aliyun",
+        "火山引擎 (VolcEngine)": "volcengine",
+        "OpenAI": "openai",
+        "MiniMax": "minimax"
+    };
 
     // 3. Classification Settings
     const [classificationMode, setClassificationMode] = useState<'simple' | 'complex'>('simple');
@@ -55,6 +68,29 @@ const SettingsApp: React.FC = () => {
     // 5. Data Processing
     const [filterDuration, setFilterDuration] = useState(10);
 
+    // 6. Modal States
+    const [showVolcEngineModal, setShowVolcEngineModal] = useState(false);
+
+    // Refs
+    const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+    // 点击外部关闭模型下拉菜单
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target as Node)) {
+                setShowModelDropdown(false);
+            }
+        };
+
+        if (showModelDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showModelDropdown]);
+
     // Load settings on mount
     useEffect(() => {
         const loadSettings = async () => {
@@ -68,6 +104,7 @@ const SettingsApp: React.FC = () => {
                 setProvider(settings.provider);
                 setProviderList(settings.provider_list);
                 setModelName(settings.model);
+                setModelHistory(settings.model_history || {});
                 setApiKey(settings.api_key || '');
                 setCostInput(settings.input_tokens_cost);
                 setCostOutput(settings.output_tokens_cost);
@@ -129,6 +166,41 @@ const SettingsApp: React.FC = () => {
         setBrowserApps(browserApps.filter(a => a !== app));
     };
 
+    const handleProviderChange = (newProvider: string) => {
+        setProvider(newProvider);
+        // 当选择火山引擎时显示说明弹窗
+        if (newProvider.includes('火山引擎') || newProvider.toLowerCase().includes('volcengine')) {
+            setShowVolcEngineModal(true);
+        }
+    };
+
+    // 获取当前服务商的模型历史
+    const getCurrentProviderModelHistory = (): string[] => {
+        const providerId = PROVIDER_ID_MAP[provider] || provider.toLowerCase();
+        return modelHistory[providerId] || [];
+    };
+
+    // 删除模型历史
+    const handleDeleteModelHistory = async (model: string) => {
+        const providerId = PROVIDER_ID_MAP[provider] || provider.toLowerCase();
+        try {
+            await SettingsAPI.deleteModelHistory(providerId, model);
+            // 更新本地状态
+            setModelHistory(prev => ({
+                ...prev,
+                [providerId]: (prev[providerId] || []).filter(m => m !== model)
+            }));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '删除失败');
+        }
+    };
+
+    // 选择历史模型
+    const handleSelectModel = (model: string) => {
+        setModelName(model);
+        setShowModelDropdown(false);
+    };
+
     const handleSaveAll = async () => {
         try {
             setIsSaving(true);
@@ -163,7 +235,8 @@ const SettingsApp: React.FC = () => {
         // Only save if it's a new key (not masked)
         if (apiKey && !apiKey.includes('*') && apiKey.length > 0) {
             try {
-                await SettingsAPI.updateApiKey(apiKey);
+                // 传递当前选择的 provider，后端会自动转换为 provider_id
+                await SettingsAPI.updateApiKey(apiKey, provider);
                 // Reload to get masked version
                 const settings = await SettingsAPI.getSettings();
                 setApiKey(settings.api_key || '');
@@ -264,7 +337,7 @@ const SettingsApp: React.FC = () => {
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">服务商</label>
                             <select
                                 value={provider}
-                                onChange={(e) => setProvider(e.target.value)}
+                                onChange={(e) => handleProviderChange(e.target.value)}
                                 className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all appearance-none cursor-pointer"
                             >
                                 <option value="">选择服务商...</option>
@@ -275,12 +348,61 @@ const SettingsApp: React.FC = () => {
                         </div>
                         <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">模型名称</label>
-                            <input
-                                type="text"
-                                value={modelName}
-                                onChange={(e) => setModelName(e.target.value)}
-                                className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all"
-                            />
+                            <div className="relative" ref={modelDropdownRef}>
+                                <input
+                                    type="text"
+                                    value={modelName}
+                                    onChange={(e) => setModelName(e.target.value)}
+                                    onFocus={() => setShowModelDropdown(true)}
+                                    placeholder="输入或选择模型..."
+                                    className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 pr-10 text-slate-800 font-medium outline-none transition-all"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowModelDropdown(!showModelDropdown)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    <ChevronDown size={18} className={`transition-transform ${showModelDropdown ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {/* 模型历史下拉菜单 */}
+                                {showModelDropdown && (
+                                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                        <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-gray-100">
+                                            历史记录
+                                        </div>
+                                        {getCurrentProviderModelHistory().length > 0 ? (
+                                            getCurrentProviderModelHistory().map((model) => (
+                                                <div
+                                                    key={model}
+                                                    className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 cursor-pointer group"
+                                                >
+                                                    <span
+                                                        onClick={() => handleSelectModel(model)}
+                                                        className="flex-1 text-sm text-slate-700 font-medium truncate"
+                                                    >
+                                                        {model}
+                                                    </span>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteModelHistory(model);
+                                                        }}
+                                                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all"
+                                                        title="删除此记录"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="px-3 py-3 text-sm text-slate-400 text-center">
+                                                暂无历史记录
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -546,6 +668,54 @@ const SettingsApp: React.FC = () => {
                     </div>
                 </div>
             </section>
+
+            {/* VolcEngine Info Modal */}
+            {showVolcEngineModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+                    <div className="bg-white rounded-2xl p-6 max-w-lg mx-4 shadow-2xl">
+                        <div className="flex items-start gap-4 mb-4">
+                            <div className="p-2 bg-orange-100 rounded-xl">
+                                <Info className="w-6 h-6 text-orange-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">火山引擎配置说明</h3>
+                                <p className="text-sm text-slate-500 mt-1">使用火山引擎需要特殊配置</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
+                            <p className="text-sm text-slate-700 leading-relaxed">
+                                火山引擎使用 <strong>Endpoint ID</strong> 而不是模型名称。
+                            </p>
+                            <p className="text-sm text-slate-600 mt-2">
+                                请在「模型名称」字段填写您的 Endpoint ID，格式如：
+                            </p>
+                            <code className="block mt-2 bg-white px-3 py-2 rounded-lg text-sm font-mono text-orange-700 border border-orange-200">
+                                ep-m-20260205214401-8rthb
+                            </code>
+                        </div>
+
+                        <div className="text-sm text-slate-600 space-y-2 mb-6">
+                            <p><strong>获取 Endpoint ID 步骤：</strong></p>
+                            <ol className="list-decimal list-inside space-y-1 text-slate-500">
+                                <li>登录火山引擎控制台</li>
+                                <li>进入「模型推理」→「推理接入点管理」</li>
+                                <li>创建或选择一个接入点</li>
+                                <li>复制 Endpoint ID（以 ep- 开头）</li>
+                            </ol>
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowVolcEngineModal(false)}
+                                className="px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors"
+                            >
+                                我知道了
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );

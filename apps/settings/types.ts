@@ -11,6 +11,7 @@ export interface Settings {
     provider: string;
     provider_list: string[];  // 支持的模型服务商列表
     model: string;
+    model_history: Record<string, string[]>;  // 按服务商存储的模型历史
     input_tokens_cost: number;
     output_tokens_cost: number;
     classification_mode: string;
@@ -47,6 +48,7 @@ export interface UpdateSettingsRequest {
 /** 更新 API Key 请求 */
 export interface UpdateApiKeyRequest {
     api_key: string;
+    provider_id?: string;
 }
 
 /** 更新 API Key 响应 */
