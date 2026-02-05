@@ -73,8 +73,8 @@ class SettingsManager:
         else:
             # 打包环境：使用 customData/config/config.yaml
             self._config_path = self._custom_data_path / 'config' / 'config.yaml'
-            self.DEFAULTS['lw_db_path'] = str(self._custom_data_path / 'data' / 'lifewatch_ai.db')
-            self.DEFAULTS['chat_db_path'] = str(self._custom_data_path / 'data' / 'chat_history.db')
+            self.DEFAULTS['lw_db_path'] = str(self._custom_data_path / 'dataset' / 'lifewatch_ai.db')
+            self.DEFAULTS['chat_db_path'] = str(self._custom_data_path / 'dataset' / 'chat_history.db')
 
 
         self._load_config()
