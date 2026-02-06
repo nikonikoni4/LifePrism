@@ -43,13 +43,8 @@ const SettingsApp: React.FC = () => {
     const [costInput, setCostInput] = useState(0);
     const [costOutput, setCostOutput] = useState(0);
 
-    // Provider 显示名称到 ID 的映射
-    const PROVIDER_ID_MAP: Record<string, string> = {
-        "阿里云百炼 (Aliyun)": "aliyun",
-        "火山引擎 (VolcEngine)": "volcengine",
-        "OpenAI": "openai",
-        "MiniMax": "minimax"
-    };
+    // Provider 显示名称到 ID 的映射（从 API 动态获取）
+    const [providerIdMap, setProviderIdMap] = useState<Record<string, string>>({});
 
     // 3. Classification Settings
     const [classificationMode, setClassificationMode] = useState<'simple' | 'complex'>('simple');
@@ -129,6 +124,7 @@ const SettingsApp: React.FC = () => {
                 setNickname(settings.user_name);
                 setProvider(settings.provider);
                 setProviderList(settings.provider_list);
+                setProviderIdMap(settings.provider_id_map || {});
                 setModelName(settings.model);
                 setModelHistory(settings.model_history || {});
                 setApiKey(settings.api_key || '');
@@ -226,13 +222,15 @@ const SettingsApp: React.FC = () => {
 
     // 获取当前服务商的模型历史
     const getCurrentProviderModelHistory = (): string[] => {
-        const providerId = PROVIDER_ID_MAP[provider] || provider.toLowerCase();
+        const providerId = providerIdMap[provider] || '';
+        if (!providerId) return [];
         return modelHistory[providerId] || [];
     };
 
     // 删除模型历史
     const handleDeleteModelHistory = async (model: string) => {
-        const providerId = PROVIDER_ID_MAP[provider] || provider.toLowerCase();
+        const providerId = providerIdMap[provider] || '';
+        if (!providerId) return;
         try {
             await SettingsAPI.deleteModelHistory(providerId, model);
             // 更新本地状态
@@ -256,8 +254,8 @@ const SettingsApp: React.FC = () => {
         // Only save if it's a new key (not masked)
         if (apiKey && !apiKey.includes('*') && apiKey.length > 0) {
             try {
-                // 传递当前选择的 provider，后端会自动转换为 provider_id
-                await SettingsAPI.updateApiKey(apiKey, provider);
+                // 传递 provider_id 而非显示名称
+                await SettingsAPI.updateApiKey(apiKey, providerIdMap[provider]);
                 // Reload to get masked version
                 const settings = await SettingsAPI.getSettings();
                 setApiKey(settings.api_key || '');

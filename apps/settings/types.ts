@@ -10,6 +10,7 @@ export interface Settings {
     api_key: string | null;  // 脱敏显示
     provider: string;
     provider_list: string[];  // 支持的模型服务商列表
+    provider_id_map: Record<string, string>;  // 服务商显示名称到 ID 的映射
     model: string;
     model_history: Record<string, string[]>;  // 按服务商存储的模型历史
     input_tokens_cost: number;
