@@ -92,8 +92,13 @@ class SettingsManager:
         if custom_data_env:
             return Path(custom_data_env)
         
-        # 2. 打包环境：基于 exe 位置推算
+        # 2. 打包环境：后备路径
         if getattr(sys, 'frozen', False):
+            # 优先使用 APPDATA 目录（与 Electron 保持一致，重装不丢失）
+            appdata = os.environ.get('APPDATA', '')
+            if appdata:
+                return Path(appdata) / 'LifePrism' / 'customData'
+            # 最终后备：基于 exe 位置推算（兼容非 Electron 启动场景）
             # sys.executable = .../resources/backend/lifeprism-backend.exe
             backend_dir = Path(sys.executable).parent   # .../resources/backend
             resources_dir = backend_dir.parent          # .../resources

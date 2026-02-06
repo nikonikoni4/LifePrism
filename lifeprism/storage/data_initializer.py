@@ -3,6 +3,7 @@
 在新安装环境中，当数据库表为空时，添加默认的分类、示例目标和示例计划书
 """
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -42,31 +43,32 @@ EXAMPLE_GOAL = {
 EXAMPLE_PLAN_DOC = {
     'id': '示例-planDoc',
     'goal_id': EXAMPLE_GOAL_ID,
-    'content': '''# 示例计划书
-
-这是一个示例计划书，用于展示计划书的基本结构和功能。
-
-## 如何使用计划书
-
-1. **创建任务**：在计划书中使用 `- [ ]` 语法创建待办任务
-2. **同步到任务池**：计划书中的任务会自动同步到任务池
-3. **跟踪进度**：完成任务后，勾选复选框即可
-
-## 示例任务列表
-
-- [ ] 这是第一个示例任务
-- [ ] 这是第二个示例任务
-- [ ] 这是第三个示例任务
-
-## 提示
-
-- 计划书支持 Markdown 格式
-- 可以添加标题、列表、代码块等
-- 任务完成后会自动更新进度
-''',
+    'content': '示例计划书',
     'status': 'active',
     'order_index': 0,
 }
+
+# 示例计划书 MD 文件内容
+EXAMPLE_PLAN_DOC_MD_CONTENT = """\
+# New Plan
+
+在这里编写你的目标计划！
+
+使用命令/ 选择todo block，在这个区域的todolist会被系统自动检测添加到任务池中！
+
+1. 例子：在下方的block中添加todolist
+
+<!-- lp:todoblock -->
+- [ ] 任务1
+\t- [ ] 子任务1
+\t\t- [ ] 子任务2
+- [ ] 任务2
+<!-- /lp:todoblock -->
+
+1. 点击保存
+
+1. 在任务池中点击同步！
+"""
 
 
 class DataInitializer:
@@ -194,7 +196,7 @@ class DataInitializer:
         """
         初始化示例计划书
 
-        只有当 plan_doc 表为空时才添加示例计划书
+        只有当 plan_doc 表为空时才添加示例计划书，并生成对应的 MD 文件
         """
         if not self._is_table_empty('plan_doc'):
             logger.debug("plan_doc 表已有数据，跳过示例计划书初始化")
@@ -219,9 +221,31 @@ class DataInitializer:
 
                 logger.info(f"成功初始化示例计划书，ID: {EXAMPLE_PLAN_DOC['id']}")
 
+            # 生成示例 MD 文件
+            self._generate_example_plan_doc_md()
+
         except Exception as e:
             logger.error(f"初始化示例计划书失败: {e}")
             raise
+
+    def _generate_example_plan_doc_md(self):
+        """
+        生成示例计划书 MD 文件
+
+        在 customData/plan 目录下创建示例 MD 文件，如果文件已存在则跳过
+        """
+        try:
+            from lifeprism.utils.common_utils import get_custom_data_path
+            plan_dir = get_custom_data_path() / "plan"
+            plan_dir.mkdir(parents=True, exist_ok=True)
+            md_path = plan_dir / f"{EXAMPLE_PLAN_DOC['id']}.md"
+            if not md_path.exists():
+                md_path.write_text(EXAMPLE_PLAN_DOC_MD_CONTENT, encoding='utf-8')
+                logger.info(f"生成示例计划书 MD 文件: {md_path}")
+            else:
+                logger.debug(f"示例计划书 MD 文件已存在，跳过: {md_path}")
+        except Exception as e:
+            logger.error(f"生成示例计划书 MD 文件失败: {e}")
 
 
 def initialize_default_data():

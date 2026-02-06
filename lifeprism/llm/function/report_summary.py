@@ -21,8 +21,7 @@ from lifeprism.llm.llm_linear_executor.llm_linear_executor.os_plan import load_p
 from lifeprism.llm.llm_linear_executor.llm_linear_executor.executor import Executor
 from typing import Literal
 from lifeprism.llm.providers.llm_lw_data_provider import llm_lw_data_provider
-from lifeprism.llm.llm_linear_executor.llm_linear_executor.llm_factory import create_llm_factory
-from lifeprism.config import settings
+from lifeprism.llm.utils.llm_factory import create_llm
 from lifeprism.utils import get_custom_data_path
 import sys
 from pathlib import Path
@@ -96,11 +95,8 @@ async def daily_summary(date : str, pattern ="complex"):
         "query_goal_time_distribution": query_goal_time_distribution
     }
 
-    # 创建 LLM 工厂
-    llm_factory = create_llm_factory(
-            model=settings.model,
-            api_key= settings.api_key,
-        )
+    # 创建 LLM 工厂（使用统一工厂，自动从 settings 获取 provider/model/api_key）
+    llm_factory = lambda: create_llm()
     # 创建异步执行器并执行
     executor = Executor(
         plan=plan,
@@ -108,7 +104,7 @@ async def daily_summary(date : str, pattern ="complex"):
         llm_factory=llm_factory
     )
     result = await executor.aexecute()
-    
+
     # 保存 tokens 使用量到数据库
     session_id = f"summary-{date}"
     tokens_usage = result["tokens_usage"]
@@ -183,12 +179,8 @@ async def multi_days_summary(start_date: str, end_date: str, pattern: str = "com
         "query_goal_time_distribution": query_goal_time_distribution
     }
 
-    # 创建 LLM 工厂
-    
-    llm_factory = create_llm_factory(
-            model=settings.model,
-            api_key= settings.api_key,
-        )
+    # 创建 LLM 工厂（使用统一工厂，自动从 settings 获取 provider/model/api_key）
+    llm_factory = lambda: create_llm()
     # 创建异步执行器并执行
     executor = Executor(
         plan=plan,

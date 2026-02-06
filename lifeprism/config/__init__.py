@@ -12,6 +12,11 @@ from .settings_manager import (
     get_api_key,
     get_all_settings,
 )
+from .provider_manager import (
+    ProviderManager,
+    ProviderInfo,
+    provider_manager,
+)
 
 __all__ = [
     "settings",
@@ -22,4 +27,7 @@ __all__ = [
     "set_setting",
     "get_api_key",
     "get_all_settings",
+    "provider_manager",
+    "ProviderManager",
+    "ProviderInfo",
 ]

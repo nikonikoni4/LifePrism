@@ -16,6 +16,7 @@ class SettingItems(BaseModel):
     api_key: Optional[str] = Field(default=None, description="API Key (显示时脱敏)")
     provider: str = Field(description="LLM Provider")
     provider_list: List[str] = Field(description="支持的模型服务商列表")
+    provider_id_map: Dict[str, str] = Field(default={}, description="服务商显示名称到 ID 的映射")
     model: str = Field(description="模型选择")
     model_history: Dict[str, List[str]] = Field(default={}, description="按服务商存储的模型历史")
     input_tokens_cost: float = Field(description="输入token单价 /1k")
