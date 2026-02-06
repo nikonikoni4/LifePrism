@@ -23,9 +23,12 @@ def _get_log_file_path() -> Path:
         if custom_data_env:
             custom_data_path = Path(custom_data_env)
         else:
-            backend_dir = Path(sys.executable).parent
-            resources_dir = backend_dir.parent
-            custom_data_path = resources_dir / 'customData'
+            # 后备：通过 exe 路径推算
+            # sys.executable = .../LifePrism/app/resources/backend/lifeprism-backend.exe
+            backend_dir = Path(sys.executable).parent   # .../app/resources/backend
+            app_dir = backend_dir.parent.parent          # .../app
+            root_dir = app_dir.parent                    # .../LifePrism
+            custom_data_path = root_dir / 'customData'
 
         log_dir = custom_data_path / 'debug_logs'
         log_dir.mkdir(parents=True, exist_ok=True)
