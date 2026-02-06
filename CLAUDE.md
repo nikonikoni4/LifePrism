@@ -12,7 +12,71 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. 当发现bug首先需要编写一个能够重现该bug的测试，然后不断修复它，直到它通过测试为止。
 5. 每次我纠正你之后，就在claude.md文件中新增加一条规则，这样就不会再发生这种情况了。
 6. 所有测试内容都应该在test文件夹下，并且需要编写对应的测试用例。
+7. **单一数据源原则（Single Source of Truth）**：当同一份硬编码数据（如配置映射、枚举值、常量列表等）需要在多处使用时，**禁止在多个文件中重复硬编码**，必须抽取到唯一的数据源文件中，其他所有使用方通过导入/引用该数据源获取数据。必要时，请求用户，是否需要将该数据源抽取到单独的外部文件中，比如yaml，json文件。
 
+   **判断标准**：
+   - 如果一个硬编码值（字典、列表、映射、常量等）已经或即将出现在 **2 个及以上文件** 中，必须进行同源处理
+   - 即使当前只在一个文件中使用，但该数据本质上是**全局共享的配置信息**（如模型名称映射、服务商配置、功能开关等），也应提前抽取
+
+   **做法**：
+   - 后端：在合适的配置模块（如 `config/`）中定义唯一数据源，其他模块 `import` 使用
+   - 前端：在合适的常量/配置文件中定义唯一数据源，其他模块 `import` 使用
+   - 前后端共享的数据：由后端作为数据源，前端通过 API 获取，**不要前后端各自硬编码一份**
+
+   **示例**：
+   ```python
+   # ❌ 错误：多个文件各自硬编码模型映射
+   # file_a.py
+   MODEL_MAP = {"qwen-plus": "qwen-plus-2025-01-01", ...}
+   # file_b.py
+   MODEL_MAP = {"qwen-plus": "qwen-plus-2025-01-01", ...}  # 重复！
+
+   # ✅ 正确：唯一数据源 + 导入
+   # config/model_config.py（唯一数据源）
+   MODEL_MAP = {"qwen-plus": "qwen-plus-2025-01-01", ...}
+   # file_a.py / file_b.py
+   from config.model_config import MODEL_MAP
+   ```
+
+8. **重构策略规则（Refactor Strategy）**：重构接口/常量/模块时，**必须先搜索旧接口的所有引用点**，根据影响范围选择策略，禁止盲目添加向后兼容代码。
+
+   **第一步：量化影响范围**：
+   - 使用全局搜索（Grep/IDE）找出所有 `import`、直接引用、`__all__` 导出
+   - 统计：影响了多少个文件？多少个调用点？是否涉及外部/公开 API？
+
+   **第二步：根据引用数量选择策略**：
+
+   | 引用点数量 | 策略 | 说明 |
+   |-----------|------|------|
+   | 0 个 | **直接删除**，不兼容 | 没人用，删了最干净 |
+   | 1-5 个且同模块内 | **一次性全改**，不兼容 | 改动可控，一个 commit 搞定 |
+   | 5-15 个跨模块 | **分步重构**：先加新接口 → 逐步迁移调用方 → 删旧接口 | 每步可独立验证 |
+   | 15+ 个或涉及公开 API | **必须兼容**，但遵循薄兼容层原则 | 见下方 |
+
+   **第三步：薄兼容层原则（如果必须兼容）**：
+   - 兼容代码只做**一行转发**，禁止引入缓存、包装类、`property` 技巧等额外逻辑
+   - **兼容层的代码行数不应超过被兼容接口的行数**，如果兼容代码比新代码还复杂，说明方案有问题
+   - 兼容代码必须标注 `# DEPRECATED: 使用 xxx 替代` 注释
+
+   **示例**：
+   ```python
+   # ✅ 正确的兼容：一行转发，零逻辑
+   def get_support_provider():
+       """DEPRECATED: 使用 provider_manager.provider_list 替代"""
+       return provider_manager.provider_list
+
+   # ❌ 错误的兼容：自建缓存 + 包装类 + 语法误用
+   _cached = None
+   def _get_cached():
+       global _cached
+       if _cached is None:
+           _cached = get_support_provider()
+       return _cached
+   class _Constants:
+       @property
+       def SUPPORT_PROVIDER(self): ...
+   SUPPORT_PROVIDER = property(lambda self: ...)  # 模块级 property 根本不工作
+   ```
 
 ### 语言
 
@@ -131,6 +195,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
      # ✅ 正确：LLM 边界转换（data_processing_service.py）
      # LLM 输出: { category: "工作", link_to_goal: "学习英语" }
      # 转换为 id 后存储
+     # 注意：以下是函数内的临时局部变量，仅用于一次性 name→id 转换，
+     # 不是 service 级别的持久缓存，因此不违反"缓存 key 不能用 name"的规则
      category_name_to_id = {cat['name']: cat['id'] for cat in categories}
      goal_name_to_id = {g['name']: g['id'] for g in goals}
 
@@ -588,20 +654,13 @@ def delete_goal(self, goal_id: str) -> bool:
 
 #### service 函数编写规则
 
-- 不能在servicer中编写函数默认值
+- 不能在 service 中编写函数默认值
 
-#### 有状态 Service（需要缓存）
-- 维护内存缓存（映射、DataFrame 等）
-- 必须提供 `_refresh_cache()` 方法
-- 在 CRUD 操作后调用 `_refresh_cache()`
-- 使用 `LazySingleton` 创建单例
-- 示例：`CategoryService`, `GoalService`
+   **原因**：前端可选字段未传时，API 层传入 `None` 给 service。若 service 参数有默认值，`None` 会被默认值覆盖，导致"用户未填写"被误判为"用户填了默认值"，引发业务逻辑错误。默认值应仅在 API 层通过 `Query(default=...)` / `Field(default=...)` 定义，service 层所有参数必须由调用方显式传入。
 
-#### 纯函数 Service（无状态）
-- 不维护任何缓存
-- 每次调用直接访问数据库
-- 可以使用纯函数模块或无状态类
-- 示例：`timeline_service`, `usage_service`
+#### 有状态 vs 纯函数 Service 判断
+
+详见**后端 rule 4（Service 单例模式判断规则）**，此处不再重复。
 
 #### 职责
 - 调用 Provider 获取数据
@@ -1167,6 +1226,8 @@ The system uses a three-tier caching strategy to minimize LLM API calls:
 ### Backend Configuration
 
 **Main Config File**: `lifeprism/config/settings.yaml`
+
+> 注意：以下路径为用户本地配置示例，代码中不应硬编码这些路径，应通过 `settings_manager` 读取（参见后端 rule 6 外部存储路径规范）。
 
 ```yaml
 # LLM Provider Configuration
