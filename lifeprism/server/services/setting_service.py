@@ -6,7 +6,7 @@ Settings 服务层 - 配置管理业务逻辑
 from typing import Dict, Any, Optional, List
 
 from lifeprism.config.settings_manager import settings
-from lifeprism.config.settings import SUPPORT_PROVIDER, PROVIDER_ID_MAP
+from lifeprism.config.provider_manager import provider_manager
 from lifeprism.server.schemas.setting_schemas import (
     SettingItems,
     UpdateSettingsRequest,
@@ -24,8 +24,10 @@ def get_settings() -> SettingItems:
         SettingItems: 完整配置，API Key 已脱敏
     """
     config = settings.get_for_display()
-    # 添加 provider_list (来自常量配置)
-    config['provider_list'] = SUPPORT_PROVIDER
+    # 添加 provider_list (来自 provider_manager)
+    config['provider_list'] = provider_manager.provider_list
+    # 添加 provider_id_map (名称到 ID 的映射)
+    config['provider_id_map'] = provider_manager.name_to_id_map
     # 添加 model_history
     config['model_history'] = settings.model_history
     return SettingItems(**config)
@@ -52,7 +54,7 @@ def update_settings(request: UpdateSettingsRequest) -> SettingItems:
         model = updates.get('model')
         if provider and model:
             # 将显示名称转换为 provider_id
-            provider_id = PROVIDER_ID_MAP.get(provider, provider.lower())
+            provider_id = provider_manager.get_provider_id(provider)
             settings.add_model_to_history(provider_id, model)
             logger.info(f"已将模型 {model} 添加到 {provider_id} 的历史记录")
 
@@ -73,10 +75,8 @@ def update_api_key(api_key: str, provider_id: Optional[str] = None) -> bool:
         bool: 是否成功
     """
     if provider_id:
-        # 延迟导入避免循环依赖
-        from lifeprism.llm.utils import get_provider_id as _get_provider_id
         # 将显示名称转换为 provider_id（如果传入的是显示名称）
-        actual_provider_id = _get_provider_id(provider_id)
+        actual_provider_id = provider_manager.get_provider_id(provider_id)
         logger.info(f"正在更新 {actual_provider_id} 的 API Key...")
         settings.set_api_key(api_key, actual_provider_id)
         logger.info(f"{actual_provider_id} 的 API Key 已安全保存到系统密钥管理器")

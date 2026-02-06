@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from lifeprism.config.settings_manager import settings
+from lifeprism.config.provider_manager import provider_manager
 from lifeprism.llm.providers import (
     BaseLLMProvider,
     aliyun_provider,
@@ -28,17 +29,6 @@ PROVIDER_REGISTRY: Dict[str, BaseLLMProvider] = {
     "minimax": minimax_provider,
 }
 
-# 显示名称到 Provider ID 的映射
-PROVIDER_NAME_TO_ID: Dict[str, str] = {
-    "阿里云百炼 (Aliyun)": "aliyun",
-    "火山引擎 (VolcEngine)": "volcengine",
-    "OpenAI": "openai",
-    "MiniMax": "minimax",
-}
-
-# Provider ID 到显示名称的映射
-PROVIDER_ID_TO_NAME: Dict[str, str] = {v: k for k, v in PROVIDER_NAME_TO_ID.items()}
-
 
 def get_provider_id(provider_name: Optional[str] = None) -> str:
     """
@@ -53,18 +43,8 @@ def get_provider_id(provider_name: Optional[str] = None) -> str:
     if provider_name is None:
         provider_name = settings.provider
 
-    # 如果已经是 ID，直接返回
-    if provider_name in PROVIDER_REGISTRY:
-        return provider_name
-
-    # 尝试从显示名称映射
-    provider_id = PROVIDER_NAME_TO_ID.get(provider_name)
-    if provider_id:
-        return provider_id
-
-    # 默认使用阿里云
-    logger.warning(f"未知的服务商 '{provider_name}'，使用默认服务商 'aliyun'")
-    return "aliyun"
+    # 使用 provider_manager 统一转换
+    return provider_manager.get_provider_id(provider_name)
 
 
 def get_provider(provider: Optional[str] = None) -> BaseLLMProvider:

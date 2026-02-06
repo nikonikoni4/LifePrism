@@ -19,23 +19,12 @@ from functools import lru_cache
 KEYRING_SERVICE_NAME = "lifeprism"
 KEYRING_API_KEY_USERNAME = "api_key"  # 保留向后兼容
 
-# 服务商 ID 到 keyring 用户名的映射
-PROVIDER_KEYRING_USERNAMES = {
-    "aliyun": "api_key_aliyun",
-    "volcengine": "api_key_volcengine",
-    "openai": "api_key_openai",
-    "minimax": "api_key_minimax",
-}
-
 
 class SettingsManager:
     """配置管理器单例"""
     
     _instance: Optional['SettingsManager'] = None
-    _config: Dict[str, Any] = {}
-    _config_path: Path
-    _custom_data_path: Path
-    
+
     # 环境变量映射 (yaml_key -> env_var_name)
     ENV_VAR_MAPPING = {
         'api_key': 'LIFEWATCH_API_KEY',
@@ -67,6 +56,7 @@ class SettingsManager:
     
     def _initialize(self) -> None:
         """初始化配置管理器"""
+        self._config: Dict[str, Any] = {}
 
         # 判断是否是开发环境
         self._is_dev = not getattr(sys, 'frozen', False)
@@ -182,7 +172,9 @@ class SettingsManager:
     def _get_api_key_from_keyring_by_provider(self, provider_id: str) -> Optional[str]:
         """从系统密钥管理器获取指定服务商的 API Key"""
         try:
-            username = PROVIDER_KEYRING_USERNAMES.get(provider_id)
+            # 延迟导入避免循环依赖
+            from lifeprism.config.provider_manager import provider_manager
+            username = provider_manager.get_keyring_username(provider_id)
             if username:
                 return keyring.get_password(KEYRING_SERVICE_NAME, username)
             return None
@@ -201,7 +193,9 @@ class SettingsManager:
     def _set_api_key_to_keyring_by_provider(self, provider_id: str, api_key: str) -> bool:
         """将 API Key 保存到系统密钥管理器（按服务商）"""
         try:
-            username = PROVIDER_KEYRING_USERNAMES.get(provider_id)
+            # 延迟导入避免循环依赖
+            from lifeprism.config.provider_manager import provider_manager
+            username = provider_manager.get_keyring_username(provider_id)
             if username:
                 keyring.set_password(KEYRING_SERVICE_NAME, username, api_key)
                 return True
@@ -223,7 +217,9 @@ class SettingsManager:
     def _delete_api_key_from_keyring_by_provider(self, provider_id: str) -> bool:
         """从系统密钥管理器删除指定服务商的 API Key"""
         try:
-            username = PROVIDER_KEYRING_USERNAMES.get(provider_id)
+            # 延迟导入避免循环依赖
+            from lifeprism.config.provider_manager import provider_manager
+            username = provider_manager.get_keyring_username(provider_id)
             if username:
                 keyring.delete_password(KEYRING_SERVICE_NAME, username)
                 return True
@@ -391,14 +387,9 @@ class SettingsManager:
         Returns:
             provider_id，如 "aliyun"
         """
-        # 简单映射
-        name_to_id = {
-            "阿里云百炼 (Aliyun)": "aliyun",
-            "火山引擎 (VolcEngine)": "volcengine",
-            "OpenAI": "openai",
-            "MiniMax": "minimax",
-        }
-        return name_to_id.get(provider_name)
+        # 延迟导入避免循环依赖
+        from lifeprism.config.provider_manager import provider_manager
+        return provider_manager.name_to_id_map.get(provider_name)
     
     # ===================== 便捷属性访问 =====================
     

@@ -15,21 +15,3 @@ WINDOW_BUCKET_ID = 'aw-watcher-window_'
 # 本地模型
 OLLAMA_BASE_URL = "http://localhost:11434"
 OLLAMA_MODEL = "qwen3:0.6b"
-# 支持的模型服务商列表
-SUPPORT_PROVIDER = [
-    "阿里云百炼 (Aliyun)",
-    "火山引擎 (VolcEngine)",
-    "OpenAI",
-    "MiniMax"
-]
-
-# 服务商显示名称到内部 ID 的映射
-PROVIDER_ID_MAP = {
-    "阿里云百炼 (Aliyun)": "aliyun",
-    "火山引擎 (VolcEngine)": "volcengine",
-    "OpenAI": "openai",
-    "MiniMax": "minimax"
-}
-
-
-

@@ -9,8 +9,6 @@ from .llm_factory import (
     get_provider_capabilities,
     list_providers,
     PROVIDER_REGISTRY,
-    PROVIDER_NAME_TO_ID,
-    PROVIDER_ID_TO_NAME,
 )
 from .format_prompt_utils import (
     format_goals_for_prompt,
@@ -41,8 +39,6 @@ __all__ = [
     "get_provider_capabilities",
     "list_providers",
     "PROVIDER_REGISTRY",
-    "PROVIDER_NAME_TO_ID",
-    "PROVIDER_ID_TO_NAME",
     # 其他工具
     "format_goals_for_prompt",
     "format_category_tree_for_prompt",
