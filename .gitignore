@@ -29,3 +29,5 @@ debug_occupy_ports.py
 .mcp.json
 tests
 *.log
+CLAUDE copy.md
+lifeprismData
