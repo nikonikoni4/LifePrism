@@ -215,12 +215,14 @@ const GoalDetailView: React.FC<GoalDetailViewProps> = ({
             goalId={goal.id}
             theme={displayGoal.theme}
             category={displayGoal.category}
+            subCategory={displayGoal.subCategory}
             startDate={displayGoal.startDate}
             endDate={displayGoal.endDate}
             timeInvested={displayGoal.timeInvested}
             trackTimeAutomatically={displayGoal.trackTimeAutomatically ?? true}
             onThemeChange={(value) => handleFieldChange('theme', value)}
             onCategoryChange={(value) => handleFieldChange('category', value)}
+            onSubCategoryChange={(value) => handleFieldChange('subCategory', value)}
             onStartDateChange={(value) => handleFieldChange('startDate', value)}
             onEndDateChange={(value) => handleFieldChange('endDate', value)}
             onTimeInvestedChange={(value) => handleFieldChange('timeInvested', value)}

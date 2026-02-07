@@ -114,6 +114,7 @@ export function mapBackendGoalToFrontend(backend: BackendGoalItem): Goal {
         id: backend.id,
         title: backend.name,
         category: backend.link_to_category || '',
+        subCategory: backend.link_to_sub_category || '',
         theme: colorToTheme(backend.color),
         timeInvested: backend.time_invested || '0h 0m',
         startDate: backend.start_date || '', // Keep YYYY-MM-DD format
@@ -138,6 +139,7 @@ export function mapFrontendGoalToCreateRequest(frontend: Partial<Goal>): CreateG
         content: frontend.details || '',
         color: frontend.theme ? themeToColor(frontend.theme) : '#6366F1',
         link_to_category_id: frontend.category || null,
+        link_to_sub_category_id: frontend.subCategory || null,
         start_date: formatDateForApi(frontend.startDate || ''),
         expected_finished_at: formatDateForApi(frontend.endDate || ''),
         value: frontend.value || null,
@@ -180,6 +182,7 @@ export function mapFrontendGoalToUpdateRequest(frontend: Partial<Goal>): UpdateG
     if (frontend.details !== undefined) request.content = frontend.details;
     if (frontend.theme !== undefined) request.color = themeToColor(frontend.theme);
     if (frontend.category !== undefined) request.link_to_category_id = frontend.category || null;
+    if (frontend.subCategory !== undefined) request.link_to_sub_category_id = frontend.subCategory || null;
     if (frontend.startDate !== undefined) request.start_date = formatDateForApi(frontend.startDate);
     if (frontend.endDate !== undefined) request.expected_finished_at = formatDateForApi(frontend.endDate);
     if (frontend.value !== undefined) request.value = frontend.value || null;

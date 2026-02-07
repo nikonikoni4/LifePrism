@@ -32,6 +32,7 @@ export interface Goal {
     id: string;
     title: string;
     category: string;
+    subCategory: string;
     theme: ThemeKey;
     timeInvested: string;  // 格式化字符串，如 "2h 30m"
     trackTimeAutomatically: boolean;

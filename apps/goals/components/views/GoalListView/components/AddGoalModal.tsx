@@ -29,6 +29,7 @@ const AddGoalModal: React.FC<AddGoalModalProps> = ({ isOpen, onClose, onSave }) 
     id: '',
     title: '',
     category: '',
+    subCategory: '',
     theme: 'indigo',
     timeInvested: '0h 0m',
     trackTimeAutomatically: true,
@@ -184,10 +185,10 @@ const AddGoalModal: React.FC<AddGoalModalProps> = ({ isOpen, onClose, onSave }) 
                         <CategoryFilter
                           value={{
                             categoryId: form.category || null,
-                            subCategoryId: null,
+                            subCategoryId: form.subCategory || null,
                             color: null,
                           }}
-                          onChange={(val: CategoryFilterValue) => setForm({ ...form, category: val.categoryId || '' })}
+                          onChange={(val: CategoryFilterValue) => setForm({ ...form, category: val.categoryId || '', subCategory: val.subCategoryId || '' })}
                           buttonClassName="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium flex items-center gap-2"
                           showLabel={true}
                         />

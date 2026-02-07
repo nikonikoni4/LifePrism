@@ -10,12 +10,14 @@ interface QuickConfigPanelProps {
   goalId: string;
   theme: ThemeKey;
   category: string;
+  subCategory: string;
   startDate: string;
   endDate: string;
   timeInvested: string;
   trackTimeAutomatically: boolean;
   onThemeChange: (theme: ThemeKey) => void;
   onCategoryChange: (category: string) => void;
+  onSubCategoryChange: (subCategory: string) => void;
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
   onTimeInvestedChange: (time: string) => void;
@@ -27,12 +29,14 @@ const QuickConfigPanel: React.FC<QuickConfigPanelProps> = ({
   goalId,
   theme,
   category,
+  subCategory,
   startDate,
   endDate,
   timeInvested,
   trackTimeAutomatically,
   onThemeChange,
   onCategoryChange,
+  onSubCategoryChange,
   onStartDateChange,
   onEndDateChange,
   onTimeInvestedChange,
@@ -127,10 +131,13 @@ const QuickConfigPanel: React.FC<QuickConfigPanelProps> = ({
                   <CategoryFilter
                     value={{
                       categoryId: category || null,
-                      subCategoryId: null,
+                      subCategoryId: subCategory || null,
                       color: null,
                     }}
-                    onChange={(val: CategoryFilterValue) => onCategoryChange(val.categoryId || '')}
+                    onChange={(val: CategoryFilterValue) => {
+                      onCategoryChange(val.categoryId || '');
+                      onSubCategoryChange(val.subCategoryId || '');
+                    }}
                     buttonClassName="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium flex items-center gap-2"
                     showLabel={true}
                   />
