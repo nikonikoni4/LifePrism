@@ -26,6 +26,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 _step_start = _log_startup_time("[OK] Core imports (contextlib, fastapi, logging)", _step_start)
 
+# ==================== 配置初始化（必须在所有 lifeprism 模块之前） ====================
+print("[STARTUP] 正在初始化配置管理器...")
+_config_start = time.perf_counter()
+from lifeprism.config.settings_manager import settings  # noqa: E402 - 必须最先导入，初始化路径和日志
+_log_startup_time("[OK] settings_manager initialized (paths + file logging)", _config_start)
+
 # ==================== API 路由导入 ====================
 print("[STARTUP] 正在导入 API 路由模块...")
 _import_start = time.perf_counter()
@@ -304,7 +310,7 @@ def find_available_port(config_path: str = None) -> int:
                     fallback_list = [default_port] + [p for p in fallback_list if p != default_port]
                 print(f"[STARTUP] 从配置文件读取端口配置: 首选端口={default_port}, 备用列表={fallback_list}")
         except Exception as e:
-            logger.warning("未找到，customData/config/config.json!!")
+            logger.warning("未找到 lifeprismData/config/config.json!!")
             print(f"[STARTUP] 读取配置文件失败，使用默认端口: {e}")
     
     # 按顺序尝试端口
@@ -330,17 +336,8 @@ if __name__ == "__main__":
 
     if is_frozen:
         logger.info("正在运行打包环境")
-        # 打包环境：从环境变量获取 customData 路径
-        custom_data_path = os.environ.get('CUSTOM_DATA_PATH')
-        if custom_data_path:
-            config_path = os.path.join(custom_data_path, "config", "config.json")
-        else:
-            logger.warning("找不到环境变量：CUSTOM_DATA_PATH！")
-            # 后备：基于 exe 位置推算
-            backend_dir = os.path.dirname(sys.executable)  # .../resources/backend
-            resources_dir = os.path.dirname(backend_dir)   # .../resources
-            config_path = os.path.join(resources_dir, "customData", "config", "config.json")
-
+        # settings_manager 已初始化，直接从 settings 获取路径
+        config_path = os.path.join(settings.lifeprism_data_path, "config", "config.json")
         print(f"[STARTUP] 打包环境，配置文件路径: {config_path}")
     else:
         logger.info("正在运行开发环境")

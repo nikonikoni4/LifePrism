@@ -15,6 +15,8 @@ from lifeprism.server.schemas.setting_schemas import (
     ProviderListResponse,
     ProviderInfo,
     ProviderCapabilities,
+    ValidatePathRequest,
+    ValidatePathResponse,
 )
 from lifeprism.server.services import setting_service
 from lifeprism.llm.utils import get_provider_capabilities, list_providers
@@ -157,3 +159,17 @@ async def delete_model_history(
         return {"success": True, "message": f"已删除模型 {model}"}
     else:
         return {"success": False, "message": "模型不存在于历史记录中"}
+
+
+@router.post("/validate-path", response_model=ValidatePathResponse, summary="验证路径有效性")
+async def validate_path(request: ValidatePathRequest):
+    """
+    验证数据路径是否有效
+
+    检查路径是否存在、是否可写、是否与安装路径冲突等
+
+    Args:
+        request.path: 要验证的路径
+        request.path_type: 路径类型 (lifeprism_data | aw_db)
+    """
+    return setting_service.validate_data_path(request.path, request.path_type)

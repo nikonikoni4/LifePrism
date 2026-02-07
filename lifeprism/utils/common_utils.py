@@ -1,35 +1,4 @@
-import os
 import sys
-from pathlib import Path
-
-
-def get_custom_data_path() -> Path:
-    """
-    获取 customData 目录路径
-
-    优先级:
-    1. 环境变量 CUSTOM_DATA_PATH（由 Electron 传入）
-    2. 打包环境：基于 sys.executable 推算
-    3. 开发环境：frontend/customData
-
-    Returns:
-        Path: customData 目录的路径
-    """
-    # 1. 优先使用环境变量
-    custom_data_env = os.environ.get('CUSTOM_DATA_PATH')
-    if custom_data_env:
-        return Path(custom_data_env)
-
-    # 2. 打包环境：通过 exe 路径推算
-    if getattr(sys, 'frozen', False):
-        # sys.executable = .../LifePrism/app/resources/backend/lifeprism-backend.exe
-        backend_dir = Path(sys.executable).parent   # .../app/resources/backend
-        app_dir = backend_dir.parent.parent          # .../app
-        root_dir = app_dir.parent                    # .../LifePrism
-        return root_dir / 'customData'
-
-    # 3. 开发环境
-    return Path("frontend/customData")
 
 
 def is_dev_environment() -> bool:

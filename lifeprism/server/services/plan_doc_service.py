@@ -2,7 +2,7 @@
 PlanDoc 服务层 - Plan Doc 计划书业务逻辑
 
 设计原则：数据库只存 meta 信息，内容存 md 文件
-文件存储路径：customData/plan/{id}.md
+文件存储路径：lifeprismData/plan/{id}.md
 
 架构：纯函数模块（无内存缓存，不需要单例）
 """
@@ -16,14 +16,15 @@ from lifeprism.server.schemas.goal_schemas import (
     UpdatePlanDocRequest,
 )
 from lifeprism.server.providers.plan_doc_provider import plan_doc_provider
-from lifeprism.utils import get_logger, get_custom_data_path
+from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
 
 def _get_plan_doc_dir() -> Path:
     """获取计划书目录路径"""
-    return get_custom_data_path() / "plan"
+    from lifeprism.config.settings_manager import settings
+    return Path(settings.lifeprism_data_path) / "plan"
 
 def _ensure_plan_doc_dir():
     """确保计划书目录存在"""

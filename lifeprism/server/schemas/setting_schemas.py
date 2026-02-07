@@ -26,10 +26,9 @@ class SettingItems(BaseModel):
     long_log_threshold: int = Field(description="长时长阈值 (秒)")
     # 多用途应用配置
     multi_purpose_app_names: List[str] = Field(description="多用途/浏览器应用名称列表")
-    # 数据库路径配置
+    # 路径配置
     aw_db_path: str = Field(description="Activity Watch DB 来源路径")
-    lw_db_path: str = Field(description="Life Watch DB 保存路径")
-    chat_db_path: str = Field(description="Chat DB 保存路径")
+    lifeprism_data_path: str = Field(description="LifePrism 数据目录路径")
     # 数据清洗配置
     data_cleaning_threshold: int = Field(description="数据清洗时长阈值 (秒)")
 
@@ -51,8 +50,7 @@ class UpdateSettingsRequest(BaseModel):
     long_log_threshold: Optional[int] = None
     multi_purpose_app_names: Optional[List[str]] = None
     aw_db_path: Optional[str] = None
-    lw_db_path: Optional[str] = None
-    chat_db_path: Optional[str] = None
+    lifeprism_data_path: Optional[str] = None
     data_cleaning_threshold: Optional[int] = None
 
 
@@ -95,3 +93,15 @@ class ProviderCapabilitiesResponse(BaseModel):
 class ProviderListResponse(BaseModel):
     """获取服务商列表响应"""
     providers: List[ProviderInfo]
+
+
+class ValidatePathRequest(BaseModel):
+    """路径验证请求"""
+    path: str = Field(..., description="要验证的路径")
+    path_type: str = Field(..., description="路径类型: lifeprism_data | aw_db")
+
+
+class ValidatePathResponse(BaseModel):
+    """路径验证响应"""
+    valid: bool = Field(description="路径是否有效")
+    message: str = Field(description="验证结果消息")

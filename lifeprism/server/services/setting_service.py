@@ -3,13 +3,17 @@ Settings 服务层 - 配置管理业务逻辑
 
 纯函数模块，封装 SettingsManager 的操作，提供给 API 层使用
 """
+import os
+import sys
 from typing import Dict, Any, Optional, List
+from pathlib import Path
 
 from lifeprism.config.settings_manager import settings
 from lifeprism.config.provider_manager import provider_manager
 from lifeprism.server.schemas.setting_schemas import (
     SettingItems,
     UpdateSettingsRequest,
+    ValidatePathResponse,
 )
 from lifeprism.utils import get_logger
 
@@ -130,3 +134,58 @@ def remove_model_from_history(provider_id: str, model: str) -> bool:
     if result:
         logger.info(f"已从 {provider_id} 的历史记录中删除模型 {model}")
     return result
+
+
+def validate_data_path(path: str, path_type: str) -> ValidatePathResponse:
+    """
+    验证数据路径是否有效
+
+    Args:
+        path: 要验证的路径
+        path_type: 路径类型 (lifeprism_data | aw_db)
+
+    Returns:
+        ValidatePathResponse: 验证结果
+    """
+    if not path or not path.strip():
+        return ValidatePathResponse(valid=False, message="路径不能为空")
+
+    target = Path(path)
+
+    if path_type == 'lifeprism_data':
+        # 检测数据路径不能和安装路径相同
+        if getattr(sys, 'frozen', False):
+            install_dir = Path(sys.executable).parent.parent.parent
+            try:
+                if target.resolve() == install_dir.resolve():
+                    return ValidatePathResponse(
+                        valid=False,
+                        message="数据路径不能与安装路径相同"
+                    )
+                # 检查是否是安装路径的子目录
+                target.resolve().relative_to(install_dir.resolve())
+                return ValidatePathResponse(
+                    valid=False,
+                    message="数据路径不能位于安装目录内"
+                )
+            except ValueError:
+                pass  # 不是子目录，正常
+
+        # 检查父目录是否存在或可创建
+        if target.exists() and not target.is_dir():
+            return ValidatePathResponse(valid=False, message="路径已存在但不是目录")
+
+        return ValidatePathResponse(valid=True, message="路径有效")
+
+    elif path_type == 'aw_db':
+        # AW 数据库路径验证
+        expanded = Path(os.path.expanduser(path))
+        if not expanded.exists():
+            return ValidatePathResponse(valid=False, message="文件不存在")
+        if not expanded.is_file():
+            return ValidatePathResponse(valid=False, message="路径不是文件")
+        if not expanded.suffix == '.db':
+            return ValidatePathResponse(valid=False, message="文件不是 .db 数据库文件")
+        return ValidatePathResponse(valid=True, message="路径有效")
+
+    return ValidatePathResponse(valid=False, message=f"未知的路径类型: {path_type}")

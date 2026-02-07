@@ -42,8 +42,7 @@ class SettingsManager:
         'long_log_threshold': 600,
         'multi_purpose_app_names': ['chrome', 'msedge', 'firefox'],
         'aw_db_path': '~/AppData/Local/activitywatch/activitywatch/aw-server/peewee-sqlite.v2.db',
-        'lw_db_path': '~/AppData/Local/lifeprism/data/lifewatch_ai.db',
-        'chat_db_path': '~/AppData/Local/lifeprism/data/chat_history.db',
+        'lifeprism_data_path': '',  # 空=使用默认路径
         'data_cleaning_threshold': 10,
         'model_history': {},  # 按服务商存储的模型历史 {provider_id: [model1, model2, ...]}
     }
@@ -61,48 +60,72 @@ class SettingsManager:
         # 判断是否是开发环境
         self._is_dev = not getattr(sys, 'frozen', False)
 
-        # 始终解析 customData 路径（开发和打包环境都需要）
-        self._custom_data_path = self._resolve_custom_data_path()
-
-        # 根据环境设置默认路径
+        # 1. 解析 lifeprism_data_path（优先级：环境变量 > 默认路径）
+        self._lifeprism_data_path = self._resolve_default_data_path()
 
         if self._is_dev:
             # 开发环境：使用 lifeprism/config/settings.yaml
             self._config_path = Path(__file__).parent / 'settings.yaml'
         else:
-            # 打包环境：使用 customData/config/config.yaml
-            self._config_path = self._custom_data_path / 'config' / 'config.yaml'
-            self.DEFAULTS['lw_db_path'] = str(self._custom_data_path / 'dataset' / 'lifewatch_ai.db')
-            self.DEFAULTS['chat_db_path'] = str(self._custom_data_path / 'dataset' / 'chat_history.db')
+            # 打包环境：使用 lifeprismData/config/config.yaml
+            self._config_path = self._lifeprism_data_path / 'config' / 'config.yaml'
 
-
+        # 2. 加载 yaml 配置
         self._load_config()
-    
-    def _resolve_custom_data_path(self) -> Path:
+
+        # 3. 如果 yaml 中配置了 lifeprism_data_path，覆盖默认值
+        configured_path = self._config.get('lifeprism_data_path', '')
+        if configured_path:
+            self._lifeprism_data_path = Path(configured_path)
+
+        # 4. 设置环境变量（供 Electron 等外部进程使用）
+        os.environ['LIFEPRISM_DATA_PATH'] = str(self._lifeprism_data_path)
+
+        # 5. 配置日志文件输出（logger 此前只有控制台输出）
+        self._setup_logging()
+
+    def _resolve_default_data_path(self) -> Path:
         """
-        解析 customData 目录的路径
-        
+        解析默认的 lifeprismData 路径（不依赖 yaml 配置）
+
         优先级:
-        1. 环境变量 CUSTOM_DATA_PATH (由 Electron 传入)
-        2. 基于 sys.executable 推算 (打包环境后备)
-        3. 开发环境: frontend/customData
+        1. 环境变量 LIFEPRISM_DATA_PATH（由 Electron 启动时设置）
+        2. 打包环境：%APPDATA%/LifePrism/lifeprismData
+        3. 开发环境：frontend/lifeprismData
+
+        Returns:
+            Path: lifeprismData 目录路径
         """
-        # 1. 优先使用 Electron 传入的环境变量
-        custom_data_env = os.environ.get('CUSTOM_DATA_PATH')
-        if custom_data_env:
-            return Path(custom_data_env)
-        
-        # 2. 打包环境：通过 exe 路径推算
+        # 1. 环境变量（Electron 启动后端时传入）
+        data_env = os.environ.get('LIFEPRISM_DATA_PATH')
+        if data_env:
+            return Path(data_env)
+
+        # 2. 打包环境
         if getattr(sys, 'frozen', False):
-            # sys.executable = .../LifePrism/app/resources/backend/lifeprism-backend.exe
-            backend_dir = Path(sys.executable).parent   # .../app/resources/backend
-            app_dir = backend_dir.parent.parent          # .../app
-            root_dir = app_dir.parent                    # .../LifePrism
-            return root_dir / 'customData'
-        
+            appdata = os.environ.get('APPDATA', '')
+            if appdata:
+                return Path(appdata) / 'LifePrism' / 'lifeprismData'
+            # 后备：基于 exe 路径推算
+            backend_dir = Path(sys.executable).parent
+            app_dir = backend_dir.parent.parent
+            root_dir = app_dir.parent
+            return root_dir / 'lifeprismData'
+
         # 3. 开发环境
-        project_root = Path(__file__).parent.parent.parent
-        return project_root / 'frontend' / 'customData'
+        return Path("frontend/lifeprismData")
+
+    def _setup_logging(self) -> None:
+        """配置日志文件输出"""
+        from lifeprism.utils.logger import setup_file_logging
+
+        if getattr(sys, 'frozen', False):
+            # 打包环境：日志写入 lifeprismData/debug_logs/
+            setup_file_logging(self._lifeprism_data_path / 'debug_logs')
+        else:
+            # 开发环境：日志写入项目根目录
+            root_dir = Path(__file__).parent.parent.parent
+            setup_file_logging(root_dir)
             
     
     def _load_config(self) -> None:
@@ -301,7 +324,7 @@ class SettingsManager:
     def update(self, updates: Dict[str, Any], save: bool = True) -> None:
         """
         批量更新配置
-        
+
         Args:
             updates: 要更新的配置字典
             save: 是否立即保存到文件
@@ -313,12 +336,21 @@ class SettingsManager:
                 self._set_api_key_to_keyring(api_key)
             else:
                 self._delete_api_key_from_keyring()
-        
+
         # 更新其他配置
         if updates:
             self._config.update(updates)
             if save:
                 self._save_config()
+
+            # 如果更新了 lifeprism_data_path，同步更新环境变量和内部路径
+            if 'lifeprism_data_path' in updates:
+                new_path = updates['lifeprism_data_path']
+                if new_path:
+                    self._lifeprism_data_path = Path(new_path)
+                else:
+                    self._lifeprism_data_path = self._resolve_default_data_path()
+                os.environ['LIFEPRISM_DATA_PATH'] = str(self._lifeprism_data_path)
     
     def reload(self) -> None:
         """重新加载配置文件"""
@@ -327,24 +359,31 @@ class SettingsManager:
     def get_all(self) -> Dict[str, Any]:
         """
         获取所有配置 (合并默认值)
-        
+
         Returns:
             完整的配置字典
         """
         result = self.DEFAULTS.copy()
         result.update(self._config)
-        
+
         # 应用环境变量覆盖
         for key, env_var in self.ENV_VAR_MAPPING.items():
             env_value = os.getenv(env_var)
             if env_value:
                 result[key] = env_value
-        
+
         # 从 keyring 获取 api_key
         keyring_api_key = self._get_api_key_from_keyring()
         if keyring_api_key:
             result['api_key'] = keyring_api_key
-        
+
+        # 添加计算属性
+        result['lifeprism_data_path'] = self.lifeprism_data_path
+
+        # 移除已废弃的独立路径字段
+        result.pop('lw_db_path', None)
+        result.pop('chat_db_path', None)
+
         return result
     
     def get_for_display(self) -> Dict[str, Any]:
@@ -436,24 +475,27 @@ class SettingsManager:
     
     @property
     def lw_db_path(self) -> str:
-        """获取 LifeWatch 数据库路径"""
-        path = self.get('lw_db_path')
-        return os.path.expanduser(path) if path else ''
+        """获取 LifeWatch 数据库路径（自动推算，位于 lifeprismData/dataset/）"""
+        return str(self._lifeprism_data_path / 'dataset' / 'lifewatch_ai.db')
 
     @property
     def chat_db_path(self) -> str:
-        """获取聊天历史数据库路径"""
-        path = self.get('chat_db_path')
-        return os.path.expanduser(path) if path else ''
+        """获取聊天历史数据库路径（自动推算，位于 lifeprismData/dataset/）"""
+        return str(self._lifeprism_data_path / 'dataset' / 'chat_history.db')
     
     @property
     def data_cleaning_threshold(self) -> int:
         return self.get('data_cleaning_threshold')
 
     @property
+    def lifeprism_data_path(self) -> str:
+        """获取 lifeprismData 目录路径（唯一数据源）"""
+        return str(self._lifeprism_data_path)
+
+    @property
     def custom_data_path(self) -> Path:
-        """获取 customData 目录的绝对路径"""
-        return self._custom_data_path
+        """DEPRECATED: 使用 lifeprism_data_path 替代"""
+        return self._lifeprism_data_path
 
     @property
     def model_history(self) -> Dict[str, List[str]]:

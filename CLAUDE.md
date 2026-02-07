@@ -260,44 +260,66 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
    **核心原因**：`name` 是用户可随时修改的，如果用 `name` 做关联/查找，用户修改名称后原有关联会断裂，导致数据不一致
 
-6. **外部存储路径规范**：所有外部存储的路径（如数据库、计划书 md、日志文件等）必须区分开发环境和打包环境。
+6. **外部存储路径规范**：所有外部存储的路径（如数据库、计划书 md、日志文件等）统一通过 `settings_manager` 获取。
 
    **核心原则**：
-   - 开发环境：使用相对路径或项目内路径（如 `frontend/customData/`）
-   - 打包环境：使用 `lifeprism/utils/common_utils.py` 中的 `get_custom_data_path()` 获取路径
+   - `settings_manager` 是路径的**唯一数据源**，所有模块通过 `settings.lifeprism_data_path` 获取数据目录
+   - 禁止在其他模块中自行解析路径或读取环境变量
+   - 数据库路径（`lw_db_path`、`chat_db_path`）由 `settings_manager` 自动推算，不需要单独配置
 
-   **`get_custom_data_path()` 路径优先级**：
-   1. 环境变量 `CUSTOM_DATA_PATH`（由 Electron 传入）
-   2. 打包环境：基于 `sys.executable` 推算 `resources/customData`
-   3. 开发环境：`frontend/customData`
+   **`settings.lifeprism_data_path` 路径解析优先级**（在 `settings_manager._resolve_default_data_path()` 中）：
+   1. 环境变量 `LIFEPRISM_DATA_PATH`（由 Electron 启动时设置）
+   2. yaml 配置中的 `lifeprism_data_path`（用户在设置页面自定义）
+   3. 打包环境默认：`%APPDATA%/LifePrism/lifeprismData`
+   4. 开发环境默认：`frontend/lifeprismData`
+
+   **数据目录结构**：
+   ```
+   lifeprismData/
+   ├── config/          # 配置文件（config.yaml, providers.yaml）
+   ├── dataset/         # 数据库文件（lifewatch_ai.db, chat_history.db）
+   ├── plan/            # 计划书 MD 文件
+   ├── debug_logs/      # 日志文件（打包环境）
+   └── workflow/        # LLM workflow 配置
+   ```
 
    **适用场景**：
-   - 数据库文件路径（`.db`）
-   - 计划书/文档路径（`.md`）
-   - 日志文件路径（`.log`）
-   - 用户配置文件
+   - 数据库文件路径（`.db`）→ 使用 `settings.lw_db_path` / `settings.chat_db_path`
+   - 计划书/文档路径（`.md`）→ 使用 `Path(settings.lifeprism_data_path) / "plan"`
+   - 用户配置文件 → 使用 `Path(settings.lifeprism_data_path) / "config"`
    - 任何需要持久化存储的外部资源
 
    **示例**：
    ```python
-   from lifeprism.utils.common_utils import get_custom_data_path
+   from lifeprism.config.settings_manager import settings
 
-   # ✅ 正确：使用 get_custom_data_path 获取基础路径
-   custom_data_dir = get_custom_data_path()
-   plan_doc_path = custom_data_dir / "plans" / f"{plan_id}.md"
-   log_file_path = custom_data_dir / "logs" / "app.log"
+   # ✅ 正确：通过 settings 获取路径
+   data_dir = Path(settings.lifeprism_data_path)
+   plan_doc_path = data_dir / "plan" / f"{plan_id}.md"
+
+   # ✅ 正确：数据库路径直接用属性
+   db_path = settings.lw_db_path
 
    # ❌ 错误：硬编码绝对路径
    plan_doc_path = Path("D:/desktop/plans/plan.md")
 
+   # ❌ 错误：直接读取环境变量获取路径
+   data_path = os.environ.get('LIFEPRISM_DATA_PATH')
+
    # ❌ 错误：不区分环境直接使用相对路径
-   plan_doc_path = Path("frontend/customData/plans/plan.md")
+   plan_doc_path = Path("frontend/lifeprismData/plan/plan.md")
    ```
 
    **注意事项**：
-   - 在 `customData` 目录下按功能创建子目录（如 `plans/`, `logs/`, `exports/`）
+   - 在 `lifeprismData` 目录下按功能创建子目录（如 `plan/`, `debug_logs/`, `workflow/`）
    - 确保目录存在后再写入文件：`path.parent.mkdir(parents=True, exist_ok=True)`
-   - 打包后的路径结构：`resources/customData/` 与 `resources/backend/` 同级
+   - 打包后的路径结构：`%APPDATA%/LifePrism/lifeprismData/`（独立于安装目录）
+
+   **Logger 与 Settings 的加载顺序**：
+   - `logger.py` 模块级只配置 `StreamHandler`（控制台），不配置 `FileHandler`
+   - `settings_manager._initialize()` 末尾调用 `setup_file_logging(log_dir)` 添加 `FileHandler`
+   - `main.py` 第一个 lifeprism import 必须是 `from lifeprism.config.settings_manager import settings`
+   - 这保证后续所有模块的 `get_logger()` 都能写入日志文件
 
 ## 后端代码风格规范
 
@@ -972,7 +994,7 @@ r'^(\t*)-\s*\[([ xX])\]\s*(.+?)(?:\s*<!--\s*lp:(t-[a-f0-9]+)\s*-->)?$'
 
 #### 文件路径
 
-**计划书目录**：`get_custom_data_path() / "plan"`
+**计划书目录**：`Path(settings.lifeprism_data_path) / "plan"`
 
 **文件命名**：`{plan_doc_id}.md`
 
@@ -1244,10 +1266,10 @@ multi_purpose_app_names:
   - msedge
   - firefox
 
-# Database Paths
-lw_db_path: D:/desktop/.../lifewatch_ai.db
-aw_db_path: C:/Users/.../peewee-sqlite.v2.db
-chat_db_path: D:/desktop/.../chat_history.db
+# Data Paths
+lifeprism_data_path: ''  # 空=使用默认路径（开发: frontend/lifeprismData, 打包: %APPDATA%/LifePrism/lifeprismData）
+aw_db_path: ~/AppData/Local/activitywatch/activitywatch/aw-server/peewee-sqlite.v2.db
+# 注意：lw_db_path 和 chat_db_path 已移除，自动从 lifeprism_data_path 推算
 
 # Data Cleaning
 data_cleaning_threshold: 10  # Minimum events for classification

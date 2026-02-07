@@ -232,11 +232,12 @@ class DataInitializer:
         """
         生成示例计划书 MD 文件
 
-        在 customData/plan 目录下创建示例 MD 文件，如果文件已存在则跳过
+        在 lifeprismData/plan 目录下创建示例 MD 文件，如果文件已存在则跳过
         """
         try:
-            from lifeprism.utils.common_utils import get_custom_data_path
-            plan_dir = get_custom_data_path() / "plan"
+            from lifeprism.config.settings_manager import settings
+            from pathlib import Path
+            plan_dir = Path(settings.lifeprism_data_path) / "plan"
             plan_dir.mkdir(parents=True, exist_ok=True)
             md_path = plan_dir / f"{EXAMPLE_PLAN_DOC['id']}.md"
             if not md_path.exists():

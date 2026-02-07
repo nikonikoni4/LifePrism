@@ -28,14 +28,15 @@ from lifeprism.server.schemas.taskpool_schemas import (
 )
 from lifeprism.server.providers.todo_provider import todo_provider
 from lifeprism.server.providers.plan_doc_provider import plan_doc_provider
-from lifeprism.utils import get_logger, get_custom_data_path
+from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
 
 def _get_plan_doc_dir() -> Path:
     """获取计划书目录路径（与 plan_doc_service.py 保持一致）"""
-    return get_custom_data_path() / "plan"
+    from lifeprism.config.settings_manager import settings
+    return Path(settings.lifeprism_data_path) / "plan"
 
 
 # ============================================================================

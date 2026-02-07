@@ -16,16 +16,15 @@ from lifeprism.llm.tools.database_tools import (
 )
 from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
 import os
+import sys
 import asyncio
+from pathlib import Path
 from lifeprism.llm.llm_linear_executor.llm_linear_executor.os_plan import load_plan_from_template
 from lifeprism.llm.llm_linear_executor.llm_linear_executor.executor import Executor
 from typing import Literal
 from lifeprism.llm.providers.llm_lw_data_provider import llm_lw_data_provider
 from lifeprism.llm.utils.llm_factory import create_llm
-from lifeprism.utils import get_custom_data_path
-import sys
-from pathlib import Path
-from lifeprism.utils.logger import get_logger
+from lifeprism.utils import get_logger
 logger = get_logger(__name__)
 
 
@@ -34,7 +33,7 @@ def get_workflow_path(filename: str) -> str:
     获取 workflow 文件的路径
 
     优先级:
-    1. customData/workflow 中的自定义文件（用户可修改）
+    1. lifeprismData/workflow 中的自定义文件（用户可修改）
     2. 内置的默认 workflow 文件（开发环境）
 
     Args:
@@ -45,8 +44,9 @@ def get_workflow_path(filename: str) -> str:
     """
     is_frozen = getattr(sys, 'frozen', False)
     if is_frozen:
-        # 打包环境：使用 customData/workflow
-        return str(get_custom_data_path() / 'workflow' / filename)
+        # 打包环境：使用 lifeprismData/workflow
+        from lifeprism.config.settings_manager import settings
+        return str(Path(settings.lifeprism_data_path) / 'workflow' / filename)
     else:
         # 开发环境：使用内置 workflow
         path = "lifeprism/llm/custom_prompt/workflow"

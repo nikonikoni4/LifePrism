@@ -38,7 +38,7 @@ class ProviderManager:
     1. 加载 providers.yaml 配置文件
     2. 提供 provider_id ↔ name 的双向映射
     3. 提供服务商列表、能力查询等接口
-    4. 打包环境下自动将配置复制到 customData/config
+    4. 打包环境下自动将配置复制到 lifeprismData/config
     """
 
     _instance: Optional['ProviderManager'] = None
@@ -56,7 +56,10 @@ class ProviderManager:
         self._config_path: Optional[Path] = None
 
         self._is_dev = not getattr(sys, 'frozen', False)
-        self._custom_data_path = self._resolve_custom_data_path()
+
+        # 从 settings 获取数据路径（settings_manager 已在此之前初始化）
+        from lifeprism.config.settings_manager import settings
+        self._data_path = Path(settings.lifeprism_data_path)
 
         # 获取源配置文件路径（开发环境中的配置）
         self._source_config_path = Path(__file__).parent / 'providers.yaml'
@@ -65,39 +68,18 @@ class ProviderManager:
             # 开发环境：直接使用 lifeprism/config/providers.yaml
             self._config_path = self._source_config_path
         else:
-            # 打包环境：使用 customData/config/providers.yaml
-            self._config_path = self._custom_data_path / 'config' / 'providers.yaml'
+            # 打包环境：使用 lifeprismData/config/providers.yaml
+            self._config_path = self._data_path / 'config' / 'providers.yaml'
             # 确保配置文件存在（如果不存在则从源复制）
             self._ensure_config_exists()
 
         self._load_config()
 
-    def _resolve_custom_data_path(self) -> Path:
-        """
-        解析 customData 目录的路径
-
-        优先级:
-        1. 环境变量 CUSTOM_DATA_PATH (由 Electron 传入)
-        2. 基于 sys.executable 推算 (打包环境后备)
-        3. 开发环境: frontend/customData
-        """
-        custom_data_env = os.environ.get('CUSTOM_DATA_PATH')
-        if custom_data_env:
-            return Path(custom_data_env)
-
-        if getattr(sys, 'frozen', False):
-            backend_dir = Path(sys.executable).parent
-            resources_dir = backend_dir.parent
-            return resources_dir / 'customData'
-
-        project_root = Path(__file__).parent.parent.parent
-        return project_root / 'frontend' / 'customData'
-
     def _ensure_config_exists(self) -> None:
         """
         确保打包环境下配置文件存在
 
-        如果 customData/config/providers.yaml 不存在，
+        如果 lifeprismData/config/providers.yaml 不存在，
         则从源文件（打包时嵌入的配置）复制过去
         """
         if not self._config_path.exists():
