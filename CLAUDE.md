@@ -12,6 +12,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 | 修改 `taskpool_service` 或任何 PlanDoc / todoblock 相关代码 | `docs/claude/plandoc-sync.md` |
 | 需要了解项目架构、数据流、分类系统、缓存策略 | `docs/claude/architecture.md` |
 | 环境搭建、启动命令、配置修改、问题排查 | `docs/claude/project-setup.md` |
+| 修改路径解析、数据目录、数据迁移、`settings_manager` 路径相关代码 | `docs/claude/path-config.md` |
 
 **执行标准**：触发场景命中时，必须在编码前使用 Read 工具加载对应文档。不确定是否命中时，加载比不加载好。
 
