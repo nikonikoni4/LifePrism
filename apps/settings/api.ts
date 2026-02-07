@@ -13,7 +13,9 @@ import {
     ApiKeyStatusResponse,
     TestConnectionResponse,
     ValidatePathRequest,
-    ValidatePathResponse
+    ValidatePathResponse,
+    MigrateDataPathRequest,
+    MigrateDataPathResponse,
 } from './types';
 import { createApiV2UrlGetter } from '../../core/services/apiConfig';
 
@@ -122,6 +124,23 @@ export const SettingsAPI = {
         });
         if (!response.ok) {
             throw new Error(`路径验证失败: ${response.statusText}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * 迁移数据路径
+     * 将数据从当前路径迁移到新路径（自动追加 lifeprismData 子文件夹）
+     */
+    async migrateDataPath(request: MigrateDataPathRequest): Promise<MigrateDataPathResponse> {
+        const response = await fetch(`${getApiBase()}/settings/migrate-data-path`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `数据迁移失败: ${response.statusText}`);
         }
         return response.json();
     },

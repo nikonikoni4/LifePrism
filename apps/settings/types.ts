@@ -80,3 +80,15 @@ export interface ValidatePathResponse {
     valid: boolean;
     message: string;
 }
+
+/** 数据路径迁移请求 */
+export interface MigrateDataPathRequest {
+    target_base_path: string;
+}
+
+/** 数据路径迁移响应 */
+export interface MigrateDataPathResponse {
+    success: boolean;
+    message: string;
+    new_path: string | null;
+}

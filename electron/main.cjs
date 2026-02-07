@@ -245,6 +245,12 @@ ipcMain.handle('get-install-path', () => {
     return null;
 });
 
+// IPC: 退出应用（数据迁移后调用）
+ipcMain.handle('app-quit', () => {
+    app.isQuitting = true;
+    app.quit();
+});
+
 app.whenReady().then(() => {
     console.log('[Electron] 应用启动中...');
     console.log(`[Electron] LifePrism 数据路径: ${getLifeprismDataPath()}`);

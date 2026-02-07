@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // 获取安装路径
     getInstallPath: () => ipcRenderer.invoke('get-install-path'),
+
+    // 退出应用（数据迁移后调用）
+    quitApp: () => ipcRenderer.invoke('app-quit'),
 });
 
 // 在控制台输出 Electron 环境信息

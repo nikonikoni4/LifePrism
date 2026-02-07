@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { SettingsAPI } from './api';
 import { toast } from '../../core/components';
+import { ConfirmDialog } from '../goals/components/shared/components/ConfirmDialog';
 
 const SettingsApp: React.FC = () => {
     // Loading & Saving States
@@ -58,6 +59,12 @@ const SettingsApp: React.FC = () => {
     const [lifeprismDataPath, setLifeprismDataPath] = useState('');
     const [pathStatus, setPathStatus] = useState<'idle' | 'checking' | 'success'>('idle');
     const [isElectron, setIsElectron] = useState(false);
+
+    // 数据路径迁移
+    const [showMigrateConfirm, setShowMigrateConfirm] = useState(false);
+    const [isMigrating, setIsMigrating] = useState(false);
+    const [pendingMigratePath, setPendingMigratePath] = useState('');
+    const isDev = import.meta.env.DEV;
 
     // 5. Data Processing
     const [filterDuration, setFilterDuration] = useState(10);
@@ -192,6 +199,26 @@ const SettingsApp: React.FC = () => {
         setTimeout(() => {
             setPathStatus('success');
         }, 1000);
+    };
+
+    // 数据路径迁移处理
+    const handleMigrateData = async () => {
+        setShowMigrateConfirm(false);
+        setIsMigrating(true);
+        try {
+            const result = await SettingsAPI.migrateDataPath({
+                target_base_path: pendingMigratePath
+            });
+            if (result.success) {
+                toast.success(`数据已迁移到 ${result.new_path}，即将退出程序...`);
+                setTimeout(() => {
+                    window.electronAPI?.quitApp();
+                }, 1500);
+            }
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : '数据迁移失败');
+            setIsMigrating(false);
+        }
     };
 
     const addBrowserApp = (e: React.KeyboardEvent) => {
@@ -591,34 +618,40 @@ const SettingsApp: React.FC = () => {
                             <input
                                 type="text"
                                 value={lifeprismDataPath}
-                                onChange={(e) => setLifeprismDataPath(e.target.value)}
-                                onBlur={() => triggerAutoSave({ lifeprism_data_path: lifeprismDataPath })}
+                                onChange={(e) => {
+                                    if (isDev) setLifeprismDataPath(e.target.value);
+                                }}
+                                onBlur={() => {
+                                    if (isDev) triggerAutoSave({ lifeprism_data_path: lifeprismDataPath });
+                                }}
+                                readOnly={!isDev && isElectron}
                                 placeholder="留空使用默认路径"
                                 className="flex-1 bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
                             />
-                            {isElectron && (
+                            {isElectron && !isDev && (
                                 <button
                                     onClick={async () => {
                                         const dir = await window.electronAPI?.selectDirectory();
                                         if (dir) {
-                                            // 安全检测：不能和安装路径相同
                                             const installPath = await window.electronAPI?.getInstallPath();
                                             if (installPath && dir.startsWith(installPath)) {
                                                 toast.error('数据路径不能位于安装目录内');
                                                 return;
                                             }
-                                            setLifeprismDataPath(dir);
-                                            triggerAutoSave({ lifeprism_data_path: dir });
+                                            setPendingMigratePath(dir);
+                                            setShowMigrateConfirm(true);
                                         }
                                     }}
                                     className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-slate-600 rounded-xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all"
-                                    title="选择文件夹"
+                                    title="选择文件夹并迁移数据"
                                 >
                                     <FolderOpen size={14} />
                                 </button>
                             )}
                         </div>
-                        <p className="text-xs text-slate-400 mt-2">数据库、计划书等数据的存储目录。留空使用默认路径。</p>
+                        <p className="text-xs text-slate-400 mt-2">
+                            {isDev ? '开发模式：直接修改路径，不触发迁移。' : '数据库、计划书等数据的存储目录。修改后将迁移数据并重启程序。'}
+                        </p>
                     </div>
 
                     <div>
@@ -762,6 +795,40 @@ const SettingsApp: React.FC = () => {
                                 我知道了
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 数据迁移确认对话框 */}
+            <ConfirmDialog
+                isOpen={showMigrateConfirm}
+                onClose={() => setShowMigrateConfirm(false)}
+                onConfirm={handleMigrateData}
+                title="迁移数据路径"
+                message={
+                    <div className="space-y-2">
+                        <p className="text-sm text-slate-600">
+                            数据将从当前路径迁移到：
+                        </p>
+                        <p className="text-sm font-mono bg-slate-50 px-3 py-2 rounded-lg text-slate-700">
+                            {pendingMigratePath}\lifeprismData
+                        </p>
+                        <p className="text-xs text-amber-600 mt-2">
+                            迁移完成后程序将自动退出，请手动重新启动。原数据目录将保留。
+                        </p>
+                    </div>
+                }
+                confirmText="确认迁移并退出"
+                cancelText="取消"
+                variant="danger"
+            />
+
+            {/* 迁移中遮罩 */}
+            {isMigrating && (
+                <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl p-8 shadow-xl flex flex-col items-center gap-4">
+                        <Loader2 className="animate-spin text-orange-500" size={32} />
+                        <p className="text-sm font-medium text-slate-700">正在迁移数据，请勿关闭程序...</p>
                     </div>
                 </div>
             )}

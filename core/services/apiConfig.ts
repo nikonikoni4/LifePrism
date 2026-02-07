@@ -23,6 +23,7 @@ declare global {
             selectDirectory: () => Promise<string | null>;
             selectFile: (filters?: Array<{name: string; extensions: string[]}>) => Promise<string | null>;
             getInstallPath: () => Promise<string | null>;
+            quitApp: () => Promise<void>;
         };
     }
 }
