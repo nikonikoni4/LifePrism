@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppShell } from './shell/AppShell';
 import { incrementalSync } from './core/services/syncService';
 import { initApiConfig } from './core/services/apiConfig';
+import { toast } from './core/components';
 
 function App() {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -41,6 +42,7 @@ function App() {
       .catch(error => {
         console.error('❌ 后台同步失败:', error);
         setSyncError(error instanceof Error ? error.message : '同步失败');
+        toast.error(error instanceof Error ? error.message : '同步失败');
       })
       .finally(() => {
         setIsSyncing(false);

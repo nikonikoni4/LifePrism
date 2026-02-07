@@ -55,6 +55,9 @@ export async function incrementalSync(autoClassify: boolean = true): Promise<Syn
         }
 
         const data: SyncResponse = await response.json();
+        if (data.status === 'failed') {
+            throw new Error(data.message || '同步失败');
+        }
         return data;
     } catch (error) {
         console.error('增量同步错误:', error);
@@ -88,6 +91,9 @@ export async function syncActivityWatchDataByTimeRange(
         }
 
         const data: SyncResponse = await response.json();
+        if (data.status === 'failed') {
+            throw new Error(data.message || '同步失败');
+        }
         return data;
     } catch (error) {
         console.error('时间范围数据同步错误:', error);

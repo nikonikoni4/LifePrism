@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Calendar, RefreshCw, Clock, Database } from 'lucide-react';
 import { ActivitySummaryData } from '../types';
 import { ActivityAPI, SyncAPI } from '../api';
-import { CategoryFilter, CategoryFilterValue } from '../../../../../core/components';
+import { CategoryFilter, CategoryFilterValue, toast } from '../../../../../core/components';
 
 // 安全的日期解析函数,支持多种格式
 const parseLocalDate = (dateStr: string): Date => {
@@ -402,6 +402,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
                                 }
                             } catch (error) {
                                 console.error('Sync failed:', error);
+                                toast.error(error instanceof Error ? error.message : '同步失败');
                             } finally {
                                 setIsSyncing(false);
                             }

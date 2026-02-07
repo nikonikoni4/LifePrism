@@ -139,7 +139,11 @@ export const SyncAPI = {
             throw new Error(`Sync failed: ${response.statusText}`);
         }
 
-        return response.json();
+        const data = await response.json();
+        if (data.status === 'failed') {
+            throw new Error(data.message || '同步失败');
+        }
+        return data;
     },
 
     /**
@@ -162,6 +166,10 @@ export const SyncAPI = {
             throw new Error(`Sync failed: ${response.statusText}`);
         }
 
-        return response.json();
+        const data = await response.json();
+        if (data.status === 'failed') {
+            throw new Error(data.message || '同步失败');
+        }
+        return data;
     },
 };
