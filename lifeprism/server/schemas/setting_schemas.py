@@ -105,3 +105,15 @@ class ValidatePathResponse(BaseModel):
     """路径验证响应"""
     valid: bool = Field(description="路径是否有效")
     message: str = Field(description="验证结果消息")
+
+
+class MigrateDataPathRequest(BaseModel):
+    """数据路径迁移请求"""
+    target_base_path: str = Field(..., description="目标基础路径（不含 lifeprismData）")
+
+
+class MigrateDataPathResponse(BaseModel):
+    """数据路径迁移响应"""
+    success: bool = Field(description="是否迁移成功")
+    message: str = Field(description="结果消息")
+    new_path: Optional[str] = Field(default=None, description="迁移后的完整数据路径")

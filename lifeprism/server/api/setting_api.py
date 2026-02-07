@@ -17,6 +17,8 @@ from lifeprism.server.schemas.setting_schemas import (
     ProviderCapabilities,
     ValidatePathRequest,
     ValidatePathResponse,
+    MigrateDataPathRequest,
+    MigrateDataPathResponse,
 )
 from lifeprism.server.services import setting_service
 from lifeprism.llm.utils import get_provider_capabilities, list_providers
@@ -173,3 +175,20 @@ async def validate_path(request: ValidatePathRequest):
         request.path_type: 路径类型 (lifeprism_data | aw_db)
     """
     return setting_service.validate_data_path(request.path, request.path_type)
+
+
+@router.post("/migrate-data-path", response_model=MigrateDataPathResponse, summary="迁移数据路径")
+async def migrate_data_path(request: MigrateDataPathRequest):
+    """
+    迁移数据到新路径
+
+    将当前 lifeprismData 目录下的所有数据复制到新路径。
+    新路径会自动追加 lifeprismData 子文件夹。
+    迁移成功后需要重启程序。
+
+    注意：开发模式下此接口不可用。
+    """
+    result = setting_service.migrate_data_path(request.target_base_path)
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.message)
+    return result

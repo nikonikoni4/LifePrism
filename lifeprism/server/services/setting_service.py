@@ -5,15 +5,18 @@ Settings 服务层 - 配置管理业务逻辑
 """
 import os
 import sys
+import shutil
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 from lifeprism.config.settings_manager import settings
 from lifeprism.config.provider_manager import provider_manager
+from lifeprism.utils.common_utils import is_dev_environment
 from lifeprism.server.schemas.setting_schemas import (
     SettingItems,
     UpdateSettingsRequest,
     ValidatePathResponse,
+    MigrateDataPathResponse,
 )
 from lifeprism.utils import get_logger
 
@@ -189,3 +192,112 @@ def validate_data_path(path: str, path_type: str) -> ValidatePathResponse:
         return ValidatePathResponse(valid=True, message="路径有效")
 
     return ValidatePathResponse(valid=False, message=f"未知的路径类型: {path_type}")
+
+
+# 迁移时需要复制的子目录列表
+_DATA_SUBDIRS = ["config", "dataset", "plan", "debug_logs", "workflow", "external_files"]
+
+
+def migrate_data_path(target_base_path: str) -> MigrateDataPathResponse:
+    """
+    迁移数据到新路径
+
+    流程: 开发模式检查 → 计算新路径 → 验证 → 关闭DB连接 → 复制数据 → 更新配置
+
+    Args:
+        target_base_path: 用户选择的目标基础路径（不含 lifeprismData）
+
+    Returns:
+        MigrateDataPathResponse: 迁移结果
+    """
+    # 1. 开发模式禁用
+    if is_dev_environment():
+        return MigrateDataPathResponse(
+            success=False,
+            message="开发模式下不支持数据路径迁移"
+        )
+
+    # 2. 计算新路径（自动追加 lifeprismData）
+    if not target_base_path or not target_base_path.strip():
+        return MigrateDataPathResponse(success=False, message="目标路径不能为空")
+
+    new_path = Path(target_base_path) / "lifeprismData"
+    current_path = Path(settings.lifeprism_data_path)
+
+    # 3. 验证
+    try:
+        if new_path.resolve() == current_path.resolve():
+            return MigrateDataPathResponse(
+                success=False,
+                message="新路径与当前路径相同"
+            )
+    except Exception:
+        pass
+
+    # 检查不能在安装路径内
+    if getattr(sys, 'frozen', False):
+        install_dir = Path(sys.executable).parent.parent.parent
+        try:
+            new_path.resolve().relative_to(install_dir.resolve())
+            return MigrateDataPathResponse(
+                success=False,
+                message="数据路径不能位于安装目录内"
+            )
+        except ValueError:
+            pass
+
+    # 检查目标父目录是否存在
+    if not Path(target_base_path).exists():
+        return MigrateDataPathResponse(
+            success=False,
+            message=f"目标目录不存在: {target_base_path}"
+        )
+
+    # 4. 关闭数据库连接池
+    from lifeprism.storage import lw_db_manager, chat_history_db_manager
+    logger.info("迁移数据：关闭数据库连接池...")
+    try:
+        lw_db_manager._close_connection_pool()
+        chat_history_db_manager._close_connection_pool()
+    except Exception as e:
+        logger.error(f"关闭连接池失败: {e}")
+        return MigrateDataPathResponse(
+            success=False,
+            message=f"关闭数据库连接失败: {e}"
+        )
+
+    # 5. 复制数据
+    try:
+        new_path.mkdir(parents=True, exist_ok=True)
+        for subdir in _DATA_SUBDIRS:
+            src = current_path / subdir
+            dst = new_path / subdir
+            if src.exists() and src.is_dir():
+                shutil.copytree(str(src), str(dst), dirs_exist_ok=True)
+                logger.info(f"已复制: {src} -> {dst}")
+            else:
+                dst.mkdir(parents=True, exist_ok=True)
+                logger.info(f"源目录不存在，已创建空目录: {dst}")
+    except Exception as e:
+        logger.error(f"复制数据失败: {e}")
+        return MigrateDataPathResponse(
+            success=False,
+            message=f"复制数据失败: {e}"
+        )
+
+    # 6. 更新配置（写入旧路径的 config.yaml，重启后后端会从中读取新路径）
+    try:
+        settings.update({"lifeprism_data_path": str(new_path)})
+        logger.info(f"数据迁移完成: {current_path} -> {new_path}")
+    except Exception as e:
+        logger.error(f"更新配置失败: {e}")
+        return MigrateDataPathResponse(
+            success=False,
+            message=f"数据已复制但更新配置失败: {e}"
+        )
+
+    return MigrateDataPathResponse(
+        success=True,
+        message="数据迁移成功，请重启程序",
+        new_path=str(new_path)
+    )
