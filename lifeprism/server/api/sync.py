@@ -5,6 +5,7 @@
 from fastapi import APIRouter
 from lifeprism.server.schemas.sync import SyncRequest, SyncResponse, SyncTimeRangeRequest
 from lifeprism.server.services.sync_service import SyncService
+from lifeprism.llm.function.test_connect import test_connect
 from lifeprism.utils import LazySingleton
 
 router = APIRouter(prefix="/sync", tags=["Data Synchronization"])
@@ -40,6 +41,19 @@ async def sync_from_activitywatch(
     - 如需同步指定时间范围，请使用 /activitywatch/timerange 接口
     """
     print("sync_request (incremental)", sync_request)
+
+    # 前置校验：需要 LLM 分类时先检测连接
+    if sync_request.auto_classify:
+        connect_result = await test_connect()
+        if not connect_result["success"]:
+            return {
+                "status": "failed",
+                "synced_events": 0,
+                "new_apps_classified": 0,
+                "duration": 0,
+                "message": f"LLM 连接失败，已跳过同步: {connect_result['message']}"
+            }
+
     result = sync_service.sync_from_activitywatch(
         auto_classify=sync_request.auto_classify
     )
@@ -76,6 +90,19 @@ async def sync_from_activitywatch_by_time_range(
     - 时间范围不宜过大，建议不超过7天
     """
     print("sync_time_range_request", sync_request)
+
+    # 前置校验：需要 LLM 分类时先检测连接
+    if sync_request.auto_classify:
+        connect_result = await test_connect()
+        if not connect_result["success"]:
+            return {
+                "status": "failed",
+                "synced_events": 0,
+                "new_apps_classified": 0,
+                "duration": 0,
+                "message": f"LLM 连接失败，已跳过同步: {connect_result['message']}"
+            }
+
     result = sync_service.sync_by_time_range(
         start_time=sync_request.start_time,
         end_time=sync_request.end_time,
