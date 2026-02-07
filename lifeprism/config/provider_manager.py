@@ -59,7 +59,6 @@ class ProviderManager:
 
         # 从 settings 获取数据路径（settings_manager 已在此之前初始化）
         from lifeprism.config.settings_manager import settings
-        self._data_path = Path(settings.lifeprism_data_path)
 
         # 获取源配置文件路径（开发环境中的配置）
         self._source_config_path = Path(__file__).parent / 'providers.yaml'
@@ -68,8 +67,8 @@ class ProviderManager:
             # 开发环境：直接使用 lifeprism/config/providers.yaml
             self._config_path = self._source_config_path
         else:
-            # 打包环境：使用 lifeprismData/config/providers.yaml
-            self._config_path = self._data_path / 'config' / 'providers.yaml'
+            # 打包环境：使用固定配置路径下的 providers.yaml
+            self._config_path = Path(settings.config_base_path) / 'config' / 'providers.yaml'
             # 确保配置文件存在（如果不存在则从源复制）
             self._ensure_config_exists()
 

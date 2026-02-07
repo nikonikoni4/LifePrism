@@ -194,13 +194,16 @@ def validate_data_path(path: str, path_type: str) -> ValidatePathResponse:
     return ValidatePathResponse(valid=False, message=f"未知的路径类型: {path_type}")
 
 
-# 迁移时需要复制的子目录列表
-_DATA_SUBDIRS = ["config", "dataset", "plan", "debug_logs", "workflow", "external_files"]
+# 迁移时需要复制的子目录列表（不含 config，配置文件固定在默认路径）
+_DATA_SUBDIRS = ["dataset", "plan", "debug_logs", "workflow", "external_files"]
 
 
 def migrate_data_path(target_base_path: str) -> MigrateDataPathResponse:
     """
     迁移数据到新路径
+
+    配置文件（config/）固定在默认路径，不参与迁移。
+    只迁移数据目录：dataset/、plan/、debug_logs/、workflow/、external_files/
 
     流程: 开发模式检查 → 计算新路径 → 验证 → 关闭DB连接 → 复制数据 → 更新配置
 

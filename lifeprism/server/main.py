@@ -336,8 +336,8 @@ if __name__ == "__main__":
 
     if is_frozen:
         logger.info("正在运行打包环境")
-        # settings_manager 已初始化，直接从 settings 获取路径
-        config_path = os.path.join(settings.lifeprism_data_path, "config", "config.json")
+        # settings_manager 已初始化，直接从 settings 获取固定配置路径
+        config_path = os.path.join(settings.config_base_path, "config", "config.json")
         print(f"[STARTUP] 打包环境，配置文件路径: {config_path}")
     else:
         logger.info("正在运行开发环境")

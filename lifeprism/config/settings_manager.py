@@ -60,23 +60,25 @@ class SettingsManager:
         # 判断是否是开发环境
         self._is_dev = not getattr(sys, 'frozen', False)
 
-        # 1. 解析 lifeprism_data_path（优先级：环境变量 > 默认路径）
-        self._lifeprism_data_path = self._resolve_default_data_path()
+        # 1. 解析配置文件基础路径（固定，不随数据迁移）
+        self._config_base_path = self._resolve_config_base_path()
 
         if self._is_dev:
             # 开发环境：使用 lifeprism/config/settings.yaml
             self._config_path = Path(__file__).parent / 'settings.yaml'
         else:
-            # 打包环境：使用 lifeprismData/config/config.yaml
-            self._config_path = self._lifeprism_data_path / 'config' / 'config.yaml'
+            # 打包环境：配置文件始终在固定路径
+            self._config_path = self._config_base_path / 'config' / 'config.yaml'
 
         # 2. 加载 yaml 配置
         self._load_config()
 
-        # 3. 如果 yaml 中配置了 lifeprism_data_path，覆盖默认值
+        # 3. 解析数据路径（优先级：yaml 配置 > 环境变量 > 默认路径）
         configured_path = self._config.get('lifeprism_data_path', '')
         if configured_path:
             self._lifeprism_data_path = Path(configured_path)
+        else:
+            self._lifeprism_data_path = self._resolve_default_data_path()
 
         # 4. 设置环境变量（供 Electron 等外部进程使用）
         os.environ['LIFEPRISM_DATA_PATH'] = str(self._lifeprism_data_path)
@@ -84,24 +86,13 @@ class SettingsManager:
         # 5. 配置日志文件输出（logger 此前只有控制台输出）
         self._setup_logging()
 
-    def _resolve_default_data_path(self) -> Path:
+    def _resolve_config_base_path(self) -> Path:
         """
-        解析默认的 lifeprismData 路径（不依赖 yaml 配置）
+        配置文件基础路径（固定，不随数据迁移）
 
-        优先级:
-        1. 环境变量 LIFEPRISM_DATA_PATH（由 Electron 启动时设置）
-        2. 打包环境：%APPDATA%/LifePrism/lifeprismData
-        3. 开发环境：frontend/lifeprismData
-
-        Returns:
-            Path: lifeprismData 目录路径
+        打包环境：%APPDATA%/LifePrism/lifeprismData
+        开发环境：frontend/lifeprismData
         """
-        # 1. 环境变量（Electron 启动后端时传入）
-        data_env = os.environ.get('LIFEPRISM_DATA_PATH')
-        if data_env:
-            return Path(data_env)
-
-        # 2. 打包环境
         if getattr(sys, 'frozen', False):
             appdata = os.environ.get('APPDATA', '')
             if appdata:
@@ -111,9 +102,26 @@ class SettingsManager:
             app_dir = backend_dir.parent.parent
             root_dir = app_dir.parent
             return root_dir / 'lifeprismData'
-
-        # 3. 开发环境
         return Path("frontend/lifeprismData")
+
+    def _resolve_default_data_path(self) -> Path:
+        """
+        解析默认的 lifeprismData 路径（不依赖 yaml 配置）
+
+        优先级:
+        1. 环境变量 LIFEPRISM_DATA_PATH（由 Electron 启动时设置）
+        2. 配置基础路径（打包环境：%APPDATA%/LifePrism/lifeprismData，开发环境：frontend/lifeprismData）
+
+        Returns:
+            Path: lifeprismData 目录路径
+        """
+        # 1. 环境变量（Electron 启动后端时传入）
+        data_env = os.environ.get('LIFEPRISM_DATA_PATH')
+        if data_env:
+            return Path(data_env)
+
+        # 2. 默认与配置基础路径相同
+        return self._config_base_path
 
     def _setup_logging(self) -> None:
         """配置日志文件输出"""
@@ -491,6 +499,11 @@ class SettingsManager:
     def lifeprism_data_path(self) -> str:
         """获取 lifeprismData 目录路径（唯一数据源）"""
         return str(self._lifeprism_data_path)
+
+    @property
+    def config_base_path(self) -> str:
+        """配置文件基础路径（固定，不随数据迁移）"""
+        return str(self._config_base_path)
 
     @property
     def custom_data_path(self) -> Path:
