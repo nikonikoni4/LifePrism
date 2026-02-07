@@ -85,8 +85,8 @@
         ]
       },
       {
-        "from": "customData",
-        "to": "customData",
+        "from": "lifeprismData",
+        "to": "lifeprismData",
         "filter": [
           "**/*",
           "!plan/*.md",

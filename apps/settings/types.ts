@@ -19,8 +19,7 @@ export interface Settings {
     long_log_threshold: number;
     multi_purpose_app_names: string[];
     aw_db_path: string;
-    lw_db_path: string;
-    chat_db_path: string;
+    lifeprism_data_path: string;
     data_cleaning_threshold: number;
 }
 
@@ -41,8 +40,7 @@ export interface UpdateSettingsRequest {
     long_log_threshold?: number;
     multi_purpose_app_names?: string[];
     aw_db_path?: string;
-    lw_db_path?: string;
-    chat_db_path?: string;
+    lifeprism_data_path?: string;
     data_cleaning_threshold?: number;
 }
 
@@ -69,4 +67,16 @@ export interface TestConnectionResponse {
     success: boolean;
     message: string;
     model_response: string | null;
+}
+
+/** 路径验证请求 */
+export interface ValidatePathRequest {
+    path: string;
+    path_type: 'lifeprism_data' | 'aw_db';
+}
+
+/** 路径验证响应 */
+export interface ValidatePathResponse {
+    valid: boolean;
+    message: string;
 }

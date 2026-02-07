@@ -16,9 +16,13 @@ let initPromise: Promise<string> | null = null;
 declare global {
     interface Window {
         electronAPI?: {
+            getLifeprismDataPath: () => Promise<string>;
             getCustomDataPath: () => Promise<string>;
             isPackaged: () => Promise<boolean>;
             getConfig?: () => Promise<any>;
+            selectDirectory: () => Promise<string | null>;
+            selectFile: (filters?: Array<{name: string; extensions: string[]}>) => Promise<string | null>;
+            getInstallPath: () => Promise<string | null>;
         };
     }
 }
@@ -49,8 +53,8 @@ async function doInitialize(): Promise<string> {
     // 1. 尝试从配置文件读取（Electron 环境）
     try {
         if (window.electronAPI) {
-            const customDataPath = await window.electronAPI.getCustomDataPath();
-            const config = await loadConfigFromElectron(customDataPath);
+            const dataPath = await (window.electronAPI.getLifeprismDataPath?.() ?? window.electronAPI.getCustomDataPath());
+            const config = await loadConfigFromElectron(dataPath);
             if (config?.server) {
                 host = config.server.host || DEFAULT_HOST;
                 portList = config.server.portFallbackList || DEFAULT_PORT_LIST;
@@ -79,7 +83,7 @@ async function doInitialize(): Promise<string> {
 /**
  * 从 Electron 环境加载配置文件
  */
-async function loadConfigFromElectron(customDataPath: string): Promise<any> {
+async function loadConfigFromElectron(dataPath: string): Promise<any> {
     // 在 Electron 中，可以通过 Node.js 读取文件
     // 但由于 preload 的限制，我们通过 IPC 获取配置
     if (window.electronAPI?.getConfig) {
@@ -88,7 +92,7 @@ async function loadConfigFromElectron(customDataPath: string): Promise<any> {
 
     // 备选方案：尝试通过 fetch 读取（开发模式）
     try {
-        const response = await fetch('/customData/config/config.json');
+        const response = await fetch('/lifeprismData/config/config.json');
         if (response.ok) {
             return await response.json();
         }

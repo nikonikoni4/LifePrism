@@ -11,6 +11,7 @@ import {
     LayoutGrid,
     Database,
     FolderSearch,
+    FolderOpen,
     Filter,
     Plus,
     Minus,
@@ -54,9 +55,9 @@ const SettingsApp: React.FC = () => {
 
     // 4. Database Settings
     const [awPath, setAwPath] = useState('');
-    const [lwPath, setLwPath] = useState('');
-    const [chatPath, setChatPath] = useState('');
+    const [lifeprismDataPath, setLifeprismDataPath] = useState('');
     const [pathStatus, setPathStatus] = useState<'idle' | 'checking' | 'success'>('idle');
+    const [isElectron, setIsElectron] = useState(false);
 
     // 5. Data Processing
     const [filterDuration, setFilterDuration] = useState(10);
@@ -136,9 +137,9 @@ const SettingsApp: React.FC = () => {
                 setLongLogThreshold(settings.long_log_threshold);
                 setBrowserApps(settings.multi_purpose_app_names);
                 setAwPath(settings.aw_db_path);
-                setLwPath(settings.lw_db_path);
-                setChatPath(settings.chat_db_path);
+                setLifeprismDataPath(settings.lifeprism_data_path);
                 setFilterDuration(settings.data_cleaning_threshold);
+                setIsElectron(!!window.electronAPI);
             } catch (err) {
                 toast.error(err instanceof Error ? err.message : '加载配置失败');
             } finally {
@@ -161,13 +162,12 @@ const SettingsApp: React.FC = () => {
             long_log_threshold: longLogThreshold,
             multi_purpose_app_names: browserApps,
             aw_db_path: awPath,
-            lw_db_path: lwPath,
-            chat_db_path: chatPath,
+            lifeprism_data_path: lifeprismDataPath,
             data_cleaning_threshold: filterDuration,
             ...overrides,
         };
         debouncedSave(currentSettings);
-    }, [nickname, provider, modelName, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lwPath, chatPath, filterDuration, debouncedSave]);
+    }, [nickname, provider, modelName, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, debouncedSave]);
 
     // Handlers
     const handleTestConnection = async () => {
@@ -586,6 +586,42 @@ const SettingsApp: React.FC = () => {
 
                 <div className="space-y-6">
                     <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">LifePrism 数据路径</label>
+                        <div className="flex gap-3">
+                            <input
+                                type="text"
+                                value={lifeprismDataPath}
+                                onChange={(e) => setLifeprismDataPath(e.target.value)}
+                                onBlur={() => triggerAutoSave({ lifeprism_data_path: lifeprismDataPath })}
+                                placeholder="留空使用默认路径"
+                                className="flex-1 bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
+                            />
+                            {isElectron && (
+                                <button
+                                    onClick={async () => {
+                                        const dir = await window.electronAPI?.selectDirectory();
+                                        if (dir) {
+                                            // 安全检测：不能和安装路径相同
+                                            const installPath = await window.electronAPI?.getInstallPath();
+                                            if (installPath && dir.startsWith(installPath)) {
+                                                toast.error('数据路径不能位于安装目录内');
+                                                return;
+                                            }
+                                            setLifeprismDataPath(dir);
+                                            triggerAutoSave({ lifeprism_data_path: dir });
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-slate-600 rounded-xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all"
+                                    title="选择文件夹"
+                                >
+                                    <FolderOpen size={14} />
+                                </button>
+                            )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-2">数据库、计划书等数据的存储目录。留空使用默认路径。</p>
+                    </div>
+
+                    <div>
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">ActivityWatch 数据库路径</label>
                         <div className="flex gap-3">
                             <input
@@ -595,6 +631,23 @@ const SettingsApp: React.FC = () => {
                                 onBlur={() => triggerAutoSave({ aw_db_path: awPath })}
                                 className="flex-1 bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
                             />
+                            {isElectron && (
+                                <button
+                                    onClick={async () => {
+                                        const file = await window.electronAPI?.selectFile([
+                                            { name: 'SQLite Database', extensions: ['db'] }
+                                        ]);
+                                        if (file) {
+                                            setAwPath(file);
+                                            triggerAutoSave({ aw_db_path: file });
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-slate-600 rounded-xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all"
+                                    title="选择文件"
+                                >
+                                    <FolderSearch size={14} />
+                                </button>
+                            )}
                             <button
                                 onClick={handleCheckPath}
                                 className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-slate-600 rounded-xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all"
@@ -609,28 +662,6 @@ const SettingsApp: React.FC = () => {
                                 Detect
                             </button>
                         </div>
-                    </div>
-
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">LifeWatch 数据库路径</label>
-                        <input
-                            type="text"
-                            value={lwPath}
-                            onChange={(e) => setLwPath(e.target.value)}
-                            onBlur={() => triggerAutoSave({ lw_db_path: lwPath })}
-                            className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">聊天数据库路径</label>
-                        <input
-                            type="text"
-                            value={chatPath}
-                            onChange={(e) => setChatPath(e.target.value)}
-                            onBlur={() => triggerAutoSave({ chat_db_path: chatPath })}
-                            className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
-                        />
                     </div>
                 </div>
             </section>

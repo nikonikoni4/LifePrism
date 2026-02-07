@@ -11,7 +11,9 @@ import {
     UpdateApiKeyRequest,
     UpdateApiKeyResponse,
     ApiKeyStatusResponse,
-    TestConnectionResponse
+    TestConnectionResponse,
+    ValidatePathRequest,
+    ValidatePathResponse
 } from './types';
 import { createApiV2UrlGetter } from '../../core/services/apiConfig';
 
@@ -105,6 +107,21 @@ export const SettingsAPI = {
         });
         if (!response.ok) {
             throw new Error(`删除模型历史失败: ${response.statusText}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * 验证路径有效性
+     */
+    async validatePath(request: ValidatePathRequest): Promise<ValidatePathResponse> {
+        const response = await fetch(`${getApiBase()}/settings/validate-path`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+        });
+        if (!response.ok) {
+            throw new Error(`路径验证失败: ${response.statusText}`);
         }
         return response.json();
     },

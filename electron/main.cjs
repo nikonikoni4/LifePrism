@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -7,26 +7,31 @@ let mainWindow;
 let backendProcess;
 let tray = null;
 
-// 获取 customData 路径（安装目录内）
-function getCustomDataPath() {
+// 获取 lifeprismData 路径
+function getLifeprismDataPath() {
     if (app.isPackaged) {
-        // 打包后：resources/customData
-        return path.join(process.resourcesPath, 'customData');
+        // 打包后：%APPDATA%/LifePrism/lifeprismData
+        return path.join(app.getPath('appData'), 'LifePrism', 'lifeprismData');
     } else {
-        // 开发时：frontend/customData
-        return path.join(__dirname, '..', 'customData');
+        // 开发时：frontend/lifeprismData
+        return path.join(__dirname, '..', 'lifeprismData');
     }
+}
+
+// DEPRECATED: 保留向后兼容
+function getCustomDataPath() {
+    return getLifeprismDataPath();
 }
 
 // 启动 Python 后端
 function startBackend() {
-    const customDataPath = getCustomDataPath();
+    const lifeprismDataPath = getLifeprismDataPath();
 
     if (app.isPackaged) {
         const backendPath = path.join(process.resourcesPath, 'backend', 'lifeprism-backend.exe');
         console.log(`[Electron] 启动后端: ${backendPath}`);
         backendProcess = spawn(backendPath, [], {
-            env: { ...process.env, CUSTOM_DATA_PATH: customDataPath },
+            env: { ...process.env, LIFEPRISM_DATA_PATH: lifeprismDataPath },
             stdio: 'pipe'
         });
     } else {
@@ -34,7 +39,7 @@ function startBackend() {
         console.log('[Electron] 开发模式：启动 Python 后端...');
         backendProcess = spawn('python', ['-m', 'lifeprism.server.main'], {
             cwd: path.join(__dirname, '..', '..'),
-            env: { ...process.env, CUSTOM_DATA_PATH: customDataPath },
+            env: { ...process.env, LIFEPRISM_DATA_PATH: lifeprismDataPath },
             stdio: 'pipe',
             shell: true
         });
@@ -185,15 +190,18 @@ function createWindow() {
     }
 }
 
-// IPC: 获取 customData 路径
-ipcMain.handle('get-custom-data-path', () => getCustomDataPath());
+// IPC: 获取 lifeprismData 路径
+ipcMain.handle('get-lifeprism-data-path', () => getLifeprismDataPath());
+
+// IPC: 获取 customData 路径（向后兼容）
+ipcMain.handle('get-custom-data-path', () => getLifeprismDataPath());
 
 // IPC: 获取应用是否打包
 ipcMain.handle('is-packaged', () => app.isPackaged);
 
 // IPC: 获取配置文件
 ipcMain.handle('get-config', () => {
-    const configPath = path.join(getCustomDataPath(), 'config', 'config.json');
+    const configPath = path.join(getLifeprismDataPath(), 'config', 'config.json');
     try {
         if (fs.existsSync(configPath)) {
             const content = fs.readFileSync(configPath, 'utf-8');
@@ -205,17 +213,58 @@ ipcMain.handle('get-config', () => {
     return null;
 });
 
+// IPC: 选择目录
+ipcMain.handle('select-directory', async () => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory']
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+});
+
+// IPC: 选择文件
+ipcMain.handle('select-file', async (_event, filters) => {
+    if (!mainWindow) return null;
+    const options = {
+        properties: ['openFile']
+    };
+    if (filters) {
+        options.filters = filters;
+    }
+    const result = await dialog.showOpenDialog(mainWindow, options);
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+});
+
+// IPC: 获取安装路径
+ipcMain.handle('get-install-path', () => {
+    if (app.isPackaged) {
+        return path.dirname(app.getPath('exe'));
+    }
+    return null;
+});
+
 app.whenReady().then(() => {
     console.log('[Electron] 应用启动中...');
-    console.log(`[Electron] CustomData 路径: ${getCustomDataPath()}`);
+    console.log(`[Electron] LifePrism 数据路径: ${getLifeprismDataPath()}`);
 
-    // 确保 customData 目录存在
-    const customDataPath = getCustomDataPath();
-    const externalFilesPath = path.join(customDataPath, 'external_files');
+    // 确保 lifeprismData 目录存在
+    const dataPath = getLifeprismDataPath();
+    const externalFilesPath = path.join(dataPath, 'external_files');
 
-    if (!fs.existsSync(customDataPath)) {
-        fs.mkdirSync(customDataPath, { recursive: true });
-        console.log(`[Electron] 创建 customData 目录: ${customDataPath}`);
+    if (!fs.existsSync(dataPath)) {
+        fs.mkdirSync(dataPath, { recursive: true });
+        console.log(`[Electron] 创建 lifeprismData 目录: ${dataPath}`);
+
+        // 打包环境：从 resources/lifeprismData 复制模板数据
+        if (app.isPackaged) {
+            const templatePath = path.join(process.resourcesPath, 'lifeprismData');
+            if (fs.existsSync(templatePath)) {
+                fs.cpSync(templatePath, dataPath, { recursive: true });
+                console.log(`[Electron] 已从模板复制初始数据到: ${dataPath}`);
+            }
+        }
     }
 
     if (!fs.existsSync(externalFilesPath)) {

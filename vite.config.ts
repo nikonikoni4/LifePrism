@@ -18,8 +18,8 @@ export default defineConfig(({ mode }) => {
         },
       },
       watch: {
-        // 排除 customData 目录，避免后端写入 md 文件时触发热重载
-        ignored: ['**/customData/**'],
+        // 排除 lifeprismData 目录，避免后端写入 md 文件时触发热重载
+        ignored: ['**/lifeprismData/**'],
       },
     },
     plugins: [react(), tailwindcss()],
