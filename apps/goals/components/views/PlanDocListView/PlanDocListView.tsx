@@ -117,8 +117,16 @@ export const PlanDocListView: React.FC = () => {
         prevDocIdRef.current = currentId;
     }, [selectedDoc?.id]);
 
-    // Note: beforeunload auto-save removed because sendBeacon only supports POST
-    // but backend uses PATCH. Auto-save on doc switch handles most cases.
+    // Auto-save when component unmounts (e.g. tab switch from plans → daily)
+    // 确保编辑器内容在组件卸载前写入 MD 文件，避免切换标签页后丢失未保存内容
+    useEffect(() => {
+        return () => {
+            if (prevDocIdRef.current && hasUnsavedChangesRef.current) {
+                planDocApi.updatePlanDoc(prevDocIdRef.current, { content: prevContentRef.current })
+                    .catch(err => console.error('Auto-save on unmount failed:', err));
+            }
+        };
+    }, []);
 
     // 静默保存函数（供外部 hook 调用，不显示 toast）
     const silentSave = useCallback(async () => {
