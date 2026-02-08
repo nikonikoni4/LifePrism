@@ -6,7 +6,7 @@ activitywatch
 __pycache__
 test
 技术文档.md
-docs
+# docs
 *-info
 *.db
 *.csv
