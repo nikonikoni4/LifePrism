@@ -764,10 +764,13 @@ def sync_plan_doc(
                 'pool_order_index': order_index,
             }
 
-            # 状态同步：只有 [x] -> completed，不能 [ ] 取消完成
+            # 状态同步：[x] -> completed，[ ] + completed -> pool
             if task['is_checked'] and existing.get('state') != 'completed':
                 update_data['state'] = 'completed'
                 update_data['actual_finished_at'] = datetime.now().strftime('%Y-%m-%d')
+            elif not task['is_checked'] and existing.get('state') == 'completed':
+                update_data['state'] = 'pool'
+                update_data['actual_finished_at'] = None
 
             todos_to_update.append(update_data)
             anchor_to_db_id[anchor_id] = existing['id']

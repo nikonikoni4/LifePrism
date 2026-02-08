@@ -57,9 +57,8 @@ r'^(\t*)-\s*\[([ xX])\]\s*(.+?)(?:\s*<!--\s*lp:(t-[a-f0-9]+)\s*-->)?$'
 | MD Checkbox | 数据库 state | 说明 |
 |------------|-------------|------|
 | `[ ]` | 保持原状态 | 不改变 pool/scheduled |
+| `[ ]` + DB 为 `completed` | `pool` | 清除 `actual_finished_at` |
 | `[x]` | `completed` | 设置 `actual_finished_at` |
-
-**重要限制**：同步时只能 `[ ]` → `[x]`，不能 `[x]` → `[ ]`
 
 ### DB → MD（回写时）
 
@@ -121,10 +120,57 @@ MD 删除算法：
 | `parent_id` | 父任务 ID |
 | `pool_order_index` | 任务池排序（全局顺序） |
 
+## 三数据源架构与同步分析
+
+### 数据源关系
+
+PlanDoc 系统存在三个数据源，以 **MD 文件为中心枢纽**：
+
+```
+前端编辑器 (Editor)  ←→  MD 文件 (File)  ←→  数据库 (DB)
+```
+
+- **Editor ↔ MD**：编辑器通过 API 读写 MD 文件（`planDocApi.updatePlanDoc` / `getPlanDocDetail`）
+- **MD ↔ DB**：后端通过 `taskpool_service` 实现双向同步（`sync_plan_doc` / `update_todo_with_writeback`）
+- **Editor 与 DB 不直接交互**，所有数据必须经过 MD 文件中转
+
+### 8 种变更场景分析
+
+三个数据源各自可能发生变更，共 2³ = 8 种组合：
+
+| # | Editor | MD | DB | 场景 | 当前处理 | 状态 |
+|---|--------|----|----|------|---------|------|
+| 1 | - | - | - | 无变更 | 无需操作 | ✅ |
+| 2 | ✓ | - | - | 用户编辑 PlanDoc | 手动保存 / 切换文档自动保存 → MD；MD→DB 需手动点"同步" | ⚠️ |
+| 3 | - | ✓ | - | 外部修改 MD 文件 | 无自动检测；需手动刷新编辑器 + 手动同步到 DB | ⚠️ |
+| 4 | - | - | ✓ | 任务池操作（勾选/拖拽等） | `update_todo_with_writeback` 自动回写 MD；`triggerAllPlanDocRefreshes` 自动刷新编辑器 | ✅ |
+| 5 | ✓ | ✓ | - | 编辑器未保存 + MD 被外部修改 | 编辑器保存会覆盖外部修改；仅用户主动刷新时有冲突对话框 | ❌ |
+| 6 | ✓ | - | ✓ | 编辑器未保存 + 任务池操作 | **Save Hook 机制**：操作前 `triggerAllPlanDocSaves` → 执行操作 → `triggerAllPlanDocRefreshes` | ✅ |
+| 7 | - | ✓ | ✓ | MD 被外部修改 + 任务池操作 | `triggerAllPlanDocSaves` 将编辑器旧内容覆盖 MD（外部修改丢失）→ DB 更新 → MD 回写 → 编辑器刷新 | ❌ |
+| 8 | ✓ | ✓ | ✓ | 三者同时变更 | 无法完全处理，数据丢失风险 | ❌ |
+
+### 各场景详细说明
+
+**场景 2（仅编辑器变更）**：Editor → MD 有保存机制，但 MD → DB 依赖用户手动点击"同步"按钮，非实时。
+
+**场景 3（仅 MD 外部变更）**：系统无文件监听（file watcher），无法感知外部修改。用户必须手动刷新编辑器 + 手动同步。
+
+**场景 5（编辑器 + MD 冲突）**：编辑器保存时直接覆盖 MD 文件，不做 diff 合并。PlanDocListView 的刷新功能有冲突对话框（`hasUnsavedChanges` 检测），但仅在用户主动刷新时触发。
+
+**场景 7（MD 外部修改 + 任务池操作）**：任务池操作走 todo 标准流程：`triggerAllPlanDocSaves` → 编辑器旧内容覆盖 MD（外部修改丢失）→ 后端更新 DB → 后端回写 MD → `triggerAllPlanDocRefreshes` 刷新编辑器。外部修改被编辑器旧内容覆盖。
+
+**场景 8（三者冲突）**：`triggerAllPlanDocSaves` 先将编辑器内容覆盖到 MD（丢失外部修改），然后任务池操作回写 MD（可能覆盖编辑器的部分修改）。
+
+### 设计约束
+
+- **MD 文件是唯一真实数据源**：编辑器和数据库都以 MD 文件为准
+- **外部修改不受保护**：系统假设 MD 文件只通过编辑器和后端修改，不考虑外部编辑
+- **同步是手动触发的**：MD → DB 方向只在用户点击"同步"时执行，不自动同步
+
 ## 前端 PlanDoc 保存 Hook 机制
 
 ### 问题
-PlanDoc 编辑器、任务池、本地 MD 文件三者可能产生数据冲突。
+PlanDoc 编辑器、任务池、本地 MD 文件三者可能产生数据冲突（上述场景 6）。
 
 ### 解决方案
 1. Todo 操作前先触发 PlanDoc 编辑器保存
@@ -132,9 +178,10 @@ PlanDoc 编辑器、任务池、本地 MD 文件三者可能产生数据冲突�
 
 ### 数据流
 
+**任务池操作（勾选/创建/删除 todo）**：
 ```
-用户在任务池勾选 todo
-  → useTaskPoolStore.updateTask()
+用户在任务池操作 todo
+  → useTaskPoolStore.updateTask/addTask/deleteTask()
   → triggerAllPlanDocSaves()        ← 先保存所有编辑中的 PlanDoc
   → PlanDocListView.silentSave()    ← 静默保存到后端
   → taskPoolApi.updateTodo()        ← 执行 todo 更新
@@ -143,7 +190,19 @@ PlanDoc 编辑器、任务池、本地 MD 文件三者可能产生数据冲突�
   → PlanDocListView.silentRefresh() ← 从后端获取最新内容
 ```
 
+**同步按钮（TaskPoolView.handleSync）**：
+```
+用户点击同步按钮
+  → triggerPlanDocSave(planDocId)    ← 先保存当前编辑中的 PlanDoc
+  → taskPoolApi.syncPlanDoc(dry_run) ← 预检
+  → [用户确认删除/保留]
+  → taskPoolApi.syncPlanDoc(执行)    ← MD → DB 同步
+  → loadTasks()                      ← 刷新任务池列表
+  → triggerAllPlanDocRefreshes()     ← 刷新编辑器（后端可能修改了 MD：锚点、系统展示区）
+```
+
 ### 相关文件
 - `frontend/apps/goals/hooks/usePlanDocSaveHook.ts` - 保存/刷新 Hook 注册机制
-- `frontend/apps/goals/hooks/useTaskPoolStore.ts` - Todo 状态管理
-- `frontend/apps/goals/components/views/PlanDocListView/PlanDocListView.tsx` - 注册回调
+- `frontend/apps/goals/hooks/useTaskPoolStore.ts` - Todo 状态管理（addTask/updateTask/deleteTask 均内置 Save Hook）
+- `frontend/apps/goals/components/views/PlanDocListView/PlanDocListView.tsx` - 注册 silentSave/silentRefresh 回调
+- `frontend/apps/goals/components/views/TaskPoolView/TaskPoolView.tsx` - 同步按钮逻辑
