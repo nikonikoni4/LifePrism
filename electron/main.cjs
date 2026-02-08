@@ -262,15 +262,6 @@ app.whenReady().then(() => {
     if (!fs.existsSync(dataPath)) {
         fs.mkdirSync(dataPath, { recursive: true });
         console.log(`[Electron] 创建 lifeprismData 目录: ${dataPath}`);
-
-        // 打包环境：从 resources/lifeprismData 复制模板数据
-        if (app.isPackaged) {
-            const templatePath = path.join(process.resourcesPath, 'lifeprismData');
-            if (fs.existsSync(templatePath)) {
-                fs.cpSync(templatePath, dataPath, { recursive: true });
-                console.log(`[Electron] 已从模板复制初始数据到: ${dataPath}`);
-            }
-        }
     }
 
     if (!fs.existsSync(externalFilesPath)) {

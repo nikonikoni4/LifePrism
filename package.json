@@ -83,15 +83,6 @@
           "**/*",
           "!**/settings.yaml"
         ]
-      },
-      {
-        "from": "lifeprismData",
-        "to": "lifeprismData",
-        "filter": [
-          "**/*",
-          "!plan/*.md",
-          "plan/示例-planDoc.md"
-        ]
       }
     ],
     "win": {

@@ -306,7 +306,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
             alert('数据同步成功！');
         } catch (error) {
             console.error('Sync failed:', error);
-            alert('数据同步失败，请查看控制台了解详情');
+            alert('数据同步失败，请查看控制台或lifeprismData/Debug_logs/lifeprism.log了解详情，请查看控制台了解详情');
         } finally {
             setIsSyncing(false);
         }
