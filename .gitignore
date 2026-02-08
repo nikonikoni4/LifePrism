@@ -22,11 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-docs
 release
 
 other_project
 my-ui-kit
 plan
 *db
-workflow
+chat_history.db-shm
+chat_history.db-wal
+front_doc
