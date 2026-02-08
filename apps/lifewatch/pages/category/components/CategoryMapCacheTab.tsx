@@ -10,8 +10,17 @@ import { CategoryTreeItem } from '../../../../../core/types/common-components';
 import { CategoryMapCacheItem } from '../types';
 import { CategoryMapCacheAPI } from '../api';
 import { taskPoolApi } from '../../../../../apps/goals/apis/taskPool';
-import { Goal } from '../../../../../apps/goals/types/entities';
-import { goalsV2Api } from '../../../../../apps/goals/apis/goal';
+import { createApiV2UrlGetter } from '../../../../../core/services/apiConfig';
+
+/** 带分类 ID 的目标项（对应后端 GoalWithCategoryItem） */
+interface GoalWithCategory {
+    id: string;
+    name: string;
+    link_to_category_id: string;
+    link_to_sub_category_id: string | null;
+}
+
+const getGoalApiBase = createApiV2UrlGetter('/goal');
 
 interface CategoryMapCacheTabProps {
     categories: CategoryTreeItem[];
@@ -51,7 +60,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
     });
 
     // 目标列表（用于下拉选择）
-    const [goalsWithCategory, setGoalsWithCategory] = useState<Goal[]>([]);
+    const [goalsWithCategory, setGoalsWithCategory] = useState<GoalWithCategory[]>([]);
 
     // 批量编辑弹窗
     const [showBatchEditModal, setShowBatchEditModal] = useState(false);
@@ -82,13 +91,14 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
         sync_goal: false,
     });
 
-    // 加载目标列表
+    // 加载目标列表（带分类 ID）
     useEffect(() => {
         const fetchGoals = async () => {
             try {
-                const goals = await goalsV2Api.getGoals({ status: 'active' });
-                const goalsWithCat = goals.filter(g => g.category);
-                setGoalsWithCategory(goalsWithCat);
+                const res = await fetch(`${getGoalApiBase()}/goals/with-category`);
+                if (!res.ok) throw new Error('Failed to fetch goals with category');
+                const data = await res.json();
+                setGoalsWithCategory(data.items || []);
             } catch (err) {
                 console.error('Failed to fetch goals:', err);
             }
@@ -185,8 +195,8 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
             setEditForm(prev => ({
                 ...prev,
                 link_to_goal_id: goalId,
-                category_id: (selectedGoal as any).linkToCategoryId,
-                sub_category_id: (selectedGoal as any).linkToSubCategoryId || '',
+                category_id: selectedGoal.link_to_category_id,
+                sub_category_id: selectedGoal.link_to_sub_category_id || '',
             }));
         }
     };
@@ -220,7 +230,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                         category_id: editForm.category_id || null,
                         sub_category_id: editForm.sub_category_id || null,
                         link_to_goal_id: editForm.link_to_goal_id || null,
-                        link_to_goal: goalsWithCategory.find(g => g.id === editForm.link_to_goal_id)?.title || null,
+                        link_to_goal: goalsWithCategory.find(g => g.id === editForm.link_to_goal_id)?.name || null,
                         category: categories.find(c => c.id === editForm.category_id)?.name || null,
                         sub_category: categories.find(c => c.id === editForm.category_id)?.subcategories?.find(s => s.id === editForm.sub_category_id)?.name || null,
                     }
@@ -700,7 +710,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                                 >
                                     <option value="">-- 不关联目标 --</option>
                                     {goalsWithCategory.map(goal => (
-                                        <option key={goal.id} value={goal.id}>{goal.title}</option>
+                                        <option key={goal.id} value={goal.id}>{goal.name}</option>
                                     ))}
                                 </select>
                                 {editForm.link_to_goal_id && (
