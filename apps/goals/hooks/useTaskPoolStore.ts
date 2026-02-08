@@ -72,7 +72,7 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
         try {
             const result = await taskPoolApi.syncPlanDoc(planDocId);
             // Reload tasks after sync
-            await loadTasks(null, planDocId);
+            await loadTasks();
             return result;
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to sync');

@@ -187,7 +187,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
             } else {
                 // 无待删除任务，直接执行同步
                 const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { dry_run: false });
-                await loadTasks(null, selectedPlanDocId);
+                await loadTasks();
                 await triggerAllPlanDocRefreshes();
                 setSyncResultMessage(`同步完成：新增 ${result.created}，更新 ${result.updated}`);
                 setTimeout(() => setSyncResultMessage(null), 3000);
@@ -208,7 +208,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
         setIsSyncing(true);
         try {
             const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { confirm_delete: true });
-            await loadTasks(null, selectedPlanDocId);
+            await loadTasks();
             await triggerAllPlanDocRefreshes();
             setShowDeleteConfirm(false);
             setSyncPreviewData(null);
@@ -230,7 +230,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
         setIsSyncing(true);
         try {
             const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { confirm_delete: false });
-            await loadTasks(null, selectedPlanDocId);
+            await loadTasks();
             await triggerAllPlanDocRefreshes();
             setShowDeleteConfirm(false);
             setSyncPreviewData(null);
