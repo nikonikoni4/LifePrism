@@ -295,11 +295,18 @@ class DataProcessingService:
         
         # 构建分类名称到ID的映射
         category_name_to_id = {}
-        sub_category_name_to_id = {}
+        # sub_category 使用复合 key (category_name, sub_category_name) -> sub_category_id
+        # 避免不同主分类下同名子分类（如"其他"）的 dict key 冲突
+        sub_category_composite_to_id = {}
         if category is not None and not category.empty:
             category_name_to_id = category.set_index('name')['id'].to_dict()
+            category_id_to_name = category.set_index('id')['name'].to_dict()
+        else:
+            category_id_to_name = {}
         if sub_category is not None and not sub_category.empty:
-            sub_category_name_to_id = sub_category.set_index('name')['id'].to_dict()
+            for _, row in sub_category.iterrows():
+                parent_cat_name = category_id_to_name.get(row['category_id'], '')
+                sub_category_composite_to_id[(parent_cat_name, row['name'])] = row['id']
         
         # 构建 goal 名称到 ID 的映射（用于将 LLM 输出的 link_to_goal 名称转换为 ID）
         # 只包含 track_time_automatically=1 且绑定了分类的目标
@@ -411,9 +418,9 @@ class DataProcessingService:
             if is_multipurpose_flag == 0:
                 # 单用途应用：只保存第一条记录（代表性记录）
                 item = items[0]
-                # 获取分类ID
+                # 获取分类ID（子分类使用复合 key 消歧同名子分类）
                 cat_id = category_name_to_id.get(item.category) if item.category else None
-                sub_cat_id = sub_category_name_to_id.get(item.sub_category) if item.sub_category else None
+                sub_cat_id = sub_category_composite_to_id.get((item.category, item.sub_category)) if item.sub_category else None
                 # 将 link_to_goal 名称转换为 ID
                 goal_id = goal_name_to_id.get(item.link_to_goal) if item.link_to_goal else None
                 if item.link_to_goal:
@@ -436,9 +443,9 @@ class DataProcessingService:
             else:
                 # 多用途应用：保存所有不同 title 的记录
                 for item in items:
-                    # 获取分类ID
+                    # 获取分类ID（子分类使用复合 key 消歧同名子分类）
                     cat_id = category_name_to_id.get(item.category) if item.category else None
-                    sub_cat_id = sub_category_name_to_id.get(item.sub_category) if item.sub_category else None
+                    sub_cat_id = sub_category_composite_to_id.get((item.category, item.sub_category)) if item.sub_category else None
                     # 将 link_to_goal 名称转换为 ID
                     goal_id = goal_name_to_id.get(item.link_to_goal) if item.link_to_goal else None
                     if item.link_to_goal:
@@ -654,10 +661,10 @@ class DataProcessingService:
     def _map_category_ids(self, filtered_data: pd.DataFrame) -> pd.DataFrame:
         """
         批量映射 category_id 和 sub_category_id，并删除冗余的名称列
-        
+
         Args:
             filtered_data: 包含 category 和 sub_category 的数据
-            
+
         Returns:
             pd.DataFrame: 只包含 category_id 和 sub_category_id 的数据（名称列已删除）
         """
@@ -665,30 +672,39 @@ class DataProcessingService:
         if self._category_mappings_cache is None:
             category = self.server_lw_data_provider.load_categories()
             sub_category = self.server_lw_data_provider.load_sub_categories()
-            
+
             # 处理分类为空的情况
             category_dict = {}
+            category_id_to_name = {}
             if category is not None and not category.empty:
                 category_dict = category.set_index('name')['id'].to_dict()
-                
-            sub_category_dict = {}
+                category_id_to_name = category.set_index('id')['name'].to_dict()
+
+            # 子分类使用复合 key (category_name, sub_category_name) -> sub_category_id
+            sub_category_composite_dict = {}
             if sub_category is not None and not sub_category.empty:
-                sub_category_dict = sub_category.set_index('name')['id'].to_dict()
-            
+                for _, row in sub_category.iterrows():
+                    parent_cat_name = category_id_to_name.get(row['category_id'], '')
+                    sub_category_composite_dict[(parent_cat_name, row['name'])] = row['id']
+
             self._category_mappings_cache = {
                 'category_id_dict': category_dict,
-                'sub_category_id_dict': sub_category_dict
+                'sub_category_composite_dict': sub_category_composite_dict
             }
             logger.info("  [OK] 创建分类映射字典缓存")
-        
+
         # 批量映射
         if 'category' in filtered_data.columns:
             filtered_data['category_id'] = filtered_data['category'].map(
                 self._category_mappings_cache['category_id_dict']
             )
-        if 'sub_category' in filtered_data.columns:
-            filtered_data['sub_category_id'] = filtered_data['sub_category'].map(
-                self._category_mappings_cache['sub_category_id_dict']
+        if 'sub_category' in filtered_data.columns and 'category' in filtered_data.columns:
+            # 使用复合 key (category, sub_category) 查找子分类 ID
+            composite_dict = self._category_mappings_cache['sub_category_composite_dict']
+            filtered_data['sub_category_id'] = filtered_data.apply(
+                lambda row: composite_dict.get((row.get('category'), row.get('sub_category')))
+                if pd.notna(row.get('sub_category')) else None,
+                axis=1
             )
         
         # 统计映射结果
