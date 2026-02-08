@@ -13,8 +13,8 @@ function getLifeprismDataPath() {
         // 打包后：%APPDATA%/LifePrism/lifeprismData
         return path.join(app.getPath('appData'), 'LifePrism', 'lifeprismData');
     } else {
-        // 开发时：frontend/lifeprismData
-        return path.join(__dirname, '..', 'lifeprismData');
+        // 开发时：项目根目录/localData
+        return path.join(__dirname, '..', '..', 'localData');
     }
 }
 
