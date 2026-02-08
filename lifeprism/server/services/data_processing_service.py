@@ -313,6 +313,11 @@ class DataProcessingService:
         # 构建分类树结构：{主分类名: [子分类名列表]}
         # 只包含启用的分类（state == 1）
         category_tree = {}
+        if category is None or category.empty:
+            logger.error("主分类数据为空，无法进行 LLM 分类！")
+            return pd.DataFrame()
+        if sub_category is None:
+            sub_category = pd.DataFrame(columns=['category_id', 'name', 'state'])
         for _, cat in category.iterrows():
             # 过滤被禁用的主分类
             if cat.get('state', 1) == 0:

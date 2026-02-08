@@ -48,27 +48,8 @@ EXAMPLE_PLAN_DOC = {
     'order_index': 0,
 }
 
-# 示例计划书 MD 文件内容
-EXAMPLE_PLAN_DOC_MD_CONTENT = """\
-# New Plan
-
-在这里编写你的目标计划！
-
-使用命令/ 选择todo block，在这个区域的todolist会被系统自动检测添加到任务池中！
-
-1. 例子：在下方的block中添加todolist
-
-<!-- lp:todoblock -->
-- [ ] 任务1
-\t- [ ] 子任务1
-\t\t- [ ] 子任务2
-- [ ] 任务2
-<!-- /lp:todoblock -->
-
-1. 点击保存
-
-1. 在任务池中点击同步！
-"""
+# 示例计划书 MD 文件名
+EXAMPLE_PLAN_DOC_MD_FILENAME = "示例-planDoc.md"
 
 
 class DataInitializer:
@@ -232,19 +213,33 @@ class DataInitializer:
         """
         生成示例计划书 MD 文件
 
-        在 lifeprismData/plan 目录下创建示例 MD 文件，如果文件已存在则跳过
+        打包环境：由 resource_initializer 已提前复制，此处仅做兜底检查
+        开发环境：文件应已存在于 localData/plan/，不做复制
         """
         try:
             from lifeprism.config.settings_manager import settings
-            from pathlib import Path
             plan_dir = Path(settings.lifeprism_data_path) / "plan"
             plan_dir.mkdir(parents=True, exist_ok=True)
-            md_path = plan_dir / f"{EXAMPLE_PLAN_DOC['id']}.md"
-            if not md_path.exists():
-                md_path.write_text(EXAMPLE_PLAN_DOC_MD_CONTENT, encoding='utf-8')
+            md_path = plan_dir / EXAMPLE_PLAN_DOC_MD_FILENAME
+
+            if md_path.exists():
+                logger.debug(f"示例计划书 MD 文件已存在，跳过: {md_path}")
+                return
+
+            import sys
+            if not getattr(sys, 'frozen', False):
+                # 开发环境：source == target，无法复制，仅记录
+                logger.debug(f"开发环境，示例计划书不存在: {md_path}")
+                return
+
+            # 打包环境：从 exe 内嵌资源读取（兜底，正常由 resource_initializer 处理）
+            source = Path(sys._MEIPASS) / "templates" / "plan" / EXAMPLE_PLAN_DOC_MD_FILENAME
+            if source.exists():
+                content = source.read_text(encoding='utf-8')
+                md_path.write_text(content, encoding='utf-8')
                 logger.info(f"生成示例计划书 MD 文件: {md_path}")
             else:
-                logger.debug(f"示例计划书 MD 文件已存在，跳过: {md_path}")
+                logger.warning(f"示例计划书源文件不存在: {source}")
         except Exception as e:
             logger.error(f"生成示例计划书 MD 文件失败: {e}")
 

@@ -22,13 +22,21 @@ a = Analysis(
     pathex=[str(project_root)],
     binaries=[],
     datas=[
-        # 注意：不打包 settings.yaml，打包环境使用 customData/config/config.yaml
-        # 只打包必要的 Python 模块文件
+        # Python 模块文件
         ('lifeprism/config/__init__.py', 'lifeprism/config'),
         ('lifeprism/config/crawler.py', 'lifeprism/config'),
         ('lifeprism/config/database.py', 'lifeprism/config'),
         ('lifeprism/config/settings.py', 'lifeprism/config'),
         ('lifeprism/config/settings_manager.py', 'lifeprism/config'),
+
+        # 资源模板文件（启动时按需复制到数据目录）
+        ('localData/docs/user_guide.md', 'templates/docs'),
+        ('localData/docs/user_guide_guide.md', 'templates/docs'),
+        ('lifeprism/llm/custom_prompt/workflow/daily_summary_plan.json', 'templates/workflow'),
+        ('lifeprism/llm/custom_prompt/workflow/weekly_summary_plan.json', 'templates/workflow'),
+        ('lifeprism/llm/custom_prompt/workflow/skill.md', 'templates/workflow'),
+        ('localData/config/config.json', 'templates/config'),
+        ('localData/plan/示例-planDoc.md', 'templates/plan'),
     ],
     hiddenimports=[
         # FastAPI/Uvicorn 相关

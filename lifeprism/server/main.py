@@ -99,6 +99,10 @@ _import_start = time.perf_counter()
 from lifeprism.storage.data_initializer import initialize_default_data
 _log_startup_time("  - data_initializer.initialize_default_data", _import_start)
 
+_import_start = time.perf_counter()
+from lifeprism.storage.resource_initializer import initialize_resources
+_log_startup_time("  - resource_initializer.initialize_resources", _import_start)
+
 _step_start = _log_startup_time("[OK] Database modules imported", _step_start)
 
 logger = logging.getLogger(__name__)
@@ -116,6 +120,15 @@ async def lifespan(app: FastAPI):
     print("[STARTUP] 进入 lifespan - 应用初始化阶段")
     print(f"{'='*60}")
     
+    # 启动时：初始化资源文件（打包环境：从 exe 内嵌资源复制缺失文件）
+    logger.info("正在初始化资源文件...")
+    try:
+        _resource_start = time.perf_counter()
+        initialize_resources()
+        _log_startup_time("[OK] Resource files init (initialize_resources)", _resource_start)
+    except Exception as e:
+        logger.warning(f"资源文件初始化失败（非致命）: {e}")
+
     # 启动时：初始化数据库表结构
     logger.info("正在初始化 LifeWatch 数据库...")
     try:
