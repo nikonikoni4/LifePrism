@@ -16,6 +16,14 @@ DEFAULT_CATEGORIES = [
     {'id': 'cat-other', 'name': '其他', 'color': '#E8684A'},
 ]
 
+# 每个主分类的默认子分类
+DEFAULT_SUB_CATEGORIES = [
+    {'id': 'subcat-work-other', 'category_id': 'cat-work', 'name': '其他'},
+    {'id': 'subcat-study-other', 'category_id': 'cat-study', 'name': '其他'},
+    {'id': 'subcat-entertainment-other', 'category_id': 'cat-entertainment', 'name': '其他'},
+    {'id': 'subcat-other-other', 'category_id': 'cat-other', 'name': '其他'},
+]
+
 # 示例目标 ID（固定，用于关联 plan_doc）
 EXAMPLE_GOAL_ID = 'goal-example'
 
@@ -80,6 +88,7 @@ class DataInitializer:
         """
         try:
             self._initialize_default_categories()
+            self._initialize_default_sub_categories()
             self._initialize_example_goal()
             self._initialize_example_plan_doc()
             logger.info("默认数据初始化检查完成")
@@ -131,6 +140,32 @@ class DataInitializer:
 
         except Exception as e:
             logger.error(f"初始化默认分类失败: {e}")
+            raise
+
+    def _initialize_default_sub_categories(self):
+        """
+        初始化默认子分类
+
+        只有当 sub_category 表为空时才添加默认子分类
+        """
+        if not self._is_table_empty('sub_category'):
+            logger.debug("sub_category 表已有数据，跳过默认子分类初始化")
+            return
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+
+                for sub in DEFAULT_SUB_CATEGORIES:
+                    cursor.execute("""
+                        INSERT INTO sub_category (id, category_id, name, state)
+                        VALUES (?, ?, ?, 1)
+                    """, (sub['id'], sub['category_id'], sub['name']))
+
+                logger.info(f"成功初始化 {len(DEFAULT_SUB_CATEGORIES)} 个默认子分类")
+
+        except Exception as e:
+            logger.error(f"初始化默认子分类失败: {e}")
             raise
 
     def _initialize_example_goal(self):

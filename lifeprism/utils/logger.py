@@ -1,4 +1,6 @@
 import logging
+import os
+import sys
 from pathlib import Path
 
 DEBUG = logging.DEBUG
@@ -10,11 +12,17 @@ _LOG_FORMAT = "%(asctime)s %(levelname)s %(filename)s func:%(funcName)s line %(l
 
 # 模块级只配置 StreamHandler（控制台输出）
 # FileHandler 由 setup_file_logging() 延迟添加（等 settings_manager 初始化后调用）
+# 打包环境（PyInstaller --noconsole）下 sys.stdout 可能为 None 或无 fileno()，需防护
+try:
+    _stream = open(sys.stdout.fileno(), mode='w', encoding='utf-8', closefd=False)
+except Exception:
+    _stream = open(os.devnull, mode='w', encoding='utf-8')
+
 logging.basicConfig(
     level=logging.INFO,
     format=_LOG_FORMAT,
     handlers=[
-        logging.StreamHandler(),
+        logging.StreamHandler(stream=_stream),
     ]
 )
 
@@ -38,6 +46,9 @@ def setup_file_logging(log_dir: Path) -> None:
     try:
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / 'lifeprism.log'
+        # 每次启动时清空旧日志
+        if log_file.exists():
+            log_file.write_text('', encoding='utf-8')
         file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
         file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
         logging.getLogger().addHandler(file_handler)

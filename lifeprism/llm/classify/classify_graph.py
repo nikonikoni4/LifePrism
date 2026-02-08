@@ -29,7 +29,6 @@ MAX_LOG_ITEMS = 10
 MAX_TITLE_ITEMS = 5
 TEST_FLAG = False
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

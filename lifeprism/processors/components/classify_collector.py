@@ -89,7 +89,7 @@ class ClassifyCollector:
         ))
         self._id_counter += 1
         
-        logger.debug(f"📝 收集单用途应用: {event.app}")
+        logger.debug(f"收集单用途应用: {event.app}")
     
     def _collect_multipurpose(self, event: ProcessedEvent) -> None:
         """
@@ -126,7 +126,7 @@ class ClassifyCollector:
         self._id_counter += 1
         self._seen_titles.add(event.title)
         
-        logger.debug(f"📝 收集多用途应用: {event.app} - {event.title[:30]}...")
+        logger.debug(f"收集多用途应用: {event.app} - {event.title[:30]}...")
     
     def build_state(self) -> classifyState:
         """

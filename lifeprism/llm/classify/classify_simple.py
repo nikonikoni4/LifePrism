@@ -22,7 +22,6 @@ from lifeprism.llm.utils import (
 
 MAX_LOG_ITEMS = 15
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

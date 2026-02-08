@@ -76,10 +76,10 @@ class DataProcessingService:
             total_events = len(filtered_data) + (len(classify_state.log_items) if classify_state.log_items else 0)
             filtered_events = len(filtered_data)
             apps_to_classify = len(classify_state.log_items) if classify_state.log_items else 0
-            logger.info(f"  ✓ 获取并过滤后保留 {filtered_events} 条事件")
+            logger.info(f"  [OK] 获取并过滤后保留 {filtered_events} 条事件")
             if not filtered_data.empty:
                 logger.info(f"  {filtered_data[['app','duration','start_time','end_time']]}")
-            logger.info(f"  ✓ 发现 {apps_to_classify} 条待分类日志项")
+            logger.info(f"  [OK] 发现 {apps_to_classify} 条待分类日志项")
             
             classified_apps = 0
             
@@ -93,7 +93,7 @@ class DataProcessingService:
                 if classified_app_df is not None and not classified_app_df.empty:
                     self.server_lw_data_provider.save_category_map_cache_V2(classified_app_df)
                     classified_apps = len(classified_app_df)
-                    logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
+                    logger.info(f"  [OK] 保存了 {classified_apps} 个应用的分类")
                     
                     # 5. 合并分类结果到事件数据
                     logger.info("步骤 5/6: 合并分类结果...")
@@ -102,7 +102,7 @@ class DataProcessingService:
                         classified_app_df
                     )
                 else:
-                    logger.warning("  ⚠ 分类结果为空，跳过保存和合并")
+                    logger.warning("  [!] 分类结果为空，跳过保存和合并")
             else:
                 logger.info("步骤 3-5/6: 跳过分类（auto_classify=False 或无待分类应用）")
             
@@ -114,7 +114,7 @@ class DataProcessingService:
             logger.info("保存行为日志到数据库...")
             self.server_lw_data_provider.save_user_app_behavior_log(filtered_data)
             saved_events = len(filtered_data)
-            logger.info(f"  ✓ 保存了 {saved_events} 条行为日志")
+            logger.info(f"  [OK] 保存了 {saved_events} 条行为日志")
             
             # 统计结果
             result = {
@@ -177,8 +177,8 @@ class DataProcessingService:
             total_events = len(filtered_data) + (len(classify_state.log_items) if classify_state.log_items else 0)
             filtered_events = len(filtered_data)
             apps_to_classify = len(classify_state.log_items) if classify_state.log_items else 0
-            logger.info(f"  ✓ 获取并过滤后保留 {filtered_events} 条事件")
-            logger.info(f"  ✓ 发现 {apps_to_classify} 条待分类日志项")
+            logger.info(f"  [OK] 获取并过滤后保留 {filtered_events} 条事件")
+            logger.info(f"  [OK] 发现 {apps_to_classify} 条待分类日志项")
             
             classified_apps = 0
             
@@ -192,7 +192,7 @@ class DataProcessingService:
                 if classified_app_df is not None and not classified_app_df.empty:
                     self.server_lw_data_provider.save_category_map_cache_V2(classified_app_df)
                     classified_apps = len(classified_app_df)
-                    logger.info(f"  ✓ 保存了 {classified_apps} 个应用的分类")
+                    logger.info(f"  [OK] 保存了 {classified_apps} 个应用的分类")
                     
                     # 5. 合并分类结果到事件数据
                     logger.info("步骤 5/6: 合并分类结果...")
@@ -201,7 +201,7 @@ class DataProcessingService:
                         classified_app_df
                     )
                 else:
-                    logger.warning("  ⚠ 分类结果为空，跳过保存和合并")
+                    logger.warning("  [!] 分类结果为空，跳过保存和合并")
             else:
                 logger.info("步骤 3-5/6: 跳过分类（auto_classify=False 或无待分类应用）")
             
@@ -213,7 +213,7 @@ class DataProcessingService:
             logger.info("保存行为日志到数据库...")
             self.server_lw_data_provider.save_user_app_behavior_log(filtered_data)
             saved_events = len(filtered_data)
-            logger.info(f"  ✓ 保存了 {saved_events} 条行为日志")
+            logger.info(f"  [OK] 保存了 {saved_events} 条行为日志")
             
             # 统计结果
             result = {
@@ -306,7 +306,7 @@ class DataProcessingService:
         if self._goal_name_to_id_cache is None:
             goals = goal_provider.get_active_goals_for_classify()
             self._goal_name_to_id_cache = {g['name']: g['id'] for g in goals}
-            logger.info(f"  ✓ 创建 goal 名称映射缓存，共 {len(self._goal_name_to_id_cache)} 个可自动追踪目标")
+            logger.info(f"  [OK] 创建 goal 名称映射缓存，共 {len(self._goal_name_to_id_cache)} 个可自动追踪目标")
             logger.debug(f"  [DEBUG] goal_name_to_id 映射: {self._goal_name_to_id_cache}")
         goal_name_to_id = self._goal_name_to_id_cache
         
@@ -367,7 +367,7 @@ class DataProcessingService:
                 sub_category=sub_cat_name
             ))
         
-        logger.info(f"  ✓ 构建 goals 列表，共 {len(goals_for_llm)} 个可自动追踪目标（已过滤被禁用分类和未开启自动追踪的目标）")
+        logger.info(f"  [OK] 构建 goals 列表，共 {len(goals_for_llm)} 个可自动追踪目标（已过滤被禁用分类和未开启自动追踪的目标）")
         
         # 初始化 LLMClassify 分类器
         classifier = LLMClassify(
@@ -379,15 +379,15 @@ class DataProcessingService:
         # 执行分类
         logger.info(f"  调用 LLM 分类器...")
         result = classifier.classify(classify_state)
-        logger.info(f"  ✓ 分类完成")
-        print(result)
+        logger.info(f"  [OK] 分类完成")
+        logger.debug(f"  分类结果: {result}")
         # 处理分类结果
         if result is None or not result.get('result_items'):
-            logger.warning("  ⚠ 分类结果为空")
+            logger.warning("  ! 分类结果为空")
             return pd.DataFrame()
         
         result_items = result['result_items']
-        logger.info(f"  ✓ 获取到 {len(result_items)} 条分类结果")
+        logger.info(f"  [OK] 获取到 {len(result_items)} 条分类结果")
         
         # 保存 token 使用数据（使用 filtered_events 作为 result_items_count）
         self._save_tokens_usage(result, filtered_events)
@@ -457,13 +457,13 @@ class DataProcessingService:
                         'sub_category': item.sub_category,  # 保留用于调试
                     })
         
-        logger.info(f"  ✓ 处理后保留 {len(classified_records)} 条分类记录（原始 {len(result_items)} 条）")
+        logger.info(f"  [OK] 处理后保留 {len(classified_records)} 条分类记录（原始 {len(result_items)} 条）")
         classified_app_df = pd.DataFrame(classified_records)
         
         # 验证分类结果
         logger.info(f"  验证分类结果...")
         classified_app_df = self._validate_classification_results(classified_app_df, category_tree)
-        logger.info(f"  ✓ 验证完成")
+        logger.info(f"  [OK] 验证完成")
         
         return classified_app_df
     
@@ -496,7 +496,7 @@ class DataProcessingService:
             
             # 规则4: A为None但B有值，不合法 -> 修正为都为None
             if pd.isna(cat) and not pd.isna(sub_cat):
-                logger.warning(f"    ⚠ 索引 {idx}: 主分类为None但子分类为'{sub_cat}'，修正为都为None")
+                logger.warning(f"    [!] 索引 {idx}: 主分类为None但子分类为'{sub_cat}'，修正为都为None")
                 df.at[idx, 'sub_category'] = None
                 invalid_count += 1
                 continue
@@ -504,7 +504,7 @@ class DataProcessingService:
             # 规则2: A有值但B为None是合法的（A必须在分类树中）
             if not pd.isna(cat) and pd.isna(sub_cat):
                 if cat not in category_tree:
-                    logger.warning(f"    ⚠ 索引 {idx}: 主分类'{cat}'不在分类树中，修正为None")
+                    logger.warning(f"    [!] 索引 {idx}: 主分类'{cat}'不在分类树中，修正为None")
                     df.at[idx, 'category'] = None
                     invalid_count += 1
                 continue
@@ -513,7 +513,7 @@ class DataProcessingService:
             if not pd.isna(cat) and not pd.isna(sub_cat):
                 # 检查主分类是否存在
                 if cat not in category_tree:
-                    logger.warning(f"    ⚠ 索引 {idx}: 主分类'{cat}'不在分类树中，修正为都为None")
+                    logger.warning(f"    [!] 索引 {idx}: 主分类'{cat}'不在分类树中，修正为都为None")
                     df.at[idx, 'category'] = None
                     df.at[idx, 'sub_category'] = None
                     invalid_count += 1
@@ -522,7 +522,7 @@ class DataProcessingService:
                 # 检查子分类是否属于该主分类
                 if sub_cat not in category_tree[cat]:
                     logger.warning(
-                        f"    ⚠ 索引 {idx}: 子分类'{sub_cat}'不属于主分类'{cat}'，"
+                        f"    [!] 索引 {idx}: 子分类'{sub_cat}'不属于主分类'{cat}'，"
                         f"期望子分类为{category_tree[cat]}，修正为都为None"
                     )
                     df.at[idx, 'category'] = None
@@ -606,7 +606,7 @@ class DataProcessingService:
                 drop_cols.append('link_to_goal_id_single')
             filtered_data = filtered_data.drop(columns=drop_cols)
             
-            logger.info(f"    ✓ 合并了 {mask_single.sum()} 个单用途应用的分类")
+            logger.info(f"    [OK] 合并了 {mask_single.sum()} 个单用途应用的分类")
         
         # 处理多用途应用：按 (app, title) 匹配
         # 注意: app 和 title 已在数据清洗阶段小写化，直接使用原字段匹配
@@ -643,11 +643,11 @@ class DataProcessingService:
                 drop_cols.append('link_to_goal_id_multi')
             filtered_data = filtered_data.drop(columns=drop_cols)
             
-            logger.info(f"    ✓ 合并了 {mask_multi.sum()} 个多用途应用的分类")
+            logger.info(f"    [OK] 合并了 {mask_multi.sum()} 个多用途应用的分类")
         
         # 统计
         total_classified = filtered_data['category_id'].notna().sum()
-        logger.info(f"  ✓ 总共合并了 {total_classified} 条记录的分类")
+        logger.info(f"  [OK] 总共合并了 {total_classified} 条记录的分类")
         
         return filtered_data
     
@@ -679,7 +679,7 @@ class DataProcessingService:
                 'category_id_dict': category_dict,
                 'sub_category_id_dict': sub_category_dict
             }
-            logger.info("  ✓ 创建分类映射字典缓存")
+            logger.info("  [OK] 创建分类映射字典缓存")
         
         # 批量映射
         if 'category' in filtered_data.columns:
@@ -693,7 +693,7 @@ class DataProcessingService:
         
         # 统计映射结果
         mapped_count = filtered_data['category_id'].notna().sum() if 'category_id' in filtered_data.columns else 0
-        logger.info(f"  ✓ 映射了 {mapped_count} 条记录的分类 ID")
+        logger.info(f"  [OK] 映射了 {mapped_count} 条记录的分类 ID")
         
         return filtered_data
      
@@ -734,7 +734,7 @@ class DataProcessingService:
             
             # 保存到数据库
             self.server_lw_data_provider.upsert_session_tokens_usage(session_id, new_usage)
-            logger.info(f"  ✓ 保存 token 使用数据到 {session_id}: input={new_usage['input_tokens']}, output={new_usage['output_tokens']}, total={new_usage['total_tokens']}")
+            logger.info(f"  [OK] 保存 token 使用数据到 {session_id}: input={new_usage['input_tokens']}, output={new_usage['output_tokens']}, total={new_usage['total_tokens']}")
             
         except Exception as e:
             logger.error(f"保存 token 使用数据失败: {e}")

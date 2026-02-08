@@ -323,9 +323,9 @@ def clean_activitywatch_data_old(
     single_count = len([item for item in log_items if not app_registry.get(item.app, AppInFo(description="", is_multipurpose=False)).is_multipurpose])
     multi_count = len([item for item in log_items if app_registry.get(item.app, AppInFo(description="", is_multipurpose=False)).is_multipurpose])
     
-    logger.info(f"📊 过滤统计: 总事件 {len(raw_events)} -> 保留 {len(filtered_events_df)} -> 删除 {removed_count}")
-    logger.info(f"📊 待分类统计: 总项目 {len(log_items)} -> 单用途 {single_count} -> 多用途 {multi_count}")
-    logger.info(f"📊 应用注册表: {len(app_registry)} 个应用")
+    logger.info(f"[STAT] 过滤统计: 总事件 {len(raw_events)} -> 保留 {len(filtered_events_df)} -> 删除 {removed_count}")
+    logger.info(f"[STAT] 待分类统计: 总项目 {len(log_items)} -> 单用途 {single_count} -> 多用途 {multi_count}")
+    logger.info(f"[STAT] 应用注册表: {len(app_registry)} 个应用")
     return filtered_events_df, classify_state
 
 
@@ -479,10 +479,10 @@ def clean_activitywatch_data(
     match_stats = matcher.get_stats()
     collect_stats = collector.get_stats()
     
-    logger.info(f"📊 过滤统计: 总事件 {total_events} -> 保留 {len(all_events)} -> 删除 {total_removed}")
-    logger.info(f"📊 缓存匹配: 命中 {match_stats['matched']}, 未命中 {match_stats['missed']}")
-    logger.info(f"📊 待分类统计: 总项目 {collect_stats['total']} -> 单用途 {collect_stats['single']} -> 多用途 {collect_stats['multi']}")
-    logger.info(f"📊 应用注册表: {collect_stats['apps']} 个应用")
+    logger.info(f"[STAT] 过滤统计: 总事件 {total_events} -> 保留 {len(all_events)} -> 删除 {total_removed}")
+    logger.info(f"[STAT] 缓存匹配: 命中 {match_stats['matched']}, 未命中 {match_stats['missed']}")
+    logger.info(f"[STAT] 待分类统计: 总项目 {collect_stats['total']} -> 单用途 {collect_stats['single']} -> 多用途 {collect_stats['multi']}")
+    logger.info(f"[STAT] 应用注册表: {collect_stats['apps']} 个应用")
     
     return filtered_events_df, classify_state
 

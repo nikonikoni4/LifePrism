@@ -6,7 +6,6 @@ from lifeprism.llm.classify.classify_graph import ClassifyGraph
 from lifeprism.llm.classify.classify_simple import ClassifySimple
 import logging
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 分类器名称到类的映射
