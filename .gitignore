@@ -31,3 +31,5 @@ tests
 *.log
 CLAUDE copy.md
 lifeprismData
+dataset
+plan

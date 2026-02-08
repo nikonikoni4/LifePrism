@@ -91,7 +91,7 @@ class SettingsManager:
         配置文件基础路径（固定，不随数据迁移）
 
         打包环境：%APPDATA%/LifePrism/lifeprismData
-        开发环境：frontend/lifeprismData
+        开发环境：localData
         """
         if getattr(sys, 'frozen', False):
             appdata = os.environ.get('APPDATA', '')
@@ -102,7 +102,7 @@ class SettingsManager:
             app_dir = backend_dir.parent.parent
             root_dir = app_dir.parent
             return root_dir / 'lifeprismData'
-        return Path("frontend/lifeprismData")
+        return Path("localData")
 
     def _resolve_default_data_path(self) -> Path:
         """
@@ -110,7 +110,7 @@ class SettingsManager:
 
         优先级:
         1. 环境变量 LIFEPRISM_DATA_PATH（由 Electron 启动时设置）
-        2. 配置基础路径（打包环境：%APPDATA%/LifePrism/lifeprismData，开发环境：frontend/lifeprismData）
+        2. 配置基础路径（打包环境：%APPDATA%/LifePrism/lifeprismData，开发环境：localData）
 
         Returns:
             Path: lifeprismData 目录路径
