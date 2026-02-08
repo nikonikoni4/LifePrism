@@ -201,6 +201,19 @@ PlanDoc 编辑器、任务池、本地 MD 文件三者可能产生数据冲突�
   → triggerAllPlanDocRefreshes()     ← 刷新编辑器（后端可能修改了 MD：锚点、系统展示区）
 ```
 
+### 保存时机
+
+PlanDocListView 的编辑器内容在以下时机写入 MD 文件：
+
+| 时机 | 触发条件 | 实现位置 |
+|------|---------|---------|
+| 手动保存 | 用户点击保存按钮 / Ctrl+S | `handleSave` |
+| 切换文档 | `selectedDoc.id` 变化且有未保存内容 | `useEffect([selectedDoc?.id])` |
+| 组件卸载 | 切换标签页（如 plans → daily）且有未保存内容 | `useEffect([], cleanup)` |
+| Save Hook | todo 操作前 `triggerAllPlanDocSaves()` 且有未保存内容 | `silentSave` 回调 |
+
+**注意**：Save Hook 回调依赖 PlanDocListView 挂载。当编辑器不在页面上时（如用户在 daily 标签页），回调已被注销，`triggerAllPlanDocSaves()` 不会执行保存。此时依赖"组件卸载时自动保存"确保 MD 文件已是最新。
+
 ### 相关文件
 - `frontend/apps/goals/hooks/usePlanDocSaveHook.ts` - 保存/刷新 Hook 注册机制
 - `frontend/apps/goals/hooks/useTaskPoolStore.ts` - Todo 状态管理（addTask/updateTask/deleteTask 均内置 Save Hook）
