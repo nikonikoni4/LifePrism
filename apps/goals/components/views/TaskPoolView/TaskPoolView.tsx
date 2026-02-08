@@ -13,6 +13,7 @@ import { viewBackground } from '../../shared/backgroundStyles';
 import type { TaskPoolViewProps, TodoItem } from '../../../types';
 import type { TodoDeletePreview } from '../../../types/backend';
 import { taskPoolApi } from '../../../apis/taskPool';
+import { triggerPlanDocSave, triggerAllPlanDocRefreshes } from '../../../hooks/usePlanDocSaveHook';
 
 // State border colors for left accent
 const STATE_BORDER_COLORS: Record<string, string> = {
@@ -169,7 +170,10 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
 
         setIsSyncing(true);
         try {
-            // 1. 先执行 dry_run 预检
+            // 1. 先保存编辑器内容到 MD 文件，确保后端读取最新内容
+            await triggerPlanDocSave(selectedPlanDocId);
+
+            // 2. 执行 dry_run 预检
             const preview = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { dry_run: true });
 
             if (preview.to_delete && preview.to_delete.length > 0) {
@@ -184,6 +188,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                 // 无待删除任务，直接执行同步
                 const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { dry_run: false });
                 await loadTasks(null, selectedPlanDocId);
+                await triggerAllPlanDocRefreshes();
                 setSyncResultMessage(`同步完成：新增 ${result.created}，更新 ${result.updated}`);
                 setTimeout(() => setSyncResultMessage(null), 3000);
             }
@@ -204,6 +209,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
         try {
             const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { confirm_delete: true });
             await loadTasks(null, selectedPlanDocId);
+            await triggerAllPlanDocRefreshes();
             setShowDeleteConfirm(false);
             setSyncPreviewData(null);
             setSyncResultMessage(`同步完成：新增 ${result.created}，更新 ${result.updated}，删除 ${result.deleted}`);
@@ -225,6 +231,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
         try {
             const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { confirm_delete: false });
             await loadTasks(null, selectedPlanDocId);
+            await triggerAllPlanDocRefreshes();
             setShowDeleteConfirm(false);
             setSyncPreviewData(null);
             setSyncResultMessage(`同步完成：新增 ${result.created}，更新 ${result.updated}（已保留 ${syncPreviewData?.toDelete.length || 0} 个任务）`);
