@@ -102,8 +102,9 @@ def _clean_json_string(json_str: str) -> str:
 
 
 def get_default_user_guide_path() -> Path:
-    """获取默认的用户指南文件路径（位于 utils 目录下）"""
-    return Path(__file__).parent / "user_guide.md"
+    """获取默认的用户指南文件路径（位于 lifeprism_data_path/docs/ 下）"""
+    from lifeprism.config.settings_manager import settings
+    return Path(settings.lifeprism_data_path) / "docs" / "user_guide.md"
 
 
 def load_user_guide() -> UserGuide:
