@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // 浮窗管理
     openFloatingWindow: (windowId) => ipcRenderer.invoke('open-floating-window', windowId),
     closeFloatingWindow: (windowId) => ipcRenderer.invoke('close-floating-window', windowId),
+
+    // 对话框窗口管理
+    openDialogWindow: (dialogId, options) => ipcRenderer.invoke('open-dialog-window', dialogId, options),
+    closeDialogWindow: (dialogId) => ipcRenderer.invoke('close-dialog-window', dialogId),
 });
 
 // 在控制台输出 Electron 环境信息

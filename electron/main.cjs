@@ -317,6 +317,82 @@ ipcMain.handle('close-floating-window', (_event, windowId) => {
     return { success: false, reason: 'window not found' };
 });
 
+// 存储对话框窗口
+let dialogWindows = {};
+
+// IPC: 打开对话框窗口
+ipcMain.handle('open-dialog-window', (_event, dialogId, options = {}) => {
+    if (!dialogId || typeof dialogId !== 'string') {
+        return { success: false, reason: 'invalid dialogId' };
+    }
+
+    // 已存在且未销毁 → show + focus
+    const existing = dialogWindows[dialogId];
+    if (existing && !existing.isDestroyed()) {
+        existing.show();
+        existing.focus();
+        return { success: true, action: 'focused' };
+    }
+
+    // 根据 dialogId 设置不同的窗口大小
+    const dialogConfigs = {
+        'todo-picker': { width: 500, height: 600 },
+        'default': { width: 400, height: 500 }
+    };
+    const config = dialogConfigs[dialogId] || dialogConfigs['default'];
+
+    const win = new BrowserWindow({
+        width: config.width,
+        height: config.height,
+        frame: false,           // 无边框
+        alwaysOnTop: true,      // 置顶
+        resizable: true,
+        skipTaskbar: false,
+        center: true,           // 居中显示
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.cjs'),
+            nodeIntegration: false,
+            contextIsolation: true
+        }
+    });
+
+    // 加载对话框页面（hash 路由）
+    win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), {
+        hash: `/dialog/${dialogId}`
+    });
+
+    // 右键菜单
+    win.webContents.on('context-menu', () => {
+        const menu = Menu.buildFromTemplate([
+            {
+                label: '关闭对话框',
+                click: () => {
+                    if (!win.isDestroyed()) win.close();
+                }
+            }
+        ]);
+        menu.popup({ window: win });
+    });
+
+    // 关闭时清理引用
+    win.on('closed', () => {
+        delete dialogWindows[dialogId];
+    });
+
+    dialogWindows[dialogId] = win;
+    return { success: true, action: 'created' };
+});
+
+// IPC: 关闭对话框窗口
+ipcMain.handle('close-dialog-window', (_event, dialogId) => {
+    const win = dialogWindows[dialogId];
+    if (win && !win.isDestroyed()) {
+        win.close();
+        return { success: true };
+    }
+    return { success: false, reason: 'dialog not found' };
+});
+
 app.whenReady().then(() => {
     console.log('[Electron] 应用启动中...');
     console.log(`[Electron] LifePrism 数据路径: ${getLifeprismDataPath()}`);
@@ -360,6 +436,14 @@ app.on('before-quit', () => {
         }
     }
     floatingWindows = {};
+
+    // 关闭所有对话框窗口
+    for (const [id, win] of Object.entries(dialogWindows)) {
+        if (win && !win.isDestroyed()) {
+            win.close();
+        }
+    }
+    dialogWindows = {};
 
     // 关闭后端进程
     if (backendProcess) {

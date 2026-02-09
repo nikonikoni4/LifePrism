@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AppShell } from './shell/AppShell';
 import { FloatingRouter } from './floating/FloatingRouter';
+import { DialogRouter } from './dialogs/DialogRouter';
 import { incrementalSync } from './core/services/syncService';
 import { initApiConfig } from './core/services/apiConfig';
 import { toast } from './core/components';
@@ -90,6 +91,11 @@ function App() {
   // 浮窗路由分流：跳过主窗口的 API 初始化、同步等逻辑
   if (location.pathname.startsWith('/floating/')) {
     return <FloatingRouter />;
+  }
+
+  // 对话框路由分流：独立的对话框窗口
+  if (location.pathname.startsWith('/dialog/')) {
+    return <DialogRouter />;
   }
 
   return <MainApp />;
