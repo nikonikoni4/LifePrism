@@ -6,6 +6,7 @@ const fs = require('fs');
 let mainWindow;
 let backendProcess;
 let tray = null;
+let floatingWindows = {};
 
 // 获取 lifeprismData 路径
 function getLifeprismDataPath() {
@@ -251,6 +252,71 @@ ipcMain.handle('app-quit', () => {
     app.quit();
 });
 
+// IPC: 打开浮窗
+ipcMain.handle('open-floating-window', (_event, windowId) => {
+    if (!windowId || typeof windowId !== 'string') {
+        return { success: false, reason: 'invalid windowId' };
+    }
+
+    // 已存在且未销毁 → show + focus
+    const existing = floatingWindows[windowId];
+    if (existing && !existing.isDestroyed()) {
+        existing.show();
+        existing.focus();
+        return { success: true, action: 'focused' };
+    }
+
+    const win = new BrowserWindow({
+        width: 320,
+        height: 400,
+        frame: false,
+        alwaysOnTop: true,
+        resizable: true,
+        skipTaskbar: false,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.cjs'),
+            nodeIntegration: false,
+            contextIsolation: true
+        }
+    });
+
+    // 加载浮窗页面（hash 路由）
+    win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), {
+        hash: `/floating/${windowId}`
+    });
+
+    // 右键菜单
+    win.webContents.on('context-menu', () => {
+        const menu = Menu.buildFromTemplate([
+            {
+                label: '关闭浮窗',
+                click: () => {
+                    if (!win.isDestroyed()) win.close();
+                }
+            }
+        ]);
+        menu.popup({ window: win });
+    });
+
+    // 关闭时清理引用
+    win.on('closed', () => {
+        delete floatingWindows[windowId];
+    });
+
+    floatingWindows[windowId] = win;
+    return { success: true, action: 'created' };
+});
+
+// IPC: 关闭浮窗
+ipcMain.handle('close-floating-window', (_event, windowId) => {
+    const win = floatingWindows[windowId];
+    if (win && !win.isDestroyed()) {
+        win.close();
+        return { success: true };
+    }
+    return { success: false, reason: 'window not found' };
+});
+
 app.whenReady().then(() => {
     console.log('[Electron] 应用启动中...');
     console.log(`[Electron] LifePrism 数据路径: ${getLifeprismDataPath()}`);
@@ -286,6 +352,14 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
     console.log('[Electron] 应用即将退出...');
     app.isQuitting = true;
+
+    // 关闭所有浮窗
+    for (const [id, win] of Object.entries(floatingWindows)) {
+        if (win && !win.isDestroyed()) {
+            win.close();
+        }
+    }
+    floatingWindows = {};
 
     // 关闭后端进程
     if (backendProcess) {

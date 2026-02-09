@@ -25,6 +25,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // 退出应用（数据迁移后调用）
     quitApp: () => ipcRenderer.invoke('app-quit'),
+
+    // 浮窗管理
+    openFloatingWindow: (windowId) => ipcRenderer.invoke('open-floating-window', windowId),
+    closeFloatingWindow: (windowId) => ipcRenderer.invoke('close-floating-window', windowId),
 });
 
 // 在控制台输出 Electron 环境信息

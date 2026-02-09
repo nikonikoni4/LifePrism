@@ -24,6 +24,8 @@ declare global {
             selectFile: (filters?: Array<{name: string; extensions: string[]}>) => Promise<string | null>;
             getInstallPath: () => Promise<string | null>;
             quitApp: () => Promise<void>;
+            openFloatingWindow: (windowId: string) => Promise<{ success: boolean; action?: string; reason?: string }>;
+            closeFloatingWindow: (windowId: string) => Promise<{ success: boolean; reason?: string }>;
         };
     }
 }

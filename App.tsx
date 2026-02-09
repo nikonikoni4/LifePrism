@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AppShell } from './shell/AppShell';
+import { FloatingRouter } from './floating/FloatingRouter';
 import { incrementalSync } from './core/services/syncService';
 import { initApiConfig } from './core/services/apiConfig';
 import { toast } from './core/components';
 
-function App() {
+function MainApp() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isApiReady, setIsApiReady] = useState(false);
@@ -51,7 +53,7 @@ function App() {
 
   return (
     <>
-      {/* 全局同步状态指示器 (Optional: could move to AppShell or specialized component) */}
+      {/* 全局同步状态指示器 */}
       {isSyncing && (
         <div className="fixed top-0 left-0 right-0 z-[10000] bg-blue-500 text-white px-4 py-2 text-center text-sm font-medium shadow-lg pointer-events-none">
           <span className="inline-flex items-center">
@@ -80,6 +82,17 @@ function App() {
       )}
     </>
   );
+}
+
+function App() {
+  const location = useLocation();
+
+  // 浮窗路由分流：跳过主窗口的 API 初始化、同步等逻辑
+  if (location.pathname.startsWith('/floating/')) {
+    return <FloatingRouter />;
+  }
+
+  return <MainApp />;
 }
 
 export default App;
