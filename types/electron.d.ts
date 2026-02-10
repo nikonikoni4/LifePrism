@@ -1,7 +1,7 @@
 // Electron API 类型定义
 // 这些类型对应 electron/preload.cjs 中暴露的 API
 
-export interface ElectronAPI {
+interface ElectronAPI {
     // 获取 lifeprismData 文件夹路径
     getLifeprismDataPath: () => Promise<string>;
 
@@ -35,10 +35,6 @@ export interface ElectronAPI {
     closeDialogWindow: (dialogId: string) => Promise<{ success: boolean; reason?: string }>;
 }
 
-declare global {
-    interface Window {
-        electronAPI?: ElectronAPI;
-    }
+interface Window {
+    electronAPI?: ElectronAPI;
 }
-
-export { };

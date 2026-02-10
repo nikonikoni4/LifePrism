@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference path="types/electron.d.ts" />
 
 interface ImportMetaEnv {
     readonly DEV: boolean
