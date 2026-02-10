@@ -130,6 +130,7 @@ export interface BackendTaskPoolItem {
     color: string;
     order_index: number;
     pool_order_index: number | null;
+    waid_order: number | null;
     created_at: string | null;
 }
 

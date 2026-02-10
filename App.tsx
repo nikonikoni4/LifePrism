@@ -5,6 +5,7 @@ import { FloatingRouter } from './floating/FloatingRouter';
 import { DialogRouter } from './dialogs/DialogRouter';
 import { incrementalSync } from './core/services/syncService';
 import { initApiConfig } from './core/services/apiConfig';
+import { initPlanDocBridge } from './core/services/ipcPlanDocBridge';
 import { toast } from './core/components';
 
 function MainApp() {
@@ -25,6 +26,11 @@ function MainApp() {
         // 即使失败也设置为 ready，使用默认端口
         setIsApiReady(true);
       });
+  }, []);
+
+  // 初始化 PlanDoc IPC 桥接（主窗口监听浮窗的同步请求）
+  useEffect(() => {
+    initPlanDocBridge();
   }, []);
 
   // 页面加载时自动同步数据（等待 API 配置初始化完成）

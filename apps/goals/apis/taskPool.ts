@@ -39,6 +39,7 @@ export function mapBackendTaskItemToFrontend(item: BackendTaskPoolItem): TodoIte
         color: item.color || '#FFFFFF',
         orderIndex: item.order_index,
         poolOrderIndex: item.pool_order_index,
+        waidOrder: item.waid_order ?? null,
         children: [],
     };
 }

@@ -393,6 +393,46 @@ ipcMain.handle('close-dialog-window', (_event, dialogId) => {
     return { success: false, reason: 'dialog not found' };
 });
 
+// IPC: 浮窗/对话框 → 指定浮窗
+ipcMain.handle('send-to-floating', (_event, windowId, channel, data) => {
+    const win = floatingWindows[windowId];
+    if (win && !win.isDestroyed()) {
+        win.webContents.send(channel, data);
+        return { success: true };
+    }
+    return { success: false };
+});
+
+// IPC: 浮窗/对话框 → 主窗口
+ipcMain.handle('send-to-main', (_event, channel, data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(channel, data);
+        return { success: true };
+    }
+    return { success: false };
+});
+
+// IPC: 主窗口 → 对话框
+ipcMain.handle('send-to-dialog', (_event, dialogId, channel, data) => {
+    const win = dialogWindows[dialogId];
+    if (win && !win.isDestroyed()) {
+        win.webContents.send(channel, data);
+        return { success: true };
+    }
+    return { success: false };
+});
+
+// IPC: 调整浮窗大小
+ipcMain.handle('resize-floating-window', (_event, windowId, { width, height }) => {
+    const win = floatingWindows[windowId];
+    if (win && !win.isDestroyed()) {
+        const [currentWidth] = win.getSize();
+        win.setSize(width ?? currentWidth, Math.round(height));
+        return { success: true };
+    }
+    return { success: false };
+});
+
 app.whenReady().then(() => {
     console.log('[Electron] 应用启动中...');
     console.log(`[Electron] LifePrism 数据路径: ${getLifeprismDataPath()}`);

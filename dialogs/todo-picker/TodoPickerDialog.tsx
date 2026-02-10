@@ -1,28 +1,119 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { TodoItem } from '../../apps/goals/types/todo';
+import { taskPoolApi } from '../../apps/goals/apis/taskPool';
+import { goalsV2Api } from '../../apps/goals/apis/goal';
+import { WaidAPI } from '../../floating/what-am-i-doing/api/waidApi';
+import { flatListToTree, getDescendantIds, findItemById } from '../../my-ui-kit/ui-kit/todoItem/utils';
+
+type StateFilter = 'all' | 'pool' | 'scheduled';
 
 export const TodoPickerDialog: React.FC = () => {
-    // 关闭对话框
+    const [allTodos, setAllTodos] = useState<TodoItem[]>([]);
+    const [goalNames, setGoalNames] = useState<Record<string, string>>({});
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [search, setSearch] = useState('');
+    const [stateFilter, setStateFilter] = useState<StateFilter>('all');
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+
+    // 加载数据
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const [todos, goals] = await Promise.all([
+                    taskPoolApi.fetchTaskPool(null, null, undefined),
+                    goalsV2Api.getGoals(),
+                ]);
+                // 过滤：未完成 + 未在浮窗中
+                const available = todos.filter(
+                    (t) => t.state !== 'completed' && t.waidOrder === null
+                );
+                setAllTodos(available);
+
+                const nameMap: Record<string, string> = {};
+                goals.forEach((g) => { nameMap[g.id] = g.title; });
+                setGoalNames(nameMap);
+            } catch (e) {
+                console.error('[TodoPicker] Load failed:', e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+    }, []);
+
+    // 过滤
+    const filtered = useMemo(() => {
+        return allTodos.filter((t) => {
+            if (stateFilter === 'pool' && t.state !== 'pool') return false;
+            if (stateFilter === 'scheduled' && t.state !== 'scheduled') return false;
+            if (search && !t.content.toLowerCase().includes(search.toLowerCase())) return false;
+            return true;
+        });
+    }, [allTodos, stateFilter, search]);
+
+    // 按 goalId 分组
+    const groups = useMemo(() => {
+        const map = new Map<string, TodoItem[]>();
+        filtered.forEach((t) => {
+            const key = t.goalId || '__none__';
+            if (!map.has(key)) map.set(key, []);
+            map.get(key)!.push(t);
+        });
+        return map;
+    }, [filtered]);
+
+    // 构建树（用于父子联动）
+    const tree = useMemo(() => flatListToTree(allTodos), [allTodos]);
+
+    // 选择/取消（父子联动：从树中查找节点以获取 children）
+    const toggleSelect = useCallback((item: TodoItem) => {
+        const treeNode = findItemById(tree, item.id);
+        const target = treeNode || item;
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            const descendants = getDescendantIds(target);
+            if (next.has(item.id)) {
+                descendants.forEach((id) => next.delete(id as number));
+            } else {
+                descendants.forEach((id) => next.add(id as number));
+            }
+            return next;
+        });
+    }, [tree]);
+
     const handleClose = async () => {
-        if (window.electronAPI?.closeDialogWindow) {
-            await window.electronAPI.closeDialogWindow('todo-picker');
+        await window.electronAPI?.closeDialogWindow?.('todo-picker');
+    };
+
+    const handleConfirm = async () => {
+        if (selectedIds.size === 0) return;
+        setSubmitting(true);
+        try {
+            await WaidAPI.batchAddToWaid(Array.from(selectedIds));
+            // 通知浮窗刷新
+            await window.electronAPI?.sendToFloating?.('what-am-i-doing', 'waid-refresh', {});
+            await handleClose();
+        } catch (e) {
+            console.error('[TodoPicker] Confirm failed:', e);
+            setSubmitting(false);
         }
     };
 
-    // 确认选择（暂时只是关闭）
-    const handleConfirm = async () => {
-        // TODO: 后续实现选择逻辑，将选中的 todo 返回给浮窗
-        console.log('确认选择 Todo');
-        await handleClose();
-    };
+    const stateFilters: { key: StateFilter; label: string }[] = [
+        { key: 'all', label: 'All' },
+        { key: 'pool', label: 'Pool' },
+        { key: 'scheduled', label: 'Scheduled' },
+    ];
 
     return (
-        <div className="h-screen flex flex-col bg-slate-900 text-white select-none overflow-hidden">
-            {/* 拖拽区域 / 标题栏 */}
+        <div className="h-screen flex flex-col bg-[#1e1e1e] text-white select-none overflow-hidden">
+            {/* 标题栏 */}
             <div
                 className="h-10 flex items-center justify-between px-4 bg-gradient-to-r from-emerald-600 to-teal-600 shrink-0"
                 style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
             >
-                <span className="text-sm font-medium text-white/90">选择任务</span>
+                <span className="text-sm font-medium text-white/90">Select Tasks</span>
                 <button
                     onClick={handleClose}
                     className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/20 transition-colors"
@@ -34,104 +125,100 @@ export const TodoPickerDialog: React.FC = () => {
                 </button>
             </div>
 
-            {/* 搜索框 */}
-            <div className="shrink-0 p-4 border-b border-slate-700/50">
-                <div className="relative">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="M21 21l-4.35-4.35" />
-                    </svg>
-                    <input
-                        type="text"
-                        placeholder="搜索任务..."
-                        className="w-full h-10 pl-10 pr-4 rounded-lg bg-slate-800 border border-slate-600/50 focus:border-emerald-500/50 focus:outline-none text-sm text-white placeholder-slate-500"
-                    />
+            {/* 搜索 + 筛选 */}
+            <div className="shrink-0 px-3 pt-3 pb-2 space-y-2 border-b border-white/5">
+                <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search..."
+                    className="w-full h-8 px-3 rounded bg-white/10 border border-white/10 focus:border-emerald-500/50 focus:outline-none text-sm text-white placeholder-white/30"
+                />
+                <div className="flex gap-1">
+                    {stateFilters.map((f) => (
+                        <button
+                            key={f.key}
+                            onClick={() => setStateFilter(f.key)}
+                            className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                                stateFilter === f.key
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-white/5 text-white/50 hover:text-white/70'
+                            }`}
+                        >
+                            {f.label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
             {/* 任务列表 */}
-            <div className="flex-1 overflow-y-auto p-4">
-                {/* 分组示例：工作 */}
-                <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">📁 工作</span>
-                    </div>
-                    <div className="space-y-2">
-                        <TodoItem title="完成项目文档" />
-                        <TodoItem title="代码审查" />
-                        <TodoItem title="准备周报" />
-                    </div>
-                </div>
-
-                {/* 分组示例：学习 */}
-                <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">📁 学习</span>
-                    </div>
-                    <div className="space-y-2">
-                        <TodoItem title="看 React 教程" />
-                        <TodoItem title="练习 TypeScript" />
-                    </div>
-                </div>
-
-                {/* 分组示例：生活 */}
-                <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">📁 生活</span>
-                    </div>
-                    <div className="space-y-2">
-                        <TodoItem title="健身" />
-                        <TodoItem title="阅读" />
-                    </div>
-                </div>
+            <div className="flex-1 overflow-y-auto px-3 py-2">
+                {loading ? (
+                    <div className="flex items-center justify-center py-8 text-white/30 text-sm">Loading...</div>
+                ) : filtered.length === 0 ? (
+                    <div className="flex items-center justify-center py-8 text-white/30 text-sm">No tasks available</div>
+                ) : (
+                    Array.from(groups.entries()).map(([goalId, items]) => (
+                        <div key={goalId} className="mb-3">
+                            <div className="text-xs text-white/40 font-medium mb-1 px-1">
+                                {goalId === '__none__' ? 'Uncategorized' : goalNames[goalId] || goalId}
+                            </div>
+                            <div className="space-y-0.5">
+                                {items.map((item) => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => toggleSelect(item)}
+                                        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors ${
+                                            selectedIds.has(item.id)
+                                                ? 'bg-emerald-600/20'
+                                                : 'hover:bg-white/5'
+                                        }`}
+                                    >
+                                        <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
+                                            selectedIds.has(item.id)
+                                                ? 'bg-emerald-500 border-emerald-500'
+                                                : 'border-white/30'
+                                        }`}>
+                                            {selectedIds.has(item.id) && (
+                                                <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                                                    <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <span
+                                            className="w-2 h-2 rounded-full flex-shrink-0"
+                                            style={{ backgroundColor: item.color || '#666' }}
+                                        />
+                                        <span className="text-sm text-white/80 truncate">{item.content}</span>
+                                        <span className="text-xs text-white/30 ml-auto flex-shrink-0">{item.state}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
 
-            {/* 底部按钮区 */}
-            <div className="shrink-0 p-4 border-t border-slate-700/50 flex gap-3">
+            {/* 底部按钮 */}
+            <div className="shrink-0 px-3 py-2 border-t border-white/5 flex gap-2">
                 <button
                     onClick={handleClose}
-                    className="flex-1 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors"
+                    className="flex-1 py-2 rounded bg-white/5 hover:bg-white/10 text-white/70 text-sm transition-colors"
                 >
-                    取消
+                    Cancel
                 </button>
                 <button
                     onClick={handleConfirm}
-                    className="flex-1 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
+                    disabled={selectedIds.size === 0 || submitting}
+                    className={`flex-1 py-2 rounded text-sm font-medium transition-colors ${
+                        selectedIds.size > 0 && !submitting
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                            : 'bg-white/5 text-white/30 cursor-not-allowed'
+                    }`}
                 >
-                    确认添加
+                    {submitting ? 'Adding...' : `Add ${selectedIds.size > 0 ? `(${selectedIds.size})` : ''}`}
                 </button>
             </div>
         </div>
-    );
-};
-
-// 单个 Todo 项组件
-const TodoItem: React.FC<{ title: string }> = ({ title }) => {
-    const [isSelected, setIsSelected] = React.useState(false);
-
-    return (
-        <button
-            onClick={() => setIsSelected(!isSelected)}
-            className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${isSelected
-                ? 'bg-emerald-600/20 border-emerald-500/50'
-                : 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600'
-                }`}
-        >
-            {/* 复选框 */}
-            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected
-                ? 'bg-emerald-500 border-emerald-500'
-                : 'border-slate-500'
-                }`}>
-                {isSelected && (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" className="w-3 h-3">
-                        <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                )}
-            </div>
-            {/* 标题 */}
-            <span className={`text-sm text-left ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                {title}
-            </span>
-        </button>
     );
 };

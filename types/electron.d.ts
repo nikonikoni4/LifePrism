@@ -33,6 +33,16 @@ interface ElectronAPI {
     // 对话框窗口管理
     openDialogWindow: (dialogId: string, options?: Record<string, unknown>) => Promise<{ success: boolean; action?: string; reason?: string }>;
     closeDialogWindow: (dialogId: string) => Promise<{ success: boolean; reason?: string }>;
+
+    // 窗口间通信
+    sendToFloating: (windowId: string, channel: string, data?: unknown) => Promise<{ success: boolean }>;
+    sendToMain: (channel: string, data?: unknown) => Promise<{ success: boolean }>;
+    sendToDialog: (dialogId: string, channel: string, data?: unknown) => Promise<{ success: boolean }>;
+    onMessage: (channel: string, callback: (data: unknown) => void) => void;
+    removeMessageListener: (channel: string, callback: (data: unknown) => void) => void;
+
+    // 浮窗大小调整
+    resizeFloatingWindow: (windowId: string, size: { width?: number; height?: number }) => Promise<{ success: boolean }>;
 }
 
 interface Window {

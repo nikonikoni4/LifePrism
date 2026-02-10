@@ -33,6 +33,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // 对话框窗口管理
     openDialogWindow: (dialogId, options) => ipcRenderer.invoke('open-dialog-window', dialogId, options),
     closeDialogWindow: (dialogId) => ipcRenderer.invoke('close-dialog-window', dialogId),
+
+    // 窗口间通信
+    sendToFloating: (windowId, channel, data) =>
+        ipcRenderer.invoke('send-to-floating', windowId, channel, data),
+    sendToMain: (channel, data) =>
+        ipcRenderer.invoke('send-to-main', channel, data),
+    sendToDialog: (dialogId, channel, data) =>
+        ipcRenderer.invoke('send-to-dialog', dialogId, channel, data),
+    onMessage: (channel, callback) => {
+        const handler = (_event, data) => callback(data);
+        ipcRenderer.on(channel, handler);
+    },
+    removeMessageListener: (channel, callback) => {
+        ipcRenderer.removeAllListeners(channel);
+    },
+
+    // 浮窗大小调整
+    resizeFloatingWindow: (windowId, size) =>
+        ipcRenderer.invoke('resize-floating-window', windowId, size),
 });
 
 // 在控制台输出 Electron 环境信息

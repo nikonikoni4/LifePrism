@@ -14,5 +14,6 @@ export interface TodoItem {
     color: string;
     orderIndex: number;
     poolOrderIndex: number | null;
+    waidOrder: number | null;
     children?: TodoItem[];
 }
