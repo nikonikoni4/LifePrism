@@ -6,7 +6,7 @@ LifePrism是一个专注于个人数据收集，目标管理，习惯养成，�
 
 ### 前置条件
 
-1. 安装activityWacht
+1. 安装 [activityWatch](https://github.com/ActivityWatch/activitywatch)
 2. 下载lifeprism
 
 ### 系统设定
