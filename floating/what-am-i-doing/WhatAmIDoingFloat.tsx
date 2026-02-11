@@ -1,4 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import {
+    DndContext,
+    closestCenter,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { TodoItem } from '../../apps/goals/types/todo';
 import { WaidAPI } from './api/waidApi';
 import { safeUpdateTodo, safeCreateTodo } from './api/safeTodoOps';
@@ -7,7 +20,7 @@ import { useWaidTimer } from './hooks/useWaidTimer';
 import { WaidTodoItem } from './components/WaidTodoItem';
 import { AddTaskMenu } from './components/AddTaskMenu';
 import { getTodayStr } from './utils/formatTime';
-import { flatListToTree } from '../../my-ui-kit/ui-kit/todoItem/utils';
+import { flatListToTree, treeToFlatList } from '../../my-ui-kit/ui-kit/todoItem/utils';
 
 const TITLE_BAR_HEIGHT = 32;
 const ADD_BUTTON_HEIGHT = 40;
@@ -20,8 +33,23 @@ export const WhatAmIDoingFloat: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
     const [newTaskContent, setNewTaskContent] = useState('');
+    const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
     const contentRef = useRef<HTMLDivElement>(null);
     const newTaskInputRef = useRef<HTMLInputElement>(null);
+
+    // dnd-kit sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    );
+
+    const toggleCollapse = useCallback((id: number) => {
+        setCollapsedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
 
     // 计时器
     const handleDurationAdded = useCallback((todoId: number, minutes: number) => {
@@ -143,30 +171,108 @@ export const WhatAmIDoingFloat: React.FC = () => {
         }
     }, [newTaskContent, refreshWaidTodos]);
 
-    // 构建树形结构
-    const tree = useMemo(() => flatListToTree(todos), [todos]);
+    // 构建树形结构（用 waidOrder 覆盖 orderIndex 以确保排序一致）
+    const tree = useMemo(() => {
+        const todosForTree = todos.map((t) => ({
+            ...t,
+            orderIndex: t.waidOrder ?? t.orderIndex,
+        }));
+        return flatListToTree(todosForTree);
+    }, [todos]);
+
+    // 拖拽结束处理
+    const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        // 找到 active 和 over 所在的同级列表
+        const findSiblings = (items: TodoItem[]): TodoItem[] | null => {
+            const ids = items.map((i) => i.id);
+            if (ids.includes(active.id as number) && ids.includes(over.id as number)) {
+                return items;
+            }
+            for (const item of items) {
+                if (item.children && item.children.length > 0) {
+                    const found = findSiblings(item.children as TodoItem[]);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+
+        const siblings = findSiblings(tree);
+        if (!siblings) return;
+
+        const oldIndex = siblings.findIndex((i) => i.id === active.id);
+        const newIndex = siblings.findIndex((i) => i.id === over.id);
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        // 在同级列表中移动
+        const reordered = arrayMove(siblings, oldIndex, newIndex);
+        // 替换 tree 中对应的同级列表，然后 DFS 扁平化
+        const replaceInTree = (items: TodoItem[]): TodoItem[] => {
+            if (items === siblings) return reordered;
+            return items.map((item) => ({
+                ...item,
+                children: item.children && item.children.length > 0
+                    ? replaceInTree(item.children as TodoItem[])
+                    : item.children,
+            }));
+        };
+        const newTree = replaceInTree(tree);
+        const flatIds = treeToFlatList(newTree).map((t) => t.id);
+
+        // 乐观更新本地状态（同步更新 waidOrder 以确保 flatListToTree 排序正确）
+        const reorderedTodos = flatIds
+            .map((id, idx) => {
+                const t = todos.find((t) => t.id === id);
+                return t ? { ...t, waidOrder: idx } : null;
+            })
+            .filter(Boolean) as TodoItem[];
+        setTodos(reorderedTodos);
+
+        // 持久化
+        try {
+            await WaidAPI.reorderWaid(flatIds);
+        } catch (e) {
+            console.error('[WAID] Reorder failed:', e);
+            await refreshWaidTodos();
+        }
+    }, [tree, todos, refreshWaidTodos]);
 
     // 递归渲染 todo 树
     const renderTodoTree = (items: TodoItem[], level: number = 0): React.ReactNode => {
-        return items.map((item) => (
-            <WaidTodoItem
-                key={item.id}
-                item={item}
-                level={level}
-                isTimerActive={activeTimerId === item.id}
-                elapsed={activeTimerId === item.id ? elapsed : 0}
-                accumulatedMinutes={accumulated[item.id] || 0}
-                onToggleComplete={handleToggleComplete}
-                onStartTimer={startTimer}
-                onStopTimer={stopTimer}
-                onContentChange={handleContentChange}
-                onRemove={handleRemove}
-            >
-                {item.children && item.children.length > 0
-                    ? renderTodoTree(item.children as TodoItem[], level + 1)
-                    : null}
-            </WaidTodoItem>
-        ));
+        const ids = items.map((i) => i.id);
+        return (
+            <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+                {items.map((item) => {
+                    const hasChildren = !!(item.children && item.children.length > 0);
+                    const isCollapsed = collapsedIds.has(item.id);
+                    return (
+                        <WaidTodoItem
+                            key={item.id}
+                            item={item}
+                            level={level}
+                            isTimerActive={activeTimerId === item.id}
+                            elapsed={activeTimerId === item.id ? elapsed : 0}
+                            accumulatedMinutes={accumulated[item.id] || 0}
+                            collapsed={isCollapsed}
+                            hasChildren={hasChildren}
+                            onToggleComplete={handleToggleComplete}
+                            onStartTimer={startTimer}
+                            onStopTimer={stopTimer}
+                            onContentChange={handleContentChange}
+                            onRemove={handleRemove}
+                            onToggleCollapse={toggleCollapse}
+                        >
+                            {hasChildren && !isCollapsed
+                                ? renderTodoTree(item.children as TodoItem[], level + 1)
+                                : null}
+                        </WaidTodoItem>
+                    );
+                })}
+            </SortableContext>
+        );
     };
 
     return (
@@ -196,7 +302,13 @@ export const WhatAmIDoingFloat: React.FC = () => {
                     </div>
                 ) : (
                     <>
-                        {renderTodoTree(tree)}
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            {renderTodoTree(tree)}
+                        </DndContext>
                         {/* 内联新建输入框 */}
                         {isCreating && (
                             <div className="px-2 py-1.5">

@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { TodoItem } from '../../../apps/goals/types/todo';
 import { formatElapsed, formatMinutes } from '../utils/formatTime';
 
@@ -8,11 +10,14 @@ interface WaidTodoItemProps {
     isTimerActive: boolean;
     elapsed: number;
     accumulatedMinutes: number;
+    collapsed: boolean;
+    hasChildren: boolean;
     onToggleComplete: (id: number) => void;
     onStartTimer: (item: TodoItem) => void;
     onStopTimer: () => void;
     onContentChange: (id: number, content: string) => void;
     onRemove: (id: number) => void;
+    onToggleCollapse: (id: number) => void;
     children?: React.ReactNode;
 }
 
@@ -22,11 +27,14 @@ export function WaidTodoItem({
     isTimerActive,
     elapsed,
     accumulatedMinutes,
+    collapsed,
+    hasChildren,
     onToggleComplete,
     onStartTimer,
     onStopTimer,
     onContentChange,
     onRemove,
+    onToggleCollapse,
     children,
 }: WaidTodoItemProps) {
     const [isEditing, setIsEditing] = useState(false);
@@ -35,6 +43,21 @@ export function WaidTodoItem({
     const inputRef = useRef<HTMLInputElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const isCompleted = item.state === 'completed';
+
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: item.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
 
     useEffect(() => {
         if (isEditing && inputRef.current) {
@@ -75,23 +98,59 @@ export function WaidTodoItem({
     };
 
     return (
-        <div>
+        <div ref={setNodeRef} style={style} className="relative">
+            {/* 层级连接线 */}
+            {level > 0 && (
+                <div
+                    className="absolute top-0 bottom-0 border-l border-white/10"
+                    style={{ left: `${8 + (level - 1) * 20 + 10}px` }}
+                />
+            )}
             <div
                 className="flex items-center gap-1.5 px-2 py-1.5 group hover:bg-white/5 rounded"
                 style={{ paddingLeft: `${8 + level * 20}px` }}
             >
+                {/* 拖拽手柄 */}
+                <button
+                    className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-white/20 hover:text-white/50 cursor-grab active:cursor-grabbing"
+                    {...attributes}
+                    {...listeners}
+                >
+                    <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
+                        <circle cx="5" cy="3" r="1.2" />
+                        <circle cx="11" cy="3" r="1.2" />
+                        <circle cx="5" cy="8" r="1.2" />
+                        <circle cx="11" cy="8" r="1.2" />
+                        <circle cx="5" cy="13" r="1.2" />
+                        <circle cx="11" cy="13" r="1.2" />
+                    </svg>
+                </button>
+
+                {/* 折叠箭头 */}
+                {hasChildren ? (
+                    <button
+                        onClick={() => onToggleCollapse(item.id)}
+                        className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-white/40 hover:text-white/70"
+                    >
+                        <svg className={`w-3 h-3 transition-transform ${collapsed ? '' : 'rotate-90'}`} viewBox="0 0 12 12" fill="currentColor">
+                            <path d="M4 2l4 4-4 4V2z" />
+                        </svg>
+                    </button>
+                ) : (
+                    <span className="flex-shrink-0 w-4" />
+                )}
+
                 {/* Checkbox */}
                 <button
                     onClick={() => onToggleComplete(item.id)}
-                    className={`flex-shrink-0 w-4 h-4 rounded border ${
-                        isCompleted
+                    className={`flex-shrink-0 w-4 h-4 rounded border ${isCompleted
                             ? 'bg-green-500 border-green-500'
                             : 'border-white/40 hover:border-white/70'
-                    } flex items-center justify-center transition-colors`}
+                        } flex items-center justify-center transition-colors`}
                 >
                     {isCompleted && (
                         <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                            <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                     )}
                 </button>
@@ -108,9 +167,8 @@ export function WaidTodoItem({
                     />
                 ) : (
                     <span
-                        className={`flex-1 min-w-0 text-sm truncate cursor-text ${
-                            isCompleted ? 'line-through text-white/40' : 'text-white/90'
-                        }`}
+                        className={`flex-1 min-w-0 text-sm truncate cursor-text ${isCompleted ? 'line-through text-white/40' : 'text-white/90'
+                            }`}
                         onDoubleClick={() => {
                             if (!isCompleted) {
                                 setEditValue(item.content);
@@ -138,11 +196,10 @@ export function WaidTodoItem({
                 {!isCompleted && (
                     <button
                         onClick={() => isTimerActive ? onStopTimer() : onStartTimer(item)}
-                        className={`flex-shrink-0 w-6 h-6 rounded flex items-center justify-center transition-colors ${
-                            isTimerActive
+                        className={`flex-shrink-0 w-6 h-6 rounded flex items-center justify-center transition-colors ${isTimerActive
                                 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                                 : 'text-white/30 hover:text-white/70 hover:bg-white/10 opacity-0 group-hover:opacity-100'
-                        }`}
+                            }`}
                         title={isTimerActive ? 'Stop' : 'Start'}
                     >
                         {isTimerActive ? (

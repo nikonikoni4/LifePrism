@@ -58,7 +58,8 @@ export function useWaidTimer(
         }
 
         const endTime = new Date();
-        const durationMinutes = Math.round((endTime.getTime() - start.getTime()) / 60000);
+        const elapsedSeconds = (endTime.getTime() - start.getTime()) / 1000;
+        const durationMinutes = Math.ceil(elapsedSeconds / 60);
 
         // 重置状态
         setActiveTimerId(null);
@@ -67,15 +68,15 @@ export function useWaidTimer(
         activeTodoRef.current = null;
         timerStartRef.current = null;
 
-        // duration > 0 时创建 CustomBlock
-        if (durationMinutes > 0) {
+        // 实际经过 >= 60 秒才创建 CustomBlock
+        if (elapsedSeconds >= 60) {
             const blockData: UserCustomBlockCreate = {
                 content: todo.content,
                 start_time: formatLocalDateTime(start),
                 end_time: formatLocalDateTime(endTime),
                 duration: durationMinutes,
                 todo_id: todo.id,
-                color: todo.color || '#FFFFFF',
+                color: '#bfdbfe',
             };
             try {
                 await CustomBlockAPI.create(blockData);
@@ -111,11 +112,12 @@ export function useWaidTimer(
             if (!activeTodoRef.current || !timerStartRef.current) return;
 
             const endTime = new Date();
-            const durationMinutes = Math.round(
+            const durationMinutes = Math.ceil(
                 (endTime.getTime() - timerStartRef.current.getTime()) / 60000
             );
+            const elapsedSec = (endTime.getTime() - timerStartRef.current.getTime()) / 1000;
 
-            if (durationMinutes > 0) {
+            if (elapsedSec >= 60) {
                 // 使用 sendBeacon 确保窗口关闭时请求能发出
                 const blockData: UserCustomBlockCreate = {
                     content: activeTodoRef.current.content,
@@ -123,7 +125,7 @@ export function useWaidTimer(
                     end_time: formatLocalDateTime(endTime),
                     duration: durationMinutes,
                     todo_id: activeTodoRef.current.id,
-                    color: activeTodoRef.current.color || '#FFFFFF',
+                    color: '#bfdbfe',
                 };
                 const url = `${getApiV2UrlSync()}/timeline/custom-blocks`;
                 const blob = new Blob([JSON.stringify(blockData)], { type: 'application/json' });
