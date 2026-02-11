@@ -19,8 +19,11 @@ from lifeprism.server.schemas.taskpool_schemas import (
     CreateTodoV2Response,
     UpdateTodoV2Request,
     UpdateTodoV2Response,
+    WaidReorderRequest,
+    WaidAddRequest,
 )
 from lifeprism.server.services import taskpool_service
+from lifeprism.server.providers.todo_provider import todo_provider
 
 router = APIRouter(prefix="/todos", tags=["Todos"])
 
@@ -92,6 +95,63 @@ async def create_todo(request: CreateTodoV2Request):
         raise HTTPException(status_code=500, detail="创建任务失败")
 
     return CreateTodoV2Response(item=result)
+
+
+# ============================================================================
+# WAID 浮窗接口
+# ============================================================================
+
+@router.get("/waid", response_model=TaskPoolResponse, summary="获取 WAID 浮窗 todo 列表")
+async def get_waid_todos():
+    """获取浮窗中的 todo 列表（waid_order IS NOT NULL，ASC 排序）"""
+    items = todo_provider.get_waid_todos()
+    task_items = [taskpool_service._db_to_taskpool_item(item) for item in items]
+    return TaskPoolResponse(items=task_items)
+
+
+@router.put("/waid/reorder", summary="WAID 浮窗重排序")
+async def reorder_waid(request: WaidReorderRequest):
+    """批量更新排序，body: { "todo_ids": [3, 1, 5] }"""
+    success = todo_provider.batch_update_waid_order(request.todo_ids)
+    if not success:
+        raise HTTPException(status_code=500, detail="重排序失败")
+    return {"success": True}
+
+
+@router.put("/{todo_id}/waid", summary="添加 todo 到 WAID 浮窗")
+async def add_to_waid(
+    todo_id: int = Path(..., description="任务 ID"),
+    request: WaidAddRequest = WaidAddRequest()
+):
+    """添加 todo 到浮窗。如果未指定 waid_order，自动追加到末尾（MAX+1）"""
+    todo = taskpool_service.get_todo_by_id(todo_id)
+    if not todo:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    order = request.waid_order
+    if order is None:
+        waid_todos = todo_provider.get_waid_todos()
+        if waid_todos:
+            max_order = max(t.get('waid_order', 0) for t in waid_todos)
+            order = max_order + 1
+        else:
+            order = 0
+
+    success = todo_provider.update_todo(todo_id, {'waid_order': order})
+    if not success:
+        raise HTTPException(status_code=500, detail="添加到浮窗失败")
+    return {"success": True, "waid_order": order}
+
+
+@router.delete("/{todo_id}/waid", summary="从 WAID 浮窗移除")
+async def remove_from_waid(
+    todo_id: int = Path(..., description="任务 ID")
+):
+    """从浮窗移除（设 waid_order = NULL），不删除 todo 本身"""
+    success = todo_provider.clear_waid_order(todo_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="任务不存在或未在浮窗中")
+    return {"success": True}
 
 
 # ============================================================================

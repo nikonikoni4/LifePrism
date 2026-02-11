@@ -8,8 +8,11 @@ from lifeprism.server.schemas.timeline_schemas import (
     UserCustomBlockUpdate,
     UserCustomBlockResponse,
     UserCustomBlockListResponse,
+    TodoDurationResponse,
 )
+from lifeprism.server.schemas.taskpool_schemas import BatchDurationRequest, BatchDurationResponse
 from lifeprism.server.services import timeline_service
+from lifeprism.server.providers.timeline_provider import timeline_provider
 
 router = APIRouter(prefix="/timeline", tags=["Timeline V2"])
 
@@ -91,6 +94,29 @@ async def get_custom_blocks(
     - **date**: 查询日期，格式 YYYY-MM-DD
     """
     return timeline_service.get_custom_blocks_by_date(date)
+
+
+# ============================================================================
+# WAID 累计时长查询
+# ============================================================================
+
+@router.get("/custom-blocks/duration-by-todo", response_model=TodoDurationResponse,
+            summary="查询 todo 累计时长")
+async def get_duration_by_todo(
+    todo_id: int = Query(..., description="待办事项 ID"),
+    date: str = Query(..., description="查询日期（YYYY-MM-DD）")
+):
+    """查询指定 todo 在指定日期的累计时长（分钟）"""
+    duration = timeline_provider.get_duration_by_todo(todo_id, date)
+    return TodoDurationResponse(todo_id=todo_id, date=date, duration=duration)
+
+
+@router.post("/custom-blocks/batch-duration", response_model=BatchDurationResponse,
+             summary="批量查询 todo 累计时长")
+async def batch_get_duration(request: BatchDurationRequest):
+    """批量查询多个 todo 的累计时长。返回 { "data": { "1": 45, "2": 0 } }"""
+    result = timeline_provider.batch_get_duration_by_todos(request.todo_ids, request.date)
+    return BatchDurationResponse(data={str(k): v for k, v in result.items()})
 
 
 @router.get("/custom-blocks/{block_id}", response_model=UserCustomBlockResponse)

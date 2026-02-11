@@ -182,7 +182,7 @@ class TodoProvider(LWBaseDataProvider):
                     'date', 'expected_finished_at', 'actual_finished_at',
                     'cross_day', 'pool_order_index', 'folder_id',
                     'parent_id', 'plan_doc_id', 'source_anchor_id',
-                    'delay_days', 'delay_reason'
+                    'delay_days', 'delay_reason', 'waid_order'
                 ]
                 for key, value in data.items():
                     if key in allowed_fields:
@@ -192,16 +192,16 @@ class TodoProvider(LWBaseDataProvider):
                             values.append(1 if value else 0)
                         else:
                             values.append(value)
-                
+
                 if not set_clauses:
                     return True
-                
+
                 values.append(todo_id)
                 sql = f"UPDATE todo_list SET {', '.join(set_clauses)} WHERE id = ?"
-                
+
                 cursor.execute(sql, values)
                 success = cursor.rowcount > 0
-                
+
                 if success:
                     logger.info(f"更新任务 {todo_id} 成功")
                 return success
@@ -840,7 +840,7 @@ class TodoProvider(LWBaseDataProvider):
                     'date', 'expected_finished_at', 'actual_finished_at',
                     'cross_day', 'pool_order_index', 'order_index',
                     'parent_id', 'plan_doc_id', 'source_anchor_id',
-                    'delay_days', 'delay_reason'
+                    'delay_days', 'delay_reason', 'waid_order'
                 ]
                 
                 for data in updates:
@@ -870,10 +870,76 @@ class TodoProvider(LWBaseDataProvider):
                 
                 logger.info(f"批量更新 {updated_count} 个任务成功")
                 return updated_count
-                
+
         except Exception as e:
             logger.error(f"批量更新任务失败: {e}")
             return updated_count
+
+    # ==================== WAID 浮窗操作 ====================
+
+    def get_waid_todos(self) -> List[Dict[str, Any]]:
+        """获取所有 waid_order IS NOT NULL 的 todo，按 waid_order ASC 排序"""
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT * FROM todo_list WHERE waid_order IS NOT NULL ORDER BY waid_order ASC"
+                )
+                rows = cursor.fetchall()
+                if not rows:
+                    return []
+                columns = [desc[0] for desc in cursor.description]
+                return [dict(zip(columns, row)) for row in rows]
+        except Exception as e:
+            logger.error(f"获取 WAID todo 列表失败: {e}")
+            return []
+
+    def batch_update_waid_order(self, todo_ids: List[int]) -> bool:
+        """批量设置 waid_order，按数组索引顺序赋值 0,1,2...
+
+        Args:
+            todo_ids: todo ID 列表，索引即为新的 waid_order 值
+
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                for idx, tid in enumerate(todo_ids):
+                    cursor.execute(
+                        "UPDATE todo_list SET waid_order = ? WHERE id = ?",
+                        (idx, tid)
+                    )
+                logger.info(f"批量更新 WAID 排序成功，共 {len(todo_ids)} 个")
+                return True
+        except Exception as e:
+            logger.error(f"批量更新 WAID 排序失败: {e}")
+            return False
+
+    def clear_waid_order(self, todo_id: int) -> bool:
+        """将指定 todo 的 waid_order 设为 NULL（从浮窗移除）
+
+        Args:
+            todo_id: 任务 ID
+
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE todo_list SET waid_order = NULL WHERE id = ?",
+                    (todo_id,)
+                )
+                success = cursor.rowcount > 0
+                if success:
+                    logger.info(f"清除 todo {todo_id} 的 WAID 排序")
+                return success
+        except Exception as e:
+            logger.error(f"清除 WAID 排序失败: {e}")
+            return False
 
 
 # 创建全局单例

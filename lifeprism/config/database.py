@@ -455,6 +455,11 @@ TODO_LIST_CONFIG = {
             'type': 'TEXT',
             'constraints': ['DEFAULT NULL'],
             'comment': '延期/未完成原因说明'
+        },
+        'waid_order': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT NULL'],
+            'comment': 'WAID 浮窗排序（NULL=不在浮窗, 0/1/2...=排序位置）'
         }
     },
     'table_constraints': [],
@@ -828,7 +833,8 @@ TIMELINE_CUSTOM_BLOCK_CONFIG = {
     'indexes': [
         {'name': 'idx_timeline_custom_block_start_time', 'columns': ['start_time']},
         {'name': 'idx_timeline_custom_block_end_time', 'columns': ['end_time']},
-        {'name': 'idx_timeline_custom_block_time_range', 'columns': ['start_time', 'end_time']}
+        {'name': 'idx_timeline_custom_block_time_range', 'columns': ['start_time', 'end_time']},
+        {'name': 'idx_timeline_custom_block_todo_id', 'columns': ['todo_id']}
     ],
     'timestamps': True  # 自动添加 created_at, updated_at
 }

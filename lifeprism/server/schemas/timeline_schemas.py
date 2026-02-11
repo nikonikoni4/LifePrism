@@ -123,3 +123,10 @@ class UserCustomBlockListResponse(BaseModel):
     data: List[UserCustomBlock] = Field(default=[], description="用户自定义数据块列表")
     total: int = Field(default=0, description="总数量")
 
+
+class TodoDurationResponse(BaseModel):
+    """单个 todo 累计时长响应"""
+    todo_id: int = Field(..., description="待办事项 ID")
+    date: str = Field(..., description="查询日期")
+    duration: int = Field(..., description="累计时长（分钟）")
+

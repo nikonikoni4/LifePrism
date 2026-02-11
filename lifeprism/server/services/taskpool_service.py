@@ -62,6 +62,7 @@ def _db_to_taskpool_item(db_item: Dict[str, Any]) -> TaskPoolItem:
         created_at=db_item.get('created_at'),
         delay_days=db_item.get('delay_days'),
         delay_reason=db_item.get('delay_reason'),
+        waid_order=db_item.get('waid_order'),
     )
 
 

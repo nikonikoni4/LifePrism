@@ -9,7 +9,7 @@
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, List, Literal
+from typing import Optional, List, Dict, Literal
 
 
 # ============================================================================
@@ -34,6 +34,7 @@ class TaskPoolItem(BaseModel):
     created_at: Optional[str] = Field(default=None, description="创建时间")
     delay_days: Optional[int] = Field(default=None, description="延期天数")
     delay_reason: Optional[str] = Field(default=None, description="延期/未完成原因说明")
+    waid_order: Optional[int] = Field(default=None, description="WAID 浮窗排序")
 
 
 class TaskPoolResponse(BaseModel):
@@ -106,6 +107,7 @@ class UpdateTodoV2Request(BaseModel):
     parent_id: Optional[int] = Field(default=None, description="父任务 ID")
     delay_days: Optional[int] = Field(default=None, description="延期天数")
     delay_reason: Optional[str] = Field(default=None, description="延期/未完成原因说明")
+    waid_order: Optional[int] = Field(default=None, description="WAID 浮窗排序")
 
 
 class UpdateTodoV2Response(BaseModel):
@@ -132,8 +134,30 @@ class CreateTodoV2Request(BaseModel):
     parent_id: Optional[int] = Field(default=None, description="父任务 ID")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期")
     pool_order_index: Optional[int] = Field(default=None, description="任务池排序")
+    waid_order: Optional[int] = Field(default=None, description="WAID 浮窗排序")
 
 
 class CreateTodoV2Response(BaseModel):
     """创建任务响应 (V2)"""
     item: TaskPoolItem = Field(..., description="创建的任务")
+
+
+class WaidReorderRequest(BaseModel):
+    """WAID 浮窗重排序请求"""
+    todo_ids: List[int] = Field(..., description="按新顺序排列的 todo ID 列表")
+
+
+class WaidAddRequest(BaseModel):
+    """添加 todo 到 WAID 浮窗请求"""
+    waid_order: Optional[int] = Field(default=None, description="排序位置（可选，默认追加到末尾）")
+
+
+class BatchDurationRequest(BaseModel):
+    """批量查询累计时长请求"""
+    todo_ids: List[int] = Field(..., description="待办事项 ID 列表")
+    date: str = Field(..., description="查询日期（YYYY-MM-DD）")
+
+
+class BatchDurationResponse(BaseModel):
+    """批量查询累计时长响应"""
+    data: Dict[str, int] = Field(default={}, description="todo_id -> 累计分钟数")

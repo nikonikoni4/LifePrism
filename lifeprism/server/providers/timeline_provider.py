@@ -195,6 +195,70 @@ class TimelineProvider(LWBaseDataProvider):
         affected_rows = self.db.delete("timeline_custom_block", where={"id": block_id})
         return affected_rows > 0
 
+    # ============================================================================
+    # WAID 累计时长查询
+    # ============================================================================
+
+    def get_duration_by_todo(self, todo_id: int, date: str) -> int:
+        """查询指定 todo 在指定日期的累计时长（分钟）
+
+        Args:
+            todo_id: 待办事项 ID
+            date: 日期（YYYY-MM-DD 格式）
+
+        Returns:
+            int: 累计时长（分钟），无记录返回 0
+        """
+        try:
+            start_of_day = f"{date} 00:00:00"
+            end_of_day = f"{date} 23:59:59"
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """SELECT COALESCE(SUM(duration), 0) FROM timeline_custom_block
+                       WHERE todo_id = ? AND start_time >= ? AND start_time <= ?""",
+                    (todo_id, start_of_day, end_of_day)
+                )
+                return cursor.fetchone()[0]
+        except Exception as e:
+            logger.error(f"查询 todo {todo_id} 累计时长失败: {e}")
+            return 0
+
+    def batch_get_duration_by_todos(self, todo_ids: list[int], date: str) -> dict[int, int]:
+        """批量查询多个 todo 在指定日期的累计时长
+
+        Args:
+            todo_ids: 待办事项 ID 列表
+            date: 日期（YYYY-MM-DD 格式）
+
+        Returns:
+            dict: {todo_id: 累计分钟数}
+        """
+        if not todo_ids:
+            return {}
+        try:
+            start_of_day = f"{date} 00:00:00"
+            end_of_day = f"{date} 23:59:59"
+            placeholders = ','.join('?' * len(todo_ids))
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""SELECT todo_id, COALESCE(SUM(duration), 0) as total
+                        FROM timeline_custom_block
+                        WHERE todo_id IN ({placeholders})
+                          AND start_time >= ? AND start_time <= ?
+                        GROUP BY todo_id""",
+                    (*todo_ids, start_of_day, end_of_day)
+                )
+                result = {row[0]: row[1] for row in cursor.fetchall()}
+                for tid in todo_ids:
+                    if tid not in result:
+                        result[tid] = 0
+                return result
+        except Exception as e:
+            logger.error(f"批量查询累计时长失败: {e}")
+            return {tid: 0 for tid in todo_ids}
+
 
 
 timeline_provider = LazySingleton(TimelineProvider)
