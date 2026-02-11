@@ -50,6 +50,11 @@ LifePrism包含：
 实现：觉察（了解自己，觉察当下）->接纳（接纳自己的不完满，才能立足当下）->价值与承诺（承诺做出符合我们价值的行为）的闭环
 
 
+## 鸣谢
+
+感谢以下开源项目为 LifePrism 提供的灵感与支持：
+
+- [ActivityWatch](https://github.com/ActivityWatch/activitywatch) - 核心数据采集与追踪支持。
 
 
 
