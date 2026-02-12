@@ -4,7 +4,7 @@ import { AppShell } from './shell/AppShell';
 import { FloatingRouter } from './floating/FloatingRouter';
 import { DialogRouter } from './dialogs/DialogRouter';
 import { incrementalSync } from './core/services/syncService';
-import { initApiConfig } from './core/services/apiConfig';
+import { initApiConfig, getApiV2UrlSync } from './core/services/apiConfig';
 import { initPlanDocBridge } from './core/services/ipcPlanDocBridge';
 import { toast } from './core/components';
 
@@ -32,6 +32,19 @@ function MainApp() {
   useEffect(() => {
     initPlanDocBridge();
   }, []);
+
+  // 启动时请求系统警告
+  useEffect(() => {
+    if (!isApiReady) return;
+    fetch(`${getApiV2UrlSync()}/system/warnings`)
+      .then(res => res.ok ? res.json() : null)
+      .catch(() => null)
+      .then(data => {
+        if (data?.warnings?.length) {
+          data.warnings.forEach((msg: string) => toast.warning(msg, 10000));
+        }
+      });
+  }, [isApiReady]);
 
   // 页面加载时自动同步数据（等待 API 配置初始化完成）
   useEffect(() => {
