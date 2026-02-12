@@ -7,12 +7,50 @@ let mainWindow;
 let backendProcess;
 let tray = null;
 let floatingWindows = {};
+let logStream = null;
+
+const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB
+
+// 初始化前端日志文件
+function initFrontendLog() {
+    const logDir = path.join(getLifeprismDataPath(), 'debug_logs');
+    if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+    }
+
+    const logPath = path.join(logDir, 'frontend.log');
+
+    // 启动时检查文件大小，超过阈值清空
+    try {
+        if (fs.existsSync(logPath) && fs.statSync(logPath).size > MAX_LOG_SIZE) {
+            fs.writeFileSync(logPath, '');
+        }
+    } catch (_) { /* ignore */ }
+
+    logStream = fs.createWriteStream(logPath, { flags: 'a' });
+
+    // 劫持 main 进程 console
+    const origLog = console.log;
+    const origError = console.error;
+    const origWarn = console.warn;
+
+    const writeLog = (level, args) => {
+        if (!logStream) return;
+        const ts = new Date().toISOString();
+        const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+        logStream.write(`[${ts}] [${level}] ${msg}\n`);
+    };
+
+    console.log = (...args) => { origLog(...args); writeLog('INFO', args); };
+    console.error = (...args) => { origError(...args); writeLog('ERROR', args); };
+    console.warn = (...args) => { origWarn(...args); writeLog('WARN', args); };
+}
 
 // 获取 lifeprismData 路径
 function getLifeprismDataPath() {
     if (app.isPackaged) {
-        // 打包后：%APPDATA%/LifePrism/lifeprismData
-        return path.join(app.getPath('appData'), 'LifePrism', 'lifeprismData');
+        // 打包后：%LOCALAPPDATA%/LifePrism/lifeprismData
+        return path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'LifePrism', 'lifeprismData');
     } else {
         // 开发时：项目根目录/localData
         return path.join(__dirname, '..', '..', 'localData');
@@ -159,6 +197,15 @@ function createWindow() {
 
     // 移除默认菜单栏
     mainWindow.setMenu(null);
+
+    // 捕获 renderer 进程的 console 输出写入日志文件
+    mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+        if (!logStream) return;
+        const ts = new Date().toISOString();
+        const levelMap = { 0: 'DEBUG', 1: 'INFO', 2: 'WARN', 3: 'ERROR' };
+        const src = sourceId ? `${sourceId}:${line}` : '';
+        logStream.write(`[${ts}] [Renderer/${levelMap[level] || 'INFO'}] ${message}${src ? ` (${src})` : ''}\n`);
+    });
 
     // 直接加载构建后的文件（npm run electron:dev 会先构建）
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
@@ -434,6 +481,9 @@ ipcMain.handle('resize-floating-window', (_event, windowId, { width, height }) =
 });
 
 app.whenReady().then(() => {
+    // 初始化日志（必须在第一条 console.log 之前）
+    initFrontendLog();
+
     console.log('[Electron] 应用启动中...');
     console.log(`[Electron] LifePrism 数据路径: ${getLifeprismDataPath()}`);
 
@@ -495,6 +545,12 @@ app.on('before-quit', () => {
     if (tray) {
         tray.destroy();
         tray = null;
+    }
+
+    // 关闭日志流
+    if (logStream) {
+        logStream.end();
+        logStream = null;
     }
 });
 
