@@ -56,6 +56,7 @@ class SettingsManager:
     def _initialize(self) -> None:
         """初始化配置管理器"""
         self._config: Dict[str, Any] = {}
+        self._warnings: List[str] = []
 
         # 判断是否是开发环境
         self._is_dev = not getattr(sys, 'frozen', False)
@@ -86,6 +87,9 @@ class SettingsManager:
         # 5. 配置日志文件输出（logger 此前只有控制台输出）
         self._setup_logging()
 
+        # 6. 检查数据路径安全性（仅打包环境）
+        self._check_data_path_safety()
+
     def _resolve_config_base_path(self) -> Path:
         """
         配置文件基础路径（固定，不随数据迁移）
@@ -101,7 +105,7 @@ class SettingsManager:
             backend_dir = Path(sys.executable).parent
             app_dir = backend_dir.parent.parent
             root_dir = app_dir.parent
-            return root_dir / 'lifeprismData'
+            return root_dir.parent / 'lifeprismData'
         return Path("localData")
 
     def _resolve_default_data_path(self) -> Path:
@@ -134,6 +138,29 @@ class SettingsManager:
             # 开发环境：日志写入项目根目录
             root_dir = Path(__file__).parent.parent.parent
             setup_file_logging(root_dir)
+
+    def _check_data_path_safety(self) -> None:
+        """检查数据路径是否位于安装目录内（仅打包环境）"""
+        if self._is_dev:
+            return
+        try:
+            # exe 位于 install_dir/resources/app/backend/xxx.exe
+            backend_dir = Path(sys.executable).parent
+            install_dir = backend_dir.parent.parent.parent
+            resolved_data = self._lifeprism_data_path.resolve()
+            resolved_install = install_dir.resolve()
+            resolved_data.relative_to(resolved_install)
+            # 没抛异常 = 数据路径在安装目录内
+            self._warnings.append(
+                "数据路径位于安装目录内，更新版本时安装目录下的内容可能被删除，建议在设置中迁移数据路径"
+            )
+        except (ValueError, OSError):
+            pass  # ValueError=不是子目录（安全），OSError=resolve失败（不阻塞启动）
+
+    @property
+    def warnings(self) -> List[str]:
+        """获取系统警告列表"""
+        return list(self._warnings)
             
     
     def _load_config(self) -> None:
