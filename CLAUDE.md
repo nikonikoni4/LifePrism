@@ -92,7 +92,7 @@ This file provides guidance to Claude Code when working with code in this reposi
    - `settings_manager` 是路径唯一数据源，禁止其他模块自行解析路径或读环境变量
    - DB 路径用 `settings.lw_db_path` / `settings.chat_db_path`
    - 数据目录用 `settings.lifeprism_data_path`
-   - 路径优先级：环境变量 `LIFEPRISM_DATA_PATH` → yaml 配置 → 打包默认 `%APPDATA%/LifePrism/lifeprismData` → 开发默认 `localData`
+   - 路径优先级：环境变量 `LIFEPRISM_DATA_PATH` → yaml 配置 → 打包默认 `%LOCALAPPDATA%/LifePrism/lifeprismData` → 开发默认 `localData`
    - 数据目录结构：`config/` | `dataset/` | `plan/` | `debug_logs/` | `workflow/`
 
 6. **Logger 与 Settings 加载顺序**（脆弱约定，勿破坏）：
