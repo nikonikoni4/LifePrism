@@ -188,7 +188,7 @@ async def migrate_data_path(request: MigrateDataPathRequest):
 
     注意：开发模式下此接口不可用。
     """
-    result = setting_service.migrate_data_path(request.target_base_path)
+    result = setting_service.migrate_data_path(request.target_base_path, request.migrate_data)
     if not result.success:
         raise HTTPException(status_code=400, detail=result.message)
     return result

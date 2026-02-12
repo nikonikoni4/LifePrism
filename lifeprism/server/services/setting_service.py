@@ -198,17 +198,18 @@ def validate_data_path(path: str, path_type: str) -> ValidatePathResponse:
 _DATA_SUBDIRS = ["dataset", "plan", "debug_logs", "workflow", "external_files", "docs"]
 
 
-def migrate_data_path(target_base_path: str) -> MigrateDataPathResponse:
+def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> MigrateDataPathResponse:
     """
-    迁移数据到新路径
+    迁移数据到新路径，或仅切换路径不迁移数据
 
     配置文件（config/）固定在默认路径，不参与迁移。
     只迁移数据目录：dataset/、plan/、debug_logs/、workflow/、external_files/
 
-    流程: 开发模式检查 → 计算新路径 → 验证 → 关闭DB连接 → 复制数据 → 更新配置
+    流程: 开发模式检查 → 计算新路径 → 验证 → [关闭DB连接 → 复制数据] → 更新配置
 
     Args:
         target_base_path: 用户选择的目标基础路径（不含 lifeprismData）
+        migrate_data: 是否迁移数据，False 则仅切换路径并创建空目录结构
 
     Returns:
         MigrateDataPathResponse: 迁移结果
@@ -256,37 +257,51 @@ def migrate_data_path(target_base_path: str) -> MigrateDataPathResponse:
             message=f"目标目录不存在: {target_base_path}"
         )
 
-    # 4. 关闭数据库连接池
-    from lifeprism.storage import lw_db_manager, chat_history_db_manager
-    logger.info("迁移数据：关闭数据库连接池...")
-    try:
-        lw_db_manager._close_connection_pool()
-        chat_history_db_manager._close_connection_pool()
-    except Exception as e:
-        logger.error(f"关闭连接池失败: {e}")
-        return MigrateDataPathResponse(
-            success=False,
-            message=f"关闭数据库连接失败: {e}"
-        )
+    if migrate_data:
+        # 4. 关闭数据库连接池
+        from lifeprism.storage import lw_db_manager, chat_history_db_manager
+        logger.info("迁移数据：关闭数据库连接池...")
+        try:
+            lw_db_manager._close_connection_pool()
+            chat_history_db_manager._close_connection_pool()
+        except Exception as e:
+            logger.error(f"关闭连接池失败: {e}")
+            return MigrateDataPathResponse(
+                success=False,
+                message=f"关闭数据库连接失败: {e}"
+            )
 
-    # 5. 复制数据
-    try:
-        new_path.mkdir(parents=True, exist_ok=True)
-        for subdir in _DATA_SUBDIRS:
-            src = current_path / subdir
-            dst = new_path / subdir
-            if src.exists() and src.is_dir():
-                shutil.copytree(str(src), str(dst), dirs_exist_ok=True)
-                logger.info(f"已复制: {src} -> {dst}")
-            else:
-                dst.mkdir(parents=True, exist_ok=True)
-                logger.info(f"源目录不存在，已创建空目录: {dst}")
-    except Exception as e:
-        logger.error(f"复制数据失败: {e}")
-        return MigrateDataPathResponse(
-            success=False,
-            message=f"复制数据失败: {e}"
-        )
+        # 5. 复制数据
+        try:
+            new_path.mkdir(parents=True, exist_ok=True)
+            for subdir in _DATA_SUBDIRS:
+                src = current_path / subdir
+                dst = new_path / subdir
+                if src.exists() and src.is_dir():
+                    shutil.copytree(str(src), str(dst), dirs_exist_ok=True)
+                    logger.info(f"已复制: {src} -> {dst}")
+                else:
+                    dst.mkdir(parents=True, exist_ok=True)
+                    logger.info(f"源目录不存在，已创建空目录: {dst}")
+        except Exception as e:
+            logger.error(f"复制数据失败: {e}")
+            return MigrateDataPathResponse(
+                success=False,
+                message=f"复制数据失败: {e}"
+            )
+    else:
+        # 仅切换路径：创建目录结构，不复制数据
+        try:
+            new_path.mkdir(parents=True, exist_ok=True)
+            for subdir in _DATA_SUBDIRS:
+                (new_path / subdir).mkdir(parents=True, exist_ok=True)
+            logger.info(f"仅切换路径，已创建空目录结构: {new_path}")
+        except Exception as e:
+            logger.error(f"创建目录结构失败: {e}")
+            return MigrateDataPathResponse(
+                success=False,
+                message=f"创建目录结构失败: {e}"
+            )
 
     # 6. 更新配置（写入旧路径的 config.yaml，重启后后端会从中读取新路径）
     try:

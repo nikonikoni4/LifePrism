@@ -110,6 +110,7 @@ class ValidatePathResponse(BaseModel):
 class MigrateDataPathRequest(BaseModel):
     """数据路径迁移请求"""
     target_base_path: str = Field(..., description="目标基础路径（不含 lifeprismData）")
+    migrate_data: bool = Field(default=True, description="是否迁移数据，False 则仅切换路径")
 
 
 class MigrateDataPathResponse(BaseModel):
