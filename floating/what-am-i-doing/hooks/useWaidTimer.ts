@@ -21,6 +21,7 @@ export interface UseWaidTimerReturn {
     elapsed: number; // 秒
     startTimer: (todo: TodoItem) => Promise<void>;
     stopTimer: () => Promise<void>;
+    updateActiveTodoContent: (id: number, content: string) => void;
 }
 
 export function useWaidTimer(
@@ -137,10 +138,17 @@ export function useWaidTimer(
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, []);
 
+    // 计时中修改 todo content 时同步更新 ref，确保 stopTimer/beforeunload 使用最新内容
+    const updateActiveTodoContent = useCallback((id: number, content: string) => {
+        if (activeTodoRef.current && activeTodoRef.current.id === id) {
+            activeTodoRef.current = { ...activeTodoRef.current, content };
+        }
+    }, []);
+
     // 组件卸载时清理 interval
     useEffect(() => {
         return () => clearTimer();
     }, [clearTimer]);
 
-    return { activeTimerId, timerStart, elapsed, startTimer, stopTimer };
+    return { activeTimerId, timerStart, elapsed, startTimer, stopTimer, updateActiveTodoContent };
 }

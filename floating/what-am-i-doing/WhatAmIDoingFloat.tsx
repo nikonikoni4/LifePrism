@@ -59,7 +59,7 @@ export const WhatAmIDoingFloat: React.FC = () => {
         }));
     }, []);
 
-    const { activeTimerId, elapsed, startTimer, stopTimer } = useWaidTimer(handleDurationAdded);
+    const { activeTimerId, elapsed, startTimer, stopTimer, updateActiveTodoContent } = useWaidTimer(handleDurationAdded);
 
     // 加载数据
     const refreshWaidTodos = useCallback(async () => {
@@ -129,10 +129,11 @@ export const WhatAmIDoingFloat: React.FC = () => {
         try {
             await safeUpdateTodo(id, { content });
             setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, content } : t)));
+            updateActiveTodoContent(id, content);
         } catch (e) {
             console.error('[WAID] Content change failed:', e);
         }
-    }, []);
+    }, [updateActiveTodoContent]);
 
     const handleRemove = useCallback(async (id: number) => {
         try {
