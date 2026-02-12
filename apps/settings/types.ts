@@ -84,6 +84,7 @@ export interface ValidatePathResponse {
 /** 数据路径迁移请求 */
 export interface MigrateDataPathRequest {
     target_base_path: string;
+    migrate_data?: boolean;
 }
 
 /** 数据路径迁移响应 */
