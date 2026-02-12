@@ -2,6 +2,11 @@
 火山引擎 (VolcEngine/Doubao) Provider
 
 使用 OpenAI SDK 调用火山引擎原生接口，包装为 LangChain 兼容的 ChatModel
+
+修改记录:
+- 2026-02-12: 硬编码禁用网络搜索功能（enable_search 强制为 False）
+  当前仅保留阿里云的网络搜索服务，火山引擎默认不启用搜索。
+  如需重新启用，将 get_model_kwargs 中的 enable_search 硬编码覆盖移除即可。
 """
 
 import logging
@@ -219,6 +224,8 @@ class VolcEngineProvider(BaseLLMProvider):
         """
         model_kwargs = {}
 
+        # 硬编码禁用：当前仅保留阿里云搜索服务，火山引擎暂不启用
+        enable_search = False
         if enable_search and self.supports(ProviderCapability.WEB_SEARCH):
             model_kwargs["web_search"] = {"enable": True}
 
