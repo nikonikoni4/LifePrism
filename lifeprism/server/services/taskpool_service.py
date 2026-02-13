@@ -726,13 +726,15 @@ def sync_plan_doc(
         # 重新获取 blocks（位置已变化）
         blocks = _get_all_todoblocks(content)
 
-    # 6. 构建父任务映射（每个 block 独立构建，然后合并）
+    # 6. 构建父任务映射（每个 block 独立构建，用复合键避免跨 block 冲突）
     # 注意：父子关系只在同一个 block 内有效
+    # key: (block_index, line_index) -> parent_anchor_id
     parent_map = {}
     for block in blocks:
         block_tasks = [t for t in all_parsed_tasks if t.get('block_index') == block['block_index']]
         block_parent_map = _build_parent_map(block_tasks)
-        parent_map.update(block_parent_map)
+        for line_index, parent_anchor in block_parent_map.items():
+            parent_map[(block['block_index'], line_index)] = parent_anchor
 
     # 7. 获取现有任务（用于匹配和删除检测）
     existing_todos = todo_provider.get_todos_by_plan_doc(plan_doc_id)
@@ -752,10 +754,12 @@ def sync_plan_doc(
     anchor_to_db_id = {}  # anchor_id -> db_id 映射（用于设置 parent_id）
     todos_to_create = []
     todos_to_update = []
+    existing_parent_info = []  # 已存在任务的 parent 信息，用于后续更新 parent_id
 
     for order_index, task in enumerate(all_parsed_tasks):
         anchor_id = task['anchor_id']
         existing = existing_by_anchor.get(anchor_id)
+        parent_key = (task.get('block_index'), task['line_index'])
 
         if existing:
             # 更新现有任务
@@ -775,6 +779,14 @@ def sync_plan_doc(
 
             todos_to_update.append(update_data)
             anchor_to_db_id[anchor_id] = existing['id']
+
+            # 记录 parent 信息，待所有 anchor_to_db_id 就绪后统一更新
+            existing_parent_info.append({
+                'id': existing['id'],
+                'parent_anchor': parent_map.get(parent_key),
+                'old_parent_id': existing.get('parent_id'),
+            })
+
             result.updated += 1
         else:
             # 创建新任务
@@ -795,7 +807,7 @@ def sync_plan_doc(
             todos_to_create.append({
                 'data': create_data,
                 'anchor_id': anchor_id,
-                'parent_anchor': parent_map.get(task['line_index']),
+                'parent_anchor': parent_map.get(parent_key),
             })
             result.created += 1
 
@@ -843,6 +855,23 @@ def sync_plan_doc(
 
         if parent_updates:
             todo_provider.batch_update_todos(parent_updates)
+
+    # 11.5 更新已存在任务的 parent_id（anchor_to_db_id 此时已包含所有任务）
+    if existing_parent_info:
+        parent_updates_existing = []
+        for info in existing_parent_info:
+            new_parent_id = None
+            if info['parent_anchor']:
+                new_parent_id = anchor_to_db_id.get(info['parent_anchor'])
+            # 只在 parent 实际变化时更新
+            if new_parent_id != info['old_parent_id']:
+                parent_updates_existing.append({
+                    'id': info['id'],
+                    'parent_id': new_parent_id,
+                })
+        if parent_updates_existing:
+            todo_provider.batch_update_todos(parent_updates_existing)
+            logger.info(f"更新 {len(parent_updates_existing)} 个任务的 parent_id")
 
     # 12. 处理删除
     if confirm_delete and todos_to_delete:
