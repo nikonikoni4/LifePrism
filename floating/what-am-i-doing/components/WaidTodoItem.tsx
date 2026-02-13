@@ -227,7 +227,7 @@ export function WaidTodoItem({
                         </svg>
                     </button>
                     {showMenu && (
-                        <div className="absolute right-0 top-full mt-1 bg-[#2a2a2a] border border-white/10 rounded-md shadow-xl z-50 py-1 min-w-[100px]">
+                        <div className="absolute right-0 bottom-full mb-1 bg-[#2a2a2a] border border-white/10 rounded-md shadow-xl z-50 py-1 min-w-[100px]">
                             <button
                                 onClick={() => {
                                     setShowMenu(false);
