@@ -23,18 +23,20 @@ async function requestPlanDocSave(): Promise<void> {
     if (!window.electronAPI?.sendToMain) return;
 
     return new Promise<void>((resolve) => {
+        let ipcHandler: ReturnType<typeof window.electronAPI.onMessage> | null = null;
+
         const timeout = setTimeout(() => {
-            window.electronAPI?.removeMessageListener?.('plandoc-save-done', handler);
+            if (ipcHandler) window.electronAPI?.removeMessageListener?.('plandoc-save-done', ipcHandler);
             resolve();
         }, PLANDOC_SAVE_TIMEOUT);
 
-        const handler = () => {
+        const callback = () => {
             clearTimeout(timeout);
-            window.electronAPI?.removeMessageListener?.('plandoc-save-done', handler);
+            if (ipcHandler) window.electronAPI?.removeMessageListener?.('plandoc-save-done', ipcHandler);
             resolve();
         };
 
-        window.electronAPI!.onMessage('plandoc-save-done', handler);
+        ipcHandler = window.electronAPI!.onMessage('plandoc-save-done', callback);
         window.electronAPI!.sendToMain('plandoc-save-request');
     });
 }

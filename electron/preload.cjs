@@ -44,9 +44,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onMessage: (channel, callback) => {
         const handler = (_event, data) => callback(data);
         ipcRenderer.on(channel, handler);
+        return handler;
     },
-    removeMessageListener: (channel, callback) => {
-        ipcRenderer.removeAllListeners(channel);
+    removeMessageListener: (channel, handler) => {
+        ipcRenderer.removeListener(channel, handler);
     },
 
     // 浮窗大小调整

@@ -38,8 +38,8 @@ interface ElectronAPI {
     sendToFloating: (windowId: string, channel: string, data?: unknown) => Promise<{ success: boolean }>;
     sendToMain: (channel: string, data?: unknown) => Promise<{ success: boolean }>;
     sendToDialog: (dialogId: string, channel: string, data?: unknown) => Promise<{ success: boolean }>;
-    onMessage: (channel: string, callback: (data: unknown) => void) => void;
-    removeMessageListener: (channel: string, callback: (data: unknown) => void) => void;
+    onMessage: (channel: string, callback: (data: unknown) => void) => ((_event: unknown, data: unknown) => void);
+    removeMessageListener: (channel: string, handler: ((_event: unknown, data: unknown) => void)) => void;
 
     // 浮窗大小调整
     resizeFloatingWindow: (windowId: string, size: { width?: number; height?: number }) => Promise<{ success: boolean }>;

@@ -55,32 +55,39 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ displayMode, onModeChange, onWidt
 
     // 拖拽移动
     useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!isResizing) return;
+        if (!isResizing) return;
 
+        const handleMouseMove = (e: MouseEvent) => {
             const windowWidth = window.innerWidth;
             const newWidth = windowWidth - e.clientX;
-
-            // 限制宽度在最小和最大值之间
             const clampedWidth = Math.min(Math.max(newWidth, MIN_WIDTH), MAX_WIDTH);
             setPanelWidth(clampedWidth);
         };
 
-        const handleMouseUp = () => {
-            setIsResizing(false);
-        };
+        const stopResizing = () => setIsResizing(false);
 
-        if (isResizing) {
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
-            // 拖拽时禁止选择文本
-            document.body.style.userSelect = 'none';
-            document.body.style.cursor = 'ew-resize';
-        }
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', stopResizing);
+        window.addEventListener('blur', stopResizing);
+
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'ew-resize';
+
+        // 兜底：5 秒无 mousemove 自动结束 resize，防止 mouseup 丢失导致状态卡住
+        let safetyTimer: ReturnType<typeof setTimeout>;
+        const resetSafetyTimer = () => {
+            clearTimeout(safetyTimer);
+            safetyTimer = setTimeout(stopResizing, 5000);
+        };
+        resetSafetyTimer();
+        document.addEventListener('mousemove', resetSafetyTimer);
 
         return () => {
             document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('mouseup', stopResizing);
+            window.removeEventListener('blur', stopResizing);
+            document.removeEventListener('mousemove', resetSafetyTimer);
+            clearTimeout(safetyTimer);
             document.body.style.userSelect = '';
             document.body.style.cursor = '';
         };

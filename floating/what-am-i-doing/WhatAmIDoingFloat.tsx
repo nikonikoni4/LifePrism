@@ -86,8 +86,8 @@ export const WhatAmIDoingFloat: React.FC = () => {
     // 监听来自主窗口/对话框的刷新消息
     useEffect(() => {
         if (!window.electronAPI?.onMessage) return;
-        const handler = () => { refreshWaidTodos(); };
-        window.electronAPI.onMessage('waid-refresh', handler);
+        const callback = () => { refreshWaidTodos(); };
+        const handler = window.electronAPI.onMessage('waid-refresh', callback);
         return () => {
             window.electronAPI?.removeMessageListener?.('waid-refresh', handler);
         };
