@@ -12,6 +12,7 @@ from .timeline_provider import timeline_provider
 from .goal_stats_provider import goal_stats_provider
 from .journal_provider import journal_provider
 from .plan_doc_provider import plan_doc_provider
+from .diary_provider import diary_provider
 
 # 对外导出
 __all__ = [
@@ -22,5 +23,6 @@ __all__ = [
     "goal_stats_provider",
     "journal_provider",
     "plan_doc_provider",
+    "diary_provider",
 ]
  

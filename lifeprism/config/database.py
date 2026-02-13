@@ -1106,7 +1106,46 @@ TIME_PARADOXES_CONFIG={
 }
 
 
-
+# 日记表配置（Mind Space 日记模块）
+DIARY_CONFIG = {
+    'table_name': 'diary',
+    'columns': {
+        'date': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY', 'NOT NULL'],
+            'comment': '日期 YYYY-MM-DD，唯一标识'
+        },
+        'mood': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '心情: very_happy, happy, calm, bad, very_bad'
+        },
+        'importance': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '平凡程度: important, normal, unimportant'
+        },
+        'custom_tags': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT \'[]\''],
+            'comment': '自定义 tag，JSON 数组'
+        },
+        'word_count': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '字数统计，用于日历视图展示'
+        },
+        'ai_summary': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': 'AI 总结（保留字段）'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [],
+    'timestamps': True,
+    'update_at': True
+}
 
 
 # 所有表配置的映射
@@ -1131,6 +1170,7 @@ TABLE_CONFIGS = {
     'weekly_report': weekly_report_config,
     'monthly_report': monthly_report_config,
     'time_paradoxes': TIME_PARADOXES_CONFIG,
+    'diary': DIARY_CONFIG,
 }
 
 

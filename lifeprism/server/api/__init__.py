@@ -16,6 +16,7 @@ from .being_api import router as being_router
 from .taskpool_api import router as taskpool_router
 from .todos_api import router as todos_router
 from .system_api import router as system_router
+from .diary_api import router as diary_router
 
 __all__ = [
     "sync_router",
@@ -31,5 +32,6 @@ __all__ = [
     "taskpool_router",
     "todos_router",
     "system_router",
+    "diary_router",
 ]
 

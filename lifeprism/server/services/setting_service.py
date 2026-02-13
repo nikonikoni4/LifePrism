@@ -195,7 +195,7 @@ def validate_data_path(path: str, path_type: str) -> ValidatePathResponse:
 
 
 # 迁移时需要复制的子目录列表（不含 config，配置文件固定在默认路径）
-_DATA_SUBDIRS = ["dataset", "plan", "debug_logs", "workflow", "external_files", "docs"]
+_DATA_SUBDIRS = ["dataset", "plan", "debug_logs", "workflow", "external_files", "docs", "diary"]
 
 
 def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> MigrateDataPathResponse:

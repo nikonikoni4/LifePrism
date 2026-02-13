@@ -19,6 +19,7 @@ from . import activity_service  # 已改为纯函数
 from . import setting_service   # 已改为纯函数
 from . import plan_doc_service
 from . import taskpool_service  # Task Pool V2
+from . import diary_service     # Mind Space 日记
 
 __all__ = [
     # 有状态服务单例
@@ -33,4 +34,5 @@ __all__ = [
     "setting_service",
     "plan_doc_service",
     "taskpool_service",
+    "diary_service",
 ]
