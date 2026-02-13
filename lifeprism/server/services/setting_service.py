@@ -221,11 +221,15 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
             message="开发模式下不支持数据路径迁移"
         )
 
-    # 2. 计算新路径（自动追加 lifeprismData）
+    # 2. 计算新路径（末尾已是 lifeprismData 则不再追加）
     if not target_base_path or not target_base_path.strip():
         return MigrateDataPathResponse(success=False, message="目标路径不能为空")
 
-    new_path = Path(target_base_path) / "lifeprismData"
+    target = Path(target_base_path)
+    if target.name == "lifeprismData":
+        new_path = target
+    else:
+        new_path = target / "lifeprismData"
     current_path = Path(settings.lifeprism_data_path)
 
     # 3. 验证
