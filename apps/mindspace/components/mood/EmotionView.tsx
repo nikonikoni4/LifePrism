@@ -10,22 +10,9 @@ import {
 } from 'lucide-react';
 import EmotionRecord from './EmotionRecord';
 import BlobBackground from '../BlobBackground';
-import { MOCK_ENTRIES } from './mockData';
-
-const DEFAULT_MOODS = [
-  { id: 'joy', icon: 'Sun', color: '#fed7aa', text: '喜悦', glow: 'rgba(254, 215, 170, 0.6)', score: 90, isDark: false },
-  { id: 'calm', icon: 'Wind', color: '#d1fae5', text: '宁静', glow: 'rgba(209, 250, 229, 0.6)', score: 70, isDark: false },
-  { id: 'pensive', icon: 'Cloud', color: '#cbd5e1', text: '沉思', glow: 'rgba(203, 213, 225, 0.6)', score: 50, isDark: false },
-  { id: 'anger', icon: 'Flame', color: '#fb7185', text: '愤怒', glow: 'rgba(251, 113, 133, 0.6)', score: 40, isDark: true },
-  { id: 'guilt', icon: 'ShieldAlert', color: '#8589c9', text: '内疚', glow: 'rgba(133, 137, 201, 0.6)', score: 35, isDark: true },
-  { id: 'melancholy', icon: 'Moon', color: '#a5b4fc', text: '忧郁', glow: 'rgba(165, 180, 252, 0.6)', score: 30, isDark: false },
-  { id: 'sorrow', icon: 'Heart', color: '#52525b', text: '悲伤', glow: 'rgba(82, 82, 91, 0.6)', score: 10, isDark: true },
-];
-
-const INITIAL_IMPACTS = [
-  "健康", "健身", "自我照顾", "爱好", "身份", "心灵", "社群", "家人", "朋友", 
-  "伴侣", "约会", "家务", "工作", "教育", "旅行", "天气", "时事", "金钱"
-];
+import { MoodAPI } from './moodApi';
+import { toMoodTypeUI, toMoodEntryUI } from './moodTransform';
+import type { MoodTypeUI, MoodEntryUI, MoodImpactItem } from './types';
 
 const ICON_MAP: Record<string, any> = { 
   Sun, Wind, Cloud, Moon, Heart, Plus, Flame, ShieldAlert, 
@@ -49,26 +36,54 @@ interface EmotionViewProps {
 }
 
 const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGuide }) => {
-  const [moods, setMoods] = useState(DEFAULT_MOODS);
-  const [impactCategories, setImpactCategories] = useState(INITIAL_IMPACTS);
-  const [entries, setEntries] = useState<any[]>(MOCK_ENTRIES);
-  const [view, setView] = useState('present'); 
-  const [activeMood, setActiveMood] = useState<any>(null);
+  const [moods, setMoods] = useState<MoodTypeUI[]>([]);
+  const [impactCategories, setImpactCategories] = useState<MoodImpactItem[]>([]);
+  const [entries, setEntries] = useState<MoodEntryUI[]>([]);
+  const [view, setView] = useState('present');
+  const [activeMood, setActiveMood] = useState<MoodTypeUI | null>(null);
   const [selectedImpacts, setSelectedImpacts] = useState<string[]>([]);
   const [note, setNote] = useState('');
-  const [step, setStep] = useState('mood'); 
+  const [step, setStep] = useState('mood');
   const [isAbsorbing, setIsAbsorbing] = useState(false);
   const [journeyPulse, setJourneyPulse] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isManagingMoods, setIsManagingMoods] = useState(false);
-  const [editingMood, setEditingMood] = useState<any>(null); 
-  const [editingEntryId, setEditingEntryId] = useState<number | null>(null);
+  const [editingMood, setEditingMood] = useState<any>(null);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+
+  // 构建 typesMap 用于 entry 转换
+  const typesMap = useMemo(() => new Map(moods.map(m => [m.id, m])), [moods]);
 
   const sortedMoods = useMemo(() => {
-    return [...moods].sort((a, b) => b.score - a.score);
+    return [...moods].sort((a, b) => b.sort_order - a.sort_order);
   }, [moods]);
 
-  const currentMood = activeMood || (entries.length > 0 ? entries[entries.length - 1].mood : sortedMoods[0]);
+  // 初始化数据加载
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [typesData, impactsData, entriesData] = await Promise.all([
+          MoodAPI.getTypes(),
+          MoodAPI.getImpacts(),
+          MoodAPI.getEntries(),
+        ]);
+        const moodTypes = typesData.map(toMoodTypeUI);
+        const map = new Map(moodTypes.map(t => [t.id, t]));
+        setMoods(moodTypes);
+        setImpactCategories(impactsData);
+        setEntries(entriesData.map(e => toMoodEntryUI(e, map)));
+      } catch (err) {
+        console.error('加载心情数据失败:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const defaultMood: MoodTypeUI = sortedMoods[0] ?? { id: '', name: '', icon: 'Sun', color: '#cbd5e1', score: 50, is_dark: 0, sort_order: 0, created_at: '', text: '', isDark: false, glow: '#cbd5e199' };
+  const currentMood = activeMood || (entries.length > 0 ? entries[entries.length - 1].mood : defaultMood);
   const isWriting = step === 'write';
   const isDarkTheme = currentMood.isDark;
   const isRecordView = view === 'record';
@@ -84,30 +99,34 @@ const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGui
     transition: 'all 2000ms cubic-bezier(0.4, 0, 0.2, 1)'
   } as React.CSSProperties;
 
-  const saveEntry = () => {
+  const saveEntry = async () => {
     if (!activeMood || isAbsorbing) return;
     setIsAbsorbing(true);
-    setTimeout(() => {
+    try {
       if (editingEntryId) {
-        setEntries(prev => prev.map(e => e.id === editingEntryId ? {
-          ...e,
-          mood: activeMood,
-          impacts: [...selectedImpacts],
-          note: note,
-          // 保留原始时间戳，或者这里也可以更新为 new Date() 如果需要更新时间
-        } : e));
+        const updated = await MoodAPI.updateEntry(editingEntryId, {
+          mood_type_id: activeMood.id,
+          content: note || undefined,
+          factors: selectedImpacts,
+        });
+        const updatedUI = toMoodEntryUI(updated, typesMap);
+        setEntries(prev => prev.map(e => e.id === editingEntryId ? updatedUI : e));
       } else {
-        const newEntry = {
-          id: Date.now(),
-          timestamp: new Date(),
-          mood: activeMood,
-          impacts: [...selectedImpacts],
-          note: note,
-        };
-        setEntries(prev => [...prev, newEntry]);
+        const created = await MoodAPI.createEntry({
+          mood_type_id: activeMood.id,
+          content: note || undefined,
+          factors: selectedImpacts,
+        });
+        const createdUI = toMoodEntryUI(created, typesMap);
+        setEntries(prev => [...prev, createdUI]);
       }
       setJourneyPulse(true);
       setTimeout(() => setJourneyPulse(false), 600);
+    } catch (err) {
+      console.error('保存心情记录失败:', err);
+    }
+    // 延迟关闭动画
+    setTimeout(() => {
       setIsAbsorbing(false);
       resetPresentState();
     }, 1100);
@@ -130,9 +149,14 @@ const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGui
     setStep('write');
   };
 
-  const handleDeleteEntry = (id: number) => {
+  const handleDeleteEntry = async (id: string) => {
     if (window.confirm("确定要删除这条记录吗？")) {
-      setEntries(prev => prev.filter(e => e.id !== id));
+      try {
+        await MoodAPI.deleteEntry(id);
+        setEntries(prev => prev.filter(e => e.id !== id));
+      } catch (err) {
+        console.error('删除心情记录失败:', err);
+      }
     }
   };
 
@@ -144,30 +168,48 @@ const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGui
     }
   };
 
-  const handleSaveMood = (moodData: any) => {
+  const handleSaveMood = async (moodData: any) => {
     if (!moodData.text.trim()) return;
-    
+
     const darkColors = ['#52525b', '#fb7185', '#6366f1', '#a5b4fc', '#8589c9'];
     const isDark = darkColors.includes(moodData.color);
-    
-    const moodToAdd = {
-      ...moodData,
-      id: moodData.id || Date.now().toString(),
-      glow: `${moodData.color}99`,
-      isDark: isDark
-    };
 
-    if (moodData.id) {
-      setMoods(moods.map(m => m.id === moodData.id ? moodToAdd : m));
-    } else {
-      setMoods([...moods, moodToAdd]);
+    try {
+      if (moodData.id) {
+        const updated = await MoodAPI.updateType(moodData.id, {
+          name: moodData.text,
+          icon: moodData.icon,
+          color: moodData.color,
+          score: moodData.score,
+          is_dark: isDark ? 1 : 0,
+        });
+        const updatedUI = toMoodTypeUI(updated);
+        setMoods(prev => prev.map(m => m.id === moodData.id ? updatedUI : m));
+      } else {
+        const created = await MoodAPI.createType({
+          name: moodData.text,
+          icon: moodData.icon,
+          color: moodData.color,
+          score: moodData.score,
+          is_dark: isDark ? 1 : 0,
+        });
+        const createdUI = toMoodTypeUI(created);
+        setMoods(prev => [...prev, createdUI]);
+      }
+    } catch (err) {
+      console.error('保存心情类型失败:', err);
     }
     setEditingMood(null);
   };
 
-  const deleteMood = (id: string, e: React.MouseEvent) => {
+  const deleteMood = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setMoods(moods.filter(m => m.id !== id));
+    try {
+      await MoodAPI.deleteType(id);
+      setMoods(prev => prev.filter(m => m.id !== id));
+    } catch (err: any) {
+      alert(err.message || '删除失败，该心情类型下可能有关联记录');
+    }
   };
 
   return (
@@ -258,6 +300,11 @@ const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGui
       </motion.nav>
 
       <main className="relative h-full w-full flex flex-col items-center justify-center p-6 z-[45] text-[var(--theme-text)]">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full opacity-40">
+            <span className="text-[10px] tracking-[0.4em] uppercase animate-pulse">Loading...</span>
+          </div>
+        ) : (
         <AnimatePresence mode="wait">
           {view === 'present' ? (
             <motion.div key="present" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full max-w-2xl flex flex-col items-center">
@@ -295,23 +342,28 @@ const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGui
                   
                   <div className="flex flex-wrap justify-center gap-3 mb-16 max-w-xl">
                     {impactCategories.map((impact) => (
-                      <button 
-                        key={impact} 
-                        onClick={() => toggleImpact(impact)}
+                      <button
+                        key={impact.id}
+                        onClick={() => toggleImpact(impact.name)}
                         className={`px-5 py-2 rounded-full text-[11px] tracking-widest transition-all duration-500 border focus:outline-none ${
-                          selectedImpacts.includes(impact) 
-                          ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-lg scale-105' 
+                          selectedImpacts.includes(impact.name)
+                          ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-lg scale-105'
                           : 'bg-[var(--theme-ui-bg)] border-[var(--theme-ui-border)] opacity-60 hover:opacity-100'
                         }`}
                       >
-                        {impact}
+                        {impact.name}
                       </button>
                     ))}
-                    <button 
-                      onClick={() => {
+                    <button
+                      onClick={async () => {
                         const newImpact = prompt("添加新的影响因素:");
-                        if (newImpact && !impactCategories.includes(newImpact)) {
-                          setImpactCategories([...impactCategories, newImpact]);
+                        if (newImpact && !impactCategories.some(i => i.name === newImpact)) {
+                          try {
+                            const created = await MoodAPI.createImpact({ name: newImpact });
+                            setImpactCategories(prev => [...prev, created]);
+                          } catch (err) {
+                            console.error('添加影响因素失败:', err);
+                          }
                         }
                       }}
                       className="px-5 py-2 rounded-full text-[11px] tracking-widest border border-dashed opacity-40 hover:opacity-100 flex items-center gap-2 focus:outline-none"
@@ -397,6 +449,7 @@ const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGui
             </motion.div>
           )}
         </AnimatePresence>
+        )}
 
         {/* 情绪管理 Overlay */}
         <AnimatePresence>

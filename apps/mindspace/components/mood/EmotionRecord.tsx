@@ -18,7 +18,7 @@ interface EmotionRecordProps {
   entries: any[];
   onNavigate?: (view: any) => void;
   onEdit?: (entry: any) => void;
-  onDelete?: (id: number) => void;
+  onDelete?: (id: string) => void;
 }
 
 const EmotionRecord: React.FC<EmotionRecordProps> = ({ entries, onNavigate, onEdit, onDelete }) => {
