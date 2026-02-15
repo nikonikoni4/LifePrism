@@ -7,11 +7,13 @@ import { incrementalSync } from './core/services/syncService';
 import { initApiConfig, getApiV2UrlSync } from './core/services/apiConfig';
 import { initPlanDocBridge } from './core/services/ipcPlanDocBridge';
 import { toast } from './core/components';
+import DataPathWarningDialog from './core/components/DataPathWarningDialog';
 
 function MainApp() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isApiReady, setIsApiReady] = useState(false);
+  const [pathWarnings, setPathWarnings] = useState<string[]>([]);
 
   // 初始化 API 配置（探测后端端口）
   useEffect(() => {
@@ -41,7 +43,17 @@ function MainApp() {
       .catch(() => null)
       .then(data => {
         if (data?.warnings?.length) {
-          data.warnings.forEach((msg: string) => toast.warning(msg, 10000));
+          const pathMsgs: string[] = [];
+          data.warnings.forEach((w: { type: string; message: string }) => {
+            if (w.type === 'data_path') {
+              pathMsgs.push(w.message);
+            } else {
+              toast.warning(w.message, 10000);
+            }
+          });
+          if (pathMsgs.length > 0) {
+            setPathWarnings(pathMsgs);
+          }
         }
       });
   }, [isApiReady]);
@@ -99,6 +111,13 @@ function MainApp() {
         </div>
       ) : (
         <AppShell />
+      )}
+
+      {pathWarnings.length > 0 && (
+        <DataPathWarningDialog
+          warnings={pathWarnings}
+          onClose={() => setPathWarnings([])}
+        />
       )}
     </>
   );
