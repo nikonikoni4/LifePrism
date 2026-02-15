@@ -421,11 +421,6 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
           margin-top: -4.5px; transition: transform 0.2s;
         }
         input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
-        .slider-modal-range::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          height: 16px; width: 16px; border-radius: 50%; background: white;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: pointer; border: 2px solid #fff;
-        }
         /* MarkdownEditor 禅意样式覆盖 */
         .diary-editor .mdxeditor {
           background: transparent !important;
@@ -449,6 +444,11 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
         }
         .diary-editor .mdxeditor [contenteditable] p {
           margin-bottom: 0.8em;
+        }
+        .diary-pill:hover {
+          background: var(--pill-hover-bg) !important;
+          border-color: var(--pill-hover-border) !important;
+          color: var(--pill-hover-color) !important;
         }
       `}} />
     </div>

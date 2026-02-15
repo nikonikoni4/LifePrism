@@ -1,13 +1,12 @@
 /**
  * DiaryTagBar - 日期下方标签栏
- * 心情 tag + 重要程度 tag + 自定义 tag + 添加按钮
+ * 心情 pill 标签组 + 重要程度 pill 标签组 + 自定义 tag + 添加按钮
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
-import { MOOD_OPTIONS, IMPORTANCE_OPTIONS, getMoodOption, getImportanceOption } from './diaryConstants';
+import { MOOD_OPTIONS, IMPORTANCE_OPTIONS } from './diaryConstants';
 import type { MoodLevel, ImportanceLevel } from './diaryTypes';
-import SliderModal from './SliderModal';
 
 interface DiaryTagBarProps {
   mood: MoodLevel | null;
@@ -22,40 +21,15 @@ const DiaryTagBar: React.FC<DiaryTagBarProps> = ({
   mood, importance, customTags,
   onMoodChange, onImportanceChange, onCustomTagsChange,
 }) => {
-  const [showMoodModal, setShowMoodModal] = useState(false);
-  const [showImportanceModal, setShowImportanceModal] = useState(false);
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTag, setNewTag] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  // 首次选择时连续弹窗
-  const [pendingImportance, setPendingImportance] = useState(false);
 
   useEffect(() => {
     if (isAddingTag && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isAddingTag]);
-
-  const handleMoodClick = () => {
-    if (!mood && !importance) {
-      setPendingImportance(true);
-    }
-    setShowMoodModal(true);
-  };
-
-  const handleMoodConfirm = (value: MoodLevel) => {
-    onMoodChange(value);
-    setShowMoodModal(false);
-    if (pendingImportance) {
-      setTimeout(() => setShowImportanceModal(true), 300);
-      setPendingImportance(false);
-    }
-  };
-
-  const handleImportanceConfirm = (value: ImportanceLevel) => {
-    onImportanceChange(value);
-    setShowImportanceModal(false);
-  };
 
   const handleAddTag = () => {
     const tag = newTag.trim();
@@ -70,47 +44,61 @@ const DiaryTagBar: React.FC<DiaryTagBarProps> = ({
     onCustomTagsChange(customTags.filter(t => t !== tag));
   };
 
-  const moodOpt = mood ? getMoodOption(mood) : null;
-  const impOpt = importance ? getImportanceOption(importance) : null;
+  /* 渲染单个 pill 按钮 */
+  const renderPill = (
+    o: { value: string; label: string; color: string },
+    selected: boolean,
+    onClick: () => void,
+  ) => (
+    <button
+      key={o.value}
+      onClick={onClick}
+      className={`px-4 py-1.5 rounded-full text-[11px] tracking-widest transition-all duration-300 focus:outline-none ${
+        selected ? 'scale-[1.03]' : 'diary-pill'
+      }`}
+      style={selected ? {
+        background: `${o.color}1A`,
+        border: `1px solid ${o.color}35`,
+        color: '#1f2937',
+        boxShadow: `0 1px 6px ${o.color}15, inset 0 1px 0 rgba(255,255,255,0.4)`,
+      } : {
+        background: 'transparent',
+        border: `1px solid ${o.color}25`,
+        color: 'rgba(31,41,55,0.6)',
+        boxShadow: 'none',
+        '--pill-hover-bg': `${o.color}0A`,
+        '--pill-hover-border': `${o.color}40`,
+        '--pill-hover-color': '#1f2937',
+      } as React.CSSProperties}
+    >
+      {o.label}
+    </button>
+  );
 
   return (
-    <>
-      <div className="flex flex-wrap items-center gap-2.5">
-        {/* 心情 tag */}
-        <button
-          onClick={handleMoodClick}
-          className={`px-4 py-1.5 rounded-full text-[11px] tracking-wider transition-all duration-300 ${
-            moodOpt
-              ? 'border shadow-sm hover:shadow-md hover:scale-105'
-              : 'border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-500'
-          }`}
-          style={moodOpt ? {
-            backgroundColor: `${moodOpt.color}20`,
-            borderColor: `${moodOpt.color}60`,
-            color: moodOpt.color,
-          } : undefined}
-        >
-          {moodOpt ? moodOpt.label : '+ 心情'}
-        </button>
+    <div className="flex flex-col gap-3">
+      {/* 心情标签组 */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] tracking-[0.2em] text-gray-400 shrink-0">心情</span>
+        <div className="flex flex-wrap gap-1.5">
+          {MOOD_OPTIONS.map(o =>
+            renderPill(o, mood === o.value, () => onMoodChange(o.value))
+          )}
+        </div>
+      </div>
 
-        {/* 重要程度 tag */}
-        <button
-          onClick={() => setShowImportanceModal(true)}
-          className={`px-4 py-1.5 rounded-full text-[11px] tracking-wider transition-all duration-300 ${
-            impOpt
-              ? 'border shadow-sm hover:shadow-md hover:scale-105'
-              : 'border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-500'
-          }`}
-          style={impOpt ? {
-            backgroundColor: `${impOpt.color}20`,
-            borderColor: `${impOpt.color}60`,
-            color: impOpt.color,
-          } : undefined}
-        >
-          {impOpt ? impOpt.label : '+ 重要程度'}
-        </button>
+      {/* 重要程度标签组 */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] tracking-[0.2em] text-gray-400 shrink-0">重要</span>
+        <div className="flex flex-wrap gap-1.5">
+          {IMPORTANCE_OPTIONS.map(o =>
+            renderPill(o, importance === o.value, () => onImportanceChange(o.value))
+          )}
+        </div>
+      </div>
 
-        {/* 自定义 tags */}
+      {/* 自定义标签行 */}
+      <div className="flex flex-wrap items-center gap-1.5">
         <AnimatePresence>
           {customTags.map(tag => (
             <motion.span
@@ -118,12 +106,18 @@ const DiaryTagBar: React.FC<DiaryTagBarProps> = ({
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="group relative px-4 py-1.5 rounded-full text-[11px] tracking-wider bg-gray-100 text-gray-500 border border-gray-200"
+              className="group relative px-4 py-1.5 rounded-full text-[11px] tracking-wider"
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(154,142,130,0.25)',
+                color: 'rgba(154,142,130,0.7)',
+                boxShadow: 'none',
+              }}
             >
               {tag}
               <button
                 onClick={() => handleRemoveTag(tag)}
-                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-gray-300 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-400"
+                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#c4b5a4] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#a89888]"
               >
                 <X size={8} />
               </button>
@@ -131,7 +125,6 @@ const DiaryTagBar: React.FC<DiaryTagBarProps> = ({
           ))}
         </AnimatePresence>
 
-        {/* 添加自定义 tag */}
         {isAddingTag ? (
           <motion.div
             initial={{ opacity: 0, width: 0 }}
@@ -149,39 +142,30 @@ const DiaryTagBar: React.FC<DiaryTagBarProps> = ({
               onBlur={handleAddTag}
               placeholder="标签名"
               maxLength={10}
-              className="w-20 px-3 py-1.5 rounded-full text-[11px] bg-gray-50 border border-gray-200 outline-none focus:border-gray-400 transition-colors"
+              className="w-20 px-3 py-1.5 rounded-full text-[11px] outline-none transition-colors"
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(154,142,130,0.25)',
+                color: '#7a6e62',
+                boxShadow: 'none',
+              }}
             />
           </motion.div>
         ) : (
           <button
             onClick={() => setIsAddingTag(true)}
-            className="px-3 py-1.5 rounded-full text-[11px] border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-500 transition-all flex items-center gap-1"
+            className="px-3 py-1.5 rounded-full text-[11px] transition-all flex items-center gap-1 hover:brightness-95"
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(181,169,157,0.25)',
+              color: 'rgba(181,169,157,0.7)',
+            }}
           >
             <Plus size={10} /> 标签
           </button>
         )}
       </div>
-
-      {/* 心情选择弹窗 */}
-      <SliderModal
-        open={showMoodModal}
-        title="此刻的心境"
-        options={MOOD_OPTIONS}
-        value={mood}
-        onConfirm={handleMoodConfirm}
-        onClose={() => { setShowMoodModal(false); setPendingImportance(false); }}
-      />
-
-      {/* 重要程度选择弹窗 */}
-      <SliderModal
-        open={showImportanceModal}
-        title="这一天的分量"
-        options={IMPORTANCE_OPTIONS}
-        value={importance}
-        onConfirm={handleImportanceConfirm}
-        onClose={() => setShowImportanceModal(false)}
-      />
-    </>
+    </div>
   );
 };
 
