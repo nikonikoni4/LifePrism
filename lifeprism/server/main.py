@@ -91,6 +91,14 @@ _import_start = time.perf_counter()
 from lifeprism.server.api import diary_router
 _log_startup_time("  - diary_router", _import_start)
 
+_import_start = time.perf_counter()
+from lifeprism.server.api import mood_router
+_log_startup_time("  - mood_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import value_router, commitment_router
+_log_startup_time("  - value_router + commitment_router", _import_start)
+
 _step_start = _log_startup_time("[OK] API routers imported", _step_start)
 
 # ==================== 数据库模块导入 ====================
@@ -248,8 +256,11 @@ app.include_router(taskpool_router, prefix="/api/v2")  # Task Pool
 app.include_router(todos_router, prefix="/api/v2")  # Todos 统一接口
 app.include_router(system_router, prefix="/api/v2")  # System 系统信息
 app.include_router(diary_router, prefix="/api/v2")  # Diary 日记
+app.include_router(mood_router, prefix="/api/v2")  # Mood 心情
+app.include_router(value_router, prefix="/api/v2")  # Value 价值
+app.include_router(commitment_router, prefix="/api/v2")  # Commitment 承诺
 
-_log_startup_time("[OK] API routers registered (15 routers)", _router_start)
+_log_startup_time("[OK] API routers registered (18 routers)", _router_start)
 
 # 模块加载阶段总结
 _module_load_total = (time.perf_counter() - _startup_timer) * 1000

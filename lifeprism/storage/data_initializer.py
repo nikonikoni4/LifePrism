@@ -59,6 +59,24 @@ EXAMPLE_PLAN_DOC = {
 # 示例计划书 MD 文件名
 EXAMPLE_PLAN_DOC_MD_FILENAME = "示例-planDoc.md"
 
+# 默认心情类型（sort_order 从 7 递减到 1，越大越靠前）
+DEFAULT_MOOD_TYPES = [
+    {'id': 'joy',        'name': '喜悦', 'icon': 'Sun',         'color': '#fed7aa', 'score': 90, 'is_dark': 0, 'sort_order': 7},
+    {'id': 'calm',       'name': '宁静', 'icon': 'Wind',        'color': '#d1fae5', 'score': 70, 'is_dark': 0, 'sort_order': 6},
+    {'id': 'pensive',    'name': '沉思', 'icon': 'Cloud',       'color': '#cbd5e1', 'score': 50, 'is_dark': 0, 'sort_order': 5},
+    {'id': 'anger',      'name': '愤怒', 'icon': 'Flame',       'color': '#fb7185', 'score': 40, 'is_dark': 1, 'sort_order': 4},
+    {'id': 'guilt',      'name': '内疚', 'icon': 'ShieldAlert',  'color': '#8589c9', 'score': 35, 'is_dark': 1, 'sort_order': 3},
+    {'id': 'melancholy', 'name': '忧郁', 'icon': 'Moon',        'color': '#a5b4fc', 'score': 30, 'is_dark': 0, 'sort_order': 2},
+    {'id': 'sorrow',     'name': '悲伤', 'icon': 'Heart',       'color': '#52525b', 'score': 10, 'is_dark': 1, 'sort_order': 1},
+]
+
+# 默认影响因素
+DEFAULT_MOOD_IMPACTS = [
+    '健康', '健身', '自我照顾', '爱好', '身份', '心灵',
+    '社群', '家人', '朋友', '伴侣', '约会', '家务',
+    '工作', '教育', '旅行', '天气', '时事', '金钱',
+]
+
 
 class DataInitializer:
     """
@@ -91,6 +109,8 @@ class DataInitializer:
             self._initialize_default_sub_categories()
             self._initialize_example_goal()
             self._initialize_example_plan_doc()
+            self._initialize_default_mood_types()
+            self._initialize_default_mood_impacts()
             logger.info("默认数据初始化检查完成")
         except Exception as e:
             logger.error(f"初始化默认数据失败: {e}")
@@ -277,6 +297,54 @@ class DataInitializer:
                 logger.warning(f"示例计划书源文件不存在: {source}")
         except Exception as e:
             logger.error(f"生成示例计划书 MD 文件失败: {e}")
+
+    def _initialize_default_mood_types(self):
+        """
+        初始化默认心情类型
+
+        只有当 mood_types 表为空时才添加默认数据
+        """
+        if not self._is_table_empty('mood_types'):
+            logger.debug("mood_types 表已有数据，跳过默认心情类型初始化")
+            return
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                for mt in DEFAULT_MOOD_TYPES:
+                    cursor.execute("""
+                        INSERT INTO mood_types (id, name, icon, color, score, is_dark, sort_order)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (mt['id'], mt['name'], mt['icon'], mt['color'],
+                          mt['score'], mt['is_dark'], mt['sort_order']))
+                logger.info(f"成功初始化 {len(DEFAULT_MOOD_TYPES)} 个默认心情类型")
+        except Exception as e:
+            logger.error(f"初始化默认心情类型失败: {e}")
+            raise
+
+    def _initialize_default_mood_impacts(self):
+        """
+        初始化默认影响因素
+
+        只有当 mood_impacts 表为空时才添加默认数据
+        """
+        if not self._is_table_empty('mood_impacts'):
+            logger.debug("mood_impacts 表已有数据，跳过默认影响因素初始化")
+            return
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                total = len(DEFAULT_MOOD_IMPACTS)
+                for idx, name in enumerate(DEFAULT_MOOD_IMPACTS):
+                    cursor.execute("""
+                        INSERT INTO mood_impacts (name, sort_order)
+                        VALUES (?, ?)
+                    """, (name, total - idx))
+                logger.info(f"成功初始化 {total} 个默认影响因素")
+        except Exception as e:
+            logger.error(f"初始化默认影响因素失败: {e}")
+            raise
 
 
 def initialize_default_data():

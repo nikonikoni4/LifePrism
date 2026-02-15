@@ -1148,6 +1148,186 @@ DIARY_CONFIG = {
 }
 
 
+# 心情类型表配置（Mind Space 心情模块）
+MOOD_TYPES_CONFIG = {
+    'table_name': 'mood_types',
+    'columns': {
+        'id': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY', 'NOT NULL'],
+            'comment': '心情类型 ID，默认类型用固定 id（如 joy, calm），自定义用 mood-type-{uuid[:8]}'
+        },
+        'name': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '心情名称（如"喜悦"、"宁静"），最长 4 字符'
+        },
+        'icon': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': 'Lucide 图标名（如 Sun, Wind）'
+        },
+        'color': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '十六进制颜色值（如 #fed7aa）'
+        },
+        'score': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL'],
+            'comment': '心情评分权重 0-100，用于点图 Y 轴'
+        },
+        'is_dark': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '是否深色主题（影响前端文字颜色）'
+        },
+        'sort_order': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '排序权重，越大越靠前'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [],
+    'timestamps': True,
+    'update_at': False
+}
+
+# 心情记录表配置（Mind Space 心情模块）
+MOOD_ENTRIES_CONFIG = {
+    'table_name': 'mood_entries',
+    'columns': {
+        'id': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY', 'NOT NULL'],
+            'comment': '心情记录 ID，格式 mood-{uuid[:8]}'
+        },
+        'mood_type_id': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '关联 mood_types.id'
+        },
+        'score': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL'],
+            'comment': '该条记录的心情评分（冗余存储，取自 mood_type 的 score）'
+        },
+        'content': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '用户输入的文字内容（可为空）'
+        },
+        'factors': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': 'JSON 数组，影响心情的 tag 列表'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_mood_entries_mood_type_id', 'columns': ['mood_type_id']},
+        {'name': 'idx_mood_entries_created_at', 'columns': ['created_at']}
+    ],
+    'timestamps': True,
+    'update_at': False
+}
+
+# 影响因素配置表（Mind Space 心情模块）
+MOOD_IMPACTS_CONFIG = {
+    'table_name': 'mood_impacts',
+    'columns': {
+        'id': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增 ID'
+        },
+        'name': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL', 'UNIQUE'],
+            'comment': '因素名称（如"健康"、"工作"）'
+        },
+        'sort_order': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '排序权重，越大越靠前'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [],
+    'timestamps': True,
+    'update_at': False
+}
+
+
+# 价值表配置（Mind Space 承诺与价值模块）
+USER_VALUES_CONFIG = {
+    'table_name': 'user_values',
+    'columns': {
+        'id': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY', 'NOT NULL'],
+            'comment': '价值 ID，格式 val-{uuid[:8]}'
+        },
+        'keyword': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL', 'UNIQUE'],
+            'comment': '短标签（2-4字，如"生机"），用于卡片展示，UNIQUE 防止重复'
+        },
+        'content': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '详细描述（可为空）'
+        },
+        'sort_order': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '排序权重，越大越靠前'
+        }
+    },
+    'table_constraints': [],
+    'indexes': [],
+    'timestamps': True,
+    'update_at': True
+}
+
+# 承诺表配置（Mind Space 承诺与价值模块）
+COMMITMENTS_CONFIG = {
+    'table_name': 'commitments',
+    'columns': {
+        'id': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY', 'NOT NULL'],
+            'comment': '承诺 ID，格式 cmt-{uuid[:8]}'
+        },
+        'content': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '承诺的具体行动描述'
+        },
+        'value_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '关联价值 ID（删除价值时可置空）'
+        },
+        'status': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL', "DEFAULT 'active'"],
+            'comment': '状态: active / completed / archived'
+        }
+    },
+    'table_constraints': [
+        "CHECK(status IN ('active', 'completed', 'archived'))"
+    ],
+    'indexes': [
+        {'name': 'idx_commitments_value_id', 'columns': ['value_id']},
+        {'name': 'idx_commitments_status', 'columns': ['status']}
+    ],
+    'timestamps': True,
+    'update_at': True
+}
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'category_map_cache': category_map_cache_CONFIG,
@@ -1171,6 +1351,11 @@ TABLE_CONFIGS = {
     'monthly_report': monthly_report_config,
     'time_paradoxes': TIME_PARADOXES_CONFIG,
     'diary': DIARY_CONFIG,
+    'mood_types': MOOD_TYPES_CONFIG,
+    'mood_entries': MOOD_ENTRIES_CONFIG,
+    'mood_impacts': MOOD_IMPACTS_CONFIG,
+    'user_values': USER_VALUES_CONFIG,
+    'commitments': COMMITMENTS_CONFIG,
 }
 
 
