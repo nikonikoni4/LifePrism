@@ -56,7 +56,7 @@ class SettingsManager:
     def _initialize(self) -> None:
         """初始化配置管理器"""
         self._config: Dict[str, Any] = {}
-        self._warnings: List[str] = []
+        self._warnings: List[Dict[str, str]] = []
 
         # 判断是否是开发环境
         self._is_dev = not getattr(sys, 'frozen', False)
@@ -151,16 +151,17 @@ class SettingsManager:
             resolved_install = install_dir.resolve()
             resolved_data.relative_to(resolved_install)
             # 没抛异常 = 数据路径在安装目录内
-            self._warnings.append(
-                "数据路径位于安装目录内，更新版本时安装目录下的内容可能被删除，建议在设置中迁移数据路径"
-            )
+            self._warnings.append({
+                "type": "data_path",
+                "message": "数据路径位于安装目录内，更新版本时安装目录下的内容可能被删除，建议在设置中迁移数据路径"
+            })
         except (ValueError, OSError):
             pass  # ValueError=不是子目录（安全），OSError=resolve失败（不阻塞启动）
 
     @property
     def warnings(self) -> List[str]:
         """获取系统警告列表"""
-        return list(self._warnings)
+        return list(self._warnings)  # List[Dict[str, str]]
             
     
     def _load_config(self) -> None:
