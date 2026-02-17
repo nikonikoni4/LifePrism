@@ -18,7 +18,8 @@ from .todos_api import router as todos_router
 from .system_api import router as system_router
 from .diary_api import router as diary_router
 from .mood_api import router as mood_router
-from .value_commitment_api import value_router, commitment_router
+from .value_api import value_router
+from .commitment_api import commitment_router
 
 __all__ = [
     "sync_router",

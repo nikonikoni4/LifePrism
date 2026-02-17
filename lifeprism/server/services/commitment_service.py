@@ -6,7 +6,7 @@ Commitment 服务层 - 承诺模块业务逻辑
 """
 from typing import Optional
 
-from lifeprism.server.schemas.value_schemas import (
+from lifeprism.server.schemas.commitment_schemas import (
     CommitmentItem,
     CommitmentListResponse,
     CreateCommitmentRequest,
@@ -17,6 +17,9 @@ from lifeprism.server.providers.value_provider import value_provider
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
+
+# 合法状态值集合
+VALID_STATUSES = {'active', 'completed', 'archived'}
 
 # 合法的状态转换集合
 VALID_TRANSITIONS = {
@@ -45,9 +48,22 @@ def get_commitments(status: Optional[str] = None, value_id: Optional[str] = None
     获取承诺列表
 
     Args:
-        status: 状态筛选，支持逗号分隔多值
+        status: 状态筛选，支持逗号分隔多值（如 "active,archived"）
         value_id: 按价值 ID 筛选
+
+    Raises:
+        ValueError: status 包含非法值
     """
+    # 校验 status 参数中的每个值是否合法
+    if status:
+        status_list = [s.strip() for s in status.split(",")]
+        invalid = [s for s in status_list if s not in VALID_STATUSES]
+        if invalid:
+            raise ValueError(
+                f"非法的 status 值: {', '.join(invalid)}。"
+                f"允许的值: {', '.join(sorted(VALID_STATUSES))}"
+            )
+
     items = commitment_provider.get_commitments(status, value_id)
     return CommitmentListResponse(
         items=[_convert_to_commitment_item(item) for item in items],
@@ -114,25 +130,24 @@ def update_commitment(commitment_id: str, request: UpdateCommitmentRequest) -> O
     if not existing:
         return None
 
-    explicitly_set = request.model_fields_set
-    update_data = {}
+    update_data = request.model_dump(exclude_unset=True)
 
-    if 'status' in explicitly_set and request.status is not None:
+    # status 校验：不允许清空，需校验状态转换合法性
+    if 'status' in update_data:
+        if update_data['status'] is None:
+            raise ValueError("status 不允许清空")
         current_status = existing['status']
-        new_status = request.status
-        if current_status != new_status:
-            if (current_status, new_status) not in VALID_TRANSITIONS:
-                raise ValueError(f"不允许从 {current_status} 转换到 {new_status}")
-            update_data['status'] = new_status
+        new_status = update_data['status']
+        if current_status == new_status:
+            del update_data['status']
+        elif (current_status, new_status) not in VALID_TRANSITIONS:
+            raise ValueError(f"不允许从 {current_status} 转换到 {new_status}")
 
-    if 'value_id' in explicitly_set and request.value_id is not None:
-        value = value_provider.get_value_by_id(request.value_id)
+    # value_id 校验：null 表示解除关联，非 null 需校验存在性
+    if 'value_id' in update_data and update_data['value_id'] is not None:
+        value = value_provider.get_value_by_id(update_data['value_id'])
         if not value:
-            raise ValueError(f"价值不存在: {request.value_id}")
-        update_data['value_id'] = request.value_id
-
-    if 'content' in explicitly_set:
-        update_data['content'] = request.content
+            raise ValueError(f"价值不存在: {update_data['value_id']}")
 
     if update_data:
         commitment_provider.update_commitment(commitment_id, update_data)

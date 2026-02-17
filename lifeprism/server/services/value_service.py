@@ -3,6 +3,7 @@ Value 服务层 - 价值模块业务逻辑
 
 架构：纯函数模块（无内存缓存，不需要单例）
 """
+import sqlite3
 from typing import Optional
 
 from lifeprism.server.schemas.value_schemas import (
@@ -11,11 +12,11 @@ from lifeprism.server.schemas.value_schemas import (
     ValueListResponse,
     CreateValueRequest,
     UpdateValueRequest,
-    CommitmentBriefItem,
 )
+from lifeprism.server.schemas.commitment_schemas import CommitmentBriefItem
 from lifeprism.server.providers.value_provider import value_provider
 from lifeprism.server.providers.commitment_provider import commitment_provider
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger, ConflictError
 
 logger = get_logger(__name__)
 
@@ -87,9 +88,15 @@ def create_value(request: CreateValueRequest) -> Optional[ValueItem]:
 
     Returns:
         Optional[ValueItem]: 新创建的价值，失败返回 None
+
+    Raises:
+        ConflictError: keyword 已存在
     """
     data = request.model_dump()
-    new_id = value_provider.create_value(data)
+    try:
+        new_id = value_provider.create_value(data)
+    except sqlite3.IntegrityError:
+        raise ConflictError(f"keyword 已存在: {request.keyword}")
     if not new_id:
         return None
     item = value_provider.get_value_by_id(new_id)
@@ -111,11 +118,7 @@ def update_value(value_id: str, request: UpdateValueRequest) -> Optional[ValueIt
     if not existing:
         return None
 
-    explicitly_set = request.model_fields_set
-    update_data = {}
-    for field in ['keyword', 'content', 'sort_order']:
-        if field in explicitly_set:
-            update_data[field] = getattr(request, field)
+    update_data = request.model_dump(exclude_unset=True)
 
     if update_data:
         value_provider.update_value(value_id, update_data)
