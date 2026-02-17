@@ -13,6 +13,7 @@ from .aliyun_provider import AliyunProvider, aliyun_provider
 from .volcengine_provider import VolcEngineProvider, volcengine_provider
 from .openai_provider import OpenAIProvider, openai_provider
 from .minimax_provider import MiniMaxProvider, minimax_provider
+from .kimi_provider import KimiProvider, kimi_provider
 
 # 保留原有的数据提供者
 from .llm_lw_data_provider import LLMLWDataProvider, llm_lw_data_provider
@@ -27,11 +28,13 @@ __all__ = [
     "VolcEngineProvider",
     "OpenAIProvider",
     "MiniMaxProvider",
+    "KimiProvider",
     # Provider 单例
     "aliyun_provider",
     "volcengine_provider",
     "openai_provider",
     "minimax_provider",
+    "kimi_provider",
     # 数据提供者（保留原有）
     "LLMLWDataProvider",
     "llm_lw_data_provider",

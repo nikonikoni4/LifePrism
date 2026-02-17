@@ -17,6 +17,7 @@ from lifeprism.llm.providers import (
     volcengine_provider,
     openai_provider,
     minimax_provider,
+    kimi_provider,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ PROVIDER_REGISTRY: Dict[str, BaseLLMProvider] = {
     "volcengine": volcengine_provider,
     "openai": openai_provider,
     "minimax": minimax_provider,
+    "kimi": kimi_provider,
 }
 
 
