@@ -101,6 +101,20 @@ This file provides guidance to Claude Code when working with code in this reposi
    - `main.py` 第一个 lifeprism import 必须是 `from lifeprism.config.settings_manager import settings`
    - 这保证后续所有模块的 `get_logger()` 都能写入日志文件
 
+7. **异常处理规范**：
+   - **层级职责**：
+     - Provider 层：捕获外部异常（sqlite3.Error, IOError 等），转换为业务异常（DataAccessError, NotFoundError 等）
+     - Service 层：通常让异常自然冒泡；仅在聚合多步操作（需回滚/清理）或补充业务上下文时捕获包装
+     - API 层：捕获业务异常映射为 HTTPException；main.py 注册全局 exception_handler 兜底
+   - **允许 try/except 的场景**：外部 I/O 边界、不可信数据解析（JSON/日期/数字）、全局兜底 handler
+   - **禁止的模式**：
+     - 内部业务逻辑的 try/except（bug 应暴露而非捕获）
+     - catch-and-return-default（except → return None/False/[]/0），错误必须以异常传播
+     - except Exception 宽泛捕获（全局兜底 handler 除外），必须捕获具体异常类型
+   - **冒泡原则**：不需要额外处理的异常让其自然冒泡，不写 catch-log-rethrow
+   - **异常类定义**：统一放 `utils/exceptions.py`，继承 `LWBaseError`；新模块若需特有异常，在同文件新增
+   - **迁移策略**：新代码必须遵守。修改现有文件时仅重构自己触及的函数
+
 ### 业务规则
 
 - **Goal 自动追踪条件**：`track_time_automatically == 1` AND `status == "active"` AND 已设定分类类别。只有满足全部条件的 goal 才传入分类器（`data_processing_service.py`）。
