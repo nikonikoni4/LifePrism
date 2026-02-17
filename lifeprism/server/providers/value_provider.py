@@ -2,6 +2,7 @@
 Value 数据提供者
 提供 user_values 表的 CRUD 操作 + 级联删除事务
 """
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -82,6 +83,8 @@ class ValueProvider(LWBaseDataProvider):
                 """, (new_id, data['keyword'], data.get('content'), data.get('sort_order', 0)))
             logger.info(f"创建价值成功: {new_id}")
             return new_id
+        except sqlite3.IntegrityError:
+            raise
         except Exception as e:
             logger.error(f"创建价值失败: {e}")
             return None
