@@ -8,7 +8,7 @@ Category V2 API Schema 定义
           └── TitleDuration (标题及时长)
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List
 
 
@@ -27,15 +27,14 @@ class SubCategoryTreeItem(BaseModel):
     color: str = Field(..., description="分类颜色（十六进制格式）")
     state: int = Field(default=1, description="分类状态（1: 启用, 0: 禁用）")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "id": "coding",
-                "name": "编程",
-                "color": "#5B8FF9",
-                "state": 1
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "id": "coding",
+            "name": "编程",
+            "color": "#5B8FF9",
+            "state": 1
         }
+    })
 
 
 class CategoryTreeItem(BaseModel):
@@ -46,23 +45,22 @@ class CategoryTreeItem(BaseModel):
     state: int = Field(default=1, description="分类状态（1: 启用, 0: 禁用）")
     subcategories: list[SubCategoryTreeItem] | None = Field(default=None, description="子分类列表，depth=1时为None")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "id": "work",
-                "name": "工作/学习",
-                "color": "#5B8FF9",
-                "state": 1,
-                "subcategories": [
-                    {
-                        "id": "coding",
-                        "name": "编程",
-                        "color": "#7C9AE6",
-                        "state": 1
-                    }
-                ]
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "id": "work",
+            "name": "工作/学习",
+            "color": "#5B8FF9",
+            "state": 1,
+            "subcategories": [
+                {
+                    "id": "coding",
+                    "name": "编程",
+                    "color": "#7C9AE6",
+                    "state": 1
+                }
+            ]
         }
+    })
 
 
 # ============================================================================
@@ -74,13 +72,12 @@ class TitleDuration(BaseModel):
     title: str = Field(..., description="窗口标题")
     duration: int = Field(..., description="使用时长（秒）")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "title": "Youtube - 首页",
-                "duration": 300
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "title": "Youtube - 首页",
+            "duration": 300
         }
+    })
 
 
 class AppUseInfo(BaseModel):
@@ -89,17 +86,16 @@ class AppUseInfo(BaseModel):
     duration: int | None = Field(default=None, description="该应用总使用时长（秒）")
     top_titles: list[TitleDuration] | None = Field(default=None, description="该应用下使用时长最长的标题列表")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "name": "msedge.exe",
-                "duration": 3600,
-                "top_titles": [
-                    {"title": "Youtube - 首页", "duration": 1200},
-                    {"title": "GitHub - Issues", "duration": 800}
-                ]
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "name": "msedge.exe",
+            "duration": 3600,
+            "top_titles": [
+                {"title": "Youtube - 首页", "duration": 1200},
+                {"title": "GitHub - Issues", "duration": 800}
+            ]
         }
+    })
 
 
 class SubCategoryDef(BaseModel):
@@ -111,24 +107,23 @@ class SubCategoryDef(BaseModel):
     duration_percent: int | None = Field(default=None, description="该子分类占主分类的时长百分比")
     app_use_info: list[AppUseInfo] | None = Field(default=None, description="该子分类下的应用使用情况")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "id": "coding",
-                "name": "编程",
-                "duration": 7200,
-                "duration_percent": 60,
-                "app_use_info": [
-                    {
-                        "name": "Code.exe",
-                        "duration": 5400,
-                        "top_titles": [
-                            {"title": "main.py - VS Code", "duration": 3000}
-                        ]
-                    }
-                ]
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "id": "coding",
+            "name": "编程",
+            "duration": 7200,
+            "duration_percent": 60,
+            "app_use_info": [
+                {
+                    "name": "Code.exe",
+                    "duration": 5400,
+                    "top_titles": [
+                        {"title": "main.py - VS Code", "duration": 3000}
+                    ]
+                }
+            ]
         }
+    })
 
 
 class CategoryDef(BaseModel):
@@ -140,24 +135,23 @@ class CategoryDef(BaseModel):
     duration_percent: int | None = Field(default=None, description="该分类占总时长的百分比")
     subcategories: list[SubCategoryDef] | None = Field(default=None, description="子分类列表，depth=1时为None")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "id": "work",
-                "name": "工作/学习",
-                "color": "#5B8FF9",
-                "duration": 14400,
-                "duration_percent": 50,
-                "subcategories": [
-                    {
-                        "id": "coding",
-                        "name": "编程",
-                        "duration": 7200,
-                        "duration_percent": 50
-                    }
-                ]
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "id": "work",
+            "name": "工作/学习",
+            "color": "#5B8FF9",
+            "duration": 14400,
+            "duration_percent": 50,
+            "subcategories": [
+                {
+                    "id": "coding",
+                    "name": "编程",
+                    "duration": 7200,
+                    "duration_percent": 50
+                }
+            ]
         }
+    })
 
 
 # ============================================================================
@@ -272,25 +266,24 @@ class CategoryMapCacheItem(BaseModel):
     state: int = Field(default=1, description="记录状态（1: 有效, 0: 无效）")
     created_at: str | None = Field(default=None, description="创建时间")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "id": "m-a1b2c3d4",
-                "app": "msedge.exe",
-                "app_description": "Microsoft Edge 浏览器，用于网页浏览",
-                "title": "YouTube - 首页",
-                "title_analysis": "用户正在观看 YouTube 视频",
-                "category": "娱乐",
-                "sub_category": "视频",
-                "category_id": "entertainment",
-                "sub_category_id": "video",
-                "link_to_goal_id": "goal-123",
-                "link_to_goal": "学习 Python",
-                "is_multipurpose_app": True,
-                "state": 1,
-                "created_at": "2025-12-22T10:30:00"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "id": "m-a1b2c3d4",
+            "app": "msedge.exe",
+            "app_description": "Microsoft Edge 浏览器，用于网页浏览",
+            "title": "YouTube - 首页",
+            "title_analysis": "用户正在观看 YouTube 视频",
+            "category": "娱乐",
+            "sub_category": "视频",
+            "category_id": "entertainment",
+            "sub_category_id": "video",
+            "link_to_goal_id": "goal-123",
+            "link_to_goal": "学习 Python",
+            "is_multipurpose_app": True,
+            "state": 1,
+            "created_at": "2025-12-22T10:30:00"
         }
+    })
 
 class CategoryMapCacheResponse(BaseModel):
     """GET /category/app-purpose 响应"""
@@ -300,25 +293,24 @@ class CategoryMapCacheResponse(BaseModel):
     page_size: int = Field(..., description="每页记录数")
     total_pages: int = Field(..., description="总页数")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "data": [
-                    {
-                        "app": "msedge.exe",
-                        "app_description": "Microsoft Edge 浏览器",
-                        "title": "YouTube",
-                        "title_analysis": "视频观看",
-                        "category": "娱乐",
-                        "sub_category": "视频"
-                    }
-                ],
-                "total": 100,
-                "page": 1,
-                "page_size": 50,
-                "total_pages": 2
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "data": [
+                {
+                    "app": "msedge.exe",
+                    "app_description": "Microsoft Edge 浏览器",
+                    "title": "YouTube",
+                    "title_analysis": "视频观看",
+                    "category": "娱乐",
+                    "sub_category": "视频"
+                }
+            ],
+            "total": 100,
+            "page": 1,
+            "page_size": 50,
+            "total_pages": 2
         }
+    })
 
 
 # ============================================================================
@@ -334,17 +326,16 @@ class UpdateCategoryMapCacheRequest(BaseModel):
     title_analysis: str | None = Field(default=None, description="标题分析结果，为空时不修改")
     link_to_goal_id: str | None = Field(default=None, description="新的关联目标ID，为空时不修改")
     
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "id": "m-a1b2c3d4",
-                "category_id": "cat-124",
-                "sub_category_id": "subcat-124",
-                "app_description": "Microsoft Edge 浏览器",
-                "title_analysis": "用户正在浏览视频网站",
-                "link_to_goal_id": "goal-123"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "id": "m-a1b2c3d4",
+            "category_id": "cat-124",
+            "sub_category_id": "subcat-124",
+            "app_description": "Microsoft Edge 浏览器",
+            "title_analysis": "用户正在浏览视频网站",
+            "link_to_goal_id": "goal-123"
         }
+    })
 
 
 class BatchUpdateCategoryMapCacheRequest(BaseModel):
@@ -354,36 +345,33 @@ class BatchUpdateCategoryMapCacheRequest(BaseModel):
     sub_category_id: str | None = Field(default=None, description="新的子分类ID")
     app_description: str | None = Field(default=None, description="应用程序描述，为空时不修改")
     link_to_goal_id: str | None = Field(default=None, description="新的关联目标ID，为空时不修改")
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "ids": ["m-a1b2c3d4", "s-e5f6g7h8"],
-                "category_id": "cat-124",
-                "sub_category_id": "subcat-124",
-                "app_description": "Microsoft Edge 浏览器"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "ids": ["m-a1b2c3d4", "s-e5f6g7h8"],
+            "category_id": "cat-124",
+            "sub_category_id": "subcat-124",
+            "app_description": "Microsoft Edge 浏览器"
         }
+    })
 
 
 class DeleteCategoryMapCacheRequest(BaseModel):
     """删除 category_map_cache 记录请求"""
     id: str = Field(..., description="记录ID（格式：m-xxx 或 s-xxx）")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "id": "m-a1b2c3d4"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "id": "m-a1b2c3d4"
         }
+    })
 
 
 class BatchDeleteCategoryMapCacheRequest(BaseModel):
     """批量删除 category_map_cache 记录请求"""
     ids: List[str] = Field(..., description="记录ID列表", min_length=1)
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "ids": ["m-a1b2c3d4", "s-e5f6g7h8"]
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "ids": ["m-a1b2c3d4", "s-e5f6g7h8"]
         }
+    })

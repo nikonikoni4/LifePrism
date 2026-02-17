@@ -4,7 +4,7 @@ Activity V2 API Schema 定义
 用于 Activity 统计、日志等接口的请求和响应模型
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Dict, Any
 
 
@@ -57,16 +57,14 @@ class DailyActivitiesData(BaseModel):
     duration: int = Field(..., description="活动时长（秒）", serialization_alias="duration")
     active_time_percentage: int = Field(..., description="活动时长占比（%）", serialization_alias="activeTimePercentage")
     color: str = Field(..., description="分类颜色（十六进制格式）", serialization_alias="color")
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 from lifeprism.server.schemas.category_schemas import CategoryTreeItem
 class ActivitySummaryData(BaseModel):
     """活动摘要条形图数据（框架）"""
     daily_activities: List[DailyActivitiesData] = Field(..., description="每日活动数据", alias="dailyActivities")
     category_tree: Optional[List[CategoryTreeItem]] = Field(default=None, description="分类树", alias="categoryTree")
     
-    class Config:
-        populate_by_name = True    
+    model_config = ConfigDict(populate_by_name=True)
 
 # -------------------------------TimeOverviewData-------------------------
 
@@ -78,16 +76,15 @@ class ChartSegment(BaseModel):
     color: str = Field(..., description="颜色（十六进制格式）")
     title: str = Field(default="", description="app层的标题显示,显示该应用最长的3个title")
     
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "key": "work",
-                "name": "Work/Study",
-                "value": 480,
-                "color": "#5B8FF9",
-                "title": ""
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "key": "work",
+            "name": "Work/Study",
+            "value": 480,
+            "color": "#5B8FF9",
+            "title": ""
         }
+    })
 
 
 class BarConfig(BaseModel):
@@ -96,14 +93,13 @@ class BarConfig(BaseModel):
     label: str = Field(..., description="图例标签")
     color: str = Field(..., description="颜色（十六进制格式）")
     
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "key": "work",
-                "label": "Work",
-                "color": "#5B8FF9"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "key": "work",
+            "label": "Work",
+            "color": "#5B8FF9"
         }
+    })
 
 
 class TimeOverviewData(BaseModel):
@@ -117,34 +113,32 @@ class TimeOverviewData(BaseModel):
     bar_data: List[Dict[str, Any]] = Field(..., alias="barData", description="时间分布数据")
     details: Optional[Dict[str, 'TimeOverviewData']] = Field(None, description="子分类详情（递归结构）")
     
-    class Config:
-        populate_by_name = True
-        json_schema_extra = {
-            "example": {
-                "title": "Time Overview",
-                "subTitle": "Activity breakdown & timeline",
-                "totalTrackedMinutes": 780,
-                "pieData": [
-                    {"key": "work", "name": "Work/Study", "value": 480, "color": "#5B8FF9"}
-                ],
-                "barKeys": [
-                    {"key": "work", "label": "Work", "color": "#5B8FF9"}
-                ],
-                "barData": [
-                    {"timeRange": "0-2", "work": 0, "entertainment": 30, "other": 90}
-                ],
-                "details": {
-                    "Work/Study": {
-                        "title": "Work/Study Details",
-                        "subTitle": "Detailed breakdown",
-                        "totalTrackedMinutes": 480,
-                        "pieData": [],
-                        "barKeys": [],
-                        "barData": []
-                    }
+    model_config = ConfigDict(populate_by_name=True, json_schema_extra={
+        "example": {
+            "title": "Time Overview",
+            "subTitle": "Activity breakdown & timeline",
+            "totalTrackedMinutes": 780,
+            "pieData": [
+                {"key": "work", "name": "Work/Study", "value": 480, "color": "#5B8FF9"}
+            ],
+            "barKeys": [
+                {"key": "work", "label": "Work", "color": "#5B8FF9"}
+            ],
+            "barData": [
+                {"timeRange": "0-2", "work": 0, "entertainment": 30, "other": 90}
+            ],
+            "details": {
+                "Work/Study": {
+                    "title": "Work/Study Details",
+                    "subTitle": "Detailed breakdown",
+                    "totalTrackedMinutes": 480,
+                    "pieData": [],
+                    "barKeys": [],
+                    "barData": []
                 }
             }
         }
+    })
 class TopTitleData(BaseModel):
     """热门标题数据（框架）"""
     name: str = Field(..., description="窗口标题")
@@ -162,8 +156,7 @@ class TodoListData(BaseModel):
     name: str = Field(..., description="待办事项名称")
     is_completed: bool = Field(..., description="是否完成",alias="isCompleted")
     link_to_goal_id: Optional[str] = Field(default=None, description="关联目标ID",alias="linkToGoalId")
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 # ============================================================================
 # API 响应模型
