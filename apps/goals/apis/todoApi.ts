@@ -1,14 +1,13 @@
 /**
- * TaskPool API
- * /api/v2/taskpool
+ * Todo API
  * /api/v2/todos
  */
 
 import { createApiV2UrlGetter } from '../../../core/services/apiConfig';
 import { TodoItem } from '../types/todo';
 import {
-    BackendTaskPoolItem,
-    BackendTaskPoolResponse,
+    BackendTodoItem,
+    BackendTodoListResponse,
     BackendSyncResponse,
     BackendUpdateTodoResponse,
     BackendCreateTodoResponse
@@ -22,7 +21,7 @@ const getApiBase = createApiV2UrlGetter();
 // Type Conversion Functions
 // ============================================================================
 
-export function mapBackendTaskItemToFrontend(item: BackendTaskPoolItem): TodoItem {
+export function mapBackendTodoToFrontend(item: BackendTodoItem): TodoItem {
     return {
         id: item.id,
         content: item.content,
@@ -48,7 +47,7 @@ export function mapBackendTaskItemToFrontend(item: BackendTaskPoolItem): TodoIte
 // API Functions
 // ============================================================================
 
-export const taskPoolApi = {
+export const todoApi = {
     /**
      * Get task pool items
      */
@@ -62,16 +61,15 @@ export const taskPoolApi = {
         if (planDocId) params.append('plan_doc_id', planDocId);
         if (state) params.append('state', state);
 
-        // Correct URL: /api/v2/taskpool
-        const url = `${getApiBase()}/taskpool${params.toString() ? '?' + params.toString() : ''}`;
+        const url = `${getApiBase()}/todos${params.toString() ? '?' + params.toString() : ''}`;
         const response = await fetch(url);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch taskpool: ${response.statusText}`);
         }
 
-        const data: BackendTaskPoolResponse = await response.json();
-        return data.items.map(mapBackendTaskItemToFrontend);
+        const data: BackendTodoListResponse = await response.json();
+        return data.items.map(mapBackendTodoToFrontend);
     },
 
     /**
@@ -85,7 +83,6 @@ export const taskPoolApi = {
         planDocId: string,
         options?: { dry_run?: boolean; confirm_delete?: boolean }
     ): Promise<BackendSyncResponse> => {
-        // Correct URL: /api/v2/taskpool/sync
         const response = await fetch(`${getApiBase()}/taskpool/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

@@ -10,7 +10,7 @@
  * 直接调用 WaidAPI 即可，不需要 safe* 包装。
  */
 
-import { taskPoolApi } from '../../../apps/goals/apis/taskPool';
+import { todoApi } from '../../../apps/goals/apis/todoApi';
 import { BackendUpdateTodoResponse, BackendCreateTodoResponse } from '../../../apps/goals/types/backend';
 
 const PLANDOC_SAVE_TIMEOUT = 2000; // 2s 超时兜底
@@ -52,7 +52,7 @@ export async function safeUpdateTodo(
     updates: Record<string, unknown>
 ): Promise<BackendUpdateTodoResponse> {
     await requestPlanDocSave();
-    const result = await taskPoolApi.updateTodo(todoId, updates as any);
+    const result = await todoApi.updateTodo(todoId, updates as any);
     await requestPlanDocRefresh();
     return result;
 }
@@ -62,7 +62,7 @@ export async function safeCreateTodo(
     data: Record<string, unknown>
 ): Promise<BackendCreateTodoResponse> {
     await requestPlanDocSave();
-    const result = await taskPoolApi.createTodo(data as any);
+    const result = await todoApi.createTodo(data as any);
     await requestPlanDocRefresh();
     return result;
 }
@@ -70,6 +70,6 @@ export async function safeCreateTodo(
 /** PlanDoc 安全的 todo 删除 */
 export async function safeDeleteTodo(todoId: number): Promise<void> {
     await requestPlanDocSave();
-    await taskPoolApi.deleteTodo(todoId);
+    await todoApi.deleteTodo(todoId);
     await requestPlanDocRefresh();
 }

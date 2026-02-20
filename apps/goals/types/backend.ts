@@ -111,10 +111,10 @@ export interface UpdatePlanDocApiRequest {
 }
 
 // ============================================================================
-// TaskPool Backend Types
+// Todo Backend Types
 // ============================================================================
 
-export interface BackendTaskPoolItem {
+export interface BackendTodoItem {
     id: number;
     content: string;
     parent_id: number | null;
@@ -134,8 +134,8 @@ export interface BackendTaskPoolItem {
     created_at: string | null;
 }
 
-export interface BackendTaskPoolResponse {
-    items: BackendTaskPoolItem[];
+export interface BackendTodoListResponse {
+    items: BackendTodoItem[];
 }
 
 // 待删除任务预览
@@ -155,18 +155,11 @@ export interface BackendSyncResponse {
     to_delete: TodoDeletePreview[] | null;  // dry_run 模式返回
 }
 
-// 同步请求参数
-export interface SyncPlanDocRequest {
-    plan_doc_id: string;
-    dry_run?: boolean;
-    confirm_delete?: boolean;
-}
-
 export interface BackendUpdateTodoResponse {
-    item: BackendTaskPoolItem;
+    item: BackendTodoItem;
     md_synced: boolean;
 }
 
 export interface BackendCreateTodoResponse {
-    item: BackendTaskPoolItem;
+    item: BackendTodoItem;
 }

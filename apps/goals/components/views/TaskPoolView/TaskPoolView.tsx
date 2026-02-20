@@ -12,7 +12,7 @@ import { TodoItem as TodoItemComponent, DraggableItem, DroppablePoolRoot } from 
 import { viewBackground } from '../../shared/backgroundStyles';
 import type { TaskPoolViewProps, TodoItem } from '../../../types';
 import type { TodoDeletePreview } from '../../../types/backend';
-import { taskPoolApi } from '../../../apis/taskPool';
+import { todoApi } from '../../../apis/todoApi';
 import { triggerPlanDocSave, triggerAllPlanDocRefreshes } from '../../../hooks/usePlanDocSaveHook';
 
 // State border colors for left accent
@@ -174,7 +174,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
             await triggerPlanDocSave(selectedPlanDocId);
 
             // 2. 执行 dry_run 预检
-            const preview = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { dry_run: true });
+            const preview = await todoApi.syncPlanDoc(selectedPlanDocId, { dry_run: true });
 
             if (preview.to_delete && preview.to_delete.length > 0) {
                 // 有待删除任务，显示确认对话框
@@ -186,7 +186,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
                 setShowDeleteConfirm(true);
             } else {
                 // 无待删除任务，直接执行同步
-                const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { dry_run: false });
+                const result = await todoApi.syncPlanDoc(selectedPlanDocId, { dry_run: false });
                 await loadTasks();
                 await triggerAllPlanDocRefreshes();
                 setSyncResultMessage(`同步完成：新增 ${result.created}，更新 ${result.updated}`);
@@ -207,7 +207,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
 
         setIsSyncing(true);
         try {
-            const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { confirm_delete: true });
+            const result = await todoApi.syncPlanDoc(selectedPlanDocId, { confirm_delete: true });
             await loadTasks();
             await triggerAllPlanDocRefreshes();
             setShowDeleteConfirm(false);
@@ -229,7 +229,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
 
         setIsSyncing(true);
         try {
-            const result = await taskPoolApi.syncPlanDoc(selectedPlanDocId, { confirm_delete: false });
+            const result = await todoApi.syncPlanDoc(selectedPlanDocId, { confirm_delete: false });
             await loadTasks();
             await triggerAllPlanDocRefreshes();
             setShowDeleteConfirm(false);

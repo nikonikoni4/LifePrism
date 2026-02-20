@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { TodoItem } from '../../apps/goals/types/todo';
 import { PlanDoc } from '../../apps/goals/types/entities';
-import { taskPoolApi } from '../../apps/goals/apis/taskPool';
+import { todoApi } from '../../apps/goals/apis/todoApi';
 import { goalsV2Api } from '../../apps/goals/apis/goal';
 import { planDocApi } from '../../apps/goals/apis/planDoc';
 import { WaidAPI } from '../../floating/what-am-i-doing/api/waidApi';
@@ -38,7 +38,7 @@ export const TodoPickerDialog: React.FC = () => {
         const load = async () => {
             try {
                 const [todos, goals, docs] = await Promise.all([
-                    taskPoolApi.fetchTaskPool(null, null, undefined),
+                    todoApi.fetchTaskPool(null, null, undefined),
                     goalsV2Api.getGoals(),
                     planDocApi.getPlanDocs(),
                 ]);

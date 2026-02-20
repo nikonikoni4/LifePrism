@@ -15,7 +15,7 @@ import {
 import { TodoItem } from '../../apps/goals/types/todo';
 import { WaidAPI } from './api/waidApi';
 import { safeUpdateTodo, safeCreateTodo } from './api/safeTodoOps';
-import { mapBackendTaskItemToFrontend } from '../../apps/goals/apis/taskPool';
+import { mapBackendTodoToFrontend } from '../../apps/goals/apis/todoApi';
 import { useWaidTimer } from './hooks/useWaidTimer';
 import { WaidTodoItem } from './components/WaidTodoItem';
 import { AddTaskMenu } from './components/AddTaskMenu';
@@ -164,7 +164,7 @@ export const WhatAmIDoingFloat: React.FC = () => {
         if (!content) return;
         try {
             const result = await safeCreateTodo({ content, state: 'pool' });
-            const newTodo = mapBackendTaskItemToFrontend(result.item);
+            const newTodo = mapBackendTodoToFrontend(result.item);
             await WaidAPI.addToWaid(newTodo.id);
             await refreshWaidTodos();
         } catch (e) {

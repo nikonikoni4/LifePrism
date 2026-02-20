@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, ChevronRight, Target, Loader2 } from 'lucide-react';
 import { TodoItem } from '../../../../../apps/goals/types/todo';
-import { taskPoolApi } from '../../../../../apps/goals/apis/taskPool';
+import { todoApi } from '../../../../../apps/goals/apis/todoApi';
 
 interface TodoListWidgetProps {
     selectedDate: string;
@@ -29,7 +29,7 @@ const TodoListWidget: React.FC<TodoListWidgetProps> = ({
         const loadTodos = async () => {
             setLoading(true);
             try {
-                const allTodos = await taskPoolApi.fetchTaskPool(null, null, 'scheduled');
+                const allTodos = await todoApi.fetchTaskPool(null, null, 'scheduled');
                 const todosForDate = allTodos.filter(todo => todo.scheduledDate === selectedDate);
                 setItems(todosForDate);
                 // Note: dailyFocusContent not available in V2 - set to null for now

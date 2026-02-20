@@ -9,7 +9,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { TodoItemType as TodoItem } from '@my-ui-kit/core';
-import { taskPoolApi, mapBackendTaskItemToFrontend } from '../apis/taskPool';
+import { todoApi, mapBackendTodoToFrontend } from '../apis/todoApi';
 import { BackendSyncResponse } from '../types/backend';
 import { triggerAllPlanDocSaves, triggerAllPlanDocRefreshes } from './usePlanDocSaveHook';
 
@@ -55,7 +55,7 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
         setLoading(true);
         setError(null);
         try {
-            const data = await taskPoolApi.fetchTaskPool(goalId, planDocId, state);
+            const data = await todoApi.fetchTaskPool(goalId, planDocId, state);
             setTasks(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load tasks');
@@ -70,7 +70,7 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
         setSyncing(true);
         setError(null);
         try {
-            const result = await taskPoolApi.syncPlanDoc(planDocId);
+            const result = await todoApi.syncPlanDoc(planDocId);
             // Reload tasks after sync
             await loadTasks();
             return result;
@@ -102,8 +102,8 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
                 pool_order_index: task.poolOrderIndex,
             };
 
-            const response = await taskPoolApi.createTodo(apiData);
-            const createdItem = mapBackendTaskItemToFrontend(response.item);
+            const response = await todoApi.createTodo(apiData);
+            const createdItem = mapBackendTodoToFrontend(response.item);
             setTasks(prev => [...prev, createdItem]);
             // 刷新 PlanDoc 编辑器内容
             await triggerAllPlanDocRefreshes();
@@ -131,10 +131,10 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
             // parentId needs to be number or null
             if (updates.parentId !== undefined) apiUpdates.parent_id = updates.parentId ? Number(updates.parentId) : null;
 
-            const response = await taskPoolApi.updateTodo(id, apiUpdates);
+            const response = await todoApi.updateTodo(id, apiUpdates);
 
             // Update local state with response
-            const updatedItem = mapBackendTaskItemToFrontend(response.item);
+            const updatedItem = mapBackendTodoToFrontend(response.item);
             setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updatedItem } : t));
             // 刷新 PlanDoc 编辑器内容
             await triggerAllPlanDocRefreshes();
@@ -158,7 +158,7 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
             // 在删除 todo 前，先触发所有 PlanDoc 保存
             await triggerAllPlanDocSaves();
 
-            await taskPoolApi.deleteTodo(id);
+            await todoApi.deleteTodo(id);
             setTasks(prev => prev.filter(t => t.id !== id));
             // 刷新 PlanDoc 编辑器内容
             await triggerAllPlanDocRefreshes();

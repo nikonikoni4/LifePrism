@@ -9,7 +9,6 @@ import { Search, Trash2, ChevronLeft, ChevronRight, Loader2, Edit3, X, Save, Glo
 import { CategoryTreeItem } from '../../../../../core/types/common-components';
 import { CategoryMapCacheItem } from '../types';
 import { CategoryMapCacheAPI } from '../api';
-import { taskPoolApi } from '../../../../../apps/goals/apis/taskPool';
 import { createApiV2UrlGetter } from '../../../../../core/services/apiConfig';
 
 /** 带分类 ID 的目标项（对应后端 GoalWithCategoryItem） */

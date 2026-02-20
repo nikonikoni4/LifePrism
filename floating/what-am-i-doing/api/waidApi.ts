@@ -11,8 +11,8 @@
 
 import { createApiV2UrlGetter } from '../../../core/services/apiConfig';
 import { TodoItem } from '../../../apps/goals/types/todo';
-import { BackendTaskPoolItem } from '../../../apps/goals/types/backend';
-import { mapBackendTaskItemToFrontend } from '../../../apps/goals/apis/taskPool';
+import { BackendTodoItem } from '../../../apps/goals/types/backend';
+import { mapBackendTodoToFrontend } from '../../../apps/goals/apis/todoApi';
 
 const getApiBase = createApiV2UrlGetter();
 
@@ -23,8 +23,8 @@ export const WaidAPI = {
         if (!response.ok) {
             throw new Error(`Failed to fetch WAID todos: ${response.statusText}`);
         }
-        const data: { items: BackendTaskPoolItem[] } = await response.json();
-        return data.items.map(mapBackendTaskItemToFrontend);
+        const data: { items: BackendTodoItem[] } = await response.json();
+        return data.items.map(mapBackendTodoToFrontend);
     },
 
     /** 添加 todo 到浮窗（自动追加到末尾） */
