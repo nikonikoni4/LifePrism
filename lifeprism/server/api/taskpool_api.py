@@ -5,21 +5,19 @@ Task Pool API - 任务池接口
 - GET /taskpool - 获取任务池任务
 - POST /taskpool/sync - 同步计划书任务
 - POST /taskpool/regenerate-summary - 重新生成系统展示区
-- PUT /taskpool/todos/{id} - 更新任务（含 MD 回写）
 """
-from fastapi import APIRouter, Query, HTTPException, Path
+from fastapi import APIRouter, Query
 from typing import Optional
 
-from lifeprism.server.schemas.taskpool_schemas import (
-    TaskPoolResponse,
-    SyncPlanDocRequest,
-    SyncPlanDocResponse,
-    RegenerateSummaryRequest,
-    RegenerateSummaryResponse,
-    UpdateTodoV2Request,
-    UpdateTodoV2Response,
+from lifeprism.server.schemas.todo_schemas import (
+    TodoListResponse,
+)
+from lifeprism.server.schemas.plan_doc_schemas import (
+    SyncPlanDocRequest, SyncPlanDocResponse,
+    RegenerateSummaryRequest, RegenerateSummaryResponse,
 )
 from lifeprism.server.services import taskpool_service
+from lifeprism.server.services import plandoc_sync_service
 
 router = APIRouter(prefix="/taskpool", tags=["Task Pool"])
 
@@ -28,7 +26,7 @@ router = APIRouter(prefix="/taskpool", tags=["Task Pool"])
 # 任务池接口
 # ============================================================================
 
-@router.get("", response_model=TaskPoolResponse)
+@router.get("", response_model=TodoListResponse)
 async def get_taskpool(
     goal_id: Optional[str] = Query(default=None, description="按目标筛选"),
     plan_doc_id: Optional[str] = Query(default=None, description="按计划书筛选"),
@@ -82,7 +80,7 @@ async def sync_plan_doc(request: SyncPlanDocRequest):
     - **total**: 该计划书关联的总任务数
     - **to_delete**: 待删除任务列表（dry_run 模式返回）
     """
-    return taskpool_service.sync_plan_doc(
+    return plandoc_sync_service.sync_plan_doc(
         request.plan_doc_id,
         dry_run=request.dry_run,
         confirm_delete=request.confirm_delete
@@ -99,7 +97,7 @@ async def regenerate_summary(request: RegenerateSummaryRequest):
     系统展示区位于 MD 文件末尾，以 `<!-- lp:system-section -->` 标记。
     用户对此区域的手动修改会在下次同步时被覆盖。
     """
-    success = taskpool_service.regenerate_summary(request.plan_doc_id)
+    success = plandoc_sync_service.regenerate_summary(request.plan_doc_id)
     
     if success:
         return RegenerateSummaryResponse(
@@ -111,43 +109,3 @@ async def regenerate_summary(request: RegenerateSummaryRequest):
             success=False,
             message="更新失败，请检查计划书是否存在"
         )
-
-
-# ============================================================================
-# 任务更新接口（V2，支持 MD 回写）
-# ============================================================================
-
-@router.put("/todos/{todo_id}", response_model=UpdateTodoV2Response)
-async def update_todo_v2(
-    todo_id: int = Path(..., description="任务 ID"),
-    request: UpdateTodoV2Request = ...
-):
-    """
-    更新任务（V2）
-    
-    支持 MD 文件回写：当 state 变为 completed 时，
-    如果任务关联了计划书且有锚点，会同步将 MD 中的 [ ] 改为 [x]。
-    
-    可更新字段：
-    - **content**: 任务内容
-    - **color**: 任务颜色
-    - **state**: 任务状态（pool/scheduled/completed）
-    - **date**: 安排日期（设置后状态自动变为 scheduled）
-    - **expected_finished_at**: 预计完成日期
-    - **parent_id**: 父任务 ID
-    
-    返回：
-    - **item**: 更新后的任务
-    - **md_synced**: 是否同步了 MD 文件
-    """
-    # 如果设置了 date，自动将状态改为 scheduled
-    updates = request.model_dump(exclude_unset=True)
-    if 'date' in updates and updates['date'] and updates.get('state') != 'completed':
-        updates['state'] = 'scheduled'
-    
-    result = taskpool_service.update_todo_with_writeback(todo_id, updates)
-    
-    if result is None:
-        raise HTTPException(status_code=404, detail="任务不存在")
-    
-    return result

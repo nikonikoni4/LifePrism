@@ -9,7 +9,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 | 触发场景 | 必须先读取的文档 |
 |---------|----------------|
 | 新建或修改后端模块（API / Service / Provider / Schema） | `docs/claude/backend-style-guide.md` |
-| 修改 `taskpool_service` 或任何 PlanDoc / todoblock 相关代码 | `docs/claude/plandoc-sync.md` |
+| 修改 `taskpool_service` / `plandoc_sync_service` 或任何 PlanDoc / todoblock 相关代码 | `docs/claude/plandoc-sync.md` |
 | 需要了解项目架构、数据流、分类系统、缓存策略 | `docs/claude/architecture.md` |
 | 环境搭建、启动命令、配置修改、问题排查 | `docs/claude/project-setup.md` |
 | 修改路径解析、数据目录、数据迁移、`settings_manager` 路径相关代码 | `docs/claude/path-config.md` |
@@ -70,7 +70,9 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 1. **TaskPoolView 虚拟滚动禁止移除**：`@tanstack/react-virtual` 是必须保留的性能方案。视觉重叠是库的固有限制，不是 bug。优化只能调整 `estimateSize`/`measureElement`/`paddingBottom`，不能改为普通列表。
 
-2. **Todo 操作必须通过 useTaskPoolStore**：禁止直接调用 `taskPoolApi`。原因：store 内置 PlanDoc 保存 Hook（`triggerAllPlanDocSaves`），操作前先保存编辑器内容，操作后刷新编辑器，避免 MD 文件冲突。
+2. **Todo 操作必须通过 useTaskPoolStore**：禁止直接调用 `todoApi`。原因：store 内置 PlanDoc 保存 Hook（`triggerAllPlanDocSaves`），操作前先保存编辑器内容，操作后刷新编辑器，避免 MD 文件冲突。
+
+3. **PATCH 请求只发送实际修改的字段**：不要把整个表单所有字段都发送。清空字段发送 `null`，不要用空字符串 `""` 代替（空字符串和 null 是不同语义）。
 
 ### 后端规则
 

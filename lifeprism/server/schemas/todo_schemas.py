@@ -1,5 +1,5 @@
 """
-任务池 V2 API Schemas 定义
+Todo Schemas 定义
 
 状态说明：
 - pool: 任务池中（未分配日期）
@@ -16,8 +16,8 @@ from typing import Optional, List, Dict, Literal
 # Response Models
 # ============================================================================
 
-class TaskPoolItem(BaseModel):
-    """任务池任务项"""
+class TodoItem(BaseModel):
+    """任务项"""
     id: int = Field(..., description="任务 ID")
     content: str = Field(..., description="任务内容")
     parent_id: Optional[int] = Field(default=None, description="父任务 ID（NULL 表示根任务）")
@@ -37,61 +37,29 @@ class TaskPoolItem(BaseModel):
     waid_order: Optional[int] = Field(default=None, description="WAID 浮窗排序")
 
 
-class TaskPoolResponse(BaseModel):
-    """任务池响应"""
-    items: List[TaskPoolItem] = Field(default=[], description="任务列表（扁平结构）")
+class TodoListResponse(BaseModel):
+    """任务列表响应"""
+    items: List[TodoItem] = Field(default=[], description="任务列表（扁平结构）")
+
+
+# ============================================================================
+# Query Models
+# ============================================================================
+
+class TodoQueryParams(BaseModel):
+    """任务查询参数"""
+    goal_id: Optional[str] = Field(default=None, description="按目标筛选")
+    plan_doc_id: Optional[str] = Field(default=None, description="按计划书筛选")
+    state: Optional[str] = Field(default="all", description="按状态筛选（pool/scheduled/completed/all）")
 
 
 # ============================================================================
 # Request Models
 # ============================================================================
 
-class TaskPoolQueryParams(BaseModel):
-    """任务池查询参数"""
-    goal_id: Optional[str] = Field(default=None, description="按目标筛选")
-    plan_doc_id: Optional[str] = Field(default=None, description="按计划书筛选")
-    state: Optional[str] = Field(default="all", description="按状态筛选（pool/scheduled/completed/all）")
-
-
-class SyncPlanDocRequest(BaseModel):
-    """同步计划书任务请求"""
-    plan_doc_id: str = Field(..., description="计划书 ID")
-    dry_run: bool = Field(default=False, description="预检模式：只返回差异，不执行操作")
-    confirm_delete: bool = Field(default=False, description="确认删除：True=删除全部待删除任务，False=保留全部")
-
-
-class TodoDeletePreview(BaseModel):
-    """待删除任务预览"""
-    id: int = Field(..., description="任务 ID")
-    content: str = Field(..., description="任务内容")
-    state: str = Field(..., description="任务状态")
-    source_anchor_id: Optional[str] = Field(default=None, description="锚点 ID")
-
-
-class SyncPlanDocResponse(BaseModel):
-    """同步计划书任务响应"""
-    created: int = Field(default=0, description="新创建的任务数")
-    updated: int = Field(default=0, description="更新的任务数")
-    deleted: int = Field(default=0, description="删除的任务数")
-    cleaned: int = Field(default=0, description="清理的锚点数")
-    total: int = Field(default=0, description="该计划书关联的总任务数")
-    to_delete: Optional[List[TodoDeletePreview]] = Field(default=None, description="待删除任务列表（dry_run 模式返回）")
-
-
-class RegenerateSummaryRequest(BaseModel):
-    """重新生成系统展示区请求"""
-    plan_doc_id: str = Field(..., description="计划书 ID")
-
-
-class RegenerateSummaryResponse(BaseModel):
-    """重新生成系统展示区响应"""
-    success: bool = Field(..., description="是否成功")
-    message: Optional[str] = Field(default=None, description="提示信息")
-
-
-class UpdateTodoV2Request(BaseModel):
+class UpdateTodoRequest(BaseModel):
     """
-    更新任务请求 (V2)
+    更新任务请求
 
     支持 MD 文件回写：当 state 变为 completed 时，
     如果任务关联了计划书且有锚点，会同步更新 MD 文件
@@ -110,18 +78,14 @@ class UpdateTodoV2Request(BaseModel):
     waid_order: Optional[int] = Field(default=None, description="WAID 浮窗排序")
 
 
-class UpdateTodoV2Response(BaseModel):
-    """更新任务响应 (V2)"""
-    item: TaskPoolItem = Field(..., description="更新后的任务")
+class UpdateTodoResponse(BaseModel):
+    """更新任务响应"""
+    item: TodoItem = Field(..., description="更新后的任务")
     md_synced: bool = Field(default=False, description="是否同步了 MD 文件")
 
 
-class CreateTodoV2Request(BaseModel):
-    """
-    创建任务请求 (V2)
-
-    用于统一的 /api/v2/todos 接口
-    """
+class CreateTodoRequest(BaseModel):
+    """创建任务请求"""
     content: str = Field(..., description="任务内容")
     state: Optional[Literal["pool", "scheduled", "completed", "shelved"]] = Field(
         default="pool",
@@ -137,9 +101,9 @@ class CreateTodoV2Request(BaseModel):
     waid_order: Optional[int] = Field(default=None, description="WAID 浮窗排序")
 
 
-class CreateTodoV2Response(BaseModel):
-    """创建任务响应 (V2)"""
-    item: TaskPoolItem = Field(..., description="创建的任务")
+class CreateTodoResponse(BaseModel):
+    """创建任务响应"""
+    item: TodoItem = Field(..., description="创建的任务")
 
 
 class WaidReorderRequest(BaseModel):

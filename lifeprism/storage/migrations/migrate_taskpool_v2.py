@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def get_db_path() -> Path:
     """获取数据库文件路径"""
     # 从 settings 获取数据库路径
-    from lifeprism.config.settings import settings
+    from lifeprism.config.settings_manager import settings
     return Path(settings.lw_db_path)
 
 

@@ -12,15 +12,11 @@ Todos API - 统一任务接口
 from fastapi import APIRouter, Query, HTTPException, Path
 from typing import Optional
 
-from lifeprism.server.schemas.taskpool_schemas import (
-    TaskPoolItem,
-    TaskPoolResponse,
-    CreateTodoV2Request,
-    CreateTodoV2Response,
-    UpdateTodoV2Request,
-    UpdateTodoV2Response,
-    WaidReorderRequest,
-    WaidAddRequest,
+from lifeprism.server.schemas.todo_schemas import (
+    TodoItem, TodoListResponse,
+    CreateTodoRequest, CreateTodoResponse,
+    UpdateTodoRequest, UpdateTodoResponse,
+    WaidReorderRequest, WaidAddRequest,
 )
 from lifeprism.server.services import taskpool_service
 from lifeprism.server.providers.todo_provider import todo_provider
@@ -32,7 +28,7 @@ router = APIRouter(prefix="/todos", tags=["Todos"])
 # 任务查询接口
 # ============================================================================
 
-@router.get("", response_model=TaskPoolResponse)
+@router.get("", response_model=TodoListResponse)
 async def get_todos(
     date: Optional[str] = Query(default=None, description="日期（YYYY-MM-DD 格式）"),
     goal_id: Optional[str] = Query(default=None, description="按目标筛选"),
@@ -72,8 +68,8 @@ async def get_todos(
 # 任务创建接口
 # ============================================================================
 
-@router.post("", response_model=CreateTodoV2Response)
-async def create_todo(request: CreateTodoV2Request):
+@router.post("", response_model=CreateTodoResponse)
+async def create_todo(request: CreateTodoRequest):
     """
     创建新任务
 
@@ -94,19 +90,19 @@ async def create_todo(request: CreateTodoV2Request):
     if not result:
         raise HTTPException(status_code=500, detail="创建任务失败")
 
-    return CreateTodoV2Response(item=result)
+    return CreateTodoResponse(item=result)
 
 
 # ============================================================================
 # WAID 浮窗接口
 # ============================================================================
 
-@router.get("/waid", response_model=TaskPoolResponse, summary="获取 WAID 浮窗 todo 列表")
+@router.get("/waid", response_model=TodoListResponse, summary="获取 WAID 浮窗 todo 列表")
 async def get_waid_todos():
     """获取浮窗中的 todo 列表（waid_order IS NOT NULL，ASC 排序）"""
     items = todo_provider.get_waid_todos()
-    task_items = [taskpool_service._db_to_taskpool_item(item) for item in items]
-    return TaskPoolResponse(items=task_items)
+    task_items = [taskpool_service.db_to_todo_item(item) for item in items]
+    return TodoListResponse(items=task_items)
 
 
 @router.put("/waid/reorder", summary="WAID 浮窗重排序")
@@ -158,7 +154,7 @@ async def remove_from_waid(
 # 单个任务操作接口
 # ============================================================================
 
-@router.get("/{todo_id}", response_model=TaskPoolItem)
+@router.get("/{todo_id}", response_model=TodoItem)
 async def get_todo(
     todo_id: int = Path(..., description="任务 ID")
 ):
@@ -171,10 +167,10 @@ async def get_todo(
     return result
 
 
-@router.put("/{todo_id}", response_model=UpdateTodoV2Response)
+@router.put("/{todo_id}", response_model=UpdateTodoResponse)
 async def update_todo(
     todo_id: int = Path(..., description="任务 ID"),
-    request: UpdateTodoV2Request = ...
+    request: UpdateTodoRequest = ...
 ):
     """
     更新任务
