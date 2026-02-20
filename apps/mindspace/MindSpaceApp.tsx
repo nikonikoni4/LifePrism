@@ -85,7 +85,7 @@ export const MindSpaceApp: React.FC = () => {
                         transition={{ duration: 0.4, ease: "easeOut" }}
                         className="fixed inset-0 z-[100] bg-[#F2F4F1] overflow-y-auto"
                     >
-                        <CommitmentView onBack={() => handleNavigate('home')} />
+                        <CommitmentView onBack={() => handleNavigate('home')} onNavigate={handleNavigate} />
                     </motion.div>
                 )}
             </AnimatePresence>
