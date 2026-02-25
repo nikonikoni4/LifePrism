@@ -1,159 +1,27 @@
 """
 火山引擎 (VolcEngine/Doubao) Provider
 
-使用 OpenAI SDK 调用火山引擎原生接口，包装为 LangChain 兼容的 ChatModel
+使用 langchain_openai.ChatOpenAI (OpenAI 兼容接口) 调用火山引擎原生接口
 
 修改记录:
 - 2026-02-12: 硬编码禁用网络搜索功能（enable_search 强制为 False）
   当前仅保留阿里云的网络搜索服务，火山引擎默认不启用搜索。
   如需重新启用，将 get_model_kwargs 中的 enable_search 硬编码覆盖移除即可。
+- 2026-02-25: 将自定义 ChatVolcEngine 替换为 langchain_openai.ChatOpenAI
+  原因: 自定义的 ChatVolcEngine 继承 BaseChatModel 但未实现 bind_tools 方法，
+  导致 norm_chat 调用 bind_tools 时抛出 NotImplementedError。
+  ChatOpenAI 已内置完整的 bind_tools 支持，且火山引擎接口与 OpenAI 兼容。
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Iterator
+from typing import Any, Dict
 
-from openai import OpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage
-from langchain_core.outputs import ChatResult, ChatGeneration
-from langchain_core.callbacks import CallbackManagerForLLMRun
 
 from .base_provider import BaseLLMProvider, ProviderCapability, ProviderConfig
 
 logger = logging.getLogger(__name__)
-
-
-class ChatVolcEngine(BaseChatModel):
-    """
-    火山引擎 LangChain ChatModel 包装器
-
-    使用 OpenAI SDK 调用火山引擎的 chat/completions 接口
-    """
-
-    client: Any = None
-    model: str = "doubao-1-5-pro-32k-250115"
-    temperature: float = 0.7
-    streaming: bool = False
-    model_kwargs: Dict[str, Any] = {}
-
-    def __init__(
-        self,
-        api_key: str,
-        model: str = "doubao-1-5-pro-32k-250115",
-        temperature: float = 0.7,
-        streaming: bool = False,
-        model_kwargs: Optional[Dict[str, Any]] = None,
-        **kwargs
-    ):
-        super().__init__(**kwargs)
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url="https://ark.cn-beijing.volces.com/api/v3"
-        )
-        self.model = model
-        self.temperature = temperature
-        self.streaming = streaming
-        self.model_kwargs = model_kwargs or {}
-
-    @property
-    def _llm_type(self) -> str:
-        return "volcengine-doubao"
-
-    def _convert_messages(self, messages: List[BaseMessage]) -> List[Dict[str, str]]:
-        """将 LangChain 消息转换为 OpenAI 格式"""
-        result = []
-        for msg in messages:
-            if isinstance(msg, SystemMessage):
-                result.append({"role": "system", "content": msg.content})
-            elif isinstance(msg, HumanMessage):
-                result.append({"role": "user", "content": msg.content})
-            elif isinstance(msg, AIMessage):
-                result.append({"role": "assistant", "content": msg.content})
-            else:
-                # 默认作为 user 消息
-                result.append({"role": "user", "content": str(msg.content)})
-        return result
-
-    def _generate(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
-        **kwargs
-    ) -> ChatResult:
-        """同步生成"""
-        openai_messages = self._convert_messages(messages)
-
-        # 分离 extra_body 参数（火山引擎特有参数需要通过 extra_body 传递）
-        extra_body = {}
-        standard_kwargs = {}
-
-        for key, value in self.model_kwargs.items():
-            if key in ("web_search", "thinking"):
-                # 火山引擎特有参数放入 extra_body
-                extra_body[key] = value
-            else:
-                standard_kwargs[key] = value
-
-        # 合并参数
-        request_kwargs = {
-            "model": self.model,
-            "messages": openai_messages,
-            "temperature": self.temperature,
-            **standard_kwargs,
-            **kwargs
-        }
-
-        if stop:
-            request_kwargs["stop"] = stop
-
-        if extra_body:
-            request_kwargs["extra_body"] = extra_body
-
-        # 调用 API
-        response = self.client.chat.completions.create(**request_kwargs)
-
-        # 解析响应
-        content = response.choices[0].message.content or ""
-
-        # 构建 token_usage（统一格式，兼容 parse_token_usage）
-        token_usage = {
-            "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-            "completion_tokens": response.usage.completion_tokens if response.usage else 0,
-            "total_tokens": response.usage.total_tokens if response.usage else 0,
-        }
-
-        # 构建 response_metadata（LangChain 标准格式）
-        response_metadata = {
-            "model": response.model,
-            "token_usage": token_usage,
-        }
-
-        # 创建带有 response_metadata 的 AIMessage
-        ai_message = AIMessage(
-            content=content,
-            response_metadata=response_metadata
-        )
-
-        return ChatResult(
-            generations=[ChatGeneration(message=ai_message)],
-            llm_output={
-                "model": response.model,
-                "usage": token_usage
-            }
-        )
-
-    async def _agenerate(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
-        **kwargs
-    ) -> ChatResult:
-        """异步生成 - 使用同步方法（OpenAI SDK 的异步需要 AsyncOpenAI）"""
-        # 简单实现：直接调用同步方法
-        # 如果需要真正的异步，可以使用 AsyncOpenAI
-        return self._generate(messages, stop, run_manager, **kwargs)
 
 
 class VolcEngineProvider(BaseLLMProvider):
@@ -161,9 +29,10 @@ class VolcEngineProvider(BaseLLMProvider):
     火山引擎 (VolcEngine/Doubao) Provider
 
     特性:
-    - 使用 OpenAI SDK 调用火山引擎原生接口
+    - 使用 ChatOpenAI（OpenAI 兼容接口）调用火山引擎原生接口
     - 支持 web_search 启用网络搜索
     - 支持 thinking 启用深度思考
+    - 支持 bind_tools 工具调用
 
     注意:
     - 火山引擎需要使用 Endpoint ID（格式：ep-xxx）而不是模型名称
@@ -196,17 +65,18 @@ class VolcEngineProvider(BaseLLMProvider):
         enable_streaming: bool = False,
         **kwargs
     ) -> BaseChatModel:
-        """创建 ChatVolcEngine 模型实例"""
+        """创建 ChatOpenAI 模型实例（火山引擎兼容）"""
         model_kwargs = self.get_model_kwargs(
             enable_search=enable_search,
             enable_thinking=enable_thinking,
             **kwargs
         )
 
-        return ChatVolcEngine(
-            api_key=api_key,
+        return ChatOpenAI(
             model=model or self.config.default_model,
             temperature=temperature,
+            api_key=api_key,
+            base_url=self.config.base_url,
             streaming=enable_streaming,
             model_kwargs=model_kwargs
         )
@@ -219,18 +89,23 @@ class VolcEngineProvider(BaseLLMProvider):
     ) -> Dict[str, Any]:
         """
         火山引擎参数格式:
-        - web_search: {"enable": true}
-        - thinking: {"type": "enabled"}
+        - extra_body.web_search: {"enable": true}
+        - extra_body.thinking: {"type": "enabled"}
+
+        注意: 火山引擎特有参数需通过 extra_body 传递
         """
         model_kwargs = {}
 
         # 硬编码禁用：当前仅保留阿里云搜索服务，火山引擎暂不启用
         enable_search = False
         if enable_search and self.supports(ProviderCapability.WEB_SEARCH):
-            model_kwargs["web_search"] = {"enable": True}
+            # 火山引擎特有参数需要通过 extra_body 传递
+            model_kwargs.setdefault("extra_body", {})
+            model_kwargs["extra_body"]["web_search"] = {"enable": True}
 
         if enable_thinking and self.supports(ProviderCapability.THINKING):
-            model_kwargs["thinking"] = {"type": "enabled"}
+            model_kwargs.setdefault("extra_body", {})
+            model_kwargs["extra_body"]["thinking"] = {"type": "enabled"}
 
         # 合并其他 kwargs
         model_kwargs.update(kwargs.get("extra_model_kwargs", {}))
