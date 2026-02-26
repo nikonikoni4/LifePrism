@@ -96,7 +96,7 @@ class LWTableManager:
         """
         
         cursor.execute(create_table_sql)
-        logger.info(f"表 '{table_name}' 创建成功")
+        # logger.info(f"表 '{table_name}' 创建成功")
         
         # 5. 创建索引
         for index in indexes:
