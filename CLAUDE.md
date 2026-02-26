@@ -20,6 +20,10 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Rules
 
+### 控制台指令
+
+对于rm指令，或者其他删除相关指令前必须通过用户许可，并且做出警告，在删除内容之前判断所删除的内容是否备份，能否通过git追踪
+
 ### 语言
 
 对话时除了专有名词外，使用中文回答。
