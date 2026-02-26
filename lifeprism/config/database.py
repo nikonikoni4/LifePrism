@@ -1322,6 +1322,33 @@ COMMITMENTS_CONFIG = {
 }
 
 
+# 数据库迁移版本表配置
+SCHEMA_VERSION_CONFIG = {
+    'table_name': 'schema_version',
+    'columns': {
+        'version': {
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '迁移版本号'
+        },
+        'name': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '迁移脚本名称'
+        },
+        'applied_at': {
+            'type': 'TIMESTAMP',
+            'constraints': ["DEFAULT (datetime('now', 'localtime'))"],
+            'comment': '执行时间'
+        },
+    },
+    'table_constraints': [],
+    'indexes': [],
+    'timestamps': False,
+    'update_at': False,
+}
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'category_map_cache': category_map_cache_CONFIG,
@@ -1350,6 +1377,7 @@ TABLE_CONFIGS = {
     'mood_impacts': MOOD_IMPACTS_CONFIG,
     'user_values': USER_VALUES_CONFIG,
     'commitments': COMMITMENTS_CONFIG,
+    'schema_version': SCHEMA_VERSION_CONFIG,
 }
 
 

@@ -116,6 +116,10 @@ from lifeprism.storage.data_initializer import initialize_default_data
 _log_startup_time("  - data_initializer.initialize_default_data", _import_start)
 
 _import_start = time.perf_counter()
+from lifeprism.storage.migrations.migration_runner import run_migrations
+_log_startup_time("  - migration_runner.run_migrations", _import_start)
+
+_import_start = time.perf_counter()
 from lifeprism.storage.resource_initializer import initialize_resources
 _log_startup_time("  - resource_initializer.initialize_resources", _import_start)
 
@@ -151,6 +155,10 @@ async def lifespan(app: FastAPI):
         _init_start = time.perf_counter()
         init_database()
         _log_startup_time("[OK] Database tables init (init_database)", _init_start)
+
+        _migration_start = time.perf_counter()
+        run_migrations(settings.lw_db_path)
+        _log_startup_time("[OK] Database migrations (run_migrations)", _migration_start)
 
         _default_data_start = time.perf_counter()
         initialize_default_data()
