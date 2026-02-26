@@ -31,11 +31,11 @@ interface TaskPoolStoreContextType {
     loadTasks: (goalId?: string | null, planDocId?: string | null, state?: string) => Promise<void>;
     syncFromPlanDoc: (planDocId: string) => Promise<BackendSyncResponse | null>;
     addTask: (task: TodoItem) => Promise<void>;
-    updateTask: (id: number, updates: Partial<TodoItem>) => Promise<void>;
-    deleteTask: (id: number) => Promise<void>;
-    moveTaskToPool: (id: number) => Promise<void>;
-    scheduleTask: (id: number, date: string) => Promise<void>;
-    completeTask: (id: number) => Promise<void>;
+    updateTask: (id: string, updates: Partial<TodoItem>) => Promise<void>;
+    deleteTask: (id: string) => Promise<void>;
+    moveTaskToPool: (id: string) => Promise<void>;
+    scheduleTask: (id: string, date: string) => Promise<void>;
+    completeTask: (id: string) => Promise<void>;
 }
 
 const TaskPoolStoreContext = createContext<TaskPoolStoreContextType | undefined>(undefined);
@@ -97,7 +97,7 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
                 color: task.color,
                 link_to_goal_id: task.goalId,
                 plan_doc_id: task.planDocId,
-                parent_id: task.parentId ? Number(task.parentId) : null,
+                parent_id: task.parentId,
                 expected_finished_at: task.expectedFinishAt,
                 pool_order_index: task.poolOrderIndex,
             };
@@ -115,7 +115,7 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, []);
 
     // Update task via API
-    const updateTask = useCallback(async (id: number, updates: Partial<TodoItem>) => {
+    const updateTask = useCallback(async (id: string, updates: Partial<TodoItem>) => {
         try {
             // 在更新 todo 前，先触发所有 PlanDoc 保存
             // 确保编辑器中的未保存内容先同步到 MD 文件
@@ -129,7 +129,7 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
             if (updates.scheduledDate !== undefined) apiUpdates.date = updates.scheduledDate;
             if (updates.expectedFinishAt !== undefined) apiUpdates.expected_finished_at = updates.expectedFinishAt;
             // parentId needs to be number or null
-            if (updates.parentId !== undefined) apiUpdates.parent_id = updates.parentId ? Number(updates.parentId) : null;
+            if (updates.parentId !== undefined) apiUpdates.parent_id = updates.parentId;
 
             const response = await todoApi.updateTodo(id, apiUpdates);
 
@@ -153,7 +153,7 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, []);
 
     // Delete task via API
-    const deleteTask = useCallback(async (id: number) => {
+    const deleteTask = useCallback(async (id: string) => {
         try {
             // 在删除 todo 前，先触发所有 PlanDoc 保存
             await triggerAllPlanDocSaves();
@@ -170,17 +170,17 @@ export const TaskPoolProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, []);
 
     // Move task to pool
-    const moveTaskToPool = useCallback(async (id: number) => {
+    const moveTaskToPool = useCallback(async (id: string) => {
         await updateTask(id, { state: 'pool', scheduledDate: null });
     }, [updateTask]);
 
     // Schedule task
-    const scheduleTask = useCallback(async (id: number, date: string) => {
+    const scheduleTask = useCallback(async (id: string, date: string) => {
         await updateTask(id, { state: 'scheduled', scheduledDate: date });
     }, [updateTask]);
 
     // Complete task
-    const completeTask = useCallback(async (id: number) => {
+    const completeTask = useCallback(async (id: string) => {
         await updateTask(id, { state: 'completed' });
     }, [updateTask]);
 

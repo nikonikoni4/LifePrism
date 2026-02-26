@@ -36,7 +36,7 @@ const STATE_FILTER_OPTIONS: { value: StateFilter; label: string; color: string }
  * 构建任务树：将扁平列表转换为树形结构
  */
 const buildTaskTree = (tasks: TodoItem[]): TodoItem[] => {
-    const taskMap = new Map<number, TodoItem>();
+    const taskMap = new Map<string, TodoItem>();
     const roots: TodoItem[] = [];
 
     // 先创建所有节点的副本
@@ -47,7 +47,7 @@ const buildTaskTree = (tasks: TodoItem[]): TodoItem[] => {
     // 构建父子关系
     taskMap.forEach(task => {
         if (task.parentId) {
-            const parent = taskMap.get(Number(task.parentId));
+            const parent = taskMap.get(task.parentId);
             if (parent) {
                 parent.children = parent.children || [];
                 parent.children.push(task);
@@ -79,7 +79,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
 
     // 默认筛选 pool 状态，减少初始渲染量
     const [stateFilter, setStateFilter] = useState<StateFilter>('pool');
-    const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
     // 同步相关状态
     const [isSyncing, setIsSyncing] = useState(false);
@@ -96,7 +96,7 @@ export const TaskPoolView: React.FC<TaskPoolViewProps> = ({
     const parentRef = useRef<HTMLDivElement>(null);
 
     // 切换展开/折叠
-    const handleToggleExpand = useCallback((id: number) => {
+    const handleToggleExpand = useCallback((id: string) => {
         setExpandedIds(prev => {
             const next = new Set(prev);
             if (next.has(id)) {

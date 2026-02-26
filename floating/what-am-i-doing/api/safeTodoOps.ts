@@ -48,7 +48,7 @@ async function requestPlanDocRefresh(): Promise<void> {
 
 /** PlanDoc 安全的 todo 更新 */
 export async function safeUpdateTodo(
-    todoId: number,
+    todoId: string,
     updates: Record<string, unknown>
 ): Promise<BackendUpdateTodoResponse> {
     await requestPlanDocSave();
@@ -68,7 +68,7 @@ export async function safeCreateTodo(
 }
 
 /** PlanDoc 安全的 todo 删除 */
-export async function safeDeleteTodo(todoId: number): Promise<void> {
+export async function safeDeleteTodo(todoId: string): Promise<void> {
     await requestPlanDocSave();
     await todoApi.deleteTodo(todoId);
     await requestPlanDocRefresh();

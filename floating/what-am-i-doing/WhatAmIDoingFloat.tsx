@@ -29,11 +29,11 @@ const MAX_WINDOW_HEIGHT = 600;
 
 export const WhatAmIDoingFloat: React.FC = () => {
     const [todos, setTodos] = useState<TodoItem[]>([]);
-    const [accumulated, setAccumulated] = useState<Record<number, number>>({});
+    const [accumulated, setAccumulated] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
     const [newTaskContent, setNewTaskContent] = useState('');
-    const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
+    const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
     const contentRef = useRef<HTMLDivElement>(null);
     const newTaskInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,7 +42,7 @@ export const WhatAmIDoingFloat: React.FC = () => {
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
     );
 
-    const toggleCollapse = useCallback((id: number) => {
+    const toggleCollapse = useCallback((id: string) => {
         setCollapsedIds((prev) => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
@@ -52,7 +52,7 @@ export const WhatAmIDoingFloat: React.FC = () => {
     }, []);
 
     // 计时器
-    const handleDurationAdded = useCallback((todoId: number, minutes: number) => {
+    const handleDurationAdded = useCallback((todoId: string, minutes: number) => {
         setAccumulated((prev) => ({
             ...prev,
             [todoId]: (prev[todoId] || 0) + minutes,
@@ -109,7 +109,7 @@ export const WhatAmIDoingFloat: React.FC = () => {
     }, []);
 
     // 操作回调
-    const handleToggleComplete = useCallback(async (id: number) => {
+    const handleToggleComplete = useCallback(async (id: string) => {
         const todo = todos.find((t) => t.id === id);
         if (!todo) return;
         const newState = todo.state === 'completed' ? 'pool' : 'completed';
@@ -125,7 +125,7 @@ export const WhatAmIDoingFloat: React.FC = () => {
         }
     }, [todos, activeTimerId, stopTimer, refreshWaidTodos]);
 
-    const handleContentChange = useCallback(async (id: number, content: string) => {
+    const handleContentChange = useCallback(async (id: string, content: string) => {
         try {
             await safeUpdateTodo(id, { content });
             setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, content } : t)));
@@ -135,7 +135,7 @@ export const WhatAmIDoingFloat: React.FC = () => {
         }
     }, [updateActiveTodoContent]);
 
-    const handleRemove = useCallback(async (id: number) => {
+    const handleRemove = useCallback(async (id: string) => {
         try {
             if (activeTimerId === id) await stopTimer();
             await WaidAPI.removeFromWaid(id);
@@ -189,7 +189,7 @@ export const WhatAmIDoingFloat: React.FC = () => {
         // 找到 active 和 over 所在的同级列表
         const findSiblings = (items: TodoItem[]): TodoItem[] | null => {
             const ids = items.map((i) => i.id);
-            if (ids.includes(active.id as number) && ids.includes(over.id as number)) {
+            if (ids.includes(active.id as string) && ids.includes(over.id as string)) {
                 return items;
             }
             for (const item of items) {

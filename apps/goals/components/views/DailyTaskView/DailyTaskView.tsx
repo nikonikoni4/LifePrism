@@ -16,7 +16,7 @@ import { DailyTaskHeader, DailyTaskToolbar, TaskInputBox } from './components';
  * 将扁平的任务列表转换为嵌套的树形结构
  */
 const buildTaskTree = (tasks: TodoItem[]): TodoItem[] => {
-    const taskMap = new Map<number, TodoItem>();
+    const taskMap = new Map<string, TodoItem>();
     const roots: TodoItem[] = [];
 
     // 首先创建所有任务的副本
@@ -28,7 +28,7 @@ const buildTaskTree = (tasks: TodoItem[]): TodoItem[] => {
     tasks.forEach(task => {
         const taskWithChildren = taskMap.get(task.id)!;
         if (task.parentId) {
-            const parentId = Number(task.parentId);
+            const parentId = task.parentId;
             const parent = taskMap.get(parentId);
             if (parent) {
                 parent.children = parent.children || [];
@@ -59,8 +59,8 @@ const buildTaskTree = (tasks: TodoItem[]): TodoItem[] => {
 /**
  * 收集所有任务ID（包括子任务）
  */
-const collectAllIds = (tasks: TodoItem[]): Set<number> => {
-    const ids = new Set<number>();
+const collectAllIds = (tasks: TodoItem[]): Set<string> => {
+    const ids = new Set<string>();
     const collect = (items: TodoItem[]) => {
         items.forEach(item => {
             ids.add(item.id);
@@ -78,7 +78,7 @@ const collectAllIds = (tasks: TodoItem[]): Set<number> => {
  */
 interface AddChildModalState {
     isOpen: boolean;
-    parentId: number | null;
+    parentId: string | null;
     parentGoalId: string | null;
     parentPlanDocId: string | null;
 }
@@ -88,7 +88,7 @@ interface AddChildModalState {
  */
 const AddChildModal: React.FC<{
     isOpen: boolean;
-    parentId: number | null;
+    parentId: string | null;
     defaultGoalId: string | null;
     defaultPlanDocId: string | null;
     defaultDate: string;
@@ -98,7 +98,7 @@ const AddChildModal: React.FC<{
         color: string;
         scheduledDate: string;
         expectedFinishAt: string | null;
-        parentId: number;
+        parentId: string;
         goalId: string | null;
         planDocId: string | null;
     }) => void;
@@ -308,10 +308,10 @@ export const DailyTaskView: React.FC = () => {
     const { planDocs } = usePlanDocStore();
 
     // Local state
-    const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [inputGoalId, setInputGoalId] = useState<string | null>(null);
     const [inputPlanDocId, setInputPlanDocId] = useState<string | null>(null);
-    const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
     // 子任务创建弹窗状态
     const [addChildModal, setAddChildModal] = useState<AddChildModalState>({
@@ -421,12 +421,11 @@ export const DailyTaskView: React.FC = () => {
     const handleAddTask = useCallback((content: string) => {
         // 直接调用 addTask，由 store 发送到后端创建
         const newTask: TodoItem = {
-            id: 0, // 临时 ID，后端会返回真实 ID
+            id: '', // 临时 ID，后端会返回真实 ID
             content,
             parentId: null,
             goalId: inputGoalId,
             planDocId: inputPlanDocId,
-            sourceAnchorId: null,
             state: 'scheduled',
             scheduledDate: dateStr,
             expectedFinishAt: null,
@@ -441,7 +440,7 @@ export const DailyTaskView: React.FC = () => {
     }, [addTask, inputGoalId, inputPlanDocId, dateStr, dailyTasks.length]);
 
     // 打开添加子任务弹窗
-    const handleAddChild = useCallback((parentId: number) => {
+    const handleAddChild = useCallback((parentId: string) => {
         const parent = tasks.find(t => t.id === parentId);
         setAddChildModal({
             isOpen: true,
@@ -467,19 +466,18 @@ export const DailyTaskView: React.FC = () => {
         color: string;
         scheduledDate: string;
         expectedFinishAt: string | null;
-        parentId: number;
+        parentId: string;
         goalId: string | null;
         planDocId: string | null;
     }) => {
-        const siblings = tasks.filter(t => t.parentId === String(data.parentId));
+        const siblings = tasks.filter(t => t.parentId === data.parentId);
 
         const newTask: TodoItem = {
-            id: 0, // 临时 ID，后端会返回真实 ID
+            id: '', // 临时 ID，后端会返回真实 ID
             content: data.content,
-            parentId: String(data.parentId),
+            parentId: data.parentId,
             goalId: data.goalId,
             planDocId: data.planDocId,
-            sourceAnchorId: null,
             state: 'scheduled',
             scheduledDate: data.scheduledDate,
             expectedFinishAt: data.expectedFinishAt,
@@ -497,22 +495,22 @@ export const DailyTaskView: React.FC = () => {
     }, [tasks, addTask]);
 
     // 更新任务
-    const handleUpdateTask = useCallback((id: number, updates: Partial<TodoItem>) => {
+    const handleUpdateTask = useCallback((id: string, updates: Partial<TodoItem>) => {
         updateTask(id, updates);
     }, [updateTask]);
 
     // 删除任务
-    const handleDeleteTask = useCallback((id: number) => {
+    const handleDeleteTask = useCallback((id: string) => {
         deleteTask(id);
     }, [deleteTask]);
 
     // 选择任务
-    const handleSelectTask = useCallback((id: number) => {
+    const handleSelectTask = useCallback((id: string) => {
         setSelectedTaskId(id);
     }, []);
 
     // 展开/折叠变化
-    const handleExpandChange = useCallback((id: number, expanded: boolean) => {
+    const handleExpandChange = useCallback((id: string, expanded: boolean) => {
         setExpandedIds(prev => {
             const next = new Set(prev);
             if (expanded) {

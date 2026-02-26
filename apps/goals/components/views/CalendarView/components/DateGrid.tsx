@@ -42,7 +42,7 @@ export const DateGrid: React.FC<DateGridProps> = ({ startDate, endDate }) => {
             if (task.scheduledDate) {
                 // 检查父任务是否也是 scheduled 状态
                 const parentTask = task.parentId
-                    ? tasks.find(t => t.id === Number(task.parentId))
+                    ? tasks.find(t => t.id === task.parentId)
                     : null;
                 const parentIsScheduled = parentTask && parentTask.state === 'scheduled';
 

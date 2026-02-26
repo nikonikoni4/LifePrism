@@ -25,10 +25,9 @@ export function mapBackendTodoToFrontend(item: BackendTodoItem): TodoItem {
     return {
         id: item.id,
         content: item.content,
-        parentId: item.parent_id ? String(item.parent_id) : null,
+        parentId: item.parent_id,
         goalId: item.link_to_goal_id,
         planDocId: item.plan_doc_id,
-        sourceAnchorId: item.source_anchor_id,
         state: item.state as 'pool' | 'scheduled' | 'completed' | 'shelved',
         scheduledDate: item.date,
         expectedFinishAt: item.expected_finished_at,
@@ -104,14 +103,14 @@ export const todoApi = {
      * Update a todo item
      */
     updateTodo: async (
-        todoId: number,
+        todoId: string,
         updates: Partial<{
             content: string;
             color: string;
             state: string;
             date: string | null;
             expected_finished_at: string | null;
-            parent_id: number | null;
+            parent_id: string | null;
             delay_days: number | null;
             delay_reason: string | null;
         }>
@@ -140,7 +139,7 @@ export const todoApi = {
             color?: string;
             link_to_goal_id?: string | null;
             plan_doc_id?: string | null;
-            parent_id?: number | null;
+            parent_id?: string | null;
             expected_finished_at?: string | null;
             pool_order_index?: number | null;
         }
@@ -161,7 +160,7 @@ export const todoApi = {
     /**
      * Delete a todo item
      */
-    deleteTodo: async (todoId: number): Promise<void> => {
+    deleteTodo: async (todoId: string): Promise<void> => {
         const response = await fetch(`${getApiBase()}/todos/${todoId}`, {
             method: 'DELETE',
         });

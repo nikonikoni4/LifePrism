@@ -15,16 +15,16 @@ export const TodoPickerDialog: React.FC = () => {
     const [allTodos, setAllTodos] = useState<TodoItem[]>([]);
     const [goalNames, setGoalNames] = useState<Record<string, string>>({});
     const [planDocs, setPlanDocs] = useState<PlanDoc[]>([]);
-    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [search, setSearch] = useState('');
     const [stateFilter, setStateFilter] = useState<StateFilter>('scheduled');
     const [timeFilter, setTimeFilter] = useState<TimeFilter>('today');
     const [planDocFilter, setPlanDocFilter] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
+    const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
 
-    const toggleCollapse = useCallback((id: number) => {
+    const toggleCollapse = useCallback((id: string) => {
         setCollapsedIds((prev) => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
@@ -68,7 +68,7 @@ export const TodoPickerDialog: React.FC = () => {
         const today = getTodayStr();
 
         // Step 1: 找到所有匹配过滤条件的 item ID
-        const matchingIds = new Set<number>();
+        const matchingIds = new Set<string>();
         allTodos.forEach((t) => {
             if (planDocFilter && t.planDocId !== planDocFilter) return;
             if (stateFilter === 'pool' && t.state !== 'pool') return;
@@ -82,14 +82,14 @@ export const TodoPickerDialog: React.FC = () => {
         });
 
         // Step 2: 向上追溯所有祖先，确保树结构完整
-        const idMap = new Map<number, TodoItem>();
+        const idMap = new Map<string, TodoItem>();
         allTodos.forEach((t) => idMap.set(t.id, t));
 
-        const keepIds = new Set<number>(matchingIds);
+        const keepIds = new Set<string>(matchingIds);
         matchingIds.forEach((id) => {
             let current = idMap.get(id);
             while (current?.parentId) {
-                const parentId = Number(current.parentId);
+                const parentId = current.parentId;
                 if (keepIds.has(parentId)) break;
                 keepIds.add(parentId);
                 current = idMap.get(parentId);
@@ -101,7 +101,7 @@ export const TodoPickerDialog: React.FC = () => {
 
     // 构建树形结构（仿照 TaskPool 的 buildTaskTree，正确处理 parentId string→number 转换）
     const buildTaskTree = useCallback((tasks: TodoItem[]): TodoItem[] => {
-        const taskMap = new Map<number, TodoItem>();
+        const taskMap = new Map<string, TodoItem>();
         const roots: TodoItem[] = [];
 
         tasks.forEach(task => {
@@ -111,7 +111,7 @@ export const TodoPickerDialog: React.FC = () => {
         tasks.forEach(task => {
             const current = taskMap.get(task.id)!;
             if (task.parentId) {
-                const parent = taskMap.get(Number(task.parentId));
+                const parent = taskMap.get(task.parentId);
                 if (parent) {
                     (parent.children as TodoItem[]).push(current);
                 } else {
@@ -156,9 +156,9 @@ export const TodoPickerDialog: React.FC = () => {
             const next = new Set(prev);
             const descendants = getDescendantIds(target);
             if (next.has(item.id)) {
-                descendants.forEach((id) => next.delete(id as number));
+                descendants.forEach((id) => next.delete(id as string));
             } else {
-                descendants.forEach((id) => next.add(id as number));
+                descendants.forEach((id) => next.add(id as string));
             }
             return next;
         });

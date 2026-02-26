@@ -16,18 +16,18 @@ import { formatLocalDateTime } from '../utils/formatTime';
 import { getApiV2UrlSync } from '../../../core/services/apiConfig';
 
 export interface UseWaidTimerReturn {
-    activeTimerId: number | null;
+    activeTimerId: string | null;
     timerStart: Date | null;
     elapsed: number; // 秒
     startTimer: (todo: TodoItem) => Promise<void>;
     stopTimer: () => Promise<void>;
-    updateActiveTodoContent: (id: number, content: string) => void;
+    updateActiveTodoContent: (id: string, content: string) => void;
 }
 
 export function useWaidTimer(
-    onDurationAdded?: (todoId: number, minutes: number) => void
+    onDurationAdded?: (todoId: string, minutes: number) => void
 ): UseWaidTimerReturn {
-    const [activeTimerId, setActiveTimerId] = useState<number | null>(null);
+    const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
     const [timerStart, setTimerStart] = useState<Date | null>(null);
     const [elapsed, setElapsed] = useState(0);
 
@@ -139,7 +139,7 @@ export function useWaidTimer(
     }, []);
 
     // 计时中修改 todo content 时同步更新 ref，确保 stopTimer/beforeunload 使用最新内容
-    const updateActiveTodoContent = useCallback((id: number, content: string) => {
+    const updateActiveTodoContent = useCallback((id: string, content: string) => {
         if (activeTodoRef.current && activeTodoRef.current.id === id) {
             activeTodoRef.current = { ...activeTodoRef.current, content };
         }

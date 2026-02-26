@@ -115,12 +115,11 @@ export interface UpdatePlanDocApiRequest {
 // ============================================================================
 
 export interface BackendTodoItem {
-    id: number;
+    id: string;
     content: string;
-    parent_id: number | null;
+    parent_id: string | null;
     link_to_goal_id: string | null;
     plan_doc_id: string | null;
-    source_anchor_id: string | null;
     state: string;
     date: string | null;
     expected_finished_at: string | null;
@@ -140,10 +139,9 @@ export interface BackendTodoListResponse {
 
 // 待删除任务预览
 export interface TodoDeletePreview {
-    id: number;
+    id: string;
     content: string;
     state: string;
-    source_anchor_id: string | null;
 }
 
 export interface BackendSyncResponse {

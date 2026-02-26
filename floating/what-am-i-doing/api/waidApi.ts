@@ -28,7 +28,7 @@ export const WaidAPI = {
     },
 
     /** 添加 todo 到浮窗（自动追加到末尾） */
-    addToWaid: async (todoId: number): Promise<void> => {
+    addToWaid: async (todoId: string): Promise<void> => {
         const response = await fetch(`${getApiBase()}/todos/${todoId}/waid`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -40,7 +40,7 @@ export const WaidAPI = {
     },
 
     /** 批量添加 todo 到浮窗 */
-    batchAddToWaid: async (todoIds: number[]): Promise<void> => {
+    batchAddToWaid: async (todoIds: string[]): Promise<void> => {
         // 后端没有批量添加端点，逐个调用
         for (const id of todoIds) {
             await WaidAPI.addToWaid(id);
@@ -48,7 +48,7 @@ export const WaidAPI = {
     },
 
     /** 从浮窗移除（设 waid_order = NULL） */
-    removeFromWaid: async (todoId: number): Promise<void> => {
+    removeFromWaid: async (todoId: string): Promise<void> => {
         const response = await fetch(`${getApiBase()}/todos/${todoId}/waid`, {
             method: 'DELETE',
         });
@@ -58,7 +58,7 @@ export const WaidAPI = {
     },
 
     /** 批量更新排序（按数组顺序赋值 waid_order 0,1,2...） */
-    reorderWaid: async (todoIds: number[]): Promise<void> => {
+    reorderWaid: async (todoIds: string[]): Promise<void> => {
         const response = await fetch(`${getApiBase()}/todos/waid/reorder`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -70,7 +70,7 @@ export const WaidAPI = {
     },
 
     /** 批量获取今日累计时长（返回 todoId → 分钟数） */
-    batchGetDuration: async (todoIds: number[], date: string): Promise<Record<number, number>> => {
+    batchGetDuration: async (todoIds: string[], date: string): Promise<Record<string, number>> => {
         if (todoIds.length === 0) return {};
         const response = await fetch(`${getApiBase()}/timeline/custom-blocks/batch-duration`, {
             method: 'POST',
@@ -81,11 +81,6 @@ export const WaidAPI = {
             throw new Error(`Failed to get batch duration: ${response.statusText}`);
         }
         const result: { data: Record<string, number> } = await response.json();
-        // 后端返回 string key，转为 number key
-        const mapped: Record<number, number> = {};
-        for (const [key, value] of Object.entries(result.data)) {
-            mapped[Number(key)] = value;
-        }
-        return mapped;
+        return result.data;
     },
 };

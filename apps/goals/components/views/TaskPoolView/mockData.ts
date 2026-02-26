@@ -3,13 +3,11 @@ import { TodoItem } from '../../../types';
 
 export const INITIAL_POOL_TASKS: TodoItem[] = [
     {
-        id: 101,
+        id: "t-mock0101",
         content: "Complete React Documentation",
         parentId: null,
         goalId: "1",
         planDocId: "p1",
-
-        sourceAnchorId: "lp:react-docs",
         state: "pool",
         scheduledDate: null,
         expectedFinishAt: null,
@@ -19,16 +17,15 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         color: "#FFFFFF",
         orderIndex: 0,
         poolOrderIndex: 0,
+        waidOrder: null,
         children: []
     },
     {
-        id: 102,
+        id: "t-mock0102",
         content: "Learn Hooks",
-        parentId: "101",
+        parentId: "t-mock0101",
         goalId: "1",
         planDocId: "p1",
-
-        sourceAnchorId: "lp:hooks",
         state: "pool",
         scheduledDate: null,
         expectedFinishAt: null,
@@ -38,16 +35,15 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         color: "#FFFFFF",
         orderIndex: 0,
         poolOrderIndex: 1,
+        waidOrder: null,
         children: []
     },
     {
-        id: 103,
+        id: "t-mock0103",
         content: "Master useEffect",
-        parentId: "102",
+        parentId: "t-mock0102",
         goalId: "1",
         planDocId: "p1",
-
-        sourceAnchorId: "lp:use-effect",
         state: "pool",
         scheduledDate: null,
         expectedFinishAt: null,
@@ -57,16 +53,15 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         color: "#FFFFFF",
         orderIndex: 0,
         poolOrderIndex: 2,
+        waidOrder: null,
         children: []
     },
     {
-        id: 104,
+        id: "t-mock0104",
         content: "Understand useContext",
-        parentId: "102",
+        parentId: "t-mock0102",
         goalId: "1",
         planDocId: "p1",
-
-        sourceAnchorId: "lp:use-context",
         state: "pool",
         scheduledDate: null,
         expectedFinishAt: null,
@@ -76,16 +71,15 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         color: "#FFFFFF",
         orderIndex: 1,
         poolOrderIndex: 3,
+        waidOrder: null,
         children: []
     },
     {
-        id: 201,
+        id: "t-mock0201",
         content: "Half Marathon Training: Week 1",
         parentId: null,
         goalId: "2",
         planDocId: "p3",
-
-        sourceAnchorId: "lp:run-w1",
         state: "pool",
         scheduledDate: null,
         expectedFinishAt: null,
@@ -95,17 +89,16 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         color: "#FFFFFF",
         orderIndex: 1,
         poolOrderIndex: 4,
+        waidOrder: null,
         children: []
     },
     {
-        id: 202,
+        id: "t-mock0202",
         content: "Easy Run 5k",
-        parentId: "201",
+        parentId: "t-mock0201",
         goalId: "2",
         planDocId: "p3",
-
-        sourceAnchorId: "lp:run-5k-1",
-        state: "scheduled", // Simulate one item already scheduled
+        state: "scheduled",
         scheduledDate: "2024-02-10",
         expectedFinishAt: null,
         actualFinishAt: null,
@@ -114,16 +107,15 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         color: "#FFFFFF",
         orderIndex: 0,
         poolOrderIndex: 5,
+        waidOrder: null,
         children: []
     },
     {
-        id: 203,
+        id: "t-mock0203",
         content: "Interval Training",
-        parentId: "201",
+        parentId: "t-mock0201",
         goalId: "2",
         planDocId: "p3",
-
-        sourceAnchorId: "lp:run-interval",
         state: "pool",
         scheduledDate: null,
         expectedFinishAt: null,
@@ -133,16 +125,15 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         color: "#FFFFFF",
         orderIndex: 1,
         poolOrderIndex: 6,
+        waidOrder: null,
         children: []
     },
     {
-        id: 301,
+        id: "t-mock0301",
         content: "Buy new running shoes",
         parentId: null,
         goalId: null,
         planDocId: null,
-
-        sourceAnchorId: null,
         state: "pool",
         scheduledDate: null,
         expectedFinishAt: null,
@@ -152,6 +143,7 @@ export const INITIAL_POOL_TASKS: TodoItem[] = [
         color: "#FFFFFF",
         orderIndex: 2,
         poolOrderIndex: 7,
+        waidOrder: null,
         children: []
     }
 ];

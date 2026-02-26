@@ -1,10 +1,9 @@
 export interface TodoItem {
-    id: number;
+    id: string;
     content: string;
     parentId: string | null;
     goalId: string | null;
     planDocId: string | null;
-    sourceAnchorId: string | null;
     state: 'pool' | 'scheduled' | 'completed' | 'shelved';
     scheduledDate: string | null;
     expectedFinishAt: string | null;
