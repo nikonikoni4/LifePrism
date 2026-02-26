@@ -23,7 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 release
-
+node_modules
 other_project
 plan
 *db
