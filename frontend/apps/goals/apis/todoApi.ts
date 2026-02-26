@@ -1,0 +1,172 @@
+/**
+ * Todo API
+ * /api/v2/todos
+ */
+
+import { createApiV2UrlGetter } from '../../../core/services/apiConfig';
+import { TodoItem } from '../types/todo';
+import {
+    BackendTodoItem,
+    BackendTodoListResponse,
+    BackendSyncResponse,
+    BackendUpdateTodoResponse,
+    BackendCreateTodoResponse
+} from '../types/backend';
+
+// API base URL getter
+// This points to /api/v2 (Default)
+const getApiBase = createApiV2UrlGetter();
+
+// ============================================================================
+// Type Conversion Functions
+// ============================================================================
+
+export function mapBackendTodoToFrontend(item: BackendTodoItem): TodoItem {
+    return {
+        id: item.id,
+        content: item.content,
+        parentId: item.parent_id,
+        goalId: item.link_to_goal_id,
+        planDocId: item.plan_doc_id,
+        state: item.state as 'pool' | 'scheduled' | 'completed' | 'shelved',
+        scheduledDate: item.date,
+        expectedFinishAt: item.expected_finished_at,
+        actualFinishAt: item.actual_finished_at,
+        delayDays: item.delay_days,
+        delayReason: item.delay_reason,
+        color: item.color || '#FFFFFF',
+        orderIndex: item.order_index,
+        poolOrderIndex: item.pool_order_index,
+        waidOrder: item.waid_order ?? null,
+        children: [],
+    };
+}
+
+// ============================================================================
+// API Functions
+// ============================================================================
+
+export const todoApi = {
+    /**
+     * Get task pool items
+     */
+    fetchTaskPool: async (
+        goalId?: string | null,
+        planDocId?: string | null,
+        state?: string
+    ): Promise<TodoItem[]> => {
+        const params = new URLSearchParams();
+        if (goalId) params.append('goal_id', goalId);
+        if (planDocId) params.append('plan_doc_id', planDocId);
+        if (state) params.append('state', state);
+
+        const url = `${getApiBase()}/todos${params.toString() ? '?' + params.toString() : ''}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch taskpool: ${response.statusText}`);
+        }
+
+        const data: BackendTodoListResponse = await response.json();
+        return data.items.map(mapBackendTodoToFrontend);
+    },
+
+    /**
+     * Sync plan doc to task pool
+     * @param planDocId - The plan doc ID to sync
+     * @param options - Optional parameters:
+     *   - dry_run: If true, returns preview of changes without applying them
+     *   - confirm_delete: If true, confirms deletion of tasks removed from plan doc
+     */
+    syncPlanDoc: async (
+        planDocId: string,
+        options?: { dry_run?: boolean; confirm_delete?: boolean }
+    ): Promise<BackendSyncResponse> => {
+        const response = await fetch(`${getApiBase()}/taskpool/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plan_doc_id: planDocId,
+                dry_run: options?.dry_run ?? false,
+                confirm_delete: options?.confirm_delete,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to sync plan doc: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Update a todo item
+     */
+    updateTodo: async (
+        todoId: string,
+        updates: Partial<{
+            content: string;
+            color: string;
+            state: string;
+            date: string | null;
+            expected_finished_at: string | null;
+            parent_id: string | null;
+            delay_days: number | null;
+            delay_reason: string | null;
+        }>
+    ): Promise<BackendUpdateTodoResponse> => {
+        const response = await fetch(`${getApiBase()}/todos/${todoId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to update todo: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Create a new todo item
+     */
+    createTodo: async (
+        data: {
+            content: string;
+            state?: string;
+            date?: string | null;
+            color?: string;
+            link_to_goal_id?: string | null;
+            plan_doc_id?: string | null;
+            parent_id?: string | null;
+            expected_finished_at?: string | null;
+            pool_order_index?: number | null;
+        }
+    ): Promise<BackendCreateTodoResponse> => {
+        const response = await fetch(`${getApiBase()}/todos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to create todo: ${response.statusText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Delete a todo item
+     */
+    deleteTodo: async (todoId: string): Promise<void> => {
+        const response = await fetch(`${getApiBase()}/todos/${todoId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to delete todo: ${response.statusText}`);
+        }
+    }
+};
