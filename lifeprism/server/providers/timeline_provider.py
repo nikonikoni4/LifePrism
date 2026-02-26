@@ -199,7 +199,7 @@ class TimelineProvider(LWBaseDataProvider):
     # WAID 累计时长查询
     # ============================================================================
 
-    def get_duration_by_todo(self, todo_id: int, date: str) -> int:
+    def get_duration_by_todo(self, todo_id: str, date: str) -> int:
         """查询指定 todo 在指定日期的累计时长（分钟）
 
         Args:
@@ -224,7 +224,7 @@ class TimelineProvider(LWBaseDataProvider):
             logger.error(f"查询 todo {todo_id} 累计时长失败: {e}")
             return 0
 
-    def batch_get_duration_by_todos(self, todo_ids: list[int], date: str) -> dict[int, int]:
+    def batch_get_duration_by_todos(self, todo_ids: list[str], date: str) -> dict[str, int]:
         """批量查询多个 todo 在指定日期的累计时长
 
         Args:

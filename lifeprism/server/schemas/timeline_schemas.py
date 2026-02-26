@@ -73,7 +73,7 @@ class UserCustomBlockCreate(BaseModel):
     duration: int = Field(..., description="持续时长（分钟）")
     category_id: Optional[str] = Field(None, description="主分类ID（可选）")
     sub_category_id: Optional[str] = Field(None, description="子分类ID（可选）")
-    todo_id: Optional[int] = Field(None, description="关联的待办事项ID（可选）")
+    todo_id: Optional[str] = Field(None, description="关联的待办事项ID（可选）")
     color: Optional[str] = Field(None, description="活动颜色（可选，前端随机生成 Tailwind 200 系列）")
     
 
@@ -85,7 +85,7 @@ class UserCustomBlockUpdate(BaseModel):
     duration: Optional[int] = Field(None, description="持续时长（分钟）")
     category_id: Optional[str] = Field(None, description="主分类ID")
     sub_category_id: Optional[str] = Field(None, description="子分类ID")
-    todo_id: Optional[int] = Field(None, description="关联的待办事项ID")
+    todo_id: Optional[str] = Field(None, description="关联的待办事项ID")
     color: Optional[str] = Field(None, description="活动颜色")
 
 
@@ -99,7 +99,7 @@ class UserCustomBlock(BaseModel):
     """
     id: int = Field(..., description="数据块ID")
     content: str = Field(..., description="活动内容描述")
-    todo_id: Optional[int] = Field(None, description="关联的待办事项ID")
+    todo_id: Optional[str] = Field(None, description="关联的待办事项ID")
     todo_content: Optional[str] = Field(None, description="关联的待办事项内容（由后端查询填充）")
     start_time: str = Field(..., description="开始时间（ISO格式：YYYY-MM-DDTHH:MM:SS）")
     end_time: str = Field(..., description="结束时间（ISO格式：YYYY-MM-DDTHH:MM:SS）")
@@ -126,7 +126,7 @@ class UserCustomBlockListResponse(BaseModel):
 
 class TodoDurationResponse(BaseModel):
     """单个 todo 累计时长响应"""
-    todo_id: int = Field(..., description="待办事项 ID")
+    todo_id: str = Field(..., description="待办事项 ID")
     date: str = Field(..., description="查询日期")
     duration: int = Field(..., description="累计时长（分钟）")
 
