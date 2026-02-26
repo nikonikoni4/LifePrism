@@ -18,12 +18,11 @@ from typing import Optional, List, Dict, Literal
 
 class TodoItem(BaseModel):
     """任务项"""
-    id: int = Field(..., description="任务 ID")
+    id: str = Field(..., description="任务 ID（格式：t-{uuid[:8]}）")
     content: str = Field(..., description="任务内容")
-    parent_id: Optional[int] = Field(default=None, description="父任务 ID（NULL 表示根任务）")
+    parent_id: Optional[str] = Field(default=None, description="父任务 ID（NULL 表示根任务）")
     link_to_goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
     plan_doc_id: Optional[str] = Field(default=None, description="关联的计划书 ID")
-    source_anchor_id: Optional[str] = Field(default=None, description="MD 锚点标识")
     state: str = Field(..., description="任务状态（pool/scheduled/completed/shelved）")
     date: Optional[str] = Field(default=None, description="安排日期 YYYY-MM-DD")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期")
@@ -72,7 +71,7 @@ class UpdateTodoRequest(BaseModel):
     )
     date: Optional[str] = Field(default=None, description="安排日期 YYYY-MM-DD")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期")
-    parent_id: Optional[int] = Field(default=None, description="父任务 ID")
+    parent_id: Optional[str] = Field(default=None, description="父任务 ID")
     delay_days: Optional[int] = Field(default=None, description="延期天数")
     delay_reason: Optional[str] = Field(default=None, description="延期/未完成原因说明")
     waid_order: Optional[int] = Field(default=None, description="WAID 浮窗排序")
@@ -95,7 +94,7 @@ class CreateTodoRequest(BaseModel):
     color: Optional[str] = Field(default="#FFFFFF", description="任务颜色")
     link_to_goal_id: Optional[str] = Field(default=None, description="关联的目标 ID")
     plan_doc_id: Optional[str] = Field(default=None, description="关联的计划书 ID")
-    parent_id: Optional[int] = Field(default=None, description="父任务 ID")
+    parent_id: Optional[str] = Field(default=None, description="父任务 ID")
     expected_finished_at: Optional[str] = Field(default=None, description="预计完成日期")
     pool_order_index: Optional[int] = Field(default=None, description="任务池排序")
     waid_order: Optional[int] = Field(default=None, description="WAID 浮窗排序")
@@ -108,7 +107,7 @@ class CreateTodoResponse(BaseModel):
 
 class WaidReorderRequest(BaseModel):
     """WAID 浮窗重排序请求"""
-    todo_ids: List[int] = Field(..., description="按新顺序排列的 todo ID 列表")
+    todo_ids: List[str] = Field(..., description="按新顺序排列的 todo ID 列表")
 
 
 class WaidAddRequest(BaseModel):
@@ -118,7 +117,7 @@ class WaidAddRequest(BaseModel):
 
 class BatchDurationRequest(BaseModel):
     """批量查询累计时长请求"""
-    todo_ids: List[int] = Field(..., description="待办事项 ID 列表")
+    todo_ids: List[str] = Field(..., description="待办事项 ID 列表")
     date: str = Field(..., description="查询日期（YYYY-MM-DD）")
 
 

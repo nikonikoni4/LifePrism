@@ -10,10 +10,9 @@ from typing import Optional, List
 
 class TodoDeletePreview(BaseModel):
     """待删除任务预览"""
-    id: int = Field(..., description="任务 ID")
+    id: str = Field(..., description="任务 ID（即 MD 锚点）")
     content: str = Field(..., description="任务内容")
     state: str = Field(..., description="任务状态")
-    source_anchor_id: Optional[str] = Field(default=None, description="锚点 ID")
 
 
 class SyncPlanDocRequest(BaseModel):

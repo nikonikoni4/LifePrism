@@ -372,9 +372,9 @@ TODO_LIST_CONFIG = {
     'table_name': 'todo_list',
     'columns': {
         'id': {
-            'type': 'INTEGER',
-            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
-            'comment': '自增主键'
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '任务 ID（格式：t-{uuid[:8]}，与 MD 锚点一致）'
         },
         'order_index': {
             'type': 'INTEGER',
@@ -432,7 +432,7 @@ TODO_LIST_CONFIG = {
             'comment': '[已废弃] 所属任务池文件夹 ID'
         },
         'parent_id': {
-            'type': 'INTEGER',
+            'type': 'TEXT',
             'constraints': ['DEFAULT NULL'],
             'comment': '父任务 ID（NULL 表示根任务，支持树形结构）'
         },
@@ -440,11 +440,6 @@ TODO_LIST_CONFIG = {
             'type': 'TEXT',
             'constraints': ['DEFAULT NULL'],
             'comment': '关联的计划书 ID'
-        },
-        'source_anchor_id': {
-            'type': 'TEXT',
-            'constraints': ['DEFAULT NULL'],
-            'comment': 'MD 锚点标识（格式：t-{uuid[:8]}）'
         },
         'delay_days': {
             'type': 'INTEGER',
@@ -469,8 +464,7 @@ TODO_LIST_CONFIG = {
         {'name': 'idx_todo_list_link_to_goal_id', 'columns': ['link_to_goal_id']},
         {'name': 'idx_todo_list_state', 'columns': ['state']},
         {'name': 'idx_todo_list_parent_id', 'columns': ['parent_id']},
-        {'name': 'idx_todo_list_plan_doc_id', 'columns': ['plan_doc_id']},
-        {'name': 'idx_todo_list_source_anchor_id', 'columns': ['source_anchor_id']}
+        {'name': 'idx_todo_list_plan_doc_id', 'columns': ['plan_doc_id']}
     ],
     'timestamps': True  # 自动添加 created_at
 }
@@ -806,9 +800,9 @@ TIMELINE_CUSTOM_BLOCK_CONFIG = {
             'comment': '活动内容描述'
         },
         'todo_id':{
-            'type': 'INTEGER',
+            'type': 'TEXT',
             'constraints': [],
-            'comment': '关联的待办事项ID'
+            'comment': '关联的待办事项ID（格式：t-xxx）'
         },
         'color': {
             'type': 'TEXT',

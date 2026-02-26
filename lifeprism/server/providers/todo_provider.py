@@ -3,11 +3,17 @@ Todo 数据提供者
 提供 TodoList 的数据库操作（支持多层级 parent_id 关系）
 """
 from typing import Optional, List, Dict, Any
+import uuid
 
 from lifeprism.storage import LWBaseDataProvider
 from lifeprism.utils import get_logger, LazySingleton
 
 logger = get_logger(__name__)
+
+
+def generate_todo_id() -> str:
+    """生成 todo ID，格式：t-{uuid[:8]}"""
+    return f"t-{uuid.uuid4().hex[:8]}"
 
 
 class TodoProvider(LWBaseDataProvider):
@@ -68,7 +74,7 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"获取任务列表失败: {e}")
             return []
     
-    def get_todo_by_id(self, todo_id: int) -> Optional[Dict[str, Any]]:
+    def get_todo_by_id(self, todo_id: str) -> Optional[Dict[str, Any]]:
         """
         按 ID 获取单个任务
         
@@ -93,34 +99,37 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"获取任务 {todo_id} 失败: {e}")
             return None
     
-    def create_todo(self, data: Dict[str, Any]) -> Optional[int]:
+    def create_todo(self, data: Dict[str, Any]) -> Optional[str]:
         """
         创建新任务
-        
+
         Args:
-            data: 任务数据
-        
+            data: 任务数据（可包含 'id'，未提供则自动生成）
+
         Returns:
-            Optional[int]: 新任务 ID，失败返回 None
+            Optional[str]: 新任务 ID，失败返回 None
         """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                
+
+                # 插入前生成 ID（如果未提供）
+                todo_id = data.get('id') or generate_todo_id()
+
                 # 获取当前最大 order_index
                 cursor.execute(
                     "SELECT COALESCE(MAX(order_index), -1) + 1 FROM todo_list WHERE date = ?",
                     (data.get('date'),)
                 )
                 next_order = cursor.fetchone()[0]
-                
-                # 插入数据（包含新字段 parent_id, plan_doc_id, source_anchor_id, delay_days, delay_reason）
-                columns = ['order_index', 'pool_order_index', 'content', 'color', 'state',
+
+                columns = ['id', 'order_index', 'pool_order_index', 'content', 'color', 'state',
                           'link_to_goal_id', 'date', 'expected_finished_at',
                           'actual_finished_at', 'cross_day', 'folder_id',
-                          'parent_id', 'plan_doc_id', 'source_anchor_id',
+                          'parent_id', 'plan_doc_id',
                           'delay_days', 'delay_reason']
                 values = [
+                    todo_id,
                     next_order,
                     data.get('pool_order_index'),
                     data.get('content'),
@@ -134,28 +143,26 @@ class TodoProvider(LWBaseDataProvider):
                     data.get('folder_id'),
                     data.get('parent_id'),
                     data.get('plan_doc_id'),
-                    data.get('source_anchor_id'),
                     data.get('delay_days'),
                     data.get('delay_reason')
                 ]
-                
+
                 placeholders = ', '.join(['?' for _ in columns])
                 columns_str = ', '.join(columns)
-                
+
                 cursor.execute(
                     f"INSERT INTO todo_list ({columns_str}) VALUES ({placeholders})",
                     values
                 )
-                
-                new_id = cursor.lastrowid
-                logger.info(f"创建任务成功，ID: {new_id}")
-                return new_id
+
+                logger.info(f"创建任务成功，ID: {todo_id}")
+                return todo_id
                 
         except Exception as e:
             logger.error(f"创建任务失败: {e}")
             return None
     
-    def update_todo(self, todo_id: int, data: Dict[str, Any]) -> bool:
+    def update_todo(self, todo_id: str, data: Dict[str, Any]) -> bool:
         """
         更新任务
         
@@ -173,14 +180,14 @@ class TodoProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # 构建 SET 子句（包含新字段 parent_id, plan_doc_id, source_anchor_id, delay_days, delay_reason）
+                # 构建 SET 子句
                 set_clauses = []
                 values = []
                 allowed_fields = [
                     'content', 'color', 'state', 'link_to_goal_id',
                     'date', 'expected_finished_at', 'actual_finished_at',
                     'cross_day', 'pool_order_index', 'folder_id',
-                    'parent_id', 'plan_doc_id', 'source_anchor_id',
+                    'parent_id', 'plan_doc_id',
                     'delay_days', 'delay_reason', 'waid_order'
                 ]
                 for key, value in data.items():
@@ -209,7 +216,7 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"更新任务 {todo_id} 失败: {e}")
             return False
     
-    def delete_todo(self, todo_id: int) -> bool:
+    def delete_todo(self, todo_id: str) -> bool:
         """
         删除任务
 
@@ -233,7 +240,7 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"删除任务 {todo_id} 失败: {e}")
             return False
 
-    def delete_todo_cascade(self, todo_id: int) -> int:
+    def delete_todo_cascade(self, todo_id: str) -> int:
         """
         级联删除任务及其所有子任务（todo_list 中的 parent_id 关系）
 
@@ -248,7 +255,7 @@ class TodoProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
 
                 # 递归获取所有子任务 ID
-                def get_all_descendant_ids(parent_id: int) -> List[int]:
+                def get_all_descendant_ids(parent_id: str) -> List[str]:
                     cursor.execute(
                         "SELECT id FROM todo_list WHERE parent_id = ?",
                         (parent_id,)
@@ -277,7 +284,7 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"级联删除任务 {todo_id} 失败: {e}")
             return 0
 
-    def get_child_todos(self, parent_id: int) -> List[Dict[str, Any]]:
+    def get_child_todos(self, parent_id: str) -> List[Dict[str, Any]]:
         """
         获取直接子任务列表
 
@@ -304,7 +311,7 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"获取子任务列表失败 (parent_id={parent_id}): {e}")
             return []
 
-    def batch_delete_todos(self, todo_ids: List[int]) -> int:
+    def batch_delete_todos(self, todo_ids: List[str]) -> int:
         """
         批量删除任务（不级联删除子任务）
 
@@ -334,7 +341,7 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"批量删除任务失败: {e}")
             return 0
     
-    def reorder_todos(self, todo_ids: List[int]) -> bool:
+    def reorder_todos(self, todo_ids: List[str]) -> bool:
         """
         批量更新任务排序
         
@@ -402,7 +409,7 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"获取任务列表失败 (state={state}): {e}")
             return []
     
-    def reorder_pool_todos(self, todo_ids: List[int]) -> bool:
+    def reorder_pool_todos(self, todo_ids: List[str]) -> bool:
         """
         批量更新任务池排序 (pool_order_index)
         
@@ -429,7 +436,7 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"重排序任务池失败: {e}")
             return False
     
-    def move_todo_to_folder(self, todo_id: int, folder_id: Optional[int]) -> bool:
+    def move_todo_to_folder(self, todo_id: str, folder_id: Optional[int]) -> bool:
         """
         移动任务到指定文件夹
         
@@ -456,7 +463,7 @@ class TodoProvider(LWBaseDataProvider):
             return False
 
 
-    # ==================== Task Pool V2 操作 ====================
+    # ==================== 任务池查询 ====================
     
     def get_todos_for_taskpool(
         self,
@@ -514,39 +521,6 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"获取任务池任务失败: {e}")
             return []
     
-    def get_todo_by_anchor_id(
-        self, 
-        plan_doc_id: str, 
-        source_anchor_id: str
-    ) -> Optional[Dict[str, Any]]:
-        """
-        根据计划书 ID 和锚点 ID 获取任务
-        
-        Args:
-            plan_doc_id: 计划书 ID
-            source_anchor_id: 锚点 ID
-        
-        Returns:
-            Optional[Dict]: 任务数据，不存在返回 None
-        """
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT * FROM todo_list WHERE plan_doc_id = ? AND source_anchor_id = ?",
-                    (plan_doc_id, source_anchor_id)
-                )
-                
-                row = cursor.fetchone()
-                if row:
-                    columns = [description[0] for description in cursor.description]
-                    return dict(zip(columns, row))
-                return None
-                
-        except Exception as e:
-            logger.error(f"获取任务失败 (anchor={source_anchor_id}): {e}")
-            return None
-    
     def get_todos_by_plan_doc(self, plan_doc_id: str) -> List[Dict[str, Any]]:
         """
         获取指定计划书关联的所有任务
@@ -574,30 +548,32 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"获取计划书任务失败 (plan_doc={plan_doc_id}): {e}")
             return []
     
-    def batch_create_todos(self, todos: List[Dict[str, Any]]) -> List[int]:
+    def batch_create_todos(self, todos: List[Dict[str, Any]]) -> List[str]:
         """
         批量创建任务
-        
+
         Args:
-            todos: 任务数据列表
-        
+            todos: 任务数据列表（可包含 'id'，未提供则自动生成）
+
         Returns:
-            List[int]: 新创建的任务 ID 列表
+            List[str]: 新创建的任务 ID 列表
         """
         new_ids = []
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                
+
                 for data in todos:
+                    todo_id = data.get('id') or generate_todo_id()
                     columns = [
-                        'order_index', 'pool_order_index', 'content', 'color', 'state',
+                        'id', 'order_index', 'pool_order_index', 'content', 'color', 'state',
                         'link_to_goal_id', 'date', 'expected_finished_at',
                         'actual_finished_at', 'cross_day',
-                        'parent_id', 'plan_doc_id', 'source_anchor_id',
+                        'parent_id', 'plan_doc_id',
                         'delay_days', 'delay_reason'
                     ]
                     values = [
+                        todo_id,
                         data.get('order_index', 0),
                         data.get('pool_order_index', 0),
                         data.get('content'),
@@ -610,19 +586,18 @@ class TodoProvider(LWBaseDataProvider):
                         1 if data.get('cross_day') else 0,
                         data.get('parent_id'),
                         data.get('plan_doc_id'),
-                        data.get('source_anchor_id'),
                         data.get('delay_days'),
                         data.get('delay_reason')
                     ]
-                    
+
                     placeholders = ', '.join(['?' for _ in columns])
                     columns_str = ', '.join(columns)
-                    
+
                     cursor.execute(
                         f"INSERT INTO todo_list ({columns_str}) VALUES ({placeholders})",
                         values
                     )
-                    new_ids.append(cursor.lastrowid)
+                    new_ids.append(todo_id)
                 
                 logger.info(f"批量创建 {len(new_ids)} 个任务成功")
                 return new_ids
@@ -650,7 +625,7 @@ class TodoProvider(LWBaseDataProvider):
                     'content', 'color', 'state', 'link_to_goal_id',
                     'date', 'expected_finished_at', 'actual_finished_at',
                     'cross_day', 'pool_order_index', 'order_index',
-                    'parent_id', 'plan_doc_id', 'source_anchor_id',
+                    'parent_id', 'plan_doc_id',
                     'delay_days', 'delay_reason', 'waid_order'
                 ]
                 
@@ -705,7 +680,7 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"获取 WAID todo 列表失败: {e}")
             return []
 
-    def batch_update_waid_order(self, todo_ids: List[int]) -> bool:
+    def batch_update_waid_order(self, todo_ids: List[str]) -> bool:
         """批量设置 waid_order，按数组索引顺序赋值 0,1,2...
 
         Args:
@@ -728,7 +703,7 @@ class TodoProvider(LWBaseDataProvider):
             logger.error(f"批量更新 WAID 排序失败: {e}")
             return False
 
-    def clear_waid_order(self, todo_id: int) -> bool:
+    def clear_waid_order(self, todo_id: str) -> bool:
         """将指定 todo 的 waid_order 设为 NULL（从浮窗移除）
 
         Args:

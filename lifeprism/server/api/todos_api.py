@@ -116,7 +116,7 @@ async def reorder_waid(request: WaidReorderRequest):
 
 @router.put("/{todo_id}/waid", summary="添加 todo 到 WAID 浮窗")
 async def add_to_waid(
-    todo_id: int = Path(..., description="任务 ID"),
+    todo_id: str = Path(..., description="任务 ID"),
     request: WaidAddRequest = WaidAddRequest()
 ):
     """添加 todo 到浮窗。如果未指定 waid_order，自动追加到末尾（MAX+1）"""
@@ -141,7 +141,7 @@ async def add_to_waid(
 
 @router.delete("/{todo_id}/waid", summary="从 WAID 浮窗移除")
 async def remove_from_waid(
-    todo_id: int = Path(..., description="任务 ID")
+    todo_id: str = Path(..., description="任务 ID")
 ):
     """从浮窗移除（设 waid_order = NULL），不删除 todo 本身"""
     success = todo_provider.clear_waid_order(todo_id)
@@ -156,7 +156,7 @@ async def remove_from_waid(
 
 @router.get("/{todo_id}", response_model=TodoItem)
 async def get_todo(
-    todo_id: int = Path(..., description="任务 ID")
+    todo_id: str = Path(..., description="任务 ID")
 ):
     """
     获取单个任务详情
@@ -169,7 +169,7 @@ async def get_todo(
 
 @router.put("/{todo_id}", response_model=UpdateTodoResponse)
 async def update_todo(
-    todo_id: int = Path(..., description="任务 ID"),
+    todo_id: str = Path(..., description="任务 ID"),
     request: UpdateTodoRequest = ...
 ):
     """
@@ -219,7 +219,7 @@ async def update_todo(
 
 @router.delete("/{todo_id}")
 async def delete_todo(
-    todo_id: int = Path(..., description="任务 ID")
+    todo_id: str = Path(..., description="任务 ID")
 ):
     """
     删除任务（会级联删除子任务）

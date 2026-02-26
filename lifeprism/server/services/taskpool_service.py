@@ -39,7 +39,6 @@ def db_to_todo_item(db_item: Dict[str, Any]) -> TodoItem:
         parent_id=db_item.get('parent_id'),
         link_to_goal_id=db_item.get('link_to_goal_id'),
         plan_doc_id=db_item.get('plan_doc_id'),
-        source_anchor_id=db_item.get('source_anchor_id'),
         state=db_item.get('state', 'pool'),
         date=db_item.get('date'),
         expected_finished_at=db_item.get('expected_finished_at'),
@@ -112,7 +111,7 @@ def create_todo_v2(data: Dict[str, Any]) -> Optional[TodoItem]:
     创建新任务 (V2)
 
     支持子任务继承：当创建子任务时，自动继承父任务的 plan_doc_id 和 goal_id，
-    并生成 source_anchor_id，同步插入到 MD 文件。
+    并同步插入到 MD 文件，生成的锚点即为任务 ID。
     """
     # 如果设置了 date 且状态为 pool，自动改为 scheduled
     if data.get('date') and data.get('state', 'pool') == 'pool':
@@ -128,18 +127,14 @@ def create_todo_v2(data: Dict[str, Any]) -> Optional[TodoItem]:
             if not data.get('link_to_goal_id') and parent.get('link_to_goal_id'):
                 data['link_to_goal_id'] = parent['link_to_goal_id']
 
-    # 如果有 plan_doc_id 但没有 source_anchor_id，需要插入到 MD 并生成锚点
+    # 如果有 plan_doc_id，插入到 MD 并用锚点作为任务 ID
     plan_doc_id = data.get('plan_doc_id')
-    if plan_doc_id and not data.get('source_anchor_id'):
-        parent_anchor_id = None
-        if parent_id:
-            parent = todo_provider.get_todo_by_id(parent_id)
-            if parent:
-                parent_anchor_id = parent.get('source_anchor_id')
+    if plan_doc_id and not data.get('id'):
+        parent_anchor_id = parent_id if parent_id else None
 
         new_anchor = insert_todo_to_md(plan_doc_id, data['content'], parent_anchor_id)
         if new_anchor:
-            data['source_anchor_id'] = new_anchor
+            data['id'] = new_anchor
 
     new_id = todo_provider.create_todo(data)
     if not new_id:
@@ -152,7 +147,7 @@ def create_todo_v2(data: Dict[str, Any]) -> Optional[TodoItem]:
     return db_to_todo_item(db_item)
 
 
-def get_todo_by_id(todo_id: int) -> Optional[TodoItem]:
+def get_todo_by_id(todo_id: str) -> Optional[TodoItem]:
     """获取单个任务"""
     db_item = todo_provider.get_todo_by_id(todo_id)
     if not db_item:
@@ -165,7 +160,7 @@ def get_todo_by_id(todo_id: int) -> Optional[TodoItem]:
 # ============================================================================
 
 def update_todo_with_writeback(
-    todo_id: int,
+    todo_id: str,
     updates: Dict[str, Any]
 ) -> Optional[UpdateTodoResponse]:
     """
@@ -192,12 +187,12 @@ def update_todo_with_writeback(
     if not success:
         return None
 
-    # 4. 检查是否需要回写 MD
+    # 4. 检查是否需要回写 MD（id 就是锚点）
     md_synced = False
     plan_doc_id = existing.get('plan_doc_id')
-    anchor_id = existing.get('source_anchor_id')
+    anchor_id = existing['id']
 
-    if plan_doc_id and anchor_id:
+    if plan_doc_id:
         new_state = updates.get('state')
         new_content = updates.get('content')
 
@@ -222,11 +217,11 @@ def update_todo_with_writeback(
     )
 
 
-def delete_todo(todo_id: int) -> bool:
+def delete_todo(todo_id: str) -> bool:
     """
     删除任务（含 MD 回写和级联删除）
 
-    如果任务关联了计划书且有锚点，会同步从 MD 文件中删除。
+    如果任务关联了计划书，会同步从 MD 文件中删除（id 即锚点）。
     同时级联删除所有子任务。
     """
     todo = todo_provider.get_todo_by_id(todo_id)
@@ -234,9 +229,9 @@ def delete_todo(todo_id: int) -> bool:
         return False
 
     plan_doc_id = todo.get('plan_doc_id')
-    anchor_id = todo.get('source_anchor_id')
+    anchor_id = todo['id']
 
-    if plan_doc_id and anchor_id:
+    if plan_doc_id:
         delete_todo_from_md(plan_doc_id, anchor_id)
 
     deleted_count = todo_provider.delete_todo_cascade(todo_id)

@@ -523,21 +523,19 @@ def sync_plan_doc(
         for line_index, parent_anchor in block_parent_map.items():
             parent_map[(block['block_index'], line_index)] = parent_anchor
 
-    # 7. 获取现有任务
+    # 7. 获取现有任务（id 就是锚点）
     existing_todos = todo_provider.get_todos_by_plan_doc(plan_doc_id)
-    existing_by_anchor = {t['source_anchor_id']: t for t in existing_todos if t.get('source_anchor_id')}
+    existing_by_anchor = {t['id']: t for t in existing_todos}
 
     md_anchor_ids = {task['anchor_id'] for task in all_parsed_tasks if task['anchor_id']}
 
-    # 8. 检测待删除的任务
+    # 8. 检测待删除的任务（id 就是锚点）
     todos_to_delete = []
     for todo in existing_todos:
-        anchor_id = todo.get('source_anchor_id')
-        if anchor_id and anchor_id not in md_anchor_ids:
+        if todo['id'] not in md_anchor_ids:
             todos_to_delete.append(todo)
 
     # 9. 处理每个解析出的任务
-    anchor_to_db_id = {}
     todos_to_create = []
     todos_to_update = []
     existing_parent_info = []
@@ -562,7 +560,6 @@ def sync_plan_doc(
                 update_data['actual_finished_at'] = None
 
             todos_to_update.append(update_data)
-            anchor_to_db_id[anchor_id] = existing['id']
 
             existing_parent_info.append({
                 'id': existing['id'],
@@ -573,10 +570,10 @@ def sync_plan_doc(
             result.updated += 1
         else:
             create_data = {
+                'id': anchor_id,
                 'content': task['content'],
                 'state': 'completed' if task['is_checked'] else 'pool',
                 'plan_doc_id': plan_doc_id,
-                'source_anchor_id': anchor_id,
                 'link_to_goal_id': goal_id,
                 'pool_order_index': order_index,
                 'order_index': 0,
@@ -600,7 +597,6 @@ def sync_plan_doc(
                 id=todo['id'],
                 content=todo['content'],
                 state=todo.get('state', 'pool'),
-                source_anchor_id=todo.get('source_anchor_id')
             )
             for todo in todos_to_delete
         ]
@@ -616,19 +612,14 @@ def sync_plan_doc(
         create_data_list = [item['data'] for item in todos_to_create]
         new_ids = todo_provider.batch_create_todos(create_data_list)
 
-        for i, item in enumerate(todos_to_create):
-            if i < len(new_ids):
-                anchor_to_db_id[item['anchor_id']] = new_ids[i]
-
+        # parent_id 直接用 parent_anchor（id 就是锚点）
         parent_updates = []
-        for i, item in enumerate(todos_to_create):
-            if i < len(new_ids) and item['parent_anchor']:
-                parent_db_id = anchor_to_db_id.get(item['parent_anchor'])
-                if parent_db_id:
-                    parent_updates.append({
-                        'id': new_ids[i],
-                        'parent_id': parent_db_id,
-                    })
+        for item in todos_to_create:
+            if item['parent_anchor']:
+                parent_updates.append({
+                    'id': item['data']['id'],
+                    'parent_id': item['parent_anchor'],
+                })
 
         if parent_updates:
             todo_provider.batch_update_todos(parent_updates)
@@ -637,9 +628,7 @@ def sync_plan_doc(
     if existing_parent_info:
         parent_updates_existing = []
         for info in existing_parent_info:
-            new_parent_id = None
-            if info['parent_anchor']:
-                new_parent_id = anchor_to_db_id.get(info['parent_anchor'])
+            new_parent_id = info['parent_anchor']
             if new_parent_id != info['old_parent_id']:
                 parent_updates_existing.append({
                     'id': info['id'],
