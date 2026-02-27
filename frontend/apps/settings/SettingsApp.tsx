@@ -58,6 +58,7 @@ const SettingsApp: React.FC = () => {
     // 4. Database Settings
     const [awPath, setAwPath] = useState('');
     const [lifeprismDataPath, setLifeprismDataPath] = useState('');
+    const [configBasePath, setConfigBasePath] = useState('');
     const [pathStatus, setPathStatus] = useState<'idle' | 'checking' | 'success'>('idle');
     const [isElectron, setIsElectron] = useState(false);
 
@@ -146,6 +147,7 @@ const SettingsApp: React.FC = () => {
                 setBrowserApps(settings.multi_purpose_app_names);
                 setAwPath(settings.aw_db_path);
                 setLifeprismDataPath(settings.lifeprism_data_path);
+                setConfigBasePath(settings.config_base_path || '');
                 setFilterDuration(settings.data_cleaning_threshold);
                 setIsElectron(!!window.electronAPI);
             } catch (err) {
@@ -617,6 +619,30 @@ const SettingsApp: React.FC = () => {
                 </div>
 
                 <div className="space-y-6">
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">配置文件路径</label>
+                        <div className="flex gap-3">
+                            <input
+                                type="text"
+                                value={configBasePath ? `${configBasePath}/config` : ''}
+                                readOnly
+                                className="flex-1 bg-gray-50 border border-transparent rounded-xl px-4 py-3 text-slate-500 font-mono text-xs outline-none cursor-default"
+                            />
+                            {isElectron && configBasePath && (
+                                <button
+                                    onClick={() => {
+                                        window.electronAPI?.openFolder(`${configBasePath}/config`);
+                                    }}
+                                    className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-slate-600 rounded-xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all"
+                                    title="打开配置文件夹"
+                                >
+                                    <FolderOpen size={14} />
+                                </button>
+                            )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-2">config.yaml、providers.yaml 等配置文件的存储目录，不随数据迁移。</p>
+                    </div>
+
                     <div>
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">LifePrism 数据路径</label>
                         <div className="flex gap-3">

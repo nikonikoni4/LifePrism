@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const { initUpdater, setMainWindow, checkForUpdates, downloadUpdate, quitAndInstall } = require('./updater.cjs');
 
 let mainWindow;
 let backendProcess;
@@ -293,6 +294,18 @@ ipcMain.handle('get-install-path', () => {
     return null;
 });
 
+// IPC: 在文件管理器中打开文件夹
+ipcMain.handle('open-folder', async (_event, folderPath) => {
+    if (!folderPath) return { success: false };
+    try {
+        await shell.openPath(folderPath);
+        return { success: true };
+    } catch (e) {
+        console.log('[Electron] 打开文件夹失败:', e);
+        return { success: false };
+    }
+});
+
 // IPC: 退出应用（数据迁移后调用）
 ipcMain.handle('app-quit', () => {
     app.isQuitting = true;
@@ -480,12 +493,27 @@ ipcMain.handle('resize-floating-window', (_event, windowId, { width, height }) =
     return { success: false };
 });
 
+// IPC: 检查更新
+ipcMain.handle('updater:check', () => checkForUpdates(app.isPackaged));
+
+// IPC: 下载更新
+ipcMain.handle('updater:download', () => downloadUpdate(app.isPackaged));
+
+// IPC: 退出并安装更新
+ipcMain.handle('updater:quit-and-install', () => {
+    app.isQuitting = true;
+    quitAndInstall();
+});
+
 app.whenReady().then(() => {
     // 初始化日志（必须在第一条 console.log 之前）
     initFrontendLog();
 
     console.log('[Electron] 应用启动中...');
     console.log(`[Electron] LifePrism 数据路径: ${getLifeprismDataPath()}`);
+
+    // 初始化自动更新
+    initUpdater(app.isPackaged);
 
     // 确保 lifeprismData 目录存在
     const dataPath = getLifeprismDataPath();
@@ -511,6 +539,7 @@ app.whenReady().then(() => {
     console.log('[Electron] 等待后端启动...');
     setTimeout(() => {
         createWindow();
+        setMainWindow(mainWindow);
     }, 3000);
 });
 

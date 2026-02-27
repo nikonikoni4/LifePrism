@@ -26,6 +26,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // 退出应用（数据迁移后调用）
     quitApp: () => ipcRenderer.invoke('app-quit'),
 
+    // 在文件管理器中打开文件夹
+    openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
+
+    // 自动更新
+    checkForUpdates: () => ipcRenderer.invoke('updater:check'),
+    downloadUpdate: () => ipcRenderer.invoke('updater:download'),
+    quitAndInstall: () => ipcRenderer.invoke('updater:quit-and-install'),
+    onUpdaterStatus: (callback) => {
+        const handler = (_event, data) => callback(data);
+        ipcRenderer.on('updater:status', handler);
+        return handler;
+    },
+    onUpdaterProgress: (callback) => {
+        const handler = (_event, data) => callback(data);
+        ipcRenderer.on('updater:progress', handler);
+        return handler;
+    },
+    removeUpdaterListener: (channel, handler) => {
+        ipcRenderer.removeListener(channel, handler);
+    },
+
     // 浮窗管理
     openFloatingWindow: (windowId) => ipcRenderer.invoke('open-floating-window', windowId),
     closeFloatingWindow: (windowId) => ipcRenderer.invoke('close-floating-window', windowId),

@@ -8,6 +8,7 @@ import { initApiConfig, getApiV2UrlSync } from './core/services/apiConfig';
 import { initPlanDocBridge } from './core/services/ipcPlanDocBridge';
 import { toast } from './core/components';
 import DataPathWarningDialog from './core/components/DataPathWarningDialog';
+import UpdateNotification from './core/components/UpdateNotification';
 
 function MainApp() {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -119,6 +120,8 @@ function MainApp() {
           onClose={() => setPathWarnings([])}
         />
       )}
+
+      <UpdateNotification />
     </>
   );
 }

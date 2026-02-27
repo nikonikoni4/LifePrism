@@ -29,6 +29,7 @@ class SettingItems(BaseModel):
     # 路径配置
     aw_db_path: str = Field(description="Activity Watch DB 来源路径")
     lifeprism_data_path: str = Field(description="LifePrism 数据目录路径")
+    config_base_path: str = Field(description="配置文件所在目录路径")
     # 数据清洗配置
     data_cleaning_threshold: int = Field(description="数据清洗时长阈值 (秒)")
 

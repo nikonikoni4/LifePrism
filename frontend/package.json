@@ -2,10 +2,10 @@
   "name": "lifeprism",
   "main": "electron/main.cjs",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.1.0",
   "type": "module",
   "author": "LifePrism Team",
-  "description": "LifePrism - 个人时间管理和分析平台",
+  "description": "LifePrism - 个人数据收集与成长平台",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -39,6 +39,7 @@
     "@tiptap/suggestion": "^3.18.0",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.5",
+    "electron-updater": "^6.8.3",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.555.0",
     "react": "^19.2.1",
@@ -73,7 +74,8 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "!node_modules"
+      "!node_modules",
+      "node_modules/{electron-updater,builder-util-runtime,fs-extra,graceful-fs,js-yaml,argparse,jsonfile,lazy-val,lodash.escaperegexp,lodash.isequal,semver,tiny-typed-emitter,universalify,debug,ms,sax}/**/*"
     ],
     "extraResources": [
       {
@@ -97,7 +99,15 @@
       "perMachine": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "LifePrism"
-    }
+      "shortcutName": "LifePrism",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "nikonikoni4",
+        "repo": "LifePrism"
+      }
+    ]
   }
 }

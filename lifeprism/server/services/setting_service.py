@@ -37,6 +37,7 @@ def get_settings() -> SettingItems:
     config['provider_id_map'] = provider_manager.name_to_id_map
     # 添加 model_history
     config['model_history'] = settings.model_history
+    config['config_base_path'] = settings.config_base_path
     return SettingItems(**config)
 
 

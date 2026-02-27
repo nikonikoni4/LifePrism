@@ -26,6 +26,17 @@ interface ElectronAPI {
     // 退出应用（数据迁移后调用）
     quitApp: () => Promise<void>;
 
+    // 在文件管理器中打开文件夹
+    openFolder: (folderPath: string) => Promise<{ success: boolean }>;
+
+    // 自动更新
+    checkForUpdates: () => Promise<{ status: string; version?: string; message?: string }>;
+    downloadUpdate: () => Promise<{ status: string; message?: string }>;
+    quitAndInstall: () => Promise<void>;
+    onUpdaterStatus: (callback: (data: { status: string; version?: string; message?: string; releaseNotes?: string | null }) => void) => ((_event: unknown, data: unknown) => void);
+    onUpdaterProgress: (callback: (data: { bytesPerSecond: number; percent: number; transferred: number; total: number }) => void) => ((_event: unknown, data: unknown) => void);
+    removeUpdaterListener: (channel: string, handler: ((_event: unknown, data: unknown) => void)) => void;
+
     // 浮窗管理
     openFloatingWindow: (windowId: string) => Promise<{ success: boolean; action?: string; reason?: string }>;
     closeFloatingWindow: (windowId: string) => Promise<{ success: boolean; reason?: string }>;

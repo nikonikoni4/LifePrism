@@ -12,6 +12,8 @@ export type { CategoryFilterValue, CategoryFilterProps } from './CategoryFilter'
 export { default as ToastContainer, toast, toastManager } from './Toast';
 export type { ToastType, ToastMessage } from './Toast';
 
+export { default as UpdateNotification } from './UpdateNotification';
+
 // Types
 export * from '../types/common-components';
 

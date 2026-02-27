@@ -20,6 +20,7 @@ export interface Settings {
     multi_purpose_app_names: string[];
     aw_db_path: string;
     lifeprism_data_path: string;
+    config_base_path: string;
     data_cleaning_threshold: number;
 }
 
