@@ -13,9 +13,9 @@ export const PoolCalendarCombo: React.FC = () => {
   /**
    * 获取任务的所有子任务ID（递归）
    */
-  const getChildTaskIds = (taskId: number): number[] => {
-    const childIds: number[] = [];
-    const children = tasks.filter(t => t.parentId === String(taskId));
+  const getChildTaskIds = (taskId: string): string[] => {
+    const childIds: string[] = [];
+    const children = tasks.filter(t => t.parentId === taskId);
 
     children.forEach(child => {
       childIds.push(child.id);

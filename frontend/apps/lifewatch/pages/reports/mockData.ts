@@ -187,14 +187,14 @@ const generateGoalProgress = (): GoalProgressData[] => [
         todoTotal: 8,
         todoCompleted: 5,
         todoList: [
-            { id: 1, content: '重构数据库模型', completed: true },
-            { id: 2, content: '优化 API 接口', completed: true },
-            { id: 3, content: '更新前端组件', completed: true },
-            { id: 4, content: '编写单元测试', completed: true },
-            { id: 5, content: '代码审查', completed: true },
-            { id: 6, content: '性能优化', completed: false },
-            { id: 7, content: '文档更新', completed: false },
-            { id: 8, content: '部署上线', completed: false },
+            { id: "1", content: '重构数据库模型', completed: true },
+            { id: "2", content: '优化 API 接口', completed: true },
+            { id: "3", content: '更新前端组件', completed: true },
+            { id: "4", content: '编写单元测试', completed: true },
+            { id: "5", content: '代码审查', completed: true },
+            { id: "6", content: '性能优化', completed: false },
+            { id: "7", content: '文档更新', completed: false },
+            { id: "8", content: '部署上线', completed: false },
         ]
     },
     {
@@ -205,11 +205,11 @@ const generateGoalProgress = (): GoalProgressData[] => [
         todoTotal: 5,
         todoCompleted: 3,
         todoList: [
-            { id: 9, content: '泛型深入学习', completed: true },
-            { id: 10, content: '类型体操练习', completed: true },
-            { id: 11, content: '装饰器使用', completed: true },
-            { id: 12, content: '模块化设计', completed: false },
-            { id: 13, content: '综合项目实践', completed: false },
+            { id: "9", content: '泛型深入学习', completed: true },
+            { id: "10", content: '类型体操练习', completed: true },
+            { id: "11", content: '装饰器使用', completed: true },
+            { id: "12", content: '模块化设计', completed: false },
+            { id: "13", content: '综合项目实践', completed: false },
         ]
     },
     {
@@ -220,9 +220,9 @@ const generateGoalProgress = (): GoalProgressData[] => [
         todoTotal: 3,
         todoCompleted: 2,
         todoList: [
-            { id: 14, content: '晨跑 30 分钟', completed: true },
-            { id: 15, content: '力量训练', completed: true },
-            { id: 16, content: '瑜伽拉伸', completed: false },
+            { id: "14", content: '晨跑 30 分钟', completed: true },
+            { id: "15", content: '力量训练', completed: true },
+            { id: "16", content: '瑜伽拉伸', completed: false },
         ]
     }
 ];
@@ -336,9 +336,9 @@ export const getMockMonthlyReport = (month: string): MonthlyReportData => {
             procrastinationRate: 8.2
         },
         carryOverItems: [
-            { id: 101, content: '完善产品文档', goalName: '完成项目重构' },
-            { id: 102, content: '准备季度复盘报告', goalName: undefined },
-            { id: 103, content: '学习 Rust 基础', goalName: '学习 TypeScript 进阶' },
+            { id: "101", content: '完善产品文档', goalName: '完成项目重构' },
+            { id: "102", content: '准备季度复盘报告', goalName: undefined },
+            { id: "103", content: '学习 Rust 基础', goalName: '学习 TypeScript 进阶' },
         ],
         aiSummary: `🗓️ **${mon}月全局复盘**
 

@@ -16,7 +16,7 @@ export interface UserCustomBlockCreate {
     duration: number;         // 持续时长（分钟）
     category_id?: string;     // 主分类ID（可选）
     sub_category_id?: string; // 子分类ID（可选）
-    todo_id?: number;         // 关联的待办事项ID（可选）
+    todo_id?: string;         // 关联的待办事项ID（可选）
     color?: string;           // 活动颜色（可选，前端随机生成）
 }
 
@@ -28,7 +28,7 @@ export interface UserCustomBlockUpdate {
     duration?: number;
     category_id?: string;
     sub_category_id?: string;
-    todo_id?: number;
+    todo_id?: string;
     color?: string;
 }
 
@@ -36,7 +36,7 @@ export interface UserCustomBlockUpdate {
 export interface UserCustomBlock {
     id: number;               // 数据块ID
     content: string;          // 活动内容描述
-    todo_id?: number;         // 关联的待办事项ID
+    todo_id?: string;         // 关联的待办事项ID
     todo_content?: string;    // 关联的待办事项内容
     start_time: string;       // 开始时间
     end_time: string;         // 结束时间
@@ -95,7 +95,7 @@ export interface PopoverFormData {
     endTime: string;          // HH:MM 格式
     categoryId?: string;
     subCategoryId?: string;
-    todoId?: number;
+    todoId?: string;
     color: string;            // Tailwind 200 系列颜色
 }
 
@@ -105,7 +105,7 @@ export interface PopoverFormData {
 
 /** 待办事项选择项（用于下拉菜单） */
 export interface TodoSelectItem {
-    id: number;
+    id: string;
     content: string;
 }
 

@@ -77,7 +77,7 @@ export interface TopAppData {
 
 /** 待办事项数据 */
 export interface TodoListData {
-    id: number;
+    id: string;
     name: string;  // 待办事项名称
     isCompleted: boolean;  // 是否完成
     linkToGoalId: string | null;  // 关联目标ID

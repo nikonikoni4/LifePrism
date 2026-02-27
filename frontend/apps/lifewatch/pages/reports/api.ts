@@ -44,7 +44,7 @@ interface DailyReportAPIResponse {
         todo_total: number;
         todo_completed: number;
         todo_list: Array<{
-            id: number;
+            id: string;
             content: string;
             completed: boolean;
         }>;
@@ -256,7 +256,7 @@ interface WeeklyReportAPIResponse {
         todo_total: number;
         todo_completed: number;
         todo_list: Array<{
-            id: number;
+            id: string;
             content: string;
             completed: boolean;
         }>;
@@ -470,7 +470,7 @@ interface MonthlyReportAPIResponse {
         todo_total: number;
         todo_completed: number;
         todo_list: Array<{
-            id: number;
+            id: string;
             content: string;
             completed: boolean;
         }>;

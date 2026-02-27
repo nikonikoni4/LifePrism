@@ -50,7 +50,7 @@ class TodoStatsData(BaseModel):
 
 class GoalTodoItem(BaseModel):
     """Goal 中的 Todo 项"""
-    id: int = Field(..., description="任务 ID")
+    id: str = Field(..., description="任务 ID")
     content: str = Field(..., description="任务内容")
     completed: bool = Field(..., description="是否完成")
 

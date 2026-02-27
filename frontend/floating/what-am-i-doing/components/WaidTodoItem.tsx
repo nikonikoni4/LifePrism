@@ -12,12 +12,12 @@ interface WaidTodoItemProps {
     accumulatedMinutes: number;
     collapsed: boolean;
     hasChildren: boolean;
-    onToggleComplete: (id: number) => void;
+    onToggleComplete: (id: string) => void;
     onStartTimer: (item: TodoItem) => void;
     onStopTimer: () => void;
-    onContentChange: (id: number, content: string) => void;
-    onRemove: (id: number) => void;
-    onToggleCollapse: (id: number) => void;
+    onContentChange: (id: string, content: string) => void;
+    onRemove: (id: string) => void;
+    onToggleCollapse: (id: string) => void;
     children?: React.ReactNode;
 }
 
@@ -144,8 +144,8 @@ export function WaidTodoItem({
                 <button
                     onClick={() => onToggleComplete(item.id)}
                     className={`flex-shrink-0 w-4 h-4 rounded border ${isCompleted
-                            ? 'bg-green-500 border-green-500'
-                            : 'border-white/40 hover:border-white/70'
+                        ? 'bg-green-500 border-green-500'
+                        : 'border-white/40 hover:border-white/70'
                         } flex items-center justify-center transition-colors`}
                 >
                     {isCompleted && (
@@ -197,8 +197,8 @@ export function WaidTodoItem({
                     <button
                         onClick={() => isTimerActive ? onStopTimer() : onStartTimer(item)}
                         className={`flex-shrink-0 w-6 h-6 rounded flex items-center justify-center transition-colors ${isTimerActive
-                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                                : 'text-white/30 hover:text-white/70 hover:bg-white/10 opacity-0 group-hover:opacity-100'
+                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                            : 'text-white/30 hover:text-white/70 hover:bg-white/10 opacity-0 group-hover:opacity-100'
                             }`}
                         title={isTimerActive ? 'Stop' : 'Start'}
                     >

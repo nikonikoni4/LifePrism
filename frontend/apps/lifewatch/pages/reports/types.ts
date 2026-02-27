@@ -41,7 +41,7 @@ export interface GoalProgressData {
     todoTotal: number;
     todoCompleted: number;
     todoList: Array<{
-        id: number;
+        id: string;
         content: string;
         completed: boolean;
     }>;
@@ -68,7 +68,7 @@ export interface MonthlyTodoTracking {
     totalCompleted: number;
     totalPending: number;
     carryOverItems: Array<{
-        id: number;
+        id: string;
         content: string;
         goalName?: string;
     }>;
@@ -139,7 +139,7 @@ export interface MonthlyReportData {
     todoStats: TodoStatsData;
     /** 需滚动事项 (保留原始追踪结构中的事项) */
     carryOverItems: Array<{
-        id: number;
+        id: string;
         content: string;
         goalName?: string;
     }>;
