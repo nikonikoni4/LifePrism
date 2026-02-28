@@ -462,6 +462,15 @@ class HabitService:
             checkin=checkin_obj, habit=habit_item, settlement=settlement,
         )
 
+    def get_challenge_history(
+        self, habit_id: str, status: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        """获取习惯的挑战历史记录"""
+        row = habit_provider.get_habit_by_id(habit_id)
+        if not row:
+            raise NotFoundError("习惯不存在")
+        return habit_challenge_provider.get_challenge_history(habit_id, status)
+
     def check_settlements(self) -> "CheckSettlementsResponse":
         """批量检查所有到期未结算的挑战，执行结算并返回结果列表"""
         from lifeprism.server.schemas.habit_schemas import CheckSettlementsResponse
