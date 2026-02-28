@@ -1414,6 +1414,7 @@ TABLE_CONFIGS = {
             'status': {'type': 'TEXT', 'constraints': ["DEFAULT 'in_progress'"], 'comment': "'in_progress'|'succeeded'|'failed'|'cancelled'"},
             'finished_at': {'type': 'TEXT', 'constraints': [], 'comment': '结束时间（可空）'},
             'created_at': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '创建时间'},
+            'updated_at': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '更新时间 ISO8601'},
         },
         'table_constraints': [
             'FOREIGN KEY (habit_id) REFERENCES habits(id)',
