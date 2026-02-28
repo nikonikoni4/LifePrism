@@ -13,6 +13,7 @@ from lifeprism.server.schemas.habit_schemas import (
     HabitListItem, HabitListResponse, HabitDetailResponse,
     ChallengeObject, AnchorInfoObject,
 )
+from lifeprism.server.services.habit_stats_service import get_habit_streak
 from lifeprism.utils import get_logger, LazySingleton
 from lifeprism.utils.exceptions import NotFoundError, ValidationError
 
@@ -89,8 +90,8 @@ class HabitService:
         challenge_row = habit_challenge_provider.get_current_challenge(row["id"])
         challenge_obj = self._build_challenge_object(challenge_row)
 
-        # Streak 暂时返回 0，Task 10 实现后替换
-        streak = 0
+        # 计算当前 Streak（含上次挑战遗留的 streak_base）
+        streak = get_habit_streak(row["id"], freq, challenge_row)
 
         # 锚点信息
         anchor_map = habit_chain_provider.get_anchor_info_by_habit_ids([row["id"]])
