@@ -14,7 +14,7 @@ from lifeprism.server.schemas.habit_schemas import (
     ChallengeObject, AnchorInfoObject,
 )
 from lifeprism.utils import get_logger, LazySingleton
-from lifeprism.utils.exceptions import NotFoundError, ValidationError, ConflictError
+from lifeprism.utils.exceptions import NotFoundError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -63,8 +63,8 @@ class HabitService:
         if row.get("frequency_config"):
             try:
                 config = json.loads(row["frequency_config"])
-            except (json.JSONDecodeError, TypeError):
-                config = None
+            except (json.JSONDecodeError, TypeError) as e:
+                raise ValidationError(f"习惯频率配置损坏: {e}") from e
         specific_days = config.get("specificDays") if config else None
         return FrequencyObject(type=row["frequency_type"], specificDays=specific_days)
 
@@ -116,7 +116,7 @@ class HabitService:
         )
 
     def _create_challenge_for_habit(
-        self, habit_id: str, level: int, freq: FrequencyObject, streak_base: int = 0,
+        self, habit_id: str, level: int, freq: FrequencyObject, streak_base: int
     ) -> Dict:
         """为习惯创建新挑战，返回 challenge 行"""
         params = calculate_challenge_params(level, freq)
@@ -145,7 +145,7 @@ class HabitService:
                 "finished_at": datetime.now().isoformat(),
             })
 
-    def get_habits(self, status: Optional[str] = None) -> HabitListResponse:
+    def get_habits(self, status: Optional[str]) -> HabitListResponse:
         """获取习惯列表"""
         rows = habit_provider.get_habits(status=status)
         items = [self._build_habit_response(r) for r in rows]
@@ -174,7 +174,7 @@ class HabitService:
             "value_id": req.valueId, "commitment_id": req.commitmentId,
         }
         habit_id = habit_provider.create_habit(data)
-        self._create_challenge_for_habit(habit_id, req.initialLevel, req.frequency)
+        self._create_challenge_for_habit(habit_id, req.initialLevel, req.frequency, 0)
         self._habit_name_map[habit_id] = req.name
         return self.get_habit_detail(habit_id)
 
@@ -219,7 +219,7 @@ class HabitService:
             self._cancel_current_challenge(habit_id)
             updated_row = habit_provider.get_habit_by_id(habit_id)
             freq_obj = self._parse_frequency(updated_row)
-            self._create_challenge_for_habit(habit_id, new_level, freq_obj)
+            self._create_challenge_for_habit(habit_id, new_level, freq_obj, 0)
 
         if "name" in update_data:
             self._habit_name_map[habit_id] = update_data["name"]
@@ -259,7 +259,7 @@ class HabitService:
         if row["status"] == "active":
             raise ValidationError("习惯已经处于激活状态")
         freq = self._parse_frequency(row)
-        self._create_challenge_for_habit(row["id"], row["current_level"], freq)
+        self._create_challenge_for_habit(row["id"], row["current_level"], freq, 0)
         habit_provider.update_habit(habit_id, {"status": "active", "paused_at": None})
         return self.get_habit_detail(habit_id)
 
