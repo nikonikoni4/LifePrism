@@ -17,9 +17,9 @@ def test_today_overview_scheduled_and_checked():
     with patch.object(inner, "get_today_checkins", return_value={"h-001": True}):
         result = get_today_overview(habits, date.today())
     assert len(result) == 1
-    assert result[0]["habit_id"] == "h-001"
-    assert result[0]["today_checked_in"] is True
-    assert result[0]["is_scheduled_today"] is True
+    assert result[0]["habitId"] == "h-001"
+    assert result[0]["todayCheckedIn"] is True
+    assert result[0]["isScheduledToday"] is True
 
 
 def test_today_overview_not_scheduled():

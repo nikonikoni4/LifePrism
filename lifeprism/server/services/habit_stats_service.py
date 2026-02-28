@@ -2,12 +2,13 @@
 import json
 from collections import defaultdict
 from datetime import date, timedelta
-from typing import Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from lifeprism.server.providers.habit_checkin_provider import habit_checkin_provider
 from lifeprism.server.providers.habit_challenge_provider import habit_challenge_provider
 from lifeprism.server.schemas.habit_schemas import FrequencyObject
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import ValidationError
 
 logger = get_logger(__name__)
 
@@ -29,7 +30,9 @@ def is_scheduled_day(d: date, freq: FrequencyObject) -> bool:
     return True
 
 
-def get_effective_range(week_start: date, week_end: date, challenge_start: date, challenge_end: date, today: date):
+def get_effective_range(
+    week_start: date, week_end: date, challenge_start: date, challenge_end: date, today: date
+) -> Tuple[date, date]:
     """计算有效范围: 自然周 ∩ 挑战期 ∩ 今天及以前"""
     eff_start = max(week_start, challenge_start)
     eff_end = min(week_end, challenge_end, today)
@@ -108,19 +111,19 @@ def get_habit_streak(habit_id: str, freq: FrequencyObject, challenge: Optional[d
 # 统计接口
 # ============================================================================
 
-def _parse_freq_from_row(row: dict) -> FrequencyObject:
+def _parse_freq_from_row(row: Dict[str, Any]) -> FrequencyObject:
     """从数据库行解析 FrequencyObject（读取 frequency_type + frequency_config 两个字段）"""
     config = None
     if row.get("frequency_config"):
         try:
             config = json.loads(row["frequency_config"])
-        except (json.JSONDecodeError, TypeError):
-            config = None
+        except (json.JSONDecodeError, TypeError) as e:
+            raise ValidationError(f"习惯频率配置损坏: {e}") from e
     specific_days = config.get("specificDays") if config else None
     return FrequencyObject(type=row["frequency_type"], specificDays=specific_days)
 
 
-def get_today_overview(habits: list, today: date) -> list:
+def get_today_overview(habits: List[Dict[str, Any]], today: date) -> List[Dict[str, Any]]:
     """计算今日概览，仅返回今日有计划的习惯"""
     habit_ids = [h["id"] for h in habits]
     today_checkins = habit_checkin_provider.get_today_checkins(habit_ids)
@@ -130,15 +133,15 @@ def get_today_overview(habits: list, today: date) -> list:
         if not is_scheduled_day(today, freq):
             continue
         result.append({
-            "habit_id": h["id"],
+            "habitId": h["id"],
             "name": h["name"],
-            "is_scheduled_today": True,
-            "today_checked_in": today_checkins.get(h["id"], False),
+            "isScheduledToday": True,
+            "todayCheckedIn": today_checkins.get(h["id"], False),
         })
     return result
 
 
-def get_weekly_stats(habits: list, today: date) -> float:
+def get_weekly_stats(habits: List[Dict[str, Any]], today: date) -> float:
     """计算本周完成率（所有习惯的算术平均值）"""
     if not habits:
         return 0.0
@@ -170,7 +173,7 @@ def get_weekly_stats(habits: list, today: date) -> float:
     return round(sum(rates) / len(rates), 4)
 
 
-def get_heatmap(habit_ids: list, today: date, days: int = 365) -> list:
+def get_heatmap(habit_ids: List[str], today: date, days: int) -> List[Dict[str, Any]]:
     """获取过去 days 天热力图数据"""
     start = (today - timedelta(days=days - 1)).isoformat()
     end = today.isoformat()
