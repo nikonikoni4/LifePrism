@@ -22,16 +22,15 @@ class ActivityStatsIncludeOptions(BaseModel):
     include_time_overview: bool = Field(default=True, description="是否包含时间概览")
     include_top_title: bool = Field(default=True, description="是否包含热门标题")
     include_top_app: bool = Field(default=True, description="是否包含热门应用")
-    include_todolist: bool = Field(default=False, description="是否包含待办事项")
-    
+
     @classmethod
     def from_include_string(cls, include_str: str) -> "ActivityStatsIncludeOptions":
         """
         从逗号分隔的字符串解析选项
-        
+
         Args:
             include_str: 如 "activity_summary,time_overview,top_title"
-            
+
         Returns:
             ActivityStatsIncludeOptions 实例
         """
@@ -41,7 +40,6 @@ class ActivityStatsIncludeOptions(BaseModel):
             include_time_overview='time_overview' in include_set,
             include_top_title='top_title' in include_set,
             include_top_app='top_app' in include_set,
-            include_todolist='todolist' in include_set
         )
 
 
@@ -150,14 +148,6 @@ class TopAppData(BaseModel):
     duration: int = Field(..., description="活跃时长（秒）")
     percentage: int = Field(..., description="占比（%）")
 
-class TodoListData(BaseModel):
-    """待办事项数据（框架）"""
-    id: str = Field(..., description="待办事项ID")
-    name: str = Field(..., description="待办事项名称")
-    is_completed: bool = Field(..., description="是否完成",alias="isCompleted")
-    link_to_goal_id: Optional[str] = Field(default=None, description="关联目标ID",alias="linkToGoalId")
-    model_config = ConfigDict(populate_by_name=True)
-
 # ============================================================================
 # API 响应模型
 # ============================================================================
@@ -168,7 +158,6 @@ class ActivityStatsResponse(BaseModel):
     time_overview: Optional[TimeOverviewData] = Field(default=None, description="时间概览数据")
     top_title: Optional[List[TopTitleData]] = Field(default=None, description="热门标题数据")
     top_app: Optional[List[TopAppData]] = Field(default=None, description="热门应用数据")
-    todolist: Optional[List[TodoListData]] = Field(default=None, description="待办事项数据")
     category_tree : Optional[List[CategoryDef]] = Field(default=None, description="分类树")
     query: Optional[Dict[str, Any]] = Field(default=None, description="查询参数回显（调试用）")
     

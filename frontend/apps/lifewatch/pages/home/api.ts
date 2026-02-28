@@ -90,7 +90,7 @@ export const ActivityAPI = {
     ): Promise<ActivityStatsResponse> {
         return this.getStats({
             date,
-            include: 'activity_summary,time_overview,top_title,top_app,todolist',
+            include: 'activity_summary,time_overview,top_title,top_app',
             history_number: historyNumber,
             future_number: futureNumber,
         });

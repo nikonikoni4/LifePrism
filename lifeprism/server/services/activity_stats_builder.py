@@ -18,7 +18,6 @@ from lifeprism.server.schemas.activity_schemas import (
     BarConfig,
     TopTitleData,
     TopAppData,
-    TodoListData,
 )
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
@@ -268,33 +267,6 @@ def get_top_app(date: str, top_n: int) -> List[TopAppData]:
     return result
 
 
-def get_todolist(date: str) -> List[TodoListData]:
-    """获取待办事项数据
-    
-    Args:
-        date: 日期字符串 (YYYY-MM-DD)
-        
-    Returns:
-        list[TodoListData], 待办事项列表:
-            name: str, 待办事项名称
-            is_completed: bool, 是否完成
-    """
-    # Mock
-    todo_list = [
-        {"id": 1, "name": "待办事项1", "is_completed": False, "link_to_goal_id": None},
-        {"id": 2, "name": "待办事项2", "is_completed": True, "link_to_goal_id": None},
-        {"id": 3, "name": "待办事项3", "is_completed": False, "link_to_goal_id": None},
-    ]
-
-    result = []
-    for todo in todo_list:
-        result.append(TodoListData(
-            id=todo['id'], 
-            name=todo['name'], 
-            is_completed=todo['is_completed'], 
-            link_to_goal_id=todo['link_to_goal_id']
-        ))
-    return result
 
 
 # ============================================================================

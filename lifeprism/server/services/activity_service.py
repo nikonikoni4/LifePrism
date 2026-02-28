@@ -20,7 +20,6 @@ from lifeprism.server.services.activity_stats_builder import (
     build_time_overview,
     get_top_title,
     get_top_app,
-    get_todolist,
 )
 from lifeprism.utils import get_logger
 
@@ -74,10 +73,7 @@ def get_activity_stats(
     
     if include_options.include_top_app:
         result.top_app = get_top_app(date, top_n=5)
-    
-    if include_options.include_todolist:
-        result.todolist = get_todolist(date)
-    
+
     return result
 
 

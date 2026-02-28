@@ -37,8 +37,8 @@ async def get_activity_stats(
         regex=r"^\d{4}-\d{2}-\d{2}$"
     ),
     include: str = Query(
-        "activity_summary,time_overview,top_title,top_app,todolist",
-        description="需要包含的数据模块，多个用逗号分隔。可选值: activity_summary, time_overview, top_title, top_app, todolist"
+        "activity_summary,time_overview,top_title,top_app",
+        description="需要包含的数据模块，多个用逗号分隔。可选值: activity_summary, time_overview, top_title, top_app"
     ),
     history_number: int = Query(
         15, 
@@ -73,11 +73,9 @@ async def get_activity_stats(
     - `time_overview`: 时间概览（饼图+柱状图）
     - `top_title`: 热门窗口标题
     - `top_app`: 热门应用统计
-    - `todolist`: 待办事项列表
-    
+
     **示例：**
     - `/api/v2/activity/stats?date=2025-12-19&include=activity_summary,time_overview`
-    - `/api/v2/activity/stats?date=2025-12-19&include=todolist&category_id=work`
     """
     try:
         # API 层职责：解析 include 字符串为结构化选项
