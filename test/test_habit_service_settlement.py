@@ -32,8 +32,12 @@ def test_check_settlements_success():
     challenge = habit_challenge_provider.get_current_challenge(created.id)
     habit_challenge_provider.update_challenge(challenge["id"], {
         "completed_count": challenge["required_completions"],
-        "end_date": (date.today() - timedelta(days=1)).isoformat(),
     })
+    with habit_provider.db.get_connection() as conn:
+        conn.execute(
+            "UPDATE habit_challenges SET end_date = ? WHERE id = ?",
+            ((date.today() - timedelta(days=1)).isoformat(), challenge["id"]),
+        )
     resp = habit_service.check_settlements()
     assert len(resp.settlements) == 1
     assert resp.settlements[0].result == "succeeded"
@@ -48,8 +52,12 @@ def test_check_settlements_failure():
     challenge = habit_challenge_provider.get_current_challenge(created.id)
     habit_challenge_provider.update_challenge(challenge["id"], {
         "completed_count": 1,
-        "end_date": (date.today() - timedelta(days=1)).isoformat(),
     })
+    with habit_provider.db.get_connection() as conn:
+        conn.execute(
+            "UPDATE habit_challenges SET end_date = ? WHERE id = ?",
+            ((date.today() - timedelta(days=1)).isoformat(), challenge["id"]),
+        )
     resp = habit_service.check_settlements()
     assert len(resp.settlements) == 1
     assert resp.settlements[0].result == "failed"
@@ -62,8 +70,12 @@ def test_check_settlements_idempotent():
     challenge = habit_challenge_provider.get_current_challenge(created.id)
     habit_challenge_provider.update_challenge(challenge["id"], {
         "completed_count": 1,
-        "end_date": (date.today() - timedelta(days=1)).isoformat(),
     })
+    with habit_provider.db.get_connection() as conn:
+        conn.execute(
+            "UPDATE habit_challenges SET end_date = ? WHERE id = ?",
+            ((date.today() - timedelta(days=1)).isoformat(), challenge["id"]),
+        )
     resp1 = habit_service.check_settlements()
     assert len(resp1.settlements) == 1
     resp2 = habit_service.check_settlements()

@@ -81,8 +81,12 @@ def test_checkin_triggers_success_settlement(active_habit):
     challenge = habit_challenge_provider.get_current_challenge(active_habit.id)
     habit_challenge_provider.update_challenge(challenge["id"], {
         "completed_count": challenge["required_completions"] - 1,
-        "end_date": (date.today() - timedelta(days=1)).isoformat(),
     })
+    with habit_provider.db.get_connection() as conn:
+        conn.execute(
+            "UPDATE habit_challenges SET end_date = ? WHERE id = ?",
+            ((date.today() - timedelta(days=1)).isoformat(), challenge["id"]),
+        )
     resp = habit_service.checkin_today(active_habit.id)
     assert resp.settlement is not None
     assert resp.settlement.result == "succeeded"
@@ -95,8 +99,12 @@ def test_judge_challenge_failed():
     challenge = habit_challenge_provider.get_current_challenge(created.id)
     habit_challenge_provider.update_challenge(challenge["id"], {
         "completed_count": 1,
-        "end_date": (date.today() - timedelta(days=1)).isoformat(),
     })
+    with habit_provider.db.get_connection() as conn:
+        conn.execute(
+            "UPDATE habit_challenges SET end_date = ? WHERE id = ?",
+            ((date.today() - timedelta(days=1)).isoformat(), challenge["id"]),
+        )
     result = habit_service._judge_challenge_result(created.id, challenge["id"])
     assert result is not None
     assert result.result == "failed"
