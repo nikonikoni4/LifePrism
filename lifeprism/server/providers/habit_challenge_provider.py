@@ -120,7 +120,7 @@ class HabitChallengeProvider(LWBaseDataProvider):
         Returns:
             True（成功或无字段需更新）
         """
-        allowed_fields = {"completed_count", "streak_base", "status", "finished_at"}
+        allowed_fields = {"completed_count", "streak_base", "status", "finished_at", "end_date"}
         filtered = {k: v for k, v in update_data.items() if k in allowed_fields}
         if not filtered:
             return True

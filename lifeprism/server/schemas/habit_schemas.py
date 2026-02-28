@@ -99,6 +99,7 @@ class CheckInObject(BaseModel):
     habitId: str
     challengeId: str
     date: str
+    completed: bool = True
     completedAt: Optional[str] = None
     createdAt: str
 
@@ -111,6 +112,7 @@ class CheckInResponse(BaseModel):
 
 class CancelCheckInResponse(BaseModel):
     habit: HabitListItem
+    settlement: Optional[SettlementItem] = None
 
 
 class BackfillCheckInRequest(BaseModel):
