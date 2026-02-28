@@ -79,6 +79,7 @@ class HabitListItem(BaseModel):
     createdAt: str
     pausedAt: Optional[str] = None
     streak: int = 0
+    todayCompleted: bool = False
     anchorInfo: Optional[AnchorInfoObject] = None
 
 
