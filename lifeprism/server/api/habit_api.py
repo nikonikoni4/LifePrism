@@ -204,7 +204,7 @@ async def get_challenge_history(
         )
 
 
-@router.post("/habits/check-settlements")
+@router.post("/check-settlements")
 async def check_settlements():
     """批量检查并结算到期挑战"""
     return habit_service.check_settlements()
