@@ -20,6 +20,7 @@ from .diary_api import router as diary_router
 from .mood_api import router as mood_router
 from .value_api import value_router
 from .commitment_api import commitment_router
+from .habit_api import router as habit_router
 
 __all__ = [
     "sync_router",
@@ -39,5 +40,6 @@ __all__ = [
     "mood_router",
     "value_router",
     "commitment_router",
+    "habit_router",
 ]
 

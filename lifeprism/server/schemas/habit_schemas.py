@@ -8,8 +8,8 @@ from typing import Optional, List, Literal
 # ============================================================================
 
 class FrequencyObject(BaseModel):
-    type: Literal["daily", "weekly"] = Field(..., description="频率类型")
-    weekDays: Optional[List[int]] = Field(default=None, description="每周哪几天执行（0=周一...6=周日），weekly 类型时必填")
+    type: Literal["daily", "weekdays", "weekend", "custom"] = Field(..., description="频率类型")
+    specificDays: Optional[List[int]] = Field(default=None, description="每周哪几天执行（0=周一...6=周日），custom 类型时必填")
 
 
 class ChallengeObject(BaseModel):
@@ -61,6 +61,7 @@ class UpdateHabitRequest(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     description: Optional[str] = Field(default=None, max_length=500)
     frequency: Optional[FrequencyObject] = None
+    level: Optional[int] = Field(default=None, ge=0, le=4)
     valueId: Optional[str] = None
     commitmentId: Optional[str] = None
 
@@ -99,6 +100,7 @@ class CheckInObject(BaseModel):
     habitId: str
     challengeId: str
     date: str
+    completed: bool = True
     completedAt: Optional[str] = None
     createdAt: str
 
@@ -111,6 +113,7 @@ class CheckInResponse(BaseModel):
 
 class CancelCheckInResponse(BaseModel):
     habit: HabitListItem
+    settlement: Optional[SettlementItem] = None
 
 
 class BackfillCheckInRequest(BaseModel):
