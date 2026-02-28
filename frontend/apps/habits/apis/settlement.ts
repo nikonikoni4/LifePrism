@@ -1,6 +1,6 @@
 import { createApiV2UrlGetter } from '../../../core/services/apiConfig';
 import { fetchApi } from './utils';
-import { SettlementItem, BackfillCheckInRequest, CheckInResponse } from '../types/backend';
+import { SettlementItem } from '../types/backend';
 
 const getApiBase = createApiV2UrlGetter('/habit');
 
@@ -13,17 +13,5 @@ export const settlementApi = {
             method: 'POST',
         });
         return Array.isArray(data) ? data : [];
-    },
-
-    /**
-     * 为给定的过去几天中某一天进行补录
-     * 这是失败挽救流程重要的一步
-     */
-    backfillCheckIn: async (habitId: string, request: BackfillCheckInRequest): Promise<CheckInResponse> => {
-        return fetchApi<CheckInResponse>(`${getApiBase()}/habits/${habitId}/checkins/backfill`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(request),
-        });
     },
 };

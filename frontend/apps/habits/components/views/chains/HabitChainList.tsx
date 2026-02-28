@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ListTree, Plus } from 'lucide-react';
+import { ListTree, Plus, Link2 } from 'lucide-react';
 import { useChainStore } from '../../../hooks/useChainStore';
 import { ChainCard } from './ChainCard';
 import { ChainEditDialog } from '../../dialogs/ChainEditDialog';
@@ -29,9 +29,19 @@ export const HabitChainList: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-4 pr-2">
-                {chains.map((chain) => (
-                    <ChainCard key={chain.id} chain={chain} />
-                ))}
+                {chains.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center flex-1 text-center py-10">
+                        <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+                            <Link2 size={18} className="text-slate-300" />
+                        </div>
+                        <p className="text-sm text-slate-400 font-medium">暂无链条</p>
+                        <p className="text-xs text-slate-300 mt-1">将多个习惯串联成链条</p>
+                    </div>
+                ) : (
+                    chains.map((chain) => (
+                        <ChainCard key={chain.id} chain={chain} />
+                    ))
+                )}
             </div>
 
             <ChainEditDialog

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Play, MoreHorizontal } from 'lucide-react';
 import { Habit } from '../../../types/entities';
 import { useHabitStore } from '../../../hooks/useHabitStore';
+import { useToast } from '../../shared/Toast';
 import { HabitFormDialog } from '../../dialogs/HabitFormDialog';
 import { HabitHistoryDialog } from '../../dialogs/HabitHistoryDialog';
 
@@ -11,6 +12,7 @@ interface PausedHabitCardProps {
 
 export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
     const { resumeHabit, deleteHabit } = useHabitStore();
+    const { showToast } = useToast();
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -30,13 +32,21 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
 
     const handleDelete = async () => {
         if (window.confirm('删除后不可恢复，确认删除？')) {
-            await deleteHabit(habit.id);
+            try {
+                await deleteHabit(habit.id);
+            } catch {
+                showToast('error', '删除失败，请重试');
+            }
         }
         setIsMenuOpen(false);
     };
 
     const handleResume = async () => {
-        await resumeHabit(habit.id);
+        try {
+            await resumeHabit(habit.id);
+        } catch {
+            showToast('error', '恢复失败，请重试');
+        }
         setIsMenuOpen(false);
     };
 

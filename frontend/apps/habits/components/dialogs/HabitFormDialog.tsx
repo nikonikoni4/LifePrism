@@ -2,9 +2,10 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Flag, AlignLeft } from 'lucide-react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { HabitListItem, FrequencyType } from '../../types/backend';
 import { useHabitStore } from '../../hooks/useHabitStore';
+import { useToast } from '../shared/Toast';
 
 interface HabitFormDialogProps {
     isOpen: boolean;
@@ -43,6 +44,7 @@ export const HabitFormDialog: React.FC<HabitFormDialogProps> = ({
     habit
 }) => {
     const { createHabit, updateHabit } = useHabitStore();
+    const { showToast } = useToast();
     const isEditMode = !!habit;
 
     const {
@@ -104,16 +106,17 @@ export const HabitFormDialog: React.FC<HabitFormDialogProps> = ({
                     ...payload,
                     level: data.initialLevel
                 });
+                showToast('success', '习惯已更新');
             } else {
                 await createHabit({
                     ...payload,
                     initialLevel: data.initialLevel
                 });
+                showToast('success', '习惯已创建');
             }
             onClose();
-        } catch (error) {
-            console.error("Failed to save habit", error);
-            // Optionally show toast error here
+        } catch {
+            showToast('error', isEditMode ? '更新失败，请重试' : '创建失败，请重试');
         }
     };
 

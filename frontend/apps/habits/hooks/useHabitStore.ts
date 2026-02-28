@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 import { Habit } from '../types/entities';
 import { habitApi } from '../apis/habit';
 import { checkinApi } from '../apis/checkin';
-import { CreateHabitRequest, UpdateHabitRequest } from '../types/backend';
+import { CreateHabitRequest, UpdateHabitRequest, SettlementItem } from '../types/backend';
 import { format } from 'date-fns';
 
 interface HabitStoreContextType {
@@ -24,7 +24,13 @@ interface HabitStoreContextType {
 
 const HabitStoreContext = createContext<HabitStoreContextType | undefined>(undefined);
 
-export const HabitProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+interface HabitProviderProps {
+    children: ReactNode;
+    onSettlement?: (item: SettlementItem) => void;
+    onCheckInChange?: () => void;
+}
+
+export const HabitProvider: React.FC<HabitProviderProps> = ({ children, onSettlement, onCheckInChange }) => {
     const [activeHabits, setActiveHabits] = useState<Habit[]>([]);
     const [pausedHabits, setPausedHabits] = useState<Habit[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -169,7 +175,10 @@ export const HabitProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 return h;
             }));
 
-            // TODO: Here we could also push checkInRes.settlement to a settlement store
+            if (checkInRes.settlement && onSettlement) {
+                onSettlement(checkInRes.settlement);
+            }
+            onCheckInChange?.();
         } catch (err) {
             console.error('[HabitStore] Failed to check in:', err);
             setError(err instanceof Error ? err.message : 'Failed to check in');
@@ -219,6 +228,7 @@ export const HabitProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 }
                 return h;
             }));
+            onCheckInChange?.();
         } catch (err) {
             console.error('[HabitStore] Failed to undo check in:', err);
             setError(err instanceof Error ? err.message : 'Failed to undo check in');

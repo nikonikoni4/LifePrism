@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Flame, Anchor, Check, MoreHorizontal } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Habit } from '../../../types/entities';
 import { useHabitStore } from '../../../hooks/useHabitStore';
+import { useToast } from '../../shared/Toast';
 import { HabitFormDialog } from '../../dialogs/HabitFormDialog';
 import { HabitHistoryDialog } from '../../dialogs/HabitHistoryDialog';
 
@@ -11,6 +13,7 @@ interface HabitCardProps {
 
 export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
     const { checkIn, undoCheckIn, pauseHabit, deleteHabit } = useHabitStore();
+    const { showToast } = useToast();
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -42,15 +45,39 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
     // Use todayCompleted from optimistic state, fallback to false if undefined
     const isDoneToday = habit.todayCompleted || false;
 
+    const handleCheckIn = async () => {
+        try {
+            await checkIn(habit.id);
+        } catch {
+            showToast('error', '打卡失败，请重试');
+        }
+    };
+
+    const handleUndoCheckIn = async () => {
+        try {
+            await undoCheckIn(habit.id);
+        } catch {
+            showToast('error', '取消打卡失败，请重试');
+        }
+    };
+
     const handleDelete = async () => {
         if (window.confirm('删除后不可恢复，确认删除？')) {
-            await deleteHabit(habit.id);
+            try {
+                await deleteHabit(habit.id);
+            } catch {
+                showToast('error', '删除失败，请重试');
+            }
         }
         setIsMenuOpen(false);
     };
 
     const handlePause = async () => {
-        await pauseHabit(habit.id);
+        try {
+            await pauseHabit(habit.id);
+        } catch {
+            showToast('error', '暂停失败，请重试');
+        }
         setIsMenuOpen(false);
     };
 
@@ -138,21 +165,33 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                             <div className="h-full bg-neutral-900 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
                         </div>
                     </div>
-                    {isDoneToday ? (
-                        <button
-                            onClick={() => undoCheckIn(habit.id)}
-                            disabled={habit.isCheckingIn}
-                            className={`flex items-center justify-center bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-md text-[10px] font-bold transition-colors hover:bg-emerald-100 border border-emerald-100/50 ${habit.isCheckingIn ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                            <Check size={12} strokeWidth={3} className="mr-1" /> DONE
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => checkIn(habit.id)}
-                            disabled={habit.isCheckingIn}
-                            className={`flex items-center justify-center bg-neutral-900 text-white px-4 py-1.5 rounded-md text-[10px] font-bold transition-all hover:bg-neutral-800 hover:scale-105 active:scale-95 shadow-md shadow-neutral-900/20 ${habit.isCheckingIn ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                            CHECK IN
-                        </button>
-                    )}
+                    <AnimatePresence mode="wait">
+                        {isDoneToday ? (
+                            <motion.button
+                                key="done"
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.8, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                onClick={handleUndoCheckIn}
+                                disabled={habit.isCheckingIn}
+                                className={`flex items-center justify-center bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-md text-[10px] font-bold transition-colors hover:bg-emerald-100 border border-emerald-100/50 ${habit.isCheckingIn ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                <Check size={12} strokeWidth={3} className="mr-1" /> DONE
+                            </motion.button>
+                        ) : (
+                            <motion.button
+                                key="checkin"
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.8, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                onClick={handleCheckIn}
+                                disabled={habit.isCheckingIn}
+                                className={`flex items-center justify-center bg-neutral-900 text-white px-4 py-1.5 rounded-md text-[10px] font-bold transition-all hover:bg-neutral-800 hover:scale-105 active:scale-95 shadow-md shadow-neutral-900/20 ${habit.isCheckingIn ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                CHECK IN
+                            </motion.button>
+                        )}
+                    </AnimatePresence>
                 </div>
             </div>
 

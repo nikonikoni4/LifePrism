@@ -89,9 +89,6 @@ export const habitApi = {
         const queryString = queryParams.toString();
         const url = queryString ? `${getApiBase()}/habits/${habitId}/challenges?${queryString}` : `${getApiBase()}/habits/${habitId}/challenges`;
 
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Failed to fetch habit history: ${res.status}`);
-
-        return res.json();
+        return fetchApi<{ challenges: any[] }>(url);
     },
 };

@@ -73,9 +73,13 @@ export interface CheckInObject {
 
 export interface SettlementItem {
     habitId: string;
+    habitName: string;
     result: 'succeeded' | 'failed';
+    fromLevel: number;
+    toLevel: number;
+    completedCount: number;
+    requiredCompletions: number;
     canSaveByBackfill: boolean;
-    challengeId: string;
 }
 
 export interface ChainNodeObject {

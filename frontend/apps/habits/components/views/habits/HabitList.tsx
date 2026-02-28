@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import { useHabitStore } from '../../../hooks/useHabitStore';
 import { HabitCard } from './HabitCard';
 import { PausedHabitCard } from './PausedHabitCard';
@@ -28,17 +28,25 @@ export const HabitList: React.FC = () => {
                 </div>
             </div>
 
-            {/* Scrolling Card List (Strict Grid) */}
             <div className="flex-1 overflow-y-auto no-scrollbar pr-2">
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pb-4">
-                    {activeHabits.map(habit => (
-                        <HabitCard key={habit.id} habit={habit} />
-                    ))}
-
-                    {pausedHabits.map(habit => (
-                        <PausedHabitCard key={habit.id} habit={habit} />
-                    ))}
-                </div>
+                {activeHabits.length === 0 && pausedHabits.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center py-16">
+                        <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
+                            <Sparkles size={20} className="text-emerald-300" />
+                        </div>
+                        <p className="text-sm text-slate-400 font-medium">还没有习惯</p>
+                        <p className="text-xs text-slate-300 mt-1">点击「新建习惯」开始你的第一个挑战</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pb-4">
+                        {activeHabits.map(habit => (
+                            <HabitCard key={habit.id} habit={habit} />
+                        ))}
+                        {pausedHabits.map(habit => (
+                            <PausedHabitCard key={habit.id} habit={habit} />
+                        ))}
+                    </div>
+                )}
             </div>
 
             <HabitFormDialog

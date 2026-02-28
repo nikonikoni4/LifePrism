@@ -1,11 +1,18 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ArrowRight } from 'lucide-react';
+import { useStatsStore } from '../../../hooks/useStatsStore';
 
-interface TrendsChartProps {
-    // In Phase 2+, we can pass actual trend percentages
-}
+export const TrendsChart: React.FC = () => {
+    const { weeklyData } = useStatsStore();
 
-export const TrendsChart: React.FC<TrendsChartProps> = () => {
+    const last4 = useMemo(() => {
+        const data = weeklyData.slice(-4);
+        while (data.length < 4) {
+            data.unshift({ weekStartDate: '', weekEndDate: '', rate: 0, habitCount: 0 });
+        }
+        return data;
+    }, [weeklyData]);
+
     return (
         <div className="flex flex-col justify-between bg-white rounded-[24px] p-6 shadow-sm border border-neutral-100">
             <div className="flex items-center justify-between mb-4">
@@ -15,10 +22,22 @@ export const TrendsChart: React.FC<TrendsChartProps> = () => {
                 </div>
             </div>
             <div className="flex items-end justify-between gap-3 h-[80px] w-full mt-auto">
-                <div className="flex-1 bg-slate-100 hover:bg-slate-200 transition-colors rounded-[8px] h-[50%]" />
-                <div className="flex-1 bg-slate-100 hover:bg-slate-200 transition-colors rounded-[8px] h-[70%]" />
-                <div className="flex-1 bg-slate-100 hover:bg-slate-200 transition-colors rounded-[8px] h-[40%]" />
-                <div className="flex-1 bg-emerald-500 rounded-[8px] h-[90%] shadow-lg shadow-emerald-500/30" />
+                {last4.map((week, i) => {
+                    const isCurrentWeek = i === last4.length - 1;
+                    const heightPct = Math.max(5, Math.round(week.rate * 100));
+                    return (
+                        <div
+                            key={i}
+                            className={`flex-1 rounded-[8px] transition-colors ${
+                                isCurrentWeek
+                                    ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30'
+                                    : 'bg-slate-100 hover:bg-slate-200'
+                            }`}
+                            style={{ height: `${heightPct}%` }}
+                            title={week.weekStartDate ? `${week.weekStartDate} ~ ${week.weekEndDate}: ${Math.round(week.rate * 100)}%` : ''}
+                        />
+                    );
+                })}
             </div>
         </div>
     );
