@@ -117,7 +117,7 @@ async def resume_habit(habit_id: str):
 # 打卡操作
 # ============================================================================
 
-@router.post("/habits/{habit_id}/checkin")
+@router.post("/habits/{habit_id}/checkins")
 async def checkin_today(habit_id: str):
     """今日打卡"""
     try:
@@ -139,7 +139,7 @@ async def checkin_today(habit_id: str):
         )
 
 
-@router.delete("/habits/{habit_id}/checkin/{date_str}", status_code=200)
+@router.delete("/habits/{habit_id}/checkins/{date_str}", status_code=200)
 async def cancel_checkin(habit_id: str, date_str: str):
     """取消打卡（仅限今日）"""
     try:
@@ -162,7 +162,7 @@ async def cancel_checkin(habit_id: str, date_str: str):
         )
 
 
-@router.post("/habits/{habit_id}/checkin/backfill")
+@router.post("/habits/{habit_id}/checkins/backfill")
 async def backfill_checkin(habit_id: str, req: BackfillCheckInRequest):
     """补签（过去 7 天内）"""
     try:

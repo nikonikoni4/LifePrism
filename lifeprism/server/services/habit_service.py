@@ -103,6 +103,10 @@ class HabitService:
                 triggerTime=a.get("triggerTime"),
             )
 
+        # 今日是否已打卡
+        today_str = date.today().isoformat()
+        today_checkin = habit_checkin_provider.get_checkin_by_date(row["id"], today_str)
+
         return HabitListItem(
             id=row["id"], name=row["name"],
             description=row.get("description"),
@@ -114,6 +118,7 @@ class HabitService:
             createdAt=row["created_at"],
             pausedAt=row.get("paused_at"),
             streak=streak, anchorInfo=anchor_info,
+            todayCompleted=bool(today_checkin),
         )
 
     def _create_challenge_for_habit(
