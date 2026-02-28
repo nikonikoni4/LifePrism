@@ -217,27 +217,21 @@ async def check_settlements():
 @router.get("/stats/today")
 async def get_today_stats():
     """今日概览统计"""
-    habits_resp = habit_service.get_habits("active")
-    habits_list = [h.model_dump() for h in habits_resp.habits]
-    result = habit_stats_service.get_today_overview(habits_list, date.today())
+    result = habit_stats_service.get_today_overview(date.today())
     return {"overview": result}
 
 
 @router.get("/stats/weekly")
 async def get_weekly_stats():
     """本周完成率统计"""
-    habits_resp = habit_service.get_habits("active")
-    habits_list = [h.model_dump() for h in habits_resp.habits]
-    rate = habit_stats_service.get_weekly_stats(habits_list, date.today())
+    rate = habit_stats_service.get_weekly_stats(date.today())
     return {"completion_rate": rate}
 
 
 @router.get("/stats/heatmap")
 async def get_heatmap(days: int = Query(default=365, ge=7, le=730)):
     """热力图数据"""
-    habits_resp = habit_service.get_habits(None)
-    habit_ids = [h.id for h in habits_resp.habits]
-    data = habit_stats_service.get_heatmap(habit_ids, date.today(), days)
+    data = habit_stats_service.get_heatmap(date.today(), days)
     return {"heatmap": data}
 
 

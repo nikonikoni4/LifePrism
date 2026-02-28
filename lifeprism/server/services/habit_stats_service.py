@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
+from lifeprism.server.providers.habit_provider import habit_provider
 from lifeprism.server.providers.habit_checkin_provider import habit_checkin_provider
 from lifeprism.server.providers.habit_challenge_provider import habit_challenge_provider
 from lifeprism.server.schemas.habit_schemas import FrequencyObject
@@ -123,8 +124,9 @@ def _parse_freq_from_row(row: Dict[str, Any]) -> FrequencyObject:
     return FrequencyObject(type=row["frequency_type"], specificDays=specific_days)
 
 
-def get_today_overview(habits: List[Dict[str, Any]], today: date) -> List[Dict[str, Any]]:
+def get_today_overview(today: date) -> List[Dict[str, Any]]:
     """计算今日概览，仅返回今日有计划的习惯"""
+    habits = habit_provider.get_habits(status="active")
     habit_ids = [h["id"] for h in habits]
     today_checkins = habit_checkin_provider.get_today_checkins(habit_ids)
     result = []
@@ -141,8 +143,9 @@ def get_today_overview(habits: List[Dict[str, Any]], today: date) -> List[Dict[s
     return result
 
 
-def get_weekly_stats(habits: List[Dict[str, Any]], today: date) -> float:
+def get_weekly_stats(today: date) -> float:
     """计算本周完成率（所有习惯的算术平均值）"""
+    habits = habit_provider.get_habits(status="active")
     if not habits:
         return 0.0
     week_start = today - timedelta(days=today.weekday())
@@ -173,8 +176,10 @@ def get_weekly_stats(habits: List[Dict[str, Any]], today: date) -> float:
     return round(sum(rates) / len(rates), 4)
 
 
-def get_heatmap(habit_ids: List[str], today: date, days: int) -> List[Dict[str, Any]]:
+def get_heatmap(today: date, days: int) -> List[Dict[str, Any]]:
     """获取过去 days 天热力图数据"""
+    habits = habit_provider.get_habits()
+    habit_ids = [h["id"] for h in habits]
     start = (today - timedelta(days=days - 1)).isoformat()
     end = today.isoformat()
     raw = habit_checkin_provider.get_checkins_in_date_range(start, end, habit_ids)
