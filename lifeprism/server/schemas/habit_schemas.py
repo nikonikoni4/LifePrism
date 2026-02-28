@@ -59,7 +59,7 @@ class CreateHabitRequest(BaseModel):
 
 class UpdateHabitRequest(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    description: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=500)
     frequency: Optional[FrequencyObject] = None
     valueId: Optional[str] = None
     commitmentId: Optional[str] = None
@@ -113,7 +113,7 @@ class CancelCheckInResponse(BaseModel):
 
 
 class BackfillCheckInRequest(BaseModel):
-    date: str = Field(..., description="补签日期 YYYY-MM-DD，格式必须符合 YYYY-MM-DD")
+    date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="补签日期 YYYY-MM-DD")
 
 
 # ============================================================================
@@ -182,7 +182,7 @@ class CreateChainRequest(BaseModel):
 
 class UpdateChainRequest(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    description: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=500)
     showInTimeline: Optional[bool] = None
 
 
