@@ -52,18 +52,18 @@ export const Heatmap: React.FC = () => {
     }, [heatmapData]);
 
     return (
-        <div className="flex flex-col justify-between bg-white rounded-[24px] p-6 shadow-sm border border-neutral-100">
-            <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col justify-between bg-white rounded-[24px] p-5 shadow-sm border border-neutral-100 relative h-full">
+            <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[12px] font-bold text-neutral-400 uppercase tracking-widest">12-Week Flow</h2>
-                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-neutral-50 transition-colors cursor-pointer shadow-sm">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-neutral-50 transition-colors cursor-pointer">
                     <ArrowRight size={14} className="text-neutral-400 -rotate-45" />
                 </div>
             </div>
-            <div className="grid grid-flow-col grid-rows-7 gap-[5px] inline-grid self-start mt-auto">
+            <div className="grid grid-flow-col grid-rows-7 gap-[4px] inline-grid self-start md:mx-auto">
                 {grid.map((level, i) => (
                     <div
                         key={i}
-                        className={`w-[12px] h-[12px] rounded-[3px] border border-black/[0.03] ${levelColors[level] || 'bg-slate-100'}`}
+                        className={`w-[11px] h-[11px] rounded-[3px] border border-black/[0.03] ${levelColors[level] || 'bg-slate-50'}`}
                     />
                 ))}
             </div>
