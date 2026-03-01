@@ -27,7 +27,7 @@ const HabitStoreContext = createContext<HabitStoreContextType | undefined>(undef
 interface HabitProviderProps {
     children: ReactNode;
     onSettlement?: (item: SettlementItem) => void;
-    onCheckInChange?: () => void;
+    onCheckInChange?: () => void | Promise<void>;
 }
 
 export const HabitProvider: React.FC<HabitProviderProps> = ({ children, onSettlement, onCheckInChange }) => {
@@ -178,7 +178,7 @@ export const HabitProvider: React.FC<HabitProviderProps> = ({ children, onSettle
             if (checkInRes.settlement && onSettlement) {
                 onSettlement(checkInRes.settlement);
             }
-            onCheckInChange?.();
+            void onCheckInChange?.();
         } catch (err) {
             console.error('[HabitStore] Failed to check in:', err);
             setError(err instanceof Error ? err.message : 'Failed to check in');
@@ -228,7 +228,7 @@ export const HabitProvider: React.FC<HabitProviderProps> = ({ children, onSettle
                 }
                 return h;
             }));
-            onCheckInChange?.();
+            void onCheckInChange?.();
         } catch (err) {
             console.error('[HabitStore] Failed to undo check in:', err);
             setError(err instanceof Error ? err.message : 'Failed to undo check in');

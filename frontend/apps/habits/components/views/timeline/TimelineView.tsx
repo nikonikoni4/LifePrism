@@ -17,7 +17,7 @@ export const TimelineView: React.FC = () => {
     }, []);
 
     return (
-        <div className="col-span-12 lg:col-span-3 bg-white rounded-[24px] p-6 h-full flex flex-col overflow-hidden shadow-[0_10px_28px_rgba(15,23,42,0.08)] border-none">
+        <div className="col-span-12 lg:col-span-3 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] rounded-[24px] p-6 h-full flex flex-col overflow-hidden shadow-[0_10px_28px_rgba(15,23,42,0.08)] border border-slate-100/80">
             <div className="flex justify-between items-center mb-6 shrink-0">
                 <h2 className="text-[14px] font-semibold text-slate-700 uppercase tracking-[0.02em]">
                     Timeline
@@ -33,12 +33,12 @@ export const TimelineView: React.FC = () => {
             >
                 <div className="relative w-full" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
                     {/* Vertical Line */}
-                    <div className="absolute left-[45px] top-0 bottom-0 w-[2px] bg-neutral-200/80 z-0" />
+                    <div className="absolute left-[45px] top-0 bottom-0 w-[2px] bg-slate-300/70 z-0" />
 
                     {/* Background Hour Indicators */}
                     {Array.from({ length: 24 }).map((_, i) => (
-                        <div key={i} className="absolute left-0 right-0 border-t border-neutral-200/50 z-0" style={{ top: i * HOUR_HEIGHT, height: HOUR_HEIGHT }}>
-                            <div className="absolute top-[-8px] left-0 w-8 text-right text-[10px] font-bold text-neutral-300 font-mono">
+                        <div key={i} className="absolute left-0 right-0 border-t border-slate-300/45 z-0" style={{ top: i * HOUR_HEIGHT, height: HOUR_HEIGHT }}>
+                            <div className="absolute top-[-8px] left-0 w-8 text-right text-[10px] font-bold text-slate-400 font-mono">
                                 {String(i).padStart(2, '0')}:00
                             </div>
                         </div>

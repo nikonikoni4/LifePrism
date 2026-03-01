@@ -46,26 +46,30 @@ const HabitsAppContent: React.FC = () => {
             </div>
 
             {/* 2. TOP OVERVIEW (Bento Box Layout) */}
-            <div className="w-full shrink-0 flex flex-col lg:flex-row gap-3 pb-0">
-                <DailyTips />
+            <div className="w-full shrink-0 rounded-[28px] bg-emerald-50/55 border border-emerald-100/80 p-3 sm:p-4">
+                <div className="w-full flex flex-col lg:flex-row gap-3 pb-0">
+                    <DailyTips />
 
-                {/* Right Area - Stacked Panels */}
-                <div className="w-full lg:w-9/12 flex flex-col gap-3">
-                    <TodayDashboard />
+                    {/* Right Area - Stacked Panels */}
+                    <div className="w-full lg:w-9/12 flex flex-col gap-3">
+                        <TodayDashboard />
 
-                    {/* Bottom Row: Charts (Split) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 min-h-[140px]">
-                        <Heatmap />
-                        <TrendsChart />
+                        {/* Bottom Row: Charts (Split) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 min-h-[140px]">
+                            <Heatmap />
+                            <TrendsChart />
+                        </div>
                     </div>
                 </div>
             </div>
 
             {/* Main Content Area */}
-            <div className="grid grid-cols-12 gap-3 flex-shrink-0 w-full h-[600px] xl:h-[600px]">
-                <TimelineView />
-                <HabitChainList />
-                <HabitList />
+            <div className="w-full rounded-[28px] bg-sky-50/45 border border-sky-100/80 p-3 sm:p-4">
+                <div className="grid grid-cols-12 gap-3 flex-shrink-0 w-full h-[600px] xl:h-[600px]">
+                    <TimelineView />
+                    <HabitChainList />
+                    <HabitList />
+                </div>
             </div>
         </HabitLayout>
     );
@@ -74,9 +78,9 @@ const HabitsAppContent: React.FC = () => {
 /** 桥接组件：在 SettlementProvider 内部获取 pushSettlement，传给 HabitProvider */
 const HabitWithSettlementBridge: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { pushSettlement } = useSettlementStore();
-    const { fetchTodayOverview } = useStatsStore();
+    const { fetchAllStats } = useStatsStore();
     return (
-        <HabitProvider onSettlement={pushSettlement} onCheckInChange={fetchTodayOverview}>
+        <HabitProvider onSettlement={pushSettlement} onCheckInChange={fetchAllStats}>
             {children}
         </HabitProvider>
     );
