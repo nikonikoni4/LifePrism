@@ -66,20 +66,11 @@ def _get_daily_anchor_date(checkin_dates: set, challenge_start: date, today: dat
     return anchor
 
 
-def _has_daily_gap_between_first_checkin_and_anchor(
+def _has_daily_gap_between_challenge_start_and_anchor(
     checkin_dates: set, challenge_start: date, anchor: date
 ) -> bool:
-    """若在 [首次打卡日, 锚点] 内存在漏打卡日，则视为断链（旧 streak_base 失效）。"""
-    checkin_days = sorted(
-        date.fromisoformat(d)
-        for d in checkin_dates
-        if challenge_start <= date.fromisoformat(d) <= anchor
-    )
-    if not checkin_days:
-        return True
-
-    first_checkin = checkin_days[0]
-    current = first_checkin
+    """若在 [challenge_start, 锚点] 内存在漏打卡日，则视为断链（旧 streak_base 失效）。"""
+    current = challenge_start
     while current <= anchor:
         if current.isoformat() not in checkin_dates:
             return True
@@ -105,27 +96,46 @@ def calculate_daily_streak(checkin_dates: set, challenge: dict, today: date) -> 
     return streak
 
 
-def calculate_weekly_streak(checkin_dates: set, challenge: dict, freq: FrequencyObject, today: date) -> int:
-    """逐周判定 streak（适用于非 daily 频率）"""
+def calculate_weekly_streak(
+    checkin_dates: set, challenge: dict, freq: FrequencyObject, today: date
+) -> int:
+    """非 daily streak：按天累加，按周结算清零。"""
     challenge_start = date.fromisoformat(challenge["start_date"])
     challenge_end = date.fromisoformat(challenge["end_date"])
-    streak = 0
-    week_start = today - timedelta(days=today.weekday())
-    while True:
-        week_end = week_start + timedelta(days=6)
-        eff_start, eff_end = get_effective_range(week_start, week_end, challenge_start, challenge_end, today)
-        if eff_end < eff_start:
-            break
-        scheduled = count_scheduled_days_in_range(eff_start, eff_end, freq)
-        completed = sum(
-            1 for i in range((eff_end - eff_start).days + 1)
-            if (eff_start + timedelta(days=i)).isoformat() in checkin_dates
-        )
-        if scheduled > 0 and completed >= scheduled:
+    timeline_end = min(today, challenge_end)
+    if timeline_end < challenge_start:
+        return 0
+
+    checkin_day_set = {
+        date.fromisoformat(d)
+        for d in checkin_dates
+        if challenge_start <= date.fromisoformat(d) <= timeline_end
+    }
+    streak = challenge.get("streak_base") or 0
+    current = challenge_start
+    while current <= timeline_end:
+        # 每周一先结算上一自然周（Mon~Sun），未达标则清零。
+        if current.weekday() == 0:
+            prev_week_start = current - timedelta(days=7)
+            prev_week_end = current - timedelta(days=1)
+            eff_start = max(prev_week_start, challenge_start)
+            eff_end = min(prev_week_end, challenge_end)
+            if eff_end >= eff_start:
+                scheduled = count_scheduled_days_in_range(eff_start, eff_end, freq)
+                if scheduled > 0:
+                    completed = sum(
+                        1
+                        for i in range((eff_end - eff_start).days + 1)
+                        if (eff_start + timedelta(days=i)) in checkin_day_set
+                    )
+                    if completed < scheduled:
+                        streak = 0
+
+        # 打卡实时累加（不限制必须在 specificDays 打卡）。
+        if current in checkin_day_set:
             streak += 1
-            week_start -= timedelta(days=7)
-        else:
-            break
+        current += timedelta(days=1)
+
     return streak
 
 
@@ -144,14 +154,14 @@ def get_habit_streak(habit_id: str, freq: FrequencyObject, challenge: Optional[d
         if current <= 0:
             return 0
 
-        # daily 出现“中间断链”后，旧 streak_base 失效，只保留当前连续段。
-        if anchor is not None and _has_daily_gap_between_first_checkin_and_anchor(
+        # daily 仅在可连续回溯到 challenge_start 时叠加 streak_base。
+        if anchor is not None and _has_daily_gap_between_challenge_start_and_anchor(
             checkin_set, challenge_start, anchor
         ):
             return current
+        return streak_base + current
     else:
-        current = calculate_weekly_streak(checkin_set, challenge, freq, today)
-    return streak_base + current
+        return calculate_weekly_streak(checkin_set, challenge, freq, today)
 
 
 # ============================================================================
