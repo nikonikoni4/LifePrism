@@ -14,9 +14,9 @@ export const TrendsChart: React.FC = () => {
     }, [weeklyData]);
 
     return (
-        <div className="flex flex-col justify-between bg-white rounded-[24px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.08)] border-none relative h-full">
+        <div className="flex flex-col justify-between bg-white rounded-[24px] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.08)] border-none relative h-full">
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[12px] font-bold text-neutral-400 uppercase tracking-widest">4-Week Trend</h2>
+                <h2 className="text-[14px] font-semibold text-slate-700 uppercase tracking-[0.02em]">4-Week Trend</h2>
                 <div className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-neutral-50 transition-colors cursor-pointer">
                     <ArrowRight size={14} className="text-neutral-400 -rotate-45" />
                 </div>

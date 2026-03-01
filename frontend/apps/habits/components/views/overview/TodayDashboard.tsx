@@ -14,20 +14,20 @@ export const TodayDashboard: React.FC = () => {
     const isRestDay = todayOverview?.isRestDay ?? false;
 
     return (
-        <div className="bg-white rounded-[24px] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.08)] border-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative overflow-hidden">
+        <div className="bg-white rounded-[24px] p-6 shadow-[0_10px_28px_rgba(15,23,42,0.08)] border-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative overflow-hidden">
             {/* Background Decoration */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
 
             {/* Title & Stats */}
             <div className="flex flex-col relative z-10 w-full sm:w-auto">
-                <h2 className="text-[12px] font-bold text-neutral-400 uppercase tracking-widest mb-2">Today Dashboard</h2>
+                <h2 className="text-[14px] font-semibold text-slate-700 uppercase tracking-[0.02em] mb-2">Today Dashboard</h2>
                 <div className="flex items-baseline gap-1.5">
                     {isRestDay ? (
-                        <span className="text-[20px] font-bold text-neutral-600">休息日</span>
+                        <span className="text-[28px] sm:text-[34px] font-extrabold text-slate-700">休息日</span>
                     ) : (
                         <>
-                            <span className="text-[44px] font-black tracking-tighter text-neutral-900 leading-none">{completed}</span>
-                            <span className="text-[18px] font-bold text-neutral-300">/{total}</span>
+                            <span className="text-[36px] sm:text-[52px] font-extrabold tracking-[-0.03em] text-slate-900 leading-none">{completed}</span>
+                            <span className="text-[20px] font-semibold text-slate-300">/{total}</span>
                         </>
                     )}
                 </div>
@@ -36,8 +36,8 @@ export const TodayDashboard: React.FC = () => {
             {/* Progress Layout */}
             <div className="flex-1 w-full max-w-lg relative z-10 mt-4 sm:mt-0">
                 <div className="flex items-center justify-between mb-3">
-                    <span className="text-[13px] font-bold text-neutral-600">今日进度</span>
-                    <span className="text-emerald-600 font-extrabold text-[14px] px-3.5 py-1 bg-[#F0FDF4] rounded-full border border-emerald-100 shadow-sm">
+                    <span className="text-[14px] font-semibold text-slate-700 tracking-[0.02em]">今日进度</span>
+                    <span className="inline-flex items-center justify-center h-7 px-3 rounded-full text-emerald-700 font-semibold text-[12px] bg-emerald-100 border border-emerald-200 shadow-sm">
                         {percentage}%
                     </span>
                 </div>

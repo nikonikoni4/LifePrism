@@ -51,6 +51,12 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
     // Use todayCompleted from optimistic state, fallback to false if undefined
     const isDoneToday = habit.todayCompleted || false;
 
+    const pillBaseClass = 'inline-flex items-center h-7 px-3 rounded-full text-[10px] font-semibold leading-none';
+    const pillNeutralClass = `${pillBaseClass} text-slate-600 bg-slate-100`;
+    const pillWarningClass = `${pillBaseClass} text-amber-700 bg-amber-100`;
+    const pillInfoClass = `${pillBaseClass} text-sky-700 bg-sky-100`;
+    const pillSuccessClass = `${pillBaseClass} text-emerald-700 bg-emerald-100`;
+
     const handleCheckIn = async () => {
         try {
             await checkIn(habit.id);
@@ -89,13 +95,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
 
     return (
         <>
-            <div className="min-w-[220px] bg-white rounded-[20px] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-slate-100 flex flex-col justify-between transition-all hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 duration-300 relative group min-h-[140px]">
+            <div className="min-w-[220px] bg-white rounded-[20px] p-4 shadow-[0_8px_22px_rgba(15,23,42,0.08)] border border-slate-100/70 flex flex-col justify-between transition-all hover:shadow-[0_14px_30px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 duration-300 relative group min-h-[140px]">
 
                 {/* Menu Action */}
                 <div className="absolute top-3 right-3 z-10" ref={menuRef}>
                     <button
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
-                        className={`p-1 rounded-md transition-colors ${isMenuOpen ? 'bg-slate-200 text-slate-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 opacity-0 group-hover:opacity-100'}`}
+                        className={`p-1 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 active:scale-95 ${isMenuOpen ? 'bg-slate-200 text-slate-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 opacity-0 group-hover:opacity-100'}`}
                     >
                         <MoreHorizontal size={16} />
                     </button>
@@ -103,26 +109,26 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                         <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-xl shadow-lg border border-slate-100 py-1 overflow-hidden">
                             <button
                                 onClick={() => { setIsFormOpen(true); setIsMenuOpen(false); }}
-                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 font-medium"
+                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 font-medium"
                             >
                                 编辑
                             </button>
                             <button
                                 onClick={handlePause}
-                                className="w-full text-left px-3 py-2 text-xs text-amber-600 hover:bg-amber-50 font-medium"
+                                className="w-full text-left px-3 py-2 text-xs text-amber-700 hover:bg-amber-50 active:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 font-medium"
                             >
                                 暂停
                             </button>
                             <button
                                 onClick={() => { setIsHistoryOpen(true); setIsMenuOpen(false); }}
-                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 font-medium"
+                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 font-medium"
                             >
                                 历史记录
                             </button>
                             <div className="h-px bg-slate-100 my-1"></div>
                             <button
                                 onClick={handleDelete}
-                                className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 font-medium"
+                                className="w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50 active:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40 font-medium"
                             >
                                 删除
                             </button>
@@ -133,25 +139,25 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                 <div>
                     {/* Top Header of Card */}
                     <div className="flex justify-between items-start mb-2.5">
-                        <h3 className="text-[15px] font-bold text-neutral-900 tracking-tight leading-tight truncate pr-6">{habit.name}</h3>
+                        <h3 className="text-[16px] font-extrabold text-slate-900 tracking-[-0.01em] leading-tight truncate pr-6">{habit.name}</h3>
                         <div className="flex flex-col items-end flex-shrink-0">
-                            <span className="text-[10px] font-black text-neutral-800">Lv.{habit.currentLevel}</span>
+                            <span className="text-[11px] font-semibold text-slate-700">Lv.{habit.currentLevel}</span>
                         </div>
                     </div>
 
                     {/* Pill Tags inline */}
                     <div className="flex flex-col gap-1.5 mb-1 h-auto overflow-hidden">
                         <div className="flex flex-wrap gap-1.5">
-                            <span className="flex items-center bg-[#F4F5F7] px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wide text-neutral-500 uppercase">
+                            <span className={`${pillNeutralClass} uppercase tracking-[0.02em]`}>
                                 {freqText}
                             </span>
                             {habit.streak > 0 && (
-                                <span className="flex items-center gap-1 text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md tracking-wide">
+                                <span className={`${pillWarningClass} gap-1 tracking-[0.01em]`}>
                                     <Flame size={10} className="fill-amber-500" strokeWidth={2} /> {habit.streak}
                                 </span>
                             )}
                             {habit.anchorInfo && (
-                                <span className="flex items-center gap-1 text-blue-600 bg-blue-50/60 px-2 py-0.5 rounded-full text-[9px] font-bold truncate max-w-[120px]">
+                                <span className={`${pillInfoClass} gap-1 truncate max-w-[150px]`}>
                                     <Anchor size={10} strokeWidth={2.5} className="flex-shrink-0" />
                                     <span className="truncate">{habit.anchorInfo.triggerTime || ''} {habit.anchorInfo.nodeName}</span>
                                 </span>
@@ -160,13 +166,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                         {(valueKeyword || commitmentContent) && (
                             <div className="flex flex-wrap gap-1.5">
                                 {valueKeyword && (
-                                    <span className="flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full text-[9px] font-bold truncate max-w-[100px]" title={valueKeyword}>
+                                    <span className={`${pillInfoClass} gap-1 truncate max-w-[120px]`} title={valueKeyword}>
                                         <Gem size={10} strokeWidth={2.5} className="flex-shrink-0" />
                                         <span className="truncate">{valueKeyword}</span>
                                     </span>
                                 )}
                                 {commitmentContent && (
-                                    <span className="flex items-center gap-1 text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full text-[9px] font-bold truncate max-w-[140px]" title={commitmentContent}>
+                                    <span className={`${pillSuccessClass} gap-1 truncate max-w-[160px]`} title={commitmentContent}>
                                         <Shield size={10} strokeWidth={2.5} className="flex-shrink-0" />
                                         <span className="truncate">{commitmentContent}</span>
                                     </span>
@@ -180,8 +186,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                 <div className="flex items-center justify-between mt-auto">
                     <div className="flex-1 mr-4">
                         <div className="flex justify-between items-center mb-1">
-                            <span className="text-[9px] font-bold text-neutral-400 tracking-wider">PROGRESS</span>
-                            <span className="text-[9px] font-bold text-neutral-500 tracking-wider">
+                            <span className="text-[10px] font-semibold text-slate-500 tracking-[0.02em]">PROGRESS</span>
+                            <span className="text-[10px] font-semibold text-slate-600 tracking-[0.01em]">
                                 {progressCurrent}/{progressTotal}
                             </span>
                         </div>
@@ -199,7 +205,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                                 transition={{ duration: 0.2 }}
                                 onClick={handleUndoCheckIn}
                                 disabled={habit.isCheckingIn}
-                                className={`flex items-center justify-center bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-md text-[10px] font-bold transition-colors hover:bg-emerald-100 border border-emerald-100/50 ${habit.isCheckingIn ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                className={`min-h-10 min-w-[84px] flex items-center justify-center bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-full text-[9px] font-semibold tracking-[0.01em] transition-colors border border-emerald-200 hover:bg-emerald-100 active:bg-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${habit.isCheckingIn ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                 <Check size={12} strokeWidth={3} className="mr-1" /> DONE
                             </motion.button>
                         ) : (
@@ -211,7 +217,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                                 transition={{ duration: 0.2 }}
                                 onClick={handleCheckIn}
                                 disabled={habit.isCheckingIn}
-                                className={`flex items-center justify-center bg-neutral-900 text-white px-4 py-1.5 rounded-md text-[10px] font-bold transition-all hover:bg-neutral-800 hover:scale-105 active:scale-95 shadow-md shadow-neutral-900/20 ${habit.isCheckingIn ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                className={`min-h-10 min-w-[82px] flex items-center justify-center bg-emerald-600 text-white px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-[0.01em] transition-all shadow-md shadow-emerald-700/20 hover:bg-emerald-500 active:bg-emerald-700 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${habit.isCheckingIn ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                 CHECK IN
                             </motion.button>
                         )}

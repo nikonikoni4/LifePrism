@@ -17,9 +17,9 @@ export const TimelineView: React.FC = () => {
     }, []);
 
     return (
-        <div className="col-span-12 lg:col-span-3 bg-white rounded-[24px] p-6 h-full flex flex-col overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.08)] border-none">
+        <div className="col-span-12 lg:col-span-3 bg-white rounded-[24px] p-6 h-full flex flex-col overflow-hidden shadow-[0_10px_28px_rgba(15,23,42,0.08)] border-none">
             <div className="flex justify-between items-center mb-6 shrink-0">
-                <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">
+                <h2 className="text-[14px] font-semibold text-slate-700 uppercase tracking-[0.02em]">
                     Timeline
                 </h2>
                 <button className="text-neutral-400 hover:text-neutral-600">

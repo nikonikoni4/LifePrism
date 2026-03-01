@@ -38,14 +38,11 @@ const HabitsAppContent: React.FC = () => {
             <SettlementDialog />
 
             {/* 1. GLOBAL HEADER */}
-            <div className="w-full shrink-0 flex items-center justify-between px-2 mb-1 mt-1">
+            <div className="w-full shrink-0 flex items-center px-2 mb-1 mt-1">
                 <div>
-                    <h1 className="text-[28px] font-black text-neutral-900 tracking-tight leading-none mb-1">Morning, Nico</h1>
-                    <p className="text-[13px] font-bold text-neutral-400">Oct 24, 星期四</p>
+                    <h1 className="text-[30px] sm:text-[34px] font-extrabold text-slate-900 tracking-[-0.02em] leading-[1.05] mb-1">Morning, Nico</h1>
+                    <p className="text-[14px] font-semibold text-slate-500 tracking-[0.01em]">Oct 24, 星期四</p>
                 </div>
-                <button className="flex items-center gap-1.5 bg-neutral-900 text-white px-5 py-2.5 rounded-[14px] text-[13px] font-bold shadow-md shadow-neutral-900/20 hover:bg-neutral-800 hover:-translate-y-0.5 transition-all active:scale-95">
-                    <span className="text-lg leading-none mb-[2px]">+</span> 新建习惯
-                </button>
             </div>
 
             {/* 2. TOP OVERVIEW (Bento Box Layout) */}

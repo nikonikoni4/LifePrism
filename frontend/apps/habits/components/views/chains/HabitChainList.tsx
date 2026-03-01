@@ -9,9 +9,9 @@ export const HabitChainList: React.FC = () => {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
 
     return (
-        <div className="col-span-12 lg:col-span-3 bg-white rounded-[24px] p-6 h-full flex flex-col overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.08)] border-none">
+        <div className="col-span-12 lg:col-span-3 bg-white rounded-[24px] p-6 h-full flex flex-col overflow-hidden shadow-[0_10px_28px_rgba(15,23,42,0.08)] border-none">
             <div className="flex items-center justify-between mb-6 shrink-0">
-                <h2 className="text-[12px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-2">
+                <h2 className="text-[14px] font-semibold text-slate-700 uppercase tracking-[0.02em] flex items-center gap-2">
                     <ListTree size={14} className="text-emerald-500" /> Activity Chains
                 </h2>
                 <div className="flex items-center gap-2">
@@ -34,8 +34,8 @@ export const HabitChainList: React.FC = () => {
                         <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-3">
                             <Link2 size={18} className="text-slate-300" />
                         </div>
-                        <p className="text-sm text-slate-400 font-medium">暂无链条</p>
-                        <p className="text-xs text-slate-300 mt-1">将多个习惯串联成链条</p>
+                        <p className="text-sm text-slate-600 font-semibold">暂无链条</p>
+                        <p className="text-xs text-slate-500 mt-1">将多个习惯串联成链条</p>
                     </div>
                 ) : (
                     chains.map((chain) => (

@@ -25,6 +25,10 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
     const commitmentContent = habit.commitmentId ? commitments.find(c => c.id === habit.commitmentId)?.content : null;
 
     const menuRef = useRef<HTMLDivElement>(null);
+    const pillBaseClass = 'inline-flex items-center h-7 px-3 rounded-full text-[10px] font-semibold leading-none';
+    const pillNeutralClass = `${pillBaseClass} text-slate-600 bg-slate-100`;
+    const pillInfoClass = `${pillBaseClass} text-sky-700 bg-sky-100`;
+    const pillSuccessClass = `${pillBaseClass} text-emerald-700 bg-emerald-100`;
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -58,13 +62,13 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
 
     return (
         <>
-            <div className="bg-[#F4F5F7]/50 border border-dashed border-neutral-300 rounded-[20px] p-4 flex flex-col justify-center min-h-[140px] group relative hover:bg-[#F4F5F7] hover:border-neutral-400 transition-colors">
+            <div className="bg-white/70 border border-dashed border-slate-300 rounded-[20px] p-4 flex flex-col justify-center min-h-[140px] group relative hover:bg-slate-50/90 hover:border-slate-400 transition-colors shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
 
                 {/* Menu Action */}
                 <div className="absolute top-3 right-3 z-10" ref={menuRef}>
                     <button
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
-                        className={`p-1 rounded-md transition-colors ${isMenuOpen ? 'bg-slate-200 text-slate-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 opacity-0 group-hover:opacity-100'}`}
+                        className={`p-1 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 active:scale-95 ${isMenuOpen ? 'bg-slate-200 text-slate-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 opacity-0 group-hover:opacity-100'}`}
                     >
                         <MoreHorizontal size={16} />
                     </button>
@@ -72,26 +76,26 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
                         <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-xl shadow-lg border border-slate-100 py-1 overflow-hidden z-20">
                             <button
                                 onClick={() => { setIsFormOpen(true); setIsMenuOpen(false); }}
-                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 font-medium"
+                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 font-medium"
                             >
                                 编辑
                             </button>
                             <button
                                 onClick={handleResume}
-                                className="w-full text-left px-3 py-2 text-xs text-emerald-600 hover:bg-emerald-50 font-medium"
+                                className="w-full text-left px-3 py-2 text-xs text-emerald-700 hover:bg-emerald-50 active:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40 font-medium"
                             >
                                 恢复
                             </button>
                             <button
                                 onClick={() => { setIsHistoryOpen(true); setIsMenuOpen(false); }}
-                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 font-medium"
+                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 font-medium"
                             >
                                 历史记录
                             </button>
                             <div className="h-px bg-slate-100 my-1"></div>
                             <button
                                 onClick={handleDelete}
-                                className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 font-medium"
+                                className="w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50 active:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40 font-medium"
                             >
                                 删除
                             </button>
@@ -100,19 +104,19 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
                 </div>
 
                 <div className="flex justify-between items-center mb-3 pr-6">
-                    <h3 className="text-[14px] font-bold text-neutral-400 line-through decoration-neutral-300 truncate">{habit.name}</h3>
+                    <h3 className="text-[15px] font-semibold text-slate-500 line-through decoration-slate-300 truncate">{habit.name}</h3>
                 </div>
                 <div className="flex flex-col gap-1.5 mt-auto w-full">
                     {(valueKeyword || commitmentContent) && (
                         <div className="flex flex-wrap gap-1.5 overflow-hidden">
                             {valueKeyword && (
-                                <span className="flex items-center gap-1 text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-full text-[9px] font-bold truncate max-w-[80px]" title={valueKeyword}>
+                                <span className={`${pillInfoClass} gap-1 truncate max-w-[100px]`} title={valueKeyword}>
                                     <Gem size={10} strokeWidth={2.5} className="flex-shrink-0" />
                                     <span className="truncate">{valueKeyword}</span>
                                 </span>
                             )}
                             {commitmentContent && (
-                                <span className="flex items-center gap-1 text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-full text-[9px] font-bold truncate max-w-[100px]" title={commitmentContent}>
+                                <span className={`${pillSuccessClass} gap-1 truncate max-w-[130px]`} title={commitmentContent}>
                                     <Shield size={10} strokeWidth={2.5} className="flex-shrink-0" />
                                     <span className="truncate">{commitmentContent}</span>
                                 </span>
@@ -120,10 +124,10 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
                         </div>
                     )}
                     <div className="flex items-center gap-2">
-                        <span className="bg-white text-neutral-400 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wide uppercase border border-neutral-200 flex-shrink-0">Paused</span>
+                        <span className={`${pillNeutralClass} uppercase tracking-[0.02em] border border-slate-200`}>Paused</span>
                         <button
                             onClick={handleResume}
-                            className="text-[10px] font-bold text-neutral-400 ml-auto flex items-center gap-1 hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                            className="min-h-10 text-[10px] font-semibold text-slate-600 ml-auto flex items-center gap-1 hover:text-emerald-700 active:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed opacity-0 group-hover:opacity-100 transition-opacity">
                             <Play size={10} className="fill-current mr-1" /> Resume
                         </button>
                     </div>
