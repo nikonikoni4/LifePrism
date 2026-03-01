@@ -29,10 +29,10 @@ logger = get_logger(__name__)
 
 class HabitChainService:
 
-    _MSG_NO_NODES = "\u94fe\u4e2d\u6ca1\u6709\u8282\u70b9\uff0c\u65e0\u6cd5\u52a0\u5165 Timeline"
-    _MSG_FIRST_NODE_NEEDS_TIME = "\u7b2c\u4e00\u4e2a\u8282\u70b9\u5fc5\u987b\u8bbe\u7f6e\u89e6\u53d1\u65f6\u95f4\u624d\u80fd\u52a0\u5165 Timeline"
-    _MSG_INVALID_TIME = "\u8282\u70b9\u89e6\u53d1\u65f6\u95f4\u683c\u5f0f\u975e\u6cd5"
-    _MSG_INVALID_ORDER = "\u8282\u70b9\u89e6\u53d1\u65f6\u95f4\u987a\u5e8f\u4e0d\u5408\u7406\uff1a\u540e\u7eed\u8282\u70b9\u65f6\u95f4\u4e0d\u80fd\u65e9\u4e8e\u524d\u5e8f\u8282\u70b9"
+    _MSG_NO_NODES = "链中没有节点，无法加入 Timeline"
+    _MSG_FIRST_NODE_NEEDS_TIME = "第一个节点必须设置触发时间才能加入 Timeline"
+    _MSG_INVALID_TIME = "节点触发时间格式非法"
+    _MSG_INVALID_ORDER = "节点触发时间顺序不合理：后续节点时间不能早于前序节点"
 
     # --- Chain CRUD ---
 
@@ -168,7 +168,7 @@ class HabitChainService:
         request_ids = {item.nodeId for item in req.items}
         if existing_ids != request_ids:
             raise ValidationError(
-                f"\u8282\u70b9 ID \u96c6\u5408\u4e0d\u5339\u914d\uff1a\u671f\u671b {existing_ids}\uff0c\u5b9e\u9645 {request_ids}"
+                f"节点 ID 集合不匹配：期望 {existing_ids}，实际 {request_ids}"
             )
 
         updates = [{"node_id": item.nodeId, "sort_order": item.sortOrder} for item in req.items]
