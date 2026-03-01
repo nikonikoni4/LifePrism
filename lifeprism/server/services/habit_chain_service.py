@@ -42,12 +42,25 @@ class HabitChainService:
         return self.get_chain_detail(chain_id)
 
     def update_chain(self, chain_id: int, req: UpdateChainRequest) -> ChainDetailResponse:
-        self._get_chain_or_404(chain_id)
+        chain = self._get_chain_or_404(chain_id)
         update_data = req.model_dump(exclude_unset=True)
 
-        # showInTimeline=True 时的业务校验
-        if update_data.get("showInTimeline"):
-            nodes = habit_chain_provider.get_nodes_by_chain(chain_id)
+        # 1. 抽取批量节点时间更新
+        trigger_times = update_data.pop("triggerTimes", None)
+
+        # 2. 如果请求中包含了时间更新，去获取当前节点并与将更新的时间合并（模拟内存态）
+        nodes = habit_chain_provider.get_nodes_by_chain(chain_id)
+        if trigger_times is not None:
+            # 建立 nodeId 到 triggerTime 的映射
+            tt_map = {item["nodeId"]: item["triggerTime"] for item in trigger_times}
+            for n in nodes:
+                if n["id"] in tt_map:
+                    n["trigger_time"] = tt_map[n["id"]]
+
+        # 3. 业务校验: 判断最终是否要在 Timeline 中展示
+        is_showing_in_timeline = update_data.get("showInTimeline", bool(chain.get("show_in_timeline", False)))
+
+        if is_showing_in_timeline:
             if not nodes:
                 raise ValidationError("链中没有节点，无法加入 Timeline")
             first = sorted(nodes, key=lambda n: n["sort_order"])[0]
@@ -58,7 +71,15 @@ class HabitChainService:
         if "showInTimeline" in update_data:
             update_data["show_in_timeline"] = update_data.pop("showInTimeline")
 
-        habit_chain_provider.update_chain(chain_id, update_data)
+        # 更新链条的配置
+        if update_data:
+            habit_chain_provider.update_chain(chain_id, update_data)
+            
+        # 逐个更新节点的时间
+        if trigger_times is not None:
+            for item in trigger_times:
+                habit_chain_provider.update_node(item["nodeId"], {"trigger_time": item["triggerTime"]})
+
         return self.get_chain_detail(chain_id)
 
     def delete_chain(self, chain_id: int) -> None:

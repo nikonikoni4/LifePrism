@@ -184,10 +184,16 @@ class CreateChainRequest(BaseModel):
     description: Optional[str] = Field(default=None, max_length=500)
 
 
+class UpdateChainNodeTimeItem(BaseModel):
+    nodeId: int
+    triggerTime: str
+
+
 class UpdateChainRequest(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     description: Optional[str] = Field(default=None, max_length=500)
     showInTimeline: Optional[bool] = None
+    triggerTimes: Optional[List[UpdateChainNodeTimeItem]] = None
 
 
 class CreateNodeRequest(BaseModel):

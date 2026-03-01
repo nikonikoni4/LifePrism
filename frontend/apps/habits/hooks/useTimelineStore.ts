@@ -9,10 +9,23 @@ interface TimelineStoreContextType {
 
 const TimelineStoreContext = createContext<TimelineStoreContextType | undefined>(undefined);
 
-// Helper to parse HH:mm to minutes since midnight
+// Helper to parse HH:mm (or legacy ISO string) to minutes since midnight
 const parseTimeToMinutes = (timeStr: string): number => {
-    const [h, m] = timeStr.split(':').map(Number);
-    return (h || 0) * 60 + (m || 0);
+    // Check if it's already HH:mm
+    if (/^\d{2}:\d{2}$/.test(timeStr)) {
+        const [h, m] = timeStr.split(':').map(Number);
+        return (h || 0) * 60 + (m || 0);
+    }
+
+    // Fallback: parse as Date if it's an ISO string (legacy DB data)
+    try {
+        const d = new Date(timeStr);
+        if (!isNaN(d.getTime())) {
+            return d.getHours() * 60 + d.getMinutes();
+        }
+    } catch (e) { }
+
+    return 0;
 };
 
 // Helper to format minutes to HH:mm

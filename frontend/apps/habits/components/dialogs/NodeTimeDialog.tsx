@@ -54,10 +54,17 @@ export const NodeTimeDialog: React.FC<NodeTimeDialogProps> = ({
                     // format triggerTime if exists, else default to empty string
                     let timeStr = "";
                     if (node.triggerTime) {
-                        try {
-                            const d = new Date(node.triggerTime);
-                            timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                        } catch (e) { }
+                        // Check if it's already HH:mm
+                        if (/^\d{2}:\d{2}$/.test(node.triggerTime)) {
+                            timeStr = node.triggerTime;
+                        } else {
+                            try {
+                                const d = new Date(node.triggerTime);
+                                if (!isNaN(d.getTime())) {
+                                    timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                                }
+                            } catch (e) { }
+                        }
                     }
                     return {
                         nodeId: node.id,
@@ -76,12 +83,9 @@ export const NodeTimeDialog: React.FC<NodeTimeDialogProps> = ({
             const triggerTimes = data.nodes
                 .filter(n => n.triggerTime)
                 .map(n => {
-                    const [hours, minutes] = n.triggerTime.split(':');
-                    const d = new Date();
-                    d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
                     return {
                         nodeId: n.nodeId,
-                        triggerTime: d.toISOString()
+                        triggerTime: n.triggerTime // raw HH:mm string instead of ISO Date
                     };
                 });
 
