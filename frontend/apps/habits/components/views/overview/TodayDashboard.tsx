@@ -13,7 +13,7 @@ export const TodayDashboard: React.FC = () => {
     const isRestDay = todayOverview?.isRestDay ?? false;
 
     return (
-        <div className="bg-white rounded-[24px] p-6 shadow-sm border border-neutral-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative overflow-hidden">
+        <div className="bg-white rounded-[24px] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.08)] border-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative overflow-hidden">
             {/* Background Decoration */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
 

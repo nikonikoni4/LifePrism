@@ -52,7 +52,7 @@ export const Heatmap: React.FC = () => {
     }, [heatmapData]);
 
     return (
-        <div className="flex flex-col justify-between bg-white rounded-[24px] p-5 shadow-sm border border-neutral-100 relative h-full">
+        <div className="flex flex-col justify-between bg-white rounded-[24px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.08)] border-none relative h-full">
             <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[12px] font-bold text-neutral-400 uppercase tracking-widest">12-Week Flow</h2>
                 <div className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-neutral-50 transition-colors cursor-pointer">

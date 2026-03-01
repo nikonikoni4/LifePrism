@@ -14,8 +14,8 @@ export const TrendsChart: React.FC = () => {
     }, [weeklyData]);
 
     return (
-        <div className="flex flex-col justify-between bg-white rounded-[24px] p-5 shadow-sm border border-neutral-100 relative h-full">
-            <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-col justify-between bg-white rounded-[24px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.08)] border-none relative h-full">
+            <div className="flex items-center justify-between mb-4">
                 <h2 className="text-[12px] font-bold text-neutral-400 uppercase tracking-widest">4-Week Trend</h2>
                 <div className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-neutral-50 transition-colors cursor-pointer">
                     <ArrowRight size={14} className="text-neutral-400 -rotate-45" />
@@ -29,8 +29,8 @@ export const TrendsChart: React.FC = () => {
                         <div
                             key={i}
                             className={`flex-1 rounded-[6px] transition-colors ${isCurrentWeek
-                                    ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30'
-                                    : 'bg-slate-100 hover:bg-slate-200'
+                                ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30'
+                                : 'bg-slate-100 hover:bg-slate-200'
                                 }`}
                             style={{ height: `${heightPct}%` }}
                             title={week.weekStartDate ? `${week.weekStartDate} ~ ${week.weekEndDate}: ${Math.round(week.rate * 100)}%` : ''}

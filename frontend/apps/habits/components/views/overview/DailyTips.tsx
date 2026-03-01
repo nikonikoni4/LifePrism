@@ -3,7 +3,7 @@ import { Flame } from 'lucide-react';
 
 export const DailyTips: React.FC = () => {
     return (
-        <div className="w-full lg:w-3/12 bg-[#F0FDF4] rounded-[24px] p-6 shadow-sm border border-emerald-100 flex flex-col relative overflow-hidden min-h-[160px]">
+        <div className="w-full lg:w-3/12 bg-[#F0FDF4] rounded-[24px] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.08)] border-none flex flex-col relative overflow-hidden min-h-[160px]">
             <div className="relative z-10 flex flex-col h-full">
                 <h2 className="text-[11px] font-bold text-emerald-600/70 uppercase tracking-widest mb-4 flex items-center gap-1.5">
                     <Flame size={14} className="text-emerald-500" /> Daily Insight

@@ -9,7 +9,7 @@ export const HabitChainList: React.FC = () => {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
 
     return (
-        <div className="col-span-12 lg:col-span-3 bg-white rounded-[24px] p-6 h-full flex flex-col overflow-hidden shadow-sm border border-neutral-100">
+        <div className="col-span-12 lg:col-span-3 bg-white rounded-[24px] p-6 h-full flex flex-col overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.08)] border-none">
             <div className="flex items-center justify-between mb-6 shrink-0">
                 <h2 className="text-[12px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-2">
                     <ListTree size={14} className="text-emerald-500" /> Activity Chains

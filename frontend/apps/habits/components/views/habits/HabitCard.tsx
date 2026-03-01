@@ -89,7 +89,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
 
     return (
         <>
-            <div className="min-w-[220px] bg-slate-50 rounded-[20px] p-4 border border-neutral-100 flex flex-col justify-between transition-transform hover:-translate-y-0.5 hover:bg-slate-100 duration-300 relative group min-h-[140px]">
+            <div className="min-w-[220px] bg-white rounded-[20px] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-slate-100 flex flex-col justify-between transition-all hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 duration-300 relative group min-h-[140px]">
 
                 {/* Menu Action */}
                 <div className="absolute top-3 right-3 z-10" ref={menuRef}>

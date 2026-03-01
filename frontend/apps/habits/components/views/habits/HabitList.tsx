@@ -10,7 +10,7 @@ export const HabitList: React.FC = () => {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
 
     return (
-        <div className="col-span-12 lg:col-span-6 bg-white rounded-[24px] p-6 h-full flex flex-col overflow-hidden shadow-sm border border-neutral-100">
+        <div className="col-span-12 lg:col-span-6 bg-white rounded-[24px] p-6 h-full flex flex-col overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.08)] border-none">
             <div className="flex items-center justify-between mb-6 shrink-0 pr-2">
                 <h2 className="text-[12px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-2">
                     Active Habits <span className="bg-[#F4F5F7] text-neutral-600 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">{activeHabits.length}</span>
