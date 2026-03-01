@@ -7,9 +7,10 @@ export const TodayDashboard: React.FC = () => {
 
     const completed = todayOverview?.completedCount ?? 0;
     const total = todayOverview?.scheduledCount ?? 0;
-    const percentage = todayOverview?.completionRate != null
+    const rawPercentage = todayOverview?.completionRate != null
         ? Math.round(todayOverview.completionRate * 100)
         : (total === 0 ? 0 : Math.round((completed / total) * 100));
+    const percentage = Math.max(0, Math.min(100, rawPercentage));
     const isRestDay = todayOverview?.isRestDay ?? false;
 
     return (
