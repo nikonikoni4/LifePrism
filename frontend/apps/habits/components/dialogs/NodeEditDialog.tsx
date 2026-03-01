@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Type, Link as LinkIcon } from 'lucide-react';
+import { X, Type, Link as LinkIcon, Clock } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { HabitChainNode } from '../../types/entities';
 import { useChainStore } from '../../hooks/useChainStore';
 import { useHabitStore } from '../../hooks/useHabitStore';
+import { toast } from '../../../../core/components';
 
 interface NodeEditDialogProps {
     isOpen: boolean;
@@ -18,6 +19,7 @@ interface NodeEditDialogProps {
 interface NodeFormData {
     name: string;
     habitId: string;
+    triggerTime: string;
 }
 
 export const NodeEditDialog: React.FC<NodeEditDialogProps> = ({
@@ -27,6 +29,16 @@ export const NodeEditDialog: React.FC<NodeEditDialogProps> = ({
     node,
     insertAfterNodeId
 }) => {
+    const normalizeTimeValue = (value?: string | null): string => {
+        if (!value) return '';
+        if (/^\d{2}:\d{2}$/.test(value)) return value;
+        const date = new Date(value);
+        if (!Number.isNaN(date.getTime())) {
+            return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        }
+        return '';
+    };
+
     const { addNode, updateNode } = useChainStore();
     const { activeHabits } = useHabitStore();
     const isEditMode = !!node;
@@ -41,23 +53,24 @@ export const NodeEditDialog: React.FC<NodeEditDialogProps> = ({
     } = useForm<NodeFormData>({
         defaultValues: {
             name: '',
-            habitId: ''
+            habitId: '',
+            triggerTime: ''
         }
     });
-
-    const selectedHabitId = watch('habitId');
 
     useEffect(() => {
         if (isOpen) {
             if (node) {
                 reset({
                     name: node.name,
-                    habitId: node.habitId || ''
+                    habitId: node.habitId || '',
+                    triggerTime: normalizeTimeValue(node.triggerTime)
                 });
             } else {
                 reset({
                     name: '',
-                    habitId: ''
+                    habitId: '',
+                    triggerTime: ''
                 });
             }
         }
@@ -67,6 +80,7 @@ export const NodeEditDialog: React.FC<NodeEditDialogProps> = ({
         const payload = {
             name: data.name,
             habitId: data.habitId || null,
+            triggerTime: data.triggerTime || null,
         };
         try {
             if (isEditMode) {
@@ -80,6 +94,7 @@ export const NodeEditDialog: React.FC<NodeEditDialogProps> = ({
             onClose();
         } catch (error) {
             console.error("Failed to save chain node", error);
+            toast.error(error instanceof Error ? error.message : (isEditMode ? '保存节点失败' : '添加节点失败'));
         }
     };
 
@@ -96,12 +111,12 @@ export const NodeEditDialog: React.FC<NodeEditDialogProps> = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-0"
+                    className="fixed inset-0 z-[9999] isolate flex items-center justify-center p-4 sm:p-0"
                     onKeyDown={handleKeyDown}
                     tabIndex={-1}
                 >
                     <div
-                        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                        className="absolute inset-0 z-0 bg-slate-900/40 backdrop-blur-sm"
                         onClick={onClose}
                     />
 
@@ -110,7 +125,7 @@ export const NodeEditDialog: React.FC<NodeEditDialogProps> = ({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                        className="relative w-full max-w-[400px] bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col"
+                        className="relative z-10 w-full max-w-[400px] bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -140,6 +155,20 @@ export const NodeEditDialog: React.FC<NodeEditDialogProps> = ({
                                     placeholder="例如：刷牙、冥想..."
                                 />
                                 {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
+                            </div>
+
+                            {/* Trigger Time */}
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                                    <Clock size={16} className="text-amber-500" />
+                                    Trigger Time (Optional)
+                                </label>
+                                <input
+                                    type="time"
+                                    {...register('triggerTime')}
+                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 text-slate-700"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Used for timeline ordering validation; leave empty to skip.</p>
                             </div>
 
                             {/* Habit Binding */}

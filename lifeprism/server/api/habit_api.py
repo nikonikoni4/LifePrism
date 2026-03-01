@@ -308,6 +308,11 @@ async def create_node(chain_id: int, req: CreateNodeRequest):
             status_code=404,
             detail={"error_code": "CHAIN_NOT_FOUND", "message": "Chain not found"},
         )
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"error_code": "CHAIN_NODE_VALIDATION_FAILED", "message": str(e)},
+        )
 
 
 @router.patch("/chains/{chain_id}/nodes/{node_id}")
@@ -325,6 +330,11 @@ async def update_node(chain_id: int, node_id: int, req: UpdateNodeRequest):
         raise HTTPException(
             status_code=404,
             detail={"error_code": "NODE_NOT_FOUND", "message": "Node not found"},
+        )
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"error_code": "CHAIN_NODE_VALIDATION_FAILED", "message": str(e)},
         )
 
 

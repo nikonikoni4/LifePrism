@@ -5,6 +5,7 @@ import { X, Clock } from 'lucide-react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { HabitChain } from '../../types/entities';
 import { useChainStore } from '../../hooks/useChainStore';
+import { toast } from '../../../../core/components';
 
 interface NodeTimeDialogProps {
     isOpen: boolean;
@@ -32,8 +33,7 @@ export const NodeTimeDialog: React.FC<NodeTimeDialogProps> = ({
         register,
         handleSubmit,
         reset,
-        control,
-        formState: { errors }
+        control
     } = useForm<NodeTimeForm>({
         defaultValues: {
             showInTimeline: true,
@@ -96,6 +96,7 @@ export const NodeTimeDialog: React.FC<NodeTimeDialogProps> = ({
             onClose();
         } catch (error) {
             console.error("Failed to update chain nodes times", error);
+            toast.error(error instanceof Error ? error.message : '保存时间线设置失败');
         }
     };
 
@@ -106,19 +107,19 @@ export const NodeTimeDialog: React.FC<NodeTimeDialogProps> = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-0"
+                    className="fixed inset-0 z-[9999] isolate flex items-center justify-center p-4 sm:p-0"
                 >
                     <div
-                        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                        className="absolute inset-0 z-0 bg-slate-900/50"
                         onClick={onClose}
                     />
 
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                        className="relative w-full max-w-[480px] bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
+                        className="relative z-10 w-full max-w-[480px] bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}

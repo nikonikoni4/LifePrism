@@ -141,15 +141,15 @@ export const SettlementDialog: React.FC = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-0"
+                    className="fixed inset-0 z-[9999] isolate flex items-center justify-center p-4 sm:p-0"
                 >
-                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={handleClose} />
+                    <div className="absolute inset-0 z-0 bg-slate-900/40 backdrop-blur-sm" onClick={handleClose} />
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                        className="relative w-full max-w-[500px] bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]"
+                        className="relative z-10 w-full max-w-[500px] bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {backfillState ? (
