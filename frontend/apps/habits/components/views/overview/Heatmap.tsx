@@ -8,24 +8,23 @@ const rateToLevel = (item: HeatmapDayItem): number => {
     if (item.isRestDay) return 0;
     const rate = item.completionRate ?? 0;
     if (rate === 0) return 0;
-    if (rate < 0.25) return 1;
-    if (rate < 0.5) return 2;
-    if (rate < 0.75) return 3;
-    if (rate < 1) return 4;
-    return 5;
+    if (rate < 0.35) return 1;
+    if (rate < 0.6) return 2;
+    if (rate < 0.85) return 3;
+    return 4;
 };
 
 const levelColors: Record<number, string> = {
-    0: 'bg-slate-100',
+    0: 'bg-slate-200',
     1: 'bg-emerald-100',
     2: 'bg-emerald-200',
     3: 'bg-emerald-300',
-    4: 'bg-emerald-400',
-    5: 'bg-emerald-500',
+    4: 'bg-emerald-500',
 };
 
 export const Heatmap: React.FC = () => {
     const { heatmapData } = useStatsStore();
+    const hasHeatmapData = heatmapData.length > 0;
 
     // 构建 12 周 × 7 天的网格（按列优先：每列=一周，每行=周几）
     const grid = useMemo(() => {
@@ -59,14 +58,29 @@ export const Heatmap: React.FC = () => {
                     <ArrowRight size={14} className="text-neutral-400 -rotate-45" />
                 </div>
             </div>
-            <div className="grid grid-flow-col grid-rows-7 gap-[4px] inline-grid self-start md:mx-auto">
-                {grid.map((level, i) => (
-                    <div
-                        key={i}
-                        className={`w-[11px] h-[11px] rounded-[3px] border border-black/[0.03] ${levelColors[level] || 'bg-slate-50'}`}
-                    />
-                ))}
-            </div>
+            {!hasHeatmapData ? (
+                <div className="flex-1 flex items-center justify-center">
+                    <p className="text-[13px] text-slate-500 font-medium">暂无记录</p>
+                </div>
+            ) : (
+                <div className="flex flex-col gap-3">
+                    <div className="grid grid-flow-col grid-rows-7 gap-[4px] inline-grid self-start md:mx-auto">
+                        {grid.map((level, i) => (
+                            <div
+                                key={i}
+                                className={`w-[11px] h-[11px] rounded-[3px] border border-black/[0.03] ${levelColors[level] || 'bg-slate-200'}`}
+                            />
+                        ))}
+                    </div>
+                    <div className="flex items-center justify-end gap-1.5 text-[10px] text-slate-500 font-medium">
+                        <span>低</span>
+                        {[0, 1, 2, 3, 4].map(level => (
+                            <span key={level} className={`w-2.5 h-2.5 rounded-[2px] ${levelColors[level]}`} />
+                        ))}
+                        <span>高</span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
