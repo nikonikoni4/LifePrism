@@ -55,11 +55,47 @@ def count_scheduled_days_in_range(start: date, end: date, freq: FrequencyObject)
 # Streak 计算核心
 # ============================================================================
 
+def _get_daily_anchor_date(checkin_dates: set, challenge_start: date, today: date) -> Optional[date]:
+    """daily 连续段锚点：今日已打卡用 today，否则从 yesterday 回溯。"""
+    if today.isoformat() in checkin_dates:
+        anchor = today
+    else:
+        anchor = today - timedelta(days=1)
+    if anchor < challenge_start:
+        return None
+    return anchor
+
+
+def _has_daily_gap_between_first_checkin_and_anchor(
+    checkin_dates: set, challenge_start: date, anchor: date
+) -> bool:
+    """若在 [首次打卡日, 锚点] 内存在漏打卡日，则视为断链（旧 streak_base 失效）。"""
+    checkin_days = sorted(
+        date.fromisoformat(d)
+        for d in checkin_dates
+        if challenge_start <= date.fromisoformat(d) <= anchor
+    )
+    if not checkin_days:
+        return True
+
+    first_checkin = checkin_days[0]
+    current = first_checkin
+    while current <= anchor:
+        if current.isoformat() not in checkin_dates:
+            return True
+        current += timedelta(days=1)
+    return False
+
+
 def calculate_daily_streak(checkin_dates: set, challenge: dict, today: date) -> int:
-    """逐天判定 streak（适用于 daily 频率）"""
+    """逐天判定 streak（适用于 daily 频率）。"""
     challenge_start = date.fromisoformat(challenge["start_date"])
+    anchor = _get_daily_anchor_date(checkin_dates, challenge_start, today)
+    if anchor is None:
+        return 0
+
     streak = 0
-    current = today
+    current = anchor
     while current >= challenge_start:
         if current.isoformat() in checkin_dates:
             streak += 1
@@ -102,7 +138,17 @@ def get_habit_streak(habit_id: str, freq: FrequencyObject, challenge: Optional[d
     checkin_set = set(checkin_list)
     streak_base = challenge.get("streak_base") or 0
     if freq.type == "daily":
+        challenge_start = date.fromisoformat(challenge["start_date"])
+        anchor = _get_daily_anchor_date(checkin_set, challenge_start, today)
         current = calculate_daily_streak(checkin_set, challenge, today)
+        if current <= 0:
+            return 0
+
+        # daily 出现“中间断链”后，旧 streak_base 失效，只保留当前连续段。
+        if anchor is not None and _has_daily_gap_between_first_checkin_and_anchor(
+            checkin_set, challenge_start, anchor
+        ):
+            return current
     else:
         current = calculate_weekly_streak(checkin_set, challenge, freq, today)
     return streak_base + current

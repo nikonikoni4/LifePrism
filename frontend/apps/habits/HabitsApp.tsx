@@ -7,6 +7,7 @@ import { ChainProvider, useChainStore } from './hooks/useChainStore';
 import { TimelineProvider } from './hooks/useTimelineStore';
 import { SettlementProvider, useSettlementStore } from './hooks/useSettlementStore';
 import { StatsProvider, useStatsStore } from './hooks/useStatsStore';
+import { MindspaceProvider } from './hooks/useMindspaceStore';
 
 // View Components
 import { TodayDashboard } from './components/views/overview/TodayDashboard';
@@ -90,11 +91,13 @@ export const HabitsApp: React.FC = () => {
             <ChainProvider>
                 <SettlementProvider>
                     <StatsProvider>
-                        <HabitWithSettlementBridge>
-                            <TimelineProvider>
-                                <HabitsAppContent />
-                            </TimelineProvider>
-                        </HabitWithSettlementBridge>
+                        <MindspaceProvider>
+                            <HabitWithSettlementBridge>
+                                <TimelineProvider>
+                                    <HabitsAppContent />
+                                </TimelineProvider>
+                            </HabitWithSettlementBridge>
+                        </MindspaceProvider>
                     </StatsProvider>
                 </SettlementProvider>
             </ChainProvider>

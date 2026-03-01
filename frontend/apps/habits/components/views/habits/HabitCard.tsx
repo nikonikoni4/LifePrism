@@ -6,6 +6,8 @@ import { useHabitStore } from '../../../hooks/useHabitStore';
 import { useToast } from '../../shared/Toast';
 import { HabitFormDialog } from '../../dialogs/HabitFormDialog';
 import { HabitHistoryDialog } from '../../dialogs/HabitHistoryDialog';
+import { useMindspaceStore } from '../../../hooks/useMindspaceStore';
+import { Gem, Shield } from 'lucide-react';
 
 interface HabitCardProps {
     habit: Habit;
@@ -18,6 +20,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+    const { values, commitments } = useMindspaceStore();
+    const valueKeyword = habit.valueId ? values.find(v => v.id === habit.valueId)?.keyword : null;
+    const commitmentContent = habit.commitmentId ? commitments.find(c => c.id === habit.commitmentId)?.content : null;
 
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +89,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
 
     return (
         <>
-            <div className="min-w-[220px] bg-slate-50 rounded-[20px] p-4 border border-neutral-100 flex flex-col justify-between transition-transform hover:-translate-y-0.5 hover:bg-slate-100 duration-300 relative group h-[140px]">
+            <div className="min-w-[220px] bg-slate-50 rounded-[20px] p-4 border border-neutral-100 flex flex-col justify-between transition-transform hover:-translate-y-0.5 hover:bg-slate-100 duration-300 relative group min-h-[140px]">
 
                 {/* Menu Action */}
                 <div className="absolute top-3 right-3 z-10" ref={menuRef}>
@@ -134,20 +140,38 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                     </div>
 
                     {/* Pill Tags inline */}
-                    <div className="flex items-center flex-wrap gap-1.5 mb-1 h-[22px] overflow-hidden">
-                        <span className="bg-[#F4F5F7] px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wide text-neutral-500 uppercase">
-                            {freqText}
-                        </span>
-                        {habit.streak > 0 && (
-                            <span className="flex items-center gap-1 text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md tracking-wide">
-                                <Flame size={10} className="fill-amber-500" strokeWidth={2} /> {habit.streak}
+                    <div className="flex flex-col gap-1.5 mb-1 h-auto overflow-hidden">
+                        <div className="flex flex-wrap gap-1.5">
+                            <span className="flex items-center bg-[#F4F5F7] px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wide text-neutral-500 uppercase">
+                                {freqText}
                             </span>
-                        )}
-                        {habit.anchorInfo && (
-                            <span className="flex items-center gap-1 text-blue-600 bg-blue-50/60 px-2.5 py-0.5 rounded-md text-[9px] font-bold truncate max-w-[120px]">
-                                <Anchor size={10} strokeWidth={2.5} className="flex-shrink-0" />
-                                <span className="truncate">{habit.anchorInfo.triggerTime || ''} {habit.anchorInfo.nodeName}</span>
-                            </span>
+                            {habit.streak > 0 && (
+                                <span className="flex items-center gap-1 text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md tracking-wide">
+                                    <Flame size={10} className="fill-amber-500" strokeWidth={2} /> {habit.streak}
+                                </span>
+                            )}
+                            {habit.anchorInfo && (
+                                <span className="flex items-center gap-1 text-blue-600 bg-blue-50/60 px-2 py-0.5 rounded-full text-[9px] font-bold truncate max-w-[120px]">
+                                    <Anchor size={10} strokeWidth={2.5} className="flex-shrink-0" />
+                                    <span className="truncate">{habit.anchorInfo.triggerTime || ''} {habit.anchorInfo.nodeName}</span>
+                                </span>
+                            )}
+                        </div>
+                        {(valueKeyword || commitmentContent) && (
+                            <div className="flex flex-wrap gap-1.5">
+                                {valueKeyword && (
+                                    <span className="flex items-center gap-1 text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full text-[9px] font-bold truncate max-w-[100px]" title={valueKeyword}>
+                                        <Gem size={10} strokeWidth={2.5} className="flex-shrink-0" />
+                                        <span className="truncate">{valueKeyword}</span>
+                                    </span>
+                                )}
+                                {commitmentContent && (
+                                    <span className="flex items-center gap-1 text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full text-[9px] font-bold truncate max-w-[140px]" title={commitmentContent}>
+                                        <Shield size={10} strokeWidth={2.5} className="flex-shrink-0" />
+                                        <span className="truncate">{commitmentContent}</span>
+                                    </span>
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>

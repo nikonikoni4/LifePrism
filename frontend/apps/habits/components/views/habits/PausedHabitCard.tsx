@@ -5,6 +5,8 @@ import { useHabitStore } from '../../../hooks/useHabitStore';
 import { useToast } from '../../shared/Toast';
 import { HabitFormDialog } from '../../dialogs/HabitFormDialog';
 import { HabitHistoryDialog } from '../../dialogs/HabitHistoryDialog';
+import { useMindspaceStore } from '../../../hooks/useMindspaceStore';
+import { Gem, Shield } from 'lucide-react';
 
 interface PausedHabitCardProps {
     habit: Habit;
@@ -17,6 +19,10 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+    const { values, commitments } = useMindspaceStore();
+    const valueKeyword = habit.valueId ? values.find(v => v.id === habit.valueId)?.keyword : null;
+    const commitmentContent = habit.commitmentId ? commitments.find(c => c.id === habit.commitmentId)?.content : null;
 
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -52,7 +58,7 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
 
     return (
         <>
-            <div className="bg-[#F4F5F7]/50 border border-dashed border-neutral-300 rounded-[20px] p-4 flex flex-col justify-center h-[140px] group relative hover:bg-[#F4F5F7] hover:border-neutral-400 transition-colors">
+            <div className="bg-[#F4F5F7]/50 border border-dashed border-neutral-300 rounded-[20px] p-4 flex flex-col justify-center min-h-[140px] group relative hover:bg-[#F4F5F7] hover:border-neutral-400 transition-colors">
 
                 {/* Menu Action */}
                 <div className="absolute top-3 right-3 z-10" ref={menuRef}>
@@ -96,13 +102,31 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
                 <div className="flex justify-between items-center mb-3 pr-6">
                     <h3 className="text-[14px] font-bold text-neutral-400 line-through decoration-neutral-300 truncate">{habit.name}</h3>
                 </div>
-                <div className="flex items-center gap-2 mt-auto">
-                    <span className="bg-white text-neutral-400 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wide uppercase border border-neutral-200">Paused</span>
-                    <button
-                        onClick={handleResume}
-                        className="text-[10px] font-bold text-neutral-400 ml-auto flex items-center gap-1 hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Play size={10} className="fill-current mr-1" /> Resume
-                    </button>
+                <div className="flex flex-col gap-1.5 mt-auto w-full">
+                    {(valueKeyword || commitmentContent) && (
+                        <div className="flex flex-wrap gap-1.5 overflow-hidden">
+                            {valueKeyword && (
+                                <span className="flex items-center gap-1 text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-full text-[9px] font-bold truncate max-w-[80px]" title={valueKeyword}>
+                                    <Gem size={10} strokeWidth={2.5} className="flex-shrink-0" />
+                                    <span className="truncate">{valueKeyword}</span>
+                                </span>
+                            )}
+                            {commitmentContent && (
+                                <span className="flex items-center gap-1 text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-full text-[9px] font-bold truncate max-w-[100px]" title={commitmentContent}>
+                                    <Shield size={10} strokeWidth={2.5} className="flex-shrink-0" />
+                                    <span className="truncate">{commitmentContent}</span>
+                                </span>
+                            )}
+                        </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                        <span className="bg-white text-neutral-400 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wide uppercase border border-neutral-200 flex-shrink-0">Paused</span>
+                        <button
+                            onClick={handleResume}
+                            className="text-[10px] font-bold text-neutral-400 ml-auto flex items-center gap-1 hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Play size={10} className="fill-current mr-1" /> Resume
+                        </button>
+                    </div>
                 </div>
             </div>
 
