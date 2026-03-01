@@ -23,20 +23,19 @@ class HabitCheckinProvider(LWBaseDataProvider):
         若 UNIQUE(habit_id, date) 冲突（重复打卡），返回 None。
         """
         checkin_id = _generate_checkin_id()
-        now = datetime.now().isoformat()
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:
             with self.db.get_connection() as conn:
                 conn.execute(
                     """INSERT INTO habit_checkins
-                    (id, habit_id, challenge_id, date, completed_at, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)""",
+                    (id, habit_id, challenge_id, date, completed_at)
+                    VALUES (?, ?, ?, ?, ?)""",
                     (
                         checkin_id,
                         data["habit_id"],
                         data["challenge_id"],
                         data["date"],
-                        data.get("completed_at", now),
-                        now,
+                        data.get("completed_at", now_str),
                     ),
                 )
             return checkin_id

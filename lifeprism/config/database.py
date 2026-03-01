@@ -1349,6 +1349,110 @@ SCHEMA_VERSION_CONFIG = {
 }
 
 
+HABITS_CONFIG = {
+    'table_name': 'habits',
+    'columns': {
+        'id': {'type': 'TEXT', 'constraints': ['PRIMARY KEY'], 'comment': '习惯唯一标识'},
+        'name': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '习惯名称'},
+        'description': {'type': 'TEXT', 'constraints': [], 'comment': '习惯描述'},
+        'frequency_type': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': "频率类型: 'daily'|'weekly'"},
+        'frequency_config': {'type': 'TEXT', 'constraints': [], 'comment': 'JSON 存储额外频率配置（如 weekDays 数组）'},
+        'current_level': {'type': 'INTEGER', 'constraints': ['DEFAULT 0'], 'comment': '当前等级 0-4'},
+        'status': {'type': 'TEXT', 'constraints': ["DEFAULT 'active'"], 'comment': "'active'|'paused'"},
+        'value_id': {'type': 'TEXT', 'constraints': [], 'comment': '关联价值ID（可空）'},
+        'commitment_id': {'type': 'TEXT', 'constraints': [], 'comment': '关联承诺ID（可空）'},
+        'paused_at': {'type': 'TEXT', 'constraints': [], 'comment': '暂停时间（可空）'},
+    },
+    'table_constraints': [],
+    'indexes': [],
+    'timestamps': True,
+    'update_at': True,
+}
+
+HABIT_CHALLENGES_CONFIG = {
+    'table_name': 'habit_challenges',
+    'columns': {
+        'id': {'type': 'TEXT', 'constraints': ['PRIMARY KEY'], 'comment': '挑战唯一标识'},
+        'habit_id': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '所属习惯ID'},
+        'challenge_weeks': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '挑战周数'},
+        'required_completions': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '最低完成次数'},
+        'from_level': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '起始等级'},
+        'to_level': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '目标等级'},
+        'start_date': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '开始日期 YYYY-MM-DD'},
+        'end_date': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '结束日期 YYYY-MM-DD'},
+        'completed_count': {'type': 'INTEGER', 'constraints': ['DEFAULT 0'], 'comment': '已完成次数'},
+        'streak_base': {'type': 'INTEGER', 'constraints': ['DEFAULT 0'], 'comment': 'Streak基数（上次挑战遗留）'},
+        'status': {'type': 'TEXT', 'constraints': ["DEFAULT 'in_progress'"], 'comment': "'in_progress'|'succeeded'|'failed'|'cancelled'"},
+        'finished_at': {'type': 'TEXT', 'constraints': [], 'comment': '结束时间（可空）'},
+    },
+    'table_constraints': [
+        'FOREIGN KEY (habit_id) REFERENCES habits(id)',
+    ],
+    'indexes': [
+        {'name': 'idx_challenges_habit_id', 'columns': ['habit_id']},
+    ],
+    'timestamps': True,
+    'update_at': True,
+}
+
+HABIT_CHECKINS_CONFIG = {
+    'table_name': 'habit_checkins',
+    'columns': {
+        'id': {'type': 'TEXT', 'constraints': ['PRIMARY KEY'], 'comment': '打卡记录唯一标识'},
+        'habit_id': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '关联习惯ID'},
+        'challenge_id': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '所属挑战ID'},
+        'date': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '打卡日期 YYYY-MM-DD'},
+        'completed_at': {'type': 'TEXT', 'constraints': [], 'comment': '实际完成时间戳（可空）'},
+    },
+    'table_constraints': [
+        'FOREIGN KEY (habit_id) REFERENCES habits(id)',
+        'FOREIGN KEY (challenge_id) REFERENCES habit_challenges(id)',
+        'UNIQUE(habit_id, date)',
+    ],
+    'indexes': [
+        {'name': 'idx_checkins_habit_date', 'columns': ['habit_id', 'date']},
+    ],
+    'timestamps': True,
+    'update_at': False,
+}
+
+HABIT_CHAINS_CONFIG = {
+    'table_name': 'habit_chains',
+    'columns': {
+        'id': {'type': 'INTEGER', 'constraints': ['PRIMARY KEY AUTOINCREMENT'], 'comment': '链条自增ID'},
+        'name': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '链条名称'},
+        'description': {'type': 'TEXT', 'constraints': [], 'comment': '链条描述（可空）'},
+        'show_in_timeline': {'type': 'INTEGER', 'constraints': ['DEFAULT 0'], 'comment': '0=不显示, 1=在Timeline展示'},
+    },
+    'table_constraints': [],
+    'indexes': [],
+    'timestamps': True,
+    'update_at': True,
+}
+
+HABIT_CHAIN_NODES_CONFIG = {
+    'table_name': 'habit_chain_nodes',
+    'columns': {
+        'id': {'type': 'INTEGER', 'constraints': ['PRIMARY KEY AUTOINCREMENT'], 'comment': '节点自增ID'},
+        'chain_id': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '所属链条ID'},
+        'sort_order': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '排序顺序（从1开始）'},
+        'name': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '节点名称'},
+        'habit_id': {'type': 'TEXT', 'constraints': [], 'comment': '关联习惯ID（NULL=纯锚点节点）'},
+        'trigger_time': {'type': 'TEXT', 'constraints': [], 'comment': '触发时间 HH:mm（可空）'},
+    },
+    'table_constraints': [
+        'FOREIGN KEY (chain_id) REFERENCES habit_chains(id) ON DELETE CASCADE',
+        'FOREIGN KEY (habit_id) REFERENCES habits(id)',
+    ],
+    'indexes': [
+        {'name': 'idx_chain_nodes_chain_id', 'columns': ['chain_id']},
+        {'name': 'idx_chain_nodes_habit_id', 'columns': ['habit_id']},
+    ],
+    'timestamps': True,
+    'update_at': True,
+}
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     'category_map_cache': category_map_cache_CONFIG,
@@ -1378,108 +1482,11 @@ TABLE_CONFIGS = {
     'user_values': USER_VALUES_CONFIG,
     'commitments': COMMITMENTS_CONFIG,
     'schema_version': SCHEMA_VERSION_CONFIG,
-    'habits': {
-        'table_name': 'habits',
-        'columns': {
-            'id': {'type': 'TEXT', 'constraints': ['PRIMARY KEY'], 'comment': '习惯唯一标识'},
-            'name': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '习惯名称'},
-            'description': {'type': 'TEXT', 'constraints': [], 'comment': '习惯描述'},
-            'frequency_type': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': "频率类型: 'daily'|'weekly'"},
-            'frequency_config': {'type': 'TEXT', 'constraints': [], 'comment': 'JSON 存储额外频率配置（如 weekDays 数组）'},
-            'current_level': {'type': 'INTEGER', 'constraints': ['DEFAULT 0'], 'comment': '当前等级 0-4'},
-            'status': {'type': 'TEXT', 'constraints': ["DEFAULT 'active'"], 'comment': "'active'|'paused'"},
-            'value_id': {'type': 'TEXT', 'constraints': [], 'comment': '关联价值ID（可空）'},
-            'commitment_id': {'type': 'TEXT', 'constraints': [], 'comment': '关联承诺ID（可空）'},
-            'created_at': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '创建时间 ISO8601'},
-            'updated_at': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '更新时间 ISO8601'},
-            'paused_at': {'type': 'TEXT', 'constraints': [], 'comment': '暂停时间（可空）'},
-        },
-        'table_constraints': [],
-        'indexes': [],
-        'timestamps': False,
-    },
-    'habit_challenges': {
-        'table_name': 'habit_challenges',
-        'columns': {
-            'id': {'type': 'TEXT', 'constraints': ['PRIMARY KEY'], 'comment': '挑战唯一标识'},
-            'habit_id': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '所属习惯ID'},
-            'challenge_weeks': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '挑战周数'},
-            'required_completions': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '最低完成次数'},
-            'from_level': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '起始等级'},
-            'to_level': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '目标等级'},
-            'start_date': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '开始日期 YYYY-MM-DD'},
-            'end_date': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '结束日期 YYYY-MM-DD'},
-            'completed_count': {'type': 'INTEGER', 'constraints': ['DEFAULT 0'], 'comment': '已完成次数'},
-            'streak_base': {'type': 'INTEGER', 'constraints': ['DEFAULT 0'], 'comment': 'Streak基数（上次挑战遗留）'},
-            'status': {'type': 'TEXT', 'constraints': ["DEFAULT 'in_progress'"], 'comment': "'in_progress'|'succeeded'|'failed'|'cancelled'"},
-            'finished_at': {'type': 'TEXT', 'constraints': [], 'comment': '结束时间（可空）'},
-            'created_at': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '创建时间'},
-            'updated_at': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '更新时间 ISO8601'},
-        },
-        'table_constraints': [
-            'FOREIGN KEY (habit_id) REFERENCES habits(id)',
-        ],
-        'indexes': [
-            {'name': 'idx_challenges_habit_id', 'columns': ['habit_id']},
-        ],
-        'timestamps': False,
-    },
-    'habit_checkins': {
-        'table_name': 'habit_checkins',
-        'columns': {
-            'id': {'type': 'TEXT', 'constraints': ['PRIMARY KEY'], 'comment': '打卡记录唯一标识'},
-            'habit_id': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '关联习惯ID'},
-            'challenge_id': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '所属挑战ID'},
-            'date': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '打卡日期 YYYY-MM-DD'},
-            'completed_at': {'type': 'TEXT', 'constraints': [], 'comment': '实际完成时间戳（可空）'},
-            'created_at': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '记录创建时间'},
-        },
-        'table_constraints': [
-            'FOREIGN KEY (habit_id) REFERENCES habits(id)',
-            'FOREIGN KEY (challenge_id) REFERENCES habit_challenges(id)',
-            'UNIQUE(habit_id, date)',
-        ],
-        'indexes': [
-            {'name': 'idx_checkins_habit_date', 'columns': ['habit_id', 'date']},
-        ],
-        'timestamps': False,
-    },
-    'habit_chains': {
-        'table_name': 'habit_chains',
-        'columns': {
-            'id': {'type': 'INTEGER', 'constraints': ['PRIMARY KEY AUTOINCREMENT'], 'comment': '链条自增ID'},
-            'name': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '链条名称'},
-            'description': {'type': 'TEXT', 'constraints': [], 'comment': '链条描述（可空）'},
-            'show_in_timeline': {'type': 'INTEGER', 'constraints': ['DEFAULT 0'], 'comment': '0=不显示, 1=在Timeline展示'},
-            'created_at': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '创建时间'},
-            'updated_at': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '更新时间'},
-        },
-        'table_constraints': [],
-        'indexes': [],
-        'timestamps': False,
-    },
-    'habit_chain_nodes': {
-        'table_name': 'habit_chain_nodes',
-        'columns': {
-            'id': {'type': 'INTEGER', 'constraints': ['PRIMARY KEY AUTOINCREMENT'], 'comment': '节点自增ID'},
-            'chain_id': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '所属链条ID'},
-            'sort_order': {'type': 'INTEGER', 'constraints': ['NOT NULL'], 'comment': '排序顺序（从1开始）'},
-            'name': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '节点名称'},
-            'habit_id': {'type': 'TEXT', 'constraints': [], 'comment': '关联习惯ID（NULL=纯锚点节点）'},
-            'trigger_time': {'type': 'TEXT', 'constraints': [], 'comment': '触发时间 HH:mm（可空）'},
-            'created_at': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '创建时间'},
-            'updated_at': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '更新时间'},
-        },
-        'table_constraints': [
-            'FOREIGN KEY (chain_id) REFERENCES habit_chains(id) ON DELETE CASCADE',
-            'FOREIGN KEY (habit_id) REFERENCES habits(id)',
-        ],
-        'indexes': [
-            {'name': 'idx_chain_nodes_chain_id', 'columns': ['chain_id']},
-            {'name': 'idx_chain_nodes_habit_id', 'columns': ['habit_id']},
-        ],
-        'timestamps': False,
-    },
+    'habits': HABITS_CONFIG,
+    'habit_challenges': HABIT_CHALLENGES_CONFIG,
+    'habit_checkins': HABIT_CHECKINS_CONFIG,
+    'habit_chains': HABIT_CHAINS_CONFIG,
+    'habit_chain_nodes': HABIT_CHAIN_NODES_CONFIG,
 }
 
 

@@ -29,15 +29,13 @@ class HabitChallengeProvider(LWBaseDataProvider):
             新生成的 challenge_id（格式：challenge-xxxxxxxx）
         """
         challenge_id = _generate_challenge_id()
-        now = datetime.now().isoformat()
         with self.db.get_connection() as conn:
             conn.execute(
                 """INSERT INTO habit_challenges
                 (id, habit_id, challenge_weeks, required_completions,
                  from_level, to_level, start_date, end_date,
-                 completed_count, streak_base, status, finished_at,
-                 created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                 completed_count, streak_base, status, finished_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     challenge_id,
                     data["habit_id"],
@@ -51,8 +49,6 @@ class HabitChallengeProvider(LWBaseDataProvider):
                     data.get("streak_base", 0),
                     data.get("status", "in_progress"),
                     data.get("finished_at"),
-                    now,
-                    now,
                 ),
             )
         logger.info(f"创建挑战成功: {challenge_id} (habit_id={data['habit_id']})")
@@ -124,7 +120,7 @@ class HabitChallengeProvider(LWBaseDataProvider):
         filtered = {k: v for k, v in update_data.items() if k in allowed_fields}
         if not filtered:
             return True
-        filtered["updated_at"] = datetime.now().isoformat()
+        filtered["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         set_clause = ", ".join(f"{k} = ?" for k in filtered)
         values = list(filtered.values()) + [challenge_id]
         with self.db.get_connection() as conn:

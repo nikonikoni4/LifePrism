@@ -47,14 +47,13 @@ class HabitProvider(LWBaseDataProvider):
     def create_habit(self, data: Dict[str, Any]) -> str:
         """创建习惯，返回新生成的 habit_id"""
         habit_id = generate_id("habit")
-        now = datetime.now().isoformat()
         with self.db.get_connection() as conn:
             conn.execute(
                 """INSERT INTO habits
                 (id, name, description, frequency_type, frequency_config,
                  current_level, status, value_id, commitment_id,
-                 created_at, updated_at, paused_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                 paused_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     habit_id,
                     data["name"],
@@ -65,7 +64,7 @@ class HabitProvider(LWBaseDataProvider):
                     data.get("status", "active"),
                     data.get("value_id"),
                     data.get("commitment_id"),
-                    now, now, None,
+                    None,
                 ),
             )
         return habit_id
@@ -82,7 +81,7 @@ class HabitProvider(LWBaseDataProvider):
         filtered = {k: v for k, v in update_data.items() if k in allowed_fields}
         if not filtered:
             return True
-        filtered["updated_at"] = datetime.now().isoformat()
+        filtered["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         set_clause = ", ".join(f"{k} = ?" for k in filtered)
         values = list(filtered.values()) + [habit_id]
         with self.db.get_connection() as conn:

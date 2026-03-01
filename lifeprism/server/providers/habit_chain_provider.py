@@ -26,20 +26,18 @@ class HabitChainProvider(LWBaseDataProvider):
         Returns:
             新插入记录的 INTEGER 主键。
         """
-        now = datetime.now().isoformat()
         with self.db.get_connection() as conn:
             cursor = conn.execute(
-                """INSERT INTO habit_chains (name, description, show_in_timeline, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?)""",
+                """INSERT INTO habit_chains (name, description, show_in_timeline)
+                   VALUES (?, ?, ?)""",
                 (
                     data["name"],
                     data.get("description"),
                     data.get("show_in_timeline", 0),
-                    now,
-                    now,
                 ),
             )
             return cursor.lastrowid
+
 
     def get_chain_by_id(self, chain_id: int) -> Optional[Dict[str, Any]]:
         """按 ID 查询单个链条，不存在返回 None。
@@ -95,7 +93,7 @@ class HabitChainProvider(LWBaseDataProvider):
         filtered = {k: v for k, v in update_data.items() if k in allowed_fields}
         if not filtered:
             return True
-        filtered["updated_at"] = datetime.now().isoformat()
+        filtered["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         set_clause = ", ".join(f"{k} = ?" for k in filtered)
         values = list(filtered.values()) + [chain_id]
         with self.db.get_connection() as conn:
@@ -137,23 +135,21 @@ class HabitChainProvider(LWBaseDataProvider):
         Returns:
             新插入记录的 INTEGER 主键。
         """
-        now = datetime.now().isoformat()
         with self.db.get_connection() as conn:
             cursor = conn.execute(
                 """INSERT INTO habit_chain_nodes
-                   (chain_id, sort_order, name, habit_id, trigger_time, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                   (chain_id, sort_order, name, habit_id, trigger_time)
+                   VALUES (?, ?, ?, ?, ?)""",
                 (
                     data["chain_id"],
                     data["sort_order"],
                     data["name"],
                     data.get("habit_id"),
                     data.get("trigger_time"),
-                    now,
-                    now,
                 ),
             )
             return cursor.lastrowid
+
 
     def get_nodes_by_chain(self, chain_id: int) -> List[Dict[str, Any]]:
         """获取指定链条的所有节点，按 sort_order 升序排列。
@@ -205,7 +201,7 @@ class HabitChainProvider(LWBaseDataProvider):
         filtered = {k: v for k, v in update_data.items() if k in allowed_fields}
         if not filtered:
             return True
-        filtered["updated_at"] = datetime.now().isoformat()
+        filtered["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         set_clause = ", ".join(f"{k} = ?" for k in filtered)
         values = list(filtered.values()) + [node_id]
         with self.db.get_connection() as conn:
@@ -238,7 +234,7 @@ class HabitChainProvider(LWBaseDataProvider):
         Returns:
             True。
         """
-        now = datetime.now().isoformat()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with self.db.get_connection() as conn:
             for item in updates:
                 conn.execute(
