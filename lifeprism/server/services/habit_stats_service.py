@@ -178,7 +178,7 @@ def get_weekly_stats(today: date) -> float:
 
 def get_heatmap(today: date, days: int) -> List[Dict[str, Any]]:
     """获取过去 days 天热力图数据"""
-    habits = habit_provider.get_habits()
+    habits = habit_provider.get_habits(status="active")
     habit_ids = [h["id"] for h in habits]
     start = (today - timedelta(days=days - 1)).isoformat()
     end = today.isoformat()

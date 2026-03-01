@@ -64,7 +64,7 @@ const HabitsAppContent: React.FC = () => {
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 grid grid-cols-12 gap-3 min-h-0 overflow-hidden">
+            <div className="grid grid-cols-12 gap-3 flex-shrink-0 w-full h-[600px] xl:h-[600px]">
                 <TimelineView />
                 <HabitChainList />
                 <HabitList />
