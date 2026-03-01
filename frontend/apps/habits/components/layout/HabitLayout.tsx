@@ -6,8 +6,10 @@ interface HabitLayoutProps {
 
 export const HabitLayout: React.FC<HabitLayoutProps> = ({ children }) => {
     return (
-        <div className="bg-slate-50 text-neutral-900 font-sans h-full w-full overflow-hidden flex flex-col p-4 lg:p-6 gap-3 rounded-[32px] shadow-sm border border-neutral-100">
-            {children}
+        <div className="h-screen w-full flex justify-center py-4 px-4 sm:px-6 lg:px-8 overflow-hidden">
+            <div className="text-neutral-900 font-sans h-full w-full max-w-[1280px] overflow-hidden flex flex-col gap-3">
+                {children}
+            </div>
         </div>
     );
 };
