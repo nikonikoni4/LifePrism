@@ -10,7 +10,7 @@ type HabitFilter = 'all' | 'active' | 'paused';
 const FILTER_OPTIONS: Array<{ key: HabitFilter; label: string }> = [
     { key: 'all', label: '全部' },
     { key: 'active', label: '激活' },
-    { key: 'paused', label: '暂定' }
+    { key: 'paused', label: '暂停' }
 ];
 
 export const HabitList: React.FC = () => {
@@ -113,11 +113,11 @@ export const HabitList: React.FC = () => {
                             <section className="space-y-3">
                                 <div className="flex items-center gap-2 px-1">
                                     <span className="h-2 w-2 rounded-full bg-slate-400" />
-                                    <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-[0.03em]">暂定习惯</h3>
+                                    <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-[0.03em]">暂停习惯</h3>
                                     <span className="text-[11px] text-slate-500">{pausedHabits.length}</span>
                                 </div>
                                 {pausedHabits.length === 0 ? (
-                                    <p className="text-xs text-slate-500 px-1">暂无暂定习惯</p>
+                                    <p className="text-xs text-slate-500 px-1">无暂停习惯</p>
                                 ) : (
                                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                                         {pausedHabits.map(habit => (
