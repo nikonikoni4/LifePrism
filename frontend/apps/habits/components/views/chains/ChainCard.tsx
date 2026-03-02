@@ -106,7 +106,7 @@ export const ChainCard: React.FC<ChainCardProps> = ({ chain }) => {
                                 onClick={() => { setIsAddNodeOpen(true); setIsMenuOpen(false); }}
                                 className="w-full text-left px-3 py-2 text-xs text-emerald-600 hover:bg-emerald-50 font-medium border-t border-slate-100"
                             >
-                                <Plus size={12} className="inline mr-1" />添加节点
+                                添加节点<Plus size={12} className="inline mr-1" />
                             </button>
                             <div className="h-px bg-slate-100 my-1"></div>
                             <button

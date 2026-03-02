@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Check, GripVertical, MoreHorizontal } from 'lucide-react';
+import { Check, Clock3, GripVertical, MoreHorizontal } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { HabitChainNode } from '../../../types/entities';
@@ -11,8 +11,69 @@ interface ChainNodeProps {
     chainId: number;
 }
 
+type NodeVisualType = 'habit' | 'anchor' | 'plain';
+
+interface NodeColorTheme {
+    container: string;
+    indicator: string;
+    dot: string;
+    menuOpen: string;
+    menuHover: string;
+    menuIcon: string;
+}
+
+const NODE_COLOR_THEMES: NodeColorTheme[] = [
+    {
+        container: 'bg-emerald-50 border-emerald-200 text-emerald-900 shadow-sm shadow-emerald-100/60',
+        indicator: 'text-emerald-600',
+        dot: 'bg-emerald-400',
+        menuOpen: 'bg-emerald-100',
+        menuHover: 'hover:bg-emerald-100',
+        menuIcon: 'text-emerald-600',
+    },
+    {
+        container: 'bg-sky-50 border-sky-200 text-sky-900 shadow-sm shadow-sky-100/60',
+        indicator: 'text-sky-600',
+        dot: 'bg-sky-400',
+        menuOpen: 'bg-sky-100',
+        menuHover: 'hover:bg-sky-100',
+        menuIcon: 'text-sky-600',
+    },
+    {
+        container: 'bg-amber-50 border-amber-200 text-amber-900 shadow-sm shadow-amber-100/60',
+        indicator: 'text-amber-600',
+        dot: 'bg-amber-400',
+        menuOpen: 'bg-amber-100',
+        menuHover: 'hover:bg-amber-100',
+        menuIcon: 'text-amber-600',
+    },
+    {
+        container: 'bg-rose-50 border-rose-200 text-rose-900 shadow-sm shadow-rose-100/60',
+        indicator: 'text-rose-600',
+        dot: 'bg-rose-400',
+        menuOpen: 'bg-rose-100',
+        menuHover: 'hover:bg-rose-100',
+        menuIcon: 'text-rose-600',
+    },
+    {
+        container: 'bg-teal-50 border-teal-200 text-teal-900 shadow-sm shadow-teal-100/60',
+        indicator: 'text-teal-600',
+        dot: 'bg-teal-400',
+        menuOpen: 'bg-teal-100',
+        menuHover: 'hover:bg-teal-100',
+        menuIcon: 'text-teal-600',
+    },
+];
+
+const getNodeVisualType = (node: HabitChainNode): NodeVisualType => {
+    if (node.habitId) return 'habit';
+    if (node.triggerTime) return 'anchor';
+    return 'plain';
+};
+
 export const ChainNode: React.FC<ChainNodeProps> = ({ node, chainId }) => {
-    const isHabit = !!node.habitId;
+    const nodeType = getNodeVisualType(node);
+    const theme = NODE_COLOR_THEMES[Math.max(node.sortOrder - 1, 0) % NODE_COLOR_THEMES.length];
     const { deleteNode } = useChainStore();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
@@ -55,10 +116,7 @@ export const ChainNode: React.FC<ChainNodeProps> = ({ node, chainId }) => {
             <div
                 ref={setNodeRef}
                 style={style}
-                className={`relative px-3 py-2 rounded-[12px] border flex items-center justify-between w-full transition-shadow group/node ${isHabit
-                        ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm shadow-emerald-500/20'
-                        : 'bg-white border-neutral-200 text-neutral-600 shadow-sm'
-                    } ${isDragging ? 'shadow-lg ring-2 ring-indigo-500/50' : ''}`}
+                className={`relative px-3 py-2 rounded-[12px] border flex items-center justify-between w-full transition-shadow group/node ${theme.container} ${isDragging ? 'shadow-lg ring-2 ring-indigo-500/50' : ''}`}
             >
                 {/* Left: Drag Handle */}
                 <div
@@ -71,11 +129,9 @@ export const ChainNode: React.FC<ChainNodeProps> = ({ node, chainId }) => {
 
                 {/* Left: Node dot / icon indicator */}
                 <div className="flex items-center justify-center w-5 h-5 shrink-0 mr-1 ml-1">
-                    {isHabit ? (
-                        <Check size={12} strokeWidth={4} className="text-white" />
-                    ) : (
-                        <div className="w-1.5 h-1.5 rounded-full bg-neutral-300"></div>
-                    )}
+                    {nodeType === 'habit' && <Check size={12} strokeWidth={3.5} className={theme.indicator} />}
+                    {nodeType === 'anchor' && <Clock3 size={12} strokeWidth={3} className={theme.indicator} />}
+                    {nodeType === 'plain' && <div className={`w-1.5 h-1.5 rounded-full ${theme.dot}`}></div>}
                 </div>
 
                 {/* Center: Text */}
@@ -86,11 +142,11 @@ export const ChainNode: React.FC<ChainNodeProps> = ({ node, chainId }) => {
                     <button
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
                         className={`p-1 rounded-md transition-colors ${isMenuOpen
-                                ? (isHabit ? 'bg-emerald-600' : 'bg-slate-200')
-                                : `opacity-0 group-hover/node:opacity-100 ${isHabit ? 'hover:bg-emerald-600' : 'hover:bg-slate-100'}`
+                                ? theme.menuOpen
+                                : `opacity-0 group-hover/node:opacity-100 ${theme.menuHover}`
                             }`}
                     >
-                        <MoreHorizontal size={14} className={isHabit ? "text-emerald-100" : "text-slate-400"} />
+                        <MoreHorizontal size={14} className={theme.menuIcon} />
                     </button>
                     {isMenuOpen && (
                         <div className="absolute right-0 top-full mt-1 w-24 bg-white rounded-lg shadow-lg border border-slate-100 py-1 overflow-hidden z-20">

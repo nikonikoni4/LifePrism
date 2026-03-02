@@ -7,6 +7,7 @@ import { useToast } from '../../shared/Toast';
 import { HabitFormDialog } from '../../dialogs/HabitFormDialog';
 import { HabitHistoryDialog } from '../../dialogs/HabitHistoryDialog';
 import { useMindspaceStore } from '../../../hooks/useMindspaceStore';
+import { useSettlementStore } from '../../../hooks/useSettlementStore';
 import { Gem, Shield } from 'lucide-react';
 
 interface HabitCardProps {
@@ -15,6 +16,7 @@ interface HabitCardProps {
 
 export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
     const { checkIn, undoCheckIn, pauseHabit, deleteHabit } = useHabitStore();
+    const { openBackfill } = useSettlementStore();
     const { showToast } = useToast();
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -93,6 +95,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
         setIsMenuOpen(false);
     };
 
+    const handleOpenBackfill = () => {
+        openBackfill(habit.id);
+        setIsMenuOpen(false);
+    };
+
     return (
         <>
             <div className="min-w-[220px] bg-white rounded-[20px] p-4 shadow-[0_8px_22px_rgba(15,23,42,0.08)] border border-slate-100/70 flex flex-col justify-between transition-all hover:shadow-[0_14px_30px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 duration-300 relative group min-h-[140px]">
@@ -106,7 +113,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                         <MoreHorizontal size={16} />
                     </button>
                     {isMenuOpen && (
-                        <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-xl shadow-lg border border-slate-100 py-1 overflow-hidden">
+                        <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-lg border border-slate-100 py-1 overflow-hidden">
                             <button
                                 onClick={() => { setIsFormOpen(true); setIsMenuOpen(false); }}
                                 className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 font-medium"
@@ -118,6 +125,12 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                                 className="w-full text-left px-3 py-2 text-xs text-amber-700 hover:bg-amber-50 active:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 font-medium"
                             >
                                 暂停
+                            </button>
+                            <button
+                                onClick={handleOpenBackfill}
+                                className="w-full text-left px-3 py-2 text-xs text-indigo-700 hover:bg-indigo-50 active:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/40 font-medium"
+                            >
+                                补录近7天
                             </button>
                             <button
                                 onClick={() => { setIsHistoryOpen(true); setIsMenuOpen(false); }}
@@ -138,8 +151,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
 
                 <div>
                     {/* Top Header of Card */}
-                    <div className="flex justify-between items-start mb-2.5">
-                        <h3 className="text-[16px] font-extrabold text-slate-900 tracking-[-0.01em] leading-tight truncate pr-6">{habit.name}</h3>
+                    <div className="flex justify-between items-start mb-2.5 pr-10">
+                        <h3 className="text-[16px] font-extrabold text-slate-900 tracking-[-0.01em] leading-tight truncate pr-2">{habit.name}</h3>
                         <div className="flex flex-col items-end flex-shrink-0">
                             <span className="text-[11px] font-semibold text-slate-700">Lv.{habit.currentLevel}</span>
                         </div>
