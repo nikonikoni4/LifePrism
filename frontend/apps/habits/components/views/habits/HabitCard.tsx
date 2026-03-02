@@ -45,10 +45,19 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
         habit.frequency.type === 'weekdays' ? '工作日' :
             habit.frequency.type === 'weekend' ? '周末' : '自定义';
 
-    // Fallback values for progress if no challenge active
-    const progressCurrent = habit.currentChallenge?.completedCount || 0;
-    const progressTotal = habit.currentChallenge?.requiredCompletions || 1;
+    const weeklyDays =
+        habit.frequency.type === 'daily' ? 7 :
+            habit.frequency.type === 'weekdays' ? 5 :
+                habit.frequency.type === 'weekend' ? 2 :
+                    (habit.frequency.specificDays?.length ?? 0);
+
+    // Progress now uses total challenge days as denominator.
+    const challengeWeeks = habit.currentChallenge?.challengeWeeks ?? 0;
+    const progressCurrent = habit.currentChallenge?.completedCount ?? 0;
+    const progressRequired = habit.currentChallenge?.requiredCompletions ?? 0;
+    const progressTotal = challengeWeeks > 0 && weeklyDays > 0 ? challengeWeeks * weeklyDays : 1;
     const progressPercent = Math.min((progressCurrent / progressTotal) * 100, 100);
+    const thresholdPercent = Math.min((progressRequired / progressTotal) * 100, 100);
 
     // Use todayCompleted from optimistic state, fallback to false if undefined
     const isDoneToday = habit.todayCompleted || false;
@@ -204,8 +213,17 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                                 {progressCurrent}/{progressTotal}
                             </span>
                         </div>
-                        <div className="h-[4px] w-full bg-[#F4F5F7] rounded-full overflow-hidden">
-                            <div className="h-full bg-neutral-900 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+                        <div className="relative h-[6px] w-full rounded-full bg-[#F4F5F7]">
+                            <div className="absolute inset-0 overflow-hidden rounded-full">
+                                <div className="h-full bg-neutral-900 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+                            </div>
+                            {habit.currentChallenge && (
+                                <div
+                                    className="absolute top-1/2 z-20 h-[8px] w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-600 shadow-[0_0_0_1px_rgba(255,255,255,0.95),0_0_8px_rgba(220,38,38,0.55)]"
+                                    style={{ left: `${thresholdPercent}%` }}
+                                    title={`最低达标线: ${progressRequired}/${progressTotal}`}
+                                />
+                            )}
                         </div>
                     </div>
                     <AnimatePresence mode="wait">
