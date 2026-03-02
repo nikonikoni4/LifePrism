@@ -12,7 +12,7 @@ export const HabitChainList: React.FC = () => {
         <div className="col-span-12 lg:col-span-3 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] rounded-[24px] p-6 h-full flex flex-col overflow-hidden shadow-[0_10px_28px_rgba(15,23,42,0.08)] border border-slate-100/80">
             <div className="flex items-center justify-between mb-6 shrink-0">
                 <h2 className="text-[14px] font-semibold text-slate-700 uppercase tracking-[0.02em] flex items-center gap-2">
-                    <ListTree size={14} className="text-emerald-500" /> Activity Chains
+                    <ListTree size={14} className="text-emerald-500" /> 习惯链条
                 </h2>
                 <div className="flex items-center gap-2">
                     <button className="text-[10px] font-bold text-neutral-400 hover:text-neutral-900 transition-colors uppercase tracking-wider">

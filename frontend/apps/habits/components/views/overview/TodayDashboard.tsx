@@ -20,7 +20,7 @@ export const TodayDashboard: React.FC = () => {
 
             {/* Title & Stats */}
             <div className="flex flex-col relative z-10 w-full sm:w-auto">
-                <h2 className="text-[14px] font-semibold text-slate-700 uppercase tracking-[0.02em] mb-2">Today Dashboard</h2>
+                <h2 className="text-[14px] font-semibold text-slate-700 uppercase tracking-[0.02em] mb-2">今日打卡</h2>
                 <div className="flex items-baseline gap-1.5">
                     {isRestDay ? (
                         <span className="text-[28px] sm:text-[34px] font-extrabold text-slate-700">休息日</span>
