@@ -28,7 +28,8 @@ export const SettlementDialog: React.FC = () => {
         fetchAllStats();
     };
 
-    const handlePause = async (habitId: string) => {
+    const handlePause = async (item: SettlementItem) => {
+        const { habitId, challengeId } = item;
         setProcessingAction({ habitId, action: 'pause' });
         setActionErrors(prev => {
             if (!prev[habitId]) return prev;
@@ -37,7 +38,7 @@ export const SettlementDialog: React.FC = () => {
             return next;
         });
         try {
-            await pauseHabit(habitId);
+            await pauseHabit(habitId, { source: 'settlement', challengeId });
             dismissSettlement(habitId);
             await fetchHabits();
             await fetchAllStats();
@@ -49,7 +50,8 @@ export const SettlementDialog: React.FC = () => {
         }
     };
 
-    const handleResume = async (habitId: string) => {
+    const handleResume = async (item: SettlementItem) => {
+        const { habitId, challengeId } = item;
         setProcessingAction({ habitId, action: 'resume' });
         setActionErrors(prev => {
             if (!prev[habitId]) return prev;
@@ -58,7 +60,7 @@ export const SettlementDialog: React.FC = () => {
             return next;
         });
         try {
-            await resumeHabit(habitId);
+            await resumeHabit(habitId, { source: 'settlement', challengeId });
             dismissSettlement(habitId);
             await fetchHabits();
             await fetchAllStats();
@@ -150,14 +152,14 @@ export const SettlementDialog: React.FC = () => {
                             </button>
                         )}
                         <button
-                            onClick={() => handleResume(item.habitId)}
+                            onClick={() => handleResume(item)}
                             disabled={isProcessing}
                             className="w-full px-3 py-2 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed rounded-lg transition-colors"
                         >
                             {isProcessing && processingAction?.action === 'resume' ? '重新开始中...' : '重新开始当前挑战'}
                         </button>
                         <button
-                            onClick={() => handlePause(item.habitId)}
+                            onClick={() => handlePause(item)}
                             disabled={isProcessing}
                             className="w-full px-3 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed rounded-lg transition-colors"
                         >
@@ -193,7 +195,7 @@ export const SettlementDialog: React.FC = () => {
                         onClick={(e) => e.stopPropagation()}
                     >
                         {backfillState ? (
-                            <SettlementBackfillView />
+                            <SettlementBackfillView onBack={settlements.length === 0 ? handleClose : undefined} />
                         ) : (
                             <>
                                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">

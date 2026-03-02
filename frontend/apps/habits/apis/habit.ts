@@ -5,6 +5,7 @@ import {
     HabitDetailResponse,
     CreateHabitRequest,
     UpdateHabitRequest,
+    SettlementActionRequest,
 } from '../types/backend';
 
 const getApiBase = createApiV2UrlGetter('/habit');
@@ -55,18 +56,36 @@ export const habitApi = {
     /**
      * 暂停习惯
      */
-    pauseHabit: async (habitId: string): Promise<HabitDetailResponse> => {
+    pauseHabit: async (
+        habitId: string,
+        settlementAction?: SettlementActionRequest,
+    ): Promise<HabitDetailResponse> => {
         return fetchApi<HabitDetailResponse>(`${getApiBase()}/habits/${habitId}/pause`, {
             method: 'POST',
+            ...(settlementAction
+                ? {
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settlementAction),
+                }
+                : {}),
         });
     },
 
     /**
      * 恢复习惯
      */
-    resumeHabit: async (habitId: string): Promise<HabitDetailResponse> => {
+    resumeHabit: async (
+        habitId: string,
+        settlementAction?: SettlementActionRequest,
+    ): Promise<HabitDetailResponse> => {
         return fetchApi<HabitDetailResponse>(`${getApiBase()}/habits/${habitId}/resume`, {
             method: 'POST',
+            ...(settlementAction
+                ? {
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settlementAction),
+                }
+                : {}),
         });
     },
 

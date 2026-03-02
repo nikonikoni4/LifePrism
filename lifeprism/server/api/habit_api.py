@@ -12,6 +12,7 @@ from fastapi import APIRouter, Query, HTTPException
 from lifeprism.server.schemas.habit_schemas import (
     CreateHabitRequest, UpdateHabitRequest,
     BackfillCheckInRequest,
+    SettlementActionRequest,
     CreateChainRequest, UpdateChainRequest,
     CreateNodeRequest, UpdateNodeRequest,
     ReorderNodesRequest,
@@ -80,10 +81,12 @@ async def delete_habit(habit_id: str):
 
 
 @router.post("/habits/{habit_id}/pause")
-async def pause_habit(habit_id: str):
+async def pause_habit(
+    habit_id: str, req: Optional[SettlementActionRequest] = None,
+):
     """暂停习惯"""
     try:
-        return habit_service.pause_habit(habit_id)
+        return habit_service.pause_habit(habit_id, req)
     except NotFoundError:
         raise HTTPException(
             status_code=404,
@@ -97,10 +100,12 @@ async def pause_habit(habit_id: str):
 
 
 @router.post("/habits/{habit_id}/resume")
-async def resume_habit(habit_id: str):
+async def resume_habit(
+    habit_id: str, req: Optional[SettlementActionRequest] = None,
+):
     """恢复习惯"""
     try:
-        return habit_service.resume_habit(habit_id)
+        return habit_service.resume_habit(habit_id, req)
     except NotFoundError:
         raise HTTPException(
             status_code=404,

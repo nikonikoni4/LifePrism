@@ -72,6 +72,7 @@ export interface CheckInObject {
 }
 
 export interface SettlementItem {
+    challengeId: string;
     habitId: string;
     habitName: string;
     result: 'succeeded' | 'failed';
@@ -80,6 +81,15 @@ export interface SettlementItem {
     completedCount: number;
     requiredCompletions: number;
     canSaveByBackfill: boolean;
+}
+
+export interface CheckSettlementsResponse {
+    settlements: SettlementItem[];
+}
+
+export interface SettlementActionRequest {
+    source: 'settlement';
+    challengeId: string;
 }
 
 export interface ChainNodeObject {

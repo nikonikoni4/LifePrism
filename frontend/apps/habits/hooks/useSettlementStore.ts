@@ -96,6 +96,7 @@ export const SettlementProvider: React.FC<{ children: ReactNode }> = ({ children
     }, []);
 
     const openBackfill = useCallback((habitId: string) => {
+        setIsDialogOpen(true);
         setBackfillState({ habitId, isProcessing: false, error: null });
     }, []);
 

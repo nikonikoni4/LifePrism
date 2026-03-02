@@ -129,6 +129,28 @@ class HabitChallengeProvider(LWBaseDataProvider):
             )
         return True
 
+    def mark_in_progress_challenge_failed(self, habit_id: str, challenge_id: str) -> bool:
+        """
+        将指定 in_progress 挑战原子更新为 failed。
+
+        条件：
+        - id = challenge_id
+        - habit_id = habit_id
+        - status = 'in_progress'
+        """
+        now = datetime.now().isoformat()
+        updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with self.db.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE habit_challenges
+                SET status = ?, finished_at = ?, updated_at = ?
+                WHERE id = ? AND habit_id = ? AND status = 'in_progress'
+                """,
+                ("failed", now, updated_at, challenge_id, habit_id),
+            )
+            return cursor.rowcount == 1
+
     def get_expired_in_progress_challenges(self, today: str) -> List[Dict[str, Any]]:
         """
         获取所有 end_date < today 且 status = 'in_progress' 的挑战（到期未结算）。

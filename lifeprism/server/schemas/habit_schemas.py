@@ -34,6 +34,7 @@ class AnchorInfoObject(BaseModel):
 
 
 class SettlementItem(BaseModel):
+    challengeId: str
     habitId: str
     habitName: str
     result: Literal["succeeded", "failed"]
@@ -248,6 +249,11 @@ class TimelineResponse(BaseModel):
 
 class CheckSettlementsResponse(BaseModel):
     settlements: List[SettlementItem] = Field(default_factory=list)
+
+
+class SettlementActionRequest(BaseModel):
+    source: Literal["settlement"]
+    challengeId: str
 
 
 # ============================================================================

@@ -2,7 +2,12 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 import { Habit } from '../types/entities';
 import { habitApi } from '../apis/habit';
 import { checkinApi } from '../apis/checkin';
-import { CreateHabitRequest, UpdateHabitRequest, SettlementItem } from '../types/backend';
+import {
+    CreateHabitRequest,
+    UpdateHabitRequest,
+    SettlementActionRequest,
+    SettlementItem,
+} from '../types/backend';
 import { format } from 'date-fns';
 
 interface HabitStoreContextType {
@@ -15,8 +20,8 @@ interface HabitStoreContextType {
     createHabit: (request: CreateHabitRequest) => Promise<void>;
     updateHabit: (habitId: string, request: UpdateHabitRequest) => Promise<void>;
     deleteHabit: (habitId: string) => Promise<void>;
-    pauseHabit: (habitId: string) => Promise<void>;
-    resumeHabit: (habitId: string) => Promise<void>;
+    pauseHabit: (habitId: string, settlementAction?: SettlementActionRequest) => Promise<void>;
+    resumeHabit: (habitId: string, settlementAction?: SettlementActionRequest) => Promise<void>;
 
     checkIn: (habitId: string) => Promise<void>;
     undoCheckIn: (habitId: string) => Promise<void>;
@@ -110,10 +115,10 @@ export const HabitProvider: React.FC<HabitProviderProps> = ({ children, onSettle
         }
     };
 
-    const pauseHabit = async (habitId: string) => {
+    const pauseHabit = async (habitId: string, settlementAction?: SettlementActionRequest) => {
         setError(null);
         try {
-            const paused = await habitApi.pauseHabit(habitId);
+            const paused = await habitApi.pauseHabit(habitId, settlementAction);
             setActiveHabits(prev => prev.filter(h => h.id !== habitId));
             setPausedHabits(prev => [...prev, paused as Habit]);
         } catch (err) {
@@ -123,10 +128,10 @@ export const HabitProvider: React.FC<HabitProviderProps> = ({ children, onSettle
         }
     };
 
-    const resumeHabit = async (habitId: string) => {
+    const resumeHabit = async (habitId: string, settlementAction?: SettlementActionRequest) => {
         setError(null);
         try {
-            const resumed = await habitApi.resumeHabit(habitId);
+            const resumed = await habitApi.resumeHabit(habitId, settlementAction);
             setPausedHabits(prev => prev.filter(h => h.id !== habitId));
             setActiveHabits(prev => [...prev, resumed as Habit]);
         } catch (err) {

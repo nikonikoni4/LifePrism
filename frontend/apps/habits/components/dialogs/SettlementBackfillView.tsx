@@ -15,9 +15,8 @@ export const SettlementBackfillView: React.FC<BackfillViewProps> = ({ onBack }) 
     const [completedDates, setCompletedDates] = React.useState<Set<string>>(new Set());
     const [error, setError] = React.useState<string | null>(null);
 
-    if (!backfillState) return null;
-
-    const habit = activeHabits.find(h => h.id === backfillState.habitId);
+    const activeHabitId = backfillState?.habitId ?? null;
+    const habit = activeHabitId ? activeHabits.find(h => h.id === activeHabitId) : undefined;
     const challengeStartDate = habit?.currentChallenge?.startDate;
 
     // 生成近7天日期列表（today-6 到 today-1）
@@ -49,12 +48,12 @@ export const SettlementBackfillView: React.FC<BackfillViewProps> = ({ onBack }) 
     };
 
     const handleConfirm = async () => {
-        if (selectedDates.size === 0) return;
+        if (!activeHabitId || selectedDates.size === 0) return;
         setError(null);
         const sorted = Array.from(selectedDates).sort();
         for (const date of sorted) {
             try {
-                await backfill(backfillState.habitId, date);
+                await backfill(activeHabitId, date);
                 setCompletedDates(prev => new Set(prev).add(date));
                 setSelectedDates(prev => {
                     const next = new Set(prev);
@@ -72,6 +71,8 @@ export const SettlementBackfillView: React.FC<BackfillViewProps> = ({ onBack }) 
         closeBackfill();
         onBack?.();
     };
+
+    if (!activeHabitId) return null;
 
     return (
         <div className="flex flex-col h-full">
