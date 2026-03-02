@@ -258,15 +258,19 @@ class HabitService:
         return self.get_habit_detail(habit_id)
 
     def resume_habit(self, habit_id: str) -> HabitDetailResponse:
-        """恢复习惯：创建同等级新挑战，状态 active"""
+        """恢复/重启习惯：创建同等级新挑战，状态 active"""
         row = habit_provider.get_habit_by_id(habit_id)
         if not row:
             raise NotFoundError("习惯不存在")
-        if row["status"] == "active":
+
+        current = habit_challenge_provider.get_current_challenge(habit_id)
+        if row["status"] == "active" and current:
             raise ValidationError("习惯已经处于激活状态")
+
         freq = self._parse_frequency(row)
         self._create_challenge_for_habit(row["id"], row["current_level"], freq, 0)
-        habit_provider.update_habit(habit_id, {"status": "active", "paused_at": None})
+        if row["status"] == "paused":
+            habit_provider.update_habit(habit_id, {"status": "active", "paused_at": None})
         return self.get_habit_detail(habit_id)
 
     def _judge_challenge_result(

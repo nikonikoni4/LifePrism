@@ -17,8 +17,10 @@ export const SettlementDialog: React.FC = () => {
         dismissSettlement,
         openBackfill,
     } = useSettlementStore();
-    const { pauseHabit, fetchHabits } = useHabitStore();
+    const { pauseHabit, resumeHabit, fetchHabits } = useHabitStore();
     const { fetchAllStats } = useStatsStore();
+    const [processingAction, setProcessingAction] = React.useState<{ habitId: string; action: 'pause' | 'resume' } | null>(null);
+    const [actionErrors, setActionErrors] = React.useState<Record<string, string>>({});
 
     const handleClose = () => {
         closeDialog();
@@ -27,26 +29,56 @@ export const SettlementDialog: React.FC = () => {
     };
 
     const handlePause = async (habitId: string) => {
+        setProcessingAction({ habitId, action: 'pause' });
+        setActionErrors(prev => {
+            if (!prev[habitId]) return prev;
+            const next = { ...prev };
+            delete next[habitId];
+            return next;
+        });
         try {
             await pauseHabit(habitId);
             dismissSettlement(habitId);
-        } catch {
-            // error handled in habitStore
+            await fetchHabits();
+            await fetchAllStats();
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : '暂停失败，请稍后重试';
+            setActionErrors(prev => ({ ...prev, [habitId]: msg }));
+        } finally {
+            setProcessingAction(prev => (prev?.habitId === habitId ? null : prev));
+        }
+    };
+
+    const handleResume = async (habitId: string) => {
+        setProcessingAction({ habitId, action: 'resume' });
+        setActionErrors(prev => {
+            if (!prev[habitId]) return prev;
+            const next = { ...prev };
+            delete next[habitId];
+            return next;
+        });
+        try {
+            await resumeHabit(habitId);
+            dismissSettlement(habitId);
+            await fetchHabits();
+            await fetchAllStats();
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : '重新开始失败，请稍后重试';
+            setActionErrors(prev => ({ ...prev, [habitId]: msg }));
+        } finally {
+            setProcessingAction(prev => (prev?.habitId === habitId ? null : prev));
         }
     };
 
     const handleDismiss = (habitId: string) => {
         dismissSettlement(habitId);
-        // 如果这是最后一个，自动关闭弹窗
-        if (settlements.length <= 1) {
-            handleClose();
-        }
     };
 
     const allProcessed = settlements.length === 0;
 
     const renderSettlementCard = (item: SettlementItem) => {
         const isSuccess = item.result === 'succeeded';
+        const isProcessing = processingAction?.habitId === item.habitId;
         const rate = item.requiredCompletions > 0
             ? Math.round((item.completedCount / item.requiredCompletions) * 100)
             : 0;
@@ -106,28 +138,36 @@ export const SettlementDialog: React.FC = () => {
                         知道了
                     </button>
                 ) : (
-                    <div className="flex gap-2">
+                    <div className="space-y-2">
                         {item.canSaveByBackfill && (
                             <button
                                 onClick={() => openBackfill(item.habitId)}
-                                className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors flex items-center justify-center gap-1"
+                                disabled={isProcessing}
+                                className="w-full px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center gap-1"
                             >
                                 <Shield size={12} />
-                                补录挽救
+                                补录近7天
                             </button>
                         )}
                         <button
-                            onClick={() => handlePause(item.habitId)}
-                            className="flex-1 px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                            onClick={() => handleResume(item.habitId)}
+                            disabled={isProcessing}
+                            className="w-full px-3 py-2 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed rounded-lg transition-colors"
                         >
-                            暂停
+                            {isProcessing && processingAction?.action === 'resume' ? '重新开始中...' : '重新开始当前挑战'}
                         </button>
                         <button
-                            onClick={() => handleDismiss(item.habitId)}
-                            className="flex-1 px-3 py-2 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
+                            onClick={() => handlePause(item.habitId)}
+                            disabled={isProcessing}
+                            className="w-full px-3 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed rounded-lg transition-colors"
                         >
-                            继续
+                            {isProcessing && processingAction?.action === 'pause' ? '暂停中...' : `暂停${item.habitName}习惯`}
                         </button>
+                        {actionErrors[item.habitId] && (
+                            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-2 py-1.5">
+                                {actionErrors[item.habitId]}
+                            </p>
+                        )}
                     </div>
                 )}
             </div>
