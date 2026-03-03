@@ -62,7 +62,7 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
 
     return (
         <>
-            <div className="bg-white/70 border border-dashed border-slate-300 rounded-[20px] p-4 flex flex-col justify-center min-h-[140px] group relative hover:bg-slate-50/90 hover:border-slate-400 transition-colors shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
+            <div className={`bg-white/70 border border-dashed border-slate-300 rounded-[20px] p-4 flex flex-col justify-center min-h-[140px] group relative hover:bg-slate-50/90 hover:border-slate-400 transition-colors shadow-[0_6px_18px_rgba(15,23,42,0.05)] ${isMenuOpen ? 'z-30' : 'z-0'}`}>
 
                 {/* Menu Action */}
                 <div className="absolute top-3 right-3 z-10" ref={menuRef}>
@@ -73,7 +73,7 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
                         <MoreHorizontal size={16} />
                     </button>
                     {isMenuOpen && (
-                        <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-xl shadow-lg border border-slate-100 py-1 overflow-hidden z-20">
+                        <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-xl shadow-lg border border-slate-100 py-1 overflow-hidden z-40">
                             <button
                                 onClick={() => { setIsFormOpen(true); setIsMenuOpen(false); }}
                                 className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 font-medium"

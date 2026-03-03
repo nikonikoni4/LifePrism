@@ -115,7 +115,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
 
     return (
         <>
-            <div className="min-w-[220px] bg-white rounded-[20px] p-4 shadow-[0_8px_22px_rgba(15,23,42,0.08)] border border-slate-100/70 flex flex-col justify-between transition-all hover:shadow-[0_14px_30px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 duration-300 relative group min-h-[140px]">
+            <div className={`min-w-[220px] bg-white rounded-[20px] p-4 shadow-[0_8px_22px_rgba(15,23,42,0.08)] border border-slate-100/70 flex flex-col justify-between transition-all hover:shadow-[0_14px_30px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 duration-300 relative group min-h-[140px] ${isMenuOpen ? 'z-30' : 'z-0'}`}>
 
                 {/* Menu Action */}
                 <div className="absolute top-3 right-3 z-10" ref={menuRef}>
@@ -126,7 +126,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                         <MoreHorizontal size={16} />
                     </button>
                     {isMenuOpen && (
-                        <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-lg border border-slate-100 py-1 overflow-hidden">
+                        <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl shadow-lg border border-slate-100 py-1 overflow-hidden z-40">
                             <button
                                 onClick={() => { setIsFormOpen(true); setIsMenuOpen(false); }}
                                 className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 font-medium"
