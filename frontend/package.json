@@ -2,7 +2,7 @@
   "name": "lifeprism",
   "main": "electron/main.cjs",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "author": "LifePrism Team",
   "description": "LifePrism - 个人数据收集与成长平台",
