@@ -4,7 +4,6 @@ activitywatch
 项目分析
 .trae
 __pycache__
-test
 技术文档.md
 docs
 *-info
@@ -16,7 +15,6 @@ docs
 localpycs
 其他文件
 skills
-test
 .agent
 .pytest_cache
 simple-llm-workflow
@@ -27,10 +25,12 @@ debug_occupy_ports.py
 .cursor
 .claude
 .mcp.json
-tests
 *.log
 CLAUDE copy.md
 lifeprismData
 dataset
 plan
 localData/diary
+tests
+test
+AGENTS.md
