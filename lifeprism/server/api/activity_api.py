@@ -34,7 +34,7 @@ async def get_activity_stats(
     date: str = Query(
         ..., 
         description="中心日期 (YYYY-MM-DD 格式)", 
-        regex=r"^\d{4}-\d{2}-\d{2}$"
+        pattern=r"^\d{4}-\d{2}-\d{2}$"
     ),
     include: str = Query(
         "activity_summary,time_overview,top_title,top_app",
@@ -104,12 +104,12 @@ async def get_activity_logs(
     start_time: str = Query(
         ..., 
         description="开始时间 (YYYY-MM-DD HH:MM:SS 格式)", 
-        regex=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$"
+        pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$"
     ),
     end_time: str = Query(
         ..., 
         description="结束时间 (YYYY-MM-DD HH:MM:SS 格式)", 
-        regex=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$"
+        pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$"
     ),
     device_filter: str = Query(
         "all", 

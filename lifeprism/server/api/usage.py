@@ -25,7 +25,7 @@ async def get_usage_stats(
     date: str = Query(
         ..., 
         description="查询日期 (YYYY-MM-DD 格式)", 
-        regex=r"^\d{4}-\d{2}-\d{2}$"
+        pattern=r"^\d{4}-\d{2}-\d{2}$"
     )
 ) -> UsageStatsResponse:
     """

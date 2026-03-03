@@ -110,8 +110,7 @@ class DatabaseManager:
         """关闭连接池，释放所有连接"""
         if self._connection_pool is None:
             return
-        
-        logger.info("关闭连接池...")
+
         closed_count = 0
         
         while not self._connection_pool.empty():
@@ -122,7 +121,6 @@ class DatabaseManager:
             except Empty:
                 break
         
-        logger.info(f"连接池已关闭，共关闭 {closed_count} 个连接")
         self._connection_pool = None
     
     @contextmanager
