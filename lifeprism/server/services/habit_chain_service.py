@@ -5,6 +5,13 @@ Chain business logic.
 from datetime import datetime
 from typing import Optional, List
 
+from lifeprism.server.errors.error_codes import (
+    CHAIN_NODE_VALIDATION_FAILED,
+    CHAIN_NOT_FOUND,
+    CHAIN_VALIDATION_FAILED,
+    NODE_NOT_FOUND,
+    REORDER_VALIDATION_FAILED,
+)
 from lifeprism.server.providers.habit_chain_provider import habit_chain_provider
 from lifeprism.server.providers.habit_checkin_provider import habit_checkin_provider
 from lifeprism.server.schemas.habit_schemas import (
@@ -58,27 +65,24 @@ class HabitChainService:
         chain = self._get_chain_or_404(chain_id)
         update_data = req.model_dump(exclude_unset=True)
 
-        trigger_times = update_data.pop("triggerTimes", None)
+        trigger_times = update_data.pop("trigger_times", None)
 
         nodes = habit_chain_provider.get_nodes_by_chain(chain_id)
         if trigger_times is not None:
-            trigger_time_map = {item["nodeId"]: item["triggerTime"] for item in trigger_times}
+            trigger_time_map = {item["node_id"]: item["trigger_time"] for item in trigger_times}
             for node in nodes:
                 if node["id"] in trigger_time_map:
                     node["trigger_time"] = trigger_time_map[node["id"]]
 
-        is_showing_in_timeline = update_data.get("showInTimeline", bool(chain.get("show_in_timeline", False)))
-        self._validate_chain_timeline_rules(nodes, is_showing_in_timeline)
-
-        if "showInTimeline" in update_data:
-            update_data["show_in_timeline"] = update_data.pop("showInTimeline")
+        is_showing_in_timeline = update_data.get("show_in_timeline", bool(chain.get("show_in_timeline", False)))
+        self._validate_chain_timeline_rules(nodes, is_showing_in_timeline, CHAIN_VALIDATION_FAILED)
 
         if update_data:
             habit_chain_provider.update_chain(chain_id, update_data)
 
         if trigger_times is not None:
             for item in trigger_times:
-                habit_chain_provider.update_node(item["nodeId"], {"trigger_time": item["triggerTime"]})
+                habit_chain_provider.update_node(item["node_id"], {"trigger_time": item["trigger_time"]})
 
         return self.get_chain_detail(chain_id)
 
@@ -89,27 +93,23 @@ class HabitChainService:
     # --- Node operations ---
 
     def create_node(self, chain_id: int, req: CreateNodeRequest) -> dict:
-        chain = habit_chain_provider.get_chain_by_id(chain_id)
+        chain = self._get_chain_or_404(chain_id)
         existing = habit_chain_provider.get_nodes_by_chain(chain_id)
 
-        if req.insertAfterNodeId is not None:
-            after_node = next((n for n in existing if n["id"] == req.insertAfterNodeId), None)
+        if req.insert_after_node_id is not None:
+            after_node = next((n for n in existing if n["id"] == req.insert_after_node_id), None)
             sort_order = (after_node["sort_order"] + 1) if after_node else len(existing) + 1
         else:
             sort_order = len(existing) + 1
 
         data = req.model_dump(exclude_unset=True)
-        if "habitId" in data:
-            data["habit_id"] = data.pop("habitId")
-        if "triggerTime" in data:
-            data["trigger_time"] = data.pop("triggerTime")
-        data.pop("insertAfterNodeId", None)
+        data.pop("insert_after_node_id", None)
         data["chain_id"] = chain_id
         data["sort_order"] = sort_order
 
         if bool(chain and chain.get("show_in_timeline", False)):
             simulated_nodes = [dict(node) for node in existing]
-            if req.insertAfterNodeId is not None:
+            if req.insert_after_node_id is not None:
                 for node in simulated_nodes:
                     if node["sort_order"] >= sort_order:
                         node["sort_order"] += 1
@@ -120,9 +120,9 @@ class HabitChainService:
                     "trigger_time": data.get("trigger_time"),
                 }
             )
-            self._validate_chain_timeline_rules(simulated_nodes, True)
+            self._validate_chain_timeline_rules(simulated_nodes, True, CHAIN_NODE_VALIDATION_FAILED)
 
-        if req.insertAfterNodeId is not None:
+        if req.insert_after_node_id is not None:
             habit_chain_provider.increment_sort_order_after(chain_id, sort_order)
 
         node_id = habit_chain_provider.create_node(data)
@@ -134,17 +134,13 @@ class HabitChainService:
         chain = habit_chain_provider.get_chain_by_id(chain_id)
 
         update_data = req.model_dump(exclude_unset=True)
-        if "habitId" in update_data:
-            update_data["habit_id"] = update_data.pop("habitId")
-        if "triggerTime" in update_data:
-            update_data["trigger_time"] = update_data.pop("triggerTime")
 
         if bool(chain and chain.get("show_in_timeline", False)):
             simulated_nodes = [dict(item) for item in habit_chain_provider.get_nodes_by_chain(chain_id)]
             for item in simulated_nodes:
                 if item["id"] == node_id and "trigger_time" in update_data:
                     item["trigger_time"] = update_data["trigger_time"]
-            self._validate_chain_timeline_rules(simulated_nodes, True)
+            self._validate_chain_timeline_rules(simulated_nodes, True, CHAIN_NODE_VALIDATION_FAILED)
 
         habit_chain_provider.update_node(node_id, update_data)
         return habit_chain_provider.get_node_by_id(node_id)
@@ -165,23 +161,24 @@ class HabitChainService:
     def reorder_nodes(self, chain_id: int, req: ReorderNodesRequest) -> None:
         existing = habit_chain_provider.get_nodes_by_chain(chain_id)
         existing_ids = {n["id"] for n in existing}
-        request_ids = {item.nodeId for item in req.items}
+        request_ids = {item.node_id for item in req.items}
         if existing_ids != request_ids:
             raise ValidationError(
-                f"节点 ID 集合不匹配：期望 {existing_ids}，实际 {request_ids}"
+                f"节点 ID 集合不匹配：期望 {existing_ids}，实际 {request_ids}",
+                code=REORDER_VALIDATION_FAILED,
             )
 
-        updates = [{"node_id": item.nodeId, "sort_order": item.sortOrder} for item in req.items]
+        updates = [{"node_id": item.node_id, "sort_order": item.sort_order} for item in req.items]
 
         chain = habit_chain_provider.get_chain_by_id(chain_id)
         if bool(chain and chain.get("show_in_timeline", False)):
-            order_map = {item.nodeId: item.sortOrder for item in req.items}
+            order_map = {item.node_id: item.sort_order for item in req.items}
             simulated_nodes = []
             for node in existing:
                 copied = dict(node)
                 copied["sort_order"] = order_map[node["id"]]
                 simulated_nodes.append(copied)
-            self._validate_chain_timeline_rules(simulated_nodes, True)
+            self._validate_chain_timeline_rules(simulated_nodes, True, REORDER_VALIDATION_FAILED)
 
         habit_chain_provider.batch_update_sort_order(updates)
 
@@ -198,11 +195,11 @@ class HabitChainService:
                 TimelineNodeItem(
                     id=n["id"],
                     name=n["name"],
-                    habitId=n.get("habit_id"),
-                    habitName=n.get("habit_name"),
-                    triggerTime=n.get("trigger_time"),
-                    sortOrder=n["sort_order"],
-                    todayCheckedIn=today_map.get(n.get("habit_id"), False),
+                    habit_id=n.get("habit_id"),
+                    habit_name=n.get("habit_name"),
+                    trigger_time=n.get("trigger_time"),
+                    sort_order=n["sort_order"],
+                    today_checked_in=today_map.get(n.get("habit_id"), False),
                 )
                 for n in sorted(nodes, key=lambda x: x["sort_order"])
             ]
@@ -211,7 +208,7 @@ class HabitChainService:
 
     # --- helpers ---
 
-    def _parse_time_to_minutes(self, time_value: Optional[str]) -> Optional[int]:
+    def _parse_time_to_minutes(self, time_value: Optional[str], error_code: str) -> Optional[int]:
         if time_value is None:
             return None
 
@@ -225,46 +222,48 @@ class HabitChainService:
             minute = int(parts[1])
             if 0 <= hour <= 23 and 0 <= minute <= 59:
                 return hour * 60 + minute
-            raise ValidationError(f"{self._MSG_INVALID_TIME}: {time_value}")
+            raise ValidationError(f"{self._MSG_INVALID_TIME}: {time_value}", code=error_code)
 
         try:
             normalized = value.replace("Z", "+00:00")
             dt = datetime.fromisoformat(normalized)
             return dt.hour * 60 + dt.minute
         except ValueError as exc:
-            raise ValidationError(f"{self._MSG_INVALID_TIME}: {time_value}") from exc
+            raise ValidationError(f"{self._MSG_INVALID_TIME}: {time_value}", code=error_code) from exc
 
-    def _validate_chain_timeline_rules(self, nodes: List[dict], is_showing_in_timeline: bool) -> None:
+    def _validate_chain_timeline_rules(
+        self, nodes: List[dict], is_showing_in_timeline: bool, error_code: str,
+    ) -> None:
         if not is_showing_in_timeline:
             return
 
         if not nodes:
-            raise ValidationError(self._MSG_NO_NODES)
+            raise ValidationError(self._MSG_NO_NODES, code=error_code)
 
         sorted_nodes = sorted(nodes, key=lambda n: n["sort_order"])
-        first_minutes = self._parse_time_to_minutes(sorted_nodes[0].get("trigger_time"))
+        first_minutes = self._parse_time_to_minutes(sorted_nodes[0].get("trigger_time"), error_code)
         if first_minutes is None:
-            raise ValidationError(self._MSG_FIRST_NODE_NEEDS_TIME)
+            raise ValidationError(self._MSG_FIRST_NODE_NEEDS_TIME, code=error_code)
 
         last_minutes = first_minutes
         for node in sorted_nodes[1:]:
-            current_minutes = self._parse_time_to_minutes(node.get("trigger_time"))
+            current_minutes = self._parse_time_to_minutes(node.get("trigger_time"), error_code)
             if current_minutes is None:
                 continue
             if current_minutes < last_minutes:
-                raise ValidationError(self._MSG_INVALID_ORDER)
+                raise ValidationError(self._MSG_INVALID_ORDER, code=error_code)
             last_minutes = current_minutes
 
     def _get_chain_or_404(self, chain_id: int) -> dict:
         chain = habit_chain_provider.get_chain_by_id(chain_id)
         if not chain:
-            raise NotFoundError(f"Chain {chain_id} not found")
+            raise NotFoundError(f"Chain {chain_id} not found", code=CHAIN_NOT_FOUND)
         return chain
 
     def _get_node_or_404(self, node_id: int) -> dict:
         node = habit_chain_provider.get_node_by_id(node_id)
         if not node:
-            raise NotFoundError(f"Node {node_id} not found")
+            raise NotFoundError(f"Node {node_id} not found", code=NODE_NOT_FOUND)
         return node
 
     def _build_chain_item(self, chain: dict, nodes: list) -> ChainListItem:
@@ -272,10 +271,10 @@ class HabitChainService:
             ChainNodeObject(
                 id=n["id"],
                 name=n["name"],
-                habitId=n.get("habit_id"),
-                habitName=n.get("habit_name"),
-                triggerTime=n.get("trigger_time"),
-                sortOrder=n["sort_order"],
+                habit_id=n.get("habit_id"),
+                habit_name=n.get("habit_name"),
+                trigger_time=n.get("trigger_time"),
+                sort_order=n["sort_order"],
             )
             for n in sorted(nodes, key=lambda x: x["sort_order"])
         ]
@@ -283,7 +282,7 @@ class HabitChainService:
             id=chain["id"],
             name=chain["name"],
             description=chain.get("description"),
-            showInTimeline=bool(chain.get("show_in_timeline")),
+            show_in_timeline=bool(chain.get("show_in_timeline")),
             nodes=node_objs,
         )
 

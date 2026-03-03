@@ -1,94 +1,133 @@
 """习惯系统 Request / Response Pydantic 模型"""
-from pydantic import BaseModel, Field
-from typing import Optional, List, Literal
+import re
+from typing import List, Literal, Optional
+
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+
+
+def to_camel(value: str) -> str:
+    """snake_case 转 camelCase。"""
+    parts = value.split("_")
+    return parts[0] + "".join(p.capitalize() for p in parts[1:])
+
+
+def to_snake(value: str) -> str:
+    """camelCase 转 snake_case。"""
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower()
+
+
+class APIModel(BaseModel):
+    """统一输出 camelCase，内部字段使用 snake_case。"""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    def __getattr__(self, item: str):
+        snake_item = to_snake(item)
+        if snake_item != item and snake_item in self.__class__.model_fields:
+            return super().__getattribute__(snake_item)
+        return super().__getattr__(item)
 
 
 # ============================================================================
 # 公共子模型
 # ============================================================================
 
-class FrequencyObject(BaseModel):
+
+class FrequencyObject(APIModel):
     type: Literal["daily", "weekdays", "weekend", "custom"] = Field(..., description="频率类型")
-    specificDays: Optional[List[int]] = Field(default=None, description="每周哪几天执行（0=周一...6=周日），custom 类型时必填")
+    specific_days: Optional[List[int]] = Field(
+        default=None,
+        description="每周哪几天执行（1=周一...7=周日），custom 类型时必填",
+    )
+
+    @field_validator("specific_days")
+    @classmethod
+    def validate_specific_days(cls, values: Optional[List[int]]) -> Optional[List[int]]:
+        if values is None:
+            return values
+        if any(day < 1 or day > 7 for day in values):
+            raise ValueError("specificDays 必须在 1-7 范围内")
+        return sorted(set(values))
 
 
-class ChallengeObject(BaseModel):
+class ChallengeObject(APIModel):
     id: str
-    habitId: str
-    fromLevel: int
-    toLevel: int
-    challengeWeeks: int
-    requiredCompletions: int
-    completedCount: int
-    startDate: str
-    endDate: str
-    streakBase: int
+    habit_id: str
+    from_level: int
+    to_level: int
+    challenge_weeks: int
+    required_completions: int
+    completed_count: int
+    start_date: str
+    end_date: str
+    streak_base: int
     status: str
-    finishedAt: Optional[str] = None
+    finished_at: Optional[str] = None
 
 
-class AnchorInfoObject(BaseModel):
-    chainName: str
-    nodeName: str
-    triggerTime: Optional[str] = None
+class AnchorInfoObject(APIModel):
+    chain_name: str
+    node_name: str
+    trigger_time: Optional[str] = None
 
 
-class SettlementItem(BaseModel):
-    challengeId: str
-    habitId: str
-    habitName: str
+class SettlementItem(APIModel):
+    challenge_id: str
+    habit_id: str
+    habit_name: str
     result: Literal["succeeded", "failed"]
-    fromLevel: int
-    toLevel: int
-    completedCount: int
-    requiredCompletions: int
-    canSaveByBackfill: bool = False
+    from_level: int
+    to_level: int
+    completed_count: int
+    required_completions: int
+    can_save_by_backfill: bool = False
 
 
 # ============================================================================
 # Habit CRUD
 # ============================================================================
 
-class CreateHabitRequest(BaseModel):
+
+class CreateHabitRequest(APIModel):
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(default=None, max_length=500)
     frequency: FrequencyObject
-    initialLevel: int = Field(default=0, ge=0, le=4)
-    valueId: Optional[str] = None
-    commitmentId: Optional[str] = None
+    initial_level: int = Field(default=0, ge=0, le=4)
+    value_id: Optional[str] = None
+    commitment_id: Optional[str] = None
 
 
-class UpdateHabitRequest(BaseModel):
+class UpdateHabitRequest(APIModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     description: Optional[str] = Field(default=None, max_length=500)
     frequency: Optional[FrequencyObject] = None
     level: Optional[int] = Field(default=None, ge=0, le=4)
-    valueId: Optional[str] = None
-    commitmentId: Optional[str] = None
+    value_id: Optional[str] = None
+    commitment_id: Optional[str] = None
 
 
-class HabitListItem(BaseModel):
+class HabitListItem(APIModel):
     id: str
     name: str
     description: Optional[str] = None
     frequency: FrequencyObject
-    currentLevel: int
+    current_level: int
     status: str
-    currentChallenge: Optional[ChallengeObject] = None
-    valueId: Optional[str] = None
-    commitmentId: Optional[str] = None
-    createdAt: str
-    pausedAt: Optional[str] = None
+    current_challenge: Optional[ChallengeObject] = None
+    value_id: Optional[str] = None
+    commitment_id: Optional[str] = None
+    created_at: str
+    paused_at: Optional[str] = None
     streak: int = 0
-    todayCompleted: bool = False
-    anchorInfo: Optional[AnchorInfoObject] = None
+    today_completed: bool = False
+    anchor_info: Optional[AnchorInfoObject] = None
 
 
 class HabitDetailResponse(HabitListItem):
     pass
 
 
-class HabitListResponse(BaseModel):
+class HabitListResponse(APIModel):
     habits: List[HabitListItem] = Field(default_factory=list)
 
 
@@ -96,33 +135,34 @@ class HabitListResponse(BaseModel):
 # CheckIn
 # ============================================================================
 
-class CheckInObject(BaseModel):
+
+class CheckInObject(APIModel):
     id: str
-    habitId: str
-    challengeId: str
+    habit_id: str
+    challenge_id: str
     date: str
     completed: bool = True
-    completedAt: Optional[str] = None
-    createdAt: str
+    completed_at: Optional[str] = None
+    created_at: str
 
 
-class CheckInResponse(BaseModel):
+class CheckInResponse(APIModel):
     checkin: CheckInObject
     habit: HabitListItem
     settlement: Optional[SettlementItem] = None
 
 
-class CancelCheckInResponse(BaseModel):
+class CancelCheckInResponse(APIModel):
     habit: HabitListItem
     settlement: Optional[SettlementItem] = None
 
 
-class BackfillCheckInRequest(BaseModel):
-    challengeId: str = Field(..., min_length=1, description="目标挑战 ID")
+class BackfillCheckInRequest(APIModel):
+    challenge_id: str = Field(..., min_length=1, description="目标挑战 ID")
     date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="补签日期 YYYY-MM-DD")
 
 
-class BackfillDateAvailabilityItem(BaseModel):
+class BackfillDateAvailabilityItem(APIModel):
     date: str = Field(..., description="日期 YYYY-MM-DD")
     selectable: bool = Field(..., description="是否可补录")
     reason: Optional[Literal["already_checked_in", "before_challenge_start", "after_challenge_end"]] = Field(
@@ -130,14 +170,14 @@ class BackfillDateAvailabilityItem(BaseModel):
     )
 
 
-class BackfillAvailabilityRequest(BaseModel):
-    habitId: str = Field(..., min_length=1, description="习惯 ID")
-    challengeId: str = Field(..., min_length=1, description="挑战 ID")
+class BackfillAvailabilityRequest(APIModel):
+    habit_id: str = Field(..., min_length=1, description="习惯 ID")
+    challenge_id: str = Field(..., min_length=1, description="挑战 ID")
 
 
-class BackfillAvailabilityResponse(BaseModel):
-    habitId: str
-    challengeId: str
+class BackfillAvailabilityResponse(APIModel):
+    habit_id: str
+    challenge_id: str
     days: List[BackfillDateAvailabilityItem] = Field(default_factory=list)
 
 
@@ -145,29 +185,40 @@ class BackfillAvailabilityResponse(BaseModel):
 # Stats
 # ============================================================================
 
-class TodayOverviewItem(BaseModel):
-    habitId: str
+
+class TodayOverviewItem(APIModel):
+    habit_id: str
     name: str
-    isScheduledToday: bool
-    todayCheckedIn: bool
+    is_scheduled_today: bool
+    today_checked_in: bool
 
 
-class TodayOverviewResponse(BaseModel):
+class TodayOverviewResponse(APIModel):
     items: List[TodayOverviewItem] = Field(default_factory=list)
-    scheduledCount: int = 0
-    completedCount: int = 0
+    scheduled_count: int = 0
+    completed_count: int = 0
 
 
-class WeeklyStatsResponse(BaseModel):
-    completionRate: float  # 0.0~1.0，所有习惯本周完成率的算术平均值
+class WeeklyRateItem(APIModel):
+    week_start_date: str
+    week_end_date: str
+    rate: float
+    habit_count: int
 
 
-class HeatmapDayItem(BaseModel):
+class WeeklyStatsResponse(APIModel):
+    weeks: List[WeeklyRateItem] = Field(default_factory=list)
+
+
+class HeatmapDayItem(APIModel):
     date: str
-    count: int  # 当天所有习惯的打卡总数
+    total_habits: int
+    completed_habits: int
+    completion_rate: Optional[float] = None
+    is_rest_day: bool
 
 
-class HeatmapResponse(BaseModel):
+class HeatmapResponse(APIModel):
     days: List[HeatmapDayItem] = Field(default_factory=list)
 
 
@@ -175,20 +226,21 @@ class HeatmapResponse(BaseModel):
 # Chain / Node
 # ============================================================================
 
-class ChainNodeObject(BaseModel):
+
+class ChainNodeObject(APIModel):
     id: int
-    sortOrder: int
+    sort_order: int
     name: str
-    habitId: Optional[str] = None
-    habitName: Optional[str] = None
-    triggerTime: Optional[str] = None
+    habit_id: Optional[str] = None
+    habit_name: Optional[str] = None
+    trigger_time: Optional[str] = None
 
 
-class ChainListItem(BaseModel):
+class ChainListItem(APIModel):
     id: int
     name: str
     description: Optional[str] = None
-    showInTimeline: bool = False
+    show_in_timeline: bool = False
     nodes: List[ChainNodeObject] = Field(default_factory=list)
 
 
@@ -196,70 +248,71 @@ class ChainDetailResponse(ChainListItem):
     pass
 
 
-class ChainListResponse(BaseModel):
+class ChainListResponse(APIModel):
     chains: List[ChainListItem] = Field(default_factory=list)
 
 
-class CreateChainRequest(BaseModel):
+class CreateChainRequest(APIModel):
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(default=None, max_length=500)
 
 
-class UpdateChainNodeTimeItem(BaseModel):
-    nodeId: int
-    triggerTime: str
+class UpdateChainNodeTimeItem(APIModel):
+    node_id: int
+    trigger_time: str
 
 
-class UpdateChainRequest(BaseModel):
+class UpdateChainRequest(APIModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     description: Optional[str] = Field(default=None, max_length=500)
-    showInTimeline: Optional[bool] = None
-    triggerTimes: Optional[List[UpdateChainNodeTimeItem]] = None
+    show_in_timeline: Optional[bool] = None
+    trigger_times: Optional[List[UpdateChainNodeTimeItem]] = None
 
 
-class CreateNodeRequest(BaseModel):
+class CreateNodeRequest(APIModel):
     name: str = Field(..., min_length=1, max_length=100)
-    habitId: Optional[str] = None
-    triggerTime: Optional[str] = None
-    insertAfterNodeId: Optional[int] = None  # None = 追加到末尾
+    habit_id: Optional[str] = None
+    trigger_time: Optional[str] = None
+    insert_after_node_id: Optional[int] = None  # None = 追加到末尾
 
 
-class UpdateNodeRequest(BaseModel):
+class UpdateNodeRequest(APIModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    habitId: Optional[str] = None
-    triggerTime: Optional[str] = None
+    habit_id: Optional[str] = None
+    trigger_time: Optional[str] = None
 
 
-class ReorderItem(BaseModel):
-    nodeId: int
-    sortOrder: int
+class ReorderItem(APIModel):
+    node_id: int
+    sort_order: int
 
 
-class ReorderNodesRequest(BaseModel):
-    items: List[ReorderItem]
+class ReorderNodesRequest(APIModel):
+    items: List[ReorderItem] = Field(validation_alias=AliasChoices("items", "nodes"))
 
 
 # ============================================================================
 # Timeline
 # ============================================================================
 
-class TimelineNodeItem(BaseModel):
+
+class TimelineNodeItem(APIModel):
     id: int
     name: str
-    habitId: Optional[str] = None
-    habitName: Optional[str] = None
-    triggerTime: Optional[str] = None
-    sortOrder: int
-    todayCheckedIn: bool = False
+    habit_id: Optional[str] = None
+    habit_name: Optional[str] = None
+    trigger_time: Optional[str] = None
+    sort_order: int
+    today_checked_in: bool = False
 
 
-class TimelineChainItem(BaseModel):
+class TimelineChainItem(APIModel):
     id: int
     name: str
     nodes: List[TimelineNodeItem] = Field(default_factory=list)
 
 
-class TimelineResponse(BaseModel):
+class TimelineResponse(APIModel):
     chains: List[TimelineChainItem] = Field(default_factory=list)
 
 
@@ -267,18 +320,20 @@ class TimelineResponse(BaseModel):
 # Settlement
 # ============================================================================
 
-class CheckSettlementsResponse(BaseModel):
+
+class CheckSettlementsResponse(APIModel):
     settlements: List[SettlementItem] = Field(default_factory=list)
 
 
-class SettlementActionRequest(BaseModel):
+class SettlementActionRequest(APIModel):
     source: Literal["settlement"]
-    challengeId: str
+    challenge_id: str
 
 
 # ============================================================================
 # Challenge History
 # ============================================================================
 
-class ChallengeHistoryResponse(BaseModel):
+
+class ChallengeHistoryResponse(APIModel):
     challenges: List[ChallengeObject] = Field(default_factory=list)

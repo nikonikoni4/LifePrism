@@ -27,7 +27,7 @@ def is_scheduled_day(d: date, freq: FrequencyObject) -> bool:
     elif freq.type == "weekend":
         return d.weekday() >= 5  # Sat=5, Sun=6
     elif freq.type == "custom":
-        return d.weekday() in (freq.specificDays or [])
+        return (d.weekday() + 1) in (freq.specific_days or [])
     return True
 
 
@@ -177,7 +177,7 @@ def _parse_freq_from_row(row: Dict[str, Any]) -> FrequencyObject:
         except (json.JSONDecodeError, TypeError) as e:
             raise ValidationError(f"习惯频率配置损坏: {e}") from e
     specific_days = config.get("specificDays") if config else None
-    return FrequencyObject(type=row["frequency_type"], specificDays=specific_days)
+    return FrequencyObject(type=row["frequency_type"], specific_days=specific_days)
 
 
 def get_today_overview(today: date) -> List[Dict[str, Any]]:
@@ -199,12 +199,8 @@ def get_today_overview(today: date) -> List[Dict[str, Any]]:
     return result
 
 
-def get_weekly_stats(today: date) -> float:
-    """计算本周完成率（所有习惯的算术平均值）"""
-    habits = habit_provider.get_habits(status="active")
-    if not habits:
-        return 0.0
-    week_start = today - timedelta(days=today.weekday())
+def _calc_weekly_rate_item(today: date, week_start: date, habits: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """计算单周完成率条目。"""
     week_end = week_start + timedelta(days=6)
     rates = []
     for h in habits:
@@ -212,14 +208,17 @@ def get_weekly_stats(today: date) -> float:
         challenge = habit_challenge_provider.get_current_challenge(h["id"])
         if not challenge:
             continue
+
         ch_start = date.fromisoformat(challenge["start_date"])
         ch_end = date.fromisoformat(challenge["end_date"])
         eff_start, eff_end = get_effective_range(week_start, week_end, ch_start, ch_end, today)
         if eff_end < eff_start:
             continue
+
         scheduled = count_scheduled_days_in_range(eff_start, eff_end, freq)
         if scheduled == 0:
             continue
+
         checkin_list = habit_checkin_provider.get_checkin_dates_by_challenge(h["id"], challenge["id"])
         checkin_set = set(checkin_list)
         completed = sum(
@@ -227,14 +226,47 @@ def get_weekly_stats(today: date) -> float:
             if (eff_start + timedelta(days=i)).isoformat() in checkin_set
         )
         rates.append(min(completed / scheduled, 1.0))
-    if not rates:
-        return 0.0
-    return round(sum(rates) / len(rates), 4)
+
+    rate = round(sum(rates) / len(rates), 4) if rates else 0.0
+    return {
+        "weekStartDate": week_start.isoformat(),
+        "weekEndDate": week_end.isoformat(),
+        "rate": rate,
+        "habitCount": len(rates),
+    }
+
+
+def get_weekly_stats(today: date, weeks: int) -> List[Dict[str, Any]]:
+    """计算近 N 周完成率趋势（当前周在前）。"""
+    habits = habit_provider.get_habits(status="active")
+    if not habits or weeks <= 0:
+        return []
+
+    current_week_start = today - timedelta(days=today.weekday())
+    result = []
+    for i in range(weeks):
+        week_start = current_week_start - timedelta(days=7 * i)
+        result.append(_calc_weekly_rate_item(today, week_start, habits))
+    return result
 
 
 def get_heatmap(today: date, days: int) -> List[Dict[str, Any]]:
-    """获取过去 days 天热力图数据"""
+    """获取过去 days 天热力图数据。"""
     habits = habit_provider.get_habits(status="active")
+    if not habits:
+        result = []
+        for i in range(days):
+            d = (today - timedelta(days=days - 1 - i)).isoformat()
+            result.append({
+                "date": d,
+                "totalHabits": 0,
+                "completedHabits": 0,
+                "completionRate": None,
+                "isRestDay": True,
+            })
+        return result
+
+    parsed_habits = [(h["id"], _parse_freq_from_row(h)) for h in habits]
     habit_ids = [h["id"] for h in habits]
     start = (today - timedelta(days=days - 1)).isoformat()
     end = today.isoformat()
@@ -244,6 +276,16 @@ def get_heatmap(today: date, days: int) -> List[Dict[str, Any]]:
         counter[row["date"]] += 1
     result = []
     for i in range(days):
-        d = (today - timedelta(days=days - 1 - i)).isoformat()
-        result.append({"date": d, "count": counter.get(d, 0)})
+        day_obj = today - timedelta(days=days - 1 - i)
+        date_str = day_obj.isoformat()
+        total_habits = sum(1 for _, freq in parsed_habits if is_scheduled_day(day_obj, freq))
+        completed_habits = counter.get(date_str, 0)
+        completion_rate = None if total_habits == 0 else round(min(completed_habits / total_habits, 1.0), 4)
+        result.append({
+            "date": date_str,
+            "totalHabits": total_habits,
+            "completedHabits": completed_habits,
+            "completionRate": completion_rate,
+            "isRestDay": total_habits == 0,
+        })
     return result
