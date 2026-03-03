@@ -203,7 +203,7 @@ async def get_challenge_history(habitId: str, status: Optional[str] = Query(defa
 
 @router.post("/check-settlements")
 async def check_settlements():
-    """批量检查待处理结算项（仅检测，不落库）。"""
+    """批量检查待处理结算项（成功落库，失败仅检测不落库）。"""
     return habit_service.check_settlements()
 
 

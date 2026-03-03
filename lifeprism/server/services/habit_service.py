@@ -620,14 +620,14 @@ class HabitService:
         )
 
     def check_settlements(self) -> "CheckSettlementsResponse":
-        """批量检查所有到期未结算挑战，仅返回待处理条目（不落库）。"""
+        """批量检查所有到期未结算挑战（成功落库，失败仅检测不落库）。"""
         from lifeprism.server.schemas.habit_schemas import CheckSettlementsResponse
         today = date.today().isoformat()
         expired = habit_challenge_provider.get_expired_in_progress_challenges(today)
         settlements = []
         for challenge in expired:
             item = self._judge_challenge_result(
-                challenge["habit_id"], challenge["id"], False, False,
+                challenge["habit_id"], challenge["id"], True, False,
             )
             if item:
                 settlements.append(item)
