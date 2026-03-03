@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { HabitLayout } from './components/layout/HabitLayout';
 
 // Store Providers
@@ -19,19 +19,30 @@ import { HabitChainList } from './components/views/chains/HabitChainList';
 import { HabitList } from './components/views/habits/HabitList';
 import { SettlementDialog } from './components/dialogs/SettlementDialog';
 import { ToastProvider } from './components/shared/Toast';
+import { useUserInfo } from '../../core/context/UserInfoContext';
 
 const HabitsAppContent: React.FC = () => {
     const { fetchHabits } = useHabitStore();
     const { fetchChains } = useChainStore();
     const { checkSettlements } = useSettlementStore();
     const { fetchAllStats } = useStatsStore();
+    const { userName, refreshUserName } = useUserInfo();
+    const [now, setNow] = useState(() => new Date());
+    const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+    const currentDateText = `${now.getMonth() + 1}月${now.getDate()}日，${weekDays[now.getDay()]}`;
 
     useEffect(() => {
+        void refreshUserName();
         fetchHabits();
         fetchChains();
         checkSettlements();
         fetchAllStats();
-    }, [fetchHabits, fetchChains, checkSettlements, fetchAllStats]);
+    }, [fetchHabits, fetchChains, checkSettlements, fetchAllStats, refreshUserName]);
+
+    useEffect(() => {
+        const timer = window.setInterval(() => setNow(new Date()), 60 * 1000);
+        return () => window.clearInterval(timer);
+    }, []);
 
     return (
         <HabitLayout>
@@ -40,8 +51,8 @@ const HabitsAppContent: React.FC = () => {
             {/* 1. GLOBAL HEADER */}
             <div className="w-full shrink-0 flex items-center px-2 mb-1 mt-1">
                 <div>
-                    <h1 className="text-[30px] sm:text-[34px] font-extrabold text-slate-900 tracking-[-0.02em] leading-[1.05] mb-1">Morning, Nico</h1>
-                    <p className="text-[14px] font-semibold text-slate-500 tracking-[0.01em]">Oct 24, 星期四</p>
+                    <h1 className="text-[30px] sm:text-[34px] font-extrabold text-slate-900 tracking-[-0.02em] leading-[1.05] mb-1">Morning, {userName}</h1>
+                    <p className="text-[14px] font-semibold text-slate-500 tracking-[0.01em]">{currentDateText}</p>
                 </div>
             </div>
 

@@ -9,6 +9,7 @@ import { initPlanDocBridge } from './core/services/ipcPlanDocBridge';
 import { toast } from './core/components';
 import DataPathWarningDialog from './core/components/DataPathWarningDialog';
 import UpdateNotification from './core/components/UpdateNotification';
+import { UserInfoProvider } from './core/context/UserInfoContext';
 
 function MainApp() {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -139,7 +140,11 @@ function App() {
     return <DialogRouter />;
   }
 
-  return <MainApp />;
+  return (
+    <UserInfoProvider>
+      <MainApp />
+    </UserInfoProvider>
+  );
 }
 
 export default App;
