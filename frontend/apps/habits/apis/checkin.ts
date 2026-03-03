@@ -1,6 +1,12 @@
 import { createApiV2UrlGetter } from '../../../core/services/apiConfig';
 import { fetchApi } from './utils';
-import { CheckInResponse, CancelCheckInResponse, BackfillCheckInRequest } from '../types/backend';
+import {
+    CheckInResponse,
+    CancelCheckInResponse,
+    BackfillCheckInRequest,
+    BackfillAvailabilityRequest,
+    BackfillAvailabilityResponse,
+} from '../types/backend';
 
 const getApiBase = createApiV2UrlGetter('/habit');
 
@@ -29,6 +35,17 @@ export const checkinApi = {
      */
     backfillCheckIn: async (habitId: string, request: BackfillCheckInRequest): Promise<CheckInResponse> => {
         return fetchApi<CheckInResponse>(`${getApiBase()}/habits/${habitId}/checkins/backfill`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+        });
+    },
+
+    /**
+     * 获取补录界面的可选日期（近7天）
+     */
+    getBackfillAvailability: async (request: BackfillAvailabilityRequest): Promise<BackfillAvailabilityResponse> => {
+        return fetchApi<BackfillAvailabilityResponse>(`${getApiBase()}/checkins/backfill/availability`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),

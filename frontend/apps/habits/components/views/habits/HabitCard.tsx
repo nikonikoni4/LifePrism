@@ -105,7 +105,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
     };
 
     const handleOpenBackfill = () => {
-        openBackfill(habit.id);
+        if (habit.currentChallenge?.id) {
+            void openBackfill(habit.id, habit.currentChallenge.id);
+        } else {
+            showToast('error', '当前无可补录挑战');
+        }
         setIsMenuOpen(false);
     };
 

@@ -143,7 +143,7 @@ export const SettlementDialog: React.FC = () => {
                     <div className="space-y-2">
                         {item.canSaveByBackfill && (
                             <button
-                                onClick={() => openBackfill(item.habitId)}
+                                onClick={() => { void openBackfill(item.habitId, item.challengeId); }}
                                 disabled={isProcessing}
                                 className="w-full px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center gap-1"
                             >

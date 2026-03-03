@@ -118,7 +118,27 @@ class CancelCheckInResponse(BaseModel):
 
 
 class BackfillCheckInRequest(BaseModel):
+    challengeId: str = Field(..., min_length=1, description="目标挑战 ID")
     date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="补签日期 YYYY-MM-DD")
+
+
+class BackfillDateAvailabilityItem(BaseModel):
+    date: str = Field(..., description="日期 YYYY-MM-DD")
+    selectable: bool = Field(..., description="是否可补录")
+    reason: Optional[Literal["already_checked_in", "before_challenge_start", "after_challenge_end"]] = Field(
+        default=None, description="不可补录原因"
+    )
+
+
+class BackfillAvailabilityRequest(BaseModel):
+    habitId: str = Field(..., min_length=1, description="习惯 ID")
+    challengeId: str = Field(..., min_length=1, description="挑战 ID")
+
+
+class BackfillAvailabilityResponse(BaseModel):
+    habitId: str
+    challengeId: str
+    days: List[BackfillDateAvailabilityItem] = Field(default_factory=list)
 
 
 # ============================================================================

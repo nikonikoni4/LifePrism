@@ -153,7 +153,25 @@ export interface CancelCheckInResponse {
 }
 
 export interface BackfillCheckInRequest {
+    challengeId: string;
     date: string; // YYYY-MM-DD
+}
+
+export interface BackfillAvailabilityRequest {
+    habitId: string;
+    challengeId: string;
+}
+
+export interface BackfillAvailabilityDay {
+    date: string;
+    selectable: boolean;
+    reason: 'already_checked_in' | 'before_challenge_start' | 'after_challenge_end' | null;
+}
+
+export interface BackfillAvailabilityResponse {
+    habitId: string;
+    challengeId: string;
+    days: BackfillAvailabilityDay[];
 }
 
 // Stats

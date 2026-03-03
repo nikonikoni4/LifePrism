@@ -12,6 +12,7 @@ from lifeprism.server.schemas.habit_schemas import (
     CreateHabitRequest, UpdateHabitRequest, FrequencyObject,
     HabitListItem, HabitListResponse, HabitDetailResponse,
     ChallengeObject, AnchorInfoObject, SettlementActionRequest,
+    BackfillAvailabilityRequest,
 )
 from lifeprism.server.services.habit_stats_service import get_habit_streak
 from lifeprism.utils import get_logger, LazySingleton
@@ -306,7 +307,11 @@ class HabitService:
         return self.get_habit_detail(habit_id)
 
     def _judge_challenge_result(
-        self, habit_id: str, challenge_id: str, persist_state: bool,
+        self,
+        habit_id: str,
+        challenge_id: str,
+        persist_succeeded: bool,
+        persist_failed: bool,
     ) -> Optional["SettlementItem"]:
         """判定挑战结果，返回 SettlementItem 或 None。"""
         from lifeprism.server.schemas.habit_schemas import SettlementItem
@@ -327,7 +332,7 @@ class HabitService:
 
         if reached_end_date and completed >= required:
             new_level = min(challenge["to_level"], MAX_LEVEL)
-            if persist_state:
+            if persist_succeeded:
                 habit_challenge_provider.update_challenge(challenge["id"], {
                     "status": "succeeded",
                     "finished_at": datetime.now().isoformat(),
@@ -349,7 +354,7 @@ class HabitService:
             can_save = self._can_save_by_backfill(
                 habit_id, challenge, completed, required,
             )
-            if persist_state:
+            if persist_failed:
                 habit_challenge_provider.update_challenge(challenge["id"], {
                     "status": "failed",
                     "finished_at": datetime.now().isoformat(),
@@ -430,7 +435,9 @@ class HabitService:
         })
 
         # 判定挑战结果
-        settlement = self._judge_challenge_result(habit_id, challenge["id"], True)
+        settlement = self._judge_challenge_result(
+            habit_id, challenge["id"], True, True,
+        )
 
         checkin_obj = CheckInObject(
             id=checkin_id, habitId=habit_id,
@@ -468,7 +475,9 @@ class HabitService:
             "completed_count": new_count,
         })
 
-        settlement = self._judge_challenge_result(habit_id, challenge["id"], True)
+        settlement = self._judge_challenge_result(
+            habit_id, challenge["id"], True, True,
+        )
         habit_item = self._build_habit_response(habit_provider.get_habit_by_id(habit_id))
         return CancelCheckInResponse(habit=habit_item, settlement=settlement)
 
@@ -491,9 +500,17 @@ class HabitService:
         if (today - target_date).days > 7:
             raise ValidationError("只能补签过去 7 天内的日期")
 
-        challenge = habit_challenge_provider.get_current_challenge(habit_id)
-        if not challenge:
-            raise NotFoundError("当前无进行中的挑战")
+        challenge = habit_challenge_provider.get_challenge_by_id(req.challengeId)
+        if not challenge or challenge["habit_id"] != habit_id:
+            raise NotFoundError("挑战不存在")
+        if challenge["status"] != "in_progress":
+            raise ValidationError("挑战已结束，无法补签")
+        start_date = date.fromisoformat(challenge["start_date"])
+        end_date = date.fromisoformat(challenge["end_date"])
+        if target_date < start_date:
+            raise ValidationError("补签日期不在当前挑战周期内")
+        if target_date > end_date:
+            raise ValidationError("补签日期不在当前挑战周期内")
 
         now_str = datetime.now().isoformat()
         checkin_id = habit_checkin_provider.create_checkin({
@@ -509,7 +526,9 @@ class HabitService:
             "completed_count": new_count,
         })
 
-        settlement = self._judge_challenge_result(habit_id, challenge["id"], True)
+        settlement = self._judge_challenge_result(
+            habit_id, challenge["id"], True, False,
+        )
 
         checkin_obj = CheckInObject(
             id=checkin_id, habitId=habit_id,
@@ -530,6 +549,57 @@ class HabitService:
             raise NotFoundError("习惯不存在")
         return habit_challenge_provider.get_challenge_history(habit_id, status)
 
+    def get_backfill_availability(
+        self, req: BackfillAvailabilityRequest,
+    ) -> "BackfillAvailabilityResponse":
+        """获取补录可选日期（today-6 ~ today-1）。"""
+        from lifeprism.server.schemas.habit_schemas import (
+            BackfillAvailabilityResponse, BackfillDateAvailabilityItem,
+        )
+
+        habit = habit_provider.get_habit_by_id(req.habitId)
+        if not habit:
+            raise NotFoundError("习惯不存在")
+
+        challenge = habit_challenge_provider.get_challenge_by_id(req.challengeId)
+        if not challenge or challenge["habit_id"] != req.habitId:
+            raise NotFoundError("挑战不存在")
+
+        start_date = date.fromisoformat(challenge["start_date"])
+        end_date = date.fromisoformat(challenge["end_date"])
+        today = date.today()
+        days: List[BackfillDateAvailabilityItem] = []
+
+        for i in range(6, 0, -1):
+            d = today - timedelta(days=i)
+            date_str = d.isoformat()
+
+            if d < start_date:
+                days.append(BackfillDateAvailabilityItem(
+                    date=date_str, selectable=False, reason="before_challenge_start",
+                ))
+                continue
+
+            if d > end_date:
+                days.append(BackfillDateAvailabilityItem(
+                    date=date_str, selectable=False, reason="after_challenge_end",
+                ))
+                continue
+
+            existing = habit_checkin_provider.get_checkin_by_date(req.habitId, date_str)
+            if existing:
+                days.append(BackfillDateAvailabilityItem(
+                    date=date_str, selectable=False, reason="already_checked_in",
+                ))
+            else:
+                days.append(BackfillDateAvailabilityItem(
+                    date=date_str, selectable=True, reason=None,
+                ))
+
+        return BackfillAvailabilityResponse(
+            habitId=req.habitId, challengeId=req.challengeId, days=days,
+        )
+
     def check_settlements(self) -> "CheckSettlementsResponse":
         """批量检查所有到期未结算的挑战，执行结算并返回结果列表"""
         from lifeprism.server.schemas.habit_schemas import CheckSettlementsResponse
@@ -538,7 +608,7 @@ class HabitService:
         settlements = []
         for challenge in expired:
             item = self._judge_challenge_result(
-                challenge["habit_id"], challenge["id"], False,
+                challenge["habit_id"], challenge["id"], False, False,
             )
             if item:
                 settlements.append(item)

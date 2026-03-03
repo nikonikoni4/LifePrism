@@ -12,6 +12,7 @@ from fastapi import APIRouter, Query, HTTPException
 from lifeprism.server.schemas.habit_schemas import (
     CreateHabitRequest, UpdateHabitRequest,
     BackfillCheckInRequest,
+    BackfillAvailabilityRequest,
     SettlementActionRequest,
     CreateChainRequest, UpdateChainRequest,
     CreateNodeRequest, UpdateNodeRequest,
@@ -172,7 +173,13 @@ async def backfill_checkin(habit_id: str, req: BackfillCheckInRequest):
     """补签（过去 7 天内）"""
     try:
         return habit_service.backfill_checkin(habit_id, req)
-    except NotFoundError:
+    except NotFoundError as e:
+        msg = str(e)
+        if "挑战不存在" in msg:
+            raise HTTPException(
+                status_code=404,
+                detail={"error_code": "CHALLENGE_NOT_FOUND", "message": "Challenge not found"},
+            )
         raise HTTPException(
             status_code=404,
             detail={"error_code": "HABIT_NOT_FOUND", "message": "Habit not found"},
@@ -186,6 +193,24 @@ async def backfill_checkin(habit_id: str, req: BackfillCheckInRequest):
         raise HTTPException(
             status_code=422,
             detail={"error_code": "HABIT_NOT_ACTIVE", "message": str(e)},
+        )
+
+
+@router.post("/checkins/backfill/availability")
+async def get_backfill_availability(req: BackfillAvailabilityRequest):
+    """获取补录界面的近7天日期可用性"""
+    try:
+        return habit_service.get_backfill_availability(req)
+    except NotFoundError as e:
+        msg = str(e)
+        if "挑战不存在" in msg:
+            raise HTTPException(
+                status_code=404,
+                detail={"error_code": "CHALLENGE_NOT_FOUND", "message": "Challenge not found"},
+            )
+        raise HTTPException(
+            status_code=404,
+            detail={"error_code": "HABIT_NOT_FOUND", "message": "Habit not found"},
         )
 
 

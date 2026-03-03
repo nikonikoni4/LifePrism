@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { SettlementItem } from '../types/backend';
+import { BackfillAvailabilityDay, SettlementItem } from '../types/backend';
 import { settlementApi } from '../apis/settlement';
 import { checkinApi } from '../apis/checkin';
 
 interface BackfillState {
     habitId: string;
+    challengeId: string;
+    days: BackfillAvailabilityDay[];
+    isLoading: boolean;
     isProcessing: boolean;
     error: string | null;
 }
@@ -24,13 +27,13 @@ interface SettlementStoreContextType {
     /** 从 checkIn/undoCheckIn 响应中推入结算项 */
     pushSettlement: (item: SettlementItem) => void;
     /** 执行补录 */
-    backfill: (habitId: string, date: string) => Promise<void>;
+    backfill: (habitId: string, challengeId: string, date: string) => Promise<void>;
     /** 从列表中移除已处理的结算项 */
     dismissSettlement: (habitId: string) => void;
     /** 关闭弹窗 */
     closeDialog: () => void;
     /** 打开补录子视图 */
-    openBackfill: (habitId: string) => void;
+    openBackfill: (habitId: string, challengeId: string) => Promise<void>;
     /** 关闭补录子视图 */
     closeBackfill: () => void;
 }
@@ -68,16 +71,21 @@ export const SettlementProvider: React.FC<{ children: ReactNode }> = ({ children
         setIsDialogOpen(true);
     }, []);
 
-    const backfill = useCallback(async (habitId: string, date: string) => {
+    const backfill = useCallback(async (habitId: string, challengeId: string, date: string) => {
         setBackfillState(prev => prev ? { ...prev, isProcessing: true, error: null } : null);
         try {
-            const res = await checkinApi.backfillCheckIn(habitId, { date });
+            const res = await checkinApi.backfillCheckIn(habitId, { challengeId, date });
             if (res.settlement) {
                 setSettlements(prev =>
                     prev.map(s => s.habitId === habitId ? res.settlement! : s)
                 );
             }
-            setBackfillState(prev => prev ? { ...prev, isProcessing: false } : null);
+            try {
+                const availability = await checkinApi.getBackfillAvailability({ habitId, challengeId });
+                setBackfillState(prev => prev ? { ...prev, isProcessing: false, isLoading: false, days: availability.days } : null);
+            } catch {
+                setBackfillState(prev => prev ? { ...prev, isProcessing: false } : null);
+            }
         } catch (err) {
             const msg = err instanceof Error ? err.message : '补录失败';
             setBackfillState(prev => prev ? { ...prev, isProcessing: false, error: msg } : null);
@@ -95,9 +103,28 @@ export const SettlementProvider: React.FC<{ children: ReactNode }> = ({ children
         setBackfillState(null);
     }, []);
 
-    const openBackfill = useCallback((habitId: string) => {
+    const openBackfill = useCallback(async (habitId: string, challengeId: string) => {
         setIsDialogOpen(true);
-        setBackfillState({ habitId, isProcessing: false, error: null });
+        setBackfillState({
+            habitId,
+            challengeId,
+            days: [],
+            isLoading: true,
+            isProcessing: false,
+            error: null,
+        });
+        try {
+            const availability = await checkinApi.getBackfillAvailability({ habitId, challengeId });
+            setBackfillState(prev => prev ? {
+                ...prev,
+                days: availability.days,
+                isLoading: false,
+                error: null,
+            } : null);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : '加载补录日期失败';
+            setBackfillState(prev => prev ? { ...prev, isLoading: false, error: msg } : null);
+        }
     }, []);
 
     const closeBackfill = useCallback(() => {
