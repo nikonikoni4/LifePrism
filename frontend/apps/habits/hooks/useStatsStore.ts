@@ -11,7 +11,7 @@ interface StatsStoreContextType {
 
     fetchTodayOverview: () => Promise<void>;
     fetchWeeklyData: (weeks?: number) => Promise<void>;
-    fetchHeatmapData: (startDate?: string, endDate?: string) => Promise<void>;
+    fetchHeatmapData: (days?: number) => Promise<void>;
     fetchAllStats: () => Promise<void>;
 }
 
@@ -42,9 +42,9 @@ export const StatsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     }, []);
 
-    const fetchHeatmapData = useCallback(async (startDate?: string, endDate?: string) => {
+    const fetchHeatmapData = useCallback(async (days: number = 365) => {
         try {
-            const data = await statsApi.getHeatmapOverview(startDate, endDate);
+            const data = await statsApi.getHeatmapOverview(days);
             setHeatmapData(data.days || []);
         } catch (err) {
             console.error('[StatsStore] Failed to fetch heatmap data:', err);
@@ -57,7 +57,7 @@ export const StatsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const results = await Promise.allSettled([
             fetchTodayOverview(),
             fetchWeeklyData(4),
-            fetchHeatmapData(),
+            fetchHeatmapData(365),
         ]);
         const failed = results.filter(r => r.status === 'rejected');
         if (failed.length > 0) {

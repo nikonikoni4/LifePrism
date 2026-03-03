@@ -5,6 +5,7 @@ import {
     HabitDetailResponse,
     CreateHabitRequest,
     UpdateHabitRequest,
+    ChallengeObject,
     SettlementActionRequest,
 } from '../types/backend';
 
@@ -101,13 +102,16 @@ export const habitApi = {
     /**
      * 获取习惯挑战历史记录
      */
-    getHabitHistory: async (habitId: string, status?: string): Promise<{ challenges: any[] }> => {
+    getHabitHistory: async (
+        habitId: string,
+        status?: string,
+    ): Promise<{ challenges: ChallengeObject[] }> => {
         const queryParams = new URLSearchParams();
         if (status) queryParams.append('status', status);
 
         const queryString = queryParams.toString();
         const url = queryString ? `${getApiBase()}/habits/${habitId}/challenges?${queryString}` : `${getApiBase()}/habits/${habitId}/challenges`;
 
-        return fetchApi<{ challenges: any[] }>(url);
+        return fetchApi<{ challenges: ChallengeObject[] }>(url);
     },
 };

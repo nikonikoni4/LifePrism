@@ -22,8 +22,15 @@ export const chainApi = {
     /**
      * S9: 获取链条列表 (GET /chains)
      */
-    getChains: async (): Promise<ChainListResponse> => {
-        return fetchApi<ChainListResponse>(`${getApiBase()}/chains`);
+    getChains: async (showInTimeline?: boolean): Promise<ChainListResponse> => {
+        const queryParams = new URLSearchParams();
+        if (typeof showInTimeline === 'boolean') {
+            queryParams.append('showInTimeline', String(showInTimeline));
+        }
+
+        const queryString = queryParams.toString();
+        const url = queryString ? `${getApiBase()}/chains?${queryString}` : `${getApiBase()}/chains`;
+        return fetchApi<ChainListResponse>(url);
     },
 
     /**
@@ -115,9 +122,9 @@ export const chainApi = {
     // ---------------------------------
 
     /**
-     * S11: 获取时间轴展示，提取当前开启 showInTimeline=true 的全集 (GET /timeline)
+     * S11: 获取时间轴展示，提取当前开启 showInTimeline=true 的全集 (GET /chains/timeline)
      */
     getTimeline: async (): Promise<TimelineResponse> => {
-        return fetchApi<TimelineResponse>(`${getApiBase()}/timeline`);
+        return fetchApi<TimelineResponse>(`${getApiBase()}/chains/timeline`);
     }
 };

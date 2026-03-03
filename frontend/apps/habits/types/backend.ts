@@ -242,7 +242,7 @@ export interface ReorderNodeItem {
 }
 
 export interface ReorderNodesRequest {
-    nodes: ReorderNodeItem[];
+    items: ReorderNodeItem[];
 }
 
 // Timeline

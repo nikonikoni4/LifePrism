@@ -154,7 +154,7 @@ export const ChainProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }));
 
         try {
-            await chainApi.reorderNodes(chainId, { nodes: newOrders });
+            await chainApi.reorderNodes(chainId, { items: newOrders });
         } catch (err) {
             console.error('[ChainStore] Failed to reorder nodes:', err);
             setError(err instanceof Error ? err.message : 'Failed to reorder nodes');
