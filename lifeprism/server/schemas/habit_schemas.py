@@ -157,9 +157,39 @@ class CancelCheckInResponse(APIModel):
     settlement: Optional[SettlementItem] = None
 
 
+class BackfillCheckInItem(APIModel):
+    date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="补签日期 YYYY-MM-DD")
+
+
 class BackfillCheckInRequest(APIModel):
     challenge_id: str = Field(..., min_length=1, description="目标挑战 ID")
-    date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="补签日期 YYYY-MM-DD")
+    items: List[BackfillCheckInItem] = Field(
+        ...,
+        min_length=1,
+        max_length=6,
+        description="补签日期列表（1-6 项）",
+    )
+
+
+class BackfillCheckInResultItem(APIModel):
+    date: str
+    status: Literal["succeeded", "failed"]
+    checkin: Optional[CheckInObject] = None
+    settlement: Optional[SettlementItem] = None
+    error_code: Optional[str] = None
+    message: Optional[str] = None
+
+
+class BackfillCheckInBatchSummary(APIModel):
+    total: int
+    succeeded: int
+    failed: int
+
+
+class BackfillCheckInBatchResponse(APIModel):
+    habit: HabitListItem
+    results: List[BackfillCheckInResultItem] = Field(default_factory=list)
+    summary: BackfillCheckInBatchSummary
 
 
 class BackfillDateAvailabilityItem(APIModel):

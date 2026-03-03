@@ -501,9 +501,26 @@ class HabitService:
         habit_item = self._build_habit_response(habit_provider.get_habit_by_id(habit_id))
         return CancelCheckInResponse(habit=habit_item, settlement=settlement)
 
-    def backfill_checkin(self, habit_id: str, req: "BackfillCheckInRequest") -> "CheckInResponse":
-        """补签（过去7天内）"""
-        from lifeprism.server.schemas.habit_schemas import CheckInResponse, CheckInObject
+    def _validate_backfill_target_date(
+        self, target_date: date, today: date, start_date: date, end_date: date,
+    ) -> Optional[str]:
+        """补录日期校验（本地窗口 + 挑战周期）。"""
+        if target_date >= today:
+            return "今日打卡请使用打卡接口"
+        if (today - target_date).days > 6:
+            return "只能补签过去 6 天内的日期"
+        if target_date < start_date or target_date > end_date:
+            return "补签日期不在当前挑战周期内"
+        return None
+
+    def backfill_checkin(self, habit_id: str, req: "BackfillCheckInRequest") -> "BackfillCheckInBatchResponse":
+        """批量补签（过去 6 天内，按请求顺序逐项处理，部分成功继续）。"""
+        from lifeprism.server.schemas.habit_schemas import (
+            BackfillCheckInBatchResponse,
+            BackfillCheckInBatchSummary,
+            BackfillCheckInResultItem,
+            CheckInObject,
+        )
 
         row = habit_provider.get_habit_by_id(habit_id)
         if not row:
@@ -511,52 +528,101 @@ class HabitService:
         if row["status"] != "active":
             raise ValidationError("习惯处于暂停状态，无法补签", code=HABIT_NOT_ACTIVE)
 
-        target_date = date.fromisoformat(req.date)
-        today = date.today()
-
-        if target_date >= today:
-            raise ValidationError("今日打卡请使用打卡接口", code=BACKFILL_DATE_OUT_OF_WINDOW)
-        if (today - target_date).days > 6:
-            raise ValidationError("只能补签过去 6 天内的日期", code=BACKFILL_DATE_OUT_OF_WINDOW)
-
         challenge = habit_challenge_provider.get_challenge_by_id(req.challenge_id)
         if not challenge or challenge["habit_id"] != habit_id:
             raise NotFoundError("挑战不存在", code=CHALLENGE_NOT_FOUND)
-        if challenge["status"] != "in_progress":
-            raise ValidationError("挑战已结束，无法补签", code=BACKFILL_DATE_OUT_OF_WINDOW)
-        start_date = date.fromisoformat(challenge["start_date"])
-        end_date = date.fromisoformat(challenge["end_date"])
-        if target_date < start_date:
-            raise ValidationError("补签日期不在当前挑战周期内", code=BACKFILL_DATE_OUT_OF_WINDOW)
-        if target_date > end_date:
-            raise ValidationError("补签日期不在当前挑战周期内", code=BACKFILL_DATE_OUT_OF_WINDOW)
 
-        now_str = datetime.now().isoformat()
-        checkin_id = habit_checkin_provider.create_checkin({
-            "habit_id": habit_id,
-            "challenge_id": challenge["id"],
-            "date": req.date,
-        })
-        if not checkin_id:
-            raise ConflictError("该日期已有打卡记录", code=CHECKIN_ALREADY_EXISTS)
+        today = date.today()
+        seen_dates: set[str] = set()
+        results: List[BackfillCheckInResultItem] = []
 
-        new_count = challenge["completed_count"] + 1
-        habit_challenge_provider.update_challenge(challenge["id"], {
-            "completed_count": new_count,
-        })
+        def _append_failed(date_str: str, message: str, error_code: str):
+            results.append(BackfillCheckInResultItem(
+                date=date_str,
+                status="failed",
+                checkin=None,
+                settlement=None,
+                error_code=error_code,
+                message=message,
+            ))
 
-        settlement = self._judge_challenge_result(
-            habit_id, challenge["id"], True, False,
-        )
+        for item in req.items:
+            date_str = item.date
+            if date_str in seen_dates:
+                _append_failed(date_str, "请求内存在重复补签日期", CHECKIN_ALREADY_EXISTS)
+                continue
+            seen_dates.add(date_str)
 
-        checkin_obj = CheckInObject(
-            id=checkin_id, habit_id=habit_id,
-            challenge_id=challenge["id"], date=req.date,
-            completed=True, completed_at=now_str, created_at=now_str,
-        )
+            try:
+                target_date = date.fromisoformat(date_str)
+            except ValueError:
+                _append_failed(date_str, "补签日期格式无效", BACKFILL_DATE_OUT_OF_WINDOW)
+                continue
+
+            latest_challenge = habit_challenge_provider.get_challenge_by_id(req.challenge_id)
+            if not latest_challenge or latest_challenge["habit_id"] != habit_id:
+                raise NotFoundError("挑战不存在", code=CHALLENGE_NOT_FOUND)
+            if latest_challenge["status"] != "in_progress":
+                _append_failed(date_str, "挑战已结束，无法补签", BACKFILL_DATE_OUT_OF_WINDOW)
+                continue
+
+            start_date = date.fromisoformat(latest_challenge["start_date"])
+            end_date = date.fromisoformat(latest_challenge["end_date"])
+            date_error = self._validate_backfill_target_date(
+                target_date, today, start_date, end_date,
+            )
+            if date_error:
+                _append_failed(date_str, date_error, BACKFILL_DATE_OUT_OF_WINDOW)
+                continue
+
+            now_str = datetime.now().isoformat()
+            checkin_id = habit_checkin_provider.create_checkin({
+                "habit_id": habit_id,
+                "challenge_id": latest_challenge["id"],
+                "date": date_str,
+            })
+            if not checkin_id:
+                _append_failed(date_str, "该日期已有打卡记录", CHECKIN_ALREADY_EXISTS)
+                continue
+
+            new_count = latest_challenge["completed_count"] + 1
+            habit_challenge_provider.update_challenge(latest_challenge["id"], {
+                "completed_count": new_count,
+            })
+
+            settlement = self._judge_challenge_result(
+                habit_id, latest_challenge["id"], True, False,
+            )
+            checkin_obj = CheckInObject(
+                id=checkin_id,
+                habit_id=habit_id,
+                challenge_id=latest_challenge["id"],
+                date=date_str,
+                completed=True,
+                completed_at=now_str,
+                created_at=now_str,
+            )
+            results.append(BackfillCheckInResultItem(
+                date=date_str,
+                status="succeeded",
+                checkin=checkin_obj,
+                settlement=settlement,
+                error_code=None,
+                message=None,
+            ))
+
         habit_item = self._build_habit_response(habit_provider.get_habit_by_id(habit_id))
-        return CheckInResponse(
-            checkin=checkin_obj, habit=habit_item, settlement=settlement,
+        succeeded_count = sum(1 for item in results if item.status == "succeeded")
+        failed_count = len(results) - succeeded_count
+        summary = BackfillCheckInBatchSummary(
+            total=len(results),
+            succeeded=succeeded_count,
+            failed=failed_count,
+        )
+        return BackfillCheckInBatchResponse(
+            habit=habit_item,
+            results=results,
+            summary=summary,
         )
 
     def get_challenge_history(

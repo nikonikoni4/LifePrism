@@ -154,7 +154,32 @@ export interface CancelCheckInResponse {
 
 export interface BackfillCheckInRequest {
     challengeId: string;
+    items: BackfillCheckInItem[];
+}
+
+export interface BackfillCheckInItem {
     date: string; // YYYY-MM-DD
+}
+
+export interface BackfillCheckInResultItem {
+    date: string;
+    status: 'succeeded' | 'failed';
+    checkin: CheckInObject | null;
+    settlement: SettlementItem | null;
+    errorCode: string | null;
+    message: string | null;
+}
+
+export interface BackfillCheckInBatchSummary {
+    total: number;
+    succeeded: number;
+    failed: number;
+}
+
+export interface BackfillCheckInBatchResponse {
+    habit: HabitListItem;
+    results: BackfillCheckInResultItem[];
+    summary: BackfillCheckInBatchSummary;
 }
 
 export interface BackfillAvailabilityRequest {

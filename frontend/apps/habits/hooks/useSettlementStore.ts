@@ -27,7 +27,7 @@ interface SettlementStoreContextType {
     /** 从 checkIn/undoCheckIn 响应中推入结算项 */
     pushSettlement: (item: SettlementItem) => void;
     /** 执行补录 */
-    backfill: (habitId: string, challengeId: string, date: string) => Promise<void>;
+    backfill: (habitId: string, challengeId: string, dates: string[]) => Promise<void>;
     /** 从列表中移除已处理的结算项 */
     dismissSettlement: (habitId: string) => void;
     /** 关闭弹窗 */
@@ -71,20 +71,40 @@ export const SettlementProvider: React.FC<{ children: ReactNode }> = ({ children
         setIsDialogOpen(true);
     }, []);
 
-    const backfill = useCallback(async (habitId: string, challengeId: string, date: string) => {
+    const backfill = useCallback(async (habitId: string, challengeId: string, dates: string[]) => {
+        if (dates.length === 0) {
+            return;
+        }
         setBackfillState(prev => prev ? { ...prev, isProcessing: true, error: null } : null);
         try {
-            const res = await checkinApi.backfillCheckIn(habitId, { challengeId, date });
-            if (res.settlement) {
+            const res = await checkinApi.backfillCheckIn(
+                habitId,
+                { challengeId, items: dates.map(date => ({ date })) },
+            );
+            const latestSettlement = [...res.results]
+                .reverse()
+                .find(item => item.settlement !== null)
+                ?.settlement ?? null;
+            if (latestSettlement) {
                 setSettlements(prev =>
-                    prev.map(s => s.habitId === habitId ? res.settlement! : s)
+                    prev.map(s => s.habitId === habitId ? latestSettlement : s)
                 );
             }
+            const failedItems = res.results.filter(item => item.status === 'failed');
+            const failedMessage = failedItems.length > 0
+                ? `补录完成，${failedItems.length} 个日期失败`
+                : null;
             try {
                 const availability = await checkinApi.getBackfillAvailability({ habitId, challengeId });
-                setBackfillState(prev => prev ? { ...prev, isProcessing: false, isLoading: false, days: availability.days } : null);
+                setBackfillState(prev => prev ? {
+                    ...prev,
+                    isProcessing: false,
+                    isLoading: false,
+                    days: availability.days,
+                    error: failedMessage,
+                } : null);
             } catch {
-                setBackfillState(prev => prev ? { ...prev, isProcessing: false } : null);
+                setBackfillState(prev => prev ? { ...prev, isProcessing: false, error: failedMessage } : null);
             }
         } catch (err) {
             const msg = err instanceof Error ? err.message : '补录失败';

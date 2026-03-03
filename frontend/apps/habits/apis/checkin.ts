@@ -4,6 +4,7 @@ import {
     CheckInResponse,
     CancelCheckInResponse,
     BackfillCheckInRequest,
+    BackfillCheckInBatchResponse,
     BackfillAvailabilityRequest,
     BackfillAvailabilityResponse,
 } from '../types/backend';
@@ -33,8 +34,11 @@ export const checkinApi = {
     /**
      * 补录某日的打卡（用于挽救失败的挑战）
      */
-    backfillCheckIn: async (habitId: string, request: BackfillCheckInRequest): Promise<CheckInResponse> => {
-        return fetchApi<CheckInResponse>(`${getApiBase()}/habits/${habitId}/checkins/backfill`, {
+    backfillCheckIn: async (
+        habitId: string,
+        request: BackfillCheckInRequest,
+    ): Promise<BackfillCheckInBatchResponse> => {
+        return fetchApi<BackfillCheckInBatchResponse>(`${getApiBase()}/habits/${habitId}/checkins/backfill`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request),

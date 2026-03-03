@@ -11,7 +11,7 @@ interface BackfillViewProps {
 export const SettlementBackfillView: React.FC<BackfillViewProps> = ({ onBack }) => {
     const { backfillState, backfill, closeBackfill } = useSettlementStore();
     const { activeHabits } = useHabitStore();
-    const [selectedDate, setSelectedDate] = React.useState<string | null>(null);
+    const [selectedDates, setSelectedDates] = React.useState<string[]>([]);
     const [error, setError] = React.useState<string | null>(null);
 
     const activeHabitId = backfillState?.habitId ?? null;
@@ -20,11 +20,11 @@ export const SettlementBackfillView: React.FC<BackfillViewProps> = ({ onBack }) 
     const backfillDays = backfillState?.days ?? [];
 
     const handleConfirm = async () => {
-        if (!activeHabitId || !challengeId || !selectedDate) return;
+        if (!activeHabitId || !challengeId || selectedDates.length === 0) return;
         setError(null);
         try {
-            await backfill(activeHabitId, challengeId, selectedDate);
-            setSelectedDate(null);
+            await backfill(activeHabitId, challengeId, selectedDates);
+            setSelectedDates([]);
         } catch (err) {
             setError(err instanceof Error ? err.message : '补录失败');
         }
@@ -57,7 +57,7 @@ export const SettlementBackfillView: React.FC<BackfillViewProps> = ({ onBack }) 
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
                 <p className="text-xs text-slate-500 mb-3 flex items-center gap-1.5">
                     <Calendar size={12} />
-                    选择需要补录的日期（近7天）
+                    选择需要补录的日期（近7天，可多选）
                 </p>
                 {backfillState.isLoading && (
                     <div className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3">
@@ -70,17 +70,21 @@ export const SettlementBackfillView: React.FC<BackfillViewProps> = ({ onBack }) 
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors cursor-pointer ${
                             !day.selectable
                                 ? 'bg-slate-50 border-slate-100 opacity-50 cursor-not-allowed'
-                                : selectedDate === day.date
+                                : selectedDates.includes(day.date)
                                     ? 'bg-indigo-50 border-indigo-300'
                                     : 'bg-white border-slate-200 hover:border-slate-300'
                         }`}
                     >
                         <input
-                            type="radio"
-                            name="backfill-date"
-                            checked={selectedDate === day.date}
+                            type="checkbox"
+                            name={`backfill-date-${day.date}`}
+                            checked={selectedDates.includes(day.date)}
                             disabled={!day.selectable}
-                            onChange={() => setSelectedDate(day.date)}
+                            onChange={() => setSelectedDates(prev => (
+                                prev.includes(day.date)
+                                    ? prev.filter(d => d !== day.date)
+                                    : [...prev, day.date]
+                            ))}
                             className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                         />
                         <span className="text-sm text-slate-700">
@@ -107,6 +111,9 @@ export const SettlementBackfillView: React.FC<BackfillViewProps> = ({ onBack }) 
                         {error || backfillState.error}
                     </div>
                 )}
+                <div className="text-xs text-slate-500">
+                    已选择 {selectedDates.length} 个日期
+                </div>
                 <div className="flex gap-2">
                     <button
                         onClick={handleBack}
@@ -116,7 +123,7 @@ export const SettlementBackfillView: React.FC<BackfillViewProps> = ({ onBack }) 
                     </button>
                     <button
                         onClick={handleConfirm}
-                        disabled={!selectedDate || backfillState.isProcessing || backfillState.isLoading}
+                        disabled={selectedDates.length === 0 || backfillState.isProcessing || backfillState.isLoading}
                         className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-xl transition-colors"
                     >
                         {backfillState.isProcessing ? '补录中...' : '确认补录'}
