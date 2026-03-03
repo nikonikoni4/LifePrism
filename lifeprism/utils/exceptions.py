@@ -1,15 +1,21 @@
-"""
-业务异常定义
-
-层级职责：
-- Provider 层：捕获外部异常，转换为下列业务异常
-- Service 层：通常让异常冒泡，必要时捕获包装
-- API 层：捕获业务异常映射为 HTTPException
-"""
+"""业务异常定义。"""
+from typing import Any, Dict, Optional
 
 
 class LWBaseError(Exception):
-    """项目异常基类"""
+    """项目异常基类。"""
+
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        code: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        final_message = message or self.__class__.__name__
+        self.code = code
+        self.message = final_message
+        self.details = details or {}
+        super().__init__(final_message)
 
 
 class DataAccessError(LWBaseError):
