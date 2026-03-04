@@ -28,6 +28,7 @@ export interface ChallengeObject {
     challengeWeeks: number;
     requiredCompletions: number;
     completedCount: number;
+    remainingRestDays: number;
     startDate: string; // YYYY-MM-DD
     endDate: string; // YYYY-MM-DD
     streakBase: number;

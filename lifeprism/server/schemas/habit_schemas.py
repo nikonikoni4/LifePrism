@@ -58,6 +58,7 @@ class ChallengeObject(APIModel):
     challenge_weeks: int
     required_completions: int
     completed_count: int
+    remaining_rest_days: int
     start_date: str
     end_date: str
     streak_base: int

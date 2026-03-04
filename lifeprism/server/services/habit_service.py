@@ -81,16 +81,31 @@ class HabitService:
         specific_days = config.get("specificDays") if config else None
         return FrequencyObject(type=row["frequency_type"], specific_days=specific_days)
 
-    def _build_challenge_object(self, c: Optional[Dict]) -> Optional[ChallengeObject]:
+    def _calculate_remaining_rest_days(self, habit_id: str, challenge: Dict) -> int:
+        """计算挑战剩余可休息天数。"""
+        if challenge["status"] != "in_progress":
+            return 0
+
+        remaining_checkin_days = self._get_remaining_checkin_days(
+            habit_id, challenge, date.today(),
+        )
+        return max(
+            0,
+            challenge["completed_count"] + remaining_checkin_days - challenge["required_completions"],
+        )
+
+    def _build_challenge_object(self, c: Optional[Dict], habit_id: str) -> Optional[ChallengeObject]:
         """将 challenge 行转为 ChallengeObject"""
         if not c:
             return None
+        remaining_rest_days = self._calculate_remaining_rest_days(habit_id, c)
         return ChallengeObject(
             id=c["id"], habit_id=c["habit_id"],
             from_level=c["from_level"], to_level=c["to_level"],
             challenge_weeks=c["challenge_weeks"],
             required_completions=c["required_completions"],
             completed_count=c["completed_count"],
+            remaining_rest_days=remaining_rest_days,
             start_date=c["start_date"], end_date=c["end_date"],
             streak_base=c["streak_base"], status=c["status"],
             finished_at=c.get("finished_at"),
@@ -100,7 +115,7 @@ class HabitService:
         """将 habit 行 + 关联数据组装为 HabitListItem"""
         freq = self._parse_frequency(row)
         challenge_row = habit_challenge_provider.get_current_challenge(row["id"])
-        challenge_obj = self._build_challenge_object(challenge_row)
+        challenge_obj = self._build_challenge_object(challenge_row, row["id"])
 
         # 计算当前 Streak（含上次挑战遗留的 streak_base）
         streak = get_habit_streak(row["id"], freq, challenge_row)

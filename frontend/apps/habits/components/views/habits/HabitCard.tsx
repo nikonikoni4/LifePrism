@@ -55,12 +55,24 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
     const challengeWeeks = habit.currentChallenge?.challengeWeeks ?? 0;
     const progressCurrent = habit.currentChallenge?.completedCount ?? 0;
     const progressRequired = habit.currentChallenge?.requiredCompletions ?? 0;
+    const remainingRestDays = habit.currentChallenge?.remainingRestDays ?? 0;
     const progressTotal = challengeWeeks > 0 && weeklyDays > 0 ? challengeWeeks * weeklyDays : 1;
     const progressPercent = Math.min((progressCurrent / progressTotal) * 100, 100);
     const thresholdPercent = Math.min((progressRequired / progressTotal) * 100, 100);
+    const challengeRemainingRequiredDays = Math.max(progressRequired - progressCurrent, 0);
 
     // Use todayCompleted from optimistic state, fallback to false if undefined
     const isDoneToday = habit.todayCompleted || false;
+    const challengeStatusHint = !habit.currentChallenge
+        ? null
+        : remainingRestDays > 0
+            ? `☕ 休息余额 ${remainingRestDays} 天`
+            : isDoneToday
+                ? '✨ 休息额度已用完，继续保持'
+                : '⏳ 今日待打卡 (无剩余休息日)';
+    const challengeStatusTooltip = !habit.currentChallenge
+        ? ''
+        : `💡 挑战进度：剩余 ${challengeRemainingRequiredDays} 天 | 目标需打卡：${progressRequired} 天 | 休息余额：${remainingRestDays} 天`;
 
     const pillBaseClass = 'inline-flex items-center h-7 px-3 rounded-full text-[10px] font-semibold leading-none';
     const pillNeutralClass = `${pillBaseClass} text-slate-600 bg-slate-100`;
@@ -118,7 +130,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
             <div className={`min-w-[220px] bg-white rounded-[20px] p-4 shadow-[0_8px_22px_rgba(15,23,42,0.08)] border border-slate-100/70 flex flex-col justify-between transition-all hover:shadow-[0_14px_30px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 duration-300 relative group min-h-[140px] ${isMenuOpen ? 'z-30' : 'z-0'}`}>
 
                 {/* Menu Action */}
-                <div className="absolute top-3 right-3 z-10" ref={menuRef}>
+                <div className="absolute top-3 right-3 z-30" ref={menuRef}>
                     <button
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
                         className={`p-1 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 active:scale-95 ${isMenuOpen ? 'bg-slate-200 text-slate-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 opacity-0 group-hover:opacity-100'}`}
@@ -211,6 +223,16 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                 {/* Bottom Actions of Card */}
                 <div className="flex items-center justify-between mt-auto">
                     <div className="flex-1 mr-4">
+                        {habit.currentChallenge && challengeStatusHint && (
+                            <div className="mb-1 flex justify-start">
+                                <span
+                                    className="text-[10px] font-medium text-slate-600"
+                                    title={challengeStatusTooltip}
+                                >
+                                    {challengeStatusHint}
+                                </span>
+                            </div>
+                        )}
                         <div className="flex justify-between items-center mb-1">
                             <span className="text-[10px] font-semibold text-slate-500 tracking-[0.02em]">PROGRESS</span>
                             <span className="text-[10px] font-semibold text-slate-600 tracking-[0.01em]">
@@ -223,7 +245,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
                             </div>
                             {habit.currentChallenge && (
                                 <div
-                                    className="absolute top-1/2 z-20 h-[8px] w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-600 shadow-[0_0_0_1px_rgba(255,255,255,0.95),0_0_8px_rgba(220,38,38,0.55)]"
+                                    className="absolute top-1/2 z-20 h-[6px] w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-600 shadow-[0_0_0_1px_rgba(255,255,255,0.95),0_0_8px_rgba(220,38,38,0.55)]"
                                     style={{ left: `${thresholdPercent}%` }}
                                     title={`最低达标线: ${progressRequired}/${progressTotal}`}
                                 />
