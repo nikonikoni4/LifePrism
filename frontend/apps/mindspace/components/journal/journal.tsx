@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Settings, History, ChevronLeft, ChevronRight, X, HelpCircle } from 'lucide-react';
 import { MarkdownEditor } from '@my-ui-kit/core';
-import type { MDXEditorMethods } from '@mdxeditor/editor';
+import type { MarkdownEditorRef } from '@my-ui-kit/core';
 import DiaryTagBar from './DiaryTagBar';
 import SettingsPopover from './SettingsPopover';
 import TemplateManager from './TemplateManager';
 import { DiaryAPI } from './diaryApi';
 import { BG_PRESETS } from './diaryConstants';
 import type { DiaryItem, MoodLevel, ImportanceLevel } from './diaryTypes';
+import { toLocalDateString } from '../../../../core/utils/dateUtils';
 
 /**
  * JournalView - 禅意日记书写空间
@@ -33,6 +34,7 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   const [settingsView, setSettingsView] = useState(false);
   const [showSettingsPopover, setShowSettingsPopover] = useState(false);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [shouldScrollToDate, setShouldScrollToDate] = useState(true);
 
   // 背景色（localStorage 持久化）
   const [hsl, setHsl] = useState(() => {
@@ -44,12 +46,12 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   const bgColor = `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
   const neutralDark = '#262626';
 
-  const editorRef = useRef<MDXEditorMethods>(null);
+  const editorRef = useRef<MarkdownEditorRef>(null);
   const settingsBtnRef = useRef<HTMLButtonElement>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ========== 日期格式化 ==========
-  const formatDate = (date: Date) => date.toISOString().split('T')[0];
+  const formatDate = toLocalDateString;
 
   const isSameDay = (d1: Date, d2: Date) =>
     d1.getFullYear() === d2.getFullYear() &&
@@ -145,7 +147,22 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   const handleBackToToday = () => {
     setActiveDate(new Date());
     setSettingsView(false);
+    setShouldScrollToDate(true);
   };
+
+  // ========== 初始定位与滚动 ==========
+  useEffect(() => {
+    if (settingsView || !shouldScrollToDate) return;
+    const timer = setTimeout(() => {
+      const scrollId = `diary-date-${activeDate.getFullYear()}-${activeDate.getMonth()}-${activeDate.getDate()}`;
+      const el = document.getElementById(scrollId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      setShouldScrollToDate(false);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [activeDate, settingsView, shouldScrollToDate]);
 
   // ========== 月历数据 ==========
   const [monthList] = useState(() => {
@@ -194,12 +211,12 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
             return (
               <button
                 key={`${year}-${month}-${day}`}
+                id={`diary-date-${year}-${month}-${day}`}
                 onClick={() => setActiveDate(currentDate)}
-                className={`aspect-square rounded-full flex items-center justify-center transition-all duration-300 relative text-sm group ${
-                  isActive
-                    ? 'text-white scale-110 shadow-[0_8px_20px_-5px_rgba(0,0,0,0.3)] z-10'
-                    : 'hover:bg-black/10 hover:scale-110 hover:shadow-sm text-gray-500 hover:text-black active:scale-95'
-                }`}
+                className={`aspect-square rounded-full flex items-center justify-center transition-all duration-300 relative text-sm group ${isActive
+                  ? 'text-white scale-110 shadow-[0_8px_20px_-5px_rgba(0,0,0,0.3)] z-10'
+                  : 'hover:bg-black/10 hover:scale-110 hover:shadow-sm text-gray-500 hover:text-black active:scale-95'
+                  }`}
                 style={{ backgroundColor: isActive ? neutralDark : 'transparent' }}
               >
                 {day}
@@ -222,17 +239,15 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
       {/* 侧边栏切换按钮 */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className={`fixed top-[37px] z-50 p-2.5 rounded-full border border-black/5 bg-white/40 backdrop-blur-xl shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${
-          isSidebarOpen ? 'left-[300px] md:left-[364px]' : 'left-8'
-        } text-gray-700 hover:text-black`}
+        className={`fixed top-[37px] z-50 p-2.5 rounded-full border border-black/5 bg-white/40 backdrop-blur-xl shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${isSidebarOpen ? 'left-[300px] md:left-[364px]' : 'left-8'
+          } text-gray-700 hover:text-black`}
       >
         {isSidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
       </button>
 
       {/* 左侧侧边栏 */}
-      <aside className={`fixed inset-y-0 left-0 z-40 bg-white/40 backdrop-blur-2xl border-r border-black/[0.03] transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] transform ${
-        isSidebarOpen ? 'translate-x-0 w-80 md:w-96' : '-translate-x-full w-80 md:w-96'
-      }`}>
+      <aside className={`fixed inset-y-0 left-0 z-40 bg-white/40 backdrop-blur-2xl border-r border-black/[0.03] transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] transform ${isSidebarOpen ? 'translate-x-0 w-80 md:w-96' : '-translate-x-full w-80 md:w-96'
+        }`}>
         <div className="flex flex-col h-full">
           <header className="h-28 px-10 flex flex-col justify-center shrink-0 border-b border-black/[0.02]">
             <h2 className="text-xs font-bold tracking-[0.5em] uppercase opacity-40 text-black leading-none">Matrix</h2>
@@ -293,14 +308,13 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
             )}
           </div>
 
-          <div className="p-10 flex justify-around text-gray-500 opacity-80 shrink-0 border-t border-black/[0.02] relative">
+          <div className="p-10 flex justify-around text-gray-500 opacity-80 shrink-0 border-t border-black/[0.02] relative z-30">
             <button
               ref={settingsBtnRef}
               onClick={() => setShowSettingsPopover(!showSettingsPopover)}
               title="设置"
-              className={`p-2 rounded-full transition-all duration-500 ${
-                showSettingsPopover ? 'bg-black text-white rotate-180 scale-110 opacity-100' : 'hover:text-black hover:bg-black/5'
-              }`}
+              className={`p-2 rounded-full transition-all duration-500 ${showSettingsPopover ? 'bg-black text-white rotate-180 scale-110 opacity-100' : 'hover:text-black hover:bg-black/5'
+                }`}
             >
               <Settings size={18} />
             </button>
@@ -325,9 +339,8 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
       </aside>
 
       {/* 主体书写区 */}
-      <main className={`flex-1 relative flex flex-col z-10 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${
-        isSidebarOpen ? 'ml-80 md:ml-96' : 'ml-0'
-      }`}>
+      <main className={`flex-1 relative flex flex-col z-10 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${isSidebarOpen ? 'ml-80 md:ml-96' : 'ml-0'
+        }`}>
         {/* 顶部：日期 + 标签 + 操作 */}
         <header className="px-12 md:px-24 pt-8 pb-4 shrink-0 relative z-10 border-b border-black/[0.02]">
           <div className="flex items-center justify-between mb-4">
@@ -378,11 +391,9 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
             <div className="diary-editor h-full">
               <MarkdownEditor
                 ref={editorRef}
-                markdown={content}
+                value={content}
                 onChange={handleContentChange}
                 placeholder="在此处，开启一段与自我的深谈..."
-                showToolbar={true}
-                showDiffSource={false}
                 minHeight="100%"
                 maxHeight="100%"
               />
@@ -408,7 +419,8 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
         onApplyTemplate={handleApplyTemplate}
       />
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
