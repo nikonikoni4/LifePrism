@@ -49,6 +49,10 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   const editorRef = useRef<MarkdownEditorRef>(null);
   const settingsBtnRef = useRef<HTMLButtonElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 用于在日期切换时 flush 挂起的保存，存储当前待保存的 {date, content}
+  const pendingSaveRef = useRef<{ dateStr: string; content: string } | null>(null);
+  // 追踪正在执行中的保存请求，避免 flush 遗漏 in-flight 请求
+  const inflightSaveRef = useRef<Promise<void> | null>(null);
 
   // ========== 日期格式化 ==========
   const formatDate = toLocalDateString;
@@ -58,26 +62,57 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
     d1.getMonth() === d2.getMonth() &&
     d1.getDate() === d2.getDate();
 
+  // ========== Flush 挂起的保存 ==========
+  const flushPendingSave = useCallback(async () => {
+    // 取消定时器
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    // 等待正在执行中的保存请求完成
+    if (inflightSaveRef.current) {
+      await inflightSaveRef.current;
+      inflightSaveRef.current = null;
+    }
+    // 如果有挂起的保存数据（定时器还没触发的），立即执行保存
+    const pending = pendingSaveRef.current;
+    if (pending) {
+      pendingSaveRef.current = null;
+      try {
+        await DiaryAPI.saveContent(pending.dateStr, { content: pending.content });
+      } catch (e) {
+        console.error('flush 保存日记内容失败:', e);
+      }
+    }
+  }, []);
+
   // ========== 加载日记 ==========
   const loadDiary = useCallback(async (date: Date) => {
     const dateStr = formatDate(date);
     try {
+      // 先进入 loading 状态隐藏编辑器，防止 flush 期间用户继续输入导致跨日期写入
       setLoading(true);
+      // 再 flush 上一个日期挂起的保存，确保数据不丢失且不竞态
+      await flushPendingSave();
       const data = await DiaryAPI.getDiary(dateStr);
       setDiary(data);
-      setContent(data.content || '');
+      const newContent = data.content || '';
+      setContent(newContent);
       // 同步到编辑器
       if (editorRef.current) {
-        editorRef.current.setMarkdown(data.content || '');
+        editorRef.current.setMarkdown(newContent);
       }
     } catch (e) {
       console.error('加载日记失败:', e);
       setDiary(null);
       setContent('');
+      if (editorRef.current) {
+        editorRef.current.setMarkdown('');
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [flushPendingSave]);
 
   useEffect(() => { loadDiary(activeDate); }, [activeDate, loadDiary]);
 
@@ -89,20 +124,34 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   // ========== 内容自动保存（防抖 1.5s） ==========
   const handleContentChange = useCallback((md: string) => {
     setContent(md);
+    const dateStr = formatDate(activeDate);
+    // 记录待保存数据，供 flush 使用
+    pendingSaveRef.current = { dateStr, content: md };
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(async () => {
-      const dateStr = formatDate(activeDate);
-      try {
-        const updated = await DiaryAPI.saveContent(dateStr, { content: md });
-        setDiary(prev => prev ? { ...prev, word_count: updated.word_count, updated_at: updated.updated_at } : prev);
-      } catch (e) {
-        console.error('保存日记内容失败:', e);
-      }
+    saveTimerRef.current = setTimeout(() => {
+      // 定时器触发时清除 pending 标记和定时器引用
+      pendingSaveRef.current = null;
+      saveTimerRef.current = null;
+      // 将保存请求存入 inflightSaveRef，供 flush 追踪
+      const savePromise = (async () => {
+        try {
+          const updated = await DiaryAPI.saveContent(dateStr, { content: md });
+          setDiary(prev => prev ? { ...prev, word_count: updated.word_count, updated_at: updated.updated_at } : prev);
+        } catch (e) {
+          console.error('保存日记内容失败:', e);
+        } finally {
+          // 请求完成后清除 inflight 引用
+          if (inflightSaveRef.current === savePromise) {
+            inflightSaveRef.current = null;
+          }
+        }
+      })();
+      inflightSaveRef.current = savePromise;
     }, 1500);
   }, [activeDate]);
 
-  // 组件卸载时清理定时器
-  useEffect(() => () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); }, []);
+  // 组件卸载时 flush 挂起的保存
+  useEffect(() => () => { flushPendingSave(); }, [flushPendingSave]);
 
   // ========== Meta 更新 ==========
   const handleMoodChange = async (mood: MoodLevel) => {
