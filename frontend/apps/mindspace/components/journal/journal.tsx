@@ -50,6 +50,9 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   const editorRef = useRef<MarkdownEditorRef>(null);
   const settingsBtnRef = useRef<HTMLButtonElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 编辑器重挂载/切日期时的水合保护期，忽略编辑器内部初始化 onChange 噪音
+  const isHydratingEditorRef = useRef(true);
+  const hydrationReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 用于在日期切换时 flush 挂起的保存，存储当前待保存的 {date, content}
   const pendingSaveRef = useRef<{ dateStr: string; content: string } | null>(null);
   // 追踪正在执行中的保存请求，避免 flush 遗漏 in-flight 请求
@@ -98,6 +101,7 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   const loadDiary = useCallback(async (date: Date) => {
     const dateStr = formatDate(date);
     try {
+      isHydratingEditorRef.current = true;
       // 先进入 loading 状态隐藏编辑器，防止 flush 期间用户继续输入导致跨日期写入
       setLoading(true);
       if (isInitialLoadRef.current) {
@@ -113,7 +117,6 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
           await inflightSaveRef.current;
           inflightSaveRef.current = null;
         }
-        isInitialLoadRef.current = false;
       } else {
         // 后续日期切换：正常 flush 上一个日期挂起的保存，确保数据不丢失
         const saved = await flushPendingSave();
@@ -136,6 +139,14 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
       }
     } finally {
       setLoading(false);
+      if (hydrationReleaseTimerRef.current) {
+        clearTimeout(hydrationReleaseTimerRef.current);
+      }
+      hydrationReleaseTimerRef.current = setTimeout(() => {
+        isHydratingEditorRef.current = false;
+        isInitialLoadRef.current = false;
+        hydrationReleaseTimerRef.current = null;
+      }, 0);
     }
   }, [flushPendingSave]);
 
@@ -148,6 +159,7 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
 
   // ========== 内容自动保存（防抖 1.5s） ==========
   const handleContentChange = useCallback((md: string) => {
+    if (isHydratingEditorRef.current) return;
     // 双重防护：loadDiary 尚未完成首次加载时，忽略编辑器初始化产生的噪音内容
     // 这处理 MarkdownEditor 的 onUpdate 比 loadDiary useEffect 更晚触发的竞态情况
     if (isInitialLoadRef.current && (md === '' || md === '\n\n')) return;
@@ -179,7 +191,13 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   }, [activeDate]);
 
   // 组件卸载时 flush 挂起的保存（退出日记界面时）
-  useEffect(() => () => { flushPendingSave(); }, [flushPendingSave]);
+  useEffect(() => () => {
+    if (hydrationReleaseTimerRef.current) {
+      clearTimeout(hydrationReleaseTimerRef.current);
+      hydrationReleaseTimerRef.current = null;
+    }
+    flushPendingSave();
+  }, [flushPendingSave]);
 
   // ========== 手动保存（按钮 / Ctrl+S） ==========
   const handleManualSave = useCallback(async () => {
