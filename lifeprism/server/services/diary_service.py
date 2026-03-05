@@ -2,7 +2,7 @@
 Diary 服务层 - 日记业务逻辑
 
 设计原则：数据库只存 meta 信息，内容存 md 文件
-文件存储路径：lifeprismData/diary/{date}.md
+文件存储路径：lifeprismData/diary/YYYY/MM/{date}.md
 模板存储路径：lifeprismData/diary/template/{name}.md
 
 架构：纯函数模块（无内存缓存，不需要单例）
@@ -10,6 +10,7 @@ Diary 服务层 - 日记业务逻辑
 import json
 from typing import Optional
 from pathlib import Path
+from datetime import datetime
 
 from lifeprism.server.schemas.diary_schemas import (
     DiaryItem,
@@ -36,6 +37,14 @@ def _get_diary_dir() -> Path:
     return Path(settings.lifeprism_data_path) / "diary"
 
 
+def _get_diary_file_path(date: str) -> Path:
+    """根据日期返回日记正文文件路径：diary/YYYY/MM/YYYY-MM-DD.md"""
+    date_obj = datetime.strptime(date, "%Y-%m-%d")
+    year = f"{date_obj.year:04d}"
+    month = f"{date_obj.month:02d}"
+    return _get_diary_dir() / year / month / f"{date}.md"
+
+
 def _get_template_dir() -> Path:
     """获取模板目录路径"""
     return _get_diary_dir() / "template"
@@ -59,8 +68,8 @@ def _ensure_template_dir():
 
 def _read_diary_content(date: str) -> str:
     """从文件读取日记内容，不存在则返回空字符串"""
-    file_path = _get_diary_dir() / f"{date}.md"
     try:
+        file_path = _get_diary_file_path(date)
         if file_path.exists():
             return file_path.read_text(encoding='utf-8')
         return ""
@@ -71,9 +80,9 @@ def _read_diary_content(date: str) -> str:
 
 def _write_diary_content(date: str, content: str):
     """写入日记内容到文件"""
-    file_path = _get_diary_dir() / f"{date}.md"
     try:
-        _ensure_diary_dir()
+        file_path = _get_diary_file_path(date)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding='utf-8')
     except Exception as e:
         logger.error(f"写入日记文件 {date} 失败: {e}")

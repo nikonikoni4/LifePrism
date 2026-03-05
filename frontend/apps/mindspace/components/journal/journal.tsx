@@ -81,7 +81,6 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
     if (inflightSaveRef.current) {
       await inflightSaveRef.current;
       inflightSaveRef.current = null;
-      didSave = true;
     }
     // 如果有挂起的保存数据（定时器还没触发的），立即执行保存
     const pending = pendingSaveRef.current;
@@ -92,6 +91,7 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
         didSave = true;
       } catch (e) {
         console.error('flush 保存日记内容失败:', e);
+        toast.error('自动保存失败，请重试');
       }
     }
     return didSave;
@@ -177,8 +177,10 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
         try {
           const updated = await DiaryAPI.saveContent(dateStr, { content: md });
           setDiary(prev => prev ? { ...prev, word_count: updated.word_count, updated_at: updated.updated_at } : prev);
+          toast.success('日记已自动保存');
         } catch (e) {
           console.error('保存日记内容失败:', e);
+          toast.error('自动保存失败，请重试');
         } finally {
           // 请求完成后清除 inflight 引用
           if (inflightSaveRef.current === savePromise) {
@@ -203,8 +205,11 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   const handleManualSave = useCallback(async () => {
     const hasPending = !!pendingSaveRef.current;
     const hasInflight = !!inflightSaveRef.current;
-    // 如果既没有 pending 也没有 inflight，说明无新改动，静默不提示
-    if (!hasPending && !hasInflight) return;
+    // 如果既没有 pending 也没有 inflight，说明无新改动
+    if (!hasPending && !hasInflight) {
+      toast.info('无新改动');
+      return;
+    }
     try {
       // 取消防抖定时器，取当前 pending 内容立即保存
       if (saveTimerRef.current) {
