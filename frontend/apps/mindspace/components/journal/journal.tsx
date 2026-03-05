@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, History, ChevronLeft, ChevronRight, X, HelpCircle } from 'lucide-react';
+import { Settings, History, ChevronLeft, ChevronRight, X, HelpCircle, Save } from 'lucide-react';
+import { toast } from '../../../../core/components';
 import { MarkdownEditor } from '@my-ui-kit/core';
 import type { MarkdownEditorRef } from '@my-ui-kit/core';
 import DiaryTagBar from './DiaryTagBar';
@@ -53,6 +54,8 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   const pendingSaveRef = useRef<{ dateStr: string; content: string } | null>(null);
   // 追踪正在执行中的保存请求，避免 flush 遗漏 in-flight 请求
   const inflightSaveRef = useRef<Promise<void> | null>(null);
+  // 区分首次挂载加载 vs 后续日期切换：首次加载不 flush（避免虚假空内容覆盖）
+  const isInitialLoadRef = useRef(true);
 
   // ========== 日期格式化 ==========
   const formatDate = toLocalDateString;
@@ -63,7 +66,9 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
     d1.getDate() === d2.getDate();
 
   // ========== Flush 挂起的保存 ==========
-  const flushPendingSave = useCallback(async () => {
+  // 返回值：true 表示实际执行了保存（pending 被写入或 inflight 请求被等待）
+  const flushPendingSave = useCallback(async (): Promise<boolean> => {
+    let didSave = false;
     // 取消定时器
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
@@ -73,6 +78,7 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
     if (inflightSaveRef.current) {
       await inflightSaveRef.current;
       inflightSaveRef.current = null;
+      didSave = true;
     }
     // 如果有挂起的保存数据（定时器还没触发的），立即执行保存
     const pending = pendingSaveRef.current;
@@ -80,10 +86,12 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
       pendingSaveRef.current = null;
       try {
         await DiaryAPI.saveContent(pending.dateStr, { content: pending.content });
+        didSave = true;
       } catch (e) {
         console.error('flush 保存日记内容失败:', e);
       }
     }
+    return didSave;
   }, []);
 
   // ========== 加载日记 ==========
@@ -92,8 +100,25 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
     try {
       // 先进入 loading 状态隐藏编辑器，防止 flush 期间用户继续输入导致跨日期写入
       setLoading(true);
-      // 再 flush 上一个日期挂起的保存，确保数据不丢失且不竞态
-      await flushPendingSave();
+      if (isInitialLoadRef.current) {
+        // 首次挂载：丢弃由 MarkdownEditor 初始化（value='' → onUpdate → handleContentChange('')）
+        // 产生的虚假 pending 数据，避免空内容覆盖后端已保存的日记
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+        }
+        pendingSaveRef.current = null;
+        // 仍需等待 inflight 请求完成（虽然首次挂载极少有 inflight）
+        if (inflightSaveRef.current) {
+          await inflightSaveRef.current;
+          inflightSaveRef.current = null;
+        }
+        isInitialLoadRef.current = false;
+      } else {
+        // 后续日期切换：正常 flush 上一个日期挂起的保存，确保数据不丢失
+        const saved = await flushPendingSave();
+        if (saved) toast.success('日记已自动保存');
+      }
       const data = await DiaryAPI.getDiary(dateStr);
       setDiary(data);
       const newContent = data.content || '';
@@ -123,6 +148,9 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
 
   // ========== 内容自动保存（防抖 1.5s） ==========
   const handleContentChange = useCallback((md: string) => {
+    // 双重防护：loadDiary 尚未完成首次加载时，忽略编辑器初始化产生的噪音内容
+    // 这处理 MarkdownEditor 的 onUpdate 比 loadDiary useEffect 更晚触发的竞态情况
+    if (isInitialLoadRef.current && (md === '' || md === '\n\n')) return;
     setContent(md);
     const dateStr = formatDate(activeDate);
     // 记录待保存数据，供 flush 使用
@@ -150,8 +178,51 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
     }, 1500);
   }, [activeDate]);
 
-  // 组件卸载时 flush 挂起的保存
+  // 组件卸载时 flush 挂起的保存（退出日记界面时）
   useEffect(() => () => { flushPendingSave(); }, [flushPendingSave]);
+
+  // ========== 手动保存（按钮 / Ctrl+S） ==========
+  const handleManualSave = useCallback(async () => {
+    const hasPending = !!pendingSaveRef.current;
+    const hasInflight = !!inflightSaveRef.current;
+    // 如果既没有 pending 也没有 inflight，说明无新改动，静默不提示
+    if (!hasPending && !hasInflight) return;
+    try {
+      // 取消防抖定时器，取当前 pending 内容立即保存
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      // 等待任何 inflight 请求
+      if (inflightSaveRef.current) {
+        await inflightSaveRef.current;
+        inflightSaveRef.current = null;
+      }
+      // 若还有 pending 内容则立即保存（使用 pending.dateStr 而非 activeDate，防止日期切换时写错日期）
+      const pending = pendingSaveRef.current;
+      if (pending) {
+        pendingSaveRef.current = null;
+        const updated = await DiaryAPI.saveContent(pending.dateStr, { content: pending.content });
+        setDiary(prev => prev ? { ...prev, word_count: updated.word_count, updated_at: updated.updated_at } : prev);
+      }
+      toast.success('日记已保存');
+    } catch (e) {
+      console.error('手动保存日记失败:', e);
+      toast.error('保存失败，请重试');
+    }
+  }, []);
+
+  // ========== Ctrl+S 全局快捷键 ==========
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        handleManualSave();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleManualSave]);
 
   // ========== Meta 更新 ==========
   const handleMoodChange = async (mood: MoodLevel) => {
@@ -402,6 +473,15 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
               </span>
             </div>
             <div className="flex space-x-4 text-gray-400/50 items-center">
+              {/* 保存按钮 */}
+              <button
+                onClick={handleManualSave}
+                title="保存 (Ctrl+S)"
+                className="p-2.5 rounded-full transition-all duration-300 hover:scale-105 active:scale-95 bg-white/50 text-slate-600 hover:bg-white hover:text-emerald-600 hover:shadow-md backdrop-blur-sm border border-transparent hover:border-emerald-100"
+                aria-label="保存日记"
+              >
+                <Save size={18} strokeWidth={2} />
+              </button>
               {onOpenGuide && (
                 <button
                   onClick={onOpenGuide}

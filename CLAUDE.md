@@ -14,6 +14,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 | 环境搭建、启动命令、配置修改、问题排查 | `docs/claude/project-setup.md` |
 | 修改路径解析、数据目录、数据迁移、`settings_manager` 路径相关代码 | `docs/claude/path-config.md` |
 | 前端涉及 `Date` 对象格式化、日期字符串转换、`toISOString` 相关代码 | `docs/claude/frontend-date-handling.md` |
+| 新建或修改需求文档（PRD） | `docs/需求文档/prd-rules.md` |
 
 **执行标准**：触发场景命中时，必须在编码前使用 Read 工具加载对应文档。不确定是否命中时，加载比不加载好。
 
