@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
  */
 
 interface MindSpaceHomeProps {
-  onNavigate: (view: 'mood' | 'journal' | 'being' | 'commitment') => void;
+  onNavigate: (view: 'mood' | 'journal' | 'being' | 'commitment' | 'value') => void;
 }
 
 // --- Assets & Icons ---
@@ -212,9 +212,11 @@ const MindSpaceHome: React.FC<MindSpaceHomeProps> = ({ onNavigate }) => {
       case 'COMMITMENT':
         onNavigate('commitment');
         break;
+      case 'VALUE':
+        onNavigate('value');
+        break;
       // "Being" content is not connected yet as per instructions
       case 'BARRIER':
-      case 'VALUE':
       case 'EXPLORE':
         console.log("Being content - coming soon");
         break;

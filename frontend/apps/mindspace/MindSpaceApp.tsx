@@ -6,11 +6,12 @@ import BeingView from './components/being/BeingView';
 import EmotionView from './components/mood/EmotionView';
 import JournalView from './components/journal/journal';
 import CommitmentView from './components/commitment/commitment';
+import { ValueView } from './components/value/ValueView';
 import UniversalGuide from './components/shared/UniversalGuide';
 import MindSpaceHome from './components/mindSpace';
 import { getDailyQuote } from './services/geminiService';
 
-type ViewState = 'home' | 'being' | 'mood' | 'journal' | 'commitment';
+type ViewState = 'home' | 'being' | 'mood' | 'journal' | 'commitment' | 'value';
 
 export const MindSpaceApp: React.FC = () => {
     const [currentView, setCurrentView] = useState<ViewState>('home');
@@ -86,6 +87,18 @@ export const MindSpaceApp: React.FC = () => {
                         className="fixed inset-0 z-[100] bg-[#F2F4F1] overflow-y-auto"
                     >
                         <CommitmentView onBack={() => handleNavigate('home')} onNavigate={handleNavigate} />
+                    </motion.div>
+                )}
+                {currentView === 'value' && (
+                    <motion.div
+                        key="value-view"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className="fixed inset-0 z-[100] bg-[#FAF8F5] overflow-y-auto"
+                    >
+                        <ValueView onBack={() => handleNavigate('home')} onNavigate={handleNavigate} />
                     </motion.div>
                 )}
             </AnimatePresence>
