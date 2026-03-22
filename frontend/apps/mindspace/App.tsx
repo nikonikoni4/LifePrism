@@ -11,7 +11,7 @@ import UniversalGuide from './components/shared/UniversalGuide';
 import MindSpaceHome from './components/mindSpace';
 import { getDailyQuote } from './services/geminiService';
 
-type ViewState = 'home' | 'being' | 'mood' | 'journal' | 'commitment';
+type ViewState = 'home' | 'being' | 'mood' | 'journal' | 'commitment' | 'value';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('home');
