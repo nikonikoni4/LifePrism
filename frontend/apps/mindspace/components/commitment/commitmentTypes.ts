@@ -4,7 +4,7 @@ export interface CommitmentItem {
   id: string;
   content: string;
   value_id: string | null;
-  value_keyword: string | null;
+  value_keywords: string | null;
   status: CommitmentStatus;
   created_at: string;
   updated_at: string | null;
@@ -28,5 +28,5 @@ export interface UpdateCommitmentRequest {
 
 export interface ValueOption {
   id: string;
-  keyword: string;
+  keywords: string;
 }

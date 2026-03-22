@@ -64,6 +64,6 @@ export const ValueAPI = {
     const res = await fetch(`${getValueBase()}/`);
     if (!res.ok) throw new Error(await parseError(res, '获取价值列表失败'));
     const data = await res.json();
-    return (data.items ?? []).map((v: any) => ({ id: v.id, keyword: v.keyword }));
+    return (data.items ?? []).map((v: any) => ({ id: v.id, keywords: v.keywords }));
   },
 };

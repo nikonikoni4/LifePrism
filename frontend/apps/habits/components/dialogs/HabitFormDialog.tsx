@@ -365,7 +365,7 @@ export const HabitFormDialog: React.FC<HabitFormDialogProps> = ({
                     <option value="">-- 不关联 --</option>
                     {values.map((v) => (
                       <option key={v.id} value={v.id}>
-                        {v.keyword}
+                        {v.keywords}
                       </option>
                     ))}
                   </select>

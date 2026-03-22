@@ -25,8 +25,9 @@ def _convert_to_value_item(item: dict) -> ValueItem:
     """将数据库记录转换为 ValueItem"""
     return ValueItem(
         id=item['id'],
-        keyword=item['keyword'],
-        content=item.get('content'),
+        keywords=item['keywords'],
+        content_positive=item.get('content_positive'),
+        content_negative=item.get('content_negative'),
         sort_order=item.get('sort_order', 0),
         created_at=item.get('created_at', ''),
         updated_at=item.get('updated_at'),
@@ -70,8 +71,9 @@ def get_value_detail(value_id: str) -> Optional[ValueDetailItem]:
 
     return ValueDetailItem(
         id=item['id'],
-        keyword=item['keyword'],
-        content=item.get('content'),
+        keywords=item['keywords'],
+        content_positive=item.get('content_positive'),
+        content_negative=item.get('content_negative'),
         sort_order=item.get('sort_order', 0),
         created_at=item.get('created_at', ''),
         updated_at=item.get('updated_at'),
@@ -90,13 +92,13 @@ def create_value(request: CreateValueRequest) -> Optional[ValueItem]:
         Optional[ValueItem]: 新创建的价值，失败返回 None
 
     Raises:
-        ConflictError: keyword 已存在
+        ConflictError: keywords 已存在
     """
     data = request.model_dump()
     try:
         new_id = value_provider.create_value(data)
     except sqlite3.IntegrityError:
-        raise ConflictError(f"keyword 已存在: {request.keyword}")
+        raise ConflictError(f"keywords 已存在: {request.keywords}")
     if not new_id:
         return None
     item = value_provider.get_value_by_id(new_id)

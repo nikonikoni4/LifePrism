@@ -24,7 +24,7 @@ class CommitmentProvider(LWBaseDataProvider):
 
     def get_commitments(self, status: Optional[str] = None, value_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        获取承诺列表（LEFT JOIN user_values 获取 value_keyword）
+        获取承诺列表（LEFT JOIN user_values 获取 value_keywords）
 
         Args:
             status: 状态筛选，支持逗号分隔多值（如 "active,archived"）
@@ -51,7 +51,7 @@ class CommitmentProvider(LWBaseDataProvider):
 
                 where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
                 sql = f"""
-                    SELECT c.*, v.keyword AS value_keyword
+                    SELECT c.*, v.keywords AS value_keywords
                     FROM commitments c
                     LEFT JOIN user_values v ON c.value_id = v.id
                     {where}
@@ -68,7 +68,7 @@ class CommitmentProvider(LWBaseDataProvider):
 
     def get_commitment_by_id(self, commitment_id: str) -> Optional[Dict[str, Any]]:
         """
-        按 ID 获取承诺（LEFT JOIN user_values 获取 value_keyword）
+        按 ID 获取承诺（LEFT JOIN user_values 获取 value_keywords）
 
         Args:
             commitment_id: 承诺 ID (格式: cmt-xxx)
@@ -80,7 +80,7 @@ class CommitmentProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT c.*, v.keyword AS value_keyword
+                    SELECT c.*, v.keywords AS value_keywords
                     FROM commitments c
                     LEFT JOIN user_values v ON c.value_id = v.id
                     WHERE c.id = ?

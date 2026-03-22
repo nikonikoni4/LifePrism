@@ -68,7 +68,7 @@ class ValueProvider(LWBaseDataProvider):
         创建价值
 
         Args:
-            data: 价值数据（需包含 keyword）
+            data: 价值数据（需包含 keywords）
 
         Returns:
             Optional[str]: 新创建的 ID，失败返回 None
@@ -78,9 +78,9 @@ class ValueProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO user_values (id, keyword, content, sort_order)
-                    VALUES (?, ?, ?, ?)
-                """, (new_id, data['keyword'], data.get('content'), data.get('sort_order', 0)))
+                    INSERT INTO user_values (id, keywords, content_positive, content_negative, sort_order)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (new_id, data['keywords'], data.get('content_positive'), data.get('content_negative'), data.get('sort_order', 0)))
             logger.info(f"创建价值成功: {new_id}")
             return new_id
         except sqlite3.IntegrityError:
@@ -105,7 +105,7 @@ class ValueProvider(LWBaseDataProvider):
                 return True
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                allowed_fields = ['keyword', 'content', 'sort_order']
+                allowed_fields = ['keywords', 'content_positive', 'content_negative', 'sort_order']
                 set_clauses = []
                 values = []
                 for key, value in data.items():

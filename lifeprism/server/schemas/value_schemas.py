@@ -10,8 +10,9 @@ from lifeprism.server.schemas.commitment_schemas import CommitmentBriefItem
 class ValueItem(BaseModel):
     """价值信息"""
     id: str = Field(..., description="价值 ID (格式: val-xxx)")
-    keyword: str = Field(..., description="短标签（2-4字）")
-    content: Optional[str] = Field(default=None, description="详细描述")
+    keywords: str = Field(..., description="关键词（支持多个，使用分号分隔，如'健康;活力;自律'）")
+    content_positive: Optional[str] = Field(default=None, description="正向描述")
+    content_negative: Optional[str] = Field(default=None, description="负向描述")
     sort_order: int = Field(default=0, description="排序权重")
     created_at: str = Field(default="", description="创建时间")
     updated_at: Optional[str] = Field(default=None, description="更新时间")
@@ -29,14 +30,16 @@ class ValueListResponse(BaseModel):
 
 class CreateValueRequest(BaseModel):
     """创建价值"""
-    keyword: str = Field(..., description="短标签（2-4字）")
-    content: Optional[str] = Field(default=None, description="详细描述")
+    keywords: str = Field(..., description="关键词（支持多个，使用分号分隔，如'健康;活力;自律'）")
+    content_positive: Optional[str] = Field(default=None, description="正向描述")
+    content_negative: Optional[str] = Field(default=None, description="负向描述")
 
 
 class UpdateValueRequest(BaseModel):
     """更新价值（部分更新）"""
-    keyword: Optional[str] = Field(default=None, description="短标签")
-    content: Optional[str] = Field(default=None, description="详细描述")
+    keywords: Optional[str] = Field(default=None, description="关键词（支持多个，使用分号分隔）")
+    content_positive: Optional[str] = Field(default=None, description="正向描述")
+    content_negative: Optional[str] = Field(default=None, description="负向描述")
     sort_order: Optional[int] = Field(default=None, description="排序权重")
 
     @model_validator(mode='after')

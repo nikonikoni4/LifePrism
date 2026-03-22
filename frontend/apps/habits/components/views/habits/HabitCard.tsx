@@ -24,7 +24,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
     const { values, commitments } = useMindspaceStore();
-    const valueKeyword = habit.valueId ? values.find(v => v.id === habit.valueId)?.keyword : null;
+    const valueKeyword = habit.valueId ? values.find(v => v.id === habit.valueId)?.keywords : null;
     const commitmentContent = habit.commitmentId ? commitments.find(c => c.id === habit.commitmentId)?.content : null;
 
     const menuRef = useRef<HTMLDivElement>(null);

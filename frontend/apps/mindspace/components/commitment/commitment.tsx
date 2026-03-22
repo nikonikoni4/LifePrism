@@ -238,7 +238,7 @@ const CommitmentView: React.FC<CommitmentViewProps> = ({ onBack, onNavigate }) =
             {/* Card List */}
             <div className="space-y-12 md:pl-8 pb-32">
               {commitments.map((item) => {
-                const valueLabel = item.value_keyword ?? '未关联';
+                const valueLabel = item.value_keywords ?? '未关联';
                 const { core, extended } = splitValue(valueLabel);
                 const isCompleted = item.status === 'completed';
                 const isArchived = item.status === 'archived';
@@ -352,7 +352,7 @@ const CommitmentView: React.FC<CommitmentViewProps> = ({ onBack, onNavigate }) =
                     autoFocus
                   >
                     <option value="">选择价值…</option>
-                    {values.map(v => <option key={v.id} value={v.id}>{v.keyword}</option>)}
+                    {values.map(v => <option key={v.id} value={v.id}>{v.keywords}</option>)}
                   </select>
                 ) : (
                   <p className="font-ink text-lg text-[#6B7875]/60 py-4 border-b border-[#2C3835]/10">暂无价值，请先创建</p>

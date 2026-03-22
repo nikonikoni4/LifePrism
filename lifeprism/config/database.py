@@ -1263,15 +1263,20 @@ USER_VALUES_CONFIG = {
             'constraints': ['PRIMARY KEY', 'NOT NULL'],
             'comment': '价值 ID，格式 val-{uuid[:8]}'
         },
-        'keyword': {
+        'keywords': {
             'type': 'TEXT',
             'constraints': ['NOT NULL', 'UNIQUE'],
-            'comment': '短标签（2-4字，如"生机"），用于卡片展示，UNIQUE 防止重复'
+            'comment': '关键词（支持多个，使用分号分隔，如"健康;活力;自律"），UNIQUE 防止重复'
         },
-        'content': {
+        'content_positive': {
             'type': 'TEXT',
             'constraints': [],
-            'comment': '详细描述（可为空）'
+            'comment': '正向描述（我想成为什么样的人）'
+        },
+        'content_negative': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '负向描述（我不想成为什么样的人）'
         },
         'sort_order': {
             'type': 'INTEGER',

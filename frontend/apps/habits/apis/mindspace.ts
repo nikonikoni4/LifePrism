@@ -6,7 +6,7 @@ const getCommitmentBase = createApiV2UrlGetter('/commitment');
 
 export interface ValueOption {
     id: string;
-    keyword: string;
+    keywords: string;
 }
 
 export interface CommitmentOption {
@@ -20,7 +20,7 @@ export const mindspaceApi = {
         const response: any = await fetchApi(`${getValueBase()}/`);
         return (response.items || []).map((v: any) => ({
             id: v.id,
-            keyword: v.keyword,
+            keywords: v.keywords,
         }));
     },
     getCommitments: async (valueId?: string): Promise<CommitmentOption[]> => {
