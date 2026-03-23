@@ -1,6 +1,4 @@
-from email.policy import default
-from zoneinfo import available_timezones
-from lifeprism.llm.providers import litellm_provider
+
 from lifeprism.llm.providers.litellm_provider import LiteLLMProvider
 from lifeprism.llm.providers.base import LLMResponse
 from lifeprism.config import provider_manager
@@ -18,7 +16,7 @@ import asyncio
 
 ## 通过测试的provider
 tested_providers = ["volcengine","dashscope","minimax","deepseek","zhipu","moonshot"]
-tested_providers = []
+
 ## 测试provider
 async def test_providers():
     ## 测试api_key是否存在

@@ -17,7 +17,6 @@ from lifeprism.utils import get_logger
 
 from lifeprism.llm.providers.base import LLMProvider, LLMResponse, ToolCallRequest
 from lifeprism.llm.providers.registry import find_by_model, find_gateway
-from lifeprism.config import provider_manager
 logger = get_logger(__name__)
 
 # Standard chat-completion message keys.

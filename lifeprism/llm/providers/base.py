@@ -3,8 +3,6 @@
 Copyright (c) [2026.3.22] [HKUDS]
 Licensed under the MIT License.
 """
-
-import os
 import asyncio
 import json
 from abc import ABC, abstractmethod
