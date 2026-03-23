@@ -52,12 +52,15 @@ class SettingsManager:
             cls._instance = super().__new__(cls)
             cls._instance._initialize()
         return cls._instance
-    
+
+    def get_config_path(self)->Path:
+        return self._config_path
+
+        
     def _initialize(self) -> None:
         """初始化配置管理器"""
         self._config: Dict[str, Any] = {}
         self._warnings: List[Dict[str, str]] = []
-
         # 判断是否是开发环境
         self._is_dev = not getattr(sys, 'frozen', False)
 
@@ -70,7 +73,6 @@ class SettingsManager:
         else:
             # 打包环境：配置文件始终在固定路径
             self._config_path = self._config_base_path / 'config' / 'config.yaml'
-
         # 2. 加载 yaml 配置
         self._load_config()
 

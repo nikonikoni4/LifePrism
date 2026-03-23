@@ -10,6 +10,7 @@ LLM 服务商配置管理器（纯数据层）
 不导入任何 llm/ 模块，依赖方向：config → llm
 """
 
+from os import path
 import sys
 from pathlib import Path
 from typing import Any
@@ -231,35 +232,35 @@ class ProviderManager:
             cls._instance._initialize()
         return cls._instance
 
+    def get_config_path(self)->Path:
+        
+        return self._config_path
     def _initialize(self) -> None:
         self._raw_specs: list[dict[str, Any]] = []
         self._allowed_providers: list[str] = []
-
         is_dev = not getattr(sys, "frozen", False)
-
         if is_dev:
-            config_path = Path(__file__).parent / "providers.yaml"
+            self._config_path = Path(__file__).parent / "providers.yaml"
         else:
             from lifeprism.config.settings_manager import settings
-            config_path = Path(settings.config_base_path) / "config" / "providers.yaml"
-
-        if not config_path.exists():
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(config_path, "w", encoding="utf-8") as f:
+            self._config_path = Path(settings.config_base_path) / "config" / "providers.yaml"
+        if not self._config_path.exists():
+            self._config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._config_path, "w", encoding="utf-8") as f:
                 yaml.dump(DEFAULT_PROVIDER_CONFIG, f, allow_unicode=True, sort_keys=False)
-            logger.info(f"providers.yaml not found, created from DEFAULT_PROVIDER_CONFIG: {config_path}")
+            logger.info(f"providers.yaml not found, created from DEFAULT_PROVIDER_CONFIG: {self._config_path}")
 
-        self._load_config(config_path)
+        self._load_config()
 
-    def _load_config(self, config_path: Path) -> None:
+    def _load_config(self) -> None:
         try:
-            with open(config_path, encoding="utf-8") as f:
+            with open(self._config_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             self._raw_specs = data.get("providers", [])
             self._allowed_providers = data.get("allowed_providers", [])
-            logger.debug(f"Loaded {len(self._raw_specs)} providers from {config_path}")
+            logger.debug(f"Loaded {len(self._raw_specs)} providers from {self._config_path}")
         except Exception:
-            logger.exception(f"Failed to load providers.yaml from {config_path}")
+            logger.exception(f"Failed to load providers.yaml from {self._config_path}")
             self._raw_specs = []
             self._allowed_providers = []
 
