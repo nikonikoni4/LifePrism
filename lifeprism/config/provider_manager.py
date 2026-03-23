@@ -342,6 +342,37 @@ class ProviderManager:
             for s in specs
         ]
 
+    @property
+    def provider_list(self) -> list[str]:
+        """白名单 provider 的显示名称有序列表，供前端展示。"""
+        result = []
+        for name in self._allowed_providers:
+            spec = next((s for s in self._raw_specs if s.get("name") == name), None)
+            if spec:
+                result.append(spec.get("display_name", name))
+        return result
+
+    @property
+    def name_to_id_map(self) -> dict[str, str]:
+        """display_name → name(id) 映射，供 settings_manager 显示名转 id。"""
+        return {
+            s.get("display_name", ""): s.get("name", "")
+            for s in self._raw_specs
+            if s.get("display_name")
+        }
+
+    def get_provider_id(self, provider_name: str) -> str:
+        """将显示名称转为 provider id(name)，若已是 id 则原样返回。"""
+        for s in self._raw_specs:
+            if s.get("display_name") == provider_name:
+                return s.get("name", provider_name)
+        return provider_name
+
+    def get_keyring_username(self, provider_id: str) -> str | None:
+        """返回 provider 的 keyring username (env_key)，env_key 为空则返回 None。"""
+        env_key = self._get_env_key(provider_id)
+        return env_key if env_key else None
+
     def get_default_provider(self) -> str:
         """返回白名单中第一个 provider name。"""
         return self._allowed_providers[0] if self._allowed_providers else ""

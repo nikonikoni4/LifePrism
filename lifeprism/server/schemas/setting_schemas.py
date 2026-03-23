@@ -67,28 +67,13 @@ class UpdateApiKeyResponse(BaseModel):
     message: str
 
 
-class ProviderCapabilities(BaseModel):
-    """服务商能力"""
-    web_search: bool = Field(description="是否支持网络搜索")
-    thinking: bool = Field(description="是否支持深度思考")
-    streaming: bool = Field(description="是否支持流式输出")
-    tool_calling: bool = Field(description="是否支持工具调用")
-
-
 class ProviderInfo(BaseModel):
     """服务商信息"""
-    provider_id: str = Field(description="服务商 ID")
-    provider_name: str = Field(description="服务商显示名称")
-    capabilities: ProviderCapabilities = Field(description="服务商能力")
+    name: str = Field(description="服务商 ID")
+    display_name: str = Field(description="服务商显示名称")
     default_model: str = Field(description="默认模型")
-
-
-class ProviderCapabilitiesResponse(BaseModel):
-    """获取服务商能力响应"""
-    provider_id: str
-    provider_name: str
-    capabilities: Dict[str, bool]
-    default_model: str
+    default_api_base: str = Field(default="", description="默认 API Base URL")
+    has_api_key: bool = Field(description="是否需要 API Key")
 
 
 class ProviderListResponse(BaseModel):

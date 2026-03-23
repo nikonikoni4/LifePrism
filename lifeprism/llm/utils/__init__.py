@@ -4,11 +4,9 @@
 from .create_model import create_ChatTongyiModel
 from .llm_factory import (
     create_llm,
-    get_provider,
     get_provider_id,
     get_provider_capabilities,
     list_providers,
-    PROVIDER_REGISTRY,
 )
 from .format_prompt_utils import (
     format_goals_for_prompt,
@@ -34,11 +32,9 @@ __all__ = [
     "create_ChatTongyiModel",
     # 新的统一工厂函数
     "create_llm",
-    "get_provider",
     "get_provider_id",
     "get_provider_capabilities",
     "list_providers",
-    "PROVIDER_REGISTRY",
     # 其他工具
     "format_goals_for_prompt",
     "format_category_tree_for_prompt",
