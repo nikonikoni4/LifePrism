@@ -12,6 +12,8 @@ import {
     UpdateApiKeyResponse,
     ApiKeyStatusResponse,
     TestConnectionResponse,
+    ProviderInfo,
+    ProviderListResponse,
     ValidatePathRequest,
     ValidatePathResponse,
     MigrateDataPathRequest,
@@ -95,6 +97,18 @@ export const SettingsAPI = {
             throw new Error(errorData.detail || `连接测试失败: ${response.statusText}`);
         }
         return response.json();
+    },
+
+    /**
+     * 获取所有支持的服务商及其默认值
+     */
+    async getProviders(): Promise<ProviderInfo[]> {
+        const response = await fetch(`${getApiBase()}/settings/providers`);
+        if (!response.ok) {
+            throw new Error(`获取服务商列表失败: ${response.statusText}`);
+        }
+        const data: ProviderListResponse = await response.json();
+        return data.providers;
     },
 
     /**

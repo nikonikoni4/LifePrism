@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def get_provider_id(provider_name: Optional[str] = None) -> str:
     """
-    获取 Provider ID
+    获取 Provider ID (区分于display name 显示名称)
 
     Args:
         provider_name: 服务商名称（显示名称或 ID），None 时从 settings 读取

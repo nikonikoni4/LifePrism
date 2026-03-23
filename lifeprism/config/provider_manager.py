@@ -33,7 +33,7 @@ DEFAULT_PROVIDER_CONFIG = {
             'name': 'custom',
             'keywords': [],
             'env_key': '',
-            'display_name': 'Custom',
+            'display_name': 'Custom(OpenAI SDK)',
             'litellm_prefix': '',
             'skip_prefixes': [],
             'env_extras': [],
@@ -362,11 +362,27 @@ class ProviderManager:
         }
 
     def get_provider_id(self, provider_name: str) -> str:
-        """将显示名称转为 provider id(name)，若已是 id 则原样返回。"""
+        """将display name显示名称转为 provider id(name)，若已是 id 则原样返回。"""
         for s in self._raw_specs:
             if s.get("display_name") == provider_name:
                 return s.get("name", provider_name)
         return provider_name
+
+    def get_default_model(self, provider_id: str) -> str:
+        """获取指定 provider 的默认模型。"""
+        for spec in self._raw_specs:
+            if spec.get("name") == provider_id:
+                default_model = spec.get("default_model", "")
+                return default_model if isinstance(default_model, str) else ""
+        return ""
+
+    def get_default_api_base(self, provider_id: str) -> str:
+        """获取指定 provider 的默认 API Base。"""
+        for spec in self._raw_specs:
+            if spec.get("name") == provider_id:
+                default_api_base = spec.get("default_api_base", "")
+                return default_api_base if isinstance(default_api_base, str) else ""
+        return ""
 
     def get_keyring_username(self, provider_id: str) -> str | None:
         """返回 provider 的 keyring username (env_key)，env_key 为空则返回 None。"""

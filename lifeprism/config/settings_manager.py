@@ -13,7 +13,6 @@ import yaml
 import keyring
 from pathlib import Path
 from typing import Any, Optional, List, Dict
-from functools import lru_cache
 
 # Keyring 服务名称
 KEYRING_SERVICE_NAME = "lifeprism"
@@ -36,6 +35,7 @@ class SettingsManager:
         'api_key': None,
         'provider': '',
         'model': '',
+        'api_base': '',  # 空=由 settings 界面按 provider 历史/默认值回填
         'input_tokens_cost': 0.0,
         'output_tokens_cost': 0.0,
         'classification_mode': 'classify_graph',
@@ -44,7 +44,7 @@ class SettingsManager:
         'aw_db_path': '~/AppData/Local/activitywatch/activitywatch/aw-server/peewee-sqlite.v2.db',
         'lifeprism_data_path': '',  # 空=使用默认路径
         'data_cleaning_threshold': 10,
-        'model_history': {},  # 按服务商存储的模型历史 {provider_id: [model1, model2, ...]}
+        'model_history': {},  # 按服务商存储的模型历史 {provider_id: {api_base: '', models: [model1, model2, ...]}}
     }
     
     def __new__(cls) -> 'SettingsManager':
@@ -173,6 +173,10 @@ class SettingsManager:
             self._config = self.DEFAULTS.copy()
             # 如果配置文件不存在，创建默认配置
             self._save_config()
+
+        self._config['model_history'] = self._normalize_model_history(
+            self._config.get('model_history')
+        )
     
     def _save_config(self) -> None:
         """保存配置到 YAML 文件"""
@@ -187,6 +191,46 @@ class SettingsManager:
                 default_flow_style=False,
                 sort_keys=False
             )
+
+    def _normalize_model_history(
+        self, raw_history: Optional[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        统一模型历史结构。
+
+        兼容旧结构:
+        {provider_id: [model1, model2]}
+
+        新结构:
+        {provider_id: {"api_base": "", "models": [model1, model2]}}
+        """
+        normalized: Dict[str, Dict[str, Any]] = {}
+        if not isinstance(raw_history, dict):
+            return normalized
+
+        for provider_id, snapshot in raw_history.items():
+            if isinstance(snapshot, list):
+                models = [item for item in snapshot if isinstance(item, str) and item]
+                normalized[provider_id] = {
+                    "api_base": "",
+                    "models": models,
+                }
+                continue
+
+            if isinstance(snapshot, dict):
+                raw_models = snapshot.get("models", snapshot.get("model", []))
+                if isinstance(raw_models, list):
+                    models = [item for item in raw_models if isinstance(item, str) and item]
+                else:
+                    models = []
+
+                api_base = snapshot.get("api_base", "")
+                normalized[provider_id] = {
+                    "api_base": api_base if isinstance(api_base, str) else "",
+                    "models": models,
+                }
+
+        return normalized
     
     def get(self, key: str, default: Any = None) -> Any:
         """
@@ -484,6 +528,10 @@ class SettingsManager:
     @property
     def model(self) -> str:
         return self.get('model')
+
+    @property
+    def api_base(self) -> str:
+        return self.get('api_base')
     
     @property
     def input_tokens_cost(self) -> float:
@@ -539,9 +587,14 @@ class SettingsManager:
         return self._lifeprism_data_path
 
     @property
-    def model_history(self) -> Dict[str, List[str]]:
+    def model_history(self) -> Dict[str, Dict[str, Any]]:
         """获取模型历史记录"""
-        return self.get('model_history') or {}
+        return self._normalize_model_history(self.get('model_history') or {})
+
+    def get_provider_history(self, provider_id: str) -> Dict[str, Any]:
+        """获取指定服务商的历史快照。"""
+        history = self.model_history
+        return history.get(provider_id, {"api_base": "", "models": []})
 
     def get_model_history_for_provider(self, provider_id: str) -> List[str]:
         """
@@ -553,31 +606,54 @@ class SettingsManager:
         Returns:
             模型名称列表
         """
-        history = self.model_history
-        return history.get(provider_id, [])
+        snapshot = self.get_provider_history(provider_id)
+        return list(snapshot.get("models", []))
 
-    def add_model_to_history(self, provider_id: str, model: str) -> None:
+    def get_provider_api_base(self, provider_id: str) -> str:
+        """获取指定服务商最近保存的 api_base。"""
+        snapshot = self.get_provider_history(provider_id)
+        api_base = snapshot.get("api_base", "")
+        return api_base if isinstance(api_base, str) else ""
+
+    def set_provider_api_base(self, provider_id: str, api_base: str) -> None:
+        """更新指定服务商的 api_base，保留历史模型列表。"""
+        if not provider_id:
+            return
+
+        history = self.model_history
+        snapshot = history.get(provider_id, {"api_base": "", "models": []})
+        snapshot["api_base"] = api_base or ""
+        history[provider_id] = snapshot
+        self.set('model_history', history)
+
+    def add_model_to_history(
+        self, provider_id: str, model: str, api_base: Optional[str] = None
+    ) -> None:
         """
         将模型添加到历史记录
 
         Args:
             provider_id: 服务商 ID
             model: 模型名称/ID
+            api_base: 当前 provider 对应的 API Base
         """
         if not model or not provider_id:
             return
 
-        history = self.get('model_history') or {}
-        if provider_id not in history:
-            history[provider_id] = []
+        history = self.model_history
+        snapshot = history.get(provider_id, {"api_base": "", "models": []})
+        models = list(snapshot.get("models", []))
 
         # 如果已存在，先移除再添加到最前面
-        if model in history[provider_id]:
-            history[provider_id].remove(model)
-        history[provider_id].insert(0, model)
+        if model in models:
+            models.remove(model)
+        models.insert(0, model)
 
         # 限制每个服务商最多保存 10 个历史模型
-        history[provider_id] = history[provider_id][:10]
+        snapshot["models"] = models[:10]
+        if api_base is not None:
+            snapshot["api_base"] = api_base or ""
+        history[provider_id] = snapshot
 
         self.set('model_history', history)
 
@@ -592,9 +668,16 @@ class SettingsManager:
         Returns:
             是否删除成功
         """
-        history = self.get('model_history') or {}
-        if provider_id in history and model in history[provider_id]:
-            history[provider_id].remove(model)
+        history = self.model_history
+        snapshot = history.get(provider_id)
+        if not snapshot:
+            return False
+
+        models = list(snapshot.get("models", []))
+        if model in models:
+            models.remove(model)
+            snapshot["models"] = models
+            history[provider_id] = snapshot
             self.set('model_history', history)
             return True
         return False

@@ -8,6 +8,12 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 
 
+class ProviderModelHistory(BaseModel):
+    """单个服务商的模型历史快照"""
+    api_base: str = Field(default="", description="该服务商最近保存的 API Base")
+    models: List[str] = Field(default_factory=list, description="该服务商的模型历史列表")
+
+
 class SettingItems(BaseModel):
     """配置项完整模型"""
     # 用户配置
@@ -18,7 +24,8 @@ class SettingItems(BaseModel):
     provider_list: List[str] = Field(description="支持的模型服务商列表")
     provider_id_map: Dict[str, str] = Field(default={}, description="服务商显示名称到 ID 的映射")
     model: str = Field(description="模型选择")
-    model_history: Dict[str, List[str]] = Field(default={}, description="按服务商存储的模型历史")
+    api_base: str = Field(default="", description="当前 API Base")
+    model_history: Dict[str, ProviderModelHistory] = Field(default={}, description="按服务商存储的模型历史")
     input_tokens_cost: float = Field(description="输入token单价 /1k")
     output_tokens_cost: float = Field(description="输出token单价 /1k")
     # 分类配置
@@ -45,6 +52,7 @@ class UpdateSettingsRequest(BaseModel):
     user_name: Optional[str] = None
     provider: Optional[str] = None
     model: Optional[str] = None
+    api_base: Optional[str] = None
     input_tokens_cost: Optional[float] = None
     output_tokens_cost: Optional[float] = None
     classification_mode: Optional[str] = None
