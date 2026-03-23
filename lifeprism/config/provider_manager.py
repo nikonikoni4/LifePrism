@@ -1,329 +1,351 @@
 """
-LLM 服务商配置管理器
+LLM 服务商配置管理器（纯数据层）
 
-负责加载和管理 providers.yaml 配置文件
-统一管理所有服务商的 ID、名称映射、能力配置等
+职责：
+1. 加载 providers.yaml → 缓存原始 dict 列表
+2. 提供 get_raw_specs() 供 registry.py 构建 ProviderSpec
+3. keyring 读写（get_api_key / set_api_key）
+4. 提供 get_all_providers() 供 API 层返回前端展示数据
+
+不导入任何 llm/ 模块，依赖方向：config → llm
 """
 
-import os
 import sys
-import shutil
-import yaml
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
-from dataclasses import dataclass, field
+from typing import Any
+
+import keyring
+import yaml
 
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
+_KEYRING_SERVICE = "lifeprism"
 
-@dataclass
-class ProviderInfo:
-    """服务商信息"""
-    provider_id: str           # 内部标识，如 "aliyun"
-    name: str                  # 显示名称，如 "阿里云百炼 (Aliyun)"
-    base_url: str              # API 基础 URL
-    default_model: str         # 默认模型
-    env_key_name: str          # 环境变量名称，如 "DASHSCOPE_API_KEY"
-    capabilities: Set[str] = field(default_factory=set)  # 能力集合
-    notes: str = ""            # 备注信息
-
+DEFAULT_PROVIDER_CONFIG = {
+    'allowed_providers': [
+        'custom', 'volcengine', 'dashscope', 'deepseek', 
+        'zhipu', 'moonshot', 'minimax', 'openai'
+    ],
+    'providers': [
+        {
+            'name': 'custom',
+            'keywords': [],
+            'env_key': '',
+            'display_name': 'Custom',
+            'litellm_prefix': '',
+            'skip_prefixes': [],
+            'env_extras': [],
+            'is_gateway': False,
+            'is_local': False,
+            'detect_by_key_prefix': '',
+            'detect_by_base_keyword': '',
+            'default_api_base': '',
+            'strip_model_prefix': False,
+            'litellm_kwargs': {},
+            'model_overrides': [],
+            'is_oauth': False,
+            'is_direct': True,
+            'supports_prompt_caching': False,
+            'default_model': ''
+        },
+        {
+            'name': 'azure_openai',
+            'keywords': ['azure', 'azure-openai'],
+            'env_key': '',
+            'display_name': 'Azure OpenAI',
+            'litellm_prefix': '',
+            'skip_prefixes': [],
+            'env_extras': [],
+            'is_gateway': False,
+            'is_local': False,
+            'detect_by_key_prefix': '',
+            'detect_by_base_keyword': '',
+            'default_api_base': '',
+            'strip_model_prefix': False,
+            'litellm_kwargs': {},
+            'model_overrides': [],
+            'is_oauth': False,
+            'is_direct': True,
+            'supports_prompt_caching': False,
+            'default_model': ''
+        },
+        {
+            'name': 'openrouter',
+            'keywords': ['openrouter'],
+            'env_key': 'api_key_openrouter',
+            'display_name': 'OpenRouter',
+            'litellm_prefix': 'openrouter',
+            'skip_prefixes': [],
+            'env_extras': [],
+            'is_gateway': True,
+            'is_local': False,
+            'detect_by_key_prefix': 'sk-or-',
+            'detect_by_base_keyword': 'openrouter',
+            'default_api_base': 'https://openrouter.ai/api/v1',
+            'strip_model_prefix': False,
+            'litellm_kwargs': {},
+            'model_overrides': [],
+            'is_oauth': False,
+            'is_direct': False,
+            'supports_prompt_caching': True,
+            'default_model': ''
+        },
+        {
+            'name': 'aihubmix',
+            'keywords': ['aihubmix'],
+            'env_key': 'api_key_aihubmix',
+            'display_name': 'AiHubMix',
+            'litellm_prefix': 'openai',
+            'skip_prefixes': [],
+            'env_extras': [],
+            'is_gateway': True,
+            'is_local': False,
+            'detect_by_key_prefix': '',
+            'detect_by_base_keyword': 'aihubmix',
+            'default_api_base': 'https://aihubmix.com/v1',
+            'strip_model_prefix': True,
+            'litellm_kwargs': {},
+            'model_overrides': [],
+            'is_oauth': False,
+            'is_direct': False,
+            'supports_prompt_caching': False,
+            'default_model': ''
+        },
+        {
+            'name': 'siliconflow',
+            'keywords': ['siliconflow'],
+            'env_key': 'api_key_siliconflow',
+            'display_name': 'SiliconFlow',
+            'litellm_prefix': 'openai',
+            'skip_prefixes': [],
+            'env_extras': [],
+            'is_gateway': True,
+            'is_local': False,
+            'detect_by_key_prefix': '',
+            'detect_by_base_keyword': 'siliconflow',
+            'default_api_base': 'https://api.siliconflow.cn/v1',
+            'strip_model_prefix': False,
+            'litellm_kwargs': {},
+            'model_overrides': [],
+            'is_oauth': False,
+            'is_direct': False,
+            'supports_prompt_caching': False,
+            'default_model': ''
+        },
+        {
+            'name': 'volcengine',
+            'keywords': ['volcengine', 'volces', 'ark'],
+            'env_key': 'api_key_volcengine',
+            'display_name': 'VolcEngine',
+            'litellm_prefix': 'volcengine',
+            'skip_prefixes': [],
+            'env_extras': [],
+            'is_gateway': True,
+            'is_local': False,
+            'detect_by_key_prefix': '',
+            'detect_by_base_keyword': 'volces',
+            'default_api_base': 'https://ark.cn-beijing.volces.com/api/v3',
+            'strip_model_prefix': False,
+            'litellm_kwargs': {},
+            'model_overrides': [],
+            'is_oauth': False,
+            'is_direct': False,
+            'supports_prompt_caching': False,
+            'default_model': 'doubao-seed-1-6-251015'
+        },
+        {
+            'name': 'volcengine_coding_plan',
+            'keywords': ['volcengine-plan'],
+            'env_key': 'api_key_volcengine',
+            'display_name': 'VolcEngine Coding Plan',
+            'litellm_prefix': 'volcengine',
+            'skip_prefixes': [],
+            'env_extras': [],
+            'is_gateway': True,
+            'is_local': False,
+            'detect_by_key_prefix': '',
+            'detect_by_base_keyword': '',
+            'default_api_base': 'https://ark.cn-beijing.volces.com/api/coding/v3',
+            'strip_model_prefix': True,
+            'litellm_kwargs': {},
+            'model_overrides': [],
+            'is_oauth': False,
+            'is_direct': False,
+            'supports_prompt_caching': False,
+            'default_model': ''
+        },
+        {
+            'name': 'byteplus',
+            'keywords': ['byteplus'],
+            'env_key': 'api_key_byteplus',
+            'display_name': 'BytePlus',
+            'litellm_prefix': 'volcengine',
+            'skip_prefixes': [],
+            'env_extras': [],
+            'is_gateway': True,
+            'is_local': False,
+            'detect_by_key_prefix': '',
+            'detect_by_base_keyword': 'bytepluses',
+            'default_api_base': 'https://ark.ap-southeast.bytepluses.com/api/v3',
+            'strip_model_prefix': True,
+            'litellm_kwargs': {},
+            'model_overrides': [],
+            'is_oauth': False,
+            'is_direct': False,
+            'supports_prompt_caching': False,
+            'default_model': ''
+        },
+        {
+            'name': 'byteplus_coding_plan',
+            'keywords': ['byteplus-plan'],
+            'env_key': 'api_key_byteplus',
+            'display_name': 'BytePlus Coding Plan',
+            'litellm_prefix': 'volcengine',
+            'skip_prefixes': [],
+            'env_extras': [],
+            'is_gateway': True,
+            'is_local': False,
+            'detect_by_key_prefix': '',
+            'detect_by_base_keyword': '',
+            'default_api_base': 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
+            'strip_model_prefix': True,
+            'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': ''}, {'name': 'anthropic', 'keywords': ['anthropic', 'claude'], 'env_key': 'api_key_anthropic', 'display_name': 'Anthropic', 'litellm_prefix': '', 'skip_prefixes': [], 'env_extras': [], 'is_gateway': False, 'is_local': False, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '', 'default_api_base': '', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': True, 'default_model': 'claude-opus-4-5'}, {'name': 'openai', 'keywords': ['openai', 'gpt'], 'env_key': 'api_key_openai', 'display_name': 'OpenAI', 'litellm_prefix': '', 'skip_prefixes': [], 'env_extras': [], 'is_gateway': False, 'is_local': False, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '', 'default_api_base': '', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': 'gpt-4o'}, {'name': 'openai_codex', 'keywords': ['openai-codex'], 'env_key': '', 'display_name': 'OpenAI Codex', 'litellm_prefix': '', 'skip_prefixes': [], 'env_extras': [], 'is_gateway': False, 'is_local': False, 'detect_by_key_prefix': '', 'detect_by_base_keyword': 'codex', 'default_api_base': 'https://chatgpt.com/backend-api', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': True, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': ''}, {'name': 'github_copilot', 'keywords': ['github_copilot', 'copilot'], 'env_key': '', 'display_name': 'Github Copilot', 'litellm_prefix': 'github_copilot', 'skip_prefixes': ['github_copilot/'], 'env_extras': [], 'is_gateway': False, 'is_local': False, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '', 'default_api_base': '', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': True, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': ''}, {'name': 'deepseek', 'keywords': ['deepseek'], 'env_key': 'api_key_deepseek', 'display_name': 'DeepSeek', 'litellm_prefix': 'deepseek', 'skip_prefixes': ['deepseek/'], 'env_extras': [], 'is_gateway': False, 'is_local': False, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '', 'default_api_base': 'https://api.deepseek.com', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': 'deepseek-chat'}, {'name': 'gemini', 'keywords': ['gemini'], 'env_key': 'api_key_gemini', 'display_name': 'Gemini', 'litellm_prefix': 'gemini', 'skip_prefixes': ['gemini/'], 'env_extras': [], 'is_gateway': False, 'is_local': False, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '', 'default_api_base': '', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': 'gemini-2.0-flash'}, {'name': 'zhipu', 'keywords': ['zhipu', 'glm', 'zai'], 'env_key': 'api_key_zhipu', 'display_name': 'Zhipu AI', 'litellm_prefix': 'zai', 'skip_prefixes': ['zhipu/', 'zai/', 'openrouter/', 'hosted_vllm/'], 'env_extras': [['ZHIPUAI_API_KEY', '{api_key}']], 'is_gateway': False, 'is_local': False, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '', 'default_api_base': 'https://open.bigmodel.cn/api/paas/v4', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': 'glm-5'}, {'name': 'dashscope', 'keywords': ['qwen', 'dashscope'], 'env_key': 'api_key_dashscope', 'display_name': 'DashScope', 'litellm_prefix': 'dashscope', 'skip_prefixes': ['dashscope/', 'openrouter/'], 'env_extras': [], 'is_gateway': False, 'is_local': False, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '', 'default_api_base': '', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': 'qwen3.5-plus'}, {'name': 'moonshot', 'keywords': ['moonshot', 'kimi'], 'env_key': 'api_key_moonshot', 'display_name': 'Moonshot', 'litellm_prefix': 'moonshot', 'skip_prefixes': ['moonshot/', 'openrouter/'], 'env_extras': [['MOONSHOT_API_BASE', '{api_base}']], 'is_gateway': False, 'is_local': False, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '', 'default_api_base': 'https://api.moonshot.cn/v1', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [['kimi-k2.5', {'temperature': 1.0}]], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': 'kimi-k2.5'}, {'name': 'minimax', 'keywords': ['minimax'], 'env_key': 'api_key_minimax', 'display_name': 'MiniMax', 'litellm_prefix': 'minimax', 'skip_prefixes': ['minimax/', 'openrouter/'], 'env_extras': [], 'is_gateway': False, 'is_local': False, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '', 'default_api_base': 'https://api.minimaxi.com/v1', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': 'MiniMax-M2.1'}, {'name': 'vllm', 'keywords': ['vllm'], 'env_key': 'api_key_vllm', 'display_name': 'vLLM/Local', 'litellm_prefix': 'hosted_vllm', 'skip_prefixes': [], 'env_extras': [], 'is_gateway': False, 'is_local': True, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '', 'default_api_base': '', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': ''}, {'name': 'ollama', 'keywords': ['ollama', 'nemotron'], 'env_key': 'api_key_ollama', 'display_name': 'Ollama', 'litellm_prefix': 'ollama_chat', 'skip_prefixes': ['ollama/', 'ollama_chat/'], 'env_extras': [], 'is_gateway': False, 'is_local': True, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '11434', 'default_api_base': 'http://localhost:11434', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': ''}, {'name': 'groq', 'keywords': ['groq'], 'env_key': 'api_key_groq', 'display_name': 'Groq', 'litellm_prefix': 'groq', 'skip_prefixes': ['groq/'], 'env_extras': [], 'is_gateway': False, 'is_local': False, 'detect_by_key_prefix': '', 'detect_by_base_keyword': '', 'default_api_base': '', 'strip_model_prefix': False, 'litellm_kwargs': {}, 'model_overrides': [], 'is_oauth': False, 'is_direct': False, 'supports_prompt_caching': False, 'default_model': ''}
+    ]
+}
 
 class ProviderManager:
     """
     服务商配置管理器（单例）
 
-    负责：
-    1. 加载 providers.yaml 配置文件
-    2. 提供 provider_id ↔ name 的双向映射
-    3. 提供服务商列表、能力查询等接口
-    4. 打包环境下自动将配置复制到 lifeprismData/config
+    数据来源：lifeprism/config/providers.yaml（开发）
+            或 config_base_path/config/providers.yaml（打包）
     """
 
-    _instance: Optional['ProviderManager'] = None
+    _instance: "ProviderManager | None" = None
 
-    def __new__(cls) -> 'ProviderManager':
+    def __new__(cls) -> "ProviderManager":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialize()
         return cls._instance
 
     def _initialize(self) -> None:
-        """初始化配置管理器"""
-        self._providers: Dict[str, ProviderInfo] = {}
-        self._default_provider_id: str = "aliyun"
-        self._config_path: Optional[Path] = None
+        self._raw_specs: list[dict[str, Any]] = []
+        self._allowed_providers: list[str] = []
 
-        self._is_dev = not getattr(sys, 'frozen', False)
+        is_dev = not getattr(sys, "frozen", False)
 
-        # 从 settings 获取数据路径（settings_manager 已在此之前初始化）
-        from lifeprism.config.settings_manager import settings
-
-        # 获取源配置文件路径（开发环境中的配置）
-        self._source_config_path = Path(__file__).parent / 'providers.yaml'
-
-        if self._is_dev:
-            # 开发环境：直接使用 lifeprism/config/providers.yaml
-            self._config_path = self._source_config_path
+        if is_dev:
+            config_path = Path(__file__).parent / "providers.yaml"
         else:
-            # 打包环境：使用固定配置路径下的 providers.yaml
-            self._config_path = Path(settings.config_base_path) / 'config' / 'providers.yaml'
-            # 确保配置文件存在（如果不存在则从源复制）
-            self._ensure_config_exists()
+            from lifeprism.config.settings_manager import settings
+            config_path = Path(settings.config_base_path) / "config" / "providers.yaml"
 
-        self._load_config()
+        if not config_path.exists():
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_path, "w", encoding="utf-8") as f:
+                yaml.dump(DEFAULT_PROVIDER_CONFIG, f, allow_unicode=True, sort_keys=False)
+            logger.info(f"providers.yaml not found, created from DEFAULT_PROVIDER_CONFIG: {config_path}")
 
-    def _ensure_config_exists(self) -> None:
-        """
-        确保打包环境下配置文件存在
+        self._load_config(config_path)
 
-        如果 lifeprismData/config/providers.yaml 不存在，
-        则从源文件（打包时嵌入的配置）复制过去
-        """
-        if not self._config_path.exists():
-            self._config_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # 在打包环境中，源配置文件应该在 resources/backend/lifeprism/config/
-            if getattr(sys, 'frozen', False):
-                # PyInstaller 打包后的路径
-                bundle_dir = Path(sys.executable).parent
-                frozen_source = bundle_dir / 'lifeprism' / 'config' / 'providers.yaml'
-                if frozen_source.exists():
-                    shutil.copy2(frozen_source, self._config_path)
-                    logger.info(f"已从打包资源复制配置到: {self._config_path}")
-                else:
-                    # 如果打包资源中也没有，创建默认配置
-                    self._create_default_config()
-            else:
-                # 开发环境直接复制
-                if self._source_config_path.exists():
-                    shutil.copy2(self._source_config_path, self._config_path)
-                    logger.info(f"已从源复制配置到: {self._config_path}")
-                else:
-                    self._create_default_config()
-
-    def _create_default_config(self) -> None:
-        """创建默认配置文件"""
-        default_config = {
-            'providers': {
-                'aliyun': {
-                    'name': '阿里云百炼 (Aliyun)',
-                    'base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-                    'default_model': 'qwen-plus-latest',
-                    'env_key_name': 'DASHSCOPE_API_KEY',
-                    'capabilities': ['web_search', 'thinking', 'streaming', 'tool_calling']
-                },
-                'volcengine': {
-                    'name': '火山引擎 (VolcEngine)',
-                    'base_url': 'https://ark.cn-beijing.volces.com/api/v3',
-                    'default_model': 'ep-xxxxxxxxxx',
-                    'env_key_name': 'ARK_API_KEY',
-                    'capabilities': ['web_search', 'thinking', 'streaming', 'tool_calling'],
-                    'notes': '火山引擎需要使用 Endpoint ID（格式：ep-xxx）而不是模型名称'
-                },
-                'openai': {
-                    'name': 'OpenAI',
-                    'base_url': 'https://api.openai.com/v1',
-                    'default_model': 'gpt-4o',
-                    'env_key_name': 'OPENAI_API_KEY',
-                    'capabilities': ['streaming', 'tool_calling']
-                },
-                'minimax': {
-                    'name': 'MiniMax',
-                    'base_url': 'https://api.minimax.chat/v1',
-                    'default_model': 'MiniMax-M2.1',
-                    'env_key_name': 'MINIMAX_API_KEY',
-                    'capabilities': ['streaming', 'tool_calling']
-                }
-            },
-            'default_provider': 'aliyun'
-        }
-
-        self._config_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self._config_path, 'w', encoding='utf-8') as f:
-            yaml.dump(
-                default_config,
-                f,
-                allow_unicode=True,
-                default_flow_style=False,
-                sort_keys=False
-            )
-        logger.info(f"已创建默认配置: {self._config_path}")
-
-    def _load_config(self, _retry: bool = True) -> None:
-        """从 YAML 文件加载配置"""
+    def _load_config(self, config_path: Path) -> None:
         try:
-            if self._config_path.exists():
-                with open(self._config_path, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f) or {}
+            with open(config_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            self._raw_specs = data.get("providers", [])
+            self._allowed_providers = data.get("allowed_providers", [])
+            logger.debug(f"Loaded {len(self._raw_specs)} providers from {config_path}")
+        except Exception:
+            logger.exception(f"Failed to load providers.yaml from {config_path}")
+            self._raw_specs = []
+            self._allowed_providers = []
 
-                self._default_provider_id = config.get('default_provider', 'aliyun')
+    # ------------------------------------------------------------------
+    # 供 registry.py 使用
+    # ------------------------------------------------------------------
 
-                providers_config = config.get('providers', {})
-                self._providers = {}
+    def get_raw_specs(self) -> list[dict[str, Any]]:
+        """返回 yaml 中全部 provider 的原始 dict 列表，供 registry 构建 ProviderSpec。"""
+        return self._raw_specs
 
-                for provider_id, provider_data in providers_config.items():
-                    capabilities = set(provider_data.get('capabilities', []))
-                    self._providers[provider_id] = ProviderInfo(
-                        provider_id=provider_id,
-                        name=provider_data.get('name', provider_id),
-                        base_url=provider_data.get('base_url', ''),
-                        default_model=provider_data.get('default_model', ''),
-                        env_key_name=provider_data.get('env_key_name', ''),
-                        capabilities=capabilities,
-                        notes=provider_data.get('notes', '')
-                    )
+    def get_allowed_providers(self) -> list[str]:
+        """返回 allowed_providers 白名单（有序）。"""
+        return self._allowed_providers
 
-                logger.info(f"已加载 {len(self._providers)} 个服务商配置")
-            else:
-                if _retry:
-                    logger.warning(f"配置文件不存在: {self._config_path}，尝试创建默认配置")
-                    self._create_default_config()
-                    self._load_config(_retry=False)
-                else:
-                    logger.error("无法加载或创建配置文件，使用空配置")
-                    self._providers = {}
+    # ------------------------------------------------------------------
+    # keyring 读写
+    # ------------------------------------------------------------------
 
-        except Exception as e:
-            logger.error(f"加载服务商配置失败: {e}")
-            self._providers = {}
-
-    def reload(self) -> None:
-        """重新加载配置文件"""
-        self._load_config()
-
-    # ===================== 查询方法 =====================
-
-    def get_provider(self, provider_id: str) -> Optional[ProviderInfo]:
+    def get_api_key(self, provider_name: str) -> str | None:
         """
-        根据 provider_id 获取服务商信息
-
-        Args:
-            provider_id: 服务商 ID，如 "aliyun"
-
-        Returns:
-            ProviderInfo 或 None
+        从 keyring 读取 provider 的 API key。
+        env_key 为空（如 custom）时返回 None。
         """
-        return self._providers.get(provider_id)
+        env_key = self._get_env_key(provider_name)
+        if not env_key:
+            return None
+        return keyring.get_password(_KEYRING_SERVICE, env_key)
 
-    def get_provider_by_name(self, name: str) -> Optional[ProviderInfo]:
+    def set_api_key(self, provider_name: str, api_key: str) -> None:
+        """将 API key 写入 keyring。"""
+        env_key = self._get_env_key(provider_name)
+        if not env_key:
+            logger.warning(f"Provider '{provider_name}' has no env_key, skipping keyring write")
+            return
+        keyring.set_password(_KEYRING_SERVICE, env_key, api_key)
+
+    def delete_api_key(self, provider_name: str) -> None:
+        """从 keyring 删除 API key。"""
+        env_key = self._get_env_key(provider_name)
+        if not env_key:
+            return
+        try:
+            keyring.delete_password(_KEYRING_SERVICE, env_key)
+        except keyring.errors.PasswordDeleteError:
+            pass
+
+    def _get_env_key(self, provider_name: str) -> str:
+        """从 raw_specs 中查找 provider 的 env_key。"""
+        for spec in self._raw_specs:
+            if spec.get("name") == provider_name:
+                return spec.get("env_key", "")
+        return ""
+
+    # ------------------------------------------------------------------
+    # 供 API 层使用
+    # ------------------------------------------------------------------
+
+    def get_all_providers(self, allowed_only: bool = True) -> list[dict[str, Any]]:
         """
-        根据显示名称获取服务商信息
-
-        Args:
-            name: 显示名称，如 "阿里云百炼 (Aliyun)"
-
-        Returns:
-            ProviderInfo 或 None
+        返回 provider 展示信息列表，供前端使用。
+        allowed_only=True 时只返回白名单中的 provider。
         """
-        for provider in self._providers.values():
-            if provider.name == name:
-                return provider
-        return None
+        specs = self._raw_specs
+        if allowed_only and self._allowed_providers:
+            allowed_set = set(self._allowed_providers)
+            specs = [s for s in specs if s.get("name") in allowed_set]
+            # 按 allowed_providers 顺序排序
+            order = {name: i for i, name in enumerate(self._allowed_providers)}
+            specs = sorted(specs, key=lambda s: order.get(s.get("name", ""), 999))
 
-    def get_provider_id(self, name_or_id: str) -> str:
-        """
-        将名称或 ID 统一转换为 provider_id
-
-        Args:
-            name_or_id: 可以是显示名称或 provider_id
-
-        Returns:
-            provider_id，如果未找到则返回默认值
-        """
-        # 已经是 ID
-        if name_or_id in self._providers:
-            return name_or_id
-
-        # 尝试按名称查找
-        provider = self.get_provider_by_name(name_or_id)
-        if provider:
-            return provider.provider_id
-
-        # 返回默认值
-        logger.warning(f"未知的服务商 '{name_or_id}'，使用默认服务商 '{self._default_provider_id}'")
-        return self._default_provider_id
-
-    def get_provider_name(self, provider_id: str) -> str:
-        """
-        根据 provider_id 获取显示名称
-
-        Args:
-            provider_id: 服务商 ID
-
-        Returns:
-            显示名称，如果未找到则返回 provider_id 本身
-        """
-        provider = self.get_provider(provider_id)
-        return provider.name if provider else provider_id
-
-    @property
-    def default_provider_id(self) -> str:
-        """获取默认服务商 ID"""
-        return self._default_provider_id
-
-    @property
-    def provider_list(self) -> List[str]:
-        """获取服务商显示名称列表（用于前端下拉框）"""
-        return [p.name for p in self._providers.values()]
-
-    @property
-    def provider_id_list(self) -> List[str]:
-        """获取服务商 ID 列表"""
-        return list(self._providers.keys())
-
-    @property
-    def name_to_id_map(self) -> Dict[str, str]:
-        """获取 name -> id 映射字典"""
-        return {p.name: p.provider_id for p in self._providers.values()}
-
-    @property
-    def id_to_name_map(self) -> Dict[str, str]:
-        """获取 id -> name 映射字典"""
-        return {p.provider_id: p.name for p in self._providers.values()}
-
-    def get_all_providers(self) -> List[Dict[str, Any]]:
-        """
-        获取所有服务商信息（用于 API 返回）
-
-        Returns:
-            服务商信息列表
-        """
         return [
             {
-                'provider_id': p.provider_id,
-                'name': p.name,
-                'base_url': p.base_url,
-                'default_model': p.default_model,
-                'env_key_name': p.env_key_name,
-                'capabilities': list(p.capabilities),
-                'notes': p.notes
+                "name": s.get("name", ""),
+                "display_name": s.get("display_name", ""),
+                "default_model": s.get("default_model", ""),
+                "default_api_base": s.get("default_api_base", ""),
+                "has_api_key": bool(s.get("env_key", "")),
             }
-            for p in self._providers.values()
+            for s in specs
         ]
 
-    def get_keyring_username(self, provider_id: str) -> str:
-        """
-        获取服务商对应的 keyring 用户名
-
-        Args:
-            provider_id: 服务商 ID
-
-        Returns:
-            keyring 用户名，格式为 "api_key_{provider_id}"
-        """
-        return f"api_key_{provider_id}"
-
-    def get_all_keyring_usernames(self) -> Dict[str, str]:
-        """
-        获取所有服务商的 keyring 用户名映射
-
-        Returns:
-            provider_id -> keyring_username 映射
-        """
-        return {pid: self.get_keyring_username(pid) for pid in self._providers.keys()}
+    def get_default_provider(self) -> str:
+        """返回白名单中第一个 provider name。"""
+        return self._allowed_providers[0] if self._allowed_providers else ""
 
 
-# 全局单例实例
+# 全局单例
 provider_manager = ProviderManager()
