@@ -169,8 +169,9 @@ class SettingsManager:
     def _load_config(self) -> None:
         """从 YAML 文件加载配置"""
         if self._config_path.exists():
-            with open(self._config_path, 'r', encoding='utf-8') as f:
-                self._config = yaml.safe_load(f) or {}
+            from lifeprism.config.migrations.config_migrator import run_config_migrations
+            from lifeprism.config.migrations.scripts import SETTINGS_MIGRATIONS
+            self._config = run_config_migrations(self._config_path, SETTINGS_MIGRATIONS) or {}
         else:
             self._config = self.DEFAULTS.copy()
             # 如果配置文件不存在，创建默认配置
