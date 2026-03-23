@@ -1,4 +1,4 @@
-from lifeprism.llm.utils import create_llm
+from lifeprism.llm.providers import create_llm_client
 from lifeprism.config.settings_manager import settings
 import logging
 
@@ -21,13 +21,12 @@ async def test_connect() -> dict:
     """
     try:
         # 使用用户配置的服务商和模型创建 LLM
-        llm = create_llm(temperature=0.1, enable_search=False)
+        llm = create_llm_client()
         
         # 发送简单的测试请求
-        test_prompt = "请回复'连接成功'这四个字。"
-        
+        message = [{"role":"user","content":"请回复'连接成功'这四个字"}]
         # 使用异步调用 LLM
-        output = await llm.ainvoke(input=test_prompt)
+        output = await llm.chat(messages=message)
         
         # 获取回复内容
         response_content = output.content if hasattr(output, 'content') else str(output)

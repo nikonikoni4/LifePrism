@@ -6,5 +6,42 @@ False -> litellmProvider
 """
 from lifeprism.llm.providers.litellm_provider import LiteLLMProvider
 from lifeprism.llm.providers.custom_provider import CustomProvider
+from lifeprism.config import provider_manager,settings
+from lifeprism.llm.providers.registry import find_by_name
 
 
+def create_llm_client():
+    """
+    直接使用配置文件中的provider，api_key, api_base
+    """
+    provider = provider_manager.get_provider_id(settings.provider)
+    spec = find_by_name(provider)
+    if not provider  :
+        raise ValueError("config.yaml中没有设置provider,请在设置界面选择provider")
+    if not spec:
+        raise ValueError(f"无效的provider ： {provider}")
+
+    
+    is_direct = spec.is_direct 
+    # 1. 路由：查看is_direct 
+    if is_direct : 
+        return CustomProvider(
+            api_key = provider_manager.get_api_key(provider) or 'no-key',
+            api_base=settings.api_base,
+            default_model=settings.model
+            )
+    else:
+        return LiteLLMProvider(
+            api_key = provider_manager.get_api_key(provider),
+            api_base=settings.api_base,
+            default_model=settings.model,
+            provider_name=provider
+        )
+
+if __name__ == "__main__":
+    llm_client = create_llm_client()
+    async def main():
+        response = await llm_client.chat([{"role":"user","content":"你好"}])
+        print(response)
+    import asyncio
+    asyncio.run(main())
