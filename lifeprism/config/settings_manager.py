@@ -594,6 +594,10 @@ class SettingsManager:
         """获取模型历史记录"""
         return self._normalize_model_history(self.get('model_history') or {})
 
+    @property
+    def session_path(self)->Path:
+        return self._lifeprism_data_path / 'session'
+
     def get_provider_history(self, provider_id: str) -> Dict[str, Any]:
         """获取指定服务商的历史快照。"""
         history = self.model_history
