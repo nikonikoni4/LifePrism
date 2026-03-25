@@ -1,0 +1,13 @@
+{
+    "server": {
+        "backendPort": 8000,
+        "portFallbackList": [
+            8000,
+            8001,
+            8002,
+            8003,
+            8004
+        ],
+        "host": "localhost"
+    }
+}

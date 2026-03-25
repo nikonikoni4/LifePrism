@@ -30,13 +30,7 @@ a = Analysis(
         ('lifeprism/config/settings_manager.py', 'lifeprism/config'),
 
         # 资源模板文件（启动时按需复制到数据目录）
-        ('localData/docs/user_guide.md', 'templates/docs'),
-        ('localData/docs/user_guide_guide.md', 'templates/docs'),
-        ('lifeprism/llm/custom_prompt/workflow/daily_summary_plan.json', 'templates/workflow'),
-        ('lifeprism/llm/custom_prompt/workflow/weekly_summary_plan.json', 'templates/workflow'),
-        ('lifeprism/llm/custom_prompt/workflow/skill.md', 'templates/workflow'),
-        ('localData/config/config.json', 'templates/config'),
-        ('localData/plan/示例-planDoc.md', 'templates/plan'),
+        ('templates', 'templates'),
     ],
     hiddenimports=[
         # FastAPI/Uvicorn 相关
