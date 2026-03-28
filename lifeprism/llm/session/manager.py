@@ -22,6 +22,8 @@ class Session:
     updated_at : datetime = field(default_factory=datetime.now)
     # metadata : dict = field(default_factory=dict) # 扩展位，预留，暂时无任何作用
     last_compacted_loc : int = 0 # 上一次compact的位置 
+    auto_compact : bool = False # 默认不自动进行压缩 这个是因为lifeprism 里目前没有长对话，
+
 
     # def retract_last_user_message(self) -> dict[str, Any]:
     #     """撤销最后一条 user 消息及其之后的所有消息，返回被撤销的 user 消息"""
@@ -48,6 +50,12 @@ class Session:
         })
         self.updated_at = datetime.now()
         
+    def get_history_message(self) ->list[dict[str,Any]]:
+        """加载未压缩的message"""
+        load_loc = self.last_compacted_loc if self.auto_compact else 0 
+        return self.messages[load_loc:]
+
+
 class SessionManager:
     """
     维护session的生命周期: 创建，加载，保存，删除
@@ -149,6 +157,9 @@ class SessionManager:
         if not path.exists():
             return []
         return [f.name for f in path.glob('*.jsonl')]
+
+session_manager = SessionManager()
+
 
 if __name__ == "__main__":
     manager = SessionManager()

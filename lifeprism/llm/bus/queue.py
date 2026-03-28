@@ -1,5 +1,5 @@
 import asyncio
-from events import InboundMessage, OutboundMessage
+from lifeprism.llm.bus.events import InboundMessage, OutboundMessage
 
 # ─────────────────────────────────────────
 #MessageQueue：双向队列，纯数据通道

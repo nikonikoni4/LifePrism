@@ -222,7 +222,7 @@ class LiteLLMProvider(LLMProvider):
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
-        model: str | None = None,
+        model: str | None = None, 
         max_tokens: int = 4096,
         temperature: float = 0.7,
         reasoning_effort: str | None = None,
@@ -234,7 +234,7 @@ class LiteLLMProvider(LLMProvider):
         Args:
             messages: List of message dicts with 'role' and 'content'.
             tools: Optional list of tool definitions in OpenAI format.
-            model: Model identifier (e.g., 'anthropic/claude-sonnet-4-5').
+            model: Model identifier (e.g., 'anthropic/claude-sonnet-4-5'). 为None时使用spec中指定的默认模型
             max_tokens: Maximum tokens in response.
             temperature: Sampling temperature.
 
