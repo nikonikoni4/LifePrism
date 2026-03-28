@@ -1,12 +1,11 @@
 """消息收发接口 负责发送和接收"""
 import asyncio
-from lifeprism.llm.bus import InboundMessage, OutboundMessage,MessageBus
+from lifeprism.llm.bus import InboundMessage, OutboundMessage,bus
 from lifeprism.utils.logger import get_logger,DEBUG
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
 class Channel:
-    def __init__(self, bus: MessageBus):
-        self.bus = bus
+    def __init__(self):
         self._pending : dict[str,asyncio.Future] = {}
         self.stop_receive = False
         asyncio.create_task(self._receive_loop())
@@ -25,7 +24,7 @@ class Channel:
         self._pending[msg.id] = future
 
         # 3. 发送消息
-        await self.bus.publish_inbound(msg)
+        await bus.publish_inbound(msg)
 
         # 4. 等待对应future回复
         result:OutboundMessage = await asyncio.wait_for(self._pending[msg.id],None)  # 等队列里的下一个结果
@@ -35,14 +34,14 @@ class Channel:
 
     async def _receive_loop(self):
         while True:
-            msg = await self.bus.consume_outbound()
+            msg = await bus.consume_outbound()
             future = self._pending.pop(msg.id, None) 
             if future:
                 future.set_result(msg)
 
 # if __name__ == "__main__":
 #     async def main():
-#         bus = MessageBus()
+#         bus = MessageQueue()
 #         agent = AgentLoop(bus)
 #         channel = Channel(bus)
 #         asyncio.create_task(agent.run())

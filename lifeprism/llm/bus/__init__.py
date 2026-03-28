@@ -1,8 +1,8 @@
 
 from .events import OutboundMessage,InboundMessage
-from .queue import MessageBus
+from .queue import bus
 __all__ = [
     "OutboundMessage",
     "InboundMessage",
-    "MessageBus"
+    "bus"
 ]

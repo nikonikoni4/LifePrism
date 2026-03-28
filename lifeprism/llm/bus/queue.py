@@ -2,9 +2,9 @@ import asyncio
 from events import InboundMessage, OutboundMessage
 
 # ─────────────────────────────────────────
-# MessageBus：双向队列，纯数据通道
+#MessageQueue：双向队列，纯数据通道
 # ─────────────────────────────────────────
-class MessageBus:
+class MessageQueue:
     def __init__(self):
         self.inbound: asyncio.Queue[InboundMessage] = asyncio.Queue()
         self.outbound: asyncio.Queue[OutboundMessage] = asyncio.Queue()
@@ -20,3 +20,5 @@ class MessageBus:
 
     async def consume_outbound(self) -> OutboundMessage:
         return await self.outbound.get()
+
+bus = MessageQueue() # 单一实例
