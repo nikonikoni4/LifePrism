@@ -8,14 +8,22 @@ class Channel:
     def __init__(self):
         self._pending : dict[str,asyncio.Future] = {}
         self.stop_receive = False
-        asyncio.create_task(self._receive_loop())
+        self._receive_task = asyncio.create_task(self._receive_loop())
         # send -> 创建msg->创建futrue->_receive_loop内等待任务完成之后set_result, 在send中等待futrue完成
+
+    async def close(self):
+        """停止接收循环，释放资源"""
+        self._receive_task.cancel()
+        try:
+            await self._receive_task
+        except asyncio.CancelledError:
+            pass
     
     
-    async def send(self, content: str) -> str:
+    async def send(self, content: str, session_id: str | None = None) -> str:
         """发送消息并等待结果"""
         # 1. 创建消息
-        msg = InboundMessage(type="chat", content=content)
+        msg = InboundMessage(type="chat", content=content, session_id=session_id)
         logger.debug(f"[Channel] 发送 id={msg.id} content={content!r}")
 
         # 2. 创建future，并入pending
@@ -26,8 +34,8 @@ class Channel:
         # 3. 发送消息
         await bus.publish_inbound(msg)
 
-        # 4. 等待对应future回复
-        result:OutboundMessage = await asyncio.wait_for(self._pending[msg.id],None)  # 等队列里的下一个结果
+        # 4. 等待对应future回复（60s 超时，防止 agent 异常时永久挂起）
+        result:OutboundMessage = await asyncio.wait_for(self._pending[msg.id], timeout=60.0)
         logger.debug(f"[Channel] 收到回复: {result.response!r}")
 
         return result.response

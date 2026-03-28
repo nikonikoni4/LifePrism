@@ -2,6 +2,7 @@
 # 占位
 from typing import Any
 from lifeprism.llm.bus import MessageType
+from lifeprism.config import settings
 class Context:
     def __init__(self):
         pass

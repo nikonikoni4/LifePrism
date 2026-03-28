@@ -5,6 +5,8 @@ from lifeprism.llm.session import Session,session_manager
 import asyncio
 from lifeprism.llm.bus import InboundMessage,OutboundMessage,bus,MessageType
 from lifeprism.llm.agent.context import Context
+from lifeprism.utils import get_logger
+logger = get_logger(__name__)
 
 class AgentLoop:
     def __init__(self):
@@ -28,26 +30,33 @@ class AgentLoop:
         """
         依据不同的消息类型，创建system prompt + tool description
         """
-        # 1. 构建system prompt
-        system_prompt = Context.build_system_prompt(msg.type)
+        try:
+            # 1. 构建system prompt
+            system_prompt = Context.build_system_prompt(msg.type)
 
-        # 2. 构建tool description
-        if msg.type == MessageType.CHAT:
-            tools: list[dict[str, Any]] = []
-        elif msg.type == MessageType.CLASSIFY:
-            tools = []
+            # 2. 构建tool description
+            if msg.type == MessageType.CHAT:
+                tools: list[dict[str, Any]] = []
+            elif msg.type == MessageType.CLASSIFY:
+                tools = []
 
-        # 3. 构建完整消息（含历史）
-        session: Session = session_manager.get_or_create_session(msg.session_id)
-        session.add_message("user", content=msg.content)
-        messages = Context.build_prompt(system_prompt, session.get_history_message())
+            # 3. 构建完整消息（含历史）
+            session: Session = session_manager.get_or_create_session(msg.session_id)
+            session.add_message("user", content=msg.content)
+            messages = Context.build_prompt(system_prompt, session.get_history_message())
 
-        # 4. 调用 LLM
-        result = await self._run_agent_loop(messages, tools)
+            # 4. 调用 LLM
+            result = await self._run_agent_loop(messages, tools)
 
-        # 5. 保存 assistant 回复并发布结果
-        session.add_message("assistant", content=result)
-        await bus.publish_outbound(OutboundMessage(id=msg.id, response=result))
+            # 5. 保存 assistant 回复并发布结果
+            session.add_message("assistant", content=result)
+            await bus.publish_outbound(OutboundMessage(id=msg.id, response=result))
+
+            # 6. 保存session
+            session_manager.save_session(session)
+        except Exception as e:
+            logger.error(f"[AgentLoop] 处理消息 id={msg.id} 时出错: {e}", exc_info=True)
+            await bus.publish_outbound(OutboundMessage(id=msg.id, response=f"[ERROR] {e}"))
             
     
 
