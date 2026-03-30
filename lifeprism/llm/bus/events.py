@@ -17,6 +17,7 @@ class InboundMessage:
     id : str = field(default_factory=lambda : str(uuid.uuid4())[:4]) # 随机id,用于进行任务的
     content : str = '' # 消息内容
     session_id : str | None = None # 用户继续会话的id，未传入时会自动创建session
+    extra : dict | None = None
     def __post_init__(self):
         if self.type not in MESSAGE_TPYE:
             raise ValueError(f"无效的消息类型: {self.type!r}，合法值为 {MESSAGE_TPYE}")

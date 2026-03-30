@@ -8,22 +8,32 @@ class Channel:
     def __init__(self):
         self._pending : dict[str,asyncio.Future] = {}
         self.stop_receive = False
-        self._receive_task = asyncio.create_task(self._receive_loop())
+        self._receive_task: asyncio.Task | None = None
         # send -> 创建msg->创建futrue->_receive_loop内等待任务完成之后set_result, 在send中等待futrue完成
+
+    def _ensure_receive_task(self):
+        """懒启动接收循环，确保在事件循环中调用"""
+        if self._receive_task is None or self._receive_task.done():
+            self._receive_task = asyncio.create_task(self._receive_loop())
 
     async def close(self):
         """停止接收循环，释放资源"""
+        if self._receive_task is None:
+            return
         self._receive_task.cancel()
         try:
             await self._receive_task
         except asyncio.CancelledError:
             pass
+        self._receive_task = None
     
     
-    async def send(self, content: str, session_id: str | None = None) -> str:
+    async def send(self, content: str, session_id: str | None = None,
+                   type: str = "chat", extra: dict | None = None) -> str:
         """发送消息并等待结果"""
+        self._ensure_receive_task()
         # 1. 创建消息
-        msg = InboundMessage(type="chat", content=content, session_id=session_id)
+        msg = InboundMessage(type=type, content=content, session_id=session_id, extra=extra)
         logger.debug(f"[Channel] 发送 id={msg.id} content={content!r}")
 
         # 2. 创建future，并入pending
@@ -68,3 +78,5 @@ class Channel:
 #         await asyncio.gather(sender_a(), sender_b())
 
 #     asyncio.run(main())
+
+channel_manager = Channel()  # 懒初始化，_receive_task 在首次 send 时创建

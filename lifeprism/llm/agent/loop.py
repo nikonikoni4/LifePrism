@@ -32,7 +32,7 @@ class AgentLoop:
         """
         try:
             # 1. 构建system prompt
-            system_prompt = Context.build_system_prompt(msg.type)
+            system_prompt = Context.build_system_prompt(msg)
 
             # 2. 构建tool description
             if msg.type == MessageType.CHAT:
@@ -53,7 +53,8 @@ class AgentLoop:
             await bus.publish_outbound(OutboundMessage(id=msg.id, response=result))
 
             # 6. 保存session
-            session_manager.save_session(session)
+            if msg.type != MessageType.CLASSIFY: # 分类数据不保存
+                session_manager.save_session(session)
         except Exception as e:
             logger.error(f"[AgentLoop] 处理消息 id={msg.id} 时出错: {e}", exc_info=True)
             await bus.publish_outbound(OutboundMessage(id=msg.id, response=f"[ERROR] {e}"))
