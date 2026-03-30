@@ -35,20 +35,14 @@ def split_by_purpose(state: classifyState) -> classifyState:
     }
 
 
-def split_by_duration(state: classifyState) -> classifyState:
+def split_by_duration(multi_purpose_items: list) -> dict:
     """
-    将多用途 log_items 按时长分开，填充到对应字段
-    
-    Args:
-        state: 包含多用途数据的 classifyState 对象（需要先调用 split_by_purpose）
-        
+    将多用途 log_items 按时长分开
+
     Returns:
-        classifyState: 更新后的 state，包含:
-            - log_items_for_multi_short: 短时长数据
-            - log_items_for_multi_long: 长时长数据
+        dict: {log_items_for_multi_short, log_items_for_multi_long}
     """
-    # 直接从 log_items_for_multi 获取多用途数据
-    multi_purpose_items = state.log_items_for_multi
+    # multi_purpose_items 直接传入
     
     # 按时长分离
     short_duration_items = []
@@ -59,10 +53,10 @@ def split_by_duration(state: classifyState) -> classifyState:
             short_duration_items.append(item)
         else:
             long_duration_items.append(item)
-    
+
     logger.info(f"按时长分离完成: 短时长(<{settings.long_log_threshold}s) {len(short_duration_items)} 条, 长时长(>={settings.long_log_threshold}s) {len(long_duration_items)} 条")
-    
+
     return {
-        "log_items_for_multi_short": short_duration_items,
-        "log_items_for_multi_long": long_duration_items,
+        "log_items_for_multi_short": short_duration_items or None,
+        "log_items_for_multi_long": long_duration_items or None,
     }

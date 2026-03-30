@@ -37,7 +37,7 @@ class DataProcessingService:
         self._category_mappings_cache = None  # 缓存分类映射
         self._goal_name_to_id_cache = None  # 缓存 goal 名称到 ID 的映射
         
-    def process_activitywatch_data(
+    async def process_activitywatch_data(
         self,
         auto_classify: bool = True
     ) -> Dict:
@@ -86,7 +86,7 @@ class DataProcessingService:
             # 3. LLM 分类（如果需要）
             if auto_classify and apps_to_classify > 0:
                 logger.info(f"步骤 3/6: LLM 分类 {apps_to_classify} 条日志项...")
-                classified_app_df = self._classify_apps(classify_state, filtered_events)
+                classified_app_df = await self._classify_apps(classify_state, filtered_events)
                 
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
@@ -145,7 +145,7 @@ class DataProcessingService:
             logger.error(f"数据处理失败: {e}", exc_info=True)
             raise
     
-    def process_activitywatch_data_by_time_range(
+    async def process_activitywatch_data_by_time_range(
         self,
         start_time: datetime,
         end_time: datetime,
@@ -185,7 +185,7 @@ class DataProcessingService:
             # 3. LLM 分类（如果需要）
             if auto_classify and apps_to_classify > 0:
                 logger.info(f"步骤 3/6: LLM 分类 {apps_to_classify} 条日志项...")
-                classified_app_df = self._classify_apps(classify_state, filtered_events)
+                classified_app_df = await self._classify_apps(classify_state, filtered_events)
                 
                 # 4. 保存分类结果
                 logger.info("步骤 4/6: 保存分类结果...")
@@ -278,7 +278,7 @@ class DataProcessingService:
 
         return start_time, end_time
 
-    def _classify_apps(self, classify_state: classifyState, filtered_events: int) -> pd.DataFrame:
+    async def _classify_apps(self, classify_state: classifyState, filtered_events: int) -> pd.DataFrame:
         """
         使用 LLM 分类应用
         
@@ -385,7 +385,7 @@ class DataProcessingService:
         
         # 执行分类
         logger.info(f"  调用 LLM 分类器...")
-        result = classifier.classify(classify_state)
+        result = await classifier.classify(classify_state)
         logger.info(f"  [OK] 分类完成")
         logger.debug(f"  分类结果: {result}")
         # 处理分类结果
@@ -763,7 +763,10 @@ class DataProcessingService:
 
 
 if __name__ == "__main__":
-    data_processing_service = DataProcessingService()
-    start_time = datetime.now() - timedelta(minutes=5)
-    end_time = datetime.now()
-    data_processing_service.process_activitywatch_data_by_time_range(auto_classify=True, start_time=start_time, end_time=end_time)
+    import asyncio
+    async def _main():
+        data_processing_service = DataProcessingService()
+        start_time = datetime.now() - timedelta(minutes=5)
+        end_time = datetime.now()
+        await data_processing_service.process_activitywatch_data_by_time_range(auto_classify=True, start_time=start_time, end_time=end_time)
+    asyncio.run(_main())

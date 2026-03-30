@@ -54,7 +54,7 @@ async def sync_from_activitywatch(
                 "message": f"LLM 连接失败，已跳过同步: {connect_result['message']}"
             }
 
-    result = sync_service.sync_from_activitywatch(
+    result = await sync_service.sync_from_activitywatch(
         auto_classify=sync_request.auto_classify
     )
     return result
@@ -103,7 +103,7 @@ async def sync_from_activitywatch_by_time_range(
                 "message": f"LLM 连接失败，已跳过同步: {connect_result['message']}"
             }
 
-    result = sync_service.sync_by_time_range(
+    result = await sync_service.sync_by_time_range(
         start_time=sync_request.start_time,
         end_time=sync_request.end_time,
         auto_classify=sync_request.auto_classify
