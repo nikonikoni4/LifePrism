@@ -37,7 +37,11 @@ class Context:
             return "\n\n".join(parts)
         elif type == MessageType.CLASSIFY:
             classify_preference_path = base + "agent/classify/classify_preference.md"
-            return (msg.extra or {}).get("system_prompt", "") + "\n\n" + Context._read_file(classify_preference_path)
+            content = Context._read_file(classify_preference_path)
+            if content:
+                return (msg.extra or {}).get("system_prompt", "") + "\n\n" + content
+            else:
+                return (msg.extra or {}).get("system_prompt", "")
             
 
     @staticmethod
