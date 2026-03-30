@@ -32,7 +32,6 @@ dataset
 plan
 localData/
 tests
-test
 AGENTS.md
 nanobotclaude_task_manager.py
 .claude_task/
