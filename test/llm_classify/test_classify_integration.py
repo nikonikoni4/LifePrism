@@ -6,11 +6,9 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from lifeprism.config import settings, LOCAL_TIMEZONE
-from lifeprism.config.settings_manager import settings as lw_settings
 from lifeprism.processors.data_clean import clean_activitywatch_data
 from lifeprism.server.providers import server_lw_data_provider, goal_provider
-from lifeprism.llm.schemas import classifyState, Goal as LLMGoal
+from lifeprism.llm.schemas import Goal as LLMGoal
 from lifeprism.llm.classify.main_classify import LLMClassify
 from lifeprism.llm.agent.loop import AgentLoop
 from lifeprism.llm.channel.manager import channel_manager
@@ -45,11 +43,8 @@ def build_classify_inputs():
     import pandas as pd
     if sub_category is None:
         sub_category = pd.DataFrame(columns=['category_id', 'name', 'state'])
-
-    category_id_to_name = {}
     category_tree = {}
     if category is not None and not category.empty:
-        category_id_to_name = category.set_index('id')['name'].to_dict()
         for _, cat in category.iterrows():
             if cat.get('state', 1) == 0:
                 continue
