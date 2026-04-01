@@ -2,7 +2,7 @@ import unittest
 import os
 from datetime import datetime
 from lifeprism.storage.database_manager import DatabaseManager
-from lifeprism.storage.providers.window_data_provider import LWWindowDataProvider
+from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
 from lifeprism.storage.lw_table_manager import LWTableManager
 
 class TestMonitorFlow(unittest.TestCase):
@@ -14,7 +14,7 @@ class TestMonitorFlow(unittest.TestCase):
         self.db_manager = DatabaseManager(DB_PATH=self.test_db_path)
         self.table_manager = LWTableManager(db_manager=self.db_manager)
         self.table_manager.init_database()
-        self.provider = LWWindowDataProvider(db_manager=self.db_manager)
+        self.provider = MonitorDataProvider(db_manager=self.db_manager)
 
     def tearDown(self):
         if os.path.exists(self.test_db_path):

@@ -9,7 +9,7 @@ from lifeprism.utils import get_logger
 logger = get_logger(__name__)
 
 
-class LWWindowDataProvider(LWBaseDataProvider):
+class MonitorDataProvider(LWBaseDataProvider):
     """
     窗口事件数据提供者
 

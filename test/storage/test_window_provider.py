@@ -2,10 +2,10 @@ import unittest
 import os
 from datetime import datetime
 from lifeprism.storage.database_manager import DatabaseManager
-from lifeprism.storage.providers.window_data_provider import LWWindowDataProvider
+from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
 from lifeprism.storage.lw_table_manager import LWTableManager
 
-class TestLWWindowDataProvider(unittest.TestCase):
+class TestMonitorDataProvider(unittest.TestCase):
     def setUp(self):
         # 使用临时文件数据库进行测试，避免内存数据库连接重置问题
         self.test_db_path = "test_temp.db"
@@ -19,7 +19,7 @@ class TestLWWindowDataProvider(unittest.TestCase):
         self.table_manager.init_database()
 
         # 初始化 Provider
-        self.provider = LWWindowDataProvider(db_manager=self.db_manager)
+        self.provider = MonitorDataProvider(db_manager=self.db_manager)
 
     def tearDown(self):
         # 清理测试数据库

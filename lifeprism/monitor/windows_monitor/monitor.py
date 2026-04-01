@@ -11,13 +11,13 @@ from lifeprism.monitor.windows_monitor.windows_api import (
     get_tick_count,
     is_any_video_playing
 )
-from lifeprism.storage.providers.window_data_provider import LWWindowDataProvider
+from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
 from lifeprism.config.settings_manager import settings
 
 logger = get_logger(__name__)
 
 class WindowMonitor:
-    def __init__(self, provider: LWWindowDataProvider):
+    def __init__(self, provider: MonitorDataProvider):
         self.provider = provider
         self.poll_time = settings.get("poll_time", 1.0)
         self.exclude_titles = settings.get("exclude_titles", [])

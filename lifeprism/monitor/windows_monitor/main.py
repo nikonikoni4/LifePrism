@@ -4,7 +4,7 @@ from pathlib import Path
 import signal
 from lifeprism.utils.logger import get_logger
 from lifeprism.monitor.windows_monitor.monitor import WindowMonitor
-from lifeprism.storage.providers.window_data_provider import LWWindowDataProvider
+from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
 from lifeprism.config.settings_manager import settings
 
 # 配置日志
@@ -13,7 +13,7 @@ logger = get_logger("windows_monitor_main")
 def main():
     # settings_manager 在模块级由 main.py 导入时已经初始化并配置好日志
     # 这里直接使用 Provider
-    provider = LWWindowDataProvider()
+    provider = MonitorDataProvider()
     monitor = WindowMonitor(provider)
 
     def handle_signal(sig, frame):
