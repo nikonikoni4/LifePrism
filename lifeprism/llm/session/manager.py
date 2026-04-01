@@ -9,6 +9,7 @@ import json
 import uuid
 from lifeprism.config import settings
 from lifeprism.utils import get_logger,NotFoundError
+from lifeprism.utils.lazy_singleton import LazySingleton
 import os 
 logger = get_logger(__name__)
 allow_role = ['user','assistant','tool','system']
@@ -158,7 +159,7 @@ class SessionManager:
             return []
         return [f.name for f in path.glob('*.jsonl')]
 
-session_manager = SessionManager()
+session_manager:SessionManager  = LazySingleton(SessionManager)
 
 
 if __name__ == "__main__":
