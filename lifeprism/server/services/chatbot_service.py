@@ -179,10 +179,14 @@ class ChatbotService:
 
     async def update_model_config(self, request: Any) -> ModelConfig:
         """更新模型配置"""
-        if hasattr(request, 'enable_search') and request.enable_search is not None:
-            self._model_config.enable_search = request.enable_search
-        if hasattr(request, 'enable_thinking') and request.enable_thinking is not None:
-            self._model_config.enable_thinking = request.enable_thinking
+        if isinstance(request, dict):
+            if 'enable_search' in request: self._model_config.enable_search = request['enable_search']
+            if 'enable_thinking' in request: self._model_config.enable_thinking = request['enable_thinking']
+        else:
+            if hasattr(request, 'enable_search') and request.enable_search is not None:
+                self._model_config.enable_search = request.enable_search
+            if hasattr(request, 'enable_thinking') and request.enable_thinking is not None:
+                self._model_config.enable_thinking = request.enable_thinking
         return self._model_config
 
     # ========== 对话功能 ==========

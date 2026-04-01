@@ -51,14 +51,15 @@ async def update_session(
 ):
     """
     更新会话名称
-    
+
     请求体:
     - **name**: 新的会话名称
     """
-    success = await chatbot_service.update_session_name(session_id, request)
-    if not success:
-        raise HTTPException(status_code=404, detail="会话不存在")
-    return {"success": True}
+    try:
+        await chatbot_service.update_session(session_id, request)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.delete("/sessions/{session_id}")
@@ -168,27 +169,14 @@ async def chat_stream(request: ChatMessageRequest):
     """
     async def generate():
         try:
-            # 1. 获取或创建会话
-            session_info = await chatbot_service.get_or_create_session(
-                request.session_id,
-                request.content
-            )
-            
-            # 发送会话信息
-            yield f"data: {json.dumps({'type': 'session', 'session_id': session_info.session_id, 'session_name': session_info.session_name, 'is_new_session': session_info.is_new_session}, ensure_ascii=False)}\n\n"
-            
-            # 2. 流式输出内容（带状态）
-            async for event in chatbot_service.chat_stream_with_status(
-                session_info.session_id,
-                request.content
+            # 使用重构后的 send_message，它统一处理了 session 创建和事件生成
+            async for event in chatbot_service.send_message(
+                request.content,
+                request.session_id
             ):
-                # event 格式: {"type": "status"|"content", "node": str, "message": str}
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-            
-            # 3. 发送结束标记（包含 token 使用量）
-            usage = chatbot_service.get_last_token_usage(session_info.session_id)
-            yield f"data: {json.dumps({'type': 'done', 'usage': usage}, ensure_ascii=False)}\n\n"
-            
+                # event 为 ChatStreamEvent 对象，需要转换为字典并序列化
+                yield f"data: {event.json(exclude_none=True, ensure_ascii=False)}\n\n"
+
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
     
