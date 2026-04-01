@@ -3,8 +3,9 @@ import asyncio
 import time
 from typing import Any
 from collections import deque
-from lifeprism.llm.bus import InboundMessage, OutboundMessage,bus
-from lifeprism.utils.logger import get_logger,DEBUG
+from lifeprism.llm.bus import InboundMessage, OutboundMessage, bus, MessageQueue
+from lifeprism.utils.logger import get_logger, DEBUG
+from lifeprism.utils.lazy_singleton import LazySingleton
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
 TIMEOUT_MAX = 120.0
@@ -12,7 +13,8 @@ RATE_LIMIT = 100       # 每分钟最大请求数
 RATE_WINDOW = 60.0     # 滑动窗口（秒）
 
 class Channel:
-    def __init__(self):
+    def __init__(self, bus: MessageQueue):
+        self._bus = bus
         self._pending : dict[str,asyncio.Future] = {}
         self.stop_receive = False
         self._receive_task: asyncio.Task | None = None
@@ -66,17 +68,20 @@ class Channel:
         self._pending[msg.id] = future
 
         # 3. 发送消息
-        await bus.publish_inbound(msg)
+        await self._bus.publish_inbound(msg)
 
         # 4. 等待对应future回复（60s 超时，防止 agent 异常时永久挂起）
         result:OutboundMessage = await asyncio.wait_for(self._pending[msg.id], timeout=TIMEOUT_MAX)
         logger.debug(f"[Channel] 收到回复: {result.response!r}")
 
-        return result.response
+        response = result.response
+        if hasattr(response, 'content'):
+            return response.content
+        return response
 
     async def _receive_loop(self):
         while True:
-            msg = await bus.consume_outbound()
+            msg = await self._bus.consume_outbound()
             future = self._pending.pop(msg.id, None) 
             if future:
                 future.set_result(msg)
@@ -103,4 +108,4 @@ class Channel:
 
 #     asyncio.run(main())
 
-channel_manager = Channel()  # 懒初始化，_receive_task 在首次 send 时创建
+channel_manager = LazySingleton(Channel, bus=bus)  # 懒初始化代理

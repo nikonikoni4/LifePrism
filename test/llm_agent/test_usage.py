@@ -10,6 +10,7 @@ sys.path.insert(0, project_root)
 from lifeprism.llm.bus.queue import bus
 from lifeprism.llm.channel.manager import Channel
 from lifeprism.llm.agent.loop import AgentLoop
+import pytest
 
 def _drain_queue(q: asyncio.Queue):
     """清空 asyncio.Queue"""
@@ -19,14 +20,15 @@ def _drain_queue(q: asyncio.Queue):
         except asyncio.QueueEmpty:
             break
 
-async def run_usage_test():
+@pytest.mark.asyncio
+async def test_usage_logic():
     """直接运行的测试函数"""
     print("--- 启动 AgentLoop ---")
-    loop = AgentLoop()
+    loop = AgentLoop(bus)
     agent_task = asyncio.create_task(loop.loop())
 
     print("--- 初始化 Channel ---")
-    channel = Channel()
+    channel = Channel(bus)
 
     try:
         print("--- 发送消息中... ---")

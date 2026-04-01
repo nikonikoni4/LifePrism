@@ -93,7 +93,8 @@ async def run_test(classify_mode: str):
     logger.info(f"\n开始集成测试: classify_mode={classify_mode}")
 
     # 启动 AgentLoop
-    agent = AgentLoop()
+    from lifeprism.llm.bus import bus
+    agent = AgentLoop(bus)
     loop_task = asyncio.create_task(agent.loop())
 
     try:

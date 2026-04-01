@@ -1,5 +1,6 @@
 import asyncio
 from lifeprism.llm.bus.events import InboundMessage, OutboundMessage
+from lifeprism.utils.lazy_singleton import LazySingleton
 
 # ─────────────────────────────────────────
 #MessageQueue：双向队列，纯数据通道
@@ -33,4 +34,4 @@ class MessageQueue:
     async def consume_outbound(self) -> OutboundMessage:
         return await self.outbound.get()
 
-bus = MessageQueue() # 单一实例
+bus = LazySingleton(MessageQueue) # 单一实例代理
