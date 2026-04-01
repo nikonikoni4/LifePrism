@@ -5,11 +5,10 @@ import win32con
 import psutil
 from typing import Optional
 # from lifeprism.utils.logger import get_logger
-from .exceptions import MonitorError
+from lifeprism.utils.logger import get_logger
+from lifeprism.monitor.windows_monitor.exceptions import MonitorError
 
-# logger = get_logger(__name__)
-import logging
-logger = logging.getLogger()
+logger = get_logger(__name__)
 def get_last_input_time() -> float:
     """
     获取自系统启动以来的最后一次输入时间（秒）。

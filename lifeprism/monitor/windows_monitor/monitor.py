@@ -2,8 +2,8 @@ import time
 import re
 from datetime import datetime
 from typing import Optional, List
-#from lifeprism.utils.logger import get_logger
-from .windows_api import (
+from lifeprism.utils.logger import get_logger
+from lifeprism.monitor.windows_monitor.windows_api import (
     get_active_window_handle,
     get_window_title,
     get_app_name,
@@ -11,18 +11,17 @@ from .windows_api import (
     get_tick_count,
     is_any_video_playing
 )
-from .storage import Storage
-import logging
-logger = logging.getLogger()
-# logger = get_logger(__name__)
+from lifeprism.storage.providers.window_data_provider import LWWindowDataProvider
+from lifeprism.config.settings_manager import settings
+
+logger = get_logger(__name__)
 
 class WindowMonitor:
-    def __init__(self, config: dict, storage: Storage):
-        self.config = config
-        self.storage = storage
-        self.poll_time = config.get("poll_time", 1.0)
-        self.exclude_titles = config.get("exclude_titles", [])
-        self.afk_timeout = config.get("afk_timeout", 180.0)
+    def __init__(self, provider: LWWindowDataProvider):
+        self.provider = provider
+        self.poll_time = settings.get("poll_time", 1.0)
+        self.exclude_titles = settings.get("exclude_titles", [])
+        self.afk_timeout = settings.get("afk_timeout", 180.0)
 
         self.current_app: Optional[str] = None
         self.current_title: Optional[str] = None
@@ -47,7 +46,7 @@ class WindowMonitor:
             now = datetime.now()
             duration = (now - self.start_time).total_seconds()
             if duration > 0:
-                self.storage.save_event(
+                self.provider.save_event(
                     timestamp=self.start_time.isoformat(),
                     duration=duration,
                     app=self.current_app,

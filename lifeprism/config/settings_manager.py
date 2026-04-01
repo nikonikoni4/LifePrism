@@ -44,6 +44,9 @@ class SettingsManager:
         'aw_db_path': '~/AppData/Local/activitywatch/activitywatch/aw-server/peewee-sqlite.v2.db',
         'lifeprism_data_path': '',  # 空=使用默认路径
         'data_cleaning_threshold': 10,
+        'poll_time': 1.0,
+        'afk_timeout': 180.0,
+        'exclude_titles': [],
         'model_history': {},  # 按服务商存储的模型历史 {provider_id: {api_base: '', models: [model1, model2, ...]}}
     }
     
