@@ -182,11 +182,20 @@ async def lifespan(app: FastAPI):
         logger.error(f"[ERROR] Database init failed: {e}")
         raise
     
-    # 初始化 ChatBot 服务（可选，延迟初始化也可以）
-    # from lifeprism.server.services.chatbot_service import chatbot_service
-    # await chatbot_service.initialize()
-    
+    # 初始化 ChatBot 服务和 AgentLoop
+    from lifeprism.llm.agent.loop import agent_loop
+    import asyncio
+    loop_task = asyncio.create_task(agent_loop.loop())
+    logger.info("[STARTUP] AgentLoop started")
+
     yield  # 应用运行期间
+
+    # 关闭时：取消 AgentLoop 任务
+    loop_task.cancel()
+    try:
+        await loop_task
+    except asyncio.CancelledError:
+        logger.info("[SHUTDOWN] AgentLoop stopped")
     
     # 关闭时：清理 ChatBot 资源
     try:

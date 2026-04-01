@@ -36,8 +36,8 @@ class ChatBot:
 
             return response_data
         except Exception as e:
-            logger.error(f"[ChatBot] Chat error: {e}")
-            return LLMResponse(content=f"Error: {str(e)}", finish_reason="error")
+            logger.error(f"[ChatBot] Chat error: {e}", exc_info=True)
+            raise
 
     # ========== 会话管理 API ==========
 

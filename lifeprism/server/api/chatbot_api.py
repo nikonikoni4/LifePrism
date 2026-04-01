@@ -175,7 +175,7 @@ async def chat_stream(request: ChatMessageRequest):
                 request.session_id
             ):
                 # event 为 ChatStreamEvent 对象，需要转换为字典并序列化
-                yield f"data: {event.json(exclude_none=True, ensure_ascii=False)}\n\n"
+                yield f"data: {event.model_dump_json(exclude_none=True)}\n\n"
 
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
