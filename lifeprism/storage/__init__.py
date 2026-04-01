@@ -40,6 +40,7 @@ chat_history_db_manager = DatabaseManager(
 
 # ==================== 基础数据提供者 ====================
 from .base_providers import LWBaseDataProvider, AWBaseDataProvider
+from .providers.window_data_provider import LWWindowDataProvider
 
 __all__ = [
     "DatabaseManager",
@@ -47,4 +48,5 @@ __all__ = [
     "aw_db_manager",
     "LWBaseDataProvider",
     "AWBaseDataProvider",
+    "LWWindowDataProvider",
 ]
