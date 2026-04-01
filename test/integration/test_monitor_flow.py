@@ -44,10 +44,10 @@ class TestMonitorFlow(unittest.TestCase):
             cursor.execute("SELECT * FROM window_events WHERE app = ?", (event_app,))
             row = cursor.fetchone()
             self.assertIsNotNone(row)
-            self.assertEqual(row[1], event_timestamp)
-            self.assertEqual(row[2], event_app)
-            self.assertEqual(row[3], event_title)
-            self.assertEqual(row[4], event_duration)
+            self.assertEqual(row['timestamp'], event_timestamp)
+            self.assertEqual(row['app'], event_app)
+            self.assertEqual(row['title'], event_title)
+            self.assertEqual(row['duration'], event_duration)
 
 if __name__ == "__main__":
     unittest.main()
