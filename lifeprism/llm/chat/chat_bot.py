@@ -14,21 +14,13 @@ class ChatBot:
         self._session_manager = session_manager
 
     async def chat(self, content: str, session_id: str = None, **extra) -> LLMResponse:
-        """使用 channel 发送聊天消息并返回响应。同时处理会话持久化。"""
+        """使用 channel 发送聊天消息并返回响应。会话持久化由 AgentLoop 负责。"""
         try:
-            # 1. 加载或创建会话
+            # 1. 确保会话存在
             session = self._session_manager.get_or_create_session(session_id)
 
-            # 2. 添加用户消息
-            session.add_message(role='user', content=content)
-
-            # 3. 获取历史记录作为上下文
-            history = session.get_history_message()
-
-            # 4. 发送消息（通过 extra 传递历史记录，因为 Channel.send 不直接支持 history 参数）
-            if extra is None: extra = {}
-            extra['history'] = history
-
+            # 2. 发送消息
+            # 注意：不再此处手动添加消息，因为 AgentLoop 会处理消息的接收、存储和回复存储
             response_data = await self._channel_manager.send(
                 content=content,
                 session_id=session.id,
@@ -36,21 +28,13 @@ class ChatBot:
                 extra=extra
             )
 
-            # 5. 处理响应并添加助手消息
+            # 3. 包装响应
             if isinstance(response_data, LLMResponse):
-                res = response_data
-            elif isinstance(response_data, str):
-                res = LLMResponse(content=response_data)
-            else:
-                res = response_data
+                return response_data
+            if isinstance(response_data, str):
+                return LLMResponse(content=response_data)
 
-            if res.content:
-                session.add_message(role='assistant', content=res.content)
-
-            # 6. 保存会话
-            self._session_manager.save_session(session)
-
-            return res
+            return response_data
         except Exception as e:
             logger.error(f"[ChatBot] Chat error: {e}")
             return LLMResponse(content=f"Error: {str(e)}", finish_reason="error")
