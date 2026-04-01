@@ -140,7 +140,7 @@ class SessionManager:
         if session:
             path = self.get_session_path_by_id(session.id)
             settings.session_path.mkdir(parents=True, exist_ok=True)
-            with open(path,'w') as f:
+            with open(path,'w', encoding='utf-8') as f:
                 metadata_line = {
                     "_type":"metadata",
                     "name" : session.name,

@@ -1,6 +1,7 @@
 """消息收发接口 负责发送和接收"""
 import asyncio
 import time
+from typing import Any
 from collections import deque
 from lifeprism.llm.bus import InboundMessage, OutboundMessage,bus
 from lifeprism.utils.logger import get_logger,DEBUG
@@ -51,7 +52,7 @@ class Channel:
             await asyncio.sleep(wait)
 
     async def send(self, content: str, session_id: str | None = None,
-                   type: str = "chat", extra: dict | None = None) -> str:
+                   type: str = "chat", extra: dict | None = None) -> Any:
         """发送消息并等待结果"""
         self._ensure_receive_task()
         await self._wait_for_rate_limit()

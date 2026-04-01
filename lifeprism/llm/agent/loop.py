@@ -15,16 +15,16 @@ class AgentLoop:
         self._background_tasks: list[asyncio.Task] = []
         self._running = True
 
-    async def _run_agent_loop(self,messages:list[dict[str,Any]],tools:list[dict[str, Any]])->str:
+    async def _run_agent_loop(self,messages:list[dict[str,Any]],tools:list[dict[str, Any]])->LLMResponse:
         llm = create_llm_client()
         result:LLMResponse = await llm.chat(
             messages=messages,
             tools = tools
         )
-        # TODO 工具调用实现
+        # TODO  工具调用实现
         
         
-        return result.content
+        return result
     
     async def _process_msg(self,msg:InboundMessage):
         """
@@ -49,7 +49,7 @@ class AgentLoop:
             result = await self._run_agent_loop(messages, tools)
 
             # 5. 保存 assistant 回复并发布结果
-            session.add_message("assistant", content=result)
+            session.add_message("assistant", content=result.content)
             await bus.publish_outbound(OutboundMessage(id=msg.id, response=result))
 
             # 6. 保存session
