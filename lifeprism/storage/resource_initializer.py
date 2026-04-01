@@ -1,13 +1,13 @@
 """资源文件初始化模块
 
-打包环境启动时，扫描 bundle_dir/templates/ 下所有文件，
-检查目标路径是否存在，不存在则复制。
+启动时扫描 templates 根目录下所有文件，检查目标路径是否存在，不存在则复制。
+
+- 打包环境：bundle_dir 为 PyInstaller 的 sys._MEIPASS，模板根为 bundle_dir/templates/
+- 非打包环境：bundle_dir 为仓库根目录下的 templates/（与源码 templates 目录一致）
 
 路径映射规则：
   templates/config/...  -> config_base_path/config/...
   templates/<其他>/...  -> lifeprism_data_path/<其他>/...
-
-开发环境不执行任何操作（文件直接从源码位置读取）。
 """
 import sys
 import shutil
@@ -22,17 +22,18 @@ _CONFIG_SUBDIR = "config"
 
 def initialize_resources() -> None:
     """
-    初始化资源文件（仅打包环境执行）
+    初始化资源文件
 
-    扫描 bundle_dir/templates/ 下所有文件，不存在于目标路径则复制。
+    扫描模板根目录下所有文件，不存在于目标路径则复制。
     """
-    if not getattr(sys, 'frozen', False):
-        return
-
     from lifeprism.config.settings_manager import settings
 
-    bundle_dir = Path(sys._MEIPASS)
-    templates_dir = bundle_dir / "templates"
+    if getattr(sys, "frozen", False):
+        bundle_dir = Path(sys._MEIPASS)
+        templates_dir = bundle_dir / "templates"
+    else:
+        bundle_dir = Path(__file__).resolve().parent.parent.parent / "templates"
+        templates_dir = bundle_dir
     data_path = Path(settings.lifeprism_data_path)
     config_path = Path(settings.config_base_path)
 
