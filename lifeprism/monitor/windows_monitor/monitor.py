@@ -2,11 +2,19 @@ import time
 import re
 from datetime import datetime
 from typing import Optional, List
-from lifeprism.utils.logger import get_logger
-from .windows_api import get_active_window_handle, get_window_title, get_app_name
+#from lifeprism.utils.logger import get_logger
+from .windows_api import (
+    get_active_window_handle,
+    get_window_title,
+    get_app_name,
+    get_last_input_time,
+    get_tick_count,
+    is_any_video_playing
+)
 from .storage import Storage
-
-logger = get_logger(__name__)
+import logging
+logger = logging.getLogger()
+# logger = get_logger(__name__)
 
 class WindowMonitor:
     def __init__(self, config: dict, storage: Storage):
@@ -14,10 +22,12 @@ class WindowMonitor:
         self.storage = storage
         self.poll_time = config.get("poll_time", 1.0)
         self.exclude_titles = config.get("exclude_titles", [])
+        self.afk_timeout = config.get("afk_timeout", 180.0)
 
         self.current_app: Optional[str] = None
         self.current_title: Optional[str] = None
         self.start_time: Optional[datetime] = None
+        self.is_afk = False
 
         self._running = False
         self._compile_exclude_patterns()
@@ -47,33 +57,58 @@ class WindowMonitor:
 
     def run(self):
         self._running = True
-        logger.info(f"WindowMonitor started (poll_time: {self.poll_time}s)")
+        logger.info(f"WindowMonitor started (poll_time: {self.poll_time}s, afk_timeout: {self.afk_timeout}s)")
 
         try:
             while self._running:
-                hwnd = get_active_window_handle()
-                if hwnd:
-                    app = get_app_name(hwnd)
-                    title = get_window_title(hwnd)
+                # 1. 检测 AFK 状态
+                last_input = get_last_input_time()
+                now_tick = get_tick_count()
+                idle_time = now_tick - last_input
 
-                    if self._should_exclude(title):
+                # 如果超过阈值且没有视频播放请求，判定为 AFK
+                currently_afk = idle_time > self.afk_timeout and not is_any_video_playing()
+
+                if currently_afk:
+                    if not self.is_afk:
+                        # 刚进入 AFK 状态，保存当前窗口并切换到 AFK 模式
+                        logger.info(f"User is AFK (idle for {idle_time:.1f}s)")
+                        self._flush()
+                        self.is_afk = True
+                        self.current_app = "AFK"
+                        self.current_title = "Away From Keyboard"
+                        self.start_time = datetime.now()
+                else:
+                    if self.is_afk:
+                        # 从 AFK 状态恢复
+                        logger.info("User is back from AFK")
+                        self._flush()
+                        self.is_afk = False
+                        # 强制触发重新获取窗口
+                        self.current_app = None
+
+                # 2. 如果非 AFK，处理窗口逻辑
+                if not self.is_afk:
+                    hwnd = get_active_window_handle()
+                    if hwnd:
+                        app = get_app_name(hwnd)
+                        title = get_window_title(hwnd)
+
+                        if self._should_exclude(title):
+                            self._flush()
+                            self.current_app = None
+                            self.current_title = None
+                            self.start_time = None
+                        elif app != self.current_app or title != self.current_title:
+                            self._flush()
+                            self.current_app = app
+                            self.current_title = title
+                            self.start_time = datetime.now()
+                    else:
                         self._flush()
                         self.current_app = None
                         self.current_title = None
                         self.start_time = None
-                    elif app != self.current_app or title != self.current_title:
-                        # 窗口改变，保存旧事件
-                        self._flush()
-                        # 开始新事件
-                        self.current_app = app
-                        self.current_title = title
-                        self.start_time = datetime.now()
-                else:
-                    # 无活跃窗口（如锁屏或无焦点）
-                    self._flush()
-                    self.current_app = None
-                    self.current_title = None
-                    self.start_time = None
 
                 time.sleep(self.poll_time)
         except Exception as e:

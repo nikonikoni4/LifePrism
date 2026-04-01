@@ -1,10 +1,11 @@
 import sqlite3
 import logging
 from typing import Optional
-from lifeprism.utils.logger import get_logger
+# from lifeprism.utils.logger import get_logger
 
-logger = get_logger(__name__)
-
+# logger = get_logger(__name__)
+import logging
+logger = logging.getLogger()
 class Storage:
     def __init__(self, db_path: str):
         self.db_path = db_path
