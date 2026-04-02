@@ -559,6 +559,10 @@ class SettingsManager:
     @property
     def multi_purpose_app_names(self) -> List[str]:
         return self.get('multi_purpose_app_names')
+
+    @property
+    def monitor_type(self) -> str:
+        return self.get('monitor_type')
     
     @property
     def aw_db_path(self) -> str:

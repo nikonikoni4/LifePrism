@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Tuple
 import pytz
 from lifeprism.storage import LWBaseDataProvider
-from lifeprism.processors import processor_aw_data_provider
+from lifeprism.processors import processor_aw_data_provider, processor_monitor_data_provider
 from lifeprism.utils import is_multipurpose_app
 from lifeprism.config import LOCAL_TIMEZONE
 from lifeprism.config.settings_manager import settings
@@ -89,18 +89,18 @@ def convert_utc_to_local(utc_timestamp_str: str, target_tz: str ) -> str:
 
 
 def clean_activitywatch_data_old(
-    start_time: datetime, 
-    end_time: datetime, 
+    start_time: datetime,
+    end_time: datetime,
     category_map_cache_df: pd.DataFrame
 ) -> Tuple[pd.DataFrame, classifyState]:
     """
-    完整的数据清洗流程：从 AW 获取数据 + 时间戳标准化 + 短活动过滤 + 数据库查询优化
-    
+    完整的数据清洗流程：从数据源获取数据 + 时间戳标准化 + 短活动过滤 + 数据库查询优化
+
     Args:
         start_time: 开始时间 (datetime 对象)
         end_time: 结束时间 (datetime 对象)
         category_map_cache_df: 应用目的分类DataFrame，包含category_map_cache_df表中的数据
-    
+
     Returns:
         Tuple[pd.DataFrame, classifyState]:
             - filtered_events_df: 清洗后的事件数据DataFrame
@@ -108,9 +108,9 @@ def clean_activitywatch_data_old(
                 - app_registry: 应用注册表 {app: AppInFo}
                 - log_items: 待分类的日志项列表
                 - result_items: 初始为None
-    
+
     Process:
-        1. 从 ActivityWatch 数据库获取原始事件
+        1. 从指定数据源 (AW 或 内置) 获取原始事件
         2. 时间戳标准化：UTC -> 本地时间
         3. 短活动过滤：删除 < 60秒的事件
         4. 数据库查询：如果应用已存在分类数据，直接获取
@@ -423,10 +423,19 @@ def clean_activitywatch_data(
     logger.info(f"🧹 开始数据清洗流程 (v2)...")
     
     # 1. 获取原始数据
-    raw_events = processor_aw_data_provider.get_window_events(
-        start_time=start_time,
-        end_time=end_time
-    )
+    # 根据监控类型选择 Provider
+    if settings.monitor_type == 'lifeprism':
+        logger.debug("使用内置监控数据源 (lifeprism)")
+        raw_events = processor_monitor_data_provider.get_window_events(
+            start_time=start_time,
+            end_time=end_time
+        )
+    else:
+        logger.debug("使用 ActivityWatch 数据源")
+        raw_events = processor_aw_data_provider.get_window_events(
+            start_time=start_time,
+            end_time=end_time
+        )
     total_events = len(raw_events)
     logger.info(f"📥 原始数据: {total_events} 个事件")
     
