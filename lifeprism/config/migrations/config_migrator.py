@@ -7,14 +7,14 @@ Config 迁移运行器
 - 任一迁移失败则保留备份、使用默认配置兜底，不阻塞启动
 """
 import shutil
-import logging
+from lifeprism.utils import  get_logger
 from pathlib import Path
 from datetime import datetime
 from typing import Any
 
 import yaml
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def run_config_migrations(config_path: Path, migrations: list) -> dict:
