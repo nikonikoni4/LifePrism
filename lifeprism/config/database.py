@@ -1457,6 +1457,23 @@ HABIT_CHAIN_NODES_CONFIG = {
     'update_at': True,
 }
 
+WINDOW_EVENTS_CONFIG = {
+    'table_name': 'window_events',
+    'columns': {
+        'id': {'type': 'INTEGER', 'constraints': ['PRIMARY KEY AUTOINCREMENT'], 'comment': '自增ID'},
+        'timestamp': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '事件发生的时间戳 (ISO格式)'},
+        'duration': {'type': 'REAL', 'constraints': ['NOT NULL'], 'comment': '持续时长(秒)'},
+        'app': {'type': 'TEXT', 'constraints': [], 'comment': '应用程序名称'},
+        'title': {'type': 'TEXT', 'constraints': [], 'comment': '窗口标题'},
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_window_events_timestamp', 'columns': ['timestamp']},
+    ],
+    'timestamps': True,
+    'update_at': False,
+}
+
 
 # 所有表配置的映射
 TABLE_CONFIGS = {
@@ -1492,6 +1509,7 @@ TABLE_CONFIGS = {
     'habit_checkins': HABIT_CHECKINS_CONFIG,
     'habit_chains': HABIT_CHAINS_CONFIG,
     'habit_chain_nodes': HABIT_CHAIN_NODES_CONFIG,
+    'window_events': WINDOW_EVENTS_CONFIG,
 }
 
 

@@ -171,7 +171,21 @@ async def lifespan(app: FastAPI):
         _color_start = time.perf_counter()
         initialize_category_colors()
         _log_startup_time("[OK] Category colors init (initialize_category_colors)", _color_start)
-        
+
+        # 集成内置监控进程
+        if settings._config.get("monitor_type") == "lifeprism":
+            logger.info("检测到 monitor_type 为 'lifeprism'，正在启动内置监控进程...")
+            try:
+                from lifeprism.monitor.windows_monitor.main import start_monitor_process
+                app.state.monitor_process = start_monitor_process()
+                logger.info("内置监控进程启动成功")
+            except Exception as e:
+                logger.error(f"启动内置监控进程失败: {e}")
+                app.state.monitor_process = None
+        else:
+            app.state.monitor_process = None
+
+
         _total_lifespan = (time.perf_counter() - _startup_timer) * 1000
         print(f"\n{'='*60}")
         print(f"[STARTUP] [DONE] App init complete! Total: {_total_lifespan:.2f}ms")
@@ -182,6 +196,10 @@ async def lifespan(app: FastAPI):
         logger.error(f"[ERROR] Database init failed: {e}")
         raise
     
+    
+
+
+
     # 初始化 ChatBot 服务和 AgentLoop
     from lifeprism.llm.agent.loop import agent_loop
     import asyncio
@@ -189,6 +207,21 @@ async def lifespan(app: FastAPI):
     logger.info("[STARTUP] AgentLoop started")
 
     yield  # 应用运行期间
+
+    # 初始化 ChatBot 服务（可选，延迟初始化也可以）
+    # 关闭时：清理监控进程
+    if hasattr(app.state, "monitor_process") and app.state.monitor_process:
+        proc = app.state.monitor_process
+        if proc.is_alive():
+            logger.info(f"正在终止监控进程 (PID: {proc.pid})...")
+            proc.terminate()
+            proc.join(timeout=5)
+            if proc.is_alive():
+                logger.warning("监控进程未能在 5 秒内退出，正在强制杀死...")
+                proc.kill()
+            logger.info("监控进程已清理")
+
+
 
     # 关闭时：取消 AgentLoop 任务
     loop_task.cancel()

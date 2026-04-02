@@ -8,7 +8,7 @@ from lifeprism.utils.logger import get_logger, DEBUG
 from lifeprism.utils.lazy_singleton import LazySingleton
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
-TIMEOUT_MAX = 120.0
+TIMEOUT_MAX = 600.0
 RATE_LIMIT = 100       # 每分钟最大请求数
 RATE_WINDOW = 60.0     # 滑动窗口（秒）
 
