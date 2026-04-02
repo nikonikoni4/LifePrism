@@ -3,28 +3,29 @@ from typing import Any
 from lifeprism.llm.providers import LLMResponse, create_llm_client
 from lifeprism.llm.session import Session,session_manager
 import asyncio
-from lifeprism.llm.bus import InboundMessage,OutboundMessage,bus,MessageType
+from lifeprism.llm.bus import InboundMessage,OutboundMessage,bus,MessageType, MessageQueue
 from lifeprism.llm.agent.context import Context
 from lifeprism.utils import get_logger
+from lifeprism.utils.lazy_singleton import LazySingleton
 logger = get_logger(__name__)
 
 class AgentLoop:
-    def __init__(self):
-        self._processing_lock = asyncio.Lock()
+    def __init__(self, bus: MessageQueue):
+        self._bus = bus
         self._active_tasks: dict[str, list[asyncio.Task]] = {}  # session_id -> tasks
         self._background_tasks: list[asyncio.Task] = []
         self._running = True
 
-    async def _run_agent_loop(self,messages:list[dict[str,Any]],tools:list[dict[str, Any]])->str:
+    async def _run_agent_loop(self,messages:list[dict[str,Any]],tools:list[dict[str, Any]])->LLMResponse:
         llm = create_llm_client()
         result:LLMResponse = await llm.chat(
             messages=messages,
             tools = tools
         )
-        # TODO 工具调用实现
+        # TODO  工具调用实现
         
         
-        return result.content
+        return result
     
     async def _process_msg(self,msg:InboundMessage):
         """
@@ -49,15 +50,15 @@ class AgentLoop:
             result = await self._run_agent_loop(messages, tools)
 
             # 5. 保存 assistant 回复并发布结果
-            session.add_message("assistant", content=result)
-            await bus.publish_outbound(OutboundMessage(id=msg.id, response=result))
+            session.add_message("assistant", content=result.content)
+            await self._bus.publish_outbound(OutboundMessage(id=msg.id, response=result))
 
             # 6. 保存session
             if msg.type != MessageType.CLASSIFY: # 分类数据不保存
                 session_manager.save_session(session)
         except Exception as e:
             logger.error(f"[AgentLoop] 处理消息 id={msg.id} 时出错: {e}", exc_info=True)
-            await bus.publish_outbound(OutboundMessage(id=msg.id, response=f"[ERROR] {e}"))
+            await self._bus.publish_outbound(OutboundMessage(id=msg.id, response=f"[ERROR] {e}"))
             
     
 
@@ -65,7 +66,7 @@ class AgentLoop:
 
         while self._running:
             # 1. 从bus中获取消息
-            msg:InboundMessage = await bus.consume_inbound()
+            msg:InboundMessage = await self._bus.consume_inbound()
 
             # 2. 创建任务，后台处理
             task = asyncio.create_task(self._process_msg(msg))
@@ -75,4 +76,9 @@ class AgentLoop:
 
             # 4. 添加任务注销函数
             task.add_done_callback(lambda t,k = msg.id: self._active_tasks.get(k,[]).remove(t) if t in self._active_tasks.get(k,[]) else None  )
+
+    def stop(self):
+        self._running = False
+
+agent_loop = LazySingleton(AgentLoop, bus=bus)
 

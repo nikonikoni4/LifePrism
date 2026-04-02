@@ -25,7 +25,7 @@ def _drain_queue(q: asyncio.Queue):
 @pytest_asyncio.fixture(loop_scope="session", scope="session")
 async def agent_loop():
     """整个测试 session 共享一个 AgentLoop，结束后停止并清空 bus"""
-    loop = AgentLoop()
+    loop = AgentLoop(bus)
     task = asyncio.create_task(loop.loop())
     yield loop
     task.cancel()
@@ -44,7 +44,7 @@ async def agent_loop():
 @pytest.mark.asyncio
 async def test_multi_turn_chat(agent_loop):
     """发送两轮消息，验证第二轮回复中 LLM 能记住第一轮的内容"""
-    channel = Channel()
+    channel = Channel(bus)
     try:
         # 预先创建 session，拿到合法 session_id
         session = session_manager.get_or_create_session()
@@ -68,7 +68,7 @@ async def test_multi_turn_chat(agent_loop):
 @pytest.mark.asyncio
 async def test_concurrent_tasks(agent_loop):
     """同时发送 3 条独立消息，验证每条消息都能收到回复且不丢失、不串台"""
-    channel = Channel()
+    channel = Channel(bus)
     try:
         messages = [
             "请用一句话介绍Python语言",

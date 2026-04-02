@@ -1,13 +1,26 @@
 import asyncio
 from lifeprism.llm.bus.events import InboundMessage, OutboundMessage
+from lifeprism.utils.lazy_singleton import LazySingleton
 
 # ─────────────────────────────────────────
 #MessageQueue：双向队列，纯数据通道
 # ─────────────────────────────────────────
 class MessageQueue:
     def __init__(self):
-        self.inbound: asyncio.Queue[InboundMessage] = asyncio.Queue()
-        self.outbound: asyncio.Queue[OutboundMessage] = asyncio.Queue()
+        self._inbound = None
+        self._outbound = None
+
+    @property
+    def inbound(self) -> asyncio.Queue[InboundMessage]:
+        if self._inbound is None:
+            self._inbound = asyncio.Queue()
+        return self._inbound
+
+    @property
+    def outbound(self) -> asyncio.Queue[OutboundMessage]:
+        if self._outbound is None:
+            self._outbound = asyncio.Queue()
+        return self._outbound
 
     async def publish_inbound(self, msg: InboundMessage) -> None:
         await self.inbound.put(msg)
@@ -21,4 +34,4 @@ class MessageQueue:
     async def consume_outbound(self) -> OutboundMessage:
         return await self.outbound.get()
 
-bus = MessageQueue() # 单一实例
+bus = LazySingleton(MessageQueue) # 单一实例代理
