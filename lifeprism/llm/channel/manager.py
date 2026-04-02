@@ -71,8 +71,21 @@ class Channel:
         await self._bus.publish_inbound(msg)
 
         # 4. 等待对应future回复（60s 超时，防止 agent 异常时永久挂起）
-        result:OutboundMessage = await asyncio.wait_for(self._pending[msg.id], timeout=TIMEOUT_MAX)
+        result: OutboundMessage = await asyncio.wait_for(self._pending[msg.id], timeout=TIMEOUT_MAX)
         logger.debug(f"[Channel] 收到回复: {result.response!r}")
+
+        # 5. 异步保存统计信息 (不阻塞消息返回)
+        if result.response and result.response.usage:
+            try:
+                from lifeprism.llm.providers.llm_usage_db_provider import llm_usage_db_provider
+                asyncio.create_task(asyncio.to_thread(
+                    llm_usage_db_provider.save_usage,
+                    session_id=msg.session_id,
+                    usage=result.response.usage,
+                    mode=msg.type
+                ))
+            except Exception as e:
+                logger.error(f"[Channel] 保存 token 使用情况失败: {e}")
 
         response = result.response
         if hasattr(response, 'content'):

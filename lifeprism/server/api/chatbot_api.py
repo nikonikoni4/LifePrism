@@ -86,7 +86,7 @@ async def get_chat_history(
     
     返回指定会话的所有历史消息
     """
-    result = await chatbot_service.get_chat_history(session_id)
+    result = await chatbot_service.get_history(session_id)
     if not result:
         raise HTTPException(status_code=404, detail="会话不存在")
     return result
