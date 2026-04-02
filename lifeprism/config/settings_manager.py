@@ -48,7 +48,7 @@ class SettingsManager:
         'afk_timeout': 180.0,
         'exclude_titles': [],
         'model_history': {},  # 按服务商存储的模型历史 {provider_id: {api_base: '', models: [model1, model2, ...]}}
-        'monitor_type': 'aw',
+        'monitor_type': 'lifeprism',
     }
     
     def __new__(cls) -> 'SettingsManager':
