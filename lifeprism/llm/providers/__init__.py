@@ -19,6 +19,7 @@ from .registry import (
 )
 from .llm_lw_data_provider import LLMLWDataProvider, llm_lw_data_provider
 from .build_llm_client import create_llm_client
+from .summary_read_provider import SummaryReadProvider, summary_read_provider
 __all__ = [
     # 抽象层
     "LLMProvider",
@@ -37,5 +38,7 @@ __all__ = [
     # 数据提供者（保留原有）
     "LLMLWDataProvider",
     "llm_lw_data_provider",
-    "create_llm_client"
+    "create_llm_client",
+    "SummaryReadProvider",
+    "summary_read_provider",
 ]
