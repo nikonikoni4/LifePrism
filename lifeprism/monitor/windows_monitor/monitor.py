@@ -70,13 +70,16 @@ class WindowMonitor:
 
                 if currently_afk:
                     if not self.is_afk:
-                        # 刚进入 AFK 状态，保存当前窗口并切换到 AFK 模式
+                        # 刚进入 AFK 状态，保存当前窗口并清空状态（不追踪 AFK 时间段）
                         logger.info(f"User is AFK (idle for {idle_time:.1f}s)")
                         self._flush()
                         self.is_afk = True
-                        self.current_app = "AFK"
-                        self.current_title = "Away From Keyboard"
-                        self.start_time = datetime.now()
+                        # self.current_app = "AFK"
+                        # self.current_title = "Away From Keyboard"
+                        # self.start_time = datetime.now()
+                        self.current_app = None
+                        self.current_title = None
+                        self.start_time = None
                 else:
                     if self.is_afk:
                         # 从 AFK 状态恢复
