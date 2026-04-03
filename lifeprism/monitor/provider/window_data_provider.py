@@ -2,9 +2,11 @@
 Window 数据提供者
 提供窗口事件相关的数据库操作
 """
+import sqlite3
 from typing import Optional, Dict, Any
 from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
 
@@ -37,6 +39,9 @@ class MonitorDataProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否保存成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             data = {
@@ -52,6 +57,9 @@ class MonitorDataProvider(LWBaseDataProvider):
 
             return result > 0
 
-        except Exception as e:
-            logger.error(f"保存窗口事件失败: {e}")
-            return False
+        except sqlite3.Error as exc:
+            logger.error(f"保存窗口事件失败: {exc}")
+            raise DataAccessError(f"Failed to insert window event: {exc}") from exc
+        except OSError as exc:
+            logger.error(f"数据库 I/O 错误: {exc}")
+            raise DataAccessError(f"Database I/O error: {exc}") from exc
