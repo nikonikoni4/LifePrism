@@ -1,52 +1,52 @@
-import unittest
-import os
-import sqlite3
-import tempfile
-from datetime import datetime
-from lifeprism.monitor.windows_monitor.storage import Storage
+import shutil
+import uuid
+from pathlib import Path
 
-class TestStorage(unittest.TestCase):
-    def setUp(self):
-        # 创建一个临时文件用于测试数据库
-        self.db_fd, self.db_path = tempfile.mkstemp()
-        self.storage = Storage(self.db_path)
+from lifeprism.monitor.provider.screenshot_data_provider import ScreenshotDataProvider
+from lifeprism.monitor.screenshot.models import CaptureReason, CaptureRequest
+from lifeprism.monitor.screenshot.store import ScreenshotStore
+from lifeprism.storage.database_manager import DatabaseManager
+from lifeprism.storage.lw_table_manager import LWTableManager
 
-    def tearDown(self):
-        # 关闭连接并删除临时数据库文件
-        self.storage.close()
-        os.close(self.db_fd)
-        if os.path.exists(self.db_path):
-            os.remove(self.db_path)
 
-    def test_init_db(self):
-        """验证数据库和表是否正确初始化"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='window_events';")
-        table_exists = cursor.fetchone()
-        self.assertIsNotNone(table_exists)
-        conn.close()
+class FakeCaptureBackend:
+    def capture_to_file(self, target_path: Path) -> None:
+        target_path.write_bytes(b"fake-png")
 
-    def test_save_event(self):
-        """验证保存事件并读取的正确性"""
-        timestamp = datetime.now().isoformat()
-        duration = 5.0
-        app = "test_app.exe"
-        title = "Test Window Title"
 
-        self.storage.save_event(timestamp, duration, app, title)
+def _make_temp_dir() -> Path:
+    temp_dir = Path.cwd() / f"test_tmp_legacy_store_{uuid.uuid4().hex[:8]}"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    return temp_dir
 
-        # 读取验证
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT timestamp, duration, app, title FROM window_events")
-        row = cursor.fetchone()
 
-        self.assertEqual(row[0], timestamp)
-        self.assertEqual(row[1], duration)
-        self.assertEqual(row[2], app)
-        self.assertEqual(row[3], title)
-        conn.close()
+def test_screenshot_store_generates_relative_png_path():
+    temp_dir = _make_temp_dir()
+    try:
+        db_manager = DatabaseManager(DB_PATH=str(temp_dir / "legacy_store.db"))
+        LWTableManager(db_manager=db_manager).init_database()
+        store = ScreenshotStore(
+            provider=ScreenshotDataProvider(db_manager=db_manager),
+            capture_backend=FakeCaptureBackend(),
+            data_root=temp_dir,
+            id_factory=lambda: "cap-legacy",
+        )
 
-if __name__ == '__main__':
-    unittest.main()
+        payload = store.capture(
+            CaptureRequest(
+                reason=CaptureReason.SCHEDULED,
+                captured_at="2026-04-02T11:00:00",
+                window_app="test_app.exe",
+                window_title="Test Window Title",
+                frequency_level=None,
+                engaged_segment_id=None,
+            )
+        )
+
+        assert payload["file_path"] == (
+            "screenshots/2026-04-02/"
+            "2026-04-02T11-00-00_scheduled_cap-legacy.png"
+        )
+        assert (temp_dir / payload["file_path"]).exists()
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)

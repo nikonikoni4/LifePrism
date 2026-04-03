@@ -49,6 +49,13 @@ class SettingsManager:
         'exclude_titles': [],
         'model_history': {},  # 按服务商存储的模型历史 {provider_id: {api_base: '', models: [model1, model2, ...]}}
         'monitor_type': 'lifeprism',
+        'scheduled_screenshot_interval_seconds': 60,
+        'active_screenshot_frequency_level': 2,
+        'keyboard_keepalive_seconds': 12,
+        'mouse_keepalive_seconds': 6,
+        'enter_screenshot_delay_ms': 700,
+        'screenshot_retention_days': 3,
+        'cleanup_check_interval_seconds': 86400,
     }
     
     def __new__(cls) -> 'SettingsManager':
