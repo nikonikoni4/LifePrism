@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Callable, Dict
+from typing import Any, Callable, Dict
 
 from lifeprism.monitor.screenshot.models import CaptureRequest
 
@@ -19,7 +19,7 @@ class ScreenshotStore:
         self.data_root = Path(data_root)
         self.id_factory = id_factory
 
-    def capture(self, request: CaptureRequest) -> Dict[str, object]:
+    def capture(self, request: CaptureRequest) -> Dict[str, Any]:
         capture_id = self.id_factory()
         date_dir = request.captured_at[:10]
         target_dir = self.data_root / "screenshots" / date_dir

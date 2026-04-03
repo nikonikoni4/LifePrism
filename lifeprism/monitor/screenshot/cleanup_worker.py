@@ -27,6 +27,14 @@ class ScreenshotCleanupWorker:
         self.delete_file_func = delete_file_func or self._delete_file
 
     def run_once(self, now_iso: str) -> CleanupResult:
+        """执行一次清理任务，删除过期的截图文件和元数据。
+
+        Args:
+            now_iso: 当前时间的 ISO 格式字符串
+
+        Returns:
+            CleanupResult: 清理结果统计（已删除文件数、已删除记录数、失败数）
+        """
         cutoff = (
             datetime.fromisoformat(now_iso) - timedelta(days=self.retention_days)
         ).isoformat()

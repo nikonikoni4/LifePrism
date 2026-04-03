@@ -32,6 +32,11 @@ class InputActivityTracker:
         self._lock = threading.Lock()
 
     def record_keyboard_event(self, key_name: str) -> None:
+        """记录键盘事件，更新活跃状态并缓冲 Enter 键事件。
+
+        Args:
+            key_name: 按键名称，如 "a", "Enter", "Shift" 等
+        """
         now = self.time_source()
         with self._lock:
             self._last_keyboard_at = now
@@ -41,6 +46,7 @@ class InputActivityTracker:
                 self._pending_enter_events.append(now)
 
     def record_mouse_event(self) -> None:
+        """记录鼠标事件，更新活跃状态。"""
         now = self.time_source()
         with self._lock:
             self._last_mouse_at = now
@@ -48,6 +54,11 @@ class InputActivityTracker:
                 self._engaged_segment_id = self.segment_id_factory()
 
     def snapshot(self) -> InputSnapshot:
+        """生成当前输入状态的快照。
+
+        Returns:
+            InputSnapshot: 包含活跃状态、活跃段 ID 和最后输入时间的快照
+        """
         now = self.time_source()
         with self._lock:
             keyboard_alive = (
@@ -69,6 +80,11 @@ class InputActivityTracker:
             )
 
     def consume_enter_events(self) -> List[float]:
+        """消费并清空缓冲的 Enter 键事件。
+
+        Returns:
+            Enter 键事件时间戳列表（秒，浮点数）
+        """
         with self._lock:
             events = list(self._pending_enter_events)
             self._pending_enter_events.clear()

@@ -30,6 +30,22 @@ class ScreenshotScheduler:
         engaged_segment_id: str | None,
         enter_events: List[float],
     ) -> List[CaptureRequest]:
+        """根据当前状态评估并生成截图请求。
+
+        Args:
+            now_epoch: 当前时间戳（秒，浮点数）
+            now_iso: 当前时间的 ISO 格式字符串
+            window: 当前窗口上下文（应用名、标题、是否 AFK）
+            engaged: 用户是否处于活跃状态（键盘/鼠标有输入）
+            engaged_segment_id: 当前活跃段的唯一标识符，None 表示未活跃
+            enter_events: 待处理的 Enter 键事件时间戳列表
+
+        Returns:
+            截图请求列表，可能包含以下类型：
+            - SCHEDULED: 固定周期截图
+            - ACTIVE: 用户活跃时的截图（首次或重复）
+            - ENTER: 按下 Enter 键后的延迟截图
+        """
         if window.is_afk:
             return []
 
