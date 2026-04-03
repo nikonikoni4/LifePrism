@@ -61,6 +61,41 @@ def _build_category_breakdown(logs: list[dict]) -> list[dict]:
     return items
 
 
+def _build_category_breakdown_for_segment(
+    logs: list[dict],
+    segment_start: datetime,
+    segment_end: datetime,
+) -> list[dict]:
+    total_by_category: dict[str, int] = defaultdict(int)
+    name_by_category: dict[str, str] = {}
+
+    for row in logs:
+        row_start = _to_dt(row["start_time"])
+        row_end = _to_dt(row["end_time"])
+        overlap_start = max(segment_start, row_start)
+        overlap_end = min(segment_end, row_end)
+        if overlap_end <= overlap_start:
+            continue
+
+        overlap_seconds = int((overlap_end - overlap_start).total_seconds())
+        category_id = row.get("category_id") or "cat-unknown"
+        total_by_category[category_id] += overlap_seconds
+        name_by_category[category_id] = row.get("category_name") or "未分类"
+
+    total_seconds = sum(total_by_category.values())
+    items: list[dict] = []
+    for category_id, seconds in sorted(total_by_category.items(), key=lambda x: x[1], reverse=True):
+        items.append(
+            {
+                "category_id": category_id,
+                "category_name": name_by_category[category_id],
+                "seconds": seconds,
+                "ratio": 0.0 if total_seconds == 0 else round(seconds / total_seconds, 4),
+            }
+        )
+    return items
+
+
 def _collect_buckets(logs: list[dict], range_start: str, range_end: str, threshold: float) -> list[dict]:
     start_dt = _to_dt(range_start)
     end_dt = _to_dt(range_end)
@@ -108,7 +143,7 @@ def _build_segment_item(
         "segment_type": segment_type,
         "density_threshold": threshold,
         "bridge_bucket_count": sum(1 for item in merged_buckets if not item["matched"]),
-        "top_categories": _build_category_breakdown(segment_logs)[:3],
+        "top_categories": _build_category_breakdown_for_segment(segment_logs, segment_start, segment_end)[:3],
     }
 
 
@@ -180,3 +215,6 @@ def build_activity_context(logs: list[dict], range_start: str, range_end: str) -
             "reason": "ready" if has_work and has_entertainment else "missing_required_main_categories",
         },
     }
+
+if __name__ == "__main__":
+    print(build_activity_context())

@@ -63,3 +63,21 @@ def test_work_entertainment_mix_uses_category_ids_not_names():
         range_end="2026-04-02T19:00:00+08:00",
     )
     assert context["work_entertainment_mix"]["should_analyze"] is True
+
+
+def test_top_categories_use_overlap_seconds_within_segment():
+    logs = [
+        _log("2026-04-02T08:50:00+08:00", "2026-04-02T09:20:00+08:00", 1800, "cat-work", "工作"),
+        _log("2026-04-02T09:20:00+08:00", "2026-04-02T09:40:00+08:00", 1200, "cat-study", "学习"),
+    ]
+    context = build_activity_context(
+        logs=logs,
+        range_start="2026-04-02T09:00:00+08:00",
+        range_end="2026-04-02T09:40:00+08:00",
+    )
+    segment = context["active_segments"][0]
+    by_id = {item["category_id"]: item for item in segment["top_categories"]}
+
+    assert segment["duration_seconds"] == 2400
+    assert by_id["cat-work"]["seconds"] == 1200
+    assert by_id["cat-study"]["seconds"] == 1200
