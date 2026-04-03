@@ -18,9 +18,7 @@ class TestMonitorFlow(unittest.TestCase):
 
     def tearDown(self):
         if os.path.exists(self.test_db_path):
-            # Ensure connection is closed before deletion
-            # In this simple test, the context manager in init_database and provider methods should handle it
-            pass
+            os.remove(self.test_db_path)
 
     def test_save_window_event_flow(self):
         """模拟 WindowMonitor 保存数据的完整流程"""
@@ -48,6 +46,10 @@ class TestMonitorFlow(unittest.TestCase):
             self.assertEqual(row['app'], event_app)
             self.assertEqual(row['title'], event_title)
             self.assertEqual(row['duration'], event_duration)
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='screen_captures'"
+            )
+            self.assertIsNotNone(cursor.fetchone())
 
 if __name__ == "__main__":
     unittest.main()

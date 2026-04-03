@@ -59,6 +59,11 @@ a = Analysis(
         # 数据库相关
         'sqlite3',
         'aiosqlite',
+        'mss',
+        'mss.tools',
+        'pynput',
+        'pynput.keyboard',
+        'pynput.mouse',
         
         # 其他可能需要的模块
         'multipart',

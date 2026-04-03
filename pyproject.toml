@@ -31,6 +31,8 @@ dependencies = [
     "langgraph>=1.0.0",
     "langgraph-checkpoint-sqlite>=3.0.0",
     "aiosqlite==0.21.0",  # 注意：0.22.x 与 langgraph-checkpoint-sqlite 不兼容
+    "mss>=9.0.1",
+    "pynput>=1.7.7",
 ]
 
 # 可选依赖

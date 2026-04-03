@@ -1,5 +1,6 @@
 import time
 import re
+import threading
 from datetime import datetime
 from typing import Optional, List
 from lifeprism.utils.logger import get_logger
@@ -12,6 +13,7 @@ from lifeprism.monitor.windows_monitor.windows_api import (
     is_any_video_playing
 )
 from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
+from lifeprism.monitor.screenshot.models import WindowContext
 from lifeprism.config.settings_manager import settings
 
 logger = get_logger(__name__)
@@ -27,6 +29,7 @@ class WindowMonitor:
         self.current_title: Optional[str] = None
         self.start_time: Optional[datetime] = None
         self.is_afk = False
+        self._state_lock = threading.Lock()
 
         self._running = False
         self._compile_exclude_patterns()
@@ -54,6 +57,14 @@ class WindowMonitor:
                 )
             self.start_time = now
 
+    def snapshot_window_context(self) -> WindowContext:
+        with self._state_lock:
+            return WindowContext(
+                app=self.current_app,
+                title=self.current_title,
+                is_afk=self.is_afk,
+            )
+
     def run(self):
         self._running = True
         logger.info(f"WindowMonitor started (poll_time: {self.poll_time}s, afk_timeout: {self.afk_timeout}s)")
@@ -73,21 +84,19 @@ class WindowMonitor:
                         # 刚进入 AFK 状态，保存当前窗口并清空状态（不追踪 AFK 时间段）
                         logger.info(f"User is AFK (idle for {idle_time:.1f}s)")
                         self._flush()
-                        self.is_afk = True
-                        # self.current_app = "AFK"
-                        # self.current_title = "Away From Keyboard"
-                        # self.start_time = datetime.now()
-                        self.current_app = None
-                        self.current_title = None
-                        self.start_time = None
+                        with self._state_lock:
+                            self.is_afk = True
+                            self.current_app = None
+                            self.current_title = None
+                            self.start_time = None
                 else:
                     if self.is_afk:
                         # 从 AFK 状态恢复
                         logger.info("User is back from AFK")
                         self._flush()
-                        self.is_afk = False
-                        # 强制触发重新获取窗口
-                        self.current_app = None
+                        with self._state_lock:
+                            self.is_afk = False
+                            self.current_app = None
 
                 # 2. 如果非 AFK，处理窗口逻辑
                 if not self.is_afk:
@@ -98,19 +107,22 @@ class WindowMonitor:
 
                         if self._should_exclude(title):
                             self._flush()
+                            with self._state_lock:
+                                self.current_app = None
+                                self.current_title = None
+                                self.start_time = None
+                        elif app != self.current_app or title != self.current_title:
+                            self._flush()
+                            with self._state_lock:
+                                self.current_app = app
+                                self.current_title = title
+                                self.start_time = datetime.now()
+                    else:
+                        self._flush()
+                        with self._state_lock:
                             self.current_app = None
                             self.current_title = None
                             self.start_time = None
-                        elif app != self.current_app or title != self.current_title:
-                            self._flush()
-                            self.current_app = app
-                            self.current_title = title
-                            self.start_time = datetime.now()
-                    else:
-                        self._flush()
-                        self.current_app = None
-                        self.current_title = None
-                        self.start_time = None
 
                 time.sleep(self.poll_time)
         except Exception as e:

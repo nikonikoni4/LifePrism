@@ -39,6 +39,14 @@ class SettingItems(BaseModel):
     config_base_path: str = Field(description="配置文件所在目录路径")
     # 数据清洗配置
     data_cleaning_threshold: int = Field(description="数据清洗时长阈值 (秒)")
+    # 截图配置
+    scheduled_screenshot_interval_seconds: int = Field(description="固定截图周期 (秒)")
+    active_screenshot_frequency_level: int = Field(description="主动截图频率等级")
+    keyboard_keepalive_seconds: int = Field(description="键盘 keepalive 时长 (秒)")
+    mouse_keepalive_seconds: int = Field(description="鼠标 keepalive 时长 (秒)")
+    enter_screenshot_delay_ms: int = Field(description="Enter 截图延迟 (毫秒)")
+    screenshot_retention_days: int = Field(description="截图保留天数")
+    cleanup_check_interval_seconds: int = Field(description="截图清理扫描周期 (秒)")
 
 
 class SettingsResponse(BaseModel):
@@ -61,6 +69,13 @@ class UpdateSettingsRequest(BaseModel):
     aw_db_path: Optional[str] = None
     lifeprism_data_path: Optional[str] = None
     data_cleaning_threshold: Optional[int] = None
+    scheduled_screenshot_interval_seconds: Optional[int] = None
+    active_screenshot_frequency_level: Optional[int] = None
+    keyboard_keepalive_seconds: Optional[int] = None
+    mouse_keepalive_seconds: Optional[int] = None
+    enter_screenshot_delay_ms: Optional[int] = None
+    screenshot_retention_days: Optional[int] = None
+    cleanup_check_interval_seconds: Optional[int] = None
 
 
 class UpdateApiKeyRequest(BaseModel):

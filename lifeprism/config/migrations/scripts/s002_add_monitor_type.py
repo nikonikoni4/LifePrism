@@ -9,8 +9,8 @@ NAME = "s002_add_monitor_type"
 
 
 def check_if_applied(data: dict) -> bool:
-    """monitor_type 字段已存在即视为已应用"""
-    return "monitor_type" in data
+    """monitor_type 字段已存在且值合法即视为已应用"""
+    return data.get("monitor_type") in ["lifeprism", "activitywatch"]
 
 
 def upgrade(data: dict) -> dict:
