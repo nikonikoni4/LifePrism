@@ -149,13 +149,28 @@ class HabitService:
         )
 
     def _create_challenge_for_habit(
-        self, habit_id: str, level: int, freq: FrequencyObject, streak_base: int
+        self, habit_id: str, level: int, freq: FrequencyObject, streak_base: int,
+        previous_challenge: Optional[Dict] = None
     ) -> Dict:
-        """为习惯创建新挑战，返回 challenge 行"""
+        """为习惯创建新挑战，返回 challenge 行
+
+        新挑战开始日期规则：
+        - 如果提供了 previous_challenge，新挑战从其结束日的第二天开始
+        - 否则从今天开始
+        """
         params = calculate_challenge_params(level, freq)
         today = date.today()
-        start = today.isoformat()
-        end = (today + timedelta(weeks=params["challengeWeeks"])).isoformat()
+
+        if previous_challenge:
+            # 从旧挑战结束日的第二天开始
+            old_end_date = date.fromisoformat(previous_challenge["end_date"])
+            start_date = old_end_date + timedelta(days=1)
+        else:
+            # 首次创建，从今天开始
+            start_date = today
+
+        start = start_date.isoformat()
+        end = (start_date + timedelta(weeks=params["challengeWeeks"])).isoformat()
         to_level = min(level + 1, MAX_LEVEL)
         data = {
             "habit_id": habit_id,
@@ -375,7 +390,7 @@ class HabitService:
                 })
                 habit_provider.update_habit(habit_id, {"current_level": new_level})
                 freq = self._parse_frequency(habit_row)
-                self._create_challenge_for_habit(habit_id, new_level, freq, completed)
+                self._create_challenge_for_habit(habit_id, new_level, freq, completed, challenge)
             return SettlementItem(
                 challenge_id=challenge["id"],
                 habit_id=habit_id, habit_name=habit_name,
@@ -454,6 +469,15 @@ class HabitService:
             raise NotFoundError("当前无进行中的挑战", code=CHALLENGE_NOT_FOUND)
 
         today_str = date.today().isoformat()
+        challenge_start = challenge["start_date"]
+
+        # 校验打卡日期不能早于挑战开始日期
+        if today_str < challenge_start:
+            raise ValidationError(
+                f"当前挑战从 {challenge_start} 开始，无法为 {today_str} 打卡",
+                code=VALIDATION_FAILED
+            )
+
         now_str = datetime.now().isoformat()
 
         checkin_id = habit_checkin_provider.create_checkin({
