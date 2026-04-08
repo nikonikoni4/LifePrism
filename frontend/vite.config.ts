@@ -8,11 +8,11 @@ export default defineConfig(({ mode }) => {
   return {
     base: './',
     server: {
-      port: 3000,
+      port: 8100,
       host: '0.0.0.0',
       proxy: {
         '/api': {
-          target: 'http://localhost:8000',
+          target: 'http://localhost:8101',
           changeOrigin: true,
           secure: false,
         },

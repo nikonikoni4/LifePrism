@@ -386,13 +386,12 @@ if __name__ == "__main__":
         # settings_manager 已初始化，直接从 settings 获取固定配置路径
         config_path = os.path.join(settings.config_base_path, "config", "config.json")
         print(f"[STARTUP] 打包环境，配置文件路径: {config_path}")
+        port = find_available_port(config_path)
     else:
         logger.info("正在运行开发环境")
-        # 开发环境：不使用配置文件
-        config_path = None
-        print("[STARTUP] 开发环境，使用默认端口配置")
-
-    port = find_available_port(config_path)
+        # 开发环境：固定使用 8101 端口（避免与生产环境 8000 混淆）
+        port = 8101
+        print(f"[STARTUP] 开发环境，固定使用端口 {port}")
 
     print(f"[STARTUP] 后端将在端口 {port} 启动")
 
