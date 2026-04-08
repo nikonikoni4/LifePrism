@@ -6,7 +6,7 @@ LLM 结果解析工具
 - parse_utils: 解析 LLM 的输出结果
 """
 
-from lifeprism.llm.schemas.classify_shemas import classifyState
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,11 @@ def extract_json_from_response(content: str) -> str:
             json_lines.append(line)
         content = "\n".join(json_lines)
     
-    return content.strip()
+    content = content.strip()
+    # 非 JSON 内容（如错误信息）直接返回空，让调用方的 `if not clean` 拦截
+    if not content or content[0] not in ('{', '['):
+        return ""
+    return content
 
 
 def parse_classification_result(

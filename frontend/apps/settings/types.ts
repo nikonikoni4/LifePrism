@@ -4,6 +4,23 @@
  * 与后端 setting_schemas.py 对应的类型定义
  */
 
+export interface ProviderModelHistory {
+    api_base: string;
+    models: string[];
+}
+
+export interface ProviderInfo {
+    name: string;
+    display_name: string;
+    default_model: string;
+    default_api_base: string;
+    has_api_key: boolean;
+}
+
+export interface ProviderListResponse {
+    providers: ProviderInfo[];
+}
+
 /** 完整配置项 (对应后端 SettingItems) */
 export interface Settings {
     user_name: string;
@@ -12,7 +29,8 @@ export interface Settings {
     provider_list: string[];  // 支持的模型服务商列表
     provider_id_map: Record<string, string>;  // 服务商显示名称到 ID 的映射
     model: string;
-    model_history: Record<string, string[]>;  // 按服务商存储的模型历史
+    api_base: string;
+    model_history: Record<string, ProviderModelHistory>;  // 按服务商存储的模型历史
     input_tokens_cost: number;
     output_tokens_cost: number;
     classification_mode: string;
@@ -35,6 +53,7 @@ export interface UpdateSettingsRequest {
     user_name?: string;
     provider?: string;
     model?: string;
+    api_base?: string;
     input_tokens_cost?: number;
     output_tokens_cost?: number;
     classification_mode?: string;

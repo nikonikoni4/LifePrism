@@ -23,6 +23,7 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { SettingsAPI } from './api';
+import type { ProviderInfo, ProviderModelHistory } from './types';
 import { toast } from '../../core/components';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -38,7 +39,8 @@ const SettingsApp: React.FC = () => {
     const [provider, setProvider] = useState('');
     const [providerList, setProviderList] = useState<string[]>([]);
     const [modelName, setModelName] = useState('');
-    const [modelHistory, setModelHistory] = useState<Record<string, string[]>>({});
+    const [apiBase, setApiBase] = useState('');
+    const [modelHistory, setModelHistory] = useState<Record<string, ProviderModelHistory>>({});
     const [showModelDropdown, setShowModelDropdown] = useState(false);
     const [apiKey, setApiKey] = useState('');
     const [showKey, setShowKey] = useState(false);
@@ -48,6 +50,7 @@ const SettingsApp: React.FC = () => {
 
     // Provider 显示名称到 ID 的映射（从 API 动态获取）
     const [providerIdMap, setProviderIdMap] = useState<Record<string, string>>({});
+    const [providerDefaults, setProviderDefaults] = useState<Record<string, ProviderInfo>>({});
 
     // 3. Classification Settings
     const [classificationMode, setClassificationMode] = useState<'simple' | 'complex'>('simple');
@@ -128,7 +131,10 @@ const SettingsApp: React.FC = () => {
         const loadSettings = async () => {
             try {
                 setIsLoading(true);
-                const settings = await SettingsAPI.getSettings();
+                const [settings, providers] = await Promise.all([
+                    SettingsAPI.getSettings(),
+                    SettingsAPI.getProviders(),
+                ]);
 
                 // Populate state from API response
                 setNickname(settings.user_name);
@@ -136,6 +142,7 @@ const SettingsApp: React.FC = () => {
                 setProviderList(settings.provider_list);
                 setProviderIdMap(settings.provider_id_map || {});
                 setModelName(settings.model);
+                setApiBase(settings.api_base || '');
                 setModelHistory(settings.model_history || {});
                 setApiKey(settings.api_key || '');
                 setCostInput(settings.input_tokens_cost);
@@ -150,6 +157,9 @@ const SettingsApp: React.FC = () => {
                 setConfigBasePath(settings.config_base_path || '');
                 setFilterDuration(settings.data_cleaning_threshold);
                 setIsElectron(!!window.electronAPI);
+                setProviderDefaults(
+                    Object.fromEntries(providers.map((item) => [item.name, item]))
+                );
             } catch (err) {
                 toast.error(err instanceof Error ? err.message : '加载配置失败');
             } finally {
@@ -166,6 +176,7 @@ const SettingsApp: React.FC = () => {
             user_name: nickname,
             provider: provider,
             model: modelName,
+            api_base: apiBase,
             input_tokens_cost: costInput,
             output_tokens_cost: costOutput,
             classification_mode: classificationMode === 'complex' ? 'classify_graph' : 'classify_simple',
@@ -177,7 +188,7 @@ const SettingsApp: React.FC = () => {
             ...overrides,
         };
         debouncedSave(currentSettings);
-    }, [nickname, provider, modelName, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, debouncedSave]);
+    }, [nickname, provider, modelName, apiBase, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, debouncedSave]);
 
     // Handlers
     const handleTestConnection = async () => {
@@ -245,9 +256,35 @@ const SettingsApp: React.FC = () => {
         triggerAutoSave({ multi_purpose_app_names: newApps });
     };
 
+    const getProviderHistorySnapshot = (providerId: string): ProviderModelHistory => {
+        return modelHistory[providerId] || { api_base: '', models: [] };
+    };
+
+    const getDefaultProviderConfig = (providerId: string) => {
+        return providerDefaults[providerId] || {
+            name: providerId,
+            display_name: providerId,
+            default_model: '',
+            default_api_base: '',
+            has_api_key: true,
+        };
+    };
+
     const handleProviderChange = (newProvider: string) => {
+        const providerId = providerIdMap[newProvider] || '';
+        const historySnapshot = getProviderHistorySnapshot(providerId);
+        const providerConfig = getDefaultProviderConfig(providerId);
+        const nextModel = historySnapshot.models[0] || providerConfig.default_model || '';
+        const nextApiBase = historySnapshot.api_base || providerConfig.default_api_base || '';
+
         setProvider(newProvider);
-        triggerAutoSave({ provider: newProvider });
+        setModelName(nextModel);
+        setApiBase(nextApiBase);
+        triggerAutoSave({
+            provider: newProvider,
+            model: nextModel,
+            api_base: nextApiBase,
+        });
         // 当选择火山引擎时显示说明弹窗
         if (newProvider.includes('火山引擎') || newProvider.toLowerCase().includes('volcengine')) {
             setShowVolcEngineModal(true);
@@ -258,7 +295,7 @@ const SettingsApp: React.FC = () => {
     const getCurrentProviderModelHistory = (): string[] => {
         const providerId = providerIdMap[provider] || '';
         if (!providerId) return [];
-        return modelHistory[providerId] || [];
+        return getProviderHistorySnapshot(providerId).models;
     };
 
     // 删除模型历史
@@ -270,7 +307,10 @@ const SettingsApp: React.FC = () => {
             // 更新本地状态
             setModelHistory(prev => ({
                 ...prev,
-                [providerId]: (prev[providerId] || []).filter(m => m !== model)
+                [providerId]: {
+                    api_base: prev[providerId]?.api_base || '',
+                    models: (prev[providerId]?.models || []).filter(m => m !== model),
+                }
             }));
         } catch (err) {
             toast.error(err instanceof Error ? err.message : '删除失败');
@@ -434,6 +474,17 @@ const SettingsApp: React.FC = () => {
                                     </div>
                                 )}
                             </div>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">API Base</label>
+                            <input
+                                type="text"
+                                value={apiBase}
+                                onChange={(e) => setApiBase(e.target.value)}
+                                onBlur={() => triggerAutoSave({ api_base: apiBase })}
+                                placeholder="留空时使用该服务商默认 API Base"
+                                className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all"
+                            />
                         </div>
                     </div>
 

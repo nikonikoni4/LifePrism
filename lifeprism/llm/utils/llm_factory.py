@@ -7,34 +7,16 @@ LLM 统一工厂函数
 import logging
 from typing import Any, Dict, Optional
 
-from langchain_core.language_models.chat_models import BaseChatModel
-
 from lifeprism.config.settings_manager import settings
 from lifeprism.config.provider_manager import provider_manager
-from lifeprism.llm.providers import (
-    BaseLLMProvider,
-    aliyun_provider,
-    volcengine_provider,
-    openai_provider,
-    minimax_provider,
-    kimi_provider,
-)
+from lifeprism.llm.providers.registry import find_by_name
 
 logger = logging.getLogger(__name__)
-
-# Provider ID 到实例的映射
-PROVIDER_REGISTRY: Dict[str, BaseLLMProvider] = {
-    "aliyun": aliyun_provider,
-    "volcengine": volcengine_provider,
-    "openai": openai_provider,
-    "minimax": minimax_provider,
-    "kimi": kimi_provider,
-}
 
 
 def get_provider_id(provider_name: Optional[str] = None) -> str:
     """
-    获取 Provider ID
+    获取 Provider ID (区分于display name 显示名称)
 
     Args:
         provider_name: 服务商名称（显示名称或 ID），None 时从 settings 读取
@@ -49,20 +31,6 @@ def get_provider_id(provider_name: Optional[str] = None) -> str:
     return provider_manager.get_provider_id(provider_name)
 
 
-def get_provider(provider: Optional[str] = None) -> BaseLLMProvider:
-    """
-    获取 Provider 实例
-
-    Args:
-        provider: 服务商名称或 ID，None 时从 settings 读取
-
-    Returns:
-        BaseLLMProvider 实例
-    """
-    provider_id = get_provider_id(provider)
-    return PROVIDER_REGISTRY.get(provider_id, aliyun_provider)
-
-
 def create_llm(
     provider: Optional[str] = None,
     model: Optional[str] = None,
@@ -72,7 +40,7 @@ def create_llm(
     enable_thinking: bool = False,
     enable_streaming: bool = False,
     **kwargs
-) -> BaseChatModel:
+):
     """
     统一 LLM 创建入口
 
@@ -108,18 +76,19 @@ def create_llm(
             enable_thinking=True
         )
     """
-    # 获取 Provider
-    llm_provider = get_provider(provider)
-    provider_id = get_provider_id(provider)
+    from lifeprism.llm.providers.litellm_provider import LiteLLMProvider
 
-    # 获取配置值
-    actual_model = model or settings.model or llm_provider.config.default_model
+    provider_id = get_provider_id(provider)
+    spec = find_by_name(provider_id)
+
+    actual_model = model or settings.model or (spec.default_model if spec else "")
     actual_api_key = api_key or settings.get_api_key(provider_id)
+    actual_api_base = (spec.default_api_base if spec else "") or ""
+    provider_name = provider_id
 
     if not actual_api_key:
         raise ValueError(
-            f"未配置 API Key。请在设置中配置 {llm_provider.config.name} 的 API Key，"
-            f"或设置环境变量 {llm_provider.config.env_key_name}"
+            f"未配置 API Key。请在设置中配置 {provider_id} 的 API Key。"
         )
 
     logger.debug(
@@ -127,59 +96,52 @@ def create_llm(
         f"search={enable_search}, thinking={enable_thinking}"
     )
 
-    return llm_provider.create_model(
-        model=actual_model,
+    llm_provider = LiteLLMProvider(
         api_key=actual_api_key,
-        temperature=temperature,
-        enable_search=enable_search,
-        enable_thinking=enable_thinking,
-        enable_streaming=enable_streaming,
-        **kwargs
+        api_base=actual_api_base,
+        default_model=actual_model,
+        provider_name=provider_name,
     )
+    return llm_provider
 
 
 def get_provider_capabilities(provider: Optional[str] = None) -> Dict[str, Any]:
     """
-    获取服务商支持的能力
+    获取服务商信息（来自 provider_manager）。
 
     Args:
         provider: 服务商名称或 ID，None 时从 settings 读取
 
     Returns:
-        能力字典，包含:
-        - provider_id: 服务商 ID
-        - provider_name: 服务商显示名称
-        - capabilities: 能力布尔值字典
-        - default_model: 默认模型
+        包含 name/display_name/default_model/default_api_base/has_api_key 的字典
     """
-    llm_provider = get_provider(provider)
-    config = llm_provider.config
-
+    provider_id = get_provider_id(provider)
+    spec = find_by_name(provider_id)
+    if spec is None:
+        return {
+            "name": provider_id,
+            "display_name": provider_id,
+            "default_model": "",
+            "default_api_base": "",
+            "has_api_key": False,
+        }
     return {
-        "provider_id": config.provider_id,
-        "provider_name": config.name,
-        "capabilities": llm_provider.get_capabilities_dict(),
-        "default_model": config.default_model,
+        "name": spec.name,
+        "display_name": spec.display_name,
+        "default_model": spec.default_model,
+        "default_api_base": spec.default_api_base,
+        "has_api_key": bool(spec.env_key),
     }
 
 
 def list_providers() -> list:
     """
-    获取所有支持的服务商列表
+    获取所有支持的服务商列表（来自 provider_manager）。
 
     Returns:
-        服务商信息列表
+        服务商信息列表，字段：name/display_name/default_model/default_api_base/has_api_key
     """
-    result = []
-    for provider_id, provider in PROVIDER_REGISTRY.items():
-        config = provider.config
-        result.append({
-            "provider_id": config.provider_id,
-            "provider_name": config.name,
-            "capabilities": provider.get_capabilities_dict(),
-            "default_model": config.default_model,
-        })
-    return result
+    return provider_manager.get_all_providers(allowed_only=True)
 
 
 # ===================== 向后兼容别名 =====================
@@ -189,7 +151,7 @@ def create_ChatTongyiModel(
     enable_search: bool = True,
     enable_thinking: bool = False,
     enable_streaming: bool = False
-) -> BaseChatModel:
+):
     """
     向后兼容的别名函数
 
@@ -223,14 +185,13 @@ if __name__ == "__main__":
     # 列出所有服务商
     print("\n支持的服务商:")
     for p in list_providers():
-        print(f"  - {p['provider_name']} ({p['provider_id']})")
+        print(f"  - {p['display_name']} ({p['name']})")
         print(f"    默认模型: {p['default_model']}")
-        print(f"    能力: {p['capabilities']}")
 
-    # 获取当前配置的服务商能力
+    # 获取当前配置的服务商信息
     print(f"\n当前服务商: {settings.provider}")
     caps = get_provider_capabilities()
-    print(f"  能力: {caps['capabilities']}")
+    print(f"  Provider ID: {caps['name']}, 显示名: {caps['display_name']}")
 
     # ===================== 连接测试 =====================
     print("\n" + "=" * 60)
@@ -258,8 +219,8 @@ if __name__ == "__main__":
             print(f"  LLM 实例创建成功: {type(llm).__name__}")
 
             async def test():
-                response = await llm.ainvoke("请回复'连接成功'这四个字。")
-                return response.content if hasattr(response, 'content') else str(response)
+                response = await llm.chat([{"role": "user", "content": "请回复'连接成功'这四个字。"}])
+                return response.content or ""
 
             result = asyncio.run(test())
             print(f"\n[成功] 模型回复: {result}")

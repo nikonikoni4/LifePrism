@@ -1,41 +1,44 @@
 """
-LLM Providers 模块
-
-提供多服务商支持的抽象层
+LLM Providers 模块（新架构）
 """
 
-from .base_provider import (
-    BaseLLMProvider,
-    ProviderCapability,
-    ProviderConfig
+from .base import (
+    LLMProvider,
+    LLMResponse,
+    ToolCallRequest,
+    GenerationSettings,
 )
-from .aliyun_provider import AliyunProvider, aliyun_provider
-from .volcengine_provider import VolcEngineProvider, volcengine_provider
-from .openai_provider import OpenAIProvider, openai_provider
-from .minimax_provider import MiniMaxProvider, minimax_provider
-from .kimi_provider import KimiProvider, kimi_provider
-
-# 保留原有的数据提供者
+from .litellm_provider import LiteLLMProvider
+from .custom_provider import CustomProvider
+from .registry import (
+    ProviderSpec,
+    PROVIDERS,
+    find_by_model,
+    find_gateway,
+    find_by_name,
+)
 from .llm_lw_data_provider import LLMLWDataProvider, llm_lw_data_provider
-
+from .build_llm_client import create_llm_client
+from .summary_read_provider import SummaryReadProvider, summary_read_provider
 __all__ = [
-    # 基类和类型
-    "BaseLLMProvider",
-    "ProviderCapability",
-    "ProviderConfig",
-    # Provider 类
-    "AliyunProvider",
-    "VolcEngineProvider",
-    "OpenAIProvider",
-    "MiniMaxProvider",
-    "KimiProvider",
-    # Provider 单例
-    "aliyun_provider",
-    "volcengine_provider",
-    "openai_provider",
-    "minimax_provider",
-    "kimi_provider",
+    # 抽象层
+    "LLMProvider",
+    "LLMResponse",
+    "ToolCallRequest",
+    "GenerationSettings",
+    # 实现类
+    "LiteLLMProvider",
+    "CustomProvider",
+    # registry
+    "ProviderSpec",
+    "PROVIDERS",
+    "find_by_model",
+    "find_gateway",
+    "find_by_name",
     # 数据提供者（保留原有）
     "LLMLWDataProvider",
     "llm_lw_data_provider",
+    "create_llm_client",
+    "SummaryReadProvider",
+    "summary_read_provider",
 ]

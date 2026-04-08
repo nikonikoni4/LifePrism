@@ -11,17 +11,15 @@ from lifeprism.server.schemas.setting_schemas import (
     UpdateSettingsRequest,
     UpdateApiKeyRequest,
     UpdateApiKeyResponse,
-    ProviderCapabilitiesResponse,
     ProviderListResponse,
     ProviderInfo,
-    ProviderCapabilities,
     ValidatePathRequest,
     ValidatePathResponse,
     MigrateDataPathRequest,
     MigrateDataPathResponse,
 )
 from lifeprism.server.services import setting_service
-from lifeprism.llm.utils import get_provider_capabilities, list_providers
+from lifeprism.config.provider_manager import provider_manager
 
 router = APIRouter(prefix="/settings", tags=["Settings - 配置管理"])
 
@@ -109,36 +107,11 @@ async def get_providers():
     """
     获取所有支持的 LLM 服务商列表
 
-    返回每个服务商的 ID、名称、能力和默认模型
+    返回每个服务商的 ID、显示名称、默认模型和 API Base
     """
-    providers_data = list_providers()
-    providers = [
-        ProviderInfo(
-            provider_id=p["provider_id"],
-            provider_name=p["provider_name"],
-            capabilities=ProviderCapabilities(**p["capabilities"]),
-            default_model=p["default_model"]
-        )
-        for p in providers_data
-    ]
+    providers_data = provider_manager.get_all_providers(allowed_only=True)
+    providers = [ProviderInfo(**p) for p in providers_data]
     return ProviderListResponse(providers=providers)
-
-
-@router.get("/provider-capabilities", response_model=ProviderCapabilitiesResponse, summary="获取服务商能力")
-async def get_provider_caps(
-    provider: Optional[str] = Query(default=None, description="服务商名称或 ID，不传则使用当前配置的服务商")
-):
-    """
-    获取指定服务商支持的能力
-
-    Args:
-        provider: 服务商名称或 ID，如 "aliyun", "OpenAI" 等
-
-    Returns:
-        服务商能力信息，包括是否支持 web_search、thinking 等
-    """
-    caps = get_provider_capabilities(provider)
-    return ProviderCapabilitiesResponse(**caps)
 
 
 @router.delete("/model-history", summary="删除模型历史记录")

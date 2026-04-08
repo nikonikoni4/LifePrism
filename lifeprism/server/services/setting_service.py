@@ -57,13 +57,17 @@ def update_settings(request: UpdateSettingsRequest) -> SettingItems:
     if updates:
         logger.info(f"更新配置: {list(updates.keys())}")
 
-        # 如果同时更新了 provider 和 model，将模型添加到历史
-        provider = updates.get('provider')
+        provider_name = updates.get('provider') or settings.provider
+        provider_id = provider_manager.get_provider_id(provider_name) if provider_name else ""
+        api_base = updates.get('api_base')
         model = updates.get('model')
-        if provider and model:
-            # 将显示名称转换为 provider_id
-            provider_id = provider_manager.get_provider_id(provider)
-            settings.add_model_to_history(provider_id, model)
+
+        if provider_id and api_base is not None:
+            settings.set_provider_api_base(provider_id, api_base)
+            logger.info(f"已更新 {provider_id} 的 API Base 历史")
+
+        if provider_id and model:
+            settings.add_model_to_history(provider_id, model, api_base)
             logger.info(f"已将模型 {model} 添加到 {provider_id} 的历史记录")
 
         settings.update(updates)
@@ -196,7 +200,16 @@ def validate_data_path(path: str, path_type: str) -> ValidatePathResponse:
 
 
 # 迁移时需要复制的子目录列表（不含 config，配置文件固定在默认路径）
-_DATA_SUBDIRS = ["dataset", "plan", "debug_logs", "workflow", "external_files", "docs", "diary"]
+_DATA_SUBDIRS = [
+    "dataset",
+    "plan",
+    "debug_logs",
+    "workflow",
+    "external_files",
+    "screenshots",
+    "docs",
+    "diary",
+]
 
 
 def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> MigrateDataPathResponse:

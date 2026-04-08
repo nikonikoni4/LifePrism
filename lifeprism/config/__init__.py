@@ -14,7 +14,6 @@ from .settings_manager import (
 )
 from .provider_manager import (
     ProviderManager,
-    ProviderInfo,
     provider_manager,
 )
 
@@ -29,5 +28,4 @@ __all__ = [
     "get_all_settings",
     "provider_manager",
     "ProviderManager",
-    "ProviderInfo",
 ]

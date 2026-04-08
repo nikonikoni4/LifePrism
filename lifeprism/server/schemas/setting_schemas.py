@@ -8,6 +8,12 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 
 
+class ProviderModelHistory(BaseModel):
+    """单个服务商的模型历史快照"""
+    api_base: str = Field(default="", description="该服务商最近保存的 API Base")
+    models: List[str] = Field(default_factory=list, description="该服务商的模型历史列表")
+
+
 class SettingItems(BaseModel):
     """配置项完整模型"""
     # 用户配置
@@ -18,7 +24,8 @@ class SettingItems(BaseModel):
     provider_list: List[str] = Field(description="支持的模型服务商列表")
     provider_id_map: Dict[str, str] = Field(default={}, description="服务商显示名称到 ID 的映射")
     model: str = Field(description="模型选择")
-    model_history: Dict[str, List[str]] = Field(default={}, description="按服务商存储的模型历史")
+    api_base: str = Field(default="", description="当前 API Base")
+    model_history: Dict[str, ProviderModelHistory] = Field(default={}, description="按服务商存储的模型历史")
     input_tokens_cost: float = Field(description="输入token单价 /1k")
     output_tokens_cost: float = Field(description="输出token单价 /1k")
     # 分类配置
@@ -32,6 +39,14 @@ class SettingItems(BaseModel):
     config_base_path: str = Field(description="配置文件所在目录路径")
     # 数据清洗配置
     data_cleaning_threshold: int = Field(description="数据清洗时长阈值 (秒)")
+    # 截图配置
+    scheduled_screenshot_interval_seconds: int = Field(description="固定截图周期 (秒)")
+    active_screenshot_frequency_level: int = Field(description="主动截图频率等级")
+    keyboard_keepalive_seconds: int = Field(description="键盘 keepalive 时长 (秒)")
+    mouse_keepalive_seconds: int = Field(description="鼠标 keepalive 时长 (秒)")
+    enter_screenshot_delay_ms: int = Field(description="Enter 截图延迟 (毫秒)")
+    screenshot_retention_days: int = Field(description="截图保留天数")
+    cleanup_check_interval_seconds: int = Field(description="截图清理扫描周期 (秒)")
 
 
 class SettingsResponse(BaseModel):
@@ -45,6 +60,7 @@ class UpdateSettingsRequest(BaseModel):
     user_name: Optional[str] = None
     provider: Optional[str] = None
     model: Optional[str] = None
+    api_base: Optional[str] = None
     input_tokens_cost: Optional[float] = None
     output_tokens_cost: Optional[float] = None
     classification_mode: Optional[str] = None
@@ -53,6 +69,13 @@ class UpdateSettingsRequest(BaseModel):
     aw_db_path: Optional[str] = None
     lifeprism_data_path: Optional[str] = None
     data_cleaning_threshold: Optional[int] = None
+    scheduled_screenshot_interval_seconds: Optional[int] = None
+    active_screenshot_frequency_level: Optional[int] = None
+    keyboard_keepalive_seconds: Optional[int] = None
+    mouse_keepalive_seconds: Optional[int] = None
+    enter_screenshot_delay_ms: Optional[int] = None
+    screenshot_retention_days: Optional[int] = None
+    cleanup_check_interval_seconds: Optional[int] = None
 
 
 class UpdateApiKeyRequest(BaseModel):
@@ -67,28 +90,13 @@ class UpdateApiKeyResponse(BaseModel):
     message: str
 
 
-class ProviderCapabilities(BaseModel):
-    """服务商能力"""
-    web_search: bool = Field(description="是否支持网络搜索")
-    thinking: bool = Field(description="是否支持深度思考")
-    streaming: bool = Field(description="是否支持流式输出")
-    tool_calling: bool = Field(description="是否支持工具调用")
-
-
 class ProviderInfo(BaseModel):
     """服务商信息"""
-    provider_id: str = Field(description="服务商 ID")
-    provider_name: str = Field(description="服务商显示名称")
-    capabilities: ProviderCapabilities = Field(description="服务商能力")
+    name: str = Field(description="服务商 ID")
+    display_name: str = Field(description="服务商显示名称")
     default_model: str = Field(description="默认模型")
-
-
-class ProviderCapabilitiesResponse(BaseModel):
-    """获取服务商能力响应"""
-    provider_id: str
-    provider_name: str
-    capabilities: Dict[str, bool]
-    default_model: str
+    default_api_base: str = Field(default="", description="默认 API Base URL")
+    has_api_key: bool = Field(description="是否需要 API Key")
 
 
 class ProviderListResponse(BaseModel):

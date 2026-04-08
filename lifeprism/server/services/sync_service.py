@@ -19,7 +19,7 @@ class SyncService:
     def __init__(self):
         self.data_processor = DataProcessingService()
     
-    def sync_from_activitywatch(
+    async def sync_from_activitywatch(
         self,
         auto_classify: bool = True
     ) -> Dict:
@@ -36,7 +36,7 @@ class SyncService:
         
         try:
             # 使用 DataProcessingService 处理增量同步
-            result = self.data_processor.process_activitywatch_data(
+            result = await self.data_processor.process_activitywatch_data(
                 auto_classify=auto_classify
             )
             
@@ -68,7 +68,7 @@ class SyncService:
                 "message": f"同步失败: {str(e)}"
             }
     
-    def sync_by_time_range(
+    async def sync_by_time_range(
         self,
         start_time: str,
         end_time: str,
@@ -93,7 +93,7 @@ class SyncService:
             end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
             
             # 使用 DataProcessingService 处理数据
-            result = self.data_processor.process_activitywatch_data_by_time_range(
+            result = await self.data_processor.process_activitywatch_data_by_time_range(
                 start_time=start_dt,
                 end_time=end_dt,
                 auto_classify=auto_classify

@@ -1457,6 +1457,82 @@ HABIT_CHAIN_NODES_CONFIG = {
     'update_at': True,
 }
 
+SCREEN_CAPTURES_CONFIG = {
+    'table_name': 'screen_captures',
+    'columns': {
+        'id': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY'],
+            'comment': '截屏记录 ID（如 sc-{uuid[:8]}）'
+        },
+        'captured_at': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '截屏时间戳（ISO 格式）'
+        },
+        'capture_reason': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '触发截屏的原因'
+        },
+        'file_path': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '相对 lifeprism_data_path 的路径'
+        },
+        'window_app': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '截屏时的应用程序名称'
+        },
+        'window_title': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '截屏时的窗口标题'
+        },
+        'frequency_level': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '截屏频率等级'
+        },
+        'engaged_segment_id': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '关联时间段 ID'
+        },
+        'is_afk': {
+            'type': 'INTEGER',
+            'constraints': ['DEFAULT 0'],
+            'comment': '是否处于 AFK 状态（0=否, 1=是）'
+        }
+    },
+    'table_constraints': ['UNIQUE (file_path)'],
+    'indexes': [
+        {'name': 'idx_screen_captures_captured_at', 'columns': ['captured_at']},
+        {'name': 'idx_screen_captures_segment_id', 'columns': ['engaged_segment_id']},
+        {'name': 'idx_screen_captures_reason_time', 'columns': ['capture_reason', 'captured_at']},
+    ],
+    'timestamps': True,
+    'update_at': False,
+}
+
+WINDOW_EVENTS_CONFIG = {
+    'table_name': 'window_events',
+    'columns': {
+        'id': {'type': 'INTEGER', 'constraints': ['PRIMARY KEY AUTOINCREMENT'], 'comment': '自增ID'},
+        'timestamp': {'type': 'TEXT', 'constraints': ['NOT NULL'], 'comment': '事件发生的时间戳 (ISO格式)'},
+        'duration': {'type': 'REAL', 'constraints': ['NOT NULL'], 'comment': '持续时长(秒)'},
+        'app': {'type': 'TEXT', 'constraints': [], 'comment': '应用程序名称'},
+        'title': {'type': 'TEXT', 'constraints': [], 'comment': '窗口标题'},
+    },
+    'table_constraints': [],
+    'indexes': [
+        {'name': 'idx_window_events_timestamp', 'columns': ['timestamp']},
+    ],
+    'timestamps': True,
+    'update_at': False,
+}
+
 
 # 所有表配置的映射
 TABLE_CONFIGS = {
@@ -1492,6 +1568,8 @@ TABLE_CONFIGS = {
     'habit_checkins': HABIT_CHECKINS_CONFIG,
     'habit_chains': HABIT_CHAINS_CONFIG,
     'habit_chain_nodes': HABIT_CHAIN_NODES_CONFIG,
+    'screen_captures': SCREEN_CAPTURES_CONFIG,
+    'window_events': WINDOW_EVENTS_CONFIG,
 }
 
 

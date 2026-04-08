@@ -258,7 +258,7 @@ class DataInitializer:
                 logger.info(f"成功初始化示例计划书，ID: {EXAMPLE_PLAN_DOC['id']}")
 
             # 生成示例 MD 文件
-            self._generate_example_plan_doc_md()
+            # self._generate_example_plan_doc_md()
 
         except Exception as e:
             logger.error(f"初始化示例计划书失败: {e}")
