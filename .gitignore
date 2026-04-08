@@ -37,3 +37,4 @@ AGENTS.md
 nanobotclaude_task_manager.py
 .claude_task/
 claude_task_manager.py
+.worktrees

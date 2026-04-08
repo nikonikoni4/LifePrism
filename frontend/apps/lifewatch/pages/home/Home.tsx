@@ -34,15 +34,26 @@ const Home: React.FC<HomeProps> = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // 判断是否在 Electron 环境（生产环境）
+    const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined;
+
     // 记录组件挂载时间
     const [mountTime] = useState(() => {
         const time = performance.now();
         console.log(`⏱️ [Home] 组件开始渲染: ${new Date().toLocaleTimeString()}`);
+        console.log(`🔧 [Home] 运行环境: ${isElectron ? 'Electron (生产)' : '浏览器 (开发)'}`);
         return time;
     });
 
     // 统一获取首页所有数据
     useEffect(() => {
+        // 开发环境（浏览器）下不自动加载，需要手动刷新
+        if (!isElectron && refreshKey === 0) {
+            console.log(`⏸️ [Home] 开发环境下跳过自动加载，请手动刷新`);
+            setLoading(false);
+            return;
+        }
+
         const fetchHomepageData = async () => {
             const fetchStart = performance.now();
             console.log(`📡 [Home] 开始请求数据...`);
@@ -65,7 +76,7 @@ const Home: React.FC<HomeProps> = () => {
         };
 
         fetchHomepageData();
-    }, [selectedDate, refreshKey, mountTime]);
+    }, [selectedDate, refreshKey, mountTime, isElectron]);
 
     const handleRefresh = () => {
         setRefreshKey(prev => prev + 1);
@@ -81,6 +92,30 @@ const Home: React.FC<HomeProps> = () => {
                 </header>
                 <div className="flex items-center justify-center h-96">
                     <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+                </div>
+            </div>
+        );
+    }
+
+    // 开发环境未加载数据状态
+    if (!isElectron && !homepageData) {
+        return (
+            <div className="max-w-7xl mx-auto">
+                <header className="mb-6">
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to LifePrism</h1>
+                    <p className="text-slate-500 mt-1 font-medium">Refract Your Day, Reflect Your Life</p>
+                </header>
+                <div className="flex flex-col items-center justify-center h-96 gap-4">
+                    <div className="text-slate-400 text-center">
+                        <p className="text-lg font-semibold mb-2">开发环境：数据未加载</p>
+                        <p className="text-sm">点击下方按钮手动加载数据</p>
+                    </div>
+                    <button
+                        onClick={handleRefresh}
+                        className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                    >
+                        加载数据
+                    </button>
                 </div>
             </div>
         );
