@@ -5,7 +5,6 @@ activitywatch
 .trae
 __pycache__
 技术文档.md
-docs
 *-info
 *.db
 *.csv
@@ -38,3 +37,4 @@ nanobotclaude_task_manager.py
 .claude_task/
 claude_task_manager.py
 .worktrees
+遗留docs
