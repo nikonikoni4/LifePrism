@@ -12,38 +12,6 @@ let cachedApiBaseUrl: string | null = null;
 let isInitialized = false;
 let initPromise: Promise<string> | null = null;
 
-// 声明 electronAPI 类型
-declare global {
-    interface Window {
-        electronAPI?: {
-            getLifeprismDataPath: () => Promise<string>;
-            getCustomDataPath: () => Promise<string>;
-            isPackaged: () => Promise<boolean>;
-            getConfig?: () => Promise<any>;
-            selectDirectory: () => Promise<string | null>;
-            selectFile: (filters?: Array<{name: string; extensions: string[]}>) => Promise<string | null>;
-            getInstallPath: () => Promise<string | null>;
-            quitApp: () => Promise<void>;
-            checkForUpdates: () => Promise<{ status: string; version?: string; message?: string }>;
-            downloadUpdate: () => Promise<{ status: string; message?: string }>;
-            quitAndInstall: () => Promise<void>;
-            onUpdaterStatus: (callback: (data: { status: string; version?: string; message?: string; releaseNotes?: string | null }) => void) => ((_event: unknown, data: unknown) => void);
-            onUpdaterProgress: (callback: (data: { bytesPerSecond: number; percent: number; transferred: number; total: number }) => void) => ((_event: unknown, data: unknown) => void);
-            removeUpdaterListener: (channel: string, handler: ((_event: unknown, data: unknown) => void)) => void;
-            openFloatingWindow: (windowId: string) => Promise<{ success: boolean; action?: string; reason?: string }>;
-            closeFloatingWindow: (windowId: string) => Promise<{ success: boolean; reason?: string }>;
-            openDialogWindow: (dialogId: string, options?: Record<string, unknown>) => Promise<{ success: boolean; action?: string; reason?: string }>;
-            closeDialogWindow: (dialogId: string) => Promise<{ success: boolean; reason?: string }>;
-            sendToFloating: (windowId: string, channel: string, data?: unknown) => Promise<{ success: boolean }>;
-            sendToMain: (channel: string, data?: unknown) => Promise<{ success: boolean }>;
-            sendToDialog: (dialogId: string, channel: string, data?: unknown) => Promise<{ success: boolean }>;
-            onMessage: (channel: string, callback: (data: unknown) => void) => ((_event: unknown, data: unknown) => void);
-            removeMessageListener: (channel: string, handler: ((_event: unknown, data: unknown) => void)) => void;
-            resizeFloatingWindow: (windowId: string, size: { width?: number; height?: number }) => Promise<{ success: boolean }>;
-        };
-    }
-}
-
 /**
  * 初始化 API 配置（应在应用启动时调用）
  * 会探测可用的后端端口并缓存结果
@@ -180,8 +148,19 @@ export async function getApiV2Url(): Promise<string> {
  */
 export function getApiBaseUrlSync(): string {
     console.log(`[ApiConfig DEBUG] getApiBaseUrlSync 被调用 - isInitialized=${isInitialized}, cachedUrl=${cachedApiBaseUrl}`);
+
+    // 开发环境判断：没有 electronAPI 说明是浏览器访问 Vite dev server
+    const isDev = !window.electronAPI;
+
+    if (isDev) {
+        // 开发环境：返回空字符串，让 fetch 使用相对路径，走 Vite proxy
+        console.log('[ApiConfig] 开发环境，使用相对路径（通过 Vite proxy）');
+        return '';
+    }
+
+    // 打包环境：返回完整 URL
     if (!isInitialized) {
-        // 如果未初始化，使用默认值（用于开发模式代理或同步初始化场景）
+        // 如果未初始化，使用默认值
         console.warn('[ApiConfig] 警告：API 配置尚未初始化，使用默认值 http://localhost:8000');
         console.trace('[ApiConfig] 调用堆栈:');
         return 'http://localhost:8000';

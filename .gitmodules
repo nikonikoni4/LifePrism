@@ -1,9 +1,3 @@
-[submodule "lifeprism/llm/custom_prompt"]
-	path = lifeprism/llm/custom_prompt
-	url = https://github.com/nikonikoni4/lifeprism_custom_prompt.git
-[submodule "lifeprism/llm/llm_linear_executor"]
-	path = lifeprism/llm/llm_linear_executor
-	url = https://github.com/nikonikoni4/llm_linear_executor.git
 [submodule "frontend/my-ui-kit"]
 	path = frontend/my-ui-kit
 	url = https://github.com/nikonikoni4/my-ui-kit.git

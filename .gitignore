@@ -30,7 +30,6 @@ lifeprismData
 dataset
 plan
 localData/
-tests
 AGENTS.md
 nanobotclaude_task_manager.py
 .claude_task/
