@@ -8,14 +8,16 @@ Diary 服务层 - 日记业务逻辑
 架构：纯函数模块（无内存缓存，不需要单例）
 """
 import json
-from typing import Optional
+from typing import Any, Optional
 from pathlib import Path
 from datetime import datetime
 
+from lifeprism.llm.function.diary_summary import ai_diary_summary
 from lifeprism.server.schemas.diary_schemas import (
     DiaryItem,
     DiaryMetaItem,
     DiaryListResponse,
+    DiaryAISummaryResponse,
     UpdateDiaryMetaRequest,
     SaveDiaryContentRequest,
     TemplateItem,
@@ -27,6 +29,20 @@ from lifeprism.server.providers.diary_provider import diary_provider
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
+
+_MOOD_LABEL_MAP = {
+    "very_happy": "非常愉悦",
+    "happy": "有点开心",
+    "calm": "平静",
+    "bad": "不太好",
+    "very_bad": "非常不好",
+}
+
+_IMPORTANCE_LABEL_MAP = {
+    "important": "重要",
+    "normal": "一般",
+    "unimportant": "平凡",
+}
 
 
 # ==================== 文件路径工具 ====================
@@ -102,6 +118,23 @@ def _parse_custom_tags(tags_json: Optional[str]) -> list:
         return result if isinstance(result, list) else []
     except (json.JSONDecodeError, TypeError):
         return []
+
+
+def _map_diary_meta_for_summary(item: dict) -> tuple[Optional[str], Optional[str], list[str]]:
+    """将日记 meta 枚举值转换为 LLM 更易理解的文本标签"""
+    mood = _MOOD_LABEL_MAP.get(item.get("mood")) if item.get("mood") else None
+    importance = _IMPORTANCE_LABEL_MAP.get(item.get("importance")) if item.get("importance") else None
+    custom_tags = _parse_custom_tags(item.get("custom_tags"))
+    return mood, importance, custom_tags
+
+
+def _extract_summary_content(result: Any) -> Optional[str]:
+    """从 LLM 返回值中提取 summary 正文"""
+    if isinstance(result, str):
+        return result
+    if isinstance(result, dict):
+        return result.get("content")
+    return getattr(result, "content", None)
 
 
 # ==================== 日记 CRUD ====================
@@ -219,6 +252,45 @@ def save_diary_content(date: str, request: SaveDiaryContentRequest) -> Optional[
         diary_provider.get_diary_by_date(date) or existing,
         include_content=True
     )
+
+
+async def generate_diary_ai_summary(date: str) -> DiaryAISummaryResponse:
+    """
+    手动生成指定日期日记 AI 总结，并覆盖写入 diary.ai_summary
+
+    Args:
+        date: 日期 YYYY-MM-DD
+
+    Returns:
+        DiaryAISummaryResponse: AI 总结内容
+
+    Raises:
+        ValueError: 日记为空、日记不存在或 AI 总结无法保存
+    """
+    item = diary_provider.get_diary_by_date(date)
+    if not item:
+        created = get_diary(date)
+        if not created:
+            raise ValueError(f"日记不存在: {date}")
+        item = diary_provider.get_diary_by_date(date)
+        if not item:
+            raise ValueError(f"日记不存在: {date}")
+
+    content = _read_diary_content(date).strip()
+    if not content:
+        raise ValueError("日记为空，无法总结")
+
+    mood, importance, custom_tags = _map_diary_meta_for_summary(item)
+    result = await ai_diary_summary(date, mood, importance, custom_tags)
+    summary_content = _extract_summary_content(result)
+    if not summary_content:
+        raise ValueError("AI 总结生成失败")
+
+    success = diary_provider.update_diary(date, {"ai_summary": summary_content})
+    if not success:
+        raise ValueError("AI 总结保存失败")
+
+    return DiaryAISummaryResponse(content=summary_content)
 
 
 def get_diary_list(start_date: str, end_date: str) -> DiaryListResponse:

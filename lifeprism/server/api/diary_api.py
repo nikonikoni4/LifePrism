@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query, HTTPException, Path
 from lifeprism.server.schemas.diary_schemas import (
     DiaryItem,
     DiaryListResponse,
+    DiaryAISummaryResponse,
     UpdateDiaryMetaRequest,
     SaveDiaryContentRequest,
     TemplateItem,
@@ -114,3 +115,14 @@ async def save_diary_content(
     if not result:
         raise HTTPException(status_code=404, detail=f"日记不存在: {date}")
     return result
+
+
+@router.post("/{date}/ai_summary", response_model=DiaryAISummaryResponse, summary="生成日记 AI 总结")
+async def generate_diary_ai_summary(
+    date: str = Path(..., description="日期 YYYY-MM-DD"),
+):
+    """手动生成指定日期日记 AI 总结"""
+    try:
+        return await diary_service.generate_diary_ai_summary(date)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -52,6 +52,11 @@ class SaveDiaryContentRequest(BaseModel):
     content: str = Field(..., description="日记 md 内容")
 
 
+class DiaryAISummaryResponse(BaseModel):
+    """日记 AI 总结响应"""
+    content: str = Field(..., description="AI 生成的日记总结内容")
+
+
 # ==================== 模板 ====================
 
 class TemplateItem(BaseModel):

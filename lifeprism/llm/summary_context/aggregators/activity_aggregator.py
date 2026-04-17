@@ -15,10 +15,24 @@ ENTERTAINMENT_CATEGORY_IDS = {"cat-entertainment"}
 
 
 def _to_dt(value: str) -> datetime:
+    """将 ISO 格式字符串转换为 datetime 对象"""
     return datetime.fromisoformat(value)
 
 
 def compute_bucket_density(bucket_start: str, bucket_end: str, logs: list[dict]) -> float:
+    """计算时间桶内的活动密度。
+
+    密度 = 时间桶内有活动记录覆盖的秒数 / 时间桶总秒数。
+    用于判断某个时间段内用户是否活跃。
+
+    Args:
+        bucket_start: 时间桶开始时间（ISO 格式）
+        bucket_end: 时间桶结束时间（ISO 格式）
+        logs: 活动日志列表，每项包含 start_time, end_time, duration
+
+    Returns:
+        float: 密度值，范围 [0.0, 1.0]
+    """
     start_dt = _to_dt(bucket_start)
     end_dt = _to_dt(bucket_end)
     bucket_seconds = int((end_dt - start_dt).total_seconds())
@@ -38,11 +52,16 @@ def compute_bucket_density(bucket_start: str, bucket_end: str, logs: list[dict])
 
 
 def _build_category_breakdown(logs: list[dict]) -> list[dict]:
+    """构建分类时长分布列表（按时长降序排列）"""
     total_by_category: dict[str, int] = defaultdict(int)
     name_by_category: dict[str, str] = {}
 
     for row in logs:
-        category_id = row.get("category_id") or "cat-unknown"
+        category_id = row.get("category_id")
+        # 过滤掉无效的 category_id（None, nan, 空字符串等）
+        if not category_id or (isinstance(category_id, float) and category_id != category_id):
+            category_id = "cat-unknown"
+
         seconds = int(row.get("duration", 0))
         total_by_category[category_id] += seconds
         name_by_category[category_id] = row.get("category_name") or "未分类"
@@ -66,6 +85,7 @@ def _build_category_breakdown_for_segment(
     segment_start: datetime,
     segment_end: datetime,
 ) -> list[dict]:
+    """构建特定时间段内的分类时长分布（只统计与时间段重叠的部分）"""
     total_by_category: dict[str, int] = defaultdict(int)
     name_by_category: dict[str, str] = {}
 
@@ -78,7 +98,11 @@ def _build_category_breakdown_for_segment(
             continue
 
         overlap_seconds = int((overlap_end - overlap_start).total_seconds())
-        category_id = row.get("category_id") or "cat-unknown"
+        category_id = row.get("category_id")
+        # 过滤掉无效的 category_id（None, nan, 空字符串等）
+        if not category_id or (isinstance(category_id, float) and category_id != category_id):
+            category_id = "cat-unknown"
+
         total_by_category[category_id] += overlap_seconds
         name_by_category[category_id] = row.get("category_name") or "未分类"
 
@@ -97,6 +121,7 @@ def _build_category_breakdown_for_segment(
 
 
 def _collect_buckets(logs: list[dict], range_start: str, range_end: str, threshold: float) -> list[dict]:
+    """将时间范围切分为固定大小的时间桶，并计算每个桶的密度和是否匹配阈值"""
     start_dt = _to_dt(range_start)
     end_dt = _to_dt(range_end)
     bucket_span = timedelta(minutes=TIME_BUCKET_MINUTES)
@@ -125,6 +150,7 @@ def _build_segment_item(
     threshold: float,
     segment_type: str,
 ) -> dict:
+    """根据合并后的时间桶列表构建单个活动段的详细信息"""
     segment_start = merged_buckets[0]["start"]
     segment_end = merged_buckets[-1]["end"]
     duration_seconds = int((segment_end - segment_start).total_seconds())
@@ -155,12 +181,29 @@ def _build_segments(
     min_duration_minutes: int,
     segment_type: str,
 ) -> list[dict]:
+    """识别并构建活动段列表。
+
+    使用滑动窗口算法，将连续的高密度时间桶合并为活动段，
+    允许少量低密度桶作为桥接（bridge），过滤掉时长不足的段。
+
+    Args:
+        logs: 活动日志列表
+        range_start: 分析范围开始时间（ISO 格式）
+        range_end: 分析范围结束时间（ISO 格式）
+        threshold: 密度阈值，超过此值的桶被视为活跃
+        min_duration_minutes: 最小段时长（分钟），短于此值的段会被过滤
+        segment_type: 段类型标识（如 "active" 或 "long_computer_usage"）
+
+    Returns:
+        list[dict]: 活动段列表，每项包含 start, end, duration_seconds, top_categories 等
+    """
     buckets = _collect_buckets(logs, range_start, range_end, threshold)
     segments: list[dict] = []
     current: list[dict] = []
     bridge_count = 0
 
     def flush_current() -> None:
+        """将当前累积的时间桶列表转换为活动段（如果满足最小时长要求）"""
         if not current:
             return
         duration_seconds = int((current[-1]["end"] - current[0]["start"]).total_seconds())
@@ -186,6 +229,24 @@ def _build_segments(
 
 
 def build_activity_context(logs: list[dict], range_start: str, range_end: str) -> dict:
+    """构建活动上下文，包含总时长、分类分布、活动段、长时间使用段等。
+
+    这是活动数据聚合的主入口函数，将原始活动日志转换为结构化的分析结果，
+    用于 AI 总结时理解用户的电脑使用模式。
+
+    Args:
+        logs: 活动日志列表，每项包含 start_time, end_time, duration, category_id, category_name
+        range_start: 分析范围开始时间（ISO 格式）
+        range_end: 分析范围结束时间（ISO 格式）
+
+    Returns:
+        dict: 包含以下键的字典：
+            - total_active_seconds: 总活跃秒数
+            - category_breakdown: 分类时长分布列表
+            - active_segments: 活跃时间段列表（密度阈值 0.2，最小 30 分钟）
+            - long_computer_usage_segments: 长时间使用段列表（密度阈值 0.7，最小 60 分钟）
+            - work_entertainment_mix: 工作娱乐混合分析标志
+    """
     category_breakdown = _build_category_breakdown(logs)
     category_ids = {item["category_id"] for item in category_breakdown}
     has_work = bool(category_ids & WORK_CATEGORY_IDS)
@@ -215,6 +276,3 @@ def build_activity_context(logs: list[dict], range_start: str, range_end: str) -
             "reason": "ready" if has_work and has_entertainment else "missing_required_main_categories",
         },
     }
-
-if __name__ == "__main__":
-    print(build_activity_context())

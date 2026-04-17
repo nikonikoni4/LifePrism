@@ -1,0 +1,24 @@
+
+## category-spec
+- updated_at: 2026-04-16
+- path: `docs/specs/2026-04-16-category-spec.md`
+- 触发规则：开发、修改或查询分类管理模块相关功能时阅读（分类CRUD、Map Cache管理、分类状态切换、Goal绑定）
+- 内容摘要：分类管理模块规格，定义分类层级结构（主分类/子分类）、Map Cache映射管理、分类启用/禁用状态及级联影响（禁用分类→Map Cache禁用→Goal排除）、Goal分类绑定规则（track_time_automatically=1且分类启用才参与分类）、冲突处理机制
+
+## classify-spec
+- updated_at: 2026-04-16
+- path: `docs/specs/2026-04-16-classify-spec.md`
+- 触发规则：开发、修改或查询 AI 数据分类流程相关功能时阅读（数据清洗管道、Map Cache、LLM 分类逻辑、同步 API）
+- 内容摘要：AI 数据分类流程规格，定义数据清洗管道（EventTransformer→CacheMatcher→ClassifyCollector）、三级分类优先级（缓存命中→Goal 匹配→AI 纯分类）、两种分类模式（classify_graph/classify_simple）及同步 API 契约
+
+## habit-system
+- updated_at: 2026-04-15
+- path: `docs/specs/2026-04-15-habit-system.md`
+- 触发规则：开发、修改或查询习惯系统相关功能时阅读
+- 内容摘要：习惯系统规格文档，定义基于习惯堆叠心理学的习惯养成系统，包含锚点机制、等级制挑战系统（0-4级）、打卡与补签（滚动7天窗口）、Streak连续天数计算（daily逐天判定/非daily按周结算）、状态流转、统计规则等核心功能的业务规则和技术契约
+
+## mind-space-diary
+- updated_at: 2026-04-15
+- path: `docs/specs/2026-04-15-mind-space-diary.md`
+- 触发规则：开发、修改或查询 Mind Space 日记界面相关功能时阅读
+- 内容摘要：Mind Space 日记界面功能规格，定义日记的存储机制（文件+数据库混合）、日记 CRUD API、模板管理 API、心情标签（5级）和重要程度标签（3级）的枚举值与颜色方案、前端交互设计原则（极简禅意风格）

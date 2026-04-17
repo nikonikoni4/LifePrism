@@ -21,8 +21,9 @@ print(f"{'='*60}")
 
 # ==================== 核心库导入 ====================
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import logging
 _step_start = _log_startup_time("[OK] Core imports (contextlib, fastapi, logging)", _step_start)
 
@@ -291,6 +292,77 @@ app.add_middleware(
     allow_headers=["*"],  # 允许所有请求头
 )
 _log_startup_time("[OK] CORS middleware configured", _cors_start)
+
+# ==================== 全局异常处理器 ====================
+print("[STARTUP] 正在注册全局异常处理器...")
+_exception_start = time.perf_counter()
+
+from lifeprism.utils.exceptions import (
+    NotFoundError,
+    ValidationError,
+    DataAccessError,
+    ConflictError,
+    ExternalServiceError,
+)
+
+@app.exception_handler(NotFoundError)
+async def not_found_handler(request: Request, exc: NotFoundError):
+    """处理资源不存在异常 → 404"""
+    logger.warning(f"资源不存在: {exc.message} (路径: {request.url.path})")
+    return JSONResponse(
+        status_code=404,
+        content={"detail": exc.message, "code": exc.code}
+    )
+
+@app.exception_handler(ValidationError)
+async def validation_error_handler(request: Request, exc: ValidationError):
+    """处理业务验证错误 → 422"""
+    logger.warning(f"验证错误: {exc.message} (路径: {request.url.path})")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.message, "code": exc.code, "details": exc.details}
+    )
+
+@app.exception_handler(ConflictError)
+async def conflict_error_handler(request: Request, exc: ConflictError):
+    """处理资源冲突 → 409"""
+    logger.warning(f"资源冲突: {exc.message} (路径: {request.url.path})")
+    return JSONResponse(
+        status_code=409,
+        content={"detail": exc.message, "code": exc.code}
+    )
+
+@app.exception_handler(DataAccessError)
+async def data_access_error_handler(request: Request, exc: DataAccessError):
+    """处理数据访问错误 → 500"""
+    logger.error(f"数据访问错误: {exc.message} (路径: {request.url.path})", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "服务器内部错误", "code": exc.code}
+    )
+
+@app.exception_handler(ExternalServiceError)
+async def external_service_error_handler(request: Request, exc: ExternalServiceError):
+    """处理外部服务错误 → 503"""
+    logger.error(f"外部服务错误: {exc.message} (路径: {request.url.path})", exc_info=True)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "外部服务暂时不可用", "code": exc.code}
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """全局兜底异常处理器 → 500"""
+    logger.error(
+        f"未处理的异常: {type(exc).__name__}: {str(exc)} (路径: {request.url.path})",
+        exc_info=True
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "服务器内部错误"}
+    )
+
+_log_startup_time("[OK] Exception handlers registered (6 handlers)", _exception_start)
 
 # ==================== 注册 API 路由 ====================
 print("[STARTUP] 正在注册 API 路由...")

@@ -1,7 +1,6 @@
 """
 工具类模块
 """
-from .create_model import create_ChatTongyiModel
 from .llm_factory import (
     create_llm,
     get_provider_id,
@@ -23,10 +22,12 @@ from .split_utils import (
     split_by_purpose,
 
 )
+from .md_os import(
+    read_md,
+    extract_behavior_logs_from_file,
+    write_behavior_md
+)
 
-
-
-from .skill_load import get_skill_non_json_content
 __all__ = [
     # 向后兼容
     "create_ChatTongyiModel",
@@ -44,5 +45,7 @@ __all__ = [
     "split_by_duration",
     "split_by_purpose",
     "parse_token_usage",
-    "get_skill_non_json_content"
+    "read_md",
+    "extract_behavior_logs_from_file",
+    "write_behavior_md"
 ]

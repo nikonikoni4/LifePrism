@@ -12,7 +12,7 @@ LifeWatch LLM 分类模块
 # 导出核心组件
 from .schemas import classifyState, LogItem, AppInFo
 from .classify import LLMClassify
-
+from .function.diary_summary import ai_diary_summary
 
 __all__ = [
     # 数据模型
@@ -20,9 +20,10 @@ __all__ = [
     "LogItem",
     "Goal",
     "AppInFo",
-    "",
+    "ai_diary_summary",
     # 工具类
     "create_ChatTongyiModel",
+    
 ]
 
 __version__ = "0.1.0"

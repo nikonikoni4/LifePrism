@@ -13,7 +13,6 @@ __pycache__
 *.yaml
 localpycs
 其他文件
-skills
 .agent
 .pytest_cache
 simple-llm-workflow
@@ -30,9 +29,13 @@ lifeprismData
 dataset
 plan
 localData/
-AGENTS.md
-nanobotclaude_task_manager.py
 .claude_task/
-claude_task_manager.py
 .worktrees
 遗留docs
+tests
+docs copy
+skills
+docs\generated
+.superpowers
+.agents
+claude_task_manager.py

@@ -6,6 +6,7 @@ import { createApiV2UrlGetter } from '../../../../core/services/apiConfig';
 import type {
   DiaryItem,
   DiaryMetaItem,
+  DiaryAISummaryResponse,
   UpdateDiaryMetaRequest,
   SaveDiaryContentRequest,
   TemplateItem,
@@ -40,6 +41,18 @@ export const DiaryAPI = {
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error(`保存日记内容失败: ${res.statusText}`);
+    return res.json();
+  },
+
+  /** 手动生成日记 AI 总结 */
+  async generateAiSummary(date: string): Promise<DiaryAISummaryResponse> {
+    const res = await fetch(`${getApiBase()}/${date}/ai_summary`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(errorText || `生成日记 AI 总结失败: ${res.statusText}`);
+    }
     return res.json();
   },
 

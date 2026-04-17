@@ -39,6 +39,10 @@ export interface SaveDiaryContentRequest {
   content: string;
 }
 
+export interface DiaryAISummaryResponse {
+  content: string;
+}
+
 export interface TemplateItem {
   name: string;
   content: string;

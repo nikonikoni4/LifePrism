@@ -46,14 +46,14 @@ class CoverageContext(StrictBaseModel):
 class CategoryBreakdownItem(StrictBaseModel):
     category_id: str
     category_name: str
-    seconds: int
+    minutes: int
     ratio: float
 
 
 class ActivitySegment(StrictBaseModel):
     start: str
     end: str
-    duration_seconds: int
+    duration_minutes: int
     segment_type: SegmentType
     density_threshold: float
     bridge_bucket_count: int = 0
@@ -66,7 +66,7 @@ class WorkEntertainmentMix(StrictBaseModel):
 
 
 class ActivityContext(StrictBaseModel):
-    total_active_seconds: int
+    total_active_minutes: int
     category_breakdown: list[CategoryBreakdownItem] = Field(default_factory=list)
     active_segments: list[ActivitySegment] = Field(default_factory=list)
     long_computer_usage_segments: list[ActivitySegment] = Field(default_factory=list)

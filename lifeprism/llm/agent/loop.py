@@ -36,6 +36,7 @@ class AgentLoop:
             system_prompt = Context.build_system_prompt(msg)
 
             # 2. 构建tool description
+            tools = []
             if msg.type == MessageType.CHAT:
                 tools: list[dict[str, Any]] = []
             elif msg.type == MessageType.CLASSIFY:

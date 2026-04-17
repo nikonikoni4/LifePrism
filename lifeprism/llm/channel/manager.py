@@ -54,7 +54,7 @@ class Channel:
             await asyncio.sleep(wait)
 
     async def send(self, content: str, session_id: str | None = None,
-                   type: str = "chat", extra: dict | None = None) -> Any:
+                   type: str = "chat", extra: dict | None = None) -> str:
         """发送消息并等待结果"""
         self._ensure_receive_task()
         await self._wait_for_rate_limit()

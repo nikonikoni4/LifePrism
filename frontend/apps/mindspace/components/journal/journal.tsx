@@ -29,6 +29,7 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   const [content, setContent] = useState('');
   const [activeDate, setActiveDate] = useState(new Date());
   const [loading, setLoading] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   // UI 状态
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -246,6 +247,28 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleManualSave]);
+
+  // ========== AI 总结 ==========
+  const handleGenerateSummary = useCallback(async () => {
+    const dateStr = formatDate(activeDate);
+    if (!content.trim()) {
+      toast.info('日记为空，无法总结');
+      return;
+    }
+
+    try {
+      setIsGeneratingSummary(true);
+      await flushPendingSave();
+      const response = await DiaryAPI.generateAiSummary(dateStr);
+      setDiary(prev => prev ? { ...prev, ai_summary: response.content } : prev);
+      toast.success('AI 总结已生成');
+    } catch (e) {
+      console.error('生成日记 AI 总结失败:', e);
+      toast.error('AI 总结生成失败');
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  }, [activeDate, content, flushPendingSave]);
 
   // ========== Meta 更新 ==========
   const handleMoodChange = async (mood: MoodLevel) => {
@@ -531,6 +554,23 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
             onImportanceChange={handleImportanceChange}
             onCustomTagsChange={handleCustomTagsChange}
           />
+
+          {/* AI 总结 */}
+          <div className="mt-5 rounded-[24px] border border-black/10 bg-white/55 backdrop-blur-xl px-5 py-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.28)]">
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <button
+                onClick={handleGenerateSummary}
+                disabled={isGeneratingSummary}
+                className="rounded-full bg-slate-800 px-4 py-2 text-xs font-semibold tracking-[0.22em] text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isGeneratingSummary ? '生成中' : 'AI 总结'}
+              </button>
+              <span className="text-[10px] uppercase tracking-[0.28em] text-slate-400">只读</span>
+            </div>
+            <div className="whitespace-pre-wrap text-[15px] leading-8 text-slate-700">
+              {diary?.ai_summary || '暂无 AI 总结，点击左上角按钮生成'}
+            </div>
+          </div>
         </header>
 
         {/* 编辑区 */}

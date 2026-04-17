@@ -5,10 +5,11 @@ from lifeprism.llm.providers.base import LLMResponse
 import uuid
 
 class MessageType:
-    CLASSIFY = "classify"
+    CLASSIFY = "classify"  # 从extra 中 提供 分类提示词 + templates\agent\classify\classify_preference.md 分类偏好
     CHAT = "chat"
+    GENERAL_TASK = "general_task"
 
-MESSAGE_TPYE = [MessageType.CLASSIFY, MessageType.CHAT]
+MESSAGE_TPYE = [MessageType.CLASSIFY, MessageType.CHAT,MessageType.GENERAL_TASK]
 
 
 @dataclass
