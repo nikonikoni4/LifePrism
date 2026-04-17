@@ -508,7 +508,7 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
       <main className={`flex-1 relative flex flex-col z-10 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${isSidebarOpen ? 'ml-80 md:ml-96' : 'ml-0'
         }`}>
         {/* 顶部：日期 + 标签 + 操作 */}
-        <header className="px-12 md:px-24 pt-8 pb-4 shrink-0 relative z-10 border-b border-black/[0.02]">
+        <header className="px-12 md:px-24 pt-8 pb-4 shrink-0 relative z-10">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-baseline space-x-6">
               <h1 className="text-[32px] font-serif italic text-gray-800 tracking-tight leading-none">
@@ -555,42 +555,66 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
             onCustomTagsChange={handleCustomTagsChange}
           />
 
-          {/* AI 总结 */}
-          <div className="mt-5 rounded-[24px] border border-black/10 bg-white/55 backdrop-blur-xl px-5 py-4 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.28)]">
-            <div className="mb-3 flex items-center justify-between gap-4">
-              <button
-                onClick={handleGenerateSummary}
-                disabled={isGeneratingSummary}
-                className="rounded-full bg-slate-800 px-4 py-2 text-xs font-semibold tracking-[0.22em] text-white transition disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isGeneratingSummary ? '生成中' : 'AI 总结'}
-              </button>
-              <span className="text-[10px] uppercase tracking-[0.28em] text-slate-400">只读</span>
-            </div>
-            <div className="whitespace-pre-wrap text-[15px] leading-8 text-slate-700">
-              {diary?.ai_summary || '暂无 AI 总结，点击左上角按钮生成'}
-            </div>
-          </div>
         </header>
 
-        {/* 编辑区 */}
-        <section className="flex-1 px-12 md:px-24 py-6 overflow-y-auto no-scrollbar relative z-10">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-[12px] text-gray-300 italic tracking-wider">加载中...</p>
+        {/* 滚动区域：包含 AI 总结和编辑区 */}
+        <section className="flex-1 overflow-y-auto no-scrollbar relative z-10 flex flex-col">
+          {/* AI 总结 */}
+          <div className="px-12 md:px-24 shrink-0">
+            <div className="mt-6 mb-2 pb-5 border-b border-gray-800/20">
+              {!diary?.ai_summary && !isGeneratingSummary ? (
+                <button
+                  onClick={handleGenerateSummary}
+                  className="flex items-center text-[12px] font-medium tracking-[0.25em] text-gray-400 hover:text-black transition-colors duration-300 group"
+                >
+                  <span className="mr-1.5 opacity-50 group-hover:opacity-100 transition-opacity">✨</span> 
+                  生成 AI 总结
+                </button>
+              ) : (
+                <div className="w-full">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-2 text-[12px] font-medium tracking-[0.2em] text-gray-400">
+                      <span className="opacity-80">✨</span>
+                      <span>{isGeneratingSummary ? '正在凝练思绪...' : 'AI 总结'}</span>
+                    </div>
+                    {!isGeneratingSummary && (
+                      <button
+                        onClick={handleGenerateSummary}
+                        title="重新生成总结"
+                        className="text-[10px] text-gray-300 hover:text-gray-600 tracking-[0.1em] transition-colors"
+                      >
+                        重新生成
+                      </button>
+                    )}
+                  </div>
+                  {diary?.ai_summary && (
+                    <div className="pl-4 border-l-2 border-gray-800/20 whitespace-pre-wrap text-[14px] leading-[2.2] text-gray-700 font-serif italic">
+                      {diary.ai_summary}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="diary-editor h-full">
-              <MarkdownEditor
-                ref={editorRef}
-                value={content}
-                onChange={handleContentChange}
-                placeholder="在此处，开启一段与自我的深谈..."
-                minHeight="100%"
-                maxHeight="100%"
-              />
-            </div>
-          )}
+          </div>
+
+          {/* 编辑区 */}
+          <div className="flex-1 px-12 md:px-24 py-6 flex flex-col">
+            {loading ? (
+              <div className="flex items-center justify-center flex-1">
+                <p className="text-[12px] text-gray-300 italic tracking-wider">加载中...</p>
+              </div>
+            ) : (
+              <div className="diary-editor flex-1">
+                <MarkdownEditor
+                  ref={editorRef}
+                  value={content}
+                  onChange={handleContentChange}
+                  placeholder="在此处，开启一段与自我的深谈..."
+                  minHeight="100%"
+                />
+              </div>
+            )}
+          </div>
         </section>
 
         {/* 底部 */}
