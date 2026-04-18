@@ -7,15 +7,17 @@ import { viewBackground } from '../../shared/backgroundStyles';
 import type { CalendarViewProps } from '../../../types';
 
 export const CalendarView: React.FC<CalendarViewProps> = () => {
-    // 默认日期范围：今天到7天后
+    // 默认日期范围：今天-4到今天+3
     const defaultRange: DateRange = useMemo(() => {
         const today = new Date();
-        const sevenDaysLater = new Date();
-        sevenDaysLater.setDate(today.getDate() + 7);
+        const fourDaysAgo = new Date();
+        fourDaysAgo.setDate(today.getDate() - 4);
+        const threeDaysLater = new Date();
+        threeDaysLater.setDate(today.getDate() + 3);
 
         return {
-            start: today,
-            end: sevenDaysLater,
+            start: fourDaysAgo,
+            end: threeDaysLater,
         };
     }, []);
 
