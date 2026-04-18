@@ -290,7 +290,8 @@ async def generate_diary_ai_summary(date: str) -> DiaryAISummaryResponse:
         raise ValueError("日记为空，无法总结")
 
     mood, importance, custom_tags = _map_diary_meta_for_summary(item)
-    result = await ai_diary_summary(date, mood, importance, custom_tags)
+    outdate_summary = item.get("ai_summary")
+    result = await ai_diary_summary(date, mood, importance, custom_tags, outdate_summary=outdate_summary)
     summary_content = _extract_summary_content(result)
     if not summary_content:
         raise ValueError("AI 总结生成失败")

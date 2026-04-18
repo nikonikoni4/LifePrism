@@ -42,7 +42,7 @@ def test_generate_diary_ai_summary_overwrites_summary_and_source_hash(monkeypatc
         "updated_at": "",
     }
 
-    async def fake_ai_diary_summary(date, mood, importance, custom_tags):
+    async def fake_ai_diary_summary(date, mood, importance, custom_tags, outdate_summary=None):
         assert date == "2026-04-17"
         assert mood == "平静"
         assert importance == "一般"
@@ -83,7 +83,7 @@ def test_generate_diary_ai_summary_overwrites_existing_summary(monkeypatch):
         "updated_at": "",
     }
 
-    async def fake_ai_diary_summary(date, mood, importance, custom_tags):
+    async def fake_ai_diary_summary(date, mood, importance, custom_tags, outdate_summary=None):
         assert date == "2026-04-17"
         assert mood == "平静"
         assert importance == "一般"
@@ -137,3 +137,35 @@ def test_generate_diary_ai_summary_does_not_overwrite_on_llm_failure(monkeypatch
     response = client.post("/api/v2/diary/2026-04-17/ai_summary")
     assert response.status_code == 500
     assert update_called is False
+
+
+@pytest.mark.core
+def test_generate_diary_ai_summary_passes_existing_summary_to_llm(monkeypatch):
+    """Single-day regeneration should pass existing summary as outdate_summary to ai_diary_summary"""
+    from lifeprism.server.providers.diary_provider import diary_provider
+
+    stored = {
+        "date": "2026-04-17",
+        "mood": "calm",
+        "importance": "normal",
+        "custom_tags": '["阅读"]',
+        "ai_summary": "旧总结",
+        "created_at": "",
+        "updated_at": "",
+    }
+
+    captured = {}
+
+    async def fake_ai_diary_summary(date, mood, importance, custom_tags, outdate_summary=None):
+        captured["outdate_summary"] = outdate_summary
+        return {"content": "新总结"}
+
+    monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: stored)
+    monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "今天写了很多内容")
+    monkeypatch.setattr("lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary)
+    monkeypatch.setattr(diary_provider, "update_diary", lambda date, data: True)
+
+    client = TestClient(app)
+    response = client.post("/api/v2/diary/2026-04-17/ai_summary")
+    assert response.status_code == 200
+    assert captured["outdate_summary"] == "旧总结"

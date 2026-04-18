@@ -68,19 +68,18 @@ update_summary_task_prompt = """
 
 
 
-async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:list[str],)->LLMResponse:
+async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:list[str], outdate_summary: str | None = None)->LLMResponse:
     """
     对某一天的日记进行总结
     args:
         date : 日记日期
-        outdate_summary:过时的日记内容
+        outdate_summary: 过时的日记总结（外部传入）
         mood : 写日记时的心情
         importence : 写日记时认为当前的内容是否重要
         custom_label : 写日记时的自定义标签
     """
     behavior_md_path = Path(settings.lifeprism_data_path + "/user/daily_data/behavior.md")
     behavior_md_path.parent.mkdir(parents=True, exist_ok=True)
-    outdate_summary = extract_behavior_logs_from_file(file_path=behavior_md_path,start_date=date)
 
 
     year = date.split("-")[0]
