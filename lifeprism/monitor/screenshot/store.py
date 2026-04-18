@@ -40,7 +40,7 @@ class ScreenshotStore:
             "window_title": request.window_title,
             "frequency_level": request.frequency_level,
             "engaged_segment_id": request.engaged_segment_id,
-            "is_afk": 0,
+            "is_afk": 1 if request.is_afk else 0,
         }
 
         try:

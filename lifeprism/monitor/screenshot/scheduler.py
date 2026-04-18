@@ -62,6 +62,7 @@ class ScreenshotScheduler:
                     window_title=window.title,
                     frequency_level=None,
                     engaged_segment_id=None,
+                    is_afk=window.is_afk,
                 )
             )
             self._next_scheduled_at = now_epoch + self.scheduled_interval_seconds
@@ -82,6 +83,7 @@ class ScreenshotScheduler:
                     window_title=window.title,
                     frequency_level=self.policy.level,
                     engaged_segment_id=engaged_segment_id,
+                    is_afk=window.is_afk,
                 )
             )
             self._segment_first_active_done.add(engaged_segment_id)
@@ -97,6 +99,7 @@ class ScreenshotScheduler:
                     window_title=window.title,
                     frequency_level=self.policy.level,
                     engaged_segment_id=engaged_segment_id,
+                    is_afk=window.is_afk,
                 )
             )
             self._next_active_at[engaged_segment_id] = (
@@ -117,6 +120,7 @@ class ScreenshotScheduler:
                     window_title=window.title,
                     frequency_level=self.policy.level,
                     engaged_segment_id=engaged_segment_id,
+                    is_afk=window.is_afk,
                 )
             )
             self._enter_cooldown_until = now_epoch + self.policy.enter_cooldown_seconds
