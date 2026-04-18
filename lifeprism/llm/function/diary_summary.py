@@ -146,16 +146,20 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
 
 
     user_parts.append(diary)
-
+    label_to_save = None
     if mood or importence or custom_label:
         
         label = "\n\n## 标签"
+        label_to_save = "用户输入标签："
         if mood:
             label += f"\n用户输入心情（包括 非常愉悦，有点开心，平静，不太好，非常不好）：{mood}"
+            label_to_save += f" 心情：{mood}"
         if importence:
             label += f"\n用户认为该日记的重要程度（包括重要，一般，平凡）：{importence}"
+            label_to_save += f" 重要程度: {importence}"
         if custom_label:
             label += f"\n用户自定义标签：{custom_label}"
+            label_to_save += f" 用户自定义标签: {custom_label}"
         user_parts.append(label)
 
     content = "\n".join(user_parts)
@@ -163,6 +167,8 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
 
     if result : 
         # 将ai summary写入lifeprismData\user\daily_data\behavior.md
+        if label_to_save:
+            result = f"{label_to_save}\n" + result
         write_behavior_md(behavior_md_path, date, result, subheading="日记总结", mode='overwrite' if outdate_summary else 'append')
         return result
         
