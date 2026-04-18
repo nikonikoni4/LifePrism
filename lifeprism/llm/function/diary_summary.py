@@ -35,7 +35,7 @@ create_summary_task_prompt = """
 
     ## 输出契约
 
-    1. 字数不能超过200字
+    1. 字数不能超过100字
     2. 必须使用数字标号比如`1.`来进行分点总结，不可以采用其他格式
 
     """
@@ -61,7 +61,7 @@ update_summary_task_prompt = """
 
     ## 输出契约
 
-    1. 字数不能超过200字
+    1. 字数不能超过100字
     2. 必须使用数字标号比如`1.`来进行分点总结，不可以采用其他格式
 
     """
@@ -129,7 +129,7 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
     if outdate_summary:
         user_parts.append(
             f"""
-            ## 旧日记内容
+            ## 旧日记总结内容
             <outdate_summary>
             {outdate_summary}
             </outdate_summary>
