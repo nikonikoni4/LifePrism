@@ -28,7 +28,7 @@ from lifeprism.server.schemas.habit_schemas import (
 from lifeprism.server.services.habit_stats_service import get_habit_streak
 from lifeprism.utils import get_logger, LazySingleton
 from lifeprism.utils.exceptions import ConflictError, NotFoundError, ValidationError
-
+from lifeprism.server.schemas.habit_schemas import SettlementItem
 logger = get_logger(__name__)
 
 # 等级 → 挑战周数映射
@@ -365,8 +365,6 @@ class HabitService:
         persist_failed: bool,
     ) -> Optional["SettlementItem"]:
         """判定挑战结果，返回 SettlementItem 或 None。"""
-        from lifeprism.server.schemas.habit_schemas import SettlementItem
-
         challenge = habit_challenge_provider.get_challenge_by_id(challenge_id)
         if not challenge or challenge["status"] != "in_progress":
             return None

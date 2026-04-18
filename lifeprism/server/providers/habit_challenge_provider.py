@@ -163,8 +163,7 @@ class HabitChallengeProvider(LWBaseDataProvider):
         """
         with self.db.get_connection() as conn:
             cursor = conn.execute(
-                "SELECT * FROM habit_challenges WHERE status = 'in_progress' AND end_date < ?",
-                (today,),
+                "SELECT * FROM habit_challenges WHERE status = 'in_progress'",
             )
             columns = [desc[0] for desc in cursor.description]
             return [dict(zip(columns, row)) for row in cursor.fetchall()]

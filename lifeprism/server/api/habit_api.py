@@ -28,6 +28,8 @@ from lifeprism.server.errors.error_codes import (
 from lifeprism.server.schemas.habit_schemas import (
     BackfillAvailabilityRequest,
     BackfillCheckInRequest,
+    ChallengeHistoryResponse,
+    ChallengeObject,
     CreateChainRequest,
     CreateHabitRequest,
     CreateNodeRequest,
@@ -191,12 +193,16 @@ async def get_backfill_availability(req: BackfillAvailabilityRequest):
 # 挑战历史 & 结算
 # ============================================================================
 
-@router.get("/habits/{habitId}/challenges")
+@router.get("/habits/{habitId}/challenges", response_model=ChallengeHistoryResponse)
 async def get_challenge_history(habitId: str, status: Optional[str] = Query(default=None)):
     """获取习惯的挑战历史"""
     try:
-        challenges = habit_service.get_challenge_history(habitId, status)
-        return {"challenges": challenges}
+        raw_challenges = habit_service.get_challenge_history(habitId, status)
+        # 历史记录的 remaining_rest_days 总是 0（见 _calculate_remaining_rest_days 逻辑）
+        for c in raw_challenges:
+            c["remaining_rest_days"] = 0
+        challenges = [ChallengeObject(**c) for c in raw_challenges]
+        return ChallengeHistoryResponse(challenges=challenges)
     except LWBaseError as e:
         _raise_app_error(e, default_not_found=HABIT_NOT_FOUND)
 
