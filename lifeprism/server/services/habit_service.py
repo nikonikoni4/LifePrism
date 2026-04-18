@@ -24,11 +24,14 @@ from lifeprism.server.schemas.habit_schemas import (
     HabitListItem, HabitListResponse, HabitDetailResponse,
     ChallengeObject, AnchorInfoObject, SettlementActionRequest,
     BackfillAvailabilityRequest,
+    CheckInResponse, CancelCheckInResponse, BackfillCheckInRequest,
+    BackfillCheckInBatchResponse, BackfillAvailabilityResponse,
 )
 from lifeprism.server.services.habit_stats_service import get_habit_streak
 from lifeprism.utils import get_logger, LazySingleton
 from lifeprism.utils.exceptions import ConflictError, NotFoundError, ValidationError
 from lifeprism.server.schemas.habit_schemas import SettlementItem
+from lifeprism.server.schemas.habit_schemas import CheckSettlementsResponse
 logger = get_logger(__name__)
 
 # 等级 → 挑战周数映射
@@ -363,7 +366,7 @@ class HabitService:
         challenge_id: str,
         persist_succeeded: bool,
         persist_failed: bool,
-    ) -> Optional["SettlementItem"]:
+    ) -> Optional[SettlementItem]:
         """判定挑战结果，返回 SettlementItem 或 None。"""
         challenge = habit_challenge_provider.get_challenge_by_id(challenge_id)
         if not challenge or challenge["status"] != "in_progress":
@@ -452,9 +455,9 @@ class HabitService:
         remaining_future_days = max((end_date - today).days, 0)
         return (completed + backfill_count + remaining_future_days) >= required
 
-    def checkin_today(self, habit_id: str) -> "CheckInResponse":
+    def checkin_today(self, habit_id: str) -> CheckInResponse:
         """今日打卡"""
-        from lifeprism.server.schemas.habit_schemas import CheckInResponse, CheckInObject
+        from lifeprism.server.schemas.habit_schemas import CheckInObject
 
         row = habit_provider.get_habit_by_id(habit_id)
         if not row:
@@ -506,9 +509,8 @@ class HabitService:
             checkin=checkin_obj, habit=habit_item, settlement=settlement,
         )
 
-    def cancel_checkin(self, habit_id: str, date_str: str) -> "CancelCheckInResponse":
+    def cancel_checkin(self, habit_id: str, date_str: str) -> CancelCheckInResponse:
         """取消打卡（仅限今日）"""
-        from lifeprism.server.schemas.habit_schemas import CancelCheckInResponse
 
         row = habit_provider.get_habit_by_id(habit_id)
         if not row:
@@ -550,10 +552,9 @@ class HabitService:
             return "补签日期不在当前挑战周期内"
         return None
 
-    def backfill_checkin(self, habit_id: str, req: "BackfillCheckInRequest") -> "BackfillCheckInBatchResponse":
+    def backfill_checkin(self, habit_id: str, req: BackfillCheckInRequest) -> BackfillCheckInBatchResponse:
         """批量补签（过去 6 天内，按请求顺序逐项处理，部分成功继续）。"""
         from lifeprism.server.schemas.habit_schemas import (
-            BackfillCheckInBatchResponse,
             BackfillCheckInBatchSummary,
             BackfillCheckInResultItem,
             CheckInObject,
@@ -673,7 +674,7 @@ class HabitService:
 
     def get_backfill_availability(
         self, req: BackfillAvailabilityRequest,
-    ) -> "BackfillAvailabilityResponse":
+    ) -> BackfillAvailabilityResponse:
         """获取补录可选日期（today-6 ~ today-1）。"""
         from lifeprism.server.schemas.habit_schemas import (
             BackfillAvailabilityResponse, BackfillDateAvailabilityItem,
@@ -722,9 +723,9 @@ class HabitService:
             habit_id=req.habit_id, challenge_id=req.challenge_id, days=days,
         )
 
-    def check_settlements(self) -> "CheckSettlementsResponse":
+    def check_settlements(self) -> CheckSettlementsResponse:
         """批量检查所有到期未结算挑战（成功落库，失败仅检测不落库）。"""
-        from lifeprism.server.schemas.habit_schemas import CheckSettlementsResponse
+        
         today = date.today().isoformat()
         expired = habit_challenge_provider.get_expired_in_progress_challenges(today)
         settlements = []
