@@ -48,8 +48,8 @@ async def test_vlm() -> dict:
             - image_path: str, 测试图片路径
     """
     # 默认测试图片路径
-    project_root = Path(__file__).resolve().parents[3]  # lifeprism/llm/function -> 项目根目录
-    default_image = project_root / "assets" / "test-vlm.png"
+    
+    default_image = Path(settings.lifeprism_data_path)/ "assets" / "test-vlm.png"
     image_path = str(default_image)
 
     try:
