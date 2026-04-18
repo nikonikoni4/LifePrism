@@ -163,7 +163,7 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
 
     if result : 
         # 将ai summary写入lifeprismData\user\daily_data\behavior.md
-        write_behavior_md(behavior_md_path,date,result,mode = 'overwrite' if outdate_summary else 'append')
+        write_behavior_md(behavior_md_path, date, result, subheading="日记总结", mode='overwrite' if outdate_summary else 'append')
         return result
         
     return None
