@@ -1,8 +1,8 @@
 ---
-version: 1.1
+version: 1.2
 created_at: 2026-04-10
-updated_at: 2026-04-17
-last_updated: 新增日记 AI 总结实施计划索引
+updated_at: 2026-04-18
+last_updated: 新增日记范围手动总结实施计划索引
 abstract: superpowers 执行计划索引，记录技能、工具与功能实现计划。
 ---
 
@@ -24,3 +24,4 @@ abstract: superpowers 执行计划索引，记录技能、工具与功能实现�
 | ---- | -------- |
 | [2026-04-10-ci-check-skill-implementation.md](2026-04-10-ci-check-skill-implementation.md) | CI-check skill 实施计划，覆盖主 skill 改写、子 agent 模板、运行时状态与验证场景。 |
 | [2026-04-17-diary-ai-summary-implementation.md](2026-04-17-diary-ai-summary-implementation.md) | 日记 AI 总结实施计划，覆盖 diary API、Service、前端只读卡片、验证和正式 spec 同步。 |
+| [2026-04-18-diary-range-ai-summary-implementation.md](2026-04-18-diary-range-ai-summary-implementation.md) | 日记范围手动总结实施计划，覆盖 hash 判定、behavior.md 次级标题、批量更新 API 和前端设置入口。 |

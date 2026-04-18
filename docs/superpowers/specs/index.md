@@ -1,8 +1,8 @@
 ---
-version: 1.1
+version: 1.2
 created_at: 2026-04-10
-updated_at: 2026-04-17
-last_updated: 新增日记 AI 总结设计稿索引
+updated_at: 2026-04-18
+last_updated: 新增日记范围手动总结设计稿索引
 abstract: superpowers 设计文档索引，记录技能相关设计稿和实现前设计稿的主题与用途。
 ---
 
