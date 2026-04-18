@@ -199,17 +199,20 @@ def validate_data_path(path: str, path_type: str) -> ValidatePathResponse:
     return ValidatePathResponse(valid=False, message=f"未知的路径类型: {path_type}")
 
 
-# 迁移时需要复制的子目录列表（不含 config，配置文件固定在默认路径）
-_DATA_SUBDIRS = [
-    "dataset",
-    "plan",
-    "debug_logs",
-    "workflow",
-    "external_files",
-    "screenshots",
-    "docs",
-    "diary",
+# 迁移时排除的子目录黑名单（配置文件固定在默认路径，不参与迁移）
+_EXCLUDED_SUBDIRS = [
+    "config",
 ]
+
+
+def _get_subdirs_to_migrate(current_path: Path) -> list[str]:
+    """获取需要迁移的子目录列表（黑名单过滤）"""
+    if not current_path.exists():
+        return []
+    return [
+        d.name for d in current_path.iterdir()
+        if d.is_dir() and d.name not in _EXCLUDED_SUBDIRS
+    ]
 
 
 def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> MigrateDataPathResponse:
@@ -217,7 +220,7 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
     迁移数据到新路径，或仅切换路径不迁移数据
 
     配置文件（config/）固定在默认路径，不参与迁移。
-    只迁移数据目录：dataset/、plan/、debug_logs/、workflow/、external_files/
+    除 config/ 外的数据子目录都会被迁移。
 
     流程: 开发模式检查 → 计算新路径 → 验证 → [关闭DB连接 → 复制数据] → 更新配置
 
@@ -292,7 +295,7 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
         # 5. 复制数据
         try:
             new_path.mkdir(parents=True, exist_ok=True)
-            for subdir in _DATA_SUBDIRS:
+            for subdir in _get_subdirs_to_migrate(current_path):
                 src = current_path / subdir
                 dst = new_path / subdir
                 if src.exists() and src.is_dir():
@@ -311,7 +314,7 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
         # 仅切换路径：创建目录结构，不复制数据
         try:
             new_path.mkdir(parents=True, exist_ok=True)
-            for subdir in _DATA_SUBDIRS:
+            for subdir in _get_subdirs_to_migrate(current_path):
                 (new_path / subdir).mkdir(parents=True, exist_ok=True)
             logger.info(f"仅切换路径，已创建空目录结构: {new_path}")
         except Exception as e:
