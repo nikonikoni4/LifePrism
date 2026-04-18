@@ -6,9 +6,10 @@ import type { MarkdownEditorRef } from '@my-ui-kit/core';
 import DiaryTagBar from './DiaryTagBar';
 import SettingsPopover from './SettingsPopover';
 import TemplateManager from './TemplateManager';
+import RangeSummaryModal from './RangeSummaryModal';
 import { DiaryAPI } from './diaryApi';
 import { BG_PRESETS } from './diaryConstants';
-import type { DiaryItem, MoodLevel, ImportanceLevel } from './diaryTypes';
+import type { DiaryItem, MoodLevel, ImportanceLevel, ExistingSummaryMode } from './diaryTypes';
 import { toLocalDateString } from '../../../../core/utils/dateUtils';
 
 /**
@@ -36,6 +37,7 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   const [settingsView, setSettingsView] = useState(false);
   const [showSettingsPopover, setShowSettingsPopover] = useState(false);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [showRangeSummaryModal, setShowRangeSummaryModal] = useState(false);
   const [shouldScrollToDate, setShouldScrollToDate] = useState(true);
 
   // 背景色（localStorage 持久化）
@@ -249,6 +251,17 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   }, [handleManualSave]);
 
   // ========== AI 总结 ==========
+  const handleRangeSummarySubmit = useCallback(async (payload: { start_date: string; end_date: string; mode: ExistingSummaryMode }) => {
+    try {
+      const response = await DiaryAPI.generateAiSummaryRange(payload);
+      toast.success(`已生成 ${response.created_dates.length} 条，更新 ${response.updated_dates.length} 条`);
+      await loadDiary(activeDate);
+    } catch (e) {
+      console.error('生成范围 AI 总结失败:', e);
+      toast.error('范围总结生成失败');
+    }
+  }, [activeDate, loadDiary]);
+
   const handleGenerateSummary = useCallback(async () => {
     const dateStr = formatDate(activeDate);
     if (!content.trim()) {
@@ -498,6 +511,7 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
               onClose={() => setShowSettingsPopover(false)}
               onSelectColor={() => setSettingsView(true)}
               onSelectTemplate={() => setShowTemplateManager(true)}
+              onSelectRangeSummary={() => setShowRangeSummaryModal(true)}
               anchorRect={settingsBtnRef.current?.getBoundingClientRect()}
             />
           </div>
@@ -633,6 +647,14 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
         open={showTemplateManager}
         onClose={() => setShowTemplateManager(false)}
         onApplyTemplate={handleApplyTemplate}
+      />
+
+      {/* 范围更新总结弹窗 */}
+      <RangeSummaryModal
+        open={showRangeSummaryModal}
+        onClose={() => setShowRangeSummaryModal(false)}
+        onSubmit={handleRangeSummarySubmit}
+        initialDate={activeDate}
       />
 
       <style dangerouslySetInnerHTML={{

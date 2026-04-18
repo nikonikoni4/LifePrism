@@ -10,6 +10,8 @@ import type {
   UpdateDiaryMetaRequest,
   SaveDiaryContentRequest,
   TemplateItem,
+  GenerateDiaryAISummaryRangeRequest,
+  GenerateDiaryAISummaryRangeResponse,
 } from './diaryTypes';
 
 const getApiBase = createApiV2UrlGetter('/diary');
@@ -48,6 +50,20 @@ export const DiaryAPI = {
   async generateAiSummary(date: string): Promise<DiaryAISummaryResponse> {
     const res = await fetch(`${getApiBase()}/${date}/ai_summary`, {
       method: 'POST',
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(errorText || `生成日记 AI 总结失败: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  /** 批量生成日期范围内日记 AI 总结 */
+  async generateAiSummaryRange(data: GenerateDiaryAISummaryRangeRequest): Promise<GenerateDiaryAISummaryRangeResponse> {
+    const res = await fetch(`${getApiBase()}/ai_summary/range`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
     if (!res.ok) {
       const errorText = await res.text();

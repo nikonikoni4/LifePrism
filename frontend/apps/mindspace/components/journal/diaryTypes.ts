@@ -5,6 +5,7 @@
 
 export type MoodLevel = 'very_happy' | 'happy' | 'calm' | 'bad' | 'very_bad';
 export type ImportanceLevel = 'important' | 'normal' | 'unimportant';
+export type ExistingSummaryMode = 'regenerate_all' | 'regenerate_changed' | 'skip_existing';
 
 export interface DiaryItem {
   date: string;
@@ -46,6 +47,17 @@ export interface DiaryAISummaryResponse {
 export interface TemplateItem {
   name: string;
   content: string;
+}
+
+export interface GenerateDiaryAISummaryRangeRequest {
+  start_date: string;
+  end_date: string;
+  mode: ExistingSummaryMode;
+}
+
+export interface GenerateDiaryAISummaryRangeResponse {
+  created_dates: string[];
+  updated_dates: string[];
 }
 
 export interface SliderOption<T extends string> {

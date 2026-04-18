@@ -4,19 +4,20 @@
  */
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Palette, FileText } from 'lucide-react';
+import { Palette, FileText, RefreshCw } from 'lucide-react';
 
 interface SettingsPopoverProps {
   open: boolean;
   onClose: () => void;
   onSelectColor: () => void;
   onSelectTemplate: () => void;
+  onSelectRangeSummary: () => void;
   /** 锚点位置（按钮的位置信息） */
   anchorRect?: DOMRect | null;
 }
 
 const SettingsPopover: React.FC<SettingsPopoverProps> = ({
-  open, onClose, onSelectColor, onSelectTemplate, anchorRect,
+  open, onClose, onSelectColor, onSelectTemplate, onSelectRangeSummary, anchorRect,
 }) => {
   return (
     <AnimatePresence>
@@ -51,6 +52,14 @@ const SettingsPopover: React.FC<SettingsPopoverProps> = ({
             >
               <FileText size={15} className="opacity-40" />
               模板管理
+            </button>
+            <div className="mx-4 h-[0.5px] bg-black/[0.04]" />
+            <button
+              onClick={() => { onSelectRangeSummary(); onClose(); }}
+              className="w-full flex items-center gap-3 px-5 py-3.5 text-[12px] text-gray-600 hover:bg-black/[0.03] transition-colors tracking-wider"
+            >
+              <RefreshCw size={15} className="opacity-40" />
+              范围更新总结
             </button>
           </motion.div>
         </>
