@@ -107,7 +107,7 @@ class DiaryProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
-                allowed_fields = ['mood', 'importance', 'custom_tags', 'word_count', 'ai_summary']
+                allowed_fields = ['mood', 'importance', 'custom_tags', 'word_count', 'ai_summary', 'diary_source_hash']
 
                 set_clauses = []
                 values = []

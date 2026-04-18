@@ -7,6 +7,7 @@ Diary 服务层 - 日记业务逻辑
 
 架构：纯函数模块（无内存缓存，不需要单例）
 """
+import hashlib
 import json
 from typing import Any, Optional
 from pathlib import Path
@@ -137,6 +138,12 @@ def _extract_summary_content(result: Any) -> Optional[str]:
     return getattr(result, "content", None)
 
 
+def _compute_diary_source_hash(content: str) -> str:
+    """计算日记正文的 hash（用于判断 AI 总结是否需要刷新）"""
+    normalized = content.strip().replace("\r\n", "\n").replace("\r", "\n")
+    return hashlib.md5(normalized.encode("utf-8")).hexdigest()
+
+
 # ==================== 日记 CRUD ====================
 
 def _convert_db_to_diary_item(item: dict, include_content: bool = False) -> DiaryItem:
@@ -152,6 +159,7 @@ def _convert_db_to_diary_item(item: dict, include_content: bool = False) -> Diar
         custom_tags=_parse_custom_tags(item.get('custom_tags')),
         word_count=item.get('word_count', 0),
         ai_summary=item.get('ai_summary'),
+        diary_source_hash=item.get('diary_source_hash'),
         content=content,
         created_at=item.get('created_at', ''),
         updated_at=item.get('updated_at'),
@@ -167,6 +175,7 @@ def _convert_db_to_meta_item(item: dict) -> DiaryMetaItem:
         custom_tags=_parse_custom_tags(item.get('custom_tags')),
         word_count=item.get('word_count', 0),
         ai_summary=item.get('ai_summary'),
+        diary_source_hash=item.get('diary_source_hash'),
         created_at=item.get('created_at', ''),
         updated_at=item.get('updated_at'),
     )
@@ -286,7 +295,8 @@ async def generate_diary_ai_summary(date: str) -> DiaryAISummaryResponse:
     if not summary_content:
         raise ValueError("AI 总结生成失败")
 
-    success = diary_provider.update_diary(date, {"ai_summary": summary_content})
+    source_hash = _compute_diary_source_hash(content)
+    success = diary_provider.update_diary(date, {"ai_summary": summary_content, "diary_source_hash": source_hash})
     if not success:
         raise ValueError("AI 总结保存失败")
 

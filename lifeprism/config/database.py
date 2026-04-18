@@ -1133,6 +1133,11 @@ DIARY_CONFIG = {
             'type': 'TEXT',
             'constraints': ['DEFAULT NULL'],
             'comment': 'AI 总结（保留字段）'
+        },
+        'diary_source_hash': {
+            'type': 'TEXT',
+            'constraints': ['DEFAULT NULL'],
+            'comment': '生成当前 ai_summary 时使用的正文 hash'
         }
     },
     'table_constraints': [],

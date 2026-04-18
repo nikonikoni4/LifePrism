@@ -18,6 +18,7 @@ class DiaryItem(BaseModel):
     custom_tags: List[str] = Field(default=[], description="自定义 tag 列表")
     word_count: int = Field(default=0, description="字数统计")
     ai_summary: Optional[str] = Field(default=None, description="AI 总结")
+    diary_source_hash: Optional[str] = Field(default=None, description="当前 AI 总结对应的正文 hash")
     content: str = Field(default="", description="日记 md 内容")
     created_at: str = Field(default="", description="创建时间")
     updated_at: Optional[str] = Field(default=None, description="更新时间")
@@ -31,6 +32,7 @@ class DiaryMetaItem(BaseModel):
     custom_tags: List[str] = Field(default=[], description="自定义 tag 列表")
     word_count: int = Field(default=0, description="字数统计")
     ai_summary: Optional[str] = Field(default=None, description="AI 总结")
+    diary_source_hash: Optional[str] = Field(default=None, description="当前 AI 总结对应的正文 hash")
     created_at: str = Field(default="", description="创建时间")
     updated_at: Optional[str] = Field(default=None, description="更新时间")
 
