@@ -29,6 +29,8 @@ contract_refs:
 | 版本 | 更新内容 |
 | ---- | -------- |
 | 1.0 | 从旧 PRD 迁移为正式 spec，核对代码实现 |
+| 1.1 | 新增 `diary_source_hash` 字段、`范围更新 AI 总结` 入口及三种更新模式 |
+| 1.2 | 补充 behavior.md 次级标题规则：所有目标日期内容写在 `### 日记总结` 下 |
 
 ## Overview
 
@@ -125,6 +127,7 @@ CREATE TABLE IF NOT EXISTS diary (
     importance TEXT,                          -- 平凡程度: important, normal, unimportant
     custom_tags TEXT DEFAULT '[]',            -- 自定义 tag，JSON 数组
     word_count INTEGER DEFAULT 0,             -- 字数统计，用于日历视图展示
+    diary_source_hash TEXT DEFAULT NULL,     -- 当前 ai_summary 对应的正文 hash，用于判断正文是否变更
     ai_summary TEXT DEFAULT NULL,             -- AI 总结
     created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
     updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
@@ -165,6 +168,7 @@ CREATE TABLE IF NOT EXISTS diary (
   importance?: string;       // important | normal | unimportant
   custom_tags: string[];     // 自定义标签数组
   word_count: number;        // 字数统计
+  diary_source_hash?: string; // 当前 ai_summary 对应的正文 hash，用于判断正文是否变更
   ai_summary?: string;       // AI 总结
   content: string;           // 日记 md 内容
   created_at: string;        // ISO 时间戳
@@ -180,6 +184,7 @@ CREATE TABLE IF NOT EXISTS diary (
   importance?: string;
   custom_tags: string[];
   word_count: number;
+  diary_source_hash?: string; // 当前 ai_summary 对应的正文 hash
   ai_summary?: string;
   created_at: string;
   updated_at?: string;
@@ -265,8 +270,18 @@ CREATE TABLE IF NOT EXISTS diary (
 
 **5. 设置按钮**
 - 位置：底部
-- 点击弹出上拉菜单，包含"背景颜色"和"模板管理"两个入口
+- 点击弹出上拉菜单，包含"背景颜色"、"模板管理"和"范围更新 AI 总结"三个入口
 - 背景颜色：沿用当前已有的颜色选择界面，localStorage 持久化，不走后端
+- 范围更新 AI 总结：进入批量总结界面，支持日期范围选择
+
+**5.1 范围更新 AI 总结入口**
+- 入口：设置按钮上拉菜单 → "范围更新 AI 总结"
+- 功能：对指定日期范围内的日记进行批量 AI 总结
+- 更新模式支持三种：
+  1. **全部重生成**：无视现有摘要，对范围内所有日记重新生成 AI 总结
+  2. **仅更新正文变化的已有摘要**：仅对正文 hash 发生变化且已有摘要的日记重新生成
+  3. **跳过已有摘要**：仅对尚无 AI 总结的日记生成摘要
+- `diary_source_hash` 字段用途：记录当前 `ai_summary` 对应的正文内容 hash，正文变更后 hash 变化，用于判断是否需要重新生成
 
 **6. 模板管理界面**
 - 入口：设置按钮上拉菜单 →"模板管理"
@@ -302,6 +317,8 @@ CREATE TABLE IF NOT EXISTS diary (
 5. **路由顺序正确**：`/list` 和 `/templates/*` 路由在 `/{date}` 之前注册，避免路径冲突
 6. **心情/重要程度枚举值**：前后端严格遵守 `very_happy | happy | calm | bad | very_bad` 和 `important | normal | unimportant`
 7. **颜色方案一致性**：前端使用的颜色值与本 spec 定义的颜色方案一致
+8. **AI 总结写入规则**：AI 总结内容统一写在 `behavior.md` 的 `### 日记总结` 次级标题下，不得写在其他位置
+9. **`diary_source_hash` 用途**：记录当前 `ai_summary` 对应的正文 hash，正文变更后 hash 变化，用于判断范围更新时是否需要重新生成
 
 ## Out of Spec
 
