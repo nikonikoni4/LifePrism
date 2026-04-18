@@ -16,7 +16,7 @@ from lifeprism.llm.bus.events import MessageType
 from lifeprism.llm.providers import LLMResponse
 from lifeprism.config import settings
 from pathlib import Path
-from lifeprism.llm.utils import read_md,write_behavior_md,extract_behavior_logs_from_file
+from lifeprism.llm.utils.md_os import read_md,write_behavior_md,extract_behavior_logs_from_file
 
 create_summary_task_prompt = """
     ## task
