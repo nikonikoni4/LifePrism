@@ -24,3 +24,4 @@ abstract: superpowers 设计文档索引，记录技能相关设计稿和实现�
 | ---- | -------- |
 | [2026-04-10-ci-check-skill-design.md](2026-04-10-ci-check-skill-design.md) | CI-check skill 设计稿，定义检查流程、子 agent 分派、配置状态与报告契约。 |
 | [2026-04-17-diary-ai-summary-design.md](2026-04-17-diary-ai-summary-design.md) | 日记 AI 总结设计稿，定义只读总结卡片、手动触发 API、LLM 调用、数据库覆盖写入和测试边界。 |
+| [2026-04-18-diary-range-ai-summary-design.md](2026-04-18-diary-range-ai-summary-design.md) | 日记范围手动总结设计稿，定义 diary_source_hash、behavior.md 次级标题结构、旧摘要入参和批量更新策略。 |
