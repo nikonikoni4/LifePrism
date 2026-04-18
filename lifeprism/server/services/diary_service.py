@@ -7,6 +7,7 @@ Diary 服务层 - 日记业务逻辑
 
 架构：纯函数模块（无内存缓存，不需要单例）
 """
+import asyncio
 import hashlib
 import json
 from typing import Any, Optional
@@ -310,70 +311,64 @@ async def generate_diary_ai_summary(date: str) -> DiaryAISummaryResponse:
 async def generate_diary_ai_summary_range(request: GenerateDiaryAISummaryRangeRequest) -> GenerateDiaryAISummaryRangeResponse:
     """
     按日期范围生成日记 AI 总结，并根据 existing_summary_mode 应用不同策略
-
-    Args:
-        request: 范围更新请求，包含开始/结束日期和更新模式
-
-    Returns:
-        GenerateDiaryAISummaryRangeResponse: 包含 created_dates, updated_dates, skipped_dates
     """
     items = diary_provider.get_diaries_by_date_range(request.start_date, request.end_date)
 
-    created_dates: list[str] = []
-    updated_dates: list[str] = []
-    skipped_dates: list[str] = []
+    # 第一阶段：收集需要处理的项目
+    to_process: list[tuple[str, bool]] = []  # (date, is_update)
+    skipped: list[str] = []
 
     for item in items:
         date = item["date"]
         existing_summary = item.get("ai_summary")
         existing_hash = item.get("diary_source_hash")
 
-        # 读取日记内容，过滤空内容
         content = _read_diary_content(date).strip()
         if not content:
-            skipped_dates.append(date)
+            skipped.append(date)
             continue
 
         current_hash = _compute_diary_source_hash(content)
+        mode = request.existing_summary_mode
 
-        # 根据模式决定是否需要生成总结
-        should_generate = False
-        is_update = False
-
-        if request.existing_summary_mode == ExistingSummaryMode.REGENERATE_ALL:
-            # 全部重新生成
-            should_generate = True
-            is_update = existing_summary is not None
-        elif request.existing_summary_mode == ExistingSummaryMode.REGENERATE_CHANGED:
-            # 仅当 hash 不匹配时重新生成
+        if mode == ExistingSummaryMode.REGENERATE_ALL:
+            to_process.append((date, existing_summary is not None))
+        elif mode == ExistingSummaryMode.REGENERATE_CHANGED:
             if existing_hash is None or existing_hash != current_hash:
-                should_generate = True
-                is_update = existing_summary is not None
+                to_process.append((date, existing_summary is not None))
             else:
-                skipped_dates.append(date)
-        elif request.existing_summary_mode == ExistingSummaryMode.SKIP_EXISTING:
-            # 仅当没有现有总结时生成
+                skipped.append(date)
+        elif mode == ExistingSummaryMode.SKIP_EXISTING:
             if existing_summary is None:
-                should_generate = True
-                is_update = False
+                to_process.append((date, False))
             else:
-                skipped_dates.append(date)
+                skipped.append(date)
 
-        if should_generate:
-            try:
-                await generate_diary_ai_summary(date)
-                if is_update:
-                    updated_dates.append(date)
-                else:
-                    created_dates.append(date)
-            except ValueError:
-                # 生成失败，跳过
-                skipped_dates.append(date)
+    # 第二阶段：并发处理
+    async def process_one(date: str, is_update: bool) -> tuple[str, bool] | tuple[None, None]:
+        try:
+            await generate_diary_ai_summary(date)
+            return (date, is_update)
+        except ValueError:
+            return (None, None)
+
+    results = await asyncio.gather(*[process_one(d, u) for d, u in to_process])
+
+    created: list[str] = []
+    updated: list[str] = []
+    for i, r in enumerate(results):
+        d, is_up = r
+        if d is None:
+            skipped.append(to_process[i][0])
+        elif is_up:
+            updated.append(d)
+        else:
+            created.append(d)
 
     return GenerateDiaryAISummaryRangeResponse(
-        created_dates=created_dates,
-        updated_dates=updated_dates,
-        skipped_dates=skipped_dates,
+        created_dates=created,
+        updated_dates=updated,
+        skipped_dates=skipped,
     )
 
 
