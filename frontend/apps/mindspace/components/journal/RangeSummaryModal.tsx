@@ -11,7 +11,7 @@ import { toLocalDateString } from '../../../../core/utils/dateUtils';
 interface RangeSummaryModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (payload: { start_date: string; end_date: string; mode: ExistingSummaryMode }) => void;
+  onSubmit: (payload: { start_date: string; end_date: string; existing_summary_mode: ExistingSummaryMode }) => void;
   initialDate: Date;
 }
 
@@ -38,7 +38,7 @@ const RangeSummaryModal: React.FC<RangeSummaryModalProps> = ({
   const handleSubmit = () => {
     const startDate = toLocalDateString(start);
     const endDate = toLocalDateString(end);
-    onSubmit({ start_date: startDate, end_date: endDate, mode });
+    onSubmit({ start_date: startDate, end_date: endDate, existing_summary_mode: mode });
     onClose();
   };
 
@@ -82,14 +82,14 @@ const RangeSummaryModal: React.FC<RangeSummaryModalProps> = ({
                 <div className="flex items-center gap-3">
                   <input
                     type="date"
-                    value={start.toISOString().split('T')[0]}
+                    value={toLocalDateString(start)}
                     onChange={e => setStart(new Date(e.target.value))}
                     className="flex-1 px-3 py-2.5 text-[13px] border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                   />
                   <span className="text-gray-300 text-xs">至</span>
                   <input
                     type="date"
-                    value={end.toISOString().split('T')[0]}
+                    value={toLocalDateString(end)}
                     onChange={e => setEnd(new Date(e.target.value))}
                     className="flex-1 px-3 py-2.5 text-[13px] border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                   />

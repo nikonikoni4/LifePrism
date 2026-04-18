@@ -52,12 +52,13 @@ export interface TemplateItem {
 export interface GenerateDiaryAISummaryRangeRequest {
   start_date: string;
   end_date: string;
-  mode: ExistingSummaryMode;
+  existing_summary_mode: ExistingSummaryMode;
 }
 
 export interface GenerateDiaryAISummaryRangeResponse {
   created_dates: string[];
   updated_dates: string[];
+  skipped_dates: string[];
 }
 
 export interface SliderOption<T extends string> {
