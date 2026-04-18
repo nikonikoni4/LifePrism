@@ -16,6 +16,8 @@ from lifeprism.server.schemas.diary_schemas import (
     TemplateListResponse,
     CreateTemplateRequest,
     UpdateTemplateRequest,
+    GenerateDiaryAISummaryRangeRequest,
+    GenerateDiaryAISummaryRangeResponse,
 )
 from lifeprism.server.services import diary_service
 
@@ -81,6 +83,12 @@ async def delete_template(
 
 
 # ==================== 日记 CRUD ====================
+
+@router.post("/ai_summary/range", response_model=GenerateDiaryAISummaryRangeResponse, summary="按日期范围更新日记 AI 总结")
+async def generate_diary_ai_summary_range(request: GenerateDiaryAISummaryRangeRequest):
+    """按日期范围批量更新日记 AI 总结，支持三种现有总结模式"""
+    return await diary_service.generate_diary_ai_summary_range(request)
+
 
 @router.get("/{date}", response_model=DiaryItem, summary="获取日记")
 async def get_diary(

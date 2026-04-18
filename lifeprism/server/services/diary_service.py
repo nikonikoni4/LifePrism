@@ -25,6 +25,9 @@ from lifeprism.server.schemas.diary_schemas import (
     TemplateListResponse,
     CreateTemplateRequest,
     UpdateTemplateRequest,
+    GenerateDiaryAISummaryRangeRequest,
+    GenerateDiaryAISummaryRangeResponse,
+    ExistingSummaryMode,
 )
 from lifeprism.server.providers.diary_provider import diary_provider
 from lifeprism.utils import get_logger
@@ -302,6 +305,76 @@ async def generate_diary_ai_summary(date: str) -> DiaryAISummaryResponse:
         raise ValueError("AI 总结保存失败")
 
     return DiaryAISummaryResponse(content=summary_content)
+
+
+async def generate_diary_ai_summary_range(request: GenerateDiaryAISummaryRangeRequest) -> GenerateDiaryAISummaryRangeResponse:
+    """
+    按日期范围生成日记 AI 总结，并根据 existing_summary_mode 应用不同策略
+
+    Args:
+        request: 范围更新请求，包含开始/结束日期和更新模式
+
+    Returns:
+        GenerateDiaryAISummaryRangeResponse: 包含 created_dates, updated_dates, skipped_dates
+    """
+    items = diary_provider.get_diaries_by_date_range(request.start_date, request.end_date)
+
+    created_dates: list[str] = []
+    updated_dates: list[str] = []
+    skipped_dates: list[str] = []
+
+    for item in items:
+        date = item["date"]
+        existing_summary = item.get("ai_summary")
+        existing_hash = item.get("diary_source_hash")
+
+        # 读取日记内容，过滤空内容
+        content = _read_diary_content(date).strip()
+        if not content:
+            skipped_dates.append(date)
+            continue
+
+        current_hash = _compute_diary_source_hash(content)
+
+        # 根据模式决定是否需要生成总结
+        should_generate = False
+        is_update = False
+
+        if request.existing_summary_mode == ExistingSummaryMode.REGENERATE_ALL:
+            # 全部重新生成
+            should_generate = True
+            is_update = existing_summary is not None
+        elif request.existing_summary_mode == ExistingSummaryMode.REGENERATE_CHANGED:
+            # 仅当 hash 不匹配时重新生成
+            if existing_hash is None or existing_hash != current_hash:
+                should_generate = True
+                is_update = existing_summary is not None
+            else:
+                skipped_dates.append(date)
+        elif request.existing_summary_mode == ExistingSummaryMode.SKIP_EXISTING:
+            # 仅当没有现有总结时生成
+            if existing_summary is None:
+                should_generate = True
+                is_update = False
+            else:
+                skipped_dates.append(date)
+
+        if should_generate:
+            try:
+                await generate_diary_ai_summary(date)
+                if is_update:
+                    updated_dates.append(date)
+                else:
+                    created_dates.append(date)
+            except ValueError:
+                # 生成失败，跳过
+                skipped_dates.append(date)
+
+    return GenerateDiaryAISummaryRangeResponse(
+        created_dates=created_dates,
+        updated_dates=updated_dates,
+        skipped_dates=skipped_dates,
+    )
 
 
 def get_diary_list(start_date: str, end_date: str) -> DiaryListResponse:

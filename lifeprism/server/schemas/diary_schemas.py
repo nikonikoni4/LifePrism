@@ -4,6 +4,7 @@
 日记 meta 存数据库，内容存 md 文件。
 模板纯文件管理，不经过数据库。
 """
+from enum import Enum
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
@@ -57,6 +58,29 @@ class SaveDiaryContentRequest(BaseModel):
 class DiaryAISummaryResponse(BaseModel):
     """日记 AI 总结响应"""
     content: str = Field(..., description="AI 生成的日记总结内容")
+
+
+# ==================== AI 总结范围更新 ====================
+
+class ExistingSummaryMode(str, Enum):
+    """现有总结更新模式"""
+    REGENERATE_ALL = "regenerate_all"
+    REGENERATE_CHANGED = "regenerate_changed"
+    SKIP_EXISTING = "skip_existing"
+
+
+class GenerateDiaryAISummaryRangeRequest(BaseModel):
+    """生成日记 AI 总结范围请求"""
+    start_date: str = Field(..., description="开始日期 YYYY-MM-DD")
+    end_date: str = Field(..., description="结束日期 YYYY-MM-DD")
+    existing_summary_mode: ExistingSummaryMode = Field(..., description="现有总结更新模式")
+
+
+class GenerateDiaryAISummaryRangeResponse(BaseModel):
+    """生成日记 AI 总结范围响应"""
+    created_dates: List[str] = Field(default=[], description="新建总结的日期列表")
+    updated_dates: List[str] = Field(default=[], description="更新总结的日期列表")
+    skipped_dates: List[str] = Field(default=[], description="跳过的日期列表")
 
 
 # ==================== 模板 ====================
