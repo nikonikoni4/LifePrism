@@ -32,3 +32,4 @@ class CaptureRequest:
     window_title: Optional[str]
     frequency_level: Optional[int]
     engaged_segment_id: Optional[str]
+    is_afk: bool

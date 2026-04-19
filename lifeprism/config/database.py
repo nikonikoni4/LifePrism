@@ -1467,7 +1467,7 @@ SCREEN_CAPTURES_CONFIG = {
     'columns': {
         'id': {
             'type': 'TEXT',
-            'constraints': ['PRIMARY KEY'],
+            'constraints': ['PRIMARY KEY', 'NOT NULL'],
             'comment': '截屏记录 ID（如 sc-{uuid[:8]}）'
         },
         'captured_at': {
@@ -1477,7 +1477,7 @@ SCREEN_CAPTURES_CONFIG = {
         },
         'capture_reason': {
             'type': 'TEXT',
-            'constraints': [],
+            'constraints': ['NOT NULL'],
             'comment': '触发截屏的原因'
         },
         'file_path': {
@@ -1497,8 +1497,8 @@ SCREEN_CAPTURES_CONFIG = {
         },
         'frequency_level': {
             'type': 'INTEGER',
-            'constraints': ['DEFAULT 0'],
-            'comment': '截屏频率等级'
+            'constraints': [],
+            'comment': '截屏频率等级（scheduled 为 NULL）'
         },
         'engaged_segment_id': {
             'type': 'TEXT',

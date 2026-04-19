@@ -40,6 +40,8 @@ export interface Settings {
     lifeprism_data_path: string;
     config_base_path: string;
     data_cleaning_threshold: number;
+    screenshot_monitor?: boolean;
+    is_vlm?: Record<string, boolean>;
 }
 
 /** 获取配置响应 */
@@ -62,6 +64,8 @@ export interface UpdateSettingsRequest {
     aw_db_path?: string;
     lifeprism_data_path?: string;
     data_cleaning_threshold?: number;
+    screenshot_monitor?: boolean;
+    is_vlm?: Record<string, boolean>;
 }
 
 /** 更新 API Key 请求 */
@@ -87,6 +91,15 @@ export interface TestConnectionResponse {
     success: boolean;
     message: string;
     model_response: string | null;
+}
+
+/** VLM 测试响应 */
+export interface TestVlmResponse {
+    success: boolean;
+    message: string;
+    is_vlm: boolean;
+    model_response: string | null;
+    cache_updated?: boolean;
 }
 
 /** 路径验证请求 */

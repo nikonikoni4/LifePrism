@@ -1,9 +1,19 @@
 ---
-version: 1.0
+version: 2.0
 created_at: 2026-04-15
-updated_at: 2026-04-15
-last_updated: 初始版本
+updated_at: 2026-04-18
+last_updated: 数据迁移和资源初始化内容移至 resource-init.md
 abstract: 路径配置体系权威参考，定义 config_base_path（固定）、lifeprism_data_path（可迁移）、数据库路径（自动推算）的解析规则和优先级，以及配置文件固定路径设计和数据迁移机制
+---
+
+## 版本历史
+
+| 版本 | 日期 | 变更内容 |
+|------|------|----------|
+| 1.0 | 2026-04-15 | 初始版本 |
+| 2.0 | 2026-04-18 | 更新 _DATA_SUBDIRS 列表；新增 session 子目录说明；标注 custom_data_path 已废弃 |
+| 2.1 | 2026-04-18 | 数据迁移和资源初始化内容移至 resource-init.md |
+
 ---
 
 # 路径配置体系
@@ -18,6 +28,7 @@ abstract: 路径配置体系权威参考，定义 config_base_path（固定）�
 | `chat_db_path` | `settings.chat_db_path` | 自动推算 | `{data_path}/dataset/chat_history.db` |
 | `aw_db_path` | `settings.aw_db_path` | yaml 配置 | ActivityWatch 数据库，独立配置 |
 | 日志目录 | `_setup_logging()` 内部 | 自动推算 | 打包：`{data_path}/debug_logs/`，开发：项目根目录 |
+| `session_path` | `settings.session_path` | 自动推算 | `{data_path}/session/` |
 
 **关键规则**：`lw_db_path` / `chat_db_path` 不在 yaml 中配置，是从 `lifeprism_data_path` 计算得出的只读属性。
 
@@ -86,7 +97,11 @@ abstract: 路径配置体系权威参考，定义 config_base_path（固定）�
 ├── plan/             # PlanDoc Markdown 文件
 ├── debug_logs/       # 日志文件（打包环境）
 ├── workflow/         # 工作流数据
-└── external_files/   # 外部导入文件
+├── external_files/   # 外部导入文件
+├── screenshots/     # 截图数据
+├── docs/             # 文档数据
+├── diary/            # 日记数据
+└── session/          # 会话临时数据
 ```
 
 未迁移时，`config_base_path` 和 `lifeprism_data_path` 指向同一目录。
@@ -108,32 +123,15 @@ abstract: 路径配置体系权威参考，定义 config_base_path（固定）�
 
 ---
 
-## 数据迁移 API
+## 数据迁移
 
-`POST /settings/migrate-data-path` 支持将数据迁移到新路径。
-
-### 流程
-
-1. 开发模式检查（开发模式下禁用）
-2. 计算新路径：`{用户选择的目录}/lifeprismData`
-3. 验证：不能与当前路径相同、不能在安装目录内
-4. 关闭数据库连接池
-5. 复制数据子目录（`dataset`, `plan`, `debug_logs`, `workflow`, `external_files`，**不含 `config`**）
-6. 更新 yaml 配置中的 `lifeprism_data_path`（写入固定路径的 config.yaml）
-7. 需要重启程序生效
-
-### 路径验证 API
-
-`POST /settings/validate-path` 验证路径有效性：
-- `lifeprism_data` 类型：检查不与安装路径冲突、是目录
-- `aw_db` 类型：检查文件存在、是 `.db` 文件
+详细说明见 [资源初始化与迁移](resource-init.md)。
 
 ---
 
-## 编码注意事项
-
 1. **禁止**在 `settings_manager` 以外的模块自行解析路径或读取路径相关环境变量
 2. **禁止**在 yaml 中单独配置 `lw_db_path` / `chat_db_path`，它们是计算属性
-3. 新增数据子目录时，需同步更新 `setting_service._DATA_SUBDIRS` 列表（迁移用）
+3. 新增数据子目录时，会自动被迁移（黑名单机制，仅排除 `config/`）
 4. 路径相关的前端设置变更通过 `PATCH /settings` 提交，后端 `settings.update()` 会同步更新内部 `_lifeprism_data_path` 和环境变量
 5. **配置文件路径**使用 `settings.config_base_path`，**数据路径**使用 `settings.lifeprism_data_path`，两者在迁移后不同
+6. `settings.custom_data_path` 已废弃，请使用 `settings.lifeprism_data_path`

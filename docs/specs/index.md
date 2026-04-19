@@ -17,6 +17,12 @@
 - 触发规则：开发、修改或查询习惯系统相关功能时阅读
 - 内容摘要：习惯系统规格文档，定义基于习惯堆叠心理学的习惯养成系统，包含锚点机制、等级制挑战系统（0-4级）、打卡与补签（滚动7天窗口）、Streak连续天数计算（daily逐天判定/非daily按周结算）、状态流转、统计规则、链条Timeline时间计算等核心功能的业务规则和技术契约
 
+## monitor-screenshot
+- updated_at: 2026-04-02
+- path: `docs/specs/2026-04-02-monitor-screenshot-spec.md`
+- 触发规则：开发、修改或查询 monitor 模块截图功能时阅读（scheduled/active/enter 三类截图、AFK 与 engaged 状态机、engaged_segment_id、截图清理）
+- 内容摘要：monitor 截图功能规格，定义三类截图触发逻辑（固定间隔、engaged 持续时长、Enter 独立直拍）、AFK 与 engaged 分层状态机、主动截图频率等级（L1/L2/L3）、截图元数据表 screen_captures、文件按天分目录与过期清理策略
+
 ## mind-space-diary
 - updated_at: 2026-04-15
 - path: `docs/specs/2026-04-15-mind-space-diary.md`

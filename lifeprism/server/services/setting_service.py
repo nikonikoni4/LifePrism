@@ -199,17 +199,20 @@ def validate_data_path(path: str, path_type: str) -> ValidatePathResponse:
     return ValidatePathResponse(valid=False, message=f"未知的路径类型: {path_type}")
 
 
-# 迁移时需要复制的子目录列表（不含 config，配置文件固定在默认路径）
-_DATA_SUBDIRS = [
-    "dataset",
-    "plan",
-    "debug_logs",
-    "workflow",
-    "external_files",
-    "screenshots",
-    "docs",
-    "diary",
+# 迁移时排除的子目录黑名单（配置文件固定在默认路径，不参与迁移）
+_EXCLUDED_SUBDIRS = [
+    "config",
 ]
+
+
+def _get_subdirs_to_migrate(current_path: Path) -> list[str]:
+    """获取需要迁移的子目录列表（黑名单过滤）"""
+    if not current_path.exists():
+        return []
+    return [
+        d.name for d in current_path.iterdir()
+        if d.is_dir() and d.name not in _EXCLUDED_SUBDIRS
+    ]
 
 
 def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> MigrateDataPathResponse:
@@ -217,7 +220,7 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
     迁移数据到新路径，或仅切换路径不迁移数据
 
     配置文件（config/）固定在默认路径，不参与迁移。
-    只迁移数据目录：dataset/、plan/、debug_logs/、workflow/、external_files/
+    除 config/ 外的数据子目录都会被迁移。
 
     流程: 开发模式检查 → 计算新路径 → 验证 → [关闭DB连接 → 复制数据] → 更新配置
 
@@ -292,7 +295,7 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
         # 5. 复制数据
         try:
             new_path.mkdir(parents=True, exist_ok=True)
-            for subdir in _DATA_SUBDIRS:
+            for subdir in _get_subdirs_to_migrate(current_path):
                 src = current_path / subdir
                 dst = new_path / subdir
                 if src.exists() and src.is_dir():
@@ -311,7 +314,7 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
         # 仅切换路径：创建目录结构，不复制数据
         try:
             new_path.mkdir(parents=True, exist_ok=True)
-            for subdir in _DATA_SUBDIRS:
+            for subdir in _get_subdirs_to_migrate(current_path):
                 (new_path / subdir).mkdir(parents=True, exist_ok=True)
             logger.info(f"仅切换路径，已创建空目录结构: {new_path}")
         except Exception as e:
@@ -337,3 +340,56 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
         message="数据迁移成功，请重启程序",
         new_path=str(new_path)
     )
+
+
+async def test_vlm_capability() -> dict:
+    """
+    测试当前模型的 VLM 能力
+
+    流程:
+    1. 调用 test_connect() 验证 LLM 连接
+    2. 连接失败 → 返回错误
+    3. 连接成功 → 调用 test_vlm() 测试图像理解
+    4. 写入 is_vlm[provider_id/model] = result.success
+
+    Returns:
+        dict: 包含 success, message, is_vlm, model_response
+    """
+    from lifeprism.llm.function.test_connect import test_connect
+    from lifeprism.llm.function.test_vlm import test_vlm
+
+    # 1. 先测试连接
+    connect_result = await test_connect()
+    if not connect_result.get('success', False):
+        return {
+            'success': False,
+            'message': f"连接失败: {connect_result.get('message', '未知错误')}",
+            'is_vlm': False,
+            'model_response': None
+        }
+
+    # 2. 连接成功，测试 VLM
+    vlm_result = await test_vlm()
+
+    # 3. 获取 provider_id 和 model 构建 key
+    provider_name = settings.provider
+    provider_id = provider_manager.get_provider_id(provider_name) if provider_name else ""
+    model = settings.model
+    cache_updated = False
+    if provider_id and model:
+        key = f"{provider_id}/{model}"
+        is_vlm = vlm_result.get('success', False)
+        # 更新 is_vlm 缓存
+        is_vlm_cache = settings.get('is_vlm', {})
+        is_vlm_cache[key] = is_vlm
+        settings.set('is_vlm', is_vlm_cache)
+        logger.info(f"VLM 能力测试完成: {key} = {is_vlm}")
+        cache_updated = True
+
+    return {
+        'success': vlm_result.get('success', False),
+        'message': vlm_result.get('message', '测试完成'),
+        'is_vlm': vlm_result.get('success', False),
+        'model_response': vlm_result.get('model_response'),
+        'cache_updated': cache_updated
+    }

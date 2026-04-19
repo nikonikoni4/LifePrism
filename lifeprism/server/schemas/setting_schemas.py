@@ -47,6 +47,8 @@ class SettingItems(BaseModel):
     enter_screenshot_delay_ms: int = Field(description="Enter 截图延迟 (毫秒)")
     screenshot_retention_days: int = Field(description="截图保留天数")
     cleanup_check_interval_seconds: int = Field(description="截图清理扫描周期 (秒)")
+    screenshot_monitor: bool = Field(default=False, description="截图监控开关")
+    is_vlm: Dict[str, bool] = Field(default={}, description="VLM 能力缓存")
 
 
 class SettingsResponse(BaseModel):
@@ -76,6 +78,7 @@ class UpdateSettingsRequest(BaseModel):
     enter_screenshot_delay_ms: Optional[int] = None
     screenshot_retention_days: Optional[int] = None
     cleanup_check_interval_seconds: Optional[int] = None
+    screenshot_monitor: Optional[bool] = None
 
 
 class UpdateApiKeyRequest(BaseModel):
@@ -127,3 +130,12 @@ class MigrateDataPathResponse(BaseModel):
     success: bool = Field(description="是否迁移成功")
     message: str = Field(description="结果消息")
     new_path: Optional[str] = Field(default=None, description="迁移后的完整数据路径")
+
+
+class TestVlmResponse(BaseModel):
+    """测试 VLM 能力响应"""
+    success: bool = Field(description="测试是否成功")
+    message: str = Field(description="结果消息")
+    is_vlm: bool = Field(description="测试结果，该模型是否具备 VLM 能力")
+    model_response: Optional[str] = Field(default=None, description="模型回复内容")
+    cache_updated: bool = Field(default=False, description="缓存是否已更新")
