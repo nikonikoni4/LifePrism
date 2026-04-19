@@ -18,6 +18,7 @@
 | **架构决策** | `docs/design-decisions/` | 记录对于长期具有重要的作用的修改决定 |
 | **自动生成** | `docs/generated/` | 代码镜像,不手工维护正文,用于快速了解当前实现事实及 CI 结果 |
 | **执行计划** | `docs/plans/` | 执行过程中的任务分解和执行记录,也是历史执行资产 |
+| **重要bug历史记录**  | `docs/history-bugs`      | 存放可复用的bug经验   
 | **临时内容** | `docs/temp/` | 非正式文档，暂时无法归类的内容、草稿、临时记录，默认不读取，只写入 |
 | **superpower文件夹** | `docs/superpowers/` | superpower 插件下skill专用的文件夹，包括`docs/superpower/specs` 和 `docs/superpower/plans` |
 | **文档地图** | `docs/<文件夹>/index.md` | 除temp文件夹以外，其余文件都有index.md导航文件，会存放该文件夹下所有文档的索引 |
@@ -29,6 +30,9 @@
 3. **需要编写文档进入docs时**：必须阅读`docs/docs-rules/index.md`和`docs/docs-rules/docs-write-rules.md`
 4. **编写功能前**：需要阅读`docs/specs/index.md`，查看当前是否已经存在spec，按需加载具体的spec来了解该功能情况
 5. **如果你是minimax模型**：必须阅读`docs/coding-rules/other-model-rules`
+
+6. **修复bug时**: 可以阅读`docs\history-bugs\index.md`来获取历史bug解决方法
+
 </<docs-read-rules>>
 
 ## 新Feature开发流程
