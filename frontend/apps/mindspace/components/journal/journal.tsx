@@ -251,9 +251,13 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   }, [handleManualSave]);
 
   // ========== AI 总结 ==========
-  const handleRangeSummarySubmit = useCallback(async (payload: { start_date: string; end_date: string; mode: ExistingSummaryMode }) => {
+  const handleRangeSummarySubmit = useCallback(async (payload: { start_date: string; end_date: string; existing_summary_mode: ExistingSummaryMode }) => {
     try {
-      const response = await DiaryAPI.generateAiSummaryRange(payload);
+      const response = await DiaryAPI.generateAiSummaryRange({
+        start_date: payload.start_date,
+        end_date: payload.end_date,
+        existing_summary_mode: payload.existing_summary_mode
+      });
       toast.success(`已生成 ${response.created_dates.length} 条，更新 ${response.updated_dates.length} 条`);
       await loadDiary(activeDate);
     } catch (e) {
