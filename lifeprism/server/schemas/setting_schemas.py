@@ -76,6 +76,7 @@ class UpdateSettingsRequest(BaseModel):
     enter_screenshot_delay_ms: Optional[int] = None
     screenshot_retention_days: Optional[int] = None
     cleanup_check_interval_seconds: Optional[int] = None
+    screenshot_monitor: Optional[bool] = None
 
 
 class UpdateApiKeyRequest(BaseModel):
@@ -127,3 +128,11 @@ class MigrateDataPathResponse(BaseModel):
     success: bool = Field(description="是否迁移成功")
     message: str = Field(description="结果消息")
     new_path: Optional[str] = Field(default=None, description="迁移后的完整数据路径")
+
+
+class TestVlmResponse(BaseModel):
+    """测试 VLM 能力响应"""
+    success: bool = Field(description="测试是否成功")
+    message: str = Field(description="结果消息")
+    is_vlm: bool = Field(description="测试结果，该模型是否具备 VLM 能力")
+    model_response: Optional[str] = Field(default=None, description="模型回复内容")
