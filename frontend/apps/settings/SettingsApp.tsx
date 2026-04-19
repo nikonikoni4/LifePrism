@@ -74,7 +74,12 @@ const SettingsApp: React.FC = () => {
     // 5. Data Processing
     const [filterDuration, setFilterDuration] = useState(10);
 
-    // 6. Modal States
+    // 6. Screenshot Monitor
+    const [screenshotMonitor, setScreenshotMonitor] = useState(false);
+    const [isVlmTesting, setIsVlmTesting] = useState(false);
+    const [currentModelVlmStatus, setCurrentModelVlmStatus] = useState<boolean | null>(null);
+
+    // 7. Modal States
     const [showVolcEngineModal, setShowVolcEngineModal] = useState(false);
 
     // Refs
@@ -156,6 +161,13 @@ const SettingsApp: React.FC = () => {
                 setLifeprismDataPath(settings.lifeprism_data_path);
                 setConfigBasePath(settings.config_base_path || '');
                 setFilterDuration(settings.data_cleaning_threshold);
+                setScreenshotMonitor(settings.screenshot_monitor || false);
+                // 获取当前模型的 VLM 状态
+                const providerId = providerIdMap[provider] || '';
+                if (providerId && modelName) {
+                    const isVlm = settings.is_vlm?.[`${providerId}/${modelName}`];
+                    setCurrentModelVlmStatus(isVlm ?? null);
+                }
                 setIsElectron(!!window.electronAPI);
                 setProviderDefaults(
                     Object.fromEntries(providers.map((item) => [item.name, item]))
@@ -205,6 +217,27 @@ const SettingsApp: React.FC = () => {
         } catch (err) {
             setApiStatus('error');
             toast.error(err instanceof Error ? err.message : '连接测试失败，请检查配置');
+        }
+    };
+
+    const handleTestVlm = async () => {
+        setIsVlmTesting(true);
+        try {
+            const result = await SettingsAPI.testVlm();
+            if (result.success) {
+                toast.success(`图像理解能力测试成功: ${result.model_response || ''}`);
+            } else {
+                toast.error(result.message || 'VLM 测试失败');
+            }
+            // 更新本地 VLM 状态
+            setCurrentModelVlmStatus(result.is_vlm);
+            // 同步更新 screenshot_monitor 状态（如果后端已更新）
+            const updatedSettings = await SettingsAPI.getSettings();
+            setScreenshotMonitor(updatedSettings.screenshot_monitor || false);
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'VLM 测试失败');
+        } finally {
+            setIsVlmTesting(false);
         }
     };
 
@@ -322,6 +355,27 @@ const SettingsApp: React.FC = () => {
         setModelName(model);
         setShowModelDropdown(false);
         triggerAutoSave({ model: model });
+        // 如果 screenshot_monitor 已开启，自动测试新模型的 VLM 能力
+        if (screenshotMonitor) {
+            const newModel = model;
+            setIsVlmTesting(true);
+            try {
+                const result = await SettingsAPI.testVlm();
+                if (!result.success) {
+                    setScreenshotMonitor(false);
+                    triggerAutoSave({ screenshot_monitor: false });
+                    toast.warning(`截图监控已自动关闭: ${result.message}`);
+                } else {
+                    setCurrentModelVlmStatus(true);
+                }
+            } catch (err) {
+                setScreenshotMonitor(false);
+                triggerAutoSave({ screenshot_monitor: false });
+                toast.warning(`截图监控已自动关闭`);
+            } finally {
+                setIsVlmTesting(false);
+            }
+        }
     };
 
     const handleApiKeyBlur = async () => {
@@ -528,6 +582,28 @@ const SettingsApp: React.FC = () => {
                                     <Zap size={14} />
                                 )}
                                 {apiStatus === 'testing' ? '测试中...' : apiStatus === 'success' ? '已连接' : '测试连接'}
+                            </button>
+                            {/* VLM 测试按钮 */}
+                            <button
+                                onClick={handleTestVlm}
+                                disabled={isVlmTesting || !modelName}
+                                className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${
+                                    currentModelVlmStatus === true
+                                        ? 'bg-green-50 text-green-700 border-green-200'
+                                        : isVlmTesting
+                                        ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                }`}
+                                title={currentModelVlmStatus === true ? '该模型具备图像理解能力，点击可重新验证' : '测试该模型的图像理解能力'}
+                            >
+                                {isVlmTesting ? (
+                                    <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                ) : currentModelVlmStatus === true ? (
+                                    <Check size={14} />
+                                ) : (
+                                    <Cpu size={14} />
+                                )}
+                                {isVlmTesting ? '验证中...' : currentModelVlmStatus === true ? '具备图片理解能力' : '测试图片理解能力'}
                             </button>
                             {apiStatus === 'error' && (
                                 <span className="text-xs text-red-500 font-medium flex items-center gap-1">
@@ -829,6 +905,94 @@ const SettingsApp: React.FC = () => {
                         </button>
 
                         <span className="text-xs font-bold text-slate-400 uppercase ml-1">秒</span>
+                    </div>
+                </div>
+            </section>
+
+            {/* 6. Screenshot Monitor */}
+            <section className="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2.5 bg-red-50 rounded-xl text-red-500">
+                        <Eye size={20} />
+                    </div>
+                    <h2 className="text-lg font-bold text-slate-800">截图监控</h2>
+                </div>
+
+                <div className="space-y-6">
+                    {/* 开关 */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-700">开启截图监控</h4>
+                            <p className="text-xs text-slate-400 mt-1">启用后将对屏幕进行周期性截图分析</p>
+                        </div>
+                        <button
+                            onClick={async () => {
+                                if (!screenshotMonitor) {
+                                    // 尝试开启
+                                    try {
+                                        setIsVlmTesting(true);
+                                        const result = await SettingsAPI.testVlm();
+                                        if (result.success) {
+                                            setScreenshotMonitor(true);
+                                            triggerAutoSave({ screenshot_monitor: true });
+                                            setCurrentModelVlmStatus(true);
+                                            toast.success('截图监控已开启');
+                                        } else {
+                                            toast.error(`无法开启截图监控: ${result.message}`);
+                                        }
+                                    } catch (err) {
+                                        toast.error(err instanceof Error ? err.message : '开启失败');
+                                    } finally {
+                                        setIsVlmTesting(false);
+                                    }
+                                } else {
+                                    // 关闭
+                                    setScreenshotMonitor(false);
+                                    triggerAutoSave({ screenshot_monitor: false });
+                                }
+                            }}
+                            disabled={isVlmTesting || !modelName}
+                            className={`relative w-14 h-8 rounded-full transition-all ${
+                                screenshotMonitor ? 'bg-green-500' : 'bg-slate-200'
+                            } ${isVlmTesting || !modelName ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        >
+                            <div
+                                className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-sm transition-all ${
+                                    screenshotMonitor ? 'left-7' : 'left-1'
+                                }`}
+                            />
+                            {isVlmTesting && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* 当前模型状态 */}
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs text-slate-400">当前模型</p>
+                                <p className="text-sm font-bold text-slate-700 mt-1">{modelName || '未选择'}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs text-slate-400">图片理解能力</p>
+                                <p className={`text-sm font-bold mt-1 ${
+                                    currentModelVlmStatus === true ? 'text-green-600' :
+                                    currentModelVlmStatus === false ? 'text-red-500' : 'text-slate-400'
+                                }`}>
+                                    {currentModelVlmStatus === true ? '✓ 具备' :
+                                     currentModelVlmStatus === false ? '✗ 不具备' : '未知'}
+                                </p>
+                            </div>
+                        </div>
+                        {isVlmTesting && (
+                            <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                                <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                验证中...
+                            </p>
+                        )}
                     </div>
                 </div>
             </section>
