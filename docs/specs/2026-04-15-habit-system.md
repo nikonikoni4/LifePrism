@@ -1,15 +1,15 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-04-15
-updated_at: 2026-04-15
-last_updated: 从旧PRD迁移并核对代码实现，创建习惯系统正式spec
-abstract: 习惯系统规格文档，定义基于习惯堆叠心理学的习惯养成系统，包含锚点机制、等级制挑战系统、打卡与补签、状态流转等核心功能的业务规则和技术契约
+updated_at: 2026-04-19
+last_updated: 新增习惯链条Timeline节点时间计算规则
+abstract: 习惯系统规格文档，定义基于习惯堆叠心理学的习惯养成系统，包含锚点机制、等级制挑战系统、打卡与补签、状态流转、链条Timeline时间计算等核心功能的业务规则和技术契约
 id: habit-system-v1
 title: 习惯系统
 status: draft
 module: habit
 sourc_spec: D:\desktop\软件开发\liferpism多余文档\docs_old\prd\功能需求\习惯系统
-related_plan: null
+related_plan: docs/superpowers/plans/2026-04-19-habit-chain-timeline-trigger-time.md
 code_scope:
   - lifeprism/server/api/habit_api.py
   - lifeprism/server/services/habit_service.py
@@ -30,6 +30,7 @@ contract_refs:
 | 版本 | 更新内容 |
 | ---- | -------- |
 | 1.0 | 创建spec初稿，从旧PRD迁移并核对代码实现 |
+| 1.1 | 新增习惯链条Timeline节点时间计算规则 |
 
 ## Overview
 
@@ -211,6 +212,38 @@ Streak判定策略：
 - 无前置条件：无论active还是paused，均可直接删除
 - 级联顺序：habit_checkins → habit_challenges → habits
 - 习惯链条处理：将habit_chain_nodes.habit_id置为NULL，节点降级为纯锚点
+
+### 9. 习惯链条 Timeline 节点时间计算
+
+#### 9.1 计算原则
+
+Timeline 节点时间采用**后端计算、前端显示**的分离架构：
+
+- **显式时间**：用户为节点设置的 `trigger_time`，持久化存储
+- **计算时间**：后端根据显式时间和计算规则推导的 `calculated_time`，仅作为 API 返回值，不存储
+
+#### 9.2 计算规则
+
+后端根据节点链条中显式设置的 `trigger_time` 计算所有节点的 `calculated_time`：
+
+**规则A（无显式锚点）**：链条中没有任何节点设置显式时间时，所有节点按默认间隔递推计算。
+
+**规则B（有显式锚点）**：
+- 第一个锚点之前的节点：从该锚点向前递推
+- 相邻锚点之间的节点：在两个锚点之间平均分配时间间隔
+- 最后一个锚点之后的节点：从该锚点向后递推
+
+**时间类型区分**：
+- 有显式时间的节点：`calculated_time` = `trigger_time`
+- 无显式时间的节点：`calculated_time` 根据规则计算得出
+
+#### 9.3 验证规则
+
+前端设置显式时间时，后端需验证时间间隔是否符合最小间距要求。不符合时返回验证错误，阻止保存。
+
+#### 9.4 显示原则
+
+前端 Timeline 组件使用 `calculated_time` 显示节点时间。若节点无 `calculated_time`（兼容旧数据），则 fallback 到 `trigger_time`。
 
 ## Technical Contract
 
@@ -435,6 +468,36 @@ if (weekStart < challenge.startDate && 未断链):
 }
 ```
 
+**ChainNodeObject**：
+```typescript
+{
+  id: number
+  chainId: number
+  sortOrder: number
+  name: string
+  habitId: string | null
+  habitName: string | null
+  triggerTime: string | null   // 用户显式设置的触发时间（HH:mm格式）
+  calculatedTime: string | null  // 后端计算的时间（HH:mm格式），用于Timeline显示
+  createdAt: string
+  updatedAt: string
+}
+```
+
+**TimelineNodeItem**：
+```typescript
+{
+  id: number
+  name: string
+  habitId: string | null
+  habitName: string | null
+  triggerTime: string | null   // 用户显式设置的触发时间
+  calculatedTime: string | null  // 后端计算的触发时间（用于Timeline显示）
+  sortOrder: number
+  todayCheckedIn: boolean
+}
+```
+
 ### 5. 业务约束
 
 1. 挑战状态只能从in_progress转换到其他状态，不可逆
@@ -444,6 +507,8 @@ if (weekStart < challenge.startDate && 未断链):
 5. 频率外的日期也可打卡，计入completedCount
 6. 挑战成功必须等到endDate到达，失败可提前判定
 7. 删除习惯时，链条节点的habit_id置为NULL而非删除节点
+8. calculated_time 字段仅作为 API 返回值，不持久化到数据库
+9. 链条节点时间验证：相邻节点的显式设置时间必须满足最小间距要求
 
 ## Interaction / UX Notes
 
