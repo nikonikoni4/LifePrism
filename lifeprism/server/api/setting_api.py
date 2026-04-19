@@ -17,6 +17,7 @@ from lifeprism.server.schemas.setting_schemas import (
     ValidatePathResponse,
     MigrateDataPathRequest,
     MigrateDataPathResponse,
+    TestVlmResponse,
 )
 from lifeprism.server.services import setting_service
 from lifeprism.config.provider_manager import provider_manager
@@ -100,6 +101,27 @@ async def test_llm_connection():
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"连接测试失败: {str(e)}")
+
+
+@router.post("/test-vlm", response_model=TestVlmResponse, summary="测试 VLM 图像理解能力")
+async def test_vlm_capability():
+    """
+    测试当前模型的图片理解能力
+
+    流程:
+    1. 先调用 test_connect() 验证 LLM 连接
+    2. 连接失败 → 返回错误
+    3. 连接成功 → 调用 test_vlm() 测试图像理解
+    4. 根据测试结果更新 is_vlm 缓存
+
+    Returns:
+        TestVlmResponse: 测试结果
+    """
+    try:
+        result = await setting_service.test_vlm_capability()
+        return TestVlmResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"VLM 测试失败: {str(e)}")
 
 
 @router.get("/providers", response_model=ProviderListResponse, summary="获取所有支持的服务商列表")
