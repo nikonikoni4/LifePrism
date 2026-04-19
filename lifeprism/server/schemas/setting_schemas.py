@@ -136,3 +136,4 @@ class TestVlmResponse(BaseModel):
     message: str = Field(description="结果消息")
     is_vlm: bool = Field(description="测试结果，该模型是否具备 VLM 能力")
     model_response: Optional[str] = Field(default=None, description="模型回复内容")
+    cache_updated: bool = Field(default=False, description="缓存是否已更新")
