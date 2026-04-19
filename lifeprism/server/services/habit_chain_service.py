@@ -41,6 +41,10 @@ class HabitChainService:
     _MSG_INVALID_TIME = "节点触发时间格式非法"
     _MSG_INVALID_ORDER = "节点触发时间顺序不合理：后续节点时间不能早于前序节点"
 
+    # 时间计算常量
+    _DEFAULT_INTERVAL_MINUTES = 30  # 默认时长（分钟）
+    _MIN_GAP_MINUTES = 10  # 相邻节点最小间距（分钟）
+
     # --- Chain CRUD ---
 
     def get_chains(self, show_in_timeline: Optional[bool]) -> ChainListResponse:
@@ -54,7 +58,8 @@ class HabitChainService:
     def get_chain_detail(self, chain_id: int) -> ChainDetailResponse:
         chain = self._get_chain_or_404(chain_id)
         nodes = habit_chain_provider.get_nodes_with_habit_names(chain_id)
-        return ChainDetailResponse(**self._build_chain_item(chain, nodes).model_dump())
+        nodes_with_calculated = self._calculate_node_times(nodes)
+        return ChainDetailResponse(**self._build_chain_item(chain, nodes_with_calculated).model_dump())
 
     def create_chain(self, req: CreateChainRequest) -> ChainDetailResponse:
         data = req.model_dump(exclude_unset=True)
@@ -189,6 +194,8 @@ class HabitChainService:
         chain_items = []
         for chain in chains:
             nodes = habit_chain_provider.get_nodes_with_habit_names(chain["id"])
+            # 计算每个节点的 trigger_time（不存库）
+            nodes_with_calculated = self._calculate_node_times(nodes)
             habit_ids = [n["habit_id"] for n in nodes if n.get("habit_id")]
             today_map = habit_checkin_provider.get_today_checkins(habit_ids) if habit_ids else {}
             node_items = [
@@ -197,11 +204,11 @@ class HabitChainService:
                     name=n["name"],
                     habit_id=n.get("habit_id"),
                     habit_name=n.get("habit_name"),
-                    trigger_time=n.get("trigger_time"),
+                    trigger_time=n.get("trigger_time"),  # 已填充计算结果
                     sort_order=n["sort_order"],
                     today_checked_in=today_map.get(n.get("habit_id"), False),
                 )
-                for n in sorted(nodes, key=lambda x: x["sort_order"])
+                for n in sorted(nodes_with_calculated, key=lambda x: x["sort_order"])
             ]
             chain_items.append(TimelineChainItem(id=chain["id"], name=chain["name"], nodes=node_items))
         return TimelineResponse(chains=chain_items)
@@ -231,6 +238,81 @@ class HabitChainService:
         except ValueError as exc:
             raise ValidationError(f"{self._MSG_INVALID_TIME}: {time_value}", code=error_code) from exc
 
+    def _calculate_node_times(self, nodes: List[dict]) -> List[dict]:
+        """
+        计算每个节点的 trigger_time（不存库，仅返回计算结果）
+
+        规则：
+        - 显式设置的 trigger_time 保持不变
+        - 隐式节点（无 trigger_time）根据规则计算：
+          a. 若后续有显式节点，按平均间距分配
+          b. 若后续无显式节点，按默认30min递推
+
+        返回的节点中，trigger_time 字段已填充计算结果
+        """
+        if not nodes:
+            return nodes
+
+        sorted_nodes = sorted(nodes, key=lambda n: n["sort_order"])
+
+        # 找出所有锚点（显式设置了 trigger_time 的节点）
+        anchors = []
+        for i, node in enumerate(sorted_nodes):
+            if node.get("trigger_time"):
+                minutes = self._parse_time_to_minutes(node["trigger_time"], "INTERNAL_ERROR")
+                anchors.append({"index": i, "minutes": minutes})
+
+        # 情况A：没有锚点，所有节点按默认30min递推
+        if not anchors:
+            current_minutes = 0  # 从0点开始
+            for node in sorted_nodes:
+                node["trigger_time"] = self._format_minutes_to_time(current_minutes)
+                current_minutes += self._DEFAULT_INTERVAL_MINUTES
+            return sorted_nodes
+
+        # 情况B：有锚点，处理第一段（第一个锚点之前的节点）
+        first_anchor = anchors[0]
+        if first_anchor["index"] > 0:
+            current_minutes = first_anchor["minutes"] - (first_anchor["index"] * self._DEFAULT_INTERVAL_MINUTES)
+            for i in range(first_anchor["index"]):
+                sorted_nodes[i]["trigger_time"] = self._format_minutes_to_time(current_minutes)
+                current_minutes += self._DEFAULT_INTERVAL_MINUTES
+
+        # 处理锚点之间的节点
+        for a in range(len(anchors) - 1):
+            curr_anchor = anchors[a]
+            next_anchor = anchors[a + 1]
+            nodes_between = next_anchor["index"] - curr_anchor["index"] - 1
+
+            if nodes_between == 0:
+                # 连续锚点，中间无节点
+                pass
+            else:
+                # 有中间节点，平均分配
+                total_minutes = next_anchor["minutes"] - curr_anchor["minutes"]
+                interval = total_minutes / (nodes_between + 1)
+                for i in range(nodes_between):
+                    idx = curr_anchor["index"] + 1 + i
+                    sorted_nodes[idx]["trigger_time"] = self._format_minutes_to_time(
+                        curr_anchor["minutes"] + int(interval * (i + 1))
+                    )
+
+        # 处理最后一个锚点之后的节点
+        last_anchor = anchors[-1]
+        if last_anchor["index"] < len(sorted_nodes) - 1:
+            current_minutes = last_anchor["minutes"] + self._DEFAULT_INTERVAL_MINUTES
+            for i in range(last_anchor["index"] + 1, len(sorted_nodes)):
+                sorted_nodes[i]["trigger_time"] = self._format_minutes_to_time(current_minutes)
+                current_minutes += self._DEFAULT_INTERVAL_MINUTES
+
+        return sorted_nodes
+
+    def _format_minutes_to_time(self, minutes: int) -> str:
+        """将分钟数转换为 HH:mm 格式"""
+        hours = minutes // 60
+        mins = minutes % 60
+        return f"{hours:02d}:{mins:02d}"
+
     def _validate_chain_timeline_rules(
         self, nodes: List[dict], is_showing_in_timeline: bool, error_code: str,
     ) -> None:
@@ -252,6 +334,15 @@ class HabitChainService:
                 continue
             if current_minutes < last_minutes:
                 raise ValidationError(self._MSG_INVALID_ORDER, code=error_code)
+            # 新增：检查相邻节点最小间距
+            gap = current_minutes - last_minutes
+            if gap < self._MIN_GAP_MINUTES:
+                prev_time = self._format_minutes_to_time(last_minutes)
+                curr_time = self._format_minutes_to_time(current_minutes)
+                raise ValidationError(
+                    f"节点触发时间间距不足：{prev_time} → {curr_time} 间距{gap}min，要求>={self._MIN_GAP_MINUTES}min",
+                    code=error_code
+                )
             last_minutes = current_minutes
 
     def _get_chain_or_404(self, chain_id: int) -> dict:
