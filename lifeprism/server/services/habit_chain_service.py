@@ -194,7 +194,7 @@ class HabitChainService:
         chain_items = []
         for chain in chains:
             nodes = habit_chain_provider.get_nodes_with_habit_names(chain["id"])
-            # 计算每个节点的 trigger_time（不存库）
+            # 计算每个节点的 calculated_time（不存库）
             nodes_with_calculated = self._calculate_node_times(nodes)
             habit_ids = [n["habit_id"] for n in nodes if n.get("habit_id")]
             today_map = habit_checkin_provider.get_today_checkins(habit_ids) if habit_ids else {}
@@ -204,7 +204,8 @@ class HabitChainService:
                     name=n["name"],
                     habit_id=n.get("habit_id"),
                     habit_name=n.get("habit_name"),
-                    trigger_time=n.get("trigger_time"),  # 已填充计算结果
+                    trigger_time=n.get("trigger_time"),           # 原始值
+                    calculated_time=n.get("calculated_time"),     # 计算值
                     sort_order=n["sort_order"],
                     today_checked_in=today_map.get(n.get("habit_id"), False),
                 )
@@ -240,7 +241,7 @@ class HabitChainService:
 
     def _calculate_node_times(self, nodes: List[dict]) -> List[dict]:
         """
-        计算每个节点的 trigger_time（不存库，仅返回计算结果）
+        计算每个节点的 calculated_time（不存库，仅返回计算结果）
 
         规则：
         - 显式设置的 trigger_time 保持不变
@@ -248,7 +249,7 @@ class HabitChainService:
           a. 若后续有显式节点，按平均间距分配
           b. 若后续无显式节点，按默认30min递推
 
-        返回的节点中，trigger_time 字段已填充计算结果
+        返回的节点中，calculated_time 字段已填充计算结果
         """
         if not nodes:
             return nodes
@@ -260,13 +261,13 @@ class HabitChainService:
         for i, node in enumerate(sorted_nodes):
             if node.get("trigger_time"):
                 minutes = self._parse_time_to_minutes(node["trigger_time"], "INTERNAL_ERROR")
-                anchors.append({"index": i, "minutes": minutes})
+                anchors.append({"index": i, "minutes": minutes, "original_time": node["trigger_time"]})
 
         # 情况A：没有锚点，所有节点按默认30min递推
         if not anchors:
             current_minutes = 0  # 从0点开始
             for node in sorted_nodes:
-                node["trigger_time"] = self._format_minutes_to_time(current_minutes)
+                node["calculated_time"] = self._format_minutes_to_time(current_minutes)
                 current_minutes += self._DEFAULT_INTERVAL_MINUTES
             return sorted_nodes
 
@@ -275,8 +276,12 @@ class HabitChainService:
         if first_anchor["index"] > 0:
             current_minutes = first_anchor["minutes"] - (first_anchor["index"] * self._DEFAULT_INTERVAL_MINUTES)
             for i in range(first_anchor["index"]):
-                sorted_nodes[i]["trigger_time"] = self._format_minutes_to_time(current_minutes)
+                sorted_nodes[i]["calculated_time"] = self._format_minutes_to_time(current_minutes)
                 current_minutes += self._DEFAULT_INTERVAL_MINUTES
+
+        # 锚点本身的 calculated_time 等于 trigger_time
+        for anchor in anchors:
+            sorted_nodes[anchor["index"]]["calculated_time"] = anchor["original_time"]
 
         # 处理锚点之间的节点
         for a in range(len(anchors) - 1):
@@ -293,7 +298,7 @@ class HabitChainService:
                 interval = total_minutes / (nodes_between + 1)
                 for i in range(nodes_between):
                     idx = curr_anchor["index"] + 1 + i
-                    sorted_nodes[idx]["trigger_time"] = self._format_minutes_to_time(
+                    sorted_nodes[idx]["calculated_time"] = self._format_minutes_to_time(
                         curr_anchor["minutes"] + int(interval * (i + 1))
                     )
 
@@ -302,7 +307,7 @@ class HabitChainService:
         if last_anchor["index"] < len(sorted_nodes) - 1:
             current_minutes = last_anchor["minutes"] + self._DEFAULT_INTERVAL_MINUTES
             for i in range(last_anchor["index"] + 1, len(sorted_nodes)):
-                sorted_nodes[i]["trigger_time"] = self._format_minutes_to_time(current_minutes)
+                sorted_nodes[i]["calculated_time"] = self._format_minutes_to_time(current_minutes)
                 current_minutes += self._DEFAULT_INTERVAL_MINUTES
 
         return sorted_nodes
@@ -365,6 +370,7 @@ class HabitChainService:
                 habit_id=n.get("habit_id"),
                 habit_name=n.get("habit_name"),
                 trigger_time=n.get("trigger_time"),
+                calculated_time=n.get("calculated_time"),
                 sort_order=n["sort_order"],
             )
             for n in sorted(nodes, key=lambda x: x["sort_order"])

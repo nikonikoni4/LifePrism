@@ -47,15 +47,15 @@ export const TimelineProvider: React.FC<{ children: ReactNode }> = ({ children }
             const nodes = [...chain.nodes].sort((a, b) => a.sortOrder - b.sortOrder);
             if (nodes.length === 0) return;
 
-            // 直接使用后端计算并返回的 trigger_time
+            // 使用后端计算返回的 calculated_time（若无则用 trigger_time）
             nodes.forEach((node) => {
-                const triggerTime = node.triggerTime || "00:00";
-                const minutes = parseTimeToMinutes(triggerTime);
+                const displayTime = node.calculatedTime || node.triggerTime || "00:00";
+                const minutes = parseTimeToMinutes(displayTime);
 
                 events.push({
                     id: `${chain.id}_${node.id}`,
                     title: node.name,
-                    startTime: triggerTime,
+                    startTime: displayTime,
                     endTime: formatMinutesToTime(minutes + 30),  // 默认30min
                     associatedHabitId: node.habitId,
                     height: MIN_NODE_HEIGHT,

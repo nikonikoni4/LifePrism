@@ -265,6 +265,7 @@ class ChainNodeObject(APIModel):
     habit_id: Optional[str] = None
     habit_name: Optional[str] = None
     trigger_time: Optional[str] = None
+    calculated_time: Optional[str] = None
 
 
 class ChainListItem(APIModel):
@@ -333,6 +334,7 @@ class TimelineNodeItem(APIModel):
     habit_id: Optional[str] = None
     habit_name: Optional[str] = None
     trigger_time: Optional[str] = None
+    calculated_time: Optional[str] = None
     sort_order: int
     today_checked_in: bool = False
 

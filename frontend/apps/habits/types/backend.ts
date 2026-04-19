@@ -100,7 +100,8 @@ export interface ChainNodeObject {
     name: string;
     habitId: string | null;
     habitName: string | null;
-    triggerTime: string | null; // HH:mm
+    triggerTime: string | null; // HH:mm - 用户显式设置的原始值
+    calculatedTime: string | null; // HH:mm - 后端计算的时间
     createdAt: string; // ISO 8601
     updatedAt: string; // ISO 8601
 }

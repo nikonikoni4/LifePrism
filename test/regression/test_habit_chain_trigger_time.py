@@ -2,10 +2,10 @@
 回归测试：习惯链条 Timeline 节点触发时间计算逻辑
 
 验证点（新版）：
-1. 后端 _calculate_node_times 自动计算 trigger_time（填充结果）
+1. 后端 _calculate_node_times 自动计算 calculated_time（填充结果）
 2. _validate_chain_timeline_rules 验证相邻节点间距 >= 10min
 3. 相邻节点间距 < 10min 时抛出 ValidationError
-4. 计算结果通过 trigger_time 字段返回（不存库）
+4. 计算结果通过 calculated_time 字段返回（不存库），trigger_time 保持原始值
 """
 import pytest
 from lifeprism.server.services.habit_chain_service import HabitChainService
@@ -31,8 +31,8 @@ class TestChainTimelineTriggerTimeCalculation:
     def test_calculate_only_first_node_has_time(self):
         """
         场景1：第一个节点8:00，其他节点无显式时间
-        预期：后端计算 trigger_time
-        - 节点1: 08:00 (显式)
+        预期：后端计算 calculated_time
+        - 节点1: 08:00 (显式，calculated_time=trigger_time)
         - 节点2: 08:30 (30min递推)
         - 节点3: 09:00 (30min递推)
         - 节点4: 09:30 (30min递推)
@@ -49,11 +49,11 @@ class TestChainTimelineTriggerTimeCalculation:
 
         result = service._calculate_node_times(nodes)
 
-        assert result[0]["trigger_time"] == "08:00"
-        assert result[1]["trigger_time"] == "08:30"
-        assert result[2]["trigger_time"] == "09:00"
-        assert result[3]["trigger_time"] == "09:30"
-        assert result[4]["trigger_time"] == "10:00"
+        assert result[0]["calculated_time"] == "08:00"
+        assert result[1]["calculated_time"] == "08:30"
+        assert result[2]["calculated_time"] == "09:00"
+        assert result[3]["calculated_time"] == "09:30"
+        assert result[4]["calculated_time"] == "10:00"
 
     # ============================================================================
     # 场景2：第一节点8:00，第四节点9:00，中间节点平均分配
@@ -64,10 +64,10 @@ class TestChainTimelineTriggerTimeCalculation:
         场景2：第1节点8:00，第4节点9:00，中间2个节点平均分配
         - 总时长: 60min, 中间2个节点
         - 每段: 60min / 3 = 20min
-        - 节点1: 08:00 (显式)
+        - 节点1: 08:00 (显式，calculated_time=08:00)
         - 节点2: 08:20 (20min间隔)
         - 节点3: 08:40 (20min间隔)
-        - 节点4: 09:00 (显式)
+        - 节点4: 09:00 (显式，calculated_time=09:00)
         - 节点5: 09:30 (默认30min递推)
         """
         service = HabitChainService()
@@ -81,11 +81,11 @@ class TestChainTimelineTriggerTimeCalculation:
 
         result = service._calculate_node_times(nodes)
 
-        assert result[0]["trigger_time"] == "08:00"
-        assert result[1]["trigger_time"] == "08:20"
-        assert result[2]["trigger_time"] == "08:40"
-        assert result[3]["trigger_time"] == "09:00"
-        assert result[4]["trigger_time"] == "09:30"
+        assert result[0]["calculated_time"] == "08:00"
+        assert result[1]["calculated_time"] == "08:20"
+        assert result[2]["calculated_time"] == "08:40"
+        assert result[3]["calculated_time"] == "09:00"
+        assert result[4]["calculated_time"] == "09:30"
 
     # ============================================================================
     # 验证：相邻节点间距 < 10min 时抛出错误
@@ -135,18 +135,20 @@ class TestChainTimelineTriggerTimeCalculation:
 
     def test_calculated_time_not_persisted(self):
         """
-        验证：_calculate_node_times 计算结果通过 trigger_time 字段返回（不存库）
-        注意：函数会修改传入的节点数据，但计算结果通过返回值提供
+        验证：_calculate_node_times 计算结果通过 calculated_time 字段返回（不存库）
+        注意：原始 trigger_time 保持不变
         """
         service = HabitChainService()
-        nodes = [
+        original_nodes = [
             self._make_node(1, 1, "08:00"),
             self._make_node(2, 2, None),
             self._make_node(3, 3, None),
         ]
 
-        result = service._calculate_node_times(nodes)
+        result = service._calculate_node_times(original_nodes)
 
-        # 计算结果通过返回值提供
-        assert result[1]["trigger_time"] == "08:30"
-        assert result[2]["trigger_time"] == "09:00"
+        # 原始节点 trigger_time 未被修改（仍然是None）
+        assert original_nodes[1]["trigger_time"] is None
+        # 计算结果中 calculated_time 已填充
+        assert result[1]["calculated_time"] == "08:30"
+        assert result[2]["calculated_time"] == "09:00"
