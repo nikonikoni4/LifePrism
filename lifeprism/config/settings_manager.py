@@ -56,6 +56,8 @@ class SettingsManager:
         'enter_screenshot_delay_ms': 700,
         'screenshot_retention_days': 3,
         'cleanup_check_interval_seconds': 86400,
+        'is_vlm': {},  # Dict[str, bool], key = "provider_id/model_name"
+        'screenshot_monitor': False,
     }
     
     def __new__(cls) -> 'SettingsManager':
@@ -703,6 +705,19 @@ class SettingsManager:
             self.set('model_history', history)
             return True
         return False
+
+    def is_visual(self) -> bool:
+        """
+        判断当前配置的模型是否具备 VLM 能力
+
+        Returns:
+            bool: 当前模型是否支持图像理解
+        """
+        provider_id = self._get_provider_id_from_name(self.provider)
+        if not provider_id or not self.model:
+            return False
+        key = f"{provider_id}/{self.model}"
+        return self._config.get('is_vlm', {}).get(key, False)
 
 
 # 全局单例实例
