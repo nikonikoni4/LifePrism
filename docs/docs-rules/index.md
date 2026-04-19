@@ -32,3 +32,11 @@
 - path: `docs/docs-rules/design-decisions-write-rules.md`
 - 触发规则：写入 `docs/design-decisions/` 文档时读取
 - 内容摘要：design-decisions.md 的写入规则和状态变化规则。
+
+
+## formal-bugs-write-rules.md
+
+- updated_at: 2026-04-19
+- path: `docs\docs-rules\formal-bugs-write-rules.md`
+- 触发规则：编写入正式的`docs\history-bugs`才阅读，编写入`docs/temp/bugs`不需要阅读
+- 内容摘要：history-bugs文档的写入规则
