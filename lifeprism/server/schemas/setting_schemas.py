@@ -47,6 +47,8 @@ class SettingItems(BaseModel):
     enter_screenshot_delay_ms: int = Field(description="Enter 截图延迟 (毫秒)")
     screenshot_retention_days: int = Field(description="截图保留天数")
     cleanup_check_interval_seconds: int = Field(description="截图清理扫描周期 (秒)")
+    screenshot_monitor: bool = Field(default=False, description="截图监控开关")
+    is_vlm: Dict[str, bool] = Field(default={}, description="VLM 能力缓存")
 
 
 class SettingsResponse(BaseModel):

@@ -98,6 +98,7 @@ export interface TestVlmResponse {
     message: string;
     is_vlm: boolean;
     model_response: string | null;
+    cache_updated?: boolean;
 }
 
 /** 路径验证请求 */
