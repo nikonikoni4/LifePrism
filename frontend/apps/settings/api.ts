@@ -12,6 +12,7 @@ import {
     UpdateApiKeyResponse,
     ApiKeyStatusResponse,
     TestConnectionResponse,
+    TestVlmResponse,
     ProviderInfo,
     ProviderListResponse,
     ValidatePathRequest,
@@ -95,6 +96,21 @@ export const SettingsAPI = {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `连接测试失败: ${response.statusText}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * 测试 VLM 图像理解能力
+     */
+    async testVlm(): Promise<TestVlmResponse> {
+        const response = await fetch(`${getApiBase()}/settings/test-vlm`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `VLM 测试失败: ${response.statusText}`);
         }
         return response.json();
     },
