@@ -206,6 +206,99 @@ git commit -m "feat(service): 新增 test_vlm_capability 测试 VLM 能力"
 
 ---
 
+## Task 3.5: 后端 is_vlm 校验逻辑（更新 update_settings）
+
+> **说明**: 当 `screenshot_monitor=true` 时，后端检查 is_vlm 配置，决定是否允许开启。
+
+**Files:**
+- Modify: `lifeprism/server/schemas/setting_schemas.py` (SettingsResponse 新增 require_vlm_test 字段)
+- Modify: `lifeprism/server/services/setting_service.py` (update_settings 添加 is_vlm 校验)
+- Modify: `lifeprism/server/api/setting_api.py` (处理 ValueError 异常)
+
+- [ ] **Step 1: SettingsResponse 新增 require_vlm_test 字段**
+
+在 `setting_schemas.py` 的 `SettingsResponse` 类中添加:
+
+```python
+class SettingsResponse(BaseModel):
+    """获取配置响应"""
+    settings: SettingItems
+    message: str = "success"
+    require_vlm_test: bool = Field(default=False, description="是否需要调用 VLM 测试接口")
+```
+
+- [ ] **Step 2: update_settings 添加 is_vlm 校验**
+
+在 `setting_service.py` 的 `update_settings` 函数中，在 `updates.update(updates)` 之前添加:
+
+```python
+# 检查 screenshot_monitor 开启时的 is_vlm 校验
+if updates.get('screenshot_monitor') is True:
+    provider_name = updates.get('provider') or settings.provider
+    provider_id = provider_manager.get_provider_id(provider_name) if provider_name else ""
+    model = updates.get('model') or settings.model
+    if provider_id and model:
+        key = f"{provider_id}/{model}"
+        is_vlm_cache = settings.get('is_vlm', {})
+        vlm_status = is_vlm_cache.get(key)
+        if vlm_status is not True:
+            # is_vlm 不存在或为 false，拒绝开启截图监控
+            raise ValueError(
+                f"当前模型 ({provider_id}/{model}) 不具备图片理解能力，"
+                f"请先调用 POST /settings/test-vlm 进行验证。current_vlm_status={vlm_status}"
+            )
+```
+
+- [ ] **Step 3: setting_api.py 处理 ValueError 异常**
+
+修改 `@router.patch` 路由，捕获 ValueError 并返回 require_vlm_test:
+
+```python
+@router.patch("", response_model=SettingsResponse)
+async def update_settings(request: UpdateSettingsRequest):
+    """
+    更新配置 (部分更新)
+
+    只需要传入需要修改的字段，未传入的字段保持不变。
+
+    **注意**: 此接口不支持更新 API Key，请使用 PUT /settings/api-key
+
+    **截图监控校验**:
+    当 screenshot_monitor=true 时，后端会检查 is_vlm[provider_id/model] 是否为 true。
+    如果不是，返回 require_vlm_test=true，前端需要调用 POST /settings/test-vlm 进行测试。
+    """
+    try:
+        settings_data = setting_service.update_settings(request)
+        return SettingsResponse(settings=settings_data, message="配置已更新")
+    except ValueError as e:
+        # is_vlm 校验失败，需要前端先调用 test-vlm
+        settings_data = setting_service.get_settings()
+        return SettingsResponse(
+            settings=settings_data,
+            message=str(e),
+            require_vlm_test=True
+        )
+```
+
+- [ ] **Step 4: 验证代码语法正确**
+
+```bash
+python -m py_compile lifeprism/server/schemas/setting_schemas.py
+python -m py_compile lifeprism/server/services/setting_service.py
+python -m py_compile lifeprism/server/api/setting_api.py
+```
+
+预期: 无输出
+
+- [ ] **Step 5: 提交**
+
+```bash
+git add lifeprism/server/schemas/setting_schemas.py lifeprism/server/services/setting_service.py lifeprism/server/api/setting_api.py
+git commit -m "feat(backend): 后端添加 is_vlm 校验逻辑"
+```
+
+---
+
 ## Task 4: setting_api.py 新增 POST /settings/test-vlm 接口
 
 **Files:**
@@ -393,6 +486,7 @@ git commit -m "feat(frontend): 新增 testVlm() API 方法"
 const [screenshotMonitor, setScreenshotMonitor] = useState(false);
 const [isVlmTesting, setIsVlmTesting] = useState(false);
 const [currentModelVlmStatus, setCurrentModelVlmStatus] = useState<boolean | null>(null);
+const [isVlmConfig, setIsVlmConfig] = useState<Record<string, boolean>>({}); // 完整 is_vlm 配置
 ```
 
 - [ ] **Step 2: 在加载配置时读取 screenshot_monitor 和 is_vlm**
@@ -402,6 +496,7 @@ const [currentModelVlmStatus, setCurrentModelVlmStatus] = useState<boolean | nul
 ```typescript
 setFilterDuration(settings.data_cleaning_threshold);
 setScreenshotMonitor(settings.screenshot_monitor || false);
+setIsVlmConfig(settings.is_vlm || {}); // 保存完整 is_vlm 配置
 // 获取当前模型的 VLM 状态
 const providerId = providerIdMap[provider] || '';
 if (providerId && modelName) {
@@ -544,17 +639,27 @@ if (screenshotMonitor) {
             <button
                 onClick={async () => {
                     if (!screenshotMonitor) {
-                        // 尝试开启
+                        // 尝试开启：发送 PATCH 请求，由后端校验 is_vlm
                         try {
                             setIsVlmTesting(true);
-                            const result = await SettingsAPI.testVlm();
-                            if (result.success) {
-                                setScreenshotMonitor(true);
-                                triggerAutoSave({ screenshot_monitor: true });
-                                setCurrentModelVlmStatus(true);
-                                toast.success('截图监控已开启');
+                            const response = await immediateSave({ screenshot_monitor: true });
+                            // 检查后端是否要求 VLM 测试
+                            if (response?.require_vlm_test) {
+                                // 需要先测试 VLM
+                                const testResult = await SettingsAPI.testVlm();
+                                if (testResult.success) {
+                                    // VLM 测试成功，再次尝试开启截图监控
+                                    await immediateSave({ screenshot_monitor: true });
+                                    setScreenshotMonitor(true);
+                                    setCurrentModelVlmStatus(true);
+                                    toast.success('截图监控已开启');
+                                } else {
+                                    toast.error(`无法开启截图监控: ${testResult.message}`);
+                                }
                             } else {
-                                toast.error(`无法开启截图监控: ${result.message}`);
+                                // 直接开启成功
+                                setScreenshotMonitor(true);
+                                toast.success('截图监控已开启');
                             }
                         } catch (err) {
                             toast.error(err instanceof Error ? err.message : '开启失败');

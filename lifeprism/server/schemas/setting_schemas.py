@@ -55,6 +55,7 @@ class SettingsResponse(BaseModel):
     """获取配置响应"""
     settings: SettingItems
     message: str = "success"
+    require_vlm_test: bool = Field(default=False, description="是否需要调用 VLM 测试接口")
 
 
 class UpdateSettingsRequest(BaseModel):

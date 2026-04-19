@@ -23,7 +23,7 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { SettingsAPI } from './api';
-import type { ProviderInfo, ProviderModelHistory } from './types';
+import type { ProviderInfo, ProviderModelHistory, SettingsResponse } from './types';
 import { toast } from '../../core/components';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -78,6 +78,7 @@ const SettingsApp: React.FC = () => {
     const [screenshotMonitor, setScreenshotMonitor] = useState(false);
     const [isVlmTesting, setIsVlmTesting] = useState(false);
     const [currentModelVlmStatus, setCurrentModelVlmStatus] = useState<boolean | null>(null);
+    const [isVlmConfig, setIsVlmConfig] = useState<Record<string, boolean>>({}); // 完整 is_vlm 配置
 
     // 7. Modal States
     const [showVolcEngineModal, setShowVolcEngineModal] = useState(false);
@@ -122,6 +123,17 @@ const SettingsApp: React.FC = () => {
         }, 800);
     }, []);
 
+    // 立即保存函数，返回后端响应（用于需要检查 require_vlm_test 等场景）
+    const immediateSave = useCallback(async (settingsToSave: Record<string, unknown>): Promise<SettingsResponse | null> => {
+        try {
+            const response = await SettingsAPI.updateSettings(settingsToSave);
+            return response;
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : '保存失败');
+            return null;
+        }
+    }, []);
+
     // 清理定时器
     useEffect(() => {
         return () => {
@@ -162,6 +174,7 @@ const SettingsApp: React.FC = () => {
                 setConfigBasePath(settings.config_base_path || '');
                 setFilterDuration(settings.data_cleaning_threshold);
                 setScreenshotMonitor(settings.screenshot_monitor || false);
+                setIsVlmConfig(settings.is_vlm || {}); // 保存完整 is_vlm 配置
                 // 获取当前模型的 VLM 状态
                 const providerId = providerIdMap[provider] || '';
                 if (providerId && modelName) {
@@ -323,11 +336,34 @@ const SettingsApp: React.FC = () => {
         setProvider(newProvider);
         setModelName(nextModel);
         setApiBase(nextApiBase);
+        setCurrentModelVlmStatus(null); // 重置 VLM 状态，切换模型后需要重新验证
         triggerAutoSave({
             provider: newProvider,
             model: nextModel,
             api_base: nextApiBase,
         });
+        // 如果 screenshot_monitor 已开启，自动测试新模型的 VLM 能力
+        if (screenshotMonitor) {
+            setIsVlmTesting(true);
+            SettingsAPI.testVlm()
+                .then((result) => {
+                    if (!result.success) {
+                        setScreenshotMonitor(false);
+                        triggerAutoSave({ screenshot_monitor: false });
+                        toast.warning(`截图监控已自动关闭: ${result.message}`);
+                    } else {
+                        setCurrentModelVlmStatus(true);
+                    }
+                })
+                .catch(() => {
+                    setScreenshotMonitor(false);
+                    triggerAutoSave({ screenshot_monitor: false });
+                    toast.warning(`截图监控已自动关闭`);
+                })
+                .finally(() => {
+                    setIsVlmTesting(false);
+                });
+        }
         // TODO: 暂时禁用火山引擎说明弹窗
         // if (newProvider.includes('火山引擎') || newProvider.toLowerCase().includes('volcengine')) {
         //     setShowVolcEngineModal(true);
@@ -364,6 +400,7 @@ const SettingsApp: React.FC = () => {
     const handleSelectModel = async (model: string) => {
         setModelName(model);
         setShowModelDropdown(false);
+        setCurrentModelVlmStatus(null); // 重置 VLM 状态，切换模型后需要重新验证
         triggerAutoSave({ model: model });
         // 如果 screenshot_monitor 已开启，自动测试新模型的 VLM 能力
         if (screenshotMonitor) {
@@ -937,17 +974,27 @@ const SettingsApp: React.FC = () => {
                         <button
                             onClick={async () => {
                                 if (!screenshotMonitor) {
-                                    // 尝试开启
+                                    // 尝试开启：发送 PATCH 请求，由后端校验 is_vlm
                                     try {
                                         setIsVlmTesting(true);
-                                        const result = await SettingsAPI.testVlm();
-                                        if (result.success) {
-                                            setScreenshotMonitor(true);
-                                            triggerAutoSave({ screenshot_monitor: true });
-                                            setCurrentModelVlmStatus(true);
-                                            toast.success('截图监控已开启');
+                                        const response = await immediateSave({ screenshot_monitor: true });
+                                        // 检查后端是否要求 VLM 测试
+                                        if (response?.require_vlm_test) {
+                                            // 需要先测试 VLM
+                                            const testResult = await SettingsAPI.testVlm();
+                                            if (testResult.success) {
+                                                // VLM 测试成功，再次尝试开启截图监控
+                                                await immediateSave({ screenshot_monitor: true });
+                                                setScreenshotMonitor(true);
+                                                setCurrentModelVlmStatus(true);
+                                                toast.success('截图监控已开启');
+                                            } else {
+                                                toast.error(`无法开启截图监控: ${testResult.message}`);
+                                            }
                                         } else {
-                                            toast.error(`无法开启截图监控: ${result.message}`);
+                                            // 直接开启成功
+                                            setScreenshotMonitor(true);
+                                            toast.success('截图监控已开启');
                                         }
                                     } catch (err) {
                                         toast.error(err instanceof Error ? err.message : '开启失败');

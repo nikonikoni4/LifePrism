@@ -52,10 +52,29 @@ def update_settings(request: UpdateSettingsRequest) -> SettingItems:
 
     Returns:
         SettingItems: 更新后的完整配置
+
+    Raises:
+        ValueError: 当 screenshot_monitor=True 但 is_vlm[provider/model] 不存在或为 false 时
     """
     updates = request.model_dump(exclude_none=True)
     if updates:
         logger.info(f"更新配置: {list(updates.keys())}")
+
+        # 检查 screenshot_monitor 开启时的 is_vlm 校验
+        if updates.get('screenshot_monitor') is True:
+            provider_name = updates.get('provider') or settings.provider
+            provider_id = provider_manager.get_provider_id(provider_name) if provider_name else ""
+            model = updates.get('model') or settings.model
+            if provider_id and model:
+                key = f"{provider_id}/{model}"
+                is_vlm_cache = settings.get('is_vlm', {})
+                vlm_status = is_vlm_cache.get(key)
+                if vlm_status is not True:
+                    # is_vlm 不存在或为 false，拒绝开启截图监控
+                    raise ValueError(
+                        f"当前模型 ({provider_id}/{model}) 不具备图片理解能力，"
+                        f"请先调用 POST /settings/test-vlm 进行验证。current_vlm_status={vlm_status}"
+                    )
 
         provider_name = updates.get('provider') or settings.provider
         provider_id = provider_manager.get_provider_id(provider_name) if provider_name else ""

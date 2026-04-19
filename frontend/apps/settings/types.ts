@@ -48,6 +48,7 @@ export interface Settings {
 export interface SettingsResponse {
     settings: Settings;
     message: string;
+    require_vlm_test?: boolean;
 }
 
 /** 更新配置请求 (部分更新) */

@@ -40,13 +40,26 @@ async def get_settings():
 async def update_settings(request: UpdateSettingsRequest):
     """
     更新配置 (部分更新)
-    
+
     只需要传入需要修改的字段，未传入的字段保持不变。
-    
+
     **注意**: 此接口不支持更新 API Key，请使用 PUT /settings/api-key
+
+    **截图监控校验**:
+    当 screenshot_monitor=true 时，后端会检查 is_vlm[provider_id/model] 是否为 true。
+    如果不是，返回 require_vlm_test=true，前端需要调用 POST /settings/test-vlm 进行测试。
     """
-    settings_data = setting_service.update_settings(request)
-    return SettingsResponse(settings=settings_data, message="配置已更新")
+    try:
+        settings_data = setting_service.update_settings(request)
+        return SettingsResponse(settings=settings_data, message="配置已更新")
+    except ValueError as e:
+        # is_vlm 校验失败，需要前端先调用 test-vlm
+        settings_data = setting_service.get_settings()
+        return SettingsResponse(
+            settings=settings_data,
+            message=str(e),
+            require_vlm_test=True
+        )
 
 
 @router.put("/api-key", response_model=UpdateApiKeyResponse)
