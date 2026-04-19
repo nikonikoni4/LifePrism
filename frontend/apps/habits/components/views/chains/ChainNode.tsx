@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { computePosition, autoUpdate, flip, shift, offset } from '@floating-ui/dom';
 import { Check, Clock3, GripVertical, MoreHorizontal } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -77,7 +79,8 @@ export const ChainNode: React.FC<ChainNodeProps> = ({ node, chainId }) => {
     const { deleteNode } = useChainStore();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
-    const menuRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const floatingRef = useRef<HTMLDivElement>(null);
 
     const {
         attributes,
@@ -96,8 +99,31 @@ export const ChainNode: React.FC<ChainNodeProps> = ({ node, chainId }) => {
     };
 
     useEffect(() => {
+        if (!isMenuOpen || !triggerRef.current || !floatingRef.current) return;
+        
+        const cleanup = autoUpdate(triggerRef.current, floatingRef.current, () => {
+            if (!triggerRef.current || !floatingRef.current) return;
+            computePosition(triggerRef.current, floatingRef.current, {
+                placement: 'bottom-end',
+                middleware: [offset(4), flip(), shift({ padding: 8 })]
+            }).then(({ x, y }) => {
+                if (floatingRef.current) {
+                    floatingRef.current.style.left = `${x}px`;
+                    floatingRef.current.style.top = `${y}px`;
+                }
+            });
+        });
+        
+        return cleanup;
+    }, [isMenuOpen]);
+
+    useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+            const path = event.composedPath();
+            const clickTrigger = triggerRef.current && path.includes(triggerRef.current);
+            const clickFloating = floatingRef.current && path.includes(floatingRef.current);
+            
+            if (!clickTrigger && !clickFloating) {
                 setIsMenuOpen(false);
             }
         };
@@ -138,8 +164,9 @@ export const ChainNode: React.FC<ChainNodeProps> = ({ node, chainId }) => {
                 <span className="text-[11px] font-bold tracking-tight truncate flex-1 text-center">{node.name}</span>
 
                 {/* Right: Actions Menu */}
-                <div className="w-10 h-5 shrink-0 flex items-center justify-end relative" ref={menuRef}>
+                <div className="w-10 h-5 shrink-0 flex items-center justify-end relative z-50">
                     <button
+                        ref={triggerRef}
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
                         className={`p-1 rounded-md transition-colors ${isMenuOpen
                                 ? theme.menuOpen
@@ -148,21 +175,25 @@ export const ChainNode: React.FC<ChainNodeProps> = ({ node, chainId }) => {
                     >
                         <MoreHorizontal size={14} className={theme.menuIcon} />
                     </button>
-                    {isMenuOpen && (
-                        <div className="absolute right-0 top-full mt-1 w-24 bg-white rounded-lg shadow-lg border border-slate-100 py-1 overflow-hidden z-20">
+                    {isMenuOpen && typeof document !== 'undefined' && createPortal(
+                        <div 
+                            ref={floatingRef}
+                            className="absolute top-0 left-0 w-24 bg-white rounded-lg shadow-lg border border-slate-100 py-1 z-[9999]"
+                        >
                             <button
-                                onClick={() => { setIsEditOpen(true); setIsMenuOpen(false); }}
+                                onClick={(e) => { e.stopPropagation(); setIsEditOpen(true); setIsMenuOpen(false); }}
                                 className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 font-medium"
                             >
                                 编辑
                             </button>
                             <button
-                                onClick={() => { handleDelete(); setIsMenuOpen(false); }}
+                                onClick={(e) => { e.stopPropagation(); handleDelete(); setIsMenuOpen(false); }}
                                 className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 font-medium"
                             >
                                 删除
                             </button>
-                        </div>
+                        </div>,
+                        document.body
                     )}
                 </div>
             </div>
