@@ -340,3 +340,53 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
         message="数据迁移成功，请重启程序",
         new_path=str(new_path)
     )
+
+
+async def test_vlm_capability() -> dict:
+    """
+    测试当前模型的 VLM 能力
+
+    流程:
+    1. 调用 test_connect() 验证 LLM 连接
+    2. 连接失败 → 返回错误
+    3. 连接成功 → 调用 test_vlm() 测试图像理解
+    4. 写入 is_vlm[provider_id/model] = result.success
+
+    Returns:
+        dict: 包含 success, message, is_vlm, model_response
+    """
+    from lifeprism.llm.function.test_connect import test_connect
+    from lifeprism.llm.function.test_vlm import test_vlm
+
+    # 1. 先测试连接
+    connect_result = await test_connect()
+    if not connect_result.get('success', False):
+        return {
+            'success': False,
+            'message': f"连接失败: {connect_result.get('message', '未知错误')}",
+            'is_vlm': False,
+            'model_response': None
+        }
+
+    # 2. 连接成功，测试 VLM
+    vlm_result = await test_vlm()
+
+    # 3. 获取 provider_id 和 model 构建 key
+    provider_name = settings.provider
+    provider_id = provider_manager.get_provider_id(provider_name) if provider_name else ""
+    model = settings.model
+    if provider_id and model:
+        key = f"{provider_id}/{model}"
+        is_vlm = vlm_result.get('success', False)
+        # 更新 is_vlm 缓存
+        is_vlm_cache = settings.get('is_vlm', {})
+        is_vlm_cache[key] = is_vlm
+        settings.set('is_vlm', is_vlm_cache)
+        logger.info(f"VLM 能力测试完成: {key} = {is_vlm}")
+
+    return {
+        'success': vlm_result.get('success', False),
+        'message': vlm_result.get('message', '测试完成'),
+        'is_vlm': vlm_result.get('success', False),
+        'model_response': vlm_result.get('model_response')
+    }
