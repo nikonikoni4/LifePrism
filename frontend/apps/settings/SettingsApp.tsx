@@ -175,12 +175,6 @@ const SettingsApp: React.FC = () => {
                 setFilterDuration(settings.data_cleaning_threshold);
                 setScreenshotMonitor(settings.screenshot_monitor || false);
                 setIsVlmConfig(settings.is_vlm || {}); // 保存完整 is_vlm 配置
-                // 获取当前模型的 VLM 状态
-                const providerId = providerIdMap[provider] || '';
-                if (providerId && modelName) {
-                    const isVlm = settings.is_vlm?.[`${providerId}/${modelName}`];
-                    setCurrentModelVlmStatus(isVlm ?? null);
-                }
                 setIsElectron(!!window.electronAPI);
                 setProviderDefaults(
                     Object.fromEntries(providers.map((item) => [item.name, item]))
@@ -194,6 +188,17 @@ const SettingsApp: React.FC = () => {
 
         loadSettings();
     }, []);
+
+    // 实时从 isVlmConfig 计算当前模型的 VLM 状态
+    useEffect(() => {
+        const providerId = providerIdMap[provider] || '';
+        if (providerId && modelName) {
+            const isVlm = isVlmConfig[`${providerId}/${modelName}`];
+            setCurrentModelVlmStatus(isVlm ?? null);
+        } else {
+            setCurrentModelVlmStatus(null);
+        }
+    }, [provider, modelName, isVlmConfig, providerIdMap]);
 
     // 触发自动保存（收集当前所有设置）
     const triggerAutoSave = useCallback((overrides: Record<string, unknown> = {}) => {
@@ -336,7 +341,6 @@ const SettingsApp: React.FC = () => {
         setProvider(newProvider);
         setModelName(nextModel);
         setApiBase(nextApiBase);
-        setCurrentModelVlmStatus(null); // 重置 VLM 状态，切换模型后需要重新验证
         triggerAutoSave({
             provider: newProvider,
             model: nextModel,
@@ -400,7 +404,6 @@ const SettingsApp: React.FC = () => {
     const handleSelectModel = async (model: string) => {
         setModelName(model);
         setShowModelDropdown(false);
-        setCurrentModelVlmStatus(null); // 重置 VLM 状态，切换模型后需要重新验证
         triggerAutoSave({ model: model });
         // 如果 screenshot_monitor 已开启，自动测试新模型的 VLM 能力
         if (screenshotMonitor) {
