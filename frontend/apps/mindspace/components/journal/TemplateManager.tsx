@@ -22,7 +22,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ open, onClose, onAppl
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   // 加载模板列表

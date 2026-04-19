@@ -328,10 +328,10 @@ const SettingsApp: React.FC = () => {
             model: nextModel,
             api_base: nextApiBase,
         });
-        // 当选择火山引擎时显示说明弹窗
-        if (newProvider.includes('火山引擎') || newProvider.toLowerCase().includes('volcengine')) {
-            setShowVolcEngineModal(true);
-        }
+        // TODO: 暂时禁用火山引擎说明弹窗
+        // if (newProvider.includes('火山引擎') || newProvider.toLowerCase().includes('volcengine')) {
+        //     setShowVolcEngineModal(true);
+        // }
     };
 
     // 获取当前服务商的模型历史
@@ -361,7 +361,7 @@ const SettingsApp: React.FC = () => {
     };
 
     // 选择历史模型
-    const handleSelectModel = (model: string) => {
+    const handleSelectModel = async (model: string) => {
         setModelName(model);
         setShowModelDropdown(false);
         triggerAutoSave({ model: model });
@@ -1006,7 +1006,7 @@ const SettingsApp: React.FC = () => {
                 </div>
             </section>
 
-            {/* VolcEngine Info Modal */}
+            {/* TODO: 暂时禁用火山引擎说明弹窗
             {showVolcEngineModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
                     <div className="bg-white rounded-2xl p-6 max-w-lg mx-4 shadow-2xl">
@@ -1052,7 +1052,7 @@ const SettingsApp: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            )}
+            )} */}
 
             {/* 数据路径切换/迁移确认对话框 */}
             <AnimatePresence>
