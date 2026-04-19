@@ -375,6 +375,7 @@ async def test_vlm_capability() -> dict:
     provider_name = settings.provider
     provider_id = provider_manager.get_provider_id(provider_name) if provider_name else ""
     model = settings.model
+    cache_updated = False
     if provider_id and model:
         key = f"{provider_id}/{model}"
         is_vlm = vlm_result.get('success', False)
@@ -383,10 +384,12 @@ async def test_vlm_capability() -> dict:
         is_vlm_cache[key] = is_vlm
         settings.set('is_vlm', is_vlm_cache)
         logger.info(f"VLM 能力测试完成: {key} = {is_vlm}")
+        cache_updated = True
 
     return {
         'success': vlm_result.get('success', False),
         'message': vlm_result.get('message', '测试完成'),
         'is_vlm': vlm_result.get('success', False),
-        'model_response': vlm_result.get('model_response')
+        'model_response': vlm_result.get('model_response'),
+        'cache_updated': cache_updated
     }
