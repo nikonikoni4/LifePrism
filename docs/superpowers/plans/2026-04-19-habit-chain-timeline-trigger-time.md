@@ -18,19 +18,23 @@
 
 | 文件 | 改动 |
 |------|------|
-| `lifeprism/server/services/habit_chain_service.py` | 新增时间计算逻辑（计算结果临时填充到 trigger_time，不存库） |
-| `frontend/apps/habits/constants.ts` | 调整布局常量（4倍放大） |
-| `frontend/apps/habits/hooks/useTimelineStore.ts` | 简化，移除时间计算逻辑 |
-| `frontend/apps/habits/components/views/timeline/TimelineView.tsx` | 容器高度调整 |
+| `lifeprism/server/schemas/habit_schemas.py` | `ChainNodeObject` 和 `TimelineNodeItem` 新增 `calculated_time` 字段 |
+| `lifeprism/server/services/habit_chain_service.py` | 新增时间计算逻辑（计算结果填充到 calculated_time，不存库） |
+| `frontend/apps/habits/types/backend.ts` | 前端类型定义新增 `calculatedTime` 字段 |
+| `frontend/apps/habits/hooks/useTimelineStore.ts` | 使用后端返回的 `calculated_time` 显示 |
 | `test/regression/test_habit_chain_trigger_time.py` | 更新测试 |
 
-**注意**：Schema 不变，不新增 `calculated_time` 字段。后端计算结果通过 `trigger_time` 字段返回给前端，但不写入数据库。
+**注意**：新增 `calculated_time` 字段区分"显式设置"与"后端计算"。`trigger_time` 保持用户原始设置，`calculated_time` 仅作为 API 返回值，不持久化到数据库。
 
 ---
 
-## Task 1: (已移除 - Schema 不需要修改)
+## Task 1: Schema 增加 calculated_time 字段
 
-**说明**：不需要修改 Schema。`trigger_time` 字段复用，后端计算结果通过该字段返回（不存库）。
+**Files:**
+- Modify: `lifeprism/server/schemas/habit_schemas.py`
+- Modify: `frontend/apps/habits/types/backend.ts`
+
+**说明**：新增 `calculated_time`/`calculatedTime` 字段区分"显式设置"与"后端计算"。`trigger_time` 保持用户原始设置，`calculated_time` 仅作为 API 返回值，不持久化到数据库。
 
 ---
 
@@ -54,7 +58,7 @@ _MIN_GAP_MINUTES = 10  # 相邻节点最小间距（分钟）
 ```python
 def _calculate_node_times(self, nodes: List[dict]) -> List[dict]:
     """
-    计算每个节点的 trigger_time（不存库，仅返回计算结果）
+    计算每个节点的 calculated_time（不存库，仅返回计算结果）
 
     规则：
     - 显式设置的 trigger_time 保持不变
@@ -62,7 +66,7 @@ def _calculate_node_times(self, nodes: List[dict]) -> List[dict]:
       a. 若后续有显式节点，按平均间距分配
       b. 若后续无显式节点，按默认30min递推
 
-    返回的节点中，trigger_time 字段已填充计算结果
+    返回的节点中，calculated_time 字段已填充计算结果
     """
     if not nodes:
         return nodes
@@ -80,7 +84,7 @@ def _calculate_node_times(self, nodes: List[dict]) -> List[dict]:
     if not anchors:
         current_minutes = 0  # 从0点开始
         for node in sorted_nodes:
-            node["trigger_time"] = self._format_minutes_to_time(current_minutes)
+            node["calculated_time"] = self._format_minutes_to_time(current_minutes)
             current_minutes += _DEFAULT_INTERVAL_MINUTES
         return sorted_nodes
 
@@ -89,8 +93,12 @@ def _calculate_node_times(self, nodes: List[dict]) -> List[dict]:
     if first_anchor["index"] > 0:
         current_minutes = first_anchor["minutes"] - (first_anchor["index"] * _DEFAULT_INTERVAL_MINUTES)
         for i in range(first_anchor["index"]):
-            sorted_nodes[i]["trigger_time"] = self._format_minutes_to_time(current_minutes)
+            sorted_nodes[i]["calculated_time"] = self._format_minutes_to_time(current_minutes)
             current_minutes += _DEFAULT_INTERVAL_MINUTES
+
+    # 锚点本身的 calculated_time 等于 trigger_time
+    for anchor in anchors:
+        sorted_nodes[anchor["index"]]["calculated_time"] = anchor["original_time"]
 
     # 处理锚点之间的节点
     for a in range(len(anchors) - 1):
@@ -107,7 +115,7 @@ def _calculate_node_times(self, nodes: List[dict]) -> List[dict]:
             interval = total_minutes / (nodes_between + 1)
             for i in range(nodes_between):
                 idx = curr_anchor["index"] + 1 + i
-                sorted_nodes[idx]["trigger_time"] = self._format_minutes_to_time(
+                sorted_nodes[idx]["calculated_time"] = self._format_minutes_to_time(
                     curr_anchor["minutes"] + int(interval * (i + 1))
                 )
 
@@ -116,7 +124,7 @@ def _calculate_node_times(self, nodes: List[dict]) -> List[dict]:
     if last_anchor["index"] < len(sorted_nodes) - 1:
         current_minutes = last_anchor["minutes"] + _DEFAULT_INTERVAL_MINUTES
         for i in range(last_anchor["index"] + 1, len(sorted_nodes)):
-            sorted_nodes[i]["trigger_time"] = self._format_minutes_to_time(current_minutes)
+            sorted_nodes[i]["calculated_time"] = self._format_minutes_to_time(current_minutes)
             current_minutes += _DEFAULT_INTERVAL_MINUTES
 
     return sorted_nodes
@@ -177,7 +185,7 @@ def get_timeline(self) -> TimelineResponse:
     chain_items = []
     for chain in chains:
         nodes = habit_chain_provider.get_nodes_with_habit_names(chain["id"])
-        # 计算每个节点的 trigger_time（不存库）
+        # 计算每个节点的 calculated_time（不存库）
         nodes_with_calculated = self._calculate_node_times(nodes)
         habit_ids = [n["habit_id"] for n in nodes if n.get("habit_id")]
         today_map = habit_checkin_provider.get_today_checkins(habit_ids) if habit_ids else {}
@@ -187,7 +195,8 @@ def get_timeline(self) -> TimelineResponse:
                 name=n["name"],
                 habit_id=n.get("habit_id"),
                 habit_name=n.get("habit_name"),
-                trigger_time=n.get("trigger_time"),  # 已填充计算结果
+                trigger_time=n.get("trigger_time"),           # 原始值
+                calculated_time=n.get("calculated_time"),       # 计算值
                 sort_order=n["sort_order"],
                 today_checked_in=today_map.get(n.get("habit_id"), False),
             )
@@ -261,15 +270,15 @@ const timelineEvents = useMemo(() => {
         const nodes = [...chain.nodes].sort((a, b) => a.sortOrder - b.sortOrder);
         if (nodes.length === 0) return;
 
-        // 直接使用后端计算并返回的 trigger_time
+        // 使用后端计算返回的 calculated_time（若无则用 trigger_time）
         nodes.forEach((node) => {
-            const triggerTime = node.triggerTime || "00:00";
-            const minutes = parseTimeToMinutes(triggerTime);
+            const displayTime = node.calculatedTime || node.triggerTime || "00:00";
+            const minutes = parseTimeToMinutes(displayTime);
 
             events.push({
                 id: `${chain.id}_${node.id}`,
                 title: node.name,
-                startTime: triggerTime,
+                startTime: displayTime,
                 endTime: formatMinutesToTime(minutes + 30),  // 默认30min
                 associatedHabitId: node.habitId,
                 height: MIN_NODE_HEIGHT,
@@ -303,10 +312,10 @@ git commit -m "feat(frontend): use trigger_time from backend, remove local compu
 回归测试：习惯链条 Timeline 节点触发时间计算逻辑
 
 验证点（新版）：
-1. 后端 _calculate_node_times 自动计算 trigger_time（填充结果）
+1. 后端 _calculate_node_times 自动计算 calculated_time（填充结果）
 2. _validate_chain_timeline_rules 验证相邻节点间距 >= 10min
 3. 相邻节点间距 < 10min 时抛出 ValidationError
-4. 计算结果通过 trigger_time 字段返回（不存库）
+4. 计算结果通过 calculated_time 字段返回（不存库），trigger_time 保持原始值
 """
 import pytest
 from lifeprism.server.services.habit_chain_service import HabitChainService
@@ -332,8 +341,8 @@ class TestChainTimelineTriggerTimeCalculation:
     def test_calculate_only_first_node_has_time(self):
         """
         场景1：第一个节点8:00，其他节点无显式时间
-        预期：后端计算 trigger_time
-        - 节点1: 08:00 (显式)
+        预期：后端计算 calculated_time
+        - 节点1: 08:00 (显式，calculated_time=trigger_time)
         - 节点2: 08:30 (30min递推)
         - 节点3: 09:00 (30min递推)
         - 节点4: 09:30 (30min递推)
@@ -350,11 +359,11 @@ class TestChainTimelineTriggerTimeCalculation:
 
         result = service._calculate_node_times(nodes)
 
-        assert result[0]["trigger_time"] == "08:00"
-        assert result[1]["trigger_time"] == "08:30"
-        assert result[2]["trigger_time"] == "09:00"
-        assert result[3]["trigger_time"] == "09:30"
-        assert result[4]["trigger_time"] == "10:00"
+        assert result[0]["calculated_time"] == "08:00"
+        assert result[1]["calculated_time"] == "08:30"
+        assert result[2]["calculated_time"] == "09:00"
+        assert result[3]["calculated_time"] == "09:30"
+        assert result[4]["calculated_time"] == "10:00"
 
     # ============================================================================
     # 场景2：第一节点8:00，第四节点9:00，中间节点平均分配
@@ -365,10 +374,10 @@ class TestChainTimelineTriggerTimeCalculation:
         场景2：第1节点8:00，第4节点9:00，中间2个节点平均分配
         - 总时长: 60min, 中间2个节点
         - 每段: 60min / 3 = 20min
-        - 节点1: 08:00 (显式)
+        - 节点1: 08:00 (显式，calculated_time=trigger_time)
         - 节点2: 08:20 (20min间隔)
         - 节点3: 08:40 (20min间隔)
-        - 节点4: 09:00 (显式)
+        - 节点4: 09:00 (显式，calculated_time=trigger_time)
         - 节点5: 09:30 (默认30min递推)
         """
         service = HabitChainService()
@@ -382,11 +391,11 @@ class TestChainTimelineTriggerTimeCalculation:
 
         result = service._calculate_node_times(nodes)
 
-        assert result[0]["trigger_time"] == "08:00"
-        assert result[1]["trigger_time"] == "08:20"
-        assert result[2]["trigger_time"] == "08:40"
-        assert result[3]["trigger_time"] == "09:00"
-        assert result[4]["trigger_time"] == "09:30"
+        assert result[0]["calculated_time"] == "08:00"
+        assert result[1]["calculated_time"] == "08:20"
+        assert result[2]["calculated_time"] == "08:40"
+        assert result[3]["calculated_time"] == "09:00"
+        assert result[4]["calculated_time"] == "09:30"
 
     # ============================================================================
     # 验证：相邻节点间距 < 10min 时抛出错误
@@ -436,8 +445,8 @@ class TestChainTimelineTriggerTimeCalculation:
 
     def test_calculated_time_not_persisted(self):
         """
-        验证：_calculate_node_times 不修改原始 trigger_time
-        计算结果仅在返回时填充，不写入数据库
+        验证：_calculate_node_times 计算结果通过 calculated_time 字段返回（不存库）
+        注意：原始 trigger_time 保持不变
         """
         service = HabitChainService()
         original_nodes = [
@@ -450,8 +459,8 @@ class TestChainTimelineTriggerTimeCalculation:
 
         # 原始节点 trigger_time 未被修改（仍然是None）
         assert original_nodes[1]["trigger_time"] is None
-        # 计算结果中 trigger_time 已填充
-        assert result[1]["trigger_time"] == "08:30"
+        # 计算结果中 calculated_time 已填充
+        assert result[1]["calculated_time"] == "08:30"
 ```
 
 - [ ] **Step 2: Commit**
@@ -486,8 +495,8 @@ pytest tests/core/ -v -k habit
 
 - [ ] spec 中每个需求都有对应 task 实现
 - [ ] 无 placeholder (TBD/TODO)
-- [ ] 类型一致性：Schema 不变，复用 `trigger_time` 字段
+- [ ] Schema 已新增 `calculated_time` 字段
 - [ ] Task 2 中 `_MIN_GAP_MINUTES = 10` 与设计一致
 - [ ] Task 2 中 `_DEFAULT_INTERVAL_MINUTES = 30` 与设计一致
-- [ ] 前端常量放大4倍 (PIXELS_PER_MINUTE: 1 → 4)
-- [ ] 计算结果通过 `trigger_time` 字段返回，不写入数据库
+- [ ] 计算结果通过 `calculated_time` 字段返回，不写入数据库
+- [ ] 锚点节点的 `calculated_time` 等于其 `trigger_time`

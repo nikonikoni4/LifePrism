@@ -12,10 +12,10 @@
 - 内容摘要：AI 数据分类流程规格，定义数据清洗管道（EventTransformer→CacheMatcher→ClassifyCollector）、三级分类优先级（缓存命中→Goal 匹配→AI 纯分类）、两种分类模式（classify_graph/classify_simple）及同步 API 契约
 
 ## habit-system
-- updated_at: 2026-04-15
+- updated_at: 2026-04-19
 - path: `docs/specs/2026-04-15-habit-system.md`
 - 触发规则：开发、修改或查询习惯系统相关功能时阅读
-- 内容摘要：习惯系统规格文档，定义基于习惯堆叠心理学的习惯养成系统，包含锚点机制、等级制挑战系统（0-4级）、打卡与补签（滚动7天窗口）、Streak连续天数计算（daily逐天判定/非daily按周结算）、状态流转、统计规则等核心功能的业务规则和技术契约
+- 内容摘要：习惯系统规格文档，定义基于习惯堆叠心理学的习惯养成系统，包含锚点机制、等级制挑战系统（0-4级）、打卡与补签（滚动7天窗口）、Streak连续天数计算（daily逐天判定/非daily按周结算）、状态流转、统计规则、链条Timeline时间计算等核心功能的业务规则和技术契约
 
 ## mind-space-diary
 - updated_at: 2026-04-15
