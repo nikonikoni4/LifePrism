@@ -226,6 +226,16 @@ const SettingsApp: React.FC = () => {
             const result = await SettingsAPI.testVlm();
             if (result.success) {
                 toast.success(`图像理解能力测试成功: ${result.model_response || ''}`);
+                // 持久化 is_vlm 到后端
+                const providerId = providerIdMap[provider] || '';
+                if (providerId && modelName) {
+                    const currentSettings = await SettingsAPI.getSettings();
+                    const updatedIsVlm = {
+                        ...(currentSettings.is_vlm || {}),
+                        [`${providerId}/${modelName}`]: true
+                    };
+                    triggerAutoSave({ is_vlm: updatedIsVlm });
+                }
             } else {
                 toast.error(result.message || 'VLM 测试失败');
             }
@@ -357,7 +367,6 @@ const SettingsApp: React.FC = () => {
         triggerAutoSave({ model: model });
         // 如果 screenshot_monitor 已开启，自动测试新模型的 VLM 能力
         if (screenshotMonitor) {
-            const newModel = model;
             setIsVlmTesting(true);
             try {
                 const result = await SettingsAPI.testVlm();
