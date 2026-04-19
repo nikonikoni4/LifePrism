@@ -75,7 +75,8 @@ const getNodeVisualType = (node: HabitChainNode): NodeVisualType => {
 
 export const ChainNode: React.FC<ChainNodeProps> = ({ node, chainId }) => {
     const nodeType = getNodeVisualType(node);
-    const theme = NODE_COLOR_THEMES[Math.max(node.sortOrder - 1, 0) % NODE_COLOR_THEMES.length];
+    const safeSortOrder = Number(node.sortOrder) || 1;
+    const theme = NODE_COLOR_THEMES[Math.max(safeSortOrder - 1, 0) % NODE_COLOR_THEMES.length] || NODE_COLOR_THEMES[0];
     const { deleteNode } = useChainStore();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
