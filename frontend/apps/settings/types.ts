@@ -65,6 +65,7 @@ export interface UpdateSettingsRequest {
     lifeprism_data_path?: string;
     data_cleaning_threshold?: number;
     screenshot_monitor?: boolean;
+    is_vlm?: Record<string, boolean>;
 }
 
 /** 更新 API Key 请求 */
