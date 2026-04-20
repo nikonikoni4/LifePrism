@@ -79,13 +79,8 @@ class SettingsManager:
 
         # 1. 解析配置文件基础路径（固定，不随数据迁移）
         self._config_base_path = self._resolve_config_base_path()
-
-        if self._is_dev:
-            # 开发环境：使用 lifeprism/config/settings.yaml
-            self._config_path = Path(__file__).parent / 'settings.yaml'
-        else:
-            # 打包环境：配置文件始终在固定路径
-            self._config_path = self._config_base_path / 'config' / 'config.yaml'
+        
+        self._config_path = self._config_base_path / 'config' / 'config.yaml' # 打包环境和开发环境都使用_config_base_path，命名都改为config.yaml
         # 2. 加载 yaml 配置
         self._load_config()
 
