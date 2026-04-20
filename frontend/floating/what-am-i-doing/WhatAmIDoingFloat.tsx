@@ -163,7 +163,13 @@ export const WhatAmIDoingFloat: React.FC = () => {
         setNewTaskContent('');
         if (!content) return;
         try {
-            const result = await safeCreateTodo({ content, state: 'pool' });
+            const result = await safeCreateTodo({
+                content,
+                state: 'scheduled',
+                date: getTodayStr(),
+                link_to_goal_id: 'goal-daily',
+                plan_doc_id: '每日目标-docs',
+            });
             const newTodo = mapBackendTodoToFrontend(result.item);
             await WaidAPI.addToWaid(newTodo.id);
             await refreshWaidTodos();
