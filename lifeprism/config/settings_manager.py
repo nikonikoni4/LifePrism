@@ -141,13 +141,9 @@ class SettingsManager:
         """配置日志文件输出"""
         from lifeprism.utils.logger import setup_file_logging
 
-        if getattr(sys, 'frozen', False):
-            # 打包环境：日志写入 lifeprismData/debug_logs/
-            setup_file_logging(self._lifeprism_data_path / 'debug_logs')
-        else:
-            # 开发环境：日志写入项目根目录
-            root_dir = Path(__file__).parent.parent.parent
-            setup_file_logging(root_dir)
+        # 日志写入 {_lifeprism_data_path}/debug_logs/ 
+        setup_file_logging(self._lifeprism_data_path / 'debug_logs')
+ 
 
     def _check_data_path_safety(self) -> None:
         """检查数据路径是否位于安装目录内（仅打包环境）"""
