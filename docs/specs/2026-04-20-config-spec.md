@@ -1,9 +1,9 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-04-20
 updated_at: 2026-04-20
-last_updated: 创建 config 模块规格文档
-abstract: 配置管理模块规格，定义配置的读写流程、路径解析规则、API Key 安全存储、Provider 管理、配置迁移机制及前后端交互契约
+last_updated: 新增打包环境前后端路径配置详细流程图和已知问题说明
+abstract: 配置管理模块规格，定义配置的读写流程、路径解析规则（含前后端详细流程图）、API Key 安全存储、Provider 管理、配置迁移机制及前后端交互契约
 id: config-spec
 title: 配置管理模块规格
 status: draft
@@ -16,6 +16,7 @@ code_scope:
   - lifeprism/server/api/setting_api.py
   - lifeprism/server/services/setting_service.py
   - frontend/apps/settings/SettingsApp.tsx
+  - frontend/electron/main.cjs
 contract_refs:
   - lifeprism/server/schemas/setting_schemas.py
   - lifeprism/config/settings.yaml
@@ -29,6 +30,7 @@ contract_refs:
 | 版本 | 更新内容 |
 | ---- | -------- |
 | 1.0 | 创建 config 模块规格初稿 |
+| 1.1 | 新增打包环境前后端路径配置详细流程图，明确前端路径配置的已知问题 |
 
 ## Overview
 
@@ -78,14 +80,21 @@ contract_refs:
 - 配置文件路径：
   - 主配置：`{config_base_path}/config/config.yaml`
   - Provider 配置：`{config_base_path}/config/providers.yaml`
-- 说明：开发和打包环境统一使用 `config.yaml` 命名（不再使用 `settings.yaml`）
+  - 端口配置：`{config_base_path}/config/config.json`
 
 **数据路径（lifeprism_data_path）**：
 - 可由用户迁移
-- 优先级：yaml 配置 > 环境变量 > 默认路径
+- 前端优先级：yaml 配置 > 默认路径
+- 后端优先级：yaml 配置 > 环境变量 > 默认路径
 - 默认路径：与 config_base_path 相同（用户未主动迁移时）
-- 存储内容：`dataset/`, `plan/`, `debug_logs/`, `workflow/`, `external_files/`, 数据库文件
-- 说明：只有在用户主动迁移后，数据路径才会与配置路径不同
+- 存储内容：`dataset/`, `plan/`, `debug_logs/`, `workflow/`, `external_files/`, `screenshots/`, `docs/`, `diary/`, `session/`, 数据库文件
+
+**关键规则**：
+1. **前端必须读取 yaml 配置**：不能硬编码路径，必须从 `{config_base_path}/config/config.yaml` 读取 `lifeprism_data_path`
+2. **前后端日志路径统一**：都写入 `{lifeprism_data_path}/debug_logs/`，迁移后自动跟随
+3. **环境变量作为后端 fallback**：前端传递的 `LIFEPRISM_DATA_PATH` 仅作为后端的第二优先级
+
+详细的路径配置流程和实现细节见 [路径配置体系](../authority/path-config.md)。
 
 ### 3. Provider 管理
 
