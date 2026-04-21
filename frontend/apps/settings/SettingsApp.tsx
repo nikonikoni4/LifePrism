@@ -59,6 +59,9 @@ const SettingsApp: React.FC = () => {
     const [longLogThreshold, setLongLogThreshold] = useState(600);
 
     // 4. Database Settings
+    const [monitorType, setMonitorType] = useState<'lifeprism' | 'activitywatch'>('lifeprism');
+    const [pendingMonitorType, setPendingMonitorType] = useState<'lifeprism' | 'activitywatch' | null>(null);
+    const [showMonitorTypeConfirm, setShowMonitorTypeConfirm] = useState(false);
     const [awPath, setAwPath] = useState('');
     const [lifeprismDataPath, setLifeprismDataPath] = useState('');
     const [configBasePath, setConfigBasePath] = useState('');
@@ -172,6 +175,7 @@ const SettingsApp: React.FC = () => {
                 setLongLogThreshold(settings.long_log_threshold);
                 setBrowserApps(settings.multi_purpose_app_names);
                 setAwPath(settings.aw_db_path);
+                setMonitorType(settings.monitor_type || 'lifeprism');
                 setLifeprismDataPath(settings.lifeprism_data_path);
                 setConfigBasePath(settings.config_base_path || '');
                 setFilterDuration(settings.data_cleaning_threshold);
@@ -221,10 +225,11 @@ const SettingsApp: React.FC = () => {
             data_cleaning_threshold: filterDuration,
             active_screenshot_frequency_level: screenshotFrequencyLevel,
             screenshot_retention_days: screenshotRetentionDays,
+            monitor_type: monitorType,
             ...overrides,
         };
         debouncedSave(currentSettings);
-    }, [nickname, provider, modelName, apiBase, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, screenshotFrequencyLevel, screenshotRetentionDays, debouncedSave]);
+    }, [nickname, provider, modelName, apiBase, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, screenshotFrequencyLevel, screenshotRetentionDays, monitorType, debouncedSave]);
 
     // Handlers
     const handleTestConnection = async () => {
@@ -867,48 +872,95 @@ const SettingsApp: React.FC = () => {
                         </p>
                     </div>
 
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">ActivityWatch 数据库路径</label>
-                        <div className="flex gap-3">
-                            <input
-                                type="text"
-                                value={awPath}
-                                onChange={(e) => setAwPath(e.target.value)}
-                                onBlur={() => triggerAutoSave({ aw_db_path: awPath })}
-                                className="flex-1 bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
-                            />
-                            {isElectron && (
-                                <button
-                                    onClick={async () => {
-                                        const file = await window.electronAPI?.selectFile([
-                                            { name: 'SQLite Database', extensions: ['db'] }
-                                        ]);
-                                        if (file) {
-                                            setAwPath(file);
-                                            triggerAutoSave({ aw_db_path: file });
-                                        }
+                    {/* 数据源选择 */}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">数据源选择</label>
+                        <div className="space-y-2">
+                            {/* lifeprism 内置监控 */}
+                            <label className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer hover:border-blue-300 transition-all">
+                                <input
+                                    type="radio"
+                                    name="monitorSource"
+                                    value="lifeprism"
+                                    checked={(pendingMonitorType ?? monitorType) === 'lifeprism'}
+                                    onChange={() => {
+                                        setPendingMonitorType('lifeprism');
+                                        setShowMonitorTypeConfirm(true);
                                     }}
-                                    className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-slate-600 rounded-xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all"
-                                    title="选择文件"
-                                >
-                                    <FolderSearch size={14} />
-                                </button>
-                            )}
-                            <button
-                                onClick={handleCheckPath}
-                                className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-slate-600 rounded-xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all"
-                            >
-                                {pathStatus === 'checking' ? (
-                                    <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                                ) : pathStatus === 'success' ? (
-                                    <Check size={14} className="text-green-500" />
-                                ) : (
-                                    <FolderSearch size={14} />
-                                )}
-                                Detect
-                            </button>
+                                    className="mt-1"
+                                />
+                                <div className="flex-1">
+                                    <div className="text-sm font-bold text-slate-700">lifeprism 内置监控</div>
+                                    <div className="text-xs text-slate-400 mt-1">只有开启 lifeprism 内置监控才能开启截图监控</div>
+                                </div>
+                            </label>
+
+                            {/* 使用 ActivityWatch */}
+                            <label className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer hover:border-blue-300 transition-all">
+                                <input
+                                    type="radio"
+                                    name="monitorSource"
+                                    value="activitywatch"
+                                    checked={(pendingMonitorType ?? monitorType) === 'activitywatch'}
+                                    onChange={() => {
+                                        setPendingMonitorType('activitywatch');
+                                        setShowMonitorTypeConfirm(true);
+                                    }}
+                                    className="mt-1"
+                                />
+                                <div className="flex-1">
+                                    <div className="text-sm font-bold text-slate-700">使用 ActivityWatch</div>
+                                    <div className="text-xs text-slate-400 mt-1">需要额外安装</div>
+                                </div>
+                            </label>
                         </div>
                     </div>
+
+                    {/* ActivityWatch 数据库路径 - 仅当选择 activitywatch 时显示 */}
+                    {monitorType === 'activitywatch' && (
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">ActivityWatch 数据库路径</label>
+                            <div className="flex gap-3">
+                                <input
+                                    type="text"
+                                    value={awPath}
+                                    onChange={(e) => setAwPath(e.target.value)}
+                                    onBlur={() => triggerAutoSave({ aw_db_path: awPath })}
+                                    className="flex-1 bg-gray-50 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-4 focus:ring-orange-50/50 rounded-xl px-4 py-3 text-slate-600 font-mono text-xs outline-none transition-all"
+                                />
+                                {isElectron && (
+                                    <button
+                                        onClick={async () => {
+                                            const file = await window.electronAPI?.selectFile([
+                                                { name: 'SQLite Database', extensions: ['db'] }
+                                            ]);
+                                            if (file) {
+                                                setAwPath(file);
+                                                triggerAutoSave({ aw_db_path: file });
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-slate-600 rounded-xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all"
+                                        title="选择文件"
+                                    >
+                                        <FolderSearch size={14} />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleCheckPath}
+                                    className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-slate-600 rounded-xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all"
+                                >
+                                    {pathStatus === 'checking' ? (
+                                        <div className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                    ) : pathStatus === 'success' ? (
+                                        <Check size={14} className="text-green-500" />
+                                    ) : (
+                                        <FolderSearch size={14} />
+                                    )}
+                                    Detect
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </section>
 
@@ -1016,10 +1068,10 @@ const SettingsApp: React.FC = () => {
                                     triggerAutoSave({ screenshot_monitor: false });
                                 }
                             }}
-                            disabled={isVlmTesting || !modelName}
+                            disabled={isVlmTesting || !modelName || monitorType !== 'lifeprism'}
                             className={`relative w-14 h-8 rounded-full transition-all ${
                                 screenshotMonitor ? 'bg-green-500' : 'bg-slate-200'
-                            } ${isVlmTesting || !modelName ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            } ${isVlmTesting || !modelName || monitorType !== 'lifeprism' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                         >
                             <div
                                 className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-sm transition-all ${
@@ -1289,6 +1341,88 @@ const SettingsApp: React.FC = () => {
                                     className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
                                 >
                                     迁移数据并退出
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* 数据源切换确认对话框 */}
+            <AnimatePresence>
+                {showMonitorTypeConfirm && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[9999] flex items-center justify-center"
+                    >
+                        <div
+                            className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+                            onClick={() => {
+                                setShowMonitorTypeConfirm(false);
+                                setPendingMonitorType(null);
+                            }}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                            className="relative w-[420px] bg-white/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.15)] border border-white/40 overflow-hidden"
+                        >
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                                <div className="flex items-center gap-2">
+                                    <AlertTriangle size={18} className="text-amber-500" />
+                                    <h3 className="text-base font-semibold text-slate-700">切换数据源</h3>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setShowMonitorTypeConfirm(false);
+                                        setPendingMonitorType(null);
+                                    }}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="px-5 py-4 space-y-3">
+                                <p className="text-sm text-slate-600">切换数据源后需重启应用才能生效。</p>
+                                <p className="text-xs text-amber-600">
+                                    当前选择：{pendingMonitorType === 'lifeprism' ? 'lifeprism 内置监控' : '使用 ActivityWatch'}
+                                </p>
+                            </div>
+                            <div className="flex items-center justify-end gap-2 px-5 py-4 bg-slate-50/50 border-t border-slate-100">
+                                <button
+                                    onClick={() => {
+                                        setShowMonitorTypeConfirm(false);
+                                        setPendingMonitorType(null);
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                                >
+                                    取消选择
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        if (!pendingMonitorType) return;
+                                        try {
+                                            // 如果选择 activitywatch 且截图监控开启，先关闭
+                                            if (pendingMonitorType === 'activitywatch' && screenshotMonitor) {
+                                                setScreenshotMonitor(false);
+                                                await immediateSave({ screenshot_monitor: false, monitor_type: pendingMonitorType });
+                                            } else {
+                                                await immediateSave({ monitor_type: pendingMonitorType });
+                                            }
+                                            setMonitorType(pendingMonitorType);
+                                            setShowMonitorTypeConfirm(false);
+                                            setPendingMonitorType(null);
+                                        } catch (err) {
+                                            toast.error(err instanceof Error ? err.message : '保存失败');
+                                        }
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors"
+                                >
+                                    我知道了
                                 </button>
                             </div>
                         </motion.div>

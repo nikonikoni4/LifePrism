@@ -80,6 +80,7 @@ class UpdateSettingsRequest(BaseModel):
     screenshot_retention_days: Optional[int] = None
     cleanup_check_interval_seconds: Optional[int] = None
     screenshot_monitor: Optional[bool] = None
+    monitor_type: Optional[str] = None
 
 
 class UpdateApiKeyRequest(BaseModel):
