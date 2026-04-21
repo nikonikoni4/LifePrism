@@ -416,6 +416,18 @@ class SettingsManager:
             updates: 要更新的配置字典
             save: 是否立即保存到文件
         """
+        # 验证 screenshot_retention_days
+        if 'screenshot_retention_days' in updates:
+            days = updates['screenshot_retention_days']
+            if days < 3:
+                raise ValueError(f"截图保留天数不能小于3天，当前值：{days}")
+
+        # 验证 active_screenshot_frequency_level
+        if 'active_screenshot_frequency_level' in updates:
+            level = updates['active_screenshot_frequency_level']
+            if level not in [1, 2, 3]:
+                raise ValueError(f"频率等级必须是1、2或3，当前值：{level}")
+
         # 分离出 api_key
         if 'api_key' in updates:
             api_key = updates.pop('api_key')
