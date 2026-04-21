@@ -76,6 +76,8 @@ const SettingsApp: React.FC = () => {
 
     // 6. Screenshot Monitor
     const [screenshotMonitor, setScreenshotMonitor] = useState(false);
+    const [screenshotFrequencyLevel, setScreenshotFrequencyLevel] = useState(2);
+    const [screenshotRetentionDays, setScreenshotRetentionDays] = useState(7);
     const [isVlmTesting, setIsVlmTesting] = useState(false);
     const [currentModelVlmStatus, setCurrentModelVlmStatus] = useState<boolean | null>(null);
     const [isVlmConfig, setIsVlmConfig] = useState<Record<string, boolean>>({}); // 完整 is_vlm 配置
