@@ -93,7 +93,7 @@ class MonitorRuntime:
         )
         scheduler = ScreenshotScheduler(
             policy=get_frequency_policy(2),
-            scheduled_interval_seconds=60,
+            scheduled_interval_seconds=180,
             enter_delay_ms=700,
         )
         screenshot_store = ScreenshotStore(
@@ -248,7 +248,7 @@ def build_monitor_runtime() -> MonitorRuntime:
     )
     scheduler = ScreenshotScheduler(
         policy=get_frequency_policy(settings.get("active_screenshot_frequency_level", 2)),
-        scheduled_interval_seconds=settings.get("scheduled_screenshot_interval_seconds", 60),
+        scheduled_interval_seconds=settings.get("scheduled_screenshot_interval_seconds", 180),
         enter_delay_ms=settings.get("enter_screenshot_delay_ms", 700),
     )
     screenshot_store = ScreenshotStore(
