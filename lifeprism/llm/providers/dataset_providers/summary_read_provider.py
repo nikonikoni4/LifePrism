@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from lifeprism.config.settings_manager import settings
-from lifeprism.llm.providers.llm_lw_data_provider import llm_lw_data_provider
+from lifeprism.llm.providers.dataset_providers.llm_lw_data_provider import llm_lw_data_provider
 from lifeprism.server.providers.diary_provider import diary_provider
 from lifeprism.server.providers.habit_checkin_provider import habit_checkin_provider
 from lifeprism.server.providers.habit_challenge_provider import habit_challenge_provider

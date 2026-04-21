@@ -1,7 +1,7 @@
 """消息中转类型定义"""
 
 from dataclasses import dataclass, field
-from lifeprism.llm.providers.base import LLMResponse
+from lifeprism.llm.providers.llm_providers.base import LLMResponse
 import uuid
 
 class MessageType:

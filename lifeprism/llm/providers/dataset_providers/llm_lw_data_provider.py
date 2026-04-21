@@ -796,7 +796,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
                 - daily_durations: {date_str: duration_seconds} 每日时长字典
         """
         from collections import defaultdict
-        from datetime import datetime, timedelta
+        from datetime import datetime
         
         # 解析时间
         range_start = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
@@ -1238,7 +1238,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
         from collections import defaultdict
         
         # 解析日期
-        date_obj = datetime.strptime(date, "%Y-%m-%d")
+        # date_obj = datetime.strptime(date, "%Y-%m-%d")
         
         # 获取当天所有活动日志，包含 category_id 用于统计
         logs, _ = self.get_activity_logs(

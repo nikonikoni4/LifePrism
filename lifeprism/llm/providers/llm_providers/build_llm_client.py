@@ -4,10 +4,10 @@
 True -> CustomProvider
 False -> litellmProvider 
 """
-from lifeprism.llm.providers.litellm_provider import LiteLLMProvider
-from lifeprism.llm.providers.custom_provider import CustomProvider
+from lifeprism.llm.providers.llm_providers.litellm_provider import LiteLLMProvider
+from lifeprism.llm.providers.llm_providers.custom_provider import CustomProvider
 from lifeprism.config import provider_manager,settings
-from lifeprism.llm.providers.registry import find_by_name
+from lifeprism.llm.providers.llm_providers.registry import find_by_name
 
 
 def create_llm_client():
