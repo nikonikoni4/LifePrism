@@ -176,6 +176,8 @@ const SettingsApp: React.FC = () => {
                 setConfigBasePath(settings.config_base_path || '');
                 setFilterDuration(settings.data_cleaning_threshold);
                 setScreenshotMonitor(settings.screenshot_monitor || false);
+                setScreenshotFrequencyLevel(settings.active_screenshot_frequency_level || 2);
+                setScreenshotRetentionDays(settings.screenshot_retention_days || 7);
                 setIsVlmConfig(settings.is_vlm || {}); // 保存完整 is_vlm 配置
                 setIsElectron(!!window.electronAPI);
                 setProviderDefaults(

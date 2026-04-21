@@ -41,6 +41,8 @@ export interface Settings {
     config_base_path: string;
     data_cleaning_threshold: number;
     screenshot_monitor?: boolean;
+    active_screenshot_frequency_level?: number;
+    screenshot_retention_days?: number;
     is_vlm?: Record<string, boolean>;
 }
 
