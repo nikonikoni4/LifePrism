@@ -1132,6 +1132,53 @@ const SettingsApp: React.FC = () => {
                             </label>
                         </div>
                     </div>
+
+                    {/* 截图保留天数 */}
+                    <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <div className="flex-1">
+                            <h4 className="text-sm font-bold text-slate-700">截图保留天数</h4>
+                            <p className="text-xs text-slate-400 mt-1">最小3天，超过保留期的截图将被自动清理</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    const newValue = Math.max(3, screenshotRetentionDays - 1);
+                                    setScreenshotRetentionDays(newValue);
+                                    triggerAutoSave({ screenshot_retention_days: newValue });
+                                }}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-slate-500 hover:border-blue-300 hover:text-blue-600 transition-all"
+                            >
+                                <Minus size={14} />
+                            </button>
+
+                            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm w-24 justify-center">
+                                <input
+                                    type="number"
+                                    min="3"
+                                    value={screenshotRetentionDays}
+                                    onChange={(e) => {
+                                        const value = parseInt(e.target.value) || 3;
+                                        setScreenshotRetentionDays(Math.max(3, value));
+                                    }}
+                                    onBlur={() => triggerAutoSave({ screenshot_retention_days: screenshotRetentionDays })}
+                                    className="w-full text-center font-bold text-slate-800 outline-none bg-transparent"
+                                />
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    const newValue = screenshotRetentionDays + 1;
+                                    setScreenshotRetentionDays(newValue);
+                                    triggerAutoSave({ screenshot_retention_days: newValue });
+                                }}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-slate-500 hover:border-blue-300 hover:text-blue-600 transition-all"
+                            >
+                                <Plus size={14} />
+                            </button>
+
+                            <span className="text-xs font-bold text-slate-400 uppercase ml-1">天</span>
+                        </div>
+                    </div>
                 </div>
             </section>
 
