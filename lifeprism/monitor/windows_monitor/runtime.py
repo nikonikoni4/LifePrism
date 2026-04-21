@@ -105,7 +105,7 @@ class MonitorRuntime:
         cleanup_worker = ScreenshotCleanupWorker(
             provider=screenshot_provider,
             data_root=data_root,
-            retention_days=3,
+            retention_days=settings.get("screenshot_retention_days", 7),
         )
 
         runtime = cls(
