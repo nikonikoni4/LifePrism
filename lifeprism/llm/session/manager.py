@@ -40,7 +40,7 @@ class Session:
     #     self.updated_at = datetime.now()
     #     return retracted
 
-    def add_message(self,role:str,content:str,**kw:Any) -> None:
+    def add_message(self,role:str,content:str | list | None,**kw:Any) -> None:
         if role not in allow_role:
             raise ValueError(f"message role can't be {role}")
         self.messages.append({

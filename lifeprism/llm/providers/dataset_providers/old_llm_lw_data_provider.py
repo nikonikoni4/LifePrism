@@ -1562,24 +1562,5 @@ class LLMLWDataProvider(LWBaseDataProvider):
         
         return stats
 
-llm_lw_data_provider = LazySingleton(LLMLWDataProvider)
+old_llm_lw_data_provider = LazySingleton(LLMLWDataProvider)
 
-if __name__ == "__main__":
-    from lifeprism.llm.utils.data_base_format import (
-        format_hourly_logs,
-        format_daily_goal_trend,
-        format_daily_category_trend,
-        format_computer_usage_schedule,
-        format_focus_and_todos
-    )
-    
-    print(format_hourly_logs(llm_lw_data_provider.get_logs_by_time("2026-01-05")))
-    print("\n=== 重点与待办统计 ===")
-    print(format_focus_and_todos(llm_lw_data_provider.get_focus_and_todos(start_time="2026-01-01 00:00:00", end_time="2026-01-05 23:59:59")))
-    print("=== 目标时长统计 ===")
-    print(format_daily_goal_trend(llm_lw_data_provider.get_daily_goal_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59")))
-    print("\n=== 主分类时长统计 ===")
-    print(format_daily_category_trend(llm_lw_data_provider.get_daily_category_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59")))
-    print("\n=== 电脑使用时间分析（作息推断） ===")
-    print(format_computer_usage_schedule(llm_lw_data_provider.get_computer_usage_schedule("2025-12-25", "2025-12-30")))
-    

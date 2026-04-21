@@ -23,8 +23,10 @@ from .llm_providers import (
 
 # 从 dataset_providers 子模块导入
 from .dataset_providers import (
+    LLMDatasetProvider,
+    llm_dataset_provider,
     LLMLWDataProvider,
-    llm_lw_data_provider,
+    old_llm_lw_data_provider,
     SummaryReadProvider,
     summary_read_provider,
 )
@@ -47,8 +49,10 @@ __all__ = [
     # 工厂函数
     "create_llm_client",
     # 数据提供者
+    "LLMDatasetProvider",
+    "llm_dataset_provider",
     "LLMLWDataProvider",
-    "llm_lw_data_provider",
+    "old_llm_lw_data_provider",
     "SummaryReadProvider",
     "summary_read_provider",
 ]
