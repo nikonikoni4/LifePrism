@@ -219,10 +219,12 @@ const SettingsApp: React.FC = () => {
             aw_db_path: awPath,
             lifeprism_data_path: lifeprismDataPath,
             data_cleaning_threshold: filterDuration,
+            active_screenshot_frequency_level: screenshotFrequencyLevel,
+            screenshot_retention_days: screenshotRetentionDays,
             ...overrides,
         };
         debouncedSave(currentSettings);
-    }, [nickname, provider, modelName, apiBase, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, debouncedSave]);
+    }, [nickname, provider, modelName, apiBase, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, screenshotFrequencyLevel, screenshotRetentionDays, debouncedSave]);
 
     // Handlers
     const handleTestConnection = async () => {
