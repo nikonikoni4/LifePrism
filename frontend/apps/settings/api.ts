@@ -44,7 +44,7 @@ export const SettingsAPI = {
     /**
      * 更新配置 (部分更新)
      */
-    async updateSettings(settings: UpdateSettingsRequest): Promise<Settings> {
+    async updateSettings(settings: UpdateSettingsRequest): Promise<SettingsResponse> {
         const response = await fetch(`${getApiBase()}/settings`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -54,7 +54,7 @@ export const SettingsAPI = {
             throw new Error(`更新配置失败: ${response.statusText}`);
         }
         const data: SettingsResponse = await response.json();
-        return data.settings;
+        return data;
     },
 
     /**
