@@ -1059,6 +1059,79 @@ const SettingsApp: React.FC = () => {
                             </p>
                         )}
                     </div>
+
+                    {/* 截图频率等级 */}
+                    <div className="space-y-3">
+                        <h4 className="text-sm font-bold text-slate-700">截图频率等级</h4>
+
+                        <div className="space-y-2">
+                            {/* L1 - 低频 */}
+                            <label className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer hover:border-blue-300 transition-all">
+                                <input
+                                    type="radio"
+                                    name="frequency"
+                                    value={1}
+                                    checked={screenshotFrequencyLevel === 1}
+                                    onChange={(e) => {
+                                        const newLevel = Number(e.target.value);
+                                        setScreenshotFrequencyLevel(newLevel);
+                                        triggerAutoSave({ active_screenshot_frequency_level: newLevel });
+                                    }}
+                                    className="mt-1"
+                                />
+                                <div className="flex-1">
+                                    <div className="text-sm font-bold text-slate-700">低频(L1) - 节省存储和tokens使用</div>
+                                    <div className="text-xs text-slate-400 mt-1">
+                                        测试数据：高活跃度5.5小时，约70张截图，tokens约11万
+                                    </div>
+                                </div>
+                            </label>
+
+                            {/* L2 - 中频（推荐） */}
+                            <label className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer hover:border-blue-300 transition-all">
+                                <input
+                                    type="radio"
+                                    name="frequency"
+                                    value={2}
+                                    checked={screenshotFrequencyLevel === 2}
+                                    onChange={(e) => {
+                                        const newLevel = Number(e.target.value);
+                                        setScreenshotFrequencyLevel(newLevel);
+                                        triggerAutoSave({ active_screenshot_frequency_level: newLevel });
+                                    }}
+                                    className="mt-1"
+                                />
+                                <div className="flex-1">
+                                    <div className="text-sm font-bold text-slate-700">中频(L2) - 推荐，平衡语义质量、存储和tokens使用</div>
+                                    <div className="text-xs text-slate-400 mt-1">
+                                        测试数据：高活跃度5.5小时，约95张截图，tokens约15万
+                                    </div>
+                                </div>
+                            </label>
+
+                            {/* L3 - 高频 */}
+                            <label className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer hover:border-blue-300 transition-all">
+                                <input
+                                    type="radio"
+                                    name="frequency"
+                                    value={3}
+                                    checked={screenshotFrequencyLevel === 3}
+                                    onChange={(e) => {
+                                        const newLevel = Number(e.target.value);
+                                        setScreenshotFrequencyLevel(newLevel);
+                                        triggerAutoSave({ active_screenshot_frequency_level: newLevel });
+                                    }}
+                                    className="mt-1"
+                                />
+                                <div className="flex-1">
+                                    <div className="text-sm font-bold text-slate-700">高频(L3) - 高精度，适合需要详细记录的场景</div>
+                                    <div className="text-xs text-slate-400 mt-1">
+                                        测试数据：高活跃度5.5小时，约200张截图，tokens约32万
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </section>
 
