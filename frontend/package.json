@@ -79,7 +79,7 @@
       "dist/**/*",
       "electron/**/*",
       "!node_modules",
-      "node_modules/{electron-updater,builder-util-runtime,fs-extra,graceful-fs,js-yaml,argparse,jsonfile,lazy-val,lodash.escaperegexp,lodash.isequal,semver,tiny-typed-emitter,universalify,debug,ms,sax}/**/*"
+      "node_modules/{electron-updater,electron-log,builder-util-runtime,fs-extra,graceful-fs,js-yaml,argparse,jsonfile,lazy-val,lodash.escaperegexp,lodash.isequal,semver,tiny-typed-emitter,universalify,debug,ms,sax}/**/*"
     ],
     "extraResources": [
       {
