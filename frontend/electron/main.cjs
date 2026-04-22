@@ -94,7 +94,11 @@ function startBackend() {
         const backendPath = path.join(process.resourcesPath, 'backend', 'lifeprism-backend.exe');
         console.log(`[Electron] 启动后端: ${backendPath}`);
         backendProcess = spawn(backendPath, [], {
-            env: { ...process.env, LIFEPRISM_DATA_PATH: lifeprismDataPath },
+            env: {
+                ...process.env,
+                LIFEPRISM_DATA_PATH: lifeprismDataPath,
+                PYTHONIOENCODING: 'utf-8'
+            },
             stdio: 'pipe'
         });
     } else {
@@ -102,7 +106,11 @@ function startBackend() {
         console.log('[Electron] 开发模式：启动 Python 后端...');
         backendProcess = spawn('python', ['-m', 'lifeprism.server.main'], {
             cwd: path.join(__dirname, '..', '..'),
-            env: { ...process.env, LIFEPRISM_DATA_PATH: lifeprismDataPath },
+            env: {
+                ...process.env,
+                LIFEPRISM_DATA_PATH: lifeprismDataPath,
+                PYTHONIOENCODING: 'utf-8'
+            },
             stdio: 'pipe',
             shell: true
         });
@@ -230,15 +238,6 @@ function createWindow() {
 
     // 捕获 renderer 进程的 console 输出写入日志文件
     mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-        const ts = new Date().toISOString();
-        const levelMap = { 0: 'DEBUG', 1: 'INFO', 2: 'WARN', 3: 'ERROR' };
-        const src = sourceId ? `${sourceId}:${line}` : '';
-        const logMsg = `[${ts}] [Renderer/${levelMap[level] || 'INFO'}] ${message}${src ? ` (${src})` : ''}`;
-
-        if (logStream) {
-            logStream.write(logMsg + '\n');
-        }
-
         // 使用 electron-log 记录
         if (level === 3) { // ERROR
             log.error(`[Renderer] ${message}`, { source: sourceId, line });
@@ -681,12 +680,6 @@ app.on('before-quit', () => {
     if (tray) {
         tray.destroy();
         tray = null;
-    }
-
-    // 关闭日志流
-    if (logStream) {
-        logStream.end();
-        logStream = null;
     }
 });
 

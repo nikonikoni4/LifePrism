@@ -484,7 +484,7 @@ def find_available_port(config_path: str = None) -> int:
             return port
         else:
             logger.warning(f"[STARTUP] 端口 {port} 被占用，尝试下一个...")
-    
+
     # 所有端口都被占用，返回默认端口（让 uvicorn 报错）
     print(f"[STARTUP] 警告：所有备用端口都被占用，将尝试使用端口 {default_port}")
     return default_port
@@ -494,6 +494,14 @@ if __name__ == "__main__":
     import uvicorn
     import os
     import sys
+    import multiprocessing
+
+    # Windows 下 multiprocessing 必须调用 freeze_support()
+    multiprocessing.freeze_support()
+
+    # 防止子进程重复启动服务器（只需 2 行代码）
+    if multiprocessing.current_process().name != 'MainProcess':
+        sys.exit(0)
 
     # 判断是否为打包环境
     is_frozen = getattr(sys, 'frozen', False)
