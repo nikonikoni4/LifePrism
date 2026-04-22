@@ -424,6 +424,13 @@ ipcMain.handle('open-floating-window', (_event, windowId) => {
         }
     });
 
+    // 增强置顶策略：使用多种方法确保窗口永远置顶
+    // 参考：https://github.com/electron/electron/issues/37865
+    win.setAlwaysOnTop(true, 'screen-saver');  // 使用最高层级 screen-saver
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });  // 在所有工作区和全屏时可见
+
+    log.info(`[open-floating-window] 置顶设置完成: alwaysOnTop=${win.isAlwaysOnTop()}`);
+
     // 加载浮窗页面（hash 路由）
     win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), {
         hash: `/floating/${windowId}`
