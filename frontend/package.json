@@ -38,11 +38,10 @@
     "@tiptap/react": "^3.18.0",
     "@tiptap/starter-kit": "^3.18.0",
     "@tiptap/suggestion": "^3.18.0",
-    "build": "^0.1.4",
     "date-fns": "^4.1.0",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.5",
-    "electron-log": "^5.2.4",
+    "electron-log": "^5.4.3",
     "electron-updater": "^6.8.3",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.555.0",
@@ -80,7 +79,7 @@
       "dist/**/*",
       "electron/**/*",
       "!node_modules",
-      "node_modules/{electron-updater,builder-util-runtime,fs-extra,graceful-fs,js-yaml,argparse,jsonfile,lazy-val,lodash.escaperegexp,lodash.isequal,semver,tiny-typed-emitter,universalify,debug,ms,sax}/**/*"
+      "node_modules/{electron-updater,electron-log,builder-util-runtime,fs-extra,graceful-fs,js-yaml,argparse,jsonfile,lazy-val,lodash.escaperegexp,lodash.isequal,semver,tiny-typed-emitter,universalify,debug,ms,sax}/**/*"
     ],
     "extraResources": [
       {

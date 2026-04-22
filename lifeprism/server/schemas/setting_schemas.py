@@ -55,6 +55,7 @@ class SettingsResponse(BaseModel):
     """获取配置响应"""
     settings: SettingItems
     message: str = "success"
+    require_vlm_test: bool = Field(default=False, description="是否需要调用 VLM 测试接口")
 
 
 class UpdateSettingsRequest(BaseModel):
@@ -79,6 +80,7 @@ class UpdateSettingsRequest(BaseModel):
     screenshot_retention_days: Optional[int] = None
     cleanup_check_interval_seconds: Optional[int] = None
     screenshot_monitor: Optional[bool] = None
+    monitor_type: Optional[str] = None
 
 
 class UpdateApiKeyRequest(BaseModel):

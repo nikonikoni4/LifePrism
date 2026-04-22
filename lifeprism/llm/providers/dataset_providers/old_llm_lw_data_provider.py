@@ -796,7 +796,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
                 - daily_durations: {date_str: duration_seconds} 每日时长字典
         """
         from collections import defaultdict
-        from datetime import datetime, timedelta
+        from datetime import datetime
         
         # 解析时间
         range_start = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
@@ -1238,7 +1238,7 @@ class LLMLWDataProvider(LWBaseDataProvider):
         from collections import defaultdict
         
         # 解析日期
-        date_obj = datetime.strptime(date, "%Y-%m-%d")
+        # date_obj = datetime.strptime(date, "%Y-%m-%d")
         
         # 获取当天所有活动日志，包含 category_id 用于统计
         logs, _ = self.get_activity_logs(
@@ -1562,24 +1562,5 @@ class LLMLWDataProvider(LWBaseDataProvider):
         
         return stats
 
-llm_lw_data_provider = LazySingleton(LLMLWDataProvider)
+old_llm_lw_data_provider = LazySingleton(LLMLWDataProvider)
 
-if __name__ == "__main__":
-    from lifeprism.llm.utils.data_base_format import (
-        format_hourly_logs,
-        format_daily_goal_trend,
-        format_daily_category_trend,
-        format_computer_usage_schedule,
-        format_focus_and_todos
-    )
-    
-    print(format_hourly_logs(llm_lw_data_provider.get_logs_by_time("2026-01-05")))
-    print("\n=== 重点与待办统计 ===")
-    print(format_focus_and_todos(llm_lw_data_provider.get_focus_and_todos(start_time="2026-01-01 00:00:00", end_time="2026-01-05 23:59:59")))
-    print("=== 目标时长统计 ===")
-    print(format_daily_goal_trend(llm_lw_data_provider.get_daily_goal_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59")))
-    print("\n=== 主分类时长统计 ===")
-    print(format_daily_category_trend(llm_lw_data_provider.get_daily_category_trend("2025-12-25 00:00:00", "2025-12-30 23:59:59")))
-    print("\n=== 电脑使用时间分析（作息推断） ===")
-    print(format_computer_usage_schedule(llm_lw_data_provider.get_computer_usage_schedule("2025-12-25", "2025-12-30")))
-    

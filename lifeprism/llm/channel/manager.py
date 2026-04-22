@@ -4,10 +4,10 @@ import time
 from typing import Any
 from collections import deque
 from lifeprism.llm.bus import InboundMessage, OutboundMessage, bus, MessageQueue
-from lifeprism.utils.logger import get_logger, DEBUG
+from lifeprism.utils.logger import get_logger, DEBUG,INFO
 from lifeprism.utils.lazy_singleton import LazySingleton
 logger = get_logger(__name__)
-logger.setLevel(DEBUG)
+logger.setLevel(INFO)
 TIMEOUT_MAX = 600.0
 RATE_LIMIT = 100       # 每分钟最大请求数
 RATE_WINDOW = 60.0     # 滑动窗口（秒）
@@ -77,10 +77,10 @@ class Channel:
         # 5. 异步保存统计信息 (不阻塞消息返回)
         if result.response and result.response.usage:
             try:
-                from lifeprism.llm.providers.llm_usage_db_provider import llm_usage_db_provider
+                from lifeprism.llm.providers.dataset_providers import llm_dataset_provider
                 asyncio.create_task(asyncio.to_thread(
-                    llm_usage_db_provider.save_usage,
-                    session_id=msg.session_id,
+                    llm_dataset_provider.save_usage,
+                    session_id=result.session_id,
                     usage=result.response.usage,
                     mode=msg.type
                 ))

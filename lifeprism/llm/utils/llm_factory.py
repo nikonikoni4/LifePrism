@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 
 from lifeprism.config.settings_manager import settings
 from lifeprism.config.provider_manager import provider_manager
-from lifeprism.llm.providers.registry import find_by_name
+from lifeprism.llm.providers import find_by_name
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ def create_llm(
             enable_thinking=True
         )
     """
-    from lifeprism.llm.providers.litellm_provider import LiteLLMProvider
+    from lifeprism.llm.providers import LiteLLMProvider
 
     provider_id = get_provider_id(provider)
     spec = find_by_name(provider_id)

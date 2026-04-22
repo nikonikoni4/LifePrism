@@ -21,6 +21,8 @@ export interface ProviderListResponse {
     providers: ProviderInfo[];
 }
 
+export type MonitorType = 'lifeprism' | 'activitywatch';
+
 /** 完整配置项 (对应后端 SettingItems) */
 export interface Settings {
     user_name: string;
@@ -37,10 +39,13 @@ export interface Settings {
     long_log_threshold: number;
     multi_purpose_app_names: string[];
     aw_db_path: string;
+    monitor_type?: MonitorType;
     lifeprism_data_path: string;
     config_base_path: string;
     data_cleaning_threshold: number;
     screenshot_monitor?: boolean;
+    active_screenshot_frequency_level?: number;
+    screenshot_retention_days?: number;
     is_vlm?: Record<string, boolean>;
 }
 
@@ -48,6 +53,7 @@ export interface Settings {
 export interface SettingsResponse {
     settings: Settings;
     message: string;
+    require_vlm_test?: boolean;
 }
 
 /** 更新配置请求 (部分更新) */
@@ -62,6 +68,7 @@ export interface UpdateSettingsRequest {
     long_log_threshold?: number;
     multi_purpose_app_names?: string[];
     aw_db_path?: string;
+    monitor_type?: MonitorType;
     lifeprism_data_path?: string;
     data_cleaning_threshold?: number;
     screenshot_monitor?: boolean;

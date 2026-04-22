@@ -11,7 +11,8 @@ def _log_startup_time(step_name: str, start_time: float) -> float:
     current = time.perf_counter()
     elapsed = (current - start_time) * 1000  # 转换为毫秒
     total = (current - _startup_timer) * 1000
-    print(f"[STARTUP] {step_name}: {elapsed:.2f}ms (累计: {total:.2f}ms)")
+    # 关闭打印
+    # print(f"[STARTUP] {step_name}: {elapsed:.2f}ms (累计: {total:.2f}ms)")
     return current
 
 _step_start = _startup_timer
@@ -144,6 +145,8 @@ async def lifespan(app: FastAPI):
     print(f"\n{'='*60}")
     print("[STARTUP] 进入 lifespan - 应用初始化阶段")
     print(f"{'='*60}")
+    from lifeprism.utils.logger import enable_uvicorn_file_logging
+    enable_uvicorn_file_logging()
     
     # 启动时：初始化资源文件（打包环境：从 exe 内嵌资源复制缺失文件）
     logger.info("正在初始化资源文件...")
@@ -515,7 +518,8 @@ if __name__ == "__main__":
             app,  # 直接传入 app 对象，不使用字符串
             host="0.0.0.0",
             port=port,
-            log_level="info"
+            log_level="info",
+            access_log=True
         )
     else:
         # 开发模式：启用热重载
@@ -526,5 +530,6 @@ if __name__ == "__main__":
             reload=True,
             reload_dirs=["lifeprism"],  # 只监控 Python 代码目录
             reload_excludes=["__pycache__", "*.pyc", ".git","*.db","lifeprism.egg-info"],
-            log_level="info"
+            log_level="info",
+            access_log=True
         ) 

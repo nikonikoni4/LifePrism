@@ -524,13 +524,9 @@ class ProviderManager:
     def _initialize(self) -> None:
         self._raw_specs: list[dict[str, Any]] = []
         self._allowed_providers: list[str] = []
-        is_dev = not getattr(sys, "frozen", False)
-        if is_dev:
-            self._config_path = Path(__file__).parent / "providers.yaml"
-        else:
-            from lifeprism.config.settings_manager import settings
-
-            self._config_path = (
+        from lifeprism.config.settings_manager import settings
+        # 打包环境和开发环境都使用_config_base_path
+        self._config_path = (
                 Path(settings.config_base_path) / "config" / "providers.yaml"
             )
         if not self._config_path.exists():

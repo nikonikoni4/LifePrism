@@ -12,7 +12,7 @@ from typing import Any
 import json_repair
 from openai import AsyncOpenAI
 
-from lifeprism.llm.providers.base import LLMProvider, LLMResponse, ToolCallRequest
+from lifeprism.llm.providers.llm_providers.base import LLMProvider, LLMResponse, ToolCallRequest
 
 
 class CustomProvider(LLMProvider):

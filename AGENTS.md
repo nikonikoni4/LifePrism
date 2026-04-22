@@ -79,4 +79,3 @@
    5. 小范围修补或局部 bugfix
 
 
-8. **笔记输出目录**:当需要输出笔记时，将笔记输出在`D:/desktop/quackDocs/my_notes/temp_notes`

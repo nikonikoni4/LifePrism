@@ -54,7 +54,7 @@ class SettingsManager:
         'keyboard_keepalive_seconds': 12,
         'mouse_keepalive_seconds': 6,
         'enter_screenshot_delay_ms': 700,
-        'screenshot_retention_days': 3,
+        'screenshot_retention_days': 7,
         'cleanup_check_interval_seconds': 86400,
         'is_vlm': {},  # Dict[str, bool], key = "provider_id/model_name"
         'screenshot_monitor': False,
@@ -79,13 +79,8 @@ class SettingsManager:
 
         # 1. 解析配置文件基础路径（固定，不随数据迁移）
         self._config_base_path = self._resolve_config_base_path()
-
-        if self._is_dev:
-            # 开发环境：使用 lifeprism/config/settings.yaml
-            self._config_path = Path(__file__).parent / 'settings.yaml'
-        else:
-            # 打包环境：配置文件始终在固定路径
-            self._config_path = self._config_base_path / 'config' / 'config.yaml'
+        
+        self._config_path = self._config_base_path / 'config' / 'config.yaml' # 打包环境和开发环境都使用_config_base_path，命名都改为config.yaml
         # 2. 加载 yaml 配置
         self._load_config()
 
@@ -146,13 +141,9 @@ class SettingsManager:
         """配置日志文件输出"""
         from lifeprism.utils.logger import setup_file_logging
 
-        if getattr(sys, 'frozen', False):
-            # 打包环境：日志写入 lifeprismData/debug_logs/
-            setup_file_logging(self._lifeprism_data_path / 'debug_logs')
-        else:
-            # 开发环境：日志写入项目根目录
-            root_dir = Path(__file__).parent.parent.parent
-            setup_file_logging(root_dir)
+        # 日志写入 {_lifeprism_data_path}/debug_logs/ 
+        setup_file_logging(self._lifeprism_data_path / 'debug_logs')
+ 
 
     def _check_data_path_safety(self) -> None:
         """检查数据路径是否位于安装目录内（仅打包环境）"""
@@ -425,6 +416,18 @@ class SettingsManager:
             updates: 要更新的配置字典
             save: 是否立即保存到文件
         """
+        # 验证 screenshot_retention_days
+        if 'screenshot_retention_days' in updates:
+            days = updates['screenshot_retention_days']
+            if days < 3:
+                raise ValueError(f"截图保留天数不能小于3天，当前值：{days}")
+
+        # 验证 active_screenshot_frequency_level
+        if 'active_screenshot_frequency_level' in updates:
+            level = updates['active_screenshot_frequency_level']
+            if level not in [1, 2, 3]:
+                raise ValueError(f"频率等级必须是1、2或3，当前值：{level}")
+
         # 分离出 api_key
         if 'api_key' in updates:
             api_key = updates.pop('api_key')

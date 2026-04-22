@@ -27,6 +27,10 @@ from .md_os import(
     extract_behavior_logs_from_file,
     write_behavior_md
 )
+from .density_utils import (
+    compute_bucket_density,
+    build_time_segments,
+)
 
 __all__ = [
     # 向后兼容
@@ -47,5 +51,7 @@ __all__ = [
     "parse_token_usage",
     "read_md",
     "extract_behavior_logs_from_file",
-    "write_behavior_md"
+    "write_behavior_md",
+    "compute_bucket_density",
+    "build_time_segments",
 ]

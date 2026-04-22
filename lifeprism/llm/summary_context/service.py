@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-from lifeprism.llm.providers.summary_read_provider import summary_read_provider
+from lifeprism.llm.providers.dataset_providers.summary_read_provider import summary_read_provider
 from lifeprism.llm.summary_context.aggregators.activity_aggregator import build_activity_context
 from lifeprism.llm.summary_context.aggregators.authored_aggregator import build_authored_context
 from lifeprism.llm.summary_context.aggregators.coverage_aggregator import build_coverage_context

@@ -2,19 +2,19 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell } = 
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
-const log = require('electron-log/main');
+const log = require('electron-log');
+const yaml = require('js-yaml');
 const { initUpdater, setMainWindow, checkForUpdates, downloadUpdate, quitAndInstall } = require('./updater.cjs');
 
 let mainWindow;
 let backendProcess;
 let tray = null;
 let floatingWindows = {};
-let logStream = null;
 
 const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB
 
-// 获取 lifeprismData 路径（必须在初始化日志之前定义）
-function getLifeprismDataPath() {
+// 获取配置基础路径（固定，不随数据迁移）
+function getConfigBasePath() {
     if (app.isPackaged) {
         // 打包后：%LOCALAPPDATA%/LifePrism/lifeprismData
         return path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'LifePrism', 'lifeprismData');
@@ -24,18 +24,31 @@ function getLifeprismDataPath() {
     }
 }
 
-// 初始化 electron-log
-log.initialize();
-log.transports.file.level = 'debug';
-log.transports.console.level = 'debug';
-// 日志文件位置（在 app.whenReady() 后才调用 getLifeprismDataPath）
-log.transports.file.resolvePathFn = () => {
-    const logDir = path.join(getLifeprismDataPath(), 'debug_logs');
-    if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
+// 获取 lifeprismData 路径（可迁移，优先读取 yaml 配置）
+function getLifeprismDataPath() {
+    const configBasePath = getConfigBasePath();
+    const configPath = path.join(configBasePath, 'config', 'config.yaml');
+
+    // 优先级 1: 读取 yaml 配置
+    if (fs.existsSync(configPath)) {
+        try {
+            const config = yaml.load(fs.readFileSync(configPath, 'utf8'));
+            if (config && config.lifeprism_data_path) {
+                return config.lifeprism_data_path;
+            }
+        } catch (e) {
+            console.error('读取 yaml 配置失败:', e);
+        }
     }
-    return path.join(logDir, 'electron.log');
-};
+
+    // 优先级 2: 使用默认路径（与 configBasePath 相同）
+    return configBasePath;
+}
+
+// DEPRECATED: 保留向后兼容
+function getCustomDataPath() {
+    return getLifeprismDataPath();
+}
 
 // 初始化前端日志文件
 function initFrontendLog() {
@@ -44,37 +57,33 @@ function initFrontendLog() {
         fs.mkdirSync(logDir, { recursive: true });
     }
 
-    const logPath = path.join(logDir, 'frontend.log');
+    const logPath = path.join(logDir, 'electron.log');
 
-    // 启动时检查文件大小，超过阈值清空
+    // 启动时清空旧日志
     try {
-        if (fs.existsSync(logPath) && fs.statSync(logPath).size > MAX_LOG_SIZE) {
+        if (fs.existsSync(logPath)) {
             fs.writeFileSync(logPath, '');
         }
-    } catch (_) { /* ignore */ }
+    } catch (e) {
+        console.error('清空日志文件失败:', e);
+    }
 
-    logStream = fs.createWriteStream(logPath, { flags: 'a' });
+    // 配置 electron-log
+    log.transports.file.resolvePathFn = () => logPath;
+    log.transports.file.level = 'info';
+    log.transports.file.format = '{y}-{m}-{d} {h}:{i}:{s}.{ms} {level} {text}';
+    log.transports.console.level = 'info';
+    log.transports.console.format = '{y}-{m}-{d} {h}:{i}:{s}.{ms} {level} {text}';
 
-    // 劫持 main 进程 console
-    const origLog = console.log;
-    const origError = console.error;
-    const origWarn = console.warn;
+    // 劫持 console，让所有 console.log/error/warn 都通过 electron-log
+    console.log = log.info;
+    console.error = log.error;
+    console.warn = log.warn;
+    console.info = log.info;
+    console.debug = log.debug;
 
-    const writeLog = (level, args) => {
-        if (!logStream) return;
-        const ts = new Date().toISOString();
-        const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
-        logStream.write(`[${ts}] [${level}] ${msg}\n`);
-    };
-
-    console.log = (...args) => { origLog(...args); writeLog('INFO', args); };
-    console.error = (...args) => { origError(...args); writeLog('ERROR', args); };
-    console.warn = (...args) => { origWarn(...args); writeLog('WARN', args); };
-}
-
-// DEPRECATED: 保留向后兼容
-function getCustomDataPath() {
-    return getLifeprismDataPath();
+    log.info('Electron 日志系统初始化完成');
+    log.info(`数据路径: ${getLifeprismDataPath()}`);
 }
 
 // 启动 Python 后端
@@ -313,7 +322,7 @@ ipcMain.handle('is-packaged', () => app.isPackaged);
 
 // IPC: 获取配置文件
 ipcMain.handle('get-config', () => {
-    const configPath = path.join(getLifeprismDataPath(), 'config', 'config.json');
+    const configPath = path.join(getConfigBasePath(), 'config', 'config.json');
     try {
         if (fs.existsSync(configPath)) {
             const content = fs.readFileSync(configPath, 'utf-8');
@@ -384,10 +393,23 @@ ipcMain.handle('open-floating-window', (_event, windowId) => {
     // 已存在且未销毁 → show + focus
     const existing = floatingWindows[windowId];
     if (existing && !existing.isDestroyed()) {
+        log.info(`[open-floating-window] 窗口已存在: ${windowId}`);
+        log.info(`  isVisible: ${existing.isVisible()}`);
+        log.info(`  isFocused: ${existing.isFocused()}`);
+        log.info(`  isAlwaysOnTop: ${existing.isAlwaysOnTop()}`);
+
         existing.show();
         existing.focus();
+
+        log.info(`  执行 show() + focus() 后:`);
+        log.info(`  isVisible: ${existing.isVisible()}`);
+        log.info(`  isFocused: ${existing.isFocused()}`);
+        log.info(`  isAlwaysOnTop: ${existing.isAlwaysOnTop()}`);
+
         return { success: true, action: 'focused' };
     }
+
+    log.info(`[open-floating-window] 创建新窗口: ${windowId}`);
 
     const win = new BrowserWindow({
         width: 320,
@@ -549,8 +571,30 @@ ipcMain.handle('send-to-dialog', (_event, dialogId, channel, data) => {
 ipcMain.handle('resize-floating-window', (_event, windowId, { width, height }) => {
     const win = floatingWindows[windowId];
     if (win && !win.isDestroyed()) {
-        const [currentWidth] = win.getSize();
-        win.setSize(width ?? currentWidth, Math.round(height));
+        const [currentWidth, currentHeight] = win.getSize();
+        const [x, y] = win.getPosition();
+        const bounds = win.getBounds();
+
+        const newWidth = width ?? currentWidth;
+        const newHeight = Math.round(height);
+
+        log.info(`[resize-floating-window] windowId=${windowId}`);
+        log.info(`  当前尺寸: ${currentWidth}x${currentHeight}`);
+        log.info(`  当前位置: (${x}, ${y})`);
+        log.info(`  当前边界: x=${bounds.x}, y=${bounds.y}, w=${bounds.width}, h=${bounds.height}`);
+        log.info(`  请求尺寸: width=${width}, height=${height}`);
+        log.info(`  实际设置: ${newWidth}x${newHeight}`);
+
+        win.setSize(newWidth, newHeight);
+
+        const [afterWidth, afterHeight] = win.getSize();
+        const [afterX, afterY] = win.getPosition();
+        const afterBounds = win.getBounds();
+
+        log.info(`  设置后尺寸: ${afterWidth}x${afterHeight}`);
+        log.info(`  设置后位置: (${afterX}, ${afterY})`);
+        log.info(`  设置后边界: x=${afterBounds.x}, y=${afterBounds.y}, w=${afterBounds.width}, h=${afterBounds.height}`);
+
         return { success: true };
     }
     return { success: false };

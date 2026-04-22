@@ -52,10 +52,10 @@ class AgentLoop:
 
             # 5. 保存 assistant 回复并发布结果
             session.add_message("assistant", content=result.content)
-            await self._bus.publish_outbound(OutboundMessage(id=msg.id, response=result))
+            await self._bus.publish_outbound(OutboundMessage(id=msg.id, response=result,session_id=session.id))
 
             # 6. 保存session
-            if msg.type != MessageType.CLASSIFY: # 分类数据不保存
+            if msg.type == MessageType.CHAT: # 只有聊天数据才保存
                 session_manager.save_session(session)
         except Exception as e:
             logger.error(f"[AgentLoop] 处理消息 id={msg.id} 时出错: {e}", exc_info=True)

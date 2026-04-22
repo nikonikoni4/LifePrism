@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from lifeprism.config.settings_manager import settings
-from lifeprism.llm.providers.llm_lw_data_provider import llm_lw_data_provider
+from lifeprism.llm.providers.dataset_providers.old_llm_lw_data_provider import old_llm_lw_data_provider
 from lifeprism.server.providers.diary_provider import diary_provider
 from lifeprism.server.providers.habit_checkin_provider import habit_checkin_provider
 from lifeprism.server.providers.habit_challenge_provider import habit_challenge_provider
@@ -23,7 +23,7 @@ def _date_range(start_date: str, end_date: str):
 
 class SummaryReadProvider:
     def get_activity_logs_by_range(self, start_time: str, end_time: str) -> list[dict[str, Any]]:
-        return llm_lw_data_provider.query_behavior_logs(
+        return old_llm_lw_data_provider.query_behavior_logs(
             start_time=start_time,
             end_time=end_time,
             limit=None,

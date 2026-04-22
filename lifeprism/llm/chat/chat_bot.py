@@ -1,7 +1,7 @@
 from typing import List, Optional
 from lifeprism.llm.bus import MessageType
 from lifeprism.llm.channel.manager import channel_manager, Channel
-from lifeprism.llm.providers.base import LLMResponse
+from lifeprism.llm.providers.llm_providers.base import LLMResponse
 from lifeprism.llm.session.manager import session_manager, Session
 from lifeprism.utils import get_logger
 

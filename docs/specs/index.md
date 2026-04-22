@@ -28,3 +28,9 @@
 - path: `docs/specs/2026-04-15-mind-space-diary.md`
 - 触发规则：开发、修改或查询 Mind Space 日记界面相关功能时阅读
 - 内容摘要：Mind Space 日记界面功能规格，定义日记的存储机制（文件+数据库混合）、日记 CRUD API、模板管理 API、心情标签（5级）和重要程度标签（3级）的枚举值与颜色方案、前端交互设计原则（极简禅意风格）
+
+## config-spec
+- updated_at: 2026-04-20
+- path: `docs/specs/2026-04-20-config-spec.md`
+- 触发规则：开发、修改或查询配置管理模块相关功能时阅读（配置读写、路径解析、API Key 存储、Provider 管理、配置迁移、前后端配置交互）
+- 内容摘要：配置管理模块规格，定义配置读写流程（环境变量>keyring>yaml>默认值）、路径解析规则（config_base_path 固定/lifeprism_data_path 可迁移）及打包环境前后端路径配置详细流程图、API Key 安全存储（keyring）、Provider 管理（白名单/模型历史/VLM 缓存）、配置迁移机制及前后端交互契约（REST API），包含前端路径配置已知问题说明

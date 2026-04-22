@@ -59,6 +59,32 @@ EXAMPLE_PLAN_DOC = {
 # 示例计划书 MD 文件名
 EXAMPLE_PLAN_DOC_MD_FILENAME = "示例-planDoc.md"
 
+# 每日目标 ID（固定，用于关联 plan_doc）
+DAILY_GOAL_ID = 'goal-daily'
+
+# 每日目标配置
+DAILY_GOAL = {
+    'id': DAILY_GOAL_ID,
+    'name': '每日目标',
+    'content': '记录每日的目标和计划',
+    'color': '#5AD8A6',
+    'status': 'active',
+    'track_time_automatically': 0,
+    'milestones': '[]',
+    'time_unit': 'HRS',
+    'time_invested': 0,
+    'order_index': 1,
+}
+
+# 每日目标计划书配置
+DAILY_PLAN_DOC = {
+    'id': '每日目标-docs',
+    'goal_id': DAILY_GOAL_ID,
+    'content': '每日目标计划书',
+    'status': 'active',
+    'order_index': 1,
+}
+
 # 默认心情类型（sort_order 从 7 递减到 1，越大越靠前）
 DEFAULT_MOOD_TYPES = [
     {'id': 'joy',        'name': '喜悦', 'icon': 'Sun',         'color': '#fed7aa', 'score': 90, 'is_dark': 0, 'sort_order': 7},
@@ -111,6 +137,7 @@ class DataInitializer:
             self._initialize_example_plan_doc()
             self._initialize_default_mood_types()
             self._initialize_default_mood_impacts()
+            self._initialize_daily_goal()
             logger.info("默认数据初始化检查完成")
         except Exception as e:
             logger.error(f"初始化默认数据失败: {e}")
@@ -344,6 +371,70 @@ class DataInitializer:
                 logger.info(f"成功初始化 {total} 个默认影响因素")
         except Exception as e:
             logger.error(f"初始化默认影响因素失败: {e}")
+            raise
+
+    def _initialize_daily_goal(self):
+        """
+        初始化每日目标和对应的计划书
+
+        检查 goal 表中是否已存在每日目标，不存在则添加
+        检查 plan_doc 表中是否已存在每日目标计划书，不存在则添加
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # 检查每日目标是否存在
+                cursor.execute("SELECT COUNT(*) FROM goal WHERE id = ?", (DAILY_GOAL_ID,))
+                goal_exists = cursor.fetchone()[0] > 0
+
+                if not goal_exists:
+                    cursor.execute("""
+                        INSERT INTO goal (
+                            id, name, content, color, status,
+                            track_time_automatically, milestones,
+                            time_unit, time_invested, order_index
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        DAILY_GOAL['id'],
+                        DAILY_GOAL['name'],
+                        DAILY_GOAL['content'],
+                        DAILY_GOAL['color'],
+                        DAILY_GOAL['status'],
+                        DAILY_GOAL['track_time_automatically'],
+                        DAILY_GOAL['milestones'],
+                        DAILY_GOAL['time_unit'],
+                        DAILY_GOAL['time_invested'],
+                        DAILY_GOAL['order_index'],
+                    ))
+                    logger.info(f"成功初始化每日目标，ID: {DAILY_GOAL_ID}")
+                else:
+                    logger.debug(f"每日目标已存在，跳过初始化，ID: {DAILY_GOAL_ID}")
+
+                # 检查每日目标计划书是否存在
+                cursor.execute("SELECT COUNT(*) FROM plan_doc WHERE id = ?", (DAILY_PLAN_DOC['id'],))
+                plan_doc_exists = cursor.fetchone()[0] > 0
+
+                if not plan_doc_exists:
+                    cursor.execute("""
+                        INSERT INTO plan_doc (
+                            id, goal_id, content, status, order_index
+                        )
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (
+                        DAILY_PLAN_DOC['id'],
+                        DAILY_PLAN_DOC['goal_id'],
+                        DAILY_PLAN_DOC['content'],
+                        DAILY_PLAN_DOC['status'],
+                        DAILY_PLAN_DOC['order_index'],
+                    ))
+                    logger.info(f"成功初始化每日目标计划书，ID: {DAILY_PLAN_DOC['id']}")
+                else:
+                    logger.debug(f"每日目标计划书已存在，跳过初始化，ID: {DAILY_PLAN_DOC['id']}")
+
+        except Exception as e:
+            logger.error(f"初始化每日目标失败: {e}")
             raise
 
 

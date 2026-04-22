@@ -27,6 +27,8 @@ logging.basicConfig(
 )
 
 _file_handler_added = False
+_file_handler: logging.FileHandler | None = None
+_uvicorn_file_logging_added = False
 
 
 def setup_file_logging(log_dir: Path) -> None:
@@ -39,7 +41,7 @@ def setup_file_logging(log_dir: Path) -> None:
     Args:
         log_dir: 日志目录路径（如 lifeprismData/debug_logs）
     """
-    global _file_handler_added
+    global _file_handler_added, _file_handler
     if _file_handler_added:
         return
 
@@ -52,9 +54,28 @@ def setup_file_logging(log_dir: Path) -> None:
         file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
         file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
         logging.getLogger().addHandler(file_handler)
+        _file_handler = file_handler
         _file_handler_added = True
     except Exception as e:
         print(f"[WARNING] 无法创建日志文件: {e}")
+
+
+def enable_uvicorn_file_logging() -> None:
+    """
+    在服务器运行阶段将 uvicorn/fastapi 日志写入 lifeprism.log。
+
+    注意：uvicorn.run 会应用自己的日志配置，可能覆盖初始化阶段的 logger 绑定，
+    因此在 lifespan 启动时再执行一次绑定，确保 access log 落盘。
+    """
+    global _uvicorn_file_logging_added
+    if _uvicorn_file_logging_added or _file_handler is None:
+        return
+
+    for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access", "fastapi"):
+        uvicorn_logger = logging.getLogger(logger_name)
+        uvicorn_logger.addHandler(_file_handler)
+
+    _uvicorn_file_logging_added = True
 
 
 def get_logger(name: str, level=None) -> logging.Logger:
