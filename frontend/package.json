@@ -38,7 +38,6 @@
     "@tiptap/react": "^3.18.0",
     "@tiptap/starter-kit": "^3.18.0",
     "@tiptap/suggestion": "^3.18.0",
-    "build": "^0.1.4",
     "date-fns": "^4.1.0",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.5",
