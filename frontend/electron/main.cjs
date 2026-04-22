@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell } = 
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const log = require('electron-log/main');
 const { initUpdater, setMainWindow, checkForUpdates, downloadUpdate, quitAndInstall } = require('./updater.cjs');
 
 let mainWindow;
@@ -11,6 +12,30 @@ let floatingWindows = {};
 let logStream = null;
 
 const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB
+
+// 获取 lifeprismData 路径（必须在初始化日志之前定义）
+function getLifeprismDataPath() {
+    if (app.isPackaged) {
+        // 打包后：%LOCALAPPDATA%/LifePrism/lifeprismData
+        return path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'LifePrism', 'lifeprismData');
+    } else {
+        // 开发时：项目根目录/localData
+        return path.join(__dirname, '..', '..', 'localData');
+    }
+}
+
+// 初始化 electron-log
+log.initialize();
+log.transports.file.level = 'debug';
+log.transports.console.level = 'debug';
+// 日志文件位置（在 app.whenReady() 后才调用 getLifeprismDataPath）
+log.transports.file.resolvePathFn = () => {
+    const logDir = path.join(getLifeprismDataPath(), 'debug_logs');
+    if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+    }
+    return path.join(logDir, 'electron.log');
+};
 
 // 初始化前端日志文件
 function initFrontendLog() {
@@ -47,17 +72,6 @@ function initFrontendLog() {
     console.warn = (...args) => { origWarn(...args); writeLog('WARN', args); };
 }
 
-// 获取 lifeprismData 路径
-function getLifeprismDataPath() {
-    if (app.isPackaged) {
-        // 打包后：%LOCALAPPDATA%/LifePrism/lifeprismData
-        return path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'LifePrism', 'lifeprismData');
-    } else {
-        // 开发时：项目根目录/localData
-        return path.join(__dirname, '..', '..', 'localData');
-    }
-}
-
 // DEPRECATED: 保留向后兼容
 function getCustomDataPath() {
     return getLifeprismDataPath();
@@ -86,19 +100,25 @@ function startBackend() {
     }
 
     backendProcess.stdout.on('data', (data) => {
-        console.log(`[Backend] ${data.toString().trim()}`);
+        const msg = data.toString().trim();
+        console.log(`[Backend] ${msg}`);
+        log.info(`[Backend stdout] ${msg}`);
     });
 
     backendProcess.stderr.on('data', (data) => {
-        console.error(`[Backend Error] ${data.toString().trim()}`);
+        const msg = data.toString().trim();
+        console.error(`[Backend Error] ${msg}`);
+        log.error(`[Backend stderr] ${msg}`);
     });
 
     backendProcess.on('error', (err) => {
         console.error('[Backend] 启动失败:', err);
+        log.error('[Backend] 启动失败:', err);
     });
 
     backendProcess.on('exit', (code) => {
         console.log(`[Backend] 进程退出，代码: ${code}`);
+        log.info(`[Backend] 进程退出，代码: ${code}`);
     });
 }
 
@@ -201,11 +221,23 @@ function createWindow() {
 
     // 捕获 renderer 进程的 console 输出写入日志文件
     mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-        if (!logStream) return;
         const ts = new Date().toISOString();
         const levelMap = { 0: 'DEBUG', 1: 'INFO', 2: 'WARN', 3: 'ERROR' };
         const src = sourceId ? `${sourceId}:${line}` : '';
-        logStream.write(`[${ts}] [Renderer/${levelMap[level] || 'INFO'}] ${message}${src ? ` (${src})` : ''}\n`);
+        const logMsg = `[${ts}] [Renderer/${levelMap[level] || 'INFO'}] ${message}${src ? ` (${src})` : ''}`;
+
+        if (logStream) {
+            logStream.write(logMsg + '\n');
+        }
+
+        // 使用 electron-log 记录
+        if (level === 3) { // ERROR
+            log.error(`[Renderer] ${message}`, { source: sourceId, line });
+        } else if (level === 2) { // WARN
+            log.warn(`[Renderer] ${message}`, { source: sourceId, line });
+        } else {
+            log.info(`[Renderer] ${message}`, { source: sourceId, line });
+        }
     });
 
     // 直接加载构建后的文件（npm run electron:dev 会先构建）
@@ -213,14 +245,18 @@ function createWindow() {
 
     // 窗口加载完成后显示
     mainWindow.once('ready-to-show', () => {
+        log.info('[Window] ready-to-show, calling show()');
         mainWindow.show();
+        log.info('[Window] mainWindow shown');
     });
 
     // 点击关闭按钮时，隐藏窗口到托盘而不是关闭
     mainWindow.on('close', (event) => {
+        log.info('[Window] close event', { isQuitting: app.isQuitting });
         if (!app.isQuitting) {
             event.preventDefault();
             mainWindow.hide();
+            log.info('[Window] mainWindow hidden to tray');
             // 可选：显示托盘通知（首次隐藏时）
             if (tray && !app.hasShownTrayNotification) {
                 tray.displayBalloon({
@@ -231,6 +267,33 @@ function createWindow() {
                 app.hasShownTrayNotification = true;
             }
         }
+    });
+
+    // 窗口焦点事件
+    mainWindow.on('focus', () => {
+        log.info('[Window] focus event');
+    });
+
+    mainWindow.on('blur', () => {
+        log.info('[Window] blur event');
+    });
+
+    // 窗口不可见/可见事件
+    mainWindow.on('unresponsive', () => {
+        log.warn('[Window] unresponsive!');
+    });
+
+    mainWindow.on('responsive', () => {
+        log.info('[Window] responsive again');
+    });
+
+    // 页面崩溃事件
+    mainWindow.webContents.on('crashed', (event, killed) => {
+        log.error('[Window] renderer crashed!', { killed });
+    });
+
+    mainWindow.webContents.on('render-process-gone', (event, details) => {
+        log.error('[Window] render process gone', details);
     });
 
     // 开发时打开开发者工具
