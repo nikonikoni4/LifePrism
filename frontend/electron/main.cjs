@@ -601,6 +601,33 @@ ipcMain.handle('get-floating-window-size', (_event, windowId) => {
 // IPC: 检查更新
 ipcMain.handle('updater:check', () => checkForUpdates(app.isPackaged));
 
+// IPC: 显示确认对话框（避免原生 confirm 导致焦点丢失问题）
+ipcMain.handle('show-confirm', (_event, options) => {
+    const { message, title = '确认' } = options;
+    const result = dialog.showMessageBoxSync(mainWindow, {
+        type: 'question',
+        buttons: ['取消', '确定'],
+        defaultId: 0,
+        cancelId: 0,
+        title: title,
+        message: message,
+    });
+    // 返回 true 表示点击了"确定"（index === 1）
+    return result === 1;
+});
+
+// IPC: 显示消息对话框（避免原生 alert 导致焦点丢失问题）
+ipcMain.handle('show-alert', (_event, options) => {
+    const { message, title = '提示' } = options;
+    dialog.showMessageBoxSync(mainWindow, {
+        type: 'info',
+        buttons: ['确定'],
+        defaultId: 0,
+        title: title,
+        message: message,
+    });
+});
+
 // IPC: 下载更新
 ipcMain.handle('updater:download', () => downloadUpdate(app.isPackaged));
 

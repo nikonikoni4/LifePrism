@@ -148,6 +148,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
         preloadLog('INFO', 'invoke:get-floating-window-size', windowId);
         return ipcRenderer.invoke('get-floating-window-size', windowId);
     },
+
+    // 显示确认对话框（避免原生 confirm 导致焦点丢失问题）
+    showConfirm: (options) => {
+        preloadLog('INFO', 'invoke:show-confirm', options);
+        return ipcRenderer.invoke('show-confirm', options);
+    },
+
+    // 显示消息对话框（避免原生 alert 导致焦点丢失问题）
+    showAlert: (options) => {
+        preloadLog('INFO', 'invoke:show-alert', options);
+        return ipcRenderer.invoke('show-alert', options);
+    },
 });
 
 // 在控制台输出 Electron 环境信息

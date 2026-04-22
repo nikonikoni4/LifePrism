@@ -255,7 +255,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
             setEditingRecord(null);
         } catch (err) {
             console.error('Failed to update record:', err);
-            alert('更新失败，请重试');
+            await window.electronAPI.showAlert({ message: '更新失败，请重试' });
         } finally {
             setIsProcessing(false);
         }
@@ -274,10 +274,10 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                 end_date: syncDateRange.end_date || undefined,
             });
             const updatedCount = result.data?.updated_count || 0;
-            alert(`成功同步更新 ${updatedCount} 条日志记录`);
+            await window.electronAPI.showAlert({ message: `成功同步更新 ${updatedCount} 条日志记录` });
         } catch (err) {
             console.error('Failed to sync logs:', err);
-            alert('同步日志失败，请重试');
+            await window.electronAPI.showAlert({ message: '同步日志失败，请重试' });
         } finally {
             setIsProcessing(false);
             setShowSyncConfirmModal(false);
@@ -296,7 +296,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
     const handleBatchUpdate = async () => {
         if (selectedIds.size === 0) return;
         if (!batchForm.app_description && !batchForm.category_id) {
-            alert('请至少填写一项要修改的内容');
+            await window.electronAPI.showAlert({ message: '请至少填写一项要修改的内容' });
             return;
         }
 
@@ -321,10 +321,10 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
             setShowBatchEditModal(false);
             setBatchForm({ app_description: '', category_id: '', sub_category_id: '' });
             setSelectedIds(new Set());
-            alert(`成功更新 ${selectedIds.size} 条记录`);
+            await window.electronAPI.showAlert({ message: `成功更新 ${selectedIds.size} 条记录` });
         } catch (err) {
             console.error('Failed to batch update:', err);
-            alert('批量更新失败，请重试');
+            await window.electronAPI.showAlert({ message: '批量更新失败，请重试' });
         } finally {
             setIsProcessing(false);
         }
@@ -332,7 +332,7 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
 
     // 单条删除
     const handleDelete = async (recordId: string) => {
-        if (!confirm('确定要删除这条记录吗？')) return;
+        if (!(await window.electronAPI.showConfirm({ message: '确定要删除这条记录吗？' }))) return;
 
         try {
             await CategoryMapCacheAPI.delete(recordId);
@@ -342,13 +342,13 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
             setSelectedIds(new Set(selectedIds));
         } catch (err) {
             console.error('Failed to delete record:', err);
-            alert('删除失败，请重试');
+            await window.electronAPI.showAlert({ message: '删除失败，请重试' });
         }
     };
 
     // 批量删除
     const handleBatchDelete = async () => {
-        if (!confirm(`确定要删除选中的 ${selectedIds.size} 条记录吗？`)) return;
+        if (!(await window.electronAPI.showConfirm({ message: `确定要删除选中的 ${selectedIds.size} 条记录吗？` }))) return;
 
         try {
             setIsProcessing(true);
@@ -356,10 +356,10 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
             setRecords(prev => prev.filter(r => !selectedIds.has(r.id)));
             setTotalRecords(prev => prev - selectedIds.size);
             setSelectedIds(new Set());
-            alert(`成功删除 ${selectedIds.size} 条记录`);
+            await window.electronAPI.showAlert({ message: `成功删除 ${selectedIds.size} 条记录` });
         } catch (err) {
             console.error('Failed to batch delete:', err);
-            alert('批量删除失败，请重试');
+            await window.electronAPI.showAlert({ message: '批量删除失败，请重试' });
         } finally {
             setIsProcessing(false);
         }

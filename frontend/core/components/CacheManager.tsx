@@ -38,14 +38,15 @@ export const CacheManagerComponent: React.FC = () => {
         loadStats();
     }, []);
 
-    const handleClearAll = () => {
-        if (window.confirm('确定要清除所有缓存吗?这将删除所有已缓存的报告数据。')) {
-            setIsLoading(true);
-            CacheManager.clear();
-            loadStats();
-            setIsLoading(false);
-            alert('已清除所有缓存');
+    const handleClearAll = async () => {
+        if (!(await window.electronAPI.showConfirm({ message: '确定要清除所有缓存吗?这将删除所有已缓存的报告数据。' }))) {
+            return;
         }
+        setIsLoading(true);
+        CacheManager.clear();
+        loadStats();
+        setIsLoading(false);
+        window.electronAPI.showAlert({ message: '已清除所有缓存' });
     };
 
     const handleClearExpired = () => {
@@ -53,17 +54,18 @@ export const CacheManagerComponent: React.FC = () => {
         const count = CacheManager.clearExpired();
         loadStats();
         setIsLoading(false);
-        alert(`已清除 ${count} 个过期缓存项`);
+        window.electronAPI.showAlert({ message: `已清除 ${count} 个过期缓存项` });
     };
 
-    const handleClearReports = () => {
-        if (window.confirm('确定要清除所有报告缓存吗?')) {
-            setIsLoading(true);
-            ReportCacheService.clearAllReports();
-            loadStats();
-            setIsLoading(false);
-            alert('已清除所有报告缓存');
+    const handleClearReports = async () => {
+        if (!(await window.electronAPI.showConfirm({ message: '确定要清除所有报告缓存吗?' }))) {
+            return;
         }
+        setIsLoading(true);
+        ReportCacheService.clearAllReports();
+        loadStats();
+        setIsLoading(false);
+        window.electronAPI.showAlert({ message: '已清除所有报告缓存' });
     };
 
     if (!stats) {

@@ -76,6 +76,33 @@ const CustomBlockPopover: React.FC<CustomBlockPopoverProps> = ({
     const popoverRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // 监控组件挂载和卸载
+    useEffect(() => {
+        console.log('[Popover] 组件挂载，isOpen:', isOpen);
+        return () => {
+            console.log('[Popover] 组件卸载');
+            // 检查卸载时的遮罩层
+            const overlays = document.querySelectorAll('.fixed.inset-0');
+            console.log('[Popover] 卸载时遮罩层数量:', overlays.length);
+        };
+    }, []);
+
+    // 监控isOpen变化
+    useEffect(() => {
+        console.log('[Popover] isOpen 变化:', isOpen);
+        if (!isOpen) {
+            console.log('[Popover] isOpen=false，组件应该返回null');
+            // 检查此时的遮罩层
+            setTimeout(() => {
+                const overlays = document.querySelectorAll('.fixed.inset-0');
+                console.log('[Popover] isOpen=false 100ms后，遮罩层数量:', overlays.length);
+                overlays.forEach((overlay, idx) => {
+                    console.log(`  遮罩层 ${idx}:`, overlay.className);
+                });
+            }, 100);
+        }
+    }, [isOpen]);
+
     // 初始化/更新表单数据
     useEffect(() => {
         if (block) {
@@ -180,15 +207,57 @@ const CustomBlockPopover: React.FC<CustomBlockPopoverProps> = ({
     };
 
     // 处理删除
-    const handleDelete = () => {
+    const handleDelete = async () => {
+        console.log('=== [Popover] handleDelete 开始 ===');
+        console.log('[Popover] block:', block);
+        console.log('[Popover] isOpen:', isOpen);
+
         if (block && onDelete) {
-            if (confirm('确定要删除这个时间块吗？')) {
+            // 记录删除前的DOM状态
+            console.log('[Popover] 删除前 - 遮罩层详情:');
+            const overlaysBefore = document.querySelectorAll('.fixed.inset-0');
+            overlaysBefore.forEach((overlay, idx) => {
+                console.log(`  遮罩层 ${idx}:`, {
+                    className: overlay.className,
+                    zIndex: window.getComputedStyle(overlay).zIndex,
+                    display: window.getComputedStyle(overlay).display,
+                    pointerEvents: window.getComputedStyle(overlay).pointerEvents,
+                    parentElement: overlay.parentElement?.tagName,
+                });
+            });
+
+            console.log('[Popover] 即将显示 confirm 对话框');
+            const confirmStart = Date.now();
+
+            if (await window.electronAPI.showConfirm({ message: '确定要删除这个时间块吗？' })) {
+                const confirmEnd = Date.now();
+                console.log(`[Popover] confirm 确认，耗时: ${confirmEnd - confirmStart}ms`);
+
+                // 记录confirm后的DOM状态
+                console.log('[Popover] confirm后 - 遮罩层详情:');
+                const overlaysAfterConfirm = document.querySelectorAll('.fixed.inset-0');
+                overlaysAfterConfirm.forEach((overlay, idx) => {
+                    console.log(`  遮罩层 ${idx}:`, {
+                        className: overlay.className,
+                        zIndex: window.getComputedStyle(overlay).zIndex,
+                        display: window.getComputedStyle(overlay).display,
+                        pointerEvents: window.getComputedStyle(overlay).pointerEvents,
+                    });
+                });
+
+                console.log('[Popover] 调用 onDelete');
                 onDelete(block.id);
+            } else {
+                const confirmEnd = Date.now();
+                console.log(`[Popover] confirm 取消，耗时: ${confirmEnd - confirmStart}ms`);
             }
         }
+        console.log('=== [Popover] handleDelete 结束 ===');
     };
 
     if (!isOpen) return null;
+
+    console.log('[Popover] 渲染中 - isOpen:', isOpen, 'block:', block?.id);
 
     // 是否使用固定位置（跟随鼠标）还是居中显示
     const useFixedPosition = !!position;

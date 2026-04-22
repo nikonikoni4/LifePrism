@@ -56,7 +56,7 @@ export const ChainCard: React.FC<ChainCardProps> = ({ chain }) => {
     const hasMore = chain.nodes.length > 2;
 
     const handleDelete = async () => {
-        if (window.confirm('确认删除该链条及其所有节点吗？')) {
+        if (!(await window.electronAPI.showConfirm({ message: '确认删除该链条及其所有节点吗？' }))) {
             await deleteChain(chain.id);
         }
     };

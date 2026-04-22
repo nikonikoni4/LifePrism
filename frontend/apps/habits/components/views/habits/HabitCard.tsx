@@ -97,7 +97,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit }) => {
     };
 
     const handleDelete = async () => {
-        if (window.confirm('删除后不可恢复，确认删除？')) {
+        if (!(await window.electronAPI.showConfirm({ message: '删除后不可恢复，确认删除？' }))) {
             try {
                 await deleteHabit(habit.id);
             } catch {

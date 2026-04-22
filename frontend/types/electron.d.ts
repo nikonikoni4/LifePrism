@@ -54,6 +54,12 @@ interface ElectronAPI {
 
     // 浮窗大小调整
     resizeFloatingWindow: (windowId: string, size: { width?: number; height?: number }) => Promise<{ success: boolean }>;
+
+    // 显示确认对话框（避免原生 confirm 导致焦点丢失问题）
+    showConfirm: (options: { message: string; title?: string }) => Promise<boolean>;
+
+    // 显示消息对话框（避免原生 alert 导致焦点丢失问题）
+    showAlert: (options: { message: string; title?: string }) => Promise<void>;
 }
 
 interface Window {

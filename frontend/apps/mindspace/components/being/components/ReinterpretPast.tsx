@@ -45,7 +45,7 @@ const ReinterpretPast: React.FC<ReinterpretPastProps> = ({ onExit }) => {
 
   const handleNext = (nextStep: number) => {
     if (nextStep === 3 && !answers.event1.trim()) {
-      alert("请至少记录第一件事。");
+      window.electronAPI.showAlert({ message: "请至少记录第一件事。" });
       return;
     }
     setStep(nextStep);

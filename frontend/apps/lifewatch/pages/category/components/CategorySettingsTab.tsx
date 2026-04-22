@@ -56,13 +56,13 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
             setEditCatName('New Category');
         } catch (error) {
             console.error('Failed to create category:', error);
-            alert('Failed to create category. Please try again.');
+            window.electronAPI.showAlert({ message: 'Failed to create category. Please try again.' });
         }
     };
 
     const handleDeleteCategory = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (confirm('Are you sure? This will delete all sub-categories and associated rules.')) {
+        if (!(await window.electronAPI.showConfirm({ message: 'Are you sure? This will delete all sub-categories and associated rules.' }))) {
             try {
                 await CategoryAPI.deleteCategory(id);
                 const newCats = categories.filter(c => c.id !== id);
@@ -72,7 +72,7 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
                 }
             } catch (error) {
                 console.error('Failed to delete category:', error);
-                alert('Failed to delete category. Please try again.');
+                window.electronAPI.showAlert({ message: 'Failed to delete category. Please try again.' });
             }
         }
     };
@@ -95,7 +95,7 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
             setEditingCatId(null);
         } catch (error) {
             console.error('Failed to update category:', error);
-            alert('Failed to update category. Please try again.');
+            window.electronAPI.showAlert({ message: 'Failed to update category. Please try again.' });
         }
     };
 
@@ -129,7 +129,7 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
             setColorPickerCatId(null);
         } catch (error) {
             console.error('Failed to update category color:', error);
-            alert('Failed to update color. Please try again.');
+            window.electronAPI.showAlert({ message: 'Failed to update color. Please try again.' });
         }
     };
 
@@ -141,8 +141,8 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
         const action = newState === 0 ? '禁用' : '启用';
 
         if (newState === 0) {
-            const confirmed = confirm(
-                `确定要禁用此分类吗？\n\n禁用后，已分类的历史数据不会受影响，但该分类将不再参与后续的自动分类处理。`
+            const confirmed = await window.electronAPI.showConfirm(
+                { message: `确定要禁用此分类吗？\n\n禁用后，已分类的历史数据不会受影响，但该分类将不再参与后续的自动分类处理。` }
             );
             if (!confirmed) return;
         }
@@ -154,7 +154,7 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
             ));
         } catch (error) {
             console.error(`Failed to ${action} category:`, error);
-            alert(`Failed to ${action} category. Please try again.`);
+            window.electronAPI.showAlert({ message: `Failed to ${action} category. Please try again.` });
         }
     };
 
@@ -165,8 +165,8 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
         const action = newState === 0 ? '禁用' : '启用';
 
         if (newState === 0) {
-            const confirmed = confirm(
-                `确定要禁用此子分类吗？\n\n禁用后，已分类的历史数据不会受影响，但该子分类将不再参与后续的自动分类处理。`
+            const confirmed = await window.electronAPI.showConfirm(
+                { message: `确定要禁用此子分类吗？\n\n禁用后，已分类的历史数据不会受影响，但该子分类将不再参与后续的自动分类处理。` }
             );
             if (!confirmed) return;
         }
@@ -186,7 +186,7 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
             }));
         } catch (error) {
             console.error(`Failed to ${action} sub-category:`, error);
-            alert(`Failed to ${action} sub-category. Please try again.`);
+            window.electronAPI.showAlert({ message: `Failed to ${action} sub-category. Please try again.` });
         }
     };
 
@@ -209,7 +209,7 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
             setNewSubName('');
         } catch (error) {
             console.error('Failed to create sub-category:', error);
-            alert('Failed to create sub-category. Please try again.');
+            window.electronAPI.showAlert({ message: 'Failed to create sub-category. Please try again.' });
         }
     };
 
@@ -229,7 +229,7 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
             }));
         } catch (error) {
             console.error('Failed to delete sub-category:', error);
-            alert('Failed to delete sub-category. Please try again.');
+            window.electronAPI.showAlert({ message: 'Failed to delete sub-category. Please try again.' });
         }
     };
 
@@ -257,7 +257,7 @@ const CategorySettingsTab: React.FC<CategorySettingsTabProps> = ({ categories, s
             setEditingSubId(null);
         } catch (error) {
             console.error('Failed to update sub-category:', error);
-            alert('Failed to update sub-category. Please try again.');
+            window.electronAPI.showAlert({ message: 'Failed to update sub-category. Please try again.' });
         }
     };
 

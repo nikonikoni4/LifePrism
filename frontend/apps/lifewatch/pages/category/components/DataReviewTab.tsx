@@ -194,7 +194,7 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
             ));
         } catch (err) {
             console.error('Failed to update category:', err);
-            alert('更新分类失败，请重试');
+            window.electronAPI.showAlert({ message: '更新分类失败，请重试' });
         }
     };
 
@@ -208,13 +208,57 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
             ));
         } catch (err) {
             console.error('Failed to update sub-category:', err);
-            alert('更新子分类失败，请重试');
+            window.electronAPI.showAlert({ message: '更新子分类失败，请重试' });
         }
     };
 
     // 单条删除处理
     const handleDelete = async (logId: string) => {
-        if (!confirm('确定要删除这条记录吗？此操作不可撤销。')) return;
+        console.log('=== [DataReview] handleDelete 开始 ===');
+
+        console.log('[DataReview] 即将显示 confirm 对话框');
+
+        if (!(await window.electronAPI.showConfirm({ message: '确定要删除这条记录吗？此操作不可撤销。' }))) {
+            console.log('[DataReview] confirm 取消');
+
+            // 检查所有输入框的状态
+            setTimeout(() => {
+                const inputs = document.querySelectorAll('input, textarea');
+                console.log('[DataReview] confirm取消后，输入框总数:', inputs.length);
+                inputs.forEach((input, idx) => {
+                    const el = input as HTMLInputElement;
+                    if (idx < 5) { // 只检查前5个
+                        console.log(`  输入框 ${idx}:`, {
+                            tagName: el.tagName,
+                            type: el.type || 'N/A',
+                            disabled: el.disabled,
+                            readOnly: el.readOnly,
+                            tabIndex: el.tabIndex,
+                            style_pointerEvents: el.style.pointerEvents,
+                            computed_pointerEvents: window.getComputedStyle(el).pointerEvents,
+                            computed_display: window.getComputedStyle(el).display,
+                        });
+                    }
+                });
+
+                // 尝试手动聚焦到第一个输入框
+                const firstInput = inputs[0] as HTMLInputElement;
+                if (firstInput) {
+                    console.log('[DataReview] 尝试focus到第一个输入框');
+                    firstInput.focus();
+                    setTimeout(() => {
+                        console.log('[DataReview] focus后，activeElement:', document.activeElement?.tagName);
+                        console.log('[DataReview] focus后，是否是该输入框:', document.activeElement === firstInput);
+                    }, 100);
+                }
+            }, 100);
+
+            console.log('=== [DataReview] handleDelete 结束（取消） ===');
+            return;
+        }
+
+        console.log('[DataReview] confirm 确认');
+
         try {
             await ActivityLogsAPI.deleteLog(logId);
             setRecords(prev => prev.filter(r => r.id !== logId));
@@ -223,13 +267,14 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
             setSelectedIds(new Set(selectedIds));
         } catch (err) {
             console.error('Failed to delete log:', err);
-            alert('删除失败，请重试');
+            window.electronAPI.showAlert({ message: '删除失败，请重试' });
         }
+        console.log('=== [DataReview] handleDelete 结束 ===');
     };
 
     // 批量删除
     const handleBatchDelete = async () => {
-        if (!confirm(`确定要删除选中的 ${selectedIds.size} 条记录吗？此操作不可撤销。`)) return;
+        if (!(await window.electronAPI.showConfirm({ message: `确定要删除选中的 ${selectedIds.size} 条记录吗？此操作不可撤销。` }))) return;
         try {
             setIsProcessing(true);
             const result = await ActivityLogsAPI.batchDeleteLogs(Array.from(selectedIds));
@@ -237,10 +282,10 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
             setRecords(prev => prev.filter(r => !selectedIds.has(r.id)));
             setTotalRecords(prev => prev - deletedCount);
             setSelectedIds(new Set());
-            alert(`成功删除 ${deletedCount} 条记录`);
+            window.electronAPI.showAlert({ message: `成功删除 ${deletedCount} 条记录` });
         } catch (err) {
             console.error('Failed to batch delete:', err);
-            alert('批量删除失败，请重试');
+            window.electronAPI.showAlert({ message: '批量删除失败，请重试' });
         } finally {
             setIsProcessing(false);
         }
@@ -249,7 +294,7 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
     // 批量分类修改
     const handleBatchCategoryUpdate = async () => {
         if (!batchCategoryId) {
-            alert('请选择分类');
+            window.electronAPI.showAlert({ message: '请选择分类' });
             return;
         }
         try {
@@ -268,10 +313,10 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
             setBatchCategoryId('');
             setBatchSubCategoryId('');
             setSelectedIds(new Set());
-            alert(`成功更新 ${updatedCount} 条记录的分类`);
+            window.electronAPI.showAlert({ message: `成功更新 ${updatedCount} 条记录的分类` });
         } catch (err) {
             console.error('Failed to batch update category:', err);
-            alert('批量更新分类失败，请重试');
+            window.electronAPI.showAlert({ message: '批量更新分类失败，请重试' });
         } finally {
             setIsProcessing(false);
         }

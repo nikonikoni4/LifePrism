@@ -133,7 +133,7 @@ export const ChainNode: React.FC<ChainNodeProps> = ({ node, chainId }) => {
     }, [isMenuOpen]);
 
     const handleDelete = async () => {
-        if (window.confirm('确认删除该节点吗？')) {
+        if (!(await window.electronAPI.showConfirm({ message: '确认删除该节点吗？' }))) {
             await deleteNode(chainId, node.id);
         }
     };

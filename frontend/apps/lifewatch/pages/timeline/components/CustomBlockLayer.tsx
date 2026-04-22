@@ -153,12 +153,15 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
 
     // 关闭 Popover
     const handleClosePopover = useCallback(() => {
+        console.log('[CustomBlockLayer] handleClosePopover 被调用');
+        console.log('[CustomBlockLayer] 关闭前 popoverState:', popoverState);
         setPopoverState({
             isOpen: false,
             block: null,
             position: undefined,
         });
-    }, []);
+        console.log('[CustomBlockLayer] setPopoverState 已调用，设置 isOpen=false');
+    }, [popoverState]);
 
     // 保存 Popover 数据
     const handleSavePopover = useCallback(async (data: PopoverFormData, blockId?: number) => {
@@ -198,7 +201,7 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
             onUpdate();
         } catch (error) {
             console.error('Failed to save custom block:', error);
-            alert('保存失败，请重试');
+            window.electronAPI.showAlert({ message: '保存失败，请重试' });
         } finally {
             setIsSaving(false);
         }
@@ -206,15 +209,37 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
 
     // 删除块
     const handleDelete = useCallback(async (blockId: number) => {
+        console.log('=== [CustomBlockLayer] handleDelete 开始 ===');
+        console.log('[CustomBlockLayer] blockId:', blockId);
+        console.log('[CustomBlockLayer] popoverState:', popoverState);
+
         try {
             await CustomBlockAPI.delete(blockId);
+            console.log('[CustomBlockLayer] API删除成功');
+
+            console.log('[CustomBlockLayer] 调用 handleClosePopover');
             handleClosePopover();
+
+            console.log('[CustomBlockLayer] 调用 onUpdate');
             onUpdate();
+
+            // 延迟检查最终状态
+            setTimeout(() => {
+                const overlays = document.querySelectorAll('.fixed.inset-0');
+                console.log('[CustomBlockLayer] 删除完成500ms后，遮罩层数量:', overlays.length);
+                overlays.forEach((overlay, idx) => {
+                    console.log(`  遮罩层 ${idx}:`, {
+                        className: overlay.className,
+                        zIndex: window.getComputedStyle(overlay).zIndex,
+                    });
+                });
+            }, 500);
         } catch (error) {
             console.error('Failed to delete custom block:', error);
-            alert('删除失败，请重试');
+            window.electronAPI.showAlert({ message: '删除失败，请重试' });
         }
-    }, [handleClosePopover, onUpdate]);
+        console.log('=== [CustomBlockLayer] handleDelete 结束 ===');
+    }, [handleClosePopover, onUpdate, popoverState]);
 
     // 渲染单个色块（背景层）
     const renderBlock = (block: UserCustomBlock) => {

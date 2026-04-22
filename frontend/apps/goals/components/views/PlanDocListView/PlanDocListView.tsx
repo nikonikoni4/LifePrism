@@ -310,15 +310,16 @@ export const PlanDocListView: React.FC = () => {
 
     const handleDeleteDoc = async () => {
         if (selectedPlanDocId) {
-            if (confirm('Are you sure you want to delete this plan?')) {
-                try {
-                    await deletePlanDoc(selectedPlanDocId);
-                    setSelectedPlanDocId(null);
-                    toast.success('删除成功');
-                } catch (error) {
-                    console.error('Failed to delete doc:', error);
-                    toast.error('删除失败');
-                }
+            if (!(await window.electronAPI.showConfirm({ message: 'Are you sure you want to delete this plan?' }))) {
+                return;
+            }
+            try {
+                await deletePlanDoc(selectedPlanDocId);
+                setSelectedPlanDocId(null);
+                toast.success('删除成功');
+            } catch (error) {
+                console.error('Failed to delete doc:', error);
+                toast.error('删除失败');
             }
         }
     };

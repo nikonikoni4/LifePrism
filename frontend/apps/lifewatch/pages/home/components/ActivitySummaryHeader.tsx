@@ -282,7 +282,7 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
     // 执行时间范围同步
     const handleTimeRangeSync = async () => {
         if (!syncStartDate || !syncEndDate) {
-            alert('请选择开始和结束日期');
+            window.electronAPI.showAlert({ message: '请选择开始和结束日期' });
             return;
         }
 
@@ -303,10 +303,10 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
             if (onRefresh) {
                 onRefresh();
             }
-            alert('数据同步成功！');
+            window.electronAPI.showAlert({ message: '数据同步成功！' });
         } catch (error) {
             console.error('Sync failed:', error);
-            alert('数据同步失败，请查看控制台或lifeprismData/Debug_logs/lifeprism.log了解详情，请查看控制台了解详情');
+            window.electronAPI.showAlert({ message: '数据同步失败，请查看控制台或lifeprismData/Debug_logs/lifeprism.log了解详情，请查看控制台了解详情' });
         } finally {
             setIsSyncing(false);
         }
