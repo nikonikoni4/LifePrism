@@ -142,6 +142,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         preloadLog('INFO', 'invoke:resize-floating-window', { windowId, size });
         return ipcRenderer.invoke('resize-floating-window', windowId, size);
     },
+
+    // 获取浮窗当前尺寸
+    getFloatingWindowSize: (windowId) => {
+        preloadLog('INFO', 'invoke:get-floating-window-size', windowId);
+        return ipcRenderer.invoke('get-floating-window-size', windowId);
+    },
 });
 
 // 在控制台输出 Electron 环境信息

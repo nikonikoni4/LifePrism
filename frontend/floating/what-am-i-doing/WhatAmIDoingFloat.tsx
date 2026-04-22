@@ -96,12 +96,38 @@ export const WhatAmIDoingFloat: React.FC = () => {
     // 窗口自适应高度
     useEffect(() => {
         if (!contentRef.current) return;
+
+        let lastHeight = 0;
+
         const observer = new ResizeObserver((entries) => {
-            const contentHeight = entries[0].contentRect.height;
+            const entry = entries[0];
+            const contentHeight = entry.contentRect.height;
+            const heightChanged = contentHeight !== lastHeight;
+
+            // 只在高度真正变化时才调用resize，忽略宽度变化引起的触发
+            if (!heightChanged) {
+                return;
+            }
+
+            lastHeight = contentHeight;
+
             const totalHeight = contentHeight + TITLE_BAR_HEIGHT + ADD_BUTTON_HEIGHT + PADDING;
             const clampedHeight = Math.max(120, Math.min(totalHeight, MAX_WINDOW_HEIGHT));
-            window.electronAPI?.resizeFloatingWindow?.('what-am-i-doing', {
-                height: Math.round(clampedHeight),
+
+            // 获取当前窗口宽度，然后明确传入，避免Electron在副屏幕环境下的宽度bug
+            window.electronAPI?.getFloatingWindowSize?.('what-am-i-doing').then((result: any) => {
+                if (result?.success) {
+                    window.electronAPI?.resizeFloatingWindow?.('what-am-i-doing', {
+                        width: result.width,
+                        height: Math.round(clampedHeight),
+                    });
+                } else {
+                    // fallback: 使用默认宽度
+                    window.electronAPI?.resizeFloatingWindow?.('what-am-i-doing', {
+                        width: 320,
+                        height: Math.round(clampedHeight),
+                    });
+                }
             });
         });
         observer.observe(contentRef.current);

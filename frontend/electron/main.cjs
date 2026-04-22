@@ -571,30 +571,22 @@ ipcMain.handle('resize-floating-window', (_event, windowId, { width, height }) =
     const win = floatingWindows[windowId];
     if (win && !win.isDestroyed()) {
         const [currentWidth, currentHeight] = win.getSize();
-        const [x, y] = win.getPosition();
-        const bounds = win.getBounds();
-
         const newWidth = width ?? currentWidth;
         const newHeight = Math.round(height);
 
-        log.info(`[resize-floating-window] windowId=${windowId}`);
-        log.info(`  当前尺寸: ${currentWidth}x${currentHeight}`);
-        log.info(`  当前位置: (${x}, ${y})`);
-        log.info(`  当前边界: x=${bounds.x}, y=${bounds.y}, w=${bounds.width}, h=${bounds.height}`);
-        log.info(`  请求尺寸: width=${width}, height=${height}`);
-        log.info(`  实际设置: ${newWidth}x${newHeight}`);
-
         win.setSize(newWidth, newHeight);
 
-        const [afterWidth, afterHeight] = win.getSize();
-        const [afterX, afterY] = win.getPosition();
-        const afterBounds = win.getBounds();
-
-        log.info(`  设置后尺寸: ${afterWidth}x${afterHeight}`);
-        log.info(`  设置后位置: (${afterX}, ${afterY})`);
-        log.info(`  设置后边界: x=${afterBounds.x}, y=${afterBounds.y}, w=${afterBounds.width}, h=${afterBounds.height}`);
-
         return { success: true };
+    }
+    return { success: false };
+});
+
+// IPC: 获取浮窗当前尺寸
+ipcMain.handle('get-floating-window-size', (_event, windowId) => {
+    const win = floatingWindows[windowId];
+    if (win && !win.isDestroyed()) {
+        const [width, height] = win.getSize();
+        return { success: true, width, height };
     }
     return { success: false };
 });
@@ -673,7 +665,25 @@ app.on('before-quit', () => {
     // 关闭后端进程
     if (backendProcess) {
         console.log('[Electron] 正在关闭后端进程...');
-        backendProcess.kill();
+
+        if (process.platform === 'win32') {
+            // Windows: 使用 taskkill 杀死进程树（包括所有子进程）
+            // 修复 bug: 防止监控子进程变成孤儿进程
+            // 详见: docs/temp/bugs/2026-04-22-backend-orphan-process.md
+            const { exec } = require('child_process');
+            exec(`taskkill /pid ${backendProcess.pid} /T /F`, (error) => {
+                if (error) {
+                    console.error('[Electron] 杀死后端进程树失败:', error);
+                    log.error('[Electron] 杀死后端进程树失败:', error);
+                } else {
+                    console.log('[Electron] 后端进程树已终止');
+                    log.info('[Electron] 后端进程树已终止');
+                }
+            });
+        } else {
+            // Unix/Linux/macOS: 使用 SIGTERM
+            backendProcess.kill();
+        }
     }
 
     // 销毁托盘
