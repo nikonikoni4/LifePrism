@@ -83,3 +83,22 @@ export type {
     CategoryTreeItem,
     SubCategoryTreeItem,
 } from '../../../../core/types/common-components';
+
+// ============================================================================
+// Behavior Summary 相关类型
+// ============================================================================
+
+/** 单个行为分析项 */
+export interface BehaviorAnalysisItem {
+  start_time: string;       // 开始时间，格式：YYYY-MM-DD HH:MM:SS
+  end_time: string;         // 结束时间，格式：YYYY-MM-DD HH:MM:SS
+  screen_count: number;     // 截图数量
+  behavior_summary: string; // 总结性描述
+  behaviors: string;        // 分点行为（带序号的文本）
+  created_at: string;       // 创建时间
+}
+
+/** 行为分析响应 */
+export interface BehaviorAnalysisResponse {
+  behavior_list: BehaviorAnalysisItem[];
+}
