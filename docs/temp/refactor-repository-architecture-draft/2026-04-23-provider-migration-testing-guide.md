@@ -142,17 +142,38 @@ DYNAMIC_FIELDS = [
     'created_at',      # 创建时间
     'updated_at',      # 更新时间
     'timestamp',       # 时间戳
-    'id',              # 自动生成的ID（如果是UUID）
+    'last_modified',   # 最后修改时间
+    'modified_at',     # 修改时间
+    # 'id',            # 自动生成的ID（如果是UUID，取消注释）
 ]
 
-def sanitize_for_snapshot(data):
-    """清理数据用于快照对比"""
+def sanitize_for_snapshot(data, exclude_fields=None):
+    """
+    清理数据用于快照对比
+    
+    Args:
+        data: 要清理的数据
+        exclude_fields: 要排除的字段列表（默认使用DYNAMIC_FIELDS）
+    
+    Returns:
+        清理后的数据
+    """
+    if exclude_fields is None:
+        exclude_fields = DYNAMIC_FIELDS
+    
     if isinstance(data, dict):
-        return {k: sanitize_for_snapshot(v) 
-                for k, v in data.items() 
-                if k not in DYNAMIC_FIELDS}
+        result = {}
+        for k, v in data.items():
+            if k in exclude_fields:
+                continue
+            # 处理浮点数精度问题（统计查询常见）
+            if isinstance(v, float):
+                result[k] = round(v, 6)
+            else:
+                result[k] = sanitize_for_snapshot(v, exclude_fields)
+        return result
     elif isinstance(data, list):
-        return [sanitize_for_snapshot(item) for item in data]
+        return [sanitize_for_snapshot(item, exclude_fields) for item in data]
     else:
         return data
 ```
@@ -181,16 +202,51 @@ def validate_data_for_snapshot(data, test_name):
 #### 规则3：排序确保一致性
 
 ```python
-def normalize_list_for_snapshot(data_list, sort_key='id'):
-    """对列表排序，确保快照一致"""
-    if not isinstance(data_list, list):
+from typing import List, Dict, Any
+
+def normalize_list_for_snapshot(
+    data_list: List[Dict[str, Any]], 
+    sort_keys: List[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    对列表排序，确保快照一致
+    
+    Args:
+        data_list: 要排序的列表
+        sort_keys: 排序键列表（支持多级排序）
+    
+    Returns:
+        排序后的列表
+    """
+    if not isinstance(data_list, list) or not data_list:
         return data_list
     
-    # 如果列表元素是字典，按指定key排序
-    if data_list and isinstance(data_list[0], dict):
-        return sorted(data_list, key=lambda x: x.get(sort_key, ''))
+    # 如果不是字典列表，直接排序
+    if not isinstance(data_list[0], dict):
+        return sorted(data_list)
     
-    return sorted(data_list)
+    # 默认排序键
+    if sort_keys is None:
+        sort_keys = ['id', 'date', 'created_at']
+    
+    # 多级排序
+    def sort_key_func(item):
+        """生成排序键元组"""
+        keys = []
+        for key in sort_keys:
+            value = item.get(key)
+            # 处理None值和不同类型
+            if value is None:
+                keys.append('')
+            elif isinstance(value, str):
+                keys.append(value)
+            elif isinstance(value, (int, float)):
+                keys.append(value)
+            else:
+                keys.append(str(value))
+        return tuple(keys)
+    
+    return sorted(data_list, key=sort_key_func)
 ```
 
 ---
@@ -203,17 +259,45 @@ def normalize_list_for_snapshot(data_list, sort_key='id'):
 
 ```python
 # conftest.py
+import os
 import pytest
+from pathlib import Path
 from lifeprism.storage.database_manager import DatabaseManager
-from lifeprism.config.settings_manager import settings
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_environment(tmp_path_factory):
+    """
+    设置测试环境变量
+    
+    注意：使用 autouse=True 自动应用到所有测试
+    """
+    test_data_path = tmp_path_factory.mktemp("test_data")
+    
+    # 保存原始环境变量值
+    original_value = os.environ.get("LIFEPRISM_DATA_PATH")
+    
+    # 设置测试环境变量
+    os.environ["LIFEPRISM_DATA_PATH"] = str(test_data_path)
+    
+    yield test_data_path
+    
+    # 恢复原始环境变量
+    if original_value is not None:
+        os.environ["LIFEPRISM_DATA_PATH"] = original_value
+    else:
+        os.environ.pop("LIFEPRISM_DATA_PATH", None)
 
 @pytest.fixture(scope="session")
-def test_db():
-    """创建测试数据库"""
-    test_db_path = settings.lifeprism_data_path / "test_lw.db"
+def test_db(setup_test_environment):
+    """
+    创建测试数据库
+    
+    依赖 setup_test_environment 确保环境变量已设置
+    """
+    db_path = setup_test_environment / "test_lw.db"
     
     # 创建测试数据库
-    db_manager = DatabaseManager(str(test_db_path))
+    db_manager = DatabaseManager(str(db_path))
     
     # 初始化表结构
     from lifeprism.storage.resource_initializer import initialize_database
@@ -222,31 +306,40 @@ def test_db():
     yield db_manager
     
     # 清理测试数据库
-    test_db_path.unlink(missing_ok=True)
+    db_path.unlink(missing_ok=True)
 
 @pytest.fixture
 def diary_service_with_test_db(test_db):
     """使用测试数据库的diary service"""
     from lifeprism.server.services.diary_service import DiaryService
+    # 由于环境变量已设置，service会自动使用测试数据库
     service = DiaryService()
-    service.provider.db = test_db  # 注入测试数据库
     return service
 ```
 
-**方案B：使用事务回滚**（如果数据库支持）
+**方案B：使用事务回滚**（适用于需要快速回滚的场景）
 
 ```python
 @pytest.fixture
-def db_transaction():
-    """每个测试使用独立事务，测试后回滚"""
-    from lifeprism.storage import lw_db_manager
+def db_transaction(test_db):
+    """
+    每个测试使用独立事务，测试后回滚
     
-    conn = lw_db_manager.get_connection()
+    注意：SQLite的事务管理需要设置isolation_level
+    """
+    conn = test_db.get_connection()
+    
+    # 设置为手动事务模式
+    conn.isolation_level = None
     conn.execute("BEGIN")
     
     yield conn
     
+    # 回滚事务
     conn.execute("ROLLBACK")
+    
+    # 恢复自动提交模式
+    conn.isolation_level = ""
 ```
 
 ### 3.2 测试数据生成器
@@ -254,13 +347,40 @@ def db_transaction():
 ```python
 # tests/fixtures/diary_fixtures.py
 from datetime import date, timedelta
+from typing import Dict, Any, List, Tuple
 
 class DiaryTestDataGenerator:
     """日记测试数据生成器"""
     
     @staticmethod
-    def insert_sample_diary(diary_service, test_date="2026-04-23"):
-        """插入示例日记"""
+    def insert_sample_diary_raw(db_manager, test_date="2026-04-23"):
+        """
+        直接插入数据库（绕过service层）
+        
+        用途：为快照测试准备基础数据，避免service层业务逻辑影响
+        """
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO diary (date, content, mood, weather, tags)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                test_date,
+                "这是一篇测试日记。今天学习了Python。",
+                "happy",
+                "sunny",
+                '["学习", "Python"]'  # JSON字符串
+            ))
+            conn.commit()
+            return cursor.lastrowid
+    
+    @staticmethod
+    def insert_sample_diary_via_provider(diary_provider, test_date="2026-04-23"):
+        """
+        通过provider插入（测试provider本身）
+        
+        用途：测试provider的insert方法是否正常工作
+        """
         data = {
             "date": test_date,
             "content": "这是一篇测试日记。今天学习了Python。",
@@ -268,17 +388,30 @@ class DiaryTestDataGenerator:
             "weather": "sunny",
             "tags": ["学习", "Python"]
         }
-        diary_id = diary_service.insert_diary(data)
+        diary_id = diary_provider.insert_diary(data)
         return diary_id, data
     
     @staticmethod
-    def insert_diary_range(diary_service, start_date, days=7):
-        """插入一系列日记"""
+    def insert_diary_range_raw(db_manager, start_date, days=7):
+        """插入一系列日记（直接操作数据库）"""
+        diary_ids = []
+        for i in range(days):
+            current_date = (date.fromisoformat(start_date) + timedelta(days=i)).isoformat()
+            diary_id = DiaryTestDataGenerator.insert_sample_diary_raw(
+                db_manager, 
+                current_date
+            )
+            diary_ids.append(diary_id)
+        return diary_ids
+    
+    @staticmethod
+    def insert_diary_range_via_provider(diary_provider, start_date, days=7):
+        """通过provider插入一系列日记"""
         diaries = []
         for i in range(days):
             current_date = (date.fromisoformat(start_date) + timedelta(days=i)).isoformat()
-            diary_id, data = DiaryTestDataGenerator.insert_sample_diary(
-                diary_service, 
+            diary_id, data = DiaryTestDataGenerator.insert_sample_diary_via_provider(
+                diary_provider, 
                 current_date
             )
             diaries.append((diary_id, data))

@@ -124,8 +124,8 @@ lifeprism/
 - 修改表结构时，在storage模块内完成所有相关修改（schema + migration + provider）
 
 **迁移步骤**：
+
 1. 创建`storage/schemas.py`，复制`config/database.py`的表结构定义部分
-2. 在`config/database.py`中添加兼容层（re-export），保持向后兼容
 3. 更新storage模块内的导入（migrations、providers）
 4. 验证后删除`config/database.py`
 
@@ -199,145 +199,252 @@ class TodoProvider(LWBaseDataProvider, metaclass=LazySingleton):
 **所有provider必须实现的标准查询接口**：
 
 ```python
-def query_{table}(
-    self,
-    # 时间筛选（如果表有时间字段）
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
+from dataclasses import dataclass, replace
+from typing import Optional, List, Dict, Any, Tuple, Set
+
+@dataclass(frozen=True)
+class QueryOptions:
+    """
+    查询选项（通用的不可变查询参数类）
     
-    # 状态筛选（如果表有状态字段）
-    state: Optional[str] = None,
-    status: Optional[str] = None,
+    设计原则：
+    1. 不可变：使用 frozen=True，避免参数复用导致的 bug
+    2. 通用：使用 filters 统一处理所有筛选条件，适配任何表结构
+    3. 便捷：提供 with_*() 方法，方便创建新对象
     
-    # 关联筛选（如果表有外键）
-    goal_id: Optional[str] = None,
-    category_id: Optional[str] = None,
-    # ... 其他外键
+    注意：
+    - 白名单验证在各个 Provider 的类属性中定义，不在此类中
+    - 所有 Provider 共用此类，保持接口一致
+    """
     
-    # 自定义筛选（灵活的键值对）
-    filters: Optional[Dict[str, Any]] = None,
+    # 时间范围
+    date_range: Optional[Tuple[str, str]] = None  # (start_date, end_date)
+    time_range: Optional[Tuple[str, str]] = None  # (start_time, end_time)
+    
+    # 通用筛选（替代 state/status/related_ids）
+    filters: Optional[Dict[str, Any]] = None
     
     # 排序
-    order_by: str = "created_at",
-    order_desc: bool = True,
+    order_by: str = "created_at"
+    order_desc: bool = True
     
     # 分页
-    page: Optional[int] = None,
-    page_size: Optional[int] = None,
+    page: Optional[int] = None
+    page_size: Optional[int] = None
     
-    # 字段选择（可选，默认返回所有字段）
-    fields: Optional[List[str]] = None,
-) -> Tuple[List[Dict[str, Any]], int]:
+    # 字段选择
+    fields: Optional[List[str]] = None
+    
+    def __post_init__(self):
+        """参数验证"""
+        if self.page is not None and self.page < 1:
+            raise ValueError("page must be >= 1")
+        if self.page_size is not None:
+            if self.page_size < 1 or self.page_size > 1000:
+                raise ValueError("page_size must be between 1 and 1000")
+    
+    def with_date_range(self, start: str, end: str) -> 'QueryOptions':
+        """返回新对象，修改日期范围"""
+        return replace(self, date_range=(start, end))
+    
+    def with_time_range(self, start: str, end: str) -> 'QueryOptions':
+        """返回新对象，修改时间范围"""
+        return replace(self, time_range=(start, end))
+    
+    def with_filters(self, **filters) -> 'QueryOptions':
+        """返回新对象，合并筛选条件"""
+        new_filters = {**(self.filters or {}), **filters}
+        return replace(self, filters=new_filters)
+    
+    def with_order(self, field: str, desc: bool = True) -> 'QueryOptions':
+        """返回新对象，修改排序"""
+        return replace(self, order_by=field, order_desc=desc)
+    
+    def with_page(self, page: int, page_size: int = 20) -> 'QueryOptions':
+        """返回新对象，设置分页"""
+        return replace(self, page=page, page_size=page_size)
+    
+    def with_fields(self, *fields: str) -> 'QueryOptions':
+        """返回新对象，设置返回字段"""
+        return replace(self, fields=list(fields))
+
+
+class TodoProvider(LWBaseDataProvider):
     """
-    通用查询接口
+    Todo数据提供者
     
-    Args:
-        start_date: 开始日期 (YYYY-MM-DD)
-        end_date: 结束日期 (YYYY-MM-DD)
-        state: 状态筛选
-        filters: 自定义筛选条件 {"field": "value"}
-        order_by: 排序字段
-        order_desc: 是否降序
-        page: 页码（从1开始）
-        page_size: 每页数量
-        fields: 返回字段列表（None表示返回所有）
-    
-    Returns:
-        (记录列表, 总记录数)
-    
-    Examples:
-        # 查询今日活跃todos
-        todos, total = provider.query_todos(
-            start_date="2026-04-23",
-            end_date="2026-04-23",
-            state="active"
-        )
-        
-        # 查询某个目标的所有todos，按优先级排序
-        todos, total = provider.query_todos(
-            goal_id="goal_123",
-            order_by="priority",
-            order_desc=True
-        )
-        
-        # 分页查询
-        todos, total = provider.query_todos(
-            page=1,
-            page_size=20
-        )
+    职责：提供 todo_list 表的所有数据访问接口
     """
-    with self.db.get_connection() as conn:
-        cursor = conn.cursor()
-        
-        # 1. 构建SELECT子句
-        if fields:
-            select_clause = ", ".join(fields)
-        else:
-            select_clause = "*"
-        
-        # 2. 构建WHERE子句（动态条件）
-        conditions = []
-        params = []
-        
-        if start_date:
-            conditions.append("date >= ?")
-            params.append(start_date)
-        
-        if end_date:
-            conditions.append("date <= ?")
-            params.append(end_date)
-        
-        if state:
-            conditions.append("state = ?")
-            params.append(state)
-        
-        if goal_id:
-            conditions.append("goal_id = ?")
-            params.append(goal_id)
-        
-        # 自定义筛选
-        if filters:
-            for field, value in filters.items():
-                conditions.append(f"{field} = ?")
-                params.append(value)
-        
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-        
-        # 3. 构建ORDER BY子句
-        order_direction = "DESC" if order_desc else "ASC"
-        order_clause = f"ORDER BY {order_by} {order_direction}"
-        
-        # 4. 构建LIMIT子句
-        limit_clause = ""
-        if page and page_size:
-            offset = (page - 1) * page_size
-            limit_clause = f"LIMIT {page_size} OFFSET {offset}"
-        
-        # 5. 执行查询
-        query = f"""
-            SELECT {select_clause}
-            FROM todo_list
-            WHERE {where_clause}
-            {order_clause}
-            {limit_clause}
+    
+    # 白名单：类属性，集中管理（防止SQL注入）
+    _FILTER_FIELDS: Set[str] = {
+        'id', 'date', 'state', 'status', 'goal_id', 'category_id',
+        'priority', 'title', 'content', 'created_at', 'updated_at'
+    }
+    _ORDER_FIELDS: Set[str] = {
+        'id', 'date', 'created_at', 'updated_at', 'priority', 'state'
+    }
+    _SELECT_FIELDS: Set[str] = {
+        'id', 'date', 'state', 'status', 'goal_id', 'category_id',
+        'priority', 'title', 'content', 'created_at', 'updated_at'
+    }
+    
+    def query_todos(
+        self,
+        options: Optional[QueryOptions] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
         """
+        通用查询接口
         
-        cursor.execute(query, params)
-        results = [dict(row) for row in cursor.fetchall()]
+        Args:
+            options: 查询选项（QueryOptions对象）
         
-        # 6. 查询总数
-        count_query = f"""
-            SELECT COUNT(*) as total
-            FROM todo_list
-            WHERE {where_clause}
+        Returns:
+            (记录列表, 总记录数)
+        
+        Examples:
+            # 查询今日活跃todos
+            options = QueryOptions(
+                date_range=("2026-04-23", "2026-04-23"),
+                filters={'state': 'active'}
+            )
+            todos, total = provider.query_todos(options)
+            
+            # 查询某个目标的所有todos，按优先级排序
+            options = QueryOptions(
+                filters={'goal_id': 'goal_123'},
+                order_by='priority',
+                order_desc=True
+            )
+            todos, total = provider.query_todos(options)
+            
+            # 链式调用（安全，不会影响原对象）
+            base = QueryOptions(filters={'state': 'active'})
+            april_todos, _ = provider.query_todos(
+                base.with_date_range("2026-04-01", "2026-04-30")
+            )
+            may_todos, _ = provider.query_todos(
+                base.with_date_range("2026-05-01", "2026-05-31")
+            )
+            # base 保持不变，可以安全复用
+            
+            # 分页查询
+            options = QueryOptions().with_page(page=1, page_size=20)
+            todos, total = provider.query_todos(options)
         """
-        cursor.execute(count_query, params)
-        total = cursor.fetchone()['total']
+        if options is None:
+            options = QueryOptions()
         
-        return results, total
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # 1. 构建SELECT子句（白名单验证）
+            if options.fields:
+                invalid_fields = set(options.fields) - self._SELECT_FIELDS
+                if invalid_fields:
+                    raise ValueError(f"Invalid select fields: {invalid_fields}")
+                select_clause = ", ".join(options.fields)
+            else:
+                select_clause = "*"
+            
+            # 2. 构建WHERE子句（动态条件）
+            conditions = []
+            params = []
+            
+            # 日期范围
+            if options.date_range:
+                start_date, end_date = options.date_range
+                if start_date:
+                    conditions.append("date >= ?")
+                    params.append(start_date)
+                if end_date:
+                    conditions.append("date <= ?")
+                    params.append(end_date)
+            
+            # 时间范围
+            if options.time_range:
+                start_time, end_time = options.time_range
+                if start_time:
+                    conditions.append("time >= ?")
+                    params.append(start_time)
+                if end_time:
+                    conditions.append("time <= ?")
+                    params.append(end_time)
+            
+            # 通用筛选（白名单验证）
+            if options.filters:
+                for field, value in options.filters.items():
+                    if field not in self._FILTER_FIELDS:
+                        raise ValueError(f"Invalid filter field: {field}")
+                    
+                    if value is None:
+                        conditions.append(f"{field} IS NULL")
+                    elif isinstance(value, (list, tuple)):
+                        placeholders = ','.join('?' * len(value))
+                        conditions.append(f"{field} IN ({placeholders})")
+                        params.extend(value)
+                    else:
+                        conditions.append(f"{field} = ?")
+                        params.append(value)
+            
+            where_clause = " AND ".join(conditions) if conditions else "1=1"
+            
+            # 3. 构建ORDER BY子句（白名单验证）
+            if options.order_by not in self._ORDER_FIELDS:
+                raise ValueError(f"Invalid order_by field: {options.order_by}")
+            order_direction = "DESC" if options.order_desc else "ASC"
+            order_clause = f"ORDER BY {options.order_by} {order_direction}"
+            
+            # 4. 构建LIMIT子句（参数验证在 __post_init__ 中已完成）
+            limit_clause = ""
+            if options.page and options.page_size:
+                offset = (options.page - 1) * options.page_size
+                limit_clause = f"LIMIT {options.page_size} OFFSET {offset}"
+            
+            # 5. 执行查询
+            query = f"""
+                SELECT {select_clause}
+                FROM todo_list
+                WHERE {where_clause}
+                {order_clause}
+                {limit_clause}
+            """
+            
+            cursor.execute(query, params)
+            results = [dict(row) for row in cursor.fetchall()]
+            
+            # 6. 查询总数
+            count_query = f"""
+                SELECT COUNT(*) as total
+                FROM todo_list
+                WHERE {where_clause}
+            """
+            cursor.execute(count_query, params)
+            total = cursor.fetchone()['total']
+            
+            return results, total
 ```
+
+**关键设计说明**：
+
+1. **QueryOptions 是不可变的**（`frozen=True`）
+   - 避免参数复用导致的 bug
+   - 使用 `with_*()` 方法创建新对象
+
+2. **白名单在 Provider 类属性中**
+   - `_FILTER_FIELDS`：允许筛选的字段
+   - `_ORDER_FIELDS`：允许排序的字段
+   - `_SELECT_FIELDS`：允许返回的字段
+
+3. **统一使用 filters**
+   - 不再有 `state`、`status`、`related_ids` 等独立字段
+   - 所有筛选条件都通过 `filters` 字典传递
+   - 例如：`filters={'state': 'active', 'goal_id': 'xxx'}`
+
+4. **支持复杂查询**
+   - IN 查询：`filters={'id': ['id1', 'id2', 'id3']}`
+   - NULL 查询：`filters={'deleted_at': None}`
+   - 等值查询：`filters={'state': 'active'}`
 
 ### 3.4 必须实现的方法（5个核心方法）
 
