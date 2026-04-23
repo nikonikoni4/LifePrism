@@ -19,7 +19,11 @@ from lifeprism.server.schemas.mood_schemas import (
     UpdateMoodEntryRequest,
     CreateMoodImpactRequest,
 )
-from lifeprism.server.providers.mood_provider import mood_provider
+from lifeprism.storage.providers import (
+    mood_type_provider,
+    mood_entry_provider,
+    mood_impact_provider,
+)
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -78,7 +82,7 @@ def _convert_to_mood_impact_item(item: dict) -> MoodImpactItem:
 
 def get_mood_types() -> MoodTypeListResponse:
     """获取所有心情类型"""
-    items = mood_provider.get_mood_types()
+    items = mood_type_provider.get_mood_types()
     return MoodTypeListResponse(
         items=[_convert_to_mood_type_item(item) for item in items]
     )
@@ -95,10 +99,10 @@ def create_mood_type(request: CreateMoodTypeRequest) -> Optional[MoodTypeItem]:
         Optional[MoodTypeItem]: 新创建的心情类型，失败返回 None
     """
     data = request.model_dump()
-    new_id = mood_provider.create_mood_type(data)
+    new_id = mood_type_provider.create_mood_type(data)
     if not new_id:
         return None
-    item = mood_provider.get_mood_type_by_id(new_id)
+    item = mood_type_provider.get_mood_type_by_id(new_id)
     if not item:
         return None
     return _convert_to_mood_type_item(item)
@@ -115,7 +119,7 @@ def update_mood_type(mood_type_id: str, request: UpdateMoodTypeRequest) -> Optio
     Returns:
         Optional[MoodTypeItem]: 更新后的心情类型，不存在返回 None
     """
-    existing = mood_provider.get_mood_type_by_id(mood_type_id)
+    existing = mood_type_provider.get_mood_type_by_id(mood_type_id)
     if not existing:
         return None
 
@@ -126,9 +130,9 @@ def update_mood_type(mood_type_id: str, request: UpdateMoodTypeRequest) -> Optio
             update_data[field] = getattr(request, field)
 
     if update_data:
-        mood_provider.update_mood_type(mood_type_id, update_data)
+        mood_type_provider.update_mood_type(mood_type_id, update_data)
 
-    item = mood_provider.get_mood_type_by_id(mood_type_id)
+    item = mood_type_provider.get_mood_type_by_id(mood_type_id)
     return _convert_to_mood_type_item(item) if item else None
 
 
@@ -145,17 +149,17 @@ def delete_mood_type(mood_type_id: str) -> bool:
     Raises:
         ValueError: 有关联的心情记录
     """
-    existing = mood_provider.get_mood_type_by_id(mood_type_id)
+    existing = mood_type_provider.get_mood_type_by_id(mood_type_id)
     if not existing:
         return False
 
-    count = mood_provider.count_entries_by_type(mood_type_id)
+    count = mood_type_provider.count_entries_by_type(mood_type_id)
     if count < 0:
         raise ValueError("查询关联记录失败")
     if count > 0:
         raise ValueError(f"该心情类型下有 {count} 条记录，无法删除")
 
-    return mood_provider.delete_mood_type(mood_type_id)
+    return mood_type_provider.delete_mood_type(mood_type_id)
 
 
 # ==================== 心情记录 ====================
@@ -171,7 +175,7 @@ def get_mood_entries(start_date: Optional[str] = None, end_date: Optional[str] =
     Returns:
         MoodEntryListResponse: 心情记录列表
     """
-    items = mood_provider.get_mood_entries(start_date, end_date)
+    items = mood_entry_provider.get_mood_entries(start_date, end_date)
     return MoodEntryListResponse(
         items=[_convert_to_mood_entry_item(item) for item in items]
     )
@@ -187,7 +191,7 @@ def get_mood_entry(entry_id: str) -> Optional[MoodEntryItem]:
     Returns:
         Optional[MoodEntryItem]: 心情记录，不存在返回 None
     """
-    item = mood_provider.get_mood_entry_by_id(entry_id)
+    item = mood_entry_provider.get_mood_entry_by_id(entry_id)
     if not item:
         return None
     return _convert_to_mood_entry_item(item)
@@ -203,7 +207,7 @@ def create_mood_entry(request: CreateMoodEntryRequest) -> Optional[MoodEntryItem
     Returns:
         Optional[MoodEntryItem]: 新创建的心情记录，失败返回 None
     """
-    mood_type = mood_provider.get_mood_type_by_id(request.mood_type_id)
+    mood_type = mood_type_provider.get_mood_type_by_id(request.mood_type_id)
     if not mood_type:
         raise ValueError(f"无效的心情类型 ID: {request.mood_type_id}")
 
@@ -213,10 +217,10 @@ def create_mood_entry(request: CreateMoodEntryRequest) -> Optional[MoodEntryItem
         'content': request.content,
         'factors': json.dumps(request.factors, ensure_ascii=False) if request.factors else None,
     }
-    new_id = mood_provider.create_mood_entry(data)
+    new_id = mood_entry_provider.create_mood_entry(data)
     if not new_id:
         return None
-    item = mood_provider.get_mood_entry_by_id(new_id)
+    item = mood_entry_provider.get_mood_entry_by_id(new_id)
     return _convert_to_mood_entry_item(item) if item else None
 
 
@@ -231,7 +235,7 @@ def update_mood_entry(entry_id: str, request: UpdateMoodEntryRequest) -> Optiona
     Returns:
         Optional[MoodEntryItem]: 更新后的心情记录，不存在返回 None
     """
-    existing = mood_provider.get_mood_entry_by_id(entry_id)
+    existing = mood_entry_provider.get_mood_entry_by_id(entry_id)
     if not existing:
         return None
 
@@ -239,7 +243,7 @@ def update_mood_entry(entry_id: str, request: UpdateMoodEntryRequest) -> Optiona
     update_data = {}
 
     if 'mood_type_id' in explicitly_set and request.mood_type_id is not None:
-        mood_type = mood_provider.get_mood_type_by_id(request.mood_type_id)
+        mood_type = mood_type_provider.get_mood_type_by_id(request.mood_type_id)
         if not mood_type:
             raise ValueError(f"无效的心情类型 ID: {request.mood_type_id}")
         update_data['mood_type_id'] = request.mood_type_id
@@ -252,9 +256,9 @@ def update_mood_entry(entry_id: str, request: UpdateMoodEntryRequest) -> Optiona
         update_data['factors'] = json.dumps(request.factors, ensure_ascii=False) if request.factors else None
 
     if update_data:
-        mood_provider.update_mood_entry(entry_id, update_data)
+        mood_entry_provider.update_mood_entry(entry_id, update_data)
 
-    item = mood_provider.get_mood_entry_by_id(entry_id)
+    item = mood_entry_provider.get_mood_entry_by_id(entry_id)
     return _convert_to_mood_entry_item(item) if item else None
 
 
@@ -268,14 +272,14 @@ def delete_mood_entry(entry_id: str) -> bool:
     Returns:
         bool: 是否成功
     """
-    return mood_provider.delete_mood_entry(entry_id)
+    return mood_entry_provider.delete_mood_entry(entry_id)
 
 
 # ==================== 影响因素 ====================
 
 def get_mood_impacts() -> MoodImpactListResponse:
     """获取所有影响因素"""
-    items = mood_provider.get_mood_impacts()
+    items = mood_impact_provider.get_mood_impacts()
     return MoodImpactListResponse(
         items=[_convert_to_mood_impact_item(item) for item in items]
     )
@@ -294,16 +298,16 @@ def create_mood_impact(request: CreateMoodImpactRequest) -> Optional[MoodImpactI
     Raises:
         ValueError: 名称已存在
     """
-    existing = mood_provider.get_mood_impacts()
+    existing = mood_impact_provider.get_mood_impacts()
     if any(item['name'] == request.name for item in existing):
         raise ValueError(f"影响因素名称已存在: {request.name}")
 
     data = request.model_dump()
-    new_id = mood_provider.create_mood_impact(data)
+    new_id = mood_impact_provider.create_mood_impact(data)
     if new_id is None:
         return None
     # 查询刚创建的记录
-    items = mood_provider.get_mood_impacts()
+    items = mood_impact_provider.get_mood_impacts()
     for item in items:
         if item['id'] == new_id:
             return _convert_to_mood_impact_item(item)
@@ -320,4 +324,4 @@ def delete_mood_impact(impact_id: int) -> bool:
     Returns:
         bool: 是否成功
     """
-    return mood_provider.delete_mood_impact(impact_id)
+    return mood_impact_provider.delete_mood_impact(impact_id)
