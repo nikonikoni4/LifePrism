@@ -26,8 +26,7 @@ from lifeprism.server.schemas.report_schemas import (
     HeatmapDataItem,
 )
 from lifeprism.server.providers.report_provider import daily_report_provider, weekly_report_provider, monthly_report_provider, comparison_data_provider
-from lifeprism.server.providers.todo_provider import todo_provider
-from lifeprism.storage.providers import goal_provider
+from lifeprism.storage.providers import todo_provider, goal_provider
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
 from lifeprism.server.services.category_service import category_service

@@ -14,7 +14,7 @@ from datetime import datetime
 from lifeprism.server.schemas.todo_schemas import (
     TodoItem, TodoListResponse, UpdateTodoResponse,
 )
-from lifeprism.server.providers.todo_provider import todo_provider
+from lifeprism.storage.providers import todo_provider
 from lifeprism.server.services.plandoc_sync_service import (
     insert_todo_to_md,
     update_todo_in_md,

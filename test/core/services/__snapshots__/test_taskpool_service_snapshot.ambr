@@ -1,0 +1,7 @@
+# serializer version: 1
+# name: TestTaskpoolServiceSnapshot.test_get_taskpool_snapshot
+  TodoListResponse(items=[TodoItem(id='t-4e74db59', content='测试任务-1776976666', parent_id=None, link_to_goal_id=None, plan_doc_id=None, state='pool', date=None, expected_finished_at=None, actual_finished_at=None, color='#FFFFFF', order_index=0, pool_order_index=None, created_at='2026-04-24 04:37:46', delay_days=None, delay_reason=None, waid_order=None), TodoItem(id='t-1ea44905', content='测试更新-1776976666', parent_id=None, link_to_goal_id=None, plan_doc_id=None, state='pool', date=None, expected_finished_at=None, actual_finished_at=None, color='#FFFFFF', order_index=0, pool_order_index=None, created_at='2026-04-24 04:37:46', delay_days=None, delay_reason=None, waid_order=None)])
+# ---
+# name: TestTaskpoolServiceSnapshot.test_get_todos_by_date_snapshot
+  TodoListResponse(items=[])
+# ---

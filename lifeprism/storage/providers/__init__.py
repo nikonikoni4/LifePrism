@@ -32,6 +32,10 @@ from lifeprism.storage.providers.goal_providers import (
     goal_provider,
     goal_stats_provider,
 )
+from lifeprism.storage.providers.todo_provider import (
+    TodoProvider,
+    todo_provider,
+)
 from lifeprism.utils import LazySingleton
 
 # 创建全局单例（已重构为使用通用方法）
@@ -61,4 +65,6 @@ __all__ = [
     'GoalStatsProvider',
     'goal_provider',
     'goal_stats_provider',
+    'TodoProvider',
+    'todo_provider',
 ]
