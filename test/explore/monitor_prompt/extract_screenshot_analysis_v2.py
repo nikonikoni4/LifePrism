@@ -84,19 +84,24 @@ def main() -> None:
         default="test/explore/monitor_prompt/screenshot_analysis_v2_result.txt",
         help="输入文本文件路径。",
     )
+    parser.add_argument(
+        "--output",
+        default="test/explore/monitor_prompt/screenshot_analysis_v2_result.json",
+        help="输出 JSON 文件路径。",
+    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
+    output_path = Path(args.output)
     text = input_path.read_text(encoding="utf-8")
     parsed = parse_analysis_blocks(text)
+    payload = [asdict(item) for item in parsed]
 
-    print(
-        json.dumps(
-            [asdict(item) for item in parsed],
-            ensure_ascii=False,
-            indent=2,
-        )
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
