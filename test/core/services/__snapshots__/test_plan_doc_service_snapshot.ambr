@@ -1,0 +1,4 @@
+# serializer version: 1
+# name: TestPlanDocServiceSnapshot.test_get_plan_docs_snapshot
+  PlanDocListResponse(items=[PlanDocItem(id='示例-planDoc', goal_id='goal-example', content='', status='active', order_index=0, created_at='2026-04-02 05:55:27', updated_at='2026-04-02 05:55:27'), PlanDocItem(id='每日目标-docs', goal_id='goal-daily', content='', status='active', order_index=1, created_at='2026-04-20 13:45:15', updated_at='2026-04-22 11:54:09')])
+# ---

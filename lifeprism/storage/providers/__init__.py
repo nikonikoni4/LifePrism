@@ -40,6 +40,10 @@ from lifeprism.storage.providers.timeline_provider import (
     TimelineProvider,
     timeline_provider,
 )
+from lifeprism.storage.providers.plan_doc_provider import (
+    PlanDocProvider,
+    plan_doc_provider,
+)
 from lifeprism.utils import LazySingleton
 
 # 创建全局单例（已重构为使用通用方法）
@@ -73,4 +77,6 @@ __all__ = [
     'todo_provider',
     'TimelineProvider',
     'timeline_provider',
+    'PlanDocProvider',
+    'plan_doc_provider',
 ]

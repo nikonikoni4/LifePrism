@@ -22,8 +22,7 @@ from pathlib import Path
 from lifeprism.server.schemas.plan_doc_schemas import (
     SyncPlanDocResponse, TodoDeletePreview,
 )
-from lifeprism.storage.providers import todo_provider
-from lifeprism.server.providers.plan_doc_provider import plan_doc_provider
+from lifeprism.storage.providers import todo_provider, plan_doc_provider
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)

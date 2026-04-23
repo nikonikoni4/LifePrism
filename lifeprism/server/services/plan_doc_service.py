@@ -15,7 +15,7 @@ from lifeprism.server.schemas.goal_schemas import (
     CreatePlanDocRequest,
     UpdatePlanDocRequest,
 )
-from lifeprism.server.providers.plan_doc_provider import plan_doc_provider
+from lifeprism.storage.providers import plan_doc_provider
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
