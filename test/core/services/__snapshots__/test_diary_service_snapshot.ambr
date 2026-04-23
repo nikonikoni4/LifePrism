@@ -1,0 +1,190 @@
+# serializer version: 1
+# name: test_generate_diary_ai_summary_range_snapshot
+  dict({
+    'created_dates': list([
+    ]),
+    'skipped_dates': list([
+      '2026-04-01',
+      '2026-04-02',
+      '2026-04-03',
+      '2026-04-04',
+      '2026-04-05',
+      '2026-04-06',
+      '2026-04-07',
+      '2026-04-08',
+      '2026-04-09',
+      '2026-04-10',
+    ]),
+    'updated_dates': list([
+    ]),
+  })
+# ---
+# name: test_generate_diary_ai_summary_snapshot
+  dict({
+    'content': '这是一个模拟的 AI 总结',
+  })
+# ---
+# name: test_get_diary_list_snapshot
+  list([
+    dict({
+      'ai_summary': '模拟总结 2026-04-01',
+      'custom_tags': list([
+        '测试',
+        '数据',
+      ]),
+      'date': '2026-04-01',
+      'importance': 'normal',
+      'mood': 'calm',
+      'word_count': 100,
+    }),
+    dict({
+      'ai_summary': '模拟总结 2026-04-02',
+      'custom_tags': list([
+        '测试',
+        '数据',
+      ]),
+      'date': '2026-04-02',
+      'importance': 'important',
+      'mood': 'happy',
+      'word_count': 110,
+    }),
+    dict({
+      'ai_summary': '模拟总结 2026-04-03',
+      'custom_tags': list([
+        '测试',
+        '数据',
+      ]),
+      'date': '2026-04-03',
+      'importance': 'normal',
+      'mood': 'very_happy',
+      'word_count': 120,
+    }),
+    dict({
+      'ai_summary': '模拟总结 2026-04-04',
+      'custom_tags': list([
+        '测试',
+        '数据',
+      ]),
+      'date': '2026-04-04',
+      'importance': 'important',
+      'mood': 'calm',
+      'word_count': 130,
+    }),
+    dict({
+      'ai_summary': '模拟总结 2026-04-05',
+      'custom_tags': list([
+        '测试',
+        '数据',
+      ]),
+      'date': '2026-04-05',
+      'importance': 'normal',
+      'mood': 'happy',
+      'word_count': 140,
+    }),
+    dict({
+      'ai_summary': '这是一个模拟的 AI 总结',
+      'custom_tags': list([
+        '测试',
+        '快照',
+      ]),
+      'date': '2026-04-06',
+      'importance': 'important',
+      'mood': 'happy',
+      'word_count': 20,
+    }),
+    dict({
+      'ai_summary': '模拟总结 2026-04-07',
+      'custom_tags': list([
+        '测试',
+        '数据',
+      ]),
+      'date': '2026-04-07',
+      'importance': 'normal',
+      'mood': 'calm',
+      'word_count': 160,
+    }),
+    dict({
+      'ai_summary': '模拟总结 2026-04-08',
+      'custom_tags': list([
+        '测试',
+        '数据',
+      ]),
+      'date': '2026-04-08',
+      'importance': 'important',
+      'mood': 'happy',
+      'word_count': 170,
+    }),
+    dict({
+      'ai_summary': '模拟总结 2026-04-09',
+      'custom_tags': list([
+        '测试',
+        '数据',
+      ]),
+      'date': '2026-04-09',
+      'importance': 'normal',
+      'mood': 'very_happy',
+      'word_count': 180,
+    }),
+    dict({
+      'ai_summary': '模拟总结 2026-04-10',
+      'custom_tags': list([
+        '测试',
+        '数据',
+      ]),
+      'date': '2026-04-10',
+      'importance': 'important',
+      'mood': 'calm',
+      'word_count': 190,
+    }),
+  ])
+# ---
+# name: test_get_diary_snapshot
+  dict({
+    'ai_summary': '这是一个模拟的 AI 总结',
+    'content': '''
+      这是 2026-04-06 的测试日记内容。
+      
+      今天是测试的第 6 天。
+    ''',
+    'custom_tags': list([
+      '测试',
+      '数据',
+    ]),
+    'date': '2026-04-06',
+    'importance': 'important',
+    'mood': 'very_happy',
+    'word_count': 150,
+  })
+# ---
+# name: test_save_diary_content_snapshot
+  dict({
+    'ai_summary': '这是一个模拟的 AI 总结',
+    'content': '这是一段测试日记内容，用于验证快照测试。',
+    'custom_tags': list([
+      '测试',
+      '快照',
+    ]),
+    'date': '2026-04-06',
+    'importance': 'important',
+    'mood': 'happy',
+    'word_count': 20,
+  })
+# ---
+# name: test_update_diary_meta_snapshot
+  dict({
+    'ai_summary': '这是一个模拟的 AI 总结',
+    'content': '''
+      这是 2026-04-06 的测试日记内容。
+      
+      今天是测试的第 6 天。
+    ''',
+    'custom_tags': list([
+      '测试',
+      '快照',
+    ]),
+    'date': '2026-04-06',
+    'importance': 'important',
+    'mood': 'happy',
+    'word_count': 150,
+  })
+# ---

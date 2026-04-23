@@ -4,7 +4,7 @@ LifeWatch 基础数据提供者
 """
 import pandas as pd
 import logging
-from typing import Set, Optional, List, Dict
+from typing import Set, Optional, List, Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -12,17 +12,28 @@ logger = logging.getLogger(__name__)
 class LWBaseDataProvider:
     """
     LifeWatch 基础数据提供者
-    
+
     特点：
     - 内置全局单例，简化继承类的初始化
     - 提供所有通用表的读写方法
     - 各模块继承此类即可使用
+    - 提供通用 CRUD 方法，子类只需定义元数据即可使用
     """
-    
+
+    # ==================== 子类可选定义的元数据 ====================
+
+    _TABLE_NAME: Optional[str] = None           # 表名
+    _DATE_FIELD: Optional[str] = None           # 日期字段名（如 'date', 'created_at'）
+    _TIME_FIELD: Optional[str] = None           # 时间字段名（如 'time', 'trigger_time'）
+    _FILTER_FIELDS: Set[str] = set()            # 可筛选字段白名单
+    _ORDER_FIELDS: Set[str] = set()             # 可排序字段白名单
+    _SELECT_FIELDS: Set[str] = set()            # 可查询字段白名单
+    _UPDATE_FIELDS: Set[str] = set()            # 可更新字段白名单
+
     def __init__(self, db_manager=None):
         """
         初始化基础数据提供者
-        
+
         Args:
             db_manager: DatabaseManager 实例，None 则使用全局单例
         """
@@ -31,7 +42,7 @@ class LWBaseDataProvider:
             self.db = lw_db_manager
         else:
             self.db = db_manager
-        
+
         # 日期/时间范围状态（供 get_activity_logs 等方法使用）
         self._current_date = None
         self._start_time = None
@@ -834,6 +845,339 @@ class LWBaseDataProvider:
         except Exception as e:
             logger.error(f"保存会话 {session_id} 的 token 使用数据失败: {e}")
             raise
+
+
+    # ==================== 通用 CRUD 方法 ====================
+
+    def _generic_query(
+        self,
+        options: Optional['QueryOptions'] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        通用查询方法
+
+        子类只需定义表名和白名单，即可使用此方法
+
+        Args:
+            options: 查询选项（QueryOptions 对象）
+
+        Returns:
+            (记录列表, 总记录数)
+
+        Raises:
+            NotImplementedError: 子类未定义 _TABLE_NAME
+            ValueError: 字段白名单验证失败、不支持的查询类型
+        """
+        from lifeprism.storage.providers.common_query_options import QueryOptions
+
+        if options is None:
+            options = QueryOptions()
+
+        # 验证子类是否定义了必要属性
+        if not self._TABLE_NAME:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} 必须定义 _TABLE_NAME"
+            )
+
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # 1. 构建 SELECT 子句
+            select_clause = self._build_select_clause(options)
+
+            # 2. 构建 WHERE 子句
+            where_clause, params = self._build_where_clause(options)
+
+            # 3. 构建 ORDER BY 子句
+            order_clause = self._build_order_clause(options)
+
+            # 4. 构建 LIMIT 子句
+            limit_clause = self._build_limit_clause(options)
+
+            # 5. 执行查询
+            query = f"""
+                SELECT {select_clause}
+                FROM {self._TABLE_NAME}
+                WHERE {where_clause}
+                {order_clause}
+                {limit_clause}
+            """
+
+            cursor.execute(query, params)
+            columns = [desc[0] for desc in cursor.description]
+            rows = cursor.fetchall()
+            results = [dict(zip(columns, row)) for row in rows]
+
+            # 6. 查询总数
+            count_query = f"""
+                SELECT COUNT(*) as total
+                FROM {self._TABLE_NAME}
+                WHERE {where_clause}
+            """
+            cursor.execute(count_query, params)
+            total = cursor.fetchone()[0]
+
+            return results, total
+
+    def _generic_insert(
+        self,
+        data: Dict[str, Any],
+        id_prefix: Optional[str] = None,
+        auto_order_index: bool = False
+    ) -> str:
+        """
+        通用插入方法
+
+        Args:
+            data: 数据字典
+            id_prefix: ID 前缀（如 't-'），None 则不生成 ID
+            auto_order_index: 是否自动计算 order_index
+
+        Returns:
+            新记录的 ID
+
+        Raises:
+            NotImplementedError: 子类未定义 _TABLE_NAME
+            ValueError: 数据验证失败
+
+        Examples:
+            # 插入 todo（自动生成 ID 和 order_index）
+            todo_id = self._generic_insert(
+                data={'title': '测试任务', 'state': 'active'},
+                id_prefix='t-',
+                auto_order_index=True
+            )
+
+            # 插入 diary（使用自定义 ID）
+            diary_id = self._generic_insert(
+                data={'date': '2026-04-24', 'content': '日记内容'}
+            )
+        """
+        if not self._TABLE_NAME:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} 必须定义 _TABLE_NAME"
+            )
+
+        # 1. 生成 ID（如果需要）
+        if id_prefix:
+            import uuid
+            data['id'] = f"{id_prefix}{uuid.uuid4().hex[:8]}"
+
+        # 2. 计算 order_index（如果需要）
+        if auto_order_index:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT MAX(order_index) FROM {self._TABLE_NAME}"
+                )
+                result = cursor.fetchone()
+                max_order = result[0] if result and result[0] is not None else 0
+                data['order_index'] = max_order + 1
+
+        # 3. 构建 INSERT 语句
+        columns = list(data.keys())
+        placeholders = ','.join(['?'] * len(columns))
+        values = [data[col] for col in columns]
+
+        sql = f"""
+            INSERT INTO {self._TABLE_NAME} ({', '.join(columns)})
+            VALUES ({placeholders})
+        """
+
+        # 4. 执行插入
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql, values)
+                conn.commit()
+                return data.get('id', str(cursor.lastrowid))
+        except Exception as e:
+            logger.error(f"Failed to insert into {self._TABLE_NAME}: {e}")
+            raise
+
+    def _generic_update(
+        self,
+        record_id: str,
+        data: Dict[str, Any],
+        auto_timestamp: bool = True
+    ) -> bool:
+        """
+        通用更新方法
+
+        Args:
+            record_id: 记录 ID
+            data: 更新数据
+            auto_timestamp: 是否自动更新 updated_at
+
+        Returns:
+            是否成功
+
+        Raises:
+            NotImplementedError: 子类未定义 _TABLE_NAME
+            ValueError: 字段白名单验证失败
+
+        Examples:
+            # 更新 todo
+            success = self._generic_update(
+                record_id='t-12345678',
+                data={'title': '新标题', 'state': 'completed'},
+                auto_timestamp=True
+            )
+        """
+        if not self._TABLE_NAME:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} 必须定义 _TABLE_NAME"
+            )
+
+        if not data:
+            return True
+
+        # 1. 白名单验证（如果定义了）
+        if self._UPDATE_FIELDS:
+            invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
+            if invalid_fields:
+                raise ValueError(f"Invalid update fields: {invalid_fields}")
+
+        # 2. 自动更新时间戳
+        if auto_timestamp and 'updated_at' not in data:
+            from datetime import datetime
+            data['updated_at'] = datetime.now().isoformat()
+
+        # 3. 构建 UPDATE 语句
+        set_clause = ', '.join([f"{key} = ?" for key in data.keys()])
+        values = list(data.values()) + [record_id]
+
+        sql = f"""
+            UPDATE {self._TABLE_NAME}
+            SET {set_clause}
+            WHERE id = ?
+        """
+
+        # 4. 执行更新
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql, values)
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Failed to update {self._TABLE_NAME}: {e}")
+            raise
+
+    def _generic_delete(self, record_id: str) -> bool:
+        """
+        通用删除方法
+
+        Args:
+            record_id: 记录 ID
+
+        Returns:
+            是否成功
+
+        Raises:
+            NotImplementedError: 子类未定义 _TABLE_NAME
+
+        Examples:
+            # 删除 todo
+            success = self._generic_delete('t-12345678')
+        """
+        if not self._TABLE_NAME:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} 必须定义 _TABLE_NAME"
+            )
+
+        sql = f"DELETE FROM {self._TABLE_NAME} WHERE id = ?"
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql, (record_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Failed to delete from {self._TABLE_NAME}: {e}")
+            raise
+
+    # ==================== 辅助方法（构建 SQL 子句） ====================
+
+    def _build_select_clause(self, options: 'QueryOptions') -> str:
+        """构建 SELECT 子句（白名单验证）"""
+        if options.fields:
+            if self._SELECT_FIELDS:
+                invalid_fields = set(options.fields) - self._SELECT_FIELDS
+                if invalid_fields:
+                    raise ValueError(f"Invalid select fields: {invalid_fields}")
+            return ", ".join(options.fields)
+        return "*"
+
+    def _build_where_clause(
+        self,
+        options: 'QueryOptions'
+    ) -> Tuple[str, List[Any]]:
+        """构建 WHERE 子句（动态条件 + 白名单验证）"""
+        conditions = []
+        params = []
+
+        # 日期范围（只有当表有日期字段时才处理）
+        if options.date_range:
+            if not self._DATE_FIELD:
+                raise ValueError(
+                    f"{self._TABLE_NAME} 表不支持日期范围查询（未定义 _DATE_FIELD）"
+                )
+            start_date, end_date = options.date_range
+            if start_date:
+                conditions.append(f"{self._DATE_FIELD} >= ?")
+                params.append(start_date)
+            if end_date:
+                conditions.append(f"{self._DATE_FIELD} <= ?")
+                params.append(end_date)
+
+        # 时间范围（只有当表有时间字段时才处理）
+        if options.time_range:
+            if not self._TIME_FIELD:
+                raise ValueError(
+                    f"{self._TABLE_NAME} 表不支持时间范围查询（未定义 _TIME_FIELD）"
+                )
+            start_time, end_time = options.time_range
+            if start_time:
+                conditions.append(f"{self._TIME_FIELD} >= ?")
+                params.append(start_time)
+            if end_time:
+                conditions.append(f"{self._TIME_FIELD} <= ?")
+                params.append(end_time)
+
+        # 通用筛选（白名单验证）
+        if options.filters:
+            for field, value in options.filters.items():
+                if self._FILTER_FIELDS and field not in self._FILTER_FIELDS:
+                    raise ValueError(f"Invalid filter field: {field}")
+
+                if value is None:
+                    conditions.append(f"{field} IS NULL")
+                elif isinstance(value, (list, tuple)):
+                    placeholders = ','.join('?' * len(value))
+                    conditions.append(f"{field} IN ({placeholders})")
+                    params.extend(value)
+                else:
+                    conditions.append(f"{field} = ?")
+                    params.append(value)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        return where_clause, params
+
+    def _build_order_clause(self, options: 'QueryOptions') -> str:
+        """构建 ORDER BY 子句（白名单验证）"""
+        if self._ORDER_FIELDS and options.order_by not in self._ORDER_FIELDS:
+            raise ValueError(f"Invalid order_by field: {options.order_by}")
+        order_direction = "DESC" if options.order_desc else "ASC"
+        return f"ORDER BY {options.order_by} {order_direction}"
+
+    def _build_limit_clause(self, options: 'QueryOptions') -> str:
+        """构建 LIMIT 子句"""
+        if options.page and options.page_size:
+            offset = (options.page - 1) * options.page_size
+            return f"LIMIT {options.page_size} OFFSET {offset}"
+        return ""
 
 
 if __name__ == "__main__":
