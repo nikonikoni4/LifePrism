@@ -14,6 +14,23 @@ import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { BehaviorAnalysisItem } from '../types';
 
+// 添加滑入动画样式
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+`;
+if (!document.head.querySelector('style[data-behavior-panel]')) {
+    styleSheet.setAttribute('data-behavior-panel', 'true');
+    document.head.appendChild(styleSheet);
+}
+
 interface BehaviorDetailPanelProps {
     behavior: BehaviorAnalysisItem | null;
     isOpen: boolean;
@@ -94,7 +111,10 @@ const BehaviorDetailPanel: React.FC<BehaviorDetailPanelProps> = ({
             {/* 面板 */}
             <div
                 className="fixed top-0 right-0 bottom-0 w-[400px] bg-white shadow-2xl z-50
-                           flex flex-col animate-slide-in-right"
+                           flex flex-col"
+                style={{
+                    animation: 'slideInRight 300ms ease-out',
+                }}
             >
                 {/* 标题栏 */}
                 <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
