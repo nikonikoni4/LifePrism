@@ -30,7 +30,7 @@ from lifeprism.server.schemas.diary_schemas import (
     GenerateDiaryAISummaryRangeResponse,
     ExistingSummaryMode,
 )
-from lifeprism.server.providers.diary_provider import diary_provider
+from lifeprism.storage.providers import diary_provider
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
