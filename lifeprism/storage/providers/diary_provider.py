@@ -25,6 +25,7 @@ class DiaryProvider(LWBaseDataProvider):
     # ==================== 表元数据定义 ====================
 
     _TABLE_NAME = "diary"
+    _PRIMARY_KEY = "date"          # ✅ diary 表使用 date 作为主键
     _DATE_FIELD = "date"           # ✅ diary 表有 date 字段
     _TIME_FIELD = None             # ❌ diary 表没有 time 字段
 
@@ -131,25 +132,30 @@ class DiaryProvider(LWBaseDataProvider):
             return True
 
         try:
-            # 注意：diary 表使用 date 作为主键，不是 id
-            # 需要使用原生 SQL 而不是 _generic_update（它假设主键是 id）
-            # 白名单验证
-            invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
-            if invalid_fields:
-                raise ValueError(f"Invalid update fields: {invalid_fields}")
+            # 使用通用更新方法（现在支持自定义主键）
+            # 注意：SQLite 的 datetime('now','localtime') 需要手动处理
+            if 'updated_at' not in data:
+                # 使用 SQLite 特定的时间戳更新
+                with self.db.get_connection() as conn:
+                    cursor = conn.cursor()
 
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
+                    # 白名单验证
+                    invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
+                    if invalid_fields:
+                        raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-                set_clauses = [f"{key} = ?" for key in data.keys()]
-                set_clauses.append("updated_at = datetime('now','localtime')")
-                values = list(data.values()) + [date]
+                    set_clauses = [f"{key} = ?" for key in data.keys()]
+                    set_clauses.append("updated_at = datetime('now','localtime')")
+                    values = list(data.values()) + [date]
 
-                sql = f"UPDATE diary SET {', '.join(set_clauses)} WHERE date = ?"
-                cursor.execute(sql, values)
-                conn.commit()
+                    sql = f"UPDATE diary SET {', '.join(set_clauses)} WHERE date = ?"
+                    cursor.execute(sql, values)
+                    conn.commit()
 
-                return cursor.rowcount > 0
+                    return cursor.rowcount > 0
+            else:
+                # 如果已经提供了 updated_at，使用通用方法
+                return self._generic_update(date, data, auto_timestamp=False)
         except Exception as e:
             logger.error(f"更新日记 {date} 失败: {e}")
             return False
@@ -165,14 +171,11 @@ class DiaryProvider(LWBaseDataProvider):
             是否成功
         """
         try:
-            # 注意：diary 表使用 date 作为主键，不是 id
-            # 需要使用原生 SQL 而不是 _generic_delete（它假设主键是 id）
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM diary WHERE date = ?", (date,))
-                conn.commit()
+            # 现在可以使用通用删除方法（支持自定义主键）
+            success = self._generic_delete(date)
+            if success:
                 logger.info(f"删除日记 {date} 成功")
-                return cursor.rowcount > 0
+            return success
         except Exception as e:
             logger.error(f"删除日记 {date} 失败: {e}")
             return False

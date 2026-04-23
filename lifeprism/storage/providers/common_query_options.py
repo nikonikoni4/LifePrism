@@ -42,6 +42,10 @@ class QueryOptions:
         """返回新对象，修改日期范围"""
         return replace(self, date_range=(start, end))
 
+    def with_time_range(self, start: str, end: str) -> 'QueryOptions':
+        """返回新对象，修改时间范围"""
+        return replace(self, time_range=(start, end))
+
     def with_filters(self, **filters) -> 'QueryOptions':
         """返回新对象，合并筛选条件"""
         new_filters = {**(self.filters or {}), **filters}

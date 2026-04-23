@@ -18,11 +18,39 @@ class LWBaseDataProvider:
     - 提供所有通用表的读写方法
     - 各模块继承此类即可使用
     - 提供通用 CRUD 方法，子类只需定义元数据即可使用
+
+    SQLite 限制说明：
+    ==================
+    本实现仅支持 SQLite 数据库，使用了以下 SQLite 特定功能：
+
+    1. SQL 函数：
+       - datetime('now','localtime') - SQLite 日期时间函数
+       - 其他数据库需使用 NOW() 或 CURRENT_TIMESTAMP
+
+    2. 自增 ID 获取：
+       - cursor.lastrowid - SQLite 特定方法
+       - PostgreSQL 需使用 RETURNING id 子句
+       - MySQL 需使用 LAST_INSERT_ID()
+
+    3. 参数占位符：
+       - 使用 ? 作为参数占位符（SQLite/SQLite3 风格）
+       - PostgreSQL 使用 %s，其他数据库可能使用 :name 或 $1
+
+    4. 数据类型：
+       - SQLite 的动态类型系统
+       - 其他数据库有严格的类型检查
+
+    如需支持其他数据库，需要：
+    - 抽象 SQL 方言差异（使用 SQLAlchemy 等 ORM）
+    - 修改日期时间函数调用
+    - 修改自增 ID 获取方式
+    - 调整参数占位符格式
     """
 
     # ==================== 子类可选定义的元数据 ====================
 
     _TABLE_NAME: Optional[str] = None           # 表名
+    _PRIMARY_KEY: str = "id"                    # 主键字段名（默认 'id'）
     _DATE_FIELD: Optional[str] = None           # 日期字段名（如 'date', 'created_at'）
     _TIME_FIELD: Optional[str] = None           # 时间字段名（如 'time', 'trigger_time'）
     _FILTER_FIELDS: Set[str] = set()            # 可筛选字段白名单
@@ -849,6 +877,27 @@ class LWBaseDataProvider:
 
     # ==================== 通用 CRUD 方法 ====================
 
+    def _validate_table_name(self):
+        """
+        验证表名格式，防止 SQL 注入
+
+        Raises:
+            NotImplementedError: 子类未定义 _TABLE_NAME
+            ValueError: 表名格式不合法
+        """
+        if not self._TABLE_NAME:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} 必须定义 _TABLE_NAME"
+            )
+
+        import re
+        if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', self._TABLE_NAME):
+            raise ValueError(
+                f"Invalid table name: {self._TABLE_NAME}. "
+                f"Table name must start with letter or underscore, "
+                f"and contain only letters, numbers, and underscores."
+            )
+
     def _generic_query(
         self,
         options: Optional['QueryOptions'] = None
@@ -873,11 +922,8 @@ class LWBaseDataProvider:
         if options is None:
             options = QueryOptions()
 
-        # 验证子类是否定义了必要属性
-        if not self._TABLE_NAME:
-            raise NotImplementedError(
-                f"{self.__class__.__name__} 必须定义 _TABLE_NAME"
-            )
+        # 验证表名
+        self._validate_table_name()
 
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -953,10 +999,8 @@ class LWBaseDataProvider:
                 data={'date': '2026-04-24', 'content': '日记内容'}
             )
         """
-        if not self._TABLE_NAME:
-            raise NotImplementedError(
-                f"{self.__class__.__name__} 必须定义 _TABLE_NAME"
-            )
+        # 验证表名
+        self._validate_table_name()
 
         # 1. 生成 ID（如果需要）
         if id_prefix:
@@ -1024,10 +1068,8 @@ class LWBaseDataProvider:
                 auto_timestamp=True
             )
         """
-        if not self._TABLE_NAME:
-            raise NotImplementedError(
-                f"{self.__class__.__name__} 必须定义 _TABLE_NAME"
-            )
+        # 验证表名
+        self._validate_table_name()
 
         if not data:
             return True
@@ -1050,7 +1092,7 @@ class LWBaseDataProvider:
         sql = f"""
             UPDATE {self._TABLE_NAME}
             SET {set_clause}
-            WHERE id = ?
+            WHERE {self._PRIMARY_KEY} = ?
         """
 
         # 4. 执行更新
@@ -1081,12 +1123,10 @@ class LWBaseDataProvider:
             # 删除 todo
             success = self._generic_delete('t-12345678')
         """
-        if not self._TABLE_NAME:
-            raise NotImplementedError(
-                f"{self.__class__.__name__} 必须定义 _TABLE_NAME"
-            )
+        # 验证表名
+        self._validate_table_name()
 
-        sql = f"DELETE FROM {self._TABLE_NAME} WHERE id = ?"
+        sql = f"DELETE FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} = ?"
 
         try:
             with self.db.get_connection() as conn:
@@ -1148,8 +1188,14 @@ class LWBaseDataProvider:
 
         # 通用筛选（白名单验证）
         if options.filters:
+            # 强制要求定义白名单
+            if not self._FILTER_FIELDS:
+                raise NotImplementedError(
+                    f"{self.__class__.__name__} 必须定义 _FILTER_FIELDS 才能使用 filters"
+                )
+
             for field, value in options.filters.items():
-                if self._FILTER_FIELDS and field not in self._FILTER_FIELDS:
+                if field not in self._FILTER_FIELDS:
                     raise ValueError(f"Invalid filter field: {field}")
 
                 if value is None:
