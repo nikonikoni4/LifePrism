@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 import { TimeOverviewWidget } from '../../../../core/components';
-import { TimelineAPIV2, ActivityLogsAPI, CategoryAPI } from './api';
+import { TimelineAPIV2, ActivityLogsAPI, CategoryAPI, BehaviorAPI } from './api';
 import {
     TimelineStatsResponse,
     TimelineBlockStats,
@@ -22,10 +22,18 @@ import {
     TimeOverviewData,
     ActivityLogItem,
     CategoryTreeItem,
+    BehaviorAnalysisItem,
 } from './types';
 
 // 自定义时间块组件
-import { CustomBlockLayer, CustomBlockAPI, UserCustomBlock, TodoSelectItem } from './components';
+import {
+    CustomBlockLayer,
+    CustomBlockAPI,
+    UserCustomBlock,
+    TodoSelectItem,
+    BehaviorBlockLayer,
+    BehaviorDetailPanel,
+} from './components';
 
 // Todo API
 import { todoApi } from '../../../../apps/goals/apis/todoApi';
@@ -551,6 +559,12 @@ const Timeline: React.FC = () => {
     // === 当天待办事项状态（用于自定义时间块绑定） ===
     const [todos, setTodos] = useState<TodoSelectItem[]>([]);
 
+    // === Behavior Summary 状态 ===
+    const [behaviors, setBehaviors] = useState<BehaviorAnalysisItem[]>([]);
+    const [selectedBehavior, setSelectedBehavior] = useState<BehaviorAnalysisItem | null>(null);
+    const [isBehaviorPanelOpen, setIsBehaviorPanelOpen] = useState(false);
+    const [isBehaviorsLoading, setIsBehaviorsLoading] = useState(false);
+
     // === 缩放配置 ===
     const MIN_HOUR_HEIGHT = 30;
     const MAX_HOUR_HEIGHT = 1200;
@@ -651,6 +665,24 @@ const Timeline: React.FC = () => {
     useEffect(() => {
         fetchCustomBlocks();
     }, [fetchCustomBlocks]);
+
+    // 获取 Behavior Summary 数据
+    const loadBehaviors = useCallback(async () => {
+        setIsBehaviorsLoading(true);
+        try {
+            const response = await BehaviorAPI.getBehaviorSummary(currentDate);
+            setBehaviors(response.behavior_list);
+        } catch (error) {
+            console.error('Failed to load behaviors:', error);
+            setBehaviors([]);
+        } finally {
+            setIsBehaviorsLoading(false);
+        }
+    }, [currentDate]);
+
+    useEffect(() => {
+        loadBehaviors();
+    }, [loadBehaviors]);
 
     // 获取当天待办事项（用于自定义时间块绑定下拉，两种模式都需要）
     useEffect(() => {
@@ -1141,6 +1173,17 @@ const Timeline: React.FC = () => {
                             isLoading={customBlocksLoading}
                         />
 
+                        {/* Behavior Summary 层 - 右侧行为分析色块 */}
+                        <BehaviorBlockLayer
+                            behaviors={behaviors}
+                            hourHeight={HOUR_HEIGHT}
+                            onBehaviorClick={(item) => {
+                                setSelectedBehavior(item);
+                                setIsBehaviorPanelOpen(true);
+                            }}
+                            isLoading={isBehaviorsLoading}
+                        />
+
                         {/* Major Grid Lines */}
                         {majorTicks.map((t) => (
                             <div
@@ -1162,7 +1205,7 @@ const Timeline: React.FC = () => {
                         {/* === 条件渲染：缩略图 OR 事件详情 === */}
                         {thumbnailConfig.enabled ? (
                             /* 缩略图视图 */
-                            <div className="absolute left-36 right-0 top-0 bottom-0 z-[1]">
+                            <div className="absolute left-36 right-[100px] top-0 bottom-0 z-[1]">
 
                                 {thumbnailLoading && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-30">
@@ -1515,6 +1558,13 @@ const Timeline: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* Behavior Detail Panel - 行为分析详情面板 */}
+            <BehaviorDetailPanel
+                behavior={selectedBehavior}
+                isOpen={isBehaviorPanelOpen}
+                onClose={() => setIsBehaviorPanelOpen(false)}
+            />
         </div>
     );
 };
