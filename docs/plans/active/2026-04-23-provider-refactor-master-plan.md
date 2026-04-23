@@ -26,6 +26,6 @@ related_spec:
 - [x] habit_checkin_provider
 - [x] habit_stats_provider
 - [x] goal_provider
-- [ ] todo_provider
+- [x] todo_provider
 - [ ] timeline_provider
 - [ ] plan_doc_provider
