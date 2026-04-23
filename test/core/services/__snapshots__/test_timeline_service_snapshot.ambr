@@ -1,0 +1,4 @@
+# serializer version: 1
+# name: TestTimelineServiceSnapshot.test_get_custom_blocks_by_date_snapshot
+  UserCustomBlockListResponse(data=[], total=0)
+# ---

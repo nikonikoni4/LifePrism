@@ -1,0 +1,317 @@
+"""
+Timeline 数据提供者（重构版）
+
+职责：提供 timeline_custom_block 表的所有数据访问接口
+"""
+from typing import Dict, Any, Optional, List, Tuple, Set
+from lifeprism.storage.base_providers import LWBaseDataProvider
+from lifeprism.storage.providers.common_query_options import QueryOptions
+from lifeprism.utils import get_logger, LazySingleton
+
+logger = get_logger(__name__)
+
+
+class TimelineProvider(LWBaseDataProvider):
+    """
+    Timeline 自定义时间块数据提供者
+
+    职责：提供 timeline_custom_block 表的所有数据访问接口
+    """
+
+    # ==================== 表元数据定义 ====================
+
+    _TABLE_NAME = "timeline_custom_block"
+    _PRIMARY_KEY = "id"
+    _DATE_FIELD = None  # 没有单独的 date 字段
+    _TIME_FIELD = "start_time"  # 使用 start_time 作为时间字段
+
+    # 白名单字段集合（用于防止 SQL 注入）
+    _FILTER_FIELDS: Set[str] = {
+        'id', 'start_time', 'end_time', 'duration', 'content',
+        'todo_id', 'color', 'category_id', 'sub_category_id',
+        'created_at', 'updated_at'
+    }
+    _ORDER_FIELDS: Set[str] = {
+        'id', 'start_time', 'end_time', 'created_at'
+    }
+    _SELECT_FIELDS: Set[str] = {
+        'id', 'start_time', 'end_time', 'duration', 'content',
+        'todo_id', 'color', 'category_id', 'sub_category_id',
+        'created_at', 'updated_at'
+    }
+    _UPDATE_FIELDS: Set[str] = {
+        'start_time', 'end_time', 'duration', 'content',
+        'todo_id', 'color', 'category_id', 'sub_category_id'
+    }
+
+    # ==================== 核心 CRUD 方法 ====================
+
+    def get_custom_block_by_id(self, block_id: int) -> Optional[Dict[str, Any]]:
+        """
+        根据 ID 获取单条自定义时间块
+
+        Args:
+            block_id: int, 时间块 ID
+
+        Returns:
+            dict | None: 记录或 None
+        """
+        options = QueryOptions(
+            filters={self._PRIMARY_KEY: block_id},
+            order_by='id'
+        )
+        results, _ = self._generic_query(options)
+        return results[0] if results else None
+
+    def get_custom_blocks_by_date(self, date: str) -> List[Dict[str, Any]]:
+        """
+        获取指定日期的所有自定义时间块
+
+        Args:
+            date: str, 日期（YYYY-MM-DD 格式）
+
+        Returns:
+            list[dict]: 时间块列表
+        """
+        # 使用 start_time 的日期部分过滤
+        start_of_day = f"{date} 00:00:00"
+        end_of_day = f"{date} 23:59:59"
+
+        # 使用原生 SQL 查询时间范围（复杂查询保留手写 SQL）
+        sql = """
+        SELECT * FROM timeline_custom_block
+        WHERE start_time >= ? AND start_time <= ?
+        ORDER BY start_time ASC
+        """
+
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, [start_of_day, end_of_day])
+            rows = cursor.fetchall()
+            if not rows:
+                return []
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in rows]
+
+    def create_custom_block(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        创建用户自定义时间块
+
+        Args:
+            data: dict, 包含 content, start_time, end_time, duration, category_id, sub_category_id
+
+        Returns:
+            dict: 创建后的完整记录（含 id 和时间戳）
+        """
+        # 将 ISO 格式的时间（带 T）转换为标准格式（用空格分隔）
+        if 'start_time' in data and data['start_time']:
+            data['start_time'] = data['start_time'].replace('T', ' ')
+        if 'end_time' in data and data['end_time']:
+            data['end_time'] = data['end_time'].replace('T', ' ')
+
+        # 白名单验证
+        allowed_fields = self._UPDATE_FIELDS
+        invalid_fields = set(data.keys()) - allowed_fields
+        if invalid_fields:
+            raise ValueError(f"Invalid insert fields: {invalid_fields}")
+
+        self.db.insert(self._TABLE_NAME, data)
+
+        # 查询刚插入的记录（按创建时间倒序取最新一条）
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT * FROM {self._TABLE_NAME} ORDER BY id DESC LIMIT 1"
+            )
+            row = cursor.fetchone()
+            if row:
+                columns = [desc[0] for desc in cursor.description]
+                return dict(zip(columns, row))
+        return {}
+
+    def update_custom_block(self, block_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        更新用户自定义时间块
+
+        Args:
+            block_id: int, 时间块 ID
+            data: dict, 要更新的字段
+
+        Returns:
+            dict | None: 更新后的完整记录或 None
+
+        注意：
+            - todo_id, category_id, sub_category_id 允许设置为 None（清除绑定）
+            - 其他字段（content, start_time 等）不接受 None 值
+        """
+        # 将 ISO 格式的时间（带 T）转换为标准格式（用空格分隔）
+        if 'start_time' in data and data['start_time']:
+            data['start_time'] = data['start_time'].replace('T', ' ')
+        if 'end_time' in data and data['end_time']:
+            data['end_time'] = data['end_time'].replace('T', ' ')
+
+        # 可清空的字段列表（这些字段允许显式设置为 None）
+        nullable_fields = {'todo_id', 'category_id', 'sub_category_id'}
+
+        # 构建更新数据：
+        # - 可清空字段：保留 None 值（用于清除绑定）
+        # - 其他字段：过滤掉 None 值
+        update_data = {}
+        for k, v in data.items():
+            if k in nullable_fields:
+                # 可清空字段：无论是 None 还是有效值都保留
+                update_data[k] = v
+            elif v is not None:
+                # 其他字段：只保留非 None 值
+                update_data[k] = v
+
+        if not update_data:
+            return self.get_custom_block_by_id(block_id)
+
+        # 白名单验证
+        invalid_fields = set(update_data.keys()) - self._UPDATE_FIELDS
+        if invalid_fields:
+            raise ValueError(f"Invalid update fields: {invalid_fields}")
+
+        affected_rows = self.db.update(
+            self._TABLE_NAME,
+            data=update_data,
+            where={"id": block_id}
+        )
+        if affected_rows > 0:
+            return self.get_custom_block_by_id(block_id)
+        return None
+
+    def delete_custom_block(self, block_id: int) -> bool:
+        """
+        删除用户自定义时间块
+
+        Args:
+            block_id: int, 时间块 ID
+
+        Returns:
+            bool: 是否删除成功
+        """
+        try:
+            affected_rows = self.db.delete(self._TABLE_NAME, where={"id": block_id})
+            success = affected_rows > 0
+            if success:
+                logger.info(f"删除时间块 {block_id} 成功")
+            return success
+        except Exception as e:
+            logger.error(f"删除时间块 {block_id} 失败: {e}")
+            return False
+
+    # ============================================================================
+    # WAID 累计时长查询（保留业务逻辑方法）
+    # ============================================================================
+
+    def get_duration_by_todo(self, todo_id: str, date: str) -> int:
+        """查询指定 todo 在指定日期的累计时长（分钟）
+
+        Args:
+            todo_id: 待办事项 ID
+            date: 日期（YYYY-MM-DD 格式）
+
+        Returns:
+            int: 累计时长（分钟），无记录返回 0
+        """
+        try:
+            start_of_day = f"{date} 00:00:00"
+            end_of_day = f"{date} 23:59:59"
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""SELECT COALESCE(SUM(duration), 0) FROM {self._TABLE_NAME}
+                       WHERE todo_id = ? AND start_time >= ? AND start_time <= ?""",
+                    (todo_id, start_of_day, end_of_day)
+                )
+                return cursor.fetchone()[0]
+        except Exception as e:
+            logger.error(f"查询 todo {todo_id} 累计时长失败: {e}")
+            return 0
+
+    def batch_get_duration_by_todos(self, todo_ids: List[str], date: str) -> Dict[str, int]:
+        """批量查询多个 todo 在指定日期的累计时长
+
+        Args:
+            todo_ids: 待办事项 ID 列表
+            date: 日期（YYYY-MM-DD 格式）
+
+        Returns:
+            dict: {todo_id: 累计分钟数}
+        """
+        if not todo_ids:
+            return {}
+        try:
+            start_of_day = f"{date} 00:00:00"
+            end_of_day = f"{date} 23:59:59"
+            placeholders = ','.join('?' * len(todo_ids))
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""SELECT todo_id, COALESCE(SUM(duration), 0) as total
+                        FROM {self._TABLE_NAME}
+                        WHERE todo_id IN ({placeholders})
+                          AND start_time >= ? AND start_time <= ?
+                        GROUP BY todo_id""",
+                    (*todo_ids, start_of_day, end_of_day)
+                )
+                result = {row[0]: row[1] for row in cursor.fetchall()}
+                for tid in todo_ids:
+                    if tid not in result:
+                        result[tid] = 0
+                return result
+        except Exception as e:
+            logger.error(f"批量查询累计时长失败: {e}")
+            return {tid: 0 for tid in todo_ids}
+
+    # ============================================================================
+    # 兼容旧接口（保留用于 timeline_builder）
+    # ============================================================================
+
+    def get_timeline_events_by_date(self, date: str, channel: str = 'pc') -> List[Dict[str, Any]]:
+        """
+        获取指定日期的时间线事件数据
+
+        内部调用基类 get_activity_logs，封装为 timeline 专用格式
+
+        Args:
+            date: str, 日期（YYYY-MM-DD 格式）
+            channel: str, 数据通道 ('pc' 或 'mobile'，当前仅支持 'pc')
+
+        Returns:
+            list[dict]: 事件列表
+        """
+        # 调用基类方法
+        logs, _ = self.get_activity_logs(
+            date=date,
+            query_fields=["id", "start_time", "end_time", "duration", "app", "title",
+                         "category_id", "sub_category_id"],
+            order_desc=False  # 升序
+        )
+
+        # 转换为 timeline 格式
+        events = []
+        for log in logs:
+            events.append({
+                "id": log.get("id"),
+                "start_time": log.get("start_time"),
+                "end_time": log.get("end_time"),
+                "duration": log.get("duration"),
+                "app": log.get("app"),
+                "title": log.get("title"),
+                "category_id": log.get("category_id") or "",
+                "category_name": log.get("category_name") or "",
+                "sub_category_id": log.get("sub_category_id") or "",
+                "sub_category_name": log.get("sub_category_name") or "",
+                "app_description": "",  # 保留字段
+                "title_analysis": "",   # 保留字段
+                "device_type": "pc"
+            })
+
+        return events
+
+
+# 导出单例
+timeline_provider = LazySingleton(TimelineProvider)

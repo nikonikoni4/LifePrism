@@ -95,8 +95,7 @@ from lifeprism.server.schemas.timeline_schemas import (
     UserCustomBlockResponse,
     UserCustomBlockListResponse,
 )
-from lifeprism.server.providers.timeline_provider import timeline_provider
-from lifeprism.storage.providers import todo_provider
+from lifeprism.storage.providers import timeline_provider, todo_provider
 from lifeprism.server.services.category_service import category_service
 
 
