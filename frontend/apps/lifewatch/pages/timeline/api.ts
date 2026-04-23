@@ -7,6 +7,7 @@
 import {
     TimelineStatsResponse,
     TimelineTimeOverviewResponse,
+    BehaviorAnalysisResponse,
 } from './types';
 import { createApiV2UrlGetter } from '../../../../core/services/apiConfig';
 
@@ -82,3 +83,28 @@ export const TimelineAPIV2 = {
 // ============================================================================
 
 export { ActivityLogsAPI, CategoryAPI } from '../../../../core/services/commonApi';
+
+// ============================================================================
+// Behavior Summary API
+// ============================================================================
+
+export const BehaviorAPI = {
+    /**
+     * 获取指定日期的行为分析数据
+     *
+     * @param date 查询日期 (YYYY-MM-DD)
+     * @returns 行为分析列表
+     */
+    async getBehaviorSummary(date: string): Promise<BehaviorAnalysisResponse> {
+        const params = new URLSearchParams({ date });
+        const response = await fetch(
+            `${getApiBase()}/timeline/behavior_summary?${params.toString()}`
+        );
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch behavior summary: ${response.statusText}`);
+        }
+
+        return response.json();
+    }
+};
