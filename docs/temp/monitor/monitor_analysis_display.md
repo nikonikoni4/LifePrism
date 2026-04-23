@@ -27,24 +27,30 @@
     1. 范围：today - screenshot_retention_days 
     2. 选择日期确定start_date和start_end
 
-## 数据结构
+## API schemas
 
-1. screen_analysis
 
-start_time str
-end_time str
-behavior str
-screenshot_count int # 这段时间都截图数量
-create_at timestamp
-update_at timestamp
+```python
 
-2. behavior_summary 
-start_time str
-end_time str
-behavior_summary
-create_at timestamp
+claass BehaviorAnalysisItem:
+start_time :str
+end_time :str
+title :str
+behavior_summary:str
+behaviors: :str
+screen_count :int
+create_at : str
 
-确认是否真的需要两个数据表
+claass BehaviorAnalysisResponse: 
+behavior_list : list[BehaviorAnalysisItem]
+```
+
+## API
+
+api编写在timeline_api.py中
+
+url : api/v2/timeline/behavior_summary
+
 
 ## 显示位置
 
@@ -72,3 +78,11 @@ HH-MM~ HH-MM
 2. xxx
 ...
 --------
+
+
+## 实现计划
+
+两阶段实现：
+1. 仅仅前端显示，后端service仅实现提供mock数据不接入具体数据库.mock数据位置test\explore\monitor_prompt\behavior_summary.json
+2. 实现数据库相关内容
+3. 实现两类更新逻辑

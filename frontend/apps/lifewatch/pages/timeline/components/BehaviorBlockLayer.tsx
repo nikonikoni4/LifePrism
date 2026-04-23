@@ -94,7 +94,7 @@ const BehaviorBlockLayer: React.FC<BehaviorBlockLayerProps> = ({
                 onClick={() => onBehaviorClick(behavior)}
             >
                 <span className="text-[10px] font-medium text-gray-700 text-center leading-tight">
-                    {startTime}~{endTime}
+                    {behavior.title}
                 </span>
             </div>
         );

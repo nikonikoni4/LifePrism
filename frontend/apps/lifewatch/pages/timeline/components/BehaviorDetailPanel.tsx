@@ -4,36 +4,17 @@
  * 行为分析详情面板
  *
  * 设计规范：
- * - 从右侧滑入的独立面板
- * - 宽度 400px
+ * - 嵌入式面板，显示在右侧详情区域
  * - 显示 behavior_summary 和 behaviors
- * - 点击遮罩层或关闭按钮关闭
+ * - 风格与 Timeline 右侧面板保持一致
  */
 
-import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
+import React from 'react';
+import { Clock } from 'lucide-react';
 import { BehaviorAnalysisItem } from '../types';
-
-// 添加滑入动画样式
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-@keyframes slideInRight {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-`;
-if (!document.head.querySelector('style[data-behavior-panel]')) {
-    styleSheet.setAttribute('data-behavior-panel', 'true');
-    document.head.appendChild(styleSheet);
-}
 
 interface BehaviorDetailPanelProps {
     behavior: BehaviorAnalysisItem | null;
-    isOpen: boolean;
     onClose: () => void;
 }
 
@@ -77,21 +58,9 @@ function formatDate(timeStr: string): string {
 
 const BehaviorDetailPanel: React.FC<BehaviorDetailPanelProps> = ({
     behavior,
-    isOpen,
     onClose,
 }) => {
-    // ESC 键关闭面板
-    useEffect(() => {
-        const handleEsc = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && isOpen) {
-                onClose();
-            }
-        };
-        window.addEventListener('keydown', handleEsc);
-        return () => window.removeEventListener('keydown', handleEsc);
-    }, [isOpen, onClose]);
-
-    if (!isOpen || !behavior) {
+    if (!behavior) {
         return null;
     }
 
@@ -101,74 +70,57 @@ const BehaviorDetailPanel: React.FC<BehaviorDetailPanelProps> = ({
     const duration = formatDuration(behavior.start_time, behavior.end_time);
 
     return (
-        <>
-            {/* 遮罩层 */}
-            <div
-                className="fixed inset-0 bg-black/30 z-40"
-                onClick={onClose}
-            />
+        <div className="p-8 h-full flex flex-col animate-fade-in">
+            {/* Header */}
+            <div className="flex items-center gap-2 mb-6 text-xs font-bold text-gray-400 uppercase tracking-widest">
+                <Clock size={14} />
+                Behavior Analysis
+            </div>
 
-            {/* 面板 */}
-            <div
-                className="fixed top-0 right-0 bottom-0 w-[400px] bg-white shadow-2xl z-50
-                           flex flex-col"
-                style={{
-                    animation: 'slideInRight 300ms ease-out',
-                }}
-            >
-                {/* 标题栏 */}
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
-                    <h3 className="text-base font-semibold text-gray-800">行为分析详情</h3>
-                    <button
-                        onClick={onClose}
-                        className="p-1 hover:bg-gray-200 rounded transition-colors"
-                    >
-                        <X size={20} className="text-gray-600" />
-                    </button>
-                </div>
-
-                {/* 内容区域 */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {/* 基本信息 */}
-                    <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2 text-gray-600">
-                            <span>📅</span>
-                            <span>{date}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600">
-                            <span>⏰</span>
-                            <span>{startTime} ~ {endTime} ({duration})</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600">
-                            <span>📸</span>
-                            <span>{behavior.screen_count} 张截图</span>
-                        </div>
+            {/* 基本信息 */}
+            <div className="mb-8">
+                <h2 className="text-2xl font-bold text-slate-900 mb-4">{behavior.title}</h2>
+                <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2 text-slate-500 font-mono">
+                        <span>📅</span>
+                        <span>{date}</span>
                     </div>
+                    <div className="flex items-center gap-2 text-slate-500 font-mono">
+                        <span>⏰</span>
+                        <span>{startTime} → {endTime}</span>
+                        <span className="text-slate-300">|</span>
+                        <span>{duration}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-500 font-mono">
+                        <span>📸</span>
+                        <span>{behavior.screen_count} 张截图</span>
+                    </div>
+                </div>
+            </div>
 
-                    {/* 分隔线 */}
-                    <div className="border-t" />
-
-                    {/* 总结 */}
-                    <div>
-                        <h4 className="text-sm font-semibold text-gray-700 mb-2">总结：</h4>
-                        <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
+            {/* 内容区域 */}
+            <div className="flex-1 overflow-y-auto space-y-6">
+                {/* 总结 */}
+                <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-2">总结</label>
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                             {behavior.behavior_summary}
                         </p>
                     </div>
+                </div>
 
-                    {/* 分隔线 */}
-                    <div className="border-t" />
-
-                    {/* 详细行为 */}
-                    <div>
-                        <h4 className="text-sm font-semibold text-gray-700 mb-2">详细行为：</h4>
-                        <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
+                {/* 详细行为 */}
+                <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-2">详细行为</label>
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                             {behavior.behaviors}
                         </p>
                     </div>
                 </div>
             </div>
-        </>
+        </div>
     );
 };
 

@@ -498,9 +498,11 @@ if __name__ == "__main__":
 
     # Windows 下 multiprocessing 必须调用 freeze_support()
     multiprocessing.freeze_support()
-
+    logger.warning(multiprocessing.current_process().name) # 之前重复运行的问题在打包环境下还存在？
     # 防止子进程重复启动服务器（只需 2 行代码）
     if multiprocessing.current_process().name != 'MainProcess':
+        print("===============================")
+        print("监控子进程")
         sys.exit(0)
 
     # 判断是否为打包环境

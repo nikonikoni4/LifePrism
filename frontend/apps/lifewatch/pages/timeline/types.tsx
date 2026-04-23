@@ -90,6 +90,7 @@ export type {
 
 /** 单个行为分析项 */
 export interface BehaviorAnalysisItem {
+  title: string;           // 标题
   start_time: string;       // 开始时间，格式：YYYY-MM-DD HH:MM:SS
   end_time: string;         // 结束时间，格式：YYYY-MM-DD HH:MM:SS
   screen_count: number;     // 截图数量

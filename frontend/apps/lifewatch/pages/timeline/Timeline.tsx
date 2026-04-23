@@ -562,13 +562,12 @@ const Timeline: React.FC = () => {
     // === Behavior Summary 状态 ===
     const [behaviors, setBehaviors] = useState<BehaviorAnalysisItem[]>([]);
     const [selectedBehavior, setSelectedBehavior] = useState<BehaviorAnalysisItem | null>(null);
-    const [isBehaviorPanelOpen, setIsBehaviorPanelOpen] = useState(false);
     const [isBehaviorsLoading, setIsBehaviorsLoading] = useState(false);
 
     // === 缩放配置 ===
     const MIN_HOUR_HEIGHT = 30;
     const MAX_HOUR_HEIGHT = 1200;
-    const DEFAULT_HOUR_HEIGHT = 80;
+    const DEFAULT_HOUR_HEIGHT = 100;
     const ZOOM_STEP = 1.15;
     const [hourHeight, setHourHeight] = useState<number>(DEFAULT_HOUR_HEIGHT);
     const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -1018,11 +1017,11 @@ const Timeline: React.FC = () => {
                     </div>
 
                     {/* 设备过滤（占位） */}
-                    <div className="hidden md:flex gap-2">
+                    {/* <div className="hidden md:flex gap-2">
                         <span className="px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-full">All Sources</span>
                         <span className="px-3 py-1.5 hover:bg-gray-50 text-gray-500 text-xs font-bold rounded-full cursor-pointer transition-colors">PC Only</span>
                         <span className="px-3 py-1.5 hover:bg-gray-50 text-gray-500 text-xs font-bold rounded-full cursor-pointer transition-colors">Mobile Only</span>
-                    </div>
+                    </div> */}
                 </div>
 
                 {/* 缩放控制 */}
@@ -1178,8 +1177,12 @@ const Timeline: React.FC = () => {
                             behaviors={behaviors}
                             hourHeight={HOUR_HEIGHT}
                             onBehaviorClick={(item) => {
+                                // 清除其他选中状态
+                                setSelectedTimeRange(null);
+                                setOverviewData(null);
+                                setSelectedEventId(null);
+                                // 设置选中的 Behavior
                                 setSelectedBehavior(item);
-                                setIsBehaviorPanelOpen(true);
                             }}
                             isLoading={isBehaviorsLoading}
                         />
@@ -1188,7 +1191,7 @@ const Timeline: React.FC = () => {
                         {majorTicks.map((t) => (
                             <div
                                 key={`major-${t}`}
-                                className="absolute left-36 right-0 border-t border-gray-200"
+                                className="absolute left-36 right-[100px] border-t border-gray-200"
                                 style={{ top: `${t * HOUR_HEIGHT}px` }}
                             />
                         ))}
@@ -1197,7 +1200,7 @@ const Timeline: React.FC = () => {
                         {minorTicks.map((t) => (
                             <div
                                 key={`minor-${t}`}
-                                className="absolute left-36 right-0 border-t border-gray-100"
+                                className="absolute left-36 right-[100px] border-t border-gray-100"
                                 style={{ top: `${t * HOUR_HEIGHT}px` }}
                             />
                         ))}
@@ -1294,7 +1297,7 @@ const Timeline: React.FC = () => {
                                                 return (
                                                     <div
                                                         key={hour}
-                                                        className="absolute left-36 right-4"
+                                                        className="absolute left-36 right-[100px]"
                                                         style={{
                                                             top: `${hour * HOUR_HEIGHT}px`,
                                                             height: `${HOUR_HEIGHT}px`,
@@ -1376,8 +1379,13 @@ const Timeline: React.FC = () => {
 
                 {/* Right Column: Inspector Panel */}
                 <div className="hidden lg:flex w-[35%] h-full bg-white border-l border-gray-200 flex-col overflow-y-auto">
-                    {/* Timeline Overview Panel */}
-                    {selectedTimeRange ? (
+                    {/* Behavior Detail Panel */}
+                    {selectedBehavior ? (
+                        <BehaviorDetailPanel
+                            behavior={selectedBehavior}
+                            onClose={() => setSelectedBehavior(null)}
+                        />
+                    ) : selectedTimeRange ? (
                         <div className="p-4 h-full flex flex-col animate-fade-in">
                             {/* Header */}
                             <div className="flex items-center justify-between mb-4">
@@ -1558,13 +1566,6 @@ const Timeline: React.FC = () => {
                     )}
                 </div>
             </div>
-
-            {/* Behavior Detail Panel - 行为分析详情面板 */}
-            <BehaviorDetailPanel
-                behavior={selectedBehavior}
-                isOpen={isBehaviorPanelOpen}
-                onClose={() => setIsBehaviorPanelOpen(false)}
-            />
         </div>
     );
 };

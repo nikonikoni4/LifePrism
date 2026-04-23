@@ -2,6 +2,9 @@
 from dataclasses import dataclass
 import json
 from pathlib import Path
+import asyncio
+
+from lifeprism.llm.providers.llm_providers.build_llm_client import create_llm_client
 
 
 
@@ -88,6 +91,7 @@ SUMMARY_SYSTEM_PROMPT = """
 class BehaviorAnalysis:
     start_time: str # YYYY-MM-DD HH-MM-SS
     end_time : str
+    screen_count: int
     behavior_summary : str
     behaviors : str
 
@@ -113,7 +117,7 @@ def merge_behaviors_by_time(
     Returns:
         合并后的行为分析列表
     """
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     if not bucket_list:
         return []
@@ -168,6 +172,7 @@ def _create_behavior_analysis(buckets: list[SingalBucketAnalysis]) -> BehaviorAn
     # 合并所有行为描述
     behaviors_list = [f"{i+1}. {bucket.behavior}" for i, bucket in enumerate(buckets)]
     behaviors = "\n".join(behaviors_list)
+    screen_count = sum(bucket.screen_count for bucket in buckets)
 
     # 生成简单的总结（可以后续用 LLM 优化）
     behavior_summary = ""
@@ -175,6 +180,7 @@ def _create_behavior_analysis(buckets: list[SingalBucketAnalysis]) -> BehaviorAn
     return BehaviorAnalysis(
         start_time=start_time,
         end_time=end_time,
+        screen_count=screen_count,
         behavior_summary=behavior_summary,
         behaviors=behaviors
     ) 
@@ -194,27 +200,35 @@ behavior_analysis_list = merge_behaviors_by_time(bucket_analysis_list,15)
 for i in range(len(behavior_analysis_list)):
     print(behavior_analysis_list[i])
 
-user_prompt = f"""
+llm = create_llm_client()
+
+
+async def main() -> None:
+    summaries: list[dict] = []
+    for item in behavior_analysis_list:
+        user_prompt = f"""
 ## 用户目标
 1. 完成《复利效应》读书笔记编写
 2. 修复habits模块的相关bug
 
 ## 用户数据
-{behavior_analysis_list[0].behaviors}
+{item.behaviors}
 """
-messages = [{'role':"system",'content':SUMMARY_SYSTEM_PROMPT},{'role':"user",'content':user_prompt}]
+        messages = [
+            {'role': "system", 'content': SUMMARY_SYSTEM_PROMPT},
+            {'role': "user", 'content': user_prompt}
+        ]
+        response = await llm.chat(messages)
+        item.behavior_summary = response.content.strip() if response and response.content else ""
+        summaries.append({
+            "start_time": item.start_time,
+            "end_time": item.end_time,
+            "screen_count": item.screen_count,
+            "behavior_summary": item.behavior_summary,
+            "behaviors": item.behaviors,
+        })
 
-from lifeprism.llm.providers.llm_providers.build_llm_client import create_llm_client
-
-
-llm = create_llm_client()
-import asyncio
-
-
-async def main() -> None:
-    response = await llm.chat(messages)
-    print(response.content)
-    print(response.usage)
+    print(json.dumps(summaries, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

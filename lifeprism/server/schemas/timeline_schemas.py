@@ -137,6 +137,7 @@ class TodoDurationResponse(BaseModel):
 
 class BehaviorAnalysisItem(BaseModel):
     """单个行为分析项"""
+    title: str = Field(..., description="标题")
     start_time: str = Field(..., description="开始时间，格式：YYYY-MM-DD HH:MM:SS")
     end_time: str = Field(..., description="结束时间，格式：YYYY-MM-DD HH:MM:SS")
     screen_count: int = Field(..., description="截图数量")
