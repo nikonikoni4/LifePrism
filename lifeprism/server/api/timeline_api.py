@@ -9,6 +9,7 @@ from lifeprism.server.schemas.timeline_schemas import (
     UserCustomBlockResponse,
     UserCustomBlockListResponse,
     TodoDurationResponse,
+    BehaviorAnalysisResponse,
 )
 from lifeprism.server.schemas.todo_schemas import BatchDurationRequest, BatchDurationResponse
 from lifeprism.server.services import timeline_service
@@ -151,8 +152,32 @@ async def update_custom_block(block_id: int, data: UserCustomBlockUpdate):
 async def delete_custom_block(block_id: int):
     """
     删除自定义时间块
-    
+
     - **block_id**: 时间块ID
     """
     success = timeline_service.delete_custom_block(block_id)
     return {"success": success, "message": "Deleted successfully" if success else "Block not found"}
+
+
+@router.get("/behavior_summary", response_model=BehaviorAnalysisResponse)
+async def get_behavior_summary(
+    date: str = Query(..., description="查询日期 (YYYY-MM-DD)")
+):
+    """
+    获取指定日期的行为分析数据（第一阶段：Mock 数据）
+
+    - **date**: 查询日期，格式 YYYY-MM-DD
+    """
+    import json
+    from pathlib import Path
+
+    # 读取 mock 数据
+    mock_file = Path(__file__).parent.parent.parent.parent / "test" / "explore" / "monitor_prompt" / "behavior_summary.json"
+
+    try:
+        with open(mock_file, "r", encoding="utf-8") as f:
+            mock_data = json.load(f)
+        return BehaviorAnalysisResponse(behavior_list=mock_data)
+    except Exception as e:
+        # 如果读取失败，返回空列表
+        return BehaviorAnalysisResponse(behavior_list=[])
