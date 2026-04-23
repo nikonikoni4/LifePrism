@@ -26,6 +26,12 @@ from lifeprism.storage.providers.habit_chain_providers import (
     habit_chain_provider,
     habit_chain_node_provider,
 )
+from lifeprism.storage.providers.goal_providers import (
+    GoalProvider,
+    GoalStatsProvider,
+    goal_provider,
+    goal_stats_provider,
+)
 from lifeprism.utils import LazySingleton
 
 # 创建全局单例（已重构为使用通用方法）
@@ -51,4 +57,8 @@ __all__ = [
     'HabitChainNodeProvider',
     'habit_chain_provider',
     'habit_chain_node_provider',
+    'GoalProvider',
+    'GoalStatsProvider',
+    'goal_provider',
+    'goal_stats_provider',
 ]

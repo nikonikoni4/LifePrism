@@ -18,7 +18,7 @@ from lifeprism.server.schemas.goal_schemas import (
     MilestoneItem,
     JournalEntry,
 )
-from lifeprism.server.providers.goal_provider import goal_provider
+from lifeprism.storage.providers import goal_provider
 from lifeprism.server.providers.journal_provider import journal_provider
 from lifeprism.server.services.category_service import category_service
 from lifeprism.utils import get_logger

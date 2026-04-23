@@ -22,9 +22,9 @@ related_spec:
 
 - [x] diary_provider
 - [x] mood_provider
-- [ ] habit_provider
-- [ ] habit_checkin_provider
-- [ ] habit_stats_provider
+- [x] habit_provider
+- [x] habit_checkin_provider
+- [x] habit_stats_provider
 - [ ] goal_provider
 - [ ] todo_provider
 - [ ] statistical_data_providers

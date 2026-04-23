@@ -1,0 +1,25 @@
+# serializer version: 1
+# name: TestGoalServiceSnapshot.test_create_goal_snapshot
+  GoalItem(id='goal-edd3b69a', name='测试目标-snapshot-1776975142', content='这是一个测试目标', color='#5B8FF9', created_at='2026-04-24 04:12:22', link_to_category=None, link_to_sub_category=None, start_date='2026-04-24', expected_finished_at='2026-12-31', value='测试价值', commitment='测试承诺', time_invested='0h 0m', track_time_automatically=True, milestones=[], journal=[], status='active', order_index=2, days_started=0)
+# ---
+# name: TestGoalServiceSnapshot.test_delete_goal_snapshot
+  True
+# ---
+# name: TestGoalServiceSnapshot.test_get_active_goal_names_snapshot
+  ActiveGoalNamesResponse(items=[ActiveGoalItem(id='goal-example', name='示例'), ActiveGoalItem(id='goal-daily', name='每日目标')])
+# ---
+# name: TestGoalServiceSnapshot.test_get_goal_detail_snapshot
+  GoalItem(id='goal-2f00a446', name='测试目标详情-1776975142', content='测试内容', color='#5B8FF9', created_at='2026-04-24 04:12:22', link_to_category=None, link_to_sub_category=None, start_date='2026-04-24', expected_finished_at=None, value=None, commitment=None, time_invested='0h 0m', track_time_automatically=True, milestones=[], journal=[], status='active', order_index=2, days_started=0)
+# ---
+# name: TestGoalServiceSnapshot.test_get_goals_by_status_snapshot
+  GoalListResponse(items=[GoalItem(id='goal-example', name='示例', content='这是一个例子：\n\n1. 目标界面中可编辑，卡片颜色，目标分类，开始和结束时间等基础属性。\n2. 编写目标的价值和承诺，解释为什么需要做这个目标，这很重要！\n3. 在配置中可选择自动跟踪，当为目标设置了分类类别和自动跟踪时，会依据电脑使用数据自动跟踪目标投入时间\n4. 为你的目标添加里程碑吧！查看当前目标进度\n5. 可在最下方为你的目标添加log，记录目标过程！', color='#5B8FF9', created_at='2026-04-02 05:55:27', link_to_category=None, link_to_sub_category=None, start_date=None, expected_finished_at=None, value=None, commitment=None, time_invested='0h 0m', track_time_automatically=False, milestones=[], journal=[], status='active', order_index=0, days_started=None), GoalItem(id='goal-daily', name='每日目标', content='记录每日的目标和计划', color='#5AD8A6', created_at='2026-04-20 13:45:15', link_to_category=None, link_to_sub_category=None, start_date=None, expected_finished_at=None, value=None, commitment=None, time_invested='0h 0m', track_time_automatically=False, milestones=[], journal=[], status='active', order_index=1, days_started=None)], total=2)
+# ---
+# name: TestGoalServiceSnapshot.test_get_goals_snapshot
+  GoalListResponse(items=[GoalItem(id='goal-example', name='示例', content='这是一个例子：\n\n1. 目标界面中可编辑，卡片颜色，目标分类，开始和结束时间等基础属性。\n2. 编写目标的价值和承诺，解释为什么需要做这个目标，这很重要！\n3. 在配置中可选择自动跟踪，当为目标设置了分类类别和自动跟踪时，会依据电脑使用数据自动跟踪目标投入时间\n4. 为你的目标添加里程碑吧！查看当前目标进度\n5. 可在最下方为你的目标添加log，记录目标过程！', color='#5B8FF9', created_at='2026-04-02 05:55:27', link_to_category=None, link_to_sub_category=None, start_date=None, expected_finished_at=None, value=None, commitment=None, time_invested='0h 0m', track_time_automatically=False, milestones=[], journal=[], status='active', order_index=0, days_started=None), GoalItem(id='goal-daily', name='每日目标', content='记录每日的目标和计划', color='#5AD8A6', created_at='2026-04-20 13:45:15', link_to_category=None, link_to_sub_category=None, start_date=None, expected_finished_at=None, value=None, commitment=None, time_invested='0h 0m', track_time_automatically=False, milestones=[], journal=[], status='active', order_index=1, days_started=None)], total=2)
+# ---
+# name: TestGoalServiceSnapshot.test_get_goals_with_category_snapshot
+  GoalsWithCategoryResponse(items=[])
+# ---
+# name: TestGoalServiceSnapshot.test_update_goal_snapshot
+  GoalItem(id='goal-f7620102', name='更新后的目标-1776975142', content='更新后的内容', color='#FF6B6B', created_at='2026-04-24 04:12:22', link_to_category=None, link_to_sub_category=None, start_date=None, expected_finished_at=None, value=None, commitment=None, time_invested='0h 0m', track_time_automatically=True, milestones=[], journal=[], status='active', order_index=2, days_started=None)
+# ---

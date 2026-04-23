@@ -89,6 +89,10 @@ def create_mood_entry(request):
 
 ### 步骤 1: 构建 Service 快照测试
 
+**确认需要重构的provider**:在开始之前确认需要重构的所有provider
+
+**寻找所有该provider涉及到的service**：确保service不会遗漏
+
 **目的**: 在重构前捕获当前行为，确保重构后行为不变。
 
 **测试文件位置**: `test/core/services/test_<service_name>_snapshot.py`

@@ -7,7 +7,8 @@ from typing import Dict, Tuple, Optional
 from datetime import datetime, timedelta
 import pytz
 
-from lifeprism.server.providers import server_lw_data_provider, goal_provider
+from lifeprism.server.providers import server_lw_data_provider
+from lifeprism.storage.providers import goal_provider
 from lifeprism.processors.data_clean import clean_activitywatch_data
 from lifeprism.llm.classify.main_classify import LLMClassify
 from lifeprism.llm.schemas import classifyState
