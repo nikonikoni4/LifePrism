@@ -4,9 +4,11 @@ from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from lifeprism.server.providers.habit_provider import habit_provider
-from lifeprism.server.providers.habit_checkin_provider import habit_checkin_provider
-from lifeprism.server.providers.habit_challenge_provider import habit_challenge_provider
+from lifeprism.storage.providers import (
+    habit_provider,
+    habit_checkin_provider,
+    habit_challenge_provider,
+)
 from lifeprism.server.schemas.habit_schemas import FrequencyObject
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import ValidationError
