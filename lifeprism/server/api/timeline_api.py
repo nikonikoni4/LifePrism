@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Query, HTTPException
 from typing import Literal
+import json
+from pathlib import Path
 
 from lifeprism.server.schemas.timeline_schemas import (
     TimelineStatsResponse,
@@ -168,11 +170,9 @@ async def get_behavior_summary(
 
     - **date**: 查询日期，格式 YYYY-MM-DD
     """
-    import json
-    from pathlib import Path
-
     # 读取 mock 数据
-    mock_file = Path(__file__).parent.parent.parent.parent / "test" / "explore" / "monitor_prompt" / "behavior_summary.json"
+    project_root = Path(__file__).parent.parent.parent.parent
+    mock_file = project_root / "test" / "explore" / "monitor_prompt" / "behavior_summary.json"
 
     try:
         with open(mock_file, "r", encoding="utf-8") as f:
