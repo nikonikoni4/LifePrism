@@ -130,3 +130,22 @@ class TodoDurationResponse(BaseModel):
     date: str = Field(..., description="查询日期")
     duration: int = Field(..., description="累计时长（分钟）")
 
+
+# ============================================================================
+# Behavior Summary 相关 Schema
+# ============================================================================
+
+class BehaviorAnalysisItem(BaseModel):
+    """单个行为分析项"""
+    start_time: str = Field(..., description="开始时间，格式：YYYY-MM-DD HH:MM:SS")
+    end_time: str = Field(..., description="结束时间，格式：YYYY-MM-DD HH:MM:SS")
+    screen_count: int = Field(..., description="截图数量")
+    behavior_summary: str = Field(..., description="总结性描述")
+    behaviors: str = Field(..., description="分点行为（带序号的文本）")
+    created_at: str = Field(..., description="创建时间")
+
+
+class BehaviorAnalysisResponse(BaseModel):
+    """行为分析响应"""
+    behavior_list: list[BehaviorAnalysisItem] = Field(default_factory=list, description="行为分析列表")
+
