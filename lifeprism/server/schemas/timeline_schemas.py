@@ -147,5 +147,5 @@ class BehaviorAnalysisItem(BaseModel):
 
 class BehaviorAnalysisResponse(BaseModel):
     """行为分析响应"""
-    behavior_list: list[BehaviorAnalysisItem] = Field(default_factory=list, description="行为分析列表")
+    behavior_list: List[BehaviorAnalysisItem] = Field(default_factory=list, description="行为分析列表")
 
