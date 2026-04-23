@@ -275,14 +275,14 @@ def encode_image_to_base64(file_path: str) -> Optional[str]:
 async def analyze_chunk_screenshots(
     chunk: Dict[str, str],
     screenshots: List[Dict[str, Any]],
-    goal_text: Optional[str] = None
+    todolist: Optional[str] = None
 ) -> Optional[str]:
     """分析单个 chunk 的截图语义（只使用单数序号的截图：1、3、5...）
 
     Args:
         chunk: 时间段字典，包含 start 和 end
         screenshots: 截图列表
-        goal_text: 用户今日目标文本（可选）
+        todolist: 用户今日目标文本（可选）
 
     Returns:
         Optional[str]: LLM 分析结果，失败返回 None
@@ -319,8 +319,8 @@ async def analyze_chunk_screenshots(
 
     # 构建 user content
     user_content: List[Dict[str, str]] = []
-    if goal_text:
-        user_content.append({"type": "text", "text": goal_text.strip()})
+    if todolist:
+        user_content.append({"type": "text", "text": todolist.strip()})
     user_content.append({
         "type": "text",
         "text": f"时间范围: {chunk['start']} -> {chunk['end']}",
@@ -408,7 +408,7 @@ async def screenshot_analysis(
     # Step 4: 获取目标列表
     start_date = datetime.fromisoformat(start_time).strftime("%Y-%m-%d")
     end_date = datetime.fromisoformat(end_time).strftime("%Y-%m-%d")
-    goal_text = get_todolist(start_date, end_date)
+    todolist = get_todolist(start_date, end_date)
 
     # Step 5: 分析每个 chunk
     results = []
@@ -428,7 +428,7 @@ async def screenshot_analysis(
         if not screenshots:
             continue
 
-        analysis_result = await analyze_chunk_screenshots(chunk, screenshots, goal_text)
+        analysis_result = await analyze_chunk_screenshots(chunk, screenshots, todolist)
 
         results.append({
             "chunk": chunk,
@@ -441,7 +441,68 @@ async def screenshot_analysis(
     return results
 
 
+async def behavior_summary(bahaviors : str,todolist:str)->str:
+    """
+    对输入的行为内容进行总结
+    args ：
+        behaviors : 输入的行为
+    return :
+        行为总结
+    """
+    if not bahaviors:
+        raise ValueError("输入行为为空")
+    SUMMARY_SYSTEM_PROMPT = """
+    ## task 
+    你需要对输入的用户行为进行总结
 
+    ## 需要做的事情
+    1. 输入内容如果包含相似、重复的内容需要合理合并
+    2. 输入的内容如果包含逻辑关系，可以进行合理推理，比如用户先编写xx计划，然后执行xx计划等
+    3. 如果所做的事情与用户的目标相关，需要结合目标进行说明。但不能直接说在进行xx目标，而是要结合具体行为和目标关系说明
+
+    ## 不要做的事情
+    1. 不要简单重复输入内容中已经有点内容
+    2. 输出不要超过200字
+    3. 输出中不要直接包含“用户”等主语
+    4. 不要使用“完成了”等字眼，因为仅凭输入是无法判断是否完成了某项工作（即使输入的行为包含“完成”类似的语义也不能在总结中输出“完成”），只描述做了什么内容，而不是完成了什么
+
+    ## 输入说明
+    输入行为的顺序就是真实动作的时间顺序
+
+    ## 输出契约
+    直接输出总结内容
+
+    例如：
+    完成了habit模块习惯界面链条时间计算bug的全流程修复开发工作，期间穿插查看AI对 心理学概念的解析，并在思源笔记中编写整理《复利效应》的相关读书笔记
+
+    """
+    user_prompt_parts = []
+    if todolist :
+        user_prompt_parts.append(
+            f"""
+            ## 用户目标
+            {todolist}
+            """
+        )
+    user_prompt_parts.append(
+        f"""
+        ## 用户行为
+        {bahaviors}
+        """
+    )
+    user_prompt = "\n".join(user_prompt_parts)
+    
+
+    try:
+        response = await channel_manager.send(
+            content=user_prompt,
+            type=MessageType.GENERAL_TASK,
+            extra={"system_prompt": SUMMARY_SYSTEM_PROMPT},
+        )
+        return response if response else ""
+    except Exception as e:
+        logger.error(f"行为总结调用失败: {e}", exc_info=True)
+        return ""
 if __name__ == "__main__":
     from lifeprism.llm.agent.loop import agent_loop
     import asyncio
