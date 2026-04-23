@@ -4,10 +4,13 @@ import math
 from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any
 
-from lifeprism.server.providers.habit_provider import habit_provider
-from lifeprism.server.providers.habit_challenge_provider import habit_challenge_provider
-from lifeprism.server.providers.habit_checkin_provider import habit_checkin_provider
-from lifeprism.server.providers.habit_chain_provider import habit_chain_provider
+from lifeprism.storage.providers import (
+    habit_provider,
+    habit_challenge_provider,
+    habit_checkin_provider,
+    habit_chain_provider,
+    habit_chain_node_provider,
+)
 from lifeprism.server.errors.error_codes import (
     BACKFILL_DATE_OUT_OF_WINDOW,
     CANNOT_CANCEL_PAST_CHECKIN,
@@ -124,7 +127,7 @@ class HabitService:
         streak = get_habit_streak(row["id"], freq, challenge_row)
 
         # 锚点信息
-        anchor_map = habit_chain_provider.get_anchor_info_by_habit_ids([row["id"]])
+        anchor_map = habit_chain_node_provider.get_anchor_info_by_habit_ids([row["id"]])
         anchor_info = None
         if row["id"] in anchor_map:
             a = anchor_map[row["id"]]
@@ -288,7 +291,7 @@ class HabitService:
             raise NotFoundError("习惯不存在", code=HABIT_NOT_FOUND)
         habit_checkin_provider.delete_by_habit_id(habit_id)
         self._cancel_current_challenge(habit_id)
-        habit_chain_provider.unlink_habit_from_nodes(habit_id)
+        habit_chain_node_provider.unlink_habit_from_nodes(habit_id)
         habit_provider.delete_habit(habit_id)
         self._habit_name_map.pop(habit_id, None)
         return True

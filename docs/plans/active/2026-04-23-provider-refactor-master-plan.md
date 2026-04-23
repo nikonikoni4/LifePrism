@@ -21,7 +21,7 @@ related_spec:
 ## Provider 重构顺序
 
 - [x] diary_provider
-- [ ] mood_provider
+- [x] mood_provider
 - [ ] habit_provider
 - [ ] habit_checkin_provider
 - [ ] habit_stats_provider

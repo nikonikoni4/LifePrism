@@ -8,6 +8,7 @@
 - **完整实现**: `lifeprism/storage/providers/diary_provider.py`
 - **快照测试**: `test/core/services/test_diary_service_snapshot.py`
 - **单元测试**: `test/core/unit/storage/test_base_provider_generic_methods.py`
+- **表结构定义**: `lifeprism/config/database.py` - 查看所有表的 schema 定义
 
 ## 架构原则
 
