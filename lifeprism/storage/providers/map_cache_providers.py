@@ -91,9 +91,9 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def insert_multi_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
+    def create_multi_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
         """
-        插入记录
+        创建记录
 
         Args:
             data: 记录数据（必须包含 id, app, title）
@@ -373,9 +373,9 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def insert_single_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
+    def create_single_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
         """
-        插入记录
+        创建记录
 
         Args:
             data: 记录数据（必须包含 id, app, title）

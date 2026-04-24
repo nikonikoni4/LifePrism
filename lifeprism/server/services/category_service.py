@@ -446,7 +446,7 @@ class CategoryService:
                 'color': color
             }
 
-            success = self.category_store.insert_category(data)
+            success = self.category_store.create_category(data)
             if not success:
                 raise Exception("插入数据库失败")
 
@@ -599,7 +599,7 @@ class CategoryService:
                 'name': name
             }
 
-            success = self.category_store.insert_sub_category(data)
+            success = self.category_store.create_sub_category(data)
             if not success:
                 raise Exception("插入数据库失败")
 

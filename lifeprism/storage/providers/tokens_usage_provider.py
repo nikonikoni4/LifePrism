@@ -91,9 +91,9 @@ class TokensUsageProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def insert_tokens_usage(self, data: Dict[str, Any]) -> bool:
+    def create_tokens_usage(self, data: Dict[str, Any]) -> bool:
         """
-        插入 token 使用记录
+        创建 token 使用记录
 
         Args:
             data: 记录数据（必须包含 session_id）
@@ -202,7 +202,7 @@ class TokensUsageProvider(LWBaseDataProvider):
             else:
                 # 记录不存在，执行插入
                 data['session_id'] = session_id
-                return self.insert_tokens_usage(data)
+                return self.create_tokens_usage(data)
         except Exception as e:
             logger.error(f"Upsert token 使用记录 {session_id} 失败: {e}")
             return False

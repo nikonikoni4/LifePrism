@@ -1,6 +1,6 @@
 ## 数据库接口创建规则
 
-核心规则：创建接口时，必须查看现有的方法是如何实现的。provider类必须基础自LWBaseDataProvider在 Provider 类中定义以下元数据：
+核心规则：创建接口时，必须查看现有的方法是如何实现的。provider类必须继承自LWBaseDataProvider
 
 ### 1. 创建数据表
 
@@ -61,10 +61,18 @@
 
 4. 实现方法时，必须使用LWBaseDataset类的基础CURD方法（_generic_query、_generic_insert，_generic_update，_generic_delete）
 
+5. 必须实现的核心方法
+
+每个 Provider 必须实现以下 5 个核心方法：
+
+- `query_{table}()` - 通用查询接口（使用 QueryOptions）
+- `get_{table}_by_id()` - 按 ID 查询
+- `create_{table}()` - 插入记录
+- `update_{table}()` - 更新记录
+- `delete_{table}()` - 删除记录
 
 #### 3 聚合类规则
 
 1. **aggregators创建的触发条件**：仅人工认定之后才可在`lifeprism\storage\aggregators`创建新的聚合类 
-2. 聚合类所涉及的`lifeprism/storage/provider`类不能在`__init__.py`中创建单例
-3. 聚合类方法必须透传所包括的provider成员的所有CURD核心方法，常用查询（超过3次引用）建议透传而不是在聚合层实现，特殊方法编写在聚合层
+3. 聚合类方法必须透传所包括的provider成员的所有CURD核心方法，常用查询（超过3次引用）建议透传而不是在聚合层实现，特殊方法编写在聚合层。
 

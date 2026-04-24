@@ -90,9 +90,9 @@ class DiaryProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def insert_diary(self, date: str, data: Optional[Dict[str, Any]] = None) -> bool:
+    def create_diary(self, date: str, data: Optional[Dict[str, Any]] = None) -> bool:
         """
-        插入日记记录（使用基类方法）
+        创建日记记录（使用基类方法）
 
         Args:
             date: 日期 YYYY-MM-DD（主键）
@@ -219,13 +219,13 @@ class DiaryProvider(LWBaseDataProvider):
         results, _ = self.query_diaries(options)
         return results
 
-    def create_diary(self, date: str) -> bool:
+    def create_diary_simple(self, date: str) -> bool:
         """
-        创建日记记录（兼容旧接口）
+        创建日记记录（简化版本）
 
-        注意：此方法是对 insert_diary 的封装，仅为保持向后兼容。
-        新代码应优先使用 insert_diary(date, data)。
+        注意：此方法是对 create_diary 的封装，仅为保持向后兼容。
+        新代码应优先使用 create_diary(date, data)。
 
-        这是 insert_diary 的简化版本，只传 date。
+        这是 create_diary 的简化版本，只传 date。
         """
-        return self.insert_diary(date)
+        return self.create_diary(date)

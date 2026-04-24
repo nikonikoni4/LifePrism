@@ -86,9 +86,9 @@ class CategoryProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def insert_category(self, data: Dict[str, Any]) -> bool:
+    def create_category(self, data: Dict[str, Any]) -> bool:
         """
-        插入分类记录
+        创建分类记录
 
         Args:
             data: 分类数据（必须包含 id, name, color）
@@ -235,9 +235,9 @@ class SubCategoryProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def insert_sub_category(self, data: Dict[str, Any]) -> bool:
+    def create_sub_category(self, data: Dict[str, Any]) -> bool:
         """
-        插入子分类记录
+        创建子分类记录
 
         Args:
             data: 子分类数据（必须包含 id, category_id, name）

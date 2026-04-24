@@ -91,9 +91,9 @@ class MapCacheAggregator:
 
     # ==================== MultiPurposeMapCache 核心 CRUD 透传 ====================
 
-    def insert_multi_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
-        """透传：插入多用途映射缓存"""
-        return self.multi_purpose_provider.insert_multi_purpose_map_cache(data)
+    def create_multi_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
+        """透传：创建多用途映射缓存"""
+        return self.multi_purpose_provider.create_multi_purpose_map_cache(data)
 
     def update_multi_purpose_map_cache(self, cache_id: str, data: Dict[str, Any]) -> bool:
         """透传：更新多用途映射缓存"""
@@ -117,9 +117,9 @@ class MapCacheAggregator:
 
     # ==================== SinglePurposeMapCache 核心 CRUD 透传 ====================
 
-    def insert_single_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
-        """透传：插入单用途映射缓存"""
-        return self.single_purpose_provider.insert_single_purpose_map_cache(data)
+    def create_single_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
+        """透传：创建单用途映射缓存"""
+        return self.single_purpose_provider.create_single_purpose_map_cache(data)
 
     def update_single_purpose_map_cache(self, cache_id: str, data: Dict[str, Any]) -> bool:
         """透传：更新单用途映射缓存"""

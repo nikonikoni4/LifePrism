@@ -86,9 +86,9 @@ class CategoryAggregator:
 
     # ==================== Category 核心 CRUD 透传 ====================
 
-    def insert_category(self, data: Dict[str, Any]) -> bool:
-        """透传：插入分类"""
-        return self.category_provider.insert_category(data)
+    def create_category(self, data: Dict[str, Any]) -> bool:
+        """透传：创建分类"""
+        return self.category_provider.create_category(data)
 
     def update_category(self, category_id: str, data: Dict[str, Any]) -> bool:
         """透传：更新分类"""
@@ -108,9 +108,9 @@ class CategoryAggregator:
 
     # ==================== SubCategory 核心 CRUD 透传 ====================
 
-    def insert_sub_category(self, data: Dict[str, Any]) -> bool:
-        """透传：插入子分类"""
-        return self.sub_category_provider.insert_sub_category(data)
+    def create_sub_category(self, data: Dict[str, Any]) -> bool:
+        """透传：创建子分类"""
+        return self.sub_category_provider.create_sub_category(data)
 
     def update_sub_category(self, sub_id: str, data: Dict[str, Any]) -> bool:
         """透传：更新子分类"""
@@ -144,7 +144,7 @@ class CategoryAggregator:
             是否成功
         """
         # 创建分类
-        success = self.category_provider.insert_category(category_data)
+        success = self.category_provider.create_category(category_data)
         if not success:
             return False
 
@@ -154,7 +154,7 @@ class CategoryAggregator:
         if sub_categories_data:
             for sub_cat_data in sub_categories_data:
                 sub_cat_data['category_id'] = category_id
-                sub_success = self.sub_category_provider.insert_sub_category(sub_cat_data)
+                sub_success = self.sub_category_provider.create_sub_category(sub_cat_data)
                 if not sub_success:
                     logger.warning(f"创建子分类失败: {sub_cat_data.get('id')}")
 
