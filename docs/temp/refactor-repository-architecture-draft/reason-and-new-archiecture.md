@@ -84,29 +84,3 @@ lifeprism/
 | **Provider** | `storage/providers/` | 原子的数据库操作，通用、可复用 | `query_todos(filters, sort, page)` |
 | **Aggregator** | `storage/aggregators/` | 组合多个provider调用，数据聚合计算 | `aggregate_daily_stats()` 调用多个provider |
 | **Service** | `server/services/` 或 `llm/services/` | 业务逻辑、事务协调、外部调用 | `complete_todo()` 更新数据库 + 发送通知 |
-
-# 测试流程
-
-**步骤1：测试准备**
-- [ ] 识别依赖该provider的所有service
-- [ ] 为每个service编写快照测试
-- [ ] 准备测试数据（确保非空）
-- [ ] 运行测试，生成快照文件
-- [ ] 提交快照到git
-
-**步骤2：重构provider**
-- [ ] 在`storage/providers/`创建新provider
-- [ ] 实现5个核心方法（query/get/create/update/delete）
-- [ ] 实现特殊方法（批量操作、统计查询等）
-- [ ] 编写provider单元测试
-- [ ] 提交git
-**步骤3：替换调用**
-- [ ] 在service中逐步替换provider调用
-- [ ] 每替换一个方法，运行快照测试
-- [ ] 如有差异，分析并修复
-- [ ] 确认所有快照测试通过
-- [ ] 提交git
-**步骤4：清理验证**
-- [ ] 运行完整测试套件
-- [ ] 手动测试关键功能
-- [ ] 更新文档
