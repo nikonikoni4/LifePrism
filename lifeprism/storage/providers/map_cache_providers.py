@@ -6,7 +6,7 @@ Map Cache Providers
 from typing import Dict, Any, List, Optional, Tuple, Set
 from lifeprism.storage.base_providers import LWBaseDataProvider
 from lifeprism.storage.providers.common_query_options import QueryOptions
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger,LazySingleton
 
 logger = get_logger(__name__)
 
@@ -573,3 +573,4 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error(f"批量删除 single_purpose_map_cache 记录失败: {e}")
             return 0
+

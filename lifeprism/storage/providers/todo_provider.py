@@ -7,7 +7,7 @@ import uuid
 
 from lifeprism.storage import LWBaseDataProvider
 from lifeprism.storage.providers.common_query_options import QueryOptions
-from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -685,7 +685,3 @@ class TodoProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error(f"清除 WAID 排序失败: {e}")
             return False
-
-
-# 创建全局单例
-todo_provider = LazySingleton(TodoProvider)

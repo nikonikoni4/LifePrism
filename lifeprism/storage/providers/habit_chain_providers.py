@@ -418,7 +418,3 @@ class HabitChainNodeProvider(LWBaseDataProvider):
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
-# ==================== 导出单例 ====================
-
-habit_chain_provider = LazySingleton(HabitChainProvider)
-habit_chain_node_provider = LazySingleton(HabitChainNodeProvider)

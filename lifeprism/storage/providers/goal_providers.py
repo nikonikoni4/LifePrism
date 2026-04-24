@@ -758,7 +758,3 @@ class GoalStatsProvider(LWBaseDataProvider):
         return result
 
 
-# 导出单例
-goal_provider = LazySingleton(GoalProvider)
-goal_stats_provider = LazySingleton(GoalStatsProvider)
-

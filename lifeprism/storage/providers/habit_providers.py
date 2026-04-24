@@ -614,8 +614,4 @@ class HabitCheckinProvider(LWBaseDataProvider):
             return results
 
 
-# ==================== 导出单例 ====================
 
-habit_provider = LazySingleton(HabitProvider)
-habit_challenge_provider = LazySingleton(HabitChallengeProvider)
-habit_checkin_provider = LazySingleton(HabitCheckinProvider)

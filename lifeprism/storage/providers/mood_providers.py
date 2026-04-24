@@ -419,8 +419,3 @@ class MoodImpactProvider(LWBaseDataProvider):
             return False
 
 
-# ==================== 导出单例 ====================
-
-mood_type_provider = LazySingleton(MoodTypeProvider)
-mood_entry_provider = LazySingleton(MoodEntryProvider)
-mood_impact_provider = LazySingleton(MoodImpactProvider)

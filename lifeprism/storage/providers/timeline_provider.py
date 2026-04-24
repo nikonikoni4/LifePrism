@@ -6,7 +6,7 @@ Timeline 数据提供者（重构版）
 from typing import Dict, Any, Optional, List, Tuple, Set
 from lifeprism.storage.base_providers import LWBaseDataProvider
 from lifeprism.storage.providers.common_query_options import QueryOptions
-from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -311,7 +311,3 @@ class TimelineProvider(LWBaseDataProvider):
             })
 
         return events
-
-
-# 导出单例
-timeline_provider = LazySingleton(TimelineProvider)

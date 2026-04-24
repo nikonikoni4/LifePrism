@@ -6,7 +6,7 @@ Plan Doc 数据提供者（重构版）
 from typing import Dict, Any, Optional, List, Tuple, Set
 from lifeprism.storage.base_providers import LWBaseDataProvider
 from lifeprism.storage.providers.common_query_options import QueryOptions
-from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -283,7 +283,3 @@ class PlanDocProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error(f"重命名计划书 {old_id} -> {new_id} 失败: {e}")
             return False
-
-
-# 导出单例
-plan_doc_provider = LazySingleton(PlanDocProvider)
