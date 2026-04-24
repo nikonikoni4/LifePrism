@@ -26,7 +26,7 @@ from lifeprism.server.schemas.report_schemas import (
     HeatmapDataItem,
 )
 from lifeprism.server.providers.report_provider import daily_report_provider, weekly_report_provider, monthly_report_provider, comparison_data_provider
-from lifeprism.storage import todo_store, goal_provider
+from lifeprism.storage import todo_store, goal_store
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
 from lifeprism.server.services.category_service import category_service
@@ -693,7 +693,7 @@ def _calc_goal_progress(start_date: str, end_date: str) -> List[GoalProgressData
     """
     try:
         # 获取所有活跃目标
-        goals = goal_provider.get_active_goals()
+        goals = goal_store.get_active_goals()
         if not goals:
             return []
         

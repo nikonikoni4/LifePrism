@@ -18,7 +18,7 @@ from lifeprism.server.schemas.goal_schemas import (
     MilestoneItem,
     JournalEntry,
 )
-from lifeprism.storage.providers import goal_provider
+from lifeprism.storage import goal_store
 from lifeprism.server.providers.journal_provider import journal_provider
 from lifeprism.server.services.category_service import category_service
 from lifeprism.utils import get_logger
@@ -40,18 +40,18 @@ class GoalService:
         """
         初始化目标服务，构建 goal_name_map 缓存
         """
-        self.goal_provider = goal_provider
+        self.goal_store = goal_store
         # 初始化 goal_name_map: goal_id -> goal_name
         self.goal_name_map: Dict[str, str] = {}
         self._refresh_cache()
-    
+
     def _refresh_cache(self):
         """
         刷新目标名称缓存
         """
         try:
             # 获取所有目标
-            items, _ = self.goal_provider.get_goals(page=1, page_size=1000)
+            items, _ = self.goal_store.get_goals(page=1, page_size=1000)
             
             # 构建映射
             self.goal_name_map = {}
@@ -223,8 +223,8 @@ class GoalService:
             return item
 
         goal_id = item['id']
-        time_invested = self.goal_provider.calculate_time_invested(goal_id)
-        self.goal_provider.update_time_invested(goal_id, time_invested)
+        time_invested = self.goal_store.calculate_time_invested(goal_id)
+        self.goal_store.update_time_invested(goal_id, time_invested)
 
         # 更新内存中的记录
         item['time_invested'] = time_invested
@@ -245,14 +245,14 @@ class GoalService:
         """
         try:
             # 检查目标是否存在
-            item = self.goal_provider.get_goal_by_id(goal_id)
+            item = self.goal_store.get_goal_by_id(goal_id)
             if not item:
                 logger.warning(f"刷新投入时间失败：目标 {goal_id} 不存在")
                 return None
 
             # 计算并更新
-            time_invested = self.goal_provider.calculate_time_invested(goal_id)
-            success = self.goal_provider.update_time_invested(goal_id, time_invested)
+            time_invested = self.goal_store.calculate_time_invested(goal_id)
+            success = self.goal_store.update_time_invested(goal_id, time_invested)
 
             if success:
                 logger.info(f"手动刷新目标 {goal_id} 投入时间: {time_invested} 秒")
@@ -346,7 +346,7 @@ class GoalService:
         Returns:
             GoalListResponse: 目标列表响应
         """
-        items, total = self.goal_provider.get_goals(
+        items, total = self.goal_store.get_goals(
             status=status,
             category_id=category_id,
             page=page,
@@ -368,7 +368,7 @@ class GoalService:
         Returns:
             Optional[GoalItem]: 目标详情，不存在返回 None
         """
-        item = self.goal_provider.get_goal_by_id(goal_id)
+        item = self.goal_store.get_goal_by_id(goal_id)
         if not item:
             return None
 
@@ -397,7 +397,7 @@ class GoalService:
             'track_time_automatically': request.track_time_automatically,
         }
 
-        new_id = self.goal_provider.create_goal(data)
+        new_id = self.goal_store.create_goal(data)
         if new_id is None:
             return None
 
@@ -418,7 +418,7 @@ class GoalService:
             Optional[GoalItem]: 更新后的目标，失败返回 None
         """
         # 获取当前目标信息，用于判断是否为自动追踪模式
-        current_goal = self.goal_provider.get_goal_by_id(goal_id)
+        current_goal = self.goal_store.get_goal_by_id(goal_id)
         if not current_goal:
             return None
 
@@ -462,7 +462,7 @@ class GoalService:
                 update_data['time_invested'] = request.time_invested
             # 自动模式：忽略前端传来的 time_invested
 
-        success = self.goal_provider.update_goal(goal_id, update_data)
+        success = self.goal_store.update_goal(goal_id, update_data)
         if not success:
             return None
 
@@ -485,7 +485,7 @@ class GoalService:
             Optional[GoalItem]: 更新后的目标，失败返回 None
         """
         # 获取当前目标
-        item = self.goal_provider.get_goal_by_id(goal_id)
+        item = self.goal_store.get_goal_by_id(goal_id)
         if not item:
             return None
 
@@ -513,7 +513,7 @@ class GoalService:
             return None
 
         # 保存更新
-        success = self.goal_provider.update_goal(goal_id, {
+        success = self.goal_store.update_goal(goal_id, {
             'milestones': json.dumps(milestones, ensure_ascii=False)
         })
 
@@ -532,7 +532,7 @@ class GoalService:
         Returns:
             bool: 是否成功
         """
-        success = self.goal_provider.delete_goal(goal_id)
+        success = self.goal_store.delete_goal(goal_id)
         if success:
             # 刷新缓存
             self._refresh_cache()
@@ -548,7 +548,7 @@ class GoalService:
         Returns:
             bool: 是否成功
         """
-        return self.goal_provider.reorder_goals(request.goal_ids)
+        return self.goal_store.reorder_goals(request.goal_ids)
     
     def get_active_goal_names(self) -> ActiveGoalNamesResponse:
         """
@@ -557,8 +557,8 @@ class GoalService:
         Returns:
             ActiveGoalNamesResponse: 活跃目标列表
         """
-        items = self.goal_provider.get_active_goals()
-        
+        items = self.goal_store.get_active_goals()
+
         active_items = [
             ActiveGoalItem(
                 id=item['id'],
@@ -566,7 +566,7 @@ class GoalService:
             )
             for item in items
         ]
-        
+
         return ActiveGoalNamesResponse(items=active_items)
     
     def get_goal_name(self, goal_id: str) -> Optional[str]:
@@ -589,9 +589,9 @@ class GoalService:
             GoalsWithCategoryResponse: 绑定了分类的目标列表
         """
         from lifeprism.server.schemas.goal_schemas import GoalWithCategoryItem, GoalsWithCategoryResponse
-        
-        items = self.goal_provider.get_active_goals_with_category()
-        
+
+        items = self.goal_store.get_active_goals_with_category()
+
         goal_items = [
             GoalWithCategoryItem(
                 id=item['id'],
@@ -601,7 +601,7 @@ class GoalService:
             )
             for item in items
         ]
-        
+
         return GoalsWithCategoryResponse(items=goal_items)
 
 

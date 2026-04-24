@@ -12,11 +12,7 @@ from lifeprism.server.errors.error_codes import (
     NODE_NOT_FOUND,
     REORDER_VALIDATION_FAILED,
 )
-from lifeprism.storage.providers import (
-    habit_chain_provider,
-    habit_chain_node_provider,
-    habit_checkin_provider,
-)
+from lifeprism.storage import habit_store, habit_chain_store
 from lifeprism.server.schemas.habit_schemas import (
     CreateChainRequest,
     UpdateChainRequest,
@@ -51,22 +47,22 @@ class HabitChainService:
     # --- Chain CRUD ---
 
     def get_chains(self, show_in_timeline: Optional[bool]) -> ChainListResponse:
-        chains = habit_chain_provider.get_chains(show_in_timeline)
+        chains = habit_chain_store.get_chains(show_in_timeline)
         items = []
         for chain in chains:
-            nodes = habit_chain_node_provider.get_nodes_with_habit_names(chain["id"])
+            nodes = habit_chain_store.get_nodes_with_habit_names(chain["id"])
             items.append(self._build_chain_item(chain, nodes))
         return ChainListResponse(chains=items)
 
     def get_chain_detail(self, chain_id: int) -> ChainDetailResponse:
         chain = self._get_chain_or_404(chain_id)
-        nodes = habit_chain_node_provider.get_nodes_with_habit_names(chain_id)
+        nodes = habit_chain_store.get_nodes_with_habit_names(chain_id)
         nodes_with_calculated = self._calculate_node_times(nodes)
         return ChainDetailResponse(**self._build_chain_item(chain, nodes_with_calculated).model_dump())
 
     def create_chain(self, req: CreateChainRequest) -> ChainDetailResponse:
         data = req.model_dump(exclude_unset=True)
-        chain_id = habit_chain_provider.create_chain(data)
+        chain_id = habit_chain_store.create_chain(data)
         return self.get_chain_detail(chain_id)
 
     def update_chain(self, chain_id: int, req: UpdateChainRequest) -> ChainDetailResponse:
@@ -75,7 +71,7 @@ class HabitChainService:
 
         trigger_times = update_data.pop("trigger_times", None)
 
-        nodes = habit_chain_node_provider.get_nodes_by_chain(chain_id)
+        nodes = habit_chain_store.get_nodes_by_chain(chain_id)
         if trigger_times is not None:
             trigger_time_map = {item["node_id"]: item["trigger_time"] for item in trigger_times}
             for node in nodes:
@@ -86,23 +82,23 @@ class HabitChainService:
         self._validate_chain_timeline_rules(nodes, is_showing_in_timeline, CHAIN_VALIDATION_FAILED)
 
         if update_data:
-            habit_chain_provider.update_chain(chain_id, update_data)
+            habit_chain_store.update_chain(chain_id, update_data)
 
         if trigger_times is not None:
             for item in trigger_times:
-                habit_chain_node_provider.update_node(item["node_id"], {"trigger_time": item["trigger_time"]})
+                habit_chain_store.update_node(item["node_id"], {"trigger_time": item["trigger_time"]})
 
         return self.get_chain_detail(chain_id)
 
     def delete_chain(self, chain_id: int) -> None:
         self._get_chain_or_404(chain_id)
-        habit_chain_provider.delete_chain(chain_id)
+        habit_chain_store.delete_chain(chain_id)
 
     # --- Node operations ---
 
     def create_node(self, chain_id: int, req: CreateNodeRequest) -> dict:
         chain = self._get_chain_or_404(chain_id)
-        existing = habit_chain_node_provider.get_nodes_by_chain(chain_id)
+        existing = habit_chain_store.get_nodes_by_chain(chain_id)
 
         if req.insert_after_node_id is not None:
             after_node = next((n for n in existing if n["id"] == req.insert_after_node_id), None)
@@ -131,43 +127,43 @@ class HabitChainService:
             self._validate_chain_timeline_rules(simulated_nodes, True, CHAIN_NODE_VALIDATION_FAILED)
 
         if req.insert_after_node_id is not None:
-            habit_chain_node_provider.increment_sort_order_after(chain_id, sort_order)
+            habit_chain_store.increment_sort_order_after(chain_id, sort_order)
 
-        node_id = habit_chain_node_provider.create_node(data)
-        return habit_chain_node_provider.get_node_by_id(node_id)
+        node_id = habit_chain_store.create_node(data)
+        return habit_chain_store.get_node_by_id(node_id)
 
     def update_node(self, node_id: int, req: UpdateNodeRequest) -> dict:
         node = self._get_node_or_404(node_id)
         chain_id = node["chain_id"]
-        chain = habit_chain_provider.get_chain_by_id(chain_id)
+        chain = habit_chain_store.get_chain_by_id(chain_id)
 
         update_data = req.model_dump(exclude_unset=True)
 
         if bool(chain and chain.get("show_in_timeline", False)):
-            simulated_nodes = [dict(item) for item in habit_chain_node_provider.get_nodes_by_chain(chain_id)]
+            simulated_nodes = [dict(item) for item in habit_chain_store.get_nodes_by_chain(chain_id)]
             for item in simulated_nodes:
                 if item["id"] == node_id and "trigger_time" in update_data:
                     item["trigger_time"] = update_data["trigger_time"]
             self._validate_chain_timeline_rules(simulated_nodes, True, CHAIN_NODE_VALIDATION_FAILED)
 
-        habit_chain_node_provider.update_node(node_id, update_data)
-        return habit_chain_node_provider.get_node_by_id(node_id)
+        habit_chain_store.update_node(node_id, update_data)
+        return habit_chain_store.get_node_by_id(node_id)
 
     def delete_node(self, node_id: int) -> None:
         node = self._get_node_or_404(node_id)
         chain_id = node["chain_id"]
-        habit_chain_node_provider.delete_node(node_id)
-        remaining = habit_chain_node_provider.get_nodes_by_chain(chain_id)
+        habit_chain_store.delete_node(node_id)
+        remaining = habit_chain_store.get_nodes_by_chain(chain_id)
         sorted_nodes = sorted(remaining, key=lambda n: n["sort_order"])
         updates = [
             {"node_id": n["id"], "sort_order": i + 1}
             for i, n in enumerate(sorted_nodes)
         ]
         if updates:
-            habit_chain_node_provider.batch_update_sort_order(updates)
+            habit_chain_store.batch_update_sort_order(updates)
 
     def reorder_nodes(self, chain_id: int, req: ReorderNodesRequest) -> None:
-        existing = habit_chain_node_provider.get_nodes_by_chain(chain_id)
+        existing = habit_chain_store.get_nodes_by_chain(chain_id)
         existing_ids = {n["id"] for n in existing}
         request_ids = {item.node_id for item in req.items}
         if existing_ids != request_ids:
@@ -178,7 +174,7 @@ class HabitChainService:
 
         updates = [{"node_id": item.node_id, "sort_order": item.sort_order} for item in req.items]
 
-        chain = habit_chain_provider.get_chain_by_id(chain_id)
+        chain = habit_chain_store.get_chain_by_id(chain_id)
         if bool(chain and chain.get("show_in_timeline", False)):
             order_map = {item.node_id: item.sort_order for item in req.items}
             simulated_nodes = []
@@ -188,19 +184,19 @@ class HabitChainService:
                 simulated_nodes.append(copied)
             self._validate_chain_timeline_rules(simulated_nodes, True, REORDER_VALIDATION_FAILED)
 
-        habit_chain_node_provider.batch_update_sort_order(updates)
+        habit_chain_store.batch_update_sort_order(updates)
 
     # --- Timeline ---
 
     def get_timeline(self) -> TimelineResponse:
-        chains = habit_chain_provider.get_chains(show_in_timeline=True)
+        chains = habit_chain_store.get_chains(show_in_timeline=True)
         chain_items = []
         for chain in chains:
-            nodes = habit_chain_node_provider.get_nodes_with_habit_names(chain["id"])
+            nodes = habit_chain_store.get_nodes_with_habit_names(chain["id"])
             # 计算每个节点的 calculated_time（不存库）
             nodes_with_calculated = self._calculate_node_times(nodes)
             habit_ids = [n["habit_id"] for n in nodes if n.get("habit_id")]
-            today_map = habit_checkin_provider.get_today_checkins(habit_ids) if habit_ids else {}
+            today_map = habit_store.get_today_checkins(habit_ids) if habit_ids else {}
             node_items = [
                 TimelineNodeItem(
                     id=n["id"],
@@ -354,13 +350,13 @@ class HabitChainService:
             last_minutes = current_minutes
 
     def _get_chain_or_404(self, chain_id: int) -> dict:
-        chain = habit_chain_provider.get_chain_by_id(chain_id)
+        chain = habit_chain_store.get_chain_by_id(chain_id)
         if not chain:
             raise NotFoundError(f"Chain {chain_id} not found", code=CHAIN_NOT_FOUND)
         return chain
 
     def _get_node_or_404(self, node_id: int) -> dict:
-        node = habit_chain_node_provider.get_node_by_id(node_id)
+        node = habit_chain_store.get_node_by_id(node_id)
         if not node:
             raise NotFoundError(f"Node {node_id} not found", code=NODE_NOT_FOUND)
         return node

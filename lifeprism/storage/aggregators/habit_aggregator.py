@@ -20,13 +20,17 @@ class HabitAggregator:
     """
     习惯聚合器
 
-    职责：聚合 habit、challenge、checkin 三个表的数据
+    职责：
+    1. 聚合 habit、challenge、checkin 三个表的数据（核心价值）
+    2. 提供统一的数据访问接口（透传 provider 方法）
     """
 
     def __init__(self):
         self.habit_provider = HabitProvider()
         self.challenge_provider = HabitChallengeProvider()
         self.checkin_provider = HabitCheckinProvider()
+
+    # ==================== 聚合方法（核心价值）====================
 
     def get_habit_with_challenge(self, habit_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -128,6 +132,105 @@ class HabitAggregator:
 
         logger.info(f"创建习惯 {habit_id}，包含挑战: {challenge_data is not None}")
         return habit_id
+
+    # ==================== Habit 核心 CRUD 透传 ====================
+
+    def insert_habit(self, data: Dict[str, Any]) -> str:
+        """透传：插入习惯"""
+        return self.habit_provider.create_habit(data)
+
+    def update_habit(self, habit_id: str, data: Dict[str, Any]) -> bool:
+        """透传：更新习惯"""
+        return self.habit_provider.update_habit(habit_id, data)
+
+    def delete_habit(self, habit_id: str) -> bool:
+        """透传：删除习惯"""
+        return self.habit_provider.delete_habit(habit_id)
+
+    def get_habits(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """透传：查询习惯列表"""
+        return self.habit_provider.get_habits(status)
+
+    def get_habit_by_id(self, habit_id: str) -> Optional[Dict[str, Any]]:
+        """透传：根据ID获取习惯"""
+        return self.habit_provider.get_habit_by_id(habit_id)
+
+    # ==================== HabitChallenge 核心 CRUD 透传 ====================
+
+    def create_challenge(self, data: Dict[str, Any]) -> str:
+        """透传：创建挑战"""
+        return self.challenge_provider.create_challenge(data)
+
+    def update_challenge(self, challenge_id: str, data: Dict[str, Any]) -> bool:
+        """透传：更新挑战"""
+        return self.challenge_provider.update_challenge(challenge_id, data)
+
+    def delete_challenge_by_habit(self, habit_id: str) -> bool:
+        """透传：删除习惯的所有挑战"""
+        return self.challenge_provider.delete_by_habit_id(habit_id)
+
+    def get_challenges_by_habit(self, habit_id: str) -> List[Dict[str, Any]]:
+        """透传：获取习惯的所有挑战"""
+        return self.challenge_provider.get_challenges_by_habit(habit_id)
+
+    def get_challenge_by_id(self, challenge_id: str) -> Optional[Dict[str, Any]]:
+        """透传：根据ID获取挑战"""
+        return self.challenge_provider.get_challenge_by_id(challenge_id)
+
+    def get_current_challenge(self, habit_id: str) -> Optional[Dict[str, Any]]:
+        """透传：获取习惯当前进行中的挑战"""
+        return self.challenge_provider.get_current_challenge(habit_id)
+
+    def get_challenge_history(self, habit_id: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """透传：获取习惯的挑战历史"""
+        return self.challenge_provider.get_challenge_history(habit_id, status)
+
+    def get_expired_in_progress_challenges(self, today: str) -> List[Dict[str, Any]]:
+        """透传：获取所有到期的进行中挑战"""
+        return self.challenge_provider.get_expired_in_progress_challenges(today)
+
+    def mark_in_progress_challenge_failed(self, habit_id: str, challenge_id: str) -> bool:
+        """透传：将进行中的挑战标记为失败"""
+        return self.challenge_provider.mark_in_progress_challenge_failed(habit_id, challenge_id)
+
+    # ==================== HabitCheckin 核心 CRUD 透传 ====================
+
+    def create_checkin(self, data: Dict[str, Any]) -> Optional[str]:
+        """透传：创建打卡记录"""
+        return self.checkin_provider.create_checkin(data)
+
+    def delete_checkin(self, habit_id: str, checkin_date: str) -> bool:
+        """透传：删除打卡记录"""
+        return self.checkin_provider.delete_checkin(habit_id, checkin_date)
+
+    def delete_checkin_by_habit(self, habit_id: str) -> bool:
+        """透传：删除习惯的所有打卡记录"""
+        return self.checkin_provider.delete_by_habit_id(habit_id)
+
+    def get_checkin_by_date(self, habit_id: str, checkin_date: str) -> Optional[Dict[str, Any]]:
+        """透传：根据日期获取打卡记录"""
+        return self.checkin_provider.get_checkin_by_date(habit_id, checkin_date)
+
+    def get_checkin_dates_by_challenge(self, habit_id: str, challenge_id: str) -> List[str]:
+        """透传：获取挑战期内的所有打卡日期"""
+        return self.checkin_provider.get_checkin_dates_by_challenge(habit_id, challenge_id)
+
+    def get_checkins_in_date_range(
+        self,
+        start_date: str,
+        end_date: str,
+        habit_ids: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """透传：查询日期范围内的打卡记录"""
+        return self.checkin_provider.get_checkins_in_date_range(start_date, end_date, habit_ids)
+
+    def get_today_checkins(self, habit_ids: List[str]) -> Dict[str, bool]:
+        """透传：批量查询今日打卡状态"""
+        return self.checkin_provider.get_today_checkins(habit_ids)
+
+    def count_checkins_by_challenge(self, challenge_id: str) -> int:
+        """透传：统计挑战期内的打卡次数"""
+        return self.checkin_provider.count_checkins_by_challenge(challenge_id)
 
 
 # ==================== 导出单例 ====================

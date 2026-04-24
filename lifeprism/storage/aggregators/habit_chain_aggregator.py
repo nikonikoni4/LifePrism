@@ -18,12 +18,16 @@ class HabitChainAggregator:
     """
     习惯链聚合器
 
-    职责：聚合 habit_chains 和 habit_chain_nodes 两个表的数据
+    职责：
+    1. 聚合 habit_chains、habit_chain_nodes 两个表的数据（核心价值）
+    2. 提供统一的数据访问接口（透传 provider 方法）
     """
 
     def __init__(self):
         self.chain_provider = HabitChainProvider()
         self.node_provider = HabitChainNodeProvider()
+
+    # ==================== 聚合方法（核心价值）====================
 
     def get_chain_with_nodes(self, chain_id: int) -> Optional[Dict[str, Any]]:
         """
@@ -66,6 +70,72 @@ class HabitChainAggregator:
 
         return chains
 
+    # ==================== HabitChain 核心 CRUD 透传 ====================
+
+    def create_chain(self, data: Dict[str, Any]) -> int:
+        """透传：创建习惯链"""
+        return self.chain_provider.create_chain(data)
+
+    def update_chain(self, chain_id: int, data: Dict[str, Any]) -> bool:
+        """透传：更新习惯链"""
+        return self.chain_provider.update_chain(chain_id, data)
+
+    def delete_chain(self, chain_id: int) -> bool:
+        """透传：删除习惯链"""
+        return self.chain_provider.delete_chain(chain_id)
+
+    def get_chains(self, show_in_timeline: Optional[bool] = None) -> List[Dict[str, Any]]:
+        """透传：获取习惯链列表"""
+        return self.chain_provider.get_chains(show_in_timeline)
+
+    def get_chain_by_id(self, chain_id: int) -> Optional[Dict[str, Any]]:
+        """透传：根据ID获取习惯链"""
+        return self.chain_provider.get_chain_by_id(chain_id)
+
+    # ==================== HabitChainNode 核心 CRUD 透传 ====================
+
+    def create_node(self, data: Dict[str, Any]) -> int:
+        """透传：创建节点"""
+        return self.node_provider.create_node(data)
+
+    def update_node(self, node_id: int, data: Dict[str, Any]) -> bool:
+        """透传：更新节点"""
+        return self.node_provider.update_node(node_id, data)
+
+    def delete_node(self, node_id: int) -> bool:
+        """透传：删除节点"""
+        return self.node_provider.delete_node(node_id)
+
+    def get_nodes_by_chain(self, chain_id: int) -> List[Dict[str, Any]]:
+        """透传：获取链条的所有节点"""
+        return self.node_provider.get_nodes_by_chain(chain_id)
+
+    def get_nodes_with_habit_names(self, chain_id: int) -> List[Dict[str, Any]]:
+        """透传：获取链条的所有节点（包含习惯名称）"""
+        return self.node_provider.get_nodes_with_habit_names(chain_id)
+
+    def get_node_by_id(self, node_id: int) -> Optional[Dict[str, Any]]:
+        """透传：根据ID获取节点"""
+        return self.node_provider.get_node_by_id(node_id)
+
+    def increment_sort_order_after(self, chain_id: int, after_order: int) -> bool:
+        """透传：增加指定顺序之后的节点排序值"""
+        return self.node_provider.increment_sort_order_after(chain_id, after_order)
+
+    def batch_update_sort_order(self, updates: List[Dict[str, Any]]) -> bool:
+        """透传：批量更新节点排序"""
+        return self.node_provider.batch_update_sort_order(updates)
+
+    def unlink_habit_from_nodes(self, habit_id: str) -> bool:
+        """透传：解除习惯与节点的关联"""
+        return self.node_provider.unlink_habit_from_nodes(habit_id)
+
+    def get_anchor_info_by_habit_ids(self, habit_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+        """透传：获取习惯的锚点信息"""
+        return self.node_provider.get_anchor_info_by_habit_ids(habit_ids)
+
+    # ==================== 事务性聚合方法 ====================
+
     def create_chain_with_nodes(
         self, chain_data: Dict[str, Any], nodes_data: List[Dict[str, Any]]
     ) -> int:
@@ -102,8 +172,5 @@ class HabitChainAggregator:
         """
         # HabitChainProvider.delete_chain 已经处理了级联删除节点
         return self.chain_provider.delete_chain(chain_id)
-
-
-# ==================== 导出单例 ====================
 
 habit_chain_aggregator = LazySingleton(HabitChainAggregator)

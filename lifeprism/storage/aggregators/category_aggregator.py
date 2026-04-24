@@ -19,12 +19,16 @@ class CategoryAggregator:
     """
     分类聚合器
 
-    职责：聚合 category、sub_category 两个表的数据
+    职责：
+    1. 聚合 category、sub_category 两个表的数据（核心价值）
+    2. 提供统一的数据访问接口（透传 provider 方法）
     """
 
     def __init__(self):
         self.category_provider = CategoryProvider()
         self.sub_category_provider = SubCategoryProvider()
+
+    # ==================== 聚合方法（核心价值）====================
 
     def get_category_with_subs(self, category_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -79,6 +83,52 @@ class CategoryAggregator:
             category['sub_categories'] = sub_categories_map.get(category['id'], [])
 
         return categories
+
+    # ==================== Category 核心 CRUD 透传 ====================
+
+    def insert_category(self, data: Dict[str, Any]) -> bool:
+        """透传：插入分类"""
+        return self.category_provider.insert_category(data)
+
+    def update_category(self, category_id: str, data: Dict[str, Any]) -> bool:
+        """透传：更新分类"""
+        return self.category_provider.update_category(category_id, data)
+
+    def delete_category(self, category_id: str) -> bool:
+        """透传：删除分类"""
+        return self.category_provider.delete_category(category_id)
+
+    def query_categories(self, options: QueryOptions):
+        """透传：查询分类"""
+        return self.category_provider.query_categories(options)
+
+    def get_category_by_id(self, category_id: str) -> Optional[Dict[str, Any]]:
+        """透传：根据ID获取分类"""
+        return self.category_provider.get_category_by_id(category_id)
+
+    # ==================== SubCategory 核心 CRUD 透传 ====================
+
+    def insert_sub_category(self, data: Dict[str, Any]) -> bool:
+        """透传：插入子分类"""
+        return self.sub_category_provider.insert_sub_category(data)
+
+    def update_sub_category(self, sub_id: str, data: Dict[str, Any]) -> bool:
+        """透传：更新子分类"""
+        return self.sub_category_provider.update_sub_category(sub_id, data)
+
+    def delete_sub_category(self, sub_id: str) -> bool:
+        """透传：删除子分类"""
+        return self.sub_category_provider.delete_sub_category(sub_id)
+
+    def query_sub_categories(self, options: QueryOptions):
+        """透传：查询子分类"""
+        return self.sub_category_provider.query_sub_categories(options)
+
+    def get_sub_category_by_id(self, sub_id: str) -> Optional[Dict[str, Any]]:
+        """透传：根据ID获取子分类"""
+        return self.sub_category_provider.get_sub_category_by_id(sub_id)
+
+    # ==================== 事务性聚合方法 ====================
 
     def create_category_with_subs(
         self, category_data: Dict[str, Any], sub_categories_data: Optional[List[Dict[str, Any]]] = None

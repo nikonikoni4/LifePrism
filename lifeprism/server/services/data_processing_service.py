@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import pytz
 
 from lifeprism.server.providers import server_lw_data_provider
-from lifeprism.storage import goal_provider, tokens_usage_store
+from lifeprism.storage import goal_store, tokens_usage_store
 from lifeprism.processors.data_clean import clean_activitywatch_data
 from lifeprism.llm.classify.main_classify import LLMClassify
 from lifeprism.llm.schemas import classifyState
@@ -312,7 +312,7 @@ class DataProcessingService:
         # 构建 goal 名称到 ID 的映射（用于将 LLM 输出的 link_to_goal 名称转换为 ID）
         # 只包含 track_time_automatically=1 且绑定了分类的目标
         if self._goal_name_to_id_cache is None:
-            goals = goal_provider.get_active_goals_for_classify()
+            goals = goal_store.get_active_goals_for_classify()
             self._goal_name_to_id_cache = {g['name']: g['id'] for g in goals}
             logger.info(f"  [OK] 创建 goal 名称映射缓存，共 {len(self._goal_name_to_id_cache)} 个可自动追踪目标")
             logger.debug(f"  [DEBUG] goal_name_to_id 映射: {self._goal_name_to_id_cache}")
@@ -356,7 +356,7 @@ class DataProcessingService:
         # 格式: [{goal: 目标名称, category: 主分类名称, sub_category: 子分类名称}, ...]
         from lifeprism.llm.schemas import Goal as LLMGoal
         goals_for_llm = []
-        for g in goal_provider.get_active_goals_for_classify():
+        for g in goal_store.get_active_goals_for_classify():
             # 根据 ID 查找分类名称
             cat_name = None
             sub_cat_name = None
@@ -368,7 +368,7 @@ class DataProcessingService:
                 sub_row = sub_category[sub_category['id'] == g['link_to_sub_category_id']]
                 if not sub_row.empty:
                     sub_cat_name = sub_row.iloc[0]['name']
-            
+
             goals_for_llm.append(LLMGoal(
                 goal=g['name'],
                 category=cat_name,

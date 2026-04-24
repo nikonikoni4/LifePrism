@@ -18,12 +18,16 @@ class MapCacheAggregator:
     """
     映射缓存聚合器
 
-    职责：聚合 multi_purpose_map_cache、single_purpose_map_cache 两个表的数据
+    职责：
+    1. 聚合 multi_purpose_map_cache、single_purpose_map_cache 两个表的数据（核心价值）
+    2. 提供统一的数据访问接口（透传 provider 方法）
     """
 
     def __init__(self):
         self.multi_purpose_provider = MultiPurposeMapCacheProvider()
         self.single_purpose_provider = SinglePurposeMapCacheProvider()
+
+    # ==================== 聚合方法（核心价值）====================
 
     def get_all_caches(self) -> Dict[str, List[Dict[str, Any]]]:
         """
@@ -84,6 +88,60 @@ class MapCacheAggregator:
         except Exception as e:
             logger.error(f"按用途查找缓存失败 (purpose={purpose}, is_multi_purpose={is_multi_purpose}): {e}")
             return None
+
+    # ==================== MultiPurposeMapCache 核心 CRUD 透传 ====================
+
+    def insert_multi_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
+        """透传：插入多用途映射缓存"""
+        return self.multi_purpose_provider.insert_multi_purpose_map_cache(data)
+
+    def update_multi_purpose_map_cache(self, cache_id: str, data: Dict[str, Any]) -> bool:
+        """透传：更新多用途映射缓存"""
+        return self.multi_purpose_provider.update_multi_purpose_map_cache(cache_id, data)
+
+    def delete_multi_purpose_map_cache(self, cache_id: str) -> bool:
+        """透传：删除多用途映射缓存"""
+        return self.multi_purpose_provider.delete_multi_purpose_map_cache(cache_id)
+
+    def query_multi_purpose_map_cache(self, options=None):
+        """透传：查询多用途映射缓存"""
+        return self.multi_purpose_provider.query_multi_purpose_map_cache(options)
+
+    def batch_delete_multi_purpose_map_cache(self, cache_ids: List[str]) -> int:
+        """透传：批量删除多用途映射缓存"""
+        return self.multi_purpose_provider.batch_delete_multi_purpose_map_cache(cache_ids)
+
+    def batch_update_multi_purpose_map_cache(self, cache_ids: List[str], data: Dict[str, Any]) -> int:
+        """透传：批量更新多用途映射缓存"""
+        return self.multi_purpose_provider.batch_update_multi_purpose_map_cache(cache_ids, data)
+
+    # ==================== SinglePurposeMapCache 核心 CRUD 透传 ====================
+
+    def insert_single_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
+        """透传：插入单用途映射缓存"""
+        return self.single_purpose_provider.insert_single_purpose_map_cache(data)
+
+    def update_single_purpose_map_cache(self, cache_id: str, data: Dict[str, Any]) -> bool:
+        """透传：更新单用途映射缓存"""
+        return self.single_purpose_provider.update_single_purpose_map_cache(cache_id, data)
+
+    def delete_single_purpose_map_cache(self, cache_id: str) -> bool:
+        """透传：删除单用途映射缓存"""
+        return self.single_purpose_provider.delete_single_purpose_map_cache(cache_id)
+
+    def query_single_purpose_map_cache(self, options=None):
+        """透传：查询单用途映射缓存"""
+        return self.single_purpose_provider.query_single_purpose_map_cache(options)
+
+    def batch_delete_single_purpose_map_cache(self, cache_ids: List[str]) -> int:
+        """透传：批量删除单用途映射缓存"""
+        return self.single_purpose_provider.batch_delete_single_purpose_map_cache(cache_ids)
+
+    def batch_update_single_purpose_map_cache(self, cache_ids: List[str], data: Dict[str, Any]) -> int:
+        """透传：批量更新单用途映射缓存"""
+        return self.single_purpose_provider.batch_update_single_purpose_map_cache(cache_ids, data)
+
+    # ==================== 批量操作透传 ====================
 
     def clear_all_caches(self) -> Dict[str, int]:
         """

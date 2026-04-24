@@ -32,3 +32,10 @@
 - path: `docs/coding-rules/other-model-rulse.md`
 - 触发规则：minimax模型需要阅读，其他模型不必阅读
 - 内容摘要：加强minimax指令遵循
+
+## create-table-rules.md
+
+- updated_at: 2026-04-23
+- path: `docs/coding-rules/create-table-rules.md`
+- 触发规则：创建新表，修改现有的`lifeprism/storage/provider`和`lifeprism/storage/aggregators`下的文件时阅读
+- 内容摘要：创建新表，新storage.provider和新aggregators时阅读

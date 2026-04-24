@@ -120,28 +120,9 @@ def generate_id(prefix: str) -> str:
 
 **路径统一**：通过 settings_manager，禁止自行解析
 
-## 数据库操作规范（编写`lifeprism`内的正式代码时需要遵守）
+## 7 . 数据库操作规范（编写`lifeprism`内的正式代码时需要遵守）
 
-### 基本要求
-- 不能直接创建数据库对象，继承`LWBaseDataProvider`类，在provider中编写数据库操作
-- 连接管理：`with self.db.get_connection() as conn:`
-- 参数化查询：`cursor.execute(sql, (param1, param2))`，防止 SQL 注入
-- `with` 语句自动提交事务
+1. 只能从`lifeprism.storage`导入数据库store单例对象，比如`from lifeprism.storage import diray_store`
+2. 不能直接引用部分store中provider成员，只能直接使用store单例方法
+3. 不得在非storage的任何位置直接编写sql
 
-### 结果转换
-
-```python
-columns = [description[0] for description in cursor.description]
-rows = cursor.fetchall()
-items = [dict(zip(columns, row)) for row in rows]
-```
-
-## provider管理
-
-1. 一个数据表对应`lifeprism/storage/providers/__init__.py`中的一个provider，当需要操作对应数据表时，只能使用这里导出的单例，禁止直接编写sql在非provider类之外
-
-2. 使用provider时，**优先使用通用方法**（`_generic_query/insert/update/delete`）,只有在通用方法无法满足时才创建自定义方法,自定义方法必须注释说明为什么需要自定义。通用方法位置`lifeprism/storage/base_providers/lw_base_data_provider.py L878~L1228`
-
-3. 需要创建新的provider时，需要优先实现通用方法，参考`lifeprism/storage/providers/diary_provider.py`的实现
-
-4. provider仅负责简单操作数据库，不负责任何业务逻辑

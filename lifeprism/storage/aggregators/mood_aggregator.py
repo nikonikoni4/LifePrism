@@ -19,13 +19,17 @@ class MoodAggregator:
     """
     心情聚合器
 
-    职责：聚合 mood_type、mood_entry、mood_impact 三个表的数据
+    职责：
+    1. 聚合 mood_type、mood_entry、mood_impact 三个表的数据（核心价值）
+    2. 提供统一的数据访问接口（透传 provider 方法）
     """
 
     def __init__(self):
         self.type_provider = MoodTypeProvider()
         self.entry_provider = MoodEntryProvider()
         self.impact_provider = MoodImpactProvider()
+
+    # ==================== 聚合方法（核心价值）====================
 
     def get_mood_entry_with_type(self, entry_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -162,6 +166,68 @@ class MoodAggregator:
                     'date_range': {'start': start_date, 'end': end_date}
                 }
             }
+
+    # ==================== MoodType 核心 CRUD 透传 ====================
+
+    def create_mood_type(self, data: Dict[str, Any]) -> Optional[str]:
+        """透传：创建心情类型"""
+        return self.type_provider.create_mood_type(data)
+
+    def update_mood_type(self, mood_type_id: str, data: Dict[str, Any]) -> bool:
+        """透传：更新心情类型"""
+        return self.type_provider.update_mood_type(mood_type_id, data)
+
+    def delete_mood_type(self, mood_type_id: str) -> bool:
+        """透传：删除心情类型"""
+        return self.type_provider.delete_mood_type(mood_type_id)
+
+    def get_mood_types(self) -> List[Dict[str, Any]]:
+        """透传：获取所有心情类型"""
+        return self.type_provider.get_mood_types()
+
+    def get_mood_type_by_id(self, mood_type_id: str) -> Optional[Dict[str, Any]]:
+        """透传：根据ID获取心情类型"""
+        return self.type_provider.get_mood_type_by_id(mood_type_id)
+
+    def count_entries_by_type(self, mood_type_id: str) -> int:
+        """透传：统计某心情类型关联的记录数"""
+        return self.type_provider.count_entries_by_type(mood_type_id)
+
+    # ==================== MoodEntry 核心 CRUD 透传 ====================
+
+    def create_mood_entry(self, data: Dict[str, Any]) -> Optional[str]:
+        """透传：创建心情记录"""
+        return self.entry_provider.create_mood_entry(data)
+
+    def update_mood_entry(self, entry_id: str, data: Dict[str, Any]) -> bool:
+        """透传：更新心情记录"""
+        return self.entry_provider.update_mood_entry(entry_id, data)
+
+    def delete_mood_entry(self, entry_id: str) -> bool:
+        """透传：删除心情记录"""
+        return self.entry_provider.delete_mood_entry(entry_id)
+
+    def get_mood_entries(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
+        """透传：获取心情记录列表"""
+        return self.entry_provider.get_mood_entries(start_date, end_date)
+
+    def get_mood_entry_by_id(self, entry_id: str) -> Optional[Dict[str, Any]]:
+        """透传：根据ID获取心情记录"""
+        return self.entry_provider.get_mood_entry_by_id(entry_id)
+
+    # ==================== MoodImpact 核心 CRUD 透传 ====================
+
+    def create_mood_impact(self, data: Dict[str, Any]) -> Optional[int]:
+        """透传：创建影响因素"""
+        return self.impact_provider.create_mood_impact(data)
+
+    def delete_mood_impact(self, impact_id: int) -> bool:
+        """透传：删除影响因素"""
+        return self.impact_provider.delete_mood_impact(impact_id)
+
+    def get_mood_impacts(self) -> List[Dict[str, Any]]:
+        """透传：获取所有影响因素"""
+        return self.impact_provider.get_mood_impacts()
 
 
 # ==================== 导出单例 ====================
