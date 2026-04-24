@@ -88,7 +88,13 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ open, onClose, onAppl
   // 删除模板
   const handleDelete = async () => {
     if (!selected) return;
-    if (!(await window.electronAPI.showConfirm({ message: `确定删除模板「${selected}」？` }))) return;
+
+    const confirmed = window.electronAPI?.showConfirm
+      ? await window.electronAPI.showConfirm({ message: `确定删除模板「${selected}」？` })
+      : confirm(`确定删除模板「${selected}」？`);
+
+    if (!confirmed) return;
+
     try {
       await DiaryAPI.deleteTemplate(selected);
       setSelected(null);

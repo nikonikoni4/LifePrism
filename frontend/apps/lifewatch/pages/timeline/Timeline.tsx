@@ -810,7 +810,11 @@ const Timeline: React.FC = () => {
             ));
         } catch (err) {
             console.error('Failed to save category:', err);
-            window.electronAPI.showAlert({ message: '保存失败，请重试' });
+            if (window.electronAPI?.showAlert) {
+                window.electronAPI.showAlert({ message: '保存失败，请重试' });
+            } else {
+                alert('保存失败，请重试');
+            }
         } finally {
             setIsSaving(false);
         }

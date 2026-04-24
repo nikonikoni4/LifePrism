@@ -194,7 +194,11 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
             ));
         } catch (err) {
             console.error('Failed to update category:', err);
-            window.electronAPI.showAlert({ message: '更新分类失败，请重试' });
+            if (window.electronAPI?.showAlert) {
+                window.electronAPI.showAlert({ message: '更新分类失败，请重试' });
+            } else {
+                alert('更新分类失败，请重试');
+            }
         }
     };
 
@@ -208,7 +212,11 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
             ));
         } catch (err) {
             console.error('Failed to update sub-category:', err);
-            window.electronAPI.showAlert({ message: '更新子分类失败，请重试' });
+            if (window.electronAPI?.showAlert) {
+                window.electronAPI.showAlert({ message: '更新子分类失败，请重试' });
+            } else {
+                alert('更新子分类失败，请重试');
+            }
         }
     };
 
@@ -218,7 +226,11 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
 
         console.log('[DataReview] 即将显示 confirm 对话框');
 
-        if (!(await window.electronAPI.showConfirm({ message: '确定要删除这条记录吗？此操作不可撤销。' }))) {
+        const confirmed = window.electronAPI?.showConfirm
+            ? await window.electronAPI.showConfirm({ message: '确定要删除这条记录吗？此操作不可撤销。' })
+            : confirm('确定要删除这条记录吗？此操作不可撤销。');
+
+        if (!confirmed) {
             console.log('[DataReview] confirm 取消');
 
             // 检查所有输入框的状态
@@ -267,14 +279,23 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
             setSelectedIds(new Set(selectedIds));
         } catch (err) {
             console.error('Failed to delete log:', err);
-            window.electronAPI.showAlert({ message: '删除失败，请重试' });
+            if (window.electronAPI?.showAlert) {
+                window.electronAPI.showAlert({ message: '删除失败，请重试' });
+            } else {
+                alert('删除失败，请重试');
+            }
         }
         console.log('=== [DataReview] handleDelete 结束 ===');
     };
 
     // 批量删除
     const handleBatchDelete = async () => {
-        if (!(await window.electronAPI.showConfirm({ message: `确定要删除选中的 ${selectedIds.size} 条记录吗？此操作不可撤销。` }))) return;
+        const confirmed = window.electronAPI?.showConfirm
+            ? await window.electronAPI.showConfirm({ message: `确定要删除选中的 ${selectedIds.size} 条记录吗？此操作不可撤销。` })
+            : confirm(`确定要删除选中的 ${selectedIds.size} 条记录吗？此操作不可撤销。`);
+
+        if (!confirmed) return;
+
         try {
             setIsProcessing(true);
             const result = await ActivityLogsAPI.batchDeleteLogs(Array.from(selectedIds));
@@ -282,10 +303,18 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
             setRecords(prev => prev.filter(r => !selectedIds.has(r.id)));
             setTotalRecords(prev => prev - deletedCount);
             setSelectedIds(new Set());
-            window.electronAPI.showAlert({ message: `成功删除 ${deletedCount} 条记录` });
+            if (window.electronAPI?.showAlert) {
+                window.electronAPI.showAlert({ message: `成功删除 ${deletedCount} 条记录` });
+            } else {
+                alert(`成功删除 ${deletedCount} 条记录`);
+            }
         } catch (err) {
             console.error('Failed to batch delete:', err);
-            window.electronAPI.showAlert({ message: '批量删除失败，请重试' });
+            if (window.electronAPI?.showAlert) {
+                window.electronAPI.showAlert({ message: '批量删除失败，请重试' });
+            } else {
+                alert('批量删除失败，请重试');
+            }
         } finally {
             setIsProcessing(false);
         }
@@ -294,7 +323,11 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
     // 批量分类修改
     const handleBatchCategoryUpdate = async () => {
         if (!batchCategoryId) {
-            window.electronAPI.showAlert({ message: '请选择分类' });
+            if (window.electronAPI?.showAlert) {
+                window.electronAPI.showAlert({ message: '请选择分类' });
+            } else {
+                alert('请选择分类');
+            }
             return;
         }
         try {
@@ -313,10 +346,18 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
             setBatchCategoryId('');
             setBatchSubCategoryId('');
             setSelectedIds(new Set());
-            window.electronAPI.showAlert({ message: `成功更新 ${updatedCount} 条记录的分类` });
+            if (window.electronAPI?.showAlert) {
+                window.electronAPI.showAlert({ message: `成功更新 ${updatedCount} 条记录的分类` });
+            } else {
+                alert(`成功更新 ${updatedCount} 条记录的分类`);
+            }
         } catch (err) {
             console.error('Failed to batch update category:', err);
-            window.electronAPI.showAlert({ message: '批量更新分类失败，请重试' });
+            if (window.electronAPI?.showAlert) {
+                window.electronAPI.showAlert({ message: '批量更新分类失败，请重试' });
+            } else {
+                alert('批量更新分类失败，请重试');
+            }
         } finally {
             setIsProcessing(false);
         }

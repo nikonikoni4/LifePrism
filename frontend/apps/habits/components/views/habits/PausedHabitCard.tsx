@@ -41,7 +41,11 @@ export const PausedHabitCard: React.FC<PausedHabitCardProps> = ({ habit }) => {
     }, [isMenuOpen]);
 
     const handleDelete = async () => {
-        if (!(await window.electronAPI.showConfirm({ message: '删除后不可恢复，确认删除？' }))) {
+        const confirmed = window.electronAPI?.showConfirm
+            ? await window.electronAPI.showConfirm({ message: '删除后不可恢复，确认删除？' })
+            : confirm('删除后不可恢复，确认删除？');
+
+        if (confirmed) {
             try {
                 await deleteHabit(habit.id);
             } catch {

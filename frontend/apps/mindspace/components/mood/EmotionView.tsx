@@ -150,9 +150,12 @@ const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGui
   };
 
   const handleDeleteEntry = async (id: string) => {
-    if (!(await window.electronAPI.showConfirm({ message: "确定要删除这条记录吗？" }))) {
-      return;
-    }
+    const confirmed = window.electronAPI?.showConfirm
+      ? await window.electronAPI.showConfirm({ message: "确定要删除这条记录吗？" })
+      : confirm("确定要删除这条记录吗？");
+
+    if (!confirmed) return;
+
     try {
       await MoodAPI.deleteEntry(id);
       setEntries(prev => prev.filter(e => e.id !== id));
@@ -209,7 +212,11 @@ const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGui
       await MoodAPI.deleteType(id);
       setMoods(prev => prev.filter(m => m.id !== id));
     } catch (err: any) {
-      window.electronAPI.showAlert({ message: err.message || '删除失败，该心情类型下可能有关联记录' });
+      if (window.electronAPI?.showAlert) {
+        window.electronAPI.showAlert({ message: err.message || '删除失败，该心情类型下可能有关联记录' });
+      } else {
+        alert(err.message || '删除失败，该心情类型下可能有关联记录');
+      }
     }
   };
 

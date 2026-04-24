@@ -229,7 +229,11 @@ const CustomBlockPopover: React.FC<CustomBlockPopoverProps> = ({
             console.log('[Popover] 即将显示 confirm 对话框');
             const confirmStart = Date.now();
 
-            if (await window.electronAPI.showConfirm({ message: '确定要删除这个时间块吗？' })) {
+            const confirmed = window.electronAPI?.showConfirm
+                ? await window.electronAPI.showConfirm({ message: '确定要删除这个时间块吗？' })
+                : confirm('确定要删除这个时间块吗？');
+
+            if (confirmed) {
                 const confirmEnd = Date.now();
                 console.log(`[Popover] confirm 确认，耗时: ${confirmEnd - confirmStart}ms`);
 

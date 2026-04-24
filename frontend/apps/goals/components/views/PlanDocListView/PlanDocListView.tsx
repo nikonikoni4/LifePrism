@@ -310,9 +310,12 @@ export const PlanDocListView: React.FC = () => {
 
     const handleDeleteDoc = async () => {
         if (selectedPlanDocId) {
-            if (!(await window.electronAPI.showConfirm({ message: 'Are you sure you want to delete this plan?' }))) {
-                return;
-            }
+            const confirmed = window.electronAPI?.showConfirm
+                ? await window.electronAPI.showConfirm({ message: 'Are you sure you want to delete this plan?' })
+                : confirm('Are you sure you want to delete this plan?');
+
+            if (!confirmed) return;
+
             try {
                 await deletePlanDoc(selectedPlanDocId);
                 setSelectedPlanDocId(null);

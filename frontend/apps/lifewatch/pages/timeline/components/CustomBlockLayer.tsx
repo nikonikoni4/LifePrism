@@ -201,7 +201,11 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
             onUpdate();
         } catch (error) {
             console.error('Failed to save custom block:', error);
-            window.electronAPI.showAlert({ message: '保存失败，请重试' });
+            if (window.electronAPI?.showAlert) {
+                window.electronAPI.showAlert({ message: '保存失败，请重试' });
+            } else {
+                alert('保存失败，请重试');
+            }
         } finally {
             setIsSaving(false);
         }
@@ -236,7 +240,11 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
             }, 500);
         } catch (error) {
             console.error('Failed to delete custom block:', error);
-            window.electronAPI.showAlert({ message: '删除失败，请重试' });
+            if (window.electronAPI?.showAlert) {
+                window.electronAPI.showAlert({ message: '删除失败，请重试' });
+            } else {
+                alert('删除失败，请重试');
+            }
         }
         console.log('=== [CustomBlockLayer] handleDelete 结束 ===');
     }, [handleClosePopover, onUpdate, popoverState]);

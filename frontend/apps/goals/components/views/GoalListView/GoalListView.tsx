@@ -58,9 +58,12 @@ export const GoalListView: React.FC = () => {
   };
 
   const handleDeleteGoal = async (id: string) => {
-    if (!(await window.electronAPI.showConfirm({ message: '确定要删除这个目标吗？' }))) {
-      return;
-    }
+    const confirmed = window.electronAPI?.showConfirm
+      ? await window.electronAPI.showConfirm({ message: '确定要删除这个目标吗？' })
+      : confirm('确定要删除这个目标吗？');
+
+    if (!confirmed) return;
+
     try {
       await deleteGoal(id);
     } catch (err) {

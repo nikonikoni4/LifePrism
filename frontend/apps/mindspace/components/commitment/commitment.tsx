@@ -87,7 +87,13 @@ const CommitmentView: React.FC<CommitmentViewProps> = ({ onBack, onNavigate }) =
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (submitting) return;
-    if (!(await window.electronAPI.showConfirm({ message: '确定要放下这条承诺吗？' }))) return;
+
+    const confirmed = window.electronAPI?.showConfirm
+      ? await window.electronAPI.showConfirm({ message: '确定要放下这条承诺吗？' })
+      : confirm('确定要放下这条承诺吗？');
+
+    if (!confirmed) return;
+
     setSubmitting(true);
     try {
       await CommitmentAPI.delete(id);
