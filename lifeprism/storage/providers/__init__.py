@@ -44,10 +44,16 @@ from lifeprism.storage.providers.plan_doc_provider import (
     PlanDocProvider,
     plan_doc_provider,
 )
+from lifeprism.storage.providers.category_provider import (
+    CategoryProvider,
+    SubCategoryProvider,
+)
 from lifeprism.utils import LazySingleton
 
 # 创建全局单例（已重构为使用通用方法）
 diary_provider = LazySingleton(DiaryProvider)
+category_provider = LazySingleton(CategoryProvider)
+sub_category_provider = LazySingleton(SubCategoryProvider)
 
 __all__ = [
     'DiaryProvider',
@@ -79,4 +85,8 @@ __all__ = [
     'timeline_provider',
     'PlanDocProvider',
     'plan_doc_provider',
+    'CategoryProvider',
+    'SubCategoryProvider',
+    'category_provider',
+    'sub_category_provider',
 ]

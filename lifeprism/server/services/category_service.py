@@ -3,6 +3,7 @@
 实现分类的业务逻辑和数据库操作
 """
 from lifeprism.server.providers import server_lw_data_provider
+from lifeprism.storage.providers import category_provider, sub_category_provider
 from lifeprism.server.schemas.category_schemas import (
     CategoryTreeResponse,
     CategoryTreeItem,
@@ -25,13 +26,16 @@ logger = get_logger(__name__)
 
 class CategoryService:
     """分类管理服务"""
-    
+
     def __init__(self):
         """
         初始化分类服务，使用全局数据提供者单例
         """
         self.server_lw_data_provider = server_lw_data_provider
         self.db = server_lw_data_provider.db
+        # 新的 provider（已重构为使用通用方法）
+        self.category_provider = category_provider
+        self.sub_category_provider = sub_category_provider
         # 缓存 DataFrame
         self._categories_df = self.server_lw_data_provider.load_categories()
         self._sub_categories_df = self.server_lw_data_provider.load_sub_categories()
@@ -418,11 +422,11 @@ class CategoryService:
     def create_category(self, name: str, color: str) -> CategoryTreeItem:
         """
         创建新的主分类
-        
+
         Args:
             name: 分类名称
             color: 分类颜色（十六进制格式）
-            
+
         Returns:
             CategoryTreeItem: 创建的分类对象
         """
@@ -432,26 +436,29 @@ class CategoryService:
             # 生成唯一ID（使用短UUID）
             category_id = f"cat-{str(uuid.uuid4())[:8]}"
 
-            # 插入数据
+            # 插入数据（使用新的 provider）
             data = {
                 'id': category_id,
                 'name': name,
                 'color': color
             }
 
-            self.db.insert('category', data)
+            success = self.category_provider.insert_category(data)
+            if not success:
+                raise Exception("插入数据库失败")
+
             logger.info(f"成功创建分类: {category_id} - {name}")
-            
+
             # 刷新缓存
             self._refresh_cache()
-            
+
             return CategoryTreeItem(
                 id=category_id,
                 name=name,
                 color=color,
                 subcategories=[]
             )
-            
+
         except Exception as e:
             logger.error(f"创建分类失败: {e}")
             raise
@@ -459,45 +466,48 @@ class CategoryService:
     def update_category(self, category_id: str, name: str, color: str) -> CategoryTreeItem:
         """
         更新主分类
-        
+
         Args:
             category_id: 分类ID
             name: 新的分类名称（空字符串表示不更新）
             color: 新的分类颜色（空字符串表示不更新）
-            
+
         Returns:
             CategoryTreeItem: 更新后的分类对象
-            
+
         Raises:
             ValueError: 如果分类不存在
         """
         try:
-            # 检查分类是否存在
-            existing = self.db.get_by_id('category', 'id', category_id)
+            # 检查分类是否存在（使用新的 provider）
+            existing = self.category_provider.get_category_by_id(category_id)
             if not existing:
                 raise ValueError(f"分类 '{category_id}' 不存在")
-            
+
             # 构建更新数据
             update_data = {}
             if name:
                 update_data['name'] = name
             if color:
                 update_data['color'] = color
-            
+
             if not update_data:
                 logger.warning("没有提供任何更新字段")
                 return self._get_category_by_id(category_id)
-            
-            # 执行更新
-            self.db.update_by_id('category', 'id', category_id, update_data)
+
+            # 执行更新（使用新的 provider）
+            success = self.category_provider.update_category(category_id, update_data)
+            if not success:
+                raise Exception("更新数据库失败")
+
             logger.info(f"成功更新分类: {category_id}")
-            
+
             # 刷新缓存
             self._refresh_cache()
-            
+
             # 返回更新后的分类
             return self._get_category_by_id(category_id)
-            
+
         except ValueError:
             raise
         except Exception as e:
@@ -507,29 +517,29 @@ class CategoryService:
     def delete_category(self, category_id: str, reassign_to: str) -> bool:
         """
         删除主分类
-        
+
         Args:
             category_id: 要删除的分类ID
             reassign_to: 重新分配关联记录到的分类ID
-            
+
         Returns:
             bool: 是否成功删除
-            
+
         Raises:
             ValueError: 如果分类不存在
         """
         try:
-            # 检查分类是否存在
-            existing = self.db.get_by_id('category', 'id', category_id)
+            # 检查分类是否存在（使用新的 provider）
+            existing = self.category_provider.get_category_by_id(category_id)
             if not existing:
                 raise ValueError(f"分类 '{category_id}' 不存在")
-            
-            # 1. 重新分配关联的行为日志记录
+
+            # 1. 重新分配关联的行为日志记录（这部分仍使用 db，因为涉及其他表）
             behavior_logs = self.db.query(
                 'user_app_behavior_log',
                 where={'category_id': category_id}
             )
-            
+
             if not behavior_logs.empty:
                 logger.info(f"找到 {len(behavior_logs)} 条关联记录，重新分配到 '{reassign_to}'")
                 self.db.update(
@@ -537,16 +547,19 @@ class CategoryService:
                     {'category_id': reassign_to, 'sub_category_id': 'untracked'},
                     {'category_id': category_id}
                 )
-            
-            # 2. 删除主分类（子分类会通过 CASCADE 自动删除）
-            self.db.delete_by_id('category', 'id', category_id)
+
+            # 2. 删除主分类（子分类会通过 CASCADE 自动删除）（使用新的 provider）
+            success = self.category_provider.delete_category(category_id)
+            if not success:
+                raise Exception("删除数据库记录失败")
+
             logger.info(f"成功删除分类: {category_id}")
-            
+
             # 刷新缓存
             self._refresh_cache()
-            
+
             return True
-            
+
         except ValueError:
             raise
         except Exception as e:
@@ -556,45 +569,48 @@ class CategoryService:
     def create_sub_category(self, category_id: str, name: str) -> SubCategoryTreeItem:
         """
         创建子分类
-        
+
         Args:
             category_id: 所属主分类ID
             name: 子分类名称
-            
+
         Returns:
             SubCategoryTreeItem: 创建的子分类对象
-            
+
         Raises:
             ValueError: 如果主分类不存在
         """
         try:
-            # 验证主分类存在
-            existing_cat = self.db.get_by_id('category', 'id', category_id)
+            # 验证主分类存在（使用新的 provider）
+            existing_cat = self.category_provider.get_category_by_id(category_id)
             if not existing_cat:
                 raise ValueError(f"主分类 '{category_id}' 不存在")
-            
+
             # 生成唯一ID
             sub_id = f"sub-{str(uuid.uuid4())[:8]}"
 
-            # 插入数据
+            # 插入数据（使用新的 provider）
             data = {
                 'id': sub_id,
                 'category_id': category_id,
                 'name': name
             }
 
-            self.db.insert('sub_category', data)
+            success = self.sub_category_provider.insert_sub_category(data)
+            if not success:
+                raise Exception("插入数据库失败")
+
             logger.info(f"成功创建子分类: {sub_id} - {name}")
-            
+
             # 刷新缓存
             self._refresh_cache()
-            
+
             return SubCategoryTreeItem(
                 id=sub_id,
                 name=name,
                 color=color_manager.get_sub_category_color(sub_id)
             )
-            
+
         except ValueError:
             raise
         except Exception as e:
@@ -604,85 +620,88 @@ class CategoryService:
     def update_sub_category(self, category_id: str, sub_id: str, name: str) -> SubCategoryTreeItem:
         """
         更新子分类
-        
+
         Args:
             category_id: 所属主分类ID
             sub_id: 子分类ID
             name: 新的子分类名称
-            
+
         Returns:
             SubCategoryTreeItem: 更新后的子分类对象
-            
+
         Raises:
             ValueError: 如果主分类或子分类不存在
         """
         try:
-            # 验证主分类存在
-            existing_cat = self.db.get_by_id('category', 'id', category_id)
+            # 验证主分类存在（使用新的 provider）
+            existing_cat = self.category_provider.get_category_by_id(category_id)
             if not existing_cat:
                 raise ValueError(f"主分类 '{category_id}' 不存在")
-            
-            # 验证子分类存在且属于该主分类
-            existing_sub = self.db.get_by_id('sub_category', 'id', sub_id)
+
+            # 验证子分类存在且属于该主分类（使用新的 provider）
+            existing_sub = self.sub_category_provider.get_sub_category_by_id(sub_id)
             if not existing_sub:
                 raise ValueError(f"子分类 '{sub_id}' 不存在")
-            
+
             if existing_sub['category_id'] != category_id:
                 raise ValueError(f"子分类 '{sub_id}' 不属于分类 '{category_id}'")
-            
-            # 更新子分类
-            self.db.update_by_id('sub_category', 'id', sub_id, {'name': name})
+
+            # 更新子分类（使用新的 provider）
+            success = self.sub_category_provider.update_sub_category(sub_id, {'name': name})
+            if not success:
+                raise Exception("更新数据库失败")
+
             logger.info(f"成功更新子分类: {sub_id}")
-            
+
             # 刷新缓存
             self._refresh_cache()
-            
+
             return SubCategoryTreeItem(
                 id=sub_id,
                 name=name,
                 color=color_manager.get_sub_category_color(sub_id)
             )
-            
+
         except ValueError:
             raise
         except Exception as e:
             logger.error(f"更新子分类失败: {e}")
             raise
-    
+
     def delete_sub_category(self, category_id: str, sub_id: str) -> bool:
         """
         删除子分类
-        
+
         Args:
             category_id: 所属主分类ID
             sub_id: 子分类ID
-            
+
         Returns:
             bool: 是否成功删除
-            
+
         Raises:
             ValueError: 如果主分类或子分类不存在
         """
         try:
-            # 验证主分类存在
-            existing_cat = self.db.get_by_id('category', 'id', category_id)
+            # 验证主分类存在（使用新的 provider）
+            existing_cat = self.category_provider.get_category_by_id(category_id)
             if not existing_cat:
                 raise ValueError(f"主分类 '{category_id}' 不存在")
-            
-            # 验证子分类存在且属于该主分类
-            existing_sub = self.db.get_by_id('sub_category', 'id', sub_id)
+
+            # 验证子分类存在且属于该主分类（使用新的 provider）
+            existing_sub = self.sub_category_provider.get_sub_category_by_id(sub_id)
             if not existing_sub:
                 raise ValueError(f"子分类 '{sub_id}' 不存在")
-            
+
             if existing_sub['category_id'] != category_id:
                 raise ValueError(f"子分类 '{sub_id}' 不属于分类 '{category_id}'")
-            
-            # 重新分配关联的行为日志记录
+
+            # 重新分配关联的行为日志记录（这部分仍使用 db，因为涉及其他表）
             behavior_logs = self.db.query(
                 'user_app_behavior_log',
                 where={'sub_category_id': sub_id}
             )
-            
+
             if not behavior_logs.empty:
                 logger.info(f"找到 {len(behavior_logs)} 条关联记录，重新分配到 'untracked'")
                 self.db.update(
@@ -690,11 +709,14 @@ class CategoryService:
                     {'sub_category_id': 'untracked'},
                     {'sub_category_id': sub_id}
                 )
-            
-            # 删除子分类
-            self.db.delete_by_id('sub_category', 'id', sub_id)
+
+            # 删除子分类（使用新的 provider）
+            success = self.sub_category_provider.delete_sub_category(sub_id)
+            if not success:
+                raise Exception("删除数据库记录失败")
+
             logger.info(f"成功删除子分类: {sub_id}")
-            
+
             # 刷新缓存
             self._refresh_cache()
             
@@ -709,23 +731,24 @@ class CategoryService:
     def _get_category_by_id(self, category_id: str) -> CategoryTreeItem:
         """
         根据ID获取完整的分类对象（含子分类）- 内部使用，不存在时抛出异常
-        
+
         Args:
             category_id: 分类ID
-            
+
         Returns:
             CategoryTreeItem: 分类对象
         """
-        category = self.db.get_by_id('category', 'id', category_id)
+        # 使用新的 provider
+        category = self.category_provider.get_category_by_id(category_id)
         if not category:
             raise ValueError(f"分类 '{category_id}' 不存在")
-        
-        # 获取子分类
+
+        # 获取子分类（使用 db.query，因为需要 DataFrame）
         sub_cats_df = self.db.query(
             'sub_category',
             where={'category_id': category_id}
         )
-        
+
         subcategories = []
         if not sub_cats_df.empty:
             for _, sub_row in sub_cats_df.iterrows():
@@ -735,7 +758,7 @@ class CategoryService:
                     color=color_manager.get_sub_category_color(str(sub_row['id'])),
                     state=int(sub_row.get('state', 1))
                 ))
-        
+
         return CategoryTreeItem(
             id=category['id'],
             name=category['name'],
@@ -743,53 +766,57 @@ class CategoryService:
             subcategories=subcategories,
             state=int(category.get('state', 1))
         )
-    
+
     def get_category_by_id(self, category_id: str) -> CategoryTreeItem:
         """
         根据ID获取分类对象（公共方法，不存在时返回None）
-        
+
         Args:
             category_id: 分类ID
-            
+
         Returns:
             CategoryTreeItem: 分类对象，或 None 如果不存在
         """
-        category = self.db.get_by_id('category', 'id', category_id)
+        # 使用新的 provider
+        category = self.category_provider.get_category_by_id(category_id)
         if not category:
             return None
-        
+
         return CategoryTreeItem(
             id=category['id'],
             name=category['name'],
             color=color_manager.get_main_category_color(category['id'])
         )
-    
+
     def toggle_category_state(self, category_id: str, state: int) -> CategoryTreeItem:
         """
         切换主分类的启用/禁用状态
-        
+
         Args:
             category_id: 分类ID
             state: 新状态（1: 启用, 0: 禁用）
-            
+
         Returns:
             CategoryTreeItem: 更新后的分类对象
-            
+
         Raises:
             ValueError: 如果分类不存在
         """
         try:
-            # 检查分类是否存在
-            existing = self.db.get_by_id('category', 'id', category_id)
+            # 检查分类是否存在（使用新的 provider）
+            existing = self.category_provider.get_category_by_id(category_id)
             if not existing:
                 raise ValueError(f"分类 '{category_id}' 不存在")
-            
+
             old_state = existing.get('state', 1)
-            
-            # 更新分类状态
-            self.db.update_by_id('category', 'id', category_id, {'state': state})
+
+            # 更新分类状态（使用新的 provider）
+            success = self.category_provider.update_category(category_id, {'state': state})
+            if not success:
+                raise Exception("更新数据库失败")
+
             logger.info(f"成功切换分类 '{category_id}' 状态为 {state}")
-            
+
             # 同步更新 single_purpose_category_map和 multi_purpose_category_map 表的 state
             if state == 0:
                 # 禁用：将该分类下所有记录的 state 置为 0
@@ -813,38 +840,41 @@ class CategoryService:
     def toggle_sub_category_state(self, category_id: str, sub_id: str, state: int) -> SubCategoryTreeItem:
         """
         切换子分类的启用/禁用状态
-        
+
         Args:
             category_id: 主分类ID
             sub_id: 子分类ID
             state: 新状态（1: 启用, 0: 禁用）
-            
+
         Returns:
             SubCategoryTreeItem: 更新后的子分类对象
-            
+
         Raises:
             ValueError: 如果主分类或子分类不存在
         """
         try:
-            # 验证主分类存在
-            existing_cat = self.db.get_by_id('category', 'id', category_id)
+            # 验证主分类存在（使用新的 provider）
+            existing_cat = self.category_provider.get_category_by_id(category_id)
             if not existing_cat:
                 raise ValueError(f"主分类 '{category_id}' 不存在")
-            
-            # 验证子分类存在且属于该主分类
-            existing_sub = self.db.get_by_id('sub_category', 'id', sub_id)
+
+            # 验证子分类存在且属于该主分类（使用新的 provider）
+            existing_sub = self.sub_category_provider.get_sub_category_by_id(sub_id)
             if not existing_sub:
                 raise ValueError(f"子分类 '{sub_id}' 不存在")
-            
+
             if existing_sub['category_id'] != category_id:
                 raise ValueError(f"子分类 '{sub_id}' 不属于分类 '{category_id}'")
-            
+
             old_state = existing_sub.get('state', 1)
-            
-            # 更新子分类状态
-            self.db.update_by_id('sub_category', 'id', sub_id, {'state': state})
+
+            # 更新子分类状态（使用新的 provider）
+            success = self.sub_category_provider.update_sub_category(sub_id, {'state': state})
+            if not success:
+                raise Exception("更新数据库失败")
+
             logger.info(f"成功切换子分类 '{sub_id}' 状态为 {state}")
-            
+
             # 同步更新 single_purpose_category_map和 multi_purpose_category_map 表的 state
             if state == 0:
                 # 禁用：将该子分类下所有记录的 state 置为 0

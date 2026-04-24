@@ -1,0 +1,108 @@
+# serializer version: 1
+# name: TestCategoryServiceSnapshot.test_get_category_tree_depth_1_snapshot
+  list([
+    dict({
+      'color': '#FF5733',
+      'id': 'cat-0a194756',
+      'name': '测试分类',
+      'state': 1,
+      'subcategories': None,
+    }),
+    dict({
+      'color': '#F6BD16',
+      'id': 'cat-entertainment',
+      'name': '娱乐',
+      'state': 1,
+      'subcategories': None,
+    }),
+    dict({
+      'color': '#E8684A',
+      'id': 'cat-other',
+      'name': '其他',
+      'state': 1,
+      'subcategories': None,
+    }),
+    dict({
+      'color': '#5AD8A6',
+      'id': 'cat-study',
+      'name': '学习',
+      'state': 1,
+      'subcategories': None,
+    }),
+    dict({
+      'color': '#5B8FF9',
+      'id': 'cat-work',
+      'name': '工作',
+      'state': 1,
+      'subcategories': None,
+    }),
+  ])
+# ---
+# name: TestCategoryServiceSnapshot.test_get_category_tree_depth_2_snapshot
+  list([
+    dict({
+      'color': '#FF5733',
+      'id': 'cat-0a194756',
+      'name': '测试分类',
+      'state': 1,
+      'subcategories': list([
+      ]),
+    }),
+    dict({
+      'color': '#F6BD16',
+      'id': 'cat-entertainment',
+      'name': '娱乐',
+      'state': 1,
+      'subcategories': list([
+        dict({
+          'color': '#f6c022',
+          'id': 'subcat-entertainment-other',
+          'name': '其他',
+          'state': 1,
+        }),
+      ]),
+    }),
+    dict({
+      'color': '#E8684A',
+      'id': 'cat-other',
+      'name': '其他',
+      'state': 1,
+      'subcategories': list([
+        dict({
+          'color': '#e55533',
+          'id': 'subcat-other-other',
+          'name': '其他',
+          'state': 1,
+        }),
+      ]),
+    }),
+    dict({
+      'color': '#5AD8A6',
+      'id': 'cat-study',
+      'name': '学习',
+      'state': 1,
+      'subcategories': list([
+        dict({
+          'color': '#45d39a',
+          'id': 'subcat-study-other',
+          'name': '其他',
+          'state': 1,
+        }),
+      ]),
+    }),
+    dict({
+      'color': '#5B8FF9',
+      'id': 'cat-work',
+      'name': '工作',
+      'state': 1,
+      'subcategories': list([
+        dict({
+          'color': '#2167f6',
+          'id': 'subcat-work-other',
+          'name': '其他',
+          'state': 1,
+        }),
+      ]),
+    }),
+  ])
+# ---
