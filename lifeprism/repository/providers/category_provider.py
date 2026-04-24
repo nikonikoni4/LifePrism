@@ -136,7 +136,7 @@ class CategoryProvider(LWBaseDataProvider):
             if invalid_fields:
                 raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-            return self._generic_update(category_id, data, auto_timestamp=True)
+            return self._generic_update(category_id, data)
         except Exception as e:
             logger.error(f"更新分类 {category_id} 失败: {e}")
             return False
@@ -285,7 +285,7 @@ class SubCategoryProvider(LWBaseDataProvider):
             if invalid_fields:
                 raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-            return self._generic_update(sub_category_id, data, auto_timestamp=True)
+            return self._generic_update(sub_category_id, data)
         except Exception as e:
             logger.error(f"更新子分类 {sub_category_id} 失败: {e}")
             return False

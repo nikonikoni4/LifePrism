@@ -122,7 +122,7 @@ class DiaryProvider(LWBaseDataProvider):
         更新日记记录
 
         注意：此方法使用自定义 SQL 是因为需要 SQLite 特定的时间戳函数
-        datetime('now','localtime')，通用方法的 auto_timestamp 使用 UTC 时间
+        datetime('now','localtime')
 
         Args:
             date: 日期 YYYY-MM-DD
@@ -157,7 +157,7 @@ class DiaryProvider(LWBaseDataProvider):
                     return cursor.rowcount > 0
             else:
                 # 如果已经提供了 updated_at，使用通用方法
-                return self._generic_update(date, data, auto_timestamp=False)
+                return self._generic_update(date, data)
         except Exception as e:
             logger.error(f"更新日记 {date} 失败: {e}")
             return False

@@ -142,7 +142,7 @@ class HabitProvider(LWBaseDataProvider):
         if not update_data:
             return True
 
-        return self._generic_update(habit_id, update_data, auto_timestamp=True)
+        return self._generic_update(habit_id, update_data)
 
     def delete_habit(self, habit_id: str) -> bool:
         """
@@ -301,7 +301,7 @@ class HabitChallengeProvider(LWBaseDataProvider):
         if not update_data:
             return True
 
-        return self._generic_update(challenge_id, update_data, auto_timestamp=True)
+        return self._generic_update(challenge_id, update_data)
 
     def mark_in_progress_challenge_failed(self, habit_id: str, challenge_id: str) -> bool:
         """

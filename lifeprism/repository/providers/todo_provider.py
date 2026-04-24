@@ -452,7 +452,7 @@ class TodoProvider(LWBaseDataProvider):
             bool: 是否成功
         """
         try:
-            return self._generic_update(todo_id, {'folder_id': folder_id}, auto_timestamp=False)
+            return self._generic_update(todo_id, {'folder_id': folder_id})
         except Exception as e:
             logger.error(f"移动任务失败: {e}")
             return False
@@ -681,7 +681,7 @@ class TodoProvider(LWBaseDataProvider):
             bool: 是否成功
         """
         try:
-            return self._generic_update(todo_id, {'waid_order': None}, auto_timestamp=False)
+            return self._generic_update(todo_id, {'waid_order': None})
         except Exception as e:
             logger.error(f"清除 WAID 排序失败: {e}")
             return False

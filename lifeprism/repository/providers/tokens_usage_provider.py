@@ -155,7 +155,7 @@ class TokensUsageProvider(LWBaseDataProvider):
             if invalid_fields:
                 raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-            return self._generic_update(session_id, data, auto_timestamp=False)
+            return self._generic_update(session_id, data)
         except Exception as e:
             logger.error(f"更新 token 使用记录 {session_id} 失败: {e}")
             return False

@@ -295,7 +295,7 @@ class LWBaseDataProvider:
         self,
         record_id: str,
         data: Dict[str, Any],
-        auto_timestamp: bool = True
+        auto_update: bool = True
     ) -> bool:
         """
         通用更新方法
@@ -303,7 +303,7 @@ class LWBaseDataProvider:
         Args:
             record_id: 记录 ID
             data: 更新数据
-            auto_timestamp: 是否自动更新 updated_at
+            auto_update: 是否自动更新 updated_at
         
         Returns:
             是否成功
@@ -317,7 +317,7 @@ class LWBaseDataProvider:
             success = self._generic_update(
                 record_id='t-12345678',
                 data={'title': '新标题', 'state': 'completed'},
-                auto_timestamp=True
+                auto_update=True
             )
         """
         if not self._TABLE_NAME:
@@ -335,7 +335,7 @@ class LWBaseDataProvider:
                 raise ValueError(f"Invalid update fields: {invalid_fields}")
         
         # 2. 自动更新时间戳
-        if auto_timestamp and 'updated_at' not in data:
+        if auto_update and 'updated_at' not in data:
             from datetime import datetime
             data['updated_at'] = datetime.now().isoformat()
         
@@ -590,7 +590,7 @@ class TodoProvider(LWBaseDataProvider, metaclass=LazySingleton):
         return self._generic_update(
             record_id=todo_id,
             data=data,
-            auto_timestamp=True          # 自动更新 updated_at
+            auto_update=True          # 自动更新 updated_at
         )
     
     # ==================== 删除方法 ====================
@@ -1209,9 +1209,9 @@ class TodoProvider(LWBaseDataProvider):
 
 ### 10.6 时间戳处理
 
-- `auto_timestamp=True` 会自动更新 `updated_at` 字段
+- `auto_update=True` 会自动更新 `updated_at` 字段
 - 时间格式：ISO 8601（`2026-04-24T10:30:00`）
-- 如果表没有 `updated_at` 字段，设置 `auto_timestamp=False`
+- 如果表没有 `updated_at` 字段，设置 `auto_update=False`
 
 ---
 

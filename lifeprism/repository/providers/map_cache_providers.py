@@ -139,7 +139,7 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
             if invalid_fields:
                 raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-            return self._generic_update(cache_id, data, auto_timestamp=True)
+            return self._generic_update(cache_id, data)
         except Exception as e:
             logger.error(f"更新 multi_purpose_map_cache 记录 {cache_id} 失败: {e}")
             return False
@@ -421,7 +421,7 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
             if invalid_fields:
                 raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-            return self._generic_update(cache_id, data, auto_timestamp=True)
+            return self._generic_update(cache_id, data)
         except Exception as e:
             logger.error(f"更新 single_purpose_map_cache 记录 {cache_id} 失败: {e}")
             return False

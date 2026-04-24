@@ -133,7 +133,7 @@ class HabitChainProvider(LWBaseDataProvider):
         if not update_data:
             return True
 
-        return self._generic_update(chain_id, update_data, auto_timestamp=True)
+        return self._generic_update(chain_id, update_data)
 
     def delete_chain(self, chain_id: int) -> bool:
         """
@@ -276,7 +276,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         if not update_data:
             return True
 
-        return self._generic_update(node_id, update_data, auto_timestamp=True)
+        return self._generic_update(node_id, update_data)
 
     def delete_node(self, node_id: int) -> bool:
         """

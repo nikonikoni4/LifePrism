@@ -437,8 +437,8 @@ def update_item(self, item_id: str, data: Dict[str, Any]) -> bool:
             raise ValueError(f"Invalid update fields: {invalid_fields}")
         
         # 如果需要自定义 updated_at 更新逻辑，手动处理
-        # 否则使用 auto_timestamp=True（默认）
-        return self._generic_update(item_id, data, auto_timestamp=True)
+        # 否则使用 auto_update=True（默认）
+        return self._generic_update(item_id, data)
     except Exception as e:
         logger.error(f"更新记录 {item_id} 失败: {e}")
         return False
@@ -502,7 +502,7 @@ def update_item(self, item_id: str, data: Dict[str, Any]) -> bool:
             return cursor.rowcount > 0
     else:
         # 使用通用方法
-        return self._generic_update(item_id, data, auto_timestamp=False)
+        return self._generic_update(item_id, data)
 ```
 
 **情况 3: 自动生成 ID**

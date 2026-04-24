@@ -58,6 +58,22 @@ class LWBaseDataProvider:
     _SELECT_FIELDS: Set[str] = set()            # 可查询字段白名单
     _UPDATE_FIELDS: Set[str] = set()            # 可更新字段白名单
 
+    # ==================== 类级别缓存 ====================
+
+    _TABLES_WITH_UPDATE_AT: Optional[Set[str]] = None  # 需要自动更新 updated_at 的表名集合
+
+    @classmethod
+    def _init_update_at_cache(cls):
+        """初始化 update_at 缓存，加载所有配置了 update_at=True 的表名"""
+        if cls._TABLES_WITH_UPDATE_AT is None:
+            from lifeprism.config.database import TABLE_CONFIGS
+            cls._TABLES_WITH_UPDATE_AT = {
+                table_name
+                for table_name, config in TABLE_CONFIGS.items()
+                if config.get('update_at', False)
+            }
+            logger.debug(f"初始化 update_at 缓存，共 {len(cls._TABLES_WITH_UPDATE_AT)} 个表需要自动更新时间戳")
+
     def __init__(self, db_manager=None):
         """
         初始化基础数据提供者
@@ -1042,8 +1058,7 @@ class LWBaseDataProvider:
     def _generic_update(
         self,
         record_id: str,
-        data: Dict[str, Any],
-        auto_timestamp: bool = True
+        data: Dict[str, Any]
     ) -> bool:
         """
         通用更新方法
@@ -1051,7 +1066,6 @@ class LWBaseDataProvider:
         Args:
             record_id: 记录 ID
             data: 更新数据
-            auto_timestamp: 是否自动更新 updated_at
 
         Returns:
             是否成功
@@ -1064,8 +1078,7 @@ class LWBaseDataProvider:
             # 更新 todo
             success = self._generic_update(
                 record_id='t-12345678',
-                data={'title': '新标题', 'state': 'completed'},
-                auto_timestamp=True
+                data={'title': '新标题', 'state': 'completed'}
             )
         """
         # 验证表名
@@ -1080,8 +1093,11 @@ class LWBaseDataProvider:
             if invalid_fields:
                 raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-        # 2. 自动更新时间戳
-        if auto_timestamp and 'updated_at' not in data:
+        # 2. 从缓存中查询该表是否需要自动更新 updated_at
+        if self._TABLES_WITH_UPDATE_AT is None:
+            self._init_update_at_cache()
+
+        if self._TABLE_NAME in self._TABLES_WITH_UPDATE_AT and 'updated_at' not in data:
             from datetime import datetime
             data['updated_at'] = datetime.now().isoformat()
 

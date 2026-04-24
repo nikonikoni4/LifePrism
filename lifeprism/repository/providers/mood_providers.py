@@ -124,7 +124,7 @@ class MoodTypeProvider(LWBaseDataProvider):
             if invalid_fields:
                 raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-            return self._generic_update(mood_type_id, data, auto_timestamp=False)
+            return self._generic_update(mood_type_id, data)
         except Exception as e:
             logger.error(f"更新心情类型 {mood_type_id} 失败: {e}")
             return False
@@ -295,7 +295,7 @@ class MoodEntryProvider(LWBaseDataProvider):
             if invalid_fields:
                 raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-            return self._generic_update(entry_id, data, auto_timestamp=False)
+            return self._generic_update(entry_id, data)
         except Exception as e:
             logger.error(f"更新心情记录 {entry_id} 失败: {e}")
             return False

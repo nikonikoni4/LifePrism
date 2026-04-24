@@ -395,7 +395,7 @@ class GoalProvider(LWBaseDataProvider):
                 'time_invested': time_invested,
                 'time_invested_updated_at': now
             }
-            success = self._generic_update(goal_id, data, auto_timestamp=False)
+            success = self._generic_update(goal_id, data)
             if success:
                 logger.debug(f"更新目标 {goal_id} 投入时间: {time_invested} 秒")
             return success
