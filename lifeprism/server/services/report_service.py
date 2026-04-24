@@ -26,7 +26,7 @@ from lifeprism.server.schemas.report_schemas import (
     HeatmapDataItem,
 )
 from lifeprism.server.providers.report_provider import daily_report_provider, weekly_report_provider, monthly_report_provider, comparison_data_provider
-from lifeprism.storage.providers import todo_provider, goal_provider
+from lifeprism.storage import todo_store, goal_provider
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
 from lifeprism.server.services.category_service import category_service
@@ -654,7 +654,7 @@ def _calc_todo_stats(start_date: str, end_date: str) -> TodoStatsData:
         
         for i in range(days):
             current_date = (start_dt + timedelta(days=i)).strftime('%Y-%m-%d')
-            todos = todo_provider.get_todos_by_date(current_date, include_cross_day=False)
+            todos = todo_store.get_todos_by_date(current_date, include_cross_day=False)
             
             total += len(todos)
             completed += sum(1 for t in todos if t.get('state') == 'completed')
@@ -711,7 +711,7 @@ def _calc_goal_progress(start_date: str, end_date: str) -> List[GoalProgressData
             
             for i in range(days):
                 current_date = (start_dt + timedelta(days=i)).strftime('%Y-%m-%d')
-                all_todos = todo_provider.get_todos_by_date(current_date, include_cross_day=True)
+                all_todos = todo_store.get_todos_by_date(current_date, include_cross_day=True)
                 day_goal_todos = [t for t in all_todos if t.get('link_to_goal_id') == goal_id]
                 
                 # 避免重复添加（跨天任务可能重复）

@@ -14,10 +14,102 @@ from lifeprism.server.schemas.usage_schemas import (
     UsageStats7DaysItem,
     UsageStatsResponse
 )
-from lifeprism.server.providers import server_lw_data_provider
+from lifeprism.storage import tokens_usage_store
+from lifeprism.storage.providers.common_query_options import QueryOptions
 from lifeprism.config.settings_manager import settings
 # 常量：Data Processing 的 mode
 MODE_CLASSIFICATION = "classification"
+
+
+def _to_time_range(date: str = None, start_time: str = None, end_time: str = None) -> tuple[str | None, str | None]:
+    """将 date 或显式时间范围统一转换为时间范围字符串。"""
+    if date:
+        return f"{date} 00:00:00", f"{date} 23:59:59"
+    return start_time, end_time
+
+
+def _is_in_time_range(created_at: str, start_time: str = None, end_time: str = None) -> bool:
+    """判断记录 created_at 是否处于指定时间范围内（闭区间）。"""
+    if not created_at:
+        return False
+    time_value = str(created_at)[:19]
+    if start_time and time_value < start_time:
+        return False
+    if end_time and time_value > end_time:
+        return False
+    return True
+
+
+def _query_tokens_usage_records(date: str = None,
+                                start_time: str = None,
+                                end_time: str = None,
+                                mode: str = None) -> list[dict]:
+    """查询 token 使用原始记录，并在 service 层做时间过滤。"""
+    query_options = QueryOptions(order_by="created_at", order_desc=False)
+    if mode:
+        query_options = query_options.with_filters(mode=mode)
+
+    records, _ = tokens_usage_store.query_tokens_usage(query_options)
+    range_start, range_end = _to_time_range(date=date, start_time=start_time, end_time=end_time)
+
+    if not range_start and not range_end:
+        return records
+
+    return [
+        record for record in records
+        if _is_in_time_range(record.get("created_at"), range_start, range_end)
+    ]
+
+
+def _empty_usage_data() -> dict:
+    return {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "result_items_count": 0
+    }
+
+
+def _aggregate_tokens_usage_by_date(records: list[dict]) -> dict[str, dict]:
+    """按日期聚合 token 使用记录。"""
+    usage_dict: dict[str, dict] = {}
+    for record in records:
+        created_at = str(record.get("created_at", ""))
+        usage_date = created_at[:10]
+        if not usage_date:
+            continue
+        if usage_date not in usage_dict:
+            usage_dict[usage_date] = _empty_usage_data()
+        usage_dict[usage_date]["input_tokens"] += record.get("input_tokens", 0) or 0
+        usage_dict[usage_date]["output_tokens"] += record.get("output_tokens", 0) or 0
+        usage_dict[usage_date]["total_tokens"] += record.get("total_tokens", 0) or 0
+        usage_dict[usage_date]["result_items_count"] += record.get("result_items_count", 0) or 0
+    return usage_dict
+
+
+def _aggregate_tokens_usage_by_mode(records: list[dict]) -> dict[str, dict]:
+    """按 mode 聚合 token 使用记录。"""
+    usage_dict: dict[str, dict] = {}
+    for record in records:
+        mode = record.get("mode")
+        if mode not in usage_dict:
+            usage_dict[mode] = _empty_usage_data()
+        usage_dict[mode]["input_tokens"] += record.get("input_tokens", 0) or 0
+        usage_dict[mode]["output_tokens"] += record.get("output_tokens", 0) or 0
+        usage_dict[mode]["total_tokens"] += record.get("total_tokens", 0) or 0
+        usage_dict[mode]["result_items_count"] += record.get("result_items_count", 0) or 0
+    return usage_dict
+
+
+def _aggregate_all_tokens_usage(records: list[dict]) -> dict:
+    """聚合全部 token 使用记录。"""
+    total_data = _empty_usage_data()
+    for record in records:
+        total_data["input_tokens"] += record.get("input_tokens", 0) or 0
+        total_data["output_tokens"] += record.get("output_tokens", 0) or 0
+        total_data["total_tokens"] += record.get("total_tokens", 0) or 0
+        total_data["result_items_count"] += record.get("result_items_count", 0) or 0
+    return total_data
 
 
 def get_usage_stats(date: str) -> UsageStatsResponse:
@@ -31,16 +123,24 @@ def get_usage_stats(date: str) -> UsageStatsResponse:
         UsageStatsResponse: 包含总览、7天统计、数据处理统计和其他消耗统计
     """
     # 获取单日数据用于总览和数据处理统计
-    tokens_usage_data = server_lw_data_provider.get_tokens_usage(date=date)
+    tokens_usage_data = _aggregate_tokens_usage_by_date(
+        _query_tokens_usage_records(date=date)
+    )
     
     # 获取按 mode 分组的今日数据
-    tokens_by_mode_today = server_lw_data_provider.get_tokens_usage_by_mode(date=date)
+    tokens_by_mode_today = _aggregate_tokens_usage_by_mode(
+        _query_tokens_usage_records(date=date)
+    )
     
     # 获取全部数据（不限日期范围）
-    all_tokens_data = server_lw_data_provider.get_all_tokens_usage()
+    all_tokens_data = _aggregate_all_tokens_usage(
+        _query_tokens_usage_records()
+    )
     
     # 获取按 mode 分组的全部数据
-    all_tokens_by_mode = server_lw_data_provider.get_all_tokens_usage_by_mode()
+    all_tokens_by_mode = _aggregate_tokens_usage_by_mode(
+        _query_tokens_usage_records()
+    )
     
     return UsageStatsResponse(
         usage_overview=get_usage_overview(date, tokens_usage_data, all_tokens_data),
@@ -72,7 +172,9 @@ def get_usage_stats_7days(date: str) -> UsageStats7Days:
     start_time = start_date.strftime("%Y-%m-%d 00:00:00")
     end_time = end_date.strftime("%Y-%m-%d 23:59:59")
     
-    usage_data = server_lw_data_provider.get_tokens_usage(start_time=start_time, end_time=end_time)
+    usage_data = _aggregate_tokens_usage_by_date(
+        _query_tokens_usage_records(start_time=start_time, end_time=end_time)
+    )
     
     # 构建7天的统计列表
     items = []
@@ -119,11 +221,15 @@ def get_usage_overview(date: str,
         UsageOverview: 使用总览数据
     """
     # 如果没有提供数据，则获取
-    if not tokens_usage_data:
-        tokens_usage_data = server_lw_data_provider.get_tokens_usage(date=date)
+    if tokens_usage_data is None:
+        tokens_usage_data = _aggregate_tokens_usage_by_date(
+            _query_tokens_usage_records(date=date)
+        )
     
-    if not all_tokens_data:
-        all_tokens_data = server_lw_data_provider.get_all_tokens_usage()
+    if all_tokens_data is None:
+        all_tokens_data = _aggregate_all_tokens_usage(
+            _query_tokens_usage_records()
+        )
     
     # 获取当天的数据
     day_data = tokens_usage_data.get(date, {
@@ -174,11 +280,15 @@ def get_data_processing_usage_stats(date: str,
         DataProcessingUsageStats: 数据处理统计
     """
     # 如果没有提供数据，则获取
-    if not tokens_by_mode_today:
-        tokens_by_mode_today = server_lw_data_provider.get_tokens_usage_by_mode(date=date)
+    if tokens_by_mode_today is None:
+        tokens_by_mode_today = _aggregate_tokens_usage_by_mode(
+            _query_tokens_usage_records(date=date)
+        )
     
-    if not all_tokens_by_mode:
-        all_tokens_by_mode = server_lw_data_provider.get_all_tokens_usage_by_mode()
+    if all_tokens_by_mode is None:
+        all_tokens_by_mode = _aggregate_tokens_usage_by_mode(
+            _query_tokens_usage_records()
+        )
     
     # 获取今日 classification 数据
     today_data = tokens_by_mode_today.get(MODE_CLASSIFICATION, {
@@ -241,11 +351,15 @@ def get_other_usage_stats(date: str,
         OtherUsageStats: 其他消耗统计
     """
     # 如果没有提供数据，则获取
-    if not tokens_by_mode_today:
-        tokens_by_mode_today = server_lw_data_provider.get_tokens_usage_by_mode(date=date)
+    if tokens_by_mode_today is None:
+        tokens_by_mode_today = _aggregate_tokens_usage_by_mode(
+            _query_tokens_usage_records(date=date)
+        )
     
-    if not all_tokens_by_mode:
-        all_tokens_by_mode = server_lw_data_provider.get_all_tokens_usage_by_mode()
+    if all_tokens_by_mode is None:
+        all_tokens_by_mode = _aggregate_tokens_usage_by_mode(
+            _query_tokens_usage_records()
+        )
     
     # 计算今日其他消耗（排除 classification）
     today_input_tokens = 0

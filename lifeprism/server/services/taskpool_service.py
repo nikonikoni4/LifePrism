@@ -14,7 +14,7 @@ from datetime import datetime
 from lifeprism.server.schemas.todo_schemas import (
     TodoItem, TodoListResponse, UpdateTodoResponse,
 )
-from lifeprism.storage.providers import todo_provider
+from lifeprism.storage import todo_store
 from lifeprism.server.services.plandoc_sync_service import (
     insert_todo_to_md,
     update_todo_in_md,
@@ -73,7 +73,7 @@ def get_taskpool(
     Returns:
         TodoListResponse: 任务列表（扁平结构）
     """
-    db_items = todo_provider.get_todos_for_taskpool(
+    db_items = todo_store.get_todos_for_taskpool(
         goal_id=goal_id,
         plan_doc_id=plan_doc_id,
         state=state or "all"
@@ -95,7 +95,7 @@ def get_todos_by_date(date: str) -> TodoListResponse:
     1. 当天 scheduled 状态的任务
     2. 当天 completed 状态的任务
     """
-    db_items = todo_provider.get_todos_by_date(date, include_cross_day=False)
+    db_items = todo_store.get_todos_by_date(date, include_cross_day=False)
 
     filtered_items = [
         item for item in db_items
@@ -120,7 +120,7 @@ def create_todo_v2(data: Dict[str, Any]) -> Optional[TodoItem]:
     # 子任务继承逻辑
     parent_id = data.get('parent_id')
     if parent_id:
-        parent = todo_provider.get_todo_by_id(parent_id)
+        parent = todo_store.get_todo_by_id(parent_id)
         if parent:
             if not data.get('plan_doc_id') and parent.get('plan_doc_id'):
                 data['plan_doc_id'] = parent['plan_doc_id']
@@ -136,11 +136,11 @@ def create_todo_v2(data: Dict[str, Any]) -> Optional[TodoItem]:
         if new_anchor:
             data['id'] = new_anchor
 
-    new_id = todo_provider.create_todo(data)
+    new_id = todo_store.create_todo(data)
     if not new_id:
         return None
 
-    db_item = todo_provider.get_todo_by_id(new_id)
+    db_item = todo_store.get_todo_by_id(new_id)
     if not db_item:
         return None
 
@@ -149,7 +149,7 @@ def create_todo_v2(data: Dict[str, Any]) -> Optional[TodoItem]:
 
 def get_todo_by_id(todo_id: str) -> Optional[TodoItem]:
     """获取单个任务"""
-    db_item = todo_provider.get_todo_by_id(todo_id)
+    db_item = todo_store.get_todo_by_id(todo_id)
     if not db_item:
         return None
     return db_to_todo_item(db_item)
@@ -171,7 +171,7 @@ def update_todo_with_writeback(
     2. content 变更时，更新 MD 中的任务内容
     """
     # 1. 获取现有任务
-    existing = todo_provider.get_todo_by_id(todo_id)
+    existing = todo_store.get_todo_by_id(todo_id)
     if not existing:
         logger.warning(f"任务不存在: {todo_id}")
         return None
@@ -183,7 +183,7 @@ def update_todo_with_writeback(
         updates['actual_finished_at'] = None
 
     # 3. 更新数据库
-    success = todo_provider.update_todo(todo_id, updates)
+    success = todo_store.update_todo(todo_id, updates)
     if not success:
         return None
 
@@ -207,7 +207,7 @@ def update_todo_with_writeback(
             md_synced = md_synced or content_synced
 
     # 5. 获取更新后的任务
-    updated = todo_provider.get_todo_by_id(todo_id)
+    updated = todo_store.get_todo_by_id(todo_id)
     if not updated:
         return None
 
@@ -224,7 +224,7 @@ def delete_todo(todo_id: str) -> bool:
     如果任务关联了计划书，会同步从 MD 文件中删除（id 即锚点）。
     同时级联删除所有子任务。
     """
-    todo = todo_provider.get_todo_by_id(todo_id)
+    todo = todo_store.get_todo_by_id(todo_id)
     if not todo:
         return False
 
@@ -234,5 +234,5 @@ def delete_todo(todo_id: str) -> bool:
     if plan_doc_id:
         delete_todo_from_md(plan_doc_id, anchor_id)
 
-    deleted_count = todo_provider.delete_todo_cascade(todo_id)
+    deleted_count = todo_store.delete_todo_cascade(todo_id)
     return deleted_count > 0

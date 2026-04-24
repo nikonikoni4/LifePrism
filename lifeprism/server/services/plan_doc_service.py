@@ -15,7 +15,7 @@ from lifeprism.server.schemas.goal_schemas import (
     CreatePlanDocRequest,
     UpdatePlanDocRequest,
 )
-from lifeprism.storage.providers import plan_doc_provider
+from lifeprism.storage import plan_doc_store
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -115,9 +115,9 @@ def get_plan_docs(
         PlanDocListResponse: 计划书列表响应
     """
     if goal_id:
-        items = plan_doc_provider.get_plan_docs_by_goal(goal_id)
+        items = plan_doc_store.get_plan_docs_by_goal(goal_id)
     else:
-        items = plan_doc_provider.get_all_plan_docs()
+        items = plan_doc_store.get_all_plan_docs()
 
     plan_doc_items = [_convert_db_item_to_plan_doc_item(item, include_content=False) for item in items]
     return PlanDocListResponse(items=plan_doc_items)
@@ -133,7 +133,7 @@ def get_plan_docs_by_goal(goal_id: str) -> PlanDocListResponse:
     Returns:
         PlanDocListResponse: 计划书列表响应
     """
-    items = plan_doc_provider.get_plan_docs_by_goal(goal_id)
+    items = plan_doc_store.get_plan_docs_by_goal(goal_id)
     plan_doc_items = [_convert_db_item_to_plan_doc_item(item, include_content=False) for item in items]
     return PlanDocListResponse(items=plan_doc_items)
 
@@ -148,7 +148,7 @@ def get_plan_doc_detail(doc_id: str) -> Optional[PlanDocItem]:
     Returns:
         Optional[PlanDocItem]: 计划书详情，不存在返回 None
     """
-    item = plan_doc_provider.get_plan_doc_by_id(doc_id)
+    item = plan_doc_store.get_plan_doc_by_id(doc_id)
     if not item:
         return None
     return _convert_db_item_to_plan_doc_item(item, include_content=True)
@@ -165,7 +165,7 @@ def _check_plan_doc_id_exists(doc_id: str) -> tuple[bool, str]:
         tuple[bool, str]: (是否存在, 冲突来源描述)
     """
     # 检查数据库
-    if plan_doc_provider.get_plan_doc_by_id(doc_id):
+    if plan_doc_store.get_plan_doc_by_id(doc_id):
         return True, "数据库中已存在同名计划书"
 
     # 检查文件系统
@@ -200,7 +200,7 @@ def create_plan_doc(request: CreatePlanDocRequest) -> Optional[PlanDocItem]:
         'goal_id': request.goal_id,
     }
 
-    new_id = plan_doc_provider.create_plan_doc(data)
+    new_id = plan_doc_store.create_plan_doc(data)
     if new_id is None:
         return None
 
@@ -225,7 +225,7 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
         ValueError: 当重命名时新 ID 已存在
     """
     # 先检查文档是否存在
-    existing = plan_doc_provider.get_plan_doc_by_id(doc_id)
+    existing = plan_doc_store.get_plan_doc_by_id(doc_id)
     if not existing:
         logger.warning(f"计划书 {doc_id} 不存在")
         return None
@@ -253,7 +253,7 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
         _write_content_to_file(new_id, content_to_write)
 
         # 3. 数据库层操作：事务更新 ID 和级联引用
-        success = plan_doc_provider.rename_plan_doc(doc_id, new_id)
+        success = plan_doc_store.rename_plan_doc(doc_id, new_id)
 
         if not success:
             logger.error(f"数据库重命名失败，回滚文件操作 (删除 {new_id}.md)")
@@ -262,7 +262,7 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
             
         # 4. 如果还有其他字段需要更新 (status)，则再更新一次新记录
         if 'status' in explicitly_set_fields:
-             plan_doc_provider.update_plan_doc(new_id, {'status': request.status})
+             plan_doc_store.update_plan_doc(new_id, {'status': request.status})
              
         return get_plan_doc_detail(new_id)
 
@@ -274,7 +274,7 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
 
     # 更新数据库 meta
     if update_data:
-        plan_doc_provider.update_plan_doc(doc_id, update_data)
+        plan_doc_store.update_plan_doc(doc_id, update_data)
 
     # 更新文件内容
     if 'content' in explicitly_set_fields:
@@ -296,4 +296,4 @@ def delete_plan_doc(doc_id: str) -> bool:
     # 先删除文件
     _delete_content_file(doc_id)
     # 再删除数据库记录
-    return plan_doc_provider.delete_plan_doc(doc_id)
+    return plan_doc_store.delete_plan_doc(doc_id)

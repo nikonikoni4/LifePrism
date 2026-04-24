@@ -30,7 +30,7 @@ from lifeprism.server.schemas.diary_schemas import (
     GenerateDiaryAISummaryRangeResponse,
     ExistingSummaryMode,
 )
-from lifeprism.storage.providers import diary_provider
+from lifeprism.storage import diary_store
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -195,14 +195,14 @@ def get_diary(date: str) -> Optional[DiaryItem]:
     Returns:
         Optional[DiaryItem]: 日记详情
     """
-    item = diary_provider.get_diary_by_date(date)
+    item = diary_store.get_diary_by_date(date)
     if not item:
         # 自动创建 DB 记录 + 空 md 文件
-        success = diary_provider.create_diary(date)
+        success = diary_store.create_diary(date)
         if not success:
             return None
         _ensure_diary_dir()
-        item = diary_provider.get_diary_by_date(date)
+        item = diary_store.get_diary_by_date(date)
         if not item:
             return None
     return _convert_db_to_diary_item(item, include_content=True)
@@ -219,7 +219,7 @@ def update_diary_meta(date: str, request: UpdateDiaryMetaRequest) -> Optional[Di
     Returns:
         Optional[DiaryItem]: 更新后的日记
     """
-    existing = diary_provider.get_diary_by_date(date)
+    existing = diary_store.get_diary_by_date(date)
     if not existing:
         return None
 
@@ -234,10 +234,10 @@ def update_diary_meta(date: str, request: UpdateDiaryMetaRequest) -> Optional[Di
         update_data['custom_tags'] = json.dumps(request.custom_tags, ensure_ascii=False)
 
     if update_data:
-        diary_provider.update_diary(date, update_data)
+        diary_store.update_diary(date, update_data)
 
     return _convert_db_to_diary_item(
-        diary_provider.get_diary_by_date(date) or existing,
+        diary_store.get_diary_by_date(date) or existing,
         include_content=True
     )
 
@@ -253,16 +253,16 @@ def save_diary_content(date: str, request: SaveDiaryContentRequest) -> Optional[
     Returns:
         Optional[DiaryItem]: 更新后的日记
     """
-    existing = diary_provider.get_diary_by_date(date)
+    existing = diary_store.get_diary_by_date(date)
     if not existing:
         return None
 
     _write_diary_content(date, request.content)
     word_count = _calculate_word_count(request.content)
-    diary_provider.update_diary(date, {'word_count': word_count})
+    diary_store.update_diary(date, {'word_count': word_count})
 
     return _convert_db_to_diary_item(
-        diary_provider.get_diary_by_date(date) or existing,
+        diary_store.get_diary_by_date(date) or existing,
         include_content=True
     )
 
@@ -280,12 +280,12 @@ async def generate_diary_ai_summary(date: str) -> DiaryAISummaryResponse:
     Raises:
         ValueError: 日记为空、日记不存在或 AI 总结无法保存
     """
-    item = diary_provider.get_diary_by_date(date)
+    item = diary_store.get_diary_by_date(date)
     if not item:
         created = get_diary(date)
         if not created:
             raise ValueError(f"日记不存在: {date}")
-        item = diary_provider.get_diary_by_date(date)
+        item = diary_store.get_diary_by_date(date)
         if not item:
             raise ValueError(f"日记不存在: {date}")
 
@@ -301,7 +301,7 @@ async def generate_diary_ai_summary(date: str) -> DiaryAISummaryResponse:
         raise ValueError("AI 总结生成失败")
 
     source_hash = _compute_diary_source_hash(content)
-    success = diary_provider.update_diary(date, {"ai_summary": summary_content, "diary_source_hash": source_hash})
+    success = diary_store.update_diary(date, {"ai_summary": summary_content, "diary_source_hash": source_hash})
     if not success:
         raise ValueError("AI 总结保存失败")
 
@@ -312,7 +312,7 @@ async def generate_diary_ai_summary_range(request: GenerateDiaryAISummaryRangeRe
     """
     按日期范围生成日记 AI 总结，并根据 existing_summary_mode 应用不同策略
     """
-    items = diary_provider.get_diaries_by_date_range(request.start_date, request.end_date)
+    items = diary_store.get_diaries_by_date_range(request.start_date, request.end_date)
 
     # 第一阶段：收集需要处理的项目
     to_process: list[tuple[str, bool]] = []  # (date, is_update)
@@ -383,7 +383,7 @@ def get_diary_list(start_date: str, end_date: str) -> DiaryListResponse:
     Returns:
         DiaryListResponse: 日记 meta 列表
     """
-    items = diary_provider.get_diaries_by_date_range(start_date, end_date)
+    items = diary_store.get_diaries_by_date_range(start_date, end_date)
     meta_items = [_convert_db_to_meta_item(item) for item in items]
     return DiaryListResponse(items=meta_items)
 
