@@ -1,3 +1,10 @@
+## 2026-04-25-electron-native-dialog-focus-loss
+
+- updated_at: 2026-04-25
+- path: `docs/history-bugs/2026-04-25-electron-native-dialog-focus-loss.md`
+- 触发规则：在排查 Electron 应用中使用 window.confirm/alert/prompt 后输入框无法输入、焦点丢失，或 window.electronAPI undefined 错误时阅读
+- 内容摘要：记录了 Electron 原生对话框导致输入框焦点丢失的已知 bug，以及 window.electronAPI 调用缺少可选链和降级方案导致的崩溃问题。包含完整的解决方案和 18 个文件的修复记录。
+
 ## 2026-04-22-multiprocessing-infinite-loop
 
 - updated_at: 2026-04-22
