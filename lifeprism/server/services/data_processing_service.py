@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import pytz
 
 from lifeprism.server.providers import server_lw_data_provider
-from lifeprism.storage.providers import goal_provider
+from lifeprism.storage.providers import goal_provider, tokens_usage_provider
 from lifeprism.processors.data_clean import clean_activitywatch_data
 from lifeprism.llm.classify.main_classify import LLMClassify
 from lifeprism.llm.schemas import classifyState
@@ -741,16 +741,16 @@ class DataProcessingService:
             }
             
             # 读取已有数据并累加
-            existing = self.server_lw_data_provider.get_session_tokens_usage(session_id)
+            existing = tokens_usage_provider.get_tokens_usage_by_session_id(session_id)
             if existing:
                 new_usage['input_tokens'] += existing.get('input_tokens', 0)
                 new_usage['output_tokens'] += existing.get('output_tokens', 0)
                 new_usage['total_tokens'] += existing.get('total_tokens', 0)
                 new_usage['search_count'] += existing.get('search_count', 0)
                 new_usage['result_items_count'] += existing.get('result_items_count', 0)
-            
+
             # 保存到数据库
-            self.server_lw_data_provider.upsert_session_tokens_usage(session_id, new_usage)
+            tokens_usage_provider.upsert_tokens_usage(session_id, new_usage)
             logger.info(f"  [OK] 保存 token 使用数据到 {session_id}: input={new_usage['input_tokens']}, output={new_usage['output_tokens']}, total={new_usage['total_tokens']}")
             
         except Exception as e:

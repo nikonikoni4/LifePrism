@@ -48,12 +48,16 @@ from lifeprism.storage.providers.category_provider import (
     CategoryProvider,
     SubCategoryProvider,
 )
+from lifeprism.storage.providers.tokens_usage_provider import (
+    TokensUsageProvider,
+)
 from lifeprism.utils import LazySingleton
 
 # 创建全局单例（已重构为使用通用方法）
 diary_provider = LazySingleton(DiaryProvider)
 category_provider = LazySingleton(CategoryProvider)
 sub_category_provider = LazySingleton(SubCategoryProvider)
+tokens_usage_provider = LazySingleton(TokensUsageProvider)
 
 __all__ = [
     'DiaryProvider',
@@ -89,4 +93,6 @@ __all__ = [
     'SubCategoryProvider',
     'category_provider',
     'sub_category_provider',
+    'TokensUsageProvider',
+    'tokens_usage_provider',
 ]

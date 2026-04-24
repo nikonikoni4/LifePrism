@@ -1,0 +1,141 @@
+# serializer version: 1
+# name: TestUsageServiceSnapshot.test_get_data_processing_usage_stats_snapshot
+  dict({
+    'all_total_cost': 0.0,
+    'all_total_tokens': 0,
+    'avg_cost': 0.0,
+    'avg_processing_tokens': 0.0,
+    'processing_items': 0,
+    'total_cost': 0.0,
+    'total_tokens': 0,
+  })
+# ---
+# name: TestUsageServiceSnapshot.test_get_other_usage_stats_snapshot
+  dict({
+    'all_total_cost': 0.0,
+    'all_total_tokens': 15455,
+    'total_cost': 0.0,
+    'total_tokens': 0,
+  })
+# ---
+# name: TestUsageServiceSnapshot.test_get_usage_overview_snapshot
+  dict({
+    'all_total_price': 0.0,
+    'all_total_tokens': 15455,
+    'input_tokens': 0,
+    'input_tokens_price': 0.0,
+    'output_tokens': 0,
+    'output_tokens_price': 0.0,
+    'total_price': 0.0,
+    'total_tokens': 0,
+  })
+# ---
+# name: TestUsageServiceSnapshot.test_get_usage_stats_7days_snapshot
+  dict({
+    'items': list([
+      dict({
+        'day': '2026-01-09',
+        'total_cost': 0.0,
+        'total_tokens': 0,
+      }),
+      dict({
+        'day': '2026-01-10',
+        'total_cost': 0.0,
+        'total_tokens': 0,
+      }),
+      dict({
+        'day': '2026-01-11',
+        'total_cost': 0.0,
+        'total_tokens': 0,
+      }),
+      dict({
+        'day': '2026-01-12',
+        'total_cost': 0.0,
+        'total_tokens': 0,
+      }),
+      dict({
+        'day': '2026-01-13',
+        'total_cost': 0.0,
+        'total_tokens': 0,
+      }),
+      dict({
+        'day': '2026-01-14',
+        'total_cost': 0.0,
+        'total_tokens': 0,
+      }),
+      dict({
+        'day': '2026-01-15',
+        'total_cost': 0.0,
+        'total_tokens': 0,
+      }),
+    ]),
+  })
+# ---
+# name: TestUsageServiceSnapshot.test_get_usage_stats_snapshot
+  dict({
+    'data_processing_usage_stats': dict({
+      'all_total_cost': 0.0,
+      'all_total_tokens': 0,
+      'avg_cost': 0.0,
+      'avg_processing_tokens': 0.0,
+      'processing_items': 0,
+      'total_cost': 0.0,
+      'total_tokens': 0,
+    }),
+    'other_usage_stats': dict({
+      'all_total_cost': 0.0,
+      'all_total_tokens': 15455,
+      'total_cost': 0.0,
+      'total_tokens': 0,
+    }),
+    'usage_overview': dict({
+      'all_total_price': 0.0,
+      'all_total_tokens': 15455,
+      'input_tokens': 0,
+      'input_tokens_price': 0.0,
+      'output_tokens': 0,
+      'output_tokens_price': 0.0,
+      'total_price': 0.0,
+      'total_tokens': 0,
+    }),
+    'usage_stats_7days': dict({
+      'items': list([
+        dict({
+          'day': '2026-01-09',
+          'total_cost': 0.0,
+          'total_tokens': 0,
+        }),
+        dict({
+          'day': '2026-01-10',
+          'total_cost': 0.0,
+          'total_tokens': 0,
+        }),
+        dict({
+          'day': '2026-01-11',
+          'total_cost': 0.0,
+          'total_tokens': 0,
+        }),
+        dict({
+          'day': '2026-01-12',
+          'total_cost': 0.0,
+          'total_tokens': 0,
+        }),
+        dict({
+          'day': '2026-01-13',
+          'total_cost': 0.0,
+          'total_tokens': 0,
+        }),
+        dict({
+          'day': '2026-01-14',
+          'total_cost': 0.0,
+          'total_tokens': 0,
+        }),
+        dict({
+          'day': '2026-01-15',
+          'total_cost': 0.0,
+          'total_tokens': 0,
+        }),
+      ]),
+    }),
+  })
+# ---
