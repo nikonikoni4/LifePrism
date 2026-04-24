@@ -5,6 +5,7 @@ Habit Aggregator - 习惯数据聚合层
 提供习惯相关的统一数据视图
 """
 from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta
 from lifeprism.storage.providers.habit_providers import (
     habit_provider,
     habit_challenge_provider,
@@ -41,11 +42,9 @@ class HabitAggregator:
         if not habit:
             return None
 
-        # 获取当前活跃的挑战
-        challenges = self.challenge_provider.get_challenges_by_habit(
-            habit_id, status='active'
-        )
-        habit['current_challenge'] = challenges[0] if challenges else None
+        # 获取当前进行中的挑战
+        current_challenge = self.challenge_provider.get_current_challenge(habit_id)
+        habit['current_challenge'] = current_challenge
 
         return habit
 
@@ -63,12 +62,12 @@ class HabitAggregator:
         """
         habits = self.habit_provider.get_habits(status)
 
-        # 批量获取所有习惯的挑战
+        # 为每个习惯获取当前进行中的挑战
+        # 注意：这里使用循环查询是因为 HabitChallengeProvider 没有提供批量查询接口
+        # 如果未来需要优化性能，应在 Provider 层添加批量查询方法
         for habit in habits:
-            challenges = self.challenge_provider.get_challenges_by_habit(
-                habit['id'], status='active'
-            )
-            habit['current_challenge'] = challenges[0] if challenges else None
+            current_challenge = self.challenge_provider.get_current_challenge(habit['id'])
+            habit['current_challenge'] = current_challenge
 
         return habits
 
@@ -90,14 +89,13 @@ class HabitAggregator:
             return None
 
         # 获取最近的打卡记录
-        from datetime import datetime, timedelta
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days)
 
-        checkins = self.checkin_provider.get_checkins_by_habit(
-            habit_id,
+        checkins = self.checkin_provider.get_checkins_in_date_range(
             start_date=start_date.isoformat(),
-            end_date=end_date.isoformat()
+            end_date=end_date.isoformat(),
+            habit_ids=[habit_id]
         )
 
         habit['stats'] = {
@@ -130,3 +128,10 @@ class HabitAggregator:
 
         logger.info(f"创建习惯 {habit_id}，包含挑战: {challenge_data is not None}")
         return habit_id
+
+
+# ==================== 导出单例 ====================
+
+from lifeprism.utils import LazySingleton
+
+habit_aggregator = LazySingleton(HabitAggregator)
