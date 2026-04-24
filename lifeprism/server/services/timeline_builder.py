@@ -20,7 +20,7 @@ from lifeprism.server.schemas.activity_schemas import (
     ChartSegment,
     BarConfig,
 )
-from lifeprism.server.providers import timeline_provider
+from lifeprism.storage.providers import timeline_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color, get_timeline_category_color
 from lifeprism.server.services.category_service import category_service
 

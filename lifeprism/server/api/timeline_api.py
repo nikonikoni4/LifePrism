@@ -12,7 +12,7 @@ from lifeprism.server.schemas.timeline_schemas import (
 )
 from lifeprism.server.schemas.todo_schemas import BatchDurationRequest, BatchDurationResponse
 from lifeprism.server.services import timeline_service
-from lifeprism.server.providers.timeline_provider import timeline_provider
+from lifeprism.storage.providers.timeline_provider import timeline_provider
 
 router = APIRouter(prefix="/timeline", tags=["Timeline V2"])
 

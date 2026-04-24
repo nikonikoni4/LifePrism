@@ -19,7 +19,7 @@ from lifeprism.server.schemas.todo_schemas import (
     WaidReorderRequest, WaidAddRequest,
 )
 from lifeprism.server.services import taskpool_service
-from lifeprism.server.providers.todo_provider import todo_provider
+from lifeprism.storage.providers.todo_provider import todo_provider
 
 router = APIRouter(prefix="/todos", tags=["Todos"])
 

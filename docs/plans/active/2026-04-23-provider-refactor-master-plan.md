@@ -39,11 +39,14 @@ related_spec:
 
 - [ ] value_provider
 - [ ] commitment_provider
+- [ ] (goal)jounral_provider
+- [ ] being_provider
 
-2. 聚合类的，不应该直接写在provider
+2. 聚合类的(业务类)，不应该直接写在provider
 
 - [ ] statistical_data_providers
 - [ ] report_provider
+- [ ] category_color_privder
 
 3. 废弃的
 - [ ] focus_provider
@@ -51,12 +54,12 @@ related_spec:
 
 4. 直接写在statistical_data_providers内部，没有单独编写的provider（一个表对应一个provider）
 
-- [ ] category_provider（category表）
-- [ ] sub_category_provider（sub_category表）
-- [ ] app_behavior_log_provider（user_app_behavior_log表）
-- [ ] tokens_usage_provider（tokens_usage_log表）
-- [ ] multi_purpose_map_cache_provider（multi_purpose_map_cache表）
-- [ ] single_purpose_map_cache_provider（single_purpose_map_cache表）
+- [x] category_provider（category表）
+- [x] sub_category_provider（sub_category表）
+- [x] app_behavior_log_provider（user_app_behavior_log表）
+- [x] tokens_usage_provider（tokens_usage_log表）
+- [x] multi_purpose_map_cache_provider（multi_purpose_map_cache表）
+- [x] single_purpose_map_cache_provider（single_purpose_map_cache表）
 
 # 聚合层
 
