@@ -82,7 +82,7 @@ class CategoryProvider(LWBaseDataProvider):
         Returns:
             分类记录，不存在返回 None
         """
-        options = QueryOptions(filters={'id': category_id})
+        options = QueryOptions(filters={'id': category_id}, order_by='id')
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
@@ -231,7 +231,7 @@ class SubCategoryProvider(LWBaseDataProvider):
         Returns:
             子分类记录，不存在返回 None
         """
-        options = QueryOptions(filters={'id': sub_category_id})
+        options = QueryOptions(filters={'id': sub_category_id}, order_by='id')
         results, _ = self._generic_query(options)
         return results[0] if results else None
 

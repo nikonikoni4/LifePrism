@@ -46,6 +46,18 @@
       'name': '测试分类',
       'state': 1,
       'subcategories': list([
+        dict({
+          'color': '#f87053',
+          'id': 'sub-346a612c',
+          'name': '测试',
+          'state': 1,
+        }),
+        dict({
+          'color': '#cc2400',
+          'id': 'sub-4dff14d2',
+          'name': '测试',
+          'state': 1,
+        }),
       ]),
     }),
     dict({
