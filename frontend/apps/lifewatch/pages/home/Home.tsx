@@ -24,6 +24,69 @@ const getTodayDate = (): string => {
     return `${year}-${month}-${day}`;
 };
 
+// 缓存键名
+const CACHE_KEY = 'homepage_last_update_date_v1';
+
+// 更新时间边界（使用本地系统时间）
+const UPDATE_BOUNDARY_HOUR = 4;
+
+// 获取当前时间是否 >= 4:00
+const isAfter4AM = (): boolean => {
+    const now = new Date();
+    const hours = now.getHours();
+    return hours >= UPDATE_BOUNDARY_HOUR;
+};
+
+// 获取"有效日期"（4点之前算前一天，使用本地系统时间）
+const getEffectiveDate = (): string => {
+    const now = new Date();
+    if (now.getHours() < UPDATE_BOUNDARY_HOUR) {
+        // 4点之前，算前一天
+        now.setDate(now.getDate() - 1);
+    }
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+// 判断是否需要自动更新
+const shouldAutoUpdate = (): boolean => {
+    // 条件1：当前时间 >= 4:00
+    if (!isAfter4AM()) {
+        console.log(`⏸️ [Home] 当前时间未到4点，跳过自动更新`);
+        return false;
+    }
+
+    // 条件2：今天没有更新过
+    try {
+        const lastUpdate = localStorage.getItem(CACHE_KEY);
+        const effectiveDate = getEffectiveDate();
+        if (lastUpdate === effectiveDate) {
+            console.log(`⏸️ [Home] 今日已更新过（${effectiveDate}），跳过自动更新`);
+            return false;
+        }
+    } catch (error) {
+        console.warn(`⚠️ [Home] localStorage 读取失败，允许更新:`, error);
+        // Fail open: 缓存检查失败时允许更新
+    }
+
+    console.log(`✅ [Home] 满足自动更新条件（时间>=4点 且 今日未更新）`);
+    return true;
+};
+
+// 记录更新日期
+const recordUpdateDate = (): void => {
+    try {
+        const effectiveDate = getEffectiveDate();
+        localStorage.setItem(CACHE_KEY, effectiveDate);
+        console.log(`📝 [Home] 记录更新日期: ${effectiveDate}`);
+    } catch (error) {
+        console.warn(`⚠️ [Home] localStorage 写入失败:`, error);
+        // 写入失败不影响功能，仅记录警告
+    }
+};
+
 const Home: React.FC<HomeProps> = () => {
     const navigate = useNavigate();
     const [selectedDate, setSelectedDate] = useState(getTodayDate());
@@ -54,6 +117,14 @@ const Home: React.FC<HomeProps> = () => {
             return;
         }
 
+        // 生产环境：首次进入时判断是否需要自动更新
+        if (isElectron && refreshKey === 0) {
+            if (!shouldAutoUpdate()) {
+                setLoading(false);
+                return;
+            }
+        }
+
         const fetchHomepageData = async () => {
             const fetchStart = performance.now();
             console.log(`📡 [Home] 开始请求数据...`);
@@ -67,9 +138,13 @@ const Home: React.FC<HomeProps> = () => {
                 const fetchEnd = performance.now();
                 console.log(`✅ [Home] 数据加载完成: ${(fetchEnd - fetchStart).toFixed(0)}ms (API 请求)`);
                 console.log(`✅ [Home] 总渲染时间: ${(fetchEnd - mountTime).toFixed(0)}ms (从组件挂载到数据就绪)`);
+
+                // 数据加载完全成功后才记录更新日期
+                recordUpdateDate();
             } catch (err) {
                 console.error('Failed to fetch homepage data:', err);
                 setError('Failed to load homepage data');
+                // 加载失败时不记录更新日期，允许下次重试
             } finally {
                 setLoading(false);
             }
