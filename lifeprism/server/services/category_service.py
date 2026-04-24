@@ -3,7 +3,12 @@
 实现分类的业务逻辑和数据库操作
 """
 from lifeprism.server.providers import server_lw_data_provider
-from lifeprism.storage.providers import category_provider, sub_category_provider
+from lifeprism.storage.providers import (
+    category_provider,
+    sub_category_provider,
+    multi_purpose_map_cache_provider,
+    single_purpose_map_cache_provider,
+)
 from lifeprism.server.schemas.category_schemas import (
     CategoryTreeResponse,
     CategoryTreeItem,
@@ -36,6 +41,8 @@ class CategoryService:
         # 新的 provider（已重构为使用通用方法）
         self.category_provider = category_provider
         self.sub_category_provider = sub_category_provider
+        self.multi_purpose_map_cache_provider = multi_purpose_map_cache_provider
+        self.single_purpose_map_cache_provider = single_purpose_map_cache_provider
         # 缓存 DataFrame
         self._categories_df = self.server_lw_data_provider.load_categories()
         self._sub_categories_df = self.server_lw_data_provider.load_sub_categories()
@@ -1185,13 +1192,22 @@ class CategoryService:
                     category_name = self.category_name_map.get(str(category_id), None) if category_id else None
                     sub_category_name = self.sub_category_name_map.get(str(sub_category_id), None) if sub_category_id else None
                     goal_name = goal_service.get_goal_name(str(goal_id)) if goal_id else None
-                    
+
+                    # 处理 pandas NaN 值
+                    import pandas as pd
+                    app_description = row.get('app_description')
+                    if pd.isna(app_description):
+                        app_description = None
+                    title_analysis = row.get('title_analysis')
+                    if pd.isna(title_analysis):
+                        title_analysis = None
+
                     items.append(CategoryMapCacheItem(
                         id=str(row['id']),
                         app=row['app'],
-                        app_description=row.get('app_description'),
+                        app_description=app_description,
                         title=row['title'],
-                        title_analysis=row.get('title_analysis'),
+                        title_analysis=title_analysis,
                         category=category_name,
                         sub_category=sub_category_name,
                         category_id=str(category_id) if category_id else None,
@@ -1237,20 +1253,20 @@ class CategoryService:
         return int(cat_row.iloc[0].get('state', 1))
     
     def update_category_map_cache(
-        self, 
-        record_id: str, 
+        self,
+        record_id: str,
         update_fields: dict
     ) -> bool:
         """
         更新 category_map_cache 记录的分类
-        
+
         Args:
             record_id: 记录ID（格式：m-xxx 或 s-xxx）
             update_fields: 需要更新的字段字典，使用 'key in dict' 判断是否需要更新
                 - 字段存在且值为 None：将该字段设为 NULL（清空）
                 - 字段存在且值非 None：更新为新值
                 - 字段不存在：不更新该字段
-        
+
         Returns:
             bool: 是否更新成功
         """
@@ -1259,19 +1275,29 @@ class CategoryService:
             if 'category_id' in update_fields and update_fields['category_id'] is not None:
                 state = self._get_category_state_from_cache(update_fields['category_id'])
                 update_fields['state'] = state
-            
-            result = self.server_lw_data_provider.update_category_map_cache_by_id(
-                record_id=record_id,
-                update_fields=update_fields
-            )
-            
+
+            # 根据 ID 前缀判断使用哪个 provider
+            if record_id.startswith('m-'):
+                result = self.multi_purpose_map_cache_provider.update_multi_purpose_map_cache(
+                    cache_id=record_id,
+                    data=update_fields
+                )
+            elif record_id.startswith('s-'):
+                result = self.single_purpose_map_cache_provider.update_single_purpose_map_cache(
+                    cache_id=record_id,
+                    data=update_fields
+                )
+            else:
+                logger.error(f"无效的 record_id 格式: {record_id}")
+                return False
+
             if result:
                 logger.info(f"成功更新 category_map_cache 记录 ID={record_id} 的分类")
             else:
                 logger.warning(f"未找到 category_map_cache 记录 ID={record_id}")
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"更新 category_map_cache 记录失败: {e}")
             raise
@@ -1283,14 +1309,14 @@ class CategoryService:
     ) -> int:
         """
         批量更新 category_map_cache 记录的分类
-        
+
         Args:
             record_ids: 记录ID列表（格式：m-xxx 或 s-xxx）
             update_fields: 需要更新的字段字典，使用 'key in dict' 判断是否需要更新
                 - 字段存在且值为 None：将该字段设为 NULL（清空）
                 - 字段存在且值非 None：更新为新值
                 - 字段不存在：不更新该字段
-        
+
         Returns:
             int: 成功更新的数量
         """
@@ -1299,15 +1325,30 @@ class CategoryService:
             if 'category_id' in update_fields and update_fields['category_id'] is not None:
                 state = self._get_category_state_from_cache(update_fields['category_id'])
                 update_fields['state'] = state
-            
-            count = self.server_lw_data_provider.batch_update_category_map_cache_by_ids(
-                record_ids=record_ids,
-                update_fields=update_fields
-            )
-            
+
+            # 根据 ID 前缀分组
+            multi_ids = [rid for rid in record_ids if rid.startswith('m-')]
+            single_ids = [rid for rid in record_ids if rid.startswith('s-')]
+
+            count = 0
+
+            # 批量更新 multi_purpose_map_cache
+            if multi_ids:
+                count += self.multi_purpose_map_cache_provider.batch_update_multi_purpose_map_cache(
+                    cache_ids=multi_ids,
+                    data=update_fields
+                )
+
+            # 批量更新 single_purpose_map_cache
+            if single_ids:
+                count += self.single_purpose_map_cache_provider.batch_update_single_purpose_map_cache(
+                    cache_ids=single_ids,
+                    data=update_fields
+                )
+
             logger.info(f"批量更新 {count} 条 category_map_cache 记录的分类")
             return count
-            
+
         except Exception as e:
             logger.error(f"批量更新 category_map_cache 记录失败: {e}")
             raise
@@ -1315,23 +1356,30 @@ class CategoryService:
     def delete_category_map_cache(self, record_id: str) -> bool:
         """
         删除 category_map_cache 记录
-        
+
         Args:
             record_id: 记录ID（格式：m-xxx 或 s-xxx）
-        
+
         Returns:
             bool: 是否删除成功
         """
         try:
-            result = self.server_lw_data_provider.delete_category_map_cache_by_id(record_id)
-            
+            # 根据 ID 前缀判断使用哪个 provider
+            if record_id.startswith('m-'):
+                result = self.multi_purpose_map_cache_provider.delete_multi_purpose_map_cache(record_id)
+            elif record_id.startswith('s-'):
+                result = self.single_purpose_map_cache_provider.delete_single_purpose_map_cache(record_id)
+            else:
+                logger.error(f"无效的 record_id 格式: {record_id}")
+                return False
+
             if result:
                 logger.info(f"成功删除 category_map_cache 记录 ID={record_id}")
             else:
                 logger.warning(f"未找到 category_map_cache 记录 ID={record_id}")
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"删除 category_map_cache 记录失败: {e}")
             raise
@@ -1339,19 +1387,31 @@ class CategoryService:
     def batch_delete_category_map_cache(self, record_ids: list[str]) -> int:
         """
         批量删除 category_map_cache 记录
-        
+
         Args:
             record_ids: 记录ID列表（格式：m-xxx 或 s-xxx）
-        
+
         Returns:
             int: 成功删除的数量
         """
         try:
-            count = self.server_lw_data_provider.batch_delete_category_map_cache_by_ids(record_ids)
-            
+            # 根据 ID 前缀分组
+            multi_ids = [rid for rid in record_ids if rid.startswith('m-')]
+            single_ids = [rid for rid in record_ids if rid.startswith('s-')]
+
+            count = 0
+
+            # 批量删除 multi_purpose_map_cache
+            if multi_ids:
+                count += self.multi_purpose_map_cache_provider.batch_delete_multi_purpose_map_cache(multi_ids)
+
+            # 批量删除 single_purpose_map_cache
+            if single_ids:
+                count += self.single_purpose_map_cache_provider.batch_delete_single_purpose_map_cache(single_ids)
+
             logger.info(f"批量删除 {count} 条 category_map_cache 记录")
             return count
-            
+
         except Exception as e:
             logger.error(f"批量删除 category_map_cache 记录失败: {e}")
             raise
