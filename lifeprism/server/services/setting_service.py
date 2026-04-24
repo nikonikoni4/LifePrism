@@ -299,11 +299,12 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
 
     if migrate_data:
         # 4. 关闭数据库连接池
-        from lifeprism.repository import lw_db_manager, chat_history_db_manager
+
+        from lifeprism.repository import lw_db_manager
+
         logger.info("迁移数据：关闭数据库连接池...")
         try:
             lw_db_manager._close_connection_pool()
-            chat_history_db_manager._close_connection_pool()
         except Exception as e:
             logger.error(f"关闭连接池失败: {e}")
             return MigrateDataPathResponse(

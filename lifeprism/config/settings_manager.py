@@ -54,7 +54,7 @@ class SettingsManager:
         'keyboard_keepalive_seconds': 12,
         'mouse_keepalive_seconds': 6,
         'enter_screenshot_delay_ms': 700,
-        'screenshot_retention_days': 7,
+        'screenshot_retention_days': 3,
         'cleanup_check_interval_seconds': 86400,
         'is_vlm': {},  # Dict[str, bool], key = "provider_id/model_name"
         'screenshot_monitor': False,

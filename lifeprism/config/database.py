@@ -1538,6 +1538,86 @@ WINDOW_EVENTS_CONFIG = {
     'update_at': False,
 }
 
+RAW_BEHAVIOR_ANALYSIS_CONFIG = {
+    'table_name': 'raw_behavior_analysis',
+    'columns': {
+        'start_time': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY', 'NOT NULL'],
+            'comment': '开始时间（YYYY-MM-DD HH:MM:SS 格式）'
+        },
+        'end_time': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '结束时间（YYYY-MM-DD HH:MM:SS 格式）'
+        },
+        'behavior': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '行为描述'
+        },
+        'screen_count': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '截图数量'
+        }
+    },
+    'table_constraints': [
+        'CHECK(end_time > start_time)'
+    ],
+    'indexes': [
+        {'name': 'idx_raw_behavior_start_time', 'columns': ['start_time']},
+        {'name': 'idx_raw_behavior_time_range', 'columns': ['start_time', 'end_time']}
+    ],
+    'timestamps': True,
+    'update_at': False
+}
+
+BEHAVIOR_ANALYSIS_CONFIG = {
+    'table_name': 'behavior_analysis',
+    'columns': {
+        'start_time': {
+            'type': 'TEXT',
+            'constraints': ['PRIMARY KEY', 'NOT NULL'],
+            'comment': '开始时间（YYYY-MM-DD HH:MM:SS 格式）'
+        },
+        'end_time': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '结束时间（YYYY-MM-DD HH:MM:SS 格式）'
+        },
+        'behavior': {
+            'type': 'TEXT',
+            'constraints': ['NOT NULL'],
+            'comment': '行为详细描述'
+        },
+        'behavior_summary': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '行为摘要'
+        },
+        'title': {
+            'type': 'TEXT',
+            'constraints': [],
+            'comment': '行为标题'
+        },
+        'screen_count': {
+            'type': 'INTEGER',
+            'constraints': ['NOT NULL', 'DEFAULT 0'],
+            'comment': '截图数量'
+        }
+    },
+    'table_constraints': [
+        'CHECK(end_time > start_time)'
+    ],
+    'indexes': [
+        {'name': 'idx_behavior_start_time', 'columns': ['start_time']},
+        {'name': 'idx_behavior_time_range', 'columns': ['start_time', 'end_time']}
+    ],
+    'timestamps': True,
+    'update_at': False
+}
+
 
 # 所有表配置的映射
 TABLE_CONFIGS = {
@@ -1575,6 +1655,8 @@ TABLE_CONFIGS = {
     'habit_chain_nodes': HABIT_CHAIN_NODES_CONFIG,
     'screen_captures': SCREEN_CAPTURES_CONFIG,
     'window_events': WINDOW_EVENTS_CONFIG,
+    'raw_behavior_analysis': RAW_BEHAVIOR_ANALYSIS_CONFIG,
+    'behavior_analysis': BEHAVIOR_ANALYSIS_CONFIG,
 }
 
 

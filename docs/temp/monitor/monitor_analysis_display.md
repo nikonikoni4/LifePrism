@@ -86,3 +86,47 @@ HH-MM~ HH-MM
 1. 仅仅前端显示，后端service仅实现提供mock数据不接入具体数据库.mock数据位置test\explore\monitor_prompt\behavior_summary.json
 2. 实现数据库相关内容
 3. 实现两类更新逻辑
+
+
+
+## 数据库实现
+
+整个数据流: 连续数据->bucket计算获取区间->区间直接按照bucket强行切割并单独分析（简化单次分析的长度）,输出表raw_behavior_analysis->区间合并，输出表behavior_analysis
+
+raw_behavior_analysis 原始分析数据表
+时间格式YYYY-MM-DD HH-MM-SS
+```
+start_time : string # primary key 
+end_time : string
+behavior : string
+screen_count ： integer
+create_at ： timestamp
+
+```
+
+behavior_analysis # 经过时间段融合的behavior
+```
+start_time : string # primary key 
+end_time : string
+behavior : string
+behavior_summary : string
+title : string 
+screen_count ： integer
+create_at ： timestamp
+
+
+```
+
+完成
+## 实现两类更新逻辑
+
+1. 现有逻辑修改：修改主页的更新逻辑
+    1. 取消每次进主页的自动更新
+    2. 增加每天自动更新：每天只自动触发一次增量更新
+2. 在这个逻辑上增加截图分析的增量更新
+    触发流程：
+    1. 判断今天是否已经更新过（需要决定这个逻辑前端如何持久化）
+        是->不发送更新请求
+        不是->自动发送更新请求
+                ->更新user_app_behavior_log
+                ->调用
