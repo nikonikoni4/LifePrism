@@ -7,9 +7,9 @@ Habit Aggregator - 习惯数据聚合层
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from lifeprism.storage.providers.habit_providers import (
-    habit_provider,
-    habit_challenge_provider,
-    habit_checkin_provider,
+    HabitProvider,
+    HabitChallengeProvider,
+    HabitCheckinProvider,
 )
 from lifeprism.utils import get_logger
 
@@ -24,9 +24,9 @@ class HabitAggregator:
     """
 
     def __init__(self):
-        self.habit_provider = habit_provider
-        self.challenge_provider = habit_challenge_provider
-        self.checkin_provider = habit_checkin_provider
+        self.habit_provider = HabitProvider()
+        self.challenge_provider = HabitChallengeProvider()
+        self.checkin_provider = HabitCheckinProvider()
 
     def get_habit_with_challenge(self, habit_id: str) -> Optional[Dict[str, Any]]:
         """

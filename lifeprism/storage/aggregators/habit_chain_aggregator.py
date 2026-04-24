@@ -6,8 +6,8 @@ Habit Chain Aggregator - 习惯链数据聚合层
 """
 from typing import Optional, List, Dict, Any
 from lifeprism.storage.providers.habit_chain_providers import (
-    habit_chain_provider,
-    habit_chain_node_provider,
+    HabitChainProvider,
+    HabitChainNodeProvider,
 )
 from lifeprism.utils import get_logger, LazySingleton
 
@@ -22,8 +22,8 @@ class HabitChainAggregator:
     """
 
     def __init__(self):
-        self.chain_provider = habit_chain_provider
-        self.node_provider = habit_chain_node_provider
+        self.chain_provider = HabitChainProvider()
+        self.node_provider = HabitChainNodeProvider()
 
     def get_chain_with_nodes(self, chain_id: int) -> Optional[Dict[str, Any]]:
         """

@@ -7,8 +7,8 @@ Goal Aggregator - 目标数据聚合层
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from lifeprism.storage.providers.goal_providers import (
-    goal_provider,
-    goal_stats_provider,
+    GoalProvider,
+    GoalStatsProvider,
 )
 from lifeprism.utils import get_logger
 
@@ -23,8 +23,8 @@ class GoalAggregator:
     """
 
     def __init__(self):
-        self.goal_provider = goal_provider
-        self.stats_provider = goal_stats_provider
+        self.goal_provider = GoalProvider()
+        self.stats_provider = GoalStatsProvider()
 
     def get_goal_with_stats(
         self, goal_id: str, stats_limit: int = 30

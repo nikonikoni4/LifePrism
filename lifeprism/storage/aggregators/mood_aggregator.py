@@ -6,9 +6,9 @@ Mood Aggregator - 心情数据聚合层
 """
 from typing import Optional, List, Dict, Any
 from lifeprism.storage.providers.mood_providers import (
-    mood_type_provider,
-    mood_entry_provider,
-    mood_impact_provider,
+    MoodTypeProvider,
+    MoodEntryProvider,
+    MoodImpactProvider,
 )
 from lifeprism.utils import get_logger
 
@@ -23,9 +23,9 @@ class MoodAggregator:
     """
 
     def __init__(self):
-        self.type_provider = mood_type_provider
-        self.entry_provider = mood_entry_provider
-        self.impact_provider = mood_impact_provider
+        self.type_provider = MoodTypeProvider()
+        self.entry_provider = MoodEntryProvider()
+        self.impact_provider = MoodImpactProvider()
 
     def get_mood_entry_with_type(self, entry_id: str) -> Optional[Dict[str, Any]]:
         """
