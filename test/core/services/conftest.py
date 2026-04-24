@@ -145,3 +145,135 @@ def use_tokens_usage_test_data(prepare_tokens_usage_test_data):
     """
     return prepare_tokens_usage_test_data
 
+
+@pytest.fixture(scope="session")
+def prepare_cache_test_data(test_data_path):
+    """
+    准备 multi_purpose_map_cache 和 single_purpose_map_cache 测试数据
+
+    创建多条缓存记录，确保测试数据非空。
+    """
+    # 确保数据库已初始化
+    from lifeprism.config.settings_manager import settings
+    settings._initialize()
+
+    import uuid
+    from lifeprism.storage.providers import category_provider, sub_category_provider
+
+    # 确保有测试分类数据
+    # 创建测试主分类
+    test_category_id = "test_work"
+    category_provider.insert_category({
+        'id': test_category_id,
+        'name': '测试工作',
+        'color': '#5B8FF9',
+        'state': 1
+    })
+
+    # 创建测试子分类
+    test_sub_category_id = "test_coding"
+    sub_category_provider.insert_sub_category({
+        'id': test_sub_category_id,
+        'category_id': test_category_id,
+        'name': '测试编码',
+        'state': 1
+    })
+
+    # 准备测试数据
+    multi_purpose_records = []
+    single_purpose_records = []
+
+    # 创建 multi_purpose_map_cache 测试数据（多用途应用，需要 title 区分）
+    multi_apps = [
+        ('chrome.exe', 'GitHub - Pull Request', 'Chrome浏览器', 'GitHub代码审查'),
+        ('chrome.exe', 'YouTube - Video', 'Chrome浏览器', 'YouTube视频'),
+        ('code.exe', 'main.py - VSCode', 'VSCode编辑器', '编辑Python文件'),
+        ('code.exe', 'test.js - VSCode', 'VSCode编辑器', '编辑JavaScript文件'),
+    ]
+
+    for app, title, app_desc, title_analysis in multi_apps:
+        multi_purpose_records.append({
+            'id': f"m-{uuid.uuid4().hex[:8]}",
+            'app': app,
+            'title': title,
+            'app_description': app_desc,
+            'title_analysis': title_analysis,
+            'category_id': test_category_id,
+            'sub_category_id': test_sub_category_id,
+            'state': 1,
+            'link_to_goal_id': None
+        })
+
+    # 创建 single_purpose_map_cache 测试数据（单用途应用，不需要 title）
+    single_apps = [
+        ('pycharm.exe', 'PyCharm IDE', 'PyCharm集成开发环境'),
+        ('notepad++.exe', 'Notepad++', 'Notepad++文本编辑器'),
+        ('git.exe', 'Git', 'Git版本控制工具'),
+    ]
+
+    for app, title, app_desc in single_apps:
+        single_purpose_records.append({
+            'id': f"s-{uuid.uuid4().hex[:8]}",
+            'app': app,
+            'title': title,
+            'app_description': app_desc,
+            'category_id': test_category_id,
+            'sub_category_id': test_sub_category_id,
+            'state': 1,
+            'link_to_goal_id': None
+        })
+
+    # 插入数据到数据库
+    from lifeprism.storage import Database
+    db = Database()
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+
+        # 清理可能存在的测试数据
+        cursor.execute("DELETE FROM multi_purpose_map_cache WHERE id LIKE 'm-%'")
+        cursor.execute("DELETE FROM single_purpose_map_cache WHERE id LIKE 's-%'")
+        conn.commit()
+
+        # 插入 multi_purpose_map_cache 数据
+        for record in multi_purpose_records:
+            cursor.execute("""
+                INSERT INTO multi_purpose_map_cache
+                (id, app, title, app_description, title_analysis, category_id, sub_category_id, state, link_to_goal_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                record['id'], record['app'], record['title'], record['app_description'],
+                record['title_analysis'], record['category_id'], record['sub_category_id'],
+                record['state'], record['link_to_goal_id']
+            ))
+
+        # 插入 single_purpose_map_cache 数据
+        for record in single_purpose_records:
+            cursor.execute("""
+                INSERT INTO single_purpose_map_cache
+                (id, app, title, app_description, category_id, sub_category_id, state, link_to_goal_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                record['id'], record['app'], record['title'], record['app_description'],
+                record['category_id'], record['sub_category_id'], record['state'], record['link_to_goal_id']
+            ))
+
+        conn.commit()
+
+    return {
+        'multi_purpose_records': multi_purpose_records,
+        'single_purpose_records': single_purpose_records,
+        'test_category_id': test_category_id,
+        'test_sub_category_id': test_sub_category_id
+    }
+
+
+@pytest.fixture(scope="function")
+def use_cache_test_data(prepare_cache_test_data):
+    """
+    在测试函数中使用准备好的 cache 数据
+
+    这个 fixture 确保数据在每个测试前都已准备好。
+    """
+    return prepare_cache_test_data
+

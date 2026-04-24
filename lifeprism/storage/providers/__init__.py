@@ -51,6 +51,10 @@ from lifeprism.storage.providers.category_provider import (
 from lifeprism.storage.providers.tokens_usage_provider import (
     TokensUsageProvider,
 )
+from lifeprism.storage.providers.map_cache_providers import (
+    MultiPurposeMapCacheProvider,
+    SinglePurposeMapCacheProvider,
+)
 from lifeprism.utils import LazySingleton
 
 # 创建全局单例（已重构为使用通用方法）
@@ -58,6 +62,8 @@ diary_provider = LazySingleton(DiaryProvider)
 category_provider = LazySingleton(CategoryProvider)
 sub_category_provider = LazySingleton(SubCategoryProvider)
 tokens_usage_provider = LazySingleton(TokensUsageProvider)
+multi_purpose_map_cache_provider = LazySingleton(MultiPurposeMapCacheProvider)
+single_purpose_map_cache_provider = LazySingleton(SinglePurposeMapCacheProvider)
 
 __all__ = [
     'DiaryProvider',
@@ -95,4 +101,8 @@ __all__ = [
     'sub_category_provider',
     'TokensUsageProvider',
     'tokens_usage_provider',
+    'MultiPurposeMapCacheProvider',
+    'SinglePurposeMapCacheProvider',
+    'multi_purpose_map_cache_provider',
+    'single_purpose_map_cache_provider',
 ]
