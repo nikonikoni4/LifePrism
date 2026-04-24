@@ -89,7 +89,16 @@ def create_mood_entry(request):
 
 ### 步骤 1: 构建 Service 快照测试
 
-**确认需要重构的provider**:在开始之前确认需要重构的所有provider
+流程：
+```
+1. 寻找所有该provider涉及到的service，确保service不会遗漏
+2. 确保当前的数据库是有测试数据，不能让快照测试在没有任何数据的情况下进行
+3. 按照快照测试构建方法，并且参考其他快照测试，构建当前provider的快照测试
+
+```
+
+
+
 
 **寻找所有该provider涉及到的service**：确保service不会遗漏
 

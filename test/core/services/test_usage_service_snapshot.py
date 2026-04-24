@@ -41,7 +41,7 @@ def sanitize_usage_stats(data: dict) -> dict:
 class TestUsageServiceSnapshot:
     """Usage Service 快照测试"""
 
-    def test_get_usage_stats_snapshot(self, snapshot: SnapshotAssertion):
+    def test_get_usage_stats_snapshot(self, use_tokens_usage_test_data, snapshot: SnapshotAssertion):
         """
         测试 get_usage_stats() 方法
 
@@ -56,7 +56,7 @@ class TestUsageServiceSnapshot:
         sanitized = sanitize_usage_stats(result.model_dump())
         assert sanitized == snapshot
 
-    def test_get_usage_overview_snapshot(self, snapshot: SnapshotAssertion):
+    def test_get_usage_overview_snapshot(self, use_tokens_usage_test_data, snapshot: SnapshotAssertion):
         """
         测试 get_usage_overview() 方法
 
@@ -70,7 +70,7 @@ class TestUsageServiceSnapshot:
         sanitized = sanitize_usage_stats(result.model_dump())
         assert sanitized == snapshot
 
-    def test_get_usage_stats_7days_snapshot(self, snapshot: SnapshotAssertion):
+    def test_get_usage_stats_7days_snapshot(self, use_tokens_usage_test_data, snapshot: SnapshotAssertion):
         """
         测试 get_usage_stats_7days() 方法
 
@@ -84,7 +84,7 @@ class TestUsageServiceSnapshot:
         sanitized = sanitize_usage_stats(result.model_dump())
         assert sanitized == snapshot
 
-    def test_get_data_processing_usage_stats_snapshot(self, snapshot: SnapshotAssertion):
+    def test_get_data_processing_usage_stats_snapshot(self, use_tokens_usage_test_data, snapshot: SnapshotAssertion):
         """
         测试 get_data_processing_usage_stats() 方法
 
@@ -98,7 +98,7 @@ class TestUsageServiceSnapshot:
         sanitized = sanitize_usage_stats(result.model_dump())
         assert sanitized == snapshot
 
-    def test_get_other_usage_stats_snapshot(self, snapshot: SnapshotAssertion):
+    def test_get_other_usage_stats_snapshot(self, use_tokens_usage_test_data, snapshot: SnapshotAssertion):
         """
         测试 get_other_usage_stats() 方法
 
