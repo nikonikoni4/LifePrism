@@ -55,7 +55,15 @@ class Channel:
 
     async def send(self, content: str, session_id: str | None = None,
                    type: str = "chat", extra: dict | None = None) -> str:
-        """发送消息并等待结果"""
+        """发送消息并等待结果
+        args:
+            content: 消息内容
+            session_id: 会话ID
+            type: 消息类型
+            extra: 额外信息
+        return:
+            消息回复内容
+        """
         self._ensure_receive_task()
         await self._wait_for_rate_limit()
         # 1. 创建消息
@@ -121,4 +129,4 @@ class Channel:
 
 #     asyncio.run(main())
 
-channel_manager = LazySingleton(Channel, bus=bus)  # 懒初始化代理
+channel_manager :Channel= LazySingleton(Channel, bus=bus)  # 懒初始化代理

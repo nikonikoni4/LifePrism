@@ -8,6 +8,7 @@
 3. 查询每个 chunk 的 active 截图
 4. 调用 LLM 分析截图语义
 """
+import asyncio
 import os
 import base64
 import mimetypes
@@ -20,7 +21,7 @@ from lifeprism.llm.channel.manager import channel_manager
 from lifeprism.llm.bus.events import MessageType
 from lifeprism.config import settings
 from lifeprism.utils import get_logger
-
+from lifeprism.storage import raw_behavior_analysis_store
 logger = get_logger(__name__)
 
 # ==================== 常量配置 ====================
@@ -96,59 +97,6 @@ None
 DENSITY_THRESHOLD = 0.6
 MIN_DURATION_MINUTES = 6
 CHUNK_MINUTES = 15
-
-# 语义合并的系统提示词将原来CHUNK_MINUTES的语义进行合并。
-# 输入的数据是：分析输出的所有数据
-MERGE_SYSTEMP_PROMPT=f"""
-    ## task
-    你需要对输入的行为语义进行合并，使得相似且相邻的行为得以合并，并且进一步推断其行为，使得不相邻或语义不同的行为分离
-
-    ## 核心原则
-    宁愿合并也不要将行为分离的过于分散。即有明显行为变化的时间段才需要分离。
-
-    ## 时间段合并条件
-    <合并条件>
-    1. 两个时间段相邻（间隔不超过{CHUNK_MINUTES}min）
-    2. 对于两个相邻的时间段A和B，分情况讨论：
-        <情况1>
-            情况：A时间段和B时间段进行着符合用户的某一个目的，逻辑一致或同类型的行为
-            例子：
-                1. A时间段在做符合用户某一个目的的任务，B时间段也在做符合用户该目的的任务
-                2. A时间段在编写某一个功能，B时间段在调试该功能，具有时间连续性和一致性
-                2. A时间段在视频网站查看某个视频，B时间段在某个视频网站查看另一个视频，都属于娱乐行为
-            
-        </情况1>
-        <情况2>
-            情况：A时间段和B时间段做着完全不属于用户同一目的，逻辑不一致，不同类型的的行为，需要分离
-            动作：分离
-            例子：
-                1. A时间段在看电视，B时间段在做工作相关的内容
-        </情况2>
-
-        <情况3>
-            情况：A时间段或B时间段段内部分动作可以合并，但是有不能合并的动作
-            动作：按比例分离
-            例子：A时间段进行不可合并的事件a和b，而B时间段做事件b，则事件a按比例分离为独立内容，剩余时间和行为合并到时间段B
-        <情况3>
-
-    </合并条件>
-
-    ## 行为语义合并和分离步骤
-    <执行步骤>
-    1. 对接收到的每个时间段数据进行按照时间顺序进行判断，从第一个时间段开始判断
-    2. 判断该时间段之后是否有相邻的时间段：
-        a. 不存在，则直接对这个时间段的行为（包括已经合并进这个时间段的内容）进行总结
-        b. 存在，判断该时间段行为与下一时间段行为是否可以合并，判断规则见《时间段合并条件》部分
-            1) 可以，则把这两段时间段合并为一段，回到步骤2. 
-            2）不可以，则对这个时间段的所有行为（包括合并的内容）进行总结
-    </执行步骤>
-
-
-    ## 不要做的事情
-
-    1. 将事件分的过于细致。当你没有把握的时候，不要进行分离，尽可能合并，这样得到的结果不会违反核心原则：**宁愿合并也不要将行为分离的过于分散**
-"""
-
 
 # ==================== 辅助函数 ====================
 
@@ -276,8 +224,8 @@ async def analyze_chunk_screenshots(
     chunk: Dict[str, str],
     screenshots: List[Dict[str, Any]],
     todolist: Optional[str] = None
-) -> Optional[str]:
-    """分析单个 chunk 的截图语义（只使用单数序号的截图：1、3、5...）
+) -> Optional[RawBehaviorAnalysisItem]:
+    """分析单个 chunk 的截图语义
 
     Args:
         chunk: 时间段字典，包含 start 和 end
@@ -285,20 +233,14 @@ async def analyze_chunk_screenshots(
         todolist: 用户今日目标文本（可选）
 
     Returns:
-        Optional[str]: LLM 分析结果，失败返回 None
+        Optional[RawBehaviorAnalysisItem]: LLM 分析结果，失败返回 None
     """
     if not screenshots:
         return None
 
-    # 过滤：只保留单数序号的截图（1、3、5... 即 index 0, 2, 4...）
-    odd_index_screenshots = screenshots[::2]
-
-    if not odd_index_screenshots:
-        return None
-
     # 准备图片消息
     content_parts = []
-    for sc in odd_index_screenshots:
+    for sc in screenshots:
         app = sc.get("window_app", "")
         title = sc.get("window_title", "")[:50]
         captured_at = sc.get("captured_at", "")
@@ -329,11 +271,23 @@ async def analyze_chunk_screenshots(
 
 
     try:
-        response :LLMResponse= await channel_manager.send(
+        response :str= await channel_manager.send(
             content = user_content,
             type = MessageType.GENERAL_TASK,
             extra = {'ANALYSIS_SYSTEM_PROMPT' : ANALYSIS_SYSTEM_PROMPT })
-        return response if response else None
+
+        if response:
+            data = {
+                'start_time' : chunk['start'],
+                'end_time' : chunk['end'],
+                'screenshot_count' : len(screenshots),
+                'behavior' : f"{chunk['start']} ~ {chunk['end']}\n behavior: {response} \n"
+            }
+            
+            raw_behavior_analysis_store.create_raw_behavior(data)
+            return data 
+        else:
+            return None
     except Exception as e:
         logger.error(f"LLM 调用失败: {e}", exc_info=True)
         return None
@@ -342,6 +296,7 @@ async def analyze_chunk_screenshots(
 async def screenshot_analysis(
     start_time: str,
     end_time: str,
+    todolist: str,
     density_threshold: float = DENSITY_THRESHOLD,
     min_duration_minutes: int = MIN_DURATION_MINUTES,
     chunk_minutes: int = CHUNK_MINUTES
@@ -351,22 +306,23 @@ async def screenshot_analysis(
     步骤：
     1. 获取高密度时间段（复用时间密度分割）
     2. 将高密度时间段以指定分钟数进行切分
-    3. 对每个 chunk 查询 active 截图（稀释一半，只保留单数序号）
+    3. 对每个 chunk 查询 active 截图
     4. 调用 LLM 分析截图语义
 
     Args:
         start_time: 开始时间（YYYY-MM-DD HH:MM:SS 格式）
         end_time: 结束时间（YYYY-MM-DD HH:MM:SS 格式）
+        todolist: 用户目标列表文本
         density_threshold: 密度阈值（默认 0.6）
         min_duration_minutes: 最小时长（默认 6 分钟）
         chunk_minutes: chunk 大小（默认 15 分钟）
 
     Returns:
         List[Dict[str, Any]]: 分析结果列表，每项包含：
-            - chunk: 时间段信息
-            - screenshot_count: 原始截图数量
-            - filtered_count: 过滤后截图数量
-            - analysis_result: LLM 分析结果
+            - start_time: 开始时间（YYYY-MM-DD HH:MM:SS 格式）
+            - end_time: 结束时间（YYYY-MM-DD HH:MM:SS 格式）
+            - screenshot_count: 截图数量
+            - behavior: 分析结果
     """
     logger.info(f"开始截图语义分析: {start_time} -> {end_time}")
 
@@ -405,37 +361,38 @@ async def screenshot_analysis(
         all_chunks.extend(chunks)
     logger.info(f"切分为 {len(all_chunks)} 个 {chunk_minutes} 分钟块")
 
-    # Step 4: 获取目标列表
-    start_date = datetime.fromisoformat(start_time).strftime("%Y-%m-%d")
-    end_date = datetime.fromisoformat(end_time).strftime("%Y-%m-%d")
-    todolist = get_todolist(start_date, end_date)
-
-    # Step 5: 分析每个 chunk
+    # Step 4: 分析每个 chunk
     results = []
+    pending_chunks: List[Dict[str, Any]] = []
+    analysis_tasks = []
     for i, chunk in enumerate(all_chunks, 1):
         chunk_start = chunk["start"]
         chunk_end = chunk["end"]
 
         screenshots = get_active_screenshots(chunk_start, chunk_end)
         screenshot_count = len(screenshots)
-        filtered_count = len(screenshots[::2])
 
         logger.debug(
             f"[{i}/{len(all_chunks)}] {chunk_start} -> {chunk_end}, "
-            f"原始截图: {screenshot_count}, 过滤后: {filtered_count}"
+            f"截图数量: {screenshot_count}"
         )
 
         if not screenshots:
             continue
 
-        analysis_result = await analyze_chunk_screenshots(chunk, screenshots, todolist)
-
-        results.append({
+        pending_chunks.append({
             "chunk": chunk,
             "screenshot_count": screenshot_count,
-            "filtered_count": filtered_count,
-            "analysis_result": analysis_result
         })
+        analysis_tasks.append(
+            analyze_chunk_screenshots(chunk, screenshots, todolist)
+        )
+
+    if analysis_tasks:
+        analysis_results = await asyncio.gather(*analysis_tasks)
+        for analysis_result in analysis_results:
+            if analysis_result:
+                results.append(analysis_result)
 
     logger.info(f"截图语义分析完成，共分析 {len(results)} 个 chunk")
     return results
@@ -445,9 +402,13 @@ async def behavior_summary(bahaviors : str,todolist:str)->str:
     """
     对输入的行为内容进行总结
     args ：
-        behaviors : 输入的行为
+        todolist : 用户今日目标文本（可选）
+        bahaviors : 输入的行为
     return :
-        行为总结
+        行为总结json字符串
+        包含字段：
+        - behavior_summary : 行为总结，不超过150字
+        - title : 行为标题，对于行为的极致压缩，不超过30个字（一个英文单词算一个字符）
     """
     if not bahaviors:
         raise ValueError("输入行为为空")
