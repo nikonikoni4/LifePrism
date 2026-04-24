@@ -5,8 +5,8 @@ from pathlib import Path
 from lifeprism.monitor.provider.screenshot_data_provider import ScreenshotDataProvider
 from lifeprism.monitor.screenshot.models import CaptureReason, CaptureRequest
 from lifeprism.monitor.screenshot.store import ScreenshotStore
-from lifeprism.storage.database_manager import DatabaseManager
-from lifeprism.storage.lw_table_manager import LWTableManager
+from lifeprism.repository.database_manager import DatabaseManager
+from lifeprism.repository.lw_table_manager import LWTableManager
 
 
 class FakeCaptureBackend:

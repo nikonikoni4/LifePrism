@@ -19,13 +19,13 @@
 lifeprism/
 ├── config/
 │   └── database.py              # 表结构定义
-├── storage/
+├── repository/
 │   ├── database_manager.py      # 数据库连接管理
 │   ├── base_providers/
 │   │   └── lw_base_data_provider.py  # 基类
 │   └── migrations/              # 数据库迁移
 ├── server/
-│   ├── providers/               # ❌ 20+ provider类（应该在storage）
+│   ├── providers/               # ❌ 20+ provider类（应该在repository）
 │   │   ├── goal_provider.py
 │   │   ├── todo_provider.py
 │   │   └── ...
@@ -75,7 +75,7 @@ lifeprism/
 │   ├── settings_manager.py      # 用户设置（保持不变）
 │   └── providers.yaml            # LLM提供商配置（保持不变）
 │
-├── storage/                      # 🎯 数据存储层（核心重构区域）
+├── repository/                      # 🎯 数据存储层（核心重构区域）
 │   ├── schemas.py                # ✅ 表结构定义（从config/database.py迁移）
 │   ├── database_manager.py       # 数据库连接管理（保持不变）
 │   │
@@ -104,7 +104,7 @@ lifeprism/
 │   └── schemas/                  # API schemas（保持不变，不移动）
 │
 └── llm/                          # LLM模块
-    ├── services/                 # 🆕 LLM业务逻辑（直接使用storage.providers）
+    ├── services/                 # 🆕 LLM业务逻辑（直接使用repository.providers）
     └── ...                       # 删除llm/providers/dataset_providers/
 ```
 
@@ -112,8 +112,8 @@ lifeprism/
 
 | 层级 | 位置 | 职责 | 示例 |
 |------|------|------|------|
-| **Provider** | `storage/providers/` | 原子的数据库操作，通用、可复用 | `query_todos(filters, sort, page)` |
-| **Aggregator** | `storage/aggregators/` | 组合多个provider调用，数据聚合计算 | `aggregate_daily_stats()` 调用多个provider |
+| **Provider** | `repository/providers/` | 原子的数据库操作，通用、可复用 | `query_todos(filters, sort, page)` |
+| **Aggregator** | `repository/aggregators/` | 组合多个provider调用，数据聚合计算 | `aggregate_daily_stats()` 调用多个provider |
 | **Service** | `server/services/` 或 `llm/services/` | 业务逻辑、事务协调、外部调用 | `complete_todo()` 更新数据库 + 发送通知 |
 
 ### 2.3 schemas.py迁移说明
@@ -121,12 +121,12 @@ lifeprism/
 **迁移原因**：
 - 表结构定义是存储层的一部分，不是应用配置
 - 与migrations、providers在同一模块，内聚性更高
-- 修改表结构时，在storage模块内完成所有相关修改（schema + migration + provider）
+- 修改表结构时，在repository模块内完成所有相关修改（schema + migration + provider）
 
 **迁移步骤**：
 
-1. 创建`storage/schemas.py`，复制`config/database.py`的表结构定义部分
-3. 更新storage模块内的导入（migrations、providers）
+1. 创建`repository/schemas.py`，复制`config/database.py`的表结构定义部分
+3. 更新repository模块内的导入（migrations、providers）
 4. 验证后删除`config/database.py`
 
 ---
@@ -136,7 +136,7 @@ lifeprism/
 ### 3.1 文件组织规范
 
 ```python
-# storage/providers/todo_provider.py
+# repository/providers/todo_provider.py
 """
 Todo数据提供者
 
@@ -146,7 +146,7 @@ Todo数据提供者
 - 返回原始数据（Dict），不做业务转换
 """
 from typing import Optional, List, Dict, Any, Tuple
-from lifeprism.storage import LWBaseDataProvider
+from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import LazySingleton
 
 class TodoProvider(LWBaseDataProvider, metaclass=LazySingleton):
@@ -671,7 +671,7 @@ def test_get_diary_by_date_snapshot(diary_service, test_date, snapshot):
 | **阶段3** | 1周 | LLM前置（goal） | 确保LLM分类功能可用 |
 | **阶段4** | 1周 | 核心业务（todo） | 充分测试后迁移 |
 | **阶段5** | 1周 | 复杂provider（statistical_data） | 完整回归测试 |
-| **阶段6** | 3天 | 提取aggregator | 创建storage/aggregators/ |
+| **阶段6** | 3天 | 提取aggregator | 创建repository/aggregators/ |
 | **阶段7** | 3天 | LLM模块集成 + 清理 | 删除旧代码，全量测试 |
 
 **总计**：约5-6周
@@ -686,7 +686,7 @@ def test_get_diary_by_date_snapshot(diary_service, test_date, snapshot):
 - [ ] 提交快照到git
 
 **步骤2：重构provider**（1-2天）
-- [ ] 在`storage/providers/`创建新provider
+- [ ] 在`repository/providers/`创建新provider
 - [ ] 实现5个核心方法（query/get/create/update/delete）
 - [ ] 实现特殊方法（批量操作、统计查询等）
 - [ ] 编写provider单元测试
@@ -710,7 +710,7 @@ def test_get_diary_by_date_snapshot(diary_service, test_date, snapshot):
 | 天数 | 任务 | 产出 |
 |------|------|------|
 | Day 1 | 编写diary_service快照测试 | `tests/services/test_diary_service_snapshot.py` |
-| Day 2 | 重构diary_provider | `storage/providers/diary_provider.py` |
+| Day 2 | 重构diary_provider | `repository/providers/diary_provider.py` |
 | Day 3 | 替换调用 + 验证 | 所有快照测试通过 |
 
 **试点2：mood_provider**（2天，流程已熟悉）
@@ -731,7 +731,7 @@ def test_get_diary_by_date_snapshot(diary_service, test_date, snapshot):
 | 架构 | 需要修改的位置 | 维护成本 |
 |------|--------------|---------|
 | **当前** | 1. 数据库迁移脚本<br>2. `server/providers/todo_provider.py`<br>3. `llm/providers/dataset_providers/llm_dataset_provider.py`<br>4. 各自的schemas | 🔴 高：需要在多个模块中搜索 |
-| **优化后** | 1. 数据库迁移脚本<br>2. `storage/providers/todo_provider.py`<br>3. 共享的schemas | 🟢 低：只需修改一处 |
+| **优化后** | 1. 数据库迁移脚本<br>2. `repository/providers/todo_provider.py`<br>3. 共享的schemas | 🟢 低：只需修改一处 |
 
 ### 7.2 代码复用提升
 
@@ -741,7 +741,7 @@ def test_get_diary_by_date_snapshot(diary_service, test_date, snapshot):
 
 ### 7.3 架构清晰度提升
 
-- 模块职责清晰：storage（数据层）、server（业务层）、llm（AI层）
+- 模块职责清晰：repository（数据层）、server（业务层）、llm（AI层）
 - 依赖方向正确：业务层 → 数据层
 - 符合主流实践：与Django、SQLAlchemy等框架一致
 

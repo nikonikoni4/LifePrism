@@ -68,7 +68,7 @@ templates/
 
 ### `initialize_resources()` — 启动时按需复制
 
-**代码位置**: `lifeprism/storage/resource_initializer.py`
+**代码位置**: `lifeprism/repository/resource_initializer.py`
 
 **调用时机**: `lifespan` 阶段（FastAPI 应用启动时）
 
@@ -140,7 +140,7 @@ def initialize_resources() -> None:
 
 | 目录/文件 | 创建时机 | 代码位置 |
 |----------|----------|----------|
-| `dataset/*.db` | 首次 import `lifeprism.storage` | `lifeprism/storage/__init__.py:11-17` |
+| `dataset/*.db` | 首次 import `lifeprism.repository` | `lifeprism/repository/__init__.py:11-17` |
 | `debug_logs/` | 首次调用 `setup_file_logging()` | `lifeprism/utils/logger.py:47` |
 | `config/config.yaml` | 首次调用 `_save_config()` | `lifeprism/config/settings_manager.py:198` |
 
@@ -200,9 +200,9 @@ PyInstaller 打包时复制 `templates/` 到 `pyinstaller-dist/`，但后续对�
 
 | 文件 | 说明 |
 |------|------|
-| `lifeprism/storage/resource_initializer.py` | 资源初始化实现 |
+| `lifeprism/repository/resource_initializer.py` | 资源初始化实现 |
 | `lifeprism/server/services/setting_service.py` | 数据迁移实现（含 `_EXCLUDED_SUBDIRS` 黑名单） |
-| `lifeprism/storage/__init__.py` | 数据库懒加载创建 |
+| `lifeprism/repository/__init__.py` | 数据库懒加载创建 |
 | `lifeprism/utils/logger.py` | 日志目录懒加载创建 |
 | `lifeprism/config/settings_manager.py` | 配置保存、`_save_config` |
 | `lifeprism.spec` | PyInstaller 打包配置（`datas=[('templates', 'templates')]`） |

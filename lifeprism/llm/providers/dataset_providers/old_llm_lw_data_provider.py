@@ -7,7 +7,7 @@ import logging
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
 
-from lifeprism.storage import LWBaseDataProvider
+from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import LazySingleton
 from lifeprism.server.services.timeline_builder import slice_events_by_time_range
 

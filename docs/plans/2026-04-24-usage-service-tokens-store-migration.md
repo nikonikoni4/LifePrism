@@ -3,7 +3,7 @@ version: 1.0
 created_at: 2026-04-24
 updated_at: 2026-04-24
 last_updated: 创建 usage_service 切换到 tokens_usage_store 的实施计划
-abstract: 将 usage_service 的 token 统计来源从 server_lw_data_provider 迁移到 lifeprism.storage.tokens_usage_store，优先使用 query_tokens_usage 通用方法并在 service 层完成聚合。
+abstract: 将 usage_service 的 token 统计来源从 server_lw_data_provider 迁移到 lifeprism.repository.tokens_usage_store，优先使用 query_tokens_usage 通用方法并在 service 层完成聚合。
 title: usage_service 切换到 tokens_usage_store 实施计划
 status: active
 related_spec:
@@ -13,9 +13,9 @@ related_spec:
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** 将 `usage_service.py` 的统计数据来源替换为 `lifeprism.storage.tokens_usage_store`，不修改 `tokens_usage_store` 既有方法语义。  
+**Goal:** 将 `usage_service.py` 的统计数据来源替换为 `lifeprism.repository.tokens_usage_store`，不修改 `tokens_usage_store` 既有方法语义。  
 **Architecture:** 在 `usage_service` 内通过 `tokens_usage_store.query_tokens_usage()` 拉取明细数据，并以私有聚合函数复刻旧接口输出结构（按日、按 mode、全量汇总），保持返回 schema 与价格计算逻辑不变。  
-**Tech Stack:** Python, Storage Provider (`QueryOptions` + `TokensUsageProvider`), Pydantic schema
+**Tech Stack:** Python, repository Provider (`QueryOptions` + `TokensUsageProvider`), Pydantic schema
 
 ---
 
@@ -38,7 +38,7 @@ related_spec:
 - Expected: 通过或定位当前相关测试集。
 
 **Step 3: 修改 import 和查询入口**
-- 将 `server_lw_data_provider` 替换为 `from lifeprism.storage import tokens_usage_store`
+- 将 `server_lw_data_provider` 替换为 `from lifeprism.repository import tokens_usage_store`
 - 引入 `QueryOptions`，新增私有查询函数，支持：
   - `date` 当日范围查询
   - `start_time/end_time` 范围查询

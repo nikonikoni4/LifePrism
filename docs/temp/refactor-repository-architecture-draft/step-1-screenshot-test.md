@@ -161,7 +161,7 @@ def test_get_diary_by_date_snapshot(diary_service, test_date, snapshot):
 
 ### 7.2 重构中（During Migration）
 
-- [ ] 创建新的provider（在storage/providers/）
+- [ ] 创建新的provider（在repository/providers/）
 - [ ] 实现通用查询接口（query_*方法）
 - [ ] 实现5个核心方法（query/get/insert/update/delete）
 - [ ] 保持旧provider不变（兼容期）

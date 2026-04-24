@@ -22,7 +22,7 @@ from pathlib import Path
 from lifeprism.server.schemas.plan_doc_schemas import (
     SyncPlanDocResponse, TodoDeletePreview,
 )
-from lifeprism.storage import todo_store, plan_doc_store
+from lifeprism.repository import todo_repository, plan_doc_repository
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -445,7 +445,7 @@ def sync_plan_doc(
     result = SyncPlanDocResponse(created=0, updated=0, deleted=0, cleaned=0, total=0)
 
     # 1. 验证计划书存在
-    plan_doc = plan_doc_store.get_plan_doc_by_id(plan_doc_id)
+    plan_doc = plan_doc_repository.get_plan_doc_by_id(plan_doc_id)
     if not plan_doc:
         logger.warning(f"计划书不存在: {plan_doc_id}")
         return result
@@ -523,7 +523,7 @@ def sync_plan_doc(
             parent_map[(block['block_index'], line_index)] = parent_anchor
 
     # 7. 获取现有任务（id 就是锚点）
-    existing_todos = todo_store.get_todos_by_plan_doc(plan_doc_id)
+    existing_todos = todo_repository.get_todos_by_plan_doc(plan_doc_id)
     existing_by_anchor = {t['id']: t for t in existing_todos}
 
     md_anchor_ids = {task['anchor_id'] for task in all_parsed_tasks if task['anchor_id']}
@@ -605,11 +605,11 @@ def sync_plan_doc(
 
     # 11. 执行数据库操作
     if todos_to_update:
-        todo_store.batch_update_todos(todos_to_update)
+        todo_repository.batch_update_todos(todos_to_update)
 
     if todos_to_create:
         create_data_list = [item['data'] for item in todos_to_create]
-        new_ids = todo_store.batch_create_todos(create_data_list)
+        new_ids = todo_repository.batch_create_todos(create_data_list)
 
         # parent_id 直接用 parent_anchor（id 就是锚点）
         parent_updates = []
@@ -621,7 +621,7 @@ def sync_plan_doc(
                 })
 
         if parent_updates:
-            todo_store.batch_update_todos(parent_updates)
+            todo_repository.batch_update_todos(parent_updates)
 
     # 11.5 更新已存在任务的 parent_id
     if existing_parent_info:
@@ -634,14 +634,14 @@ def sync_plan_doc(
                     'parent_id': new_parent_id,
                 })
         if parent_updates_existing:
-            todo_store.batch_update_todos(parent_updates_existing)
+            todo_repository.batch_update_todos(parent_updates_existing)
             logger.info(f"更新 {len(parent_updates_existing)} 个任务的 parent_id")
 
     # 12. 处理删除
     if confirm_delete and todos_to_delete:
         delete_ids = [todo['id'] for todo in todos_to_delete]
         for todo_id in delete_ids:
-            deleted_count = todo_store.delete_todo_cascade(todo_id)
+            deleted_count = todo_repository.delete_todo_cascade(todo_id)
             result.deleted += deleted_count if deleted_count > 0 else 1
         logger.info(f"删除 {result.deleted} 个任务")
 
@@ -650,7 +650,7 @@ def sync_plan_doc(
     _write_plan_doc_content(plan_doc_id, content)
 
     # 14. 统计总数
-    result.total = len(todo_store.get_todos_by_plan_doc(plan_doc_id))
+    result.total = len(todo_repository.get_todos_by_plan_doc(plan_doc_id))
 
     logger.info(f"同步计划书 {plan_doc_id} 完成: created={result.created}, updated={result.updated}, deleted={result.deleted}")
     return result

@@ -7,7 +7,7 @@ Report 数据提供者
 import json
 from typing import Optional, List, Dict, Any
 
-from lifeprism.storage import LWBaseDataProvider
+from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)

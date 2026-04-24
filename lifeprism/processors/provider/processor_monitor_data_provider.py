@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import List, Dict, Optional
 
-from lifeprism.storage import LWBaseDataProvider
+from lifeprism.repository import LWBaseDataProvider
 
 logger = logging.getLogger(__name__)
 

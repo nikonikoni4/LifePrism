@@ -8,7 +8,7 @@ import pytz
 # 添加项目根目录到 sys.path 以便导入 lifeprism 模块
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from lifeprism.storage.base_providers.aw_base_data_provider import AWBaseDataProvider
+from lifeprism.repository.base_providers.aw_base_data_provider import AWBaseDataProvider
 from lifeprism.config.settings_manager import settings
 
 def get_window_activity_data(db_path, minutes=10, min_duration=30.0):

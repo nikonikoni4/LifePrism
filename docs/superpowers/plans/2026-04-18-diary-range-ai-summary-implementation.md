@@ -30,8 +30,8 @@ related_spec: docs/superpowers/specs/2026-04-18-diary-range-ai-summary-design.md
 ## File Structure
 
 - Modify: `lifeprism/config/database.py`
-- Create: `lifeprism/storage/migrations/scripts/m004_diary_source_hash.py`
-- Modify: `lifeprism/storage/migrations/scripts/__init__.py`
+- Create: `lifeprism/repository/migrations/scripts/m004_diary_source_hash.py`
+- Modify: `lifeprism/repository/migrations/scripts/__init__.py`
 - Modify: `lifeprism/server/schemas/diary_schemas.py`
 - Modify: `lifeprism/server/providers/diary_provider.py`
 - Modify: `lifeprism/server/services/diary_service.py`
@@ -62,8 +62,8 @@ related_spec: docs/superpowers/specs/2026-04-18-diary-range-ai-summary-design.md
 
 **Files:**
 - Modify: `lifeprism/config/database.py`
-- Create: `lifeprism/storage/migrations/scripts/m004_diary_source_hash.py`
-- Modify: `lifeprism/storage/migrations/scripts/__init__.py`
+- Create: `lifeprism/repository/migrations/scripts/m004_diary_source_hash.py`
+- Modify: `lifeprism/repository/migrations/scripts/__init__.py`
 - Modify: `lifeprism/server/schemas/diary_schemas.py`
 - Modify: `lifeprism/server/providers/diary_provider.py`
 - Test: `test/core/api/test_diary_ai_summary_api.py`
@@ -131,7 +131,7 @@ Expected: PASS for the existing single-day contracts with the new hash assertion
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lifeprism/config/database.py lifeprism/storage/migrations/scripts/m004_diary_source_hash.py lifeprism/storage/migrations/scripts/__init__.py lifeprism/server/schemas/diary_schemas.py lifeprism/server/providers/diary_provider.py test/core/api/test_diary_ai_summary_api.py
+git add lifeprism/config/database.py lifeprism/repository/migrations/scripts/m004_diary_source_hash.py lifeprism/repository/migrations/scripts/__init__.py lifeprism/server/schemas/diary_schemas.py lifeprism/server/providers/diary_provider.py test/core/api/test_diary_ai_summary_api.py
 git commit -m "feat(diary): add diary source hash persistence"
 ```
 

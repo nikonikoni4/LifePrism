@@ -13,13 +13,13 @@
 lifeprism/
 ├── config/
 │   └── database.py              # 表结构定义
-├── storage/
+├── repository/
 │   ├── database_manager.py      # 数据库连接管理
 │   ├── base_providers/
 │   │   └── lw_base_data_provider.py  # 基类
 │   └── migrations/              # 数据库迁移
 ├── server/
-│   ├── providers/               # ❌ 20+ provider类（应该在storage）
+│   ├── providers/               # ❌ 20+ provider类（应该在repository）
 │   │   ├── goal_provider.py
 │   │   ├── todo_provider.py
 │   │   └── ...
@@ -44,7 +44,7 @@ lifeprism/
 │   ├── settings_manager.py      # 用户设置（保持不变）
 │   └── providers.yaml            # LLM提供商配置（保持不变）
 │
-├── storage/                      # 🎯 数据存储层（核心重构区域）
+├── repository/                      # 🎯 数据存储层（核心重构区域）
 │   ├── schemas.py                # ✅ 表结构定义（从config/database.py迁移）
 │   ├── database_manager.py       # 数据库连接管理（保持不变）
 │   │
@@ -73,7 +73,7 @@ lifeprism/
 │   └── schemas/                  # API schemas（保持不变，不移动）
 │
 └── llm/                          # LLM模块
-    ├── services/                 # 🆕 LLM业务逻辑（直接使用storage.providers）
+    ├── services/                 # 🆕 LLM业务逻辑（直接使用repository.providers）
     └── ...                       # 删除llm/providers/dataset_providers/
 ```
 
@@ -81,8 +81,8 @@ lifeprism/
 
 | 层级 | 位置 | 职责 | 示例 |
 |------|------|------|------|
-| **Provider** | `storage/providers/` | 原子的数据库操作，通用、可复用 | `query_todos(filters, sort, page)` |
-| **Aggregator** | `storage/aggregators/` | 组合多个provider调用，数据聚合计算 | `aggregate_daily_stats()` 调用多个provider |
+| **Provider** | `repository/providers/` | 原子的数据库操作，通用、可复用 | `query_todos(filters, sort, page)` |
+| **Aggregator** | `repository/aggregators/` | 组合多个provider调用，数据聚合计算 | `aggregate_daily_stats()` 调用多个provider |
 | **Service** | `server/services/` 或 `llm/services/` | 业务逻辑、事务协调、外部调用 | `complete_todo()` 更新数据库 + 发送通知 |
 
 
@@ -93,9 +93,9 @@ lifeprism/
 
 ## 参考示例
 
-- **完整实现**: `lifeprism/storage/providers/diary_provider.py`
+- **完整实现**: `lifeprism/repository/providers/diary_provider.py`
 - **快照测试**: `test/core/services/test_diary_service_snapshot.py`
-- **单元测试**: `test/core/unit/storage/test_base_provider_generic_methods.py`
+- **单元测试**: `test/core/unit/repository/test_base_provider_generic_methods.py`
 - **表结构定义**: `lifeprism/config/database.py` - 查看所有表的 schema 定义
 
 ## 架构原则
@@ -111,7 +111,7 @@ lifeprism/
 
 **示例**：
 ```python
-# lifeprism/storage/providers/mood_providers.py（注意文件名用复数）
+# lifeprism/repository/providers/mood_providers.py（注意文件名用复数）
 
 # ==================== MoodTypeProvider ====================
 class MoodTypeProvider(LWBaseDataProvider):
@@ -143,7 +143,7 @@ mood_impact_provider = LazySingleton(MoodImpactProvider)
 **Service 层协调**：
 ```python
 # lifeprism/server/services/mood_service.py
-from lifeprism.storage.providers import (
+from lifeprism.repository.providers import (
     mood_type_provider,
     mood_entry_provider,
     mood_impact_provider
@@ -522,11 +522,11 @@ def insert_item(self, data: Dict[str, Any]) -> bool:
 
 **目的**: 在 Service 层使用新的 Provider，保持向后兼容。
 
-#### 3.1 在 storage/providers/__init__.py 中导出新 Provider
+#### 3.1 在 repository/providers/__init__.py 中导出新 Provider
 
 ```python
-# lifeprism/storage/providers/__init__.py
-from lifeprism.storage.providers.your_provider import YourProvider, QueryOptions
+# lifeprism/repository/providers/__init__.py
+from lifeprism.repository.providers.your_provider import YourProvider, QueryOptions
 from lifeprism.utils import LazySingleton
 
 # 创建全局单例（已重构为使用通用方法）
@@ -548,7 +548,7 @@ from lifeprism.server.providers.your_provider import your_provider
 
 **修改后**:
 ```python
-from lifeprism.storage.providers import your_provider
+from lifeprism.repository.providers import your_provider
 ```
 
 **注意**: 
@@ -586,14 +586,14 @@ git status
 git diff --cached
 
 # 提交
-git commit -m "refactor(storage): 完成 <Provider> 重构迁移
+git commit -m "refactor(repository): 完成 <Provider> 重构迁移
 
-将 <service> 从旧的 server.providers.<provider> 迁移到新的 storage.providers.<provider>。
+将 <service> 从旧的 server.providers.<provider> 迁移到新的 repository.providers.<provider>。
 
 变更：
-- <service>.py: 改用 storage.providers.<provider>（已重构版本）
-- storage/providers/<provider>.py: 使用通用方法重构核心 CRUD
-- storage/providers/__init__.py: 导出新的 provider 单例
+- <service>.py: 改用 repository.providers.<provider>（已重构版本）
+- repository/providers/<provider>.py: 使用通用方法重构核心 CRUD
+- repository/providers/__init__.py: 导出新的 provider 单例
 
 测试：
 - 所有快照测试通过（X/X），验证新旧 provider 行为完全一致
@@ -622,7 +622,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [ ] 所有快照测试通过
 
 ### 集成
-- [ ] 在 storage/providers/__init__.py 中导出单例
+- [ ] 在 repository/providers/__init__.py 中导出单例
 - [ ] 在 Service 中替换 import 路径
 - [ ] 运行快照测试验证行为一致
 - [ ] 提交代码
@@ -660,7 +660,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ## 参考资料
 
-- **DiaryProvider 实现**: `lifeprism/storage/providers/diary_provider.py`
+- **DiaryProvider 实现**: `lifeprism/repository/providers/diary_provider.py`
 - **快照测试示例**: `test/core/services/test_diary_service_snapshot.py`
-- **通用方法文档**: `lifeprism/storage/base_providers/lw_base_data_provider.py`
-- **QueryOptions 文档**: `lifeprism/storage/providers/common_query_options.py`
+- **通用方法文档**: `lifeprism/repository/base_providers/lw_base_data_provider.py`
+- **QueryOptions 文档**: `lifeprism/repository/providers/common_query_options.py`

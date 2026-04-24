@@ -4,14 +4,14 @@
 
 # from lifeprism.config.settings_manager import settings
 # from lifeprism.llm.providers.dataset_providers.old_llm_lw_data_provider import old_llm_lw_data_provider
-# from lifeprism.storage.providers import diary_provider
-# from lifeprism.storage.providers import (
+# from lifeprism.repository.providers import diary_provider
+# from lifeprism.repository.providers import (
 #     habit_checkin_provider,
 #     habit_challenge_provider,
 #     habit_provider,
 # )
-# from lifeprism.storage.providers.mood_provider import mood_provider
-# from lifeprism.storage.providers.timeline_provider import timeline_provider
+# from lifeprism.repository.providers.mood_provider import mood_provider
+# from lifeprism.repository.providers.timeline_provider import timeline_provider
 # from lifeprism.server.providers.todo_provider import todo_provider
 
 

@@ -233,8 +233,8 @@ git commit -m "feat: add screenshot domain models and policy"
 **Files:**
 - Create: `lifeprism/monitor/provider/screenshot_data_provider.py`
 - Modify: `lifeprism/monitor/provider/__init__.py`
-- Create: `lifeprism/monitor/screenshot/store.py`
-- Create: `test/storage/test_screenshot_provider.py`
+- Create: `lifeprism/monitor/screenshot/repository.py`
+- Create: `test/repository/test_screenshot_provider.py`
 - Create: `test/monitor/test_screenshot_store.py`
 
 **Step 1: Write the failing test**
@@ -244,7 +244,7 @@ from pathlib import Path
 
 from lifeprism.monitor.provider.screenshot_data_provider import ScreenshotDataProvider
 from lifeprism.monitor.screenshot.models import CaptureReason, CaptureRequest
-from lifeprism.monitor.screenshot.store import ScreenshotStore
+from lifeprism.monitor.screenshot.repository import ScreenshotStore
 
 
 class FakeCaptureBackend:
@@ -254,7 +254,7 @@ class FakeCaptureBackend:
 
 def test_store_writes_relative_path_and_metadata(tmp_path, db_manager):
     provider = ScreenshotDataProvider(db_manager=db_manager)
-    store = ScreenshotStore(
+    repository = ScreenshotStore(
         provider=provider,
         capture_backend=FakeCaptureBackend(),
         data_root=tmp_path,
@@ -270,13 +270,13 @@ def test_store_writes_relative_path_and_metadata(tmp_path, db_manager):
         engaged_segment_id=None,
     )
 
-    record = store.capture(request)
+    record = repository.capture(request)
     assert record["id"] == "cap-0001"
     assert record["file_path"] == "screenshots/2026-04-02/2026-04-02T10-30-00_scheduled_cap-0001.png"
 
 
 def test_store_rolls_back_file_when_metadata_insert_fails(tmp_path, failing_provider):
-    store = ScreenshotStore(
+    repository = ScreenshotStore(
         provider=failing_provider,
         capture_backend=FakeCaptureBackend(),
         data_root=tmp_path,
@@ -287,9 +287,9 @@ def test_store_rolls_back_file_when_metadata_insert_fails(tmp_path, failing_prov
 
 **Step 2: Run test to verify it fails**
 
-Run: `pytest test/storage/test_screenshot_provider.py test/monitor/test_screenshot_store.py -q`
+Run: `pytest test/repository/test_screenshot_provider.py test/monitor/test_screenshot_store.py -q`
 
-Expected: FAIL with missing provider/store modules.
+Expected: FAIL with missing provider/repository modules.
 
 **Step 3: Write minimal implementation**
 
@@ -316,7 +316,7 @@ class ScreenshotDataProvider(LWBaseDataProvider):
     def delete_capture(self, capture_id: str) -> bool:
         return self.db.delete("screen_captures", {"id": capture_id}) > 0
 
-# lifeprism/monitor/screenshot/store.py
+# lifeprism/monitor/screenshot/repository.py
 class ScreenshotStore:
     def capture(self, request: CaptureRequest) -> dict:
         capture_id = self.id_factory()
@@ -349,15 +349,15 @@ class ScreenshotStore:
 
 **Step 4: Run test to verify it passes**
 
-Run: `pytest test/storage/test_screenshot_provider.py test/monitor/test_screenshot_store.py -q`
+Run: `pytest test/repository/test_screenshot_provider.py test/monitor/test_screenshot_store.py -q`
 
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add lifeprism/monitor/provider/screenshot_data_provider.py lifeprism/monitor/provider/__init__.py lifeprism/monitor/screenshot/store.py test/storage/test_screenshot_provider.py test/monitor/test_screenshot_store.py
-git commit -m "feat: add screenshot metadata provider and store"
+git add lifeprism/monitor/provider/screenshot_data_provider.py lifeprism/monitor/provider/__init__.py lifeprism/monitor/screenshot/repository.py test/repository/test_screenshot_provider.py test/monitor/test_screenshot_store.py
+git commit -m "feat: add screenshot metadata provider and repository"
 ```
 
 ### Task 4: InputActivityTracker 状态机
@@ -871,7 +871,7 @@ def test_window_monitor_still_persists_window_events(db_manager):
 
 Run: `pytest test/monitor/test_config.py test/monitor/test_storage.py test/integration/test_monitor_flow.py -q`
 
-Expected: FAIL because旧文件仍引用不存在的 `lifeprism.monitor.windows_monitor.config` / `storage`。
+Expected: FAIL because旧文件仍引用不存在的 `lifeprism.monitor.windows_monitor.config` / `repository`。
 
 **Step 3: Write minimal implementation**
 
@@ -893,7 +893,7 @@ def test_save_window_event_flow():
 
 **Step 4: Run full verification**
 
-Run: `pytest test/config/test_database.py test/config/test_monitor_screenshot_settings.py test/storage/test_window_provider.py test/storage/test_screenshot_provider.py test/monitor/test_config.py test/monitor/test_storage.py test/monitor/test_screenshot_policy.py test/monitor/test_input_activity_tracker.py test/monitor/test_screenshot_scheduler.py test/monitor/test_screenshot_store.py test/monitor/test_screenshot_cleanup_worker.py test/integration/test_monitor_flow.py test/integration/test_monitor_screenshot_flow.py -q`
+Run: `pytest test/config/test_database.py test/config/test_monitor_screenshot_settings.py test/repository/test_window_provider.py test/repository/test_screenshot_provider.py test/monitor/test_config.py test/monitor/test_storage.py test/monitor/test_screenshot_policy.py test/monitor/test_input_activity_tracker.py test/monitor/test_screenshot_scheduler.py test/monitor/test_screenshot_store.py test/monitor/test_screenshot_cleanup_worker.py test/integration/test_monitor_flow.py test/integration/test_monitor_screenshot_flow.py -q`
 
 Expected: PASS
 
@@ -913,7 +913,7 @@ Manual smoke check:
 
 ```bash
 git add test/monitor/test_config.py test/monitor/test_storage.py test/integration/test_monitor_flow.py
-git add test/config/test_database.py test/config/test_monitor_screenshot_settings.py test/storage/test_window_provider.py test/storage/test_screenshot_provider.py
+git add test/config/test_database.py test/config/test_monitor_screenshot_settings.py test/repository/test_window_provider.py test/repository/test_screenshot_provider.py
 git add test/monitor/test_screenshot_policy.py test/monitor/test_input_activity_tracker.py test/monitor/test_screenshot_scheduler.py test/monitor/test_screenshot_store.py test/monitor/test_screenshot_cleanup_worker.py test/integration/test_monitor_screenshot_flow.py
 git commit -m "test: verify monitor screenshot end to end"
 ```

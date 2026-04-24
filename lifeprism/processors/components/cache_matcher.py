@@ -118,7 +118,7 @@ class CacheMatcher:
 if __name__ == "__main__":
     from lifeprism.processors.components.category_cache import CategoryCache
     from lifeprism.processors.models.processed_event import ProcessedEvent
-    from lifeprism.storage import LWBaseDataProvider
+    from lifeprism.repository import LWBaseDataProvider
     lw_data_provider = LWBaseDataProvider()
     cache = CategoryCache(lw_data_provider.load_category_map_cache_V2())
     print(cache.is_multipurpose_title_cached("msedge", "lifewatchai"))

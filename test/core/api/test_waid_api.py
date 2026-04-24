@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from datetime import datetime
 
 from lifeprism.server.main import app
-from lifeprism.storage import lw_db_manager
+from lifeprism.repository import lw_db_manager
 
 
 @pytest.fixture

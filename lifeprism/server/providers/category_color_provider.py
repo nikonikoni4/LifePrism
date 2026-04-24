@@ -7,7 +7,7 @@
 import colorsys
 import random
 from typing import Dict, Optional
-from lifeprism.storage import lw_db_manager
+from lifeprism.repository import lw_db_manager
 
 
 # 禁用分类使用的浅灰色

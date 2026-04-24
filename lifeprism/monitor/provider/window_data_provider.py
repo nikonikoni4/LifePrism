@@ -4,7 +4,7 @@ Window 数据提供者
 """
 import sqlite3
 from typing import Optional, Dict, Any
-from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
+from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
 

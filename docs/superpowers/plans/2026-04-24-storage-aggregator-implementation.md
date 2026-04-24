@@ -1,4 +1,4 @@
-# Storage Aggregator 实施计划
+# repository Aggregator 实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -15,36 +15,36 @@
 ## 文件结构概览
 
 **新建文件:**
-- `lifeprism/storage/aggregators/__init__.py` - Aggregator 导出
-- `lifeprism/storage/aggregators/habit_aggregator.py` - Habit 聚合器
-- `lifeprism/storage/aggregators/mood_aggregator.py` - Mood 聚合器
-- `lifeprism/storage/aggregators/goal_aggregator.py` - Goal 聚合器
-- `lifeprism/storage/aggregators/habit_chain_aggregator.py` - HabitChain 聚合器
-- `lifeprism/storage/aggregators/category_aggregator.py` - Category 聚合器
-- `lifeprism/storage/aggregators/map_cache_aggregator.py` - MapCache 聚合器
+- `lifeprism/repository/aggregators/__init__.py` - Aggregator 导出
+- `lifeprism/repository/aggregators/habit_aggregator.py` - Habit 聚合器
+- `lifeprism/repository/aggregators/mood_aggregator.py` - Mood 聚合器
+- `lifeprism/repository/aggregators/goal_aggregator.py` - Goal 聚合器
+- `lifeprism/repository/aggregators/habit_chain_aggregator.py` - HabitChain 聚合器
+- `lifeprism/repository/aggregators/category_aggregator.py` - Category 聚合器
+- `lifeprism/repository/aggregators/map_cache_aggregator.py` - MapCache 聚合器
 
 **修改文件:**
-- `lifeprism/storage/__init__.py` - 添加统一 store 导出
-- `lifeprism/storage/providers/__init__.py` - 保持 provider 导出（内部使用）
+- `lifeprism/repository/__init__.py` - 添加统一 repository 导出
+- `lifeprism/repository/providers/__init__.py` - 保持 provider 导出（内部使用）
 
 ---
 
 ## Task 1: 创建 Aggregators 目录和基础结构
 
 **Files:**
-- Create: `lifeprism/storage/aggregators/__init__.py`
+- Create: `lifeprism/repository/aggregators/__init__.py`
 
 - [ ] **Step 1: 创建 aggregators 目录**
 
 ```bash
-mkdir -p lifeprism/storage/aggregators
+mkdir -p lifeprism/repository/aggregators
 ```
 
 - [ ] **Step 2: 创建 __init__.py 文件**
 
 ```python
 """
-Storage Aggregators - 数据聚合层
+repository Aggregators - 数据聚合层
 
 聚合多个相关 Provider，提供统一的业务数据视图。
 """
@@ -54,7 +54,7 @@ Storage Aggregators - 数据聚合层
 - [ ] **Step 3: 验证目录结构**
 
 ```bash
-ls -la lifeprism/storage/aggregators/
+ls -la lifeprism/repository/aggregators/
 ```
 
 Expected: 看到 `__init__.py` 文件
@@ -62,8 +62,8 @@ Expected: 看到 `__init__.py` 文件
 - [ ] **Step 4: Commit**
 
 ```bash
-git add lifeprism/storage/aggregators/__init__.py
-git commit -m "feat(storage): 创建 aggregators 目录结构"
+git add lifeprism/repository/aggregators/__init__.py
+git commit -m "feat(repository): 创建 aggregators 目录结构"
 ```
 
 ---
@@ -71,7 +71,7 @@ git commit -m "feat(storage): 创建 aggregators 目录结构"
 ## Task 2: 创建 HabitAggregator
 
 **Files:**
-- Create: `lifeprism/storage/aggregators/habit_aggregator.py`
+- Create: `lifeprism/repository/aggregators/habit_aggregator.py`
 
 **聚合对象:** HabitProvider, HabitChallengeProvider, HabitCheckinProvider
 
@@ -85,7 +85,7 @@ Habit Aggregator - 习惯数据聚合层
 提供习惯相关的统一数据视图
 """
 from typing import Optional, List, Dict, Any
-from lifeprism.storage.providers import (
+from lifeprism.repository.providers import (
     habit_provider,
     habit_challenge_provider,
     habit_checkin_provider,
@@ -231,7 +231,7 @@ class HabitAggregator:
 - [ ] **Step 6: 验证代码语法**
 
 ```bash
-python -m py_compile lifeprism/storage/aggregators/habit_aggregator.py
+python -m py_compile lifeprism/repository/aggregators/habit_aggregator.py
 ```
 
 Expected: 无输出表示编译成功
@@ -239,8 +239,8 @@ Expected: 无输出表示编译成功
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lifeprism/storage/aggregators/habit_aggregator.py
-git commit -m "feat(storage): 添加 HabitAggregator 聚合器"
+git add lifeprism/repository/aggregators/habit_aggregator.py
+git commit -m "feat(repository): 添加 HabitAggregator 聚合器"
 ```
 
 ---
@@ -248,7 +248,7 @@ git commit -m "feat(storage): 添加 HabitAggregator 聚合器"
 ## Task 3: 创建 MoodAggregator
 
 **Files:**
-- Create: `lifeprism/storage/aggregators/mood_aggregator.py`
+- Create: `lifeprism/repository/aggregators/mood_aggregator.py`
 
 **聚合对象:** MoodTypeProvider, MoodEntryProvider, MoodImpactProvider
 
@@ -262,7 +262,7 @@ Mood Aggregator - 心情数据聚合层
 提供心情相关的统一数据视图
 """
 from typing import Optional, List, Dict, Any
-from lifeprism.storage.providers import (
+from lifeprism.repository.providers import (
     mood_type_provider,
     mood_entry_provider,
     mood_impact_provider,
@@ -403,7 +403,7 @@ class MoodAggregator:
 - [ ] **Step 6: 验证代码语法**
 
 ```bash
-python -m py_compile lifeprism/storage/aggregators/mood_aggregator.py
+python -m py_compile lifeprism/repository/aggregators/mood_aggregator.py
 ```
 
 Expected: 无输出表示编译成功
@@ -411,8 +411,8 @@ Expected: 无输出表示编译成功
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lifeprism/storage/aggregators/mood_aggregator.py
-git commit -m "feat(storage): 添加 MoodAggregator 聚合器"
+git add lifeprism/repository/aggregators/mood_aggregator.py
+git commit -m "feat(repository): 添加 MoodAggregator 聚合器"
 ```
 
 ---
@@ -420,7 +420,7 @@ git commit -m "feat(storage): 添加 MoodAggregator 聚合器"
 ## Task 4: 创建 GoalAggregator
 
 **Files:**
-- Create: `lifeprism/storage/aggregators/goal_aggregator.py`
+- Create: `lifeprism/repository/aggregators/goal_aggregator.py`
 
 **聚合对象:** GoalProvider, GoalStatsProvider
 
@@ -434,7 +434,7 @@ Goal Aggregator - 目标数据聚合层
 提供目标相关的统一数据视图
 """
 from typing import Optional, List, Dict, Any
-from lifeprism.storage.providers import (
+from lifeprism.repository.providers import (
     goal_provider,
     goal_stats_provider,
 )
@@ -549,7 +549,7 @@ class GoalAggregator:
 - [ ] **Step 5: 验证代码语法**
 
 ```bash
-python -m py_compile lifeprism/storage/aggregators/goal_aggregator.py
+python -m py_compile lifeprism/repository/aggregators/goal_aggregator.py
 ```
 
 Expected: 无输出表示编译成功
@@ -557,8 +557,8 @@ Expected: 无输出表示编译成功
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lifeprism/storage/aggregators/goal_aggregator.py
-git commit -m "feat(storage): 添加 GoalAggregator 聚合器"
+git add lifeprism/repository/aggregators/goal_aggregator.py
+git commit -m "feat(repository): 添加 GoalAggregator 聚合器"
 ```
 
 ---
@@ -566,7 +566,7 @@ git commit -m "feat(storage): 添加 GoalAggregator 聚合器"
 ## Task 5: 创建 HabitChainAggregator
 
 **Files:**
-- Create: `lifeprism/storage/aggregators/habit_chain_aggregator.py`
+- Create: `lifeprism/repository/aggregators/habit_chain_aggregator.py`
 
 **聚合对象:** HabitChainProvider, HabitChainNodeProvider
 
@@ -580,7 +580,7 @@ HabitChain Aggregator - 习惯链数据聚合层
 提供习惯链相关的统一数据视图
 """
 from typing import Optional, List, Dict, Any
-from lifeprism.storage.providers import (
+from lifeprism.repository.providers import (
     habit_chain_provider,
     habit_chain_node_provider,
 )
@@ -714,7 +714,7 @@ class HabitChainAggregator:
 - [ ] **Step 6: 验证代码语法**
 
 ```bash
-python -m py_compile lifeprism/storage/aggregators/habit_chain_aggregator.py
+python -m py_compile lifeprism/repository/aggregators/habit_chain_aggregator.py
 ```
 
 Expected: 无输出表示编译成功
@@ -722,8 +722,8 @@ Expected: 无输出表示编译成功
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lifeprism/storage/aggregators/habit_chain_aggregator.py
-git commit -m "feat(storage): 添加 HabitChainAggregator 聚合器"
+git add lifeprism/repository/aggregators/habit_chain_aggregator.py
+git commit -m "feat(repository): 添加 HabitChainAggregator 聚合器"
 ```
 
 ---
@@ -731,7 +731,7 @@ git commit -m "feat(storage): 添加 HabitChainAggregator 聚合器"
 ## Task 6: 创建 CategoryAggregator
 
 **Files:**
-- Create: `lifeprism/storage/aggregators/category_aggregator.py`
+- Create: `lifeprism/repository/aggregators/category_aggregator.py`
 
 **聚合对象:** CategoryProvider, SubCategoryProvider
 
@@ -745,7 +745,7 @@ Category Aggregator - 分类数据聚合层
 提供分类相关的统一数据视图
 """
 from typing import Optional, List, Dict, Any
-from lifeprism.storage.providers import (
+from lifeprism.repository.providers import (
     category_provider,
     sub_category_provider,
 )
@@ -784,7 +784,7 @@ class CategoryAggregator:
             return None
         
         # 获取子分类列表
-        from lifeprism.storage.providers.common_query_options import QueryOptions
+        from lifeprism.repository.providers.common_query_options import QueryOptions
         options = QueryOptions(filters={'category_id': category_id})
         sub_categories, _ = self.sub_category_provider.query_sub_categories(options)
         
@@ -804,7 +804,7 @@ class CategoryAggregator:
         Returns:
             分类树列表，每个分类包含 sub_categories 字段
         """
-        from lifeprism.storage.providers.common_query_options import QueryOptions
+        from lifeprism.repository.providers.common_query_options import QueryOptions
         
         # 获取所有分类
         categories, _ = self.category_provider.query_categories(QueryOptions())
@@ -876,7 +876,7 @@ class CategoryAggregator:
         Returns:
             是否成功
         """
-        from lifeprism.storage.providers.common_query_options import QueryOptions
+        from lifeprism.repository.providers.common_query_options import QueryOptions
         
         # 先获取所有子分类
         options = QueryOptions(filters={'category_id': category_id})
@@ -898,7 +898,7 @@ class CategoryAggregator:
 - [ ] **Step 6: 验证代码语法**
 
 ```bash
-python -m py_compile lifeprism/storage/aggregators/category_aggregator.py
+python -m py_compile lifeprism/repository/aggregators/category_aggregator.py
 ```
 
 Expected: 无输出表示编译成功
@@ -906,8 +906,8 @@ Expected: 无输出表示编译成功
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lifeprism/storage/aggregators/category_aggregator.py
-git commit -m "feat(storage): 添加 CategoryAggregator 聚合器"
+git add lifeprism/repository/aggregators/category_aggregator.py
+git commit -m "feat(repository): 添加 CategoryAggregator 聚合器"
 ```
 
 ---
@@ -915,7 +915,7 @@ git commit -m "feat(storage): 添加 CategoryAggregator 聚合器"
 ## Task 7: 创建 MapCacheAggregator
 
 **Files:**
-- Create: `lifeprism/storage/aggregators/map_cache_aggregator.py`
+- Create: `lifeprism/repository/aggregators/map_cache_aggregator.py`
 
 **聚合对象:** MultiPurposeMapCacheProvider, SinglePurposeMapCacheProvider
 
@@ -929,7 +929,7 @@ MapCache Aggregator - 缓存数据聚合层
 提供缓存相关的统一数据视图
 """
 from typing import Optional, List, Dict, Any
-from lifeprism.storage.providers import (
+from lifeprism.repository.providers import (
     multi_purpose_map_cache_provider,
     single_purpose_map_cache_provider,
 )
@@ -960,7 +960,7 @@ class MapCacheAggregator:
         Returns:
             包含 multi_purpose 和 single_purpose 的字典
         """
-        from lifeprism.storage.providers.common_query_options import QueryOptions
+        from lifeprism.repository.providers.common_query_options import QueryOptions
         
         # 获取多用途缓存
         multi_caches, multi_total = self.multi_provider.query_multi_purpose_map_cache(
@@ -997,7 +997,7 @@ class MapCacheAggregator:
         Returns:
             缓存数据，不存在返回 None
         """
-        from lifeprism.storage.providers.common_query_options import QueryOptions
+        from lifeprism.repository.providers.common_query_options import QueryOptions
         
         if is_multi_purpose:
             options = QueryOptions(filters={'purpose': purpose})
@@ -1019,7 +1019,7 @@ class MapCacheAggregator:
         Returns:
             清理统计信息
         """
-        from lifeprism.storage.providers.common_query_options import QueryOptions
+        from lifeprism.repository.providers.common_query_options import QueryOptions
         
         # 获取所有缓存 ID
         multi_caches, _ = self.multi_provider.query_multi_purpose_map_cache(
@@ -1048,7 +1048,7 @@ class MapCacheAggregator:
 - [ ] **Step 5: 验证代码语法**
 
 ```bash
-python -m py_compile lifeprism/storage/aggregators/map_cache_aggregator.py
+python -m py_compile lifeprism/repository/aggregators/map_cache_aggregator.py
 ```
 
 Expected: 无输出表示编译成功
@@ -1056,8 +1056,8 @@ Expected: 无输出表示编译成功
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lifeprism/storage/aggregators/map_cache_aggregator.py
-git commit -m "feat(storage): 添加 MapCacheAggregator 聚合器"
+git add lifeprism/repository/aggregators/map_cache_aggregator.py
+git commit -m "feat(repository): 添加 MapCacheAggregator 聚合器"
 ```
 
 ---
@@ -1065,22 +1065,22 @@ git commit -m "feat(storage): 添加 MapCacheAggregator 聚合器"
 ## Task 8: 更新 Aggregators __init__.py 导出
 
 **Files:**
-- Modify: `lifeprism/storage/aggregators/__init__.py`
+- Modify: `lifeprism/repository/aggregators/__init__.py`
 
 - [ ] **Step 1: 导入所有 Aggregator 类**
 
 ```python
 """
-Storage Aggregators - 数据聚合层
+repository Aggregators - 数据聚合层
 
 聚合多个相关 Provider，提供统一的业务数据视图。
 """
-from lifeprism.storage.aggregators.habit_aggregator import HabitAggregator
-from lifeprism.storage.aggregators.mood_aggregator import MoodAggregator
-from lifeprism.storage.aggregators.goal_aggregator import GoalAggregator
-from lifeprism.storage.aggregators.habit_chain_aggregator import HabitChainAggregator
-from lifeprism.storage.aggregators.category_aggregator import CategoryAggregator
-from lifeprism.storage.aggregators.map_cache_aggregator import MapCacheAggregator
+from lifeprism.repository.aggregators.habit_aggregator import HabitAggregator
+from lifeprism.repository.aggregators.mood_aggregator import MoodAggregator
+from lifeprism.repository.aggregators.goal_aggregator import GoalAggregator
+from lifeprism.repository.aggregators.habit_chain_aggregator import HabitChainAggregator
+from lifeprism.repository.aggregators.category_aggregator import CategoryAggregator
+from lifeprism.repository.aggregators.map_cache_aggregator import MapCacheAggregator
 from lifeprism.utils import LazySingleton
 ```
 
@@ -1120,7 +1120,7 @@ __all__ = [
 - [ ] **Step 4: 验证导入**
 
 ```bash
-python -c "from lifeprism.storage.aggregators import habit_aggregator, mood_aggregator, goal_aggregator, habit_chain_aggregator, category_aggregator, map_cache_aggregator; print('导入成功')"
+python -c "from lifeprism.repository.aggregators import habit_aggregator, mood_aggregator, goal_aggregator, habit_chain_aggregator, category_aggregator, map_cache_aggregator; print('导入成功')"
 ```
 
 Expected: 输出 "导入成功"
@@ -1128,22 +1128,22 @@ Expected: 输出 "导入成功"
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lifeprism/storage/aggregators/__init__.py
-git commit -m "feat(storage): 更新 aggregators 导出所有聚合器单例"
+git add lifeprism/repository/aggregators/__init__.py
+git commit -m "feat(repository): 更新 aggregators 导出所有聚合器单例"
 ```
 
 ---
 
-## Task 9: 更新 Storage __init__.py 统一导出为 Store
+## Task 9: 更新 repository __init__.py 统一导出为 Store
 
 **Files:**
-- Modify: `lifeprism/storage/__init__.py`
+- Modify: `lifeprism/repository/__init__.py`
 
 - [ ] **Step 1: 在文件开头添加文档说明**
 
 ```python
 """
-Storage Layer - 数据访问层统一入口
+repository Layer - 数据访问层统一入口
 
 架构设计：
 - Provider: 单表数据访问（内部实现）
@@ -1151,9 +1151,9 @@ Storage Layer - 数据访问层统一入口
 - Store: 统一对外接口（使用 as 重命名）
 
 使用方式：
-    from lifeprism.storage import diary_store, habit_store
+    from lifeprism.repository import diary_store, habit_store
     
-    # 统一的 store 接口，无需区分 provider 或 aggregator
+    # 统一的 repository 接口，无需区分 provider 或 aggregator
     diaries = diary_store.query_diaries(options)
     habits = habit_store.get_habits_with_challenges()
 
@@ -1161,30 +1161,30 @@ Storage Layer - 数据访问层统一入口
 """
 ```
 
-- [ ] **Step 2: 导入单表 Provider 并重命名为 store**
+- [ ] **Step 2: 导入单表 Provider 并重命名为 repository**
 
 ```python
 # ==================== 单表 Store（内部是 Provider）====================
-from lifeprism.storage.providers import diary_provider as diary_store
-from lifeprism.storage.providers import todo_provider as todo_store
-from lifeprism.storage.providers import timeline_provider as timeline_store
-from lifeprism.storage.providers import plan_doc_provider as plan_doc_store
-from lifeprism.storage.providers import tokens_usage_provider as tokens_usage_store
+from lifeprism.repository.providers import diary_provider as diary_store
+from lifeprism.repository.providers import todo_provider as todo_store
+from lifeprism.repository.providers import timeline_provider as timeline_store
+from lifeprism.repository.providers import plan_doc_provider as plan_doc_store
+from lifeprism.repository.providers import tokens_usage_provider as tokens_usage_store
 ```
 
-- [ ] **Step 3: 导入多表 Aggregator 并重命名为 store**
+- [ ] **Step 3: 导入多表 Aggregator 并重命名为 repository**
 
 ```python
 # ==================== 多表 Store（内部是 Aggregator）====================
-from lifeprism.storage.aggregators import habit_aggregator as habit_store
-from lifeprism.storage.aggregators import mood_aggregator as mood_store
-from lifeprism.storage.aggregators import goal_aggregator as goal_store
-from lifeprism.storage.aggregators import habit_chain_aggregator as habit_chain_store
-from lifeprism.storage.aggregators import category_aggregator as category_store
-from lifeprism.storage.aggregators import map_cache_aggregator as map_cache_store
+from lifeprism.repository.aggregators import habit_aggregator as habit_store
+from lifeprism.repository.aggregators import mood_aggregator as mood_store
+from lifeprism.repository.aggregators import goal_aggregator as goal_store
+from lifeprism.repository.aggregators import habit_chain_aggregator as habit_chain_store
+from lifeprism.repository.aggregators import category_aggregator as category_store
+from lifeprism.repository.aggregators import map_cache_aggregator as map_cache_store
 ```
 
-- [ ] **Step 4: 更新 __all__ 导出列表（只导出 store）**
+- [ ] **Step 4: 更新 __all__ 导出列表（只导出 repository）**
 
 ```python
 __all__ = [
@@ -1207,16 +1207,16 @@ __all__ = [
 - [ ] **Step 5: 验证统一导出**
 
 ```bash
-python -c "from lifeprism.storage import diary_store, habit_store, mood_store, goal_store; print('统一 store 导出成功')"
+python -c "from lifeprism.repository import diary_store, habit_store, mood_store, goal_store; print('统一 repository 导出成功')"
 ```
 
-Expected: 输出 "统一 store 导出成功"
+Expected: 输出 "统一 repository 导出成功"
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lifeprism/storage/__init__.py
-git commit -m "feat(storage): 统一导出为 xxx_store 接口"
+git add lifeprism/repository/__init__.py
+git commit -m "feat(repository): 统一导出为 xxx_store 接口"
 ```
 
 ---
@@ -1224,14 +1224,14 @@ git commit -m "feat(storage): 统一导出为 xxx_store 接口"
 ## Task 10: 验证完整架构
 
 **Files:**
-- Test: 验证所有 store 接口可用
+- Test: 验证所有 repository 接口可用
 
 - [ ] **Step 1: 创建验证脚本**
 
 ```python
-# test_storage_architecture.py
-"""验证 Storage 架构重构"""
-from lifeprism.storage import (
+# test_repository_architecture.py
+"""验证 repository 架构重构"""
+from lifeprism.repository import (
     # 单表 Store
     diary_store,
     todo_store,
@@ -1314,7 +1314,7 @@ if __name__ == '__main__':
 - [ ] **Step 2: 运行验证脚本**
 
 ```bash
-python test_storage_architecture.py
+python test_repository_architecture.py
 ```
 
 Expected: 输出所有 ✓ 和最后的 "✅ 所有 Store 接口验证通过！"
@@ -1322,18 +1322,18 @@ Expected: 输出所有 ✓ 和最后的 "✅ 所有 Store 接口验证通过！"
 - [ ] **Step 3: 删除验证脚本**
 
 ```bash
-rm test_storage_architecture.py
+rm test_repository_architecture.py
 ```
 
 - [ ] **Step 4: 验证导入一致性（确保没有命名冲突）**
 
 ```bash
 python -c "
-from lifeprism.storage import diary_store, habit_store
-from lifeprism.storage.providers import diary_provider
-from lifeprism.storage.aggregators import habit_aggregator
+from lifeprism.repository import diary_store, habit_store
+from lifeprism.repository.providers import diary_provider
+from lifeprism.repository.aggregators import habit_aggregator
 
-# 验证 store 是 provider/aggregator 的别名
+# 验证 repository 是 provider/aggregator 的别名
 assert diary_store is diary_provider
 assert habit_store is habit_aggregator
 print('✅ Store 别名验证通过')
@@ -1346,7 +1346,7 @@ Expected: 输出 "✅ Store 别名验证通过"
 
 ```bash
 git add -A
-git commit -m "test(storage): 验证 Storage 架构重构完成"
+git commit -m "test(repository): 验证 repository 架构重构完成"
 ```
 
 ---
@@ -1354,16 +1354,16 @@ git commit -m "test(storage): 验证 Storage 架构重构完成"
 ## Task 11: 更新文档
 
 **Files:**
-- Create: `docs/coding-rules/storage-layer-usage.md`
+- Create: `docs/coding-rules/repository-layer-usage.md`
 
-- [ ] **Step 1: 创建 Storage 层使用规范文档**
+- [ ] **Step 1: 创建 repository 层使用规范文档**
 
 ```markdown
-# Storage 层使用规范
+# repository 层使用规范
 
 ## 概述
 
-Storage 层采用统一的 `xxx_store` 接口命名，内部实现分为 Provider（单表）和 Aggregator（多表）。
+repository 层采用统一的 `xxx_store` 接口命名，内部实现分为 Provider（单表）和 Aggregator（多表）。
 
 ## 架构设计
 
@@ -1385,14 +1385,14 @@ Provider（原子操作）→ Aggregator（数据聚合）→ Service（业务�
 ### 导入 Store
 
 ```python
-from lifeprism.storage import diary_store, habit_store, goal_store
+from lifeprism.repository import diary_store, habit_store, goal_store
 ```
 
 ### 单表 Store（Provider）
 
 ```python
 # diary_store - 日记数据访问
-from lifeprism.storage import diary_store
+from lifeprism.repository import diary_store
 
 # 查询日记
 diaries, total = diary_store.query_diaries(options)
@@ -1405,7 +1405,7 @@ diary = diary_store.get_diary_by_id(date)
 
 ```python
 # habit_store - 习惯数据聚合
-from lifeprism.storage import habit_store
+from lifeprism.repository import habit_store
 
 # 获取习惯详情（包含挑战信息）
 habit = habit_store.get_habit_with_challenge(habit_id)
@@ -1443,29 +1443,29 @@ habits = habit_store.get_habits_with_challenges(status='active')
 
 ✅ **正确**：
 ```python
-from lifeprism.storage import diary_store, habit_store
+from lifeprism.repository import diary_store, habit_store
 ```
 
 ❌ **错误**：
 ```python
 # 不要直接导入 provider 或 aggregator
-from lifeprism.storage.providers import diary_provider
-from lifeprism.storage.aggregators import habit_aggregator
+from lifeprism.repository.providers import diary_provider
+from lifeprism.repository.aggregators import habit_aggregator
 ```
 
 ### 2. 不要混用 Provider/Aggregator 和 Store
 
 ✅ **正确**：
 ```python
-from lifeprism.storage import habit_store
+from lifeprism.repository import habit_store
 
 habits = habit_store.get_habits_with_challenges()
 ```
 
 ❌ **错误**：
 ```python
-from lifeprism.storage.providers import habit_provider
-from lifeprism.storage.aggregators import habit_aggregator
+from lifeprism.repository.providers import habit_provider
+from lifeprism.repository.aggregators import habit_aggregator
 
 # 混用会导致混乱
 habits = habit_provider.get_habits()
@@ -1478,7 +1478,7 @@ Service 层应该只导入和使用 Store 接口：
 
 ```python
 # lifeprism/server/services/habit_service.py
-from lifeprism.storage import habit_store
+from lifeprism.repository import habit_store
 
 class HabitService:
     def get_habit_details(self, habit_id: str):
@@ -1489,13 +1489,13 @@ class HabitService:
 
 ### Provider（单表数据访问）
 
-- 位置：`lifeprism/storage/providers/`
+- 位置：`lifeprism/repository/providers/`
 - 职责：提供单表的 CRUD 操作
 - 特点：原子操作，可复用
 
 ### Aggregator（多表数据聚合）
 
-- 位置：`lifeprism/storage/aggregators/`
+- 位置：`lifeprism/repository/aggregators/`
 - 职责：聚合多个 Provider，提供统一的业务数据视图
 - 特点：组合多个 Provider，包含聚合逻辑
 
@@ -1508,7 +1508,7 @@ class HabitService:
 - [ ] **Step 2: 验证文档格式**
 
 ```bash
-cat docs/coding-rules/storage-layer-usage.md | head -20
+cat docs/coding-rules/repository-layer-usage.md | head -20
 ```
 
 Expected: 看到文档开头内容
@@ -1516,8 +1516,8 @@ Expected: 看到文档开头内容
 - [ ] **Step 3: Commit**
 
 ```bash
-git add docs/coding-rules/storage-layer-usage.md
-git commit -m "docs(storage): 添加 Storage 层使用规范文档"
+git add docs/coding-rules/repository-layer-usage.md
+git commit -m "docs(repository): 添加 repository 层使用规范文档"
 ```
 
 ---
@@ -1536,7 +1536,7 @@ git commit -m "docs(storage): 添加 Storage 层使用规范文档"
 
 **文件统计**：
 - 新建：7 个文件（6 个 aggregator + 1 个文档）
-- 修改：2 个文件（storage/__init__.py, aggregators/__init__.py）
+- 修改：2 个文件（repository/__init__.py, aggregators/__init__.py）
 
 ---
 

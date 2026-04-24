@@ -19,7 +19,7 @@ from lifeprism.server.schemas.todo_schemas import (
     WaidReorderRequest, WaidAddRequest,
 )
 from lifeprism.server.services import taskpool_service
-from lifeprism.storage.todo_store import todo_store
+from lifeprism.repository import todo_repository
 
 router = APIRouter(prefix="/todos", tags=["Todos"])
 
@@ -100,7 +100,7 @@ async def create_todo(request: CreateTodoRequest):
 @router.get("/waid", response_model=TodoListResponse, summary="获取 WAID 浮窗 todo 列表")
 async def get_waid_todos():
     """获取浮窗中的 todo 列表（waid_order IS NOT NULL，ASC 排序）"""
-    items = todo_store.get_waid_todos()
+    items = todo_repository.get_waid_todos()
     task_items = [taskpool_service.db_to_todo_item(item) for item in items]
     return TodoListResponse(items=task_items)
 
@@ -108,7 +108,7 @@ async def get_waid_todos():
 @router.put("/waid/reorder", summary="WAID 浮窗重排序")
 async def reorder_waid(request: WaidReorderRequest):
     """批量更新排序，body: { "todo_ids": [3, 1, 5] }"""
-    success = todo_store.batch_update_waid_order(request.todo_ids)
+    success = todo_repository.batch_update_waid_order(request.todo_ids)
     if not success:
         raise HTTPException(status_code=500, detail="重排序失败")
     return {"success": True}
@@ -126,14 +126,14 @@ async def add_to_waid(
 
     order = request.waid_order
     if order is None:
-        waid_todos = todo_store.get_waid_todos()
+        waid_todos = todo_repository.get_waid_todos()
         if waid_todos:
             max_order = max(t.get('waid_order', 0) for t in waid_todos)
             order = max_order + 1
         else:
             order = 0
 
-    success = todo_store.update_todo(todo_id, {'waid_order': order})
+    success = todo_repository.update_todo(todo_id, {'waid_order': order})
     if not success:
         raise HTTPException(status_code=500, detail="添加到浮窗失败")
     return {"success": True, "waid_order": order}
@@ -144,7 +144,7 @@ async def remove_from_waid(
     todo_id: str = Path(..., description="任务 ID")
 ):
     """从浮窗移除（设 waid_order = NULL），不删除 todo 本身"""
-    success = todo_store.clear_waid_order(todo_id)
+    success = todo_repository.clear_waid_order(todo_id)
     if not success:
         raise HTTPException(status_code=404, detail="任务不存在或未在浮窗中")
     return {"success": True}

@@ -3,7 +3,7 @@
 
 # 为 Timeline 模块提供专用的数据加载方法
 # """
-# from lifeprism.storage import LWBaseDataProvider
+# from lifeprism.repository import LWBaseDataProvider
 # from lifeprism.utils import get_logger, LazySingleton
 # logger = get_logger(__name__)
 

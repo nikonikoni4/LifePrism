@@ -46,7 +46,7 @@ logger.debug(f"刷新缓存成功，共 {count} 个")  # 调试
 
 ### 4.1 Service 层职责
 
-- 调用 `from lifeprism.storage  import xx_store`获取数据、实现业务逻辑、数据转换和聚合、缓存管理
+- 调用 `from lifeprism.repository  import xx_store`获取数据、实现业务逻辑、数据转换和聚合、缓存管理
 
 #### 有状态 Service 示例
 
@@ -91,8 +91,8 @@ def generate_id(prefix: str) -> str:
 
 ## 5. 错误处理分层
 
-### store 层（数据访问层）
-- 范围：storage，llm，processor，monitor等大部分外部接口
+### repository 层（数据访问层）
+- 范围：repository，llm，processor，monitor等大部分外部接口
 - 捕获外部异常，转换为业务异常并抛出
 
 ### Service 层（业务逻辑层）
@@ -117,8 +117,8 @@ def generate_id(prefix: str) -> str:
 2. **统一接口**：所有 Provider 使用 `QueryOptions` 统一查询接口
 3. **分层清晰**：Provider（原子操作）→ Aggregator（数据聚合）→ Service（业务逻辑）
 4. **类型安全**：使用 Store 统一导出，提供类型提示
-5. 不得在非storage的任何位置直接编写sql
-6. 只能从`lifeprism.storage`导入数据库store单例对象，比如`from lifeprism.storage import diray_store`
+5. 不得在非repository的任何位置直接编写sql
+6. 只能从`lifeprism.repository`导入数据库store单例对象，比如`from lifeprism.repository import diray_store`
 7. 不能直接引用store中provider成员，只能直接使用store单例提供的方法
 
 ### 查询接口使用
@@ -128,7 +128,7 @@ def generate_id(prefix: str) -> str:
 **基本使用方法**：
 
 ```python
-from lifeprism.storage import Store, QueryOptions
+from lifeprism.repository import Store, QueryOptions
 
 # 查询今日活跃 todos
 options = QueryOptions(

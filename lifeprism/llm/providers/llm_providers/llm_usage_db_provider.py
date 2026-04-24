@@ -5,7 +5,7 @@ LLM 使用统计数据提供者
 import logging
 from typing import Any
 
-from lifeprism.storage import LWBaseDataProvider
+from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import LazySingleton
 
 logger = logging.getLogger(__name__)

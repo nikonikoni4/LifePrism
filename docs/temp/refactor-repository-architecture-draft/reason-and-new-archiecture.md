@@ -13,13 +13,13 @@
 lifeprism/
 ├── config/
 │   └── database.py              # 表结构定义
-├── storage/
+├── repository/
 │   ├── database_manager.py      # 数据库连接管理
 │   ├── base_providers/
 │   │   └── lw_base_data_provider.py  # 基类
 │   └── migrations/              # 数据库迁移
 ├── server/
-│   ├── providers/               # ❌ 20+ provider类（应该在storage）
+│   ├── providers/               # ❌ 20+ provider类（应该在repository）
 │   │   ├── goal_provider.py
 │   │   ├── todo_provider.py
 │   │   └── ...
@@ -44,7 +44,7 @@ lifeprism/
 │   ├── settings_manager.py      # 用户设置（保持不变）
 │   └── providers.yaml            # LLM提供商配置（保持不变）
 │
-├── storage/                      # 🎯 数据存储层（核心重构区域）
+├── repository/                      # 🎯 数据存储层（核心重构区域）
 │   ├── schemas.py                # ✅ 表结构定义（从config/database.py迁移）
 │   ├── database_manager.py       # 数据库连接管理（保持不变）
 │   │
@@ -73,7 +73,7 @@ lifeprism/
 │   └── schemas/                  # API schemas（保持不变，不移动）
 │
 └── llm/                          # LLM模块
-    ├── services/                 # 🆕 LLM业务逻辑（直接使用storage.providers）
+    ├── services/                 # 🆕 LLM业务逻辑（直接使用repository.providers）
     └── ...                       # 删除llm/providers/dataset_providers/
 ```
 
@@ -81,6 +81,6 @@ lifeprism/
 
 | 层级 | 位置 | 职责 | 示例 |
 |------|------|------|------|
-| **Provider** | `storage/providers/` | 原子的数据库操作，通用、可复用 | `query_todos(filters, sort, page)` |
-| **Aggregator** | `storage/aggregators/` | 组合多个provider调用，数据聚合计算 | `aggregate_daily_stats()` 调用多个provider |
+| **Provider** | `repository/providers/` | 原子的数据库操作，通用、可复用 | `query_todos(filters, sort, page)` |
+| **Aggregator** | `repository/aggregators/` | 组合多个provider调用，数据聚合计算 | `aggregate_daily_stats()` 调用多个provider |
 | **Service** | `server/services/` 或 `llm/services/` | 业务逻辑、事务协调、外部调用 | `complete_todo()` 更新数据库 + 发送通知 |

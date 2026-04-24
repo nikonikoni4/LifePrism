@@ -673,7 +673,7 @@
         "keywords": ["分类模式", "长活动", "多用途应用"]
       },
       {
-        "id": "settings-storage",
+        "id": "settings-repository",
         "title": "存储与数据源",
         "abstract": "配置两个关键路径：1) LifePrism 数据路径 - 系统数据存储位置（数据库、计划书、数据集等），支持迁移到其他位置；2) ActivityWatch 数据库路径 - AW 的 SQLite 数据库文件位置，用于读取电脑活动数据。路径修改后会自动验证有效性。",
         "keywords": ["数据路径", "ActivityWatch", "数据库", "lifeprismData"]

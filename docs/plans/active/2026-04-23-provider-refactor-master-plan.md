@@ -120,7 +120,7 @@ related_spec:
 ## 重构lwbaseprovider
 
  1. 背景：我最近正在重构provider，原因：docs\temp\refactor-repository-architecture-draft\reason-and-new-archi
-  ecture.md 。我已经重构了比较简单的内容，已经完成的内容在lifeprism/storage/provder内。现在我想打算重构lwbased
+  ecture.md 。我已经重构了比较简单的内容，已经完成的内容在lifeprism/repository/provder内。现在我想打算重构lwbased
     atabaseprovider，使其仅仅保留通用内容。需要你整理出非
 
 1. 需要移除的函数

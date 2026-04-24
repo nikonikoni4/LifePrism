@@ -110,7 +110,7 @@ _step_start = _log_startup_time("[OK] API routers imported", _step_start)
 # ==================== 数据库模块导入 ====================
 print("[STARTUP] 正在导入数据库模块...")
 _import_start = time.perf_counter()
-from lifeprism.storage.lw_table_manager import init_database
+from lifeprism.repository.lw_table_manager import init_database
 _log_startup_time("  - lw_table_manager.init_database", _import_start)
 
 _import_start = time.perf_counter()
@@ -118,15 +118,15 @@ from lifeprism.server.providers.category_color_provider import initialize_catego
 _log_startup_time("  - category_color_provider.initialize_category_colors", _import_start)
 
 _import_start = time.perf_counter()
-from lifeprism.storage.data_initializer import initialize_default_data
+from lifeprism.repository.data_initializer import initialize_default_data
 _log_startup_time("  - data_initializer.initialize_default_data", _import_start)
 
 _import_start = time.perf_counter()
-from lifeprism.storage.migrations.migration_runner import run_migrations
+from lifeprism.repository.migrations.migration_runner import run_migrations
 _log_startup_time("  - migration_runner.run_migrations", _import_start)
 
 _import_start = time.perf_counter()
-from lifeprism.storage.resource_initializer import initialize_resources
+from lifeprism.repository.resource_initializer import initialize_resources
 _log_startup_time("  - resource_initializer.initialize_resources", _import_start)
 
 _step_start = _log_startup_time("[OK] Database modules imported", _step_start)

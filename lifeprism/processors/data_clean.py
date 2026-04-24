@@ -9,7 +9,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Tuple
 import pytz
-from lifeprism.storage import LWBaseDataProvider
+from lifeprism.repository import LWBaseDataProvider
 from lifeprism.processors import processor_aw_data_provider, processor_monitor_data_provider
 from lifeprism.utils import is_multipurpose_app
 from lifeprism.config import LOCAL_TIMEZONE

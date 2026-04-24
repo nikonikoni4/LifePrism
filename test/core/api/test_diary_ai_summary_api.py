@@ -8,7 +8,7 @@ from lifeprism.server.main import app
 def test_generate_diary_ai_summary_rejects_empty_content(monkeypatch):
     from lifeprism.server.providers.diary_provider import diary_provider
 
-    stored = {
+    repositoryd = {
         "date": "2026-04-17",
         "mood": None,
         "importance": None,
@@ -18,7 +18,7 @@ def test_generate_diary_ai_summary_rejects_empty_content(monkeypatch):
         "updated_at": "",
     }
 
-    monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: stored)
+    monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: repositoryd)
     monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "   \n")
 
     client = TestClient(app)
@@ -31,7 +31,7 @@ def test_generate_diary_ai_summary_rejects_empty_content(monkeypatch):
 def test_generate_diary_ai_summary_overwrites_summary_and_source_hash(monkeypatch):
     from lifeprism.server.providers.diary_provider import diary_provider
 
-    stored = {
+    repositoryd = {
         "date": "2026-04-17",
         "mood": "calm",
         "importance": "normal",
@@ -51,7 +51,7 @@ def test_generate_diary_ai_summary_overwrites_summary_and_source_hash(monkeypatc
 
     updated_payloads = []
 
-    monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: stored)
+    monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: repositoryd)
     monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "今天写了很多内容")
     monkeypatch.setattr("lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary)
     monkeypatch.setattr(diary_provider, "update_diary", lambda date, data: updated_payloads.append(data) or True)
@@ -73,7 +73,7 @@ def test_generate_diary_ai_summary_overwrites_summary_and_source_hash(monkeypatc
 def test_generate_diary_ai_summary_overwrites_existing_summary(monkeypatch):
     from lifeprism.server.providers.diary_provider import diary_provider
 
-    stored = {
+    repositoryd = {
         "date": "2026-04-17",
         "mood": "calm",
         "importance": "normal",
@@ -92,7 +92,7 @@ def test_generate_diary_ai_summary_overwrites_existing_summary(monkeypatch):
 
     updated_payloads = []
 
-    monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: stored)
+    monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: repositoryd)
     monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "今天写了很多内容")
     monkeypatch.setattr("lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary)
     monkeypatch.setattr(diary_provider, "update_diary", lambda date, data: updated_payloads.append(data) or True)
@@ -109,7 +109,7 @@ def test_generate_diary_ai_summary_overwrites_existing_summary(monkeypatch):
 def test_generate_diary_ai_summary_does_not_overwrite_on_llm_failure(monkeypatch):
     from lifeprism.server.providers.diary_provider import diary_provider
 
-    stored = {
+    repositoryd = {
         "date": "2026-04-17",
         "mood": "calm",
         "importance": "normal",
@@ -128,7 +128,7 @@ def test_generate_diary_ai_summary_does_not_overwrite_on_llm_failure(monkeypatch
         update_called = True
         return True
 
-    monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: stored)
+    monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: repositoryd)
     monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "今天写了很多内容")
     monkeypatch.setattr("lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary)
     monkeypatch.setattr(diary_provider, "update_diary", fake_update_diary)
@@ -144,7 +144,7 @@ def test_generate_diary_ai_summary_passes_existing_summary_to_llm(monkeypatch):
     """Single-day regeneration should pass existing summary as outdate_summary to ai_diary_summary"""
     from lifeprism.server.providers.diary_provider import diary_provider
 
-    stored = {
+    repositoryd = {
         "date": "2026-04-17",
         "mood": "calm",
         "importance": "normal",
@@ -160,7 +160,7 @@ def test_generate_diary_ai_summary_passes_existing_summary_to_llm(monkeypatch):
         captured["outdate_summary"] = outdate_summary
         return {"content": "新总结"}
 
-    monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: stored)
+    monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: repositoryd)
     monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "今天写了很多内容")
     monkeypatch.setattr("lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary)
     monkeypatch.setattr(diary_provider, "update_diary", lambda date, data: True)

@@ -4,7 +4,7 @@
 import pandas as pd
 from typing import Optional
 from datetime import datetime
-from lifeprism.storage import LWBaseDataProvider
+from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger, LazySingleton
 from lifeprism.config.database import get_table_columns
 

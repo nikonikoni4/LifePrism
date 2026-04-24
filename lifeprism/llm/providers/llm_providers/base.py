@@ -54,7 +54,7 @@ class LLMResponse:
 class GenerationSettings:
     """Default generation parameters for LLM calls.
 
-    Stored on the provider so every call site inherits the same defaults
+    repositoryd on the provider so every call site inherits the same defaults
     without having to pass temperature / max_tokens / reasoning_effort
     through every layer.  Individual call sites can still override by
     passing explicit keyword arguments to chat() / chat_with_retry().

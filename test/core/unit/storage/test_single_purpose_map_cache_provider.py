@@ -5,8 +5,8 @@ SinglePurposeMapCacheProvider 单元测试
 """
 import pytest
 import uuid
-from lifeprism.storage.providers import single_purpose_map_cache_provider
-from lifeprism.storage.providers.common_query_options import QueryOptions
+from lifeprism.repository.providers import single_purpose_map_cache_provider
+from lifeprism.repository.providers.common_query_options import QueryOptions
 
 
 # ==================== 测试辅助函数 ====================

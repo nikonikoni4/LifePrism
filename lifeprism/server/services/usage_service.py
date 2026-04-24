@@ -14,8 +14,8 @@ from lifeprism.server.schemas.usage_schemas import (
     UsageStats7DaysItem,
     UsageStatsResponse
 )
-from lifeprism.storage import tokens_usage_store
-from lifeprism.storage.providers.common_query_options import QueryOptions
+from lifeprism.repository import tokens_usage_repository
+from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.config.settings_manager import settings
 # 常量：Data Processing 的 mode
 MODE_CLASSIFICATION = "classification"
@@ -49,7 +49,7 @@ def _query_tokens_usage_records(date: str = None,
     if mode:
         query_options = query_options.with_filters(mode=mode)
 
-    records, _ = tokens_usage_store.query_tokens_usage(query_options)
+    records, _ = tokens_usage_repository.query_tokens_usage(query_options)
     range_start, range_end = _to_time_range(date=date, start_time=start_time, end_time=end_time)
 
     if not range_start and not range_end:

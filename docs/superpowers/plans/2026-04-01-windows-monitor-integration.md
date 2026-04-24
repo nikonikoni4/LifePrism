@@ -87,17 +87,17 @@ git commit -m "feat(config): add window_events table configuration"
 ### Task 2: 实现 Window Data Provider
 
 **Files:**
-- Create: `lifeprism/storage/providers/window_data_provider.py`
-- Modify: `lifeprism/storage/__init__.py`
+- Create: `lifeprism/repository/providers/window_data_provider.py`
+- Modify: `lifeprism/repository/__init__.py`
 
 - [ ] **Step 1: 编写 TDD 测试**
 
-在 `tests/storage/test_window_provider.py` 中编写 `save_event` 的测试。
+在 `tests/repository/test_window_provider.py` 中编写 `save_event` 的测试。
 
 - [ ] **Step 2: 实现 LWWindowDataProvider**
 
 ```python
-from lifeprism.storage.base_providers import LWBaseDataProvider
+from lifeprism.repository.base_providers import LWBaseDataProvider
 class LWWindowDataProvider(LWBaseDataProvider):
     def save_event(self, timestamp, duration, app, title):
         sql = "INSERT INTO window_events (timestamp, duration, app, title) VALUES (?, ?, ?, ?)"
@@ -113,10 +113,10 @@ class LWWindowDataProvider(LWBaseDataProvider):
 
 - [ ] **Step 1: 批量更新导入路径**
 将所有相对导入改为 `lifeprism.monitor.windows_monitor` 开头的绝对导入。
-- [ ] **Step 2: 注入 Provider 替换本地 Storage**
+- [ ] **Step 2: 注入 Provider 替换本地 repository**
 修改 `WindowMonitor.__init__` 接受 `LWWindowDataProvider` 实例。
 - [ ] **Step 3: 移除冗余文件**
-删除 `monitor/windows_monitor/storage.py` 和 `config.py`。
+删除 `monitor/windows_monitor/repository.py` 和 `config.py`。
 
 ### Task 4: 服务器集成与多进程管理
 

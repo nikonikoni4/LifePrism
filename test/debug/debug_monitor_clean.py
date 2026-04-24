@@ -9,7 +9,7 @@ sys.path.insert(0, project_root)
 
 from lifeprism.config.settings_manager import settings
 from lifeprism.processors.data_clean import clean_activitywatch_data
-from lifeprism.storage import lw_db_manager
+from lifeprism.repository import lw_db_manager
 
 def setup_debug_data():
     """在 window_events 表中创建一些模拟数据"""

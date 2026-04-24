@@ -10,7 +10,7 @@
 
 **核心问题**: 在重构 Provider 后，如何设计 Aggregator 层？是否需要为所有实体创建 Aggregator（包括单表的透传 Aggregator）？
 
-**推荐方案**: 混合模式 - 单表使用 Provider，多表使用 Aggregator，统一从 `storage` 导出
+**推荐方案**: 混合模式 - 单表使用 Provider，多表使用 Aggregator，统一从 `repository` 导出
 
 **关键发现**:
 - 透传 Aggregator 违反 YAGNI 和 SRP 原则
@@ -269,14 +269,14 @@ class UniversalDataProvider:
 **在本项目中的应用**:
 ```python
 # ❌ 违反最小惊讶原则：名为 aggregator 但只是转发
-from storage.aggregators import diary_aggregator
+from repository.aggregators import diary_aggregator
 # 用户期待：这应该是一个聚合多个数据源的类
 # 实际情况：只是简单转发给 diary_provider
 # 结果：用户感到困惑
 
 # ✅ 符合最小惊讶原则：名称准确反映功能
-from storage.providers import diary_provider      # 期待：单表操作 ✓
-from storage.aggregators import habit_aggregator  # 期待：多表聚合 ✓
+from repository.providers import diary_provider      # 期待：单表操作 ✓
+from repository.aggregators import habit_aggregator  # 期待：多表聚合 ✓
 ```
 
 ---
@@ -297,14 +297,14 @@ from storage.aggregators import habit_aggregator  # 期待：多表聚合 ✓
 **在本项目中的应用**:
 ```python
 # ❌ 违反接口正交化：两种类型的接口
-from storage import diary_provider      # 类型 1：provider
-from storage import habit_aggregator    # 类型 2：aggregator
+from repository import diary_provider      # 类型 1：provider
+from repository import habit_aggregator    # 类型 2：aggregator
 # AI 需要判断：何时用 provider，何时用 aggregator
 
 # ✅ 符合接口正交化：统一类型的接口
-from storage import diary_store         # 统一类型：store
-from storage import habit_store         # 统一类型：store
-# AI 只需要选择具体的 store，不需要判断类型
+from repository import diary_store         # 统一类型：repository
+from repository import habit_store         # 统一类型：repository
+# AI 只需要选择具体的 repository，不需要判断类型
 ```
 
 #### 2.7.2 动作空间最小化 (Minimal Action Space)
@@ -329,7 +329,7 @@ from storage import habit_store         # 统一类型：store
 
 # ✅ 动作空间最小：只需要选择对象
 动作空间 = {
-    选择 store (diary_store, todo_store, habit_store, goal_store, ...)
+    选择 repository (diary_store, todo_store, habit_store, goal_store, ...)
 }
 # AI 直接选择具体对象，不需要判断类型
 ```
@@ -427,7 +427,7 @@ diary_provider         : 1 次
 
 **典型的多表聚合场景**（HabitChainService）：
 ```python
-from lifeprism.storage.providers import (
+from lifeprism.repository.providers import (
     habit_chain_provider,
     habit_chain_node_provider,
     habit_checkin_provider,
@@ -501,7 +501,7 @@ def get_chains(self, show_in_timeline: Optional[bool]):
 
 **实现方式**：
 ```python
-# storage/__init__.py
+# repository/__init__.py
 from .providers import diary_provider
 from .aggregators import habit_aggregator as habit_provider
 ```
@@ -523,7 +523,7 @@ from .aggregators import habit_aggregator as habit_provider
 
 **实现方式**：
 ```python
-# storage/__init__.py
+# repository/__init__.py
 from .providers import diary_provider as diary_aggregator
 from .aggregators import habit_aggregator
 ```
@@ -544,7 +544,7 @@ from .aggregators import habit_aggregator
 
 **实现方式**：
 ```python
-# storage/__init__.py
+# repository/__init__.py
 from .providers import diary_provider as diary_store
 from .aggregators import habit_aggregator as habit_store
 ```
@@ -552,9 +552,9 @@ from .aggregators import habit_aggregator as habit_store
 **优势**：
 - ✅ 符合接口正交化（统一类型）
 - ✅ 符合动作空间最小化（只选择对象）
-- ✅ 语义中性（store 既不暗示简单也不暗示复杂）
+- ✅ 语义中性（repository 既不暗示简单也不暗示复杂）
 - ✅ 语义准确（无论单表还是多表，都是"数据存储"）
-- ✅ 业界常见（Redux、Vuex、MobX 都用 store）
+- ✅ 业界常见（Redux、Vuex、MobX 都用 repository）
 - ✅ 不会误导（不会让人误以为都简单或都复杂）
 
 **劣势**：
@@ -564,13 +564,13 @@ from .aggregators import habit_aggregator as habit_store
 
 ### 5.6 多维度对比表
 
-| 维度 | 方案 B（混合） | 方案 C（统一 provider） | 方案 D（统一 aggregator） | **方案 E（统一 store）** |
+| 维度 | 方案 B（混合） | 方案 C（统一 provider） | 方案 D（统一 aggregator） | **方案 E（统一 repository）** |
 |------|--------------|---------------------|----------------------|---------------------|
 | **接口正交化** | ❌ 两种类型 | ✅ 统一类型 | ✅ 统一类型 | ✅ 统一类型 |
 | **动作空间最小化** | ❌ 需要选择类型 | ✅ 只选择对象 | ✅ 只选择对象 | ✅ 只选择对象 |
 | **语义准确性** | ✅ 准确 | ⚠️ 单表准确，多表不准确 | ⚠️ 多表准确，单表不准确 | ✅ 都准确 |
 | **避免误导** | ✅ 不误导 | ⚠️ 可能误以为都简单 | ⚠️ 可能误以为都复杂 | ✅ 不误导 |
-| **业界惯例** | ⚠️ 不常见 | ⚠️ provider 不常用于聚合 | ⚠️ aggregator 不常用于单表 | ✅ store 很常见 |
+| **业界惯例** | ⚠️ 不常见 | ⚠️ provider 不常用于聚合 | ⚠️ aggregator 不常用于单表 | ✅ repository 很常见 |
 | **符合 YAGNI** | ✅ 按需创建 | ✅ 只需 as 重命名 | ✅ 只需 as 重命名 | ✅ 只需 as 重命名 |
 | **符合 SRP** | ✅ 职责明确 | ✅ 职责明确 | ✅ 职责明确 | ✅ 职责明确 |
 | **符合 DDD** | ✅ 聚合根才用 Aggregator | ✅ 内部实现符合 | ✅ 内部实现符合 | ✅ 内部实现符合 |
@@ -590,7 +590,7 @@ from .aggregators import habit_aggregator as habit_store
 
 **方案 B（混合命名）的问题**：
 ```python
-from storage import diary_provider, habit_aggregator
+from repository import diary_provider, habit_aggregator
 
 # AI 的决策树：
 # 1. 判断是单表还是多表？
@@ -599,9 +599,9 @@ from storage import diary_provider, habit_aggregator
 # 决策节点：2 个
 ```
 
-**方案 E（统一 store）的优势**：
+**方案 E（统一 repository）的优势**：
 ```python
-from storage import diary_store, habit_store
+from repository import diary_store, habit_store
 
 # AI 的决策树：
 # 1. 选择具体的 xxx_store
@@ -660,7 +660,7 @@ from storage import diary_store, habit_store
 
 **方案 A 的问题**：
 ```python
-from storage.aggregators import diary_aggregator
+from repository.aggregators import diary_aggregator
 
 # AI 的推理过程：
 # 1. 看到 "aggregator" → 期待聚合逻辑
@@ -671,8 +671,8 @@ from storage.aggregators import diary_aggregator
 
 **方案 B 的优势**：
 ```python
-from storage.providers import diary_provider
-from storage.aggregators import habit_aggregator
+from repository.providers import diary_provider
+from repository.aggregators import habit_aggregator
 
 # AI 的推理过程：
 # 1. 看到 "provider" → 理解为单表操作
@@ -732,7 +732,7 @@ AI 理解：规则清晰，易于判断
 **核心理念**：
 1. **接口正交化**：统一的接口类型，清晰的边界
 2. **动作空间最小化**：减少 AI 的选择负担
-3. **语义准确性**：store 是中性词，适用于所有场景
+3. **语义准确性**：repository 是中性词，适用于所有场景
 4. **YAGNI**：使用 `as` 重命名，不创建透传层
 
 ---
@@ -741,7 +741,7 @@ AI 理解：规则清晰，易于判断
 
 **目录结构**：
 ```
-lifeprism/storage/
+lifeprism/repository/
 ├── __init__.py                    # 统一导出点（使用 as 重命名）
 ├── providers/                     # 单表数据访问（内部实现）
 │   ├── diary_provider.py
@@ -754,20 +754,20 @@ lifeprism/storage/
 └── migrations/
 ```
 
-**统一导出（storage/__init__.py）**：
+**统一导出（repository/__init__.py）**：
 ```python
-# 单表场景（内部是 Provider，对外命名为 store）
+# 单表场景（内部是 Provider，对外命名为 repository）
 from .providers import diary_provider as diary_store
 from .providers import todo_provider as todo_store
 
-# 多表场景（内部是 Aggregator，对外命名为 store）
+# 多表场景（内部是 Aggregator，对外命名为 repository）
 from .aggregators import habit_aggregator as habit_store
 from .aggregators import goal_aggregator as goal_store
 ```
 
 **使用方式**：
 ```python
-from lifeprism.storage import diary_store, habit_store
+from lifeprism.repository import diary_store, habit_store
 
 # 统一的接口，AI 不需要判断类型
 diaries = diary_store.query_diaries(options)
@@ -787,7 +787,7 @@ habits = habit_store.get_habits_with_stats()
 
 **关键原则**：
 - ✅ 内部实现保持清晰（Provider 还是 Provider，Aggregator 还是 Aggregator）
-- ✅ 对外接口统一（都是 store）
+- ✅ 对外接口统一（都是 repository）
 - ✅ 使用 `as` 重命名，不创建透传层
 
 ---
@@ -795,8 +795,8 @@ habits = habit_store.get_habits_with_stats()
 ### 6.4 方案优势总结
 
 **符合 AI 协作原则**：
-- ✅ 接口正交化：统一的 store 接口
-- ✅ 动作空间最小化：只需选择具体的 store
+- ✅ 接口正交化：统一的 repository 接口
+- ✅ 动作空间最小化：只需选择具体的 repository
 
 **符合传统架构原则**：
 - ✅ YAGNI：不创建透传层
@@ -804,7 +804,7 @@ habits = habit_store.get_habits_with_stats()
 - ✅ DDD：Aggregator 对应聚合根
 
 **语义准确性**：
-- ✅ store 是中性词，适用于所有场景
+- ✅ repository 是中性词，适用于所有场景
 - ✅ 不会误导 AI 和开发者
 - ✅ 符合业界惯例（Redux、Vuex、MobX）
 
@@ -821,7 +821,7 @@ habits = habit_store.get_habits_with_stats()
 
 **方案 E（统一 Store）**：
 - 需要创建：6 个 Aggregator（只创建真正需要的）
-- 需要修改：`storage/__init__.py` 中添加 `as` 重命名
+- 需要修改：`repository/__init__.py` 中添加 `as` 重命名
 - 需要修改：所有 service 层的导入语句（约 13 处）
 - 代码量：约 300-500 行（只有实际聚合逻辑）
 - 工作量：2-3 天
@@ -829,11 +829,11 @@ habits = habit_store.get_habits_with_stats()
 ### 7.2 实施步骤
 
 **阶段 1：创建 Aggregator（1-2 天）**
-- 创建 `storage/aggregators/` 目录
+- 创建 `repository/aggregators/` 目录
 - 创建 6 个 Aggregator（habit, goal, mood, habit_chain, category, map_cache）
 
 **阶段 2：统一导出（0.5 天）**
-- 修改 `storage/__init__.py`，使用 `as` 将所有接口重命名为 `xxx_store`
+- 修改 `repository/__init__.py`，使用 `as` 将所有接口重命名为 `xxx_store`
 - 添加文档注释说明统一命名规范
 
 **阶段 3：迁移 Service 层（1 天）**
@@ -842,7 +842,7 @@ habits = habit_store.get_habits_with_stats()
 - 将 `xxx_aggregator` 改为 `xxx_store`
 
 **阶段 4：编写规范文档（0.5 天）**
-- 在 `docs/coding-rules/` 创建 `storage-layer-usage.md`
+- 在 `docs/coding-rules/` 创建 `repository-layer-usage.md`
 - 说明统一使用 `xxx_store` 的规范
 - 解释内部实现（Provider vs Aggregator）的区别
 
@@ -927,7 +927,7 @@ habits = habit_store.get_habits_with_stats()
 ### 关键优势
 
 **AI 协作层面**：
-- ✅ 接口正交化：统一的 store 接口，清晰的边界
+- ✅ 接口正交化：统一的 repository 接口，清晰的边界
 - ✅ 动作空间最小化：决策节点减少 50%，选择复杂度降低 50%
 
 **架构设计层面**：
@@ -936,7 +936,7 @@ habits = habit_store.get_habits_with_stats()
 - ✅ DDD：Aggregator 对应聚合根
 
 **语义准确性**：
-- ✅ store 是中性词，适用于所有场景
+- ✅ repository 是中性词，适用于所有场景
 - ✅ 不会误导 AI 和开发者
 - ✅ 符合业界惯例
 

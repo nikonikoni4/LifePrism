@@ -16,8 +16,8 @@ from lifeprism.monitor.screenshot.policy import get_frequency_policy
 from lifeprism.monitor.screenshot.scheduler import ScreenshotScheduler
 from lifeprism.monitor.screenshot.store import ScreenshotStore
 from lifeprism.monitor.windows_monitor.monitor import WindowMonitor
-from lifeprism.storage.database_manager import DatabaseManager
-from lifeprism.storage.lw_table_manager import LWTableManager
+from lifeprism.repository.database_manager import DatabaseManager
+from lifeprism.repository.lw_table_manager import LWTableManager
 from lifeprism.utils.logger import get_logger
 
 logger = get_logger(__name__)

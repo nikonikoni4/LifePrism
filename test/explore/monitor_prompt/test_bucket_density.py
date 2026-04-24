@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, '.')
 
 from datetime import datetime, timedelta
-from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
+from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
 from lifeprism.llm.summary_context.aggregators.activity_aggregator import (
     compute_bucket_density,
     _collect_buckets,
@@ -89,7 +89,7 @@ def get_app_descriptions(apps: set) -> dict:
     """从 category_map_cache 查询 app 的 description"""
     if not apps:
         return {}
-    from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
     prov = LWBaseDataProvider()
     df = prov.load_category_map_cache_V2()
     if df is None:
@@ -113,7 +113,7 @@ def get_screenshot_counts(seg_start: str, seg_end: str) -> dict:
     WHERE captured_at >= ? AND captured_at <= ?
     GROUP BY capture_reason
     """
-    from lifeprism.storage import lw_db_manager
+    from lifeprism.repository import lw_db_manager
     result = {'scheduled': 0, 'enter': 0, 'active': 0}
     with lw_db_manager.get_connection() as conn:
         cursor = conn.cursor()

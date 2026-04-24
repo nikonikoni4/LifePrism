@@ -6,8 +6,8 @@ LWBaseDataProvider 通用方法单元测试
 import pytest
 from typing import Set
 
-from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
-from lifeprism.storage.providers.common_query_options import QueryOptions
+from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+from lifeprism.repository.providers.common_query_options import QueryOptions
 
 
 # ==================== 测试用 Mock Provider ====================

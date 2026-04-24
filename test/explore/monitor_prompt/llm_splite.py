@@ -11,7 +11,7 @@ sys.path.insert(0, '.')
 
 from datetime import datetime
 from lifeprism.llm.providers.build_llm_client import create_llm_client
-from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
+from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
 
 
 # === prompt ===
@@ -58,7 +58,7 @@ STEP_1_PROMPT = """
 
 def get_segment_logs(segments: list, logs: list) -> list:
     """收集每个段内的log数据（含app_description）"""
-    from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
 
     prov = LWBaseDataProvider()
     df = prov.load_category_map_cache_V2()

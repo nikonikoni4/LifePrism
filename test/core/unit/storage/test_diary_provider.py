@@ -4,7 +4,7 @@ Diary Provider 单元测试
 测试新 provider 的所有方法。
 """
 import pytest
-from lifeprism.storage.providers import DiaryProvider, QueryOptions
+from lifeprism.repository.providers import DiaryProvider, QueryOptions
 
 
 @pytest.fixture

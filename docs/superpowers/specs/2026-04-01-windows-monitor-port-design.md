@@ -7,7 +7,7 @@
 
 ### 2.1 模块结构
 - `windows_api.py`: 封装 Windows 原生 API 调用 (`pywin32`, `WMI`)。
-- `storage.py`: 数据库持久化逻辑，使用 `sqlite3`。
+- `repository.py`: 数据库持久化逻辑，使用 `sqlite3`。
 - `monitor.py`: 轮询逻辑、心跳检测与合并存储算法。
 - `main.py`: 入口文件，处理命令行参数、日志配置和退出处理。
 - `config.py`: 配置管理（默认值与配置文件）。
@@ -18,7 +18,7 @@
 3. **合并存储策略**: 
    - 在内存中维护 `current_window` 和 `start_time`。
    - 如果新窗口与 `current_window` 相同，则累加时长。
-   - 如果不同，则计算前一个窗口的 `duration`，调用 `storage.py` 写入数据库，并重置 `current_window`。
+   - 如果不同，则计算前一个窗口的 `duration`，调用 `repository.py` 写入数据库，并重置 `current_window`。
 4. 程序退出前（收到 SIGINT/SIGTERM），强制刷盘最后一条记录。
 
 ## 3. 技术规范 (Technical Specifications)
@@ -56,7 +56,7 @@ else:
 ## 5. 测试计划 (Test Plan)
 1. **单元测试**: 
    - 测试 `windows_api.py` 是否能正确获取各种窗口（普通窗口、管理员权限窗口、UWP 应用）。
-   - 测试 `storage.py` 的读写和初始化逻辑。
+   - 测试 `repository.py` 的读写和初始化逻辑。
 2. **集成测试**: 
    - 运行 `main.py`，在不同应用间切换，手动检查数据库是否按预期生成记录并正确计算 `duration`。
    - 检查正常退出后最后一条记录是否已存入。

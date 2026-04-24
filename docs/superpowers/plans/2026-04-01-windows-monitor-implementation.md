@@ -73,13 +73,13 @@ def get_app_name_wmi(hwnd):
 ### Task 3: 实现 SQLite 存储层
 
 **Files:**
-- Create: `lifeprism/monitor/windows-monitor/storage.py`
+- Create: `lifeprism/monitor/windows-monitor/repository.py`
 
 - [ ] **Step 1: 实现数据库初始化与插入**
 ```python
 import sqlite3, json
 
-class Storage:
+class repository:
     def __init__(self, db_path):
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.execute("""

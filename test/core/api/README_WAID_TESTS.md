@@ -174,7 +174,7 @@ WARNING: 回写失败：MD 文件不存在 每日目标-docs
 
 - **前端**: `frontend/floating/what-am-i-doing/WhatAmIDoingFloat.tsx`
 - **后端 API**: `lifeprism/server/api/todos_api.py`
-- **数据初始化**: `lifeprism/storage/data_initializer.py`
+- **数据初始化**: `lifeprism/repository/data_initializer.py`
 - **Schema**: `lifeprism/server/schemas/todo_schemas.py`
 
 ## 注意事项

@@ -7,12 +7,12 @@ from pathlib import Path
 
 # 定义需要检查的 store 和对应的 aggregator 文件
 stores = {
-    'goal_store': 'lifeprism/storage/aggregators/goal_aggregator.py',
-    'habit_store': 'lifeprism/storage/aggregators/habit_aggregator.py',
-    'mood_store': 'lifeprism/storage/aggregators/mood_aggregator.py',
-    'habit_chain_store': 'lifeprism/storage/aggregators/habit_chain_aggregator.py',
-    'map_cache_store': 'lifeprism/storage/aggregators/map_cache_aggregator.py',
-    'category_store': 'lifeprism/storage/aggregators/category_aggregator.py',
+    'goal_store': 'lifeprism/repository/aggregators/goal_aggregator.py',
+    'habit_store': 'lifeprism/repository/aggregators/habit_aggregator.py',
+    'mood_store': 'lifeprism/repository/aggregators/mood_aggregator.py',
+    'habit_chain_store': 'lifeprism/repository/aggregators/habit_chain_aggregator.py',
+    'map_cache_store': 'lifeprism/repository/aggregators/map_cache_aggregator.py',
+    'category_store': 'lifeprism/repository/aggregators/category_aggregator.py',
 }
 
 def get_aggregator_methods(file_path):

@@ -4,7 +4,7 @@
 
 **Goal:** Relocate and rename `LWWindowDataProvider` to `MonitorDataProvider` in the `monitor` module and update all references.
 
-**Architecture:** Move the provider to its dedicated monitor sub-module, rename it for clarity, and update imports across storage, monitor, and test modules.
+**Architecture:** Move the provider to its dedicated monitor sub-module, rename it for clarity, and update imports across repository, monitor, and test modules.
 
 **Tech Stack:** Python, FastAPI, Pytest
 
@@ -34,12 +34,12 @@ git add lifeprism/monitor/provider/window_data_provider.py
 git commit -m "refactor(monitor): rename LWWindowDataProvider to MonitorDataProvider"
 ```
 
-### Task 2: Update Storage Module Exports
+### Task 2: Update repository Module Exports
 
 **Files:**
-- Modify: `lifeprism/storage/__init__.py`
+- Modify: `lifeprism/repository/__init__.py`
 
-- [ ] **Step 1: Remove old provider from storage init**
+- [ ] **Step 1: Remove old provider from repository init**
 
 ```python
 # Remove these lines:
@@ -50,8 +50,8 @@ git commit -m "refactor(monitor): rename LWWindowDataProvider to MonitorDataProv
 - [ ] **Step 2: Commit**
 
 ```bash
-git add lifeprism/storage/__init__.py
-git commit -m "refactor(storage): remove LWWindowDataProvider from storage exports"
+git add lifeprism/repository/__init__.py
+git commit -m "refactor(repository): remove LWWindowDataProvider from repository exports"
 ```
 
 ### Task 3: Update Monitor Module References
@@ -87,7 +87,7 @@ git commit -m "refactor(monitor): update references to MonitorDataProvider"
 
 **Files:**
 - Modify: `test/integration/test_monitor_flow.py`
-- Modify: `test/storage/test_window_provider.py`
+- Modify: `test/repository/test_window_provider.py`
 
 - [ ] **Step 1: Update test/integration/test_monitor_flow.py**
 
@@ -97,7 +97,7 @@ from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
         self.provider = MonitorDataProvider(db_manager=self.db_manager)
 ```
 
-- [ ] **Step 2: Update test/storage/test_window_provider.py**
+- [ ] **Step 2: Update test/repository/test_window_provider.py**
 
 ```python
 from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
@@ -109,12 +109,12 @@ class TestMonitorDataProvider(unittest.TestCase):
 
 - [ ] **Step 3: Run tests**
 
-Run: `pytest test/integration/test_monitor_flow.py test/storage/test_window_provider.py`
+Run: `pytest test/integration/test_monitor_flow.py test/repository/test_window_provider.py`
 Expected: PASS
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add test/integration/test_monitor_flow.py test/storage/test_window_provider.py
+git add test/integration/test_monitor_flow.py test/repository/test_window_provider.py
 git commit -m "test: update monitor provider tests"
 ```

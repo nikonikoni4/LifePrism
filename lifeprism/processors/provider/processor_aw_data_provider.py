@@ -14,7 +14,7 @@ import pytz
 
 
 logger = logging.getLogger(__name__)
-from lifeprism.storage import AWBaseDataProvider
+from lifeprism.repository import AWBaseDataProvider
 
 class ProcessorAWDataProvider(AWBaseDataProvider):
     """

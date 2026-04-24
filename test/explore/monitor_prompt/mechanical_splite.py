@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, '.')
 
 from datetime import datetime, timedelta
-from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
+from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
 
 # === 参数 ===
 CHUNK_MINUTES = 15
@@ -97,7 +97,7 @@ def get_screenshot_counts(seg_start: str, seg_end: str) -> dict:
     WHERE captured_at >= ? AND captured_at <= ?
     GROUP BY capture_reason
     """
-    from lifeprism.storage import lw_db_manager
+    from lifeprism.repository import lw_db_manager
     result = {'scheduled': 0, 'enter': 0, 'active': 0}
     with lw_db_manager.get_connection() as conn:
         cursor = conn.cursor()

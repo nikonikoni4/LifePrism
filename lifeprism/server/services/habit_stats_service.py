@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from lifeprism.storage import habit_store
+from lifeprism.repository import habit_repository
 from lifeprism.server.schemas.habit_schemas import FrequencyObject
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import ValidationError
@@ -142,7 +142,7 @@ def get_habit_streak(habit_id: str, freq: FrequencyObject, challenge: Optional[d
     if not challenge:
         return 0
     today = date.today()
-    checkin_list = habit_store.get_checkin_dates_by_challenge(habit_id, challenge["id"])
+    checkin_list = habit_repository.get_checkin_dates_by_challenge(habit_id, challenge["id"])
     checkin_set = set(checkin_list)
     streak_base = challenge.get("streak_base") or 0
     if freq.type == "daily":
@@ -180,9 +180,9 @@ def _parse_freq_from_row(row: Dict[str, Any]) -> FrequencyObject:
 
 def get_today_overview(today: date) -> List[Dict[str, Any]]:
     """计算今日概览，仅返回今日有计划的习惯"""
-    habits = habit_store.get_habits(status="active")
+    habits = habit_repository.get_habits(status="active")
     habit_ids = [h["id"] for h in habits]
-    today_checkins = habit_store.get_today_checkins(habit_ids)
+    today_checkins = habit_repository.get_today_checkins(habit_ids)
     result = []
     for h in habits:
         freq = _parse_freq_from_row(h)
@@ -203,7 +203,7 @@ def _calc_weekly_rate_item(today: date, week_start: date, habits: List[Dict[str,
     rates = []
     for h in habits:
         freq = _parse_freq_from_row(h)
-        challenge = habit_store.get_current_challenge(h["id"])
+        challenge = habit_repository.get_current_challenge(h["id"])
         if not challenge:
             continue
 
@@ -217,7 +217,7 @@ def _calc_weekly_rate_item(today: date, week_start: date, habits: List[Dict[str,
         if scheduled == 0:
             continue
 
-        checkin_list = habit_store.get_checkin_dates_by_challenge(h["id"], challenge["id"])
+        checkin_list = habit_repository.get_checkin_dates_by_challenge(h["id"], challenge["id"])
         checkin_set = set(checkin_list)
         completed = sum(
             1 for i in range((eff_end - eff_start).days + 1)
@@ -236,7 +236,7 @@ def _calc_weekly_rate_item(today: date, week_start: date, habits: List[Dict[str,
 
 def get_weekly_stats(today: date, weeks: int) -> List[Dict[str, Any]]:
     """计算近 N 周完成率趋势（当前周在前）。"""
-    habits = habit_store.get_habits(status="active")
+    habits = habit_repository.get_habits(status="active")
     if not habits or weeks <= 0:
         return []
 
@@ -250,7 +250,7 @@ def get_weekly_stats(today: date, weeks: int) -> List[Dict[str, Any]]:
 
 def get_heatmap(today: date, days: int) -> List[Dict[str, Any]]:
     """获取过去 days 天热力图数据。"""
-    habits = habit_store.get_habits(status="active")
+    habits = habit_repository.get_habits(status="active")
     if not habits:
         result = []
         for i in range(days):
@@ -268,7 +268,7 @@ def get_heatmap(today: date, days: int) -> List[Dict[str, Any]]:
     habit_ids = [h["id"] for h in habits]
     start = (today - timedelta(days=days - 1)).isoformat()
     end = today.isoformat()
-    raw = habit_store.get_checkins_in_date_range(start, end, habit_ids)
+    raw = habit_repository.get_checkins_in_date_range(start, end, habit_ids)
     counter = defaultdict(int)
     for row in raw:
         counter[row["date"]] += 1

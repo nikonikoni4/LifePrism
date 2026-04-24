@@ -5,10 +5,10 @@
 
 ## 2. 核心架构设计
 
-### 2.1 数据层 (Storage)
+### 2.1 数据层 (repository)
 - **配置定义**: 在 `lifeprism/config/database.py` 中新增 `WINDOW_EVENTS_CONFIG`。
 - **表结构**: `window_events` 表，包含 `id`, `timestamp`, `duration`, `app`, `title` 字段。
-- **提供者**: 新建 `lifeprism/storage/providers/window_data_provider.py`，继承 `LWBaseDataProvider`，负责窗口事件的持久化。
+- **提供者**: 新建 `lifeprism/repository/providers/window_data_provider.py`，继承 `LWBaseDataProvider`，负责窗口事件的持久化。
 
 ### 2.2 监控层 (Monitor)
 - **重构导入**: 统一使用 `lifeprism.monitor.windows_monitor` 作为前缀，消除相对引用风险。
@@ -25,7 +25,7 @@
 
 ## 3. 实现步骤预览
 1. 修改 `database.py` 增加表定义。
-2. 在 `storage/providers/` 下实现 `LWWindowDataProvider`。
+2. 在 `repository/providers/` 下实现 `LWWindowDataProvider`。
 3. 重构 `windows_monitor` 目录下的所有导入路径和日志记录方式。
 4. 修改 `settings_manager.py` 增加 `monitor_type` 字段及其默认值。
 5. 在 `server/main.py` 中实现多进程启动逻辑。

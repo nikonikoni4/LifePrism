@@ -6,8 +6,8 @@ TokensUsageProvider 单元测试
 import pytest
 from datetime import datetime
 
-from lifeprism.storage.providers import tokens_usage_provider
-from lifeprism.storage.providers.common_query_options import QueryOptions
+from lifeprism.repository.providers import tokens_usage_provider
+from lifeprism.repository.providers.common_query_options import QueryOptions
 
 
 # ==================== Fixtures ====================

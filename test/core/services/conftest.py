@@ -9,7 +9,7 @@ from pathlib import Path
 
 from lifeprism.server.providers.diary_provider import diary_provider
 from lifeprism.server.services import diary_service
-from lifeprism.storage.providers import tokens_usage_provider
+from lifeprism.repository.providers import tokens_usage_provider
 
 
 @pytest.fixture(scope="session")
@@ -158,7 +158,7 @@ def prepare_cache_test_data(test_data_path):
     settings._initialize()
 
     import uuid
-    from lifeprism.storage.providers import category_provider, sub_category_provider
+    from lifeprism.repository.providers import category_provider, sub_category_provider
 
     # 确保有测试分类数据
     # 创建测试主分类
@@ -224,7 +224,7 @@ def prepare_cache_test_data(test_data_path):
         })
 
     # 插入数据到数据库
-    from lifeprism.storage import Database
+    from lifeprism.repository import Database
     db = Database()
 
     with db.get_connection() as conn:

@@ -14,7 +14,7 @@ import os
 sys.path.insert(0, '.')
 
 from datetime import datetime, timedelta
-from lifeprism.storage.base_providers.lw_base_data_provider import LWBaseDataProvider
+from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
 from lifeprism.llm.providers.build_llm_client import create_llm_client
 
 # === Prompt ===
@@ -188,7 +188,7 @@ def get_active_screenshots(seg_start: str, seg_end: str) -> list:
     WHERE captured_at >= ? AND captured_at <= ? AND capture_reason = 'active'
     ORDER BY captured_at ASC
     """
-    from lifeprism.storage import lw_db_manager
+    from lifeprism.repository import lw_db_manager
     results = []
     with lw_db_manager.get_connection() as conn:
         cursor = conn.cursor()

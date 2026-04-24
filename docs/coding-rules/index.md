@@ -37,5 +37,5 @@
 
 - updated_at: 2026-04-23
 - path: `docs/coding-rules/create-table-rules.md`
-- 触发规则：创建新表，修改现有的`lifeprism/storage/provider`和`lifeprism/storage/aggregators`下的文件时阅读
-- 内容摘要：创建新表，新storage.provider和新aggregators时阅读
+- 触发规则：创建新表，修改现有的`lifeprism/repository/provider`和`lifeprism/repository/aggregators`下的文件时阅读
+- 内容摘要：创建新表，新repository.provider和新aggregators时阅读

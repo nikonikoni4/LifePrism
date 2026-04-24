@@ -6,7 +6,7 @@
 # from datetime import datetime
 # import uuid
 
-# from lifeprism.storage import LWBaseDataProvider
+# from lifeprism.repository import LWBaseDataProvider
 # from lifeprism.utils import get_logger, LazySingleton
 
 # logger = get_logger(__name__)

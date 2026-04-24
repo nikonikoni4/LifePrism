@@ -262,7 +262,7 @@ def normalize_list_for_snapshot(
 import os
 import pytest
 from pathlib import Path
-from lifeprism.storage.database_manager import DatabaseManager
+from lifeprism.repository.database_manager import DatabaseManager
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment(tmp_path_factory):
@@ -300,7 +300,7 @@ def test_db(setup_test_environment):
     db_manager = DatabaseManager(str(db_path))
     
     # 初始化表结构
-    from lifeprism.storage.resource_initializer import initialize_database
+    from lifeprism.repository.resource_initializer import initialize_database
     initialize_database(db_manager)
     
     yield db_manager
@@ -433,7 +433,7 @@ class DiaryTestDataGenerator:
 
 ### 4.2 重构中（During Migration）
 
-- [ ] 创建新的provider（在storage/providers/）
+- [ ] 创建新的provider（在repository/providers/）
 - [ ] 实现通用查询接口（query_*方法）
 - [ ] 实现5个核心方法（query/get/insert/update/delete）
 - [ ] 保持旧provider不变（兼容期）

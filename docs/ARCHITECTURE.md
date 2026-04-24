@@ -107,7 +107,7 @@ LifePrism 是一个围绕个人成长构建的桌面应用项目，核心目标�
 | `lifeprism/processors/` | ActivityWatch 数据清洗、缓存匹配、分类收集与处理主链 |
 | `lifeprism/llm/` | 聊天、分类、summary context、provider、工具与 agent loop |
 | `lifeprism/config/` | 配置读取、provider 管理、配置迁移 |
-| `lifeprism/storage/` | SQLite 初始化、迁移、资源初始化与基础数据访问 |
+| `lifeprism/repository/` | SQLite 初始化、迁移、资源初始化与基础数据访问 |
 | `lifeprism/monitor/` | 内置监控进程与窗口监控能力 |
 | `lifeprism/utils/` | 日志、异常、通用工具、单例等基础设施 |
 
@@ -134,7 +134,7 @@ LifePrism 是一个围绕个人成长构建的桌面应用项目，核心目标�
 → `CacheMatcher`
 → `ClassifyCollector`
 → `LLM classify`
-→ `CategoryCache / storage`
+→ `CategoryCache / repository`
 → `server services / APIs`
 → `frontend views`
 
@@ -150,7 +150,7 @@ LifePrism 是一个围绕个人成长构建的桌面应用项目，核心目标�
 → `frontend/core/services`
 → `FastAPI api`
 → `services`
-→ `providers / storage / llm`
+→ `providers / repository / llm`
 → `API response`
 → `frontend apps`
 
@@ -171,11 +171,11 @@ LifePrism 是一个围绕个人成长构建的桌面应用项目，核心目标�
 
 第一次理解项目时，可以先把后端主依赖方向记成：
 
-`utils -> config -> storage -> monitor -> processors -> server`
+`utils -> config -> repository -> monitor -> processors -> server`
 
 同时还要补上一条智能能力链：
 
-`utils / config / storage -> llm -> server`
+`utils / config / repository -> llm -> server`
 
 对应到代码层，可以这样理解：
 
@@ -187,26 +187,26 @@ LifePrism 是一个围绕个人成长构建的桌面应用项目，核心目标�
    - 建立在 `utils` 之上
    - 负责路径、配置文件、provider 配置和启动前置初始化
 
-3. `storage`
+3. `repository`
    - 依赖 `config` 和 `utils`
    - 负责数据库连接、基础 provider、初始化和迁移
 
 4. `monitor`
-   - 依赖 `storage`、`config` 和 `utils`
+   - 依赖 `repository`、`config` 和 `utils`
    - 负责窗口监控与数据采集入口
 
 5. `processors`
-   - 依赖 `storage`、`config`、`utils`
+   - 依赖 `repository`、`config`、`utils`
    - 同时调用部分 `llm` 类型与分类能力
    - 负责把原始事件清洗为可分类、可持久化的数据
 
 6. `llm`
-   - 依赖 `utils`、`config`、`storage`
+   - 依赖 `utils`、`config`、`repository`
    - 提供分类、聊天、summary context、agent loop 和 provider 抽象
 
 7. `server`
    - 位于对外服务层
-   - 汇总 `storage`、`processors`、`llm`、`config` 的能力，对前端暴露 API
+   - 汇总 `repository`、`processors`、`llm`、`config` 的能力，对前端暴露 API
 
 需要特别注意的是，当前实现里 `llm` 和 `server` 并不是完全严格的单向依赖：
 
@@ -218,7 +218,7 @@ LifePrism 是一个围绕个人成长构建的桌面应用项目，核心目标�
 - 主体结构上，`server` 是对外汇总层
 - 但 `llm` 与 `server` 之间存在现实代码耦合，还不是完全解耦的独立层
 
-对第一次阅读项目的人来说，先把它理解为“以 `utils/config/storage` 为底座，`monitor/processors/llm` 提供能力，`server` 对外汇总，`frontend` 通过 HTTP 使用 `server`”即可。
+对第一次阅读项目的人来说，先把它理解为“以 `utils/config/repository` 为底座，`monitor/processors/llm` 提供能力，`server` 对外汇总，`frontend` 通过 HTTP 使用 `server`”即可。
 
 ## Update Triggers
 

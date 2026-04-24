@@ -53,7 +53,7 @@ TodoProvider (子类)
 ### 2.1 QueryOptions 定义
 
 ```python
-# storage/query_options.py
+# repository/query_options.py
 from dataclasses import dataclass, replace
 from typing import Optional, List, Dict, Any, Tuple
 
@@ -123,9 +123,9 @@ class QueryOptions:
 ### 2.2 基类通用查询方法
 
 ```python
-# storage/base_providers/lw_base_data_provider.py
+# repository/base_providers/lw_base_data_provider.py
 from typing import Optional, List, Dict, Any, Tuple, Set
-from lifeprism.storage.query_options import QueryOptions
+from lifeprism.repository.query_options import QueryOptions
 
 class LWBaseDataProvider:
     """
@@ -486,7 +486,7 @@ class LWBaseDataProvider:
 ### 3.1 标准实现模板
 
 ```python
-# storage/providers/todo_provider.py
+# repository/providers/todo_provider.py
 """
 Todo 数据提供者
 
@@ -496,8 +496,8 @@ Todo 数据提供者
 - 返回原始数据（Dict），不做业务转换
 """
 from typing import Optional, List, Dict, Any, Tuple, Set
-from lifeprism.storage.base_providers import LWBaseDataProvider
-from lifeprism.storage.query_options import QueryOptions
+from lifeprism.repository.base_providers import LWBaseDataProvider
+from lifeprism.repository.query_options import QueryOptions
 from lifeprism.utils import LazySingleton
 
 class TodoProvider(LWBaseDataProvider, metaclass=LazySingleton):
@@ -918,8 +918,8 @@ class GoalProvider(LWBaseDataProvider):
 ```python
 # test/core/providers/test_todo_provider.py
 import pytest
-from lifeprism.storage.providers.todo_provider import TodoProvider
-from lifeprism.storage.query_options import QueryOptions
+from lifeprism.repository.providers.todo_provider import TodoProvider
+from lifeprism.repository.query_options import QueryOptions
 
 @pytest.fixture
 def todo_provider():
@@ -1022,8 +1022,8 @@ class TestTodoProvider:
 
 ### 7.1 第一步：实现基类通用方法
 
-1. 在 `storage/query_options.py` 中定义 `QueryOptions` 类
-2. 在 `storage/base_providers/lw_base_data_provider.py` 中实现 `_generic_query()` 方法
+1. 在 `repository/query_options.py` 中定义 `QueryOptions` 类
+2. 在 `repository/base_providers/lw_base_data_provider.py` 中实现 `_generic_query()` 方法
 3. 编写基类方法的单元测试
 
 ### 7.2 第二步：为每个 provider 编写特定方法
@@ -1219,8 +1219,8 @@ class TodoProvider(LWBaseDataProvider):
 
 ### 11.1 第一步：实现基类通用方法
 
-1. 在 `storage/query_options.py` 中定义 `QueryOptions` 类
-2. 在 `storage/base_providers/lw_base_data_provider.py` 中实现：
+1. 在 `repository/query_options.py` 中定义 `QueryOptions` 类
+2. 在 `repository/base_providers/lw_base_data_provider.py` 中实现：
    - `_generic_query()` - 通用查询方法
    - `_generic_insert()` - 通用插入方法
    - `_generic_update()` - 通用更新方法
@@ -1288,7 +1288,7 @@ class TodoProvider(LWBaseDataProvider):
 ## 附录：完整的 Provider 示例
 
 ```python
-# storage/providers/diary_provider.py
+# repository/providers/diary_provider.py
 """
 Diary 数据提供者
 
@@ -1298,8 +1298,8 @@ Diary 数据提供者
 - 返回原始数据（Dict），不做业务转换
 """
 from typing import Optional, List, Dict, Any, Tuple, Set
-from lifeprism.storage.base_providers import LWBaseDataProvider
-from lifeprism.storage.query_options import QueryOptions
+from lifeprism.repository.base_providers import LWBaseDataProvider
+from lifeprism.repository.query_options import QueryOptions
 from lifeprism.utils import LazySingleton
 
 class DiaryProvider(LWBaseDataProvider, metaclass=LazySingleton):

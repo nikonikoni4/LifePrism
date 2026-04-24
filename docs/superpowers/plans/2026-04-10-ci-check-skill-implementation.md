@@ -106,7 +106,7 @@ Core principles:
 2. Never run a full-repo scan when file-driven scoping is possible.
 3. Treat `git diff --cached --name-only` as the authoritative scope for this commit.
 4. Treat `docs/temp/ci-check-state.json` as runtime state because `docs/temp/**` is gitignored.
-5. Never store post-commit state in a tracked file under `skills/` or `docs/generated/`.
+5. Never repository post-commit state in a tracked file under `skills/` or `docs/generated/`.
 ```
 
 - [ ] **Step 4: Add the child-agent output contract and finalize constraints**

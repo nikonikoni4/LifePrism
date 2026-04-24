@@ -10,7 +10,7 @@
 
 1. **创建接口触发条件**：新增表时需要新增数据库接口
 
-2. **如何创建新增的数据库接口**：在`lifeprism/storage/provider`中编写该数据表的provider类，在`lifeprism/storage/provider/__init__.py`创建单例并导出
+2. **如何创建新增的数据库接口**：在`lifeprism/repository/provider`中编写该数据表的provider类，在`lifeprism/repository/provider/__init__.py`创建单例并导出
 
 3. 创建provider时，必须符合下面的结构：
 
@@ -73,6 +73,6 @@
 
 #### 3 聚合类规则
 
-1. **aggregators创建的触发条件**：仅人工认定之后才可在`lifeprism\storage\aggregators`创建新的聚合类 
+1. **aggregators创建的触发条件**：仅人工认定之后才可在`lifeprism\repository\aggregators`创建新的聚合类 
 3. 聚合类方法必须透传所包括的provider成员的所有CURD核心方法，常用查询（超过3次引用）建议透传而不是在聚合层实现，特殊方法编写在聚合层。
 

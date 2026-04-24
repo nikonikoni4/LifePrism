@@ -197,7 +197,7 @@ class CategoryCache:
 
 
 if __name__ == '__main__':
-    from lifeprism.storage import LWBaseDataProvider
+    from lifeprism.repository import LWBaseDataProvider
     lw_data_provider = LWBaseDataProvider()
     
     category_cache = CategoryCache(lw_data_provider.load_category_map_cache_V2())

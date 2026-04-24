@@ -1,9 +1,9 @@
 import unittest
 import os
 from datetime import datetime
-from lifeprism.storage.database_manager import DatabaseManager
+from lifeprism.repository.database_manager import DatabaseManager
 from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
-from lifeprism.storage.lw_table_manager import LWTableManager
+from lifeprism.repository.lw_table_manager import LWTableManager
 
 class TestMonitorDataProvider(unittest.TestCase):
     def setUp(self):

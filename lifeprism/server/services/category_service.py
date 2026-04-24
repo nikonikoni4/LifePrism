@@ -3,9 +3,9 @@
 实现分类的业务逻辑和数据库操作
 """
 from lifeprism.server.providers import server_lw_data_provider
-from lifeprism.storage import (
-    category_store,
-    map_cache_store,
+from lifeprism.repository import (
+    category_repository,
+    map_cache_repository,
 )
 from lifeprism.server.schemas.category_schemas import (
     CategoryTreeResponse,
@@ -36,9 +36,9 @@ class CategoryService:
         """
         self.server_lw_data_provider = server_lw_data_provider
         self.db = server_lw_data_provider.db
-        # 新的 store（已重构为使用 Aggregator）
-        self.category_store = category_store
-        self.map_cache_store = map_cache_store
+        # 新的 repository（已重构为使用 Aggregator）
+        self.category_repository = category_repository
+        self.map_cache_repository = map_cache_repository
         # 缓存 DataFrame
         self._categories_df = self.server_lw_data_provider.load_categories()
         self._sub_categories_df = self.server_lw_data_provider.load_sub_categories()
@@ -446,7 +446,7 @@ class CategoryService:
                 'color': color
             }
 
-            success = self.category_store.create_category(data)
+            success = self.category_repository.create_category(data)
             if not success:
                 raise Exception("插入数据库失败")
 
@@ -483,7 +483,7 @@ class CategoryService:
         """
         try:
             # 检查分类是否存在（使用新的 provider）
-            existing = self.category_store.get_category_by_id(category_id)
+            existing = self.category_repository.get_category_by_id(category_id)
             if not existing:
                 raise ValueError(f"分类 '{category_id}' 不存在")
 
@@ -499,7 +499,7 @@ class CategoryService:
                 return self._get_category_by_id(category_id)
 
             # 执行更新（使用新的 provider）
-            success = self.category_store.update_category(category_id, update_data)
+            success = self.category_repository.update_category(category_id, update_data)
             if not success:
                 raise Exception("更新数据库失败")
 
@@ -533,7 +533,7 @@ class CategoryService:
         """
         try:
             # 检查分类是否存在（使用新的 provider）
-            existing = self.category_store.get_category_by_id(category_id)
+            existing = self.category_repository.get_category_by_id(category_id)
             if not existing:
                 raise ValueError(f"分类 '{category_id}' 不存在")
 
@@ -552,7 +552,7 @@ class CategoryService:
                 )
 
             # 2. 删除主分类（子分类会通过 CASCADE 自动删除）（使用新的 provider）
-            success = self.category_store.delete_category(category_id)
+            success = self.category_repository.delete_category(category_id)
             if not success:
                 raise Exception("删除数据库记录失败")
 
@@ -585,7 +585,7 @@ class CategoryService:
         """
         try:
             # 验证主分类存在（使用新的 provider）
-            existing_cat = self.category_store.get_category_by_id(category_id)
+            existing_cat = self.category_repository.get_category_by_id(category_id)
             if not existing_cat:
                 raise ValueError(f"主分类 '{category_id}' 不存在")
 
@@ -599,7 +599,7 @@ class CategoryService:
                 'name': name
             }
 
-            success = self.category_store.create_sub_category(data)
+            success = self.category_repository.create_sub_category(data)
             if not success:
                 raise Exception("插入数据库失败")
 
@@ -637,12 +637,12 @@ class CategoryService:
         """
         try:
             # 验证主分类存在（使用新的 provider）
-            existing_cat = self.category_store.get_category_by_id(category_id)
+            existing_cat = self.category_repository.get_category_by_id(category_id)
             if not existing_cat:
                 raise ValueError(f"主分类 '{category_id}' 不存在")
 
             # 验证子分类存在且属于该主分类（使用新的 provider）
-            existing_sub = self.category_store.get_sub_category_by_id(sub_id)
+            existing_sub = self.category_repository.get_sub_category_by_id(sub_id)
             if not existing_sub:
                 raise ValueError(f"子分类 '{sub_id}' 不存在")
 
@@ -650,7 +650,7 @@ class CategoryService:
                 raise ValueError(f"子分类 '{sub_id}' 不属于分类 '{category_id}'")
 
             # 更新子分类（使用新的 provider）
-            success = self.category_store.update_sub_category(sub_id, {'name': name})
+            success = self.category_repository.update_sub_category(sub_id, {'name': name})
             if not success:
                 raise Exception("更新数据库失败")
 
@@ -687,12 +687,12 @@ class CategoryService:
         """
         try:
             # 验证主分类存在（使用新的 provider）
-            existing_cat = self.category_store.get_category_by_id(category_id)
+            existing_cat = self.category_repository.get_category_by_id(category_id)
             if not existing_cat:
                 raise ValueError(f"主分类 '{category_id}' 不存在")
 
             # 验证子分类存在且属于该主分类（使用新的 provider）
-            existing_sub = self.category_store.get_sub_category_by_id(sub_id)
+            existing_sub = self.category_repository.get_sub_category_by_id(sub_id)
             if not existing_sub:
                 raise ValueError(f"子分类 '{sub_id}' 不存在")
 
@@ -714,7 +714,7 @@ class CategoryService:
                 )
 
             # 删除子分类（使用新的 provider）
-            success = self.category_store.delete_sub_category(sub_id)
+            success = self.category_repository.delete_sub_category(sub_id)
             if not success:
                 raise Exception("删除数据库记录失败")
 
@@ -742,7 +742,7 @@ class CategoryService:
             CategoryTreeItem: 分类对象
         """
         # 使用新的 provider
-        category = self.category_store.get_category_by_id(category_id)
+        category = self.category_repository.get_category_by_id(category_id)
         if not category:
             raise ValueError(f"分类 '{category_id}' 不存在")
 
@@ -781,7 +781,7 @@ class CategoryService:
             CategoryTreeItem: 分类对象，或 None 如果不存在
         """
         # 使用新的 provider
-        category = self.category_store.get_category_by_id(category_id)
+        category = self.category_repository.get_category_by_id(category_id)
         if not category:
             return None
 
@@ -807,14 +807,14 @@ class CategoryService:
         """
         try:
             # 检查分类是否存在（使用新的 provider）
-            existing = self.category_store.get_category_by_id(category_id)
+            existing = self.category_repository.get_category_by_id(category_id)
             if not existing:
                 raise ValueError(f"分类 '{category_id}' 不存在")
 
             old_state = existing.get('state', 1)
 
             # 更新分类状态（使用新的 provider）
-            success = self.category_store.update_category(category_id, {'state': state})
+            success = self.category_repository.update_category(category_id, {'state': state})
             if not success:
                 raise Exception("更新数据库失败")
 
@@ -857,12 +857,12 @@ class CategoryService:
         """
         try:
             # 验证主分类存在（使用新的 provider）
-            existing_cat = self.category_store.get_category_by_id(category_id)
+            existing_cat = self.category_repository.get_category_by_id(category_id)
             if not existing_cat:
                 raise ValueError(f"主分类 '{category_id}' 不存在")
 
             # 验证子分类存在且属于该主分类（使用新的 provider）
-            existing_sub = self.category_store.get_sub_category_by_id(sub_id)
+            existing_sub = self.category_repository.get_sub_category_by_id(sub_id)
             if not existing_sub:
                 raise ValueError(f"子分类 '{sub_id}' 不存在")
 
@@ -872,7 +872,7 @@ class CategoryService:
             old_state = existing_sub.get('state', 1)
 
             # 更新子分类状态（使用新的 provider）
-            success = self.category_store.update_sub_category(sub_id, {'state': state})
+            success = self.category_repository.update_sub_category(sub_id, {'state': state})
             if not success:
                 raise Exception("更新数据库失败")
 
@@ -1274,12 +1274,12 @@ class CategoryService:
 
             # 根据 ID 前缀判断使用哪个 provider
             if record_id.startswith('m-'):
-                result = self.map_cache_store.update_multi_purpose_map_cache(
+                result = self.map_cache_repository.update_multi_purpose_map_cache(
                     cache_id=record_id,
                     data=update_fields
                 )
             elif record_id.startswith('s-'):
-                result = self.map_cache_store.update_single_purpose_map_cache(
+                result = self.map_cache_repository.update_single_purpose_map_cache(
                     cache_id=record_id,
                     data=update_fields
                 )
@@ -1330,14 +1330,14 @@ class CategoryService:
 
             # 批量更新 multi_purpose_map_cache
             if multi_ids:
-                count += self.map_cache_store.batch_update_multi_purpose_map_cache(
+                count += self.map_cache_repository.batch_update_multi_purpose_map_cache(
                     cache_ids=multi_ids,
                     data=update_fields
                 )
 
             # 批量更新 single_purpose_map_cache
             if single_ids:
-                count += self.map_cache_store.batch_update_single_purpose_map_cache(
+                count += self.map_cache_repository.batch_update_single_purpose_map_cache(
                     cache_ids=single_ids,
                     data=update_fields
                 )
@@ -1362,9 +1362,9 @@ class CategoryService:
         try:
             # 根据 ID 前缀判断使用哪个 provider
             if record_id.startswith('m-'):
-                result = self.map_cache_store.delete_multi_purpose_map_cache(record_id)
+                result = self.map_cache_repository.delete_multi_purpose_map_cache(record_id)
             elif record_id.startswith('s-'):
-                result = self.map_cache_store.delete_single_purpose_map_cache(record_id)
+                result = self.map_cache_repository.delete_single_purpose_map_cache(record_id)
             else:
                 logger.error(f"无效的 record_id 格式: {record_id}")
                 return False
@@ -1399,11 +1399,11 @@ class CategoryService:
 
             # 批量删除 multi_purpose_map_cache
             if multi_ids:
-                count += self.map_cache_store.batch_delete_multi_purpose_map_cache(multi_ids)
+                count += self.map_cache_repository.batch_delete_multi_purpose_map_cache(multi_ids)
 
             # 批量删除 single_purpose_map_cache
             if single_ids:
-                count += self.map_cache_store.batch_delete_single_purpose_map_cache(single_ids)
+                count += self.map_cache_repository.batch_delete_single_purpose_map_cache(single_ids)
 
             logger.info(f"批量删除 {count} 条 category_map_cache 记录")
             return count

@@ -172,7 +172,7 @@
 - `sleep` 只阻塞当前线程，不阻塞整个进程
 - 不需要为状态同步引入额外 IPC
 
-## Storage Design
+## repository Design
 
 ### File Path
 

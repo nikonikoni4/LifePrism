@@ -12,7 +12,7 @@ from lifeprism.server.schemas.timeline_schemas import (
 )
 from lifeprism.server.schemas.todo_schemas import BatchDurationRequest, BatchDurationResponse
 from lifeprism.server.services import timeline_service
-from lifeprism.storage import timeline_store
+from lifeprism.repository import timeline_repository
 
 router = APIRouter(prefix="/timeline", tags=["Timeline V2"])
 
@@ -107,7 +107,7 @@ async def get_duration_by_todo(
     date: str = Query(..., description="查询日期（YYYY-MM-DD）")
 ):
     """查询指定 todo 在指定日期的累计时长（分钟）"""
-    duration = timeline_store.get_duration_by_todo(todo_id, date)
+    duration = timeline_repository.get_duration_by_todo(todo_id, date)
     return TodoDurationResponse(todo_id=todo_id, date=date, duration=duration)
 
 
@@ -115,7 +115,7 @@ async def get_duration_by_todo(
              summary="批量查询 todo 累计时长")
 async def batch_get_duration(request: BatchDurationRequest):
     """批量查询多个 todo 的累计时长。返回 { "data": { "1": 45, "2": 0 } }"""
-    result = timeline_store.batch_get_duration_by_todos(request.todo_ids, request.date)
+    result = timeline_repository.batch_get_duration_by_todos(request.todo_ids, request.date)
     return BatchDurationResponse(data=result)
 
 

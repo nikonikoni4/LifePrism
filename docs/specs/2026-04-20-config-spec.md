@@ -56,7 +56,7 @@ contract_refs:
 
 **不包含**：
 - 具体的 LLM 调用逻辑（属于 llm 模块）
-- 数据库连接管理（属于 storage 模块）
+- 数据库连接管理（属于 repository 模块）
 - 日志配置的详细实现（属于 utils 模块）
 
 ## Core Behavior

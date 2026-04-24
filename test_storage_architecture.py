@@ -1,13 +1,13 @@
-# test_storage_architecture.py
-"""验证 Storage 架构重构"""
-from lifeprism.storage.providers import (
+# test_repository_architecture.py
+"""验证 repository 架构重构"""
+from lifeprism.repository.providers import (
     DiaryProvider,
     TodoProvider,
     TimelineProvider,
     PlanDocProvider,
     TokensUsageProvider,
 )
-from lifeprism.storage.aggregators import (
+from lifeprism.repository.aggregators import (
     HabitAggregator,
     MoodAggregator,
     GoalAggregator,
@@ -82,7 +82,7 @@ def test_store_aliases():
     """测试 Store 别名导入"""
     print("\nTesting Store aliases...")
 
-    from lifeprism.storage import (
+    from lifeprism.repository import (
         diary_store,
         todo_store,
         timeline_store,
@@ -95,14 +95,14 @@ def test_store_aliases():
         category_store,
         map_cache_store,
     )
-    from lifeprism.storage.providers import (
+    from lifeprism.repository.providers import (
         diary_provider,
         todo_provider,
         timeline_provider,
         plan_doc_provider,
         tokens_usage_provider,
     )
-    from lifeprism.storage.aggregators import (
+    from lifeprism.repository.aggregators import (
         habit_aggregator,
         mood_aggregator,
         goal_aggregator,

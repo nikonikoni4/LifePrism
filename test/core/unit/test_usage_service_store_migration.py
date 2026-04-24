@@ -2,7 +2,7 @@
 usage_service 存储层迁移测试
 
 验证 usage_service 不再依赖 server_lw_data_provider，
-而是通过 tokens_usage_store.query_tokens_usage 获取数据。
+而是通过 tokens_usage_repository.query_tokens_usage 获取数据。
 """
 from types import SimpleNamespace
 import importlib.util
@@ -20,8 +20,8 @@ def _load_usage_service_module():
     return module
 
 
-def test_get_usage_overview_uses_tokens_usage_store(monkeypatch):
-    """get_usage_overview 应通过 tokens_usage_store 查询，而不是旧 provider。"""
+def test_get_usage_overview_uses_tokens_usage_repository(monkeypatch):
+    """get_usage_overview 应通过 tokens_usage_repository 查询，而不是旧 provider。"""
     usage_service = _load_usage_service_module()
 
     def _legacy_called(*args, **kwargs):
@@ -51,7 +51,7 @@ def test_get_usage_overview_uses_tokens_usage_store(monkeypatch):
 
     monkeypatch.setattr(
         usage_service,
-        "tokens_usage_store",
+        "tokens_usage_repository",
         SimpleNamespace(query_tokens_usage=_fake_query_tokens_usage),
         raising=False
     )
