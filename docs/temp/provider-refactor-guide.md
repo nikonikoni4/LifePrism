@@ -97,6 +97,12 @@ def create_mood_entry(request):
 
 **测试文件位置**: `test/core/services/test_<service_name>_snapshot.py`
 
+**参考其他 Service 的快照测试**：
+- 查看 `test/core/services/` 目录下已有的快照测试
+- 参考 `test_diary_service_snapshot.py`、`test_goal_service_snapshot.py` 等
+- 学习测试结构、数据准备、断言方式
+- 保持测试风格一致
+
 **快照测试构建方法**:
 
 ```python
@@ -135,9 +141,45 @@ def test_update_item_snapshot(snapshot: SnapshotAssertion):
 
 **快照测试原则**:
 - 测试 Service 层的公开接口（不是直接测试 Provider）
-- 覆盖核心 CRUD 操作：查询、创建、更新、删除
+- **必须覆盖所有 CRUD 操作**：查询、创建、更新、删除
+- **特别注意**：不要只测试读操作（如 `get_xxx_tree()`），必须测试写操作（如 `create_xxx()`、`update_xxx()`）
 - 使用独立的测试数据库（`lifewatch_ai-test.db`）
 - 首次运行使用 `--snapshot-update` 生成快照
+
+**⚠️ 常见陷阱 - CategoryProvider 重构教训**:
+
+**问题场景**：
+- 快照测试只测试了 `get_category_tree()`（读操作）
+- 该方法使用缓存的 DataFrame，不调用新的 provider
+- 测试全部通过 ✅
+- 但实际使用 `create_sub_category()` 时失败 ❌
+
+**根本原因**：
+1. `get_category_tree()` 使用 `self._categories_df`（缓存），通过 `server_lw_data_provider.load_categories()` 加载
+2. `load_categories()` 使用 `self.db.query('category')`，不涉及 `QueryOptions`
+3. 写操作（如 `create_sub_category()`）调用 `category_provider.get_category_by_id()` 验证主分类
+4. `get_category_by_id()` 使用 `QueryOptions(filters={'id': xxx})`，默认 `order_by='date'`
+5. `category` 表没有 `date` 字段 → 抛出 `ValueError: Invalid order_by field: date`
+
+**教训总结**：
+1. ❌ **只测试读操作** → 无法发现 provider 调用路径的问题
+2. ❌ **只测试缓存读取** → 无法发现实际数据库查询的问题
+3. ✅ **必须测试写操作** → 会触发 provider 的实际调用（如 `get_by_id` 验证）
+4. ✅ **必须覆盖 CRUD** → 确保所有代码路径都被测试
+
+**正确的测试覆盖**：
+```python
+✅ test_get_category_tree_snapshot       # 读操作（缓存）
+✅ test_create_category_snapshot         # 写操作（调用 provider.insert）
+✅ test_create_sub_category_snapshot     # 写操作（调用 provider.get_by_id + insert）
+✅ test_update_category_snapshot         # 写操作（调用 provider.get_by_id + update）
+✅ test_delete_category_snapshot         # 写操作（调用 provider.get_by_id + delete）
+```
+
+**QueryOptions 默认值问题**：
+- `QueryOptions` 默认 `order_by='date'`
+- 如果表没有 `date` 字段，必须显式指定 `order_by`
+- 示例：`QueryOptions(filters={'id': xxx}, order_by='id')`
 
 **运行命令**:
 ```bash
