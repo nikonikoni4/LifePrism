@@ -12,14 +12,14 @@ from lifeprism.storage.aggregators.map_cache_aggregator import MapCacheAggregato
 from lifeprism.utils import LazySingleton
 
 # 创建全局单例
-habit_aggregator = LazySingleton(HabitAggregator)
-mood_aggregator = LazySingleton(MoodAggregator)
-goal_aggregator = LazySingleton(GoalAggregator)
-habit_chain_aggregator = LazySingleton(HabitChainAggregator)
-category_aggregator = LazySingleton(CategoryAggregator)
-map_cache_aggregator = LazySingleton(MapCacheAggregator)
+habit_aggregator :HabitAggregator = LazySingleton(HabitAggregator)
+mood_aggregator : MoodAggregator = LazySingleton(MoodAggregator)
+goal_aggregator : GoalAggregator = LazySingleton(GoalAggregator)
+habit_chain_aggregator : HabitChainAggregator = LazySingleton(HabitChainAggregator)
+category_aggregator : CategoryAggregator = LazySingleton(CategoryAggregator)
+map_cache_aggregator : MapCacheAggregator= LazySingleton(MapCacheAggregator)
 
-__all__ = [
+__all__ = [ 
     # 类
     'HabitAggregator',
     'MoodAggregator',

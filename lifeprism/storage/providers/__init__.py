@@ -5,11 +5,11 @@ from lifeprism.storage.providers.plan_doc_provider import PlanDocProvider
 from lifeprism.storage.providers.timeline_provider import TimelineProvider
 from lifeprism.storage.providers.todo_provider import TodoProvider
 
-tokens_usage_provider = LazySingleton(TokensUsageProvider)
-diary_provider = LazySingleton(DiaryProvider)
-plan_doc_provider = LazySingleton(PlanDocProvider)
-timeline_provider = LazySingleton(TimelineProvider)
-todo_provider = LazySingleton(TodoProvider)
+tokens_usage_provider : TokensUsageProvider = LazySingleton(TokensUsageProvider)
+diary_provider : DiaryProvider= LazySingleton(DiaryProvider)
+plan_doc_provider : PlanDocProvider= LazySingleton(PlanDocProvider)
+timeline_provider : TimelineProvider= LazySingleton(TimelineProvider)
+todo_provider : TodoProvider = LazySingleton(TodoProvider)
 
 
 __all__ = [
