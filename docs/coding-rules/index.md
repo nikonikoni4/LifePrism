@@ -3,7 +3,7 @@
 - updated_at: 2026-04-15
 - path: `docs/coding-rules/backend-core-rules.md`
 - 触发规则：编写任何后端代码时阅读（高频）
-- 内容摘要：后端核心规范，包括 Schema 设计、类型注解、文档字符串、日志记录、数据库操作、Service/Provider 层职责、ID 生成、命名约定等通用规则
+- 内容摘要：后端开发核心规范，包含类型注解、文档字符串、日志记录、数据库操作、Service层职责、ID生成规范和命名约定，数据库操作规范
 
 ## backend-api-rules.md
 

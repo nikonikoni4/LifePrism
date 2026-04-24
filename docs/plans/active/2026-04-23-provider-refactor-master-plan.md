@@ -29,3 +29,36 @@ related_spec:
 - [x] todo_provider
 - [x] timeline_provider
 - [x] plan_doc_provider
+
+说明：timeline service涉及到多个聚合，当前编写内容还未真实替换service，状态：待替换（当替换完成之后修改这个状态，修改位置lifeprism\server\services\timeline_builder.py lifeprism\server\services\usage_service.py）
+
+
+## 剩下还未重构的内容
+
+1. 功能未完全确认的
+
+- [ ] value_provider
+- [ ] commitment_provider
+
+2. 聚合类的，不应该直接写在provider
+
+- [ ] statistical_data_providers
+- [ ] report_provider
+
+3. 废弃的
+- [ ] focus_provider
+- [ ] chat_session_provider
+
+4. 直接写在statistical_data_providers内部，没有单独编写的provider（一个表对应一个provider）
+
+- [ ] category_provider（category表）
+- [ ] sub_category_provider（sub_category表）
+- [ ] app_behavior_log_provider（user_app_behavior_log表）
+- [ ] tokens_usage_provider（tokens_usage_log表）
+- [ ] multi_purpose_map_cache_provider（multi_purpose_map_cache表）
+- [ ] single_purpose_map_cache_provider（single_purpose_map_cache表）
+
+# 聚合层
+
+新增聚合层，将聚合类的provider移动至聚合类
+调用流向 provider -> aggregater(可选) ->service/llm

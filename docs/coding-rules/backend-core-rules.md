@@ -2,22 +2,22 @@
 version: 1.0
 created_at: 2026-04-15
 updated_at: 2026-04-15
-last_updated: 初始版本
-abstract: 后端开发核心规范，包含类型注解、文档字符串、日志记录、数据库操作、Service/Provider层职责划分、ID生成规范和命名约定
+last_updated: 修改数据库操作规范
+abstract: 后端开发核心规范，包含类型注解、文档字符串、日志记录、数据库操作、Service层职责、ID生成规范和命名约定，数据库操作规范
 ---
 
 # 后端核心规范
 
 本文档包含后端开发的核心规范，包括数据库操作、配置管理、日志记录、代码风格等通用规则。
 
-## 类型注解规范
+## 1. 类型注解规范
 
 - 所有函数必须有返回类型注解，所有参数必须有类型注解
 - 单个对象：`Optional[Dict[str, Any]]`
 - 对象列表：`List[Dict[str, Any]]`
 - 列表 + 总数：`tuple[List[Dict[str, Any]], int]`
 
-## 文档字符串规范
+## 2. 文档字符串规范
 
 使用 Google 风格：
 
@@ -38,7 +38,7 @@ def get_goals(self, status: Optional[str] = None, page: int = 1) -> tuple[List[D
 - ID 参数：`"目标 ID (格式: goal-xxx)"`
 - 枚举参数：`"可选值: active, completed, archived"`
 
-## 日志记录规范
+## 3. 日志记录规范
 
 ```python
 from lifeprism.utils import get_logger
@@ -50,23 +50,8 @@ logger.error(f"创建目标失败: {e}")            # 错误
 logger.debug(f"刷新缓存成功，共 {count} 个")  # 调试
 ```
 
-## 数据库操作规范
 
-### 基本要求
-- 不能直接创建数据库对象，使用 `lifeprism/storage` 中的基础类
-- 连接管理：`with self.db.get_connection() as conn:`
-- 参数化查询：`cursor.execute(sql, (param1, param2))`，防止 SQL 注入
-- `with` 语句自动提交事务
-
-### 结果转换
-
-```python
-columns = [description[0] for description in cursor.description]
-rows = cursor.fetchall()
-items = [dict(zip(columns, row)) for row in rows]
-```
-
-## server模块
+## 4. server模块
 
 ### Service 层职责
 
@@ -91,11 +76,9 @@ class GoalService:
 goal_service = LazySingleton(GoalService)
 ```
 
-### Provider 层职责
+### server/Provider(已经弃用)
 
-- 只负责数据库操作，不涉及业务逻辑，继承 `LWBaseDataProvider`
-- 方法命名：`get_xxx_by_id()` | `get_xxxs()` | `create_xxx()` | `update_xxx()` | `delete_xxx()`
-- 返回值：单个 `Optional[Dict]` | 多个 `tuple[List[Dict], int]` | 操作 `bool`
+`server/provider`已经转移至`storage/provider`,具体使用查看《数据库操作规范》章节
 
 ### ID 生成规范
 
@@ -119,7 +102,7 @@ def generate_id(prefix: str) -> str:
 | 公共缓存 | 无前缀 | `self.category_name_map` |
 | 依赖注入 | 无前缀 | `self.goal_provider` |
 
-## 错误处理分层
+## 5. 错误处理分层
 
 ### Provider 层（数据访问层）
 - 范围：server/provider，llm，processor，monitor等大部分外部接口
@@ -133,6 +116,32 @@ def generate_id(prefix: str) -> str:
 - 范围：server/api
 - 使用全局异常处理器统一处理
 
-## 数据路径
+## 6. 数据路径
 
 **路径统一**：通过 settings_manager，禁止自行解析
+
+## 数据库操作规范（编写`lifeprism`内的正式代码时需要遵守）
+
+### 基本要求
+- 不能直接创建数据库对象，继承`LWBaseDataProvider`类，在provider中编写数据库操作
+- 连接管理：`with self.db.get_connection() as conn:`
+- 参数化查询：`cursor.execute(sql, (param1, param2))`，防止 SQL 注入
+- `with` 语句自动提交事务
+
+### 结果转换
+
+```python
+columns = [description[0] for description in cursor.description]
+rows = cursor.fetchall()
+items = [dict(zip(columns, row)) for row in rows]
+```
+
+## provider管理
+
+1. 一个数据表对应`lifeprism/storage/providers/__init__.py`中的一个provider，当需要操作对应数据表时，只能使用这里导出的单例，禁止直接编写sql在非provider类之外
+
+2. 使用provider时，**优先使用通用方法**（`_generic_query/insert/update/delete`）,只有在通用方法无法满足时才创建自定义方法,自定义方法必须注释说明为什么需要自定义。通用方法位置`lifeprism/storage/base_providers/lw_base_data_provider.py L878~L1228`
+
+3. 需要创建新的provider时，需要优先实现通用方法，参考`lifeprism/storage/providers/diary_provider.py`的实现
+
+4. provider仅负责简单操作数据库，不负责任何业务逻辑

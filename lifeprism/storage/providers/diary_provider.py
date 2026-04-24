@@ -119,7 +119,10 @@ class DiaryProvider(LWBaseDataProvider):
 
     def update_diary(self, date: str, data: Dict[str, Any]) -> bool:
         """
-        更新日记记录（使用基类方法）
+        更新日记记录
+
+        注意：此方法使用自定义 SQL 是因为需要 SQLite 特定的时间戳函数
+        datetime('now','localtime')，通用方法的 auto_timestamp 使用 UTC 时间
 
         Args:
             date: 日期 YYYY-MM-DD
@@ -132,8 +135,7 @@ class DiaryProvider(LWBaseDataProvider):
             return True
 
         try:
-            # 使用通用更新方法（现在支持自定义主键）
-            # 注意：SQLite 的 datetime('now','localtime') 需要手动处理
+            # 使用自定义 SQL 以支持 SQLite 的 datetime('now','localtime')
             if 'updated_at' not in data:
                 # 使用 SQLite 特定的时间戳更新
                 with self.db.get_connection() as conn:
@@ -181,18 +183,26 @@ class DiaryProvider(LWBaseDataProvider):
             return False
 
     # ==================== 特殊方法（兼容旧接口）====================
+    # 注意：以下方法是对通用方法的简单封装，提供更清晰的业务语义
+    # 新 provider 不应创建此类便捷方法，应直接使用通用方法
 
     def get_diary_by_date(self, date: str) -> Optional[Dict[str, Any]]:
         """
         按日期获取日记（兼容旧接口）
 
         这是 get_diary_by_id 的别名，因为 diary 表使用 date 作为主键。
+
+        注意：此方法是对 get_diary_by_id 的封装，仅为保持向后兼容。
+        新代码应优先使用 get_diary_by_id 或 query_diaries。
         """
         return self.get_diary_by_id(date)
 
     def get_diaries_by_date_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """
         获取日期范围内的日记列表（兼容旧接口）
+
+        注意：此方法是对 query_diaries 的封装，仅为保持向后兼容。
+        新代码应优先使用 query_diaries(QueryOptions(date_range=(start, end)))。
 
         Args:
             start_date: 开始日期 YYYY-MM-DD
@@ -212,6 +222,9 @@ class DiaryProvider(LWBaseDataProvider):
     def create_diary(self, date: str) -> bool:
         """
         创建日记记录（兼容旧接口）
+
+        注意：此方法是对 insert_diary 的封装，仅为保持向后兼容。
+        新代码应优先使用 insert_diary(date, data)。
 
         这是 insert_diary 的简化版本，只传 date。
         """
