@@ -3,10 +3,12 @@ Timeline 数据提供者（重构版）
 
 职责：提供 timeline_custom_block 表的所有数据访问接口
 """
+import sqlite3
 from typing import Dict, Any, Optional, List, Tuple, Set
 from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -191,6 +193,9 @@ class TimelineProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否删除成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             affected_rows = self.db.delete(self._TABLE_NAME, where={"id": block_id})
@@ -200,7 +205,7 @@ class TimelineProvider(LWBaseDataProvider):
             return success
         except Exception as e:
             logger.error(f"删除时间块 {block_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"删除时间块 {block_id} 失败") from e
 
     # ============================================================================
     # WAID 累计时长查询（保留业务逻辑方法）
@@ -215,6 +220,9 @@ class TimelineProvider(LWBaseDataProvider):
 
         Returns:
             int: 累计时长（分钟），无记录返回 0
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             start_of_day = f"{date} 00:00:00"
@@ -229,7 +237,7 @@ class TimelineProvider(LWBaseDataProvider):
                 return cursor.fetchone()[0]
         except Exception as e:
             logger.error(f"查询 todo {todo_id} 累计时长失败: {e}")
-            return 0
+            raise DataAccessError(f"查询 todo {todo_id} 累计时长失败") from e
 
     def batch_get_duration_by_todos(self, todo_ids: List[str], date: str) -> Dict[str, int]:
         """批量查询多个 todo 在指定日期的累计时长
@@ -240,6 +248,9 @@ class TimelineProvider(LWBaseDataProvider):
 
         Returns:
             dict: {todo_id: 累计分钟数}
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not todo_ids:
             return {}
@@ -264,7 +275,7 @@ class TimelineProvider(LWBaseDataProvider):
                 return result
         except Exception as e:
             logger.error(f"批量查询累计时长失败: {e}")
-            return {tid: 0 for tid in todo_ids}
+            raise DataAccessError(f"批量查询累计时长失败") from e
 
     # ============================================================================
     # 兼容旧接口（保留用于 timeline_builder）

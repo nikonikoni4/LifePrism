@@ -3,10 +3,12 @@ Map Cache Providers
 
 提供 multi_purpose_map_cache 和 single_purpose_map_cache 表的数据访问接口。
 """
+import sqlite3
 from typing import Dict, Any, List, Optional, Tuple, Set
 from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger,LazySingleton
+from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -100,24 +102,36 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 白名单验证
             allowed_fields = self._UPDATE_FIELDS | {self._PRIMARY_KEY}
             invalid_fields = set(data.keys()) - allowed_fields
             if invalid_fields:
-                raise ValueError(f"Invalid insert fields: {invalid_fields}")
+                raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
             # 验证必需字段
             if 'id' not in data or 'app' not in data or 'title' not in data:
-                raise ValueError("Missing required fields: id, app, title")
+                raise ValidationError("Missing required fields: id, app, title")
 
             self._generic_insert(data)
             logger.info(f"创建 multi_purpose_map_cache 记录成功: {data.get('id')}")
             return True
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在: {data.get('id')}") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"创建 multi_purpose_map_cache 记录失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"创建 multi_purpose_map_cache 记录失败",
+                details={"id": data.get('id'), "error": str(e)}
+            ) from e
 
     def update_multi_purpose_map_cache(self, cache_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -129,6 +143,9 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not data:
             return True
@@ -137,12 +154,21 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
             # 白名单验证
             invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
             if invalid_fields:
-                raise ValueError(f"Invalid update fields: {invalid_fields}")
+                raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
             return self._generic_update(cache_id, data)
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"更新 multi_purpose_map_cache 记录 {cache_id} 失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"更新 multi_purpose_map_cache 记录失败",
+                details={"cache_id": cache_id, "error": str(e)}
+            ) from e
 
     def delete_multi_purpose_map_cache(self, cache_id: str) -> bool:
         """
@@ -153,15 +179,27 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             success = self._generic_delete(cache_id)
             if success:
                 logger.info(f"删除 multi_purpose_map_cache 记录 {cache_id} 成功")
             return success
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"删除 multi_purpose_map_cache 记录 {cache_id} 失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"删除 multi_purpose_map_cache 记录失败",
+                details={"cache_id": cache_id, "error": str(e)}
+            ) from e
 
     def batch_insert_multi_purpose_map_cache(self, data_list: List[Dict[str, Any]]) -> int:
         """
@@ -172,6 +210,9 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             成功插入的数量
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not data_list:
             return 0
@@ -182,11 +223,11 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
             for data in data_list:
                 invalid_fields = set(data.keys()) - allowed_fields
                 if invalid_fields:
-                    raise ValueError(f"Invalid insert fields: {invalid_fields}")
+                    raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
                 # 验证必需字段
                 if 'id' not in data or 'app' not in data or 'title' not in data:
-                    raise ValueError("Missing required fields: id, app, title")
+                    raise ValidationError("Missing required fields: id, app, title")
 
             # 手动实现批量插入
             count = 0
@@ -207,9 +248,18 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
             logger.info(f"批量插入 {count} 条 multi_purpose_map_cache 记录")
             return count
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"批量插入 multi_purpose_map_cache 记录失败: {e}")
-            return 0
+            raise DataAccessError(
+                message=f"批量插入 multi_purpose_map_cache 记录失败",
+                details={"count": len(data_list), "error": str(e)}
+            ) from e
 
     def batch_update_multi_purpose_map_cache(
         self,
@@ -225,6 +275,9 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             成功更新的数量
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not cache_ids or not data:
             return 0
@@ -233,7 +286,7 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
             # 白名单验证
             invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
             if invalid_fields:
-                raise ValueError(f"Invalid update fields: {invalid_fields}")
+                raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
             # 手动实现批量更新
             from datetime import datetime
@@ -258,9 +311,18 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
             logger.info(f"批量更新 {count} 条 multi_purpose_map_cache 记录")
             return count
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"批量更新 multi_purpose_map_cache 记录失败: {e}")
-            return 0
+            raise DataAccessError(
+                message=f"批量更新 multi_purpose_map_cache 记录失败",
+                details={"count": len(cache_ids), "error": str(e)}
+            ) from e
 
     def batch_delete_multi_purpose_map_cache(self, cache_ids: List[str]) -> int:
         """
@@ -271,6 +333,9 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             成功删除的数量
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not cache_ids:
             return 0
@@ -288,9 +353,18 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
             logger.info(f"批量删除 {count} 条 multi_purpose_map_cache 记录")
             return count
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"批量删除 multi_purpose_map_cache 记录失败: {e}")
-            return 0
+            raise DataAccessError(
+                message=f"批量删除 multi_purpose_map_cache 记录失败",
+                details={"count": len(cache_ids), "error": str(e)}
+            ) from e
 
 
 # ==================== SinglePurposeMapCacheProvider ====================
@@ -382,24 +456,36 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 白名单验证
             allowed_fields = self._UPDATE_FIELDS | {self._PRIMARY_KEY}
             invalid_fields = set(data.keys()) - allowed_fields
             if invalid_fields:
-                raise ValueError(f"Invalid insert fields: {invalid_fields}")
+                raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
             # 验证必需字段
             if 'id' not in data or 'app' not in data or 'title' not in data:
-                raise ValueError("Missing required fields: id, app, title")
+                raise ValidationError("Missing required fields: id, app, title")
 
             self._generic_insert(data)
             logger.info(f"创建 single_purpose_map_cache 记录成功: {data.get('id')}")
             return True
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在: {data.get('id')}") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"创建 single_purpose_map_cache 记录失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"创建 single_purpose_map_cache 记录失败",
+                details={"id": data.get('id'), "error": str(e)}
+            ) from e
 
     def update_single_purpose_map_cache(self, cache_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -411,6 +497,9 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not data:
             return True
@@ -419,12 +508,21 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
             # 白名单验证
             invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
             if invalid_fields:
-                raise ValueError(f"Invalid update fields: {invalid_fields}")
+                raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
             return self._generic_update(cache_id, data)
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"更新 single_purpose_map_cache 记录 {cache_id} 失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"更新 single_purpose_map_cache 记录失败",
+                details={"cache_id": cache_id, "error": str(e)}
+            ) from e
 
     def delete_single_purpose_map_cache(self, cache_id: str) -> bool:
         """
@@ -435,15 +533,27 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             success = self._generic_delete(cache_id)
             if success:
                 logger.info(f"删除 single_purpose_map_cache 记录 {cache_id} 成功")
             return success
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"删除 single_purpose_map_cache 记录 {cache_id} 失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"删除 single_purpose_map_cache 记录失败",
+                details={"cache_id": cache_id, "error": str(e)}
+            ) from e
 
     def batch_insert_single_purpose_map_cache(self, data_list: List[Dict[str, Any]]) -> int:
         """
@@ -454,6 +564,9 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             成功插入的数量
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not data_list:
             return 0
@@ -464,11 +577,11 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
             for data in data_list:
                 invalid_fields = set(data.keys()) - allowed_fields
                 if invalid_fields:
-                    raise ValueError(f"Invalid insert fields: {invalid_fields}")
+                    raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
                 # 验证必需字段
                 if 'id' not in data or 'app' not in data or 'title' not in data:
-                    raise ValueError("Missing required fields: id, app, title")
+                    raise ValidationError("Missing required fields: id, app, title")
 
             # 手动实现批量插入
             count = 0
@@ -489,9 +602,18 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
             logger.info(f"批量插入 {count} 条 single_purpose_map_cache 记录")
             return count
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"批量插入 single_purpose_map_cache 记录失败: {e}")
-            return 0
+            raise DataAccessError(
+                message=f"批量插入 single_purpose_map_cache 记录失败",
+                details={"count": len(data_list), "error": str(e)}
+            ) from e
 
     def batch_update_single_purpose_map_cache(
         self,
@@ -507,6 +629,9 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             成功更新的数量
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not cache_ids or not data:
             return 0
@@ -515,7 +640,7 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
             # 白名单验证
             invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
             if invalid_fields:
-                raise ValueError(f"Invalid update fields: {invalid_fields}")
+                raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
             # 手动实现批量更新
             from datetime import datetime
@@ -540,9 +665,18 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
             logger.info(f"批量更新 {count} 条 single_purpose_map_cache 记录")
             return count
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"批量更新 single_purpose_map_cache 记录失败: {e}")
-            return 0
+            raise DataAccessError(
+                message=f"批量更新 single_purpose_map_cache 记录失败",
+                details={"count": len(cache_ids), "error": str(e)}
+            ) from e
 
     def batch_delete_single_purpose_map_cache(self, cache_ids: List[str]) -> int:
         """
@@ -553,6 +687,9 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
         Returns:
             成功删除的数量
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not cache_ids:
             return 0
@@ -570,7 +707,16 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
             logger.info(f"批量删除 {count} 条 single_purpose_map_cache 记录")
             return count
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"记录已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"批量删除 single_purpose_map_cache 记录失败: {e}")
-            return 0
+            raise DataAccessError(
+                message=f"批量删除 single_purpose_map_cache 记录失败",
+                details={"count": len(cache_ids), "error": str(e)}
+            ) from e
 

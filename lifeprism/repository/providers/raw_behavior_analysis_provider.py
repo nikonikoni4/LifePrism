@@ -3,10 +3,12 @@
 
 职责：提供 raw_behavior_analysis 表的所有数据访问接口
 """
+import sqlite3
 from typing import Dict, Any, Optional, List, Set
 from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -184,6 +186,9 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
 
         Returns:
             int: 删除的记录数
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         start_datetime = f"{start_date} 00:00:00"
         end_datetime = f"{end_date} 23:59:59"
@@ -201,7 +206,7 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
                 return affected_rows
         except Exception as e:
             logger.error(f"删除原始行为分析记录失败: {e}")
-            return 0
+            raise DataAccessError(f"删除原始行为分析记录失败: {e}") from e
 
 
 

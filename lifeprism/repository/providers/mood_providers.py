@@ -4,12 +4,14 @@ Mood Providers - 心情模块数据访问层
 提供 mood_types / mood_entries / mood_impacts 三张表的数据访问接口。
 按照架构原则：一个 Provider 对应一张表，多个 Provider 写在同一个文件内。
 """
+import sqlite3
 import uuid
 from typing import Optional, List, Dict, Any, Tuple, Set
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -76,7 +78,7 @@ class MoodTypeProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_mood_type(self, data: Dict[str, Any]) -> Optional[str]:
+    def create_mood_type(self, data: Dict[str, Any]) -> str:
         """
         创建心情类型
 
@@ -84,7 +86,10 @@ class MoodTypeProvider(LWBaseDataProvider):
             data: 心情类型数据
 
         Returns:
-            Optional[str]: 新创建的 ID，失败返回 None
+            str: 新创建的 ID
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 自动生成 ID
@@ -102,7 +107,7 @@ class MoodTypeProvider(LWBaseDataProvider):
             return new_id
         except Exception as e:
             logger.error(f"创建心情类型失败: {e}")
-            return None
+            raise DataAccessError(f"创建心情类型失败: {e}") from e
 
     def update_mood_type(self, mood_type_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -114,6 +119,9 @@ class MoodTypeProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not data:
             return True
@@ -127,7 +135,7 @@ class MoodTypeProvider(LWBaseDataProvider):
             return self._generic_update(mood_type_id, data)
         except Exception as e:
             logger.error(f"更新心情类型 {mood_type_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"更新心情类型 {mood_type_id} 失败: {e}") from e
 
     def delete_mood_type(self, mood_type_id: str) -> bool:
         """
@@ -138,6 +146,9 @@ class MoodTypeProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             success = self._generic_delete(mood_type_id)
@@ -146,7 +157,7 @@ class MoodTypeProvider(LWBaseDataProvider):
             return success
         except Exception as e:
             logger.error(f"删除心情类型 {mood_type_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"删除心情类型 {mood_type_id} 失败: {e}") from e
 
     def count_entries_by_type(self, mood_type_id: str) -> int:
         """
@@ -156,7 +167,10 @@ class MoodTypeProvider(LWBaseDataProvider):
             mood_type_id: 心情类型 ID
 
         Returns:
-            int: 记录数，查询失败返回 -1
+            int: 记录数
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -165,7 +179,7 @@ class MoodTypeProvider(LWBaseDataProvider):
                 return cursor.fetchone()[0]
         except Exception as e:
             logger.error(f"统计心情类型 {mood_type_id} 关联记录数失败: {e}")
-            return -1
+            raise DataAccessError(f"统计心情类型 {mood_type_id} 关联记录数失败: {e}") from e
 
 
 # ==================== MoodEntryProvider ====================
@@ -212,6 +226,9 @@ class MoodEntryProvider(LWBaseDataProvider):
 
         Returns:
             List[Dict]: 心情记录列表
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         # 使用自定义 SQL 处理日期范围（因为需要 date(created_at) 函数）
         try:
@@ -231,7 +248,7 @@ class MoodEntryProvider(LWBaseDataProvider):
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
         except Exception as e:
             logger.error(f"获取心情记录列表失败: {e}")
-            return []
+            raise DataAccessError(f"获取心情记录列表失败: {e}") from e
 
     def get_mood_entry_by_id(self, entry_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -247,7 +264,7 @@ class MoodEntryProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_mood_entry(self, data: Dict[str, Any]) -> Optional[str]:
+    def create_mood_entry(self, data: Dict[str, Any]) -> str:
         """
         创建心情记录
 
@@ -255,7 +272,10 @@ class MoodEntryProvider(LWBaseDataProvider):
             data: 心情记录数据（需包含 mood_type_id, score）
 
         Returns:
-            Optional[str]: 新创建的 ID，失败返回 None
+            str: 新创建的 ID
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 自动生成 ID
@@ -273,7 +293,7 @@ class MoodEntryProvider(LWBaseDataProvider):
             return new_id
         except Exception as e:
             logger.error(f"创建心情记录失败: {e}")
-            return None
+            raise DataAccessError(f"创建心情记录失败: {e}") from e
 
     def update_mood_entry(self, entry_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -285,6 +305,9 @@ class MoodEntryProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not data:
             return True
@@ -298,7 +321,7 @@ class MoodEntryProvider(LWBaseDataProvider):
             return self._generic_update(entry_id, data)
         except Exception as e:
             logger.error(f"更新心情记录 {entry_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"更新心情记录 {entry_id} 失败: {e}") from e
 
     def delete_mood_entry(self, entry_id: str) -> bool:
         """
@@ -309,6 +332,9 @@ class MoodEntryProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             success = self._generic_delete(entry_id)
@@ -317,7 +343,7 @@ class MoodEntryProvider(LWBaseDataProvider):
             return success
         except Exception as e:
             logger.error(f"删除心情记录 {entry_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"删除心情记录 {entry_id} 失败: {e}") from e
 
 
 # ==================== MoodImpactProvider ====================
@@ -369,7 +395,7 @@ class MoodImpactProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results
 
-    def create_mood_impact(self, data: Dict[str, Any]) -> Optional[int]:
+    def create_mood_impact(self, data: Dict[str, Any]) -> int:
         """
         创建影响因素
 
@@ -377,7 +403,10 @@ class MoodImpactProvider(LWBaseDataProvider):
             data: 影响因素数据（需包含 name）
 
         Returns:
-            Optional[int]: 新创建的 ID，失败返回 None
+            int: 新创建的 ID
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 白名单验证
@@ -397,7 +426,7 @@ class MoodImpactProvider(LWBaseDataProvider):
                 return new_id
         except Exception as e:
             logger.error(f"创建影响因素失败: {e}")
-            return None
+            raise DataAccessError(f"创建影响因素失败: {e}") from e
 
     def delete_mood_impact(self, impact_id: int) -> bool:
         """
@@ -408,6 +437,9 @@ class MoodImpactProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             success = self._generic_delete(impact_id)
@@ -416,6 +448,6 @@ class MoodImpactProvider(LWBaseDataProvider):
             return success
         except Exception as e:
             logger.error(f"删除影响因素 {impact_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"删除影响因素 {impact_id} 失败: {e}") from e
 
 

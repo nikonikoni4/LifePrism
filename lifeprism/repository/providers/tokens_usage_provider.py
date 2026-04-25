@@ -3,11 +3,13 @@ Tokens Usage Provider - Token 使用统计数据访问层
 
 职责：提供 tokens_usage_log 表的所有数据访问接口
 """
+import sqlite3
 from typing import Optional, List, Dict, Any, Tuple, Set
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -100,6 +102,9 @@ class TokensUsageProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 白名单验证
@@ -133,7 +138,7 @@ class TokensUsageProvider(LWBaseDataProvider):
             return True
         except Exception as e:
             logger.error(f"创建 token 使用记录失败: {e}")
-            return False
+            raise DataAccessError(f"创建 token 使用记录失败: {e}") from e
 
     def update_tokens_usage(self, session_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -145,6 +150,9 @@ class TokensUsageProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not data:
             return True
@@ -158,7 +166,7 @@ class TokensUsageProvider(LWBaseDataProvider):
             return self._generic_update(session_id, data)
         except Exception as e:
             logger.error(f"更新 token 使用记录 {session_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"更新 token 使用记录 {session_id} 失败: {e}") from e
 
     def delete_tokens_usage(self, session_id: str) -> bool:
         """
@@ -169,6 +177,9 @@ class TokensUsageProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             success = self._generic_delete(session_id)
@@ -177,7 +188,7 @@ class TokensUsageProvider(LWBaseDataProvider):
             return success
         except Exception as e:
             logger.error(f"删除 token 使用记录 {session_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"删除 token 使用记录 {session_id} 失败: {e}") from e
 
     def upsert_tokens_usage(self, session_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -191,6 +202,9 @@ class TokensUsageProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 检查记录是否存在
@@ -205,7 +219,7 @@ class TokensUsageProvider(LWBaseDataProvider):
                 return self.create_tokens_usage(data)
         except Exception as e:
             logger.error(f"Upsert token 使用记录 {session_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"Upsert token 使用记录 {session_id} 失败: {e}") from e
 
     def batch_insert_tokens_usage(self, data_list: List[Dict[str, Any]]) -> int:
         """
@@ -216,6 +230,9 @@ class TokensUsageProvider(LWBaseDataProvider):
 
         Returns:
             成功插入的记录数
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 为每条记录设置默认值
@@ -238,4 +255,4 @@ class TokensUsageProvider(LWBaseDataProvider):
             return affected
         except Exception as e:
             logger.error(f"批量插入 token 使用记录失败: {e}")
-            return 0
+            raise DataAccessError(f"批量插入 token 使用记录失败: {e}") from e

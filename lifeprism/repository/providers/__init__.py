@@ -1,5 +1,5 @@
 from lifeprism.utils import LazySingleton
-
+from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.repository.providers.tokens_usage_provider import TokensUsageProvider
 from lifeprism.repository.providers.diary_provider import DiaryProvider
 from lifeprism.repository.providers.plan_doc_provider import PlanDocProvider
@@ -23,4 +23,5 @@ __all__ = [
     "todo_provider",
     'behavior_analysis_provider',
     'raw_behavior_analysis_provider',
+    'QueryOptions',
 ]

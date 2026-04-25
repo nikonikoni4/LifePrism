@@ -3,10 +3,12 @@ Plan Doc 数据提供者（重构版）
 
 职责：提供 plan_doc 表的所有数据访问接口
 """
+import sqlite3
 from typing import Dict, Any, Optional, List, Tuple, Set
 from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -49,6 +51,9 @@ class PlanDocProvider(LWBaseDataProvider):
 
         Returns:
             List[Dict]: 计划书列表，按排序索引升序排列
+
+        Raises:
+            DataAccessError: 数据库访问失败
         """
         try:
             # 使用原生 SQL 保持复杂排序逻辑
@@ -68,7 +73,7 @@ class PlanDocProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"获取所有计划书失败: {e}")
-            return []
+            raise DataAccessError(f"获取所有计划书失败: {e}") from e
 
     def get_plan_docs_by_goal(self, goal_id: str) -> List[Dict[str, Any]]:
         """
@@ -79,6 +84,9 @@ class PlanDocProvider(LWBaseDataProvider):
 
         Returns:
             List[Dict]: 计划书列表，按排序索引升序排列
+
+        Raises:
+            DataAccessError: 数据库访问失败
         """
         try:
             # 使用原生 SQL 保持复杂排序逻辑
@@ -100,7 +108,7 @@ class PlanDocProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"获取目标 {goal_id} 的计划书失败: {e}")
-            return []
+            raise DataAccessError(f"获取目标 {goal_id} 的计划书失败: {e}") from e
 
     def get_plan_doc_by_id(self, doc_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -128,6 +136,11 @@ class PlanDocProvider(LWBaseDataProvider):
 
         Returns:
             Optional[str]: 新计划书 ID，失败返回 None
+
+        Raises:
+            ValidationError: 数据验证失败（如 id 为空）
+            ConflictError: 主键冲突
+            DataAccessError: 数据库访问失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -136,8 +149,7 @@ class PlanDocProvider(LWBaseDataProvider):
                 # 使用 id
                 doc_id = data.get('id', '')
                 if not doc_id:
-                    logger.error("创建计划书失败: id 不能为空")
-                    return None
+                    raise ValidationError("创建计划书失败: id 不能为空")
 
                 # 获取当前目标下最大 order_index
                 cursor.execute(
@@ -168,9 +180,14 @@ class PlanDocProvider(LWBaseDataProvider):
                 logger.info(f"创建计划书成功，ID: {doc_id}")
                 return doc_id
 
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            logger.error(f"创建计划书失败: {e}")
+            raise ConflictError(f"创建计划书失败，ID 已存在: {doc_id}") from e
         except Exception as e:
             logger.error(f"创建计划书失败: {e}")
-            return None
+            raise DataAccessError(f"创建计划书失败: {e}") from e
 
     def update_plan_doc(self, doc_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -182,6 +199,10 @@ class PlanDocProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            ValidationError: 字段验证失败
+            DataAccessError: 数据库访问失败
         """
         if not data:
             return True
@@ -190,7 +211,7 @@ class PlanDocProvider(LWBaseDataProvider):
             # 白名单验证
             invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
             if invalid_fields:
-                raise ValueError(f"Invalid update fields: {invalid_fields}")
+                raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
@@ -218,9 +239,11 @@ class PlanDocProvider(LWBaseDataProvider):
                     logger.info(f"更新计划书 {doc_id} 成功")
                 return success
 
+        except ValidationError:
+            raise
         except Exception as e:
             logger.error(f"更新计划书 {doc_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"更新计划书 {doc_id} 失败: {e}") from e
 
     def delete_plan_doc(self, doc_id: str) -> bool:
         """
@@ -231,6 +254,9 @@ class PlanDocProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库访问失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -244,7 +270,7 @@ class PlanDocProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"删除计划书 {doc_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"删除计划书 {doc_id} 失败: {e}") from e
 
     def rename_plan_doc(self, old_id: str, new_id: str) -> bool:
         """
@@ -256,6 +282,10 @@ class PlanDocProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            ConflictError: 新 ID 已存在
+            DataAccessError: 数据库访问失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -280,6 +310,9 @@ class PlanDocProvider(LWBaseDataProvider):
                 logger.info(f"重命名计划书成功: {old_id} -> {new_id}, 关联任务更新数: {cursor.rowcount}")
                 return True
 
+        except sqlite3.IntegrityError as e:
+            logger.error(f"重命名计划书 {old_id} -> {new_id} 失败: {e}")
+            raise ConflictError(f"重命名计划书失败，新 ID 已存在: {new_id}") from e
         except Exception as e:
             logger.error(f"重命名计划书 {old_id} -> {new_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"重命名计划书 {old_id} -> {new_id} 失败: {e}") from e

@@ -4,10 +4,12 @@ Todo 数据提供者（重构版）
 """
 from typing import Optional, List, Dict, Any, Tuple, Set
 import uuid
+import sqlite3
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -60,6 +62,30 @@ class TodoProvider(LWBaseDataProvider):
 
     # ==================== 核心方法（使用通用方法） ====================
 
+    def query_todos(
+        self,
+        options: Optional[QueryOptions] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        通用查询接口（使用基类方法）
+
+        Args:
+            options: 查询选项
+
+        Returns:
+            (记录列表, 总记录数)
+
+        Examples:
+            # 查询日期范围
+            options = QueryOptions(date_range=("2026-04-01", "2026-04-30"))
+            todos, total = provider.query_todos(options)
+
+            # 查询特定状态
+            options = QueryOptions(filters={'state': 'active'})
+            todos, total = provider.query_todos(options)
+        """
+        return self._generic_query(options)
+
     def get_todos_by_date(
         self,
         date: str,
@@ -73,7 +99,10 @@ class TodoProvider(LWBaseDataProvider):
             include_cross_day: 是否包含跨天未完成任务
 
         Returns:
-            List[Dict]: 任务列表
+            List[Dict]: 任务列表（可能为空）
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -103,8 +132,11 @@ class TodoProvider(LWBaseDataProvider):
                 return [dict(zip(columns, row)) for row in rows]
 
         except Exception as e:
-            logger.error(f"获取任务列表失败: {e}")
-            return []
+            logger.error(f"获取任务列表失败 (date={date}): {e}")
+            raise DataAccessError(
+                message=f"获取任务列表失败",
+                details={"date": date, "error": str(e)}
+            ) from e
 
     def get_todo_by_id(self, todo_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -123,7 +155,7 @@ class TodoProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_todo(self, data: Dict[str, Any]) -> Optional[str]:
+    def create_todo(self, data: Dict[str, Any]) -> str:
         """
         创建新任务
 
@@ -131,7 +163,12 @@ class TodoProvider(LWBaseDataProvider):
             data: 任务数据（可包含 'id'，未提供则自动生成）
 
         Returns:
-            Optional[str]: 新任务 ID，失败返回 None
+            str: 新任务 ID
+
+        Raises:
+            ValidationError: 数据验证失败
+            ConflictError: 记录已存在
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -182,9 +219,13 @@ class TodoProvider(LWBaseDataProvider):
                 logger.info(f"创建任务成功，ID: {todo_id}")
                 return todo_id
 
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"任务已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"创建任务失败: {e}")
-            return None
+            raise DataAccessError(f"创建任务失败") from e
 
     def update_todo(self, todo_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -196,6 +237,10 @@ class TodoProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            ValidationError: 字段验证失败
+            DataAccessError: 数据库操作失败
         """
         if not data:
             return True
@@ -204,7 +249,7 @@ class TodoProvider(LWBaseDataProvider):
             # 白名单验证
             invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
             if invalid_fields:
-                raise ValueError(f"Invalid update fields: {invalid_fields}")
+                raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
@@ -233,9 +278,14 @@ class TodoProvider(LWBaseDataProvider):
                     logger.info(f"更新任务 {todo_id} 成功")
                 return success
 
+        except ValidationError:
+            raise
         except Exception as e:
             logger.error(f"更新任务 {todo_id} 失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"更新任务失败",
+                details={"todo_id": todo_id, "error": str(e)}
+            ) from e
 
     def delete_todo(self, todo_id: str) -> bool:
         """
@@ -246,6 +296,9 @@ class TodoProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             success = self._generic_delete(todo_id)
@@ -254,7 +307,10 @@ class TodoProvider(LWBaseDataProvider):
             return success
         except Exception as e:
             logger.error(f"删除任务 {todo_id} 失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"删除任务失败",
+                details={"todo_id": todo_id, "error": str(e)}
+            ) from e
 
     def delete_todo_cascade(self, todo_id: str) -> int:
         """
@@ -265,6 +321,9 @@ class TodoProvider(LWBaseDataProvider):
 
         Returns:
             int: 删除的总任务数（包括子任务）
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -298,7 +357,10 @@ class TodoProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"级联删除任务 {todo_id} 失败: {e}")
-            return 0
+            raise DataAccessError(
+                message=f"级联删除任务失败",
+                details={"todo_id": todo_id, "error": str(e)}
+            ) from e
 
     def get_child_todos(self, parent_id: str) -> List[Dict[str, Any]]:
         """
@@ -308,7 +370,10 @@ class TodoProvider(LWBaseDataProvider):
             parent_id: 父任务 ID
 
         Returns:
-            List[Dict]: 子任务列表
+            List[Dict]: 子任务列表（可能为空）
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             options = QueryOptions(
@@ -320,7 +385,10 @@ class TodoProvider(LWBaseDataProvider):
             return results
         except Exception as e:
             logger.error(f"获取子任务列表失败 (parent_id={parent_id}): {e}")
-            return []
+            raise DataAccessError(
+                message=f"获取子任务列表失败",
+                details={"parent_id": parent_id, "error": str(e)}
+            ) from e
 
     def batch_delete_todos(self, todo_ids: List[str]) -> int:
         """
@@ -331,6 +399,9 @@ class TodoProvider(LWBaseDataProvider):
 
         Returns:
             int: 成功删除的数量
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not todo_ids:
             return 0
@@ -350,7 +421,10 @@ class TodoProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"批量删除任务失败: {e}")
-            return 0
+            raise DataAccessError(
+                message=f"批量删除任务失败",
+                details={"count": len(todo_ids), "error": str(e)}
+            ) from e
 
     def reorder_todos(self, todo_ids: List[str]) -> bool:
         """
@@ -361,6 +435,9 @@ class TodoProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -377,7 +454,10 @@ class TodoProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"重排序任务失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"重排序任务失败",
+                details={"count": len(todo_ids), "error": str(e)}
+            ) from e
 
     # ==================== Task Pool 操作 ====================
 
@@ -389,7 +469,10 @@ class TodoProvider(LWBaseDataProvider):
             state: 任务状态 ('active', 'completed', 'inactive')
 
         Returns:
-            List[Dict]: 任务列表
+            List[Dict]: 任务列表（可能为空）
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 对于 inactive 状态（任务池），按 pool_order_index 排序
@@ -411,7 +494,10 @@ class TodoProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"获取任务列表失败 (state={state}): {e}")
-            return []
+            raise DataAccessError(
+                message=f"获取任务列表失败",
+                details={"state": state, "error": str(e)}
+            ) from e
 
     def reorder_pool_todos(self, todo_ids: List[str]) -> bool:
         """
@@ -422,6 +508,9 @@ class TodoProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -438,7 +527,10 @@ class TodoProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"重排序任务池失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"重排序任务池失败",
+                details={"count": len(todo_ids), "error": str(e)}
+            ) from e
 
     def move_todo_to_folder(self, todo_id: str, folder_id: Optional[int]) -> bool:
         """
@@ -450,12 +542,18 @@ class TodoProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             return self._generic_update(todo_id, {'folder_id': folder_id})
         except Exception as e:
-            logger.error(f"移动任务失败: {e}")
-            return False
+            logger.error(f"移动任务失败 (todo_id={todo_id}): {e}")
+            raise DataAccessError(
+                message=f"移动任务失败",
+                details={"todo_id": todo_id, "folder_id": folder_id, "error": str(e)}
+            ) from e
 
 
     # ==================== 任务池查询 ====================
@@ -475,7 +573,10 @@ class TodoProvider(LWBaseDataProvider):
             state: 按状态筛选（pool/scheduled/completed/all）
 
         Returns:
-            List[Dict]: 任务列表（扁平结构，前端通过 parent_id 构建树）
+            List[Dict]: 任务列表（扁平结构，前端通过 parent_id 构建树，可能为空）
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             filters = {}
@@ -500,7 +601,10 @@ class TodoProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"获取任务池任务失败: {e}")
-            return []
+            raise DataAccessError(
+                message=f"获取任务池任务失败",
+                details={"goal_id": goal_id, "plan_doc_id": plan_doc_id, "state": state, "error": str(e)}
+            ) from e
 
     def get_todos_by_plan_doc(self, plan_doc_id: str) -> List[Dict[str, Any]]:
         """
@@ -510,7 +614,10 @@ class TodoProvider(LWBaseDataProvider):
             plan_doc_id: 计划书 ID
 
         Returns:
-            List[Dict]: 任务列表
+            List[Dict]: 任务列表（可能为空）
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             options = QueryOptions(
@@ -522,7 +629,10 @@ class TodoProvider(LWBaseDataProvider):
             return results
         except Exception as e:
             logger.error(f"获取计划书任务失败 (plan_doc={plan_doc_id}): {e}")
-            return []
+            raise DataAccessError(
+                message=f"获取计划书任务失败",
+                details={"plan_doc_id": plan_doc_id, "error": str(e)}
+            ) from e
 
     def batch_create_todos(self, todos: List[Dict[str, Any]]) -> List[str]:
         """
@@ -533,6 +643,10 @@ class TodoProvider(LWBaseDataProvider):
 
         Returns:
             List[str]: 新创建的任务 ID 列表
+
+        Raises:
+            ConflictError: 记录已存在
+            DataAccessError: 数据库操作失败
         """
         new_ids = []
         try:
@@ -578,9 +692,16 @@ class TodoProvider(LWBaseDataProvider):
                 logger.info(f"批量创建 {len(new_ids)} 个任务成功")
                 return new_ids
 
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"任务已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"批量创建任务失败: {e}")
-            return new_ids
+            raise DataAccessError(
+                message=f"批量创建任务失败",
+                details={"count": len(todos), "created": len(new_ids), "error": str(e)}
+            ) from e
 
     def batch_update_todos(self, updates: List[Dict[str, Any]]) -> int:
         """
@@ -591,6 +712,10 @@ class TodoProvider(LWBaseDataProvider):
 
         Returns:
             int: 成功更新的数量
+
+        Raises:
+            ValidationError: 字段验证失败
+            DataAccessError: 数据库操作失败
         """
         updated_count = 0
         try:
@@ -627,12 +752,23 @@ class TodoProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"批量更新任务失败: {e}")
-            return updated_count
+            raise DataAccessError(
+                message=f"批量更新任务失败",
+                details={"count": len(updates), "updated": updated_count, "error": str(e)}
+            ) from e
 
     # ==================== WAID 浮窗操作 ====================
 
     def get_waid_todos(self) -> List[Dict[str, Any]]:
-        """获取所有 waid_order IS NOT NULL 的 todo，按 waid_order ASC 排序"""
+        """
+        获取所有 waid_order IS NOT NULL 的 todo，按 waid_order ASC 排序
+
+        Returns:
+            List[Dict]: WAID todo 列表（可能为空）
+
+        Raises:
+            DataAccessError: 数据库操作失败
+        """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
@@ -646,16 +782,23 @@ class TodoProvider(LWBaseDataProvider):
                 return [dict(zip(columns, row)) for row in rows]
         except Exception as e:
             logger.error(f"获取 WAID todo 列表失败: {e}")
-            return []
+            raise DataAccessError(
+                message=f"获取 WAID todo 列表失败",
+                details={"error": str(e)}
+            ) from e
 
     def batch_update_waid_order(self, todo_ids: List[str]) -> bool:
-        """批量设置 waid_order，按数组索引顺序赋值 0,1,2...
+        """
+        批量设置 waid_order，按数组索引顺序赋值 0,1,2...
 
         Args:
             todo_ids: todo ID 列表，索引即为新的 waid_order 值
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -669,19 +812,29 @@ class TodoProvider(LWBaseDataProvider):
                 return True
         except Exception as e:
             logger.error(f"批量更新 WAID 排序失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"批量更新 WAID 排序失败",
+                details={"count": len(todo_ids), "error": str(e)}
+            ) from e
 
     def clear_waid_order(self, todo_id: str) -> bool:
-        """将指定 todo 的 waid_order 设为 NULL（从浮窗移除）
+        """
+        将指定 todo 的 waid_order 设为 NULL（从浮窗移除）
 
         Args:
             todo_id: 任务 ID
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             return self._generic_update(todo_id, {'waid_order': None})
         except Exception as e:
-            logger.error(f"清除 WAID 排序失败: {e}")
-            return False
+            logger.error(f"清除 WAID 排序失败 (todo_id={todo_id}): {e}")
+            raise DataAccessError(
+                message=f"清除 WAID 排序失败",
+                details={"todo_id": todo_id, "error": str(e)}
+            ) from e

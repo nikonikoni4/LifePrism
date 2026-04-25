@@ -3,11 +3,13 @@ Category Provider - 分类数据访问层
 
 职责：提供 category 和 sub_category 表的所有数据访问接口
 """
+import sqlite3
 from typing import Optional, List, Dict, Any, Tuple, Set
 from .common_query_options import QueryOptions
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger,LazySingleton
+from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -95,6 +97,9 @@ class CategoryProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 白名单验证
@@ -114,7 +119,7 @@ class CategoryProvider(LWBaseDataProvider):
             return True
         except Exception as e:
             logger.error(f"创建分类失败: {e}")
-            return False
+            raise DataAccessError(f"创建分类失败: {e}") from e
 
     def update_category(self, category_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -126,6 +131,9 @@ class CategoryProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not data:
             return True
@@ -139,7 +147,7 @@ class CategoryProvider(LWBaseDataProvider):
             return self._generic_update(category_id, data)
         except Exception as e:
             logger.error(f"更新分类 {category_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"更新分类 {category_id} 失败: {e}") from e
 
     def delete_category(self, category_id: str) -> bool:
         """
@@ -150,6 +158,9 @@ class CategoryProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             success = self._generic_delete(category_id)
@@ -158,7 +169,7 @@ class CategoryProvider(LWBaseDataProvider):
             return success
         except Exception as e:
             logger.error(f"删除分类 {category_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"删除分类 {category_id} 失败: {e}") from e
 
 
 # ==================== SubCategoryProvider ====================
@@ -244,6 +255,9 @@ class SubCategoryProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 白名单验证
@@ -263,7 +277,7 @@ class SubCategoryProvider(LWBaseDataProvider):
             return True
         except Exception as e:
             logger.error(f"创建子分类失败: {e}")
-            return False
+            raise DataAccessError(f"创建子分类失败: {e}") from e
 
     def update_sub_category(self, sub_category_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -275,6 +289,9 @@ class SubCategoryProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not data:
             return True
@@ -288,7 +305,7 @@ class SubCategoryProvider(LWBaseDataProvider):
             return self._generic_update(sub_category_id, data)
         except Exception as e:
             logger.error(f"更新子分类 {sub_category_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"更新子分类 {sub_category_id} 失败: {e}") from e
 
     def delete_sub_category(self, sub_category_id: str) -> bool:
         """
@@ -299,6 +316,9 @@ class SubCategoryProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             success = self._generic_delete(sub_category_id)
@@ -307,4 +327,4 @@ class SubCategoryProvider(LWBaseDataProvider):
             return success
         except Exception as e:
             logger.error(f"删除子分类 {sub_category_id} 失败: {e}")
-            return False
+            raise DataAccessError(f"删除子分类 {sub_category_id} 失败: {e}") from e

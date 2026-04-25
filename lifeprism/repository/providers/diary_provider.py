@@ -3,11 +3,13 @@ Diary Provider - 日记数据访问层
 
 职责：提供 diary 表的所有数据访问接口
 """
+import sqlite3
 from typing import Optional, List, Dict, Any, Tuple, Set
 from .common_query_options import QueryOptions
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -100,6 +102,9 @@ class DiaryProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             insert_data = {'date': date}
@@ -115,7 +120,7 @@ class DiaryProvider(LWBaseDataProvider):
             return True
         except Exception as e:
             logger.error(f"创建日记 {date} 失败: {e}")
-            return False
+            raise DataAccessError(f"创建日记 {date} 失败") from e
 
     def update_diary(self, date: str, data: Dict[str, Any]) -> bool:
         """
@@ -130,6 +135,9 @@ class DiaryProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         if not data:
             return True
@@ -160,7 +168,7 @@ class DiaryProvider(LWBaseDataProvider):
                 return self._generic_update(date, data)
         except Exception as e:
             logger.error(f"更新日记 {date} 失败: {e}")
-            return False
+            raise DataAccessError(f"更新日记 {date} 失败") from e
 
     def delete_diary(self, date: str) -> bool:
         """
@@ -171,6 +179,9 @@ class DiaryProvider(LWBaseDataProvider):
 
         Returns:
             是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 现在可以使用通用删除方法（支持自定义主键）
@@ -180,7 +191,7 @@ class DiaryProvider(LWBaseDataProvider):
             return success
         except Exception as e:
             logger.error(f"删除日记 {date} 失败: {e}")
-            return False
+            raise DataAccessError(f"删除日记 {date} 失败") from e
 
     # ==================== 特殊方法（兼容旧接口）====================
     # 注意：以下方法是对通用方法的简单封装，提供更清晰的业务语义

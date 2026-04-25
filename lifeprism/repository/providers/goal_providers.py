@@ -8,10 +8,12 @@ Goal Providers - 目标相关数据提供者
 from typing import Optional, List, Dict, Any, Tuple, Set
 from datetime import datetime, timedelta
 import uuid
+import sqlite3
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -115,7 +117,12 @@ class GoalProvider(LWBaseDataProvider):
             data: 目标数据
 
         Returns:
-            Optional[str]: 新目标 ID (格式: goal-xxx)，失败返回 None
+            Optional[str]: 新目标 ID (格式: goal-xxx)
+
+        Raises:
+            ValidationError: 字段验证失败
+            ConflictError: 记录已存在
+            DataAccessError: 数据库操作失败
         """
         try:
             # 生成唯一 ID
@@ -142,15 +149,24 @@ class GoalProvider(LWBaseDataProvider):
             allowed_fields = self._UPDATE_FIELDS | {self._PRIMARY_KEY}
             invalid_fields = set(data.keys()) - allowed_fields
             if invalid_fields:
-                raise ValueError(f"Invalid insert fields: {invalid_fields}")
+                raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
             self._generic_insert(data)
             logger.info(f"创建目标成功，ID: {goal_id}")
             return goal_id
 
+        except ValidationError:
+            raise
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint" in str(e):
+                raise ConflictError(f"目标记录已存在") from e
+            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"创建目标失败: {e}")
-            return None
+            raise DataAccessError(
+                message=f"创建目标失败",
+                details={"goal_id": goal_id, "error": str(e)}
+            ) from e
 
     def update_goal(self, goal_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -162,6 +178,10 @@ class GoalProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            ValidationError: 字段验证失败
+            DataAccessError: 数据库操作失败
         """
         if not data:
             return True
@@ -170,7 +190,7 @@ class GoalProvider(LWBaseDataProvider):
             # 白名单验证
             invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
             if invalid_fields:
-                raise ValueError(f"Invalid update fields: {invalid_fields}")
+                raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
             # goal 表不自动更新 updated_at，只更新传入的字段
             with self.db.get_connection() as conn:
@@ -185,9 +205,14 @@ class GoalProvider(LWBaseDataProvider):
                 logger.info(f"更新目标 {goal_id} 成功")
             return success
 
+        except ValidationError:
+            raise
         except Exception as e:
             logger.error(f"更新目标 {goal_id} 失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"更新目标失败",
+                details={"goal_id": goal_id, "error": str(e)}
+            ) from e
 
     def delete_goal(self, goal_id: str) -> bool:
         """
@@ -198,6 +223,9 @@ class GoalProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             # 先清除 todo_list 中关联的目标
@@ -219,7 +247,10 @@ class GoalProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"删除目标 {goal_id} 失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"删除目标失败",
+                details={"goal_id": goal_id, "error": str(e)}
+            ) from e
 
     # ==================== 业务方法 ====================
 
@@ -232,6 +263,9 @@ class GoalProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -248,7 +282,10 @@ class GoalProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"重排序目标失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"重排序目标失败",
+                details={"goal_count": len(goal_ids), "error": str(e)}
+            ) from e
 
     def get_active_goals(self) -> List[Dict[str, Any]]:
         """
@@ -274,6 +311,9 @@ class GoalProvider(LWBaseDataProvider):
 
         Returns:
             List[Dict]: 目标列表，包含 id, name, link_to_category_id, link_to_sub_category_id
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -292,7 +332,10 @@ class GoalProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"获取绑定分类的活跃目标列表失败: {e}")
-            return []
+            raise DataAccessError(
+                message=f"获取绑定分类的活跃目标列表失败",
+                details={"error": str(e)}
+            ) from e
 
     def get_goals_linked_to_category(self, category_id: str) -> List[Dict[str, Any]]:
         """
@@ -325,6 +368,9 @@ class GoalProvider(LWBaseDataProvider):
 
         Returns:
             List[Dict]: 包含 id, name, link_to_category_id, link_to_sub_category_id 的目标列表
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -349,7 +395,10 @@ class GoalProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"获取活跃目标列表（用于分类）失败: {e}")
-            return []
+            raise DataAccessError(
+                message=f"获取活跃目标列表（用于分类）失败",
+                details={"error": str(e)}
+            ) from e
 
     def calculate_time_invested(self, goal_id: str) -> int:
         """
@@ -360,6 +409,9 @@ class GoalProvider(LWBaseDataProvider):
 
         Returns:
             int: 总投入时间（秒）
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -376,7 +428,10 @@ class GoalProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"计算目标 {goal_id} 投入时间失败: {e}")
-            return 0
+            raise DataAccessError(
+                message=f"计算目标投入时间失败",
+                details={"goal_id": goal_id, "error": str(e)}
+            ) from e
 
     def update_time_invested(self, goal_id: str, time_invested: int) -> bool:
         """
@@ -388,6 +443,9 @@ class GoalProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -402,7 +460,10 @@ class GoalProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"更新目标 {goal_id} 投入时间失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"更新目标投入时间失败",
+                details={"goal_id": goal_id, "time_invested": time_invested, "error": str(e)}
+            ) from e
 
 
 # ==================== GoalStatsProvider ====================
@@ -469,6 +530,9 @@ class GoalStatsProvider(LWBaseDataProvider):
 
         Returns:
             Optional[str]: 最后日期 (YYYY-MM-DD)，无数据返回 None
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -482,7 +546,10 @@ class GoalStatsProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"获取目标 {goal_id} 最新统计日期失败: {e}")
-            return None
+            raise DataAccessError(
+                message=f"获取目标最新统计日期失败",
+                details={"goal_id": goal_id, "error": str(e)}
+            ) from e
 
     def get_stat_by_date(self, goal_id: str, date: str) -> Optional[Dict[str, Any]]:
         """
@@ -517,6 +584,9 @@ class GoalStatsProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -549,7 +619,10 @@ class GoalStatsProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"更新目标 {goal_id} 在 {date} 的统计数据失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"更新目标统计数据失败",
+                details={"goal_id": goal_id, "date": date, "error": str(e)}
+            ) from e
 
     # ==================== 聚合操作 ====================
 
@@ -563,6 +636,9 @@ class GoalStatsProvider(LWBaseDataProvider):
 
         Returns:
             int: 花费时间（秒）
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -585,7 +661,10 @@ class GoalStatsProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"聚合目标 {goal_id} 在 {date} 的时间花费失败: {e}")
-            return 0
+            raise DataAccessError(
+                message=f"聚合目标时间花费失败",
+                details={"goal_id": goal_id, "date": date, "error": str(e)}
+            ) from e
 
     def aggregate_completed_todos(self, goal_id: str, date: str) -> int:
         """
@@ -597,6 +676,9 @@ class GoalStatsProvider(LWBaseDataProvider):
 
         Returns:
             int: 完成的待办数量
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -615,7 +697,10 @@ class GoalStatsProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"统计目标 {goal_id} 在 {date} 完成的待办数量失败: {e}")
-            return 0
+            raise DataAccessError(
+                message=f"统计目标完成的待办数量失败",
+                details={"goal_id": goal_id, "date": date, "error": str(e)}
+            ) from e
 
     def sync_stats_to_date(self, goal_id: str, target_date: str, start_date: str = None) -> bool:
         """
@@ -630,6 +715,9 @@ class GoalStatsProvider(LWBaseDataProvider):
 
         Returns:
             bool: 是否成功
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             last_date = self.get_latest_stat_date(goal_id)
@@ -709,11 +797,23 @@ class GoalStatsProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"同步目标 {goal_id} 统计数据失败: {e}")
-            return False
+            raise DataAccessError(
+                message=f"同步目标统计数据失败",
+                details={"goal_id": goal_id, "target_date": target_date, "error": str(e)}
+            ) from e
 
     def _get_earliest_stat_date(self, goal_id: str) -> Optional[str]:
         """
         获取目标统计的最早日期
+
+        Args:
+            goal_id: 目标 ID
+
+        Returns:
+            Optional[str]: 最早日期 (YYYY-MM-DD)，无数据返回 None
+
+        Raises:
+            DataAccessError: 数据库操作失败
         """
         try:
             with self.db.get_connection() as conn:
@@ -727,7 +827,10 @@ class GoalStatsProvider(LWBaseDataProvider):
 
         except Exception as e:
             logger.error(f"获取目标 {goal_id} 最早统计日期失败: {e}")
-            return None
+            raise DataAccessError(
+                message=f"获取目标最早统计日期失败",
+                details={"goal_id": goal_id, "error": str(e)}
+            ) from e
 
     def get_cumulative_stats(self, goal_id: str, limit: int = 30) -> List[Dict[str, Any]]:
         """
