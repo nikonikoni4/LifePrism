@@ -188,12 +188,6 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
             if success:
                 logger.info(f"删除 multi_purpose_map_cache 记录 {cache_id} 成功")
             return success
-        except ValidationError:
-            raise
-        except sqlite3.IntegrityError as e:
-            if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"记录已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"删除 multi_purpose_map_cache 记录 {cache_id} 失败: {e}")
             raise DataAccessError(
@@ -353,12 +347,6 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
             logger.info(f"批量删除 {count} 条 multi_purpose_map_cache 记录")
             return count
-        except ValidationError:
-            raise
-        except sqlite3.IntegrityError as e:
-            if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"记录已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"批量删除 multi_purpose_map_cache 记录失败: {e}")
             raise DataAccessError(
@@ -542,12 +530,6 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
             if success:
                 logger.info(f"删除 single_purpose_map_cache 记录 {cache_id} 成功")
             return success
-        except ValidationError:
-            raise
-        except sqlite3.IntegrityError as e:
-            if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"记录已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"删除 single_purpose_map_cache 记录 {cache_id} 失败: {e}")
             raise DataAccessError(
@@ -707,12 +689,6 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
             logger.info(f"批量删除 {count} 条 single_purpose_map_cache 记录")
             return count
-        except ValidationError:
-            raise
-        except sqlite3.IntegrityError as e:
-            if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"记录已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
             logger.error(f"批量删除 single_purpose_map_cache 记录失败: {e}")
             raise DataAccessError(
