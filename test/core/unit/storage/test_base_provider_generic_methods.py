@@ -165,6 +165,39 @@ class TestGenericQuery:
         with pytest.raises(ValueError, match="不支持时间范围查询"):
             provider._generic_query(options)
 
+    def test_query_with_order_by_none(self, mock_provider):
+        """测试 order_by=None 时不生成 ORDER BY 子句"""
+        # 插入测试数据
+        with mock_provider.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO test_table (id, name, status) VALUES ('1', 'test1', 'active')")
+            cursor.execute("INSERT INTO test_table (id, name, status) VALUES ('2', 'test2', 'active')")
+            conn.commit()
+
+        # 测试 order_by=None
+        options = QueryOptions(order_by=None)
+        results, total = mock_provider._generic_query(options)
+        assert len(results) == 2
+        assert total == 2
+
+    def test_build_order_clause_with_none(self, mock_provider):
+        """测试 _build_order_clause() 处理 None 的情况"""
+        options = QueryOptions(order_by=None)
+        order_clause = mock_provider._build_order_clause(options)
+        assert order_clause == "", "order_by=None should return empty string"
+
+    def test_build_order_clause_with_valid_field(self, mock_provider):
+        """测试 _build_order_clause() 生成正确的 ORDER BY 子句"""
+        # 测试升序
+        options = QueryOptions(order_by='id', order_desc=False)
+        order_clause = mock_provider._build_order_clause(options)
+        assert order_clause == "ORDER BY id ASC"
+
+        # 测试降序
+        options = QueryOptions(order_by='name', order_desc=True)
+        order_clause = mock_provider._build_order_clause(options)
+        assert order_clause == "ORDER BY name DESC"
+
 
 # ==================== 插入方法测试 ====================
 

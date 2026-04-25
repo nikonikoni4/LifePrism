@@ -72,7 +72,7 @@ class CategoryProvider(LWBaseDataProvider):
             categories, total = provider.query_categories(options)
 
             # 按名称排序
-            options = QueryOptions(order_by='name', order='ASC')
+            options = QueryOptions(order_by='name', order_desc=False)
             categories, total = provider.query_categories(options)
         """
         return self._generic_query(options)
