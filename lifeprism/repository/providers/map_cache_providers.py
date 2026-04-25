@@ -58,6 +58,9 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
         Args:
             options: 查询选项
+                - 支持 filters: 字段过滤
+                - 支持 order_by/order_desc: 排序
+                - 支持 page/page_size: 分页
 
         Returns:
             (记录列表, 总记录数)
@@ -400,6 +403,9 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
         Args:
             options: 查询选项
+                - 支持 filters: 字段过滤
+                - 支持 order_by/order_desc: 排序
+                - 支持 page/page_size: 分页
 
         Returns:
             (记录列表, 总记录数)

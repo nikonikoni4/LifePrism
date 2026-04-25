@@ -4,7 +4,7 @@
 职责：提供 behavior_analysis 表的所有数据访问接口
 """
 import sqlite3
-from typing import Dict, Any, Optional, List, Set
+from typing import Dict, Any, Optional, List, Set, Tuple
 from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
@@ -45,6 +45,34 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
     }
 
     # ==================== 核心 CRUD 方法 ====================
+
+    def query_behaviors(
+        self,
+        options: Optional[QueryOptions] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        通用查询接口
+
+        Args:
+            options: 查询选项
+                - 支持 time_range: 时间范围查询（基于 start_time 字段）
+                - 支持 filters: 字段过滤
+                - 支持 order_by/order_desc: 排序
+                - 支持 page/page_size: 分页
+
+        Returns:
+            (记录列表, 总记录数)
+
+        Examples:
+            # 基本查询
+            options = QueryOptions(filters={'behavior': 'working'})
+            records, total = provider.query_behaviors(options)
+
+            # 分页查询
+            options = QueryOptions(page=1, page_size=20)
+            records, total = provider.query_behaviors(options)
+        """
+        return self._generic_query(options)
 
     def get_behavior_by_start_time(self, start_time: str) -> Optional[Dict[str, Any]]:
         """

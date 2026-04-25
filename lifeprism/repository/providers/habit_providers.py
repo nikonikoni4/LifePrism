@@ -56,6 +56,33 @@ class HabitProvider(LWBaseDataProvider):
 
     # ==================== 核心方法 ====================
 
+    def query_habits(
+        self,
+        options: Optional[QueryOptions] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        通用查询接口
+
+        Args:
+            options: 查询选项
+                - 支持 filters: 字段过滤
+                - 支持 order_by/order_desc: 排序
+                - 支持 page/page_size: 分页
+
+        Returns:
+            (记录列表, 总记录数)
+
+        Examples:
+            # 基本查询
+            options = QueryOptions(filters={'status': 'active'})
+            records, total = provider.query_habits(options)
+
+            # 分页查询
+            options = QueryOptions(page=1, page_size=20)
+            records, total = provider.query_habits(options)
+        """
+        return self._generic_query(options)
+
     def get_habits(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         获取习惯列表，可按 status 过滤
@@ -192,6 +219,34 @@ class HabitChallengeProvider(LWBaseDataProvider):
     }
 
     # ==================== 核心方法 ====================
+
+    def query_habit_challenges(
+        self,
+        options: Optional[QueryOptions] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        通用查询接口
+
+        Args:
+            options: 查询选项
+                - 支持 date_range: 日期范围查询（基于 start_date 字段）
+                - 支持 filters: 字段过滤
+                - 支持 order_by/order_desc: 排序
+                - 支持 page/page_size: 分页
+
+        Returns:
+            (记录列表, 总记录数)
+
+        Examples:
+            # 基本查询
+            options = QueryOptions(filters={'status': 'active'})
+            records, total = provider.query_habit_challenges(options)
+
+            # 分页查询
+            options = QueryOptions(page=1, page_size=20)
+            records, total = provider.query_habit_challenges(options)
+        """
+        return self._generic_query(options)
 
     def create_challenge(self, data: Dict[str, Any]) -> str:
         """
@@ -428,6 +483,34 @@ class HabitCheckinProvider(LWBaseDataProvider):
     }
 
     # ==================== 核心方法 ====================
+
+    def query_habit_checkins(
+        self,
+        options: Optional[QueryOptions] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        通用查询接口
+
+        Args:
+            options: 查询选项
+                - 支持 date_range: 日期范围查询（基于 date 字段）
+                - 支持 filters: 字段过滤
+                - 支持 order_by/order_desc: 排序
+                - 支持 page/page_size: 分页
+
+        Returns:
+            (记录列表, 总记录数)
+
+        Examples:
+            # 基本查询
+            options = QueryOptions(filters={'status': 'active'})
+            records, total = provider.query_habit_checkins(options)
+
+            # 分页查询
+            options = QueryOptions(page=1, page_size=20)
+            records, total = provider.query_habit_checkins(options)
+        """
+        return self._generic_query(options)
 
     def create_checkin(self, data: Dict[str, Any]) -> Optional[str]:
         """

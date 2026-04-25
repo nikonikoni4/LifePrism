@@ -6,7 +6,7 @@ Habit Chain 模块数据提供者
 - HabitChainNodeProvider: habit_chain_nodes 表
 """
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Set
+from typing import Optional, List, Dict, Any, Set, Tuple
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
@@ -43,6 +43,33 @@ class HabitChainProvider(LWBaseDataProvider):
     }
 
     # ==================== 核心方法 ====================
+
+    def query_habit_chains(
+        self,
+        options: Optional[QueryOptions] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        通用查询接口
+
+        Args:
+            options: 查询选项
+                - 支持 filters: 字段过滤
+                - 支持 order_by/order_desc: 排序
+                - 支持 page/page_size: 分页
+
+        Returns:
+            (记录列表, 总记录数)
+
+        Examples:
+            # 基本查询
+            options = QueryOptions(filters={'status': 'active'})
+            records, total = provider.query_habit_chains(options)
+
+            # 分页查询
+            options = QueryOptions(page=1, page_size=20)
+            records, total = provider.query_habit_chains(options)
+        """
+        return self._generic_query(options)
 
     def create_chain(self, data: Dict[str, Any]) -> int:
         """
@@ -188,6 +215,33 @@ class HabitChainNodeProvider(LWBaseDataProvider):
     }
 
     # ==================== 核心方法 ====================
+
+    def query_habit_chain_nodes(
+        self,
+        options: Optional[QueryOptions] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        通用查询接口
+
+        Args:
+            options: 查询选项
+                - 支持 filters: 字段过滤
+                - 支持 order_by/order_desc: 排序
+                - 支持 page/page_size: 分页
+
+        Returns:
+            (记录列表, 总记录数)
+
+        Examples:
+            # 基本查询
+            options = QueryOptions(filters={'status': 'active'})
+            records, total = provider.query_habit_chain_nodes(options)
+
+            # 分页查询
+            options = QueryOptions(page=1, page_size=20)
+            records, total = provider.query_habit_chain_nodes(options)
+        """
+        return self._generic_query(options)
 
     def create_node(self, data: Dict[str, Any]) -> int:
         """

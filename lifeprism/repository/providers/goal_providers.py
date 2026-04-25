@@ -57,6 +57,33 @@ class GoalProvider(LWBaseDataProvider):
 
     # ==================== 核心方法（使用通用方法） ====================
 
+    def query_goals(
+        self,
+        options: Optional[QueryOptions] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        通用查询接口
+
+        Args:
+            options: 查询选项
+                - 支持 filters: 字段过滤
+                - 支持 order_by/order_desc: 排序
+                - 支持 page/page_size: 分页
+
+        Returns:
+            (记录列表, 总记录数)
+
+        Examples:
+            # 基本查询
+            options = QueryOptions(filters={'status': 'active'})
+            records, total = provider.query_goals(options)
+
+            # 分页查询
+            options = QueryOptions(page=1, page_size=20)
+            records, total = provider.query_goals(options)
+        """
+        return self._generic_query(options)
+
     def get_goals(
         self,
         status: Optional[str] = None,
@@ -498,6 +525,34 @@ class GoalStatsProvider(LWBaseDataProvider):
     }
 
     # ==================== 核心方法（使用通用方法） ====================
+
+    def query_goal_stats(
+        self,
+        options: Optional[QueryOptions] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        通用查询接口
+
+        Args:
+            options: 查询选项
+                - 支持 date_range: 日期范围查询（基于 date 字段）
+                - 支持 filters: 字段过滤
+                - 支持 order_by/order_desc: 排序
+                - 支持 page/page_size: 分页
+
+        Returns:
+            (记录列表, 总记录数)
+
+        Examples:
+            # 基本查询
+            options = QueryOptions(filters={'goal_id': 'goal-12345678'})
+            records, total = provider.query_goal_stats(options)
+
+            # 分页查询
+            options = QueryOptions(page=1, page_size=20)
+            records, total = provider.query_goal_stats(options)
+        """
+        return self._generic_query(options)
 
     def get_stats_by_goal(self, goal_id: str, limit: int = 30) -> List[Dict[str, Any]]:
         """
