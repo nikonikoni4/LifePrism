@@ -1229,6 +1229,10 @@ class LWBaseDataProvider:
 
     def _build_order_clause(self, options: 'QueryOptions') -> str:
         """构建 ORDER BY 子句（白名单验证）"""
+        # 如果没有指定排序，返回空字符串
+        if options.order_by is None:
+            return ""
+
         if self._ORDER_FIELDS and options.order_by not in self._ORDER_FIELDS:
             raise ValueError(f"Invalid order_by field: {options.order_by}")
         order_direction = "DESC" if options.order_desc else "ASC"

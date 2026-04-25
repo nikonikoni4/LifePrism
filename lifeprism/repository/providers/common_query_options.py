@@ -20,7 +20,7 @@ class QueryOptions:
     filters: Optional[Dict[str, Any]] = None
 
     # 排序
-    order_by: str = "date"
+    order_by: Optional[str] = None
     order_desc: bool = True
 
     # 分页

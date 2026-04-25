@@ -92,7 +92,7 @@ class DiaryProvider(LWBaseDataProvider):
         Returns:
             日记记录，不存在返回 None
         """
-        options = QueryOptions(filters={'date': date})
+        options = QueryOptions(filters={'date': date}, order_by='date')
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
