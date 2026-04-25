@@ -142,7 +142,7 @@ class BehaviorAnalysisItem(BaseModel):
     end_time: str = Field(..., description="结束时间，格式：YYYY-MM-DD HH:MM:SS")
     screen_count: int = Field(..., description="截图数量")
     behavior_summary: str = Field(..., description="总结性描述")
-    behaviors: str = Field(..., description="分点行为（带序号的文本）")
+    behavior: str = Field(..., description="分点行为（带序号的文本）")
     created_at: Optional[str] = Field(None, description="创建时间")
 
 

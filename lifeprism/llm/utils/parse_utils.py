@@ -202,3 +202,18 @@ def parse_token_usage(result) -> dict:
         'search_count': search_count
     }
 
+
+if __name__ == "__main__":
+    content = """
+    ```json
+        {
+            "start":1,
+            "end":2
+        }
+    ```
+    
+    """
+    import json
+    content = extract_json_from_response(content)
+    print(content)
+    print(json.loads(content))

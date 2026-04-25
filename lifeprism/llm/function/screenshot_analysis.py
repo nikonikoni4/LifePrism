@@ -14,14 +14,14 @@ import base64
 import mimetypes
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
-
-from lifeprism.llm.providers import LLMResponse
+import json
+from lifeprism.llm.utils.parse_utils import extract_json_from_response
 from lifeprism.llm.providers.dataset_providers import llm_dataset_provider
 from lifeprism.llm.channel.manager import channel_manager
 from lifeprism.llm.bus.events import MessageType
 from lifeprism.config import settings
 from lifeprism.utils import get_logger
-from lifeprism.storage import raw_behavior_analysis_store
+from lifeprism.repository import raw_behavior_analysis_repository, behavior_analysis_repository,todo_repository,QueryOptions
 logger = get_logger(__name__)
 
 # ==================== 常量配置 ====================
@@ -88,7 +88,9 @@ ANALYSIS_SYSTEM_PROMPT = """
 直接输出用户行为
 例子：
 1. 当有行为判断时:
-用户在查看openai的harness engineering博客, 用户在查看claude的harness engineering博客, 用户在观看《老友记》
+    1. 用户在查看openai的harness engineering博客
+    2. 用户在查看claude的harness engineering博客
+    3. 用户在观看《老友记》
 2. 当无行为判断时:
 None
 
@@ -148,6 +150,18 @@ def get_todolist(start_date: str, end_date: str) -> Optional[str]:
     except Exception as e:
         logger.error(f"获取 TodoList 失败: {e}", exc_info=True)
         return None
+
+
+def get_today_todolist(date: str) -> Optional[str]:
+    """获取今日目标（单日版本）
+
+    Args:
+        date: 日期（YYYY-MM-DD 格式）
+
+    Returns:
+        Optional[str]: 格式化的目标文本
+    """
+    return get_todolist(date, date)
 
 
 def split_segment_into_chunks(segment: Dict[str, str], chunk_minutes: int) -> List[Dict[str, str]]:
@@ -224,7 +238,7 @@ async def analyze_chunk_screenshots(
     chunk: Dict[str, str],
     screenshots: List[Dict[str, Any]],
     todolist: Optional[str] = None
-) -> Optional[RawBehaviorAnalysisItem]:
+) -> Optional[Dict[str, Any]]:
     """分析单个 chunk 的截图语义
 
     Args:
@@ -233,7 +247,7 @@ async def analyze_chunk_screenshots(
         todolist: 用户今日目标文本（可选）
 
     Returns:
-        Optional[RawBehaviorAnalysisItem]: LLM 分析结果，失败返回 None
+        Optional[Dict[str, Any]]: LLM 分析结果，失败返回 None
     """
     if not screenshots:
         return None
@@ -280,11 +294,11 @@ async def analyze_chunk_screenshots(
             data = {
                 'start_time' : chunk['start'],
                 'end_time' : chunk['end'],
-                'screenshot_count' : len(screenshots),
+                'screen_count' : len(screenshots),
                 'behavior' : f"{chunk['start']} ~ {chunk['end']}\n behavior: {response} \n"
             }
             
-            raw_behavior_analysis_store.create_raw_behavior(data)
+            raw_behavior_analysis_repository.create_raw_behavior(data)
             return data 
         else:
             return None
@@ -321,7 +335,7 @@ async def screenshot_analysis(
         List[Dict[str, Any]]: 分析结果列表，每项包含：
             - start_time: 开始时间（YYYY-MM-DD HH:MM:SS 格式）
             - end_time: 结束时间（YYYY-MM-DD HH:MM:SS 格式）
-            - screenshot_count: 截图数量
+            - screen_count: 截图数量
             - behavior: 分析结果
     """
     logger.info(f"开始截图语义分析: {start_time} -> {end_time}")
@@ -370,11 +384,11 @@ async def screenshot_analysis(
         chunk_end = chunk["end"]
 
         screenshots = get_active_screenshots(chunk_start, chunk_end)
-        screenshot_count = len(screenshots)
+        screen_count = len(screenshots)
 
         logger.debug(
             f"[{i}/{len(all_chunks)}] {chunk_start} -> {chunk_end}, "
-            f"截图数量: {screenshot_count}"
+            f"截图数量: {screen_count}"
         )
 
         if not screenshots:
@@ -382,7 +396,7 @@ async def screenshot_analysis(
 
         pending_chunks.append({
             "chunk": chunk,
-            "screenshot_count": screenshot_count,
+            "screen_count": screen_count,
         })
         analysis_tasks.append(
             analyze_chunk_screenshots(chunk, screenshots, todolist)
@@ -398,19 +412,22 @@ async def screenshot_analysis(
     return results
 
 
-async def behavior_summary(bahaviors : str,todolist:str)->str:
+async def _behavior_summary(start_time:str,end_time:str,screen_count:int,behavior : str,todolist:str)->dict[str,Any]:
     """
     对输入的行为内容进行总结
     args ：
+        start_time : 开始时间（YYYY-MM-DD HH:MM:SS 格式）
+        end_time : 结束时间（YYYY-MM-DD HH:MM:SS 格式）
+        screen_count : 截图数量
         todolist : 用户今日目标文本（可选）
-        bahaviors : 输入的行为
+        behavior : 输入的行为
     return :
         行为总结json字符串
         包含字段：
         - behavior_summary : 行为总结，不超过150字
         - title : 行为标题，对于行为的极致压缩，不超过30个字（一个英文单词算一个字符）
     """
-    if not bahaviors:
+    if not behavior:
         raise ValueError("输入行为为空")
     SUMMARY_SYSTEM_PROMPT = """
     ## task 
@@ -426,14 +443,13 @@ async def behavior_summary(bahaviors : str,todolist:str)->str:
     2. 输出不要超过200字
     3. 输出中不要直接包含“用户”等主语
     4. 不要使用“完成了”等字眼，因为仅凭输入是无法判断是否完成了某项工作（即使输入的行为包含“完成”类似的语义也不能在总结中输出“完成”），只描述做了什么内容，而不是完成了什么
-    
-    ## 输入说明
-    输入行为的顺序就是真实动作的时间顺序
+    5. 不要在总结中出现具体时间，输入的时间只作为动作顺序参考，不作为总结的内容
 
     ## 输出契约
     输出json数据,包含字段:
     - behavior_summary : 行为总结，不超过150字
     - title : 行为标题，对于行为的极致压缩，不超过30个字（一个英文单词算一个字符）
+    **注意**:不要在输出中包含```json ```等json格式的标识符
     输出示例：
     {
         "behavior_summary" : "完成了habit模块习惯界面链条时间计算bug的全流程修复开发工作，期间穿插查看AI对 心理学概念的解析，并在思源笔记中编写整理《复利效应》的相关读书笔记",
@@ -452,22 +468,100 @@ async def behavior_summary(bahaviors : str,todolist:str)->str:
     user_prompt_parts.append(
         f"""
         ## 用户行为
-        {bahaviors}
+        {behavior}
         """
     )
     user_prompt = "\n".join(user_prompt_parts)
     
 
     try:
-        response = await channel_manager.send(
+        response:str = await channel_manager.send(
             content=user_prompt,
             type=MessageType.GENERAL_TASK,
             extra={"system_prompt": SUMMARY_SYSTEM_PROMPT},
         )
-        return response if response else ""
-    except Exception as e:
-        logger.error(f"行为总结调用失败: {e}", exc_info=True)
-        return ""
+        if response:
+            # 解析json字符串
+           
+            response = extract_json_from_response(response)
+            data : dict = json.loads(response)
+            if "behavior_summary" in data and "title" in data:
+                # 存入数据库 start_time, end_time, behavior, behavior_summary, title, screen_count
+                data["screen_count"] = screen_count
+                data["behavior"] = behavior
+                data["start_time"] = start_time
+                data["end_time"] = end_time
+                behavior_analysis_repository.create_behavior(
+                    data=data,
+                )
+                return data
+            else:
+                raise ValueError(f"截图分析行为总结-llm输出字段错误:{data.keys()}")
+            
+        else:
+            raise ValueError("截图分析行为总结-llm输出为空")
+       
+    except json.JSONDecodeError:
+        logger.error(f"截图分析行为总结-json解析失败: {response}")
+        return None
+
+def merage_results_list(analysis_results_list : list[dict[str,Any]])->list[dict[str,Any]]:
+    """ 对相邻的结果进行合并"""
+    if not analysis_results_list:
+        return []
+    
+    merged_results = []
+    for i in range(len(analysis_results_list)):
+        if i == 0 or analysis_results_list[i]['start_time'] != analysis_results_list[i-1]['end_time']:
+            merged_results.append(analysis_results_list[i])
+        else:
+            merged_results[-1]['screen_count'] += analysis_results_list[i]['screen_count']
+            merged_results[-1]['behavior'] += analysis_results_list[i]['behavior']
+    return merged_results
+async def screenshot_behavior_summary(analysis_start_time : str, analysis_end_time : str, analysis_results_list : list[dict[str,Any]], todolist: str = "")->list[dict[str,str]]:
+    """
+    对单个chuck分析进行合并总结
+    args:
+        analysis_start_time: 分析开始时间，格式为YYYY-MM-DD HH:MM:SS
+        analysis_end_time: 分析结束时间，格式为YYYY-MM-DD HH:MM:SS
+        analysis_results_list: 分析结果列表，每个元素为一个字典，包含字段:
+        - start_time: 开始时间，格式为YYYY-MM-DD HH:MM:SS
+        - end_time: 结束时间，格式为YYYY-MM-DD HH:MM:SS
+        - screen_count: 截图数量
+        - behavior: 行为描述
+        todolist: 用户目标
+        
+    return:
+        合并后的分析结果列表，每个元素为一个字典，包含字段:
+        - start_time: 开始时间，格式为YYYY-MM-DD HH:MM:SS
+        - end_time: 结束时间，格式为YYYY-MM-DD HH:MM:SS
+        - screen_count: 截图数量
+        - behavior: 行为描述
+        - behavior_summary: 行为总结
+        - title: 行为标题
+    """
+
+    # 合并连续的时间段
+    merged_results = merage_results_list(analysis_results_list)
+    # 进行总结
+    task_list = []
+    for result in merged_results:
+        task_list.append(
+            _behavior_summary(
+                start_time=result['start_time'],
+                end_time=result['end_time'],
+                behavior=result['behavior'],
+                screen_count=result['screen_count'],
+                todolist=todolist,
+            )
+        )
+    summary_results = await asyncio.gather(*task_list)
+    # 过滤掉None值
+    summary_results = [result for result in summary_results if result is not None]
+    return summary_results
+
+
+
 if __name__ == "__main__":
     from lifeprism.llm.agent.loop import agent_loop
     import asyncio

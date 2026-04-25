@@ -12,59 +12,50 @@ import asyncio
 import json
 from datetime import datetime, timedelta
 
-from lifeprism.llm.function import screenshot_analysis,behavior_summary
+from lifeprism.llm.function import screenshot_analysis,screenshot_behavior_summary
 from lifeprism.config import settings
 from lifeprism.server.schemas.timeline_schemas import BehaviorAnalysisItem
-from lifeprism.storage import todo_store,QueryOptions
+from lifeprism.repository import todo_repository,QueryOptions
 
 async def screen_behavior_anlysis(start_time:str,end_time:str) ->list[BehaviorAnalysisItem]:
     """
-    分析规定时间内的屏幕截图
-    args : 
-        start_time : 开始时间 YYYY-MM-DD HH-MM-SS
-        end_time : 结束时间
-    return 
+    分析规定时间内的屏幕截图,返回分析结果列表
+    args :
+        start_time : 开始时间，支持格式：
+                    - "YYYY-MM-DD HH:MM:SS" (标准格式)
+                    - "YYYY-MM-DDTHH:MM:SS" (ISO 8601格式)
+        end_time : 结束时间，格式同上
+    return
+
     """
+    # 0. 时间格式转换：将 ISO 8601 格式转换为标准格式
+    # 替换 'T' 为空格，确保统一格式
+    start_time = start_time.replace('T', ' ')
+    end_time = end_time.replace('T', ' ')
+
     # 1. 计算开始时间
     screenshot_retention_days = settings.get("screenshot_retention_days", 3)
     requested_start_time = datetime.fromisoformat(start_time)
     earliest_available_time = datetime.now().replace(microsecond=0) - timedelta(days=screenshot_retention_days)
     start_time = max(requested_start_time, earliest_available_time).replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
     
-    # 2. 获取时间范围内的toddolist
-
-    todolist = await todo_store.get_todolist(QueryOptions(
-        start_time=start_time,
-        end_time=end_time,
-    ))
-
+    #2.  查询todolist
+    todolist,_ = todo_repository.query_todos(
+        QueryOptions()
+        .with_date_range(start_time[:10], end_time[:10])
+        .with_order('date', desc=False)
+    )
+    todolist = """
+    1. 修改habit 相关bug
+    2. 编写《复利效应》笔记
+    """
     # 2. 分析屏幕截图
     analysis_results_list = await screenshot_analysis(start_time, end_time,todolist)
     
-    # 3. 对相邻的结果进行合并
-    merged_results = []
-    for i in range(len(analysis_results_list)):
-        if i == 0 or analysis_results_list[i]['start_time'] != analysis_results_list[i-1]['end_time']:
-            merged_results.append(analysis_results_list[i])
-        else:
-            merged_results[-1]['screenshot_count'] += analysis_results_list[i]['screenshot_count']
-            merged_results[-1]['behavior'] += analysis_results_list[i]['behavior']
+    # 3. 对分析结果进行摘要分析
+    summary_results = await screenshot_behavior_summary(start_time,end_time,analysis_results_list,todolist)
 
-    # 4. 摘要分析
-    todolist_text = "\n".join([f"- {todo.content}" for todo in todolist]) if todolist else ""
-    
-    async def get_summary_and_title(merged_item: dict) -> dict:
-        summary_result = await behavior_summary(merged_item['behavior'], todolist_text)
-        result = json.loads(summary_result)
-        merged_item['behavior_summary'] = result.get('behavior_summary', '')
-        merged_item['title'] = result.get('title', '')
-        merged_item['behaviors'] = merged_item.pop('behavior')
-        return merged_item
-    
-    merged_results = await asyncio.gather(*[get_summary_and_title(item) for item in merged_results])
-    
-    return [BehaviorAnalysisItem(**item) for item in merged_results]
-
+    return summary_results
 
 class SyncService:
     """
@@ -97,8 +88,10 @@ class SyncService:
             auto_classify=auto_classify
         )
         
-        
-        await screen_behavior_anlysis(result["time_range"]["start"],result["time_range"]["end"])
+        if settings.monitor_type == "lifeprism":
+            # time_range 格式: "2026-04-19 11:00:00 ~ 2026-04-19 11:15:00"
+            time_parts = result["time_range"].split(" ~ ")
+            await screen_behavior_anlysis(time_parts[0], time_parts[1])
         duration = time.time() - start_time
         return {
             "status": "success",
@@ -148,7 +141,10 @@ class SyncService:
             end_time=end_dt,
             auto_classify=auto_classify
         )
-        await screen_behavior_anlysis(result["time_range"]["start"],result["time_range"]["end"])
+        if settings.monitor_type == "lifeprism":
+            # time_range 格式: "2026-04-19 11:00:00 ~ 2026-04-19 11:15:00"
+            time_parts = result["time_range"].split(" ~ ")
+            await screen_behavior_anlysis(time_parts[0], time_parts[1])
         duration = time.time() - sync_start
         
         return {
@@ -167,3 +163,15 @@ class SyncService:
             }
         }
          
+if __name__ == "__main__":
+    from lifeprism.llm.agent.loop import agent_loop
+    import asyncio
+    
+    async def main():
+        loop_task = asyncio.create_task(agent_loop.loop())
+        # logger.info("[STARTUP] AgentLoop started") # logger is not imported in this file
+        response = await screen_behavior_anlysis("2026-04-19 11:00:00","2026-04-19 11:15:00")
+        print(response)
+        loop_task.cancel() # Cancel the loop task when done to exit cleanly
+        
+    asyncio.run(main())
