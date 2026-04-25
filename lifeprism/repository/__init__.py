@@ -61,6 +61,7 @@ from lifeprism.repository.providers import timeline_provider as timeline_reposit
 from lifeprism.repository.providers import tokens_usage_provider as tokens_usage_repository
 from lifeprism.repository.providers import raw_behavior_analysis_provider as raw_behavior_analysis_repository
 from lifeprism.repository.providers import behavior_analysis_provider as behavior_analysis_repository
+from lifeprism.repository.providers import screen_capture_provider as screen_capture_repository
 # ==================== 多表 repository（内部是 Aggregator）====================
 from lifeprism.repository.aggregators import habit_aggregator as habit_repository
 from lifeprism.repository.aggregators import mood_aggregator as mood_repository
@@ -84,6 +85,9 @@ __all__ = [
     'timeline_repository',
     'plan_doc_repository',
     'tokens_usage_repository',
+    'raw_behavior_analysis_repository',
+    'behavior_analysis_repository',
+    'screen_capture_repository',
     # 多表 repository
     'habit_repository',
     'mood_repository',

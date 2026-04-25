@@ -16,12 +16,17 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
 from lifeprism.llm.utils.parse_utils import extract_json_from_response
-from lifeprism.llm.providers.dataset_providers import llm_dataset_provider
 from lifeprism.llm.channel.manager import channel_manager
 from lifeprism.llm.bus.events import MessageType
 from lifeprism.config import settings
 from lifeprism.utils import get_logger
-from lifeprism.repository import raw_behavior_analysis_repository, behavior_analysis_repository,todo_repository,QueryOptions
+from lifeprism.repository import (
+    raw_behavior_analysis_repository, 
+    behavior_analysis_repository,
+    todo_repository,
+    QueryOptions,
+    screen_capture_repository
+)
 logger = get_logger(__name__)
 
 # ==================== 常量配置 ====================
@@ -102,68 +107,6 @@ CHUNK_MINUTES = 15
 
 # ==================== 辅助函数 ====================
 
-def get_todolist(start_date: str, end_date: str) -> Optional[str]:
-    """获取指定日期范围的 TodoList 并格式化为结构化文本
-
-    Args:
-        start_date: 开始日期（YYYY-MM-DD 格式）
-        end_date: 结束日期（YYYY-MM-DD 格式）
-
-    Returns:
-        Optional[str]: 格式化的目标文本，如果没有任务则返回 None
-
-    Example:
-        >>> text = get_todolist("2026-04-21", "2026-04-21")
-        >>> print(text)
-        ## 目标：
-        1. 完成《复利效应》的笔记
-        2. 完成 feat_monitor 监控功能开发
-        3. 修复 habit 模块 bug：习惯界面链条时间计算有问题
-    """
-    try:
-        todos = llm_dataset_provider.query_todos(
-            start_date=start_date,
-            end_date=end_date,
-            include_cross_day=True
-        )
-
-        active_todos = [
-            todo for todo in todos
-            if todo.get("state") in ("active", "scheduled")
-        ]
-
-        if not active_todos:
-            return None
-
-        # 判断是否跨天
-        is_single_day = (start_date == end_date)
-        header = "## 今日目标：" if is_single_day else f"## 目标（{start_date} ~ {end_date}）："
-
-        lines = [header, ""]
-        for i, todo in enumerate(active_todos, 1):
-            content = todo.get("content", "").strip()
-            if content:
-                lines.append(f"{i}. {content}")
-
-        return "\n".join(lines)
-
-    except Exception as e:
-        logger.error(f"获取 TodoList 失败: {e}", exc_info=True)
-        return None
-
-
-def get_today_todolist(date: str) -> Optional[str]:
-    """获取今日目标（单日版本）
-
-    Args:
-        date: 日期（YYYY-MM-DD 格式）
-
-    Returns:
-        Optional[str]: 格式化的目标文本
-    """
-    return get_todolist(date, date)
-
-
 def split_segment_into_chunks(segment: Dict[str, str], chunk_minutes: int) -> List[Dict[str, str]]:
     """将一个时间段切分为固定大小的 chunk
 
@@ -202,7 +145,7 @@ def get_active_screenshots(seg_start: str, seg_end: str) -> List[Dict[str, Any]]
     Returns:
         List[Dict[str, Any]]: 截图列表
     """
-    return llm_dataset_provider.query_screenshots(
+    return screen_capture_repository.query_screenshots(
         start_time=seg_start,
         end_time=seg_end,
         capture_reason='active'
