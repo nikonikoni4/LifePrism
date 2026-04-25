@@ -73,25 +73,40 @@ class SyncService:
     ) -> Dict:
         """
         增量同步 ActivityWatch 数据（从数据库最新时间同步到现在）
-        
+
         Args:
             auto_classify: 是否自动分类新应用
-            
+
         Returns:
             Dict: 同步结果
         """
         start_time = time.time()
-        
-        
+
+
         # 使用 DataProcessingService 处理增量同步
         result = await self.data_processor.process_activitywatch_data(
             auto_classify=auto_classify
         )
-        
+
         if settings.monitor_type == "lifeprism":
-            # time_range 格式: "2026-04-19 11:00:00 ~ 2026-04-19 11:15:00"
-            time_parts = result["time_range"].split(" ~ ")
-            await screen_behavior_anlysis(time_parts[0], time_parts[1])
+            # 查询 behavior_analysis 表中最后一条记录的 end_time
+            from lifeprism.repository import behavior_analysis_repository, QueryOptions
+
+            # 获取最后一条记录（按 end_time 降序）
+            options = QueryOptions().with_order('end_time', desc=True).with_limit(1)
+            last_records, _ = behavior_analysis_repository.query_behaviors(options)
+
+            if last_records:
+                # 使用最后一条记录的 end_time 作为起始时间
+                analysis_start_time = last_records[0]['end_time']
+            else:
+                # 如果表为空，使用当前时间往前推 1 天
+                analysis_start_time = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+
+            # 使用当前时间作为结束时间
+            analysis_end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            await screen_behavior_anlysis(analysis_start_time, analysis_end_time)
         duration = time.time() - start_time
         return {
             "status": "success",
