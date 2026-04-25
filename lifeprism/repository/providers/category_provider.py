@@ -28,6 +28,7 @@ class CategoryProvider(LWBaseDataProvider):
     _PRIMARY_KEY = "id"
     _DATE_FIELD = None
     _TIME_FIELD = None
+    _ON_CONFLICT = "ignore"  # 分类数据可能重复导入，忽略冲突
 
     # 白名单字段集合（用于防止 SQL 注入）
     _FILTER_FIELDS: Set[str] = {
@@ -189,6 +190,7 @@ class SubCategoryProvider(LWBaseDataProvider):
     _PRIMARY_KEY = "id"
     _DATE_FIELD = None
     _TIME_FIELD = None
+    _ON_CONFLICT = "ignore"  # 子分类数据可能重复导入，忽略冲突
 
     # 白名单字段集合（用于防止 SQL 注入）
     _FILTER_FIELDS: Set[str] = {

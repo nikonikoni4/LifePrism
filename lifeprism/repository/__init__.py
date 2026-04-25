@@ -57,9 +57,7 @@ from .base_providers import LWBaseDataProvider, AWBaseDataProvider
 from lifeprism.repository.providers import QueryOptions 
 # ==================== 单表 repository（内部是 Provider）====================
 from lifeprism.repository.providers import diary_provider as diary_repository
-from lifeprism.repository.providers import todo_provider as todo_repository
 from lifeprism.repository.providers import timeline_provider as timeline_repository
-from lifeprism.repository.providers import plan_doc_provider as plan_doc_repository
 from lifeprism.repository.providers import tokens_usage_provider as tokens_usage_repository
 from lifeprism.repository.providers import raw_behavior_analysis_provider as raw_behavior_analysis_repository
 from lifeprism.repository.providers import behavior_analysis_provider as behavior_analysis_repository
@@ -70,6 +68,8 @@ from lifeprism.repository.aggregators import goal_aggregator as goal_repository
 from lifeprism.repository.aggregators import habit_chain_aggregator as habit_chain_repository
 from lifeprism.repository.aggregators import category_aggregator as category_repository
 from lifeprism.repository.aggregators import map_cache_aggregator as map_cache_repository
+from lifeprism.repository.aggregators import todo_aggregator as todo_repository
+from lifeprism.repository.aggregators import plan_doc_aggregator as plan_doc_repository
 
 __all__ = [
     "QueryOptions",

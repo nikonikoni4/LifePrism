@@ -32,6 +32,7 @@ class TodoProvider(LWBaseDataProvider):
     _PRIMARY_KEY = "id"
     _DATE_FIELD = "date"
     _TIME_FIELD = None
+    _ON_CONFLICT = "abort"  # todo 不应该有重复 ID，冲突时应该报错
 
     # 白名单字段集合（用于防止 SQL 注入）
     _FILTER_FIELDS: Set[str] = {
@@ -41,7 +42,7 @@ class TodoProvider(LWBaseDataProvider):
         'created_at', 'updated_at'
     }
     _ORDER_FIELDS: Set[str] = {
-        'id', 'order_index', 'pool_order_index', 'created_at', 'waid_order'
+        'id', 'order_index', 'pool_order_index', 'created_at', 'waid_order','date'
     }
     _SELECT_FIELDS: Set[str] = {
         'id', 'order_index', 'pool_order_index', 'content', 'color', 'state',
@@ -164,72 +165,51 @@ class TodoProvider(LWBaseDataProvider):
         创建新任务
 
         Args:
-            data: 任务数据（可包含 'id'，未提供则自动生成）
+            data: 任务数据
+                - 可包含 'id'，未提供则自动生成
+                - 必须包含 'order_index'（由聚合层计算）
 
         Returns:
             str: 新任务 ID
 
         Raises:
-            ValidationError: 数据验证失败
+            ValidationError: 数据验证失败（如缺少 order_index）
             ConflictError: 记录已存在
             DataAccessError: 数据库操作失败
         """
         try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
+            # 验证必填字段
+            if 'order_index' not in data:
+                raise ValidationError("order_index is required")
 
-                # 插入前生成 ID（如果未提供）
-                todo_id = data.get('id') or generate_todo_id()
+            # 生成 ID（如果未提供）
+            if 'id' not in data:
+                data['id'] = generate_todo_id()
 
-                # 获取当前最大 order_index
-                cursor.execute(
-                    "SELECT COALESCE(MAX(order_index), -1) + 1 FROM todo_list WHERE date = ?",
-                    (data.get('date'),)
-                )
-                next_order = cursor.fetchone()[0]
+            # 白名单验证
+            allowed_fields = {
+                'id', 'order_index', 'pool_order_index', 'content', 'color', 'state',
+                'link_to_goal_id', 'date', 'expected_finished_at', 'actual_finished_at',
+                'cross_day', 'folder_id', 'parent_id', 'plan_doc_id',
+                'delay_days', 'delay_reason', 'waid_order'
+            }
+            invalid_fields = set(data.keys()) - allowed_fields
+            if invalid_fields:
+                raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
-                columns = ['id', 'order_index', 'pool_order_index', 'content', 'color', 'state',
-                          'link_to_goal_id', 'date', 'expected_finished_at',
-                          'actual_finished_at', 'cross_day', 'folder_id',
-                          'parent_id', 'plan_doc_id',
-                          'delay_days', 'delay_reason']
-                values = [
-                    todo_id,
-                    next_order,
-                    data.get('pool_order_index'),
-                    data.get('content'),
-                    data.get('color', '#FFFFFF'),
-                    data.get('state', 'pool'),
-                    data.get('link_to_goal_id'),
-                    data.get('date'),
-                    data.get('expected_finished_at'),
-                    data.get('actual_finished_at'),
-                    1 if data.get('cross_day') else 0,
-                    data.get('folder_id'),
-                    data.get('parent_id'),
-                    data.get('plan_doc_id'),
-                    data.get('delay_days'),
-                    data.get('delay_reason')
-                ]
+            # 使用 _generic_insert
+            todo_id = self._generic_insert(data, on_conflict=self._ON_CONFLICT)
+            logger.info(f"创建任务成功，ID: {todo_id}")
+            return todo_id
 
-                placeholders = ', '.join(['?' for _ in columns])
-                columns_str = ', '.join(columns)
-
-                cursor.execute(
-                    f"INSERT INTO todo_list ({columns_str}) VALUES ({placeholders})",
-                    values
-                )
-
-                logger.info(f"创建任务成功，ID: {todo_id}")
-                return todo_id
-
-        except sqlite3.IntegrityError as e:
-            if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"任务已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
+        except ValidationError:
+            raise
         except Exception as e:
             logger.error(f"创建任务失败: {e}")
-            raise DataAccessError(f"创建任务失败") from e
+            raise DataAccessError(
+                message=f"创建任务失败",
+                details={"error": str(e)}
+            ) from e
 
     def update_todo(self, todo_id: str, data: Dict[str, Any]) -> bool:
         """

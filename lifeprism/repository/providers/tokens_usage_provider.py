@@ -27,6 +27,7 @@ class TokensUsageProvider(LWBaseDataProvider):
     _PRIMARY_KEY = "session_id"
     _DATE_FIELD = None
     _TIME_FIELD = None
+    _ON_CONFLICT = "replace"  # token 使用统计按 session_id 更新，冲突时替换
 
     # 白名单字段集合（用于防止 SQL 注入）
     _FILTER_FIELDS: Set[str] = {

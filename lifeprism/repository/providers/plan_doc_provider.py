@@ -26,6 +26,7 @@ class PlanDocProvider(LWBaseDataProvider):
     _PRIMARY_KEY = "id"
     _DATE_FIELD = None
     _TIME_FIELD = None
+    _ON_CONFLICT = "abort"  # 计划书不应该有重复 ID，冲突时应该报错
 
     # 白名单字段集合（用于防止 SQL 注入）
     _FILTER_FIELDS: Set[str] = {
@@ -159,59 +160,40 @@ class PlanDocProvider(LWBaseDataProvider):
         创建新计划书
 
         Args:
-            data: 计划书数据，id 将作为主键使用
+            data: 计划书数据
+                - 必须包含 'id'（作为主键）
+                - 必须包含 'order_index'（由聚合层计算）
 
         Returns:
             Optional[str]: 新计划书 ID，失败返回 None
 
         Raises:
-            ValidationError: 数据验证失败（如 id 为空）
+            ValidationError: 数据验证失败（如 id 或 order_index 为空）
             ConflictError: 主键冲突
             DataAccessError: 数据库访问失败
         """
         try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
+            # 验证必填字段
+            doc_id = data.get('id', '')
+            if not doc_id:
+                raise ValidationError("创建计划书失败: id 不能为空")
 
-                # 使用 id
-                doc_id = data.get('id', '')
-                if not doc_id:
-                    raise ValidationError("创建计划书失败: id 不能为空")
+            if 'order_index' not in data:
+                raise ValidationError("创建计划书失败: order_index 不能为空")
 
-                # 获取当前目标下最大 order_index
-                cursor.execute(
-                    "SELECT COALESCE(MAX(order_index), -1) + 1 FROM plan_doc WHERE goal_id = ?",
-                    (data.get('goal_id'),)
-                )
-                next_order = cursor.fetchone()[0]
+            # 白名单验证
+            allowed_fields = {'id', 'goal_id', 'status', 'order_index'}
+            invalid_fields = set(data.keys()) - allowed_fields
+            if invalid_fields:
+                raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
-                # 构建插入数据（content 存储在文件系统中，不存数据库）
-                columns = [
-                    'id', 'goal_id', 'status', 'order_index'
-                ]
-                values = [
-                    doc_id,
-                    data.get('goal_id'),
-                    data.get('status', 'active'),
-                    next_order
-                ]
-
-                placeholders = ', '.join(['?' for _ in columns])
-                columns_str = ', '.join(columns)
-
-                cursor.execute(
-                    f"INSERT INTO plan_doc ({columns_str}) VALUES ({placeholders})",
-                    values
-                )
-
-                logger.info(f"创建计划书成功，ID: {doc_id}")
-                return doc_id
+            # 使用 _generic_insert
+            result_id = self._generic_insert(data, on_conflict=self._ON_CONFLICT)
+            logger.info(f"创建计划书成功，ID: {doc_id}")
+            return doc_id
 
         except ValidationError:
             raise
-        except sqlite3.IntegrityError as e:
-            logger.error(f"创建计划书失败: {e}")
-            raise ConflictError(f"创建计划书失败，ID 已存在: {doc_id}") from e
         except Exception as e:
             logger.error(f"创建计划书失败: {e}")
             raise DataAccessError(f"创建计划书失败: {e}") from e

@@ -30,6 +30,7 @@ class DiaryProvider(LWBaseDataProvider):
     _PRIMARY_KEY = "date"          # ✅ diary 表使用 date 作为主键
     _DATE_FIELD = "date"           # ✅ diary 表有 date 字段
     _TIME_FIELD = None             # ❌ diary 表没有 time 字段
+    _ON_CONFLICT = "replace"       # 日记按日期更新，冲突时替换
 
     _FILTER_FIELDS: Set[str] = {
         'date', 'mood', 'importance', 'custom_tags',

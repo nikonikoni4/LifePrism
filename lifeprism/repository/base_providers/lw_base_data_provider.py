@@ -53,6 +53,7 @@ class LWBaseDataProvider:
     _PRIMARY_KEY: str = "id"                    # 主键字段名（默认 'id'）
     _DATE_FIELD: Optional[str] = None           # 日期字段名（如 'date', 'created_at'）
     _TIME_FIELD: Optional[str] = None           # 时间字段名（如 'time', 'trigger_time'）
+    _ON_CONFLICT: str = "replace"               # 冲突处理策略（默认 'replace'）
     _FILTER_FIELDS: Set[str] = set()            # 可筛选字段白名单
     _ORDER_FIELDS: Set[str] = set()             # 可排序字段白名单
     _SELECT_FIELDS: Set[str] = set()            # 可查询字段白名单
@@ -985,8 +986,9 @@ class LWBaseDataProvider:
         self,
         data: Dict[str, Any],
         id_prefix: Optional[str] = None,
-        auto_order_index: bool = False
-    ) -> str:
+        auto_order_index: bool = False,
+        on_conflict: Optional[str] = None
+    ) -> Optional[str]:
         """
         通用插入方法
 
@@ -994,13 +996,17 @@ class LWBaseDataProvider:
             data: 数据字典
             id_prefix: ID 前缀（如 't-'），None 则不生成 ID
             auto_order_index: 是否自动计算 order_index
+            on_conflict: 冲突处理策略，None 则使用 self._ON_CONFLICT
+                - 'abort': 遇到冲突时抛出异常
+                - 'ignore': 遇到冲突时忽略，不插入
+                - 'replace': 遇到冲突时替换已存在的记录
 
         Returns:
-            新记录的 ID
+            新记录的 ID，'ignore' 模式下冲突时返回 None
 
         Raises:
             NotImplementedError: 子类未定义 _TABLE_NAME
-            ValueError: 数据验证失败
+            ValueError: 数据验证失败或 on_conflict 参数无效
 
         Examples:
             # 插入 todo（自动生成 ID 和 order_index）
@@ -1014,9 +1020,24 @@ class LWBaseDataProvider:
             diary_id = self._generic_insert(
                 data={'date': '2026-04-24', 'content': '日记内容'}
             )
+
+            # 忽略冲突
+            todo_id = self._generic_insert(
+                data={'id': 't-12345678', 'title': '测试'},
+                on_conflict='ignore'
+            )
         """
         # 验证表名
         self._validate_table_name()
+
+        # 0. 确定冲突处理策略
+        conflict_strategy = on_conflict if on_conflict is not None else self._ON_CONFLICT
+        valid_strategies = {'abort', 'ignore', 'replace'}
+        if conflict_strategy not in valid_strategies:
+            raise ValueError(
+                f"Invalid on_conflict value: {conflict_strategy}. "
+                f"Must be one of {valid_strategies}"
+            )
 
         # 1. 生成 ID（如果需要）
         if id_prefix:
@@ -1039,10 +1060,17 @@ class LWBaseDataProvider:
         placeholders = ','.join(['?'] * len(columns))
         values = [data[col] for col in columns]
 
-        sql = f"""
-            INSERT INTO {self._TABLE_NAME} ({', '.join(columns)})
-            VALUES ({placeholders})
-        """
+        # 根据冲突策略构建不同的 SQL
+        if conflict_strategy == 'abort':
+            sql = f"""
+                INSERT INTO {self._TABLE_NAME} ({', '.join(columns)})
+                VALUES ({placeholders})
+            """
+        else:
+            sql = f"""
+                INSERT OR {conflict_strategy.upper()} INTO {self._TABLE_NAME} ({', '.join(columns)})
+                VALUES ({placeholders})
+            """
 
         # 4. 执行插入
         try:
@@ -1050,6 +1078,12 @@ class LWBaseDataProvider:
                 cursor = conn.cursor()
                 cursor.execute(sql, values)
                 conn.commit()
+
+                # 对于 ignore 模式，如果发生冲突（rowcount=0），返回 None
+                if conflict_strategy == 'ignore' and cursor.rowcount == 0:
+                    logger.debug(f"Insert ignored due to conflict in {self._TABLE_NAME}")
+                    return None
+
                 return data.get('id', str(cursor.lastrowid))
         except Exception as e:
             logger.error(f"Failed to insert into {self._TABLE_NAME}: {e}")

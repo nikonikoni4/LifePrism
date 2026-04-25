@@ -27,6 +27,7 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
     _PRIMARY_KEY = "start_time"
     _DATE_FIELD = None
     _TIME_FIELD = "start_time"
+    _ON_CONFLICT = "replace"  # 行为分析数据可能重新融合，冲突时替换
 
     # 白名单字段集合（用于防止 SQL 注入）
     _FILTER_FIELDS: Set[str] = {
@@ -164,23 +165,31 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
 
         Raises:
             ValueError: 如果字段不合法
+            DataAccessError: 数据库操作失败
         """
-        # 白名单验证
-        required_fields = {'start_time', 'end_time', 'behavior', 'screen_count'}
-        if not required_fields.issubset(data.keys()):
-            missing = required_fields - set(data.keys())
-            raise ValueError(f"Missing required fields: {missing}")
+        try:
+            # 白名单验证
+            required_fields = {'start_time', 'end_time', 'behavior', 'screen_count'}
+            if not required_fields.issubset(data.keys()):
+                missing = required_fields - set(data.keys())
+                raise ValueError(f"Missing required fields: {missing}")
 
-        allowed_fields = {'start_time', 'end_time', 'behavior', 'behavior_summary', 'title', 'screen_count'}
-        invalid_fields = set(data.keys()) - allowed_fields
-        if invalid_fields:
-            raise ValueError(f"Invalid insert fields: {invalid_fields}")
+            allowed_fields = {'start_time', 'end_time', 'behavior', 'behavior_summary', 'title', 'screen_count'}
+            invalid_fields = set(data.keys()) - allowed_fields
+            if invalid_fields:
+                raise ValueError(f"Invalid insert fields: {invalid_fields}")
 
-        self.db.insert(self._TABLE_NAME, data)
-        logger.info(f"创建行为分析记录: {data['start_time']}")
+            # 使用 _generic_insert（_ON_CONFLICT = "replace"）
+            self._generic_insert(data,on_conflict=self._ON_CONFLICT)
+            logger.info(f"创建行为分析记录: {data['start_time']}")
 
-        # 返回刚插入的记录
-        return self.get_behavior_by_start_time(data['start_time']) or {}
+            # 返回刚插入的记录
+            return self.get_behavior_by_start_time(data['start_time']) or {}
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"创建行为分析记录失败: {e}")
+            raise DataAccessError(f"创建行为分析记录失败: {e}") from e
 
     def update_behavior(self, start_time: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """

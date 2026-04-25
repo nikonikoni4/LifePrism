@@ -9,6 +9,8 @@ from lifeprism.repository.aggregators.goal_aggregator import GoalAggregator
 from lifeprism.repository.aggregators.habit_chain_aggregator import HabitChainAggregator
 from lifeprism.repository.aggregators.category_aggregator import CategoryAggregator
 from lifeprism.repository.aggregators.map_cache_aggregator import MapCacheAggregator
+from lifeprism.repository.aggregators.todo_aggregator import TodoAggregator
+from lifeprism.repository.aggregators.plan_doc_aggregator import PlanDocAggregator
 from lifeprism.utils import LazySingleton
 
 # 创建全局单例
@@ -18,8 +20,10 @@ goal_aggregator : GoalAggregator = LazySingleton(GoalAggregator)
 habit_chain_aggregator : HabitChainAggregator = LazySingleton(HabitChainAggregator)
 category_aggregator : CategoryAggregator = LazySingleton(CategoryAggregator)
 map_cache_aggregator : MapCacheAggregator= LazySingleton(MapCacheAggregator)
+todo_aggregator : TodoAggregator = LazySingleton(TodoAggregator)
+plan_doc_aggregator : PlanDocAggregator = LazySingleton(PlanDocAggregator)
 
-__all__ = [ 
+__all__ = [
     # 类
     'HabitAggregator',
     'MoodAggregator',
@@ -27,6 +31,8 @@ __all__ = [
     'HabitChainAggregator',
     'CategoryAggregator',
     'MapCacheAggregator',
+    'TodoAggregator',
+    'PlanDocAggregator',
     # 单例
     'habit_aggregator',
     'mood_aggregator',
@@ -34,4 +40,6 @@ __all__ = [
     'habit_chain_aggregator',
     'category_aggregator',
     'map_cache_aggregator',
+    'todo_aggregator',
+    'plan_doc_aggregator',
 ]

@@ -26,6 +26,7 @@ class TimelineProvider(LWBaseDataProvider):
     _PRIMARY_KEY = "id"
     _DATE_FIELD = None  # 没有单独的 date 字段
     _TIME_FIELD = "start_time"  # 使用 start_time 作为时间字段
+    _ON_CONFLICT = "abort"  # 自定义时间块不应该有重复 ID，冲突时应该报错
 
     # 白名单字段集合（用于防止 SQL 注入）
     _FILTER_FIELDS: Set[str] = {
@@ -132,32 +133,37 @@ class TimelineProvider(LWBaseDataProvider):
 
         Returns:
             dict: 创建后的完整记录（含 id 和时间戳）
+
+        Raises:
+            ValueError: 如果字段不合法
+            DataAccessError: 数据库操作失败
         """
-        # 将 ISO 格式的时间（带 T）转换为标准格式（用空格分隔）
-        if 'start_time' in data and data['start_time']:
-            data['start_time'] = data['start_time'].replace('T', ' ')
-        if 'end_time' in data and data['end_time']:
-            data['end_time'] = data['end_time'].replace('T', ' ')
+        try:
+            # 将 ISO 格式的时间（带 T）转换为标准格式（用空格分隔）
+            if 'start_time' in data and data['start_time']:
+                data['start_time'] = data['start_time'].replace('T', ' ')
+            if 'end_time' in data and data['end_time']:
+                data['end_time'] = data['end_time'].replace('T', ' ')
 
-        # 白名单验证
-        allowed_fields = self._UPDATE_FIELDS
-        invalid_fields = set(data.keys()) - allowed_fields
-        if invalid_fields:
-            raise ValueError(f"Invalid insert fields: {invalid_fields}")
+            # 白名单验证
+            allowed_fields = self._UPDATE_FIELDS
+            invalid_fields = set(data.keys()) - allowed_fields
+            if invalid_fields:
+                raise ValueError(f"Invalid insert fields: {invalid_fields}")
 
-        self.db.insert(self._TABLE_NAME, data)
+            # 使用 _generic_insert（_ON_CONFLICT = "abort"）
+            # 返回的是自增 ID
+            block_id = self._generic_insert(data)
 
-        # 查询刚插入的记录（按创建时间倒序取最新一条）
-        with self.db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"SELECT * FROM {self._TABLE_NAME} ORDER BY id DESC LIMIT 1"
-            )
-            row = cursor.fetchone()
-            if row:
-                columns = [desc[0] for desc in cursor.description]
-                return dict(zip(columns, row))
-        return {}
+            if block_id:
+                # 查询刚插入的记录
+                return self.get_custom_block_by_id(int(block_id)) or {}
+            return {}
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"创建自定义时间块失败: {e}")
+            raise DataAccessError(f"创建自定义时间块失败: {e}") from e
 
     def update_custom_block(self, block_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """

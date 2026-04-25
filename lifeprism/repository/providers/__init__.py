@@ -9,18 +9,14 @@ from lifeprism.repository.providers.behavior_analysis_provider import BehaviorAn
 from lifeprism.repository.providers.raw_behavior_analysis_provider import RawBehaviorAnalysisProvider
 tokens_usage_provider : TokensUsageProvider = LazySingleton(TokensUsageProvider)
 diary_provider : DiaryProvider= LazySingleton(DiaryProvider)
-plan_doc_provider : PlanDocProvider= LazySingleton(PlanDocProvider)
 timeline_provider : TimelineProvider= LazySingleton(TimelineProvider)
-todo_provider : TodoProvider = LazySingleton(TodoProvider)
 behavior_analysis_provider :BehaviorAnalysisProvider= LazySingleton(BehaviorAnalysisProvider)
 raw_behavior_analysis_provider :RawBehaviorAnalysisProvider= LazySingleton(RawBehaviorAnalysisProvider)
 
 __all__ = [
     "tokens_usage_provider",
     "diary_provider",
-    "plan_doc_provider",
     "timeline_provider",
-    "todo_provider",
     'behavior_analysis_provider',
     'raw_behavior_analysis_provider',
     'QueryOptions',
