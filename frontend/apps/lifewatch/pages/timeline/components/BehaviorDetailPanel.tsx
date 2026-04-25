@@ -5,7 +5,7 @@
  *
  * 设计规范：
  * - 嵌入式面板，显示在右侧详情区域
- * - 显示 behavior_summary 和 behaviors
+ * - 显示 behavior_summary 和 behavior
  * - 风格与 Timeline 右侧面板保持一致
  */
 
@@ -115,7 +115,7 @@ const BehaviorDetailPanel: React.FC<BehaviorDetailPanelProps> = ({
                     <label className="block text-xs font-bold text-slate-700 mb-2">详细行为</label>
                     <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                         <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                            {behavior.behaviors}
+                            {behavior.behavior}
                         </p>
                     </div>
                 </div>

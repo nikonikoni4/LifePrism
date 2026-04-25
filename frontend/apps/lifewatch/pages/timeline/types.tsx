@@ -95,7 +95,7 @@ export interface BehaviorAnalysisItem {
   end_time: string;         // 结束时间，格式：YYYY-MM-DD HH:MM:SS
   screen_count: number;     // 截图数量
   behavior_summary: string; // 总结性描述
-  behaviors: string;        // 分点行为（带序号的文本）
+  behavior: string;         // 分点行为（带序号的文本）
   created_at: string;       // 创建时间
 }
 
