@@ -1277,6 +1277,8 @@ class LWBaseDataProvider:
         if options.page and options.page_size:
             offset = (options.page - 1) * options.page_size
             return f"LIMIT {options.page_size} OFFSET {offset}"
+        elif options.limit:
+            return f"LIMIT {options.limit}"
         return ""
 
 

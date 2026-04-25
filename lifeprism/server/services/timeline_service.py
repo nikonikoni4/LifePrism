@@ -10,6 +10,8 @@ from datetime import datetime
 from lifeprism.server.schemas.timeline_schemas import (
     TimelineStatsResponse,
     TimelineTimeOverviewResponse,
+    BehaviorAnalysisItem,
+    BehaviorAnalysisResponse
 )
 from lifeprism.server.services.timeline_builder import (
     load_day_events,
@@ -18,6 +20,32 @@ from lifeprism.server.services.timeline_builder import (
     build_time_overview_from_df,
 )
 
+from lifeprism.repository import behavior_analysis_repository,QueryOptions
+
+def get_behavior_analysis(
+    date: str,
+) -> BehaviorAnalysisResponse:
+    """
+    获取行为分析结果
+    
+    Args:
+        date: 查询日期 (YYYY-MM-DD)
+        
+    Returns:
+        BehaviorAnalysisResponse: 行为分析响应
+    """
+    response = BehaviorAnalysisResponse()
+    screent_analysis_summary_list = behavior_analysis_repository.get_behaviors_by_date(date)
+    for item in screent_analysis_summary_list:
+        response.behavior_list.append(BehaviorAnalysisItem(
+            start_time=item["start_time"],
+            end_time=item["end_time"],
+            screen_count=item["screen_count"],
+            behavior_summary=item["behavior_summary"],
+            behavior=item["behavior"],
+            title = item["title"],
+        ))
+    return response
 
 def get_timeline_stats(
     date: str,
@@ -225,3 +253,7 @@ def delete_custom_block(block_id: int) -> bool:
     """
     return timeline_repository.delete_custom_block(block_id)
 
+
+if __name__ == "__main__":
+    behaviors = behavior_analysis_repository.get_behaviors_by_date("2026-04-21")
+    print(behaviors)

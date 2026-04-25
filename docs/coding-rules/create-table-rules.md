@@ -59,7 +59,7 @@
      - `_SELECT_FIELDS`: 可用于 SELECT 的字段
      - `_UPDATE_FIELDS`: 可用于 UPDATE 的字段（不包含主键、created_at、updated_at）
 
-4. 实现方法时，必须使用LWBaseDataset类的基础CURD方法（_generic_query、_generic_insert，_generic_update，_generic_delete）来编写5中提到的核心方法。若CURD方法存在某些轻量业务逻辑，可以为这个provider单独增加一个聚合类，将业务逻辑编写在aggregators中，参考`lifeprism/repository/aggregators/todo_aggregator.py`的`create_todo`方法。
+4. 实现方法时，必须使用LWBaseDataset类的基础CURD方法（`_generic_query`、`_generic_insert`，`_generic_update`，`_generic_delete`）来编写5中提到的核心方法。若CURD方法存在某些轻量业务逻辑，可以为这个provider单独增加一个聚合类，将业务逻辑编写在aggregators中，参考`lifeprism/repository/aggregators/todo_aggregator.py`的`create_todo`方法。
 
 5. 必须实现的核心方法
 

@@ -170,14 +170,7 @@ async def get_behavior_summary(
 
     - **date**: 查询日期，格式 YYYY-MM-DD
     """
-    # 读取 mock 数据
-    project_root = Path(__file__).parent.parent.parent.parent
-    mock_file = project_root / "test" / "explore" / "monitor_prompt" / "behavior_summary.json"
-
-    try:
-        with open(mock_file, "r", encoding="utf-8") as f:
-            mock_data = json.load(f)
-        return BehaviorAnalysisResponse(behavior_list=mock_data)
+    try :
+        return timeline_service.get_behavior_analysis(date)
     except Exception as e:
-        # 如果读取失败，返回空列表
-        return BehaviorAnalysisResponse(behavior_list=[])
+        raise HTTPException(status_code=500, detail=str(e))

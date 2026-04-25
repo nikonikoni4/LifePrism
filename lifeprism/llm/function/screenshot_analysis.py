@@ -20,12 +20,13 @@ from lifeprism.llm.channel.manager import channel_manager
 from lifeprism.llm.bus.events import MessageType
 from lifeprism.config import settings
 from lifeprism.utils import get_logger
+from lifeprism.llm.providers.dataset_providers import llm_dataset_provider
 from lifeprism.repository import (
     raw_behavior_analysis_repository, 
     behavior_analysis_repository,
     todo_repository,
     QueryOptions,
-    screen_capture_repository
+    screen_capture_repository,
 )
 logger = get_logger(__name__)
 
@@ -234,13 +235,17 @@ async def analyze_chunk_screenshots(
             extra = {'ANALYSIS_SYSTEM_PROMPT' : ANALYSIS_SYSTEM_PROMPT })
 
         if response:
+            # 写入数据库前，将 ISO 格式（带 T）转换为数据库格式（空格分隔）
+            start_time_db = chunk['start'].replace('T', ' ')
+            end_time_db = chunk['end'].replace('T', ' ')
+
             data = {
-                'start_time' : chunk['start'],
-                'end_time' : chunk['end'],
+                'start_time' : start_time_db,
+                'end_time' : end_time_db,
                 'screen_count' : len(screenshots),
-                'behavior' : f"{chunk['start']} ~ {chunk['end']}\n behavior: {response} \n"
+                'behavior' : f"{start_time_db} ~ {end_time_db}\n behavior: {response} \n"
             }
-            
+
             raw_behavior_analysis_repository.create_raw_behavior(data)
             return data 
         else:
@@ -429,11 +434,15 @@ async def _behavior_summary(start_time:str,end_time:str,screen_count:int,behavio
             response = extract_json_from_response(response)
             data : dict = json.loads(response)
             if "behavior_summary" in data and "title" in data:
+                # 写入数据库前，将 ISO 格式（带 T）转换为数据库格式（空格分隔）
+                start_time_db = start_time.replace('T', ' ') if 'T' in start_time else start_time
+                end_time_db = end_time.replace('T', ' ') if 'T' in end_time else end_time
+
                 # 存入数据库 start_time, end_time, behavior, behavior_summary, title, screen_count
                 data["screen_count"] = screen_count
                 data["behavior"] = behavior
-                data["start_time"] = start_time
-                data["end_time"] = end_time
+                data["start_time"] = start_time_db
+                data["end_time"] = end_time_db
                 behavior_analysis_repository.create_behavior(
                     data=data,
                 )

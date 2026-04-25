@@ -46,20 +46,20 @@ logger.debug(f"刷新缓存成功，共 {count} 个")  # 调试
 
 ### 4.1 Service 层职责
 
-- 调用 `from lifeprism.repository  import xx_store`获取数据、实现业务逻辑、数据转换和聚合、缓存管理
+- 调用 `from lifeprism.repository  import xx_repository`获取数据、实现业务逻辑、数据转换和聚合、缓存管理
 
 #### 有状态 Service 示例
 
 ```python
 class GoalService:
     def __init__(self):
-        self.goal_store = goal_store
+        self.goal_repository = goal_repository
         self.goal_name_map: Dict[str, str] = {}
         self._refresh_cache()
 
     def _refresh_cache(self):
         try:
-            items, _ = self.goal_store.get_goals(page=1, page_size=1000)
+            items, _ = self.goal_repository.get_goals(page=1, page_size=1000)
             self.goal_name_map = {str(item.get('id', '')): item.get('name', '') for item in items if item.get('id') and item.get('name')}
         except Exception as e:
             logger.error(f"刷新目标缓存失败: {e}")
@@ -87,7 +87,7 @@ def generate_id(prefix: str) -> str:
 | 私有方法 | `_` 前缀 | `_refresh_cache()` |
 | 常量 | 全大写 | `DEFAULT_PAGE_SIZE = 20` |
 | 公共缓存 | 无前缀 | `self.category_name_map` |
-| 依赖注入 | 无前缀 | `self.goal_store` |
+| 依赖注入 | 无前缀 | `self.goal_repository` |
 
 ## 5. 错误处理分层
 
@@ -116,10 +116,10 @@ def generate_id(prefix: str) -> str:
 1. **单一职责**：Provider 只做数据库操作，不包含业务逻辑
 2. **统一接口**：所有 Provider 使用 `QueryOptions` 统一查询接口
 3. **分层清晰**：Provider（原子操作）→ Aggregator（数据聚合）→ Service（业务逻辑）
-4. **类型安全**：使用 Store 统一导出，提供类型提示
+4. **类型安全**：使用 repository 统一导出，提供类型提示
 5. 不得在非repository的任何位置直接编写sql
-6. 只能从`lifeprism.repository`导入数据库store单例对象，比如`from lifeprism.repository import diray_store`
-7. 不能直接引用store中provider成员，只能直接使用store单例提供的方法
+6. 只能从`lifeprism.repository`导入数据库repository单例对象，并重命名，将后缀改为_repository，比如`from lifeprism.repository.providers import diary_provider as diary_repository`
+7. 不能直接引用repository.providers中provider成员，只能直接使用repository单例提供的方法
 
 ### 查询接口使用
 
@@ -128,14 +128,14 @@ def generate_id(prefix: str) -> str:
 **基本使用方法**：
 
 ```python
-from lifeprism.repository import Store, QueryOptions
+from lifeprism.repository import repository, QueryOptions
 
 # 查询今日活跃 todos
 options = QueryOptions(
     date_range=("2026-04-24", "2026-04-24"),
     filters={'state': 'active'}
 )
-todos, total = Store.todo.query_todos(options)
+todos, total = repository.todo.query_todos(options)
 ```
 **其他高级查询方法，查看QueryOptions与相关query函数**
 
