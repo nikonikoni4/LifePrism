@@ -30,7 +30,7 @@
        _PRIMARY_KEY = "id"                  # 主键字段（默认 "id"）
        _DATE_FIELD = "date"                 # 日期字段（可选，用于日期范围查询）
        _TIME_FIELD = "time"                 # 时间字段（可选，用于时间范围查询）
-       
+       _ON_CONFLICT = "replace"             # 冲突处理策略（默认 "replace", 可选"ignore"：忽略冲突，"abort"：回滚事务，"replace"：替换记录）
        # 白名单字段集合（用于防止 SQL 注入）
        _FILTER_FIELDS: Set[str] = {
            'id', 'name', 'status', 'date', 'time',
@@ -59,7 +59,7 @@
      - `_SELECT_FIELDS`: 可用于 SELECT 的字段
      - `_UPDATE_FIELDS`: 可用于 UPDATE 的字段（不包含主键、created_at、updated_at）
 
-4. 实现方法时，必须使用LWBaseDataset类的基础CURD方法（_generic_query、_generic_insert，_generic_update，_generic_delete）
+4. 实现方法时，必须使用LWBaseDataset类的基础CURD方法（_generic_query、_generic_insert，_generic_update，_generic_delete）来编写5中提到的核心方法。若CURD方法存在某些轻量业务逻辑，可以为这个provider单独增加一个聚合类，将业务逻辑编写在aggregators中，参考`lifeprism/repository/aggregators/todo_aggregator.py`的`create_todo`方法。
 
 5. 必须实现的核心方法
 
@@ -71,8 +71,6 @@
 - `update_{table}()` - 更新记录
 - `delete_{table}()` - 删除记录
 
-#### 3 聚合类规则
+6. 新增provider或aggregator时，必须参考`lifeprism\repository\providers\diary_provider.py`或`lifeprism\repository\aggregators\category_aggregator.py`。
 
-1. **aggregators创建的触发条件**：仅人工认定之后才可在`lifeprism\repository\aggregators`创建新的聚合类 
-3. 聚合类方法必须透传所包括的provider成员的所有CURD核心方法，常用查询（超过3次引用）建议透传而不是在聚合层实现，特殊方法编写在聚合层。
 

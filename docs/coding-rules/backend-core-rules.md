@@ -93,7 +93,7 @@ def generate_id(prefix: str) -> str:
 
 ### repository 层（数据访问层）
 - 范围：repository，llm，processor，monitor等大部分外部接口
-- 捕获外部异常，转换为业务异常并抛出
+- 捕获外部异常，转换为业务异常并抛出，必须明确"转换后抛出"，不能返回默认值
 
 ### Service 层（业务逻辑层）
 - 范围：server/service
@@ -139,3 +139,8 @@ todos, total = Store.todo.query_todos(options)
 ```
 **其他高级查询方法，查看QueryOptions与相关query函数**
 
+### 职责划分
+
+1. `lifeprism.repository.providers`:只负责数据访问，不包含业务逻辑
+2. `lifeprism.repository.aggregators`:只负责数据聚合，以及轻量的业务逻辑，不得在aggregators中写入大量重型且不使用数据库等没有必要写在aggregators中的业务逻辑
+3. `lifeprism.server.service`：只实现业务逻辑，不得在非repository的任何位置直接编写sql
