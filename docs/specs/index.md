@@ -34,3 +34,9 @@
 - path: `docs/specs/2026-04-20-config-spec.md`
 - 触发规则：开发、修改或查询配置管理模块相关功能时阅读（配置读写、路径解析、API Key 存储、Provider 管理、配置迁移、前后端配置交互）
 - 内容摘要：配置管理模块规格，定义配置读写流程（环境变量>keyring>yaml>默认值）、路径解析规则（config_base_path 固定/lifeprism_data_path 可迁移）及打包环境前后端路径配置详细流程图、API Key 安全存储（keyring）、Provider 管理（白名单/模型历史/VLM 缓存）、配置迁移机制及前后端交互契约（REST API），包含前端路径配置已知问题说明
+
+## screenshot-analysis-spec
+- updated_at: 2026-04-26
+- path: `docs/specs/2026-04-26-screenshot-analysis-spec.md`
+- 触发规则：开发、修改或查询截图语义分析功能时阅读（高密度时间段识别、chunk 切分、LLM 分析、行为总结、tokens 消耗控制）
+- 内容摘要：截图语义分析功能规格，定义基于 LLM 的截图语义分析流程（高密度时间段识别→chunk 切分→截图查询→LLM 分析→行为总结），包括 ANALYSIS_SYSTEM_PROMPT 核心原则（精确度优先、基于截图内容、独立判断）、三种语义推断情况、输出契约、数据持久化规则，以及新增的 tokens 消耗控制机制（基于分类的截图过滤、配置项 screen_analysis_ignore、前端多选界面）
