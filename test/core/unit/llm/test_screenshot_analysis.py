@@ -1,321 +1,392 @@
-"""测试 screenshot_analysis 模块的 get_today_todolist 函数"""
+"""测试 screenshot_analysis 模块的辅助函数"""
 import pytest
-from datetime import datetime
+from unittest.mock import Mock, patch, MagicMock
 
-from lifeprism.llm.function.screenshot_analysis import get_today_todolist, merage_results_list
+from lifeprism.llm.function.screenshot_analysis import (
+    encode_image_to_base64,
+    _get_screenshot_category_info,
+    _is_image_screenshot,
+    _clean_llm_response,
+)
 
 
 @pytest.mark.core
-class TestGetTodayTodolist:
-    """测试 get_today_todolist 函数"""
+class TestEncodeImageToBase64:
+    """测试 encode_image_to_base64 函数"""
 
-    def test_get_today_todolist_basic(self):
-        """测试基本功能"""
-        today = datetime.now().strftime("%Y-%m-%d")
-        result = get_today_todolist(today)
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    @patch('builtins.open', create=True)
+    @patch('os.path.join')
+    def test_encode_valid_image(self, mock_join, mock_open, mock_settings):
+        """测试编码有效图片"""
+        # Mock 设置
+        mock_settings.lifeprism_data_path = "/fake/data/path"
+        mock_join.return_value = "/fake/data/path/test.png"
 
-        # 结果应该是字符串或 None
-        assert result is None or isinstance(result, str)
+        # Mock 文件读取
+        mock_file = MagicMock()
+        mock_file.read.return_value = b'\x89PNG\r\n\x1a\n'  # PNG 文件头
+        mock_open.return_value.__enter__.return_value = mock_file
 
-    def test_get_today_todolist_format(self):
-        """测试输出格式"""
-        today = datetime.now().strftime("%Y-%m-%d")
-        result = get_today_todolist(today)
+        result = encode_image_to_base64("test.png")
 
-        if result is not None:
-            # 应该包含标题
-            assert "## 今日目标：" in result
+        # 验证返回格式
+        assert result is not None
+        assert result.startswith("data:image/png;base64,")
+        assert len(result) > 30  # 应该包含 base64 数据
 
-            # 应该有编号列表
-            lines = result.split("\n")
-            numbered_lines = [line for line in lines if line.strip() and line[0].isdigit()]
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    @patch('builtins.open', side_effect=FileNotFoundError)
+    @patch('os.path.join')
+    def test_encode_nonexistent_file(self, mock_join, mock_open, mock_settings):
+        """测试编码不存在的文件"""
+        mock_settings.lifeprism_data_path = "/fake/data/path"
+        mock_join.return_value = "/fake/data/path/nonexistent.png"
 
-            # 如果有内容，应该有编号行
-            if len(lines) > 2:  # 标题 + 空行 + 内容
-                assert len(numbered_lines) > 0
+        result = encode_image_to_base64("nonexistent.png")
 
-                # 验证编号格式
-                for i, line in enumerate(numbered_lines, 1):
-                    assert line.startswith(f"{i}. "), f"编号格式错误: {line}"
-
-    def test_get_today_todolist_empty_date(self):
-        """测试未来日期（应该没有数据）"""
-        future_date = "2099-12-31"
-        result = get_today_todolist(future_date)
-
-        # 未来日期应该返回 None
+        # 应该返回 None
         assert result is None
 
-    def test_get_today_todolist_return_type(self):
-        """测试返回类型"""
-        today = datetime.now().strftime("%Y-%m-%d")
-        result = get_today_todolist(today)
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    @patch('builtins.open', create=True)
+    @patch('os.path.join')
+    def test_encode_different_image_types(self, mock_join, mock_open, mock_settings):
+        """测试不同类型的图片"""
+        mock_settings.lifeprism_data_path = "/fake/data/path"
 
-        # 返回值应该是 str 或 None
-        assert isinstance(result, (str, type(None)))
+        # 测试 JPEG
+        mock_join.return_value = "/fake/data/path/test.jpg"
+        mock_file = MagicMock()
+        mock_file.read.return_value = b'\xff\xd8\xff'  # JPEG 文件头
+        mock_open.return_value.__enter__.return_value = mock_file
 
-
-@pytest.mark.core
-class TestGetTodayTodolistIntegration:
-    """测试 get_today_todolist 与数据库的集成"""
-
-    def test_includes_active_todos(self):
-        """测试是否包含 active 状态的任务"""
-        today = datetime.now().strftime("%Y-%m-%d")
-        result = get_today_todolist(today)
-
-        # 如果有结果，验证格式正确
-        if result is not None:
-            assert isinstance(result, str)
-            assert len(result) > 0
-
-    def test_output_structure(self):
-        """测试输出结构完整性"""
-        today = datetime.now().strftime("%Y-%m-%d")
-        result = get_today_todolist(today)
-
-        if result is not None:
-            lines = result.split("\n")
-
-            # 第一行应该是标题
-            assert lines[0] == "## 今日目标："
-
-            # 第二行应该是空行
-            if len(lines) > 1:
-                assert lines[1] == ""
-
-            # 后续行应该是编号列表或空
-            for line in lines[2:]:
-                if line.strip():
-                    # 非空行应该是编号格式
-                    assert line[0].isdigit() and ". " in line
+        result = encode_image_to_base64("test.jpg")
+        assert result is not None
+        assert "data:image/jpeg;base64," in result
 
 
 @pytest.mark.core
-class TestMerageResultsList:
-    """测试 merage_results_list 函数"""
+class TestIsImageScreenshot:
+    """测试 _is_image_screenshot 函数"""
 
-    def test_empty_list(self):
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    @patch('os.path.exists')
+    @patch('os.path.join')
+    def test_all_images_exist(self, mock_join, mock_exists, mock_settings):
+        """测试所有图片都存在"""
+        mock_settings.lifeprism_data_path = "/fake/data/path"
+        mock_join.side_effect = lambda base, path: f"{base}/{path}"
+        mock_exists.return_value = True
+
+        image_paths = ["img1.png", "img2.png", "img3.png"]
+        result = _is_image_screenshot(image_paths)
+
+        assert result is True
+
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    @patch('os.path.exists')
+    @patch('os.path.join')
+    def test_no_images_exist(self, mock_join, mock_exists, mock_settings):
+        """测试所有图片都不存在"""
+        mock_settings.lifeprism_data_path = "/fake/data/path"
+        mock_join.side_effect = lambda base, path: f"{base}/{path}"
+        mock_exists.return_value = False
+
+        image_paths = ["img1.png", "img2.png", "img3.png"]
+        result = _is_image_screenshot(image_paths)
+
+        assert result is False
+
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    @patch('os.path.exists')
+    @patch('os.path.join')
+    def test_some_images_exist(self, mock_join, mock_exists, mock_settings):
+        """测试部分图片存在"""
+        mock_settings.lifeprism_data_path = "/fake/data/path"
+        mock_join.side_effect = lambda base, path: f"{base}/{path}"
+
+        # 第一个不存在，第二个存在
+        mock_exists.side_effect = [False, True]
+
+        image_paths = ["img1.png", "img2.png"]
+        result = _is_image_screenshot(image_paths)
+
+        # 只要有一个存在就返回 True
+        assert result is True
+
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    def test_empty_list(self, mock_settings):
         """测试空列表"""
-        result = merage_results_list([])
-        assert result == []
+        mock_settings.lifeprism_data_path = "/fake/data/path"
 
-    def test_single_item_list(self):
-        """测试单个元素的列表"""
-        input_list = [
-            {
-                'start_time': '10:00',
-                'end_time': '10:30',
-                'screenshot_count': 5,
-                'behavior': 'Reading'
-            }
-        ]
-        result = merage_results_list(input_list)
-        assert len(result) == 1
-        assert result[0]['screenshot_count'] == 5
-        assert result[0]['behavior'] == 'Reading'
+        result = _is_image_screenshot([])
 
-    def test_multiple_items_no_merge(self):
-        """测试多个不相关的项目（时间不连续，不应该合并）"""
-        input_list = [
-            {
-                'start_time': '10:00',
-                'end_time': '10:30',
-                'screenshot_count': 5,
-                'behavior': 'Reading'
-            },
-            {
-                'start_time': '11:00',
-                'end_time': '11:30',
-                'screenshot_count': 3,
-                'behavior': 'Writing'
-            },
-            {
-                'start_time': '14:00',
-                'end_time': '14:30',
-                'screenshot_count': 7,
-                'behavior': 'Coding'
-            }
-        ]
-        result = merage_results_list(input_list)
-        assert len(result) == 3
-        assert result[0]['screenshot_count'] == 5
-        assert result[0]['behavior'] == 'Reading'
-        assert result[1]['screenshot_count'] == 3
-        assert result[1]['behavior'] == 'Writing'
-        assert result[2]['screenshot_count'] == 7
-        assert result[2]['behavior'] == 'Coding'
-
-    def test_multiple_items_with_merge(self):
-        """测试多个相邻的项目（时间连续，应该合并）"""
-        input_list = [
-            {
-                'start_time': '10:00',
-                'end_time': '10:30',
-                'screenshot_count': 5,
-                'behavior': 'Reading'
-            },
-            {
-                'start_time': '10:30',
-                'end_time': '11:00',
-                'screenshot_count': 3,
-                'behavior': 'Writing'
-            }
-        ]
-        result = merage_results_list(input_list)
-        assert len(result) == 1
-        assert result[0]['screenshot_count'] == 8  # 5 + 3
-        assert result[0]['behavior'] == 'ReadingWriting'
-
-    def test_mixed_merge_and_no_merge(self):
-        """测试混合场景：部分项目需要合并，部分不需要"""
-        input_list = [
-            {
-                'start_time': '10:00',
-                'end_time': '10:30',
-                'screenshot_count': 5,
-                'behavior': 'Reading'
-            },
-            {
-                'start_time': '10:30',
-                'end_time': '11:00',
-                'screenshot_count': 3,
-                'behavior': 'Writing'
-            },
-            {
-                'start_time': '12:00',
-                'end_time': '12:30',
-                'screenshot_count': 7,
-                'behavior': 'Coding'
-            },
-            {
-                'start_time': '12:30',
-                'end_time': '13:00',
-                'screenshot_count': 2,
-                'behavior': 'Testing'
-            },
-            {
-                'start_time': '15:00',
-                'end_time': '15:30',
-                'screenshot_count': 4,
-                'behavior': 'Debugging'
-            }
-        ]
-        result = merage_results_list(input_list)
-        assert len(result) == 3
-
-        # 第一个合并组
-        assert result[0]['screenshot_count'] == 8  # 5 + 3
-        assert result[0]['behavior'] == 'ReadingWriting'
-
-        # 第二个合并组
-        assert result[1]['screenshot_count'] == 9  # 7 + 2
-        assert result[1]['behavior'] == 'CodingTesting'
-
-        # 第三个单独项
-        assert result[2]['screenshot_count'] == 4
-        assert result[2]['behavior'] == 'Debugging'
-
-    def test_three_consecutive_merges(self):
-        """测试三个连续的项目全部合并"""
-        input_list = [
-            {
-                'start_time': '10:00',
-                'end_time': '10:20',
-                'screenshot_count': 2,
-                'behavior': 'A'
-            },
-            {
-                'start_time': '10:20',
-                'end_time': '10:40',
-                'screenshot_count': 3,
-                'behavior': 'B'
-            },
-            {
-                'start_time': '10:40',
-                'end_time': '11:00',
-                'screenshot_count': 5,
-                'behavior': 'C'
-            }
-        ]
-        result = merage_results_list(input_list)
-        assert len(result) == 1
-        assert result[0]['screenshot_count'] == 10  # 2 + 3 + 5
-        assert result[0]['behavior'] == 'ABC'
-
-    def test_none_values_in_behavior(self):
-        """测试 behavior 为 None 的情况
-        
-        注意: 当前实现不支持 None 值，会抛出 TypeError
-        如果需要支持 None，应该将其视为空字符串处理
-        """
-        input_list = [
-            {
-                'start_time': '10:00',
-                'end_time': '10:30',
-                'screenshot_count': 5,
-                'behavior': None
-            },
-            {
-                'start_time': '10:30',
-                'end_time': '11:00',
-                'screenshot_count': 3,
-                'behavior': 'Reading'
-            }
-        ]
-        # 当前实现会抛出 TypeError，因为 += 不支持 None + str
-        # 这是实现的一个限制，需要在代码中处理 None 值
-        with pytest.raises(TypeError):
-            merage_results_list(input_list)
-
-    def test_preserves_other_fields(self):
-        """测试保留其他字段不变
-        
-        注意: 当前实现不会更新 end_time
-        合并后的 end_time 保持为第一个项目的时间
-        这可能是设计决策，也可能是需要修复的 bug
-        """
-        input_list = [
-            {
-                'start_time': '10:00',
-                'end_time': '10:30',
-                'screenshot_count': 5,
-                'behavior': 'Reading',
-                'extra_field': 'value1',
-                'id': 1
-            },
-            {
-                'start_time': '10:30',
-                'end_time': '11:00',
-                'screenshot_count': 3,
-                'behavior': 'Writing',
-                'extra_field': 'value2',
-                'id': 2
-            }
-        ]
-        result = merage_results_list(input_list)
-        assert len(result) == 1
-        assert result[0]['start_time'] == '10:00'
-        # end_time 保持为第一个项目的时间，不会更新为合并后的最后时间
-        assert result[0]['end_time'] == '10:30'
-        assert result[0]['screenshot_count'] == 8
-        assert result[0]['behavior'] == 'ReadingWriting'
-        assert result[0]['extra_field'] == 'value1'
-        assert result[0]['id'] == 1
+        assert result is False
 
 
-if __name__ == "__main__":
-    # 手动测试
-    today = datetime.now().strftime("%Y-%m-%d")
-    result = get_today_todolist(today)
+@pytest.mark.core
+class TestGetScreenshotCategoryInfo:
+    """测试 _get_screenshot_category_info 函数"""
 
-    print("=" * 60)
-    print(f"测试日期: {today}")
-    print("=" * 60)
+    @patch('lifeprism.llm.function.screenshot_analysis.category_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.map_cache_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    def test_multi_purpose_app_ignored(self, mock_settings, mock_map_cache, mock_category):
+        """测试多用途应用被忽略的情况"""
+        # Mock 设置
+        mock_settings.is_multi_purpose_app.return_value = True
+        mock_settings.get.return_value = ["cat-123"]  # 忽略列表
 
-    if result:
-        print(result)
-    else:
-        print("今日没有待办任务")
+        # Mock map_cache 查询
+        mock_map_cache.query_multi_purpose_map_cache.return_value = (
+            [{"category_id": "cat-123", "app_description": "浏览器应用"}],
+            1
+        )
 
-    print("=" * 60)
+        # Mock category 查询
+        mock_category.get_category_by_id.return_value = {
+            "id": "cat-123",
+            "name": "娱乐",
+            "description": "娱乐类应用"
+        }
+
+        result = _get_screenshot_category_info("Chrome", "YouTube - 视频")
+
+        # 验证结果
+        assert result["category_id"] == "cat-123"
+        assert result["category_name"] == "娱乐"
+        assert result["app_description"] == "浏览器应用"
+        assert result["is_ignored"] is True
+
+        # 验证调用
+        mock_settings.is_multi_purpose_app.assert_called_once_with("Chrome")
+        mock_map_cache.query_multi_purpose_map_cache.assert_called_once()
+
+    @patch('lifeprism.llm.function.screenshot_analysis.category_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.map_cache_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    def test_single_purpose_app_not_ignored(self, mock_settings, mock_map_cache, mock_category):
+        """测试单用途应用不被忽略的情况"""
+        # Mock 设置
+        mock_settings.is_multi_purpose_app.return_value = False
+        mock_settings.get.return_value = ["cat-999"]  # 忽略列表（不包含当前分类）
+
+        # Mock map_cache 查询
+        mock_map_cache.query_single_purpose_map_cache.return_value = (
+            [{"category_id": "cat-456", "app_description": "代码编辑器"}],
+            1
+        )
+
+        result = _get_screenshot_category_info("VSCode", "main.py")
+
+        # 验证结果
+        assert result["category_id"] == "cat-456"
+        assert result["category_name"] is None  # 不被忽略时不查询名称
+        assert result["app_description"] == "代码编辑器"
+        assert result["is_ignored"] is False
+
+        # 验证没有调用 category 查询（延迟加载优化）
+        mock_category.get_category_by_id.assert_not_called()
+
+    @patch('lifeprism.llm.function.screenshot_analysis.category_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.map_cache_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    def test_no_category_found(self, mock_settings, mock_map_cache, mock_category):
+        """测试未找到分类的情况"""
+        # Mock 设置
+        mock_settings.is_multi_purpose_app.return_value = False
+        mock_settings.get.return_value = []
+
+        # Mock map_cache 查询返回空
+        mock_map_cache.query_single_purpose_map_cache.return_value = ([], 0)
+
+        result = _get_screenshot_category_info("UnknownApp", "")
+
+        # 验证结果
+        assert result["category_id"] is None
+        assert result["category_name"] is None
+        assert result["app_description"] == ""
+        assert result["is_ignored"] is False
+
+    @patch('lifeprism.llm.function.screenshot_analysis.category_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.map_cache_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    def test_exception_handling(self, mock_settings, mock_map_cache, mock_category):
+        """测试异常处理"""
+        # Mock 设置抛出异常
+        mock_settings.is_multi_purpose_app.side_effect = Exception("Database error")
+
+        result = _get_screenshot_category_info("Chrome", "Test")
+
+        # 应该返回默认值
+        assert result["category_id"] is None
+        assert result["category_name"] is None
+        assert result["app_description"] == ""
+        assert result["is_ignored"] is False
+
+    @patch('lifeprism.llm.function.screenshot_analysis.category_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.map_cache_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.settings')
+    def test_ignored_with_missing_category_name(self, mock_settings, mock_map_cache, mock_category):
+        """测试被忽略但分类名称查询失败的情况"""
+        # Mock 设置
+        mock_settings.is_multi_purpose_app.return_value = True
+        mock_settings.get.return_value = ["cat-123"]
+
+        # Mock map_cache 查询
+        mock_map_cache.query_multi_purpose_map_cache.return_value = (
+            [{"category_id": "cat-123", "app_description": "测试应用"}],
+            1
+        )
+
+        # Mock category 查询返回 None
+        mock_category.get_category_by_id.return_value = None
+
+        result = _get_screenshot_category_info("TestApp", "Test")
+
+        # 验证结果
+        assert result["category_id"] == "cat-123"
+        assert result["category_name"] == "未分类"  # 应该有默认值
+        assert result["is_ignored"] is True
+
+
+@pytest.mark.core
+class TestCleanLlmResponse:
+    """测试 _clean_llm_response 函数"""
+
+    def test_clean_valid_response(self):
+        """测试清理有效的响应"""
+        response = """1. 查看 React 官方文档的 Hooks 章节
+2. 编辑 user_service.py 中的登录验证逻辑
+3. 观看 YouTube 上的 Python 教程视频"""
+
+        result = _clean_llm_response(response)
+
+        assert result == response  # 应该保持不变
+
+    def test_clean_response_with_markdown_headers(self):
+        """测试清理包含 Markdown 标题的响应"""
+        response = """### 基础统计
+1. 查看文档
+2. 编辑代码
+### 总结
+这是总结"""
+
+        result = _clean_llm_response(response)
+
+        expected = """1. 查看文档
+2. 编辑代码"""
+        assert result == expected
+
+    def test_clean_response_with_tables(self):
+        """测试清理包含表格的响应"""
+        response = """| 应用 | 时长 | 用途 |
+|------|------|------|
+| Chrome | 10分钟 | 浏览 |
+1. 查看文档
+2. 编辑代码"""
+
+        result = _clean_llm_response(response)
+
+        expected = """1. 查看文档
+2. 编辑代码"""
+        assert result == expected
+
+    def test_clean_response_with_bold_and_italic(self):
+        """测试清理包含加粗和斜体的响应"""
+        response = """1. 查看 **React** 官方文档
+2. 编辑 *user_service.py* 文件
+3. 观看 `Python` 教程"""
+
+        result = _clean_llm_response(response)
+
+        expected = """1. 查看 React 官方文档
+2. 编辑 user_service.py 文件
+3. 观看 Python 教程"""
+        assert result == expected
+
+    def test_clean_response_with_separators(self):
+        """测试清理包含分隔线的响应"""
+        response = """---
+1. 查看文档
+---
+2. 编辑代码
+==="""
+
+        result = _clean_llm_response(response)
+
+        expected = """1. 查看文档
+2. 编辑代码"""
+        assert result == expected
+
+    def test_clean_response_with_code_blocks(self):
+        """测试清理包含代码块的响应"""
+        response = """```python
+def test():
+    pass
+```
+1. 查看文档
+2. 编辑代码"""
+
+        result = _clean_llm_response(response)
+
+        expected = """1. 查看文档
+2. 编辑代码"""
+        assert result == expected
+
+    def test_clean_response_none(self):
+        """测试清理 None 响应"""
+        response = "None"
+        result = _clean_llm_response(response)
+        assert result == "None"
+
+    def test_clean_response_empty(self):
+        """测试清理空响应"""
+        response = ""
+        result = _clean_llm_response(response)
+        assert result == ""
+
+    def test_clean_response_only_markdown(self):
+        """测试只包含 Markdown 格式没有有效内容的响应"""
+        response = """### 标题
+| 表格 | 内容 |
+|------|------|
+---
+**加粗文本**"""
+
+        result = _clean_llm_response(response)
+
+        # 应该返回 None（没有有效的行为列表）
+        assert result == "None"
+
+    def test_clean_complex_response(self):
+        """测试清理复杂的混合格式响应（实际案例）"""
+        response = """这是你2026年4月20日凌晨的**AI辅助开发工作活动记录**，整理梳理如下：
+
+---
+### 基础统计（总时长约14分钟，全部为开发工作）
+| 应用                | 累计使用时长 | 用途                    |
+|---------------------|--------------|--------------------------|
+| WindowsTerminal(Claude Code) | ~9分钟      | AI辅助开发交互终端       |
+| Antigravity代码编辑器 | ~5分钟       | 开发编写代码/配置文件    |
+
+---
+### 完整开发工作流
+你正在开发`feat_monitor`功能的配置模块，工作轨迹为：
+1. 先在Claude Code终端梳理开发需求/代码逻辑
+2. 打开编辑器编写配置接口文件setting_api.py
+3. 切回终端继续和AI确认开发细节
+4. 再次返回编辑器，迭代开发配置模块全栈代码
+5. 最后切回终端，准备继续后续开发
+
+属于典型的AI辅助全栈开发流程。"""
+
+        result = _clean_llm_response(response)
+
+        expected = """1. 先在Claude Code终端梳理开发需求/代码逻辑
+2. 打开编辑器编写配置接口文件setting_api.py
+3. 切回终端继续和AI确认开发细节
+4. 再次返回编辑器，迭代开发配置模块全栈代码
+5. 最后切回终端，准备继续后续开发"""
+        assert result == expected

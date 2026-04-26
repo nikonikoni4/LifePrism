@@ -45,6 +45,11 @@ async def screen_behavior_anlysis(start_time:str,end_time:str) ->list[BehaviorAn
         .with_date_range(start_time[:10], end_time[:10])
         .with_order('date', desc=False)
     )
+    if todolist:
+        todolist = f"""
+        ## 计划列表
+        {"\n".join(todolist)}
+        """
     # 2. 分析屏幕截图
     analysis_results_list = await screenshot_analysis(start_time, end_time,todolist)
     

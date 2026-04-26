@@ -103,7 +103,7 @@ class MapCacheAggregator:
         """透传：删除多用途映射缓存"""
         return self.multi_purpose_provider.delete_multi_purpose_map_cache(cache_id)
 
-    def query_multi_purpose_map_cache(self, options=None):
+    def query_multi_purpose_map_cache(self, options=None)->List[Dict[str, Any]]:
         """透传：查询多用途映射缓存"""
         return self.multi_purpose_provider.query_multi_purpose_map_cache(options)
 

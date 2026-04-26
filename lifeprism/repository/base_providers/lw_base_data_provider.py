@@ -965,7 +965,6 @@ class LWBaseDataProvider:
                 {order_clause}
                 {limit_clause}
             """
-
             cursor.execute(query, params)
             columns = [desc[0] for desc in cursor.description]
             rows = cursor.fetchall()

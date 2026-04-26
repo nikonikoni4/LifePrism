@@ -1,4 +1,6 @@
 from lifeprism.config import settings
-from lifeprism.llm.utils import read_md,extract_behavior_logs_from_file
-from pathlib import Path
-print(extract_behavior_logs_from_file("localData/user/daily_data/behavior.md","2026-04-12"))
+from lifeprism.repository import QueryOptions,map_cache_repository
+app = "msedge"
+title = "火山引擎控制台"
+result,_ = map_cache_repository.query_single_purpose_map_cache(QueryOptions(filters = {"app": app},fields=["category_id"]))
+print(result)

@@ -19,17 +19,18 @@ from lifeprism.llm.utils.parse_utils import extract_json_from_response
 from lifeprism.llm.channel.manager import channel_manager
 from lifeprism.llm.bus.events import MessageType
 from lifeprism.config import settings
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger,DEBUG
 from lifeprism.llm.providers.dataset_providers import llm_dataset_provider
 from lifeprism.repository import (
+    map_cache_repository,
     raw_behavior_analysis_repository, 
     behavior_analysis_repository,
-    todo_repository,
+    category_repository,
     QueryOptions,
     screen_capture_repository,
 )
 logger = get_logger(__name__)
-
+# logger.setLevel(DEBUG)
 # ==================== 常量配置 ====================
 
 ANALYSIS_SYSTEM_PROMPT = """
@@ -53,23 +54,21 @@ ANALYSIS_SYSTEM_PROMPT = """
 ## 行为语义推断
 
 好的行为分析结果需要与用户目的进行匹配，有3种语义判断情况:
-<语义推断情况1>
+### 情况1
 1. 触发场景：用户目标存在，且行为与用户目标强相关
 2. 行为语义推断：行为语义需要是这个目标的细分语义阐述
 3. 例子：用户的目标是阅读《XXX》，与目标窗口对应，那么行为语义就应该是查看《xxx》的<具体>章节
-</语义推断情况1>
 
-<语义推断情况2>
+### 情况2
 1. 触发场景：用户目标不存在，或行为与用户目标弱相关（需要经过超过2~3次逻辑推理转折才能和用户目标上联系上），不相关
 2. 行为语义推断：需要放弃与目标结合判断，专注于具体截图以及截图变化趋势判断行为语义
 3. 例子：用户正在使用AI工具查询某些内容，但是这个内容可能与目标没有直接关联，就不能强行绑定用户为了实现什么目标而利用ai工具查询内容
-</语义推断情况2>
 
-<语义推断情况3>
+### 情况3
 1. 触发场景：在语义推断情况2的基础上，所给出的行为语义判断过于模糊，详情见规则中的不要做的事情，第2和3条
 2. 行为语义推断：需要放弃该条行为的输出，遵守核心规则：宁愿不输出结果，也不要输出不确定的，过度推断的用户行为
 3. 例子：截图中app所在窗口仅存在一些文字，无法聚焦用户的行为。比如显示cursor中一个脚本内容，但是前后截图该脚本内容无变化或不相关，无法判断用户在该内容做了什么动作，就不要输出行为，不要输出"用户在cursor编辑xx.py"等内容
-</语义推断情况3>
+
 
 ## 语义识别步骤
 <执行步骤>
@@ -83,36 +82,26 @@ ANALYSIS_SYSTEM_PROMPT = """
 
 ## 规则
 
-<不要做的事情>
+### 不要做的事情
     1. 不要输出用户能力相关的行为和总结，比如"文档内容具有技术深度"，"整体行为体现专注度"
     2. 不要输出"相关"等模糊词语，比如不能出现："用户正在修改相关bug"，应该为用户正在修复X模块bug。如果结果不清晰宁愿不输出也不要给出模糊信息
     3. 不要给出只从app和title就能判断的语义：比如，app:cursor title: xx.py "使用cursor编辑xx.py"。这种语义太过模糊。
-</不要做的事情>
-<需要做的事情>
-    若所有截图都无法判断行为，直接输出：None
-</需要做的事情>
+    4. 不要在输出中引用截图信息，比如见截图1等，你需要的是说明用户行为
+    5. 不要在输出中包含具体的时间
+
+
+
+## 输入说明
+
+1. 每张截图对应着一个文本描述，会传入截图时间,截图时使用的app名称以及app的标题，以及这个文本描述对应的图片id（与图片传入顺序对应）
+2. **特殊情况**:当传入[无截图]时，意味着这个文本没有图片对应，需要根据文本描述判断行为即可
 
 ## 输出契约
 
-**输出格式**：
+**严格输出格式要求**：
 - 当能够判断行为时：使用数字编号（1. 2. 3. ...）分点列出，每条行为独立成行
-- 当无法判断行为时：仅输出单词 "None"
+- **只输出行为列表**：严格按照数字编号格式输出，不要有任何其他内容
 
-**输出要求**：
-1. 每条行为必须包含具体的内容信息，不能只描述动作
-2. 直接描述行为本身，不要添加"用户在"等主语
-3. 严格基于截图内容，不要编造或推测
-4. 如果多个截图显示相同行为，合并为一条
-
-**正确的输出示例**：
-- 查看 React 官方文档的 Hooks 章节
-- 编辑 user_service.py 中的登录验证逻辑
-- 观看 YouTube 上的 Python 教程视频
-
-**错误的输出示例**（不要这样输出）：
-- 使用 Cursor 编辑代码（过于笼统，缺少具体内容）
-- 用户在浏览网页（包含不必要的主语）
-- 可能在修复某个 bug（不确定的推测）
 
 """
 
@@ -189,6 +178,151 @@ def encode_image_to_base64(file_path: str) -> Optional[str]:
         logger.warning(f"读取图片失败 {file_path}: {e}")
         return None
 
+def _get_screenshot_category_info(app: str, title: str) -> Dict[str, Any]:
+    """获取截图的分类信息（一次查询获取所有需要的信息）
+
+    Args:
+        app: 应用名称
+        title: 窗口标题
+
+    Returns:
+        Dict[str, Any]: 包含以下字段的字典
+            - category_id: 分类 ID（可能为 None）
+            - category_name: 分类名称（仅在被忽略时查询）
+            - app_description: 应用描述
+            - is_ignored: 是否应该被忽略
+    """
+    try:
+        # 1. 判断是否为多用途应用
+        is_multi = settings.is_multi_purpose_app(app)
+
+        # 2. 一次查询获取 category_id 和 app_description
+        category_id = None
+        app_description = ""
+
+        if is_multi:
+            # 从 multi_purpose_map_cache 查找
+            result, _ = map_cache_repository.query_multi_purpose_map_cache(
+                QueryOptions(filters={"app": app, "title": title}, fields=["category_id", "app_description"])
+            )
+            if result:
+                category_id = result[0].get("category_id")
+                app_description = result[0].get("app_description", "")
+        else:
+            # 从 single_purpose_map_cache 查找
+            result, _ = map_cache_repository.query_single_purpose_map_cache(
+                QueryOptions(filters={"app": app}, fields=["category_id", "app_description"])
+            )
+            if result:
+                category_id = result[0].get("category_id")
+                app_description = result[0].get("app_description", "")
+
+        # 3. 判断是否应该被忽略
+        ignore_categories_id = settings.get("screen_analysis_ignore", [])
+        is_ignored = category_id in ignore_categories_id if category_id else False
+
+        # 4. 只在被忽略时才查询分类名称（延迟查询优化）
+        category_name = None
+        if is_ignored and category_id:
+            category_info = category_repository.get_category_by_id(category_id)
+            if category_info:
+                category_name = category_info.get("name", "未分类")
+            else:
+                category_name = "未分类"
+
+        return {
+            "category_id": category_id,
+            "category_name": category_name,  # 可能为 None（不被忽略时）
+            "app_description": app_description,
+            "is_ignored": is_ignored
+        }
+
+    except Exception as e:
+        logger.warning(f"获取截图分类信息失败 (app={app}, title={title}): {e}")
+        return {
+            "category_id": None,
+            "category_name": None,
+            "app_description": "",
+            "is_ignored": False
+        }
+
+
+
+
+def _is_image_screenshot(image_path_list: list[str]) -> bool:
+    """判断是否为无图片截图
+
+    Args:
+        screenshots: 截图列表
+
+    Returns:
+        bool: True 表示有图片截图，False 表示无图片截图
+    """
+    # 转化为path，并判断是否存在图片
+    for path in image_path_list:
+        full_path = os.path.join(settings.lifeprism_data_path, path)
+        if os.path.exists(full_path):
+            # 图片存在，返回True
+            return True
+    # 所有图片都不存在，返回False
+    return False
+def _clean_llm_response(response: str) -> str:
+    """清理 LLM 响应中的 Markdown 格式和多余内容
+
+    Args:
+        response: LLM 原始响应
+
+    Returns:
+        str: 清理后的纯文本响应
+    """
+    if not response or response.strip() == "None":
+        return response
+
+    lines = response.split('\n')
+    cleaned_lines = []
+
+    for line in lines:
+        line = line.strip()
+
+        # 跳过空行
+        if not line:
+            continue
+
+        # 跳过 Markdown 标题行（以 # 开头）
+        if line.startswith('#'):
+            continue
+
+        # 跳过分隔线
+        if line.startswith('---') or line.startswith('==='):
+            continue
+
+        # 跳过表格行（包含 | 符号）
+        if '|' in line and line.count('|') >= 2:
+            continue
+
+        # 跳过代码块标记
+        if line.startswith('```'):
+            continue
+
+        # 移除加粗标记 **text**
+        line = line.replace('**', '')
+
+        # 移除斜体标记 *text*
+        line = line.replace('*', '')
+
+        # 移除代码标记 `code`
+        line = line.replace('`', '')
+
+        # 只保留以数字开头的行（行为列表）
+        if line and line[0].isdigit() and '. ' in line:
+            cleaned_lines.append(line)
+
+    # 如果清理后没有有效行，返回 None
+    if not cleaned_lines:
+        return "None"
+
+    return '\n'.join(cleaned_lines)
+
 
 # ==================== 核心函数 ====================
 
@@ -209,14 +343,33 @@ async def analyze_chunk_screenshots(
     """
     if not screenshots:
         return None
-
+    if not _is_image_screenshot([sc["file_path"] for sc in screenshots]):
+        # 所有截图都不存在，返回None
+        return None
     # 准备图片消息
     content_parts = []
+    img_idx = 1
     for sc in screenshots:
         app = sc.get("window_app", "")
         title = sc.get("window_title", "")[:50]
         captured_at = sc.get("captured_at", "")
 
+        # 一次查询获取所有分类信息（包括是否忽略）
+        category_info = _get_screenshot_category_info(app, title)
+
+        # 判断是否忽略该截图
+        if category_info["is_ignored"]:
+            logger.debug(f"截图 {sc['file_path']} 被忽略，app :{app}")
+            # 使用已获取的分类信息构建占位符
+            category_name = category_info['category_name'] or "未分类"
+            content_parts.append({
+                "type": "text",
+                "text": f"[无截图] timestamp: {captured_at} | app: {app} | title: {title} | category: {category_name} | description: {category_info['app_description']}"
+            })
+            logger.debug(f"[无截图] timestamp: {captured_at} | app: {app} | title: {title} | category: {category_name} | description: {category_info['app_description']}")
+            continue
+
+        # 不忽略，正常处理图片
         b64 = encode_image_to_base64(sc["file_path"])
         if b64:
             content_parts.append({
@@ -225,20 +378,16 @@ async def analyze_chunk_screenshots(
             })
             content_parts.append({
                 "type": "text",
-                "text": f"[{captured_at}] app: {app} | title: {title}"
+                "text": f"[{img_idx}] | timestamp: {captured_at} app: {app} | title: {title}"
             })
-
-    if not any(p.get("type") == "image_url" for p in content_parts):
-        return None
+            logger.debug(f"[{img_idx}] | timestamp: {captured_at} app: {app} | title: {title}")
+            img_idx += 1
 
     # 构建 user content
     user_content: List[Dict[str, str]] = []
     if todolist:
-        user_content.append({"type": "text", "text": todolist.strip()})
-    user_content.append({
-        "type": "text",
-        "text": f"时间范围: {chunk['start']} -> {chunk['end']}",
-    })
+        user_content.append({"type": "text", "text": todolist})
+
     user_content.extend(content_parts)
 
 
@@ -249,6 +398,9 @@ async def analyze_chunk_screenshots(
             extra = {'ANALYSIS_SYSTEM_PROMPT' : ANALYSIS_SYSTEM_PROMPT })
 
         if response:
+            # 清理 LLM 响应中的 Markdown 格式
+            cleaned_response = _clean_llm_response(response)
+
             # 写入数据库前，将 ISO 格式（带 T）转换为数据库格式（空格分隔）
             start_time_db = chunk['start'].replace('T', ' ')
             end_time_db = chunk['end'].replace('T', ' ')
@@ -257,11 +409,11 @@ async def analyze_chunk_screenshots(
                 'start_time' : start_time_db,
                 'end_time' : end_time_db,
                 'screen_count' : len(screenshots),
-                'behavior' : f"{start_time_db} ~ {end_time_db}\n behavior: {response} \n"
+                'behavior' : f"{start_time_db} ~ {end_time_db}\n behavior: {cleaned_response} \n"
             }
 
             raw_behavior_analysis_repository.create_raw_behavior(data)
-            return data 
+            return data
         else:
             return None
     except Exception as e:
@@ -540,11 +692,11 @@ async def screenshot_behavior_summary(analysis_start_time : str, analysis_end_ti
 if __name__ == "__main__":
     from lifeprism.llm.agent.loop import agent_loop
     import asyncio
-    
+    todolist = ""
     async def main():
         loop_task = asyncio.create_task(agent_loop.loop())
         # logger.info("[STARTUP] AgentLoop started") # logger is not imported in this file
-        response = await screenshot_analysis("2026-04-19 11:00:00","2026-04-19 11:15:00")
+        response = await screenshot_analysis("2026-04-20 02:45:00","2026-04-20 03:00:00",todolist)
         print(response)
         loop_task.cancel() # Cancel the loop task when done to exit cleanly
         
