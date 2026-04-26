@@ -51,21 +51,22 @@ class ScreenshotScheduler:
 
         requests: List[CaptureRequest] = []
 
-        if self._next_scheduled_at is None:
-            self._next_scheduled_at = now_epoch + self.scheduled_interval_seconds
-        elif now_epoch >= self._next_scheduled_at:
-            requests.append(
-                CaptureRequest(
-                    reason=CaptureReason.SCHEDULED,
-                    captured_at=now_iso,
-                    window_app=window.app,
-                    window_title=window.title,
-                    frequency_level=None,
-                    engaged_segment_id=None,
-                    is_afk=window.is_afk,
-                )
-            )
-            self._next_scheduled_at = now_epoch + self.scheduled_interval_seconds
+        # 暂时关停 SCHEDULED 截图
+        # if self._next_scheduled_at is None:
+        #     self._next_scheduled_at = now_epoch + self.scheduled_interval_seconds
+        # elif now_epoch >= self._next_scheduled_at:
+        #     requests.append(
+        #         CaptureRequest(
+        #             reason=CaptureReason.SCHEDULED,
+        #             captured_at=now_iso,
+        #             window_app=window.app,
+        #             window_title=window.title,
+        #             frequency_level=None,
+        #             engaged_segment_id=None,
+        #             is_afk=window.is_afk,
+        #         )
+        #     )
+        #     self._next_scheduled_at = now_epoch + self.scheduled_interval_seconds
 
         if not engaged or not engaged_segment_id:
             return requests
@@ -106,23 +107,24 @@ class ScreenshotScheduler:
                 now_epoch + self.policy.repeat_active_every_seconds
             )
 
-        due_enter_events = [
-            event_time
-            for event_time in enter_events
-            if event_time + (self.enter_delay_ms / 1000.0) <= now_epoch
-        ]
-        if due_enter_events and now_epoch >= self._enter_cooldown_until:
-            requests.append(
-                CaptureRequest(
-                    reason=CaptureReason.ENTER,
-                    captured_at=now_iso,
-                    window_app=window.app,
-                    window_title=window.title,
-                    frequency_level=self.policy.level,
-                    engaged_segment_id=engaged_segment_id,
-                    is_afk=window.is_afk,
-                )
-            )
-            self._enter_cooldown_until = now_epoch + self.policy.enter_cooldown_seconds
+        # 暂时关停 ENTER 截图
+        # due_enter_events = [
+        #     event_time
+        #     for event_time in enter_events
+        #     if event_time + (self.enter_delay_ms / 1000.0) <= now_epoch
+        # ]
+        # if due_enter_events and now_epoch >= self._enter_cooldown_until:
+        #     requests.append(
+        #         CaptureRequest(
+        #             reason=CaptureReason.ENTER,
+        #             captured_at=now_iso,
+        #             window_app=window.app,
+        #             window_title=window.title,
+        #             frequency_level=self.policy.level,
+        #             engaged_segment_id=engaged_segment_id,
+        #             is_afk=window.is_afk,
+        #         )
+        #     )
+        #     self._enter_cooldown_until = now_epoch + self.policy.enter_cooldown_seconds
 
         return requests
