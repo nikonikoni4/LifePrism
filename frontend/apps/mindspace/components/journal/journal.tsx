@@ -395,7 +395,10 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
               <button
                 key={`${year}-${month}-${day}`}
                 id={`diary-date-${year}-${month}-${day}`}
-                onClick={() => setActiveDate(currentDate)}
+                onClick={() => {
+                  setActiveDate(currentDate);
+                  setShouldScrollToDate(false);
+                }}
                 className={`aspect-square rounded-full flex items-center justify-center transition-all duration-300 relative text-sm group ${isActive
                   ? 'text-white scale-110 shadow-[0_8px_20px_-5px_rgba(0,0,0,0.3)] z-10'
                   : 'hover:bg-black/10 hover:scale-110 hover:shadow-sm text-gray-500 hover:text-black active:scale-95'
