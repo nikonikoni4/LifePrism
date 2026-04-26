@@ -379,16 +379,28 @@ class DataInitializer:
 
         检查 goal 表中是否已存在每日目标，不存在则添加
         检查 plan_doc 表中是否已存在每日目标计划书，不存在则添加
+
+        处理逻辑：
+        1. 查询同名或同id的记录
+        2. 无冲突：直接创建
+        3. 同名且同id：跳过（已存在）
+        4. id相同但名不同：跳过（用户改名，前端绑定id无影响）
+        5. 同名但不同id：修改id为固定值（用户无感知）
+        6. 极端情况（多条冲突）：跳过（避免数据破坏）
         """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # 检查每日目标是否存在
-                cursor.execute("SELECT COUNT(*) FROM goal WHERE id = ?", (DAILY_GOAL_ID,))
-                goal_exists = cursor.fetchone()[0] > 0
+                # 查询同名或同id的记录
+                cursor.execute(
+                    "SELECT id, name FROM goal WHERE id = ? OR name = ?",
+                    (DAILY_GOAL_ID, DAILY_GOAL['name'])
+                )
+                conflicts = cursor.fetchall()
 
-                if not goal_exists:
+                # 情况1：无冲突，直接创建
+                if not conflicts:
                     cursor.execute("""
                         INSERT INTO goal (
                             id, name, content, color, status,
@@ -409,8 +421,36 @@ class DataInitializer:
                         DAILY_GOAL['order_index'],
                     ))
                     logger.info(f"成功初始化每日目标，ID: {DAILY_GOAL_ID}")
+
+                # 情况6：极端情况（多条冲突记录），跳过
+                elif len(conflicts) > 1:
+                    logger.warning(
+                        f"检测到多条冲突记录，跳过每日目标初始化。冲突记录：{conflicts}"
+                    )
+
+                # 单条冲突记录，进一步判断
                 else:
-                    logger.debug(f"每日目标已存在，跳过初始化，ID: {DAILY_GOAL_ID}")
+                    existing_id, existing_name = conflicts[0]
+
+                    # 情况2：同名且同id，跳过
+                    if existing_id == DAILY_GOAL_ID and existing_name == DAILY_GOAL['name']:
+                        logger.debug(f"每日目标已存在，跳过初始化，ID: {DAILY_GOAL_ID}")
+
+                    # 情况3：id相同但名不同，跳过
+                    elif existing_id == DAILY_GOAL_ID and existing_name != DAILY_GOAL['name']:
+                        logger.debug(
+                            f"检测到固定id目标名称已被修改（'{existing_name}'），跳过初始化"
+                        )
+
+                    # 情况4：同名但不同id，修改id
+                    elif existing_id != DAILY_GOAL_ID and existing_name == DAILY_GOAL['name']:
+                        cursor.execute(
+                            "UPDATE goal SET id = ? WHERE id = ?",
+                            (DAILY_GOAL_ID, existing_id)
+                        )
+                        logger.info(
+                            f"检测到同名目标 '{existing_name}'（id={existing_id}），已更新为固定id '{DAILY_GOAL_ID}'"
+                        )
 
                 # 检查每日目标计划书是否存在
                 cursor.execute("SELECT COUNT(*) FROM plan_doc WHERE id = ?", (DAILY_PLAN_DOC['id'],))
