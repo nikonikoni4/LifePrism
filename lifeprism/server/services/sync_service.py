@@ -45,10 +45,6 @@ async def screen_behavior_anlysis(start_time:str,end_time:str) ->list[BehaviorAn
         .with_date_range(start_time[:10], end_time[:10])
         .with_order('date', desc=False)
     )
-    todolist = """
-    1. 修改habit 相关bug
-    2. 编写《复利效应》笔记
-    """
     # 2. 分析屏幕截图
     analysis_results_list = await screenshot_analysis(start_time, end_time,todolist)
     
