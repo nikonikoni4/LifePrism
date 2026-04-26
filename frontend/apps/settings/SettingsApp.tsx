@@ -26,6 +26,8 @@ import { SettingsAPI } from './api';
 import type { ProviderInfo, ProviderModelHistory, SettingsResponse } from './types';
 import { toast } from '../../core/components';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CategoryAPI } from '../lifewatch/pages/category/api';
+import type { CategoryTreeItem } from '../lifewatch/pages/category/types';
 
 const SettingsApp: React.FC = () => {
     // Loading & Saving States
@@ -85,7 +87,11 @@ const SettingsApp: React.FC = () => {
     const [currentModelVlmStatus, setCurrentModelVlmStatus] = useState<boolean | null>(null);
     const [isVlmConfig, setIsVlmConfig] = useState<Record<string, boolean>>({}); // 完整 is_vlm 配置
 
-    // 7. Modal States
+    // 7. Screenshot Analysis Configuration
+    const [categories, setCategories] = useState<CategoryTreeItem[]>([]);
+    const [screenAnalysisIgnore, setScreenAnalysisIgnore] = useState<string[]>([]);
+
+    // 8. Modal States
     const [showVolcEngineModal, setShowVolcEngineModal] = useState(false);
 
     // Refs
@@ -153,9 +159,10 @@ const SettingsApp: React.FC = () => {
         const loadSettings = async () => {
             try {
                 setIsLoading(true);
-                const [settings, providers] = await Promise.all([
+                const [settings, providers, cats] = await Promise.all([
                     SettingsAPI.getSettings(),
                     SettingsAPI.getProviders(),
+                    CategoryAPI.getTree(1), // depth=1 仅获取主分类
                 ]);
 
                 // Populate state from API response
@@ -183,6 +190,8 @@ const SettingsApp: React.FC = () => {
                 setScreenshotFrequencyLevel(settings.active_screenshot_frequency_level || 2);
                 setScreenshotRetentionDays(settings.screenshot_retention_days || 7);
                 setIsVlmConfig(settings.is_vlm || {}); // 保存完整 is_vlm 配置
+                setScreenAnalysisIgnore(settings.screen_analysis_ignore || []);
+                setCategories(cats);
                 setIsElectron(!!window.electronAPI);
                 setProviderDefaults(
                     Object.fromEntries(providers.map((item) => [item.name, item]))
@@ -226,10 +235,11 @@ const SettingsApp: React.FC = () => {
             active_screenshot_frequency_level: screenshotFrequencyLevel,
             screenshot_retention_days: screenshotRetentionDays,
             monitor_type: monitorType,
+            screen_analysis_ignore: screenAnalysisIgnore,
             ...overrides,
         };
         debouncedSave(currentSettings);
-    }, [nickname, provider, modelName, apiBase, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, screenshotFrequencyLevel, screenshotRetentionDays, monitorType, debouncedSave]);
+    }, [nickname, provider, modelName, apiBase, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, screenshotFrequencyLevel, screenshotRetentionDays, monitorType, screenAnalysisIgnore, debouncedSave]);
 
     // Handlers
     const handleTestConnection = async () => {
@@ -286,6 +296,18 @@ const SettingsApp: React.FC = () => {
             setPathStatus('success');
         }, 1000);
     };
+
+    // 切换分类忽略状态
+    const toggleCategoryIgnore = useCallback((categoryId: string) => {
+        setScreenAnalysisIgnore(prev => {
+            const newIgnore = prev.includes(categoryId)
+                ? prev.filter(id => id !== categoryId)
+                : [...prev, categoryId];
+
+            triggerAutoSave({ screen_analysis_ignore: newIgnore });
+            return newIgnore;
+        });
+    }, [triggerAutoSave]);
 
     // 数据路径迁移处理
     const handleMigrateData = async (migrateData: boolean) => {
@@ -1233,6 +1255,56 @@ const SettingsApp: React.FC = () => {
                     </div>
                 </div>
             </section>
+
+            {/* 7. Screenshot Analysis Configuration */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 }}
+                className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8"
+            >
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2.5 bg-orange-50 rounded-xl text-orange-600">
+                        <Filter size={20} />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">截图分析配置</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">选择需要忽略的分类以减少 tokens 消耗</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-3">
+                            忽略的分类
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            {categories.map(cat => (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => toggleCategoryIgnore(cat.id)}
+                                    className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all ${
+                                        screenAnalysisIgnore.includes(cat.id)
+                                            ? 'border-blue-400 bg-blue-50/30'
+                                            : 'border-gray-100 bg-gray-50 hover:border-blue-200'
+                                    }`}
+                                >
+                                    <span className="text-sm font-bold text-slate-700">
+                                        {cat.name}
+                                    </span>
+                                    {screenAnalysisIgnore.includes(cat.id) && (
+                                        <Check size={16} className="text-green-600 flex-shrink-0" />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                            <Info size={12} className="inline mr-1" />
+                            建议：选择目的明确且不需要仔细分析的分类（如娱乐）。被忽略的截图将用文字描述代替，从而减少 tokens 消耗。
+                        </p>
+                    </div>
+                </div>
+            </motion.div>
 
             {/* TODO: 暂时禁用火山引擎说明弹窗
             {showVolcEngineModal && (

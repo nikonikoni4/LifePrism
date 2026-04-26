@@ -47,6 +47,7 @@ export interface Settings {
     active_screenshot_frequency_level?: number;
     screenshot_retention_days?: number;
     is_vlm?: Record<string, boolean>;
+    screen_analysis_ignore?: string[];
 }
 
 /** 获取配置响应 */
@@ -73,6 +74,7 @@ export interface UpdateSettingsRequest {
     data_cleaning_threshold?: number;
     screenshot_monitor?: boolean;
     is_vlm?: Record<string, boolean>;
+    screen_analysis_ignore?: string[];
 }
 
 /** 更新 API Key 请求 */

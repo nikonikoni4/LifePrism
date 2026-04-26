@@ -4,7 +4,7 @@ Config 迁移脚本注册表
 显式注册所有迁移脚本（不做文件系统扫描，兼容 PyInstaller 打包）。
 新增迁移时在此处 import 并追加到对应列表。
 """
-from . import s001_baseline, s002_add_monitor_type, s003_add_vlm_fields, s004_add_monitor_config, p001_baseline
+from . import s001_baseline, s002_add_monitor_type, s003_add_vlm_fields, s004_add_monitor_config, s005_add_screen_analysis_ignore, p001_baseline
 
 # settings.yaml 迁移列表（按 VERSION 升序）
 SETTINGS_MIGRATIONS = [
@@ -12,6 +12,7 @@ SETTINGS_MIGRATIONS = [
     s002_add_monitor_type,
     s003_add_vlm_fields,
     s004_add_monitor_config,
+    s005_add_screen_analysis_ignore,
 ]
 
 # providers.yaml 迁移列表（按 VERSION 升序）

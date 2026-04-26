@@ -49,6 +49,7 @@ class SettingItems(BaseModel):
     cleanup_check_interval_seconds: int = Field(description="截图清理扫描周期 (秒)")
     screenshot_monitor: bool = Field(default=False, description="截图监控开关")
     is_vlm: Dict[str, bool] = Field(default={}, description="VLM 能力缓存")
+    screen_analysis_ignore: List[str] = Field(default_factory=list, description="截图分析忽略的分类 ID 列表")
 
 
 class SettingsResponse(BaseModel):
@@ -81,6 +82,7 @@ class UpdateSettingsRequest(BaseModel):
     cleanup_check_interval_seconds: Optional[int] = None
     screenshot_monitor: Optional[bool] = None
     monitor_type: Optional[str] = None
+    screen_analysis_ignore: Optional[List[str]] = None
 
 
 class UpdateApiKeyRequest(BaseModel):

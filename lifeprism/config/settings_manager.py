@@ -58,6 +58,7 @@ class SettingsManager:
         'cleanup_check_interval_seconds': 86400,
         'is_vlm': {},  # Dict[str, bool], key = "provider_id/model_name"
         'screenshot_monitor': False,
+        'screen_analysis_ignore': [],  # 截图分析忽略的分类 ID 列表
     }
     
     def __new__(cls) -> 'SettingsManager':
@@ -571,6 +572,15 @@ class SettingsManager:
     @property
     def multi_purpose_app_names(self) -> List[str]:
         return self.get('multi_purpose_app_names')
+
+    def is_multi_purpose_app(self, app_name: str) -> bool:
+        if not app_name:
+            return False
+        normalized_name = app_name.lower()
+        for multi_app in self.multi_purpose_app_names:
+            if multi_app.lower() in normalized_name or normalized_name in multi_app.lower():
+                return True
+        return False
 
     @property
     def monitor_type(self) -> str:
