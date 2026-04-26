@@ -82,7 +82,21 @@ async def test_vlm() -> dict:
         # 获取回复内容
         response_content = output.content if hasattr(output, 'content') else str(output)
 
-        # 严格成功判定
+        # 严格成功判定：3个失败条件 + 1个成功条件，默认失败
+
+        # 失败条件1: 包含错误信息
+        if "error" in response_content.lower():
+            logger.error(f"VLM 测试失败: 模型返回错误 (provider={settings.provider}, model={settings.model}): {response_content[:200]}")
+            return {
+                "success": False,
+                "message": f"VLM 测试失败: 模型返回错误",
+                "model_response": response_content,
+                "provider": settings.provider,
+                "model": settings.model,
+                "image_path": image_path
+            }
+
+        # 失败条件2: 未收到图片
         if "未收到图片" in response_content:
             logger.error(f"VLM 测试失败: 模型未收到图片 (provider={settings.provider}, model={settings.model})")
             return {
@@ -94,25 +108,26 @@ async def test_vlm() -> dict:
                 "image_path": image_path
             }
 
-        if "猫" not in response_content and "cat" not in response_content.lower():
-            logger.error(f"VLM 测试失败: 模型未识别出猫 (provider={settings.provider}, model={settings.model}): {response_content[:100]}...")
+        # 成功条件: 识别出猫
+        if "猫" in response_content or "cat" in response_content.lower():
+            logger.info(
+                f"VLM 测试成功 (provider={settings.provider}, model={settings.model}): "
+                f"{response_content[:100] if response_content else 'None'}..."
+            )
             return {
-                "success": False,
-                "message": "VLM 测试失败: 模型未识别出猫",
+                "success": True,
+                "message": "VLM 图像理解测试成功",
                 "model_response": response_content,
                 "provider": settings.provider,
                 "model": settings.model,
                 "image_path": image_path
             }
 
-        logger.info(
-            f"VLM 测试成功 (provider={settings.provider}, model={settings.model}): "
-            f"{response_content[:100] if response_content else 'None'}..."
-        )
-
+        # 失败条件3 (默认): 未识别出猫
+        logger.error(f"VLM 测试失败: 模型未识别出猫 (provider={settings.provider}, model={settings.model}): {response_content[:100]}...")
         return {
-            "success": True,
-            "message": "VLM 图像理解测试成功",
+            "success": False,
+            "message": "VLM 测试失败",
             "model_response": response_content,
             "provider": settings.provider,
             "model": settings.model,

@@ -30,12 +30,36 @@ async def test_connect() -> dict:
         
         # 获取回复内容
         response_content = output.content if hasattr(output, 'content') else str(output)
-        
-        logger.info(f"LLM 连接测试成功 (provider={settings.provider}, model={settings.model}): {response_content}")
 
+        # 严格成功判定：2个失败条件 + 1个成功条件，默认失败
+
+        # 失败条件1: 包含错误信息
+        if "error" in response_content.lower():
+            logger.error(f"LLM 连接测试失败: 模型返回错误 (provider={settings.provider}, model={settings.model}): {response_content[:200]}")
+            return {
+                "success": False,
+                "message": f"连接失败: 模型返回错误",
+                "model_response": response_content,
+                "provider": settings.provider,
+                "model": settings.model
+            }
+
+        # 成功条件: 包含"连接成功"
+        if "连接成功" in response_content:
+            logger.info(f"LLM 连接测试成功 (provider={settings.provider}, model={settings.model}): {response_content}")
+            return {
+                "success": True,
+                "message": "LLM 连接测试成功",
+                "model_response": response_content,
+                "provider": settings.provider,
+                "model": settings.model
+            }
+
+        # 失败条件2 (默认): 未返回预期内容
+        logger.error(f"LLM 连接测试失败: 模型未返回预期内容 (provider={settings.provider}, model={settings.model}): {response_content[:100]}")
         return {
-            "success": True,
-            "message": "LLM 连接测试成功",
+            "success": False,
+            "message": "连接失败: 模型未返回预期内容",
             "model_response": response_content,
             "provider": settings.provider,
             "model": settings.model
