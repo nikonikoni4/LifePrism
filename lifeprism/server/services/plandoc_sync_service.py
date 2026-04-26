@@ -257,13 +257,28 @@ def insert_todo_to_md(
     """
     md_content = _read_plan_doc_content(plan_doc_id)
     if md_content is None:
-        logger.warning(f"插入失败：MD 文件不存在 {plan_doc_id}")
-        return None
+        logger.info(f"MD 文件不存在，创建新文件: {plan_doc_id}")
+        file_path = _get_plan_doc_path(plan_doc_id)
+
+        # 确保目录存在
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # 创建初始 MD 内容
+        initial_content = f"# {plan_doc_id}\n\n## 任务列表\n"
+        if not _write_plan_doc_content(plan_doc_id, initial_content):
+            logger.error(f"创建 MD 文件失败: {plan_doc_id}")
+            return None
+
+        md_content = initial_content
 
     blocks = _get_all_todoblocks(md_content)
     if not blocks:
-        logger.warning(f"插入失败：无 todoblock {plan_doc_id}")
-        return None
+        logger.info(f"无 todoblock，自动创建: {plan_doc_id}")
+        md_content = _ensure_todoblock_exists(md_content)
+        if not _write_plan_doc_content(plan_doc_id, md_content):
+            logger.error(f"写入 todoblock 失败: {plan_doc_id}")
+            return None
+        blocks = _get_all_todoblocks(md_content)
 
     # 确定目标 block
     target_block_index = 0
