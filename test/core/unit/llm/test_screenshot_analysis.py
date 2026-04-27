@@ -390,3 +390,165 @@ def test():
 4. 再次返回编辑器，迭代开发配置模块全栈代码
 5. 最后切回终端，准备继续后续开发"""
         assert result == expected
+
+
+@pytest.mark.core
+class TestAnalyzeChunkScreenshotsFirstScreenshotLogic:
+    """测试 analyze_chunk_screenshots 中的首张截图保留逻辑"""
+
+    @pytest.mark.asyncio
+    @patch('lifeprism.llm.function.screenshot_analysis.channel_manager')
+    @patch('lifeprism.llm.function.screenshot_analysis.raw_behavior_analysis_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.encode_image_to_base64')
+    @patch('lifeprism.llm.function.screenshot_analysis._get_screenshot_category_info')
+    @patch('lifeprism.llm.function.screenshot_analysis._is_image_screenshot')
+    async def test_first_screenshot_preserved_for_ignored_category(
+        self, mock_is_image, mock_get_category, mock_encode, mock_repo, mock_channel
+    ):
+        """测试被忽略分类的第一张截图被保留"""
+        from lifeprism.llm.function.screenshot_analysis import analyze_chunk_screenshots
+
+        # Mock 数据
+        chunk = {"start": "2026-04-27T10:00:00", "end": "2026-04-27T10:15:00"}
+        screenshots = [
+            {"file_path": "img1.png", "window_app": "Game.exe", "window_title": "游戏", "captured_at": "2026-04-27 10:00:00"},
+            {"file_path": "img2.png", "window_app": "Game.exe", "window_title": "游戏", "captured_at": "2026-04-27 10:05:00"},
+            {"file_path": "img3.png", "window_app": "Game.exe", "window_title": "游戏", "captured_at": "2026-04-27 10:10:00"},
+        ]
+
+        # Mock 返回值
+        mock_is_image.return_value = True
+        mock_get_category.return_value = {
+            "category_id": "cat-game",
+            "category_name": "娱乐",
+            "app_description": "游戏应用",
+            "is_ignored": True
+        }
+        mock_encode.return_value = "data:image/png;base64,fake_data"
+        mock_channel.send.return_value = "1. 玩游戏"
+
+        await analyze_chunk_screenshots(chunk, screenshots)
+
+        # 验证：第一张截图应该被编码（保留），后续截图不应该被编码
+        assert mock_encode.call_count == 1
+        mock_encode.assert_called_once_with("img1.png")
+
+        # 验证发送给 LLM 的内容
+        call_args = mock_channel.send.call_args
+        content = call_args[1]['content']
+
+        # 第一张截图：应该有图片
+        assert any(part.get('type') == 'image_url' for part in content)
+
+        # 后续截图：应该是文字描述
+        text_parts = [part['text'] for part in content if part.get('type') == 'text']
+        assert any('[无截图]' in text and 'Game.exe' in text for text in text_parts)
+
+    @pytest.mark.asyncio
+    @patch('lifeprism.llm.function.screenshot_analysis.channel_manager')
+    @patch('lifeprism.llm.function.screenshot_analysis.raw_behavior_analysis_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.encode_image_to_base64')
+    @patch('lifeprism.llm.function.screenshot_analysis._get_screenshot_category_info')
+    @patch('lifeprism.llm.function.screenshot_analysis._is_image_screenshot')
+    async def test_multiple_apps_first_screenshots_preserved(
+        self, mock_is_image, mock_get_category, mock_encode, mock_repo, mock_channel
+    ):
+        """测试多个不同 app 的第一张截图都被保留"""
+        from lifeprism.llm.function.screenshot_analysis import analyze_chunk_screenshots
+
+        chunk = {"start": "2026-04-27T10:00:00", "end": "2026-04-27T10:15:00"}
+        screenshots = [
+            {"file_path": "img1.png", "window_app": "Game.exe", "window_title": "游戏", "captured_at": "2026-04-27 10:00:00"},
+            {"file_path": "img2.png", "window_app": "Video.exe", "window_title": "视频", "captured_at": "2026-04-27 10:05:00"},
+            {"file_path": "img3.png", "window_app": "Game.exe", "window_title": "游戏", "captured_at": "2026-04-27 10:10:00"},
+        ]
+
+        mock_is_image.return_value = True
+        mock_get_category.return_value = {
+            "category_id": "cat-entertainment",
+            "category_name": "娱乐",
+            "app_description": "娱乐应用",
+            "is_ignored": True
+        }
+        mock_encode.return_value = "data:image/png;base64,fake_data"
+        mock_channel.send.return_value = "1. 娱乐活动"
+
+        await analyze_chunk_screenshots(chunk, screenshots)
+
+        # 验证：两个不同 app 的第一张截图都应该被编码
+        assert mock_encode.call_count == 2
+        assert mock_encode.call_args_list[0][0][0] == "img1.png"
+        assert mock_encode.call_args_list[1][0][0] == "img2.png"
+
+    @pytest.mark.asyncio
+    @patch('lifeprism.llm.function.screenshot_analysis.channel_manager')
+    @patch('lifeprism.llm.function.screenshot_analysis.raw_behavior_analysis_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.encode_image_to_base64')
+    @patch('lifeprism.llm.function.screenshot_analysis._get_screenshot_category_info')
+    @patch('lifeprism.llm.function.screenshot_analysis._is_image_screenshot')
+    async def test_not_ignored_screenshots_all_preserved(
+        self, mock_is_image, mock_get_category, mock_encode, mock_repo, mock_channel
+    ):
+        """测试不在忽略列表的截图全部保留"""
+        from lifeprism.llm.function.screenshot_analysis import analyze_chunk_screenshots
+
+        chunk = {"start": "2026-04-27T10:00:00", "end": "2026-04-27T10:15:00"}
+        screenshots = [
+            {"file_path": "img1.png", "window_app": "VSCode.exe", "window_title": "代码", "captured_at": "2026-04-27 10:00:00"},
+            {"file_path": "img2.png", "window_app": "VSCode.exe", "window_title": "代码", "captured_at": "2026-04-27 10:05:00"},
+        ]
+
+        mock_is_image.return_value = True
+        mock_get_category.return_value = {
+            "category_id": "cat-work",
+            "category_name": "工作",
+            "app_description": "代码编辑器",
+            "is_ignored": False
+        }
+        mock_encode.return_value = "data:image/png;base64,fake_data"
+        mock_channel.send.return_value = "1. 编写代码"
+
+        await analyze_chunk_screenshots(chunk, screenshots)
+
+        # 验证：所有截图都应该被编码
+        assert mock_encode.call_count == 2
+
+    @pytest.mark.asyncio
+    @patch('lifeprism.llm.function.screenshot_analysis.channel_manager')
+    @patch('lifeprism.llm.function.screenshot_analysis.raw_behavior_analysis_repository')
+    @patch('lifeprism.llm.function.screenshot_analysis.encode_image_to_base64')
+    @patch('lifeprism.llm.function.screenshot_analysis._get_screenshot_category_info')
+    @patch('lifeprism.llm.function.screenshot_analysis._is_image_screenshot')
+    async def test_mixed_ignored_and_not_ignored(
+        self, mock_is_image, mock_get_category, mock_encode, mock_repo, mock_channel
+    ):
+        """测试混合场景：部分忽略、部分不忽略"""
+        from lifeprism.llm.function.screenshot_analysis import analyze_chunk_screenshots
+
+        chunk = {"start": "2026-04-27T10:00:00", "end": "2026-04-27T10:15:00"}
+        screenshots = [
+            {"file_path": "img1.png", "window_app": "Game.exe", "window_title": "游戏", "captured_at": "2026-04-27 10:00:00"},
+            {"file_path": "img2.png", "window_app": "VSCode.exe", "window_title": "代码", "captured_at": "2026-04-27 10:05:00"},
+            {"file_path": "img3.png", "window_app": "Game.exe", "window_title": "游戏", "captured_at": "2026-04-27 10:10:00"},
+        ]
+
+        mock_is_image.return_value = True
+
+        def get_category_side_effect(app, title):
+            if app == "Game.exe":
+                return {"category_id": "cat-game", "category_name": "娱乐", "app_description": "游戏", "is_ignored": True}
+            else:
+                return {"category_id": "cat-work", "category_name": "工作", "app_description": "编辑器", "is_ignored": False}
+
+        mock_get_category.side_effect = get_category_side_effect
+        mock_encode.return_value = "data:image/png;base64,fake_data"
+        mock_channel.send.return_value = "1. 工作和娱乐"
+
+        await analyze_chunk_screenshots(chunk, screenshots)
+
+        # 验证：Game.exe 第一张 + VSCode.exe = 2 张图片被编码
+        assert mock_encode.call_count == 2
+        encoded_files = [call[0][0] for call in mock_encode.call_args_list]
+        assert "img1.png" in encoded_files  # Game.exe 第一张
+        assert "img2.png" in encoded_files  # VSCode.exe
+        assert "img3.png" not in encoded_files  # Game.exe 第二张被过滤

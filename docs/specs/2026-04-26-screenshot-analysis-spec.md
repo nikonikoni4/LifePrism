@@ -6,7 +6,7 @@ last_updated: 创建截图分析功能规格文档
 abstract: >
   截图分析功能规格文档。定义基于 LLM 的截图语义分析流程，包括高密度时间段识别、
   chunk 切分、截图查询、LLM 分析、行为总结等核心功能，以及新增的 tokens 消耗控制机制
-  （基于分类的截图过滤）。
+  （基于分类的截图过滤，保留每个 app 的首张截图以提供初始语义）。
 id: screenshot-analysis-spec
 title: 截图语义分析功能
 status: draft
@@ -74,7 +74,7 @@ contract_refs:
    ↓
 4. 对每个 chunk 查询 active 截图
    ↓
-5. 应用 tokens 控制过滤（基于分类忽略列表）
+5. 应用 tokens 控制过滤（基于分类忽略列表，保留每个 app 的首张截图）
    ↓
 6. 调用 LLM 分析截图语义
    ↓
@@ -138,17 +138,20 @@ contract_refs:
 2. 获取该截图的分类（category_id）
 
 3. 判断该分类是否在忽略列表中（settings.screen_analysis_ignore）
-   - 是：用叉文替换该截图（不发送给 LLM）
+   - 是：判断是否是该 app 在当前时间段的第一张截图
+     - 是：保留该截图（正常发送给 LLM）
+     - 否：用文字替换该截图（不发送给 LLM）
    - 否：正常发送给 LLM
 ```
+
 
 **配置项：**
 - `screen_analysis_ignore`：需要忽略的分类 ID 列表（存储在 `config.yaml`）
 - 前端提供多选界面，用户可选择需要忽略的主分类
 
 **替换策略：**
-- 被忽略的截图用叉文（❌）或占位符替换
-- 保留截图的元数据（app、title、captured_at），但不发送图片内容
+- 被忽略的截图（非第一张）用文字描述替换，格式：`[无截图] timestamp: {captured_at} | app: {window_app} | title: {window_title} | category: {category_name} | description: {app_description}`
+- 第一张截图正常发送，为 LLM 提供该 app 的初始语义上下文
 
 ### 6. LLM 截图语义分析
 
@@ -310,7 +313,7 @@ GET /settings/screen-analysis-ignore
 │ ☑ 其他                           │
 │                                     │
 │ 建议：选择目的明确且不需要仔细分析的分类，例如娱乐等│
-| 说明：当使用这类型软件时会用文字描述代替截图见行为分析，从而减少tokens消耗|
+| 说明：被忽略分类的每个 app 会保留第一张截图提供初始语义，后续截图用文字替代以减少 tokens 消耗|
 │                                     │
 └─────────────────────────────────────┘
 ```

@@ -349,6 +349,8 @@ async def analyze_chunk_screenshots(
     # 准备图片消息
     content_parts = []
     img_idx = 1
+    first_app_screenshots = set()  # 记录已出现的 app
+
     for sc in screenshots:
         app = sc.get("window_app", "")
         title = sc.get("window_title", "")[:50]
@@ -359,17 +361,37 @@ async def analyze_chunk_screenshots(
 
         # 判断是否忽略该截图
         if category_info["is_ignored"]:
-            logger.debug(f"截图 {sc['file_path']} 被忽略，app :{app}")
-            # 使用已获取的分类信息构建占位符
-            category_name = category_info['category_name'] or "未分类"
-            content_parts.append({
-                "type": "text",
-                "text": f"[无截图] timestamp: {captured_at} | app: {app} | title: {title} | category: {category_name} | description: {category_info['app_description']}"
-            })
-            logger.debug(f"[无截图] timestamp: {captured_at} | app: {app} | title: {title} | category: {category_name} | description: {category_info['app_description']}")
+            # 判断是否是该 app 的第一张截图
+            is_first_screenshot = app not in first_app_screenshots
+
+            if is_first_screenshot:
+                # 第一张截图：保留图片
+                first_app_screenshots.add(app)
+                b64 = encode_image_to_base64(sc["file_path"])
+                if b64:
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {"url": b64}
+                    })
+                    content_parts.append({
+                        "type": "text",
+                        "text": f"[{img_idx}] | timestamp: {captured_at} app: {app} | title: {title}"
+                    })
+                    logger.debug(f"[{img_idx}] | timestamp: {captured_at} app: {app} | title: {title} (首张截图，保留)")
+                    img_idx += 1
+            else:
+                # 非第一张截图：用文字替换
+                logger.debug(f"截图 {sc['file_path']} 被忽略，app: {app}")
+                category_name = category_info['category_name'] or "未分类"
+                content_parts.append({
+                    "type": "text",
+                    "text": f"[无截图] timestamp: {captured_at} | app: {app} | title: {title} | category: {category_name} | description: {category_info['app_description']}"
+                })
+                logger.debug(f"[无截图] timestamp: {captured_at} | app: {app} | title: {title} | category: {category_name} | description: {category_info['app_description']}")
             continue
 
         # 不忽略，正常处理图片
+        first_app_screenshots.add(app)  # 记录该 app 已出现
         b64 = encode_image_to_base64(sc["file_path"])
         if b64:
             content_parts.append({
