@@ -46,9 +46,11 @@ async def screen_behavior_anlysis(start_time:str,end_time:str) ->list[BehaviorAn
         .with_order('date', desc=False)
     )
     if todolist:
+        # 提取每个 todo 的 content 字段并格式化
+        todo_contents = [f"- {todo.get('content', '')}" for todo in todolist]
         todolist = f"""
         ## 计划列表
-        {"\n".join(todolist)}
+        {chr(10).join(todo_contents)}
         """
     # 2. 分析屏幕截图
     analysis_results_list = await screenshot_analysis(start_time, end_time,todolist)
@@ -107,7 +109,8 @@ class SyncService:
             # 使用当前时间作为结束时间
             analysis_end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            await screen_behavior_anlysis(analysis_start_time, analysis_end_time)
+            # 后台执行截图分析，不阻塞 sync 响应
+            asyncio.create_task(screen_behavior_anlysis(analysis_start_time, analysis_end_time))
         duration = time.time() - start_time
         return {
             "status": "success",
@@ -160,7 +163,8 @@ class SyncService:
         if settings.monitor_type == "lifeprism":
             # time_range 格式: "2026-04-19 11:00:00 ~ 2026-04-19 11:15:00"
             time_parts = result["time_range"].split(" ~ ")
-            await screen_behavior_anlysis(time_parts[0], time_parts[1])
+            # 后台执行截图分析，不阻塞 sync 响应
+            asyncio.create_task(screen_behavior_anlysis(time_parts[0], time_parts[1]))
         duration = time.time() - sync_start
         
         return {

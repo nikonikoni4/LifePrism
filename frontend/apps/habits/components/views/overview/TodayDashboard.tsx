@@ -5,6 +5,10 @@ import { useStatsStore } from '../../../hooks/useStatsStore';
 export const TodayDashboard: React.FC = () => {
     const { todayOverview } = useStatsStore();
 
+    React.useEffect(() => {
+        console.log('[TodayDashboard] todayOverview 状态更新:', todayOverview);
+    }, [todayOverview]);
+
     const completed = todayOverview?.completedCount ?? 0;
     const total = todayOverview?.scheduledCount ?? 0;
     const rawPercentage = todayOverview?.completionRate != null

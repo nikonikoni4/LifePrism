@@ -26,10 +26,13 @@ export const StatsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const fetchTodayOverview = useCallback(async () => {
         try {
+            console.log('[StatsStore] 开始获取 todayOverview...');
             const data = await statsApi.getTodayOverview();
+            console.log('[StatsStore] todayOverview 获取成功:', data);
             setTodayOverview(data);
         } catch (err) {
             console.error('[StatsStore] Failed to fetch today overview:', err);
+            console.error('[StatsStore] Error details:', err instanceof Error ? err.message : String(err));
         }
     }, []);
 
@@ -52,6 +55,7 @@ export const StatsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }, []);
 
     const fetchAllStats = useCallback(async () => {
+        console.log('[StatsStore] fetchAllStats 开始执行...');
         setIsLoading(true);
         setError(null);
         const results = await Promise.allSettled([
@@ -59,8 +63,14 @@ export const StatsProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             fetchWeeklyData(4),
             fetchHeatmapData(365),
         ]);
+        console.log('[StatsStore] fetchAllStats 完成，结果:', results.map((r, i) => ({
+            index: i,
+            status: r.status,
+            reason: r.status === 'rejected' ? r.reason : 'success'
+        })));
         const failed = results.filter(r => r.status === 'rejected');
         if (failed.length > 0) {
+            console.error('[StatsStore] 部分统计数据加载失败:', failed);
             setError('部分统计数据加载失败');
         }
         setIsLoading(false);
