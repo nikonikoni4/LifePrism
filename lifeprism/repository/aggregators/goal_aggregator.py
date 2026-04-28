@@ -121,6 +121,10 @@ class GoalAggregator:
         """透传：更新目标的投入时间"""
         return self.goal_provider.update_time_invested(goal_id, time_invested)
 
+    def get_goals_linked_to_category(self, category_id: str) -> List[Dict[str, Any]]:
+        """透传：获取关联到指定分类的目标"""
+        return self.goal_provider.get_goals_linked_to_category(category_id)
+
     # ==================== GoalStats 核心 CRUD 透传 ====================
 
     def create_goal_stat(self, data: Dict[str, Any]) -> bool:
@@ -146,6 +150,14 @@ class GoalAggregator:
     def sync_stats_to_date(self, goal_id: str, target_date: str, start_date: Optional[str] = None) -> bool:
         """透传：同步统计数据到指定日期"""
         return self.stats_provider.sync_stats_to_date(goal_id=goal_id, target_date=target_date, start_date=start_date)
+
+    def get_stat_by_date(self, goal_id: str, date: str) -> Optional[Dict[str, Any]]:
+        """透传：获取指定日期的目标统计"""
+        return self.stats_provider.get_stat_by_date(goal_id, date)
+
+    def upsert_stat(self, goal_id: str, date: str, time_spent: int, todo_count: int) -> Dict[str, Any]:
+        """透传：更新或插入目标统计"""
+        return self.stats_provider.upsert_stat(goal_id, date, time_spent, todo_count)
 
     # ==================== 事务性聚合方法 ====================
 
