@@ -1,6 +1,5 @@
 from typing import List, Optional
-from lifeprism.llm.bus import MessageType
-from lifeprism.llm.channel.manager import channel_manager, Channel
+from lifeprism.llm.bus import MessageType, bus
 from lifeprism.llm.providers.llm_providers.base import LLMResponse
 from lifeprism.llm.session.manager import session_manager, Session
 from lifeprism.utils import get_logger
@@ -10,7 +9,7 @@ logger = get_logger(__name__)
 class ChatBot:
     def __init__(self):
         # 现在的 Channel 自动管理接收循环和单例状态，ChatBot 变为无状态包装器
-        self._channel_manager: Channel = channel_manager
+        self._bus = bus
         self._session_manager = session_manager
 
     async def chat(self, content: str, session_id: str = None, **extra) -> LLMResponse:
@@ -21,7 +20,7 @@ class ChatBot:
 
             # 2. 发送消息
             # 注意：不再此处手动添加消息，因为 AgentLoop 会处理消息的接收、存储和回复存储
-            response_data = await self._channel_manager.send(
+            response_data = await self._bus.send(
                 content=content,
                 session_id=session.id,
                 type=MessageType.CHAT,

@@ -1,5 +1,4 @@
-from .manager import channel_manager
+# Channel 模块已重构，消息流转功能已迁移到 bus
+# 未来用于外部通道接入（微信、QQ 等）
 
-__all__ = [
-    "channel_manager"
-]
+__all__ = []

@@ -11,8 +11,7 @@
 2. 前端需要增加手动更新按钮
 """
 
-from lifeprism.llm.channel.manager import channel_manager ,Channel
-from lifeprism.llm.bus.events import MessageType
+from lifeprism.llm.bus import bus, MessageType
 from lifeprism.llm.providers import LLMResponse
 from lifeprism.config import settings
 from pathlib import Path
@@ -85,10 +84,6 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
     year = date.split("-")[0]
     month = date.split("-")[1]
     diary_context = read_md(Path(settings.lifeprism_data_path + f"/diary/{year}/{month}/{date}.md"))
-
-
-
-    channel: Channel = channel_manager
     # 一个人情绪或状态应该都是有一定连续性的，所以一定要把这个连续性给捕捉到，然后这个连续性破坏一定会有关键事件，这个关键事件一定要重点分析，这样就能绘制一个心里折线图了
     sys_parts = []
     # 任务提示词
@@ -163,7 +158,7 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
         user_parts.append(label)
 
     content = "\n".join(user_parts)
-    result = await channel.send(content,type = MessageType.GENERAL_TASK,extra={'system_prompt':system_prompt}) 
+    result = await bus.send(content,type = MessageType.GENERAL_TASK,extra={'system_prompt':system_prompt}) 
 
     if result : 
         # 将ai summary写入lifeprismData\user\daily_data\behavior.md
