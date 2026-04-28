@@ -30,6 +30,8 @@ from lifeprism.repository import (
     screen_capture_repository,
 )
 logger = get_logger(__name__)
+logger.setLevel(DEBUG)
+
 # logger.setLevel(DEBUG)
 # ==================== 常量配置 ====================
 
@@ -363,7 +365,7 @@ async def analyze_chunk_screenshots(
         if category_info["is_ignored"]:
             # 判断是否是该 app 的第一张截图
             is_first_screenshot = app not in first_app_screenshots
-
+            is_first_screenshot = False # 暂时不保留第一张截图
             if is_first_screenshot:
                 # 第一张截图：保留图片
                 first_app_screenshots.add(app)
@@ -502,7 +504,7 @@ async def screenshot_analysis(
         bucket_minutes=10,  # 与原来的 TIME_BUCKET_MINUTES 保持一致
         max_bridge_buckets=1,  # 与原来的 MAX_BRIDGE_BUCKETS 保持一致
     )
-    logger.info(f"获取到 {len(high_density_segments)} 个高密度时间段")
+    logger.info(f"获取到 {len(high_density_segments)} 个高密度时间段, {high_density_segments}")
 
     # Step 3: 切分为 chunk
     all_chunks = []
@@ -522,7 +524,7 @@ async def screenshot_analysis(
         screenshots = get_active_screenshots(chunk_start, chunk_end)
         screen_count = len(screenshots)
 
-        logger.debug(
+        logger.info(
             f"[{i}/{len(all_chunks)}] {chunk_start} -> {chunk_end}, "
             f"截图数量: {screen_count}"
         )
@@ -666,6 +668,7 @@ def merage_results_list(analysis_results_list : list[dict[str,Any]])->list[dict[
         else:
             merged_results[-1]['screen_count'] += analysis_results_list[i]['screen_count']
             merged_results[-1]['behavior'] += analysis_results_list[i]['behavior']
+            merged_results[-1]['end_time'] = analysis_results_list[i]['end_time']
     return merged_results
 async def screenshot_behavior_summary(analysis_start_time : str, analysis_end_time : str, analysis_results_list : list[dict[str,Any]], todolist: str = "")->list[dict[str,str]]:
     """
