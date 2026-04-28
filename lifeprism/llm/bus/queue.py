@@ -1,6 +1,5 @@
 import asyncio
 import time
-from typing import Any
 from collections import deque
 from lifeprism.llm.bus.events import InboundMessage, OutboundMessage
 from lifeprism.utils.lazy_singleton import LazySingleton
@@ -132,7 +131,7 @@ class MessageQueue:
         response = result.response
         if hasattr(response, 'content'):
             return response.content
-        return response
+        return str(response)
 
     async def _receive_loop(self):
         try:
