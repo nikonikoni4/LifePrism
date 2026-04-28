@@ -126,5 +126,24 @@ class TodoAggregator:
 
     def get_waid_todos(self) -> List[Dict[str, Any]]:
         """透传：获取待办任务"""
-
         return self.provider.get_waid_todos()
+
+    def delete_todo_cascade(self, todo_id: str) -> int:
+        """透传：级联删除任务及其所有子任务"""
+        return self.provider.delete_todo_cascade(todo_id)
+
+    def get_todos_by_plan_doc(self, plan_doc_id: str) -> List[Dict[str, Any]]:
+        """透传：获取指定计划书关联的所有任务"""
+        return self.provider.get_todos_by_plan_doc(plan_doc_id)
+
+    def batch_create_todos(self, todos: List[Dict[str, Any]]) -> List[str]:
+        """透传：批量创建任务"""
+        return self.provider.batch_create_todos(todos)
+
+    def batch_update_waid_order(self, todo_ids: List[str]) -> bool:
+        """透传：批量设置 WAID 浮窗排序"""
+        return self.provider.batch_update_waid_order(todo_ids)
+
+    def clear_waid_order(self, todo_id: str) -> bool:
+        """透传：清除单个任务的 WAID 排序"""
+        return self.provider.clear_waid_order(todo_id)
