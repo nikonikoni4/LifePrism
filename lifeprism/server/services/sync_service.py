@@ -56,7 +56,7 @@ async def screen_behavior_anlysis(start_time:str,end_time:str) ->list[BehaviorAn
     analysis_results_list = await screenshot_analysis(start_time, end_time,todolist)
     
     # 3. 对分析结果进行摘要分析
-    summary_results = await screenshot_behavior_summary(start_time,end_time,analysis_results_list,todolist)
+    summary_results = await screenshot_behavior_summary(analysis_results_list,todolist)
 
     return summary_results
 
