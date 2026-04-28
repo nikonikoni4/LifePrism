@@ -670,7 +670,7 @@ def merage_results_list(analysis_results_list : list[dict[str,Any]])->list[dict[
             merged_results[-1]['behavior'] += analysis_results_list[i]['behavior']
             merged_results[-1]['end_time'] = analysis_results_list[i]['end_time']
     return merged_results
-async def screenshot_behavior_summary(analysis_start_time : str, analysis_end_time : str, analysis_results_list : list[dict[str,Any]], todolist: str = "")->list[dict[str,str]]:
+async def screenshot_behavior_summary( analysis_results_list : list[dict[str,Any]], todolist: str = "")->list[dict[str,str]]:
     """
     对单个chuck分析进行合并总结
     args:
