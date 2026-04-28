@@ -58,6 +58,7 @@ class MessageQueue:
         """停止接收循环，释放资源"""
         if self._receive_task is None:
             return
+        self.stop_receive = True  # 设置停止标志
         self._receive_task.cancel()
         try:
             await self._receive_task
@@ -109,6 +110,9 @@ class MessageQueue:
         try:
             result: OutboundMessage = await asyncio.wait_for(future, timeout=TIMEOUT_MAX)
             logger.debug(f"[MessageQueue] 收到回复: {result.response!r}")
+        except asyncio.TimeoutError:
+            logger.error(f"[MessageQueue] 消息 {msg.id} 超时")
+            raise
         finally:
             self._pending.pop(msg.id, None)  # 确保清理，避免内存泄漏
 
@@ -131,10 +135,21 @@ class MessageQueue:
         return response
 
     async def _receive_loop(self):
-        while True:
-            msg = await self.consume_outbound()
-            future = self._pending.pop(msg.id, None)
-            if future:
-                future.set_result(msg)
+        try:
+            while not self.stop_receive:
+                msg = await self.consume_outbound()
+                future = self._pending.pop(msg.id, None)
+                if future and not future.done():
+                    future.set_result(msg)
+        except asyncio.CancelledError:
+            # 清理所有 pending futures
+            for future in self._pending.values():
+                if not future.done():
+                    future.cancel()
+            self._pending.clear()
+            raise
+        except Exception as e:
+            logger.error(f"[MessageQueue] 接收循环异常: {e}")
+            raise
 
 bus = LazySingleton(MessageQueue) # 单一实例代理
