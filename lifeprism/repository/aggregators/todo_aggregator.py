@@ -123,3 +123,8 @@ class TodoAggregator:
     def batch_update_todos(self, updates: List[Dict[str, Any]]) -> int:
         """透传：批量更新任务"""
         return self.provider.batch_update_todos(updates)
+
+    def get_waid_todos(self) -> List[Dict[str, Any]]:
+        """透传：获取待办任务"""
+
+        return self.provider.get_waid_todos()
