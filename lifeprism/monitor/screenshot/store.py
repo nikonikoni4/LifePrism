@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Callable, Dict
+from datetime import datetime
 
 from lifeprism.monitor.screenshot.models import CaptureRequest
 
@@ -31,13 +32,26 @@ class ScreenshotStore:
         relative_path = file_path.relative_to(self.data_root).as_posix()
 
         self.capture_backend.capture_to_file(file_path)
+
+        # 对 app 和 title 进行标准化处理，与 data_clean.py 保持一致
+        window_app = request.window_app
+        if window_app:
+            window_app = window_app.lower().strip().split('.exe')[0]
+
+        window_title = request.window_title
+        if window_title:
+            window_title = window_title.split('和另外')[0].strip().lower()
+
+        # 转换时间戳格式为 YYYY-MM-DD HH:MM:SS
+        captured_at_formatted = datetime.fromisoformat(request.captured_at).strftime("%Y-%m-%d %H:%M:%S")
+
         payload = {
             "id": capture_id,
-            "captured_at": request.captured_at,
+            "captured_at": captured_at_formatted,
             "capture_reason": request.reason.value,
             "file_path": relative_path,
-            "window_app": request.window_app,
-            "window_title": request.window_title,
+            "window_app": window_app,
+            "window_title": window_title,
             "frequency_level": request.frequency_level,
             "engaged_segment_id": request.engaged_segment_id,
             "is_afk": 1 if request.is_afk else 0,

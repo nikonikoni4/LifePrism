@@ -50,7 +50,7 @@ class WindowMonitor:
             duration = (now - self.start_time).total_seconds()
             if duration > 0:
                 self.provider.save_event(
-                    timestamp=self.start_time.isoformat(),
+                    timestamp=self.start_time.strftime("%Y-%m-%d %H:%M:%S"),
                     duration=duration,
                     app=self.current_app,
                     title=self.current_title

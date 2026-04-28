@@ -660,17 +660,17 @@ def merage_results_list(analysis_results_list : list[dict[str,Any]])->list[dict[
     """ 对相邻的结果进行合并"""
     if not analysis_results_list:
         return []
-    
+
     merged_results = []
     for i in range(len(analysis_results_list)):
-        if i == 0 or analysis_results_list[i]['start_time'] != analysis_results_list[i-1]['end_time']:
+        if i == 0 or analysis_results_list[i]['start_time'] != merged_results[-1]['end_time']:
             merged_results.append(analysis_results_list[i])
         else:
             merged_results[-1]['screen_count'] += analysis_results_list[i]['screen_count']
             merged_results[-1]['behavior'] += analysis_results_list[i]['behavior']
             merged_results[-1]['end_time'] = analysis_results_list[i]['end_time']
     return merged_results
-async def screenshot_behavior_summary(analysis_results_list : list[dict[str,Any]], todolist: str = "")->list[dict[str,str]]:
+async def screenshot_behavior_summary(analysis_start_time : str, analysis_end_time : str, analysis_results_list : list[dict[str,Any]], todolist: str = "")->list[dict[str,str]]:
     """
     对单个chuck分析进行合并总结
     args:
@@ -715,14 +715,28 @@ async def screenshot_behavior_summary(analysis_results_list : list[dict[str,Any]
 
 
 if __name__ == "__main__":
-    from lifeprism.llm.agent.loop import agent_loop
-    import asyncio
-    todolist = ""
-    async def main():
-        loop_task = asyncio.create_task(agent_loop.loop())
-        # logger.info("[STARTUP] AgentLoop started") # logger is not imported in this file
-        response = await screenshot_analysis("2026-04-20 02:45:00","2026-04-20 03:00:00",todolist)
-        print(response)
-        loop_task.cancel() # Cancel the loop task when done to exit cleanly
+    # from lifeprism.llm.agent.loop import agent_loop
+    # import asyncio
+    # todolist = ""
+    # async def main():
+    #     loop_task = asyncio.create_task(agent_loop.loop())
+    #     # logger.info("[STARTUP] AgentLoop started") # logger is not imported in this file
+    #     response = await screenshot_analysis("2026-04-20 02:45:00","2026-04-20 03:00:00",todolist)
+    #     print(response)
+    #     loop_task.cancel() # Cancel the loop task when done to exit cleanly
         
-    asyncio.run(main())
+    # asyncio.run(main())
+    raw_results,_ = raw_behavior_analysis_repository.query_raw_behaviors(QueryOptions(time_range=("2026-04-28 12:00:05","2026-04-28 17:05:00")))
+    merged_results = merage_results_list(raw_results)
+    for result in raw_results:
+        print(f"{result['start_time']}~{result['end_time']}")
+        
+    
+    for result in merged_results:
+        print("="*20)
+        print(f"{result['start_time']}~{result['end_time']}")
+
+        print("="*20)
+
+
+    print('2026-04-28 12:15:05' == '2026-04-28 12:15:05')
