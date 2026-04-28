@@ -117,9 +117,6 @@ const Home: React.FC<HomeProps> = () => {
             return;
         }
 
-        // 生产环境：判断是否需要记录自动更新
-        const shouldRecordUpdate = isElectron && refreshKey === 0 && shouldAutoUpdate();
-
         const fetchHomepageData = async () => {
             const fetchStart = performance.now();
             console.log(`📡 [Home] 开始请求数据...`);
@@ -128,20 +125,14 @@ const Home: React.FC<HomeProps> = () => {
                 setLoading(true);
                 setError(null);
                 const response = await ActivityAPI.getHomepageData(selectedDate, 15, 14);
-
-                // 诊断日志：检查 time_overview 数据
-                console.log(`🔍 [Home] 完整响应数据:`, response);
-                console.log(`🔍 [Home] time_overview 存在:`, !!response?.time_overview);
-                console.log(`🔍 [Home] time_overview 内容:`, response?.time_overview);
-
                 setHomepageData(response);
 
                 const fetchEnd = performance.now();
                 console.log(`✅ [Home] 数据加载完成: ${(fetchEnd - fetchStart).toFixed(0)}ms (API 请求)`);
                 console.log(`✅ [Home] 总渲染时间: ${(fetchEnd - mountTime).toFixed(0)}ms (从组件挂载到数据就绪)`);
 
-                // 只有在满足自动更新条件时才记录更新日期
-                if (shouldRecordUpdate) {
+                // 生产环境：数据加载成功后判断是否需要记录自动更新
+                if (isElectron && shouldAutoUpdate()) {
                     recordUpdateDate();
                 }
             } catch (err) {
