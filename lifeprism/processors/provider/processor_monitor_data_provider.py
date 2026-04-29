@@ -4,7 +4,7 @@
 import logging
 from datetime import datetime
 from typing import List, Dict, Optional
-
+from lifeprism.config import settings
 from lifeprism.repository import LWBaseDataProvider
 
 logger = logging.getLogger(__name__)
@@ -42,11 +42,14 @@ class ProcessorMonitorDataProvider(LWBaseDataProvider):
             ORDER BY timestamp ASC
             LIMIT ?
         """
-
-        # 格式化时间戳为 ISO 字符串 (如果数据库存储的是 ISO 格式，直接传值)
-        start_str = start_time.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(start_time, datetime) else start_time
-        end_str = end_time.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(end_time, datetime) else end_time
-
+        if settings.monitor_type != 'lifeprism':
+            # activitywatch的格式
+            start_str = start_time.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(start_time, datetime) else start_time
+            end_str = end_time.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(end_time, datetime) else end_time
+        else:
+            # lifeprism的时间戳已经改为了YYYY-MM-DD HH:MM:SS
+            start_str = start_time.strftime("%Y-%m-%d %H:%M:%S") if isinstance(start_time, datetime) else start_time
+            end_str = end_time.strftime("%Y-%m-%d %H:%M:%S") if isinstance(end_time, datetime) else end_time
         params = [start_str, end_str, limit]
 
         try:
@@ -73,3 +76,7 @@ class ProcessorMonitorDataProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error(f"获取内置监控事件失败: {e}")
             return []
+
+
+if __name__ == "__main__":
+    print(len(ProcessorMonitorDataProvider().get_window_events(start_time="2026-04-29 12:08:46" ,end_time="2026-04-30 01:01:00")))
