@@ -2,6 +2,7 @@ import json
 import asyncio
 import qrcode
 from pathlib import Path
+from typing import Any
 from lifeprism.utils.logger import get_logger
 from lifeprism.llm.channel.wechat.client import WechatClient
 
@@ -21,7 +22,7 @@ class WechatAuth:
         self.client = client
         self.state_file = state_file
 
-    def _print_qr_code(self, data: str):
+    def _print_qr_code(self, data: str) -> None:
         """在终端打印 QR 码
 
         Args:
@@ -33,7 +34,7 @@ class WechatAuth:
         qr.print_ascii()
         logger.info("请使用微信扫描上方二维码登录")
 
-    def load_state(self) -> dict:
+    def load_state(self) -> dict[str, Any]:
         """加载保存的状态
 
         Returns:
@@ -44,10 +45,10 @@ class WechatAuth:
         try:
             return json.loads(self.state_file.read_text())
         except Exception as e:
-            logger.error(f"加载状态失败: {e}")
+            logger.error(f"加载状态失败: {e}", exc_info=True)
             return {}
 
-    def save_state(self, state: dict):
+    def save_state(self, state: dict[str, Any]) -> None:
         """保存状态
 
         Args:
@@ -57,10 +58,13 @@ class WechatAuth:
             self.state_file.parent.mkdir(parents=True, exist_ok=True)
             self.state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2))
         except Exception as e:
-            logger.error(f"保存状态失败: {e}")
+            logger.error(f"保存状态失败: {e}", exc_info=True)
 
-    async def qr_login(self) -> bool:
+    async def qr_login(self, timeout: int = 300) -> bool:
         """QR 码登录流程
+
+        Args:
+            timeout: 超时时间（秒），默认 300 秒
 
         Returns:
             登录是否成功
@@ -77,7 +81,12 @@ class WechatAuth:
             self._print_qr_code(qrcode_img)
 
             # 轮询状态
+            start_time = asyncio.get_event_loop().time()
             while True:
+                if asyncio.get_event_loop().time() - start_time > timeout:
+                    logger.error(f"登录超时（{timeout}秒）")
+                    return False
+
                 status_data = await self.client.api_get(
                     "ilink/bot/get_qrcode_status",
                     params={"qrcode": qrcode_id},
@@ -97,8 +106,10 @@ class WechatAuth:
                 elif status == "expired":
                     logger.error("QR 码已过期")
                     return False
+                elif status == "scanning":
+                    logger.info("用户正在扫描二维码")
 
                 await asyncio.sleep(1)
         except Exception as e:
-            logger.error(f"登录失败: {e}")
+            logger.error(f"登录失败: {e}", exc_info=True)
             return False
