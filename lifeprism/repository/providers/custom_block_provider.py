@@ -13,7 +13,7 @@ from lifeprism.utils.exceptions import DataAccessError, ConflictError, Validatio
 logger = get_logger(__name__)
 
 
-class TimelineProvider(LWBaseDataProvider):
+class CustomBlockProvider(LWBaseDataProvider):
     """
     Timeline 自定义时间块数据提供者
 

@@ -16,27 +16,31 @@ class QueryOptions:
       - 如果同时设置了 page 和 page_size，使用分页逻辑（LIMIT page_size OFFSET offset）
       - 否则如果设置了 limit，使用结果数量限制（LIMIT limit）
       - 都未设置则不限制结果数量
+
+    参数说明：
+    - date_range: 日期范围过滤，格式为 (start_date, end_date)，如 ("2024-01-01", "2024-12-31")
+                  保留在此日期范围内的记录（闭区间）
+    - time_range: 时间范围过滤，格式为 (start_time, end_time)，如 ("2026-04-01 09:00", "2026-04-02 18:00")
+                  保留在此时间范围内的记录（闭区间）
+    - filters: 通用筛选条件字典，语义为"保留匹配的记录"（WHERE 条件）
+               例如 {"category": "work", "status": "active"} 表示只保留 category=work 且 status=active 的记录
+               具体支持的字段和匹配规则由各 Provider 实现决定
+    - order_by: 排序字段名，如 "created_at"、"priority" 等
+    - order_desc: 是否降序排序，True=降序（默认），False=升序
+    - page: 页码，从 1 开始。需与 page_size 配合使用
+    - page_size: 每页记录数，范围 [1, 1000]。需与 page 配合使用
+    - limit: 结果数量限制，当不使用分页时生效。例如 limit=10 表示最多返回 10 条记录
+    - fields: 返回字段列表，如 ["id", "title", "created_at"]。None 表示返回所有字段
     """
 
-    # 时间范围
     date_range: Optional[Tuple[str, str]] = None
     time_range: Optional[Tuple[str, str]] = None
-
-    # 通用筛选
     filters: Optional[Dict[str, Any]] = None
-
-    # 排序
     order_by: Optional[str] = None
     order_desc: bool = True
-
-    # 分页
     page: Optional[int] = None
     page_size: Optional[int] = None
-
-    # 结果数量限制
     limit: Optional[int] = None
-
-    # 字段选择
     fields: Optional[List[str]] = None
 
     def __post_init__(self):

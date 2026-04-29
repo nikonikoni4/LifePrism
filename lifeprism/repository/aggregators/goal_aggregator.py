@@ -6,6 +6,7 @@ Goal Aggregator - 目标数据聚合层
 """
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from lifeprism.repository import QueryOptions
 from lifeprism.repository.providers.goal_providers import (
     GoalProvider,
     GoalStatsProvider,
@@ -92,6 +93,10 @@ class GoalAggregator:
     def get_goals(self, status: Optional[str] = None, category_id: Optional[str] = None, page: int = 1, page_size: int = 20):
         """透传：获取目标列表"""
         return self.goal_provider.get_goals(status=status, category_id=category_id, page=page, page_size=page_size)
+
+    def query_goals(self, options : QueryOptions):
+        """透传：通用目标查询"""
+        return self.goal_provider.query_goals(options)
 
     def get_goal_by_id(self, goal_id: str) -> Optional[Dict[str, Any]]:
         """透传：根据ID获取目标"""
