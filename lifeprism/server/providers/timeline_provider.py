@@ -8,7 +8,7 @@
 # logger = get_logger(__name__)
 
 
-# class TimelineProvider(LWBaseDataProvider):
+# class CustomBlockProvider(LWBaseDataProvider):
 #     """
 #     Timeline 模块专用数据提供者
     
@@ -261,8 +261,8 @@
 
 
 
-# timeline_provider = LazySingleton(TimelineProvider)
+# custom_block_provider = LazySingleton(CustomBlockProvider)
 
 # if __name__ == "__main__":
-#     timeline_provider = TimelineProvider()
-#     print(timeline_provider.get_timeline_events_by_date("2025-12-31", "pc")[-10:])
+#     custom_block_provider = CustomBlockProvider()
+#     print(custom_block_provider.get_timeline_events_by_date("2025-12-31", "pc")[-10:])

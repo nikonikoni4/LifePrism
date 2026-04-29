@@ -769,5 +769,5 @@ if __name__ == "__main__":
         data_processing_service = DataProcessingService()
         start_time = datetime.now() - timedelta(minutes=5)
         end_time = datetime.now()
-        await data_processing_service.process_activitywatch_data_by_time_range(auto_classify=True, start_time=start_time, end_time=end_time)
+        await data_processing_service.process_activitywatch_data(auto_classify=True)
     asyncio.run(_main())

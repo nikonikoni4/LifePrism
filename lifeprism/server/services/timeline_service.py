@@ -123,7 +123,7 @@ from lifeprism.server.schemas.timeline_schemas import (
     UserCustomBlockResponse,
     UserCustomBlockListResponse,
 )
-from lifeprism.repository import timeline_repository, todo_repository
+from lifeprism.repository import custom_block_repository, todo_repository
 from lifeprism.server.services.category_service import category_service
 
 
@@ -180,7 +180,7 @@ def create_custom_block(data: UserCustomBlockCreate) -> UserCustomBlockResponse:
     Returns:
         UserCustomBlockResponse: 创建后的记录（含名称和颜色）
     """
-    record = timeline_repository.create_custom_block(data.model_dump())
+    record = custom_block_repository.create_custom_block(data.model_dump())
     enriched_record = _enrich_block_record(record)
     return UserCustomBlockResponse(data=UserCustomBlock(**enriched_record))
 
@@ -198,7 +198,7 @@ def get_custom_block(block_id: int) -> UserCustomBlockResponse:
     Raises:
         ValueError: 如果记录不存在
     """
-    record = timeline_repository.get_custom_block_by_id(block_id)
+    record = custom_block_repository.get_custom_block_by_id(block_id)
     if not record:
         raise ValueError(f"Custom block with id {block_id} not found")
     enriched_record = _enrich_block_record(record)
@@ -215,7 +215,7 @@ def get_custom_blocks_by_date(date: str) -> UserCustomBlockListResponse:
     Returns:
         UserCustomBlockListResponse: 时间块列表（每条含名称和颜色）
     """
-    records = timeline_repository.get_custom_blocks_by_date(date)
+    records = custom_block_repository.get_custom_blocks_by_date(date)
     blocks = [UserCustomBlock(**_enrich_block_record(r)) for r in records]
     return UserCustomBlockListResponse(data=blocks, total=len(blocks))
 
@@ -234,7 +234,7 @@ def update_custom_block(block_id: int, data: UserCustomBlockUpdate) -> UserCusto
     Raises:
         ValueError: 如果记录不存在
     """
-    record = timeline_repository.update_custom_block(block_id, data.model_dump(exclude_unset=True))
+    record = custom_block_repository.update_custom_block(block_id, data.model_dump(exclude_unset=True))
     if not record:
         raise ValueError(f"Custom block with id {block_id} not found")
     enriched_record = _enrich_block_record(record)
@@ -251,7 +251,7 @@ def delete_custom_block(block_id: int) -> bool:
     Returns:
         bool: 是否删除成功
     """
-    return timeline_repository.delete_custom_block(block_id)
+    return custom_block_repository.delete_custom_block(block_id)
 
 
 if __name__ == "__main__":

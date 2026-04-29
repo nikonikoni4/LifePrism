@@ -20,7 +20,7 @@ from lifeprism.server.schemas.activity_schemas import (
     ChartSegment,
     BarConfig,
 )
-from lifeprism.repository import timeline_repository
+from lifeprism.repository import custom_block_repository
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color, get_timeline_category_color
 from lifeprism.server.services.category_service import category_service
 
@@ -97,7 +97,7 @@ def load_day_events(date: str) -> pd.DataFrame:
     """
     start_time = f"{date} 00:00:00"
     end_time = f"{date} 23:59:59"
-    df = timeline_repository.load_user_app_behavior_log(
+    df = custom_block_repository.load_user_app_behavior_log(
         start_time=start_time, 
         end_time=end_time
     )
