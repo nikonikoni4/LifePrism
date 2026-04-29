@@ -1,23 +1,36 @@
 """微信消息处理模块"""
 
 import uuid
-from typing import Any, Dict, List
-from lifeprism.utils.logger import get_logger
+from typing import Any, Dict
 
-logger = get_logger(__name__)
+ITEM_TEXT: int = 1
+ITEM_IMAGE: int = 2
+ITEM_VOICE: int = 3
+ITEM_FILE: int = 4
+ITEM_VIDEO: int = 5
 
-ITEM_TEXT = 1
-ITEM_IMAGE = 2
-ITEM_VOICE = 3
-ITEM_FILE = 4
-ITEM_VIDEO = 5
+MESSAGE_TYPE_BOT: int = 2
+MESSAGE_STATE_FINISH: int = 2
 
-MESSAGE_TYPE_BOT = 2
-MESSAGE_STATE_FINISH = 2
+CLIENT_ID_LENGTH: int = 12
 
 
 class WechatMessage:
     """微信消息处理"""
+
+    _MEDIA_KEY_MAP: Dict[int, str] = {
+        ITEM_IMAGE: "image_item",
+        ITEM_VOICE: "voice_item",
+        ITEM_FILE: "file_item",
+        ITEM_VIDEO: "video_item"
+    }
+
+    _MEDIA_TYPE_MAP: Dict[int, str] = {
+        ITEM_IMAGE: "image",
+        ITEM_VOICE: "voice",
+        ITEM_FILE: "file",
+        ITEM_VIDEO: "video"
+    }
 
     @staticmethod
     def parse_message(msg: Dict[str, Any]) -> Dict[str, Any]:
@@ -44,20 +57,10 @@ class WechatMessage:
                 text_item = item.get("text_item", {})
                 result["content"] += text_item.get("text", "")
             elif item_type in [ITEM_IMAGE, ITEM_VOICE, ITEM_FILE, ITEM_VIDEO]:
-                media_key = {
-                    ITEM_IMAGE: "image_item",
-                    ITEM_VOICE: "voice_item",
-                    ITEM_FILE: "file_item",
-                    ITEM_VIDEO: "video_item"
-                }[item_type]
+                media_key = WechatMessage._MEDIA_KEY_MAP[item_type]
                 media_item = item.get(media_key, {})
                 result["media"].append({
-                    "type": {
-                        ITEM_IMAGE: "image",
-                        ITEM_VOICE: "voice",
-                        ITEM_FILE: "file",
-                        ITEM_VIDEO: "video"
-                    }[item_type],
+                    "type": WechatMessage._MEDIA_TYPE_MAP[item_type],
                     "info": media_item
                 })
 
@@ -76,7 +79,7 @@ class WechatMessage:
         Returns:
             构造好的消息字典
         """
-        client_id = f"lifeprism-{uuid.uuid4().hex[:12]}"
+        client_id = f"lifeprism-{uuid.uuid4().hex[:CLIENT_ID_LENGTH]}"
 
         msg = {
             "from_user_id": "",
