@@ -78,7 +78,7 @@ class WechatChannel(BaseChannel):
         # 加载状态
         state = self.auth.load_state()
         token = state.get("token", "")
-        self._context_tokens = state.get("context_tokens", )
+        self._context_tokens = state.get("context_tokens", {})
 
         if token:
             self.client.token = token
