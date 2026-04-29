@@ -623,6 +623,10 @@ class SettingsManager:
     def model_history(self) -> Dict[str, Dict[str, Any]]:
         """获取模型历史记录"""
         return self._normalize_model_history(self.get('model_history') or {})
+    @property
+    def channel_path(self) -> Path:
+        """获取通道路径配置"""
+        return self._lifeprism_data_path / 'channel'
 
     @property
     def session_path(self)->Path:

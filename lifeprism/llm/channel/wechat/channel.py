@@ -81,6 +81,9 @@ class WechatChannel(BaseChannel):
         token = state.get("token", "")
         self._context_tokens = state.get("context_tokens", {})
 
+        logger.info(f"[DEBUG] 加载的 token: {token[:20] if token else 'None'}...")
+        logger.info(f"[DEBUG] 加载的 context_tokens: {self._context_tokens}")
+
         if token:
             self.client.token = token
             logger.info("使用已保存的 token")
@@ -91,6 +94,14 @@ class WechatChannel(BaseChannel):
                 logger.error("登录失败")
                 self._running = False
                 return
+
+        # 测试 token 是否有效
+        try:
+            test_body = {"get_updates_buf": ""}
+            test_data = await self.client.api_post("ilink/bot/getupdates", test_body)
+            logger.info(f"[DEBUG] Token 测试成功，返回数据: {test_data}")
+        except Exception as e:
+            logger.error(f"[DEBUG] Token 测试失败: {e}", exc_info=True)
 
         # 初始化媒体处理
         self.media = WechatMedia(self.client, self.media_dir)
@@ -157,18 +168,30 @@ class WechatChannel(BaseChannel):
         持续轮询微信服务器获取新消息，处理接收到的消息并发送到消息总线。
         发生错误时会记录日志并等待 5 秒后重试，确保轮询持续运行。
         """
+        logger.info("[DEBUG] 轮询循环已启动")
         get_updates_buf = ""
+        poll_count = 0
 
         while self._running:
             try:
+                poll_count += 1
+                logger.debug(f"[DEBUG] 第 {poll_count} 次轮询, get_updates_buf={get_updates_buf[:50]}...")
                 body = {"get_updates_buf": get_updates_buf}
                 data = await self.client.api_post("ilink/bot/getupdates", body)
 
-                get_updates_buf = data.get("get_updates_buf", "")
-                messages = data.get("messages", [])
+                # 打印完整响应
+                logger.info(f"[DEBUG] 完整响应数据: {data}")
 
-                for msg in messages:
-                    await self._handle_wechat_message(msg)
+                get_updates_buf = data.get("get_updates_buf", "")
+                messages = data.get("msgs", [])
+
+                logger.debug(f"[DEBUG] 轮询返回: get_updates_buf={get_updates_buf[:50]}..., 消息数={len(messages)}")
+
+                if messages:
+                    logger.info(f"[DEBUG] *** 收到 {len(messages)} 条消息 ***")
+                    for idx, msg in enumerate(messages):
+                        logger.info(f"[DEBUG] 消息 {idx+1}: {msg}")
+                        await self._handle_wechat_message(msg)
 
             except Exception as e:
                 logger.error(f"长轮询错误: {e}", exc_info=True)
@@ -184,10 +207,13 @@ class WechatChannel(BaseChannel):
             msg: 原始微信消息字典
         """
         try:
+            logger.info(f"[DEBUG] 开始处理微信消息: {msg}")
             from lifeprism.llm.channel.wechat.message import WechatMessage
             from lifeprism.llm.bus.events import InboundMessage
 
             parsed = WechatMessage.parse_message(msg)
+            logger.debug(f"[DEBUG] 解析后的消息: {parsed}")
+
             from_user_id = parsed["from_user_id"]
             content = parsed["content"]
             context_token = parsed["context_token"]
@@ -196,6 +222,8 @@ class WechatChannel(BaseChannel):
             if not self.is_allowed(from_user_id):
                 logger.warning(f"拒绝未授权用户: {from_user_id}")
                 return
+
+            logger.info(f"[DEBUG] 用户 {from_user_id} 已授权")
 
             # 保存 context_token
             if context_token:
@@ -222,8 +250,9 @@ class WechatChannel(BaseChannel):
                 }
             )
 
+            logger.info(f"[DEBUG] 准备发布到 bus: id={inbound_msg.id}, content={content}")
             # 发送到 bus
             await self.bus.publish_inbound(inbound_msg)
-            logger.info(f"接收到微信消息: {from_user_id}")
+            logger.info(f"[DEBUG] 已发布到 bus，接收到微信消息: {from_user_id}")
         except Exception as e:
             logger.error(f"处理微信消息失败: {e}", exc_info=True)

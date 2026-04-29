@@ -85,7 +85,7 @@ class MessageQueue:
         """发送消息并等待结果
         args:
             content: 消息内容
-            session_id: 会话ID
+            session_id: 会话ID，必须是已经存在的id，否则会报错。session_id的生命周期完全由内部决定
             type: 消息类型
             extra: 额外信息
         return:
