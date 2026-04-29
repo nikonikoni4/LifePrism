@@ -1,31 +1,48 @@
 # Agent调用循环实现
 from typing import Any
-from lifeprism.llm.providers import LLMResponse, create_llm_client
+from lifeprism.llm.providers import LLMResponse, create_llm_client,ToolCallRequest
 from lifeprism.llm.session import Session,session_manager
 import asyncio
 from lifeprism.llm.bus import InboundMessage,OutboundMessage,bus,MessageType, MessageQueue
 from lifeprism.llm.agent.context import Context
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger,DEBUG
 from lifeprism.utils.lazy_singleton import LazySingleton
-logger = get_logger(__name__)
+from lifeprism.llm.agent.tools import (
+    ToolRegistry,
+    LifeprismDataQueryTool
+)
 
+MAX_TOOL_CALL = 20
+logger = get_logger(__name__)
+logger.setLevel(DEBUG)
 class AgentLoop:
     def __init__(self, bus: MessageQueue):
         self._bus = bus
         self._active_tasks: dict[str, list[asyncio.Task]] = {}  # session_id -> tasks
         self._background_tasks: list[asyncio.Task] = []
         self._running = True
-
+        self._tool_registry = ToolRegistry()
     async def _run_agent_loop(self,messages:list[dict[str,Any]],tools:list[dict[str, Any]])->LLMResponse:
         llm = create_llm_client()
-        result:LLMResponse = await llm.chat(
+        response:LLMResponse = await llm.chat(
             messages=messages,
             tools = tools
         )
         # TODO  工具调用实现
-        
-        
-        return result
+        tool_call_count = 1
+        while response.tool_calls and tool_call_count <=MAX_TOOL_CALL:
+            tool_results =[]
+            for tool_call in response.tool_calls:
+                logger.debug(f"工具调用 ： {tool_call.name} ，调用参数{tool_call.arguments}")
+                result = await self._tool_registry.execute(tool_call.name,tool_call.arguments)
+                logger.debug(f"工具结果 ： {tool_call.name} - {result}")
+                messages.append({'role':'tool','tool_call_id':tool_call.id,'content':result})
+            response:LLMResponse = await llm.chat(
+                messages=messages,
+                tools = tools
+            )
+            
+        return response
     
     async def _process_msg(self,msg:InboundMessage):
         """
@@ -38,7 +55,8 @@ class AgentLoop:
             # 2. 构建tool description
             tools = []
             if msg.type == MessageType.CHAT:
-                tools: list[dict[str, Any]] = []
+                self._tool_registry.register(LifeprismDataQueryTool())
+                tools: list[dict[str, Any]] = self._tool_registry.get_definitions()
             elif msg.type == MessageType.CLASSIFY:
                 tools = []
 

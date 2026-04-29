@@ -16,13 +16,17 @@ class Context:
             return p.read_text(encoding="utf-8")
         return None
 
-
     @staticmethod
-    def build_system_prompt(msg:InboundMessage):
+    def build_system_prompt(msg:InboundMessage)->str:
         """ 构建系统提示词 """
         parts = []
         type = msg.type
         base = settings.lifeprism_data_path
+
+        # 
+
+
+
         if type == MessageType.CHAT:
             # 1. 加载基础文档
             # 加载agent.md + bootstrap.md + user.md + memory.md
@@ -39,9 +43,9 @@ class Context:
             # 2. 加载skill
             skill_loader = SkillLoad()
             skill_load_list = (msg.extra or {}).get("skill_list",None)
-            parts.append(skill_loader.load_skills(skill_load_list))
+            # parts.append(skill_loader.load_skills(skill_load_list))
             # 3. 加载可用skill list 
-            parts.append(skill_loader.load_frontmatters(skill_load_list))
+            # parts.append(skill_loader.load_frontmatters(skill_load_list))
 
             return "\n\n".join(parts)
         elif type == MessageType.CLASSIFY:

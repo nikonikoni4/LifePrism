@@ -11,7 +11,7 @@
 #     habit_provider,
 # )
 # from lifeprism.repository.providers.mood_provider import mood_provider
-# from lifeprism.repository.providers.timeline_provider import timeline_provider
+# from lifeprism.repository.providers.custom_block_provider import custom_block_provider
 # from lifeprism.server.providers.todo_provider import todo_provider
 
 
@@ -55,7 +55,7 @@
 #     def get_custom_blocks_by_range(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
 #         rows: list[dict[str, Any]] = []
 #         for one_date in _date_range(start_date, end_date):
-#             rows.extend(timeline_provider.get_custom_blocks_by_date(one_date))
+#             rows.extend(custom_block_provider.get_custom_blocks_by_date(one_date))
 #         return rows
 
 #     def get_diaries_by_range(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
