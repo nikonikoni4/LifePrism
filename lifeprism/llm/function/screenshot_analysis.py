@@ -108,7 +108,16 @@ ANALYSIS_SYSTEM_PROMPT = """
 
 DENSITY_THRESHOLD = 0.6
 MIN_DURATION_MINUTES = 6
-CHUNK_MINUTES = 15
+MAX_SCREENSHOTS_PER_CHUNK = 9  # Doubao Seed 2.0 Lite 最多支持 9 张图片
+
+# 根据截图频率等级动态设置 chunk 大小（分钟）
+# 计算依据：first_active_after_seconds + 12秒segment冷却 = 单张截图周期
+# 9张图片 × 单张周期 + 20%余量
+CHUNK_MINUTES_BY_LEVEL = {
+    1: 12,  # 低频：(60s + 12s) × 9 ≈ 10.8分钟 + 余量
+    2: 10,  # 中频：(45s + 12s) × 9 ≈ 8.55分钟 + 余量
+    3: 8,   # 高频：(30s + 12s) × 9 ≈ 6.3分钟 + 余量
+}
 
 # ==================== 辅助函数 ====================
 
@@ -347,6 +356,12 @@ async def analyze_chunk_screenshots(
     if not _is_image_screenshot([sc["file_path"] for sc in screenshots]):
         # 所有截图都不存在，返回None
         return None
+
+    # 限制截图数量，直接截断
+    if len(screenshots) > MAX_SCREENSHOTS_PER_CHUNK:
+        screenshots = screenshots[:MAX_SCREENSHOTS_PER_CHUNK]
+        logger.warning(f"截图数量超过 {MAX_SCREENSHOTS_PER_CHUNK}，已截断至 {len(screenshots)} 张")
+
     # 准备图片消息
     content_parts = []
     img_idx = 1
@@ -450,13 +465,13 @@ async def screenshot_analysis(
     todolist: str,
     density_threshold: float = DENSITY_THRESHOLD,
     min_duration_minutes: int = MIN_DURATION_MINUTES,
-    chunk_minutes: int = CHUNK_MINUTES
+    frequency_level: int = 2
 ) -> List[Dict[str, Any]]:
     """分析指定时间段的截图语义
 
     步骤：
     1. 获取高密度时间段（复用时间密度分割）
-    2. 将高密度时间段以指定分钟数进行切分
+    2. 根据频率等级动态设置chunk大小并切分时间段
     3. 对每个 chunk 查询 active 截图
     4. 调用 LLM 分析截图语义
 
@@ -466,7 +481,7 @@ async def screenshot_analysis(
         todolist: 用户目标列表文本
         density_threshold: 密度阈值（默认 0.6）
         min_duration_minutes: 最小时长（默认 6 分钟）
-        chunk_minutes: chunk 大小（默认 15 分钟）
+        frequency_level: 截图频率等级（1=低频 2=中频 3=高频，默认2）
 
     Returns:
         List[Dict[str, Any]]: 分析结果列表，每项包含：
@@ -475,7 +490,9 @@ async def screenshot_analysis(
             - screen_count: 截图数量
             - behavior: 分析结果
     """
-    logger.info(f"开始截图语义分析: {start_time} -> {end_time}")
+    # 根据频率等级获取chunk大小
+    chunk_minutes = CHUNK_MINUTES_BY_LEVEL.get(frequency_level, 10)
+    logger.info(f"开始截图语义分析: {start_time} -> {end_time}, 频率等级={frequency_level}, chunk大小={chunk_minutes}分钟")
 
     # Step 1: 查询活动日志
     logs, total = llm_dataset_provider.get_activity_logs(start_time=start_time, end_time=end_time)

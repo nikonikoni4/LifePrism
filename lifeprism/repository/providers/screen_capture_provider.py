@@ -193,8 +193,8 @@ class ScreenCaptureProvider(LWBaseDataProvider):
         这是对 query_screen_captures 的封装，提供更简洁的接口用于时间范围查询。
 
         Args:
-            start_time: 开始时间（ISO 格式）
-            end_time: 结束时间（ISO 格式）
+            start_time: 开始时间（ISO 格式或 YYYY-MM-DD HH:MM:SS 格式）
+            end_time: 结束时间（ISO 格式或 YYYY-MM-DD HH:MM:SS 格式）
             capture_reason: 截图原因过滤（可选，如 'active', 'scheduled'）
 
         Returns:
@@ -208,12 +208,16 @@ class ScreenCaptureProvider(LWBaseDataProvider):
             ...     capture_reason="active"
             ... )
         """
+        # 将 ISO 格式（带 T）转换为数据库格式（空格分隔）
+        start_time_db = start_time.replace('T', ' ') if 'T' in start_time else start_time
+        end_time_db = end_time.replace('T', ' ') if 'T' in end_time else end_time
+
         filters = {}
         if capture_reason is not None:
             filters['capture_reason'] = capture_reason
 
         options = QueryOptions(
-            time_range=(start_time, end_time),
+            time_range=(start_time_db, end_time_db),
             filters=filters,
             order_by='captured_at',
             order_desc=False  # 升序排序

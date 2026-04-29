@@ -70,9 +70,9 @@ contract_refs:
    ↓
 2. 识别高密度时间段（density_utils.build_time_segments）
    ↓
-3. 切分为固定大小的 chunk（默认 15 分钟）
+3. 根据频率等级动态切分 chunk（等级1=12分钟，等级2=10分钟，等级3=8分钟）
    ↓
-4. 对每个 chunk 查询 active 截图
+4. 对每个 chunk 查询 active 截图（最多9张，超过则截断）
    ↓
 5. 应用 tokens 控制过滤（基于分类忽略列表，保留每个 app 的首张截图）
    ↓
@@ -102,14 +102,25 @@ contract_refs:
 **目的：** 将长时间段切分为固定大小的 chunk，便于 LLM 分析
 
 **参数：**
-- `chunk_minutes`：chunk 大小（默认 15 分钟）
+- `frequency_level`：截图频率等级（1=低频 2=中频 3=高频，默认2）
+- `chunk_minutes`：根据频率等级动态设置
+  - 等级1（低频）：12分钟
+  - 等级2（中频）：10分钟
+  - 等级3（高频）：8分钟
+
+**计算依据：**
+- 考虑 engaged segment 冷却时间（12秒）
+- 单张截图周期 = `first_active_after_seconds` + 12秒冷却
+- 9张图片总时间 = 单张周期 × 9 + 20%余量
+- 例如等级2：(45s + 12s) × 9 ≈ 8.55分钟 → 设置为10分钟
 
 **规则：**
 - 从时间段起点开始，每 `chunk_minutes` 分钟切分一次
 - 最后一个 chunk 可能小于 `chunk_minutes`
 - 每个 chunk 包含 `start` 和 `end`（ISO 格式）
+- 每个 chunk 最多分析 9 张截图（Doubao Seed 2.0 Lite 限制）
 
-### 4. 截图查询
+### 4. 截图查询与数量限制
 
 **数据源：** `screen_captures` 表
 
@@ -117,11 +128,16 @@ contract_refs:
 - `captured_at` 在 chunk 的 `[start, end)` 范围内
 - `capture_reason = 'active'`（仅查询主动截图）
 
+**数量限制：**
+- 每个 chunk 最多分析 **9 张截图**（Doubao Seed 2.0 Lite 模型限制）
+- 超过 9 张时，直接截断保留前 9 张（按时间顺序）
+- 通过动态调整 chunk 大小，使大部分情况下截图数量接近 9 张
+
 **返回字段：**
 - `file_path`：截图文件路径（相对于 `lifeprism_data_path`）
 - `window_app`：截图时的应用程序名称
 - `window_title`：截图时的窗口标题
-- `captured_at`：截图时间戳
+- `captured_at`：截图时间戳（YYYY-MM-DD HH:MM:SS 格式）
 
 ### 5. Tokens 消耗控制（新增功能）
 
@@ -172,7 +188,7 @@ contract_refs:
 | 字段 | 类型 | 约束 | 说明 |
 |-----|------|------|------|
 | id | TEXT | PRIMARY KEY, NOT NULL | 截屏记录 ID（如 sc-{uuid[:8]}） |
-| captured_at | TEXT | NOT NULL | 截屏时间戳（ISO 格式） |
+| captured_at | TEXT | NOT NULL | 截屏时间戳（YYYY-MM-DD HH:MM:SS 格式） |
 | capture_reason | TEXT | NOT NULL | 触发截屏的原因（scheduled/active/enter） |
 | file_path | TEXT | NOT NULL, UNIQUE | 相对 lifeprism_data_path 的路径 |
 | window_app | TEXT | | 截屏时的应用程序名称 |
@@ -336,8 +352,10 @@ screen_analysis_ignore:
 ## Acceptance Notes
 
 - [ ] 高密度时间段识别正确，密度阈值和最小时长可配置
-- [ ] Chunk 切分正确，最后一个 chunk 可能小于 chunk_minutes
+- [ ] Chunk 大小根据截图频率等级动态调整
+- [ ] 每个 chunk 最多分析 9 张截图，超过则截断前 9 张
 - [ ] 仅查询 active 截图，不包括 scheduled 和 enter 截图
+- [ ] 数据库存储时间戳格式为 YYYY-MM-DD HH:MM:SS，查询接口支持 ISO 格式输入并自动转换
 - [ ] LLM 分析遵循"精确度优先"原则，不输出不确定的结果
 - [ ] 行为总结合并相似内容，结合用户目标进行说明
 - [ ] 原始分析结果和行为总结分别存储到不同表

@@ -1,3 +1,10 @@
+## 2026-04-30-screenshot-timestamp-format-mismatch
+
+- updated_at: 2026-04-30
+- path: `docs/history-bugs/2026-04-30-screenshot-timestamp-format-mismatch.md`
+- 触发规则：在排查截图分析查询失败、时间戳格式不匹配、SQLite 时间范围查询返回空结果时阅读
+- 内容摘要：记录了修改 screen_captures 表时间戳格式后，查询时使用 ISO 格式导致无法匹配数据库格式的 bug，以及截图数量限制和动态 chunk 大小的优化方案。
+
 ## 2026-04-25-electron-native-dialog-focus-loss
 
 - updated_at: 2026-04-25
