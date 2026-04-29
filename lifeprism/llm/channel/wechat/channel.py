@@ -125,7 +125,71 @@ class WechatChannel(BaseChannel):
     async def _poll_loop(self) -> None:
         """消息轮询循环
 
-        持续轮询微信服务器获取新消息。
+        持续轮询微信服务器获取新消息，处理接收到的消息并发送到消息总线。
         """
-        # 将在 Task 8 中实现
-        pass
+        get_updates_buf = ""
+
+        while self._running:
+            try:
+                body = {"get_updates_buf": get_updates_buf}
+                data = await self.client.api_post("ilink/bot/getupdates", body)
+
+                get_updates_buf = data.get("get_updates_buf", "")
+                messages = data.get("messages", [])
+
+                for msg in messages:
+                    await self._handle_wechat_message(msg)
+
+            except Exception as e:
+                logger.error(f"长轮询错误: {e}")
+                await asyncio.sleep(5)
+
+    async def _handle_wechat_message(self, msg: dict) -> None:
+        """处理微信消息
+
+        解析微信消息，检查权限，下载媒体文件，构造 InboundMessage 并发送到消息总线。
+
+        Args:
+            msg: 原始微信消息字典
+        """
+        from lifeprism.llm.channel.wechat.message import WechatMessage
+        from lifeprism.llm.bus.events import InboundMessage
+
+        parsed = WechatMessage.parse_message(msg)
+        from_user_id = parsed["from_user_id"]
+        content = parsed["content"]
+        context_token = parsed["context_token"]
+
+        # 检查权限
+        if not self.is_allowed(from_user_id):
+            logger.warning(f"拒绝未授权用户: {from_user_id}")
+            return
+
+        # 保存 context_token
+        if context_token:
+            self._context_tokens[from_user_id] = context_token
+
+        # 下载媒体
+        media_paths = []
+        for media_item in parsed["media"]:
+            media_type = media_item["type"]
+            media_info = media_item["info"]
+            path = await self.media.download_media(media_info, media_type)
+            if path:
+                media_paths.append(path)
+
+        # 构造 InboundMessage
+        inbound_msg = InboundMessage(
+            type="chat",
+            content=content,
+            session_id=f"wechat:{from_user_id}",
+            extra={
+                "media": media_paths,
+                "sender_id": from_user_id,
+                "chat_id": from_user_id
+            }
+        )
+
+        # 发送到 bus
+        await self.bus.publish_inbound(inbound_msg)
+        logger.info(f"接收到微信消息: {from_user_id}")
