@@ -1,5 +1,6 @@
 """微信 Channel 测试入口"""
 import asyncio
+import time
 from lifeprism.llm.channel.wechat import WechatChannel, WechatConfig
 from lifeprism.llm.bus.queue import MessageQueue
 from lifeprism.llm.bus.events import OutboundMessage, LLMResponse
@@ -7,9 +8,13 @@ from lifeprism.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+last_sender = None
+
 
 async def main():
     """测试微信 channel"""
+    global last_sender
+
     # 配置
     config = WechatConfig(
         enabled=True,
@@ -24,16 +29,12 @@ async def main():
 
     # 订阅入站消息
     async def handle_inbound(msg):
-        logger.info(f"收到消息: {msg.content}")
-        logger.info(f"发送者: {msg.extra.get('sender_id')}")
-
-        # 自动回复
-        reply = OutboundMessage(
-            id=f"reply_{msg.extra.get('sender_id')}",
-            response=LLMResponse(content=f"收到你的消息: {msg.content}"),
-            session_id=msg.session_id
-        )
-        await channel.send(reply)
+        global last_sender
+        last_sender = msg.extra.get('sender_id')
+        print(f"\n[收到消息] {last_sender}: {msg.content}")
+        if msg.extra.get('media'):
+            print(f"[媒体文件] {msg.extra['media']}")
+        print("回复> ", end="", flush=True)
 
     bus.subscribe_inbound(handle_inbound)
 
@@ -45,12 +46,33 @@ async def main():
         logger.error("启动失败")
         return
 
-    logger.info("微信 channel 已启动，等待消息...")
+    print("\n微信 channel 已启动")
+    print("等待微信消息，收到消息后可输入回复...")
+    print("按 Ctrl+C 退出\n")
+
+    # 输入循环
+    async def input_loop():
+        while channel._running:
+            try:
+                text = await asyncio.to_thread(input, "回复> ")
+                if not text.strip():
+                    continue
+                if not last_sender:
+                    print("还没有收到任何消息，无法发送")
+                    continue
+
+                reply = OutboundMessage(
+                    id=f"manual_{last_sender}_{int(time.time())}",
+                    response=LLMResponse(content=text),
+                    session_id=f"wechat:{last_sender}"
+                )
+                await channel.send(reply)
+                print(f"[已发送] -> {last_sender}")
+            except EOFError:
+                break
 
     try:
-        # 保持运行
-        while channel._running:
-            await asyncio.sleep(1)
+        await input_loop()
     except KeyboardInterrupt:
         logger.info("收到中断信号")
     finally:
