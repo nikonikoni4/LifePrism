@@ -1,7 +1,7 @@
 """微信媒体处理模块"""
 
 import base64
-import time
+import uuid
 from pathlib import Path
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
@@ -36,6 +36,8 @@ class WechatMedia:
     def _decrypt_aes_ecb(data: bytes, key_b64: str) -> bytes:
         """AES-ECB 解密
 
+        注意：使用 ECB 模式是因为微信 API 要求此格式，不建议在其他场景使用 ECB 模式。
+
         Args:
             data: 加密的字节数据
             key_b64: Base64 编码的 AES 密钥
@@ -66,33 +68,37 @@ class WechatMedia:
             aes_key = media_info.get("aes_key", "")
 
             if not full_url and not encrypt_param:
+                logger.warning("媒体信息缺少 URL 和加密参数")
+                return None
+
+            # 检查客户端是否已初始化
+            if not self.client._client:
+                logger.error("HTTP 客户端未初始化")
                 return None
 
             # 下载
-            if not self.client._client:
-                return None
-
             url = full_url or f"{self.client.base_url.replace('ilinkai', 'novac2c.cdn')}/c2c/download?encrypted_query_param={encrypt_param}"
             resp = await self.client._client.get(url)
             resp.raise_for_status()
             data = resp.content
-
 
             # 解密
             if aes_key and data:
                 data = self._decrypt_aes_ecb(data, aes_key)
 
             if not data:
+                logger.warning(f"下载的媒体数据为空: {media_type}")
                 return None
 
             # 保存
             ext_map = {"image": ".jpg", "voice": ".mp3", "file": ".bin", "video": ".mp4"}
             ext = ext_map.get(media_type, ".bin")
-            filename = f"{media_type}_{int(time.time())}_{hash(url) % 100000}{ext}"
+            filename = f"{media_type}_{uuid.uuid4().hex[:12]}{ext}"
             file_path = self.media_dir / filename
             file_path.write_bytes(data)
 
+            logger.info(f"媒体文件已保存: {file_path}, 类型: {media_type}, 大小: {len(data)} bytes")
             return str(file_path)
         except Exception as e:
-            logger.error(f"下载媒体失败: {e}")
+            logger.error(f"下载媒体失败: {e}, 类型: {media_type}", exc_info=True)
             return None
