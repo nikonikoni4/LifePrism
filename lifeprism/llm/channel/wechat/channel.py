@@ -139,6 +139,7 @@ class WechatChannel(BaseChannel):
             content = msg.response.content
 
         if not content:
+            logger.debug(f"消息内容为空，跳过发送: {to_user_id}")
             return
 
         # 构造并发送消息
@@ -148,7 +149,7 @@ class WechatChannel(BaseChannel):
             await self.client.api_post("ilink/bot/sendmessage", message_body)
             logger.info(f"发送消息到微信: {to_user_id}")
         except Exception as e:
-            logger.error(f"发送消息失败: {e}")
+            logger.error(f"发送消息失败，目标用户: {to_user_id}, 错误: {e}", exc_info=True)
 
     async def _poll_loop(self) -> None:
         """消息轮询循环
