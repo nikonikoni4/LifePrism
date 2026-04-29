@@ -107,9 +107,16 @@ contract_refs: lifeprism/llm/bus/events.py
 3. 获取媒体 ID
 4. 在消息中引用媒体 ID
 
+### 路径管理
+
+**目录结构：**
+- 根目录：`settings.channel_path / 'wechat'`
+- 媒体目录：`settings.channel_path / 'wechat' / 'media'`
+- 状态文件：`settings.channel_path / 'wechat' / 'account.json'`
+
 ### 状态管理
 
-状态保存到 `state_dir/account.json`：
+状态保存到 `settings.channel_path / 'wechat' / 'account.json'`：
 - `token` - 认证令牌
 - `get_updates_buf` - 长轮询缓冲标记
 - `context_tokens` - 每个用户的上下文 token（用于回复）
@@ -131,9 +138,14 @@ contract_refs: lifeprism/llm/bus/events.py
 - `enabled` (bool): 是否启用微信 channel
 - `base_url` (str): 微信 API 地址，默认 "https://ilinkai.weixin.qq.com"
 - `cdn_base_url` (str): CDN 地址，默认 "https://novac2c.cdn.weixin.qq.com/c2c"
-- `state_dir` (str): 状态保存目录路径
 - `poll_timeout` (int): 长轮询超时时间（秒），默认 35
 - `allow_from` (list[str]): 允许的用户 ID 白名单，空列表拒绝所有，"*" 允许所有
+
+**路径管理：**
+- 所有路径通过 `settings.channel_path` 获取
+- 微信根目录：`settings.channel_path / 'wechat'`
+- 媒体目录：`settings.channel_path / 'wechat' / 'media'`
+- 状态文件：`settings.channel_path / 'wechat' / 'account.json'`
 
 ### 消息事件结构
 
@@ -186,7 +198,7 @@ contract_refs: lifeprism/llm/bus/events.py
 
 ### 状态持久化
 
-保存到 `{state_dir}/account.json`：
+保存到 `settings.channel_path / 'wechat' / 'account.json'`：
 ```json
 {
   "token": "认证令牌",
@@ -206,7 +218,7 @@ contract_refs: lifeprism/llm/bus/events.py
 
 ### 媒体文件存储
 
-- 保存路径：`{media_dir}/weixin/{filename}`
+- 保存路径：`settings.channel_path / 'wechat' / 'media' / {filename}`
 - 文件命名：`{type}_{timestamp}_{hash}{ext}`
 - 支持的扩展名：
   - 图片：.jpg, .png, .gif, .bmp, .webp
