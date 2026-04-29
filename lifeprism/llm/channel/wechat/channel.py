@@ -120,8 +120,35 @@ class WechatChannel(BaseChannel):
         Args:
             msg: 待发送的出站消息
         """
-        # 将在 Task 9 中实现
-        pass
+        if not self.client or not self._running:
+            logger.warning("客户端未初始化或未运行")
+            return
+
+        # 提取用户 ID
+        session_id = msg.session_id or ""
+        if not session_id.startswith("wechat:"):
+            logger.error(f"无效的 session_id: {session_id}")
+            return
+
+        to_user_id = session_id.replace("wechat:", "")
+        context_token = self._context_tokens.get(to_user_id, "")
+
+        # 提取内容
+        content = ""
+        if msg.response and hasattr(msg.response, "content"):
+            content = msg.response.content
+
+        if not content:
+            return
+
+        # 构造并发送消息
+        try:
+            from lifeprism.llm.channel.wechat.message import WechatMessage
+            message_body = WechatMessage.build_text_message(to_user_id, content, context_token)
+            await self.client.api_post("ilink/bot/sendmessage", message_body)
+            logger.info(f"发送消息到微信: {to_user_id}")
+        except Exception as e:
+            logger.error(f"发送消息失败: {e}")
 
     async def _poll_loop(self) -> None:
         """消息轮询循环
