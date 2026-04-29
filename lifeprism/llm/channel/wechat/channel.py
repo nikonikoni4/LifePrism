@@ -1,6 +1,7 @@
 """微信 Channel 主类模块"""
 
 import asyncio
+from typing import Any
 from pathlib import Path
 from lifeprism.llm.channel.base import BaseChannel
 from lifeprism.llm.channel.wechat.config import WechatConfig
@@ -126,6 +127,7 @@ class WechatChannel(BaseChannel):
         """消息轮询循环
 
         持续轮询微信服务器获取新消息，处理接收到的消息并发送到消息总线。
+        发生错误时会记录日志并等待 5 秒后重试，确保轮询持续运行。
         """
         get_updates_buf = ""
 
@@ -141,55 +143,59 @@ class WechatChannel(BaseChannel):
                     await self._handle_wechat_message(msg)
 
             except Exception as e:
-                logger.error(f"长轮询错误: {e}")
+                logger.error(f"长轮询错误: {e}", exc_info=True)
                 await asyncio.sleep(5)
 
-    async def _handle_wechat_message(self, msg: dict) -> None:
+    async def _handle_wechat_message(self, msg: dict[str, Any]) -> None:
         """处理微信消息
 
         解析微信消息，检查权限，下载媒体文件，构造 InboundMessage 并发送到消息总线。
+        单个消息处理失败不会影响其他消息的处理。
 
         Args:
             msg: 原始微信消息字典
         """
-        from lifeprism.llm.channel.wechat.message import WechatMessage
-        from lifeprism.llm.bus.events import InboundMessage
+        try:
+            from lifeprism.llm.channel.wechat.message import WechatMessage
+            from lifeprism.llm.bus.events import InboundMessage
 
-        parsed = WechatMessage.parse_message(msg)
-        from_user_id = parsed["from_user_id"]
-        content = parsed["content"]
-        context_token = parsed["context_token"]
+            parsed = WechatMessage.parse_message(msg)
+            from_user_id = parsed["from_user_id"]
+            content = parsed["content"]
+            context_token = parsed["context_token"]
 
-        # 检查权限
-        if not self.is_allowed(from_user_id):
-            logger.warning(f"拒绝未授权用户: {from_user_id}")
-            return
+            # 检查权限
+            if not self.is_allowed(from_user_id):
+                logger.warning(f"拒绝未授权用户: {from_user_id}")
+                return
 
-        # 保存 context_token
-        if context_token:
-            self._context_tokens[from_user_id] = context_token
+            # 保存 context_token
+            if context_token:
+                self._context_tokens[from_user_id] = context_token
 
-        # 下载媒体
-        media_paths = []
-        for media_item in parsed["media"]:
-            media_type = media_item["type"]
-            media_info = media_item["info"]
-            path = await self.media.download_media(media_info, media_type)
-            if path:
-                media_paths.append(path)
+            # 下载媒体
+            media_paths = []
+            for media_item in parsed["media"]:
+                media_type = media_item["type"]
+                media_info = media_item["info"]
+                path = await self.media.download_media(media_info, media_type)
+                if path:
+                    media_paths.append(path)
 
-        # 构造 InboundMessage
-        inbound_msg = InboundMessage(
-            type="chat",
-            content=content,
-            session_id=f"wechat:{from_user_id}",
-            extra={
-                "media": media_paths,
-                "sender_id": from_user_id,
-                "chat_id": from_user_id
-            }
-        )
+            # 构造 InboundMessage
+            inbound_msg = InboundMessage(
+                type="chat",
+                content=content,
+                session_id=f"wechat:{from_user_id}",
+                extra={
+                    "media": media_paths,
+                    "sender_id": from_user_id,
+                    "chat_id": from_user_id
+                }
+            )
 
-        # 发送到 bus
-        await self.bus.publish_inbound(inbound_msg)
-        logger.info(f"接收到微信消息: {from_user_id}")
+            # 发送到 bus
+            await self.bus.publish_inbound(inbound_msg)
+            logger.info(f"接收到微信消息: {from_user_id}")
+        except Exception as e:
+            logger.error(f"处理微信消息失败: {e}", exc_info=True)
