@@ -27,7 +27,7 @@ related_spec:
 - [x] habit_stats_provider
 - [x] goal_provider
 - [x] todo_provider
-- [x] timeline_provider
+- [x] custom_block_provider
 - [x] plan_doc_provider
 
 说明：timeline service涉及到多个聚合，当前编写内容还未真实替换service，状态：待替换（当替换完成之后修改这个状态，修改位置lifeprism\server\services\timeline_builder.py lifeprism\server\services\usage_service.py）
@@ -91,8 +91,8 @@ related_spec:
     'goal_stats_provider',
     'TodoProvider',
     'todo_provider',
-    'TimelineProvider',
-    'timeline_provider',
+    'CustomBlockProvider',
+    'custom_block_provider',
     'PlanDocProvider',
     'plan_doc_provider',
     'CategoryProvider',

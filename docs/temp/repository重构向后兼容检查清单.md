@@ -10,7 +10,7 @@
 
 - [x] diary_repository
 - [x] todo_repository 
-- [x] timeline_repository
+- [x] custom_block_repository
 - [x] tokens_usage_repository
 - [x] raw_behavior_analysis_repository
 - [x] behavior_analysis_repository
@@ -127,7 +127,7 @@ aggregator 内部结构：
 
 ### Provider 层（6个）
 - ✅ diary_repository: 完全兼容
-- ✅ timeline_repository: 完全兼容
+- ✅ custom_block_repository: 完全兼容
 - ✅ tokens_usage_repository: 架构升级（聚合逻辑上移到service层）
 - ✅ raw_behavior_analysis_repository: 新增表
 - ✅ behavior_analysis_repository: 新增表

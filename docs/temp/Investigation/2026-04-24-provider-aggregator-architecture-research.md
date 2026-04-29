@@ -393,7 +393,7 @@ from repository import habit_store         # 统一类型：repository
 ```
 diary_provider.py          → DiaryProvider
 plan_doc_provider.py       → PlanDocProvider
-timeline_provider.py       → TimelineProvider
+custom_block_provider.py       → CustomBlockProvider
 todo_provider.py           → TodoProvider
 tokens_usage_provider.py   → TokensUsageProvider
 ```
@@ -420,7 +420,7 @@ map_cache_providers.py     → MultiPurposeMapCacheProvider, SinglePurposeMapCac
 todo_provider          : 4 次
 goal_provider          : 3 次
 plan_doc_provider      : 2 次
-timeline_provider      : 2 次
+custom_block_provider      : 2 次
 tokens_usage_provider  : 1 次
 diary_provider         : 1 次
 ```

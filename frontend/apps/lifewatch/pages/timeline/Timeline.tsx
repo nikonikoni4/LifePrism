@@ -330,7 +330,7 @@ const adjustBrightness = (hex: string, percent: number): string => {
 // - /activity/logs API 只返回 category_id，不返回颜色值
 // - 前端通过 /category/tree 获取分类列表（含原始颜色，Tailwind 500 系列）
 // - 前端使用下方的 softenColor 函数将颜色转换为柔和版本（Tailwind 300 系列）
-// - 这与缩略图模式（后端 timeline_provider 返回柔和颜色）保持视觉一致
+// - 这与缩略图模式（后端 custom_block_provider 返回柔和颜色）保持视觉一致
 //
 // 【维护说明】
 // - 颜色映射表需与后端 category_color_provider.py 的 TAILWIND_500_TO_300 保持同步
@@ -578,7 +578,7 @@ const Timeline: React.FC = () => {
 
     // =========================================================================
     // 非缩略图模式：分类颜色计算
-    // 颜色由前端基于 category_id 自行计算，与后端 timeline_provider 的柔和颜色保持一致
+    // 颜色由前端基于 category_id 自行计算，与后端 custom_block_provider 的柔和颜色保持一致
     // @see 上方的 TAILWIND_500_TO_300 映射表和 softenColor 函数
     // =========================================================================
 

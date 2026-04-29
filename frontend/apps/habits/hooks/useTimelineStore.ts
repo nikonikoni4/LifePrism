@@ -35,7 +35,7 @@ const formatMinutesToTime = (minutes: number): string => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 };
 
-export const TimelineProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const CustomBlockProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { chains } = useChainStore();
 
     const timelineEvents = useMemo(() => {
@@ -81,7 +81,7 @@ export const TimelineProvider: React.FC<{ children: ReactNode }> = ({ children }
 export const useTimelineStore = () => {
     const context = useContext(TimelineStoreContext);
     if (!context) {
-        throw new Error("useTimelineStore must be used within a TimelineProvider");
+        throw new Error("useTimelineStore must be used within a CustomBlockProvider");
     }
     return context;
 };

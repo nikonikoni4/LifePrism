@@ -1167,7 +1167,7 @@ repository Layer - 数据访问层统一入口
 # ==================== 单表 Store（内部是 Provider）====================
 from lifeprism.repository.providers import diary_provider as diary_store
 from lifeprism.repository.providers import todo_provider as todo_store
-from lifeprism.repository.providers import timeline_provider as timeline_store
+from lifeprism.repository.providers import custom_block_provider as timeline_store
 from lifeprism.repository.providers import plan_doc_provider as plan_doc_store
 from lifeprism.repository.providers import tokens_usage_provider as tokens_usage_store
 ```
@@ -1422,7 +1422,7 @@ habits = habit_store.get_habits_with_challenges(status='active')
 |-----------|---------|-------|------|
 | `diary_store` | DiaryProvider | diary | 日记数据 |
 | `todo_store` | TodoProvider | todos | 待办事项 |
-| `timeline_store` | TimelineProvider | timeline | 时间线 |
+| `timeline_store` | CustomBlockProvider | timeline | 时间线 |
 | `plan_doc_store` | PlanDocProvider | plan_docs | 计划文档 |
 | `tokens_usage_store` | TokensUsageProvider | tokens_usage_log | Token 使用记录 |
 

@@ -98,7 +98,7 @@
 
 - diary_repository
 - todo_repository  
-- timeline_repository
+- custom_block_repository
 - plan_doc_repository
 - tokens_usage_repository
 - raw_behavior_analysis_repository

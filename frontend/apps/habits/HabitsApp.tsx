@@ -4,7 +4,7 @@ import { HabitLayout } from './components/layout/HabitLayout';
 // Store Providers
 import { HabitProvider, useHabitStore } from './hooks/useHabitStore';
 import { ChainProvider, useChainStore } from './hooks/useChainStore';
-import { TimelineProvider } from './hooks/useTimelineStore';
+import { CustomBlockProvider } from './hooks/useTimelineStore';
 import { SettlementProvider, useSettlementStore } from './hooks/useSettlementStore';
 import { StatsProvider, useStatsStore } from './hooks/useStatsStore';
 import { MindspaceProvider } from './hooks/useMindspaceStore';
@@ -105,9 +105,9 @@ export const HabitsApp: React.FC = () => {
                     <StatsProvider>
                         <MindspaceProvider>
                             <HabitWithSettlementBridge>
-                                <TimelineProvider>
+                                <CustomBlockProvider>
                                     <HabitsAppContent />
-                                </TimelineProvider>
+                                </CustomBlockProvider>
                             </HabitWithSettlementBridge>
                         </MindspaceProvider>
                     </StatsProvider>
