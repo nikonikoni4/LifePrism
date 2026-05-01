@@ -232,20 +232,24 @@ const SettingsApp: React.FC = () => {
         }
 
         const startTime = Date.now();
-        const TIMEOUT = 5 * 60 * 1000; // 5 分钟
-        const INTERVAL = 2000; // 2 秒
-        let intervalId: NodeJS.Timeout | null = null;
+        const TIMEOUT = 5 * 60 * 1000;
+        const INTERVAL = 2000;
+        let stopped = false;
 
         const pollStatus = async () => {
+            if (stopped) return;
+
             try {
                 const result = await SettingsAPI.getQRCodeStatus(selectedChannel, qrCodeId);
+                if (stopped) return;
+
                 setQrStatus(result.status as any);
 
                 if (result.status === 'confirmed') {
-                    if (intervalId) clearInterval(intervalId);
+                    stopped = true;
                     toast.success('登录成功！');
                 } else if (result.status === 'expired') {
-                    if (intervalId) clearInterval(intervalId);
+                    stopped = true;
                     toast.error('二维码已过期');
                 }
             } catch (error) {
@@ -253,20 +257,25 @@ const SettingsApp: React.FC = () => {
             }
         };
 
-        intervalId = setInterval(() => {
-            if (Date.now() - startTime > TIMEOUT) {
-                if (intervalId) clearInterval(intervalId);
-                setQrStatus('expired');
-                toast.error('请求超时，请重试');
+        const intervalId = setInterval(() => {
+            if (stopped || Date.now() - startTime > TIMEOUT) {
+                clearInterval(intervalId);
+                if (!stopped) {
+                    stopped = true;
+                    setQrStatus('expired');
+                    toast.error('请求超时，请重试');
+                }
                 return;
             }
             pollStatus();
         }, INTERVAL);
 
-        // 立即执行一次
         pollStatus();
 
-        return () => { if (intervalId) clearInterval(intervalId); };
+        return () => {
+            stopped = true;
+            clearInterval(intervalId);
+        };
     }, [qrCodeId, qrStatus, selectedChannel]);
 
     // 触发自动保存（收集当前所有设置）
