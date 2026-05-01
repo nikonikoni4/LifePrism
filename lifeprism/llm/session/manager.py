@@ -61,6 +61,7 @@ class SessionManager:
     """
     维护session的生命周期: 创建，加载，保存，删除
     """
+    ALLOW_SAVE_MESSAGE_TYPE = ['user','assistant','tool']
     def __init__(self):
         self._cache : dict[str,Session] = {} # 存放已经加载过的内容 {id : session}
 
@@ -151,7 +152,8 @@ class SessionManager:
                 }
                 f.write(json.dumps(metadata_line, ensure_ascii=False) + "\n")
                 for msg in session.messages:
-                    f.write(json.dumps(msg, ensure_ascii=False) + "\n")
+                    if msg.get('role','') in self.ALLOW_SAVE_MESSAGE_TYPE:
+                        f.write(json.dumps(msg, ensure_ascii=False) + "\n")
     @staticmethod
     def show_session_list(path:Path= settings.session_path)-> list[str]:
         """搜索存储地址内的jsonl, 返回文件名称list"""
