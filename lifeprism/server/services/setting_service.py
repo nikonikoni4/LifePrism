@@ -19,6 +19,7 @@ from lifeprism.server.schemas.setting_schemas import (
     MigrateDataPathResponse,
 )
 from lifeprism.utils import get_logger
+from lifeprism.llm.channel.wechat.client import WechatClient
 
 logger = get_logger(__name__)
 
@@ -413,3 +414,40 @@ async def test_vlm_capability() -> dict:
         'model_response': vlm_result.get('model_response'),
         'cache_updated': cache_updated
     }
+
+
+async def get_qrcode(channel: str) -> dict:
+    """获取指定通道的 QR 码
+
+    Args:
+        channel: 通道类型（当前仅支持 wechat）
+
+    Returns:
+        包含 qr_string 和 qrcode_id 的字典
+
+    Raises:
+        ValueError: 不支持的通道类型
+    """
+    if channel != "wechat":
+        raise ValueError(f"不支持的通道类型: {channel}")
+
+    from lifeprism.llm.channel.wechat.config import WechatConfig
+
+    config = WechatConfig()
+    base_url = config.base_url
+
+    logger.info(f"正在获取 {channel} 通道的 QR 码")
+    async with WechatClient(base_url) as client:
+        data = await client.api_get("ilink/bot/get_bot_qrcode", params={"bot_type": "3"}, auth=False)
+        qrcode_id = data.get("qrcode", "")
+        qrcode_img = data.get("qrcode_img_content", qrcode_id)
+
+        if not qrcode_id:
+            logger.error(f"获取 QR 码失败，返回数据: {data}")
+            raise ValueError("获取 QR 码失败")
+
+        logger.info(f"成功获取 QR 码，ID: {qrcode_id[:20]}...")
+        return {
+            "qr_string": qrcode_img,
+            "qrcode_id": qrcode_id
+        }
