@@ -53,7 +53,7 @@ class WechatAuth:
         try:
             token = keyring.get_password(KEYRING_SERVICE_NAME, KEYRING_WECHAT_TOKEN_USERNAME)
             return token if token else ""
-        except Exception as e:
+        except (keyring.errors.KeyringError, OSError) as e:
             logger.debug(f"从 keyring 加载 token 失败: {e}")
             return ""
 
@@ -70,7 +70,7 @@ class WechatAuth:
             keyring.set_password(KEYRING_SERVICE_NAME, KEYRING_WECHAT_TOKEN_USERNAME, token)
             logger.info("Token 已保存到 keyring")
             return True
-        except Exception as e:
+        except (keyring.errors.KeyringError, OSError) as e:
             logger.error(f"保存 token 到 keyring 失败: {e}", exc_info=True)
             return False
 
@@ -79,6 +79,10 @@ class WechatAuth:
 
         Args:
             state: 要保存的状态字典
+
+        Raises:
+            OSError: 文件操作失败
+            TypeError: JSON 序列化失败
         """
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2))
@@ -99,7 +103,7 @@ class WechatAuth:
             logger.info("已从 keyring 删除 token")
         except keyring.errors.PasswordDeleteError:
             logger.debug("Keyring 中没有 token")
-        except Exception as e:
+        except (keyring.errors.KeyringError, OSError) as e:
             logger.error(f"从 keyring 删除 token 失败: {e}", exc_info=True)
             success = False
 
@@ -111,7 +115,7 @@ class WechatAuth:
                     file_state.pop("token")
                     self._save_state_to_file(file_state)
                     logger.info("已从文件删除 token")
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, TypeError) as e:
                 logger.error(f"从文件删除 token 失败: {e}", exc_info=True)
                 success = False
 
@@ -162,7 +166,7 @@ class WechatAuth:
                     try:
                         self._save_state_to_file(file_state)
                         logger.info("文件中的旧 token 已清理")
-                    except Exception as e:
+                    except (OSError, TypeError) as e:
                         logger.warning(f"清理文件中的旧 token 失败: {e}")
 
                 # 加载 context_tokens（始终从文件读取）
@@ -175,9 +179,9 @@ class WechatAuth:
                     backup_path = self.state_file.with_suffix('.json.backup')
                     self.state_file.rename(backup_path)
                     logger.info(f"已备份损坏的状态文件到: {backup_path}")
-                except Exception:
+                except OSError:
                     pass
-            except Exception as e:
+            except OSError as e:
                 logger.error(f"加载状态文件失败: {e}", exc_info=True)
 
         return state
@@ -193,27 +197,23 @@ class WechatAuth:
             state: 要保存的状态字典
 
         Raises:
-            Exception: 保存失败时抛出异常
+            OSError: 文件操作失败
+            TypeError: JSON 序列化失败
         """
-        try:
-            # 1. 保存 token 到 keyring
-            token = state.get("token", "")
-            if token and token.strip():  # 确保非空且非空白
-                if not self._save_token_to_keyring(token):
-                    logger.warning("Keyring 保存失败，fallback 到文件存储")
-                    # Fallback: 保存到文件
-                    self._save_state_to_file(state)
-                    return
+        # 1. 保存 token 到 keyring
+        token = state.get("token", "")
+        if token and token.strip():  # 确保非空且非空白
+            if not self._save_token_to_keyring(token):
+                logger.warning("Keyring 保存失败，fallback 到文件存储")
+                # Fallback: 保存到文件
+                self._save_state_to_file(state)
+                return
 
-            # 2. 保存 context_tokens 到文件（不包含 token）
-            file_state = {
-                "context_tokens": state.get("context_tokens", {})
-            }
-            self._save_state_to_file(file_state)
-
-        except Exception as e:
-            logger.error(f"保存状态失败: {e}", exc_info=True)
-            raise  # 让调用者处理失败
+        # 2. 保存 context_tokens 到文件（不包含 token）
+        file_state = {
+            "context_tokens": state.get("context_tokens", {})
+        }
+        self._save_state_to_file(file_state)
 
     async def qr_login(self, timeout: int = 300) -> bool:
         """QR 码登录流程
@@ -259,7 +259,7 @@ class WechatAuth:
                             self.save_state(state)
                             logger.info("登录成功")
                             return True
-                        except Exception as e:
+                        except (OSError, TypeError) as e:
                             logger.error(f"保存登录状态失败: {e}")
                             return False
                 elif status == "expired":
