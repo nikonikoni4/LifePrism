@@ -12,7 +12,7 @@ from lifeprism.llm.utils import (
     format_goals_for_prompt,
     format_category_tree_for_prompt,
 )
-from lifeprism.llm.bus import bus
+from lifeprism.llm.bus import bus, InboundMessage,MessageType
 
 MAX_LOG_ITEMS = 15
 
@@ -38,11 +38,12 @@ class ClassifySimple:
             for item in batch
         ]
         user_content = f"数据格式：[id, app_name, app_description, title, is_multipurpose]\n{json.dumps(compact_data, ensure_ascii=False)}"
-        raw = await bus.send(
+        msg = InboundMessage(
             content=user_content,
-            type="classify",
+            type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
         )
+        raw = await bus.send(msg)
         clean = extract_json_from_response(raw)
         if not clean:
             logger.error(f"classify_simple 批次 {batch_num} 返回空内容，跳过")

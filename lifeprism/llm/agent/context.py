@@ -56,7 +56,6 @@ class Context:
             # 通用调用，不添加额外的上下文
             return (msg.extra or {}).get("system_prompt", "")
             
-
     @staticmethod
     def build_prompt(system_prompt: str, message: list[dict[str, Any]]):
         return [{"role": "system", "content": system_prompt}] + message

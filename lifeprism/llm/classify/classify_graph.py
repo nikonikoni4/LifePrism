@@ -15,7 +15,7 @@ from lifeprism.llm.utils import (
     split_by_purpose,
     split_by_duration,
 )
-from lifeprism.llm.bus import bus
+from lifeprism.llm.bus import bus, InboundMessage,MessageType
 
 MAX_LOG_ITEMS = 10
 MAX_TITLE_ITEMS = 5
@@ -75,11 +75,12 @@ class ClassifyGraph:
         content = f"软件名称: {app}" + (f"\ntitle 样本: {title_sample}" if title_sample else "")
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                result = await bus.send(
+                msg = InboundMessage(
                     content=content,
-                    type="classify",
+                    type=MessageType.CLASSIFY,
                     extra={"system_prompt": system_prompt},
                 )
+                result = await bus.send(msg)
                 if result and result.strip() and result.strip().lower() != "none":
                     app_info.description = result.strip()
                     logger.info(f"获取 {app} 描述成功: {result[:50]}")
@@ -116,7 +117,12 @@ class ClassifyGraph:
             batch, fields=["id", "app", "title"],
             app_registry=app_registry, group_by_app=True, show_app_description=True
         )
-        raw = await bus.send(content=content, type="classify", extra={"system_prompt": system_prompt})
+        msg = InboundMessage(
+            content=content,
+            type=MessageType.CLASSIFY,
+            extra={"system_prompt": system_prompt},
+        )
+        raw = await bus.send(msg)
         clean = extract_json_from_response(raw)
         if not clean:
             logger.error(f"single_classify 批次 {batch_num} 返回空内容，跳过")
@@ -153,7 +159,12 @@ class ClassifyGraph:
     async def _multi_classify_short_batch(self, batch: list, batch_num: int, system_prompt: str, result_items: list):
         """短时长多用途分类单批次"""
         content = format_log_items_table(batch, fields=["id", "app", "title"])
-        raw = await bus.send(content=content, type="classify", extra={"system_prompt": system_prompt})
+        msg = InboundMessage(
+            content=content,
+            type=MessageType.CLASSIFY,
+            extra={"system_prompt": system_prompt},
+        )
+        raw = await bus.send(msg)
         clean = extract_json_from_response(raw)
         if not clean:
             logger.error(f"multi_classify_short 批次 {batch_num} 返回空内容，跳过")
@@ -191,11 +202,11 @@ class ClassifyGraph:
         if not item.title:
             return
         try:
-            result = await bus.send(
+            result = await bus.send(InboundMessage(
                 content=f"搜索并分析 {item.title}",
-                type="classify",
+                type=MessageType.CLASSIFY,
                 extra={"system_prompt": system_prompt},
-            )
+            ))
             item.title_analysis = result
         except Exception as e:
             logger.warning(f"get_titles 分析 title={item.title!r} 失败: {e}")
@@ -215,7 +226,12 @@ class ClassifyGraph:
     async def _multi_classify_long_batch(self, batch: list, batch_num: int, system_prompt: str, result_items: list):
         """长时长多用途分类单批次"""
         content = format_log_items_table(batch, fields=["id", "app", "title", "title_analysis"])
-        raw = await bus.send(content=content, type="classify", extra={"system_prompt": system_prompt})
+        msg = InboundMessage(
+            content=content,
+            type=MessageType.CLASSIFY,
+            extra={"system_prompt": system_prompt},
+        )
+        raw = await bus.send(msg)
         clean = extract_json_from_response(raw)
         if not clean:
             logger.error(f"multi_classify_long 批次 {batch_num} 返回空内容，跳过")

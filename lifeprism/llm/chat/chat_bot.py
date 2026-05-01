@@ -1,5 +1,5 @@
 from typing import List, Optional
-from lifeprism.llm.bus import MessageType, bus
+from lifeprism.llm.bus import MessageType, bus, InboundMessage
 from lifeprism.llm.providers.llm_providers.base import LLMResponse
 from lifeprism.llm.session.manager import session_manager, Session
 from lifeprism.utils import get_logger
@@ -20,12 +20,13 @@ class ChatBot:
 
             # 2. 发送消息
             # 注意：不再此处手动添加消息，因为 AgentLoop 会处理消息的接收、存储和回复存储
-            response_data = await self._bus.send(
+            msg = InboundMessage(
                 content=content,
                 session_id=session.id,
                 type=MessageType.CHAT,
                 extra=extra
             )
+            response_data = await self._bus.send(msg)
 
             # 3. 包装响应
             if isinstance(response_data, LLMResponse):
