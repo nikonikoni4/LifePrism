@@ -38,8 +38,7 @@
 ```json
 {
   "status": "waiting" | "scanning" | "confirmed" | "expired",
-  "message": "等待扫描" | "用户正在扫描" | "登录成功" | "二维码已过期",
-  "token": "xxx"  // 仅当 status 为 confirmed 时返回
+  "message": "等待扫描" | "用户正在扫描" | "登录成功" | "二维码已过期"
 }
 ```
 
@@ -99,7 +98,7 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
    - 提取响应中的 `bot_token`
    - 保存 token 到 `{lifeprism_data_path}/channel/wechat/account.json`
    - 文件格式：`{"token": "xxx", "context_tokens": {}}`
-   - 返回 `{"status": "confirmed", "message": "登录成功", "token": token}`
+   - 返回 `{"status": "confirmed", "message": "登录成功"}`（不返回 token）
 7. 其他状态返回 `{"status": status, "message": message}`
 
 ### 3. API 路由
@@ -131,7 +130,6 @@ class QRCodeResponse(BaseModel):
 class QRCodeStatusResponse(BaseModel):
     status: str  # waiting | scanning | confirmed | expired
     message: str
-    token: str | None = None  # 仅当 status 为 confirmed 时返回
 ```
 
 ## 二、前端设计
@@ -192,7 +190,7 @@ async getQRCode(channel: string): Promise<{ qr_string: string; qrcode_id: string
     return response.json();
 }
 
-async getQRCodeStatus(channel: string, qrcodeId: string): Promise<{ status: string; message: string; token?: string }> {
+async getQRCodeStatus(channel: string, qrcodeId: string): Promise<{ status: string; message: string }> {
     const response = await fetch(`${getApiBase()}/settings/qrcode/status?channel=${channel}&qrcode_id=${qrcodeId}`);
     if (!response.ok) throw new Error('查询状态失败');
     return response.json();
@@ -212,7 +210,6 @@ export interface QRCodeResponse {
 export interface QRCodeStatusResponse {
     status: 'waiting' | 'scanning' | 'confirmed' | 'expired';
     message: string;
-    token?: string;  // 仅当 status 为 confirmed 时返回
 }
 ```
 
