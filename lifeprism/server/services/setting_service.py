@@ -6,6 +6,7 @@ Settings 服务层 - 配置管理业务逻辑
 import os
 import sys
 import shutil
+import json
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
@@ -438,7 +439,12 @@ async def get_qrcode(channel: str) -> dict:
 
     logger.info(f"正在获取 {channel} 通道的 QR 码")
     async with WechatClient(base_url) as client:
-        data = await client.api_get("ilink/bot/get_bot_qrcode", params={"bot_type": "3"}, auth=False)
+        try:
+            data = await client.api_get("ilink/bot/get_bot_qrcode", params={"bot_type": "3"}, auth=False)
+        except Exception as e:
+            logger.error(f"获取 QR 码失败: {e}", exc_info=True)
+            raise ValueError(f"获取 QR 码失败: {str(e)}")
+
         qrcode_id = data.get("qrcode", "")
         qrcode_img = data.get("qrcode_img_content", qrcode_id)
 
@@ -451,3 +457,75 @@ async def get_qrcode(channel: str) -> dict:
             "qr_string": qrcode_img,
             "qrcode_id": qrcode_id
         }
+
+
+async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
+    """查询 QR 码扫描状态
+
+    Args:
+        channel: 通道类型（wechat）
+        qrcode_id: QR 码 ID
+
+    Returns:
+        包含 status 和 message 的字典
+    """
+    if channel != "wechat":
+        raise ValueError(f"不支持的通道类型: {channel}")
+
+    from lifeprism.llm.channel.wechat.config import WechatConfig
+
+    config = WechatConfig()
+    base_url = config.base_url
+
+    logger.info(f"正在查询 QR 码状态: {qrcode_id[:20]}...")
+    async with WechatClient(base_url) as client:
+        try:
+            data = await client.api_get("ilink/bot/get_qrcode_status", params={"qrcode": qrcode_id}, auth=False)
+        except Exception as e:
+            logger.error(f"查询 QR 码状态失败: {e}", exc_info=True)
+            raise ValueError(f"查询 QR 码状态失败: {str(e)}")
+
+        raw_status = data.get("status", "")
+
+        # 状态映射
+        status_map = {
+            "": "waiting",
+            "waiting": "waiting",
+            "scanning": "scanning",
+            "confirmed": "confirmed",
+            "expired": "expired"
+        }
+        mapped_status = status_map.get(raw_status, "waiting")
+
+        logger.info(f"QR 码状态: {raw_status} -> {mapped_status}")
+
+        # 如果状态为 confirmed，保存 token
+        if mapped_status == "confirmed":
+            bot_token = data.get("bot_token", "")
+            if bot_token:
+                try:
+                    account_dir = Path(settings.channel_path) / "wechat"
+                    account_dir.mkdir(parents=True, exist_ok=True)
+                    account_file = account_dir / "account.json"
+
+                    account_data = {"token": bot_token, "context_tokens": {}}
+                    with open(account_file, "w", encoding="utf-8") as f:
+                        json.dump(account_data, f, ensure_ascii=False, indent=2)
+
+                    logger.info(f"已保存 bot_token 到 {account_file}")
+                    return {"status": mapped_status, "message": "登录成功，token 已保存"}
+                except Exception as e:
+                    logger.error(f"保存 token 失败: {e}", exc_info=True)
+                    # 不抛出异常，因为 token 已经获取成功，只是保存失败
+                    return {"status": mapped_status, "message": f"登录成功但保存 token 失败: {str(e)}"}
+            else:
+                logger.warning("状态为 confirmed 但未获取到 bot_token")
+                return {"status": mapped_status, "message": "登录成功但未获取到 token"}
+
+        # 其他状态
+        message_map = {
+            "waiting": "等待扫码",
+            "scanning": "已扫码，等待确认",
+            "expired": "二维码已过期"
+        }
+        return {"status": mapped_status, "message": message_map.get(mapped_status, "未知状态")}
