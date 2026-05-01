@@ -64,7 +64,7 @@ async def get_qrcode(channel: str) -> dict:
 
 **实现逻辑**：
 1. 验证 `channel` 参数（当前只支持 `wechat`）
-2. 创建临时 `WechatClient` 实例
+2. 使用默认 `base_url`（`https://ilinkai.weixin.qq.com`）创建临时 `WechatClient` 实例
 3. 调用微信 API：`ilink/bot/get_bot_qrcode`，参数 `{"bot_type": "3"}`
 4. 提取响应中的 `qrcode_img_content`（QR 码 URL）和 `qrcode`（ID）
 5. 返回 `{"qr_string": qrcode_img_content, "qrcode_id": qrcode}`
@@ -86,7 +86,7 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
 
 **实现逻辑**：
 1. 验证 `channel` 参数
-2. 创建临时 `WechatClient` 实例
+2. 使用默认 `base_url` 创建临时 `WechatClient` 实例
 3. 调用微信 API：`ilink/bot/get_qrcode_status`，参数 `{"qrcode": qrcode_id}`
 4. 提取响应中的 `status` 字段
 5. 映射状态到前端：
