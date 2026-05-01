@@ -317,6 +317,27 @@ const SettingsApp: React.FC = () => {
         });
     }, [triggerAutoSave]);
 
+    // 获取 QR 码
+    const handleGetQRCode = async () => {
+        setIsLoadingQr(true);
+        setQrStatus('idle');
+        setQrString('');
+        setQrCodeId('');
+
+        try {
+            const result = await SettingsAPI.getQRCode(selectedChannel);
+            setQrString(result.qr_string);
+            setQrCodeId(result.qrcode_id);
+            setQrStatus('waiting');
+            toast.success('二维码已生成，请扫描');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : '获取二维码失败');
+            setQrStatus('idle');
+        } finally {
+            setIsLoadingQr(false);
+        }
+    };
+
     // 数据路径迁移处理
     const handleMigrateData = async (migrateData: boolean) => {
         setShowMigrateConfirm(false);
