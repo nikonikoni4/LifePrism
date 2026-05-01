@@ -38,7 +38,8 @@
 ```json
 {
   "status": "waiting" | "scanning" | "confirmed" | "expired",
-  "message": "等待扫描" | "用户正在扫描" | "登录成功" | "二维码已过期"
+  "message": "等待扫描" | "用户正在扫描" | "登录成功" | "二维码已过期",
+  "token": "xxx"  // 仅当 status 为 confirmed 时返回
 }
 ```
 
@@ -68,7 +69,7 @@ async def get_qrcode(channel: str) -> dict:
 3. 调用微信 API：`ilink/bot/get_bot_qrcode`，参数 `{"bot_type": "3"}`
 4. 提取响应中的 `qrcode_img_content`（QR 码 URL）和 `qrcode`（ID）
 5. 返回 `{"qr_string": qrcode_img_content, "qrcode_id": qrcode}`
-6. 不启动 channel，不保存状态
+6. 不启动 channel
 
 #### 2.2 查询 QR 码状态
 ```python
@@ -94,7 +95,12 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
    - 微信 API 返回 `scanning` → `"scanning"`
    - 微信 API 返回 `confirmed` → `"confirmed"`
    - 微信 API 返回 `expired` → `"expired"`
-6. 返回 `{"status": status, "message": message}`
+6. **如果状态为 `confirmed`**：
+   - 提取响应中的 `bot_token`
+   - 保存 token 到 `{lifeprism_data_path}/channel/wechat/account.json`
+   - 文件格式：`{"token": "xxx", "context_tokens": {}}`
+   - 返回 `{"status": "confirmed", "message": "登录成功", "token": token}`
+7. 其他状态返回 `{"status": status, "message": message}`
 
 ### 3. API 路由
 
@@ -125,6 +131,7 @@ class QRCodeResponse(BaseModel):
 class QRCodeStatusResponse(BaseModel):
     status: str  # waiting | scanning | confirmed | expired
     message: str
+    token: str | None = None  # 仅当 status 为 confirmed 时返回
 ```
 
 ## 二、前端设计
@@ -185,7 +192,7 @@ async getQRCode(channel: string): Promise<{ qr_string: string; qrcode_id: string
     return response.json();
 }
 
-async getQRCodeStatus(channel: string, qrcodeId: string): Promise<{ status: string; message: string }> {
+async getQRCodeStatus(channel: string, qrcodeId: string): Promise<{ status: string; message: string; token?: string }> {
     const response = await fetch(`${getApiBase()}/settings/qrcode/status?channel=${channel}&qrcode_id=${qrcodeId}`);
     if (!response.ok) throw new Error('查询状态失败');
     return response.json();
@@ -205,6 +212,7 @@ export interface QRCodeResponse {
 export interface QRCodeStatusResponse {
     status: 'waiting' | 'scanning' | 'confirmed' | 'expired';
     message: string;
+    token?: string;  // 仅当 status 为 confirmed 时返回
 }
 ```
 
@@ -249,8 +257,9 @@ expired：显示"二维码已过期"，显示"重新获取"按钮
 
 1. **不启动 channel**：获取 QR 码和查询状态都是独立的 API 调用，不涉及 channel 的启动和停止
 2. **临时客户端**：每次 API 调用创建临时 `WechatClient`，用完即销毁
-3. **无状态保存**：不保存 token 到 `account.json`，不修改 channel 状态
+3. **状态保存**：当扫码确认后（status=confirmed），保存 token 到 `{lifeprism_data_path}/channel/wechat/account.json`
 4. **前端轮询**：使用轮询而非 WebSocket，简化实现
+5. **文件路径**：使用 `settings.channel_path` 获取 channel 数据目录（`{lifeprism_data_path}/channel`）
 
 ## 六、未来扩展
 
