@@ -178,26 +178,25 @@ export const SettingsAPI = {
     },
 
     /**
-     * 获取登录二维码
+     * 获取通道 QR 码
      */
     async getQRCode(channel: string): Promise<QRCodeResponse> {
-        const response = await fetch(`${getApiBase()}/settings/${channel}/qrcode`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        });
+        const response = await fetch(`${getApiBase()}/settings/qrcode?channel=${channel}`);
         if (!response.ok) {
-            throw new Error(`获取二维码失败: ${response.statusText}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || '获取二维码失败');
         }
         return response.json();
     },
 
     /**
-     * 查询二维码扫码状态
+     * 查询 QR 码状态
      */
     async getQRCodeStatus(channel: string, qrcodeId: string): Promise<QRCodeStatusResponse> {
-        const response = await fetch(`${getApiBase()}/settings/${channel}/qrcode/${qrcodeId}/status`);
+        const response = await fetch(`${getApiBase()}/settings/qrcode/status?channel=${channel}&qrcode_id=${qrcodeId}`);
         if (!response.ok) {
-            throw new Error(`查询状态失败: ${response.statusText}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || '查询状态失败');
         }
         return response.json();
     },

@@ -85,7 +85,6 @@ export const CacheManagerComponent: React.FC = () => {
             alert('已清除所有报告缓存');
         }
     };
-    };
 
     if (!stats) {
         return <div>加载中...</div>;

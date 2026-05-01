@@ -204,28 +204,47 @@ async def migrate_data_path(request: MigrateDataPathRequest):
     return result
 
 
-@router.post("/wechat/qrcode", response_model=QRCodeResponse, summary="获取微信登录二维码")
-async def get_wechat_qrcode():
+@router.get("/qrcode", response_model=QRCodeResponse, summary="获取通道 QR 码")
+async def get_qrcode(channel: str = Query(..., description="通道类型，如 wechat")):
     """
-    获取微信登录二维码
-
-    Returns:
-        QRCodeResponse: 包含二维码字符串和 ID
-    """
-    result = await setting_service.get_wechat_qrcode()
-    return QRCodeResponse(**result)
-
-
-@router.get("/wechat/qrcode/{qrcode_id}/status", response_model=QRCodeStatusResponse, summary="查询二维码状态")
-async def get_qrcode_status(qrcode_id: str):
-    """
-    查询二维码扫码状态
+    获取指定通道的 QR 码
 
     Args:
-        qrcode_id: 二维码 ID
+        channel: 通道类型（当前仅支持 wechat）
 
     Returns:
-        QRCodeStatusResponse: 扫码状态
+        QR 码字符串和 ID
     """
-    result = await setting_service.get_qrcode_status(qrcode_id)
-    return QRCodeStatusResponse(**result)
+    try:
+        result = await setting_service.get_qrcode(channel)
+        return QRCodeResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"获取 QR 码失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取 QR 码失败: {str(e)}")
+
+
+@router.get("/qrcode/status", response_model=QRCodeStatusResponse, summary="查询 QR 码状态")
+async def get_qrcode_status(
+    channel: str = Query(..., description="通道类型"),
+    qrcode_id: str = Query(..., description="QR 码 ID")
+):
+    """
+    查询 QR 码扫描状态
+
+    Args:
+        channel: 通道类型（wechat）
+        qrcode_id: QR 码 ID
+
+    Returns:
+        扫描状态和消息
+    """
+    try:
+        result = await setting_service.get_qrcode_status(channel, qrcode_id)
+        return QRCodeStatusResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"查询 QR 码状态失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"查询状态失败: {str(e)}")
