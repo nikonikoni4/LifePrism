@@ -262,7 +262,12 @@ class WechatChannel(BaseChannel):
             logger.info(f"准备发布到 bus: id={inbound_msg.id}, content={content}")
             # 发送到 bus
             logger.info(f"发送消息")
-            response = await self.bus.send(inbound_msg)
+            response:OutboundMessage = await self.bus.send(inbound_msg)
+            if response.session_id:
+                # 使用最新的session_id继续处理
+                logger.debug(f"更新session_id{self.session_id}-> {response.session_id}")
+                self.session_id = response.session_id
+            logger.info(f"发送响应消息->wechat ")
             await self.send(response)
             
         except (KeyError, ValueError, TypeError) as e:

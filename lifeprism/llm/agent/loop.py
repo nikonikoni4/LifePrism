@@ -47,6 +47,8 @@ class AgentLoop:
             if msg.content.startswith("/new"):
                 # 新建会话
                 new_session = session_manager.get_or_create_session()
+                # 立即保存 session 到文件，避免重启后丢失
+                session_manager.save_session(new_session)
                 # 传出新的session_id , channel 下一次使用时必须使用上一次消息传出的session_id
                 response_text = f"[SUCCESS] 新建会话 {new_session.id} ---\n 可以开始新的聊天了！"
                 return OutboundMessage(
@@ -59,7 +61,14 @@ class AgentLoop:
                 # 1.去除/continue 和空格，获取session_id
                 session_id = msg.content.replace("/continue","").strip()
 
-                # 2. 检查session_id是否存在
+                # 2. 先检查是否提供了参数
+                if not session_id:
+                    return OutboundMessage(
+                        id=msg.id,
+                        response=LLMResponse(content="[ERROR] 请提供会话ID，例如：/continue <session_id>")
+                    )
+
+                # 3. 检查session_id是否存在
                 if session_id not in session_manager.show_session_list():
                     return OutboundMessage(
                         id=msg.id,
@@ -75,8 +84,6 @@ class AgentLoop:
             elif msg.content.startswith("/session-list"):
                 # 判断是否有日期
                 date = msg.content.replace("/session-list","").strip()
-                if not date:
-                    date = date.strip()
 
                 # 列出所有会话
                 sessions = session_manager.show_session_content_list(date)

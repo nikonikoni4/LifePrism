@@ -503,21 +503,36 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
         if mapped_status == "confirmed":
             bot_token = data.get("bot_token", "")
             if bot_token:
-                try:
-                    account_dir = Path(settings.channel_path) / "wechat"
-                    account_dir.mkdir(parents=True, exist_ok=True)
-                    account_file = account_dir / "account.json"
+                # 使用 WechatAuth 静态方法保存 token 到 keyring
+                from lifeprism.llm.channel.wechat.auth import WechatAuth
 
+                account_dir = Path(settings.channel_path) / "wechat"
+                account_dir.mkdir(parents=True, exist_ok=True)
+                account_file = account_dir / "account.json"
+
+                # 保存 token 到 keyring（使用静态方法）
+                if WechatAuth._save_token_to_keyring(bot_token):
+                    # 保存 context_tokens 到文件（token 已在 keyring 中）
+                    account_data = {"context_tokens": {}}
+                    with open(account_file, "w", encoding="utf-8") as f:
+                        json.dump(account_data, f, ensure_ascii=False, indent=2)
+                    logger.info(f"已保存 bot_token 到 keyring 和 context_tokens 到 {account_file}")
+                    
+                else:
+                    # keyring 不可用，fallback 到文件存储
+                    logger.warning("Keyring 不可用，使用文件存储 token")
                     account_data = {"token": bot_token, "context_tokens": {}}
                     with open(account_file, "w", encoding="utf-8") as f:
                         json.dump(account_data, f, ensure_ascii=False, indent=2)
 
-                    logger.info(f"已保存 bot_token 到 {account_file}")
-                    return {"status": mapped_status, "message": "登录成功，token 已保存"}
-                except Exception as e:
-                    logger.error(f"保存 token 失败: {e}", exc_info=True)
-                    # 不抛出异常，因为 token 已经获取成功，只是保存失败
-                    return {"status": mapped_status, "message": f"登录成功但保存 token 失败: {str(e)}"}
+                    logger.info(f"已保存 bot_token 到 {account_file}（文件模式）")
+                    
+
+                # 启动微信channel
+                from lifeprism.llm.channel import wechat_channel
+                await wechat_channel.start() # 有_runing确认启动保护，避免重复启动
+                return {"status": mapped_status, "message": "登录成功，token 已保存"}
+                
             else:
                 logger.warning("状态为 confirmed 但未获取到 bot_token")
                 return {"status": mapped_status, "message": "登录成功但未获取到 token"}

@@ -189,6 +189,13 @@ async def lifespan(app: FastAPI):
         else:
             app.state.monitor_process = None
 
+        # 启动channel
+        from lifeprism.llm.channel import wechat_channel
+        try:
+            await wechat_channel.start()
+            logger.info("微信渠道启动成功")
+        except Exception as e:
+            logger.error(f"启动微信渠道失败: {e}")
 
         _total_lifespan = (time.perf_counter() - _startup_timer) * 1000
         print(f"\n{'='*60}")
@@ -225,7 +232,9 @@ async def lifespan(app: FastAPI):
                 proc.kill()
             logger.info("监控进程已清理")
 
-
+    # 关闭wechatchannel
+    if wechat_channel._running:
+        await wechat_channel.stop()
 
     # 关闭时：取消 AgentLoop 任务
     loop_task.cancel()

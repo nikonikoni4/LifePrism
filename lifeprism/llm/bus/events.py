@@ -34,11 +34,12 @@ class InboundMessage:
         if self.channel not in CHANNEL_TYPE:
             raise ValueError(f"无效的channel: {self.channel!r}，合法值为 {CHANNEL_TYPE}")
 
-@dataclass 
+@dataclass
 class OutboundMessage:
     id : str = ''
     response : LLMResponse | None = None # 返回消息
     session_id :str | None = None # 用户当创建首次创建session时返回id，tokens_usage保存需要
+    extra : dict | None = None # 额外数据，用于传递 channel 特定信息（如 wechat_user_id）
 
 
 
