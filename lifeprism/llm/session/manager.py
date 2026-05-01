@@ -159,6 +159,62 @@ class SessionManager:
             return []
         return [f.name for f in path.glob('*.jsonl')]
 
+    @staticmethod
+    def show_session_content_list(date_filter: str | None = None, path: Path = settings.session_path) -> list[dict]:
+        """
+        返回 session 列表及其最新 user 消息预览
+
+        Args:
+            date_filter: 日期筛选，格式 'YYYY-MM-DD'，为 None 时返回所有
+            path: session 存储路径
+
+        Returns:
+            list[dict]: [{"session_id": str, "session_current_msg": str}, ...]
+        """
+        if not path.exists():
+            return []
+
+        result = []
+        for file in path.glob('*.jsonl'):
+            session_id = file.stem
+            last_user_msg = None
+            updated_at = None
+
+            try:
+                with open(file, encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        data = json.loads(line)
+                        if data.get('_type') == 'metadata':
+                            updated_at = data.get('updated_at', '')
+                        elif data.get('role') == 'user':
+                            last_user_msg = data.get('content', '')
+            except Exception as e:
+                logger.warning(f"读取 session {session_id} 失败: {e}")
+                continue
+
+            # 日期筛选
+            if date_filter and updated_at:
+                if not updated_at.startswith(date_filter):
+                    continue
+
+            # 提取前20个字符
+            msg_preview = ''
+            if last_user_msg:
+                if isinstance(last_user_msg, str):
+                    msg_preview = last_user_msg[:20]
+                elif isinstance(last_user_msg, list):
+                    msg_preview = str(last_user_msg)[:20]
+
+            result.append({
+                'session_id': session_id,
+                'session_current_msg': msg_preview
+            })
+
+        return result
+
 session_manager:SessionManager  = LazySingleton(SessionManager)
 
 
@@ -201,3 +257,5 @@ if __name__ == "__main__":
     print("[删除] 文件已删除")
 
     print("\n全部测试通过")
+
+    print(session_manager.show_session_content_list("2026-04-28"))
