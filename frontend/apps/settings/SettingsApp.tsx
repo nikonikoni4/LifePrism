@@ -1376,6 +1376,84 @@ const SettingsApp: React.FC = () => {
                 </div>
             </motion.div>
 
+            {/* 8. Remote Channel QR Code */}
+            <section className="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600">
+                        <Zap size={20} />
+                    </div>
+                    <h2 className="text-lg font-bold text-slate-800">远程通信</h2>
+                </div>
+
+                <div className="space-y-6">
+                    {/* 通道选择 */}
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">
+                            通道选择
+                        </label>
+                        <select
+                            value={selectedChannel}
+                            onChange={(e) => setSelectedChannel(e.target.value)}
+                            className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-purple-200 focus:ring-4 focus:ring-purple-50/50 rounded-xl px-4 py-3 text-slate-800 font-medium outline-none transition-all appearance-none cursor-pointer"
+                        >
+                            <option value="wechat">微信</option>
+                        </select>
+                    </div>
+
+                    {/* 获取二维码按钮 */}
+                    <div>
+                        <button
+                            onClick={handleGetQRCode}
+                            disabled={isLoadingQr}
+                            className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-bold text-sm"
+                        >
+                            {isLoadingQr ? (
+                                <span className="flex items-center gap-2">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    获取中...
+                                </span>
+                            ) : (
+                                '获取二维码'
+                            )}
+                        </button>
+                    </div>
+
+                    {/* QR 码显示区域 */}
+                    {qrString && (
+                        <div className="border border-gray-200 rounded-xl p-6 bg-gray-50">
+                            <div className="flex flex-col items-center gap-4">
+                                {/* QR 码 */}
+                                <QRCode value={qrString} size={256} />
+
+                                {/* 状态显示 */}
+                                <div className="text-center">
+                                    {qrStatus === 'waiting' && (
+                                        <p className="text-slate-600 font-medium">等待扫描...</p>
+                                    )}
+                                    {qrStatus === 'scanning' && (
+                                        <p className="text-blue-600 font-medium">正在扫描...</p>
+                                    )}
+                                    {qrStatus === 'confirmed' && (
+                                        <p className="text-green-600 font-bold">登录成功 ✓</p>
+                                    )}
+                                    {qrStatus === 'expired' && (
+                                        <div className="space-y-2">
+                                            <p className="text-red-600 font-medium">二维码已过期</p>
+                                            <button
+                                                onClick={handleGetQRCode}
+                                                className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors font-bold text-sm"
+                                            >
+                                                重新获取
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </section>
+
             {/* TODO: 暂时禁用火山引擎说明弹窗
             {showVolcEngineModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
