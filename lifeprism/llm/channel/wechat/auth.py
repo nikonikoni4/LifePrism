@@ -46,7 +46,8 @@ class WechatAuth:
         qr.print_ascii()
         logger.info("请使用微信扫描上方二维码登录")
 
-    def _load_token_from_keyring(self) -> str:
+    @staticmethod
+    def _load_token_from_keyring() -> str:
         """从 keyring 加载 token
 
         Returns:
@@ -59,7 +60,8 @@ class WechatAuth:
             logger.debug(f"从 keyring 加载 token 失败: {e}")
             return ""
 
-    def _save_token_to_keyring(self, token: str) -> bool:
+    @staticmethod
+    def _save_token_to_keyring(token: str) -> bool:
         """保存 token 到 keyring
 
         Args:
@@ -108,7 +110,6 @@ class WechatAuth:
         except (keyring.errors.KeyringError, OSError) as e:
             logger.error(f"从 keyring 删除 token 失败: {e}", exc_info=True)
             success = False
-
         # 2. 从文件删除（如果存在）
         if self.state_file.exists():
             try:
@@ -137,7 +138,7 @@ class WechatAuth:
         state = {"token": "", "context_tokens": {}}
 
         # 1. 尝试从 keyring 加载 token
-        token_from_keyring = self._load_token_from_keyring()
+        token_from_keyring = WechatAuth._load_token_from_keyring()
         if token_from_keyring:
             state["token"] = token_from_keyring
             logger.info("从 keyring 加载 token 成功")
@@ -151,7 +152,7 @@ class WechatAuth:
                 # 如果文件中有 token 但 keyring 中没有，执行迁移
                 if file_token and not token_from_keyring:
                     logger.info("检测到文件中的 token，执行自动迁移到 keyring")
-                    if self._save_token_to_keyring(file_token):
+                    if WechatAuth._save_token_to_keyring(file_token):
                         state["token"] = file_token
                         # 迁移成功后从文件中移除 token（保留 context_tokens）
                         file_state.pop("token", None)
