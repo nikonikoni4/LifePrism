@@ -80,7 +80,7 @@ class MessageQueue:
             logger.debug(f"[MessageQueue] 限速等待 {wait:.2f}s")
             await asyncio.sleep(wait)
 
-    async def send(self, msg:InboundMessage) -> str:
+    async def send(self, msg:InboundMessage) -> OutboundMessage:
         """发送消息并等待结果
         args:
             msg : InboundMessage
@@ -123,10 +123,7 @@ class MessageQueue:
             except Exception as e:
                 logger.error(f"[MessageQueue] 保存 token 使用情况失败: {e}")
 
-        response = result.response
-        if hasattr(response, 'content'):
-            return response.content
-        return str(response)
+        return result
 
     async def _receive_loop(self):
         try:

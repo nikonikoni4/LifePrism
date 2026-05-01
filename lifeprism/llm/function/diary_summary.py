@@ -11,7 +11,7 @@
 2. 前端需要增加手动更新按钮
 """
 
-from lifeprism.llm.bus import bus, MessageType, InboundMessage
+from lifeprism.llm.bus import OutboundMessage, bus, MessageType, InboundMessage
 from lifeprism.llm.providers import LLMResponse
 from lifeprism.config import settings
 from pathlib import Path
@@ -163,7 +163,8 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
         type=MessageType.GENERAL_TASK,
         extra={'system_prompt':system_prompt}
     )
-    result = await bus.send(msg) 
+    result :OutboundMessage = await bus.send(msg) 
+    result = result.response.content
 
     if result : 
         # 将ai summary写入lifeprismData\user\daily_data\behavior.md

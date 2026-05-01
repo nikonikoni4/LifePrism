@@ -1,5 +1,5 @@
 from typing import List, Optional
-from lifeprism.llm.bus import MessageType, bus, InboundMessage
+from lifeprism.llm.bus import MessageType, OutboundMessage, bus, InboundMessage
 from lifeprism.llm.providers.llm_providers.base import LLMResponse
 from lifeprism.llm.session.manager import session_manager, Session
 from lifeprism.utils import get_logger
@@ -27,8 +27,10 @@ class ChatBot:
                 extra=extra
             )
             response_data = await self._bus.send(msg)
-
+            
             # 3. 包装响应
+            if isinstance(response_data,OutboundMessage):
+                return response_data.response
             if isinstance(response_data, LLMResponse):
                 return response_data
             if isinstance(response_data, str):

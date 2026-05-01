@@ -15,7 +15,7 @@ from lifeprism.llm.utils import (
     split_by_purpose,
     split_by_duration,
 )
-from lifeprism.llm.bus import bus, InboundMessage,MessageType
+from lifeprism.llm.bus import OutboundMessage, bus, InboundMessage,MessageType
 
 MAX_LOG_ITEMS = 10
 MAX_TITLE_ITEMS = 5
@@ -80,7 +80,8 @@ class ClassifyGraph:
                     type=MessageType.CLASSIFY,
                     extra={"system_prompt": system_prompt},
                 )
-                result = await bus.send(msg)
+                result :OutboundMessage = await bus.send(msg)
+                result = result.response.content
                 if result and result.strip() and result.strip().lower() != "none":
                     app_info.description = result.strip()
                     logger.info(f"获取 {app} 描述成功: {result[:50]}")
@@ -122,7 +123,8 @@ class ClassifyGraph:
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
         )
-        raw = await bus.send(msg)
+        raw :OutboundMessage = await bus.send(msg)
+        raw = raw.response.content
         clean = extract_json_from_response(raw)
         if not clean:
             logger.error(f"single_classify 批次 {batch_num} 返回空内容，跳过")
@@ -164,7 +166,8 @@ class ClassifyGraph:
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
         )
-        raw = await bus.send(msg)
+        raw :OutboundMessage = await bus.send(msg)
+        raw = raw.response.content
         clean = extract_json_from_response(raw)
         if not clean:
             logger.error(f"multi_classify_short 批次 {batch_num} 返回空内容，跳过")
@@ -202,12 +205,12 @@ class ClassifyGraph:
         if not item.title:
             return
         try:
-            result = await bus.send(InboundMessage(
+            result :OutboundMessage = await bus.send(InboundMessage(
                 content=f"搜索并分析 {item.title}",
                 type=MessageType.CLASSIFY,
                 extra={"system_prompt": system_prompt},
             ))
-            item.title_analysis = result
+            item.title_analysis = result.response.content
         except Exception as e:
             logger.warning(f"get_titles 分析 title={item.title!r} 失败: {e}")
 
@@ -231,7 +234,8 @@ class ClassifyGraph:
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
         )
-        raw = await bus.send(msg)
+        raw :OutboundMessage = await bus.send(msg)
+        raw = raw.response.content
         clean = extract_json_from_response(raw)
         if not clean:
             logger.error(f"multi_classify_long 批次 {batch_num} 返回空内容，跳过")
