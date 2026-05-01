@@ -191,6 +191,9 @@ class MonitorRuntime:
                 remaining_enter_events.append(event_time)
         self._pending_enter_events = remaining_enter_events
 
+        if not settings.get("screenshot_monitor", False):
+            return
+
         window_context = self.window_context_source()
         input_snapshot = self.input_tracker.snapshot()
         requests = self.scheduler.evaluate(

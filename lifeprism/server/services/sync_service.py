@@ -91,7 +91,7 @@ class SyncService:
             auto_classify=auto_classify
         )
 
-        if settings.monitor_type == "lifeprism":
+        if settings.monitor_type == "lifeprism" and settings.get("screenshot_monitor", False):
             # 查询 behavior_analysis 表中最后一条记录的 end_time
             from lifeprism.repository import behavior_analysis_repository, QueryOptions
 
@@ -160,7 +160,7 @@ class SyncService:
             end_time=end_dt,
             auto_classify=auto_classify
         )
-        if settings.monitor_type == "lifeprism":
+        if settings.monitor_type == "lifeprism" and settings.get("screenshot_monitor", False):
             # time_range 格式: "2026-04-19 11:00:00 ~ 2026-04-19 11:15:00"
             time_parts = result["time_range"].split(" ~ ")
             # 后台执行截图分析，不阻塞 sync 响应
