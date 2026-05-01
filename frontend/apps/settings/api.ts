@@ -19,6 +19,8 @@ import {
     ValidatePathResponse,
     MigrateDataPathRequest,
     MigrateDataPathResponse,
+    QRCodeResponse,
+    QRCodeStatusResponse,
 } from './types';
 import { createApiV2UrlGetter } from '../../core/services/apiConfig';
 
@@ -171,6 +173,31 @@ export const SettingsAPI = {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `数据迁移失败: ${response.statusText}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * 获取微信登录二维码
+     */
+    async getWechatQRCode(): Promise<QRCodeResponse> {
+        const response = await fetch(`${getApiBase()}/settings/wechat/qrcode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) {
+            throw new Error(`获取二维码失败: ${response.statusText}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * 查询二维码扫码状态
+     */
+    async getQRCodeStatus(qrcodeId: string): Promise<QRCodeStatusResponse> {
+        const response = await fetch(`${getApiBase()}/settings/wechat/qrcode/${qrcodeId}/status`);
+        if (!response.ok) {
+            throw new Error(`查询状态失败: ${response.statusText}`);
         }
         return response.json();
     },
