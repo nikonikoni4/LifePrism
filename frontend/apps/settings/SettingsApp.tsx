@@ -23,7 +23,8 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { SettingsAPI } from './api';
-import type { ProviderInfo, ProviderModelHistory, SettingsResponse } from './types';
+import type { ProviderInfo, ProviderModelHistory, SettingsResponse, QRCodeResponse, QRCodeStatusResponse } from './types';
+import QRCode from 'qrcode.react';
 import { toast } from '../../core/components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CategoryAPI } from '../lifewatch/pages/category/api';
@@ -93,6 +94,13 @@ const SettingsApp: React.FC = () => {
 
     // 8. Modal States
     const [showVolcEngineModal, setShowVolcEngineModal] = useState(false);
+
+    // 9. Remote Channel QR Code
+    const [selectedChannel, setSelectedChannel] = useState('wechat');
+    const [qrString, setQrString] = useState('');
+    const [qrCodeId, setQrCodeId] = useState('');
+    const [qrStatus, setQrStatus] = useState<'idle' | 'waiting' | 'scanning' | 'confirmed' | 'expired'>('idle');
+    const [isLoadingQr, setIsLoadingQr] = useState(false);
 
     // Refs
     const modelDropdownRef = useRef<HTMLDivElement>(null);
