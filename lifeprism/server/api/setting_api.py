@@ -18,6 +18,8 @@ from lifeprism.server.schemas.setting_schemas import (
     MigrateDataPathRequest,
     MigrateDataPathResponse,
     TestVlmResponse,
+    QRCodeResponse,
+    QRCodeStatusResponse,
 )
 from lifeprism.server.services import setting_service
 from lifeprism.config.provider_manager import provider_manager
@@ -200,3 +202,30 @@ async def migrate_data_path(request: MigrateDataPathRequest):
     if not result.success:
         raise HTTPException(status_code=400, detail=result.message)
     return result
+
+
+@router.post("/wechat/qrcode", response_model=QRCodeResponse, summary="获取微信登录二维码")
+async def get_wechat_qrcode():
+    """
+    获取微信登录二维码
+
+    Returns:
+        QRCodeResponse: 包含二维码字符串和 ID
+    """
+    result = await setting_service.get_wechat_qrcode()
+    return QRCodeResponse(**result)
+
+
+@router.get("/wechat/qrcode/{qrcode_id}/status", response_model=QRCodeStatusResponse, summary="查询二维码状态")
+async def get_qrcode_status(qrcode_id: str):
+    """
+    查询二维码扫码状态
+
+    Args:
+        qrcode_id: 二维码 ID
+
+    Returns:
+        QRCodeStatusResponse: 扫码状态
+    """
+    result = await setting_service.get_qrcode_status(qrcode_id)
+    return QRCodeStatusResponse(**result)
