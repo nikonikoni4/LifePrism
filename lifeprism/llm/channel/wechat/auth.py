@@ -5,12 +5,14 @@
 
 import json
 import asyncio
+import httpx
 import qrcode
 import keyring
 from pathlib import Path
 from typing import Any
 from lifeprism.utils.logger import get_logger
 from lifeprism.llm.channel.wechat.client import WechatClient
+from lifeprism.llm.channel.wechat.exceptions import WechatAuthError
 
 logger = get_logger(__name__)
 
@@ -269,6 +271,9 @@ class WechatAuth:
                     logger.info("用户正在扫描二维码")
 
                 await asyncio.sleep(1)
-        except Exception as e:
-            logger.error(f"登录失败: {e}", exc_info=True)
-            return False
+        except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
+            logger.error(f"登录网络错误: {e}", exc_info=True)
+            raise WechatAuthError(f"登录失败: {e}") from e
+        except (KeyError, ValueError) as e:
+            logger.error(f"登录响应解析错误: {e}", exc_info=True)
+            raise WechatAuthError(f"登录响应格式错误: {e}") from e

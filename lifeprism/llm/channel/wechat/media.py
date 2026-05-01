@@ -3,12 +3,14 @@
 """
 
 import base64
+import httpx
 import uuid
 from pathlib import Path
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from lifeprism.utils.logger import get_logger
 from lifeprism.llm.channel.wechat.client import WechatClient
+from lifeprism.llm.channel.wechat.exceptions import WechatMediaError
 
 logger = get_logger(__name__)
 
@@ -101,6 +103,12 @@ class WechatMedia:
 
             logger.info(f"媒体文件已保存: {file_path}, 类型: {media_type}, 大小: {len(data)} bytes")
             return str(file_path)
-        except Exception as e:
-            logger.error(f"下载媒体失败: {e}, 类型: {media_type}", exc_info=True)
-            return None
+        except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
+            logger.error(f"下载媒体网络错误: {e}, 类型: {media_type}", exc_info=True)
+            raise WechatMediaError(f"媒体下载失败: {e}") from e
+        except (KeyError, ValueError) as e:
+            logger.error(f"媒体数据解析错误: {e}, 类型: {media_type}", exc_info=True)
+            raise WechatMediaError(f"媒体数据格式错误: {e}") from e
+        except OSError as e:
+            logger.error(f"媒体文件保存错误: {e}, 类型: {media_type}", exc_info=True)
+            raise WechatMediaError(f"媒体文件保存失败: {e}") from e

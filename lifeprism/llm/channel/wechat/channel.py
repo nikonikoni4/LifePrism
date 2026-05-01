@@ -3,6 +3,7 @@
 """
 
 import asyncio
+import httpx
 from typing import Any
 from pathlib import Path
 from lifeprism.llm.channel.base import BaseChannel
@@ -10,6 +11,7 @@ from lifeprism.llm.channel.wechat.config import WechatConfig
 from lifeprism.llm.channel.wechat.client import WechatClient
 from lifeprism.llm.channel.wechat.auth import WechatAuth
 from lifeprism.llm.channel.wechat.media import WechatMedia
+from lifeprism.llm.channel.wechat.exceptions import WechatAPIError, WechatMessageError
 from lifeprism.llm.bus.queue import MessageQueue
 from lifeprism.llm.bus.events import OutboundMessage
 from lifeprism.config.settings_manager import settings
@@ -90,19 +92,20 @@ class WechatChannel(BaseChannel):
             self.client.token = token
             logger.info("使用已保存的 token")
         else:
-            # QR 登录
-            success = await self.auth.qr_login()
-            if not success:
-                logger.error("登录失败")
-                self._running = False
-                return
-
+            # # QR 登录
+            # success = await self.auth.qr_login()
+            # if not success:
+            #     logger.error("登录失败")
+            #     self._running = False
+            #     return
+            # 不存在token放弃启动
+            return 
         # 测试 token 是否有效
         try:
             test_body = {"get_updates_buf": ""}
             test_data = await self.client.api_post("ilink/bot/getupdates", test_body)
             logger.info(f"[DEBUG] Token 测试成功，返回数据: {test_data}")
-        except Exception as e:
+        except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
             logger.error(f"[DEBUG] Token 测试失败: {e}", exc_info=True)
 
         # 初始化媒体处理
@@ -161,14 +164,15 @@ class WechatChannel(BaseChannel):
             message_body = WechatMessage.build_text_message(to_user_id, content, context_token)
             await self.client.api_post("ilink/bot/sendmessage", message_body)
             logger.info(f"发送消息到微信: {to_user_id}")
-        except Exception as e:
+        except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
             logger.error(f"发送消息失败，目标用户: {to_user_id}, 错误: {e}", exc_info=True)
+            raise WechatAPIError(f"发送消息失败: {e}") from e
 
     async def _poll_loop(self) -> None:
         """消息轮询循环
 
         持续轮询微信服务器获取新消息，处理接收到的消息并发送到消息总线。
-        发生错误时会记录日志并等待 5 秒后重试，确保轮询持续运行。
+        发生网络或 API 错误时会记录日志并等待 5 秒后重试，确保轮询持续运行。
         """
         logger.info("[DEBUG] 轮询循环已启动")
         get_updates_buf = ""
@@ -195,8 +199,11 @@ class WechatChannel(BaseChannel):
                         logger.info(f"[DEBUG] 消息 {idx+1}: {msg}")
                         await self._handle_wechat_message(msg)
 
-            except Exception as e:
-                logger.error(f"长轮询错误: {e}", exc_info=True)
+            except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
+                logger.error(f"长轮询网络错误: {e}", exc_info=True)
+                await asyncio.sleep(5)
+            except (KeyError, ValueError) as e:
+                logger.error(f"长轮询数据解析错误: {e}", exc_info=True)
                 await asyncio.sleep(5)
 
     async def _handle_wechat_message(self, msg: dict[str, Any]) -> None:
@@ -256,5 +263,9 @@ class WechatChannel(BaseChannel):
             # 发送到 bus
             await self.bus.publish_inbound(inbound_msg)
             logger.info(f"[DEBUG] 已发布到 bus，接收到微信消息: {from_user_id}")
-        except Exception as e:
-            logger.error(f"处理微信消息失败: {e}", exc_info=True)
+        except (KeyError, ValueError, TypeError) as e:
+            logger.error(f"消息解析错误: {e}", exc_info=True)
+            raise WechatMessageError(f"消息解析失败: {e}") from e
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(f"媒体下载错误: {e}", exc_info=True)
+            raise WechatMessageError(f"媒体下载失败: {e}") from e

@@ -91,9 +91,10 @@ def generate_id(prefix: str) -> str:
 
 ## 5. 错误处理分层
 
-### repository 层（数据访问层）
+### 外部接口层（数据访问层）
 - 范围：repository，llm，processor，monitor等大部分外部接口
 - 捕获外部异常，转换为业务异常并抛出，必须明确"转换后抛出"，不能返回默认值
+- 不能使用`except Exception as e` 捕获全部错误，避免包含可能都编程错误
 
 ### Service 层（业务逻辑层）
 - 范围：server/service
