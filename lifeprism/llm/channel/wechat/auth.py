@@ -83,6 +83,40 @@ class WechatAuth:
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2))
 
+    def delete_token(self) -> bool:
+        """删除保存的 token
+
+        同时清理 keyring 和文件中的 token。
+
+        Returns:
+            是否成功
+        """
+        success = True
+
+        # 1. 从 keyring 删除
+        try:
+            keyring.delete_password(KEYRING_SERVICE_NAME, KEYRING_WECHAT_TOKEN_USERNAME)
+            logger.info("已从 keyring 删除 token")
+        except keyring.errors.PasswordDeleteError:
+            logger.debug("Keyring 中没有 token")
+        except Exception as e:
+            logger.error(f"从 keyring 删除 token 失败: {e}", exc_info=True)
+            success = False
+
+        # 2. 从文件删除（如果存在）
+        if self.state_file.exists():
+            try:
+                file_state = json.loads(self.state_file.read_text())
+                if "token" in file_state:
+                    file_state.pop("token")
+                    self._save_state_to_file(file_state)
+                    logger.info("已从文件删除 token")
+            except Exception as e:
+                logger.error(f"从文件删除 token 失败: {e}", exc_info=True)
+                success = False
+
+        return success
+
     def load_state(self) -> dict[str, Any]:
         """加载保存的状态
 
@@ -106,9 +140,9 @@ class WechatAuth:
         if self.state_file.exists():
             try:
                 file_state = json.loads(self.state_file.read_text())
+                file_token = file_state.get("token", "")
 
                 # 如果文件中有 token 但 keyring 中没有，执行迁移
-                file_token = file_state.get("token", "")
                 if file_token and not token_from_keyring:
                     logger.info("检测到文件中的 token，执行自动迁移到 keyring")
                     if self._save_token_to_keyring(file_token):
@@ -121,10 +155,28 @@ class WechatAuth:
                         # keyring 不可用，fallback 到文件
                         logger.warning("Keyring 不可用，继续使用文件存储")
                         state["token"] = file_token
+                elif file_token and token_from_keyring:
+                    # 迁移已完成但文件清理失败的情况，重试清理
+                    logger.info("检测到 keyring 和文件中都有 token，清理文件中的旧 token")
+                    file_state.pop("token", None)
+                    try:
+                        self._save_state_to_file(file_state)
+                        logger.info("文件中的旧 token 已清理")
+                    except Exception as e:
+                        logger.warning(f"清理文件中的旧 token 失败: {e}")
 
                 # 加载 context_tokens（始终从文件读取）
                 state["context_tokens"] = file_state.get("context_tokens", {})
 
+            except json.JSONDecodeError as e:
+                logger.error(f"状态文件格式错误: {e}", exc_info=True)
+                # 尝试备份损坏的文件
+                try:
+                    backup_path = self.state_file.with_suffix('.json.backup')
+                    self.state_file.rename(backup_path)
+                    logger.info(f"已备份损坏的状态文件到: {backup_path}")
+                except Exception:
+                    pass
             except Exception as e:
                 logger.error(f"加载状态文件失败: {e}", exc_info=True)
 
@@ -139,11 +191,14 @@ class WechatAuth:
 
         Args:
             state: 要保存的状态字典
+
+        Raises:
+            Exception: 保存失败时抛出异常
         """
         try:
             # 1. 保存 token 到 keyring
             token = state.get("token", "")
-            if token:
+            if token and token.strip():  # 确保非空且非空白
                 if not self._save_token_to_keyring(token):
                     logger.warning("Keyring 保存失败，fallback 到文件存储")
                     # Fallback: 保存到文件
@@ -158,6 +213,7 @@ class WechatAuth:
 
         except Exception as e:
             logger.error(f"保存状态失败: {e}", exc_info=True)
+            raise  # 让调用者处理失败
 
     async def qr_login(self, timeout: int = 300) -> bool:
         """QR 码登录流程
@@ -199,9 +255,13 @@ class WechatAuth:
                         self.client.token = token
                         state = self.load_state()
                         state["token"] = token
-                        self.save_state(state)
-                        logger.info("登录成功")
-                        return True
+                        try:
+                            self.save_state(state)
+                            logger.info("登录成功")
+                            return True
+                        except Exception as e:
+                            logger.error(f"保存登录状态失败: {e}")
+                            return False
                 elif status == "expired":
                     logger.error("QR 码已过期")
                     return False
