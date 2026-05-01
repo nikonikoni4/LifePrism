@@ -1,3 +1,8 @@
+"""微信 Channel 配置模块
+本文件源自 https://github.com/HKUDS/nanobot.git，经 AI 改写适配 lifeprism 项目。
+定义微信平台的配置数据类，包含 API 地址、轮询参数等配置项。
+"""
+
 from dataclasses import dataclass, field
 
 

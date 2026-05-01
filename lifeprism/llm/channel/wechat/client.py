@@ -1,4 +1,6 @@
-"""微信 API HTTP 客户端模块"""
+"""微信 API HTTP 客户端模块
+本文件源自 https://github.com/HKUDS/nanobot.git，经 AI 改写适配 lifeprism 项目。
+"""
 
 import base64
 import os

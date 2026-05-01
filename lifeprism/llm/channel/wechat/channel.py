@@ -1,4 +1,6 @@
-"""微信 Channel 主类模块"""
+"""微信 Channel 主类模块
+本文件源自 https://github.com/HKUDS/nanobot.git，经 AI 改写适配 lifeprism 项目。
+"""
 
 import asyncio
 from typing import Any

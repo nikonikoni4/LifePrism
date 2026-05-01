@@ -1,3 +1,8 @@
+"""微信认证模块
+本文件源自 https://github.com/HKUDS/nanobot.git，经 AI 改写适配 lifeprism 项目。
+提供二维码登录和状态持久化功能，支持 token 管理。
+"""
+
 import json
 import asyncio
 import qrcode

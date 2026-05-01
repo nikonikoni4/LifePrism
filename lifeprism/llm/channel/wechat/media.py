@@ -1,4 +1,6 @@
-"""微信媒体处理模块"""
+"""微信媒体处理模块
+本文件源自 https://github.com/HKUDS/nanobot.git，经 AI 改写适配 lifeprism 项目。
+"""
 
 import base64
 import uuid
