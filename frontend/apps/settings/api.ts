@@ -178,10 +178,10 @@ export const SettingsAPI = {
     },
 
     /**
-     * 获取微信登录二维码
+     * 获取登录二维码
      */
-    async getWechatQRCode(): Promise<QRCodeResponse> {
-        const response = await fetch(`${getApiBase()}/settings/wechat/qrcode`, {
+    async getQRCode(channel: string): Promise<QRCodeResponse> {
+        const response = await fetch(`${getApiBase()}/settings/${channel}/qrcode`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         });
@@ -194,8 +194,8 @@ export const SettingsAPI = {
     /**
      * 查询二维码扫码状态
      */
-    async getQRCodeStatus(qrcodeId: string): Promise<QRCodeStatusResponse> {
-        const response = await fetch(`${getApiBase()}/settings/wechat/qrcode/${qrcodeId}/status`);
+    async getQRCodeStatus(channel: string, qrcodeId: string): Promise<QRCodeStatusResponse> {
+        const response = await fetch(`${getApiBase()}/settings/${channel}/qrcode/${qrcodeId}/status`);
         if (!response.ok) {
             throw new Error(`查询状态失败: ${response.statusText}`);
         }
