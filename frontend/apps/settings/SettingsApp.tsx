@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { SettingsAPI } from './api';
 import type { ProviderInfo, ProviderModelHistory, SettingsResponse, QRCodeResponse, QRCodeStatusResponse } from './types';
-import { QRCode } from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import { toast } from '../../core/components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CategoryAPI } from '../lifewatch/pages/category/api';
@@ -1423,7 +1423,7 @@ const SettingsApp: React.FC = () => {
                         <div className="border border-gray-200 rounded-xl p-6 bg-gray-50">
                             <div className="flex flex-col items-center gap-4">
                                 {/* QR 码 */}
-                                <QRCode value={qrString} size={256} />
+                                <QRCodeSVG value={qrString} size={256} />
 
                                 {/* 状态显示 */}
                                 <div className="text-center">
