@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { SettingsAPI } from './api';
 import type { ProviderInfo, ProviderModelHistory, SettingsResponse, QRCodeResponse, QRCodeStatusResponse } from './types';
-import QRCode from 'qrcode.react';
+import { QRCode } from 'qrcode.react';
 import { toast } from '../../core/components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CategoryAPI } from '../lifewatch/pages/category/api';
