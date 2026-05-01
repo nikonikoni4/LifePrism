@@ -225,6 +225,47 @@ const SettingsApp: React.FC = () => {
         }
     }, [provider, modelName, isVlmConfig, providerIdMap]);
 
+    // 轮询 QR 码状态
+    useEffect(() => {
+        if (!qrCodeId || qrStatus === 'idle' || qrStatus === 'confirmed' || qrStatus === 'expired') {
+            return;
+        }
+
+        const startTime = Date.now();
+        const TIMEOUT = 5 * 60 * 1000; // 5 分钟
+        const INTERVAL = 2000; // 2 秒
+
+        const pollStatus = async () => {
+            try {
+                const result = await SettingsAPI.getQRCodeStatus(selectedChannel, qrCodeId);
+                setQrStatus(result.status as any);
+
+                if (result.status === 'confirmed') {
+                    toast.success('登录成功！');
+                } else if (result.status === 'expired') {
+                    toast.error('二维码已过期');
+                }
+            } catch (error) {
+                console.error('查询状态失败:', error);
+            }
+        };
+
+        const intervalId = setInterval(() => {
+            if (Date.now() - startTime > TIMEOUT) {
+                clearInterval(intervalId);
+                setQrStatus('expired');
+                toast.error('请求超时，请重试');
+                return;
+            }
+            pollStatus();
+        }, INTERVAL);
+
+        // 立即执行一次
+        pollStatus();
+
+        return () => clearInterval(intervalId);
+    }, [qrCodeId, qrStatus, selectedChannel]);
+
     // 触发自动保存（收集当前所有设置）
     const triggerAutoSave = useCallback((overrides: Record<string, unknown> = {}) => {
         const currentSettings = {
