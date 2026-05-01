@@ -95,7 +95,7 @@ class WechatChannel(BaseChannel):
             for user_id, context_token in old_context_tokens.items():
                 self._user_data[user_id] = {
                     "context_token": context_token,
-                    "last_session_id": ""  # 旧数据没有 session_id
+                    # 旧数据没有 session_id，使用 None 而不是空字符串
                 }
             logger.info(f"已迁移 {len(old_context_tokens)} 个用户的数据")
 
@@ -283,7 +283,8 @@ class WechatChannel(BaseChannel):
                     media_paths.append(path)
 
             # 从用户数据中读取 session_id（可能是 None，让 AgentLoop 处理）
-            session_id = self._user_data.get(wechat_user_id, {}).get("last_session_id")
+            # 使用 or None 确保空字符串被规范化为 None
+            session_id = self._user_data.get(wechat_user_id, {}).get("last_session_id") or None
 
             # 构造 InboundMessage
             inbound_msg = InboundMessage(
