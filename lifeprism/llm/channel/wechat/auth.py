@@ -133,9 +133,9 @@ class WechatAuth:
         3. 空状态
 
         Returns:
-            状态字典，包含 token 和 context_tokens
+            状态字典，包含 token 和 user_data（新格式）或 context_tokens（旧格式，兼容）
         """
-        state = {"token": "", "context_tokens": {}}
+        state = {"token": "", "user_data": {}}
 
         # 1. 尝试从 keyring 加载 token
         token_from_keyring = WechatAuth._load_token_from_keyring()
@@ -172,8 +172,32 @@ class WechatAuth:
                     except (OSError, TypeError) as e:
                         logger.warning(f"清理文件中的旧 token 失败: {e}")
 
-                # 加载 context_tokens（始终从文件读取）
-                state["context_tokens"] = file_state.get("context_tokens", {})
+                # 加载用户数据（支持新旧格式）
+                # 新格式：user_data = {user_id: {"context_token": "xxx", "last_session_id": "xxx"}}
+                # 旧格式：context_tokens = {user_id: "context_token_string"}
+                if "user_data" in file_state:
+                    # 新格式，直接加载
+                    state["user_data"] = file_state.get("user_data", {})
+                elif "context_tokens" in file_state:
+                    # 旧格式，自动迁移到新格式
+                    logger.info("检测到旧格式 context_tokens，自动迁移到 user_data")
+                    old_context_tokens = file_state.get("context_tokens", {})
+                    state["user_data"] = {}
+                    for user_id, context_token in old_context_tokens.items():
+                        state["user_data"][user_id] = {
+                            "context_token": context_token,
+                            # 旧数据没有 session_id，不设置该字段
+                        }
+                    # 迁移后保存新格式（异步保存，避免阻塞）
+                    try:
+                        new_file_state = {"user_data": state["user_data"]}
+                        self._save_state_to_file(new_file_state)
+                        logger.info("已将旧格式迁移并保存为新格式")
+                    except (OSError, TypeError) as e:
+                        logger.warning(f"迁移后保存失败: {e}")
+                else:
+                    # 空数据
+                    state["user_data"] = {}
 
             except json.JSONDecodeError as e:
                 logger.error(f"状态文件格式错误: {e}", exc_info=True)
@@ -194,10 +218,11 @@ class WechatAuth:
 
         策略：
         - token: 优先保存到 keyring，失败则 fallback 到文件
-        - context_tokens: 保存到文件（动态会话数据）
+        - user_data: 保存到文件（包含 context_token 和 last_session_id）
 
         Args:
-            state: 要保存的状态字典
+            state: 要保存的状态字典，格式：
+                   {"token": "xxx", "user_data": {user_id: {"context_token": "xxx", "last_session_id": "xxx"}}}
 
         Raises:
             OSError: 文件操作失败
@@ -212,9 +237,9 @@ class WechatAuth:
                 self._save_state_to_file(state)
                 return
 
-        # 2. 保存 context_tokens 到文件（不包含 token）
+        # 2. 保存 user_data 到文件（不包含 token）
         file_state = {
-            "context_tokens": state.get("context_tokens", {})
+            "user_data": state.get("user_data", {})
         }
         self._save_state_to_file(file_state)
 
