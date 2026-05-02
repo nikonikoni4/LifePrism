@@ -143,8 +143,16 @@ class SkillLoad:
         
 
     def get_skills_list(self) ->list[str]:
-        """ 获取所有skills list ,返回skill名称列表"""
-        # 获取数据目录skill下的所有skill
+        """
+        获取所有skills list ,返回skill名称列表
+
+        Returns:
+            list[str]: skill名称列表，如果目录不存在则返回空列表
+        """
+        if not self.skill_path.exists():
+            logger.warning(f"skills目录不存在: {self.skill_path}, 已创建")
+            self.skill_path.mkdir(parents=True, exist_ok=True)
+            return []
         return  [f.name for f in self.skill_path.iterdir() if f.is_dir()]
 
 if __name__ == "__main__":
