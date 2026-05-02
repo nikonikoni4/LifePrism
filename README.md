@@ -1,62 +1,54 @@
-# LifePrism
+# LifePrism 
 
-LifePrism是一个专注于个人数据收集，目标管理，习惯养成，心理成长与个人记忆的综合性个人成长平台！
+LifePrism：您的数据驱动成长伴侣。​ 一站式记录您的外在行为与内在感受，通过目标管理、深度自我剖析（行为模式、矛盾与关系分析），将数据转化为清晰的自我认知与持续的行动指南。
 
-## 快速开始
-
-### 前置条件
-
-1. 安装 [activityWatch](https://github.com/ActivityWatch/activitywatch)
-2. 下载lifeprism
-
-### 系统设定
+## 功能
 
 
+### lifewatch
 
-## feature
+<details>
+<summary>📷 点击展开查看截图</summary>
 
-LifePrism包含：
+![首页](assets/首页1.png)
 
-- LifeWatch: AI驱动的个人时间管理与分析平台，分析电脑等运行数据，可自动分类，可视化展示每天所做内容，提供可视化数据报告，以及AI总结报告。
-- GoalMaster : 个人目标管理平台，提供清晰的从目标价值确认->目标创建->目标规划->任务安排->每日todo执行的链路。
-- Habits: 个人习惯追踪平台（开发中），以**“习惯堆积”**为基础，衍生出**习惯锚点**概念，以新习惯的养成应该以已有习惯为锚点为核心理念出发的个人习惯平台。
-- Mind Sapce: 个人心理空间平台（开发中），以ACT接纳承诺治疗法为核心的个人心理空间，包括心情记录（参考iphone的心情记录，可对比心情低落时前后的各种数据），日记等基础记录功能，提供自我解构，自我价值发现，认知/情绪解离等工具。
-- My Memories：个人记忆平台（开发中），旨在打造第二自我或数字自我，以数字自我为镜，反向激励个人成长！
-- Add-on : 额外插件内容（开发中）：
-  - 规划中的插件
-    - What am I doing 插件（开发中）: 一个桌面浮窗工具，以git worktree为设计理念。GoalMaster的todo list的扩展，可依据当前的计划和todo list 指导自己当下每一分钟的工作。尤其是在当下ai普及的时代，多窗口AI调度十分消耗精力，需要一个工具帮助我们抽离具体行为，让我们知道自己当下的任务是什么！同时，在使用过程中的数据可以同步到LifeWatch的时间轴中显示，提供更加具体的数据，让我们更加了解在什么时间，做了什么事情！
-    - lifeprism skill （开发中）：支持Ai coding工具帮助我们制定目标，计划，每日todolist设定等功能。
+![时间线1](assets/timeline1.png)
 
-## 开发进度
+![时间线2](assets/timeline2.png)
 
-> 最后更新：2026-02-08
+![分类](assets/分类.png)
 
-| 模块 | 进度 | 状态 | 说明 |
-|------|------|------|------|
-| **LifeWatch** | 基本完成| ✅ 可用 | 核心功能完整：ActivityWatch 数据采集、LLM 自动分类、时间轴、可视化报告、AI 总结、聊天机器人 |
-| **GoalMaster** | 基本完成 | ✅ 可用 | 功能完整：目标管理、计划书(PlanDoc)编辑、任务池、每日 Todo、日历视图、里程碑追踪 |
-| **Settings** | 基本完成 | ✅ 可用 | 配置管理完整：API 设置、分类设置、数据路径管理与迁移 |
-| **Mind Space** | 部分完成 | 🚧 开发中 | 部分前端实现，后端未实现 |
-| **Habits** | 部分完成 | 🚧 开发中 | 前端 UI 基本完成（待重构）；后端未实现，当前使用 Mock 数据 |
-| **Add-ons** | ░░░░░░░░░░ 5% | 📋 规划中 | 仅占位页面 |
-| **My Memories** | ░░░░░░░░░░ 0% | 📋 规划中 | 尚未开始开发 |
+![报告界面](assets/报告界面.png)
+</details>
 
-## Philosophy
+### goalmaster | habit
 
-### 为什么要做LifePrism?
+<details>
+<summary>📷 点击展开查看截图</summary>
 
-了解自己也总是困难的，LifePrism旨在将外显行为（个人活动: 设备使用数据，每天所完成的todo等）与内显行为（心理活动：心情记录，日记，价值等）结合在一起，而不是孤立的看待，让我们更加了解我们的内心活动，了解为什么我们会做出各种各样的事情，我们究竟被什么东西困住（钩住）而做出于我们价值截然相反的行为？
+![目标管理](assets/目标管理.gif)
 
-实现：觉察（了解自己，觉察当下）->接纳（接纳自己的不完满，才能立足当下）->价值与承诺（承诺做出符合我们价值的行为）的闭环
+![习惯界面](assets/习惯界面.png)
+</details>
 
+### mind space
 
-## 鸣谢
+<details>
+<summary>📷 点击展开查看截图</summary>
 
-感谢以下开源项目为 LifePrism 提供的灵感与支持：
+![mind space界面](assets/mind space界面.png)
 
-- [ActivityWatch](https://github.com/ActivityWatch/activitywatch) - 核心数据采集与追踪支持。
+![心情界面](assets/心情界面.png)
 
+![日记界面](assets/日记界面.png)
+</details>
 
+### 拓展内容
 
+<details>
+<summary>📷 点击展开查看截图</summary>
 
+![What am i doing 窗口介绍](assets/waid窗口介绍.gif)
+</details>
+  
 
