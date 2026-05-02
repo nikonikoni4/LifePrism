@@ -168,13 +168,20 @@ MessageQueue.send(InboundMessage)
 ### 6. 消息发送流程
 
 ```
-
+1. AgentLoop 处理消息
+   ↓ 
+2. 返回给 MessageQueue.send
+   ↓ 
+3. session_id更新（来自OutboundMessage.session_id）
+   ↓
+4. 状态持久化（结构为 {"token":token,"wechat_user_id": {"last_session_id": session_id,"context_token": context_token}}）
 ```
 
 ### 7. session_id
 
 1. WechatChannel.session_id 被初始化为None，默认首次信息是一个新的会话（系统启动以来）
 2. 后续对话：WechatChannel.session_id = outbound_msg.session_id，内部会自动处理会话保持
+3. 每次处理消息都会保存当前会话的last_session_id和context_token，用于后续继续对话
 
 
 ### 7. WeChat 内部实现简述
