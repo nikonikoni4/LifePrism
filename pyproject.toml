@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lifeprism"
-version = "0.1.0"
+version = "0.1.2"
 description = "AI-powered software monitoring and classification system"
 requires-python = ">=3.8"
 

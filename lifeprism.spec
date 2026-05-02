@@ -80,6 +80,27 @@ a = Analysis(
         'litellm.litellm_core_utils.tokenizers',
         'litellm.litellm_core_utils.get_model_cost_map',
 
+        # Wechat Channel 相关
+        'httpx',
+        'httpx._client',
+        'httpx._config',
+        'httpx._models',
+        'httpx._transports',
+        'httpx._transports.default',
+        'qrcode',
+        'qrcode.image',
+        'qrcode.image.pure',
+        'keyring',
+        'keyring.backends',
+        'keyring.backends.Windows',
+        'cryptography',
+        'cryptography.hazmat',
+        'cryptography.hazmat.primitives',
+        'cryptography.hazmat.primitives.ciphers',
+        'cryptography.hazmat.primitives.ciphers.algorithms',
+        'cryptography.hazmat.primitives.ciphers.modes',
+        'cryptography.hazmat.backends',
+
         # 其他可能需要的模块
         'multipart',
         'python_multipart',

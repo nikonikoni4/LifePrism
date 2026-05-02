@@ -1238,7 +1238,7 @@ const SettingsApp: React.FC = () => {
                                 <div className="flex-1">
                                     <div className="text-sm font-bold text-slate-700">低频(L1) - 节省存储和tokens使用</div>
                                     <div className="text-xs text-slate-400 mt-1">
-                                        测试数据：高活跃度5.5小时，约70张截图，tokens约11万
+                                        测试数据：高活跃度8.5小时，约123张截图，tokens约23万
                                     </div>
                                 </div>
                             </label>
@@ -1260,7 +1260,7 @@ const SettingsApp: React.FC = () => {
                                 <div className="flex-1">
                                     <div className="text-sm font-bold text-slate-700">中频(L2) - 推荐，平衡语义质量、存储和tokens使用</div>
                                     <div className="text-xs text-slate-400 mt-1">
-                                        测试数据：高活跃度5.5小时，约95张截图，tokens约15万
+                                        测试数据：高活跃度8.5小时，约185张截图，tokens约34万
                                     </div>
                                 </div>
                             </label>
@@ -1282,7 +1282,7 @@ const SettingsApp: React.FC = () => {
                                 <div className="flex-1">
                                     <div className="text-sm font-bold text-slate-700">高频(L3) - 高精度，适合需要详细记录的场景</div>
                                     <div className="text-xs text-slate-400 mt-1">
-                                        测试数据：高活跃度5.5小时，约200张截图，tokens约32万
+                                        测试数据：高活跃度8.5小时，约278张截图，tokens约51万
                                     </div>
                                 </div>
                             </label>

@@ -34,7 +34,6 @@ localData/
 遗留docs
 tests
 docs copy
-skills
 .superpowers
 .agents
 claude_task_manager.py
