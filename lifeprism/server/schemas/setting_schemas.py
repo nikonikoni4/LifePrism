@@ -5,7 +5,7 @@ Setting 界面的 schemas
 """
 
 from pydantic import BaseModel, Field
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 
 class ProviderModelHistory(BaseModel):
@@ -144,3 +144,15 @@ class TestVlmResponse(BaseModel):
     is_vlm: bool = Field(description="测试结果，该模型是否具备 VLM 能力")
     model_response: Optional[str] = Field(default=None, description="模型回复内容")
     cache_updated: bool = Field(default=False, description="缓存是否已更新")
+
+
+class QRCodeResponse(BaseModel):
+    """QR 码响应"""
+    qr_string: str = Field(description="QR 码字符串内容")
+    qrcode_id: str = Field(description="QR 码唯一标识符")
+
+
+class QRCodeStatusResponse(BaseModel):
+    """QR 码状态响应"""
+    status: Literal["waiting", "scanning", "confirmed", "expired"] = Field(description="QR 码状态")
+    message: str = Field(description="状态描述信息")

@@ -135,3 +135,15 @@ export interface MigrateDataPathResponse {
     message: string;
     new_path: string | null;
 }
+
+/** QR 码响应 */
+export interface QRCodeResponse {
+    qr_string: string;
+    qrcode_id: string;
+}
+
+/** QR 码状态响应 */
+export interface QRCodeStatusResponse {
+    status: 'waiting' | 'scanning' | 'confirmed' | 'expired';
+    message: string;
+}

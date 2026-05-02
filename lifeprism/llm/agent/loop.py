@@ -3,7 +3,14 @@ from typing import Any
 from lifeprism.llm.providers import LLMResponse, create_llm_client,ToolCallRequest
 from lifeprism.llm.session import Session,session_manager
 import asyncio
-from lifeprism.llm.bus import InboundMessage,OutboundMessage,bus,MessageType, MessageQueue
+from lifeprism.llm.bus import (
+    InboundMessage,
+    OutboundMessage,
+    bus,
+    MessageType, 
+    MessageQueue,
+    ChannelType,
+)
 from lifeprism.llm.agent.context import Context
 from lifeprism.utils import get_logger,DEBUG
 from lifeprism.utils.lazy_singleton import LazySingleton
@@ -44,11 +51,96 @@ class AgentLoop:
             
         return response
     
+    def _process_cmd(self,msg:InboundMessage)->None | OutboundMessage:
+        """
+        处理命令消息
+        args :
+            msg : InboundMessage
+        return
+            None | OutboundMessage
+        """
+        # 1. 当前只有微信有命令行工具 /new
+        if msg.channel == ChannelType.WECHAT:
+            if msg.content.startswith("/new"):
+                # 新建会话
+                new_session = session_manager.get_or_create_session()
+                # 立即保存 session 到文件，避免重启后丢失
+                session_manager.save_session(new_session)
+                # 传出新的session_id , channel 下一次使用时必须使用上一次消息传出的session_id
+                response_text = f"[SUCCESS] 新建会话 {new_session.id} ---\n 可以开始新的聊天了！"
+                return OutboundMessage(
+                    id=msg.id,
+                    response=LLMResponse(content=response_text),
+                    session_id=new_session.id
+                )
+            elif msg.content.startswith("/continue"):
+                # 继续会话
+                # 1.去除/continue 和空格，获取session_id
+                session_id = msg.content.replace("/continue","").strip()
+
+                # 2. 先检查是否提供了参数
+                if not session_id:
+                    return OutboundMessage(
+                        id=msg.id,
+                        response=LLMResponse(content="[ERROR] 请提供会话ID，例如：/continue <session_id>")
+                    )
+
+                # 3. 检查session_id是否存在
+                if session_id not in session_manager.show_session_list():
+                    logger.info(f"session_id ： {session_id}")
+                    logger.info(f"session_list ： {session_manager.show_session_list()}")
+                    return OutboundMessage(
+                        id=msg.id,
+                        response=LLMResponse(content=f"[ERROR] 会话 {session_id} 不存在")
+                    )
+                else:
+                    # 存在则返回session_id
+                    return OutboundMessage(
+                        id=msg.id,
+                        response=LLMResponse(content=f"[SUCCESS] 继续会话 {session_id}"),
+                        session_id=session_id
+                    )
+            elif msg.content.startswith("/session-list"):
+                # 判断是否有日期
+                date = msg.content.replace("/session-list","").strip()
+
+                # 列出所有会话
+                sessions = session_manager.show_session_content_list(date)
+                if not sessions and date:
+                    return OutboundMessage(
+                        id=msg.id,
+                        response=LLMResponse(content=f"[SUCCESS] 暂无{date}的会话记录,请检查日期是否为YYYY-MM-DD")
+                    )
+                elif not sessions:
+                    return OutboundMessage(
+                        id=msg.id,
+                        response=LLMResponse(content="[SUCCESS] 暂无会话记录")
+                    )
+                response_text = "[SUCCESS] 会话列表:\n" + "\n".join(
+                    f"• {s['session_id']}: {s['session_current_msg']}" for s in sessions
+                )
+                return OutboundMessage(
+                    id=msg.id,
+                    response=LLMResponse(content=response_text)
+                )
+        else :
+            return None
+
+
+
     async def _process_msg(self,msg:InboundMessage):
         """
         依据不同的消息类型，创建system prompt + tool description
         """
         try:
+            # ======================= cmd message process ============================
+            # 1. 判断该消息是否为命令消息,如果是则直接处理，不进行后续的通用处理过程
+            out_msg = self._process_cmd(msg)
+            if out_msg:
+                await self._bus.publish_outbound(out_msg)
+                return
+
+            # ======================= common message process =========================
             # 1. 构建system prompt
             system_prompt = Context.build_system_prompt(msg)
 
@@ -77,7 +169,12 @@ class AgentLoop:
                 session_manager.save_session(session)
         except Exception as e:
             logger.error(f"[AgentLoop] 处理消息 id={msg.id} 时出错: {e}", exc_info=True)
-            await self._bus.publish_outbound(OutboundMessage(id=msg.id, response=f"[ERROR] {e}"))
+            await self._bus.publish_outbound(
+                OutboundMessage(
+                    id=msg.id,
+                    response=LLMResponse(content=f"[ERROR] {e}")
+                )
+            )
             
     
 

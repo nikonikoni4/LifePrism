@@ -6,6 +6,7 @@ Settings 服务层 - 配置管理业务逻辑
 import os
 import sys
 import shutil
+import json
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from lifeprism.server.schemas.setting_schemas import (
     MigrateDataPathResponse,
 )
 from lifeprism.utils import get_logger
+from lifeprism.llm.channel.wechat.client import WechatClient
 
 logger = get_logger(__name__)
 
@@ -413,3 +415,132 @@ async def test_vlm_capability() -> dict:
         'model_response': vlm_result.get('model_response'),
         'cache_updated': cache_updated
     }
+
+
+async def get_qrcode(channel: str) -> dict:
+    """获取指定通道的 QR 码
+
+    Args:
+        channel: 通道类型（当前仅支持 wechat）
+
+    Returns:
+        包含 qr_string 和 qrcode_id 的字典
+
+    Raises:
+        ValueError: 不支持的通道类型
+    """
+    if channel != "wechat":
+        raise ValueError(f"不支持的通道类型: {channel}")
+
+    from lifeprism.llm.channel.wechat.config import WechatConfig
+
+    config = WechatConfig()
+    base_url = config.base_url
+
+    logger.info(f"正在获取 {channel} 通道的 QR 码")
+    async with WechatClient(base_url) as client:
+        try:
+            data = await client.api_get("ilink/bot/get_bot_qrcode", params={"bot_type": "3"}, auth=False)
+        except Exception as e:
+            logger.error(f"获取 QR 码失败: {e}", exc_info=True)
+            raise ValueError(f"获取 QR 码失败: {str(e)}")
+
+        qrcode_id = data.get("qrcode", "")
+        qrcode_img = data.get("qrcode_img_content", qrcode_id)
+
+        if not qrcode_id:
+            logger.error(f"获取 QR 码失败，返回数据: {data}")
+            raise ValueError("获取 QR 码失败")
+
+        logger.info(f"成功获取 QR 码，ID: {qrcode_id[:20]}...")
+        return {
+            "qr_string": qrcode_img,
+            "qrcode_id": qrcode_id
+        }
+
+
+async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
+    """查询 QR 码扫描状态
+
+    Args:
+        channel: 通道类型（wechat）
+        qrcode_id: QR 码 ID
+
+    Returns:
+        包含 status 和 message 的字典
+    """
+    if channel != "wechat":
+        raise ValueError(f"不支持的通道类型: {channel}")
+
+    from lifeprism.llm.channel.wechat.config import WechatConfig
+
+    config = WechatConfig()
+    base_url = config.base_url
+
+    logger.info(f"正在查询 QR 码状态: {qrcode_id[:20]}...")
+    async with WechatClient(base_url) as client:
+        try:
+            data = await client.api_get("ilink/bot/get_qrcode_status", params={"qrcode": qrcode_id}, auth=False)
+        except Exception as e:
+            logger.error(f"查询 QR 码状态失败: {e}", exc_info=True)
+            raise ValueError(f"查询 QR 码状态失败: {str(e)}")
+
+        raw_status = data.get("status", "")
+
+        # 状态映射
+        status_map = {
+            "": "waiting",
+            "waiting": "waiting",
+            "scanning": "scanning",
+            "confirmed": "confirmed",
+            "expired": "expired"
+        }
+        mapped_status = status_map.get(raw_status, "waiting")
+
+        logger.info(f"QR 码状态: {raw_status} -> {mapped_status}")
+
+        # 如果状态为 confirmed，保存 token
+        if mapped_status == "confirmed":
+            bot_token = data.get("bot_token", "")
+            if bot_token:
+                # 使用 WechatAuth 静态方法保存 token 到 keyring
+                from lifeprism.llm.channel.wechat.auth import WechatAuth
+
+                account_dir = Path(settings.channel_path) / "wechat"
+                account_dir.mkdir(parents=True, exist_ok=True)
+                account_file = account_dir / "account.json"
+
+                # 保存 token 到 keyring（使用静态方法）
+                if WechatAuth._save_token_to_keyring(bot_token):
+                    # 保存 context_tokens 到文件（token 已在 keyring 中）
+                    account_data = {"context_tokens": {}}
+                    with open(account_file, "w", encoding="utf-8") as f:
+                        json.dump(account_data, f, ensure_ascii=False, indent=2)
+                    logger.info(f"已保存 bot_token 到 keyring 和 context_tokens 到 {account_file}")
+                    
+                else:
+                    # keyring 不可用，fallback 到文件存储
+                    logger.warning("Keyring 不可用，使用文件存储 token")
+                    account_data = {"token": bot_token, "context_tokens": {}}
+                    with open(account_file, "w", encoding="utf-8") as f:
+                        json.dump(account_data, f, ensure_ascii=False, indent=2)
+
+                    logger.info(f"已保存 bot_token 到 {account_file}（文件模式）")
+                    
+
+                # 启动微信channel
+                from lifeprism.llm.channel import wechat_channel
+                await wechat_channel.start() # 有_runing确认启动保护，避免重复启动
+                return {"status": mapped_status, "message": "登录成功，token 已保存"}
+                
+            else:
+                logger.warning("状态为 confirmed 但未获取到 bot_token")
+                return {"status": mapped_status, "message": "登录成功但未获取到 token"}
+
+        # 其他状态
+        message_map = {
+            "waiting": "等待扫码",
+            "scanning": "已扫码，等待确认",
+            "expired": "二维码已过期"
+        }
+        return {"status": mapped_status, "message": message_map.get(mapped_status, "未知状态")}

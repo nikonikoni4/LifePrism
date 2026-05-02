@@ -19,6 +19,8 @@ import {
     ValidatePathResponse,
     MigrateDataPathRequest,
     MigrateDataPathResponse,
+    QRCodeResponse,
+    QRCodeStatusResponse,
 } from './types';
 import { createApiV2UrlGetter } from '../../core/services/apiConfig';
 
@@ -171,6 +173,30 @@ export const SettingsAPI = {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `数据迁移失败: ${response.statusText}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * 获取通道 QR 码
+     */
+    async getQRCode(channel: string): Promise<QRCodeResponse> {
+        const response = await fetch(`${getApiBase()}/settings/qrcode?channel=${channel}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || '获取二维码失败');
+        }
+        return response.json();
+    },
+
+    /**
+     * 查询 QR 码状态
+     */
+    async getQRCodeStatus(channel: string, qrcodeId: string): Promise<QRCodeStatusResponse> {
+        const response = await fetch(`${getApiBase()}/settings/qrcode/status?channel=${channel}&qrcode_id=${qrcodeId}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || '查询状态失败');
         }
         return response.json();
     },

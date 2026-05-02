@@ -18,6 +18,8 @@ from lifeprism.server.schemas.setting_schemas import (
     MigrateDataPathRequest,
     MigrateDataPathResponse,
     TestVlmResponse,
+    QRCodeResponse,
+    QRCodeStatusResponse,
 )
 from lifeprism.server.services import setting_service
 from lifeprism.config.provider_manager import provider_manager
@@ -200,3 +202,49 @@ async def migrate_data_path(request: MigrateDataPathRequest):
     if not result.success:
         raise HTTPException(status_code=400, detail=result.message)
     return result
+
+
+@router.get("/qrcode", response_model=QRCodeResponse, summary="获取通道 QR 码")
+async def get_qrcode(channel: str = Query(..., description="通道类型，如 wechat")):
+    """
+    获取指定通道的 QR 码
+
+    Args:
+        channel: 通道类型（当前仅支持 wechat）
+
+    Returns:
+        QR 码字符串和 ID
+    """
+    try:
+        result = await setting_service.get_qrcode(channel)
+        return QRCodeResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"获取 QR 码失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取 QR 码失败: {str(e)}")
+
+
+@router.get("/qrcode/status", response_model=QRCodeStatusResponse, summary="查询 QR 码状态")
+async def get_qrcode_status(
+    channel: str = Query(..., description="通道类型"),
+    qrcode_id: str = Query(..., description="QR 码 ID")
+):
+    """
+    查询 QR 码扫描状态
+
+    Args:
+        channel: 通道类型（wechat）
+        qrcode_id: QR 码 ID
+
+    Returns:
+        扫描状态和消息
+    """
+    try:
+        result = await setting_service.get_qrcode_status(channel, qrcode_id)
+        return QRCodeStatusResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"查询 QR 码状态失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"查询状态失败: {str(e)}")

@@ -35,6 +35,12 @@
 - 触发规则：开发、修改或查询配置管理模块相关功能时阅读（配置读写、路径解析、API Key 存储、Provider 管理、配置迁移、前后端配置交互）
 - 内容摘要：配置管理模块规格，定义配置读写流程（环境变量>keyring>yaml>默认值）、路径解析规则（config_base_path 固定/lifeprism_data_path 可迁移）及打包环境前后端路径配置详细流程图、API Key 安全存储（keyring）、Provider 管理（白名单/模型历史/VLM 缓存）、配置迁移机制及前后端交互契约（REST API），包含前端路径配置已知问题说明
 
+## wechat-channel-integration-spec
+- updated_at: 2026-05-01
+- path: `docs/specs/2026-05-01-wechat-channel-integration-spec.md`
+- 触发规则：开发、修改或查询 WeChat Channel 与 LifePrism 对接相关功能时阅读（Channel 接口、配置数据流、消息总线集成）
+- 内容摘要：WeChat Channel 与 LifePrism 对接规格，定义 Channel 暴露给 LifePrism 的接口、配置数据流（WechatConfig、allow_from 白名单）、消息总线契约（InboundMessage/OutboundMessage）、Channel 生命周期管理（启动/停止）、session_id 规范
+
 ## screenshot-analysis-spec
 - updated_at: 2026-04-26
 - path: `docs/specs/2026-04-26-screenshot-analysis-spec.md`

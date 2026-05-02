@@ -80,22 +80,17 @@ class MessageQueue:
             logger.debug(f"[MessageQueue] 限速等待 {wait:.2f}s")
             await asyncio.sleep(wait)
 
-    async def send(self, content: str, session_id: str | None = None,
-                   type: str = "chat", extra: dict | None = None) -> str:
+    async def send(self, msg:InboundMessage) -> OutboundMessage:
         """发送消息并等待结果
         args:
-            content: 消息内容
-            session_id: 会话ID
-            type: 消息类型
-            extra: 额外信息
+            msg : InboundMessage
         return:
             消息回复内容
         """
         self._ensure_receive_task()
         await self._wait_for_rate_limit()
         # 1. 创建消息
-        msg = InboundMessage(type=type, content=content, session_id=session_id, extra=extra)
-        logger.debug(f"[MessageQueue] 发送 id={msg.id} content={content!r}")
+        logger.debug(f"[MessageQueue] 发送 id={msg.id} content={msg.content!r}")
 
         # 2. 创建future，并入pending
         loop = asyncio.get_running_loop()
@@ -128,10 +123,7 @@ class MessageQueue:
             except Exception as e:
                 logger.error(f"[MessageQueue] 保存 token 使用情况失败: {e}")
 
-        response = result.response
-        if hasattr(response, 'content'):
-            return response.content
-        return str(response)
+        return result
 
     async def _receive_loop(self):
         try:
@@ -151,4 +143,4 @@ class MessageQueue:
             logger.error(f"[MessageQueue] 接收循环异常: {e}")
             raise
 
-bus = LazySingleton(MessageQueue) # 单一实例代理
+bus:MessageQueue = LazySingleton(MessageQueue) # 单一实例代理

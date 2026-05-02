@@ -9,13 +9,18 @@ class MessageType:
     CHAT = "chat" # 会添加专门的系统提示词
     GENERAL_TASK = "general_task" # 不会添加任何系统提示词，可以自行通过extra传递
 
-MESSAGE_TYPE = [MessageType.CLASSIFY, MessageType.CHAT,MessageType.GENERAL_TASK]
+class ChannelType:
+    WECHAT = "wechat" # 微信渠道
+    LOCAL = "local" # 本机渠道
 
+MESSAGE_TYPE = [MessageType.CLASSIFY, MessageType.CHAT,MessageType.GENERAL_TASK]
+CHANNEL_TYPE = [ChannelType.WECHAT, ChannelType.LOCAL]
 
 @dataclass
 class InboundMessage:
     type : str # 功能类型， 具体的功能类型会影响cotext模块最初的system prompt的构建
     id : str = field(default_factory=lambda : str(uuid.uuid4())[:4]) # 随机id,用于进行任务的
+    channel : str = ChannelType.LOCAL
     content : str | list | None = '' # 消息内容，支持文本、多模态列表（图片+文本）或空值
     session_id : str | None = None # 用户继续会话的id，未传入时会自动创建session
     extra : dict | None = None 
@@ -26,12 +31,15 @@ class InboundMessage:
     def __post_init__(self):
         if self.type not in MESSAGE_TYPE:
             raise ValueError(f"无效的消息类型: {self.type!r}，合法值为 {MESSAGE_TYPE}")
+        if self.channel not in CHANNEL_TYPE:
+            raise ValueError(f"无效的channel: {self.channel!r}，合法值为 {CHANNEL_TYPE}")
 
-@dataclass 
+@dataclass
 class OutboundMessage:
     id : str = ''
     response : LLMResponse | None = None # 返回消息
     session_id :str | None = None # 用户当创建首次创建session时返回id，tokens_usage保存需要
+    extra : dict | None = None # 额外数据，用于传递 channel 特定信息（如 wechat_user_id）
 
 
 

@@ -16,7 +16,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
 from lifeprism.llm.utils.parse_utils import extract_json_from_response
-from lifeprism.llm.bus import bus, MessageType
+from lifeprism.llm.bus import OutboundMessage, bus, MessageType, InboundMessage
 from lifeprism.config import settings
 from lifeprism.utils import get_logger,DEBUG
 from lifeprism.llm.providers.dataset_providers import llm_dataset_provider
@@ -430,10 +430,13 @@ async def analyze_chunk_screenshots(
 
 
     try:
-        response :str= await bus.send(
-            content = user_content,
-            type = MessageType.GENERAL_TASK,
-            extra = {'ANALYSIS_SYSTEM_PROMPT' : ANALYSIS_SYSTEM_PROMPT })
+        msg = InboundMessage(
+            content=user_content,
+            type=MessageType.GENERAL_TASK,
+            extra={'system_prompt' : ANALYSIS_SYSTEM_PROMPT}
+        )
+        response :OutboundMessage = await bus.send(msg)
+        response = response.response.content
 
         if response:
             # 清理 LLM 响应中的 Markdown 格式
@@ -638,11 +641,13 @@ async def _behavior_summary(start_time:str,end_time:str,screen_count:int,behavio
     
 
     try:
-        response:str = await bus.send(
+        msg = InboundMessage(
             content=user_prompt,
             type=MessageType.GENERAL_TASK,
             extra={"system_prompt": SUMMARY_SYSTEM_PROMPT},
         )
+        response :OutboundMessage = await bus.send(msg)
+        response = response.response.content
         if response:
             # 解析json字符串
            
