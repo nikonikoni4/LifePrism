@@ -70,6 +70,8 @@ class AgentLoop:
 
                 # 3. 检查session_id是否存在
                 if session_id not in session_manager.show_session_list():
+                    logger.info(f"session_id ： {session_id}")
+                    logger.info(f"session_list ： {session_manager.show_session_list()}")
                     return OutboundMessage(
                         id=msg.id,
                         response=LLMResponse(content=f"[ERROR] 会话 {session_id} 不存在")

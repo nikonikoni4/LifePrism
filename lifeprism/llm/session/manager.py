@@ -156,10 +156,10 @@ class SessionManager:
                         f.write(json.dumps(msg, ensure_ascii=False) + "\n")
     @staticmethod
     def show_session_list(path:Path= settings.session_path)-> list[str]:
-        """搜索存储地址内的jsonl, 返回文件名称list"""
+        """搜索存储地址内的jsonl, 返回session_id list（不带.jsonl后缀）"""
         if not path.exists():
             return []
-        return [f.name for f in path.glob('*.jsonl')]
+        return [f.stem for f in path.glob('*.jsonl')]
 
     @staticmethod
     def show_session_content_list(date_filter: str | None = None, path: Path = settings.session_path) -> list[dict]:

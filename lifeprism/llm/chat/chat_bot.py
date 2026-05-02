@@ -57,9 +57,7 @@ class ChatBot:
 
     def list_sessions(self) -> List[str]:
         """获取所有会话 ID 列表"""
-        # session_manager.show_session_list 返回的是文件名列表，需要处理
-        files = self._session_manager.show_session_list()
-        return [f.replace('.jsonl', '') for f in files]
+        return self._session_manager.show_session_list()
 
     def get_session(self, session_id: str) -> Optional[Session]:
         """获取现有会话，不存在则返回 None"""

@@ -271,6 +271,7 @@ class WechatChannel(BaseChannel):
                 if wechat_user_id not in self._user_data:
                     self._user_data[wechat_user_id] = {}
                 self._user_data[wechat_user_id]["context_token"] = context_token
+                logger.debug(f"context_token ： {context_token}")
                 need_save = True
 
             # 下载媒体
