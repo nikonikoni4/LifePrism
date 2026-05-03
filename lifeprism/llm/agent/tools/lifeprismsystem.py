@@ -1,14 +1,16 @@
 from dataclasses import field
+import json
 from typing import Any
 
-from lifeprism.llm.agent.tools.base import Tool
+from lifeprism.llm.agent.tools.base import Tool,ERROR
 from lifeprism.repository import (
     todo_repository,
     goal_repository,
     behavior_analysis_repository,
     custom_block_repository,
     computer_usage_repository,
-    QueryOptions
+    QueryOptions,
+    mood_repository
 )
 from lifeprism.llm.utils import build_time_segments
 # 数据
@@ -106,9 +108,9 @@ class UserActivitySummaryTool(Tool):
 
             return query_user_activity_summary(query_option, start_time, end_time)
         except ValueError as e:
-            return f"参数错误: {str(e)}"
+            return f"{ERROR}参数错误: {str(e)}"
         except Exception as e:
-            return f"查询失败: {str(e)}"
+            return f"{ERROR}查询失败: {str(e)}"
 def _category_stats(logs: list[dict], segment_start_time: str, segment_end_time: str) -> dict:
     """
     计算某段时间内的分类占比（如果某个log的区间在边界，会依据边界截断）
@@ -173,16 +175,16 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
     allowed_options = {"computer_usage", "computer_usage_stats", "user_behavior_notes", "ai_behavior_notes", "todolist"} # , "goals"
     invalid_options = set(query_option) - allowed_options
     if invalid_options:
-        raise ValueError(f"Invalid query options: {invalid_options}")
+        raise ValueError(f"{ERROR} Invalid query options: {invalid_options}")
 
     try:
         start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     except ValueError as e:
-        raise ValueError(f"Invalid time format. Expected 'YYYY-MM-DD HH:MM:SS': {e}")
+        raise ValueError(f"{ERROR} Invalid time format. Expected 'YYYY-MM-DD HH:MM:SS': {e}")
 
     if start_dt >= end_dt:
-        raise ValueError("start_time must be before end_time")
+        raise ValueError(f"{ERROR} start_time must be before end_time")
 
     parts = []
 
@@ -312,14 +314,14 @@ class UserComputerLogTool(Tool):
             end_time = kwargs.get('end_time', '')
             duration_min = kwargs.get('duration_min', 45)
             if not start_time or not end_time:
-                return "参数错误: start_time 和 end_time 是必填参数"
+                return f"{ERROR}参数错误: start_time 和 end_time 是必填参数"
             if not duration_min:
                 duration_min = 45
             return query_user_activity_log(start_time, end_time, duration_min)
         except ValueError as e:
-            return f"参数错误: {str(e)}"
+            return f"{ERROR}参数错误: {str(e)}"
         except Exception as e:
-            return f"查询失败: {str(e)}"
+            return f"{ERROR}查询失败: {str(e)}"
 
 
 
@@ -429,10 +431,10 @@ def create_or_update_user_behavior_note(
         start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     except ValueError as e:
-        raise ValueError(f"时间格式错误，期望格式为 'YYYY-MM-DD HH:MM:SS': {e}")
+        raise ValueError(f"{ERROR} 时间格式错误，期望格式为 'YYYY-MM-DD HH:MM:SS': {e}")
 
     if start_dt >= end_dt:
-        raise ValueError("开始时间必须早于结束时间")
+        raise ValueError(f"{ERROR} 开始时间必须早于结束时间")
 
     # 计算 duration（分钟）
     duration = int((end_dt - start_dt).total_seconds() / 60)
@@ -534,7 +536,7 @@ class UpdateUserBehaviorNoteTool(Tool):
             block_id = kwargs.get('block_id')
 
             if not start_time or not end_time or not content:
-                return "参数错误: start_time、end_time 和 content 是必填参数"
+                return f"{ERROR} 参数错误: start_time、end_time 和 content 是必填参数"
 
             return create_or_update_user_behavior_note(
                 start_time=start_time,
@@ -543,13 +545,225 @@ class UpdateUserBehaviorNoteTool(Tool):
                 block_id=block_id
             )
         except ValueError as e:
-            return f"参数错误: {str(e)}"
+            return f"{ERROR} 参数错误: {str(e)}"
         except Exception as e:
-            return f"操作失败: {str(e)}"
+            return f"{ERROR} 操作失败: {str(e)}"
 
 
+def _get_mood_type_ids()->list[str]:
+    """获取所有可用的心情类型ID"""
+    mood_types = mood_repository.get_mood_types()
+    return [m['id'] for m in mood_types]
+
+def _get_mood_types()->str:
+    """获取所有可用的心情类型,输出id:name对"""
+    mood_types = mood_repository.get_mood_types()
+    return '\n '.join([f"{m['id']}: {m['name']}" for m in mood_types])
+
+class UserMoodQuryTool(Tool):
+    """查询用户心情记录工具"""
+    def __init__(self):
+        pass
+
+    @property
+    def name(self) -> str:
+        """函数调用中使用的工具名。"""
+        return "query_user_mood"
+
+    @property
+    def description(self) -> str:
+        """工具功能说明。"""
+        return """查询用户在指定时间范围内的心情记录，包括心情评分、内容和影响因素。
+        返回格式化的心情记录列表，便于用户查看和分析心情变化趋势。"""
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        """工具参数的 JSON Schema"""
+        return {
+            "type": "object",
+            "properties": {
+                "start_date": {
+                    "type": "string",
+                    "description": "查询开始日期，格式：YYYY-MM-DD"
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "查询结束日期，格式：YYYY-MM-DD"
+                },
+                "by_mood_type_id": {
+                    "type": ["string", "null"],
+                    "description": f"可选，按心情类型ID过滤，可使用的心情ID类型以及心情名称对(id:name): \n {_get_mood_types()}",
+                    "enum": _get_mood_type_ids()
+                }
+            },
+            "required": ["start_date", "end_date"]
+        }
+
+
+    async def execute(self, **kwargs: Any) -> Any:
+        """
+        使用给定参数执行工具
+
+        参数:
+            **kwargs: 工具特有参数
+
+        返回:
+            格式化的心情记录字符串
+        """
+        try:
+            start_date = kwargs.get('start_date', '')
+            end_date = kwargs.get('end_date', '')
+            by_mood_type_id = kwargs.get('by_mood_type_id', None)
+
+            return query_user_mood(start_date, end_date, by_mood_type_id)
+        except ValueError as e:
+            return f"{ERROR}参数错误: {str(e)}"
+        except Exception as e:
+            return f"{ERROR}查询失败: {str(e)}"
+
+def query_user_mood(start_date:str,end_date:str,by_mood_type_id:str|None=None)->list[dict[str,Any]]:
+    """
+    查询用户在指定时间范围内的心情记录。
+    args:
+        start_date: 开始时间，格式：YYYY-MM-DD
+        end_date: 结束时间，格式：YYYY-MM-DD
+        by_mood_type_id: 可选，心情类型ID，按心情类型查询
+    return:
+        心情记录列表
+    """
+    mood_entries:list[dict]= mood_repository.get_mood_entries(start_date=start_date,end_date=end_date)
+    result = []
+    if by_mood_type_id:
+        for mood_entry in mood_entries:
+            if mood_entry['mood_type_id'] == by_mood_type_id:
+                result.append(mood_entry)
+    else:
+        result = mood_entries
+    if not result:
+        return f"{start_date}~{end_date}  无{by_mood_type_id}对应心情记录" if by_mood_type_id else f"{start_date}~{end_date}  无心情记录"
+    formatted_result = []
+    for idx, entry in enumerate(result, 1):
+        factors_raw = entry.get('factors', '')
+        if factors_raw:
+            try:
+                factors_list = json.loads(factors_raw) if isinstance(factors_raw, str) else factors_raw
+                factors_str = ', '.join(factors_list) if isinstance(factors_list, list) else str(factors_list)
+            except (json.JSONDecodeError, TypeError):
+                factors_str = str(factors_raw)
+        else:
+            factors_str = ''
+        formatted_result.append(
+            f"{idx}. {entry.get('created_at', 'N/A')} 心情: {entry.get('score', 'N/A')}分\n"
+            f"   内容：{entry.get('content', '无') or '无'}\n"
+            f"   影响因素: {factors_str if factors_str else '无'}"
+        )
+    return '\n\n'.join(formatted_result)
+
+
+class UserMoodCreateTool(Tool):
+    """创建用户心情记录工具"""
+    def __init__(self):
+        pass
+
+    @property
+    def name(self) -> str:
+        """函数调用中使用的工具名。"""
+        return "create_user_mood"
+
+    @property
+    def description(self) -> str:
+        """工具功能说明。"""
+        return """创建用户心情记录，包括心情评分、内容和影响因素。
+        返回创建的记录ID，便于用户查看和管理心情记录。"""
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        """工具参数的 JSON Schema"""
+        return {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "心情记录内容，描述当前的心情感受"
+                },
+                "mood_type_id": {
+                    "type": "string",
+                    "description": f"可选，按心情类型ID过滤，可使用的心情ID类型以及心情名称对(id:name): \n {_get_mood_types()}",
+                    "enum": _get_mood_type_ids()
+                },
+                "factors": {
+                    "type": "array",
+                    "description": "可选，可多选，影响心情的因素列表",
+                    "items": {
+                        "type": "string",
+                        "enum": self._get_factors()
+                        }
+                }
+            },
+            "required": ["content", "mood_type_id"]
+        }
+
+    @staticmethod
+    def _get_factors()->list[str]:
+        """获取所有可用的影响因素，返回逗号分隔的字符串"""
+        impacts = mood_repository.get_mood_impacts()
+        return [imp['name'] for imp in impacts]
+
+    async def execute(self, **kwargs: Any) -> Any:
+        """
+        使用给定参数执行工具
+
+        参数:
+            **kwargs: 工具特有参数
+
+        返回:
+            创建结果消息
+        """
+        try:
+            content = kwargs.get('content', '')
+            mood_type_id = kwargs.get('mood_type_id', '')
+            factors = kwargs.get('factors', None)
+            if not mood_type_id:
+                return f"{ERROR}请输入心情类型ID"
+
+            # 使用mood_type_id查询score
+            mood_type = mood_repository.get_mood_type_by_id(mood_type_id)
+            if not mood_type:
+                return f"{ERROR}心情类型ID {mood_type_id} 不存在"
+            score = mood_type.get('score', 50)
+
+            return create_user_mood(content, score, mood_type_id, factors)
+        except ValueError as e:
+            return f"{ERROR}参数错误: {str(e)}"
+        except Exception as e:
+            return f"{ERROR}创建失败: {str(e)}"
+
+
+def create_user_mood(content:str,score:int,mood_type_id:str,factors_raw:list[str]|None=None)->str:
+    """
+    创建用户心情记录。
+    args:
+        content: 心情记录内容
+        score: 心情评分
+        mood_type_id: 心情类型ID
+        factors_raw: 可选，影响因素，格式：JSON字符串
+    return:
+        新创建的 ID
+    """
+    data = {
+        'content': content,
+        'score': score,
+        'mood_type_id': mood_type_id,
+        'factors': factors_raw
+    }
+    if factors_raw:
+        data['factors'] = json.dumps(factors_raw)
+    mood_id = mood_repository.create_mood_entry(data)
+    return  f"创建心情记录成功，ID: {mood_id}"
 
 if __name__ == "__main__":
     print(query_user_activity_summary(['computer_usage_stats'],"2026-04-28 00:00:00","2026-04-29 00:00:00"))
     print(query_user_activity_log("2026-04-28 00:00:00","2026-04-29 00:00:00"))
     print(create_or_update_user_behavior_note("2026-04-28 00:00:00","2026-04-29 00:00:00","用户在电脑上工作111",129))
+    print(query_user_mood("2026-05-03","2026-05-04"))
+    print(UserMoodCreateTool().parameters)

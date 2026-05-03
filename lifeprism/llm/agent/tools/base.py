@@ -7,7 +7,7 @@ Licensed under the MIT License.
 
 from abc import ABC, abstractmethod
 from typing import Any
-
+ERROR = "error"
 
 class Tool(ABC):
     """

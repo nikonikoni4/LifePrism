@@ -6,7 +6,7 @@ Licensed under the MIT License.
 
 from typing import Any
 
-from lifeprism.llm.agent.tools.base import Tool
+from lifeprism.llm.agent.tools.base import Tool,ERROR
 
 
 class ToolRegistry:
@@ -45,7 +45,7 @@ class ToolRegistry:
 
         tool = self._tools.get(name)
         if not tool:
-            return f"Error: Tool '{name}' not found. Available: {', '.join(self.tool_names)}"
+            return f"{ERROR}: Tool '{name}' not found. Available: {', '.join(self.tool_names)}"
 
         try:
             # Attempt to cast parameters to match schema types
@@ -54,13 +54,13 @@ class ToolRegistry:
             # Validate parameters
             errors = tool.validate_params(params)
             if errors:
-                return f"Error: Invalid parameters for tool '{name}': " + "; ".join(errors) + _HINT
+                return f"{ERROR}: Invalid parameters for tool '{name}': " + "; ".join(errors) + _HINT
             result = await tool.execute(**params)
-            if isinstance(result, str) and result.startswith("Error"):
+            if isinstance(result, str) and result.startswith("{ERROR}"):
                 return result + _HINT
             return result
         except Exception as e:
-            return f"Error executing {name}: {str(e)}" + _HINT
+            return f"{ERROR} executing {name}: {str(e)}" + _HINT
 
     @property
     def tool_names(self) -> list[str]:
