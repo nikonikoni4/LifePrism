@@ -26,13 +26,6 @@
 - 触发规则：写入 `docs/ARCHITECTURE.md` 时读取
 - 内容摘要：docs/ARCHITECTURE.md 的专属写作规则，约束其内容边界、必备覆盖面和更新触发条件。
 
-## design-decisions-write-rules
-
-- updated_at: 2026-04-14
-- path: `docs/docs-rules/design-decisions-write-rules.md`
-- 触发规则：写入 `docs/design-decisions/` 文档时读取
-- 内容摘要：design-decisions.md 的写入规则和状态变化规则。
-
 
 ## formal-bugs-write-rules.md
 

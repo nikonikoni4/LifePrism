@@ -1,4 +1,4 @@
-# AGENTS.md
+# CLAUDE.md
 
 ## 按需加载文档
 
@@ -30,20 +30,11 @@
 3. **需要编写文档进入docs时**：必须阅读`docs/docs-rules/index.md`和`docs/docs-rules/docs-write-rules.md`
 4. **编写功能前**：需要阅读`docs/specs/index.md`，查看当前是否已经存在spec，按需加载具体的spec来了解该功能情况
 5. **如果你是minimax模型**：必须阅读`docs/coding-rules/other-model-rules`
-
 6. **修复bug时**: 可以阅读`docs\history-bugs\index.md`来获取历史bug解决方法
 
 </<docs-read-rules>>
 
-## 新Feature开发流程
-
-1. 使用brainstorming skill确认需求，产出文档：`docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
-2. 阅读`docs/docs-rules/spec-write-rules.md`，将design转化为正式spec存档。
-3. 依据1产出的`YYYY-MM-DD-<topic>-design.md`文件，使用writing-plans编写计划，产出`docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
-4. 阅读`docs/docs-rules/plan-write-rules.md`，将plan转化为正式的plan存档
-5. 分派子agent执行，并持续按照skill的指示进行任务
-
-## 常规工作流程规则
+## 核心规则
 
 1. **先方案后编码**：编写任何代码之前，先描述方案等待批准。需求不明确时先提问。
 
@@ -57,25 +48,5 @@
 
 6. **记录教训**：每次被纠正后，在 `docs/temp/temp_lecture_record/temp_lecture_record.md` 记录经验教训
 
-7. **记录重大决定**：当出现一下情况时需要编写design-decisions文档：
-
-   - 3 个月后还会被问“为什么当时这么做”
-   - 它不是当前事实,而是长期取舍和原则
-   - 未来多个 agent 任务都需要知道
-   - 不写下来 agent 很难保持一致
-   - 它影响多个模块或多个任务
-
-   说明:
-
-   - 当一个内容满足上面多条特征时,就非常适合进入 `design-decisions`
-   - 其中前两条权重最高
-
-   通常不应写入 `design-decisions` 的内容:
-
-   1. 一次性执行步骤
-   2. 当前实现事实
-   3. 纯业务需求
-   4. 任务过程中临时改主意的细节
-   5. 小范围修补或局部 bugfix
 
 
