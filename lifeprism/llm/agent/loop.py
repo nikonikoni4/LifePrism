@@ -3,6 +3,7 @@ from typing import Any
 from lifeprism.llm.providers import LLMResponse, create_llm_client,ToolCallRequest
 from lifeprism.llm.session import Session,session_manager
 import asyncio
+import json
 from lifeprism.llm.bus import (
     InboundMessage,
     OutboundMessage,
@@ -38,26 +39,27 @@ class AgentLoop:
         self._background_tasks: list[asyncio.Task] = []
         self._running = True
         self._tool_registry = ToolRegistry()
-    async def _run_agent_loop(self,messages:list[dict[str,Any]],tools:list[dict[str, Any]])->LLMResponse:
+    async def _run_agent_loop(self, session: Session, system_prompt: str, tools: list[dict[str, Any]]) -> LLMResponse:
         llm = create_llm_client()
-        response:LLMResponse = await llm.chat(
+        messages = Context.build_prompt(system_prompt, session.get_history_message())
+        response: LLMResponse = await llm.chat(
             messages=messages,
-            tools = tools
+            tools=tools
         )
-        messages.append({
-                'role': 'assistant',
-                'content': response.content or '',
-                'tool_calls': [
-                    {
-                        'id': tc.id,
-                        'type': 'function',
-                        'function': {
-                            'name': tc.name,
-                            'arguments': tc.arguments
-                        }
-                    } for tc in response.tool_calls
-                ]
-            })
+        session.add_message(
+            'assistant',
+            content=response.content or '',
+            tool_calls=[
+                {
+                    'id': tc.id,
+                    'type': 'function',
+                    'function': {
+                        'name': tc.name,
+                        'arguments': json.dumps(tc.arguments, ensure_ascii=False)
+                    }
+                } for tc in response.tool_calls
+            ]
+        )
 
 
         # 工具调用实现
@@ -79,27 +81,28 @@ class AgentLoop:
                     if tool_error[tool_call.name] > MAX_TOOL_ERROR_COUNT:
                         logger.warning(f"工具 {tool_call.name} 超过最大错误次数，添加警告信息")
                         result += f"，已连续调用{tool_error[tool_call.name]}次，超过最大错误次数{MAX_TOOL_ERROR_COUNT}，请立即放弃该工具调用，尝试切换其他工具。若无可替代工具，向用户说明情况"
-                messages.append({'role':'tool','tool_call_id':tool_call.id,'content':result})
+                session.add_message('tool', result, tool_call_id=tool_call.id)
+            messages = Context.build_prompt(system_prompt, session.get_history_message())
             logger.debug(f"第{tool_call_count+1}次 llm调用开始， message 长度 {len(messages)}")
             logger.debug(messages)
-            response:LLMResponse = await llm.chat(
+            response: LLMResponse = await llm.chat(
                 messages=messages,
-                tools = tools
+                tools=tools
             )
-            messages.append({
-                    'role': 'assistant',
-                    'content': response.content or '',
-                    'tool_calls': [
-                        {
-                            'id': tc.id,
-                            'type': 'function',
-                            'function': {
-                                'name': tc.name,
-                                'arguments': tc.arguments
-                            }
-                        } for tc in response.tool_calls
-                    ]
-                })
+            session.add_message(
+                'assistant',
+                content=response.content or '',
+                tool_calls=[
+                    {
+                        'id': tc.id,
+                        'type': 'function',
+                        'function': {
+                            'name': tc.name,
+                            'arguments': json.dumps(tc.arguments, ensure_ascii=False)
+                        }
+                    } for tc in response.tool_calls
+                ]
+            )
             logger.debug(f"模型返回 ： {response}")
             logger.debug(f"模型工具调用 ： {response.tool_calls}")
             logger.debug("="*50)
@@ -108,27 +111,26 @@ class AgentLoop:
         # 如果因为达到MAX_TOOL_CALL而退出，且response仍有tool_calls，需要强制生成文本回复
         if response.tool_calls and tool_call_count > MAX_TOOL_CALL:
             logger.warning(f"达到最大工具调用次数 {MAX_TOOL_CALL}，强制生成文本回复")
-            # 添加系统消息说明已达到最大调用次数
-            messages.append({
-                'role': 'system',
-                'content': f'已达到最大工具调用次数 {MAX_TOOL_CALL}，请直接向用户说明当前情况，让用户判断是否继续工作。'
-            })
-            # 不传递tools参数，强制LLM生成文本回复
+            session.add_message(
+                'system',
+                content=f'已达到最大工具调用次数 {MAX_TOOL_CALL}，请直接向用户说明当前情况，让用户判断是否继续工作。'
+            )
+            messages = Context.build_prompt(system_prompt, session.get_history_message())
             response = await llm.chat(messages=messages)
-            messages.append({
-                    'role': 'assistant',
-                    'content': response.content or '',
-                    'tool_calls': [
-                        {
-                            'id': tc.id,
-                            'type': 'function',
-                            'function': {
-                                'name': tc.name,
-                                'arguments': tc.arguments
-                            }
-                        } for tc in response.tool_calls
-                    ]
-                })
+            session.add_message(
+                'assistant',
+                content=response.content or '',
+                tool_calls=[
+                    {
+                        'id': tc.id,
+                        'type': 'function',
+                        'function': {
+                            'name': tc.name,
+                            'arguments': json.dumps(tc.arguments, ensure_ascii=False)
+                        }
+                    } for tc in response.tool_calls
+                ]
+            )
             logger.debug(f"强制文本回复: {response}")
 
         return response
@@ -241,13 +243,11 @@ class AgentLoop:
             # 3. 构建完整消息（含历史）
             session: Session = session_manager.get_or_create_session(msg.session_id)
             session.add_message("user", content=msg.content)
-            messages = Context.build_prompt(system_prompt, session.get_history_message())
-            # 避免因为后续llm调用错误而丢失user message
             if msg.type == MessageType.CHAT: 
                 session_manager.save_session(session)
 
             # 4. 调用 LLM
-            result = await self._run_agent_loop(messages, tools)
+            result = await self._run_agent_loop(session, system_prompt, tools)
 
             # 5. 保存 assistant 回复并发布结果
             await self._bus.publish_outbound(OutboundMessage(id=msg.id, response=result,session_id=session.id))
