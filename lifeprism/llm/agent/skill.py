@@ -17,6 +17,7 @@ logger = get_logger(__name__)
 
 class SkillLoad:
     _ALWAYS_LOAD = [
+        "user-data-guide"
     ]
     def __init__(self):
         self.skill_path = Path(settings.lifeprism_data_path + "/agent/skills" )

@@ -4,11 +4,12 @@ Mood Aggregator - 心情数据聚合层
 聚合 MoodTypeProvider, MoodEntryProvider, MoodImpactProvider
 提供心情相关的统一数据视图
 """
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any,Tuple
 from lifeprism.repository.providers.mood_providers import (
     MoodTypeProvider,
     MoodEntryProvider,
     MoodImpactProvider,
+    QueryOptions
 )
 from lifeprism.utils import get_logger
 
@@ -169,6 +170,10 @@ class MoodAggregator:
 
     # ==================== MoodType 核心 CRUD 透传 ====================
 
+    def query_mood_type(self,query_options:QueryOptions)->Tuple[List[Dict[str,Any]],int]:
+        """透传：查询心情类型"""
+        return self.type_provider.query_mood_types(query_options)
+
     def create_mood_type(self, data: Dict[str, Any]) -> Optional[str]:
         """透传：创建心情类型"""
         return self.type_provider.create_mood_type(data)
@@ -194,6 +199,10 @@ class MoodAggregator:
         return self.type_provider.count_entries_by_type(mood_type_id)
 
     # ==================== MoodEntry 核心 CRUD 透传 ====================
+    def query_mood_entry(self,query_options:QueryOptions)->Tuple[List[Dict[str,Any]],int]:
+        """透传：查询心情记录"""
+        return self.entry_provider.query_mood_entries(query_options)
+
 
     def create_mood_entry(self, data: Dict[str, Any]) -> Optional[str]:
         """透传：创建心情记录"""

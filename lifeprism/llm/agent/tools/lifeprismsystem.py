@@ -2,7 +2,7 @@ from dataclasses import field
 import json
 from typing import Any
 
-from lifeprism.llm.agent.tools.base import Tool,ERROR
+from lifeprism.llm.agent.tools.base import Tool,ERROR,SUCCESS
 from lifeprism.repository import (
     todo_repository,
     goal_repository,
@@ -456,17 +456,17 @@ def create_or_update_user_behavior_note(
             # 更新模式
             result = custom_block_repository.update_custom_block(block_id, data)
             if result:
-                return f"成功更新行为备注 (ID: {block_id})\n时间段: {start_time} ~ {end_time}\n内容: {content}\n时长: {duration} 分钟"
+                return f"{SUCCESS}更新行为备注成功 (ID: {block_id})\n时间段: {start_time} ~ {end_time}\n内容: {content}\n时长: {duration} 分钟"
             else:
-                return f"更新失败: 未找到 ID 为 {block_id} 的记录"
+                return f"{ERROR}更新失败: 未找到 ID 为 {block_id} 的记录"
         else:
             # 创建模式
             result = custom_block_repository.create_custom_block(data)
             if result:
                 new_id = result.get('id', '未知')
-                return f"成功创建行为备注 (ID: {new_id})\n时间段: {start_time} ~ {end_time}\n内容: {content}\n时长: {duration} 分钟"
+                return f"{SUCCESS}创建行为备注成功 (ID: {new_id})\n时间段: {start_time} ~ {end_time}\n内容: {content}\n时长: {duration} 分钟"
             else:
-                return "创建失败: 未知错误"
+                return f"{ERROR}创建失败: 未知错误"
     except Exception as e:
         raise Exception(f"数据库操作失败: {str(e)}")
 
@@ -759,7 +759,7 @@ def create_user_mood(content:str,score:int,mood_type_id:str,factors_raw:list[str
     if factors_raw:
         data['factors'] = json.dumps(factors_raw)
     mood_id = mood_repository.create_mood_entry(data)
-    return  f"创建心情记录成功，ID: {mood_id}"
+    return f"{SUCCESS}创建心情记录成功，ID: {mood_id}"
 
 if __name__ == "__main__":
     print(query_user_activity_summary(['computer_usage_stats'],"2026-04-28 00:00:00","2026-04-29 00:00:00"))

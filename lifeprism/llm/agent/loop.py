@@ -16,10 +16,19 @@ from lifeprism.utils import get_logger,DEBUG
 from lifeprism.utils.lazy_singleton import LazySingleton
 from lifeprism.llm.agent.tools import (
     ToolRegistry,
-    UserActivitySummaryTool
+    UserActivitySummaryTool,
+    UserComputerLogTool,
+    UpdateUserBehaviorNoteTool,
+    UserMoodQuryTool,
+    UserMoodCreateTool,
+    ERROR
 )
+from collections import defaultdict
 
 MAX_TOOL_CALL = 20
+MAX_TOOL_ERROR_COUNT = 5
+
+
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
 class AgentLoop:
@@ -35,20 +44,93 @@ class AgentLoop:
             messages=messages,
             tools = tools
         )
-        # TODO  工具调用实现
+        messages.append({
+                'role': 'assistant',
+                'content': response.content or '',
+                'tool_calls': [
+                    {
+                        'id': tc.id,
+                        'type': 'function',
+                        'function': {
+                            'name': tc.name,
+                            'arguments': tc.arguments
+                        }
+                    } for tc in response.tool_calls
+                ]
+            })
+
+
+        # 工具调用实现
         tool_call_count = 1
+        # 工具调用错误统计
+        tool_error = defaultdict(int)
         while response.tool_calls and tool_call_count <=MAX_TOOL_CALL:
-            tool_results =[]
+            # 将模型回复（包含tool_calls）添加到messages中
             for tool_call in response.tool_calls:
                 logger.debug(f"工具调用 ： {tool_call.name} ，调用参数{tool_call.arguments}")
                 result = await self._tool_registry.execute(tool_call.name,tool_call.arguments)
                 logger.debug(f"工具结果 ： {tool_call.name} - {result}")
+                logger.debug(f"工具结果是否为字符串: {isinstance(result,str)}")
+                logger.debug(f"工具结果是否以错误开头: {result.startswith(ERROR)}")
+                # 只有在出错时才累加错误计数并检查阈值
+                if isinstance(result,str) and result.startswith(ERROR):
+                    tool_error[tool_call.name] += 1
+                    logger.debug(f"工具 {tool_call.name} 错误计数: {tool_error[tool_call.name]}/{MAX_TOOL_ERROR_COUNT}")
+                    if tool_error[tool_call.name] > MAX_TOOL_ERROR_COUNT:
+                        logger.warning(f"工具 {tool_call.name} 超过最大错误次数，添加警告信息")
+                        result += f"，已连续调用{tool_error[tool_call.name]}次，超过最大错误次数{MAX_TOOL_ERROR_COUNT}，请立即放弃该工具调用，尝试切换其他工具。若无可替代工具，向用户说明情况"
                 messages.append({'role':'tool','tool_call_id':tool_call.id,'content':result})
+            logger.debug(f"第{tool_call_count+1}次 llm调用开始， message 长度 {len(messages)}")
+            logger.debug(messages)
             response:LLMResponse = await llm.chat(
                 messages=messages,
                 tools = tools
             )
-            
+            messages.append({
+                    'role': 'assistant',
+                    'content': response.content or '',
+                    'tool_calls': [
+                        {
+                            'id': tc.id,
+                            'type': 'function',
+                            'function': {
+                                'name': tc.name,
+                                'arguments': tc.arguments
+                            }
+                        } for tc in response.tool_calls
+                    ]
+                })
+            logger.debug(f"模型返回 ： {response}")
+            logger.debug(f"模型工具调用 ： {response.tool_calls}")
+            logger.debug("="*50)
+            tool_call_count += 1
+
+        # 如果因为达到MAX_TOOL_CALL而退出，且response仍有tool_calls，需要强制生成文本回复
+        if response.tool_calls and tool_call_count > MAX_TOOL_CALL:
+            logger.warning(f"达到最大工具调用次数 {MAX_TOOL_CALL}，强制生成文本回复")
+            # 添加系统消息说明已达到最大调用次数
+            messages.append({
+                'role': 'system',
+                'content': f'已达到最大工具调用次数 {MAX_TOOL_CALL}，请直接向用户说明当前情况，让用户判断是否继续工作。'
+            })
+            # 不传递tools参数，强制LLM生成文本回复
+            response = await llm.chat(messages=messages)
+            messages.append({
+                    'role': 'assistant',
+                    'content': response.content or '',
+                    'tool_calls': [
+                        {
+                            'id': tc.id,
+                            'type': 'function',
+                            'function': {
+                                'name': tc.name,
+                                'arguments': tc.arguments
+                            }
+                        } for tc in response.tool_calls
+                    ]
+                })
+            logger.debug(f"强制文本回复: {response}")
+
         return response
     
     def _process_cmd(self,msg:InboundMessage)->None | OutboundMessage:
@@ -148,6 +230,10 @@ class AgentLoop:
             tools = []
             if msg.type == MessageType.CHAT:
                 self._tool_registry.register(UserActivitySummaryTool())
+                self._tool_registry.register(UserComputerLogTool())
+                self._tool_registry.register(UpdateUserBehaviorNoteTool())
+                self._tool_registry.register(UserMoodQuryTool())
+                self._tool_registry.register(UserMoodCreateTool())
                 tools: list[dict[str, Any]] = self._tool_registry.get_definitions()
             elif msg.type == MessageType.CLASSIFY:
                 tools = []
@@ -156,12 +242,14 @@ class AgentLoop:
             session: Session = session_manager.get_or_create_session(msg.session_id)
             session.add_message("user", content=msg.content)
             messages = Context.build_prompt(system_prompt, session.get_history_message())
+            # 避免因为后续llm调用错误而丢失user message
+            if msg.type == MessageType.CHAT: 
+                session_manager.save_session(session)
 
             # 4. 调用 LLM
             result = await self._run_agent_loop(messages, tools)
 
             # 5. 保存 assistant 回复并发布结果
-            session.add_message("assistant", content=result.content)
             await self._bus.publish_outbound(OutboundMessage(id=msg.id, response=result,session_id=session.id))
 
             # 6. 保存session

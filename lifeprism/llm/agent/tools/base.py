@@ -7,7 +7,10 @@ Licensed under the MIT License.
 
 from abc import ABC, abstractmethod
 from typing import Any
-ERROR = "error"
+
+# 错误和成功标识（遵循 nanobot 规范）
+ERROR = "Error: "
+SUCCESS = "Success: "
 
 class Tool(ABC):
     """
