@@ -1,6 +1,8 @@
 from lifeprism.llm.providers import create_llm_client
 from lifeprism.config.settings_manager import settings
 import logging
+import json
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +37,11 @@ async def test_connect() -> dict:
 
         # 失败条件1: 包含错误信息
         if "error" in response_content.lower():
+            error_message = _parse_error_message(response_content)
             logger.error(f"LLM 连接测试失败: 模型返回错误 (provider={settings.provider}, model={settings.model}): {response_content[:200]}")
             return {
                 "success": False,
-                "message": f"连接失败: 模型返回错误",
+                "message": f"连接失败: {error_message}",
                 "model_response": response_content,
                 "provider": settings.provider,
                 "model": settings.model
@@ -76,3 +79,40 @@ async def test_connect() -> dict:
             "provider": settings.provider,
             "model": settings.model
         }
+
+
+def _parse_error_message(response_content: str) -> str:
+    """
+    解析错误响应，提取友好的错误提示
+
+    Args:
+        response_content: 原始响应内容
+
+    Returns:
+        str: 友好的错误提示信息
+    """
+    try:
+        # 尝试提取 JSON 部分（可能包含 "Error: {...}" 格式）
+        json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
+        if json_match:
+            error_data = json.loads(json_match.group())
+
+            # 提取 error 字段
+            if "error" in error_data:
+                error_info = error_data["error"]
+                code = error_info.get("code", "")
+                message = error_info.get("message", "")
+
+                # 根据错误码和消息返回友好提示
+                if code == "401" or "Invalid API Key" in message:
+                    return "API Key 无效，请检查配置中的 API Key 是否正确；检查API url 是否正确"
+                elif code == "400" and "Not supported model" in message:
+                    return f"模型不支持，请检查模型名称是否正确（当前模型: {settings.model}）"
+                elif message:
+                    return f"模型返回错误: {message}"
+
+    except (json.JSONDecodeError, KeyError, AttributeError):
+        pass
+
+    # 如果解析失败，返回截断的原始内容
+    return f"模型返回错误: {response_content[:200]}"
