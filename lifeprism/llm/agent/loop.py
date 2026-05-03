@@ -16,7 +16,7 @@ from lifeprism.utils import get_logger,DEBUG
 from lifeprism.utils.lazy_singleton import LazySingleton
 from lifeprism.llm.agent.tools import (
     ToolRegistry,
-    LifeprismDataQueryTool
+    UserActivitySummaryTool
 )
 
 MAX_TOOL_CALL = 20
@@ -147,7 +147,7 @@ class AgentLoop:
             # 2. 构建tool description
             tools = []
             if msg.type == MessageType.CHAT:
-                self._tool_registry.register(LifeprismDataQueryTool())
+                self._tool_registry.register(UserActivitySummaryTool())
                 tools: list[dict[str, Any]] = self._tool_registry.get_definitions()
             elif msg.type == MessageType.CLASSIFY:
                 tools = []

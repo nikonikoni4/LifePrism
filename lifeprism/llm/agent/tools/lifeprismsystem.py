@@ -40,7 +40,7 @@ from lifeprism.llm.utils import build_time_segments
 # 先全部写在一个
 
 # 习惯养成暂时先不查询
-class LifeprismDataQueryTool(Tool):
+class UserActivitySummaryTool(Tool):
     """数据查询工具"""
     def __init__(self):
         pass 
@@ -48,12 +48,19 @@ class LifeprismDataQueryTool(Tool):
     @property
     def name(self) -> str:
         """函数调用中使用的工具名。"""
-        return "lifeprism_data_query"
+        return "query_user_activity_summary"
 
     @property
     def description(self) -> str:
         """工具功能说明。"""
-        return "查询 LifePrism 系统中的数据，包括电脑使用数据，用户自定义行为备注，AI行为备注，目标数据，todolist"
+        
+        return """查询lifeprism系统中用户的行为活动数据，包括
+        1. computer_usage_stats ： 电脑使用的高频时段和该时段内的分类统计数据。
+        2. user_behavior_notes ： 用户对于某段时间的自定义行为备注，是了解用户行为最直接的数据。
+        3. ai_behavior_notes ： AI对于某段时间的截图分析，由AI经过截图分析，不一定准确，仅供参考。
+        4. todolist ： 用户在这段时间内的任务列表。
+        """
+        
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -97,7 +104,7 @@ class LifeprismDataQueryTool(Tool):
             start_time = kwargs.get('start_time', '')
             end_time = kwargs.get('end_time', '')
 
-            return query_data(query_option, start_time, end_time)
+            return query_user_activity_summary(query_option, start_time, end_time)
         except ValueError as e:
             return f"参数错误: {str(e)}"
         except Exception as e:
@@ -144,7 +151,7 @@ def _category_stats(logs: list[dict], segment_start_time: str, segment_end_time:
 
     return {cat: (dur / total_duration * 100) for cat, dur in category_durations.items()}
 
-def query_data(query_option: set[str],start_time: str,end_time: str) -> str:
+def query_user_activity_summary(query_option: set[str],start_time: str,end_time: str) -> str:
     """查询 LifePrism 系统中的数据
     args :
         query_option: list
@@ -203,13 +210,13 @@ def query_data(query_option: set[str],start_time: str,end_time: str) -> str:
 
             parts.append(content)
     if 'user_behavior_notes' in query_option:
-        custom_blocks, _ = custom_block_repository.query_custom_blocks(QueryOptions(fields=['start_time', 'end_time', 'content']).with_time_range(start_time, end_time))
+        custom_blocks, _ = custom_block_repository.query_custom_blocks(QueryOptions(fields=['id','start_time', 'end_time', 'content']).with_time_range(start_time, end_time))
         if not custom_blocks:
             parts.append("## 用户自定义行为备注 \n 用户自定义行为备注为空")
         else:
             content = "## 用户自定义行为备注\n"
             for i in range(len(custom_blocks)):
-                content += f"{i}. {custom_blocks[i]['start_time']}~{custom_blocks[i]['end_time']} : {custom_blocks[i]['content']}\n"
+                content += f"{i}. 'block_id': {custom_blocks[i]['id']}, {custom_blocks[i]['start_time']}~{custom_blocks[i]['end_time']} : {custom_blocks[i]['content']}\n"
             parts.append(content)
     if 'ai_behavior_notes' in query_option:
         behaviors, _ = behavior_analysis_repository.query_behaviors(QueryOptions(fields=['start_time', 'end_time', 'behavior_summary']).with_time_range(start_time, end_time))
@@ -250,6 +257,299 @@ def query_data(query_option: set[str],start_time: str,end_time: str) -> str:
             parts.append(content)
     return "\n".join(parts)
 
+class UserComputerLogTool(Tool):
+    """用户电脑使用日志工具"""
+    def __init__(self):
+        pass
+
+    @property
+    def name(self) -> str:
+        """函数调用中使用的工具名。"""
+        return "query_user_activity_log"
+
+    @property
+    def description(self) -> str:
+        """工具功能说明。"""
+        return """查询用户电脑使用的详细日志，返回格式化的活动记录。
+        适用场景：需要查看用户在某个时间段内具体使用了哪些应用、窗口标题、使用时长等详细信息。
+        """
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        """工具参数的 JSON Schema"""
+        return {
+            "type": "object",
+            "properties": {
+                "start_time": {
+                    "type": "string",
+                    "description": "查询开始时间，格式：YYYY-MM-DD HH:MM:SS"
+                },
+                "end_time": {
+                    "type": "string",
+                    "description": "查询结束时间，格式：YYYY-MM-DD HH:MM:SS"
+                },
+                "duration_min": {
+                    "type": "integer",
+                    "description": "最小持续时长（秒），只返回持续时长大于等于此值的记录，默认45秒",
+                    "default": 45
+                }
+            },
+            "required": ["start_time", "end_time"]
+        }
+
+    async def execute(self, **kwargs: Any) -> Any:
+        """
+        使用给定参数执行工具
+
+        参数:
+            **kwargs: 工具特有参数
+
+        返回:
+            工具执行结果（字符串或内容块列表）
+        """
+        try:
+            start_time = kwargs.get('start_time', '')
+            end_time = kwargs.get('end_time', '')
+            duration_min = kwargs.get('duration_min', 45)
+            if not start_time or not end_time:
+                return "参数错误: start_time 和 end_time 是必填参数"
+            if not duration_min:
+                duration_min = 45
+            return query_user_activity_log(start_time, end_time, duration_min)
+        except ValueError as e:
+            return f"参数错误: {str(e)}"
+        except Exception as e:
+            return f"查询失败: {str(e)}"
+
+
+
+def _format_duration(seconds: int) -> str:
+    """将秒数格式化为可读的时长字符串
+
+    Args:
+        seconds: 持续时长（秒）
+
+    Returns:
+        str: 格式化后的时长，如 "1小时5分30秒"、"5分30秒"、"30秒"
+    """
+    if seconds < 60:
+        return f"{seconds}秒"
+
+    minutes = seconds // 60
+    remaining_seconds = seconds % 60
+
+    if minutes < 60:
+        if remaining_seconds > 0:
+            return f"{minutes}分{remaining_seconds}秒"
+        return f"{minutes}分"
+
+    hours = minutes // 60
+    remaining_minutes = minutes % 60
+
+    if remaining_minutes > 0 and remaining_seconds > 0:
+        return f"{hours}小时{remaining_minutes}分{remaining_seconds}秒"
+    elif remaining_minutes > 0:
+        return f"{hours}小时{remaining_minutes}分"
+    elif remaining_seconds > 0:
+        return f"{hours}小时{remaining_seconds}秒"
+    return f"{hours}小时"
+
+
+def query_user_activity_log(start_time: str, end_time: str, duration_min: int = 45) -> str:
+    """查询用户电脑使用的详细日志
+
+    Args:
+        start_time: 查询开始时间 YYYY-MM-DD HH:MM:SS
+        end_time: 查询结束时间 YYYY-MM-DD HH:MM:SS
+        duration_min: 最小持续时长（秒），只返回持续时长大于等于此值的记录，默认45秒
+
+    Returns:
+        str: 格式化的活动日志，每行格式为 "start_time ~ end_time app title duration category_name"
+    """
+    MAX_LEN = 40
+    result = f"[日志查询说明] 查询结果屏蔽了持续时间小于{duration_min}秒的记录。\n\n"
+
+    app_log, _ = computer_usage_repository.query_computer_usage_with_names(
+        QueryOptions(fields=['start_time', 'end_time', 'app', 'title', 'duration', 'category_id']).with_time_range(start_time, end_time)
+    )
+
+    # 时长过滤
+    app_log = [log for log in app_log if log.get('duration', 0) >= duration_min]
+
+    if not app_log:
+        return f"该时间段内没有持续时长大于等于{duration_min}秒的电脑使用记录。"
+
+    if len(app_log) > MAX_LEN:
+        total_log = len(app_log)
+        app_log = app_log[:MAX_LEN]
+        result += f"注意：当前搜索区间过大，共{total_log}条记录，仅展示前{MAX_LEN}条记录。展示的时间范围为：{app_log[0]['start_time']} ~ {app_log[-1]['end_time']}。\n\n"
+
+    result += "查询结果：\n"
+    # 解析输出
+    for log in app_log:
+        start = log.get('start_time', '')
+        end = log.get('end_time', '')
+        app = log.get('app', '未知应用')
+        title = log.get('title', '无标题')
+        duration_sec = log.get('duration', 0)
+        category = log.get('category_name', '未分类')
+
+        # 格式化持续时长
+        duration_str = _format_duration(duration_sec)
+
+        result += f"{start} ~ {end} {app} {title} {duration_str} {category}\n"
+
+    return result.strip()
+
+
+def create_or_update_user_behavior_note(
+    start_time: str,
+    end_time: str,
+    content: str,
+    block_id: int | None = None
+) -> str:
+    """创建或更新用户行为备注
+
+    Args:
+        start_time: 开始时间 YYYY-MM-DD HH:MM:SS
+        end_time: 结束时间 YYYY-MM-DD HH:MM:SS
+        content: 备注内容
+        block_id: 可选，时间块 ID。如果提供则更新，否则创建
+
+    Returns:
+        str: 操作结果描述
+
+    Raises:
+        ValueError: 时间格式错误或时间范围无效
+    """
+    from datetime import datetime
+
+    # 参数校验
+    try:
+        start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+    except ValueError as e:
+        raise ValueError(f"时间格式错误，期望格式为 'YYYY-MM-DD HH:MM:SS': {e}")
+
+    if start_dt >= end_dt:
+        raise ValueError("开始时间必须早于结束时间")
+
+    # 计算 duration（分钟）
+    duration = int((end_dt - start_dt).total_seconds() / 60)
+
+    # 硬编码 color
+    color = "#bfdbfe"
+
+    # 构建数据
+    data = {
+        "start_time": start_time,
+        "end_time": end_time,
+        "content": content,
+        "duration": duration,
+        "color": color
+    }
+
+    try:
+        if block_id is not None:
+            # 更新模式
+            result = custom_block_repository.update_custom_block(block_id, data)
+            if result:
+                return f"成功更新行为备注 (ID: {block_id})\n时间段: {start_time} ~ {end_time}\n内容: {content}\n时长: {duration} 分钟"
+            else:
+                return f"更新失败: 未找到 ID 为 {block_id} 的记录"
+        else:
+            # 创建模式
+            result = custom_block_repository.create_custom_block(data)
+            if result:
+                new_id = result.get('id', '未知')
+                return f"成功创建行为备注 (ID: {new_id})\n时间段: {start_time} ~ {end_time}\n内容: {content}\n时长: {duration} 分钟"
+            else:
+                return "创建失败: 未知错误"
+    except Exception as e:
+        raise Exception(f"数据库操作失败: {str(e)}")
+
+
+class UpdateUserBehaviorNoteTool(Tool):
+    """创建或更新用户行为备注工具"""
+    def __init__(self):
+        pass
+
+    @property
+    def name(self) -> str:
+        """函数调用中使用的工具名。"""
+        return "create_or_update_user_behavior_note"
+
+    @property
+    def description(self) -> str:
+        """工具功能说明。"""
+        return """创建或更新用户对某段时间的自定义行为备注。
+        适用场景：用户想要记录或修改某个时间段内做了什么事情。
+        如果提供 block_id 则更新现有记录，block_id可通过query_user_activity_summary工具获取。
+               """
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        """工具参数的 JSON Schema"""
+        return {
+            "type": "object",
+            "properties": {
+                "start_time": {
+                    "type": "string",
+                    "description": "开始时间，格式：YYYY-MM-DD HH:MM:SS"
+                },
+                "end_time": {
+                    "type": "string",
+                    "description": "结束时间，格式：YYYY-MM-DD HH:MM:SS"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "行为备注内容"
+                },
+                "block_id": {
+                    "type": "integer",
+                    "description": "可选，时间块 ID。如果提供则更新现有记录，否则创建新记录。 可以通过query_user_activity_summary工具获取。"
+                }
+            },
+            "required": ["start_time", "end_time", "content"]
+        }
+
+    async def execute(self, **kwargs: Any) -> Any:
+        """
+        使用给定参数执行工具
+
+        参数:
+            **kwargs: 工具特有参数
+                - start_time: 开始时间
+                - end_time: 结束时间
+                - content: 备注内容
+                - block_id: 可选，用于更新
+
+        返回:
+            工具执行结果（字符串）
+        """
+        try:
+            start_time = kwargs.get('start_time', '')
+            end_time = kwargs.get('end_time', '')
+            content = kwargs.get('content', '')
+            block_id = kwargs.get('block_id')
+
+            if not start_time or not end_time or not content:
+                return "参数错误: start_time、end_time 和 content 是必填参数"
+
+            return create_or_update_user_behavior_note(
+                start_time=start_time,
+                end_time=end_time,
+                content=content,
+                block_id=block_id
+            )
+        except ValueError as e:
+            return f"参数错误: {str(e)}"
+        except Exception as e:
+            return f"操作失败: {str(e)}"
+
+
 
 if __name__ == "__main__":
-    print(query_data(['computer_usage_stats'],"2026-04-28 00:00:00","2026-04-29 00:00:00"))
+    print(query_user_activity_summary(['computer_usage_stats'],"2026-04-28 00:00:00","2026-04-29 00:00:00"))
+    print(query_user_activity_log("2026-04-28 00:00:00","2026-04-29 00:00:00"))
+    print(create_or_update_user_behavior_note("2026-04-28 00:00:00","2026-04-29 00:00:00","用户在电脑上工作111",129))

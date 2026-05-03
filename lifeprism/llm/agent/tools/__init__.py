@@ -1,6 +1,7 @@
 from .registry import ToolRegistry
-from .lifeprismsystem import LifeprismDataQueryTool
+from .lifeprismsystem import UserActivitySummaryTool, UserComputerLogTool
 __all__ = [
-    "ToolRegistry"
-    "LifeprismDataQueryTool"
+    "ToolRegistry",
+    "UserActivitySummaryTool",
+    "UserComputerLogTool"
 ]
