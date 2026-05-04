@@ -1,73 +1,76 @@
-
-
-"""File system tools: read, write, edit, list.
-
-代码源自 https://github.com/HKUDS/nanobot.git
-Copyright (c) [2026.3.30] [HKUDS]
-Licensed under the MIT License.
-"""
-
-import difflib
-import mimetypes
+"""文件系统工具"""
+from typing import Optional, Dict, Any, Tuple
 from pathlib import Path
-from typing import Any
+from .base import Tool,ERROR,SUCCESS
+from lifeprism.utils import get_logger
+from lifeprism.config import settings
 
-from lifeprism.llm.agent.tools.base import Tool
-from lifeprism.llm.utils.helpers import build_image_content_blocks, detect_image_mime
+logger = get_logger(__name__)
 
+# 问题1：需要限制阅读工具的返回字符长度吗？
+# 需要：
+# 问题2：阅读工具需要什么参数
+# 1. 路径 2. 阅读的行号 3. 读取的最大字符限制  4. 正文内容还是md文档的frontmatter内容
+# 问题3： 要不要剥离 frontmatter内容 作为一个独立的工具？
+# 不，
+# 增加：only_frontmatter参数,表示是否只返回frontmatter内容
 
-def _resolve_path(
-    path: str,
-    workspace: Path | None = None,
-    allowed_dir: Path | None = None,
-    extra_allowed_dirs: list[Path] | None = None,
-) -> Path:
-    """Resolve path against workspace (if relative) and enforce directory restriction."""
-    p = Path(path).expanduser()
-    if not p.is_absolute() and workspace:
-        p = workspace / p
-    resolved = p.resolve()
-    if allowed_dir:
-        all_dirs = [allowed_dir] + (extra_allowed_dirs or [])
-        if not any(_is_under(resolved, d) for d in all_dirs):
-            raise PermissionError(f"Path {path} is outside allowed directory {allowed_dir}")
-    return resolved
+ALLOWED_DIRS = ['user','diary','agent']
 
 
-def _is_under(path: Path, directory: Path) -> bool:
-    try:
-        path.relative_to(directory.resolve())
-        return True
-    except ValueError:
-        return False
 
 
-class _FsTool(Tool):
-    """Shared base for filesystem tools — common init and path resolution."""
-
+class FileTool(Tool):
+    """文件系统工具基类，提供路径权限验证功能"""
+    
     def __init__(
-        self,
-        workspace: Path | None = None,
-        allowed_dir: Path | None = None,
-        extra_allowed_dirs: list[Path] | None = None,
+        self, 
+        workspace: Path  = settings.lifeprism_data_path, 
+        allowed_dirs: list[str]  = ALLOWED_DIRS
     ):
-        self._workspace = workspace
-        self._allowed_dir = allowed_dir
-        self._extra_allowed_dirs = extra_allowed_dirs
+        allowed_dir_path: list[Path] = []
+        
+        if workspace:
+            allowed_dir_path.append(Path(workspace).resolve())
+        
+        if allowed_dirs:
+            for dir_path in allowed_dirs:
+                resolved_path = Path(dir_path).resolve()
+                if resolved_path not in allowed_dir_path:
+                    allowed_dir_path.append(resolved_path)
+        
+        self.allowed_dir_path = allowed_dir_path
+    
+    def _check_workspace_permission(self, file_path: str) -> Tuple[bool, str]:
+        """检查文件路径是否在允许的工作目录内
+        
+        Args:
+            file_path: 要检查的文件路径
+            
+        Returns:
+            Tuple[bool, str]: (是否允许, 错误信息)
+                              如果允许，返回 (True, "")
+                              如果不允许，返回 (False, 错误信息)
+        """
+        if not self.allowed_dir_path:
+            return True, ""
+        
+        file_path_obj = Path(file_path).resolve()
+        
+        for allowed_dir in self.allowed_dir_path:
+            try:
+                file_path_obj.relative_to(allowed_dir)
+                return True, ""
+            except ValueError:
+                continue
+        
+        return False, f"没有权限访问该文件: {file_path}，允许的工作目录为: {[str(p) for p in self.allowed_dir_path]}"
 
-    def _resolve(self, path: str) -> Path:
-        return _resolve_path(path, self._workspace, self._allowed_dir, self._extra_allowed_dirs)
+class ReadFileTool(FileTool):
 
-
-# ---------------------------------------------------------------------------
-# read_file
-# ---------------------------------------------------------------------------
-
-class ReadFileTool(_FsTool):
-    """Read file contents with optional line-based pagination."""
-
-    _MAX_CHARS = 128_000
-    _DEFAULT_LIMIT = 2000
+    def __init__(self, workspace: Path | None = None, allowed_dirs: list[str] | None = None):
+        super().__init__(workspace, allowed_dirs)
+            
 
     @property
     def name(self) -> str:
@@ -75,327 +78,246 @@ class ReadFileTool(_FsTool):
 
     @property
     def description(self) -> str:
-        return (
-            "Read the contents of a file. Returns numbered lines. "
-            "Use offset and limit to paginate through large files."
+        return ("读取文件内容，支持按行号范围读取正文或读取 frontmatter。"
+                "返回：content(内容), read_ratio(已读内容占全文比例), last_line(最后行号)")
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "文件路径（绝对路径或相对路径）",
+                    "minLength": 1,
+                },
+                "start_line": {
+                    "type": "integer",
+                    "description": "开始行号（从0开始，相对于正文，only_frontmatter=True时忽略）",
+                    "minimum": 0,
+                    "default": 0,
+                },
+                "end_line": {
+                    "type": ["integer", "null"],
+                    "description": "结束行号（None表示读取到文件末尾，相对于正文）",
+                    "minimum": 0,
+                    "default": None,
+                },
+                "only_frontmatter": {
+                    "type": "boolean",
+                    "description": "是否只返回 frontmatter 内容（忽略 start_line 和 end_line）",
+                    "default": False,
+                },
+                "max_chars": {
+                    "type": "integer",
+                    "description": "最大字符数限制",
+                    "minimum": 1,
+                    "maximum": 100000,
+                    "default": 1024,
+                },
+            },
+            "required": ["file_path"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        """执行文件读取操作
+
+        Args:
+            **kwargs: 工具参数（file_path, start_line, end_line, only_frontmatter, max_chars）
+
+        Returns:
+            str: 执行结果（成功返回 JSON 格式的结果，失败返回错误信息）
+        """
+        import json
+
+        # 提取参数（使用默认值）
+        file_path = kwargs.get("file_path")
+        start_line = kwargs.get("start_line", 0)
+        end_line = kwargs.get("end_line", None)
+        only_frontmatter = kwargs.get("only_frontmatter", False)
+        max_chars = kwargs.get("max_chars", 1024)
+        if not file_path:
+            return f"{ERROR}文件路径不能为空"
+        
+        # 权限检查
+        is_allowed, error_msg = self._check_workspace_permission(file_path)
+        if not is_allowed:
+            return f"{ERROR}{error_msg}"
+        
+        # 调用底层实现
+        result = _read_file(
+            file_path=file_path,
+            start_line=start_line,
+            end_line=end_line,
+            only_frontmatter=only_frontmatter,
+            max_chars=max_chars,
         )
 
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "The file path to read"},
-                "offset": {
-                    "type": "integer",
-                    "description": "Line number to start reading from (1-indexed, default 1)",
-                    "minimum": 1,
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Maximum number of lines to read (default 2000)",
-                    "minimum": 1,
-                },
-            },
-            "required": ["path"],
-        }
+        # 检查是否有错误
+        if "error" in result:
+            
+            return f"{ERROR}{result['error']}"
 
-    async def execute(self, path: str, offset: int = 1, limit: int | None = None, **kwargs: Any) -> Any:
-        try:
-            fp = self._resolve(path)
-            if not fp.exists():
-                return f"Error: File not found: {path}"
-            if not fp.is_file():
-                return f"Error: Not a file: {path}"
-
-            raw = fp.read_bytes()
-            if not raw:
-                return f"(Empty file: {path})"
-
-            mime = detect_image_mime(raw) or mimetypes.guess_type(path)[0]
-            if mime and mime.startswith("image/"):
-                return build_image_content_blocks(raw, mime, str(fp), f"(Image file: {path})")
-
-            try:
-                text_content = raw.decode("utf-8")
-            except UnicodeDecodeError:
-                return f"Error: Cannot read binary file {path} (MIME: {mime or 'unknown'}). Only UTF-8 text and images are supported."
-
-            all_lines = text_content.splitlines()
-            total = len(all_lines)
-
-            if offset < 1:
-                offset = 1
-            if offset > total:
-                return f"Error: offset {offset} is beyond end of file ({total} lines)"
-
-            start = offset - 1
-            end = min(start + (limit or self._DEFAULT_LIMIT), total)
-            numbered = [f"{start + i + 1}| {line}" for i, line in enumerate(all_lines[start:end])]
-            result = "\n".join(numbered)
-
-            if len(result) > self._MAX_CHARS:
-                trimmed, chars = [], 0
-                for line in numbered:
-                    chars += len(line) + 1
-                    if chars > self._MAX_CHARS:
-                        break
-                    trimmed.append(line)
-                end = start + len(trimmed)
-                result = "\n".join(trimmed)
-
-            if end < total:
-                result += f"\n\n(Showing lines {offset}-{end} of {total}. Use offset={end + 1} to continue.)"
-            else:
-                result += f"\n\n(End of file — {total} lines total)"
-            return result
-        except PermissionError as e:
-            return f"Error: {e}"
-        except Exception as e:
-            return f"Error reading file: {e}"
+        # 返回成功结果
+        return f"{SUCCESS}{json.dumps(result, ensure_ascii=False)}"
 
 
-# ---------------------------------------------------------------------------
-# write_file
-# ---------------------------------------------------------------------------
+def _read_file(
+    file_path: str,
+    start_line: int = 0,
+    end_line: Optional[int] = None,
+    only_frontmatter: bool = False,
+    max_chars: int = 1024
+) -> Dict[str, Any]:
+    """读取文件内容
 
-class WriteFileTool(_FsTool):
-    """Write content to a file."""
+    Args:
+        file_path: 文件路径
+        start_line: 开始行号（从0开始，相对于正文，only_frontmatter=True时忽略）
+        end_line: 结束行号（None表示读取到文件末尾，相对于正文，only_frontmatter=True时忽略）
+        only_frontmatter: 是否只返回frontmatter内容
+        max_chars: 最大字符数限制
 
-    @property
-    def name(self) -> str:
-        return "write_file"
-
-    @property
-    def description(self) -> str:
-        return "Write content to a file at the given path. Creates parent directories if needed."
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "The file path to write to"},
-                "content": {"type": "string", "description": "The content to write"},
-            },
-            "required": ["path", "content"],
-        }
-
-    async def execute(self, path: str, content: str, **kwargs: Any) -> str:
-        try:
-            fp = self._resolve(path)
-            fp.parent.mkdir(parents=True, exist_ok=True)
-            fp.write_text(content, encoding="utf-8")
-            return f"Successfully wrote {len(content)} bytes to {fp}"
-        except PermissionError as e:
-            return f"Error: {e}"
-        except Exception as e:
-            return f"Error writing file: {e}"
-
-
-# ---------------------------------------------------------------------------
-# edit_file
-# ---------------------------------------------------------------------------
-
-def _find_match(content: str, old_text: str) -> tuple[str | None, int]:
-    """Locate old_text in content: exact first, then line-trimmed sliding window.
-
-    Both inputs should use LF line endings (caller normalises CRLF).
-    Returns (matched_fragment, count) or (None, 0).
+    Returns:
+        dict: 包含以下字段
+            - content (str): 文件内容（only_frontmatter=True时返回frontmatter，否则返回正文）
+            - read_ratio (float): 已读取内容占总内容的比例
+            - last_line (int): 当前返回内容的最后一行行号（从0开始）
     """
-    if old_text in content:
-        return old_text, content.count(old_text)
+    try:
+        # 读取文件所有行
+        file_path_obj = Path(file_path)
+        if not file_path_obj.exists():
+            logger.warning(f"文件不存在: {file_path}")
+            return {
+                "content": "",
+                "read_ratio": 0.0,
+                "last_line": -1,
+                "error": f"文件 {file_path} 不存在"
+            }
 
-    old_lines = old_text.splitlines()
-    if not old_lines:
-        return None, 0
-    stripped_old = [l.strip() for l in old_lines]
-    content_lines = content.splitlines()
+        with open(file_path, "r", encoding="utf-8") as f:
+            all_lines = f.readlines()
 
-    candidates = []
-    for i in range(len(content_lines) - len(stripped_old) + 1):
-        window = content_lines[i : i + len(stripped_old)]
-        if [l.strip() for l in window] == stripped_old:
-            candidates.append("\n".join(window))
+        # 分离 frontmatter 和正文
+        frontmatter_lines = []
+        body_lines = all_lines
+        frontmatter_end_idx = 0
 
-    if candidates:
-        return candidates[0], len(candidates)
-    return None, 0
+        # 检测 frontmatter（以 --- 开头和结尾）
+        if len(all_lines) > 0 and all_lines[0].strip() == "---":
+            # 查找第二个 ---
+            for i in range(1, len(all_lines)):
+                if all_lines[i].strip() == "---":
+                    frontmatter_end_idx = i + 1
+                    # 提取 frontmatter 内容（不包括 --- 分隔符）
+                    frontmatter_lines = all_lines[1:i]
+                    # 正文从 frontmatter 之后开始
+                    body_lines = all_lines[frontmatter_end_idx:]
+                    break
 
+        # 如果只读取 frontmatter
+        if only_frontmatter:
+            content = "".join(frontmatter_lines)
+            total_chars = sum(len(line) for line in frontmatter_lines)
 
-class EditFileTool(_FsTool):
-    """Edit a file by replacing text with fallback matching."""
+            # 应用字符数限制
+            if len(content) > max_chars:
+                content = content[:max_chars]
 
-    @property
-    def name(self) -> str:
-        return "edit_file"
+            # 计算读取比例和最后一行
+            read_ratio = len(content) / total_chars if total_chars > 0 else 0.0
+            last_line = len(frontmatter_lines) - 1 if frontmatter_lines else -1
 
-    @property
-    def description(self) -> str:
-        return (
-            "Edit a file by replacing old_text with new_text. "
-            "Supports minor whitespace/line-ending differences. "
-            "Set replace_all=true to replace every occurrence."
+            logger.debug(
+                f"读取文件 {file_path} frontmatter: "
+                f"字符数 {len(content)}/{total_chars}, "
+                f"比例 {read_ratio:.2%}"
+            )
+
+            return {
+                "content": content,
+                "read_ratio": read_ratio,
+                "last_line": last_line
+            }
+
+        # 读取正文内容
+        total_body_chars = sum(len(line) for line in body_lines)
+        total_body_lines = len(body_lines)
+
+        # 处理行号范围
+        if start_line >= total_body_lines:
+            logger.debug(f"start_line ({start_line}) 超出文件行数 ({total_body_lines})")
+            return {
+                "content": "",
+                "read_ratio": 0.0,
+                "last_line": -1
+            }
+
+        # 确定实际的结束行号
+        actual_end_line = end_line if end_line is not None else total_body_lines - 1
+        actual_end_line = min(actual_end_line, total_body_lines - 1)
+
+        # 检查行号范围有效性
+        if start_line > actual_end_line:
+            logger.debug(f"start_line ({start_line}) > end_line ({actual_end_line})")
+            return {
+                "content": "",
+                "read_ratio": 0.0,
+                "last_line": -1
+            }
+
+        # 截取行范围
+        selected_lines = body_lines[start_line:actual_end_line + 1]
+        content = "".join(selected_lines)
+
+        # 应用字符数限制
+        actual_last_line = actual_end_line
+        if len(content) > max_chars:
+            # 截断内容并重新计算最后一行
+            content = content[:max_chars]
+            # 计算截断后的实际行数
+            char_count = 0
+            for i, line in enumerate(selected_lines):
+                char_count += len(line)
+                if char_count >= max_chars:
+                    actual_last_line = start_line + i
+                    break
+
+        # 计算读取比例
+        read_ratio = len(content) / total_body_chars if total_body_chars > 0 else 0.0
+
+        logger.debug(
+            f"读取文件 {file_path}: "
+            f"行范围 [{start_line}, {actual_last_line}], "
+            f"字符数 {len(content)}/{total_body_chars}, "
+            f"比例 {read_ratio:.2%}"
         )
 
-    @property
-    def parameters(self) -> dict[str, Any]:
         return {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "The file path to edit"},
-                "old_text": {"type": "string", "description": "The text to find and replace"},
-                "new_text": {"type": "string", "description": "The text to replace with"},
-                "replace_all": {
-                    "type": "boolean",
-                    "description": "Replace all occurrences (default false)",
-                },
-            },
-            "required": ["path", "old_text", "new_text"],
+            "content": content,
+            "read_ratio": read_ratio,
+            "last_line": actual_last_line
         }
 
-    async def execute(
-        self, path: str, old_text: str, new_text: str,
-        replace_all: bool = False, **kwargs: Any,
-    ) -> str:
-        try:
-            fp = self._resolve(path)
-            if not fp.exists():
-                return f"Error: File not found: {path}"
-
-            raw = fp.read_bytes()
-            uses_crlf = b"\r\n" in raw
-            content = raw.decode("utf-8").replace("\r\n", "\n")
-            match, count = _find_match(content, old_text.replace("\r\n", "\n"))
-
-            if match is None:
-                return self._not_found_msg(old_text, content, path)
-            if count > 1 and not replace_all:
-                return (
-                    f"Warning: old_text appears {count} times. "
-                    "Provide more context to make it unique, or set replace_all=true."
-                )
-
-            norm_new = new_text.replace("\r\n", "\n")
-            new_content = content.replace(match, norm_new) if replace_all else content.replace(match, norm_new, 1)
-            if uses_crlf:
-                new_content = new_content.replace("\n", "\r\n")
-
-            fp.write_bytes(new_content.encode("utf-8"))
-            return f"Successfully edited {fp}"
-        except PermissionError as e:
-            return f"Error: {e}"
-        except Exception as e:
-            return f"Error editing file: {e}"
-
-    @staticmethod
-    def _not_found_msg(old_text: str, content: str, path: str) -> str:
-        lines = content.splitlines(keepends=True)
-        old_lines = old_text.splitlines(keepends=True)
-        window = len(old_lines)
-
-        best_ratio, best_start = 0.0, 0
-        for i in range(max(1, len(lines) - window + 1)):
-            ratio = difflib.SequenceMatcher(None, old_lines, lines[i : i + window]).ratio()
-            if ratio > best_ratio:
-                best_ratio, best_start = ratio, i
-
-        if best_ratio > 0.5:
-            diff = "\n".join(difflib.unified_diff(
-                old_lines, lines[best_start : best_start + window],
-                fromfile="old_text (provided)",
-                tofile=f"{path} (actual, line {best_start + 1})",
-                lineterm="",
-            ))
-            return f"Error: old_text not found in {path}.\nBest match ({best_ratio:.0%} similar) at line {best_start + 1}:\n{diff}"
-        return f"Error: old_text not found in {path}. No similar text found. Verify the file content."
-
-
-# ---------------------------------------------------------------------------
-# list_dir
-# ---------------------------------------------------------------------------
-
-class ListDirTool(_FsTool):
-    """List directory contents with optional recursion."""
-
-    _DEFAULT_MAX = 200
-    _IGNORE_DIRS = {
-        ".git", "node_modules", "__pycache__", ".venv", "venv",
-        "dist", "build", ".tox", ".mypy_cache", ".pytest_cache",
-        ".ruff_cache", ".coverage", "htmlcov",
-    }
-
-    @property
-    def name(self) -> str:
-        return "list_dir"
-
-    @property
-    def description(self) -> str:
-        return (
-            "List the contents of a directory. "
-            "Set recursive=true to explore nested structure. "
-            "Common noise directories (.git, node_modules, __pycache__, etc.) are auto-ignored."
-        )
-
-    @property
-    def parameters(self) -> dict[str, Any]:
+    except UnicodeDecodeError as e:
+        logger.error(f"文件编码错误 {file_path}: {e}")
         return {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "The directory path to list"},
-                "recursive": {
-                    "type": "boolean",
-                    "description": "Recursively list all files (default false)",
-                },
-                "max_entries": {
-                    "type": "integer",
-                    "description": "Maximum entries to return (default 200)",
-                    "minimum": 1,
-                },
-            },
-            "required": ["path"],
+            "content": "",
+            "read_ratio": 0.0,
+            "last_line": -1,
+            "error": f"文件编码错误: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"读取文件 {file_path} 时出错: {e}")
+        return {
+            "content": "",
+            "read_ratio": 0.0,
+            "last_line": -1,
+            "error": f"读取文件时出错: {str(e)}"
         }
 
-    async def execute(
-        self, path: str, recursive: bool = False,
-        max_entries: int | None = None, **kwargs: Any,
-    ) -> str:
-        try:
-            dp = self._resolve(path)
-            if not dp.exists():
-                return f"Error: Directory not found: {path}"
-            if not dp.is_dir():
-                return f"Error: Not a directory: {path}"
 
-            cap = max_entries or self._DEFAULT_MAX
-            items: list[str] = []
-            total = 0
 
-            if recursive:
-                for item in sorted(dp.rglob("*")):
-                    if any(p in self._IGNORE_DIRS for p in item.parts):
-                        continue
-                    total += 1
-                    if len(items) < cap:
-                        rel = item.relative_to(dp)
-                        items.append(f"{rel}/" if item.is_dir() else str(rel))
-            else:
-                for item in sorted(dp.iterdir()):
-                    if item.name in self._IGNORE_DIRS:
-                        continue
-                    total += 1
-                    if len(items) < cap:
-                        pfx = "📁 " if item.is_dir() else "📄 "
-                        items.append(f"{pfx}{item.name}")
 
-            if not items and total == 0:
-                return f"Directory {path} is empty"
 
-            result = "\n".join(items)
-            if total > cap:
-                result += f"\n\n(truncated, showing first {cap} of {total} entries)"
-            return result
-        except PermissionError as e:
-            return f"Error: {e}"
-        except Exception as e:
-            return f"Error listing directory: {e}"
