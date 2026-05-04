@@ -349,9 +349,9 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
                 - z-index: 0 确保在 ThumbnailBlock 之下
             */}
 
-            {/* 背景色块层 - 从时间刻度右边横跨到最右边 */}
+            {/* 背景色块层 - 从时间刻度右边到 behavior analysis 左侧 */}
             <div
-                className="absolute left-16 right-0 top-0"
+                className="absolute left-16 right-[100px] top-0"
                 style={{ height: `${24 * hourHeight}px`, zIndex: 0 }}
             >
                 {blocks.map(renderBlock)}
