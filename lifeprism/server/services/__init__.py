@@ -24,6 +24,7 @@ from . import diary_service     # Mind Space 日记
 from . import mood_service      # Mind Space 心情
 from . import value_service      # Mind Space 价值
 from . import commitment_service # Mind Space 承诺
+from . import add_on_service      # Add-on 扩展功能
 
 __all__ = [
     # 有状态服务单例
@@ -43,4 +44,5 @@ __all__ = [
     "mood_service",
     "value_service",
     "commitment_service",
+    "add_on_service",
 ]
