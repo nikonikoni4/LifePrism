@@ -477,8 +477,8 @@ class SettingsManager:
         if keyring_api_key:
             result['api_key'] = keyring_api_key
 
-        # 添加计算属性
-        result['lifeprism_data_path'] = self.lifeprism_data_path
+        # 添加计算属性（转为字符串供前端使用）
+        result['lifeprism_data_path'] = str(self.lifeprism_data_path)
 
         # 移除已废弃的独立路径字段
         result.pop('lw_db_path', None)
@@ -587,32 +587,33 @@ class SettingsManager:
         return self.get('monitor_type')
     
     @property
-    def aw_db_path(self) -> str:
-        return os.path.expanduser(self.get('aw_db_path')) if self.get('aw_db_path') else ''
-    
-    @property
-    def lw_db_path(self) -> str:
-        """获取 LifeWatch 数据库路径（自动推算，位于 lifeprismData/dataset/）"""
-        return str(self._lifeprism_data_path / 'dataset' / 'lifewatch_ai.db')
+    def aw_db_path(self) -> Path:
+        aw_path = os.path.expanduser(self.get('aw_db_path')) if self.get('aw_db_path') else ''
+        return Path(aw_path) if aw_path else Path()
 
     @property
-    def chat_db_path(self) -> str:
+    def lw_db_path(self) -> Path:
+        """获取 LifeWatch 数据库路径（自动推算，位于 lifeprismData/dataset/）"""
+        return self._lifeprism_data_path / 'dataset' / 'lifewatch_ai.db'
+
+    @property
+    def chat_db_path(self) -> Path:
         """获取聊天历史数据库路径（自动推算，位于 lifeprismData/dataset/）"""
-        return str(self._lifeprism_data_path / 'dataset' / 'chat_history.db')
-    
+        return self._lifeprism_data_path / 'dataset' / 'chat_history.db'
+
     @property
     def data_cleaning_threshold(self) -> int:
         return self.get('data_cleaning_threshold')
 
     @property
-    def lifeprism_data_path(self) -> str:
+    def lifeprism_data_path(self) -> Path:
         """获取 lifeprismData 目录路径（唯一数据源）"""
-        return str(self._lifeprism_data_path)
+        return self._lifeprism_data_path
 
     @property
-    def config_base_path(self) -> str:
+    def config_base_path(self) -> Path:
         """配置文件基础路径（固定，不随数据迁移）"""
-        return str(self._config_base_path)
+        return self._config_base_path
 
     @property
     def custom_data_path(self) -> Path:

@@ -300,7 +300,7 @@ class DataInitializer:
         """
         try:
             from lifeprism.config.settings_manager import settings
-            plan_dir = Path(settings.lifeprism_data_path) / "plan"
+            plan_dir = settings.lifeprism_data_path / "plan"
             plan_dir.mkdir(parents=True, exist_ok=True)
             md_path = plan_dir / EXAMPLE_PLAN_DOC_MD_FILENAME
 

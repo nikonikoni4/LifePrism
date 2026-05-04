@@ -570,9 +570,7 @@ class ProviderManager:
         self._allowed_providers: list[str] = []
         from lifeprism.config.settings_manager import settings
         # 打包环境和开发环境都使用_config_base_path
-        self._config_path = (
-                Path(settings.config_base_path) / "config" / "providers.yaml"
-            )
+        self._config_path = settings.config_base_path / "config" / "providers.yaml"
         if not self._config_path.exists():
             self._config_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self._config_path, "w", encoding="utf-8") as f:

@@ -35,7 +35,7 @@ logger = get_logger(__name__)
 def _get_plan_doc_dir() -> Path:
     """获取计划书目录路径"""
     from lifeprism.config.settings_manager import settings
-    return Path(settings.lifeprism_data_path) / "plan"
+    return settings.lifeprism_data_path / "plan"
 
 
 def _get_plan_doc_path(doc_id: str) -> Path:

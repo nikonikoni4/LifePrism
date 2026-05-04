@@ -21,16 +21,16 @@ class Context:
         """ 构建系统提示词 """
         parts = []
         type = msg.type
-        base = settings.lifeprism_data_path
+        base = str(settings.lifeprism_data_path)
 
-        # 
+        #
 
 
 
         if type == MessageType.CHAT:
             # 1. 加载基础文档
             # 加载agent.md + bootstrap.md + user.md + memory.md
-            
+
             agent_path    = base + "/agent/chat/agent.md"
             bootstrap_path = base + "/agent/chat/bootstrap.md"
             user_path     = base + "/user/user.md"
@@ -63,6 +63,22 @@ class Context:
     @staticmethod
     def build_prompt(system_prompt: str, message: list[dict[str, Any]]):
         return [{"role": "system", "content": system_prompt}] + message
+
+    def _build_identity(self)->str:
+        """构建系统运行环境提示词"""
+        return f"""
+        ## role
+        你是lifeprism系统的助手。
+        ## workspace
+        你当前工作目录是：{str(settings.lifeprism_data_path)}
+        """
+
+    def _build_bootstrap(self)->str:
+        """构建引导文档提示词"""
+        return f"""
+        ## bootstrap
+        你当前引导文档路径：{str(settings.lifeprism_data_path)}/agent/chat/bootstrap.md
+        """
 
 
 if __name__ == "__main__":

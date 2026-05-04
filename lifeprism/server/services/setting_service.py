@@ -39,7 +39,7 @@ def get_settings() -> SettingItems:
     config['provider_id_map'] = provider_manager.name_to_id_map
     # 添加 model_history
     config['model_history'] = settings.model_history
-    config['config_base_path'] = settings.config_base_path
+    config['config_base_path'] = str(settings.config_base_path)
     return SettingItems(**config)
 
 
@@ -268,7 +268,7 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
         new_path = target
     else:
         new_path = target / "lifeprismData"
-    current_path = Path(settings.lifeprism_data_path)
+    current_path = settings.lifeprism_data_path
 
     # 3. 验证
     try:

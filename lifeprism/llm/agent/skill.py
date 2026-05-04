@@ -20,7 +20,7 @@ class SkillLoad:
         "user-data-guide"
     ]
     def __init__(self):
-        self.skill_path = Path(settings.lifeprism_data_path + "/agent/skills" )
+        self.skill_path = settings.lifeprism_data_path / "agent" / "skills"
 
     def _escape_xml(self, s: Any) -> str:
         """XML 特殊字符转义"""

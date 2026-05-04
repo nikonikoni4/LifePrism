@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def get_db_path() -> Path:
     from lifeprism.config.settings_manager import settings
-    return Path(settings.lw_db_path)
+    return settings.lw_db_path
 
 
 def run_migration():

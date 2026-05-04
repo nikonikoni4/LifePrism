@@ -257,12 +257,12 @@ def build_monitor_runtime() -> MonitorRuntime:
     screenshot_store = ScreenshotStore(
         provider=screenshot_provider,
         capture_backend=MSSCaptureBackend(),
-        data_root=Path(settings.lifeprism_data_path),
+        data_root=settings.lifeprism_data_path,
         id_factory=lambda: f"cap-{uuid.uuid4().hex[:8]}",
     )
     cleanup_worker = ScreenshotCleanupWorker(
         provider=screenshot_provider,
-        data_root=Path(settings.lifeprism_data_path),
+        data_root=settings.lifeprism_data_path,
         retention_days=settings.get("screenshot_retention_days", 3),
     )
 

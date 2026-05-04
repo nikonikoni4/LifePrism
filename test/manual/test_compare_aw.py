@@ -59,7 +59,7 @@ def run_test():
     print("=== 开始对比测试 ===")
 
     # 获取路径
-    data_path = Path(settings.lifeprism_data_path)
+    data_path = settings.lifeprism_data_path
     monitor_db = str(data_path / "window_activity.db")
 
     # 1-3. 处理本地监控数据

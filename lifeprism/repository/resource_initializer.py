@@ -34,8 +34,8 @@ def initialize_resources() -> None:
     else:
         bundle_dir = Path(__file__).resolve().parent.parent.parent / "templates"
         templates_dir = bundle_dir
-    data_path = Path(settings.lifeprism_data_path)
-    config_path = Path(settings.config_base_path)
+    data_path = settings.lifeprism_data_path
+    config_path = settings.config_base_path
 
     if not templates_dir.exists():
         logger.warning(f"内嵌 templates 目录不存在，跳过资源初始化: {templates_dir}")

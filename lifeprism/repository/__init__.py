@@ -23,30 +23,29 @@ import os
 # 检查并创建数据库文件（如果不存在）
 # 防止 readonly 模式下因文件不存在导致连接失败
 for db_path in [settings.lw_db_path, settings.chat_db_path]:
-    if db_path and not os.path.exists(db_path):
+    if db_path and not db_path.exists():
         print(f"Creating database file: {db_path}")
         # 确保目录存在
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        with open(db_path, 'w') as f:
-            pass
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        db_path.touch()
 
 # LifeWatch 数据库（读写，使用连接池）
 lw_db_manager = DatabaseManager(
-    DB_PATH=settings.lw_db_path,
+    DB_PATH=str(settings.lw_db_path),
     use_pool=True,
     pool_size=5
 )
 
 # ActivityWatch 数据库（只读，使用连接池）
 aw_db_manager = DatabaseManager(
-    DB_PATH=settings.aw_db_path,
+    DB_PATH=str(settings.aw_db_path),
     use_pool=True,
     pool_size=1,
     readonly=True
 )
 
 chat_history_db_manager = DatabaseManager(
-    DB_PATH=settings.chat_db_path,
+    DB_PATH=str(settings.chat_db_path),
     use_pool=True,
     pool_size=2,
     readonly=True

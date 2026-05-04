@@ -176,8 +176,8 @@ def encode_image_to_base64(file_path: str) -> Optional[str]:
         Optional[str]: base64 data URL，失败返回 None
     """
     try:
-        full_path = os.path.join(settings.lifeprism_data_path, file_path)
-        mime_type, _ = mimetypes.guess_type(full_path)
+        full_path = settings.lifeprism_data_path / file_path
+        mime_type, _ = mimetypes.guess_type(str(full_path))
         mime_type = mime_type or "image/png"
 
         with open(full_path, "rb") as f:
@@ -270,8 +270,8 @@ def _is_image_screenshot(image_path_list: list[str]) -> bool:
     """
     # 转化为path，并判断是否存在图片
     for path in image_path_list:
-        full_path = os.path.join(settings.lifeprism_data_path, path)
-        if os.path.exists(full_path):
+        full_path = settings.lifeprism_data_path / path
+        if full_path.exists():
             # 图片存在，返回True
             return True
     # 所有图片都不存在，返回False

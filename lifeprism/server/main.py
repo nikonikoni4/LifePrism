@@ -165,7 +165,7 @@ async def lifespan(app: FastAPI):
         _log_startup_time("[OK] Database tables init (init_database)", _init_start)
 
         _migration_start = time.perf_counter()
-        run_migrations(settings.lw_db_path)
+        run_migrations(str(settings.lw_db_path))
         _log_startup_time("[OK] Database migrations (run_migrations)", _migration_start)
 
         _default_data_start = time.perf_counter()
@@ -520,7 +520,7 @@ if __name__ == "__main__":
     if is_frozen:
         logger.info("正在运行打包环境")
         # settings_manager 已初始化，直接从 settings 获取固定配置路径
-        config_path = os.path.join(settings.config_base_path, "config", "config.json")
+        config_path = str(settings.config_base_path / "config" / "config.json")
         print(f"[STARTUP] 打包环境，配置文件路径: {config_path}")
         port = find_available_port(config_path)
     else:

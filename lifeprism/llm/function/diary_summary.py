@@ -77,13 +77,13 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
         importence : 写日记时认为当前的内容是否重要
         custom_label : 写日记时的自定义标签
     """
-    behavior_md_path = Path(settings.lifeprism_data_path + "/user/daily_data/behavior.md")
+    behavior_md_path = settings.lifeprism_data_path / "user" / "daily_data" / "behavior.md"
     behavior_md_path.parent.mkdir(parents=True, exist_ok=True)
 
 
     year = date.split("-")[0]
     month = date.split("-")[1]
-    diary_context = read_md(Path(settings.lifeprism_data_path + f"/diary/{year}/{month}/{date}.md"))
+    diary_context = read_md(settings.lifeprism_data_path / "diary" / year / month / f"{date}.md")
     # 一个人情绪或状态应该都是有一定连续性的，所以一定要把这个连续性给捕捉到，然后这个连续性破坏一定会有关键事件，这个关键事件一定要重点分析，这样就能绘制一个心里折线图了
     sys_parts = []
     # 任务提示词
@@ -92,7 +92,7 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
     )
 
     # 用户画像（长期内容）
-    user_md_path = Path(settings.lifeprism_data_path + "/user/user.md")
+    user_md_path = settings.lifeprism_data_path / "user" / "user.md"
     user_md = read_md(user_md_path)
     if user_md:
         sys_parts.append(
@@ -107,7 +107,7 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
 
     user_parts = []
     # 用户近况
-    recent_status_md_path = Path(settings.lifeprism_data_path + "/user/daily_data/recent_status.md")
+    recent_status_md_path = settings.lifeprism_data_path / "user" / "daily_data" / "recent_status.md"
     recent_status_md = read_md(recent_status_md_path)
     if recent_status_md:
         user_parts.append(

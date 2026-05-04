@@ -55,7 +55,7 @@ _IMPORTANCE_LABEL_MAP = {
 def _get_diary_dir() -> Path:
     """获取日记目录路径"""
     from lifeprism.config.settings_manager import settings
-    return Path(settings.lifeprism_data_path) / "diary"
+    return settings.lifeprism_data_path / "diary"
 
 
 def _get_diary_file_path(date: str) -> Path:
