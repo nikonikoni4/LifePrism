@@ -50,7 +50,7 @@ async def update_expand_dir(id: str, data: UpdateExpandDirRequest):
     except ValueError as e:
         error_msg = str(e)
         # 判断是否为资源不存在错误
-        if "不存在" in error_msg or "ID" in error_msg:
+        if "不存在" in error_msg:
             logger.warning(f"更新扩展文件夹失败（资源不存在）: {e}")
             raise HTTPException(status_code=404, detail=error_msg)
         else:
