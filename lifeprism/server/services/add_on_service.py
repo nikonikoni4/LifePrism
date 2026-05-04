@@ -38,14 +38,13 @@ def _read_data() -> dict:
 
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return data
+            return json.load(f)
     except json.JSONDecodeError as e:
         logger.error(f"JSON 文件损坏: {e}")
-        return {"expand_dirs": []}
+        raise ValueError(f"配置文件格式错误: {e}")
     except Exception as e:
         logger.error(f"读取配置文件失败: {e}")
-        return {"expand_dirs": []}
+        raise IOError(f"无法读取配置文件: {e}")
 
 
 def _save_data(data: dict) -> None:
@@ -64,10 +63,13 @@ def _save_data(data: dict) -> None:
         os.replace(temp_path, file_path)
     except Exception as e:
         # 清理临时文件
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception as cleanup_error:
+            logger.warning(f"清理临时文件失败: {cleanup_error}")
         logger.error(f"保存配置文件失败: {e}")
-        raise RuntimeError("保存配置失败")
+        raise RuntimeError("保存配置失败") from e
 
 
 def _generate_next_id(existing_dirs: List[dict]) -> str:
@@ -87,16 +89,43 @@ def _generate_next_id(existing_dirs: List[dict]) -> str:
 
 
 def _validate_path(path: str) -> bool:
-    """验证路径是否存在且可访问"""
+    """验证路径是否存在且可访问，且不在系统关键目录中"""
     try:
-        p = Path(path)
+        p = Path(path).resolve()
+
+        # 禁止系统关键目录
+        forbidden_dirs = [
+            Path.home() / "AppData",
+            Path("C:/Windows") if os.name == 'nt' else Path("/etc"),
+            Path("C:/Program Files") if os.name == 'nt' else Path("/sys"),
+            Path("/proc") if os.name != 'nt' else None,
+        ]
+        forbidden_dirs = [d for d in forbidden_dirs if d is not None]
+
+        for forbidden in forbidden_dirs:
+            try:
+                if p.is_relative_to(forbidden.resolve()):
+                    logger.warning(f"拒绝访问系统目录: {p}")
+                    return False
+            except (ValueError, OSError):
+                continue
+
         return p.exists() and p.is_dir()
     except Exception:
         return False
 
 
 def get_all_expand_dirs() -> List[ExpandDirItem]:
-    """获取所有扩展文件夹配置"""
+    """
+    获取所有扩展文件夹配置
+
+    Returns:
+        List[ExpandDirItem]: 扩展文件夹配置列表，按 ID 升序排列
+
+    Raises:
+        ValueError: 配置文件格式错误
+        IOError: 无法读取配置文件
+    """
     data = _read_data()
     expand_dirs = data.get("expand_dirs", [])
 
@@ -115,7 +144,19 @@ def get_all_expand_dirs() -> List[ExpandDirItem]:
 
 
 def create_expand_dir(data: CreateExpandDirRequest) -> ExpandDirItem:
-    """创建新的扩展文件夹配置"""
+    """
+    创建新的扩展文件夹配置
+
+    Args:
+        data: 创建请求数据，包含 name, path, description, ai_index
+
+    Returns:
+        ExpandDirItem: 创建成功的扩展文件夹配置
+
+    Raises:
+        ValueError: 路径不存在、无法访问或已被添加
+        RuntimeError: 保存配置失败
+    """
     # 验证路径
     if not _validate_path(data.path):
         raise ValueError(f"路径不存在或无法访问: {data.path}")
@@ -152,7 +193,20 @@ def create_expand_dir(data: CreateExpandDirRequest) -> ExpandDirItem:
 
 
 def update_expand_dir(id: str, data: UpdateExpandDirRequest) -> ExpandDirItem:
-    """更新扩展文件夹配置"""
+    """
+    更新扩展文件夹配置
+
+    Args:
+        id: 扩展文件夹 ID
+        data: 更新请求数据，包含 name, path, description, ai_index
+
+    Returns:
+        ExpandDirItem: 更新后的扩展文件夹配置
+
+    Raises:
+        ValueError: 路径不存在、无法访问、已被添加或 ID 不存在
+        RuntimeError: 保存配置失败
+    """
     # 验证路径
     if not _validate_path(data.path):
         raise ValueError(f"路径不存在或无法访问: {data.path}")
@@ -196,7 +250,16 @@ def update_expand_dir(id: str, data: UpdateExpandDirRequest) -> ExpandDirItem:
 
 
 def delete_expand_dir(id: str) -> None:
-    """删除扩展文件夹配置（仅删除配置，不删除磁盘文件）"""
+    """
+    删除扩展文件夹配置（仅删除配置，不删除磁盘文件）
+
+    Args:
+        id: 扩展文件夹 ID
+
+    Raises:
+        ValueError: ID 不存在
+        RuntimeError: 保存配置失败
+    """
     # 读取现有数据
     file_data = _read_data()
     expand_dirs = file_data.get("expand_dirs", [])
