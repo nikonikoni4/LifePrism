@@ -161,31 +161,23 @@ export const ExpandDirManager: React.FC = () => {
 
     if (isLoading) {
         return (
-            <section className="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm">
-                <div className="flex items-center justify-center h-32">
-                    <div className="text-slate-500">加载中...</div>
-                </div>
-            </section>
+            <div className="flex items-center justify-center h-32">
+                <div className="text-slate-500">加载中...</div>
+            </div>
         );
     }
 
     return (
-        <section className="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm">
+        <div>
             <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
-                        <FolderOpen size={20} />
-                    </div>
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-800">扩展数据文件夹</h2>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                            建议增加诸如：读书笔记，个人文章等能够表达出个人价值观等内心活动的文件夹内容
-                        </p>
-                    </div>
+                <div>
+                    <p className="text-sm text-slate-600">
+                        建议增加诸如：读书笔记，个人文章等能够表达出个人价值观等内心活动的文件夹内容
+                    </p>
                 </div>
                 <button
                     onClick={handleAddNew}
-                    className="p-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-colors"
+                    className="p-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-colors flex-shrink-0"
                     title="添加扩展文件夹"
                 >
                     <Plus size={20} />
@@ -343,6 +335,6 @@ export const ExpandDirManager: React.FC = () => {
                     );
                 })}
             </div>
-        </section>
+        </div>
     );
 };
