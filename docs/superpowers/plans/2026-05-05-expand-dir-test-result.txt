@@ -1,0 +1,70 @@
+扩展数据文件夹功能测试报告
+================================
+
+测试日期: 2026-05-05
+测试人员: Claude Opus 4.7
+
+## 后端单元测试
+
+测试文件: test/server/services/test_add_on_service.py
+测试结果: ✅ 全部通过 (9/9)
+
+测试用例:
+- ✅ test_get_all_expand_dirs_empty - 获取空列表
+- ✅ test_create_expand_dir_success - 创建成功
+- ✅ test_create_expand_dir_invalid_path - 无效路径验证
+- ✅ test_create_expand_dir_duplicate_path - 重复路径检查
+- ✅ test_update_expand_dir_success - 更新成功
+- ✅ test_update_expand_dir_not_found - 更新不存在的项
+- ✅ test_delete_expand_dir_success - 删除成功
+- ✅ test_delete_expand_dir_not_found - 删除不存在的项
+- ✅ test_id_generation_sequence - ID 自增逻辑
+
+## API 手动测试
+
+服务端口: http://localhost:8101
+测试结果: ✅ 全部通过
+
+### 1. GET /api/v2/add_on/expand_dir
+- ✅ 获取空列表: {"expand_dirs":[]}
+- ✅ 获取包含数据的列表: 正常返回
+
+### 2. POST /api/v2/add_on/expand_dir
+- ✅ 创建成功: 返回 201，包含 id 和 created_at
+- ✅ 无效路径: 返回 400，错误信息 "路径不存在或无法访问"
+- ✅ 重复路径: 返回 400，错误信息 "该路径已被添加"
+
+### 3. PATCH /api/v2/add_on/expand_dir/{id}
+- ✅ 更新成功: 返回更新后的数据
+- ✅ ID 不存在: 返回 404，错误信息 "扩展文件夹不存在"
+
+### 4. DELETE /api/v2/add_on/expand_dir/{id}
+- ✅ 删除成功: 返回 204 状态码
+- ✅ 删除后验证: 列表为空
+
+## 功能验证
+
+- ✅ JSON 文件存储: 数据持久化正常
+- ✅ ID 自增逻辑: 从 "1" 开始正确自增
+- ✅ 路径验证: 正确检查路径存在性
+- ✅ 重复检查: 正确阻止重复路径
+- ✅ 错误处理: 所有错误场景都有清晰的错误提示
+- ✅ 原子性写入: 使用临时文件 + rename 保证数据安全
+
+## 前端测试
+
+由于前端需要 Electron 环境和路径选择功能，建议在桌面应用中进行完整测试：
+- 创建扩展文件夹
+- 编辑文件夹配置
+- 删除文件夹
+- 路径选择功能
+- AI 索引开关
+
+## 总结
+
+✅ 后端功能完全正常
+✅ API 端点全部工作正常
+✅ 错误处理完善
+✅ 数据持久化正常
+
+建议: 在桌面应用中进行前端 UI 测试以验证完整的用户体验。
