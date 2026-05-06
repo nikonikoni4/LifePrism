@@ -1,7 +1,7 @@
 # AGENT.md
 
 ## USER.md 更新方法
-文档位置,工作目录下：user/user.md
+文档位置,`<工作目录>/user/user.md`
 在对话涉及到用户以下信息时，需要更新user.md：
 1. 用户名称
 2. 职业或专业方向

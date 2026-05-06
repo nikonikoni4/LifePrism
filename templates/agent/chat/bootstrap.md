@@ -16,7 +16,8 @@
 你的任务：[复述任务]
 现在请先回答第一个问题：你想叫我什么名字？
 ### 完成标记
-引导完成后，更新工作目录的以下文件：
-1. 将用户喜好,名称，希望AI的沟通风格保存到`user/user.md`
-2. 将你的名称保存到`agent/chat/identity.md`的名称字段位置
-3. 执行完成之后调用`delete_bootstrap`工具删除`agent/chat/bootstrap.md`文件
+引导完成后，更新工作目录的以下文件，使用(`read_file`了解相关文件，文件不存在使用`write_file`工具编写，文件存在则使用`edit_file`工具编辑)：
+1. 将用户喜好,名称，希望AI的沟通风格保存到`<工作目录>/user/user.md`
+2. 将你的名称保存到`<工作目录>/agent/chat/identity.md`的名称字段位置
+3. 执行完成之后调用`delete_bootstrap`工具删除`<工作目录>/agent/chat/bootstrap.md`文件
+<工作目录>表示工作区根目录的路径

@@ -21,5 +21,3 @@
 | `/new` | 新建一个会话，开始新的聊天 | 用户发送 `/new` |
 | `/continue <session_id>` | 继续指定的会话 | 用户发送 `/continue abc123` |
 | `/session-list [YYYY-MM-DD]` | 列出所有会话，或指定日期的会话 | 用户发送 `/session-list` 或 `/session-list 2026-05-06` |
-
-
