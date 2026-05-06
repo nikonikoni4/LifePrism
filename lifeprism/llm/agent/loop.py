@@ -24,6 +24,9 @@ from lifeprism.llm.agent.tools import (
     UserMoodQuryTool,
     UserMoodCreateTool,
     DeleteBootstrapTool,
+    ReadFileTool,
+    WriteFileTool,
+    EditFileTool,
     ERROR
 )
 from collections import defaultdict
@@ -238,7 +241,10 @@ class AgentLoop:
                 self._tool_registry.register(UpdateUserBehaviorNoteTool())
                 self._tool_registry.register(UserMoodQuryTool())
                 self._tool_registry.register(UserMoodCreateTool())
-                if not (settings.lifeprism_data_path / 'agent/chat/bootstrap.md').exists():
+                self._tool_registry.register(ReadFileTool())
+                self._tool_registry.register(WriteFileTool())
+                self._tool_registry.register(EditFileTool())
+                if (settings.lifeprism_data_path / 'agent/chat/bootstrap.md').exists():
                     self._tool_registry.register(DeleteBootstrapTool())
                 tools: list[dict[str, Any]] = self._tool_registry.get_definitions()
             elif msg.type == MessageType.CLASSIFY:
@@ -246,7 +252,7 @@ class AgentLoop:
 
             # 3. 构建完整消息（含历史）
             session: Session = session_manager.get_or_create_session(msg.session_id)
-            session.add_message("user", content=msg.content)
+            session.add_message("user", content=Context._build_user_message(msg))
             if msg.type == MessageType.CHAT: 
                 session_manager.save_session(session)
 

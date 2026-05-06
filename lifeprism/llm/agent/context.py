@@ -1,10 +1,13 @@
 # context 模块负责加载各种外置文件，构建system prompt
 from typing import Any
-from lifeprism.llm.bus import InboundMessage, MessageType
+from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType
 from lifeprism.config import settings,ALLOWED_DIRS
 from pathlib import Path
 from lifeprism.llm.agent.skill import SkillLoad
-
+from datetime import datetime
+from lifeprism.utils import get_logger,DEBUG
+logger = get_logger(__name__)
+logger.setLevel(DEBUG)
 class Context:
     def __init__(self):
         pass
@@ -23,17 +26,11 @@ class Context:
         type = msg.type
         base = str(settings.lifeprism_data_path)
 
-        #
-
-
-
         if type == MessageType.CHAT:
             # 1. 系统环境层
             parts.append(Context._build_identity())
             # 2. agent定义层和用户定义层
             parts.append(Context._build_bootstrap())
-            # 3. memory层 短期记忆层
-            parts.append(Context._build_memory())
             # 4. 加载永远可用的和激活的skill
             skill_loader = SkillLoad()
             skill_load_list = (msg.extra or {}).get("skill_list",None)
@@ -41,6 +38,7 @@ class Context:
             parts.append(skill_loader.load_skills(skill_load_list))
             # 5. 加载可用skill list 
             parts.append(skill_loader.load_frontmatters(skill_load_list))
+            logger.debug("systemp prompt "+"\n\n".join(parts))
             return "\n\n".join(parts)
         elif type == MessageType.CLASSIFY:
             classify_preference_path = base + "agent/classify/classify_preference.md"
@@ -68,10 +66,10 @@ class Context:
 - 性格 : 温暖
             """
         if not content or ": " not in content or content.split("- 名称 :")[1].split("\n")[0].strip() == "":
-            content += f"你当前名称为空，需要向用户询问你的名字, 随后利用文件修改问工具修改工作目录下`user/user.md`的内容"
+            content += f"你当前名称为空，需要向用户询问你的名字, 随后利用文件修改问工具修改`<工作目录>/agent/chat/identity.md`的内容"
         elif ": " in content and content.split("- 名称 :")[1].split("\n")[0].strip() == "":
-            content += f"你当前名称为空，需要向用户询问你的名字, 随后利用文件修改问工具修改工作目录下`agent/chat/identity.md`的内容"
-        content += f"\n你当前工作目录是：{str(settings.lifeprism_data_path)},你能够阅读和操作的目录是：{ALLOWED_DIRS}"
+            content += f"你当前名称为空，需要向用户询问你的名字, 随后利用文件修改问工具修改`<工作目录>/agent/chat/identity.md`的内容"
+        content += f"\n你当前工作目录是：{str(settings.lifeprism_data_path.resolve())},你能够阅读和操作的目录是：{str(settings.lifeprism_data_path.resolve())}/{ALLOWED_DIRS}"
         return content
     @staticmethod
     def _build_bootstrap()->str:
@@ -104,17 +102,22 @@ class Context:
             parts.append(f"\n{user_content}")
         return "\n\n".join(parts)
     @staticmethod
-    def _build_memory()->str:
-        """构建短期记忆层词"""
-        memory_content = Context._read_file(str(settings.lifeprism_data_path / "user/memory.md"))
-        if not memory_content:
-            return ""
-        return f"""
-        ## memory
-        {memory_content}
-        """
+    def _build_run_context(msg:InboundMessage)->str:
+        """构建运行上下文提示词"""
+        if msg.channel == ChannelType.WECHAT:
+            channel_type = "微信"
+        elif msg.channel == ChannelType.LOCAL:
+            channel_type = "本地"
+        else:
+            channel_type = "未知"
 
+        return f"## runtime\n 当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n 当前对话方式：{channel_type}\n"
 
+    @staticmethod
+    def _build_user_message(msg:InboundMessage)->str:
+        """构建用户消息提示词"""
+        logger.debug("user message\n"+f"{Context._build_run_context(msg)}## user's message \n {msg.content}")
+        return f"{Context._build_run_context(msg)}## user's message \n {msg.content}"
 
 if __name__ == "__main__":
     from unittest.mock import MagicMock

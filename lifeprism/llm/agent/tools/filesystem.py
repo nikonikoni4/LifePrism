@@ -1,12 +1,12 @@
 """文件系统工具"""
 from typing import Optional, Dict, Any, Tuple
 from pathlib import Path
-from .base import Tool,ERROR,SUCCESS
-from lifeprism.utils import get_logger
+from lifeprism.llm.agent.tools.base import Tool,ERROR,SUCCESS
+from lifeprism.utils import get_logger,DEBUG
 from lifeprism.config import settings,ALLOWED_DIRS
 
 logger = get_logger(__name__)
-
+logger.debug(DEBUG)
 # 问题1：需要限制阅读工具的返回字符长度吗？
 # 需要：
 # 问题2：阅读工具需要什么参数
@@ -25,21 +25,17 @@ class _FileTool(Tool):
     
     def __init__(
         self, 
-        workspace: Path  = settings.lifeprism_data_path, 
-        allowed_dirs: list[str]  = ALLOWED_DIRS
+        workspace: Path | None = None, 
+        allowed_dirs: list[str] | None = None
     ):
-        allowed_dir_path: list[Path] = []
+        self.workspace = workspace if workspace else settings.lifeprism_data_path
+        self.allowed_dirs = allowed_dirs if allowed_dirs else ALLOWED_DIRS
+        self.allowed_dir_path: list[Path] = []
+        for dir in self.allowed_dirs:
+            self.allowed_dir_path.append(Path(self.workspace / dir).resolve())
+        logger.debug(f"允许的工作目录: {[self.allowed_dir_path]}")
         
-        if workspace:
-            allowed_dir_path.append(Path(workspace).resolve())
-        
-        if allowed_dirs:
-            for dir_path in allowed_dirs:
-                resolved_path = Path(dir_path).resolve()
-                if resolved_path not in allowed_dir_path:
-                    allowed_dir_path.append(resolved_path)
-        
-        self.allowed_dir_path = allowed_dir_path
+    
     
     def _check_workspace_permission(self, file_path: str) -> Tuple[bool, str]:
         """检查文件路径是否在允许的工作目录内
@@ -424,7 +420,7 @@ class WriteFileTool(_FileTool):
             'required':['file_path','content']
         }
 
-    def execute(self, **kwargs: Any) -> Any:
+    async def execute(self, **kwargs: Any) -> Any:
         file_path = kwargs.get("file_path")
         content = kwargs.get("content")
         if not file_path or not content:
@@ -438,7 +434,7 @@ class WriteFileTool(_FileTool):
             file_path = Path(file_path)
             # 确保路径和文件存在
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(file_path, "w", encoding="utf-8") as f:   
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
             return f"{SUCCESS}: 文件 {file_path} 已成功写入"
         except Exception as e:
@@ -532,3 +528,37 @@ class EditFileTool(_FileTool):
 
         # 返回成功结果
         return f"{SUCCESS}{result['message']}"
+if __name__ == "__main__":
+    def _check_workspace_permission(file_path: str) -> Tuple[bool, str]:
+        """检查文件路径是否在允许的工作目录内
+        
+        Args:
+            file_path: 要检查的文件路径
+            
+        Returns:
+            Tuple[bool, str]: (是否允许, 错误信息)
+                              如果允许，返回 (True, "")
+                              如果不允许，返回 (False, 错误信息)
+        """
+        workspace = settings.lifeprism_data_path
+        allowed_dirs =  ALLOWED_DIRS
+        allowed_dir_path: list[Path] = []
+        for dir in allowed_dirs:
+            allowed_dir_path.append(Path(workspace / dir).resolve())
+        print(f"允许的工作目录: {[allowed_dir_path]}")
+        if not allowed_dir_path:
+            return True, ""
+        
+        file_path_obj = Path(file_path).resolve()
+        
+        for allowed_dir in allowed_dir_path:
+            try:
+                file_path_obj.relative_to(allowed_dir)
+                return True, ""
+            except ValueError:
+                continue
+        
+        return False, f"没有权限访问该文件: {file_path}，允许的工作目录为: {[str(p) for p in allowed_dir_path]}"
+
+    
+    print(_check_workspace_permission("user/user.md"))
