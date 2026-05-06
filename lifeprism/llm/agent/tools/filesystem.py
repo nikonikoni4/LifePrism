@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any, Tuple
 from pathlib import Path
 from .base import Tool,ERROR,SUCCESS
 from lifeprism.utils import get_logger
-from lifeprism.config import settings
+from lifeprism.config import settings,ALLOWED_DIRS
 
 logger = get_logger(__name__)
 
@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 # 不，
 # 增加：only_frontmatter参数,表示是否只返回frontmatter内容
 
-ALLOWED_DIRS = ['user','diary','agent']
+
 
 
 

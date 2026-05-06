@@ -6,6 +6,7 @@ from .lifeprismsystem import (
     UserMoodQuryTool,
     UserMoodCreateTool
 )
+from .delete_bootstrap import DeleteBootstrapTool
 from .base import ERROR
 __all__ = [
     "ToolRegistry",
@@ -14,5 +15,6 @@ __all__ = [
     "UpdateUserBehaviorNoteTool",
     "UserMoodQuryTool",
     "UserMoodCreateTool",
+    "DeleteBootstrapTool",
     "ERROR"
 ]

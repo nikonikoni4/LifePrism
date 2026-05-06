@@ -13,6 +13,7 @@ from lifeprism.llm.bus import (
     ChannelType,
 )
 from lifeprism.llm.agent.context import Context
+from lifeprism.server.services import setting_service
 from lifeprism.utils import get_logger,DEBUG
 from lifeprism.utils.lazy_singleton import LazySingleton
 from lifeprism.llm.agent.tools import (
@@ -22,10 +23,11 @@ from lifeprism.llm.agent.tools import (
     UpdateUserBehaviorNoteTool,
     UserMoodQuryTool,
     UserMoodCreateTool,
+    DeleteBootstrapTool,
     ERROR
 )
 from collections import defaultdict
-
+from lifeprism.config import settings
 MAX_TOOL_CALL = 20
 MAX_TOOL_ERROR_COUNT = 5
 
@@ -236,6 +238,8 @@ class AgentLoop:
                 self._tool_registry.register(UpdateUserBehaviorNoteTool())
                 self._tool_registry.register(UserMoodQuryTool())
                 self._tool_registry.register(UserMoodCreateTool())
+                if not (settings.lifeprism_data_path / 'agent/chat/bootstrap.md').exists():
+                    self._tool_registry.register(DeleteBootstrapTool())
                 tools: list[dict[str, Any]] = self._tool_registry.get_definitions()
             elif msg.type == MessageType.CLASSIFY:
                 tools = []

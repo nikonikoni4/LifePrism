@@ -1,7 +1,7 @@
 # context 模块负责加载各种外置文件，构建system prompt
 from typing import Any
 from lifeprism.llm.bus import InboundMessage, MessageType
-from lifeprism.config import settings
+from lifeprism.config import settings,ALLOWED_DIRS
 from pathlib import Path
 from lifeprism.llm.agent.skill import SkillLoad
 
@@ -58,32 +58,30 @@ class Context:
     def build_prompt(system_prompt: str, message: list[dict[str, Any]]):
         return [{"role": "system", "content": system_prompt}] + message
     @staticmethod
-    def _build_identity(self)->str:
+    def _build_identity()->str:
         """构建系统运行环境提示词"""
-        return f"""
-        ## role
-        你是lifeprism系统的助手。
-        ## workspace
-        你当前工作目录是：{str(settings.lifeprism_data_path)}
-        """
+        content = Context._read_file(str(settings.lifeprism_data_path) + "/agent/chat/identity.md")
+        if not content:
+            content = """# identity
+            - 名称 : 
+- 身份 : lifeprism的系统AI助手，意在帮助用户查询和管理他们的生活数据，并且结合各种数据来回答用户的问题，为用户个人成长提供支持。
+- 性格 : 温暖
+            """
+        if not content or ": " not in content or content.split("- 名称 :")[1].split("\n")[0].strip() == "":
+            content += f"你当前名称为空，需要向用户询问你的名字, 随后利用文件修改问工具修改工作目录下`user/user.md`的内容"
+        elif ": " in content and content.split("- 名称 :")[1].split("\n")[0].strip() == "":
+            content += f"你当前名称为空，需要向用户询问你的名字, 随后利用文件修改问工具修改工作目录下`agent/chat/identity.md`的内容"
+        content += f"\n你当前工作目录是：{str(settings.lifeprism_data_path)},你能够阅读和操作的目录是：{ALLOWED_DIRS}"
+        return content
     @staticmethod
     def _build_bootstrap()->str:
         """构建引导文档提示词"""
-        # 读取 templates\agent\chat\bootstrap.json 判断是否经过了引导文档处理
-        # 因为不打算提供删除工具，所以只能增加一个文档记录状态
-        bootstrap_json_path = str(settings.lifeprism_data_path) + "/agent/chat/bootstrap.json"
-        content = Context._read_file(bootstrap_json_path)
-        if content:
-            content: dict = json.loads(content)
-            if content.get("bootstrap", False):
-                # 判断bootstrap.md 是否存在
-                bootstrap_path = str(settings.lifeprism_data_path) + "/agent/chat/bootstrap.md"
-                bootstrap_file = Context._read_file(bootstrap_path)
-                if bootstrap_file:
-                    return f"""
-                    ## bootstrap
-                    {bootstrap_file}
-                    """
+        parts = []
+        # 判断bootstrap.md 是否存在
+        bootstrap_path = str(settings.lifeprism_data_path) + "/agent/chat/bootstrap.md"
+        bootstrap_file = Context._read_file(bootstrap_path)
+        if bootstrap_file:
+            parts.append(f"{bootstrap_file}")
         # bootstrap.md 不存在 或 json 不存在 或 json bootstrap 为 False
         # 添加 soul.md agent.md tool.md user.md
         soul_path = str(settings.lifeprism_data_path / "agent/chat/soul.md")
@@ -95,15 +93,15 @@ class Context:
         agent_content = Context._read_file(agent_path)
         tool_content = Context._read_file(tool_path)
         user_content = Context._read_file(user_path)
-        parts = []
+        
         if soul_content:
-            parts.append(f"## soul\n{soul_content}")
+            parts.append(f"\n{soul_content}")
         if agent_content:
-            parts.append(f"## agent\n{agent_content}")
+            parts.append(f"\n{agent_content}")
         if tool_content:
-            parts.append(f"## tool\n{tool_content}")
+            parts.append(f"\n{tool_content}")
         if user_content:
-            parts.append(f"## user\n{user_content}")
+            parts.append(f"\n{user_content}")
         return "\n\n".join(parts)
     @staticmethod
     def _build_memory()->str:

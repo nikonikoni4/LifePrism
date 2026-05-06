@@ -16,7 +16,7 @@ from .provider_manager import (
     ProviderManager,
     provider_manager,
 )
-
+ALLOWED_DIRS = ['user','diary','agent']
 __all__ = [
     "settings",
     "database",
@@ -28,4 +28,5 @@ __all__ = [
     "get_all_settings",
     "provider_manager",
     "ProviderManager",
+    "ALLOWED_DIRS",
 ]
