@@ -520,6 +520,455 @@ class EditFileTool(_FileTool):
 
         # 返回成功结果
         return f"{SUCCESS}{result['message']}"
+
+
+
+class FileTreeTool(_FileTool):
+    """文件树工具，用于查看目录结构"""
+
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def name(self) -> str:
+        return "file_tree"
+
+    @property
+    def description(self) -> str:
+        return ("获取文件树结构。"
+                "使用场景：1. 查看文件树结构 2. 分析文件组织结构")
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "dir_path": {
+                    "type": "string",
+                    "description": "目录路径（绝对路径或相对路径）",
+                    "minLength": 1,
+                },
+                "recursive": {
+                    "type": "boolean",
+                    "description": "是否递归获取子目录（False=只看当前层，True=递归子目录）",
+                    "default": False,
+                },
+                "max_depth": {
+                    "type": "integer",
+                    "description": "递归最大深度（仅在 recursive=True 时生效）",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 3,
+                },
+                "show_hidden": {
+                    "type": "boolean",
+                    "description": "是否显示隐藏文件（以 . 开头的文件/文件夹）",
+                    "default": False,
+                },
+            },
+            "required": ["dir_path"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        """执行文件树查看操作
+
+        Args:
+            **kwargs: 工具参数（dir_path, recursive, max_depth, show_hidden）
+
+        Returns:
+            str: 执行结果（成功返回树形结构，失败返回错误信息）
+        """
+        import asyncio
+
+        # 提取参数
+        dir_path = kwargs.get("dir_path")
+        recursive = kwargs.get("recursive", False)
+        max_depth = kwargs.get("max_depth", 3)
+        show_hidden = kwargs.get("show_hidden", False)
+
+        # 参数验证
+        if not dir_path:
+            return f"{ERROR}目录路径不能为空"
+
+        # 权限检查
+        is_allowed, error_msg = self._check_workspace_permission(dir_path)
+        if not is_allowed:
+            return f"{ERROR}{error_msg}"
+
+        # 检查路径是否存在
+        dir_path_obj = Path(dir_path).resolve()
+        if not dir_path_obj.exists():
+            return f"{ERROR}目录 {dir_path} 不存在"
+
+        if not dir_path_obj.is_dir():
+            return f"{ERROR}路径 {dir_path} 不是目录"
+
+        # 构建 PowerShell 命令
+        # Get-ChildItem -Path "路径" [-Recurse] [-Depth N] [-Force] | Format-Table -AutoSize
+        cmd_parts = ["Get-ChildItem", "-Path", f'"{dir_path_obj}"']
+
+        if recursive:
+            cmd_parts.append("-Recurse")
+            cmd_parts.append("-Depth")
+            cmd_parts.append(str(max_depth))
+
+        if show_hidden:
+            cmd_parts.append("-Force")
+
+        # 添加格式化输出
+        cmd_parts.append("|")
+        cmd_parts.append("Format-Table")
+        cmd_parts.append("Mode,")
+        cmd_parts.append("LastWriteTime,")
+        cmd_parts.append("Length,")
+        cmd_parts.append("Name")
+        cmd_parts.append("-AutoSize")
+
+        cmd = " ".join(cmd_parts)
+
+        try:
+            # 执行 PowerShell 命令
+            process = await asyncio.create_subprocess_shell(
+                f'powershell -Command "{cmd}"',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await process.communicate()
+
+            if process.returncode != 0:
+                error_msg = stderr.decode('utf-8', errors='ignore').strip()
+                logger.error(f"执行 PowerShell 命令失败: {error_msg}")
+                return f"{ERROR}执行命令失败: {error_msg}"
+
+            output = stdout.decode('utf-8', errors='ignore').strip()
+
+            if not output:
+                return f"{SUCCESS}目录: {dir_path_obj}\n(空目录)"
+
+            result = f"目录: {dir_path_obj}\n{output}"
+            logger.debug(f"获取文件树 {dir_path} 成功")
+
+            return f"{SUCCESS}{result}"
+
+        except Exception as e:
+            logger.error(f"获取文件树 {dir_path} 时出错: {e}")
+            return f"{ERROR}获取文件树时出错: {str(e)}"
+
+
+
+
+class SearchFileTool(_FileTool):
+    """搜索文件工具，通过文件名匹配的方式搜索文件"""
+
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def name(self) -> str:
+        return "search_file"
+
+    @property
+    def description(self) -> str:
+        return "依据文件名称，搜索文件位置，支持模糊匹配"
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "file_name": {
+                    "type": "string",
+                    "description": "要搜索的文件名（支持模糊匹配）",
+                    "minLength": 1,
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "最大返回结果数",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 20,
+                },
+            },
+            "required": ["file_name"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        """执行文件搜索操作
+
+        Args:
+            **kwargs: 工具参数（file_name, max_results）
+
+        Returns:
+            str: 执行结果（成功返回 JSON 格式的文件列表，失败返回错误信息）
+        """
+        import json
+
+        file_name = kwargs.get("file_name")
+        max_results = kwargs.get("max_results", 20)
+
+        if not file_name:
+            return f"{ERROR}文件名不能为空"
+
+        # 调用异步底层实现
+        result = await _search_files(
+            file_name=file_name,
+            allowed_dirs=self.allowed_dir_path,
+            max_results=max_results
+        )
+
+        if "error" in result:
+            return f"{ERROR}{result['error']}"
+
+        return f"{SUCCESS}{json.dumps(result, ensure_ascii=False)}"
+
+async def _search_files(
+    file_name: str,
+    allowed_dirs: list[Path],
+    max_results: int = 20
+) -> Dict[str, Any]:
+    """搜索文件（使用 asyncio 异步执行 PowerShell Get-ChildItem 命令）
+
+    Args:
+        file_name: 要搜索的文件名
+        allowed_dirs: 允许搜索的目录列表
+        max_results: 最大返回结果数
+
+    Returns:
+        dict: 包含以下字段
+            - files (List[str]): 匹配的文件路径列表
+            - count (int): 匹配的文件数量
+    """
+    import asyncio
+    import platform
+
+    try:
+        matched_files = []
+
+        # 如果没有指定允许目录，返回空结果
+        if not allowed_dirs:
+            return {"files": [], "count": 0}
+
+        # 在每个允许的目录中搜索
+        for allowed_dir in allowed_dirs:
+            if not allowed_dir.exists():
+                continue
+
+            # 构建命令
+            if platform.system() == "Windows":
+                # Windows 使用 PowerShell
+                filter_pattern = f"*{file_name}*"
+                cmd = f"Get-ChildItem -Path '{allowed_dir}' -Recurse -File -Filter '{filter_pattern}' -ErrorAction SilentlyContinue | Select-Object -First {max_results - len(matched_files)} | ForEach-Object {{ $_.FullName }}"
+                shell_cmd = f"powershell -NoProfile -Command \"{cmd}\""
+            else:
+                # Linux/Mac 使用 find 命令
+                shell_cmd = f"find '{allowed_dir}' -type f -iname '*{file_name}*' -print | head -n {max_results - len(matched_files)}"
+
+            try:
+                # 使用 asyncio.create_subprocess_shell 异步执行命令
+                # 注意：不能使用 encoding 参数，需要手动解码
+                process = await asyncio.create_subprocess_shell(
+                    shell_cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+
+                # 等待命令执行完成，设置30秒超时
+                try:
+                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                        process.communicate(),
+                        timeout=30.0
+                    )
+
+                    # 手动解码输出
+                    stdout = stdout_bytes.decode('utf-8', errors='ignore') if stdout_bytes else ""
+
+                except asyncio.TimeoutError:
+                    logger.warning(f"搜索目录 {allowed_dir} 超时")
+                    process.kill()
+                    await process.wait()
+                    continue
+
+                if process.returncode == 0 and stdout:
+                    # 解析输出的文件路径
+                    for line in stdout.strip().split('\n'):
+                        line = line.strip()  # 去除行首尾的空白字符（包括 \r）
+                        if line:
+                            matched_files.append(line)
+
+                            # 达到最大结果数时停止
+                            if len(matched_files) >= max_results:
+                                break
+
+            except Exception as e:
+                logger.warning(f"搜索目录 {allowed_dir} 时出错: {e}")
+                continue
+
+            if len(matched_files) >= max_results:
+                break
+
+        logger.debug(f"搜索文件 '{file_name}': 找到 {len(matched_files)} 个匹配项")
+
+        return {
+            "files": matched_files,
+            "count": len(matched_files)
+        }
+
+    except Exception as e:
+        logger.error(f"搜索文件 '{file_name}' 时出错: {e}")
+        return {"error": f"搜索文件时出错: {str(e)}"}
+
+
+class SearchStringTool(_FileTool):
+    """搜索字符串工具，使用 Select-String 命令搜索文件内容"""
+
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def name(self) -> str:
+        return "search_string"
+
+    @property
+    def description(self) -> str:
+        return "在文件或文件夹中搜索匹配指定模式的字符串，支持正则表达式"
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "文件或文件夹路径（绝对路径或相对路径）",
+                    "minLength": 1,
+                },
+                "pattern": {
+                    "type": "string",
+                    "description": "搜索模式（支持正则表达式）",
+                    "minLength": 1,
+                },
+                "context_lines": {
+                    "type": "integer",
+                    "description": "上下文行数（显示匹配行前后的行数）",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "default": 0,
+                },
+            },
+            "required": ["path", "pattern"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        """执行字符串搜索操作
+
+        Args:
+            **kwargs: 工具参数（path, pattern, context_lines）
+
+        Returns:
+            str: 执行结果（成功返回命令输出，失败返回错误信息）
+        """
+        # 提取参数
+        path = kwargs.get("path")
+        pattern = kwargs.get("pattern")
+        context_lines = kwargs.get("context_lines", 0)
+
+        # 参数验证
+        if not path:
+            return f"{ERROR}路径不能为空"
+        if not pattern:
+            return f"{ERROR}搜索模式不能为空"
+
+        # 权限检查
+        is_allowed, error_msg = self._check_workspace_permission(path)
+        if not is_allowed:
+            return f"{ERROR}{error_msg}"
+
+        # 调用底层实现
+        result = await _search_string(
+            path=path,
+            pattern=pattern,
+            context_lines=context_lines,
+        )
+
+        # 检查是否有错误
+        if result.startswith("ERROR:"):
+            return f"{ERROR}{result[6:]}"
+
+        # 返回成功结果
+        return f"{SUCCESS}{result}"
+
+
+async def _search_string(
+    path: str,
+    pattern: str,
+    context_lines: int = 0
+) -> str:
+    """使用 Select-String 搜索文件内容
+
+    Args:
+        path: 文件或文件夹路径
+        pattern: 搜索模式（支持正则表达式）
+        context_lines: 上下文行数
+
+    Returns:
+        str: 命令执行结果或错误信息（错误信息以 "ERROR:" 开头）
+    """
+    import asyncio
+
+    try:
+        # 检查路径是否存在
+        path_obj = Path(path)
+        if not path_obj.exists():
+            logger.warning(f"路径不存在: {path}")
+            return f"ERROR:路径 {path} 不存在"
+
+        # 构建 PowerShell 命令
+        # 转义特殊字符
+        escaped_pattern = pattern.replace("'", "''")
+        escaped_path = str(path_obj.resolve()).replace("'", "''")
+
+        # 判断是文件还是文件夹
+        if path_obj.is_file():
+            cmd = f"Select-String -Path '{escaped_path}' -Pattern '{escaped_pattern}'"
+        else:
+            cmd = f"Select-String -Path '{escaped_path}\\*' -Pattern '{escaped_pattern}' -Recurse"
+
+        # 添加上下文参数
+        if context_lines > 0:
+            cmd += f" -Context {context_lines}"
+
+        logger.debug(f"执行搜索命令: {cmd}")
+
+        # 异步执行命令
+        process = await asyncio.create_subprocess_shell(
+            f"powershell.exe -NoProfile -Command \"{cmd}\"",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            encoding='utf-8'
+        )
+
+        stdout, stderr = await process.communicate()
+
+        # 检查错误
+        if process.returncode != 0 and stderr:
+            logger.error(f"搜索命令执行失败: {stderr}")
+            return f"ERROR:搜索失败: {stderr}"
+
+        # 如果没有匹配结果
+        if not stdout.strip():
+            logger.debug(f"未找到匹配项: pattern={pattern}, path={path}")
+            return "未找到匹配项"
+
+        logger.info(f"搜索完成: pattern={pattern}, path={path}")
+        return stdout
+
+    except Exception as e:
+        logger.error(f"搜索字符串时出错: {e}")
+        return f"ERROR:搜索时出错: {str(e)}"
+
+
+
 if __name__ == "__main__":
     def _check_workspace_permission(file_path: str) -> Tuple[bool, str]:
         """检查文件路径是否在允许的工作目录内
@@ -554,3 +1003,7 @@ if __name__ == "__main__":
 
     
     print(_check_workspace_permission("user/user.md"))
+
+
+
+    
