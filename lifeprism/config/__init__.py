@@ -11,12 +11,13 @@ from .settings_manager import (
     set_setting,
     get_api_key,
     get_all_settings,
+    ALLOWED_DIRS
 )
 from .provider_manager import (
     ProviderManager,
     provider_manager,
 )
-ALLOWED_DIRS = ['user','diary','agent']
+
 __all__ = [
     "settings",
     "database",

@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any, Tuple
 from pathlib import Path
 from lifeprism.llm.agent.tools.base import Tool,ERROR,SUCCESS
 from lifeprism.utils import get_logger,DEBUG
-from lifeprism.config import settings,ALLOWED_DIRS
+from lifeprism.config import settings
 
 logger = get_logger(__name__)
 logger.debug(DEBUG)
@@ -22,18 +22,10 @@ logger.debug(DEBUG)
 
 class _FileTool(Tool):
     """文件系统工具基类，提供路径权限验证功能"""
-    
-    def __init__(
-        self, 
-        workspace: Path | None = None, 
-        allowed_dirs: list[str] | None = None
-    ):
-        self.workspace = workspace if workspace else settings.lifeprism_data_path
-        self.allowed_dirs = allowed_dirs if allowed_dirs else ALLOWED_DIRS
-        self.allowed_dir_path: list[Path] = []
-        for dir in self.allowed_dirs:
-            self.allowed_dir_path.append(Path(self.workspace / dir).resolve())
-        logger.debug(f"允许的工作目录: {[self.allowed_dir_path]}")
+
+    def __init__(self):
+        self.allowed_dir_path: list[Path] = settings.allowed_dir_path
+        logger.debug(f"允许的工作目录: {self.allowed_dir_path}")
         
     
     
@@ -64,8 +56,8 @@ class _FileTool(Tool):
 
 class ReadFileTool(_FileTool):
 
-    def __init__(self, workspace: Path | None = None, allowed_dirs: list[str] | None = None):
-        super().__init__(workspace, allowed_dirs)
+    def __init__(self):
+        super().__init__()
             
 
     @property
@@ -393,8 +385,8 @@ def _replace_content(
 
 
 class WriteFileTool(_FileTool):
-    def __init__(self, workspace: Path | None = None, allowed_dirs: list[str] | None = None):
-        super().__init__(workspace, allowed_dirs)
+    def __init__(self):
+        super().__init__()
 
     @property
     def name(self) -> str:
@@ -446,8 +438,8 @@ class WriteFileTool(_FileTool):
 class EditFileTool(_FileTool):
     """编辑文件工具，通过内容替换的方式修改文件"""
 
-    def __init__(self, workspace: Path | None = None, allowed_dirs: list[str] | None = None):
-        super().__init__(workspace, allowed_dirs)
+    def __init__(self):
+        super().__init__()
 
     @property
     def name(self) -> str:

@@ -14,6 +14,8 @@ import keyring
 from pathlib import Path
 from typing import Any, Optional, List, Dict
 
+ALLOWED_DIRS = ['user','diary','agent']
+
 # Keyring 服务名称
 KEYRING_SERVICE_NAME = "lifeprism"
 KEYRING_API_KEY_USERNAME = "api_key"  # 保留向后兼容
@@ -101,6 +103,9 @@ class SettingsManager:
         # 6. 检查数据路径安全性（仅打包环境）
         self._check_data_path_safety()
 
+        # 7. 解析允许的工作目录路径
+        self._allowed_dir_path = self._resolve_allowed_dir_paths()
+
     def _resolve_config_base_path(self) -> Path:
         """
         配置文件基础路径（固定，不随数据迁移）
@@ -137,6 +142,22 @@ class SettingsManager:
 
         # 2. 默认与配置基础路径相同
         return self._config_base_path
+
+    def _resolve_allowed_dir_paths(self) -> List[Path]:
+        """
+        解析允许的工作目录路径列表
+
+        基于 lifeprism_data_path 和 ALLOWED_DIRS 计算允许访问的目录绝对路径
+
+        Note: 必须在 _lifeprism_data_path 初始化后调用
+
+        Returns:
+            List[Path]: 允许的目录路径列表
+        """
+        allowed_paths: List[Path] = []
+        for dir_name in ALLOWED_DIRS:
+            allowed_paths.append((self._lifeprism_data_path / dir_name).resolve())
+        return allowed_paths
 
     def _setup_logging(self) -> None:
         """配置日志文件输出"""
@@ -619,6 +640,11 @@ class SettingsManager:
     def custom_data_path(self) -> Path:
         """DEPRECATED: 使用 lifeprism_data_path 替代"""
         return self._lifeprism_data_path
+
+    @property
+    def allowed_dir_path(self) -> List[Path]:
+        """获取允许的工作目录路径列表"""
+        return self._allowed_dir_path
 
     @property
     def model_history(self) -> Dict[str, Dict[str, Any]]:
