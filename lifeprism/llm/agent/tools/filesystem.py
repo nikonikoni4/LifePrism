@@ -54,6 +54,10 @@ class _FileTool(Tool):
         
         return False, f"没有权限访问该文件: {file_path}，允许的工作目录为: {[str(p) for p in self.allowed_dir_path]}"
 
+# ==========================================
+# 读取文件工具
+# ==========================================
+
 class ReadFileTool(_FileTool):
 
     def __init__(self):
@@ -306,6 +310,66 @@ def _read_file(
         }
 
 
+
+# ==========================================
+# 写入文件工具
+# ==========================================
+
+
+
+class WriteFileTool(_FileTool):
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def name(self) -> str:
+        return "write_file"
+    @property
+    def description(self) -> str:
+        return "编写一个全新的文件"
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            'type':'object',
+            'properties':{
+                'file_path':{
+                    'type':'string',
+                    'description':'文件路径'
+                },
+                'content':{
+                    'type':'string',
+                    'description':'文件内容'
+                }
+            },
+            'required':['file_path','content']
+        }
+
+    async def execute(self, **kwargs: Any) -> Any:
+        file_path = kwargs.get("file_path")
+        content = kwargs.get("content")
+        if not file_path or not content:
+            return f"{ERROR}: 缺少参数 file_path 或 content"
+        try:
+            # 确保文件路径在允许的目录中
+            permission,error_msg = self._check_workspace_permission(file_path)
+            if not permission:
+                return f"{ERROR}: {error_msg}"
+            # 写入文件内容
+            file_path = Path(file_path)
+            # 确保路径和文件存在
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            return f"{SUCCESS}: 文件 {file_path} 已成功写入"
+        except Exception as e:
+            return f"{ERROR}: 写入文件 {file_path} 时出错: {str(e)}"
+        
+
+# ==========================================
+# 编辑文件内容工具
+# ==========================================
+
 def _replace_content(
     file_path: str,
     old_content: str,
@@ -381,59 +445,6 @@ def _replace_content(
     except Exception as e:
         logger.error(f"更新文件 {file_path} 时出错: {e}")
         return {"error": f"更新文件时出错: {str(e)}"}
-
-
-
-class WriteFileTool(_FileTool):
-    def __init__(self):
-        super().__init__()
-
-    @property
-    def name(self) -> str:
-        return "write_file"
-    @property
-    def description(self) -> str:
-        return "编写一个全新的文件"
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        return {
-            'type':'object',
-            'properties':{
-                'file_path':{
-                    'type':'string',
-                    'description':'文件路径'
-                },
-                'content':{
-                    'type':'string',
-                    'description':'文件内容'
-                }
-            },
-            'required':['file_path','content']
-        }
-
-    async def execute(self, **kwargs: Any) -> Any:
-        file_path = kwargs.get("file_path")
-        content = kwargs.get("content")
-        if not file_path or not content:
-            return f"{ERROR}: 缺少参数 file_path 或 content"
-        try:
-            # 确保文件路径在允许的目录中
-            permission,error_msg = self._check_workspace_permission(file_path)
-            if not permission:
-                return f"{ERROR}: {error_msg}"
-            # 写入文件内容
-            file_path = Path(file_path)
-            # 确保路径和文件存在
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            return f"{SUCCESS}: 文件 {file_path} 已成功写入"
-        except Exception as e:
-            return f"{ERROR}: 写入文件 {file_path} 时出错: {str(e)}"
-        
-
-
 
 class EditFileTool(_FileTool):
     """编辑文件工具，通过内容替换的方式修改文件"""
@@ -521,7 +532,9 @@ class EditFileTool(_FileTool):
         # 返回成功结果
         return f"{SUCCESS}{result['message']}"
 
-
+# ==========================================
+# 文件树工具
+# ==========================================
 
 class FileTreeTool(_FileTool):
     """文件树工具，用于查看目录结构"""
@@ -656,7 +669,9 @@ class FileTreeTool(_FileTool):
             return f"{ERROR}获取文件树时出错: {str(e)}"
 
 
-
+# ==========================================
+# 搜索文件工具
+# ==========================================
 
 class SearchFileTool(_FileTool):
     """搜索文件工具，通过文件名匹配的方式搜索文件"""
@@ -818,6 +833,9 @@ async def _search_files(
         logger.error(f"搜索文件 '{file_name}' 时出错: {e}")
         return {"error": f"搜索文件时出错: {str(e)}"}
 
+# ==========================================
+# 文件内容搜索工具
+# ==========================================
 
 class SearchStringTool(_FileTool):
     """搜索字符串工具，使用 Select-String 命令搜索文件内容"""
