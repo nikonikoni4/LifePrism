@@ -1,12 +1,58 @@
 """文件系统工具"""
 from typing import Optional, Dict, Any, Tuple
 from pathlib import Path
+import re
 from lifeprism.llm.agent.tools.base import Tool,ERROR,SUCCESS
 from lifeprism.utils import get_logger,DEBUG
 from lifeprism.config import settings
 
 logger = get_logger(__name__)
 logger.debug(DEBUG)
+
+# 高危命令黑名单（不区分大小写）
+DANGEROUS_COMMANDS = [
+    # 删除命令
+    r'\brm\b', r'\brmdir\b', r'\bdel\b', r'\berase\b', r'\brd\b',
+    r'Remove-Item', r'Remove-ItemProperty', r'Clear-RecycleBin',
+    # 格式化命令
+    r'\bformat\b', r'Format-Volume',
+    # 系统关键操作
+    r'\bshutdown\b', r'\breboot\b', r'Stop-Computer', r'Restart-Computer',
+    # 权限提升
+    r'\bsudo\b', r'\brunas\b', r'Start-Process.*-Verb RunAs',
+    # 网络命令（可能外泄数据）
+    r'\bcurl\b.*http', r'\bwget\b.*http', r'Invoke-WebRequest.*http', r'Invoke-RestMethod.*http',
+    # 进程操作
+    r'\bkill\b', r'\btaskkill\b', r'Stop-Process',
+    # 注册表操作
+    r'\breg\b.*delete', r'\breg\b.*add', r'Remove-ItemProperty.*HKLM', r'Remove-ItemProperty.*HKCU',
+    # 磁盘操作
+    r'\bdiskpart\b', r'Clear-Disk', r'Initialize-Disk',
+    # 危险的 PowerShell 命令
+    r'Invoke-Expression', r'Invoke-Command', r'iex\b', r'icm\b',
+    # 文件覆盖
+    r'>\s*nul', r'2>&1', r'/dev/null',
+]
+
+def _check_command_safety(command: str) -> Tuple[bool, str]:
+    """检查命令是否包含高危操作
+
+    Args:
+        command: 要检查的命令字符串
+
+    Returns:
+        Tuple[bool, str]: (是否安全, 错误信息)
+                          如果安全，返回 (True, "")
+                          如果不安全，返回 (False, 错误信息)
+    """
+    for pattern in DANGEROUS_COMMANDS:
+        match = re.search(pattern, command, re.IGNORECASE)
+        if match:
+            matched = match.group()
+            logger.warning(f"检测到高危命令: {matched} in command: {command}")
+            return False, f"检测到高危命令模式: {matched}，已阻止执行"
+
+    return True, ""
 # 问题1：需要限制阅读工具的返回字符长度吗？
 # 需要：
 # 问题2：阅读工具需要什么参数
@@ -618,7 +664,9 @@ class FileTreeTool(_FileTool):
 
         # 构建 PowerShell 命令
         # Get-ChildItem -Path "路径" [-Recurse] [-Depth N] [-Force] | Format-Table -AutoSize
-        cmd_parts = ["Get-ChildItem", "-Path", f'"{dir_path_obj}"']
+        # 转义双引号防止命令执行失败
+        escaped_path = str(dir_path_obj).replace('"', '`"')
+        cmd_parts = ["Get-ChildItem", "-Path", f'"{escaped_path}"']
 
         if recursive:
             cmd_parts.append("-Recurse")
@@ -639,22 +687,30 @@ class FileTreeTool(_FileTool):
 
         cmd = " ".join(cmd_parts)
 
+        # 安全检查：防止命令注入
+        is_safe, error_msg = _check_command_safety(cmd)
+        if not is_safe:
+            logger.error(f"FileTreeTool 命令安全检查失败: {error_msg}")
+            return f"{ERROR}{error_msg}"
+
         try:
             # 执行 PowerShell 命令
             process = await asyncio.create_subprocess_shell(
                 f'powershell -Command "{cmd}"',
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                encoding='utf-8',
+                errors='ignore'
             )
 
             stdout, stderr = await process.communicate()
 
             if process.returncode != 0:
-                error_msg = stderr.decode('utf-8', errors='ignore').strip()
+                error_msg = stderr.strip()
                 logger.error(f"执行 PowerShell 命令失败: {error_msg}")
                 return f"{ERROR}执行命令失败: {error_msg}"
 
-            output = stdout.decode('utf-8', errors='ignore').strip()
+            output = stdout.strip()
 
             if not output:
                 return f"{SUCCESS}目录: {dir_path_obj}\n(空目录)"
@@ -685,7 +741,8 @@ class SearchFileTool(_FileTool):
 
     @property
     def description(self) -> str:
-        return "依据文件名称，搜索文件位置，支持模糊匹配"
+        return ("依据文件名称，搜索文件位置，支持模糊匹配。"
+                "注意：大型目录搜索可能需要较长时间，单个目录超时限制为30秒")
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -772,36 +829,46 @@ async def _search_files(
             # 构建命令
             if platform.system() == "Windows":
                 # Windows 使用 PowerShell
+                # 转义单引号防止命令注入
+                escaped_dir = str(allowed_dir).replace("'", "''")
                 filter_pattern = f"*{file_name}*"
-                cmd = f"Get-ChildItem -Path '{allowed_dir}' -Recurse -File -Filter '{filter_pattern}' -ErrorAction SilentlyContinue | Select-Object -First {max_results - len(matched_files)} | ForEach-Object {{ $_.FullName }}"
+                escaped_pattern = filter_pattern.replace("'", "''")
+                cmd = f"Get-ChildItem -Path '{escaped_dir}' -Recurse -File -Filter '{escaped_pattern}' -ErrorAction SilentlyContinue | Select-Object -First {max_results - len(matched_files)} | ForEach-Object {{ $_.FullName }}"
                 shell_cmd = f"powershell -NoProfile -Command \"{cmd}\""
             else:
                 # Linux/Mac 使用 find 命令
                 shell_cmd = f"find '{allowed_dir}' -type f -iname '*{file_name}*' -print | head -n {max_results - len(matched_files)}"
 
+            # 安全检查：防止命令注入
+            is_safe, error_msg = _check_command_safety(shell_cmd)
+            if not is_safe:
+                logger.error(f"SearchFileTool 命令安全检查失败: {error_msg}")
+                continue  # 跳过这个目录，继续搜索其他目录
+
             try:
                 # 使用 asyncio.create_subprocess_shell 异步执行命令
-                # 注意：不能使用 encoding 参数，需要手动解码
                 process = await asyncio.create_subprocess_shell(
                     shell_cmd,
                     stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
+                    stderr=asyncio.subprocess.PIPE,
+                    encoding='utf-8',
+                    errors='ignore'
                 )
 
                 # 等待命令执行完成，设置30秒超时
                 try:
-                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                    stdout, stderr = await asyncio.wait_for(
                         process.communicate(),
                         timeout=30.0
                     )
 
-                    # 手动解码输出
-                    stdout = stdout_bytes.decode('utf-8', errors='ignore') if stdout_bytes else ""
-
                 except asyncio.TimeoutError:
                     logger.warning(f"搜索目录 {allowed_dir} 超时")
-                    process.kill()
-                    await process.wait()
+                    try:
+                        process.kill()
+                        await process.wait()
+                    except ProcessLookupError:
+                        pass  # 进程已结束
                     continue
 
                 if process.returncode == 0 and stdout:
@@ -910,18 +977,18 @@ class SearchStringTool(_FileTool):
         )
 
         # 检查是否有错误
-        if result.startswith("ERROR:"):
-            return f"{ERROR}{result[6:]}"
+        if "error" in result:
+            return f"{ERROR}{result['error']}"
 
         # 返回成功结果
-        return f"{SUCCESS}{result}"
+        return f"{SUCCESS}{result['result']}"
 
 
 async def _search_string(
     path: str,
     pattern: str,
     context_lines: int = 0
-) -> str:
+) -> Dict[str, Any]:
     """使用 Select-String 搜索文件内容
 
     Args:
@@ -930,7 +997,10 @@ async def _search_string(
         context_lines: 上下文行数
 
     Returns:
-        str: 命令执行结果或错误信息（错误信息以 "ERROR:" 开头）
+        dict: 包含以下字段
+            - result (str): 搜索结果
+            或
+            - error (str): 错误信息
     """
     import asyncio
 
@@ -939,7 +1009,7 @@ async def _search_string(
         path_obj = Path(path)
         if not path_obj.exists():
             logger.warning(f"路径不存在: {path}")
-            return f"ERROR:路径 {path} 不存在"
+            return {"error": f"路径 {path} 不存在"}
 
         # 构建 PowerShell 命令
         # 转义特殊字符
@@ -958,9 +1028,16 @@ async def _search_string(
 
         logger.debug(f"执行搜索命令: {cmd}")
 
+        # 安全检查：防止命令注入
+        full_cmd = f"powershell.exe -NoProfile -Command \"{cmd}\""
+        is_safe, error_msg = _check_command_safety(full_cmd)
+        if not is_safe:
+            logger.error(f"SearchStringTool 命令安全检查失败: {error_msg}")
+            return {"error": error_msg}
+
         # 异步执行命令
         process = await asyncio.create_subprocess_shell(
-            f"powershell.exe -NoProfile -Command \"{cmd}\"",
+            full_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             encoding='utf-8'
@@ -971,19 +1048,19 @@ async def _search_string(
         # 检查错误
         if process.returncode != 0 and stderr:
             logger.error(f"搜索命令执行失败: {stderr}")
-            return f"ERROR:搜索失败: {stderr}"
+            return {"error": f"搜索失败: {stderr}"}
 
         # 如果没有匹配结果
         if not stdout.strip():
             logger.debug(f"未找到匹配项: pattern={pattern}, path={path}")
-            return "未找到匹配项"
+            return {"result": "未找到匹配项"}
 
-        logger.info(f"搜索完成: pattern={pattern}, path={path}")
-        return stdout
+        logger.debug(f"搜索完成: pattern={pattern}, path={path}")
+        return {"result": stdout}
 
     except Exception as e:
         logger.error(f"搜索字符串时出错: {e}")
-        return f"ERROR:搜索时出错: {str(e)}"
+        return {"error": f"搜索时出错: {str(e)}"}
 
 
 
