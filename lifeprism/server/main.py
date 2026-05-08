@@ -215,6 +215,14 @@ async def lifespan(app: FastAPI):
 
 
 
+    # 启动定时任务调度器
+    from lifeprism.server.services.schedule_service import schedule_service
+    try:
+        schedule_service.start()
+        logger.info("[STARTUP] ScheduleService started")
+    except Exception as e:
+        logger.error(f"启动定时任务服务失败: {e}")
+
     # 初始化 ChatBot 服务和 AgentLoop
     from lifeprism.llm.agent.loop import agent_loop
     import asyncio
@@ -246,7 +254,14 @@ async def lifespan(app: FastAPI):
         await loop_task
     except asyncio.CancelledError:
         logger.info("[SHUTDOWN] AgentLoop stopped")
-    
+
+    # 关闭时：停止定时任务调度器
+    try:
+        schedule_service.shutdown()
+        logger.info("[SHUTDOWN] ScheduleService stopped")
+    except Exception as e:
+        logger.warning(f"定时任务服务关闭时出现警告: {e}")
+
     # 关闭时：清理 ChatBot 资源
     try:
         from lifeprism.server.services.chatbot_service import chatbot_service
