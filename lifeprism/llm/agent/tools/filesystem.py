@@ -10,18 +10,28 @@ logger = get_logger(__name__)
 logger.debug(DEBUG)
 
 # 高危命令黑名单（不区分大小写）
+#
+# ⚠️ 已知安全问题（待修复）：
+# 1. 黑名单机制容易被绕过（别名、字符串拼接、编码、变量等）
+# 2. 正则表达式存在 ReDoS 风险（如 .* 的灾难性回溯）
+# 3. 转义机制不完整（只转义了部分特殊字符）
+# 4. 根本解决方案：使用 create_subprocess_exec 参数化执行，或用 Python 原生代码替代 PowerShell
+#    参考：asyncio.create_subprocess_exec("powershell", "-Command", "Get-ChildItem", "-LiteralPath", path)
+# 5. 当前黑名单仅作为辅助防护，不应作为唯一的安全措施
+#
 DANGEROUS_COMMANDS = [
     # 删除命令
     r'\brm\b', r'\brmdir\b', r'\bdel\b', r'\berase\b', r'\brd\b',
     r'Remove-Item', r'Remove-ItemProperty', r'Clear-RecycleBin',
-    # 格式化命令
-    r'\bformat\b', r'Format-Volume',
+    # 格式化磁盘命令（注意：不包括 Format-Table 等格式化输出命令）
+    r'\bformat\s+[a-z]:', r'Format-Volume',
     # 系统关键操作
     r'\bshutdown\b', r'\breboot\b', r'Stop-Computer', r'Restart-Computer',
-    # 权限提升
-    r'\bsudo\b', r'\brunas\b', r'Start-Process.*-Verb RunAs',
-    # 网络命令（可能外泄数据）
-    r'\bcurl\b.*http', r'\bwget\b.*http', r'Invoke-WebRequest.*http', r'Invoke-RestMethod.*http',
+    # 权限提升（修复 ReDoS：.* 改为 [^;]* 限制回溯）
+    r'\bsudo\b', r'\brunas\b', r'Start-Process[^;]*-Verb\s+RunAs',
+    # 网络命令（可能外泄数据，修复 ReDoS）
+    r'\bcurl\b[^;]*https?://', r'\bwget\b[^;]*https?://',
+    r'Invoke-WebRequest[^;]*https?://', r'Invoke-RestMethod[^;]*https?://',
     # 进程操作
     r'\bkill\b', r'\btaskkill\b', r'Stop-Process',
     # 注册表操作
@@ -29,13 +39,24 @@ DANGEROUS_COMMANDS = [
     # 磁盘操作
     r'\bdiskpart\b', r'Clear-Disk', r'Initialize-Disk',
     # 危险的 PowerShell 命令
-    r'Invoke-Expression', r'Invoke-Command', r'iex\b', r'icm\b',
+    r'Invoke-Expression', r'Invoke-Command', r'\biex\b', r'\bicm\b',
     # 文件覆盖
     r'>\s*nul', r'2>&1', r'/dev/null',
 ]
 
 def _check_command_safety(command: str) -> Tuple[bool, str]:
     """检查命令是否包含高危操作
+
+    ⚠️ 安全警告：
+    此函数使用黑名单机制，存在以下已知问题：
+    1. 可被绕过：PowerShell 别名、字符串拼接、编码、变量引用等方式可绕过检测
+    2. 转义不完整：当前只转义了部分特殊字符（单引号、双引号），但 PowerShell 还有
+       反引号(`)、美元符($)、分号(;)、管道(|)、与号(&)等特殊字符未处理
+    3. 仅作辅助防护：不应作为唯一的安全措施，建议配合权限限制、沙箱等机制
+
+    根本解决方案：
+    - 使用 asyncio.create_subprocess_exec() 参数化执行，避免 shell 解析
+    - 或使用 Python 原生代码（pathlib、os 等）替代 PowerShell 命令
 
     Args:
         command: 要检查的命令字符串
@@ -663,8 +684,11 @@ class FileTreeTool(_FileTool):
             return f"{ERROR}路径 {dir_path} 不是目录"
 
         # 构建 PowerShell 命令
-        # Get-ChildItem -Path "路径" [-Recurse] [-Depth N] [-Force] | Format-Table -AutoSize
-        # 转义双引号防止命令执行失败
+        # Get-ChildItem -Path "路径" [-Recurse] [-Depth N] [-Force]
+        #
+        # ⚠️ 安全警告：当前使用字符串拼接构建命令，存在命令注入风险
+        # 转义双引号只能防止语法错误，无法完全防止命令注入
+        # 建议使用 create_subprocess_exec 或 Python 原生代码（pathlib）替代
         escaped_path = str(dir_path_obj).replace('"', '`"')
         cmd_parts = ["Get-ChildItem", "-Path", f'"{escaped_path}"']
 
@@ -675,15 +699,6 @@ class FileTreeTool(_FileTool):
 
         if show_hidden:
             cmd_parts.append("-Force")
-
-        # 添加格式化输出
-        cmd_parts.append("|")
-        cmd_parts.append("Format-Table")
-        cmd_parts.append("Mode,")
-        cmd_parts.append("LastWriteTime,")
-        cmd_parts.append("Length,")
-        cmd_parts.append("Name")
-        cmd_parts.append("-AutoSize")
 
         cmd = " ".join(cmd_parts)
 

@@ -7,7 +7,14 @@ from .lifeprismsystem import (
     UserMoodCreateTool
 )
 from .delete_bootstrap import DeleteBootstrapTool
-from .filesystem import ReadFileTool, WriteFileTool, EditFileTool
+from .filesystem import (
+    ReadFileTool,
+    WriteFileTool,
+    EditFileTool,
+    FileTreeTool,
+    SearchFileTool,
+    SearchStringTool
+)
 from .base import ERROR
 __all__ = [
     "ToolRegistry",
@@ -20,5 +27,8 @@ __all__ = [
     "ReadFileTool",
     "WriteFileTool",
     "EditFileTool",
+    "FileTreeTool",
+    "SearchFileTool",
+    "SearchStringTool",
     "ERROR"
 ]
