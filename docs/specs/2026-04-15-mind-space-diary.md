@@ -1,7 +1,7 @@
 ---
 version: 1.0
 created_at: 2026-04-15
-updated_at: 2026-04-15
+updated_at: 2026-05-08
 last_updated: 从旧 PRD 迁移为正式 spec
 abstract: Mind Space 日记界面功能规格，定义日记的存储、API 契约、前端交互设计和模板管理机制
 id: mind-space-diary
@@ -31,6 +31,7 @@ contract_refs:
 | 1.0 | 从旧 PRD 迁移为正式 spec，核对代码实现 |
 | 1.1 | 新增 `diary_source_hash` 字段、`范围更新 AI 总结` 入口及三种更新模式 |
 | 1.2 | 补充 behavior.md 次级标题规则：所有目标日期内容写在 `### 日记总结` 下 |
+| 1.3 | 新增 `POST /ai_summary/range` 接口，明确 AI 总结两种形式（单日手动生成 / 范围批量生成） |
 
 ## Overview
 
@@ -48,9 +49,10 @@ contract_refs:
 1. 日记的存储机制（文件 + 数据库混合存储）
 2. 日记 CRUD API 契约
 3. 日记 AI 总结手动生成 API 契约
-4. 模板管理 API 契约
-5. 心情和重要程度的枚举值、颜色方案
-6. 前端交互设计原则和 UI 组件规格
+4. 日记 AI 总结范围批量生成 API 契约（`POST /ai_summary/range`）
+5. 模板管理 API 契约
+6. 心情和重要程度的枚举值、颜色方案
+7. 前端交互设计原则和 UI 组件规格
 
 本 spec 不覆盖：
 - 前端具体实现细节（组件树、文件路径）
@@ -109,6 +111,26 @@ contract_refs:
 - 以 JSON 数组格式存储在数据库
 - 前端显示为中性样式（浅灰背景 + 深灰文字），与心情/重要程度标签视觉区分
 
+### AI 总结
+
+AI 总结功能提供两种生成形式：
+
+**1. 单日手动生成**
+- 入口：日记界面 AI 总结卡片左上角"AI 总结"按钮
+- 行为：调用 `POST /diary/{date}/ai_summary`，为当前日期生成 AI 总结并覆盖写入
+- 适用场景：用户编辑完当日日记后，手动触发单篇总结
+
+**2. 范围批量生成**
+- 入口：日记界面左下角设置按钮 → 上拉菜单 → "范围更新 AI 总结"
+- 行为：调用 `POST /diary/ai_summary/range`，对指定日期范围内的日记批量生成 AI 总结
+- 更新模式（`existing_summary_mode`）：
+  - `regenerate_all`：全部重生成，无视现有摘要，对范围内所有日记重新生成 AI 总结
+  - `regenerate_changed`：仅更新正文变化的已有摘要，通过 `diary_source_hash` 比对判断正文是否变更
+  - `skip_existing`：跳过已有摘要，仅对尚无 AI 总结的日记生成摘要
+- 适用场景：批量补全历史日记总结、定期更新已变更日记的总结
+
+`diary_source_hash` 字段：记录当前 `ai_summary` 对应的正文内容 hash，正文变更后 hash 变化，用于 `regenerate_changed` 模式判断是否需要重新生成。
+
 ### 模板系统
 
 - 模板以 `.md` 文件形式存储在 `lifeprismData/diary/template/` 目录
@@ -146,6 +168,7 @@ CREATE TABLE IF NOT EXISTS diary (
 | `PATCH` | `/diary/{date}` | 更新日记 meta（心情、重要程度、自定义 tag） | `UpdateDiaryMetaRequest` | `DiaryItem` |
 | `PUT` | `/diary/{date}/content` | 保存日记 md 内容，同时更新 word_count | `SaveDiaryContentRequest` | `DiaryItem` |
 | `POST` | `/diary/{date}/ai_summary` | 手动生成指定日期日记 AI 总结，成功后覆盖 `ai_summary` | - | `{ content: string }` |
+| `POST` | `/diary/ai_summary/range` | 按日期范围批量生成 AI 总结，支持三种更新模式 | `GenerateDiaryAISummaryRangeRequest` | `GenerateDiaryAISummaryRangeResponse` |
 | `GET` | `/diary/list` | 获取日期范围内的日记列表（仅 meta，不含内容） | Query: `start_date`, `end_date` | `DiaryListResponse` |
 
 #### 模板管理
@@ -207,6 +230,31 @@ CREATE TABLE IF NOT EXISTS diary (
 }
 ```
 
+**ExistingSummaryMode（枚举）：**
+```typescript
+"regenerate_all"      // 全部重生成，无视现有摘要
+"regenerate_changed"  // 仅更新正文变化的已有摘要（通过 diary_source_hash 比对）
+"skip_existing"       // 跳过已有摘要，仅对尚无总结的日记生成
+```
+
+**GenerateDiaryAISummaryRangeRequest：**
+```typescript
+{
+  start_date: string;              // 开始日期 YYYY-MM-DD
+  end_date: string;                // 结束日期 YYYY-MM-DD
+  existing_summary_mode: ExistingSummaryMode;  // 现有总结更新模式
+}
+```
+
+**GenerateDiaryAISummaryRangeResponse：**
+```typescript
+{
+  created_dates: string[];         // 新建总结的日期列表
+  updated_dates: string[];         // 更新总结的日期列表
+  skipped_dates: string[];         // 跳过的日期列表
+}
+```
+
 **TemplateItem：**
 ```typescript
 {
@@ -225,7 +273,7 @@ CREATE TABLE IF NOT EXISTS diary (
 
 ### 路由顺序约束
 
-**关键约束：** `/list` 和 `/templates/*` 路由必须在 `/{date}` 之前注册，否则 FastAPI 会将 "list"/"templates" 误识别为 date 参数。
+**关键约束：** `/list`、`/templates/*` 和 `/ai_summary/range` 路由必须在 `/{date}` 之前注册，否则 FastAPI 会将 "list"/"templates"/"ai_summary" 误识别为 date 参数。
 
 当前实现已正确处理此约束。
 
@@ -314,7 +362,7 @@ CREATE TABLE IF NOT EXISTS diary (
 2. **Meta 与内容分离**：心情/重要程度/自定义 tag 的更新不影响 md 内容，反之亦然
 3. **字数统计同步**：保存日记内容时，`word_count` 自动更新到数据库
 4. **模板文件管理**：模板 CRUD 操作直接操作文件系统，不经过数据库
-5. **路由顺序正确**：`/list` 和 `/templates/*` 路由在 `/{date}` 之前注册，避免路径冲突
+5. **路由顺序正确**：`/list`、`/templates/*` 和 `/ai_summary/range` 路由在 `/{date}` 之前注册，避免路径冲突
 6. **心情/重要程度枚举值**：前后端严格遵守 `very_happy | happy | calm | bad | very_bad` 和 `important | normal | unimportant`
 7. **颜色方案一致性**：前端使用的颜色值与本 spec 定义的颜色方案一致
 8. **AI 总结写入规则**：AI 总结内容统一写在 `behavior.md` 的 `### 日记总结` 次级标题下，不得写在其他位置
