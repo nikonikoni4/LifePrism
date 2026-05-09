@@ -8,11 +8,16 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.job import Job
-
+from lifeprism.server.services.diary_service import generate_diary_ai_summary
 from lifeprism.utils import get_logger
-
+from datetime import datetime
 logger = get_logger(__name__)
 
+def _generate_diary_ai_summary():
+    try:
+        generate_diary_ai_summary(datetime.now().strftime("%Y-%m-%d"))
+    except Exception as e:
+        logger.error(f"生成日记总结失败: {e}")
 
 class ScheduleService:
     """定时任务调度服务（单例）
@@ -27,7 +32,7 @@ class ScheduleService:
         """初始化调度器"""
         self._scheduler: Optional[AsyncIOScheduler] = None
         logger.info("ScheduleService 初始化")
-
+        self.add_cron_job(_generate_diary_ai_summary, "0 10 * * *")
     def start(self) -> None:
         """启动调度器
 
