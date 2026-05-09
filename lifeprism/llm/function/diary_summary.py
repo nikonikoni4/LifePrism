@@ -15,8 +15,8 @@ from lifeprism.llm.bus import OutboundMessage, bus, MessageType, InboundMessage
 from lifeprism.llm.providers import LLMResponse
 from lifeprism.config import settings
 from pathlib import Path
-from lifeprism.llm.utils.md_os import read_md,write_behavior_md,extract_behavior_logs_from_file
-
+from lifeprism.llm.utils.md_os import read_md,write_date_md,extract_date_logs_from_file
+from lifeprism.repository import diary_repository
 create_summary_task_prompt = """
     ## task
     你需要对用户的日记进行简短总结，只阐述事实，不进行推理
@@ -170,7 +170,7 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
         # 将ai summary写入lifeprismData\user\daily_data\behavior.md
         if label_to_save:
             result = f"{label_to_save}\n" + result
-        write_behavior_md(behavior_md_path, date, result, subheading="日记总结", mode='overwrite' if outdate_summary else 'append')
+        write_date_md(behavior_md_path, date, result, subheading="日记总结", mode='overwrite' if outdate_summary else 'append')
         return result
         
     return None
