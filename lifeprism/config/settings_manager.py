@@ -61,6 +61,7 @@ class SettingsManager:
         'is_vlm': {},  # Dict[str, bool], key = "provider_id/model_name"
         'screenshot_monitor': False,
         'screen_analysis_ignore': [],  # 截图分析忽略的分类 ID 列表
+        'auto_diary_summary': False,  # 每日自动总结日记
     }
     
     def __new__(cls) -> 'SettingsManager':
@@ -658,6 +659,10 @@ class SettingsManager:
     @property
     def session_path(self)->Path:
         return self._lifeprism_data_path / 'session'
+
+    @property
+    def auto_diary_summary(self)->bool:
+        return self._config.get("auto_diary_summary",False)
 
     def get_provider_history(self, provider_id: str) -> Dict[str, Any]:
         """获取指定服务商的历史快照。"""

@@ -8,6 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.job import Job
+from lifeprism.config.settings_manager import settings
 from lifeprism.server.services.diary_service import generate_diary_ai_summary
 from lifeprism.utils import get_logger
 from datetime import datetime
@@ -27,12 +28,13 @@ class ScheduleService:
     - Cron 表达式调度
     - 任务生命周期管理
     """
-
+    _SYSTEM_CRON_JOB_TIME = "0 10 * * *"
     def __init__(self) -> None:
         """初始化调度器"""
         self._scheduler: Optional[AsyncIOScheduler] = None
         logger.info("ScheduleService 初始化")
-        self.add_cron_job(_generate_diary_ai_summary, "0 10 * * *")
+        if settings.auto_diary_summary:
+            self.add_cron_job(_generate_diary_ai_summary, self._SYSTEM_CRON_JOB_TIME)
     def start(self) -> None:
         """启动调度器
 
