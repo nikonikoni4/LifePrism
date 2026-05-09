@@ -146,14 +146,14 @@ git commit -m "feat(diary): add diary source hash persistence"
 
 ```python
 @pytest.mark.core
-def test_write_behavior_md_requires_subheading(tmp_path):
+def test_write_date_md_requires_subheading(tmp_path):
     file_path = tmp_path / "behavior.md"
     with pytest.raises(ValueError):
-        write_behavior_md(file_path, "2026-04-18", "content", subheading=None)
+        write_date_md(file_path, "2026-04-18", "content", subheading=None)
 
 
 @pytest.mark.core
-def test_extract_behavior_md_reads_named_subheading_only():
+def test_extract_date_md_reads_named_subheading_only():
     markdown = """
 ## 2026-04-18
 
@@ -163,7 +163,7 @@ summary body
 ### 其他内容
 other body
 """
-    result = extract_behavior_md(markdown, "2026-04-18", subheading="日记总结")
+    result = extract_date_md(markdown, "2026-04-18", subheading="日记总结")
     assert result["2026-04-18"] == "summary body"
 ```
 
@@ -175,20 +175,20 @@ Expected: FAIL because the functions do not accept `subheading` yet.
 - [ ] **Step 3: Refactor the markdown helpers to require `subheading` on writes and support `subheading="all"` on reads**
 
 ```python
-def write_behavior_md(file_path, date, content, subheading: str, mode: str = "append") -> None:
+def write_date_md(file_path, date, content, subheading: str, mode: str = "append") -> None:
     if not subheading:
-        raise ValueError("write_behavior_md requires a non-empty subheading")
+        raise ValueError("write_date_md requires a non-empty subheading")
     ...
 
 
-def extract_behavior_md(markdown_content, start_date, end_date=None, subheading: str = "all") -> Dict[str, str]:
+def extract_date_md(markdown_content, start_date, end_date=None, subheading: str = "all") -> Dict[str, str]:
     ...
 ```
 
 - [ ] **Step 4: Re-export any changed function signatures from `lifeprism/llm/utils/__init__.py`**
 
 ```python
-from .md_os import extract_behavior_logs_from_file, write_behavior_md
+from .md_os import extract_date_logs_from_file, write_date_md
 ```
 
 - [ ] **Step 5: Run the unit tests again**
@@ -236,7 +236,7 @@ async def ai_diary_summary(date: str, mood: str, importence: str, custom_label: 
     ...
     sys_parts.append(update_summary_task_prompt if outdate_summary else create_summary_task_prompt)
     ...
-    write_behavior_md(
+    write_date_md(
         behavior_md_path,
         date,
         result,

@@ -93,7 +93,7 @@ abstract: 定义 Mind Space 日记 AI 总结范围手动更新设计，包括 di
 
 写入函数：
 
-1. `write_behavior_md(...)` 增加必填参数 `subheading`。
+1. `write_date_md(...)` 增加必填参数 `subheading`。
 2. `subheading` 不能为空。
 3. 写入时必须落到 `## YYYY-MM-DD` 下的某个 `###` 次级标题内。
 4. 不允许继续向日期块根部直接写内容。
@@ -101,7 +101,7 @@ abstract: 定义 Mind Space 日记 AI 总结范围手动更新设计，包括 di
 
 读取函数：
 
-1. `extract_behavior_md(...)` 和 `extract_behavior_logs_from_file(...)` 增加 `subheading` 参数。
+1. `extract_date_md(...)` 和 `extract_date_logs_from_file(...)` 增加 `subheading` 参数。
 2. `subheading="all"` 时，返回该日期块下全部内容。
 3. `subheading="日记总结"` 时，只返回该次级标题下内容。
 4. 如果目标次级标题不存在，则返回空。
@@ -198,7 +198,7 @@ Journal Settings
 2. 首次生成 summary 成功后会写入 `ai_summary` 和 `diary_source_hash`。
 3. 批量更新 B 分支下，只有正文 hash 与 `diary_source_hash` 不一致时才调用 `ai_diary_summary`。
 4. `ai_diary_summary` 在 `outdate_summary` 有值时走 update 分支，无值时走 create 分支。
-5. `write_behavior_md` 只能写入某个 `###` 次级标题，缺少 `subheading` 时抛错。
+5. `write_date_md` 只能写入某个 `###` 次级标题，缺少 `subheading` 时抛错。
 6. 读取 `subheading="日记总结"` 时，只返回对应内容。
 
 前端验证：

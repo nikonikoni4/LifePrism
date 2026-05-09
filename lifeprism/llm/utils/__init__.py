@@ -24,8 +24,8 @@ from .split_utils import (
 )
 from .md_os import(
     read_md,
-    extract_behavior_logs_from_file,
-    write_behavior_md
+    extract_date_logs_from_file,
+    write_date_md
 )
 from .density_utils import (
     compute_bucket_density,
@@ -50,8 +50,8 @@ __all__ = [
     "split_by_purpose",
     "parse_token_usage",
     "read_md",
-    "extract_behavior_logs_from_file",
-    "write_behavior_md",
+    "extract_date_logs_from_file",
+    "write_date_md",
     "compute_bucket_density",
     "build_time_segments",
 ]

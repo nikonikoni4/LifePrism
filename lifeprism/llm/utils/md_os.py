@@ -9,15 +9,20 @@ from typing import Optional, Dict
 
 def read_md(file_path: Path | str) -> str:
     """
-    读取 md 文件内容。如果输入是 str 类型，会自动转化为 Path。
-    如果该文档或者其所有的父目录不存在，会自动创建它们。
-    最终返回文档内容的字符串。
-    
+    读取 Markdown 文件内容，如果文件不存在则自动创建。
+
+    该函数会自动处理文件和目录的创建：
+    - 如果父目录不存在，会递归创建所有必需的父目录
+    - 如果文件不存在，会创建一个空文件
+    - 自动将 str 类型的路径转换为 Path 对象
+
     Args:
-        file_path (Path | str): 文件路径
-        
+        file_path (Path | str): Markdown 文件的绝对路径或相对路径。
+            支持 Path 对象或字符串路径。
+
     Returns:
-        str: 文件的文本内容
+        str: 文件的完整文本内容，使用 UTF-8 编码读取。
+            如果文件是新创建的，返回空字符串。
     """
     if isinstance(file_path, str):
         file_path = Path(file_path)
@@ -31,7 +36,7 @@ def read_md(file_path: Path | str) -> str:
     return file_path.read_text(encoding="utf-8")
 
 
-def write_behavior_md(
+def write_date_md(
     file_path: Path | str,
     date: str,
     content: str,
@@ -39,21 +44,39 @@ def write_behavior_md(
     mode: str = "append"
 ) -> None:
     """
-    编写 behavior.md 文件的内容。包含两种模式：覆写（overwrite）和续写（append）。
-    日志格式统一为 `## YYYY-MM-DD` 作为日期标题，`### subheading` 作为子标题。
+    向按日期组织的 Markdown 文件中写入内容，支持追加和覆盖两种模式。
+
+    该函数用于维护使用 `## YYYY-MM-DD` 格式作为日期标题、`### subheading` 格式
+    作为子标题的结构化 Markdown 文件。具有以下特性：
+    - 自动按日期升序组织内容（新日期会插入到正确的位置）
+    - 如果文件或目录不存在，会自动创建
+    - 支持在指定日期和子标题下追加或覆盖内容
+    - 自动处理空行和格式，保持文档结构整洁
 
     Args:
-        file_path (Path | str): 文件路径。
-        date (str): 目标日期的字符串，格式为 'YYYY-MM-DD'。
-        content (str): 要写入的正文内容。
-        subheading (str): 必须提供的子标题，用于组织日期下的内容分类。
-        mode (str): 写入模式，可选值为 "overwrite"（仅覆盖指定一天的内容） 或 "append"（接着在指定一天的内容下追加）。
+        file_path (Path | str): Markdown 文件的绝对路径或相对路径。
+            支持 Path 对象或字符串路径。
+        date (str): 目标日期，格式必须为 'YYYY-MM-DD'（如 '2026-05-08'）。
+            如果该日期在文件中不存在，会自动按升序插入。
+        content (str): 要写入的正文内容，不需要包含日期标题和子标题。
+        subheading (str): 子标题名称，用于在日期下组织不同类别的内容。
+            不能为空或 None。
+        mode (str, optional): 写入模式，默认为 "append"。
+            - "append": 在指定日期和子标题的现有内容后追加新内容
+            - "overwrite": 完全覆盖指定日期和子标题下的现有内容
+
+    Returns:
+        None
 
     Raises:
-        ValueError: 当 subheading 为空或 None 时抛出。
+        ValueError: 当 subheading 为空、None 或 mode 不是 "append"/"overwrite" 时抛出。
+
+    Example:
+        >>> write_date_md("log.md", "2026-05-08", "完成了功能开发", "工作记录")
+        >>> write_date_md("log.md", "2026-05-08", "修复了bug", "工作记录", mode="append")
     """
     if not subheading:
-        raise ValueError("write_behavior_md requires a non-empty subheading")
+        raise ValueError("write_date_md requires a non-empty subheading")
 
     if isinstance(file_path, str):
         file_path = Path(file_path)
@@ -159,23 +182,45 @@ def write_behavior_md(
     file_path.write_text(new_full_content, encoding="utf-8")
 
 
-def extract_behavior_md(
+def extract_date_md(
     markdown_content: str,
     start_date: str,
     end_date: Optional[str] = None,
     subheading: str = "all"
 ) -> Dict[str, str]:
     """
-    提取 behavior.md 的纯文本内容中，符合给定日期范围的内容。
-    假设日志采用了 `## YYYY-MM-DD` 格式的二级标题作为日期标识，
-    `### subheading` 作为子标题组织日期下的内容。
+    从按日期组织的 Markdown 文本中提取指定日期范围的内容。
 
-    :param markdown_content: behavior.md 的完整纯文本内容。
-    :param start_date: 开始日期，格式 'YYYY-MM-DD'。
-    :param end_date: 结束日期，格式 'YYYY-MM-DD'。如果为 None，则只提取 start_date 这一天的内容。
-    :param subheading: 要提取的子标题名称。默认为 "all"，表示提取该日期下所有子标题的内容。
-                      如果指定了具体的子标题名称，则只提取该子标题下的内容。
-    :return: 字典格式的结果，key 为日期，value 为当日标题下的正文内容。
+    该函数用于解析使用 `## YYYY-MM-DD` 格式作为日期标题、`### subheading` 格式
+    作为子标题的结构化 Markdown 文本。具有以下特性：
+    - 支持提取单日或日期范围的内容（包含起止日期）
+    - 可以提取所有子标题或指定子标题的内容
+    - 自动容错：如果起止日期顺序颠倒会自动调整
+    - 自动跳过格式错误的日期（如 2026-99-99）
+    - 如果同一日期出现多次，会自动合并内容
+
+    Args:
+        markdown_content (str): 完整的 Markdown 文本内容（不是文件路径）。
+            应包含 `## YYYY-MM-DD` 格式的日期标题。
+        start_date (str): 开始日期，格式必须为 'YYYY-MM-DD'（如 '2026-05-08'）。
+        end_date (Optional[str], optional): 结束日期，格式为 'YYYY-MM-DD'。
+            如果为 None，则只提取 start_date 当天的内容。默认为 None。
+        subheading (str, optional): 要提取的子标题名称。默认为 "all"。
+            - "all": 提取该日期下所有子标题的内容（合并为一个字符串）
+            - 具体子标题名: 只提取该子标题下的内容
+
+    Returns:
+        Dict[str, str]: 字典，key 为日期字符串（'YYYY-MM-DD'），value 为该日期下的内容。
+            - 如果指定日期不存在，不会出现在返回字典中
+            - 如果指定日期存在但内容为空，value 为空字符串
+            - 内容不包含日期标题和子标题本身，只包含正文
+
+    Example:
+        >>> content = "## 2026-05-08\\n### 工作\\n完成开发\\n## 2026-05-09\\n### 工作\\n修复bug"
+        >>> extract_date_md(content, "2026-05-08")
+        {'2026-05-08': '完成开发'}
+        >>> extract_date_md(content, "2026-05-08", "2026-05-09")
+        {'2026-05-08': '完成开发', '2026-05-09': '修复bug'}
     """
     if end_date is None:
         end_date = start_date
@@ -230,10 +275,19 @@ def extract_behavior_md(
 
 def _extract_all_subheadings(date_block: str) -> str:
     """
-    从日期块中提取所有子标题的内容。
+    从日期块中提取所有子标题的内容并合并。
 
-    :param date_block: 日期块的内容（不包含日期标题本身）。
-    :return: 所有子标题内容的合并字符串。
+    该函数是内部辅助函数，用于处理一个日期标题下的所有子标题内容。
+    会自动过滤掉子标题行本身，只保留正文内容。
+
+    Args:
+        date_block (str): 日期块的内容，不包含日期标题本身（`## YYYY-MM-DD`）。
+            应包含一个或多个 `### subheading` 格式的子标题及其内容。
+
+    Returns:
+        str: 所有子标题下的正文内容合并后的字符串，使用 `\\n\\n` 分隔。
+            如果没有任何内容，返回空字符串。
+            返回内容不包含子标题行本身。
     """
     # 匹配 ### subheading 或 ## subheading 格式的子标题
     subheading_pattern = re.compile(r'^#{1,3}\s+\S+.*$', re.MULTILINE)
@@ -255,9 +309,18 @@ def _extract_single_subheading(date_block: str, subheading: str) -> str:
     """
     从日期块中提取指定子标题的内容。
 
-    :param date_block: 日期块的内容（不包含日期标题本身）。
-    :param subheading: 要提取的子标题名称。
-    :return: 指定子标题下的内容，如果不存在则返回空字符串。
+    该函数是内部辅助函数，用于从一个日期标题下提取特定子标题的内容。
+    会自动定位子标题的起止位置，只提取该子标题下的正文。
+
+    Args:
+        date_block (str): 日期块的内容，不包含日期标题本身（`## YYYY-MM-DD`）。
+            应包含一个或多个 `### subheading` 格式的子标题及其内容。
+        subheading (str): 要提取的子标题名称，必须精确匹配。
+
+    Returns:
+        str: 指定子标题下的正文内容，已去除首尾空白。
+            如果指定的子标题不存在，返回空字符串。
+            返回内容不包含子标题行本身。
     """
     # 匹配 ### subheading 格式（子标题）
     target_subheading_pattern = re.compile(
@@ -281,22 +344,41 @@ def _extract_single_subheading(date_block: str, subheading: str) -> str:
     return content.strip()
 
 
-def extract_behavior_logs_from_file(
+def extract_date_logs_from_file(
     file_path: Path | str,
     start_date: str,
     end_date: Optional[str] = None,
     subheading: str = "all"
 ) -> Dict[str, str]:
     """
-    读取 behavior.md 文件，并提取符合日期范围的内容。
+    从按日期组织的 Markdown 文件中读取并提取指定日期范围的内容。
 
-    :param file_path: 文件的绝对或相对路径
-    :param start_date: 开始日期，格式 'YYYY-MM-DD'
-    :param end_date: 结束日期，格式 'YYYY-MM-DD'。如果为空只读取一天。
-    :param subheading: 要提取的子标题名称。默认为 "all"。
+    该函数是 `read_md` 和 `extract_date_md` 的组合封装，提供了一步到位的
+    文件读取和内容提取功能。适用于使用 `## YYYY-MM-DD` 格式作为日期标题、
+    `### subheading` 格式作为子标题的结构化 Markdown 文件。
+
+    Args:
+        file_path (Path | str): Markdown 文件的绝对路径或相对路径。
+            支持 Path 对象或字符串路径。如果文件不存在会自动创建空文件。
+        start_date (str): 开始日期，格式必须为 'YYYY-MM-DD'（如 '2026-05-08'）。
+        end_date (Optional[str], optional): 结束日期，格式为 'YYYY-MM-DD'。
+            如果为 None，则只提取 start_date 当天的内容。默认为 None。
+        subheading (str, optional): 要提取的子标题名称。默认为 "all"。
+            - "all": 提取该日期下所有子标题的内容
+            - 具体子标题名: 只提取该子标题下的内容
+
+    Returns:
+        Dict[str, str]: 字典，key 为日期字符串（'YYYY-MM-DD'），value 为该日期下的内容。
+            返回格式与 `extract_date_md` 相同。
+
+    Example:
+        >>> extract_date_logs_from_file("log.md", "2026-05-08")
+        {'2026-05-08': '完成开发'}
+        >>> extract_date_logs_from_file("log.md", "2026-05-08", "2026-05-09", "工作")
+        {'2026-05-08': '完成开发', '2026-05-09': '修复bug'}
     """
     content = read_md(file_path)
-    return extract_behavior_md(content, start_date, end_date, subheading)
+    return extract_date_md(content, start_date, end_date, subheading)
 
 # 如果直接运行当前脚本，可以作为一个轻量的命令行测试使用
 if __name__ == "__main__":
@@ -319,9 +401,9 @@ if __name__ == "__main__":
 这是未来的日子。
 '''
     print("=== 测试只取单天 ===")
-    print(extract_behavior_md(sample_md, "2026-04-16"))
+    print(extract_date_md(sample_md, "2026-04-16"))
     
     print("\n=== 测试取范围 (10号到16号) 包含边界 ===")
-    res = extract_behavior_md(sample_md, "2026-04-10", "2026-04-16")
+    res = extract_date_md(sample_md, "2026-04-10", "2026-04-16")
     for date, txt in res.items():
         print(f"[{date}日内的数据] -> {txt[:15]}...")
