@@ -54,7 +54,7 @@ class QueryOptions:
             raise ValueError("limit must be >= 1")
 
     def with_date_range(self, start: str, end: str) -> 'QueryOptions':
-        """返回新对象，修改日期范围"""
+        """返回新对象，修改日期范围,闭区间[]"""
         return replace(self, date_range=(start, end))
 
     def with_time_range(self, start: str, end: str) -> 'QueryOptions':
