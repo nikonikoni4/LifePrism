@@ -243,19 +243,29 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
     #             content += f"{i}. {goals[i]['name']},{description}\n"
     #         parts.append(content)
     if 'todolist' in query_option:
-        todolists, _ = todo_repository.query_todos(QueryOptions(fields=['content', 'date']).with_date_range(start_time[:10], end_time[:10]))
-        if not todolists:
+        todolists, _ = todo_repository.query_todos(QueryOptions(fields=['content', 'date','state']).with_date_range(start_time[:10], end_time[:10]))
+
+        def _format_state(state: str) -> str:
+            """状态转换函数：数据库状态 -> 中文描述"""
+            state_map = {
+                'scheduled': '未完成',
+                'completed': '已完成'
+            }
+            return state_map.get(state, state)
+
+        filtered_todos = [t for t in todolists if t.get('state') in ('scheduled', 'completed')]
+        if not filtered_todos:
             parts.append("## 用户待办事项 \n 用户待办事项为空")
         else:
             from collections import defaultdict
             by_date = defaultdict(list)
-            for todo in todolists:
-                by_date[todo['date']].append(todo['content'])
+            for todo in filtered_todos:
+                by_date[todo['date']].append((todo['content'], todo['state']))
             content = "## 用户待办事项\n"
             for date in sorted(by_date.keys()):
                 content += f"### {date}\n"
-                for idx, item in enumerate(by_date[date], 1):
-                    content += f"{idx}. {item}\n"
+                for idx, (item, state) in enumerate(by_date[date], 1):
+                    content += f"{idx}. {item} [{_format_state(state)}]\n"
             parts.append(content)
     return "\n".join(parts)
 
