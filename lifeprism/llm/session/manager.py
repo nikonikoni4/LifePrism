@@ -23,7 +23,7 @@ class Session:
     updated_at : datetime = field(default_factory=datetime.now)
     # metadata : dict = field(default_factory=dict) # 扩展位，预留，暂时无任何作用
     last_compacted_loc : int = 0 # 上一次compact的位置 
-    auto_compact : bool = False # 默认不自动进行压缩 这个是因为lifeprism 里目前没有长对话，
+    auto_compact : bool = True # 默认不自动进行压缩 这个是因为lifeprism 里目前没有长对话，
 
 
     # def retract_last_user_message(self) -> dict[str, Any]:

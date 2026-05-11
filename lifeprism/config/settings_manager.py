@@ -664,6 +664,10 @@ class SettingsManager:
     def auto_diary_summary(self)->bool:
         return self._config.get("auto_diary_summary",False)
 
+    @property
+    def token_limit(self)->int:
+        return  50000 # 暂定50k
+
     def get_provider_history(self, provider_id: str) -> Dict[str, Any]:
         """获取指定服务商的历史快照。"""
         history = self.model_history

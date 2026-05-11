@@ -31,6 +31,8 @@ class Context:
             parts.append(Context._build_identity())
             # 2. agent定义层和用户定义层
             parts.append(Context._build_bootstrap())
+            # 3. 加载用户最近状态
+            parts.append(Context._bulid_recent_state())
             # 4. 加载永远可用的和激活的skill
             skill_loader = SkillLoad()
             skill_load_list = (msg.extra or {}).get("skill_list",None)
@@ -119,6 +121,11 @@ class Context:
         logger.debug("user message\n"+f"{Context._build_run_context(msg)}## user's message \n {msg.content}")
         return f"{Context._build_run_context(msg)}## user's message \n {msg.content}"
 
+
+    @staticmethod
+    def _bulid_recent_state():
+        path = str(settings.lifeprism_data_path / "user/daily_data/recent_state.md")
+        return Context._read_file(path)
 if __name__ == "__main__":
     from unittest.mock import MagicMock
     from lifeprism.llm.bus import MessageType

@@ -13,7 +13,6 @@ from lifeprism.llm.bus import (
     ChannelType,
 )
 from lifeprism.llm.agent.context import Context
-from lifeprism.server.services import setting_service
 from lifeprism.utils import get_logger,DEBUG
 from lifeprism.utils.lazy_singleton import LazySingleton
 from lifeprism.llm.agent.tools import (
@@ -34,11 +33,23 @@ from lifeprism.llm.agent.tools import (
 )
 from collections import defaultdict
 from lifeprism.config import settings
+from lifeprism.llm.utils.helpers import estimate_prompt_tokens
 MAX_TOOL_CALL = 20
 MAX_TOOL_ERROR_COUNT = 5
 
+# def auto_compact(self):
+# """计算session是否超过最大token限制，超过则进行自动压缩"""
+# # 1.判断token是否超过限制
+# if not self._exceed_token_threshold_compact():
+# return 
+# # 2. 进行模型压缩，获取压缩信息
 
-logger = get_logger(__name__)
+
+# # 3. 构建新的user信息
+
+
+# # 4.记录compact位置
+logger  = get_logger(__name__)
 logger.setLevel(DEBUG)
 class AgentLoop:
     def __init__(self, bus: MessageQueue):
@@ -258,7 +269,9 @@ class AgentLoop:
 
             # 3. 构建完整消息（含历史）
             session: Session = session_manager.get_or_create_session(msg.session_id)
-            session.add_message("user", content=Context._build_user_message(msg))
+            # 判断token是否超标,自动压缩
+            self.auto_compact(session,tools)
+            session = session.add_message("user", content=Context._build_user_message(msg))
             if msg.type == MessageType.CHAT: 
                 session_manager.save_session(session)
 
@@ -300,5 +313,46 @@ class AgentLoop:
     def stop(self):
         self._running = False
 
+    async def auto_compact(self,session:Session,tools)->Session:
+        """计算session是否超过最大token限制，超过则进行自动压缩"""
+        messages = session.get_history_message()
+        # 1.判断token是否超过限制
+        if not estimate_prompt_tokens(messages,tools) > settings.token_limit:
+            # 这里暂定token_limit是常数，但是实际上应该是依据模型的上下文窗口*0.6或者其他系数来限制
+            return session
+        # 2. 进行模型压缩，获取压缩信息
+        compact_system_prompt = """
+        ## task 
+        你需要压缩用户的聊天记录
+        ## 提取内容
+        1. user msg : 完整保存用户的最后5条信息
+        2. event : 提取出聊天记录中的客观事实
+            1. 对于工具类查询问题简单说明查询了那些内容，基本结果是什么。不需要详细说明，并提示必要时使用工具重新查询
+            2. 如果使用工具记录了心情或事件，需要把相关id写出来，便于后续查询和避免反复写入
+            3. 对于非工具类的事件，需要确认事情发生的时间(避免时间逻辑上出错)，发生的经过，用户的反应
+            4. 对于情绪类事件，（如果有点话）需要记录诱发原因，用户的反应，用户的心情
+        ## 提取说明
+        对于event中的非工具累时间和情绪累事件提取组成部分（比如，用户描述事情发生的时间，诱发原因等）是如果有才记录，如果没有则不记录
+        """
+        llm = create_llm_client()
+        compact_content = json.dumps(messages)
+        messages = [
+            {"role":"system","content":compact_system_prompt},
+            {"role":"user","content":f"## 需要压缩的内容 \n {compact_content}"}
+        ]
+        try : 
+            response:LLMResponse= await llm.chat(messages)
+        except Exception as e:
+            logger.error(f"auto compact llm 处理出错, {e}")
+            return session
+        # 3.记录compact位置
+        session.last_compacted_loc = len(session.messages)
+        # 4. 构建新的user信息
+        session.add_message("system","conversation compacted")
+        session.add_message("user",f"# 消息压缩总结 \n\n{response.content}",**{'is_compact_summary':True})
+        # 5. 保存session
+        session_manager.save_session(session)
+        return session
+        
 agent_loop = LazySingleton(AgentLoop, bus=bus)
 
