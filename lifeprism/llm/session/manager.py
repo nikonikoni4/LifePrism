@@ -138,6 +138,42 @@ class SessionManager:
             if session_id in self._cache:
                 del self._cache[session_id]
 
+    @staticmethod
+    def _remove_image_content(msg: dict[str, Any]) -> dict[str, Any]:
+        """
+        移除 user 消息中的图片 base64 内容
+
+        Args:
+            msg: 消息字典
+
+        Returns:
+            处理后的消息字典（深拷贝）
+        """
+        if msg.get('role') != 'user':
+            return msg
+
+        content = msg.get('content')
+        if not isinstance(content, list):
+            return msg
+
+        # 深拷贝消息，避免修改原始数据
+        import copy
+        msg_copy = copy.deepcopy(msg)
+
+        # 过滤掉图片类型的 content block
+        filtered_content = []
+        for block in content:
+            if isinstance(block, dict):
+                block_type = block.get('type', '')
+                # 跳过图片类型的 block
+                if block_type not in ('image', 'image_url'):
+                    filtered_content.append(block)
+            else:
+                filtered_content.append(block)
+
+        msg_copy['content'] = filtered_content
+        return msg_copy
+
     def save_session(self,session:Session):
         if session:
             path = self.get_session_path_by_id(session.id)
@@ -153,7 +189,9 @@ class SessionManager:
                 f.write(json.dumps(metadata_line, ensure_ascii=False) + "\n")
                 for msg in session.messages:
                     if msg.get('role','') in self.ALLOW_SAVE_MESSAGE_TYPE:
-                        f.write(json.dumps(msg, ensure_ascii=False) + "\n")
+                        # 移除 user 消息中的图片内容
+                        processed_msg = self._remove_image_content(msg)
+                        f.write(json.dumps(processed_msg, ensure_ascii=False) + "\n")
     @staticmethod
     def show_session_list(path:Path= settings.session_path)-> list[str]:
         """搜索存储地址内的jsonl, 返回session_id list（不带.jsonl后缀）"""
