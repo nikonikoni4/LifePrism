@@ -17,3 +17,15 @@ abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设�
 - path: `docs/design-decisions/2026-05-03-llm-tool-separation-for-detail-query.md`
 - 触发规则：当设计 LLM Agent 工具时，需要决策是否合并功能相似但信息密度差异大的工具
 - 内容摘要：电脑使用详细日志查询工具设计决策，选择独立工具而非合并到聚合查询工具，基于信息密度差异（30-60倍）、使用场景差异和 LLM 工具调用可理解性考虑。核心原则：职责清晰 > 工具数量少，避免误触发 > 统一接口。
+
+## chat-history-memory-positioning
+- updated_at: 2026-05-08
+- path: `docs/design-decisions/2026-05-08-chat-history-memory-positioning.md`
+- 触发规则：当设计记忆系统文档结构、需要理解 chat_history.md 与 behavior.md 的职责划分时读取
+- 内容摘要：确立 chat_history.md 作为记忆系统「短期跨会话上下文层」的定位，采用间隔任务更新，按天组织内容，并作为 behavior.md 聊天总结部分的上游数据源。解决了聊天记录的跨会话连贯性需求与行为/心情总结的按天总结需求之间的时间粒度冲突。
+
+## memory-system-compact-dream-separation
+- updated_at: 2026-05-11
+- path: `docs/design-decisions/2026-05-11-memory-system-compact-dream-separation.md`
+- 触发规则：当需要理解 lifeprism 记忆系统的 compact 与 dream 机制、游标设计、触发时机时读取
+- 内容摘要：将 nanobot 记忆系统的 compact 机制与 dream 记忆提取机制分离，以适配 lifeprism 的短对话情感捕捉场景。Compact 专注于 token 管理（写入 session.jsonl），Dream 专注于记忆提取（写入 history.jsonl），两个游标完全独立。解决了短对话记忆丢失问题和职责混淆问题。
