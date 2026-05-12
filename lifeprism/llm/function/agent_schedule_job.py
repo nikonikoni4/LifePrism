@@ -147,8 +147,10 @@ async def update_memory(date: str):
     chat_history_to_dream = history_manager.get_histories_to_dream() # 这里先不在进行二次处理，直接放进behavior
 
     # 获取心情数据，并总结
-    
-    
+    mood_data = get_mood_data(start_time, end_time)
+    mood_summary_content = await summary_moods(mood_data)
+
+
 
 
 
