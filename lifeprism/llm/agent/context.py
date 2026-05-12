@@ -50,7 +50,7 @@ class Context:
             else:
                 return (msg.extra or {}).get("system_prompt", "")
         
-        elif type == MessageType.GENERAL_TASK :
+        else :
             # 通用调用，不添加额外的上下文
             return (msg.extra or {}).get("system_prompt", "")
             
