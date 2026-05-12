@@ -35,6 +35,29 @@ async def summary_activities(activities : str)->str:
 1. 以用户自定义行为备注和AI分析行为备注
 
 """
+    MOOD_SUMMARY_SYSTEM_PROMPT = """## 任务
+你需要对用户的心情记录进行客观总结。
+
+## 数据说明
+每条心情记录包含：
+1. 时间：心情记录的时间
+2. 心情分数：用户的心情评分（1-10分）
+3. 内容：用户对心情的描述
+4. 影响因素：导致该心情的因素
+
+## 总结要求
+对每条心情记录，按以下结构进行客观描述（有则写，无则跳过）：
+1. 事件经过：简单描述发生了什么
+2. 情绪诱因：是什么让这个情绪发生的
+3. 情绪本身：用户的情绪状态是什么
+4. 用户反应：面对这个情绪，用户的反应是什么
+
+## 核心原则
+1. 不要推敲或猜测
+2. 仅从客观角度描述，不带任何评价
+3. 如果某个组成部分数据中没有，就不写
+4. 保持简洁，每条心情总结控制在 100 字以内
+"""
     if activities:
         result = await bus.send(
             InboundMessage(
@@ -69,6 +92,36 @@ def get_mood_data(start_time: str, end_time: str) -> str:
     mood_data = query_user_mood(start_date, end_date)
 
     return mood_data
+
+async def summary_moods(mood_data: str) -> str:
+    """总结心情数据
+
+    Args:
+        mood_data: 心情数据字符串
+
+    Returns:
+        str: 心情总结内容
+    """
+    # 检查是否有心情数据
+    if not mood_data or "无心情记录" in mood_data:
+        logger.warning("没有心情数据")
+        return "无心情记录"
+
+    # 调用 LLM 进行总结
+    result = await bus.send(
+        InboundMessage(
+            MessageType.DREAM_TASK,
+            content=f"## 需要总结的心情数据\n{mood_data}",
+            extra={"system_prompt": MOOD_SUMMARY_SYSTEM_PROMPT}
+        )
+    )
+
+    # 处理返回结果
+    if result.response and result.response.content:
+        return result.response.content
+    else:
+        logger.error(f"心情总结 LLM 返回数据错误: {result}")
+        raise ExternalServiceError(f"心情总结 LLM 返回数据错误: {result}")
 
 # 1. 定时总结日记，更新behavior.md 和 recent_status.md
 async def update_memory(date: str):
