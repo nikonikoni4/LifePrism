@@ -9,7 +9,7 @@ logger = get_logger(__name__)
 logger.setLevel(INFO)
 
 TIMEOUT_MAX = 600.0
-RATE_LIMIT = 100
+RATE_LIMIT = 60
 RATE_WINDOW = 60.0
 
 # ─────────────────────────────────────────
@@ -85,7 +85,7 @@ class MessageQueue:
         args:
             msg : InboundMessage
         return:
-            消息回复内容
+            OutboundMessage 消息回复内容
         """
         self._ensure_receive_task()
         await self._wait_for_rate_limit()
@@ -118,7 +118,7 @@ class MessageQueue:
                     llm_dataset_provider.save_usage,
                     session_id=result.session_id,
                     usage=result.response.usage,
-                    mode=msg.type
+                    mode=msg.token_type or msg.type
                 ))
             except Exception as e:
                 logger.error(f"[MessageQueue] 保存 token 使用情况失败: {e}")
