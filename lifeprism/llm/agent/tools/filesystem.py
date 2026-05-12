@@ -150,28 +150,28 @@ class ReadFileTool(_FileTool):
                     "description": "文件路径（绝对路径或相对路径）",
                     "minLength": 1,
                 },
-                "start_line": {
+                "offset": {
                     "type": "integer",
-                    "description": "开始行号（从0开始，相对于正文，only_frontmatter=True时忽略）",
-                    "minimum": 0,
-                    "default": 0,
+                    "description": "起始行号（从1开始，相对于正文，only_frontmatter=True时忽略）",
+                    "minimum": 1,
+                    "default": 1,
                 },
-                "end_line": {
+                "limit": {
                     "type": ["integer", "null"],
-                    "description": "结束行号（None表示读取到文件末尾，相对于正文）",
-                    "minimum": 0,
+                    "description": "读取行数（None表示读取到文件末尾）",
+                    "minimum": 1,
                     "default": None,
                 },
                 "only_frontmatter": {
                     "type": "boolean",
-                    "description": "是否只返回 frontmatter 内容（忽略 start_line 和 end_line）",
+                    "description": "是否只返回 frontmatter 内容（忽略 offset 和 limit）",
                     "default": False,
                 },
                 "max_chars": {
                     "type": "integer",
                     "description": "最大字符数限制",
                     "minimum": 1,
-                    "maximum": 100000,
+                    "maximum": 5000,
                     "default": 1024,
                 },
             },
@@ -182,7 +182,7 @@ class ReadFileTool(_FileTool):
         """执行文件读取操作
 
         Args:
-            **kwargs: 工具参数（file_path, start_line, end_line, only_frontmatter, max_chars）
+            **kwargs: 工具参数（file_path, offset, limit, only_frontmatter, max_chars）
 
         Returns:
             str: 执行结果（成功返回 JSON 格式的结果，失败返回错误信息）
@@ -191,18 +191,26 @@ class ReadFileTool(_FileTool):
 
         # 提取参数（使用默认值）
         file_path = kwargs.get("file_path")
-        start_line = kwargs.get("start_line", 0)
-        end_line = kwargs.get("end_line", None)
+        offset = kwargs.get("offset", 1)
+        limit = kwargs.get("limit", None)
         only_frontmatter = kwargs.get("only_frontmatter", False)
         max_chars = kwargs.get("max_chars", 1024)
+
         if not file_path:
             return f"{ERROR}文件路径不能为空"
-        
+
         # 权限检查
         is_allowed, error_msg = self._check_workspace_permission(file_path)
         if not is_allowed:
             return f"{ERROR}{error_msg}"
-        
+
+        # 将 offset/limit 转换为 start_line/end_line（内部使用从0开始的索引）
+        start_line = offset - 1  # offset 从1开始，start_line 从0开始
+        if limit is not None:
+            end_line = start_line + limit - 1  # 转换为闭区间的结束行号
+        else:
+            end_line = None  # None 表示读到文件末尾
+
         # 调用底层实现
         result = _read_file(
             file_path=file_path,
@@ -214,7 +222,7 @@ class ReadFileTool(_FileTool):
 
         # 检查是否有错误
         if "error" in result:
-            
+
             return f"{ERROR}{result['error']}"
 
         # 返回成功结果
