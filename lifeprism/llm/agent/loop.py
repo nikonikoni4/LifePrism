@@ -264,6 +264,16 @@ class AgentLoop:
                 if (settings.lifeprism_data_path / 'agent/chat/bootstrap.md').exists():
                     self._tool_registry.register(DeleteBootstrapTool())
                 tools: list[dict[str, Any]] = self._tool_registry.get_definitions()
+            elif msg.type == MessageType.DREAM_TASK:
+                self._tool_registry.register(UserActivitySummaryTool())
+                self._tool_registry.register(UserComputerLogTool())
+                self._tool_registry.register(ReadFileTool())
+                self._tool_registry.register(WriteFileTool())
+                self._tool_registry.register(EditFileTool())
+                self._tool_registry.register(FileTreeTool())
+                self._tool_registry.register(SearchFileTool())
+                self._tool_registry.register(SearchStringTool())
+                tools: list[dict[str, Any]] = self._tool_registry.get_definitions()
             elif msg.type == MessageType.CLASSIFY:
                 tools = []
 
@@ -292,6 +302,9 @@ class AgentLoop:
                     response=LLMResponse(content=f"[ERROR] {e}")
                 )
             )
+        finally:
+            # 7. 清空工具注册表，避免工具累积和不同消息类型的工具混用
+            self._tool_registry.clear()
             
     
 
