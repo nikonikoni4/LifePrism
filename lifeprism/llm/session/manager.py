@@ -24,7 +24,7 @@ class Session:
     # metadata : dict = field(default_factory=dict) # 扩展位，预留，暂时无任何作用
     last_compacted_loc : int = 0 # 上一次compact的位置 
     auto_compact : bool = True # 默认不自动进行压缩 这个是因为lifeprism 里目前没有长对话，
-
+    last_processed_loc : int = 0 # 上次整理session信息的位置，区别与last_compacted_loc, last_compacted_loc仅仅作为对话压缩不涉及记忆提取
 
     # def retract_last_user_message(self) -> dict[str, Any]:
     #     """撤销最后一条 user 消息及其之后的所有消息，返回被撤销的 user 消息"""
@@ -75,6 +75,7 @@ class SessionManager:
         id = session_id
         name = None
         last_compacted_loc = None
+        last_processed_loc = None
         # metadata = None
         created_at = None
         updated_at = None
@@ -90,6 +91,7 @@ class SessionManager:
                         created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None
                         updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
                         last_compacted_loc = data.get('last_compacted_loc')
+                        last_processed_loc = data.get('last_processed_loc')
                         name = data.get('name')
                     else:
                         messages.append(data)
@@ -97,6 +99,7 @@ class SessionManager:
                 id = id,
                 name = name if name else 'default_name',
                 last_compacted_loc = last_compacted_loc if last_compacted_loc else 0,
+                last_processed_loc = last_processed_loc if last_processed_loc else 0,
                 # metadata=metadata,
                 messages = messages,
                 created_at = created_at,
@@ -185,6 +188,8 @@ class SessionManager:
                     "created_at" : session.created_at.isoformat(),
                     "updated_at" : session.updated_at.isoformat(),
                     "last_compacted_loc" : session.last_compacted_loc,
+                    "last_processed_loc" : session.last_processed_loc,
+                    "message_len":len(session.messages)
                 }
                 f.write(json.dumps(metadata_line, ensure_ascii=False) + "\n")
                 for msg in session.messages:
@@ -192,6 +197,53 @@ class SessionManager:
                         # 移除 user 消息中的图片内容
                         processed_msg = self._remove_image_content(msg)
                         f.write(json.dumps(processed_msg, ensure_ascii=False) + "\n")
+    @staticmethod
+    def get_session_metadata(session_id: str) -> dict | None:
+        """
+        只读取 session 的 metadata，不加载完整 messages
+
+        Args:
+            session_id: session ID
+
+        Returns:
+            metadata 字典，如果文件不存在或格式错误则返回 None
+        """
+        path = SessionManager.get_session_path_by_id(session_id)
+        if not path.exists():
+            logger.warning(f"Session 文件不存在: {path}")
+            return None
+
+        try:
+            with open(path, encoding="utf-8") as f:
+                first_line = f.readline().strip()
+                if first_line:
+                    data = json.loads(first_line)
+                    if data.get("_type") == "metadata":
+                        return data
+            logger.warning(f"Session {session_id} 的 metadata 格式错误")
+            return None
+        except Exception as e:
+            logger.error(f"读取 session {session_id} metadata 失败: {e}")
+            return None
+
+    def remove_from_cache(self, session_id: str) -> bool:
+        """
+        从缓存中移除指定的 session
+
+        Args:
+            session_id: 要移除的 session ID
+
+        Returns:
+            bool: 如果成功移除返回 True，如果 session 不在缓存中返回 False
+        """
+        if session_id in self._cache:
+            del self._cache[session_id]
+            logger.debug(f"已从缓存中移除 session: {session_id}")
+            return True
+        else:
+            logger.debug(f"Session {session_id} 不在缓存中")
+            return False
+
     @staticmethod
     def show_session_list(path:Path= settings.session_path)-> list[str]:
         """搜索存储地址内的jsonl, 返回session_id list（不带.jsonl后缀）"""
@@ -256,6 +308,75 @@ class SessionManager:
         return result
 
 session_manager:SessionManager  = LazySingleton(SessionManager)
+
+
+class ChatHistoryManager:
+    """管理chat_history.json, 不作为单例，每次直接创建"""
+    MAX_ITEMS = 1000
+    def __init__(self,path:Path|None = None):
+        if path:
+            self.path = path
+        else:
+            self.path = settings.lifeprism_data_path / "user/daily_date/chat_history.json"
+        self.path.parent.parent.mkdir(parents=True, exist_ok=True)
+        self.histories :list[dict]= [] # timestamp,content,is_processed
+        self.last_processed_time = datetime.now()
+        self.load_histories()
+
+    def load_histories(self)->list[dict]:
+        """加载jsonl文件和meta_date"""
+        if self.path.exists():
+            with self.path.open('r',encoding='utf-8') as f:
+                for line in f:
+                    line  = line.strip()
+                    if not line:
+                        continue
+                    data:dict = json.loads(line)
+                    if data.get("_type",None):
+                        self.last_processed_time = datetime.fromisoformat(data.get("last_processed_time",None)) if data.get("last_processed_time",None) else datetime.now()
+                    else:
+                        self.histories.append(data)
+        if self.histories:
+            # 只保存前1000条数据
+            self.histories = self.histories[-self.MAX_ITEMS:]
+        return self.histories
+    
+    def get_histories_to_dream(self)->list[dict]|None:
+        """获取所有未被处理的聊天历史总结"""
+        result = []
+        for history in self.histories:
+            if history.get("timestamp",None):
+                if datetime.fromisoformat(history["timestamp"]) > self.last_processed_time:
+                    result.append(history)
+        return result
+    def add_content(self,content):
+        """添加数据"""
+        if not content:
+            logger.warning("chat_history.json添加失败，content为None")
+            return 
+        self.path.parent.parent.mkdir(parents=True, exist_ok=True)
+        self.histories.append({"timestamp":datetime.now().isoformat(),"content":content})
+        
+
+    def save_history(self,last_processed_time:datetime|None = None):
+        """
+        在添加完内容或处理完history之后需要调用这个函数
+        args:
+            last_processed_time 在process history message之后需要添加时间
+            只添加history line 不需要添加last_processed_time参数
+        """
+        if last_processed_time:
+            self.last_processed_time = last_processed_time
+        with self.path.open("w",encoding="utf-8") as f:
+            metadata_line = {
+                    "_type":"metadata",
+                    "last_processed_time":self.last_processed_time.isoformat()
+                }
+            f.write(json.dumps(metadata_line)+"\n")
+            if self.histories:
+                f.write(json.dumps(self.histories))
+
+    
 
 
 if __name__ == "__main__":
