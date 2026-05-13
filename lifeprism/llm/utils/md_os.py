@@ -3,8 +3,9 @@ from pathlib import Path
 
 import os
 import re
+import yaml
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 
 
 def read_md(file_path: Path | str) -> str:
@@ -379,6 +380,141 @@ def extract_date_logs_from_file(
     """
     content = read_md(file_path)
     return extract_date_md(content, start_date, end_date, subheading)
+
+
+def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
+    """
+    从 prompt markdown 文件中加载所有 prompts 及其元数据。
+
+    该函数用于解析按照 prompt 管理规范组织的 Markdown 文件，提取文件级元数据、
+    各个 prompt 的名称、版本信息和内容。文件格式要求：
+    - 文件级 frontmatter（YAML）包含 module、description、author
+    - 一级标题 `#` 表示 prompt 名称
+    - 二级标题 `## metadata` 包含 YAML 格式的元数据
+    - 二级标题 `## v1`, `## v2` 等表示各个版本的 prompt 内容
+    - 使用 `---` 分隔不同的 prompts
+
+    Args:
+        file_path (Path | str): Prompt markdown 文件的绝对路径或相对路径。
+            支持 Path 对象或字符串路径。
+
+    Returns:
+        Dict[str, Any]: 包含文件级元数据和所有 prompts 的字典，结构如下：
+            {
+                "module": str,           # 模块名称
+                "description": str,      # 模块描述
+                "author": str,           # 作者
+                "prompts": {
+                    "prompt_name": {
+                        "metadata": {
+                            "active_version": str,
+                            "version_history": dict
+                        },
+                        "versions": {
+                            "v1": str,   # 版本内容
+                            "v2": str
+                        }
+                    }
+                }
+            }
+
+    Raises:
+        FileNotFoundError: 文件不存在
+        ValueError: 文件格式错误（缺少 frontmatter、metadata 等）
+
+    Example:
+        >>> data = prompts_md_load("templates/prompts/schedule_prompts.md")
+        >>> data["module"]
+        'schedule'
+        >>> data["prompts"]["activity_summary"]["metadata"]["active_version"]
+        'v2'
+        >>> data["prompts"]["activity_summary"]["versions"]["v2"]
+        '### task\\n你需要依据用户数据总结...'
+    """
+    if isinstance(file_path, str):
+        file_path = Path(file_path)
+
+    if not file_path.exists():
+        raise FileNotFoundError(f"Prompt 文件不存在: {file_path}")
+
+    content = file_path.read_text(encoding="utf-8")
+
+    # 1. 解析文件级 frontmatter
+    frontmatter_pattern = re.compile(r'^---\s*\n(.*?)\n---\s*\n', re.DOTALL | re.MULTILINE)
+    frontmatter_match = frontmatter_pattern.match(content)
+
+    if not frontmatter_match:
+        raise ValueError(f"文件缺少 frontmatter: {file_path}")
+
+    frontmatter_yaml = frontmatter_match.group(1)
+    frontmatter = yaml.safe_load(frontmatter_yaml)
+
+    # 提取 frontmatter 后的正文内容
+    body_content = content[frontmatter_match.end():]
+
+    # 2. 按 --- 分割 prompt 块
+    prompt_blocks = re.split(r'\n---\s*\n', body_content)
+
+    prompts = {}
+
+    for block in prompt_blocks:
+        block = block.strip()
+        if not block:
+            continue
+
+        # 3. 提取一级标题作为 prompt 名称
+        title_pattern = re.compile(r'^#\s+(\S+)', re.MULTILINE)
+        title_match = title_pattern.search(block)
+
+        if not title_match:
+            continue
+
+        prompt_name = title_match.group(1)
+
+        # 4. 提取 metadata 部分
+        metadata_pattern = re.compile(
+            r'^##\s+metadata\s*\n```yaml\s*\n(.*?)\n```',
+            re.MULTILINE | re.DOTALL
+        )
+        metadata_match = metadata_pattern.search(block)
+
+        if not metadata_match:
+            raise ValueError(f"Prompt '{prompt_name}' 缺少 metadata 部分")
+
+        metadata_yaml = metadata_match.group(1)
+        metadata = yaml.safe_load(metadata_yaml)
+
+        # 5. 提取所有版本内容
+        versions = {}
+        version_pattern = re.compile(r'^##\s+(v\d+)\s*\n', re.MULTILINE)
+
+        for version_match in version_pattern.finditer(block):
+            version_name = version_match.group(1)
+            version_start = version_match.end()
+
+            # 找到下一个二级标题或块结束
+            next_heading = re.compile(r'^##\s+', re.MULTILINE)
+            next_match = next_heading.search(block, version_start)
+
+            if next_match:
+                version_end = next_match.start()
+            else:
+                version_end = len(block)
+
+            version_content = block[version_start:version_end].strip()
+            versions[version_name] = version_content
+
+        prompts[prompt_name] = {
+            "metadata": metadata,
+            "versions": versions
+        }
+
+    return {
+        "module": frontmatter.get("module", ""),
+        "description": frontmatter.get("description", ""),
+        "author": frontmatter.get("author", ""),
+        "prompts": prompts
+    }
 
 # 如果直接运行当前脚本，可以作为一个轻量的命令行测试使用
 if __name__ == "__main__":
