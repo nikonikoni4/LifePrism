@@ -52,3 +52,9 @@
 - path: `docs/specs/2026-05-13-prompt-management-system.md`
 - 触发规则：开发、修改或查询 Prompt 集中管理系统时阅读（文件组织、格式规范、加载接口、版本管理、使用统计）
 - 内容摘要：Prompt 集中管理系统规格，定义使用 Markdown 文件管理所有 LLM prompts 的技术契约，包括文件命名规范（{模块名}_prompts.md）、Prompt 命名规范（snake_case）、Markdown 文件格式（frontmatter + metadata + 多版本）、导出接口（get_{prompt_name}_prompt）、使用统计机制（usage_stats.yaml）。支持版本管理、A/B 测试、代码解耦。Prompt 测试机制待后续补充。
+
+## llm-test-spec
+- updated_at: 2026-05-13
+- path: `docs/specs/2026-05-13-llm-test-spec.md`
+- 触发规则：开发、修改或查询 LLM 测试框架相关功能时阅读（测试数据管理、测试执行、评估表生成、元数据追踪）
+- 内容摘要：LLM 测试框架规格，定义测试数据目录结构、输出目录结构、meta_data.json 文件结构（包含 version、round、pass_ratio、temperature、create_at、input_file 字段）、评估表结构（6 列：llm_input、llm_output、pass、score、reason、other）、LLMTestBase 抽象函数规范（data_input、run_test、generate_eval_sheet、read_eval_result）
