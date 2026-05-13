@@ -19,12 +19,10 @@ from lifeprism.config import settings
 import asyncio
 from lifeprism.utils.exceptions import ExternalServiceError
 from lifeprism.llm.utils.md_os import write_date_md,extract_date_logs_from_file,read_md
-from lifeprism.llm.prompts import PromptLoader, Prompts
+from lifeprism.llm.prompts import prompt_loader, Prompts
 
 logger = get_logger(__name__)
 
-# 初始化 PromptLoader
-prompt_loader = PromptLoader(Path(__file__).parent.parent.parent.parent / "templates" / "prompts")
 
 async def summary_activities(activities : str)->str:
     # 加载 prompt
@@ -190,18 +188,19 @@ async def extract_from_chat_messages(session:Session)->str|None:
     extract_chat_prompt = prompt_loader.load_prompt(Prompts.Schedule.EXTRACT_CHAT)
 
     # 将message[获取所有消息记录中长度不等于last_processed_loc的消息:]转化为str
-    message = session.messages[session.last_processed_loc]
-    summary_raw_content = json.dumps(message)
-    result:OutboundMessage= await bus.send(InboundMessage(
-        type = MessageType.DREAM_TASK,
-        content = f"## 需要总结的内容 \n {summary_raw_content}",
-        extra={"system_prompt": extract_chat_prompt}
-    ))
-    session.last_processed_loc = len(session.messages)
-    session_manager.save_session(session)
+    message = session.messages[session.last_processed_loc:]
+    if message:
+        summary_raw_content = json.dumps(message)
+        result:OutboundMessage= await bus.send(InboundMessage(
+            type = MessageType.DREAM_TASK,
+            content = f"## 需要总结的内容 \n {summary_raw_content}",
+            extra={"system_prompt": extract_chat_prompt}
+        ))
+        session.last_processed_loc = len(session.messages)
+        session_manager.save_session(session)
 
-    if result.response and result.response.content and result.response.content  != "无可提取内容" :
-        return result.response.content
+        if result.response and result.response.content and result.response.content  != "无可提取内容" :
+            return result.response.content
     return None
 
 def format_chat_history(history: list[dict]) -> str:
@@ -269,7 +268,7 @@ async def process_session_message(days_offset :int = 3):
             batch_results = await asyncio.gather(
                 *[extract_from_chat_messages(session_id) for session_id in batch]
             )
-            all_results.extend(batch_results)
+            all_results.extend([r for r in batch_results if r is not None])
 
         # 删除加载的session_id
         for session_id in _session_to_process:

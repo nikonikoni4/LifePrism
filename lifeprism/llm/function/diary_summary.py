@@ -17,10 +17,7 @@ from lifeprism.config import settings
 from pathlib import Path
 from lifeprism.llm.utils.md_os import read_md,write_date_md,extract_date_logs_from_file
 from lifeprism.repository import diary_repository
-from lifeprism.llm.prompts import PromptLoader, Prompts
-
-# 创建 PromptLoader 实例
-prompt_loader = PromptLoader(settings.lifeprism_data_path / "prompts")
+from lifeprism.llm.prompts import prompt_loader, Prompts
 
 
 async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:list[str], outdate_summary: str | None = None)->LLMResponse:

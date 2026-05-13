@@ -8,8 +8,11 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
 from dataclasses import dataclass
+import shutil
+import sys
 import yaml
 
+from lifeprism.config import settings
 from lifeprism.utils import get_logger
 from lifeprism.llm.utils.md_os import prompts_md_load
 
@@ -62,7 +65,7 @@ class PromptLoader:
         _usage_stats: 使用统计数据
     """
 
-    def __init__(self, prompts_dir: Path | str, usage_stats_file: Optional[Path | str] = None):
+    def __init__(self, prompts_dir: Path | str = settings.lifeprism_data_path / "prompts", usage_stats_file: Optional[Path | str] = None):
         """
         初始化 PromptLoader
 
@@ -72,6 +75,10 @@ class PromptLoader:
         """
         if isinstance(prompts_dir, str):
             prompts_dir = Path(prompts_dir)
+
+        # 开发环境：用 templates/prompts 覆盖 localData/prompts
+        if not getattr(sys, 'frozen', False):
+            self._sync_dev_prompts(prompts_dir)
 
         self.prompts_dir = prompts_dir
 
@@ -84,6 +91,25 @@ class PromptLoader:
 
         # 缓存已加载的 prompt 文件
         self._cache: Dict[str, Dict[str, Any]] = {}
+
+    @staticmethod
+    def _sync_dev_prompts(target_dir: Path) -> None:
+        """开发环境：将 templates/prompts 同步到目标目录"""
+        # 项目根目录 = lifeprism 包的上两级
+        project_root = Path(__file__).resolve().parent.parent.parent.parent
+        source_dir = project_root / "templates" / "prompts"
+
+        if not source_dir.exists():
+            return
+
+        # 确保目标目录父目录存在
+        target_dir.parent.mkdir(parents=True, exist_ok=True)
+
+        # 删除旧目录后复制
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+        shutil.copytree(source_dir, target_dir)
+        logger.debug(f"开发环境已同步 prompts: {source_dir} -> {target_dir}")
 
         # 使用统计数据
         self._usage_stats: Dict[str, Dict[str, Any]] = {}
