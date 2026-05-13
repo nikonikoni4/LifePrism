@@ -183,11 +183,15 @@ version_history:
 
 ## v2
 
+```md
 {prompt 内容}
+```
 
 ## v1
 
+```md
 {prompt 内容}
+```
 
 ---
 
@@ -205,7 +209,9 @@ version_history:
 
 ## v1
 
+```md
 {prompt 内容}
+```
 ```
 
 **格式说明**：
@@ -215,6 +221,7 @@ version_history:
   - `metadata`：该 prompt 的元数据（YAML 格式）
   - `v1`, `v2`, `v3` 等：各个版本的 prompt 内容
 - **分隔符 `---`**：分隔不同的 prompts
+- **代码块 ` ```md ``` `**：包裹 prompt 内容，避免 Markdown 格式干扰
 
 **metadata 字段**：
 - `active_version`：当前激活的版本（必需）
@@ -222,6 +229,11 @@ version_history:
   - 每个版本包含：
     - `created_at`：创建日期（YYYY-MM-DD）
     - `change_reason`：修改原因（具体说明改了什么、为什么改）
+
+**prompt 内容格式**：
+- 必须使用 ` ```md ``` ` 代码块包裹
+- 代码块内可以自由使用 Markdown 格式（标题、列表、代码块等）
+- 解析时只提取代码块内的内容
 
 **参数注入语法**：
 - 使用 Python format 语法：`{param_name}`

@@ -492,16 +492,42 @@ def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
             version_name = version_match.group(1)
             version_start = version_match.end()
 
-            # 找到下一个二级标题或块结束
-            next_heading = re.compile(r'^##\s+', re.MULTILINE)
-            next_match = next_heading.search(block, version_start)
-
-            if next_match:
-                version_end = next_match.start()
-            else:
-                version_end = len(block)
+            # 找到下一个二级标题或块结束，需要跳过代码块内部的二级标题
+            version_end = len(block)
+            
+            # 使用状态机来跟踪是否在代码块内部
+            in_code_block = False
+            pos = version_start
+            
+            while pos < len(block):
+                # 检查是否进入或退出代码块
+                if block[pos:pos+3] == '```':
+                    in_code_block = not in_code_block
+                    pos += 3
+                    continue
+                
+                # 如果不在代码块内部，检查是否是二级标题
+                if not in_code_block:
+                    # 检查是否是行首的 ##
+                    if pos == 0 or block[pos-1] == '\n':
+                        if block[pos:pos+2] == '##' and (pos+2 >= len(block) or block[pos+2] in ' \n'):
+                            version_end = pos
+                            break
+                
+                pos += 1
 
             version_content = block[version_start:version_end].strip()
+            
+            # 解析 ```md ``` 代码块，只提取代码块内的内容
+            # 只处理以 ```md 开头的情况，避免误匹配内部的代码块
+            if version_content.startswith('```md'):
+                # 找到第一个换行后的内容和最后一个 ```
+                first_newline = version_content.find('\n')
+                last_backticks = version_content.rfind('```')
+                
+                if first_newline != -1 and last_backticks > first_newline:
+                    version_content = version_content[first_newline+1:last_backticks].strip()
+            
             versions[version_name] = version_content
 
         prompts[prompt_name] = {
