@@ -46,3 +46,9 @@
 - path: `docs/specs/2026-04-26-screenshot-analysis-spec.md`
 - 触发规则：开发、修改或查询截图语义分析功能时阅读（高密度时间段识别、chunk 切分、LLM 分析、行为总结、tokens 消耗控制）
 - 内容摘要：截图语义分析功能规格，定义基于 LLM 的截图语义分析流程（高密度时间段识别→chunk 切分→截图查询→LLM 分析→行为总结），包括 ANALYSIS_SYSTEM_PROMPT 核心原则（精确度优先、基于截图内容、独立判断）、三种语义推断情况、输出契约、数据持久化规则，以及新增的 tokens 消耗控制机制（基于分类的截图过滤、配置项 screen_analysis_ignore、前端多选界面）
+
+## prompt-management-system
+- updated_at: 2026-05-13
+- path: `docs/specs/2026-05-13-prompt-management-system.md`
+- 触发规则：开发、修改或查询 Prompt 集中管理系统时阅读（文件组织、格式规范、加载接口、版本管理、使用统计）
+- 内容摘要：Prompt 集中管理系统规格，定义使用 Markdown 文件管理所有 LLM prompts 的技术契约，包括文件命名规范（{模块名}_prompts.md）、Prompt 命名规范（snake_case）、Markdown 文件格式（frontmatter + metadata + 多版本）、导出接口（get_{prompt_name}_prompt）、使用统计机制（usage_stats.yaml）。支持版本管理、A/B 测试、代码解耦。Prompt 测试机制待后续补充。
