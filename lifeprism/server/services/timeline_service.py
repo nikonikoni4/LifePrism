@@ -4,12 +4,14 @@ Timeline V2 服务层 - 缩略图统计
 提供 Timeline 缩略图统计和时间块详情的服务接口
 """
 
-from typing import Literal
+import re
+from typing import Literal, List
 from datetime import datetime
 
 from lifeprism.server.schemas.timeline_schemas import (
     TimelineStatsResponse,
     TimelineTimeOverviewResponse,
+    BehaviorItem,
     BehaviorAnalysisItem,
     BehaviorAnalysisResponse
 )
@@ -21,6 +23,70 @@ from lifeprism.server.services.timeline_builder import (
 )
 
 from lifeprism.repository import behavior_analysis_repository,QueryOptions
+
+
+def parse_behavior_text(behavior_text: str) -> List[BehaviorItem]:
+    """
+    解析behavior文本为BehaviorItem列表
+    
+    原始文本格式示例：
+    2026-04-26 21:04:01 ~ 2026-04-26 21:19:01
+     behavior: 1. 修正函数和SQL拼写错误
+    2. 正确处理数据拼接
+    2026-04-26 21:19:01 ~ 2026-04-26 21:34:01
+     behavior: 1. Fixed the typo...
+    
+    Args:
+        behavior_text: 原始behavior文本
+        
+    Returns:
+        List[BehaviorItem]: 解析后的BehaviorItem列表
+    """
+    if not behavior_text or not behavior_text.strip():
+        return []
+    
+    # 正则表达式匹配时间区间模式：YYYY-MM-DD HH:MM:SS ~ YYYY-MM-DD HH:MM:SS
+    time_range_pattern = r'(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s*~\s*\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})'
+    
+    # 查找所有时间区间的位置
+    time_ranges = list(re.finditer(time_range_pattern, behavior_text))
+    
+    if not time_ranges:
+        # 如果没有找到时间区间，返回整个文本作为一个item
+        return [BehaviorItem(
+            time_range="",
+            behavior_items=behavior_text.strip()
+        )]
+    
+    behavior_items = []
+    
+    for i, match in enumerate(time_ranges):
+        time_range = match.group(1).strip()
+        start_pos = match.end()
+        
+        # 获取当前时间区间到下一个时间区间之间的文本
+        if i + 1 < len(time_ranges):
+            end_pos = time_ranges[i + 1].start()
+        else:
+            end_pos = len(behavior_text)
+        
+        # 提取behavior内容
+        content = behavior_text[start_pos:end_pos].strip()
+        
+        # 移除开头的 "behavior:" 前缀（如果有）
+        if content.lower().startswith("behavior:"):
+            content = content[9:].strip()
+        elif content.lower().startswith("behavior："):
+            content = content[9:].strip()
+        
+        if content:
+            behavior_items.append(BehaviorItem(
+                time_range=time_range,
+                behavior_items=content
+            ))
+    
+    return behavior_items
+
 
 def get_behavior_analysis(
     date: str,
@@ -37,12 +103,15 @@ def get_behavior_analysis(
     response = BehaviorAnalysisResponse()
     screent_analysis_summary_list = behavior_analysis_repository.get_behaviors_by_date(date)
     for item in screent_analysis_summary_list:
+        # 解析behavior文本为结构化数据
+        behavior_items = parse_behavior_text(item["behavior"])
+        
         response.behavior_list.append(BehaviorAnalysisItem(
             start_time=item["start_time"],
             end_time=item["end_time"],
             screen_count=item["screen_count"],
             behavior_summary=item["behavior_summary"],
-            behavior=item["behavior"],
+            behavior=behavior_items,
             title = item["title"],
         ))
     return response

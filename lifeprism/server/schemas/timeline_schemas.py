@@ -135,6 +135,10 @@ class TodoDurationResponse(BaseModel):
 # Behavior Summary 相关 Schema
 # ============================================================================
 
+class BehaviorItem(BaseModel):
+    time_range : str = Field(...,description="时间区间")
+    behavior_items : str = Field(...,description="该区间范围内的详细行为分析（待序号自动换行文本）")
+
 class BehaviorAnalysisItem(BaseModel):
     """单个行为分析项"""
     title: str = Field(..., description="标题")
@@ -142,7 +146,7 @@ class BehaviorAnalysisItem(BaseModel):
     end_time: str = Field(..., description="结束时间，格式：YYYY-MM-DD HH:MM:SS")
     screen_count: int = Field(..., description="截图数量")
     behavior_summary: str = Field(..., description="总结性描述")
-    behavior: str = Field(..., description="分点行为（带序号的文本）")
+    behavior: list[BehaviorItem] = Field(..., description="分区间的详细行为分析")
     created_at: Optional[str] = Field(None, description="创建时间")
 
 

@@ -88,15 +88,21 @@ export type {
 // Behavior Summary 相关类型
 // ============================================================================
 
+/** 单个行为时间区间项 */
+export interface BehaviorItem {
+  time_range: string;      // 时间区间，格式：YYYY-MM-DD HH:MM:SS ~ YYYY-MM-DD HH:MM:SS
+  behavior_items: string;  // 该区间范围内的详细行为分析（带序号自动换行文本）
+}
+
 /** 单个行为分析项 */
 export interface BehaviorAnalysisItem {
-  title: string;           // 标题
-  start_time: string;       // 开始时间，格式：YYYY-MM-DD HH:MM:SS
-  end_time: string;         // 结束时间，格式：YYYY-MM-DD HH:MM:SS
-  screen_count: number;     // 截图数量
-  behavior_summary: string; // 总结性描述
-  behavior: string;         // 分点行为（带序号的文本）
-  created_at: string;       // 创建时间
+  title: string;                // 标题
+  start_time: string;           // 开始时间，格式：YYYY-MM-DD HH:MM:SS
+  end_time: string;             // 结束时间，格式：YYYY-MM-DD HH:MM:SS
+  screen_count: number;         // 截图数量
+  behavior_summary: string;     // 总结性描述
+  behavior: BehaviorItem[];     // 分区间的详细行为分析
+  created_at: string;           // 创建时间
 }
 
 /** 行为分析响应 */

@@ -113,10 +113,27 @@ const BehaviorDetailPanel: React.FC<BehaviorDetailPanelProps> = ({
                 {/* 详细行为 */}
                 <div>
                     <label className="block text-xs font-bold text-slate-700 mb-2">详细行为</label>
-                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                        <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                            {behavior.behavior}
-                        </p>
+                    <div className="space-y-3">
+                        {behavior.behavior.map((item, index) => (
+                            <div
+                                key={index}
+                                className="p-4 bg-gray-50 rounded-xl border border-gray-100"
+                            >
+                                {/* 时间区间标签 */}
+                                {item.time_range && (
+                                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
+                                        <span className="text-xs">🕐</span>
+                                        <span className="text-xs font-mono text-slate-500">
+                                            {item.time_range}
+                                        </span>
+                                    </div>
+                                )}
+                                {/* 行为内容 */}
+                                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                    {item.behavior_items}
+                                </p>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
