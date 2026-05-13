@@ -33,6 +33,7 @@ dependencies = [
     "aiosqlite==0.21.0",  # 注意：0.22.x 与 langgraph-checkpoint-sqlite 不兼容
     "mss>=9.0.1",
     "pynput>=1.7.7",
+    "apscheduler>=3.10.0",
 ]
 
 # 可选依赖

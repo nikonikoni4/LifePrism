@@ -38,3 +38,7 @@ docs copy
 .agents
 claude_task_manager.py
 nanobot
+_temp
+_temp copy
+test\llm_prompt_test.py\dataset
+test\llm_prompt_test.py\results
