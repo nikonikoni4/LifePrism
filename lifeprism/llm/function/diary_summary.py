@@ -17,54 +17,10 @@ from lifeprism.config import settings
 from pathlib import Path
 from lifeprism.llm.utils.md_os import read_md,write_date_md,extract_date_logs_from_file
 from lifeprism.repository import diary_repository
-create_summary_task_prompt = """
-    ## task
-    你需要对用户的日记进行简短总结，只阐述事实，不进行推理
+from lifeprism.llm.prompts import PromptLoader, Prompts
 
-    ## 提取的重点
-    1. 用户记忆相关事件的重点事件
-    2. 引发用户情绪的事件，以及情绪的变化
-    3. 引发用户深度思考的事件，以及深度思考的内容
-
-    ## 禁止做的事情
-
-    1. 总结中写入事件细节
-    2. 直接复制长内容
-    3. 不要将近况内容作为总结主体
-
-    ## 输出契约
-
-    1. 字数不能超过100字
-    2. 必须使用数字标号比如`1.`来进行分点总结，不可以采用其他格式
-
-    """
-
-update_summary_task_prompt = """
-    ## task
-    当前用户已经更新了日记内容，现在需要参考新日记内容以及旧日记总结，更新日记总结
-
-    ## 你需要做的事情
-    1. 对比旧日记总结与新日记总结是否有冲突，如果有需要以新的日记内容为主
-    2. 若新日记补充了旧日记总结没有到内容，需要依据《提取的重点》章节的规则进行提取
-
-    ## 提取的重点
-    1. 总结中写入事件细节
-    2. 引发用户情绪的事件，以及情绪的变化
-    3. 引发用户深度思考的事件，以及深度思考的内容
-
-    ## 禁止做的事情
-
-    1. 总结中写入事件细节
-    2. 直接复制长内容
-    3. 不要将近况内容作为总结主体
-
-    ## 输出契约
-
-    1. 字数不能超过100字
-    2. 必须使用数字标号比如`1.`来进行分点总结，不可以采用其他格式
-
-    """
-
+# 创建 PromptLoader 实例
+prompt_loader = PromptLoader(settings.lifeprism_data_path / "prompts")
 
 
 async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:list[str], outdate_summary: str | None = None)->LLMResponse:
@@ -87,9 +43,11 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
     # 一个人情绪或状态应该都是有一定连续性的，所以一定要把这个连续性给捕捉到，然后这个连续性破坏一定会有关键事件，这个关键事件一定要重点分析，这样就能绘制一个心里折线图了
     sys_parts = []
     # 任务提示词
-    sys_parts.append( 
-        update_summary_task_prompt if outdate_summary else create_summary_task_prompt
-    )
+    if outdate_summary:
+        task_prompt = prompt_loader.load_prompt(Prompts.Schedule.UPDATE_DIARY_SUMMARY)
+    else:
+        task_prompt = prompt_loader.load_prompt(Prompts.Schedule.CREATE_DIARY_SUMMARY)
+    sys_parts.append(task_prompt)
 
     # 用户画像（长期内容）
     user_md_path = settings.lifeprism_data_path / "user" / "user.md"

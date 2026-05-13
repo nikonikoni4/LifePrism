@@ -20,6 +20,7 @@ from lifeprism.llm.bus import OutboundMessage, bus, MessageType, InboundMessage
 from lifeprism.config import settings
 from lifeprism.utils import get_logger,DEBUG
 from lifeprism.llm.providers.dataset_providers import llm_dataset_provider
+from lifeprism.llm.prompts import PromptLoader, Prompts
 from lifeprism.repository import (
     map_cache_repository,
     raw_behavior_analysis_repository, 
@@ -31,80 +32,11 @@ from lifeprism.repository import (
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
 
+# 创建 PromptLoader 实例
+prompt_loader = PromptLoader(settings.lifeprism_data_path / "prompts")
+
 # logger.setLevel(DEBUG)
 # ==================== 常量配置 ====================
-
-ANALYSIS_SYSTEM_PROMPT = """
-## task
-你需要依据用户的连续行为截图来判断用户在该时间段的行为语义。
-
-## 核心原则
-
-1. **精确度优先**：宁愿不输出结果，也不要输出不确定的、过度推断的用户行为
-2. **基于截图内容**：必须严格基于实际截图内容进行分析，不要受输出示例的具体内容影响
-3. **独立判断**：每次分析都是独立的，不要套用任何模板或历史案例
-
-## 语义说明
-
-1. 语义必须是具有内容的，而不能仅仅是描述行为：
-   - 合理语义：'观看《老友记》电视剧'，编写读书笔记，修改xxbug，实现新功能
-   - 不合理语义：在cursor界面编辑xx.py，使用claude code进行编码
-2. 良好的语义是能够匹配用户的真实目的，具体查看《行为语义推断》章节
-3. 输入的图片是一个时间段的截图，不一定仅仅只代表用户的一个行为，而可能是多个行为
-
-## 行为语义推断
-
-好的行为分析结果需要与用户目的进行匹配，有3种语义判断情况:
-### 情况1
-1. 触发场景：用户目标存在，且行为与用户目标强相关
-2. 行为语义推断：行为语义需要是这个目标的细分语义阐述
-3. 例子：用户的目标是阅读《XXX》，与目标窗口对应，那么行为语义就应该是查看《xxx》的<具体>章节
-
-### 情况2
-1. 触发场景：用户目标不存在，或行为与用户目标弱相关（需要经过超过2~3次逻辑推理转折才能和用户目标上联系上），不相关
-2. 行为语义推断：需要放弃与目标结合判断，专注于具体截图以及截图变化趋势判断行为语义
-3. 例子：用户正在使用AI工具查询某些内容，但是这个内容可能与目标没有直接关联，就不能强行绑定用户为了实现什么目标而利用ai工具查询内容
-
-### 情况3
-1. 触发场景：在语义推断情况2的基础上，所给出的行为语义判断过于模糊，详情见规则中的不要做的事情，第2和3条
-2. 行为语义推断：需要放弃该条行为的输出，遵守核心规则：宁愿不输出结果，也不要输出不确定的，过度推断的用户行为
-3. 例子：截图中app所在窗口仅存在一些文字，无法聚焦用户的行为。比如显示cursor中一个脚本内容，但是前后截图该脚本内容无变化或不相关，无法判断用户在该内容做了什么动作，就不要输出行为，不要输出"用户在cursor编辑xx.py"等内容
-
-
-## 语义识别步骤
-<执行步骤>
-1. 首先匹配每张截图用户实际使用的窗口：通过每张截图给出的附加信息app和title进行窗口定位
-2. 识别窗口内容，如果识别到用户正在打字，关注窗口输入框打字内容
-3. 将不同时间的窗口内容按照时间顺序排序，依据窗口内容变化，结合用户目标，判断用户的行为，具体判断情况见《行为语义推断》章节
-4. 将相同语义内容进行合并推理
-5. 自行审查，判断输出内容是否符合规则和输出契约
-</执行步骤>
-
-
-## 规则
-
-### 不要做的事情
-    1. 不要输出用户能力相关的行为和总结，比如"文档内容具有技术深度"，"整体行为体现专注度"
-    2. 不要输出"相关"等模糊词语，比如不能出现："用户正在修改相关bug"，应该为用户正在修复X模块bug。如果结果不清晰宁愿不输出也不要给出模糊信息
-    3. 不要给出只从app和title就能判断的语义：比如，app:cursor title: xx.py "使用cursor编辑xx.py"。这种语义太过模糊。
-    4. 不要在输出中引用截图信息，比如见截图1等，你需要的是说明用户行为
-    5. 不要在输出中包含具体的时间
-
-
-
-## 输入说明
-
-1. 每张截图对应着一个文本描述，会传入截图时间,截图时使用的app名称以及app的标题，以及这个文本描述对应的图片id（与图片传入顺序对应）
-2. **特殊情况**:当传入[无截图]时，意味着这个文本没有图片对应，需要根据文本描述判断行为即可
-
-## 输出契约
-
-**严格输出格式要求**：
-- 当能够判断行为时：使用数字编号（1. 2. 3. ...）分点列出，每条行为独立成行
-- **只输出行为列表**：严格按照数字编号格式输出，不要有任何其他内容
-
-
-"""
 
 DENSITY_THRESHOLD = 0.6
 MIN_DURATION_MINUTES = 6
@@ -430,10 +362,13 @@ async def analyze_chunk_screenshots(
 
 
     try:
+        # 加载截图分析 prompt
+        analysis_prompt = prompt_loader.load_prompt(Prompts.Schedule.SCREENSHOT_ANALYSIS)
+        
         msg = InboundMessage(
             content=user_content,
             type=MessageType.GENERAL_TASK,
-            extra={'system_prompt' : ANALYSIS_SYSTEM_PROMPT}
+            extra={'system_prompt' : analysis_prompt}
         )
         response :OutboundMessage = await bus.send(msg)
         response = response.response.content
@@ -586,43 +521,10 @@ async def _behavior_summary(start_time:str,end_time:str,screen_count:int,behavio
     """
     if not behavior:
         raise ValueError("输入行为为空")
-    SUMMARY_SYSTEM_PROMPT = """
-    ## task 
-    你需要对输入的用户行为进行总结
-
-    ## 需要做的事情
-    1. 输入内容如果包含相似、重复的内容需要合理合并
-    2. 输入的内容如果包含逻辑关系，可以进行合理推理，比如用户先编写xx计划，然后执行xx计划等
-    3. 如果所做的事情与用户的目标相关，需要结合目标进行说明。但不能直接说在进行xx目标，而是要结合具体行为和目标关系说明
-
-    ## 不要做的事情
-    1. 不要简单重复输入内容中已经有点内容
-    3. 输出中不要直接包含“用户”等主语
-    4. 不要使用“完成了”等字眼，只描述做了什么内容，而不是完成了什么
-    5. 不要在总结中出现具体时间，输入的时间只作为动作顺序参考，不作为总结的内容
-    6. 不要编造用户行为，需要基于实际输入的行为内容进行总结。
-
-
-    ## 输出契约
-
-    **输出格式**：JSON 对象，包含以下字段
-    - behavior_summary : 行为总结，不超过150字
-    - title : 行为标题，对于行为的极致压缩，不超过30个字（一个英文单词算一个字符）
-
-    一下的示例仅供参考，真实内容需要依据输入的行为内容进行总结。
-    **正确的输出示例**：
-    {
-        "behavior_summary" : "阅读 FastAPI 官方文档的异步编程章节，在 api_service.py 中重构用户认证接口，将同步调用改为异步实现",
-        "title" : "重构用户认证接口为异步实现"
-    }
-
-    **错误的输出示例**（不要这样输出）：
-    {
-        "behavior_summary" : "完成了相关功能的开发工作",  // 过于笼统，缺少具体内容
-        "title" : "开发工作"  // 没有说明具体做了什么
-    }
-
-    """
+    
+    # 加载行为总结 prompt
+    summary_prompt = prompt_loader.load_prompt(Prompts.Schedule.SCREEN_BEHAVIOR_SUMMARY)
+    
     user_prompt_parts = []
     if todolist :
         user_prompt_parts.append(
@@ -644,7 +546,7 @@ async def _behavior_summary(start_time:str,end_time:str,screen_count:int,behavio
         msg = InboundMessage(
             content=user_prompt,
             type=MessageType.GENERAL_TASK,
-            extra={"system_prompt": SUMMARY_SYSTEM_PROMPT},
+            extra={"system_prompt": summary_prompt},
         )
         response :OutboundMessage = await bus.send(msg)
         response = response.response.content

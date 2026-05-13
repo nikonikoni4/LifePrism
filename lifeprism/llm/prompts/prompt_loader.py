@@ -43,6 +43,12 @@ class Prompts:
         MOOD_SUMMARY = PromptRef("schedule", "mood_summary")
         UPDATE_MEMORY = PromptRef("schedule", "update_memory")
         EXTRACT_CHAT = PromptRef("schedule", "extract_chat")
+        CREATE_DIARY_SUMMARY = PromptRef("schedule", "create_diary_summary")
+        UPDATE_DIARY_SUMMARY = PromptRef("schedule", "update_diary_summary")
+        SCREENSHOT_ANALYSIS = PromptRef("schedule", "screenshot_analysis")
+        SCREEN_BEHAVIOR_SUMMARY = PromptRef("schedule", "screen_behavior_summary")
+        SCREENSHOT_ANALYSIS = PromptRef("schedule", "screenshot_analysis")
+        SCREENSHOT_BEHAVIOR_SUMMARY = PromptRef("schedule", "screen_behavior_summary")
 class PromptLoader:
     """
     Prompt 加载器类
