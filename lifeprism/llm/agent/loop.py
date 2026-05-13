@@ -77,7 +77,8 @@ class AgentLoop:
                         'arguments': json.dumps(tc.arguments, ensure_ascii=False)
                     }
                 } for tc in response.tool_calls
-            ]
+            ],
+            reasoning_content=response.reasoning_content
         )
 
 
@@ -120,7 +121,8 @@ class AgentLoop:
                             'arguments': json.dumps(tc.arguments, ensure_ascii=False)
                         }
                     } for tc in response.tool_calls
-                ]
+                ],
+                reasoning_content=response.reasoning_content
             )
             logger.debug(f"模型返回 ： {response}")
             logger.debug(f"模型工具调用 ： {response.tool_calls}")
@@ -148,7 +150,8 @@ class AgentLoop:
                             'arguments': json.dumps(tc.arguments, ensure_ascii=False)
                         }
                     } for tc in response.tool_calls
-                ]
+                ],
+                reasoning_content=response.reasoning_content
             )
             logger.debug(f"强制文本回复: {response}")
 
