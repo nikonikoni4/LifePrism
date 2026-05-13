@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 # templates/ 下以此子目录开头的文件映射到 config_base_path，其余映射到 lifeprism_data_path
 _CONFIG_SUBDIR = "config"
 
-
+# 需要强制覆盖的目录列表，无论目标文件是否存在都会覆盖
+OVERWRITE_DIR_LIST = ["prompts"]
 def initialize_resources() -> None:
     """
     初始化资源文件
@@ -53,6 +54,13 @@ def initialize_resources() -> None:
             target = config_path / rel
         else:
             target = data_path / rel
+
+        # 如果文件所在目录在强制覆盖列表中，则无论是否存在都覆盖
+        if rel.parts[0] in OVERWRITE_DIR_LIST:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+            logger.info(f"已强制覆盖资源文件: {target}")
+            continue
 
         if target.exists():
             continue
