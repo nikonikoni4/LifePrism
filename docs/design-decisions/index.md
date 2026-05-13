@@ -29,3 +29,9 @@ abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设�
 - path: `docs/design-decisions/2026-05-11-memory-system-compact-dream-separation.md`
 - 触发规则：当需要理解 lifeprism 记忆系统的 compact 与 dream 机制、游标设计、触发时机时读取
 - 内容摘要：将 nanobot 记忆系统的 compact 机制与 dream 记忆提取机制分离，以适配 lifeprism 的短对话情感捕捉场景。Compact 专注于 token 管理（写入 session.jsonl），Dream 专注于记忆提取（写入 history.jsonl），两个游标完全独立。解决了短对话记忆丢失问题和职责混淆问题。
+
+## prompt-centralized-management
+- updated_at: 2026-05-13
+- path: `docs/design-decisions/2026-05-13-prompt-centralized-management.md`
+- 触发规则：当需要理解为什么采用 Markdown 文件管理 Prompt、为什么不用纯代码方式、如何进行方案决策时读取
+- 内容摘要：决定采用 Markdown + YAML 文件管理 Prompt，而非纯代码方式。解决了版本管理、A/B 测试、代码耦合、元数据记录、使用统计等问题。按大模块分组组织文件，一个文件包含多个相关 prompts。记录了 AI 辅助决策的经验教训：需要主动追问缺点，避免片面决策。
