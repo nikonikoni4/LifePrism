@@ -30,7 +30,11 @@ class PromptRound(TypedDict):
     input_file : list[str] # 测试输入文件
 
 class TestLog(TypedDict):
-    pass
+    system_prompt: str
+    user_message: str
+    result: str
+    version: str
+    temperature: float
 
 class LLMTestBase(ABC):
     META_DATA_FILE_NAME = "meta_data.json"
@@ -146,6 +150,18 @@ class LLMTestBase(ABC):
         }
         self.metadata.append(new_round)
         self.save_metadata()
+
+    def save_log(self, test_logs: list[TestLog], round: str):
+        """
+        保存测试日志到 JSON 文件
+        args:
+            test_logs: 测试日志列表
+            round: 测试轮次
+        """
+        log_path = self.output_path / self.prompt.name / self.prompt_version / f"r{round}-t{self.temperature}.json"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open('w', encoding='utf-8') as f:
+            json.dump(test_logs, f, ensure_ascii=False, indent=2)
 
 
 

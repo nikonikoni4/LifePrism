@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from lifeprism.llm.prompts import prompt_loader, PromptRef, Prompts
 from lifeprism.llm.providers import create_llm_client, LLMResponse
 from lifeprism.llm.utils.md_os import read_md
-from llm_test_base import LLMTestBase
+from llm_test_base import LLMTestBase, TestLog
 import asyncio
 import openpyxl
 # prompts 目录路径
@@ -96,22 +96,30 @@ class DiarySummarySummary(LLMTestBase):
         )
         return response.content or ""
 
-    async def _process_single(self, data: dict) -> dict:
+    async def _process_single(self, data: dict) -> tuple[dict, TestLog]:
         """处理单个数据项"""
         messages = self._build_messages(data["content"], data["date"])
         # llm_input 包含文件标识和原始输入数据
         llm_input = f"文件: {data['file_name']}\n---\n{data['content']}"
         llm_output = await self._call_llm(messages)
+        test_log: TestLog = {
+            "system_prompt": messages[0]["content"],
+            "user_message": messages[1]["content"],
+            "result": llm_output,
+            "version": self.prompt_version,
+            "temperature": self.temperature
+        }
         return {
             "llm_input": llm_input,
             "llm_output": llm_output,
             "file_name": data["file_name"]
-        }
+        }, test_log
 
-    async def _run_test_async(self, input_files: list[str] | None = None) -> list[dict]:
+    async def _run_test_async(self, input_files: list[str] | None = None, round: str = "r1") -> tuple[list[dict], list[TestLog]]:
         """异步执行测试，分组调用每组30个"""
         data_list = self.data_input(input_files)
         results = []
+        test_logs = []
         batch_size = 30
 
         for i in range(0, len(data_list), batch_size):
@@ -119,22 +127,25 @@ class DiarySummarySummary(LLMTestBase):
             batch_results = await asyncio.gather(
                 *[self._process_single(data) for data in batch]
             )
-            results.extend(batch_results)
+            for result, log in batch_results:
+                results.append(result)
+                test_logs.append(log)
 
-        return results
+        return results, test_logs
 
-    def run_test(self, input_files: list[str] | None = None) -> list[dict]:
+    def run_test(self, input_files: list[str] | None = None, round: str = "r1") -> tuple[list[dict], list[TestLog]]:
         """
         执行测试
 
         Args:
             input_files: 输入的文件名称列表，None 为全量测试
+            round: 测试轮次
 
         Returns:
-            测试结果列表，每个元素包含 llm_input 和 llm_output
+            测试结果列表和测试日志列表
         """
         import asyncio
-        return asyncio.run(self._run_test_async(input_files))
+        return asyncio.run(self._run_test_async(input_files, round))
 
     def generate_eval_sheet(self, test_results: list[dict], round: str, temperature: float) -> Path:
         """
@@ -234,7 +245,7 @@ class DiarySummarySummary(LLMTestBase):
 
         # 1. 执行测试
         print("开始执行测试...")
-        test_results = self.run_test(input_files=input_files)
+        test_results, test_logs = self.run_test(input_files=input_files, round=round)
         print(f"测试完成，共 {len(test_results)} 条结果")
         print("-" * 50)
 
@@ -248,10 +259,16 @@ class DiarySummarySummary(LLMTestBase):
         print(f"评估表已生成: {eval_sheet_path}")
         print("-" * 50)
 
-        # 3. 获取输入文件列表
+        # 3. 保存测试日志
+        print("保存测试日志...")
+        self.save_log(test_logs, round)
+        print(f"测试日志已保存: {self.output_path / self.prompt.name / self.prompt_version / f'r{round}-t{self.temperature}.json'}")
+        print("-" * 50)
+
+        # 4. 获取输入文件列表
         input_file_names = [r["file_name"] for r in test_results]
 
-        # 4. 更新 metadata（pass_ratio 初始为 0，等待人工评估）
+        # 5. 更新 metadata（pass_ratio 初始为 0，等待人工评估）
         print("更新 metadata...")
         self.update_metadata(
             round=round,

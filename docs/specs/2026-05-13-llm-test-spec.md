@@ -1,8 +1,8 @@
 ---
-version: 1.2
+version: 1.3
 created_at: 2026-05-13
 updated_at: 2026-05-14
-last_updated: llm_input 字段要求包含原始输入数据和文件标识
+last_updated: 添加 TestLog 结构和 save_log 函数
 abstract: LLM 测试框架规格，定义测试数据目录结构、输出目录结构、metadata 文件结构及测试基类抽象函数规范
 id: llm-test-spec
 title: LLM 测试框架规格
@@ -23,6 +23,7 @@ contract_refs: test/llm_prompt_test.py/llm_test_base.py
 | 1.0 | 创建 spec 初稿 |
 | 1.1 | 添加 set_temperature、set_prompt_version 方法 |
 | 1.2 | llm_input 字段要求包含原始输入数据和文件标识 |
+| 1.3 | 添加 TestLog 结构和 save_log 函数 |
 
 ## Overview
 
@@ -74,10 +75,11 @@ input_path/
 
 ```
 output_path/
-├── {prompt_name}/                     # 按 prompt 名称分组
-│   ├── meta_data.json                 # 测试元数据文件
-│   └── {version}/                     # 按版本分组
+├── {prompt_name}/                        # 按 prompt 名称分组
+│   ├── meta_data.json                    # 测试元数据文件
+│   └── {version}/                        # 按版本分组
 │       ├── r{round}-t{temperature}.xlsx  # 评估表文件
+│       ├── r{round}-t{temperature}.json  # 测试日志文件
 │       └── ...
 └── ...
 ```
@@ -87,6 +89,7 @@ output_path/
 - 每个版本独立目录
 - 评估表文件命名格式：`r{round}-t{temperature}.xlsx`
 - 评估表 Sheet 名称：`r{round}-t{temperature}`
+- 测试日志文件命名格式：`r{round}-t{temperature}.json`
 
 ### 3. meta_data.json 文件结构
 
@@ -94,7 +97,7 @@ output_path/
 [
   {
     "version": "v1",
-    "round": "r1",
+    "round": "1",
     "pass_ratio": 0.85,
     "temperature": 0.7,
     "create_at": "2026-05-13T10:30:00",
@@ -149,7 +152,37 @@ Excel 评估表包含 6 列：
 今天天气很好，我去了公园散步...
 ```
 
-### 5. LLMTestBase 抽象函数规范
+### 5. TestLog 结构
+
+测试日志用于保存结构化的 LLM 调用数据，便于程序化提取和分析。
+
+```json
+[
+  {
+    "system_prompt": "你是一个日记分析助手...",
+    "user_message": "请分析以下日记内容...",
+    "result": "今天的日记记录了...",
+    "version": "v1",
+    "temperature": 0.7
+  }
+]
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| system_prompt | string | 系统提示词内容 |
+| user_message | string | 用户输入的原始消息 |
+| result | string | LLM 返回的结果 |
+| version | string | Prompt 版本号 |
+| temperature | float | LLM 温度参数 |
+
+**规则：**
+- 日志文件与评估表同目录，命名格式：`r{round}-t{temperature}.json`
+- 使用 `save_log(test_logs, round)` 方法保存
+
+### 6. LLMTestBase 抽象函数规范
 
 #### 子类必须实现的抽象函数
 
@@ -167,6 +200,7 @@ Excel 评估表包含 6 列：
 | get_metadata | 获取 metadata 列表，不存在则自动创建 |
 | save_metadata | 保存 metadata 到文件 |
 | update_metadata | 更新 metadata（自动记录 create_at） |
+| save_log | 保存测试日志到 JSON 文件 |
 | set_prompt_version | 设置 prompt 版本号 |
 | set_temperature | 设置 temperature 参数 |
 
