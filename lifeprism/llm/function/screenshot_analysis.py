@@ -20,7 +20,7 @@ from lifeprism.llm.bus import OutboundMessage, bus, MessageType, InboundMessage
 from lifeprism.config import settings
 from lifeprism.utils import get_logger,DEBUG
 from lifeprism.llm.providers.dataset_providers import llm_dataset_provider
-from lifeprism.llm.prompts import PromptLoader, Prompts
+from lifeprism.llm.prompts import prompt_loader, Prompts
 from lifeprism.repository import (
     map_cache_repository,
     raw_behavior_analysis_repository, 
@@ -31,9 +31,6 @@ from lifeprism.repository import (
 )
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
-
-# 创建 PromptLoader 实例
-prompt_loader = PromptLoader(settings.lifeprism_data_path / "prompts")
 
 # logger.setLevel(DEBUG)
 # ==================== 常量配置 ====================
