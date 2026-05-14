@@ -29,6 +29,9 @@ class PromptRound(TypedDict):
     create_at : str # 创建时间
     input_file : list[str] # 测试输入文件
 
+class TestLog(TypedDict):
+    pass
+
 class LLMTestBase(ABC):
     META_DATA_FILE_NAME = "meta_data.json"
     EVAL_SHEET_COLUMNS = ["llm_input", "llm_output", "pass", "score", "reason", "other"]

@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.2
 created_at: 2026-05-13
-updated_at: 2026-05-13
-last_updated: 创建 LLM 测试框架规格初稿
+updated_at: 2026-05-14
+last_updated: llm_input 字段要求包含原始输入数据和文件标识
 abstract: LLM 测试框架规格，定义测试数据目录结构、输出目录结构、metadata 文件结构及测试基类抽象函数规范
 id: llm-test-spec
 title: LLM 测试框架规格
@@ -22,6 +22,7 @@ contract_refs: test/llm_prompt_test.py/llm_test_base.py
 | ---- | -------- |
 | 1.0 | 创建 spec 初稿 |
 | 1.1 | 添加 set_temperature、set_prompt_version 方法 |
+| 1.2 | llm_input 字段要求包含原始输入数据和文件标识 |
 
 ## Overview
 
@@ -119,12 +120,34 @@ Excel 评估表包含 6 列：
 
 | 列名 | 说明 |
 | ---- | ---- |
-| llm_input | LLM 输入内容 |
+| llm_input | LLM 输入内容（需包含原始输入数据和文件标识） |
 | llm_output | LLM 输出内容 |
 | pass | 是否通过（人工填写） |
 | score | 评分（人工填写） |
 | reason | 原因说明（人工填写） |
 | other | 其他备注（人工填写） |
+
+**llm_input 字段规范：**
+
+`llm_input` 字段必须包含以下信息，便于追溯和调试：
+
+1. **文件标识**：文件名、文件 ID 或文件路径，用于定位原始输入文件
+2. **原始输入数据**：从文件中加载的原始内容（即 `data_input` 返回的数据内容）
+
+推荐格式：
+```
+文件: {file_name}
+---
+{原始输入数据}
+```
+
+示例：
+```
+文件: 2026-04-03.md
+---
+## 日记内容
+今天天气很好，我去了公园散步...
+```
 
 ### 5. LLMTestBase 抽象函数规范
 
