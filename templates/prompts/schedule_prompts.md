@@ -90,6 +90,10 @@ version_history:
   v1:
     created_at: 2026-05-13
     change_reason: 从 agent_schedule_job.py 迁移
+    params:
+      - recent_state_path
+      - user_md_path
+      - diary_path_template
 ```
 
 ## v1

@@ -45,6 +45,9 @@ version_history:
   v2:
     created_at: 2026-05-13
     change_reason: 优化输出格式，增加更详细的说明
+    params:
+      - user_name
+      - date
   v1:
     created_at: 2026-05-13
     change_reason: 初始版本

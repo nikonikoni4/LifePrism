@@ -75,11 +75,6 @@ class PromptLoader:
         """
         if isinstance(prompts_dir, str):
             prompts_dir = Path(prompts_dir)
-
-        # 开发环境：用 templates/prompts 覆盖 localData/prompts
-        if not getattr(sys, 'frozen', False):
-            self._sync_dev_prompts(prompts_dir)
-
         self.prompts_dir = prompts_dir
 
         if usage_stats_file is None:
@@ -89,11 +84,14 @@ class PromptLoader:
                 usage_stats_file = Path(usage_stats_file)
             self.usage_stats_file = usage_stats_file
 
+        # 开发环境：用 templates/prompts 覆盖 localData/prompts
+        if not getattr(sys, 'frozen', False):
+            self._sync_dev_prompts(prompts_dir)
+
         # 缓存已加载的 prompt 文件
         self._cache: Dict[str, Dict[str, Any]] = {}
 
-    @staticmethod
-    def _sync_dev_prompts(target_dir: Path) -> None:
+    def _sync_dev_prompts(self,target_dir: Path) -> None:
         """开发环境：将 templates/prompts 同步到目标目录"""
         # 项目根目录 = lifeprism 包的上两级
         project_root = Path(__file__).resolve().parent.parent.parent.parent
@@ -105,11 +103,17 @@ class PromptLoader:
         # 确保目标目录父目录存在
         target_dir.parent.mkdir(parents=True, exist_ok=True)
 
-        # 删除旧目录后复制
-        if target_dir.exists():
-            shutil.rmtree(target_dir)
-        shutil.copytree(source_dir, target_dir)
-        logger.debug(f"开发环境已同步 prompts: {source_dir} -> {target_dir}")
+        # 确保目标目录存在
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # 只同步 .md 文件
+        for md_file in source_dir.glob("**/*.md"):
+            relative_path = md_file.relative_to(source_dir)
+            target_file = target_dir / relative_path
+            target_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(md_file, target_file)
+        
+        logger.debug(f"开发环境已同步 .md prompts: {source_dir} -> {target_dir}")
 
         # 使用统计数据
         self._usage_stats: Dict[str, Dict[str, Any]] = {}
@@ -202,6 +206,52 @@ class PromptLoader:
             logger.error(f"加载 prompt 文件失败 {file_path}: {e}")
             raise
 
+    def _validate_params(
+        self,
+        prompt_name: str,
+        version: str,
+        version_history: Dict[str, Any],
+        params: Dict[str, Any]
+    ) -> None:
+        """
+        验证参数是否符合声明
+
+        Args:
+            prompt_name: prompt 名称
+            version: 版本号
+            version_history: 版本历史数据
+            params: 调用方传入的参数
+
+        Raises:
+            ValueError: 存在未知参数或缺少必需参数
+        """
+        # 获取当前版本的历史信息
+        version_meta = version_history.get(version, {})
+        declared_params = version_meta.get("params")
+
+        # 无 params 声明则跳过校验（向后兼容）
+        if declared_params is None:
+            return
+
+        declared_set = set(declared_params)
+        provided_set = set(params.keys())
+
+        # 1. 检查未知参数
+        unknown = provided_set - declared_set
+        if unknown:
+            raise ValueError(
+                f"Prompt '{prompt_name}' (version: {version}) 存在未知参数: {unknown}。"
+                f"已声明参数: {declared_set}"
+            )
+
+        # 2. 检查缺少必需参数
+        missing = declared_set - provided_set
+        if missing:
+            raise ValueError(
+                f"Prompt '{prompt_name}' (version: {version}) 缺少必需参数: {missing}。"
+                f"必需参数: {declared_set}"
+            )
+
     def load_prompt(
         self,
         prompt: PromptRef | str,
@@ -265,6 +315,15 @@ class PromptLoader:
 
         # 获取 prompt 内容
         prompt_content = prompt_data["versions"][version]
+
+        # 参数校验（在参数注入之前）
+        if params:
+            self._validate_params(
+                prompt_name,
+                version,
+                prompt_data["metadata"]["version_history"],
+                params
+            )
 
         # 参数注入（如果有参数）
         if params:

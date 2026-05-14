@@ -1,9 +1,9 @@
 ---
-version: 2.0
+version: 2.1
 created_at: 2026-05-13
-updated_at: 2026-05-13
-last_updated: 添加 PromptRef 和 Prompts 类型安全机制
-abstract: Prompt 集中管理系统的规格说明，定义文件组织、格式规范、加载接口、使用统计、类型安全机制等技术契约
+updated_at: 2026-05-14
+last_updated: 添加参数声明与校验机制
+abstract: Prompt 集中管理系统的规格说明，定义文件组织、格式规范、加载接口、使用统计、类型安全机制、参数校验等技术契约
 id: prompt-management-system
 title: Prompt 集中管理系统
 status: implemented
@@ -29,6 +29,7 @@ contract_refs:
 
 | 版本 | 更新日期 | 更新内容 |
 | ---- | -------- | -------- |
+| 2.1  | 2026-05-14 | 添加参数声明与校验机制 |
 | 2.0  | 2026-05-13 | 添加 PromptRef 和 Prompts 类型安全机制，更新加载接口 |
 | 1.0  | 2026-05-13 | 创建 spec 初稿 |
 
@@ -229,6 +230,10 @@ version_history:
   - 每个版本包含：
     - `created_at`：创建日期（YYYY-MM-DD）
     - `change_reason`：修改原因（具体说明改了什么、为什么改）
+    - `params`：参数声明列表（可选，仅当该版本需要参数注入时声明）
+      - 格式：字符串列表，每个元素为参数名称
+      - 所有声明的参数均为必需参数
+      - 调用时传入的参数必须与声明完全匹配
 
 **prompt 内容格式**：
 - 必须使用 ` ```md ``` ` 代码块包裹
@@ -240,6 +245,14 @@ version_history:
 - 支持的语法：`{param_name}` 基本替换
 - 不支持的语法：`{param_name:format_spec}` 格式化规范
 - 示例：`文件路径：{file_path}` 会被替换为 `文件路径：/path/to/file.md`
+
+**参数校验规则**：
+- 校验时机：`load_prompt()` 加载含参数声明的 prompt 时
+- 校验内容：
+  1. **未知参数**：调用方传入了声明之外的参数 → 抛出 `ValueError`
+  2. **缺少必需参数**：调用方未传入声明中的参数 → 抛出 `ValueError`
+- 校验逻辑在参数注入（`format()`）之前执行
+- 无 `params` 声明的版本跳过校验（向后兼容）
 
 ### prompts_md_load 函数
 
@@ -579,10 +592,10 @@ prompt = loader.load_prompt("activity_summary", module="schedule")
    - 适用场景：prompt 加载不是高频操作，当前性能可接受
    - 未来优化：可考虑批量写入或异步写入
 
-2. **参数注入无验证**：
-   - 当前影响：缺少参数时只记录警告，不抛出异常
-   - 可能问题：prompt 中有未替换的占位符
-   - 未来优化：可添加参数验证机制
+2. **参数注入验证**：
+   - 当前状态：✅ 已实现
+   - 实现方式：通过 version_history 中的 params 声明进行校验
+   - 校验内容：未知参数、缺少必需参数
 
 3. **无热加载**：
    - 当前影响：修改 prompt 文件后需要清空缓存或重启
