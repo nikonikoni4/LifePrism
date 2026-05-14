@@ -23,7 +23,7 @@ from datetime import datetime
 
 class PromptRound(TypedDict):
     version : int # 测试版本
-    round: str # 测试轮次
+    round: int # 测试轮次
     pass_ratio : float  # 测试通过率，百分比
     temperature : float
     create_at : str # 创建时间
@@ -74,6 +74,12 @@ class LLMTestBase(ABC):
                 return [PromptRound(**item) for item in data]
         return []    
     
+    def get_next_round(self) -> int:
+        """获取下一个轮次号"""
+        if not self.metadata:
+            return 1
+        return max(r["round"] for r in self.metadata) + 1
+    
     def save_metadata(self):
         """保存metadata到文件"""
         path = self.output_path / f"{self.prompt.name}/{self.META_DATA_FILE_NAME}"
@@ -104,7 +110,7 @@ class LLMTestBase(ABC):
         pass
     
     @abstractmethod
-    def generate_eval_sheet(self, test_results: list[dict], round: str, temperature: float) -> Path:
+    def generate_eval_sheet(self, test_results: list[dict], round: int, temperature: float) -> Path:
         """
         生成Excel评估表
         args :
@@ -132,7 +138,7 @@ class LLMTestBase(ABC):
         """执行测试主函数"""
         pass
 
-    def update_metadata(self, round: str, pass_ratio: float, input_files: list[str]):
+    def update_metadata(self, round: int, pass_ratio: float, input_files: list[str]):
         """
         更新metadata
         args :
@@ -151,7 +157,7 @@ class LLMTestBase(ABC):
         self.metadata.append(new_round)
         self.save_metadata()
 
-    def save_log(self, test_logs: list[TestLog], round: str):
+    def save_log(self, test_logs: list[TestLog], round: int):
         """
         保存测试日志到 JSON 文件
         args:

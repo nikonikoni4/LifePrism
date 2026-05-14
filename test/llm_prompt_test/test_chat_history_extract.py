@@ -157,7 +157,7 @@ class ChatHistoryExtract(LLMTestBase):
             "file_name": data["file_name"]
         }, test_log
 
-    async def _run_test_async(self, input_files: list[str] | None = None, round: str = "r1") -> tuple[list[dict], list[TestLog]]:
+    async def _run_test_async(self, input_files: list[str] | None = None, round: int = 1) -> tuple[list[dict], list[TestLog]]:
         """异步执行测试，分组调用每组30个"""
         data_list = self.data_input(input_files)
         results = []
@@ -175,7 +175,7 @@ class ChatHistoryExtract(LLMTestBase):
 
         return results, test_logs
 
-    def run_test(self, input_files: list[str] | None = None, round: str = "r1") -> tuple[list[dict], list[TestLog]]:
+    def run_test(self, input_files: list[str] | None = None, round: int = 1) -> tuple[list[dict], list[TestLog]]:
         """
         执行测试
 
@@ -188,7 +188,7 @@ class ChatHistoryExtract(LLMTestBase):
         """
         return asyncio.run(self._run_test_async(input_files, round))
 
-    def generate_eval_sheet(self, test_results: list[dict], round: str, temperature: float) -> Path:
+    def generate_eval_sheet(self, test_results: list[dict], round: int, temperature: float) -> Path:
         """
         生成 Excel 评估表
 
@@ -260,19 +260,22 @@ class ChatHistoryExtract(LLMTestBase):
 
         return passed / total
 
-    def main(self, round: str = "1", input_files: list[str] | None = None):
+    def main(self, input_files: list[str] | None = None):
         """
         执行测试主函数
 
         Args:
-            round: 测试轮次
             input_files: 输入文件列表，None 为全量测试
         """
+        # 自动获取下一个轮次
+        round = self.get_next_round()
+        
         print(f"Prompt: {self.prompt}")
         print(f"Prompt 版本: {self.prompt_version}")
         print(f"Input path: {self.input_path}")
         print(f"Output path: {self.output_path}")
         print(f"Temperature: {self.temperature}")
+        print(f"Round: {round}")
         print("-" * 50)
 
         print("开始执行测试...")
@@ -313,5 +316,19 @@ class ChatHistoryExtract(LLMTestBase):
 
 
 if __name__ == "__main__":
-    test = ChatHistoryExtract(prompt_version="v1", temperature=0.7)
-    test.main(round="1")
+    # 默认值
+    default_version = "v1"
+    default_temperature = 0.7
+    
+    # 交互式输入
+    version_input = input(f"请输入 Prompt 版本 (默认 {default_version}): ").strip()
+    version = version_input if version_input else default_version
+    
+    temp_input = input(f"请输入 Temperature (默认 {default_temperature}): ").strip()
+    temperature = float(temp_input) if temp_input else default_temperature
+    
+    print(f"\n使用配置: version={version}, temperature={temperature}")
+    print("=" * 50)
+    
+    test = ChatHistoryExtract(prompt_version=version, temperature=temperature)
+    test.main()
