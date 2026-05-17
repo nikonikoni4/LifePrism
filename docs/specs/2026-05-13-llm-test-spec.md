@@ -1,8 +1,8 @@
 ---
-version: 1.3
+version: 1.4
 created_at: 2026-05-13
 updated_at: 2026-05-14
-last_updated: 添加 TestLog 结构和 save_log 函数
+last_updated: round 类型改为 int，支持自动递增
 abstract: LLM 测试框架规格，定义测试数据目录结构、输出目录结构、metadata 文件结构及测试基类抽象函数规范
 id: llm-test-spec
 title: LLM 测试框架规格
@@ -24,6 +24,7 @@ contract_refs: test/llm_prompt_test.py/llm_test_base.py
 | 1.1 | 添加 set_temperature、set_prompt_version 方法 |
 | 1.2 | llm_input 字段要求包含原始输入数据和文件标识 |
 | 1.3 | 添加 TestLog 结构和 save_log 函数 |
+| 1.4 | round 类型改为 int，支持自动递增 |
 
 ## Overview
 
@@ -52,6 +53,7 @@ LLM 测试框架用于对 LLM Prompt 进行系统化测试，支持多轮次测�
 - 同一输入数据和 prompt 版本可进行多轮测试
 - 每轮测试可指定不同的输入文件集合
 - 默认全量测试输入文件夹中的所有文件
+- round 类型为 int，每次运行自动从 meta_data.json 中读取最高 round 并递增
 
 ## Technical Contract
 
@@ -111,7 +113,7 @@ output_path/
 | 字段 | 类型 | 说明 |
 | ---- | ---- | ---- |
 | version | string | Prompt 版本号 |
-| round | string | 测试轮次标识 |
+| round | int | 测试轮次（自动递增） |
 | pass_ratio | float | 通过率（0-1） |
 | temperature | float | LLM 温度参数 |
 | create_at | string | 测试创建时间（ISO 8601 格式） |
@@ -190,7 +192,7 @@ Excel 评估表包含 6 列：
 | ---- | ---- | ---- | ---- |
 | data_input | input_files: list[str] = None | list[Any] | 解析输入数据，返回 LLM 调用所需的数据列表 |
 | run_test | input_files: list[str] = None | list[dict] | 执行测试，返回包含 llm_input 和 llm_output 的结果列表 |
-| generate_eval_sheet | test_results: list[dict], round: str, temperature: float | Path | 生成 Excel 评估表，返回文件路径 |
+| generate_eval_sheet | test_results: list[dict], round: int, temperature: float | Path | 生成 Excel 评估表，返回文件路径 |
 | read_eval_result | eval_sheet_path: Path | float | 读取评估结果，计算并返回通过率（0-1） |
 
 #### 基类提供的通用函数
@@ -198,6 +200,7 @@ Excel 评估表包含 6 列：
 | 函数 | 说明 |
 | ---- | ---- |
 | get_metadata | 获取 metadata 列表，不存在则自动创建 |
+| get_next_round | 获取下一个轮次号（自动递增） |
 | save_metadata | 保存 metadata 到文件 |
 | update_metadata | 更新 metadata（自动记录 create_at） |
 | save_log | 保存测试日志到 JSON 文件 |
