@@ -18,7 +18,7 @@ from pathlib import Path
 from lifeprism.llm.utils.md_os import read_md,write_date_md,extract_date_logs_from_file
 from lifeprism.repository import diary_repository
 from lifeprism.llm.prompts import prompt_loader, Prompts
-
+from lifeprism.utils import llm_call_logger
 
 async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:list[str], outdate_summary: str | None = None)->LLMResponse:
     """
@@ -33,47 +33,31 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
     behavior_md_path = settings.lifeprism_data_path / "user" / "daily_data" / "behavior.md"
     behavior_md_path.parent.mkdir(parents=True, exist_ok=True)
 
-
     year = date.split("-")[0]
     month = date.split("-")[1]
     diary_context = read_md(settings.lifeprism_data_path / "diary" / year / month / f"{date}.md")
-    # 一个人情绪或状态应该都是有一定连续性的，所以一定要把这个连续性给捕捉到，然后这个连续性破坏一定会有关键事件，这个关键事件一定要重点分析，这样就能绘制一个心里折线图了
-    sys_parts = []
+
+    # 读取用户信息
+    user_md_path = settings.lifeprism_data_path / "user" / "user.md"
+    user_md = read_md(user_md_path) or ""
+
     # 任务提示词
     if outdate_summary:
+        # 更新日记总结使用 v1 版本（无参数）
         task_prompt = prompt_loader.load_prompt(Prompts.Schedule.UPDATE_DIARY_SUMMARY)
+        system_prompt = task_prompt
     else:
-        task_prompt = prompt_loader.load_prompt(Prompts.Schedule.CREATE_DIARY_SUMMARY)
-    sys_parts.append(task_prompt)
-
-    # 用户画像（长期内容）
-    user_md_path = settings.lifeprism_data_path / "user" / "user.md"
-    user_md = read_md(user_md_path)
-    if user_md:
-        sys_parts.append(
-            f"""
-            ## 用户信息
-            <user_message>
-            {user_md}
-            </user_message>
-            """
-            )
-    system_prompt = "\n".join(sys_parts)
+        # 创建日记总结使用 v2 版本（需要参数注入）
+        # 计算字数上限：日记长度的 30%，最小 100，最大 500
+        upper_limit = int(min(max(len(diary_context) * 0.3, 100), 500))
+        task_prompt = prompt_loader.load_prompt(
+            Prompts.Schedule.CREATE_DIARY_SUMMARY,
+            upper_limit=str(upper_limit),
+            user_md=user_md
+        )
+        system_prompt = task_prompt
 
     user_parts = []
-    # 用户近况
-    recent_status_md_path = settings.lifeprism_data_path / "user" / "daily_data" / "recent_status.md"
-    recent_status_md = read_md(recent_status_md_path)
-    if recent_status_md:
-        user_parts.append(
-            f"""
-            
-            ## 用户近况（仅供参考，不作为总结对象主体）
-            <recent_status>
-            {recent_status_md}
-            </recent_status>
-            """
-        )
 
     if outdate_summary:
         user_parts.append(
@@ -120,7 +104,7 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
     )
     result :OutboundMessage = await bus.send(msg) 
     result = result.response.content
-
+    llm_call_logger.log_call(msg,result,)
     if result : 
         # 将ai summary写入lifeprismData\user\daily_data\behavior.md
         if label_to_save:

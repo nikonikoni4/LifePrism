@@ -19,10 +19,19 @@ class DiarySummarySummary(LLMTestBase):
     def __init__(
         self,
         prompt_version: str = "v1",
-        input_path: Path = Path("D:/desktop/软件开发/LifeWatch-AI/test/llm_prompt_test.py/dataset"),
-        output_path: Path = Path("D:/desktop/软件开发/LifeWatch-AI/test/llm_prompt_test.py/results"),
-        temperature: float = 0.7
+        input_path: Path = Path("D:/desktop/软件开发/LifeWatch-AI/test/llm_prompt_test/dataset"),
+        output_path: Path = Path("D:/desktop/软件开发/LifeWatch-AI/test/llm_prompt_test/results"),
+        temperature: float = 0.7,
+        prompt_params: dict[str, str] | None = None
     ):
+        """
+        Args:
+            prompt_version: prompt 版本
+            input_path: 输入数据路径
+            output_path: 输出结果路径
+            temperature: LLM 温度参数
+            prompt_params: prompt 静态参数（如 user_md），动态参数（如 upper_limit）会在运行时计算
+        """
         super().__init__(
             prompt=Prompts.Schedule.CREATE_DIARY_SUMMARY,
             prompt_version=prompt_version,
@@ -31,6 +40,7 @@ class DiarySummarySummary(LLMTestBase):
             temperature=temperature
         )
         self.llm_client = create_llm_client()
+        self.prompt_params = prompt_params or {}
 
     def _get_diary_files(self, input_files: list[str] | None = None) -> list[Path]:
         """获取日记文件列表"""
@@ -45,10 +55,18 @@ class DiarySummarySummary(LLMTestBase):
 
     def _build_messages(self, diary_content: str, date: str) -> list[dict[str, str]]:
         """构建 LLM 消息，使用 PromptLoader 加载 prompt"""
+        # 合并静态参数和动态参数
+        params = self.prompt_params.copy()
+
+        if self.prompt_version != "v1":
+            upper_limit = int(min(max(len(diary_content) * 0.3, 100), 500))
+            params["upper_limit"] = str(upper_limit)
+
         # 使用 PromptLoader 加载 prompt
         task_prompt = prompt_loader.load_prompt(
             self.prompt,
-            version=self.prompt_version
+            version=self.prompt_version,
+            **params
         )
 
         system_prompt = task_prompt
@@ -289,5 +307,14 @@ class DiarySummarySummary(LLMTestBase):
 
 
 if __name__ == "__main__":
-    test = DiarySummarySummary(prompt_version="v1", temperature=0.7)
-    test.main(round="1")
+    # v1 版本测试（无需参数）
+    # test = DiarySummarySummary(prompt_version="v1", temperature=0.7)
+
+    # v2 版本测试（需要 user_md 参数）
+    user_md = ""
+    test = DiarySummarySummary(
+        prompt_version="v4",
+        temperature=0.7,
+        prompt_params={"user_md": user_md}
+    )
+    test.main()
