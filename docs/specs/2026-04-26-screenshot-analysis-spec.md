@@ -264,7 +264,16 @@ GET /timeline/behavior_summary?date={date}
       "end_time": "2026-04-26 10:30:00",
       "screen_count": 12,
       "behavior_summary": "阅读 FastAPI 官方文档的异步编程章节，在 api_service.py 中重构用户认证接口，将同步调用改为异步实现",
-      "behavior": "1. 查看 FastAPI 官方文档的异步编程章节\n2. 编辑 api_service.py 中的登录验证逻辑\n3. 测试异步接口响应",
+      "behavior": [
+        {
+          "time_range": "2026-04-26 09:15:00 ~ 2026-04-26 09:30:00",
+          "behavior_items": "1. 查看 FastAPI 官方文档的异步编程章节\n2. 编辑 api_service.py 中的登录验证逻辑"
+        },
+        {
+          "time_range": "2026-04-26 09:30:00 ~ 2026-04-26 10:30:00",
+          "behavior_items": "1. 测试异步接口响应"
+        }
+      ],
       "created_at": "2026-04-26 10:30:15"
     }
   ]
@@ -273,13 +282,17 @@ GET /timeline/behavior_summary?date={date}
 
 **Schema:**
 ```python
+class BehaviorItem(BaseModel):
+    time_range: str = Field(..., description="时间区间，格式：YYYY-MM-DD HH:MM:SS ~ YYYY-MM-DD HH:MM:SS")
+    behavior_items: str = Field(..., description="该区间范围内的详细行为分析")
+
 class BehaviorAnalysisItem(BaseModel):
     title: str = Field(..., description="标题")
     start_time: str = Field(..., description="开始时间，格式：YYYY-MM-DD HH:MM:SS")
     end_time: str = Field(..., description="结束时间，格式：YYYY-MM-DD HH:MM:SS")
     screen_count: int = Field(..., description="截图数量")
     behavior_summary: str = Field(..., description="总结性描述")
-    behavior: str = Field(..., description="分点行为（带序号的文本）")
+    behavior: list[BehaviorItem] = Field(..., description="分区间的详细行为分析")
     created_at: Optional[str] = Field(None, description="创建时间")
 
 class BehaviorAnalysisResponse(BaseModel):
@@ -308,8 +321,9 @@ GET /settings/screen-analysis-ignore
 #### 4.1 Timeline 页面 - Behavior Summary 展示
 
 **展示内容：**
-    1. title展示：依附于时间轴右侧，采用customblock类似的展示形式，作为时间轴的一个”批注“
+    1. title展示：依附于时间轴右侧，采用customblock类似的展示形式，作为时间轴的一个"批注"
     2. 点击title：右侧展示详细行为（behavior）
+    3. behavior 数据结构：behavior 为结构化列表，每项包含 `time_range`（时间区间）和 `behavior_items`（该区间的详细行为），前端需按时间段分组展示
 
 #### 4.2 Settings 页面 - 截图分析配置
 
