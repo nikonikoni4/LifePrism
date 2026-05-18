@@ -51,12 +51,14 @@ const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGui
   const [isManagingMoods, setIsManagingMoods] = useState(false);
   const [editingMood, setEditingMood] = useState<any>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [isAddingImpact, setIsAddingImpact] = useState(false);
+  const [newImpactName, setNewImpactName] = useState('');
 
   // 构建 typesMap 用于 entry 转换
   const typesMap = useMemo(() => new Map(moods.map(m => [m.id, m])), [moods]);
 
   const sortedMoods = useMemo(() => {
-    return [...moods].sort((a, b) => b.sort_order - a.sort_order);
+    return [...moods].sort((a, b) => b.score - a.score);
   }, [moods]);
 
   // 初始化数据加载
@@ -362,22 +364,69 @@ const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGui
                         {impact.name}
                       </button>
                     ))}
-                    <button
-                      onClick={async () => {
-                        const newImpact = prompt("添加新的影响因素:");
-                        if (newImpact && !impactCategories.some(i => i.name === newImpact)) {
-                          try {
-                            const created = await MoodAPI.createImpact({ name: newImpact });
-                            setImpactCategories(prev => [...prev, created]);
-                          } catch (err) {
-                            console.error('添加影响因素失败:', err);
-                          }
-                        }
-                      }}
-                      className="px-5 py-2 rounded-full text-[11px] tracking-widest border border-dashed opacity-40 hover:opacity-100 flex items-center gap-2 focus:outline-none"
-                    >
-                      <Plus size={12} /> 添加
-                    </button>
+
+                    {isAddingImpact ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={newImpactName}
+                          onChange={(e) => setNewImpactName(e.target.value)}
+                          onKeyDown={async (e) => {
+                            if (e.key === 'Enter' && newImpactName.trim()) {
+                              if (!impactCategories.some(i => i.name === newImpactName.trim())) {
+                                try {
+                                  const created = await MoodAPI.createImpact({ name: newImpactName.trim() });
+                                  setImpactCategories(prev => [...prev, created]);
+                                } catch (err) {
+                                  console.error('添加影响因素失败:', err);
+                                }
+                              }
+                              setNewImpactName('');
+                              setIsAddingImpact(false);
+                            } else if (e.key === 'Escape') {
+                              setNewImpactName('');
+                              setIsAddingImpact(false);
+                            }
+                          }}
+                          placeholder="输入影响因素"
+                          className="px-5 py-2 rounded-full text-[11px] tracking-widest border bg-[var(--theme-ui-bg)] border-[var(--theme-ui-border)] focus:outline-none focus:border-[var(--theme-accent)] min-w-[120px]"
+                        />
+                        <button
+                          onClick={async () => {
+                            if (newImpactName.trim() && !impactCategories.some(i => i.name === newImpactName.trim())) {
+                              try {
+                                const created = await MoodAPI.createImpact({ name: newImpactName.trim() });
+                                setImpactCategories(prev => [...prev, created]);
+                              } catch (err) {
+                                console.error('添加影响因素失败:', err);
+                              }
+                            }
+                            setNewImpactName('');
+                            setIsAddingImpact(false);
+                          }}
+                          className="p-2 rounded-full hover:bg-black/5 transition-colors opacity-60 hover:opacity-100 focus:outline-none"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setNewImpactName('');
+                            setIsAddingImpact(false);
+                          }}
+                          className="p-2 rounded-full hover:bg-black/5 transition-colors opacity-40 hover:opacity-100 focus:outline-none"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setIsAddingImpact(true)}
+                        className="px-5 py-2 rounded-full text-[11px] tracking-widest border border-dashed opacity-40 hover:opacity-100 flex items-center gap-2 focus:outline-none"
+                      >
+                        <Plus size={12} /> 添加
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex gap-10 items-center">
