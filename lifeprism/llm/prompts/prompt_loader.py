@@ -317,7 +317,12 @@ class PromptLoader:
         prompt_content = prompt_data["versions"][version]
 
         # 参数校验（在参数注入之前）
-        if params:
+        # 获取当前版本的参数声明
+        version_meta = prompt_data["metadata"]["version_history"].get(version, {})
+        declared_params = version_meta.get("params")
+
+        # 如果版本声明了参数，则进行校验
+        if declared_params is not None:
             self._validate_params(
                 prompt_name,
                 version,
