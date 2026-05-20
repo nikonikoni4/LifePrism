@@ -121,11 +121,15 @@ class ChatHistoryExtract(LLMTestBase):
             session_data = self._parse_session_file(file_path)
             if session_data["messages"]:
                 formatted_content = self._format_messages_for_llm(session_data)
+                # 从 metadata 的 created_at 提取日期 (YYYY-MM-DD)
+                created_at = session_data["metadata"].get("created_at", "")
+                created_at_date = created_at.split("T")[0] if created_at else ""
                 data_list.append({
                     "session_name": session_data["metadata"].get("name", file_path.stem),
                     "content": formatted_content,
                     "message_count": len(session_data["messages"]),
-                    "file_name": file_path.name
+                    "file_name": file_path.name,
+                    "created_at_date": created_at_date
                 })
 
         return data_list
@@ -149,7 +153,8 @@ class ChatHistoryExtract(LLMTestBase):
             "user_message": messages[1]["content"],
             "result": llm_output,
             "version": self.prompt_version,
-            "temperature": self.temperature
+            "temperature": self.temperature,
+            "input_data_date": data["created_at_date"]
         }
         return {
             "llm_input": llm_input,

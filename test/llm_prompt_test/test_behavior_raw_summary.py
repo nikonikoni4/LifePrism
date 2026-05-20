@@ -121,7 +121,8 @@ class BehaviorRawSummary(LLMTestBase):
             "user_message": messages[1]["content"],
             "result": llm_output,
             "version": self.prompt_version,
-            "temperature": self.temperature
+            "temperature": self.temperature,
+            "input_data_date": data["date"]
         }
         return {
             "llm_input": llm_input,

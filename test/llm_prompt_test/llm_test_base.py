@@ -35,6 +35,7 @@ class TestLog(TypedDict):
     result: str
     version: str
     temperature: float
+    input_data_date: str  # 输入数据日期，格式 "YYYY-MM-DD"
 
 class LLMTestBase(ABC):
     META_DATA_FILE_NAME = "meta_data.json"
