@@ -484,7 +484,8 @@ const EmotionView: React.FC<EmotionViewProps> = ({ onBack, onNavigate, onOpenGui
                   
                   <AnimatePresence>
                     {!isAbsorbing && (
-                      <motion.div exit={{ opacity: 0, y: 10 }} className="flex gap-12 mt-12">
+                      <motion.div exit={{ opacity: 0, y: 10 }} className="flex gap-8 mt-12">
+                        <button onClick={() => setStep('mood')} className="text-[10px] uppercase tracking-[0.4em] opacity-40 hover:opacity-100 transition-all focus:outline-none">修改情绪</button>
                         <button onClick={() => setStep('impact')} className="text-[10px] uppercase tracking-[0.4em] opacity-40 hover:opacity-100 transition-all focus:outline-none">修改缘由</button>
                         <button onClick={saveEntry} className="px-12 py-4 rounded-full text-[10px] uppercase tracking-[0.4em] font-bold shadow-2xl hover:scale-105 transition-all bg-[var(--theme-accent)] text-[var(--theme-accent-text)] focus:outline-none">
                           {editingEntryId ? '更新记录' : '封存记叙'}
