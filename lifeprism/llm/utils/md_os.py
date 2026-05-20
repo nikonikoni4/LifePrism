@@ -494,40 +494,55 @@ def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
 
             # 找到下一个二级标题或块结束，需要跳过代码块内部的二级标题
             version_end = len(block)
-            
-            # 使用状态机来跟踪是否在代码块内部
-            in_code_block = False
+
+            # 使用深度计数来跟踪代码块嵌套
+            code_block_depth = 0
             pos = version_start
-            
+
             while pos < len(block):
-                # 检查是否进入或退出代码块
+                # 检查是否是代码块标记
                 if block[pos:pos+3] == '```':
-                    in_code_block = not in_code_block
+                    # 检查后面的字符来判断是开始还是结束
+                    next_char_pos = pos + 3
+                    # 跳过空白字符（空格和制表符）
+                    while next_char_pos < len(block) and block[next_char_pos] in ' \t':
+                        next_char_pos += 1
+
+                    # 判断是开始还是结束
+                    if next_char_pos < len(block) and block[next_char_pos] not in '\n\r':
+                        # 后面有非换行字符（语言标识），这是代码块开始
+                        code_block_depth += 1
+                    else:
+                        # 后面是换行或结束，这是代码块结束
+                        if code_block_depth > 0:
+                            code_block_depth -= 1
+
                     pos += 3
                     continue
-                
+
                 # 如果不在代码块内部，检查是否是二级标题
-                if not in_code_block:
+                if code_block_depth == 0:
                     # 检查是否是行首的 ##
                     if pos == 0 or block[pos-1] == '\n':
                         if block[pos:pos+2] == '##' and (pos+2 >= len(block) or block[pos+2] in ' \n'):
                             version_end = pos
                             break
-                
+
                 pos += 1
 
             version_content = block[version_start:version_end].strip()
-            
+
             # 解析 ```md ``` 代码块，只提取代码块内的内容
-            # 只处理以 ```md 开头的情况，避免误匹配内部的代码块
+            # 由于前面的 version_end 查找已经正确处理了嵌套，这里只需要简单去掉最外层标记
             if version_content.startswith('```md'):
-                # 找到第一个换行后的内容和最后一个 ```
+                # 找到第一个换行后的内容
                 first_newline = version_content.find('\n')
-                last_backticks = version_content.rfind('```')
-                
-                if first_newline != -1 and last_backticks > first_newline:
-                    version_content = version_content[first_newline+1:last_backticks].strip()
-            
+                if first_newline != -1:
+                    # 找到最后一个 ```（这应该是最外层的结束标记）
+                    last_backticks = version_content.rfind('```')
+                    if last_backticks > first_newline:
+                        version_content = version_content[first_newline+1:last_backticks].strip()
+
             versions[version_name] = version_content
 
         prompts[prompt_name] = {
