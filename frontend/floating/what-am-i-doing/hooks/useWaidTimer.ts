@@ -3,8 +3,8 @@
  *
  * 功能：
  * - 全局互斥：同一时间只能有一个 todo 在计时
- * - 停止时自动创建 CustomBlock
- * - 窗口关闭时自动停止计时并保存
+ * - 停止时弹出对话框让用户输入活动内容，然后创建 CustomBlock
+ * - 窗口关闭时自动停止计时并保存（直接使用任务名称，不弹对话框）
  * - 每秒更新 elapsed
  */
 
@@ -14,6 +14,72 @@ import { UserCustomBlockCreate } from '../../../apps/lifewatch/pages/timeline/co
 import { TodoItem } from '../../../apps/goals/types/todo';
 import { formatLocalDateTime } from '../utils/formatTime';
 import { getApiV2UrlSync } from '../../../core/services/apiConfig';
+
+/**
+ * 打开记录活动对话框，等待用户输入后创建 CustomBlock
+ */
+async function openRecordActivityDialog(
+    taskName: string,
+    startTime: Date,
+    endTime: Date,
+    duration: number,
+    todoId: string,
+    onDurationAdded?: (todoId: string, minutes: number) => void
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        // 监听对话框返回的消息
+        const handleActivityRecorded = async (data: {
+            content: string;
+            startTime: string;
+            endTime: string;
+            duration: number;
+            todoId: string;
+        }) => {
+            try {
+                // 创建 CustomBlock
+                const blockData: UserCustomBlockCreate = {
+                    content: data.content,
+                    start_time: data.startTime,
+                    end_time: data.endTime,
+                    duration: data.duration,
+                    todo_id: data.todoId,
+                    color: '#bfdbfe',
+                };
+                await CustomBlockAPI.create(blockData);
+                onDurationAdded?.(data.todoId, data.duration);
+
+                // 清理监听器
+                window.electronAPI?.removeMessageListener?.('activity-recorded', handleActivityRecorded);
+                resolve();
+            } catch (e) {
+                console.error('[openRecordActivityDialog] Failed to create CustomBlock:', e);
+                window.electronAPI?.removeMessageListener?.('activity-recorded', handleActivityRecorded);
+                reject(e);
+            }
+        };
+
+        // 注册监听器
+        window.electronAPI?.onMessage?.('activity-recorded', handleActivityRecorded);
+
+        // 打开对话框
+        const params = new URLSearchParams({
+            taskName,
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            duration: duration.toString(),
+            todoId,
+        });
+
+        window.electronAPI?.openDialogWindow?.(
+            'record-activity',
+            { query: params.toString() }
+        ).catch((e: Error) => {
+            console.error('[openRecordActivityDialog] Failed to open dialog:', e);
+            window.electronAPI?.removeMessageListener?.('activity-recorded', handleActivityRecorded);
+            reject(e);
+        });
+    });
+}
 
 export interface UseWaidTimerReturn {
     activeTimerId: string | null;
@@ -71,19 +137,18 @@ export function useWaidTimer(
 
         // 实际经过 >= 60 秒才创建 CustomBlock
         if (elapsedSeconds >= 60) {
-            const blockData: UserCustomBlockCreate = {
-                content: todo.content,
-                start_time: formatLocalDateTime(start),
-                end_time: formatLocalDateTime(endTime),
-                duration: durationMinutes,
-                todo_id: todo.id,
-                color: '#bfdbfe',
-            };
+            // 打开对话框让用户输入活动内容
             try {
-                await CustomBlockAPI.create(blockData);
-                onDurationAdded?.(todo.id, durationMinutes);
+                await openRecordActivityDialog(
+                    todo.content,
+                    start,
+                    endTime,
+                    durationMinutes,
+                    todo.id,
+                    onDurationAdded
+                );
             } catch (e) {
-                console.error('[useWaidTimer] Failed to create CustomBlock:', e);
+                console.error('[useWaidTimer] Failed to open dialog or create CustomBlock:', e);
             }
         }
     }, [clearTimer, onDurationAdded]);

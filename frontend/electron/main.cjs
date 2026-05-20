@@ -488,6 +488,7 @@ ipcMain.handle('open-dialog-window', (_event, dialogId, options = {}) => {
     // 根据 dialogId 设置不同的窗口大小
     const dialogConfigs = {
         'todo-picker': { width: 500, height: 600 },
+        'record-activity': { width: 400, height: 450 },
         'default': { width: 400, height: 500 }
     };
     const config = dialogConfigs[dialogId] || dialogConfigs['default'];
@@ -508,9 +509,16 @@ ipcMain.handle('open-dialog-window', (_event, dialogId, options = {}) => {
     });
 
     // 加载对话框页面（hash 路由）
-    win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), {
+    const loadOptions = {
         hash: `/dialog/${dialogId}`
-    });
+    };
+
+    // 如果有 query 参数，附加到 hash 后面
+    if (options.query) {
+        loadOptions.hash += `?${options.query}`;
+    }
+
+    win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), loadOptions);
 
     // 右键菜单
     win.webContents.on('context-menu', () => {

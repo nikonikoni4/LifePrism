@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { TodoPickerDialog } from './todo-picker/TodoPickerDialog';
+import { RecordActivityDialog } from './record-activity/RecordActivityDialog';
 
 export const DialogRouter: React.FC = () => {
     const location = useLocation();
@@ -11,6 +12,8 @@ export const DialogRouter: React.FC = () => {
     switch (dialogId) {
         case 'todo-picker':
             return <TodoPickerDialog />;
+        case 'record-activity':
+            return <RecordActivityDialog />;
         default:
             return (
                 <div className="h-screen flex items-center justify-center bg-slate-900 text-white">
