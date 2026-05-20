@@ -64,3 +64,9 @@
 - path: `docs/specs/2026-05-20-mood-module-spec.md`
 - 触发规则：开发、修改或查询心情模块相关功能时阅读（心情类型管理、心情记录 CRUD、影响因素管理）
 - 内容摘要：心情模块规格文档，定义 Mind Space 心情追踪系统，包含心情类型（mood_types）的 CRUD 与删除约束、心情记录（mood_entries）的创建与评分自动获取规则、影响因素（mood_impacts）的唯一性约束与管理、按日期范围查询能力
+
+## waid-window-spec
+- updated_at: 2026-05-20
+- path: `docs/specs/2026-05-20-waid-window-spec.md`
+- 触发规则：开发、修改或查询 WAID 浮窗相关功能时阅读（任务管理、计时功能、拖拽排序、状态同步）
+- 内容摘要：WAID 浮窗功能规格，定义浮窗的任务显示逻辑、计时功能规则、拖拽排序机制、状态同步机制，以及相关的 API 契约和 Electron IPC 通信规范。包含创建任务时的字段映射（关联每日目标 goal-daily 和计划文档 每日目标-docs）和计时结束时 CustomBlock 的完整字段结构
