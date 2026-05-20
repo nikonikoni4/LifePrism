@@ -57,7 +57,7 @@ class LLMCallLogger:
             log_dir: 日志目录，默认为 lifeprism_data_path/debug_log/llm_logs
         """
         if log_dir is None:
-            log_dir = settings.lifeprism_data_path / "debug_log" / "llm_logs"
+            log_dir = settings.lifeprism_data_path / "debug_logs" / "llm_logs"
 
         self.log_dir = Path(log_dir)
         self.image_dir = self.log_dir / "images"
