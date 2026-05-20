@@ -58,3 +58,9 @@
 - path: `docs/specs/2026-05-13-llm-test-spec.md`
 - 触发规则：开发、修改或查询 LLM 测试框架相关功能时阅读（测试数据管理、测试执行、评估表生成、元数据追踪）
 - 内容摘要：LLM 测试框架规格，定义测试数据目录结构、输出目录结构、meta_data.json 文件结构（包含 version、round、pass_ratio、temperature、create_at、input_file 字段）、评估表结构（6 列：llm_input、llm_output、pass、score、reason、other）、LLMTestBase 抽象函数规范（data_input、run_test、generate_eval_sheet、read_eval_result）
+
+## mood-module-spec
+- updated_at: 2026-05-20
+- path: `docs/specs/2026-05-20-mood-module-spec.md`
+- 触发规则：开发、修改或查询心情模块相关功能时阅读（心情类型管理、心情记录 CRUD、影响因素管理）
+- 内容摘要：心情模块规格文档，定义 Mind Space 心情追踪系统，包含心情类型（mood_types）的 CRUD 与删除约束、心情记录（mood_entries）的创建与评分自动获取规则、影响因素（mood_impacts）的唯一性约束与管理、按日期范围查询能力
