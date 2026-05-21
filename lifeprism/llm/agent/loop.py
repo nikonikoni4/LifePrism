@@ -351,7 +351,7 @@ class AgentLoop:
         对于event中的非工具累时间和情绪累事件提取组成部分（比如，用户描述事情发生的时间，诱发原因等）是如果有才记录，如果没有则不记录
         """
         llm = create_llm_client()
-        compact_content = json.dumps(messages)
+        compact_content = json.dumps(messages, ensure_ascii=False)
         messages = [
             {"role":"system","content":compact_system_prompt},
             {"role":"user","content":f"## 需要压缩的内容 \n {compact_content}"}

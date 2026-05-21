@@ -372,9 +372,9 @@ class ChatHistoryManager:
                     "_type":"metadata",
                     "last_processed_time":self.last_processed_time.isoformat()
                 }
-            f.write(json.dumps(metadata_line)+"\n")
+            f.write(json.dumps(metadata_line, ensure_ascii=False)+"\n")
             if self.histories:
-                f.write(json.dumps(self.histories))
+                f.write(json.dumps(self.histories, ensure_ascii=False))
 
     
 
