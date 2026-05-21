@@ -69,18 +69,20 @@ class ChatbotService:
     # ========== 会话管理 ==========
 
     async def get_sessions(self, page: int, page_size: int) -> ChatSessionListResponse:
-        """获取会话列表"""
+        """获取会话列表（优化版：只读取元数据）"""
+        from lifeprism.llm.session.manager import SessionManager
+
         session_ids = self._chatbot.list_sessions()
         all_items = []
         for sid in session_ids:
-            session = self._chatbot.get_session(sid)
-            if session:
+            metadata = SessionManager.get_session_metadata(sid)
+            if metadata:
                 all_items.append(ChatSession(
-                    id=session.id,
-                    name=session.name,
-                    created_at=session.created_at.isoformat() if session.created_at else datetime.now().isoformat(),
-                    updated_at=session.updated_at.isoformat() if session.updated_at else datetime.now().isoformat(),
-                    message_count=len(session.messages)
+                    id=sid,
+                    name=metadata.get('name', 'default_name'),
+                    created_at=metadata.get('created_at', datetime.now().isoformat()),
+                    updated_at=metadata.get('updated_at', datetime.now().isoformat()),
+                    message_count=metadata.get('message_len', 0)
                 ))
 
         # 简单的内存分页
