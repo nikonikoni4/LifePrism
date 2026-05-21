@@ -174,7 +174,7 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
     # 参数校验
     from datetime import datetime
 
-    allowed_options = {"computer_usage", "high_usage_segments", "computer_overview", "user_behavior_notes", "ai_behavior_notes", "todolist"} # , "goals"
+    allowed_options = {"high_usage_segments", "computer_overview", "user_behavior_notes", "ai_behavior_notes", "todolist"} # , "goals"
     invalid_options = set(query_option) - allowed_options
     if invalid_options:
         raise ValueError(f"{ERROR} Invalid query options: {invalid_options}")
