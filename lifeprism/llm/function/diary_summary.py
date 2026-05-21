@@ -18,7 +18,7 @@ from pathlib import Path
 from lifeprism.llm.utils.md_os import read_md,write_date_md,extract_date_logs_from_file
 from lifeprism.repository import diary_repository
 from lifeprism.llm.prompts import prompt_loader, Prompts
-from lifeprism.utils import llm_call_logger
+from lifeprism.llm.utils import llm_call_logger
 
 async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:list[str], outdate_summary: str | None = None)->LLMResponse:
     """

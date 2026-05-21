@@ -18,11 +18,11 @@ from lifeprism.llm.bus import InboundMessage, bus, MessageType, OutboundMessage
 from lifeprism.llm.prompts import prompt_loader, Prompts
 from lifeprism.llm.session import Session, session_manager, ChatHistoryManager
 from lifeprism.llm.utils.md_os import write_date_md, extract_date_logs_from_file, read_md
-from lifeprism.utils import get_logger
+from lifeprism.utils import get_logger,DEBUG
 from lifeprism.utils.exceptions import ExternalServiceError
-
+from lifeprism.llm.utils import llm_call_logger
 logger = get_logger(__name__)
-
+logger.setLevel(DEBUG)
 # 常量定义
 DAILY_START_HOUR = "04:00:00"  # 每日开始时间
 SESSION_BATCH_SIZE = 10  # 批处理大小
@@ -39,23 +39,30 @@ async def summary_activities(activities: str) -> str:
     Returns:
         str: 活动总结内容
     """
+    logger.debug(f"[summary_activities] 开始活动总结")
+    logger.debug(f"[summary_activities] 输入数据长度: {len(activities) if activities else 0} 字符")
+    
     # 加载 prompt
     activity_summary_prompt = prompt_loader.load_prompt(Prompts.Schedule.ACTIVITY_SUMMARY)
+    logger.debug(f"[summary_activities] 已加载 prompt, 长度: {len(activity_summary_prompt) if activity_summary_prompt else 0} 字符")
 
     if activities:
-        result = await bus.send(
-            InboundMessage(
-                MessageType.DREAM_TASK,
-                extra={"system_prompt": activity_summary_prompt}
-            )
+        logger.debug(f"[summary_activities] 发送 LLM 请求进行活动总结")
+        msg = InboundMessage(
+            MessageType.DREAM_TASK,
+            extra={"system_prompt": activity_summary_prompt}
         )
+        result = await bus.send(msg)
+        llm_call_logger.log_call(msg, result, prompt_module=Prompts.Schedule.ACTIVITY_SUMMARY.module, prompt_name=Prompts.Schedule.ACTIVITY_SUMMARY.name)
+        
         if result.response and result.response.content:
+            logger.debug(f"[summary_activities] LLM 返回成功, 结果长度: {len(result.response.content)} 字符")
             return result.response.content
         else:
-            logger.error(f"活动总结llm返回数据错误,{result}")
+            logger.error(f"[summary_activities] 活动总结llm返回数据错误,{result}")
             raise ExternalServiceError(f"活动总结llm返回数据错误,{result}")
     else:
-        logger.info("没有活动数据，跳过总结")
+        logger.info("[summary_activities] 没有活动数据，跳过总结")
         return "无今日活动数据"
 
 def get_mood_data(start_time: str, end_time: str) -> str:
@@ -68,12 +75,11 @@ def get_mood_data(start_time: str, end_time: str) -> str:
     Returns:
         str: 格式化的心情数据字符串
     """
-    # 将时间格式从 'YYYY-MM-DD HH:MM:SS' 转换为 'YYYY-MM-DD'
-    start_date = datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
-    end_date = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
+    logger.debug(f"[get_mood_data] 获取心情数据, 时间范围: {start_time} ~ {end_time}")
 
-    # 调用 query_user_mood 获取心情数据
-    mood_data = query_user_mood(start_date, end_date)
+    # 直接使用时间查询，不再转换为日期
+    mood_data = query_user_mood(start_time, end_time)
+    logger.debug(f"[get_mood_data] 获取到心情数据长度: {len(mood_data) if mood_data else 0} 字符")
 
     return mood_data
 
@@ -86,28 +92,34 @@ async def summary_moods(mood_data: str) -> str:
     Returns:
         str: 心情总结内容
     """
+    logger.debug(f"[summary_moods] 开始心情总结")
+    logger.debug(f"[summary_moods] 输入数据长度: {len(mood_data) if mood_data else 0} 字符")
+    
     # 加载 prompt
     mood_summary_prompt = prompt_loader.load_prompt(Prompts.Schedule.MOOD_SUMMARY)
+    logger.debug(f"[summary_moods] 已加载 prompt, 长度: {len(mood_summary_prompt) if mood_summary_prompt else 0} 字符")
 
     # 检查是否有心情数据
     if not mood_data or "无心情记录" in mood_data:
-        logger.info("没有心情数据，跳过总结")
+        logger.info("[summary_moods] 没有心情数据，跳过总结")
         return "无心情记录"
 
     # 调用 LLM 进行总结
-    result = await bus.send(
-        InboundMessage(
-            MessageType.DREAM_TASK,
-            content=f"## 需要总结的心情数据\n{mood_data}",
-            extra={"system_prompt": mood_summary_prompt}
-        )
+    logger.debug(f"[summary_moods] 发送 LLM 请求进行心情总结")
+    msg = InboundMessage(
+        MessageType.DREAM_TASK,
+        content=f"## 需要总结的心情数据\n{mood_data}",
+        extra={"system_prompt": mood_summary_prompt}
     )
+    result = await bus.send(msg)
+    llm_call_logger.log_call(msg, result, prompt_module=Prompts.Schedule.MOOD_SUMMARY.module, prompt_name=Prompts.Schedule.MOOD_SUMMARY.name)
 
     # 处理返回结果
     if result.response and result.response.content:
+        logger.debug(f"[summary_moods] LLM 返回成功, 结果长度: {len(result.response.content)} 字符")
         return result.response.content
     else:
-        logger.error(f"心情总结 LLM 返回数据错误: {result}")
+        logger.error(f"[summary_moods] 心情总结 LLM 返回数据错误: {result}")
         raise ExternalServiceError(f"心情总结 LLM 返回数据错误: {result}")
 
 async def update_memory(date: str, date_offset: int = DEFAULT_DATE_OFFSET) -> None:
@@ -117,46 +129,65 @@ async def update_memory(date: str, date_offset: int = DEFAULT_DATE_OFFSET) -> No
         date: 结束时间 YYYY-MM-DD, 包括这一天
         date_offset: 时间偏移量，用于计算开始时间 date - date_offset
     """
+    logger.debug(f"[update_memory] 开始更新记忆文档, 日期: {date}, 偏移量: {date_offset}")
+    
     if date_offset < 0:
         date_offset = 0
-        logger.warning("date_offset为负")
+        logger.warning("[update_memory] date_offset为负，已重置为0")
     
     # 加载 prompt 并注入参数
     update_memory_prompt = prompt_loader.load_prompt(
         Prompts.Schedule.UPDATE_MEMORY,
         recent_state_path=str((settings.lifeprism_data_path / "user/daily_data/recent_state.md").resolve()),
-        user_md_path=str((settings.lifeprism_data_path / "user/user.md").resolve()),
-        diary_path_template=str((settings.lifeprism_data_path / "daily/YYYY/MM/YYYY-MM-DD.md").resolve())
+        upper_limit = 1000,
     )
+    logger.debug(f"[update_memory] 已加载 prompt, 长度: {len(update_memory_prompt) if update_memory_prompt else 0} 字符")
 
     # 获取behavior.md
     end_time = datetime.strptime(date, "%Y-%m-%d")
     start_time = end_time - timedelta(days=date_offset)
     start_date = start_time.strftime("%Y-%m-%d")
+    logger.debug(f"[update_memory] 提取 behavior.md 时间范围: {start_date} ~ {date}")
 
     behavior_md = extract_date_logs_from_file(
         settings.lifeprism_data_path / "user/daily_data/behavior.md",
         start_date,
         date
     )
+    logger.debug(f"[update_memory] behavior.md 内容长度: {len(behavior_md) if behavior_md else 0} 字符")
+    
     # 获取当前的recent_state.md
     recent_state_md = read_md(settings.lifeprism_data_path / "user/daily_data/recent_state.md")
-
+    logger.debug(f"[update_memory] recent_state.md 内容长度: {len(recent_state_md) if recent_state_md else 0} 字符")
+    
+    computer_overview = query_user_activity_summary(
+        set(["computer_overview"]),
+        f"{start_date} {DAILY_START_HOUR}",
+        f"{date} {DAILY_START_HOUR}"
+    )
+    logger.debug(f"[update_memory] 电脑使用总览数据长度: {len(computer_overview) if computer_overview else 0} 字符")
+    
     # 构建content
     content = f"""
     你需要帮我更新recent_state.md 文档，如果涉及到user.md相关内容,也需要更新user.md文档。
     ## 近{date_offset}天的behavior.md内容
     {behavior_md}
+    ## 近{date_offset}天的电脑使用总览
+    {computer_overview}
     ## 之前的recent_state.md内容仅作参考
     {recent_state_md}
     """
-    await bus.send(
-        InboundMessage(
-            MessageType.DREAM_TASK,
-            content=content,
-            extra={'system_prompt': update_memory_prompt}
-        )
+    logger.debug(f"[update_memory] 构建的 LLM 请求内容长度: {len(content)} 字符")
+    
+    logger.debug(f"[update_memory] 发送 LLM 请求更新记忆文档")
+    msg = InboundMessage(
+        MessageType.DREAM_TASK,
+        content=content,
+        extra={'system_prompt': update_memory_prompt}
     )
+    result = await bus.send(msg)
+    llm_call_logger.log_call(msg, result, prompt_module=Prompts.Schedule.UPDATE_MEMORY.module, prompt_name=Prompts.Schedule.UPDATE_MEMORY.name)
+    logger.debug(f"[update_memory] 记忆文档更新完成")
     
 
 
@@ -172,32 +203,61 @@ async def dreaming(date: str) -> None:
         date: 要总结的日期，格式为 '%Y-%m-%d'
               总结时间说明 date 04:00:00 ~ date + 1 04:00:00
     """
-    # 获取用户活动, 总结用户活动
+    logger.info(f"[dreaming] 开始执行 dreaming 任务, 目标日期: {date}")
+    
+    # 计算时间范围
     next_date = (datetime.strptime(date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
     start_time = f"{date} {DAILY_START_HOUR}"
     end_time = f"{next_date} {DAILY_START_HOUR}"
+    logger.debug(f"[dreaming] 时间范围: {start_time} ~ {end_time}")
+
+    # 阶段1: 获取用户活动数据并总结
+    logger.info(f"[dreaming] 阶段1: 获取用户活动数据")
+    activity_types = set(["high_usage_segments", "user_behavior_notes", "ai_behavior_notes"])
+    logger.debug(f"[dreaming] 查询活动类型: {activity_types}")
+    
     activities = query_user_activity_summary(
-        set(["computer_usage_stats", "user_behavior_notes", "ai_behavior_notes"]),
+        activity_types,
         start_time,
         end_time
     )
+    logger.debug(f"[dreaming] 获取到活动数据长度: {len(activities) if activities else 0} 字符")
+    if activities:
+        logger.debug(f"[dreaming] 活动数据前200字符: {activities[:200]}")
+    
+    logger.info(f"[dreaming] 阶段1: 总结活动数据")
     activities_summary_content = await summary_activities(activities)
+    logger.debug(f"[dreaming] 活动总结结果长度: {len(activities_summary_content) if activities_summary_content else 0} 字符")
+    logger.debug(f"[dreaming] 活动总结结果前200字符: {activities_summary_content[:200] if activities_summary_content else '无'}")
 
-    # 获取心情数据，并总结
+    # 阶段2: 获取心情数据并总结
+    logger.info(f"[dreaming] 阶段2: 获取心情数据")
     mood_data = get_mood_data(start_time, end_time)
+    logger.debug(f"[dreaming] 获取到心情数据长度: {len(mood_data) if mood_data else 0} 字符")
+    if mood_data:
+        logger.debug(f"[dreaming] 心情数据前200字符: {mood_data[:200]}")
+    
+    logger.info(f"[dreaming] 阶段2: 总结心情数据")
     mood_summary_content = await summary_moods(mood_data)
+    logger.debug(f"[dreaming] 心情总结结果长度: {len(mood_summary_content) if mood_summary_content else 0} 字符")
+    logger.debug(f"[dreaming] 心情总结结果前200字符: {mood_summary_content[:200] if mood_summary_content else '无'}")
 
-    # 将内容写入behavior.md
+    # 阶段3: 将内容写入behavior.md
+    logger.info(f"[dreaming] 阶段3: 写入 behavior.md")
     path = settings.lifeprism_data_path / "user/daily_data/behavior.md"
+    logger.debug(f"[dreaming] behavior.md 路径: {path}")
+    
     write_date_md(path, date, activities_summary_content, "行为总结")
+    logger.debug(f"[dreaming] 已写入行为总结到 behavior.md")
+    
     write_date_md(path, date, mood_summary_content, "心情总结")
+    logger.debug(f"[dreaming] 已写入心情总结到 behavior.md")
 
-    # 总结内容到recent_state.md和user.md
+    # 阶段4: 总结内容到recent_state.md和user.md
+    logger.info(f"[dreaming] 阶段4: 更新记忆文档 (recent_state.md 和 user.md)")
     await update_memory(date)
-
- 
-
-
+    
+    logger.info(f"[dreaming] dreaming 任务完成, 目标日期: {date}")
 
 
 # 2. 时间间隔任务：
@@ -218,11 +278,14 @@ async def extract_from_chat_messages(session: Session) -> str | None:
     message = session.messages[session.last_processed_loc:]
     if message:
         summary_raw_content = json.dumps(message)
-        result: OutboundMessage = await bus.send(InboundMessage(
+        msg = InboundMessage(
             type=MessageType.DREAM_TASK,
             content=f"## 需要总结的内容 \n {summary_raw_content}",
             extra={"system_prompt": extract_chat_prompt}
-        ))
+        )
+        result: OutboundMessage = await bus.send(msg)
+        llm_call_logger.log_call(msg, result, prompt_module=Prompts.Schedule.EXTRACT_CHAT.module, prompt_name=Prompts.Schedule.EXTRACT_CHAT.name)
+        
         session.last_processed_loc = len(session.messages)
         session_manager.save_session(session)
 
@@ -323,10 +386,14 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
             history_manager.save_history(datetime.now())
 
 if __name__ == "__main__":
-    update_memory_prompt = prompt_loader.load_prompt(
-        Prompts.Schedule.UPDATE_MEMORY,
-        recent_state_path=str(settings.lifeprism_data_path / "user/daily_data/recent_state.md"),
-        user_md_path=str(settings.lifeprism_data_path / "user/user.md"),
-        diary_path_template=str(settings.lifeprism_data_path / "daily/YYYY/MM/YYYY-MM-DD.md")
-    )
-    print(update_memory_prompt)
+    from lifeprism.llm.agent.loop import agent_loop
+    
+    async def main():
+        loop_task = asyncio.create_task(agent_loop.loop())
+        try:
+            await dreaming("2026-05-20")
+        finally:
+            loop_task.cancel()
+    
+    asyncio.run(main())
+    
