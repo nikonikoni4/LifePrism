@@ -17,10 +17,9 @@ from lifeprism.llm.function.agent_schedule_job import update_memory,process_sess
 logger = get_logger(__name__)
 
 # ===================== 测试配置宏 =====================
-TEST_CRON_ENABLED = False      # 是否测试定时任务
-TEST_INTERVAL_ENABLED = True   # 是否测试间隔任务
-TEST_INTERVAL_MINUTES = 1      # 间隔任务测试参数（分钟）
-TEST_CRON_AFTER_MINUTES = 1    # 定时任务测试参数（启动后N分钟触发）
+TEST_MODE = False                    # 是否启用测试模式
+TEST_INTERVAL_MINUTES = 1           # 间隔任务测试参数（覆盖原4h）
+TEST_CRON_AFTER_MINUTES = 1         # 定时任务测试参数（启动后N分钟触发，覆盖原10:00）
 # ====================================================
 
 def _update_memory():
@@ -53,18 +52,25 @@ class ScheduleService:
         
         # 根据配置决定是否注册任务
         if settings.auto_summary_session:
+            interval_minutes = TEST_INTERVAL_MINUTES if TEST_MODE else None
+            interval_hours = None if TEST_MODE else 4
             self._system_jobs.append({
                 "func": _process_session_message,
                 "trigger": "interval",
-                "kwargs": {"hours": 4},
+                "kwargs": {"hours": interval_hours, "minutes": interval_minutes},
                 "job_id": "process_session_message"
             })
         
         if settings.auto_update_memory:
+            if TEST_MODE:
+                target_time = datetime.now() + timedelta(minutes=TEST_CRON_AFTER_MINUTES)
+                cron_expr = f"{target_time.minute} {target_time.hour} * * *"
+            else:
+                cron_expr = "0 10 * * *"
             self._system_jobs.append({
                 "func": _update_memory,
                 "trigger": "cron",
-                "kwargs": {"cron_expr": "0 10 * * *"},
+                "kwargs": {"cron_expr": cron_expr},
                 "job_id": "update_memory"
             })
 
@@ -248,31 +254,6 @@ if __name__ == "__main__":
         service = ScheduleService()
         service.start()
         
-        execution_count_cron = 0
-        execution_count_interval = 0
-        
-        def test_cron_job():
-            nonlocal execution_count_cron
-            execution_count_cron += 1
-            logger.info(f"[测试] 定时任务执行次数: {execution_count_cron}")
-        
-        def test_interval_job():
-            nonlocal execution_count_interval
-            execution_count_interval += 1
-            logger.info(f"[测试] 间隔任务执行次数: {execution_count_interval}")
-        
-        # 测试定时任务（启动后 N 分钟触发）
-        if TEST_CRON_ENABLED:
-            target_time = datetime.now() + timedelta(minutes=TEST_CRON_AFTER_MINUTES)
-            cron_expr = f"{target_time.minute} {target_time.hour} * * *"
-            logger.info(f"[测试] 添加定时任务，将在 {target_time.strftime('%H:%M')} 执行")
-            service.add_cron_job(test_cron_job, cron_expr, job_id="test_cron")
-        
-        # 测试间隔任务
-        if TEST_INTERVAL_ENABLED:
-            logger.info(f"[测试] 添加间隔任务，每 {TEST_INTERVAL_MINUTES} 分钟执行一次")
-            service.add_interval_job(test_interval_job, minutes=TEST_INTERVAL_MINUTES, job_id="test_interval")
-        
         logger.info("[测试] 调度器运行中，按 Ctrl+C 停止...")
         
         try:
@@ -283,7 +264,5 @@ if __name__ == "__main__":
         finally:
             service.shutdown()
             loop_task.cancel()
-            logger.info(f"[测试] 定时任务执行次数: {execution_count_cron}")
-            logger.info(f"[测试] 间隔任务执行次数: {execution_count_interval}")
 
     asyncio.run(test_schedule())
