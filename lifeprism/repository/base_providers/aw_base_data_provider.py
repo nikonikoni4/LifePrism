@@ -9,8 +9,13 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 import pytz
 
-from lifeprism.config import WINDOW_BUCKET_ID, LOCAL_TIMEZONE
-
+try:
+    from tzlocal import get_localzone
+    LOCAL_TIMEZONE = str(get_localzone())
+except ImportError:
+    # 如果没有安装 tzlocal，使用默认值
+    LOCAL_TIMEZONE = 'Asia/Shanghai'  
+WINDOW_BUCKET_ID = 'aw-watcher-window_'
 logger = logging.getLogger(__name__)
 
 
