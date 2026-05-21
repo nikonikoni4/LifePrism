@@ -20,7 +20,7 @@ from lifeprism.llm.agent.tools.lifeprismsystem import query_user_activity_summar
 DAILY_START_HOUR = "04:00:00"
 # 输出到 test/llm_prompt_test/dataset/behavior_raw_data 目录
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "dataset" / "behavior_raw_data"
-QUERY_OPTIONS = {"computer_usage_stats", "user_behavior_notes", "ai_behavior_notes", "todolist"}
+QUERY_OPTIONS = {"high_usage_segments", "user_behavior_notes", "ai_behavior_notes", "todolist"}
 
 # 日期范围
 START_DATE = "2026-04-26"
