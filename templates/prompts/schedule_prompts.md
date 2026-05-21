@@ -89,7 +89,7 @@ version_history:
 ## metadata
 
 ```yaml
-active_version: v1
+active_version: v2
 version_history:
   v1:
     created_at: 2026-05-13
@@ -98,7 +98,7 @@ version_history:
       - recent_state_path
   v2:
     created_at: 2026-05-21
-    change_reason: 1. 当前记录时间内容过于详细，导致输出内容过多应该限制输出字符，并且应该有条件的筛选记录事件 2. 电脑使用数据应该单独进行说明，说明时间趋势，总占比（这部分数据单独提供computer_suage_stats，作为user消息都一部分）
+    change_reason: 1. 当前记录时间内容过于详细，导致输出内容过多应该限制输出字符，并且应该有条件的筛选记录事件 2. 电脑使用数据应该单独进行说明，说明时间趋势，总占比（这部分数据单独提供computer_suage_stats，作为user消息都一部分）。被删除的版本说明，被删除的版本写在了
     params:
       - recent_state_path
       - upper_limit
@@ -180,7 +180,7 @@ recent_state.md  : {recent_state_path}
 输入包含behavior.md和旧版本的recent_state.md
 ### behavior.md
 输入的behavior.md数据是7天的行为数据，每天数据格式和内容说明为:
-```md
+<behavior_md_template>
 ## YYYY-MM-DD
 ### 行为总结
 包含电脑使用数据总结和某天的行为总结（由电脑屏幕截图AI分析和用户自定义添加的行为数据综合总结而来）
@@ -188,7 +188,7 @@ recent_state.md  : {recent_state_path}
 由用户添加的心情数据总结而来，注意心情数据仅反映特定时刻的情绪状态，并不具备长期代表性
 ### 聊天总结
 ### 日记总结
-```
+<\behavior_md_template>
 心情，聊天，日记总结都注重于总结具体事件的发生，经过，用户的情绪反应和情绪反应之后的反应。
 ## recent_state.md更新方法
 ### 文档组成与内容说明
@@ -208,9 +208,8 @@ recent_state.md  : {recent_state_path}
 ### 输出文档模板
 <recent_state_template>
 ## 近期事件
-[发生时间]
-1. 对于大事件：[具体时间]，事情起因，经过，发展，结果，用户情绪反应，用户情绪发生之后动作，总体情绪。
-2. 对于小时间：[具体时间]，简写其他内容
+[YYYY~MM-DD~YYYY-MM-DD]：前5天事件简单描述
+[YYYY~MM-DD~YYYY-MM-DD] : 最近两天事件描述
 ## 心理状态和生理状态
 1. 心理状态：
 [缺少数据说明]：当前由于体现心理状态的数据过少一下内容仅代表部分时间段的心理状态。...
@@ -230,6 +229,9 @@ recent_state.md  : {recent_state_path}
 
 ## 输出目录
 recent_state.md  : {recent_state_path}
+
+## 输出要求：
+recent_state.md 字数不能超过 {upper_limit}
 ```
 ---
 

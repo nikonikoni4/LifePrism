@@ -37,6 +37,51 @@ class TestLog(TypedDict):
     temperature: float
     input_data_date: str  # 输入数据日期，格式 "YYYY-MM-DD"
 
+class ConversationManager:
+    """
+    对话管理类
+    保存每轮测试输入的 Message list，输出为 JSONL 文件
+    """
+    
+    def __init__(self, input_path: Path, version: str, round: int, temperature: float):
+        """
+        args:
+            input_path: 输入路径（版本号之前的路径）
+            version: 版本号
+            round: 轮次
+            temperature: 温度参数
+        """
+        self.input_path = input_path
+        self.version = version
+        self.round = round
+        self.temperature = temperature
+        self.file_path = input_path / version / f"r{round}-t{temperature}.jsonl"
+        self.messages: list[list[dict]] = []
+        
+        # 如果文件存在，加载历史消息（支持继续对话）
+        if self.file_path.exists():
+            with self.file_path.open('r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        self.messages.append(json.loads(line))
+    
+    def add_messages(self, messages: list[dict]):
+        """添加一轮测试的 message list"""
+        self.messages.append(messages)
+    
+    def save(self):
+        """保存为 JSONL 文件"""
+        self.file_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.file_path.open('w', encoding='utf-8') as f:
+            for msg_list in self.messages:
+                f.write(json.dumps(msg_list, ensure_ascii=False) + '\n')
+    
+    @staticmethod
+    def load(input_path: Path, version: str, round: int, temperature: float) -> 'ConversationManager':
+        """从已有文件加载对话历史"""
+        return ConversationManager(input_path, version, round, temperature)
+
+
 class LLMTestBase(ABC):
     META_DATA_FILE_NAME = "meta_data.json"
     EVAL_SHEET_COLUMNS = ["llm_input", "llm_output", "pass", "score", "reason", "other"]

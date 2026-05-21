@@ -47,7 +47,7 @@ class UpdateMemoryTest(LLMTestBase):
             temperature=temperature
         )
         self.llm_client = create_llm_client()
-        self.prompt_params = prompt_params or {"upper_limit": "2000"}
+        self.prompt_params = prompt_params or {}
         self.start_date = start_date
         self.end_date = end_date
 
@@ -62,7 +62,7 @@ class UpdateMemoryTest(LLMTestBase):
         Returns:
             行为数据文件路径列表
         """
-        behavior_dir = self.input_path / "behavior_raw_data"
+        behavior_dir = self.input_path / "update_memory"
         if not behavior_dir.exists():
             raise FileNotFoundError(f"行为数据目录不存在: {behavior_dir}")
 
@@ -147,7 +147,7 @@ class UpdateMemoryTest(LLMTestBase):
 """
 
         # v2版本需要添加电脑使用统计数据
-        if self.prompt_version == "v2":
+        if self.prompt_version != "v1":
             computer_usage_stats = self._get_computer_usage_stats()
             user_prompt += f"""
 
@@ -160,6 +160,54 @@ class UpdateMemoryTest(LLMTestBase):
             {"role": "user", "content": user_prompt}
         ]
 
+    def _filter_behavior_by_date(self, content: str, start_date: str, end_date: str) -> str:
+        """
+        按日期范围筛选 behavior.md 内容
+
+        Args:
+            content: behavior.md 完整内容
+            start_date: 开始日期 (YYYY-MM-DD)
+            end_date: 结束日期 (YYYY-MM-DD)
+
+        Returns:
+            筛选后的 behavior 内容
+        """
+        import re
+        
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+        
+        # 按日期标题分割: ## YYYY-MM-DD
+        date_pattern = re.compile(r'^## (\d{4}-\d{2}-\d{2})', re.MULTILINE)
+        
+        # 找到所有日期标题的位置
+        matches = list(date_pattern.finditer(content))
+        
+        if not matches:
+            return content
+        
+        filtered_parts = []
+        
+        for i, match in enumerate(matches):
+            date_str = match.group(1)
+            date = datetime.strptime(date_str, "%Y-%m-%d")
+            
+            # 检查日期是否在范围内
+            if start <= date <= end:
+                # 获取当前日期段的起始位置
+                start_pos = match.start()
+                # 获取下一个日期段的起始位置（或文件末尾）
+                end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(content)
+                
+                # 提取该日期段内容
+                section = content[start_pos:end_pos].rstrip()
+                filtered_parts.append(section)
+        
+        if not filtered_parts:
+            raise ValueError(f"behavior.md 中未找到 {start_date} 到 {end_date} 范围内的数据")
+        
+        return "\n\n".join(filtered_parts)
+
     def data_input(self, input_files: list[str] | None = None) -> list[dict[str, Any]]:
         """
         解析输入数据
@@ -170,14 +218,17 @@ class UpdateMemoryTest(LLMTestBase):
         Returns:
             包含日期范围、behavior 内容和 recent_state 内容的数据列表
         """
-        # 获取行为数据文件
-        behavior_files = self._get_behavior_files(self.start_date, self.end_date)
+        # 读取预生成的 behavior.md
+        behavior_path = self.input_path / "update_memory" / "behavior.md"
+        if not behavior_path.exists():
+            raise FileNotFoundError(f"behavior.md 不存在: {behavior_path}")
 
-        if not behavior_files:
-            raise FileNotFoundError(f"未找到 {self.start_date} 到 {self.end_date} 的行为数据文件")
+        full_content = read_md(behavior_path)
+        if not full_content:
+            raise ValueError(f"behavior.md 内容为空: {behavior_path}")
 
-        # 构建 behavior 内容
-        behavior_content = self._build_behavior_content(behavior_files)
+        # 按日期范围筛选内容
+        behavior_content = self._filter_behavior_by_date(full_content, self.start_date, self.end_date)
 
         # 读取旧版本 recent_state.md（如果存在）
         recent_state_path = self.input_path / "update_memory" / "recent_state.md"
@@ -189,7 +240,7 @@ class UpdateMemoryTest(LLMTestBase):
             "date_range": f"{self.start_date} ~ {self.end_date}",
             "behavior_content": behavior_content,
             "recent_state_content": recent_state_content,
-            "file_count": len(behavior_files)
+            "file_count": 1
         }]
 
     async def _call_llm(self, messages: list[dict[str, str]]) -> str:
@@ -397,9 +448,10 @@ class UpdateMemoryTest(LLMTestBase):
 if __name__ == "__main__":
     # v1 版本测试
     test = UpdateMemoryTest(
-        prompt_version="v1",
+        prompt_version="v2",
         temperature=0.7,
         start_date="2026-05-13",
-        end_date="2026-05-19"
+        end_date="2026-05-19",
+        prompt_params = {"upper_limit" : 2000}
     )
     test.main()
