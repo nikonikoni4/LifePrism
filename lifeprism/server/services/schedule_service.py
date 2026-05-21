@@ -24,7 +24,7 @@ TEST_CRON_AFTER_MINUTES = 1         # 定时任务测试参数（启动后N分�
 
 async def _update_memory():
     try:
-        generate_diary_ai_summary(datetime.now().strftime("%Y-%m-%d"))
+        await generate_diary_ai_summary(datetime.now().strftime("%Y-%m-%d"))
         await update_memory(datetime.now().strftime("%Y-%m-%d"))
     except Exception as e:
         logger.error(f"生成日记总结或更新记忆失败: {e}")
