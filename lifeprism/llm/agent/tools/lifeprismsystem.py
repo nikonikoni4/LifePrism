@@ -633,13 +633,13 @@ class UserMoodQuryTool(Tool):
         return {
             "type": "object",
             "properties": {
-                "start_date": {
+                "start_time": {
                     "type": "string",
-                    "description": "查询开始日期，格式：YYYY-MM-DD"
+                    "description": "查询开始时间，格式：YYYY-MM-DD HH:MM:SS"
                 },
-                "end_date": {
+                "end_time": {
                     "type": "string",
-                    "description": "查询结束日期，格式：YYYY-MM-DD"
+                    "description": "查询结束时间，格式：YYYY-MM-DD HH:MM:SS"
                 },
                 "by_mood_type_id": {
                     "type": ["string", "null"],
@@ -647,7 +647,7 @@ class UserMoodQuryTool(Tool):
                     "enum": _get_mood_type_ids()
                 }
             },
-            "required": ["start_date", "end_date"]
+            "required": ["start_time", "end_time"]
         }
 
 
@@ -662,27 +662,27 @@ class UserMoodQuryTool(Tool):
             格式化的心情记录字符串
         """
         try:
-            start_date = kwargs.get('start_date', '')
-            end_date = kwargs.get('end_date', '')
+            start_time = kwargs.get('start_time', '')
+            end_time = kwargs.get('end_time', '')
             by_mood_type_id = kwargs.get('by_mood_type_id', None)
 
-            return query_user_mood(start_date, end_date, by_mood_type_id)
+            return query_user_mood(start_time, end_time, by_mood_type_id)
         except ValueError as e:
             return f"{ERROR}参数错误: {str(e)}"
         except Exception as e:
             return f"{ERROR}查询失败: {str(e)}"
 
-def query_user_mood(start_date:str,end_date:str,by_mood_type_id:str|None=None)->list[dict[str,Any]]:
+def query_user_mood(start_time:str,end_time:str,by_mood_type_id:str|None=None)->list[dict[str,Any]]:
     """
     查询用户在指定时间范围内的心情记录。
     args:
-        start_date: 开始时间，格式：YYYY-MM-DD
-        end_date: 结束时间，格式：YYYY-MM-DD
+        start_time: 开始时间，格式：YYYY-MM-DD HH:MM:SS
+        end_time: 结束时间，格式：YYYY-MM-DD HH:MM:SS
         by_mood_type_id: 可选，心情类型ID，按心情类型查询
     return:
         心情记录列表
     """
-    mood_entries:list[dict]= mood_repository.get_mood_entries(start_date=start_date,end_date=end_date)
+    mood_entries:list[dict]= mood_repository.get_mood_entries(start_time=start_time,end_time=end_time)
     result = []
     if by_mood_type_id:
         for mood_entry in mood_entries:
@@ -691,7 +691,7 @@ def query_user_mood(start_date:str,end_date:str,by_mood_type_id:str|None=None)->
     else:
         result = mood_entries
     if not result:
-        return f"{start_date}~{end_date}  无{by_mood_type_id}对应心情记录" if by_mood_type_id else f"{start_date}~{end_date}  无心情记录"
+        return f"{start_time}~{end_time}  无{by_mood_type_id}对应心情记录" if by_mood_type_id else f"{start_time}~{end_time}  无心情记录"
     formatted_result = []
     for idx, entry in enumerate(result, 1):
         factors_raw = entry.get('factors', '')

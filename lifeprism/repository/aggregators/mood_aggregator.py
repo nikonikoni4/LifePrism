@@ -216,9 +216,9 @@ class MoodAggregator:
         """透传：删除心情记录"""
         return self.entry_provider.delete_mood_entry(entry_id)
 
-    def get_mood_entries(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_mood_entries(self, start_time: Optional[str] = None, end_time: Optional[str] = None) -> List[Dict[str, Any]]:
         """透传：获取心情记录列表"""
-        return self.entry_provider.get_mood_entries(start_date, end_date)
+        return self.entry_provider.get_mood_entries(start_time, end_time)
 
     def get_mood_entry_by_id(self, entry_id: str) -> Optional[Dict[str, Any]]:
         """透传：根据ID获取心情记录"""

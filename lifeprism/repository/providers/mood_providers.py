@@ -270,13 +270,13 @@ class MoodEntryProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_mood_entries(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_mood_entries(self, start_time: Optional[str] = None, end_time: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         获取心情记录列表（按 created_at ASC 排序）
 
         Args:
-            start_date: 开始日期 YYYY-MM-DD（可选）
-            end_date: 结束日期 YYYY-MM-DD（可选）
+            start_time: 开始时间 YYYY-MM-DD HH:MM:SS（可选）
+            end_time: 结束时间 YYYY-MM-DD HH:MM:SS（可选，不包含此时刻）
 
         Returns:
             List[Dict]: 心情记录列表
@@ -284,18 +284,18 @@ class MoodEntryProvider(LWBaseDataProvider):
         Raises:
             DataAccessError: 数据库操作失败
         """
-        # 使用自定义 SQL 处理日期范围（因为需要 date(created_at) 函数）
+        # 使用自定义 SQL 处理时间范围
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 conditions = []
                 params = []
-                if start_date:
-                    conditions.append("date(created_at) >= ?")
-                    params.append(start_date)
-                if end_date:
-                    conditions.append("date(created_at) <= ?")
-                    params.append(end_date)
+                if start_time:
+                    conditions.append("created_at >= ?")
+                    params.append(start_time)
+                if end_time:
+                    conditions.append("created_at < ?")
+                    params.append(end_time)
                 where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
                 cursor.execute(f"SELECT * FROM mood_entries{where} ORDER BY created_at ASC", params)
                 columns = [desc[0] for desc in cursor.description]
