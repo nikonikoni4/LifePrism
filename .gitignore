@@ -40,5 +40,7 @@ claude_task_manager.py
 nanobot
 _temp
 _temp copy
-test\llm_prompt_test.py\dataset
-test\llm_prompt_test.py\results
+test/llm_prompt_test/dataset
+test/llm_prompt_test/results
+skills-lock.json
+test.py
