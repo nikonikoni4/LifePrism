@@ -41,10 +41,24 @@ class ScheduleService:
         logger.info("ScheduleService 初始化")
         
         # 注册系统任务（在 start() 后自动添加）
-        self._system_jobs = [
-            {"func": _process_session_message, "trigger": "interval", "kwargs": {"hours": 4}, "job_id": "process_session_message"},
-            {"func": _update_memory, "trigger": "cron", "kwargs": {"cron_expr": "0 10 * * *"}, "job_id": "update_memory"},
-        ]
+        self._system_jobs = []
+        
+        # 根据配置决定是否注册任务
+        if settings.auto_summary_session:
+            self._system_jobs.append({
+                "func": _process_session_message,
+                "trigger": "interval",
+                "kwargs": {"hours": 4},
+                "job_id": "process_session_message"
+            })
+        
+        if settings.auto_update_memory:
+            self._system_jobs.append({
+                "func": _update_memory,
+                "trigger": "cron",
+                "kwargs": {"cron_expr": "0 10 * * *"},
+                "job_id": "update_memory"
+            })
 
         
     def start(self) -> None:

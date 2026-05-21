@@ -668,6 +668,14 @@ class SettingsManager:
         return self._config.get("auto_diary_summary",False)
 
     @property
+    def auto_summary_session(self)->bool:
+        return self._config.get("auto_summary_session",False)
+
+    @property
+    def auto_update_memory(self)->bool:
+        return self._config.get("auto_update_memory",False)
+
+    @property
     def token_limit(self)->int:
         return  50000 # 暂定50k
 
