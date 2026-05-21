@@ -57,10 +57,11 @@ class UserActivitySummaryTool(Tool):
         """工具功能说明。"""
         
         return """查询lifeprism系统中用户的行为活动数据，包括
-        1. computer_usage_stats ： 电脑使用的高频时段和该时段内的分类统计数据。
-        2. user_behavior_notes ： 用户对于某段时间的自定义行为备注，是了解用户行为最直接的数据。
-        3. ai_behavior_notes ： AI对于某段时间的截图分析，由AI经过截图分析，不一定准确，仅供参考。
-        4. todolist ： 用户在这段时间内的任务列表。
+        1. high_usage_segments ： 电脑高频使用时段数据分析，按高密度时间段分组展示分类占比。
+        2. computer_overview ： 电脑总体统计数据，展示整个时间段内各分类的总时间和占比。
+        3. user_behavior_notes ： 用户对于某段时间的自定义行为备注，是了解用户行为最直接的数据。
+        4. ai_behavior_notes ： AI对于某段时间的截图分析，由AI经过截图分析，不一定准确，仅供参考。
+        5. todolist ： 用户在这段时间内的任务列表。
         """
         
 
@@ -75,7 +76,7 @@ class UserActivitySummaryTool(Tool):
                     "description": "查询选项列表",
                     "items": {
                         "type": "string",
-                        "enum": ["computer_usage_stats", "user_behavior_notes", "ai_behavior_notes",  "todolist"]# "goals",
+                        "enum": ["high_usage_segments", "computer_overview", "user_behavior_notes", "ai_behavior_notes",  "todolist"]# "goals",
                     },
                     "minItems": 1
                 },
@@ -158,7 +159,8 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
     args :
         query_option: list
             查询选项:
-                computer_usage_stats,
+                high_usage_segments: 电脑高频使用时段数据分析，按高密度时间段分组展示分类占比
+                computer_overview: 电脑总体统计数据，展示整个时间段内各分类的总时间和占比
                 user_behavior_notes,
                 ai_behavior_notes,
                 # goals,
@@ -172,7 +174,7 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
     # 参数校验
     from datetime import datetime
 
-    allowed_options = {"computer_usage", "computer_usage_stats", "user_behavior_notes", "ai_behavior_notes", "todolist"} # , "goals"
+    allowed_options = {"computer_usage", "high_usage_segments", "computer_overview", "user_behavior_notes", "ai_behavior_notes", "todolist"} # , "goals"
     invalid_options = set(query_option) - allowed_options
     if invalid_options:
         raise ValueError(f"{ERROR} Invalid query options: {invalid_options}")
@@ -189,17 +191,17 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
     parts = []
 
     
-    if 'computer_usage_stats' in query_option:
+    if 'high_usage_segments' in query_option:
         app_log, _ = computer_usage_repository.query_computer_usage_with_names(
             QueryOptions(fields=['start_time', 'end_time', 'app', 'title', 'duration', 'category_id', 'sub_category_id']).with_time_range(start_time, end_time)
         )
         if not app_log:
-            parts.append("## 电脑使用统计 \n 该时间段没有电脑使用记录")
+            parts.append("## 电脑高频使用时段分析 \n 该时间段没有电脑使用记录")
         else:
             # 计算高密度时间段
             usage_time_segments: list[dict] = build_time_segments(app_log, start_time, end_time, 0.6, 6)
 
-            content = "## 电脑使用统计\n"
+            content = "## 电脑高频使用时段分析\n"
             for idx, segment in enumerate(usage_time_segments, 1):
                 # 计算每个时间段内的分类占比
                 category_stats = _category_stats(app_log, segment['start'], segment['end'])
@@ -209,6 +211,45 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
                 content += "分类占比:\n"
                 for category, percentage in sorted(category_stats.items(), key=lambda x: x[1], reverse=True):
                     content += f"  - {category}: {percentage:.1f}%\n"
+
+            parts.append(content)
+    
+    if 'computer_overview' in query_option:
+        app_log, _ = computer_usage_repository.query_computer_usage_with_names(
+            QueryOptions(fields=['start_time', 'end_time', 'app', 'title', 'duration', 'category_id', 'sub_category_id']).with_time_range(start_time, end_time)
+        )
+        if not app_log:
+            parts.append("## 电脑总体使用统计 \n 该时间段没有电脑使用记录")
+        else:
+            from datetime import datetime as dt
+            segment_start = dt.fromisoformat(start_time.replace(' ', 'T'))
+            segment_end = dt.fromisoformat(end_time.replace(' ', 'T'))
+            
+            category_durations = {}
+            total_duration = 0
+
+            for log in app_log:
+                log_start = dt.fromisoformat(log['start_time'].replace(' ', 'T'))
+                log_end = dt.fromisoformat(log['end_time'].replace(' ', 'T'))
+
+                actual_start = max(log_start, segment_start)
+                actual_end = min(log_end, segment_end)
+
+                if actual_start >= actual_end:
+                    continue
+
+                duration = (actual_end - actual_start).total_seconds()
+                category = log.get('category_name', '未分类')
+
+                category_durations[category] = category_durations.get(category, 0) + duration
+                total_duration += duration
+
+            content = "## 电脑总体使用统计\n"
+            content += f"总使用时长: {total_duration // 60} 分钟\n"
+            content += "分类统计:\n"
+            for category, duration in sorted(category_durations.items(), key=lambda x: x[1], reverse=True):
+                percentage = (duration / total_duration * 100) if total_duration > 0 else 0
+                content += f"  - {category}: {duration // 60} 分钟 ({percentage:.1f}%)\n"
 
             parts.append(content)
     if 'user_behavior_notes' in query_option:
@@ -772,8 +813,8 @@ def create_user_mood(content:str,score:int,mood_type_id:str,factors_raw:list[str
     return f"{SUCCESS}创建心情记录成功，ID: {mood_id}"
 
 if __name__ == "__main__":
-    print(query_user_activity_summary(['computer_usage_stats'],"2026-04-28 00:00:00","2026-04-29 00:00:00"))
-    print(query_user_activity_log("2026-04-28 00:00:00","2026-04-29 00:00:00"))
-    print(create_or_update_user_behavior_note("2026-04-28 00:00:00","2026-04-29 00:00:00","用户在电脑上工作111",129))
-    print(query_user_mood("2026-05-03","2026-05-04"))
-    print(UserMoodCreateTool().parameters)
+    print(query_user_activity_summary(['computer_overview'],"2026-04-28 00:00:00","2026-04-29 00:00:00"))
+    # print(query_user_activity_log("2026-04-28 00:00:00","2026-04-29 00:00:00"))
+    # print(create_or_update_user_behavior_note("2026-04-28 00:00:00","2026-04-29 00:00:00","用户在电脑上工作111",129))
+    # print(query_user_mood("2026-05-03","2026-05-04"))
+    # print(UserMoodCreateTool().parameters)
