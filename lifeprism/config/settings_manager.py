@@ -62,6 +62,7 @@ class SettingsManager:
         'screenshot_monitor': False,
         'screen_analysis_ignore': [],  # 截图分析忽略的分类 ID 列表
         'auto_diary_summary': False,  # 每日自动总结日记
+        'llm_call_logger_enabled': False,  # LLM 调用记录器开关
     }
     
     def __new__(cls) -> 'SettingsManager':

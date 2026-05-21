@@ -31,7 +31,7 @@ from .density_utils import (
     compute_bucket_density,
     build_time_segments,
 )
-
+from .llm_call_logger import llm_call_logger, LLMCallLogger
 __all__ = [
     # 向后兼容
     "create_ChatTongyiModel",
@@ -54,4 +54,5 @@ __all__ = [
     "write_date_md",
     "compute_bucket_density",
     "build_time_segments",
+    "llm_call_logger"
 ]

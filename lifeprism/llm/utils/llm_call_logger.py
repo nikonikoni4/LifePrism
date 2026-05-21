@@ -37,11 +37,11 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
 
 from lifeprism.config import settings
-from lifeprism.utils.logger import get_logger
+from lifeprism.utils.logger import get_logger,DEBUG
 from lifeprism.utils.lazy_singleton import LazySingleton
 
 logger = get_logger(__name__)
-
+logger.setLevel(DEBUG)
 
 class LLMCallLogger:
     """LLM 调用记录器
@@ -57,7 +57,9 @@ class LLMCallLogger:
             log_dir: 日志目录，默认为 lifeprism_data_path/debug_log/llm_logs
         """
         if log_dir is None:
+
             log_dir = settings.lifeprism_data_path / "debug_logs" / "llm_logs"
+            logger.info(f"llm_call_输出目录：{log_dir}")
 
         self.log_dir = Path(log_dir)
         self.image_dir = self.log_dir / "images"
@@ -66,10 +68,10 @@ class LLMCallLogger:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.image_dir.mkdir(parents=True, exist_ok=True)
 
-        # 记录标志位，默认关闭
-        self._enabled = False
+        # 从配置读取记录标志位
+        self._enabled = settings.get('llm_call_logger_enabled', False)
 
-        logger.debug(f"LLM 调用记录器初始化完成，日志目录: {self.log_dir}")
+        logger.debug(f"LLM 调用记录器初始化完成，日志目录: {self.log_dir}, 启用状态: {self._enabled}")
 
     @property
     def enabled(self) -> bool:
