@@ -5,7 +5,7 @@ sys.path.insert(0, '.')
 
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
-from lifeprism.utils import llm_call_logger
+from lifeprism.llm.utils import llm_call_logger
 
 
 # 模拟消息类
