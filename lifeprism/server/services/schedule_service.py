@@ -78,7 +78,7 @@ class ScheduleService:
         self._add_system_jobs()
 
     def _add_system_jobs(self) -> None:
-        """添加系统预设任务，对于 Cron 任务，如果已过触发时间则立即执行一次"""
+        """添加系统预设任务，对于 Cron 任务，如果已过触发时间则异步执行一次"""
         now = datetime.now()
         for job_config in self._system_jobs:
             try:
@@ -86,15 +86,22 @@ class ScheduleService:
                     self.add_interval_job(job_config["func"], job_id=job_config["job_id"], **job_config["kwargs"])
                 elif job_config["trigger"] == "cron":
                     self.add_cron_job(job_config["func"], job_config["kwargs"]["cron_expr"], job_id=job_config["job_id"])
-                    # 检查是否已过今天的触发时间，如果是则立即执行一次
+                    # 检查是否已过今天的触发时间，如果是则异步执行一次
                     cron_expr = job_config["kwargs"]["cron_expr"]
                     parts = cron_expr.split()
                     target_hour, target_minute = int(parts[1]), int(parts[0])
                     if now.hour > target_hour or (now.hour == target_hour and now.minute >= target_minute):
-                        logger.info(f"已过今日 {target_hour}:{target_minute:02d}，立即执行一次 {job_config['job_id']}")
-                        job_config["func"]()
+                        logger.info(f"已过今日 {target_hour}:{target_minute:02d}，异步执行一次 {job_config['job_id']}")
+                        import asyncio
+                        asyncio.get_event_loop().create_task(self._run_job_async(job_config["func"]))
             except Exception as e:
                 logger.error(f"添加系统任务 {job_config['job_id']} 失败: {e}")
+
+    async def _run_job_async(self, func: Callable) -> None:
+        """异步执行任务（在线程池中运行同步函数）"""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, func)
 
     def shutdown(self) -> None:
         """关闭调度器
