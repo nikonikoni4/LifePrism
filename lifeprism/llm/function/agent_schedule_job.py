@@ -277,9 +277,10 @@ async def extract_from_chat_messages(session: Session) -> str | None:
     # 将message[获取所有消息记录中长度不等于last_processed_loc的消息:]转化为str
     message = session.messages[session.last_processed_loc:]
     if message:
-        summary_raw_content = json.dumps(message)
+        summary_raw_content = json.dumps(message, ensure_ascii=False)
         msg = InboundMessage(
-            type=MessageType.DREAM_TASK,
+            type=MessageType.GENERAL_TASK,
+            token_type=MessageType.DREAM_TASK,
             content=f"## 需要总结的内容 \n {summary_raw_content}",
             extra={"system_prompt": extract_chat_prompt}
         )
@@ -334,18 +335,34 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
     Args:
         days_offset: 处理日期限制，旧session不在处理
     """
+    logger.debug(f"[process_session_message] 开始处理会话消息, days_offset={days_offset}")
+    
     # 1. 加载session meta,获取需要处理的消息
     _session_to_process = []
     session_list = session_manager.show_session_list()
+    logger.debug(f"[process_session_message] 获取到 {len(session_list)} 个 session")
+    
     for session_id in session_list:
         meta_data = session_manager.get_session_metadata(session_id)
+        logger.debug(f"[process_session_message] 检查 session: {session_id}, meta_data keys: {list(meta_data.keys()) if meta_data else 'None'}")
+        
         if meta_data.get("message_len", None):
             message_len = meta_data["message_len"]
             last_processed_loc = meta_data.get("last_processed_loc", 0)
             update_at = datetime.fromisoformat(meta_data.get("update_at", datetime.now().isoformat()))
+            logger.debug(f"[process_session_message] session {session_id}: message_len={message_len}, last_processed_loc={last_processed_loc}, update_at={update_at}")
+            
             # 判断是否有未处理消息 且 update_at > 今天 - days_offset
             if message_len > last_processed_loc and update_at > datetime.now() - timedelta(days=days_offset):
                 _session_to_process.append(session_id)
+                logger.debug(f"[process_session_message] session {session_id} 需要处理 (有 {message_len - last_processed_loc} 条新消息)")
+            else:
+                logger.debug(f"[process_session_message] session {session_id} 跳过: message_len({message_len}) <= last_processed_loc({last_processed_loc}) 或 update_at({update_at}) 过期")
+        else:
+            logger.debug(f"[process_session_message] session {session_id} 跳过: 无 message_len")
+    
+    logger.debug(f"[process_session_message] 共 {len(_session_to_process)} 个 session 需要处理: {_session_to_process}")
+    
     # 处理消息（分组处理，每组最多10个）
     history_manager = ChatHistoryManager()
     if _session_to_process:
@@ -353,29 +370,50 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
 
         try:
             # 分组处理
+            total_batches = (len(_session_to_process) + SESSION_BATCH_SIZE - 1) // SESSION_BATCH_SIZE
+            logger.debug(f"[process_session_message] 开始分组处理, 每组 {SESSION_BATCH_SIZE} 个, 共 {total_batches} 组")
+            
             for i in range(0, len(_session_to_process), SESSION_BATCH_SIZE):
                 batch = _session_to_process[i:i + SESSION_BATCH_SIZE]
+                batch_num = i // SESSION_BATCH_SIZE + 1
+                logger.debug(f"[process_session_message] 处理第 {batch_num}/{total_batches} 组: {batch}")
+                
                 # 先加载 session 对象
                 sessions = [session_manager._load_session(sid) for sid in batch]
+                logger.debug(f"[process_session_message] 第 {batch_num} 组 session 加载完成")
+                
                 batch_results = await asyncio.gather(
                     *[extract_from_chat_messages(session) for session in sessions]
                 )
-                all_results.extend([r for r in batch_results if r is not None])
+                
+                valid_results = [r for r in batch_results if r is not None]
+                logger.debug(f"[process_session_message] 第 {batch_num} 组处理完成, 获取 {len(valid_results)}/{len(batch_results)} 个有效结果")
+                all_results.extend(valid_results)
+                
         finally:
             # 删除加载的session_id
+            logger.debug(f"[process_session_message] 清理 session 缓存, 共 {len(_session_to_process)} 个")
             for session_id in _session_to_process:
                 session_manager.remove_from_cache(session_id)
+            logger.debug(f"[process_session_message] session 缓存清理完成")
 
         # 创建history
+        logger.debug(f"[process_session_message] 开始保存历史记录, 共 {len(all_results)} 条结果")
         for content in all_results:
             history_manager.add_content(content)
         history_manager.save_history()
+        logger.debug(f"[process_session_message] 历史记录保存完成")
+    else:
+        logger.debug(f"[process_session_message] 没有需要处理的 session")
 
     # 将chat_history 更新到behavior
+    logger.debug(f"[process_session_message] 开始更新 behavior")
     history = history_manager.get_histories_to_dream()
     if history:
+        logger.debug(f"[process_session_message] 获取到 {len(history)} 条历史记录用于更新 behavior")
         history_content = format_chat_history(history)
         if history_content:
+            logger.debug(f"[process_session_message] 格式化后 history_content 长度: {len(history_content)} 字符")
             write_date_md(
                 settings.lifeprism_data_path / "user/daily_data/behavior.md",
                 datetime.now().strftime('%Y-%m-%d'),
@@ -384,6 +422,13 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
             )
             # 更新 last_processed_time
             history_manager.save_history(datetime.now())
+            logger.debug(f"[process_session_message] behavior 更新完成")
+        else:
+            logger.debug(f"[process_session_message] history_content 为空, 跳过更新")
+    else:
+        logger.debug(f"[process_session_message] 没有历史记录需要更新 behavior")
+    
+    logger.debug(f"[process_session_message] 会话消息处理完成")
 
 if __name__ == "__main__":
     from lifeprism.llm.agent.loop import agent_loop
@@ -391,7 +436,7 @@ if __name__ == "__main__":
     async def main():
         loop_task = asyncio.create_task(agent_loop.loop())
         try:
-            await dreaming("2026-05-20")
+            await process_session_message(10)
         finally:
             loop_task.cancel()
     

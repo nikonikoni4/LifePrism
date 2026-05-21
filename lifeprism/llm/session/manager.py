@@ -317,7 +317,7 @@ class ChatHistoryManager:
         if path:
             self.path = path
         else:
-            self.path = settings.lifeprism_data_path / "user/daily_date/chat_history.json"
+            self.path = settings.lifeprism_data_path / "user/daily_data/chat_history.json"
         self.path.parent.parent.mkdir(parents=True, exist_ok=True)
         self.histories :list[dict]= [] # timestamp,content,is_processed
         self.last_processed_time = datetime.now()

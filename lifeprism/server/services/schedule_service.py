@@ -13,22 +13,25 @@ from lifeprism.config.settings_manager import settings
 from lifeprism.server.services.diary_service import generate_diary_ai_summary
 from lifeprism.utils import get_logger
 from datetime import datetime, timedelta
-from lifeprism.llm.function.agent_schedule_job import update_memory,process_session_message
+from lifeprism.llm.function.agent_schedule_job import dreaming,process_session_message
 logger = get_logger(__name__)
 
 # ===================== 测试配置 =====================
-TEST_MODE = True                    # 是否启用测试模式
+TEST_MODE = False                    # 是否启用测试模式
 TEST_INTERVAL_MINUTES = 1           # 间隔任务测试参数（覆盖原4h）
 TEST_CRON_AFTER_MINUTES = 1         # 定时任务测试参数（启动后N分钟触发，覆盖原10:00）
 # ====================================================
 
-async def _update_memory():
+async def _dreaming():
     try:
         await generate_diary_ai_summary(datetime.now().strftime("%Y-%m-%d"))
-        await update_memory(datetime.now().strftime("%Y-%m-%d"))
+        
     except Exception as e:
-        logger.error(f"生成日记总结或更新记忆失败: {e}")
-
+        logger.error(f"生成日记总结失败: {e}")
+    try: 
+        await dreaming(datetime.now().strftime("%Y-%m-%d"))
+    except Exception as e:
+            logger.error(f"更新记忆失败: {e}")
 async def _process_session_message():
     try:
         await process_session_message()
@@ -69,7 +72,7 @@ class ScheduleService:
             else:
                 cron_expr = "0 10 * * *"
             self._system_jobs.append({
-                "func": _update_memory,
+                "func": _dreaming,
                 "trigger": "cron",
                 "kwargs": {"cron_expr": cron_expr},
                 "job_id": "update_memory"

@@ -100,6 +100,7 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
     msg = InboundMessage(
         content=content,
         type=MessageType.GENERAL_TASK,
+        token_type=MessageType.DREAM_TASK,
         extra={'system_prompt':system_prompt}
     )
     result :OutboundMessage = await bus.send(msg) 
