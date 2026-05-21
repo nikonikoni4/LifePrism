@@ -283,8 +283,8 @@ class AgentLoop:
             # 3. 构建完整消息（含历史）
             session: Session = session_manager.get_or_create_session(msg.session_id)
             # 判断token是否超标,自动压缩
-            self.auto_compact(session,tools)
-            session = session.add_message("user", content=Context._build_user_message(msg))
+            session = await self.auto_compact(session,tools)
+            session.add_message("user", content=Context._build_user_message(msg))
             if msg.type == MessageType.CHAT: 
                 session_manager.save_session(session)
 
