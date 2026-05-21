@@ -16,21 +16,22 @@ from datetime import datetime, timedelta
 from lifeprism.llm.function.agent_schedule_job import update_memory,process_session_message
 logger = get_logger(__name__)
 
-# ===================== 测试配置宏 =====================
-TEST_MODE = False                    # 是否启用测试模式
+# ===================== 测试配置 =====================
+TEST_MODE = True                    # 是否启用测试模式
 TEST_INTERVAL_MINUTES = 1           # 间隔任务测试参数（覆盖原4h）
 TEST_CRON_AFTER_MINUTES = 1         # 定时任务测试参数（启动后N分钟触发，覆盖原10:00）
 # ====================================================
 
-def _update_memory():
+async def _update_memory():
     try:
         generate_diary_ai_summary(datetime.now().strftime("%Y-%m-%d"))
-        update_memory(datetime.now().strftime("%Y-%m-%d"))
+        await update_memory(datetime.now().strftime("%Y-%m-%d"))
     except Exception as e:
         logger.error(f"生成日记总结或更新记忆失败: {e}")
-def _process_session_message():
+
+async def _process_session_message():
     try:
-        process_session_message()
+        await process_session_message()
     except Exception as e:
         logger.error(f"提取历史对话消息信息失败: {e}")
 class ScheduleService:
@@ -107,15 +108,9 @@ class ScheduleService:
                     if now.hour > target_hour or (now.hour == target_hour and now.minute >= target_minute):
                         logger.info(f"已过今日 {target_hour}:{target_minute:02d}，异步执行一次 {job_config['job_id']}")
                         import asyncio
-                        asyncio.get_event_loop().create_task(self._run_job_async(job_config["func"]))
+                        asyncio.get_event_loop().create_task(job_config["func"]())
             except Exception as e:
                 logger.error(f"添加系统任务 {job_config['job_id']} 失败: {e}")
-
-    async def _run_job_async(self, func: Callable) -> None:
-        """异步执行任务（在线程池中运行同步函数）"""
-        import asyncio
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, func)
 
     def shutdown(self) -> None:
         """关闭调度器
