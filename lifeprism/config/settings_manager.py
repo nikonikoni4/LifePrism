@@ -9,6 +9,7 @@ API Key 读取优先级:
 
 import os
 import sys
+import json
 import yaml
 import keyring
 from pathlib import Path
@@ -151,7 +152,8 @@ class SettingsManager:
         """
         解析允许的工作目录路径列表
 
-        基于 lifeprism_data_path 和 ALLOWED_DIRS 计算允许访问的目录绝对路径
+        基于 lifeprism_data_path 和 ALLOWED_DIRS 计算允许访问的目录绝对路径，
+        并从 expand_meta_data.json 中读取扩展目录路径
 
         Note: 必须在 _lifeprism_data_path 初始化后调用
 
@@ -159,8 +161,25 @@ class SettingsManager:
             List[Path]: 允许的目录路径列表
         """
         allowed_paths: List[Path] = []
+        # 1. 处理固定的白名单目录
         for dir_name in ALLOWED_DIRS:
             allowed_paths.append((self._lifeprism_data_path / dir_name).resolve())
+        
+        # 2. 读取 expand_meta_data.json 中的扩展目录
+        expand_meta_path = self._lifeprism_data_path / 'expand_dir' / 'expand_meta_data.json'
+        if expand_meta_path.exists():
+            try:
+                with open(expand_meta_path, 'r', encoding='utf-8') as f:
+                    meta_data = json.load(f)
+                expand_dirs = meta_data.get('expand_dirs', [])
+                for dir_info in expand_dirs:
+                    dir_path = dir_info.get('path')
+                    if dir_path:
+                        allowed_paths.append(Path(dir_path).resolve())
+            except Exception:
+                # 读取失败不影响启动，静默处理
+                pass
+        
         return allowed_paths
 
     def _setup_logging(self) -> None:
