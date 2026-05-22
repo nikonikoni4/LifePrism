@@ -5,9 +5,11 @@ ScheduleService 测试
 """
 
 import asyncio
+import json
 import pytest
 import pytest_asyncio
-from unittest.mock import MagicMock, AsyncMock
+from pathlib import Path
+from unittest.mock import MagicMock, AsyncMock, patch
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from lifeprism.server.services.schedule_service import ScheduleService
 
@@ -333,17 +335,170 @@ class TestScheduleServiceIntegration:
         """测试获取任务列表功能"""
         def test_func():
             pass
-        
+
         # 添加几个任务
         job_id_1 = schedule_service.add_interval_job(test_func, seconds=30, job_id="test_job_1")
         job_id_2 = schedule_service.add_interval_job(test_func, seconds=60, job_id="test_job_2")
-        
+
         # 获取任务列表
         jobs = schedule_service.get_jobs()
-        
+
         # 验证任务列表
         assert len(jobs) >= 2, "任务列表应包含至少两个任务"
-        
+
         # 清理
         schedule_service.remove_job(job_id_1)
         schedule_service.remove_job(job_id_2)
+
+
+class TestScheduleServiceCronState:
+    """ScheduleService Cron 状态持久化测试类"""
+
+    @pytest.fixture
+    def temp_state_file(self):
+        """创建临时状态文件路径"""
+        temp_dir = Path("test_temp")
+        temp_dir.mkdir(exist_ok=True)
+        temp_file = temp_dir / ".schedule_state_test.json"
+        yield temp_file
+        # 清理
+        if temp_file.exists():
+            temp_file.unlink()
+        if temp_dir.exists() and not list(temp_dir.iterdir()):
+            temp_dir.rmdir()
+
+    @pytest.fixture
+    def schedule_service_with_temp_state(self, temp_state_file):
+        """创建使用临时状态文件的 ScheduleService 实例"""
+        service = ScheduleService()
+        service._state_file_path = temp_state_file
+        return service
+
+    def test_load_cron_state_empty(self, schedule_service_with_temp_state):
+        """测试加载不存在的状态文件"""
+        state = schedule_service_with_temp_state._load_cron_state()
+        assert state == {}, "不存在的状态文件应返回空字典"
+
+    def test_save_and_load_cron_state(self, schedule_service_with_temp_state, temp_state_file):
+        """测试保存和加载状态"""
+        # 保存状态
+        schedule_service_with_temp_state._save_cron_state("update_memory", "2026-05-22")
+
+        # 验证文件存在
+        assert temp_state_file.exists(), "状态文件应该被创建"
+
+        # 加载状态
+        state = schedule_service_with_temp_state._load_cron_state()
+        assert state == {"update_memory": "2026-05-22"}, "加载的状态应与保存的一致"
+
+    def test_save_multiple_cron_states(self, schedule_service_with_temp_state):
+        """测试保存多个任务状态"""
+        # 保存第一个任务状态
+        schedule_service_with_temp_state._save_cron_state("update_memory", "2026-05-22")
+
+        # 保存第二个任务状态
+        schedule_service_with_temp_state._save_cron_state("another_job", "2026-05-23")
+
+        # 加载状态
+        state = schedule_service_with_temp_state._load_cron_state()
+        assert state == {
+            "update_memory": "2026-05-22",
+            "another_job": "2026-05-23"
+        }, "应该包含两个任务的状态"
+
+    def test_update_existing_cron_state(self, schedule_service_with_temp_state):
+        """测试更新已存在的任务状态"""
+        # 保存初始状态
+        schedule_service_with_temp_state._save_cron_state("update_memory", "2026-05-22")
+
+        # 更新状态
+        schedule_service_with_temp_state._save_cron_state("update_memory", "2026-05-23")
+
+        # 加载状态
+        state = schedule_service_with_temp_state._load_cron_state()
+        assert state == {"update_memory": "2026-05-23"}, "状态应该被更新"
+
+    def test_should_execute_cron_today_no_record(self, schedule_service_with_temp_state):
+        """测试没有执行记录时应该执行"""
+        should_execute = schedule_service_with_temp_state._should_execute_cron_today("update_memory")
+        assert should_execute is True, "没有执行记录时应该返回 True"
+
+    def test_should_execute_cron_today_same_date(self, schedule_service_with_temp_state):
+        """测试同一天已执行时不应该再执行"""
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # 保存今天的执行记录
+        schedule_service_with_temp_state._save_cron_state("update_memory", today)
+
+        # 检查是否应该执行
+        should_execute = schedule_service_with_temp_state._should_execute_cron_today("update_memory")
+        assert should_execute is False, "同一天已执行时应该返回 False"
+
+    def test_should_execute_cron_today_different_date(self, schedule_service_with_temp_state):
+        """测试不同日期时应该执行"""
+        # 保存昨天的执行记录
+        schedule_service_with_temp_state._save_cron_state("update_memory", "2026-05-21")
+
+        # 检查是否应该执行（假设今天是 2026-05-22）
+        should_execute = schedule_service_with_temp_state._should_execute_cron_today("update_memory")
+        assert should_execute is True, "不同日期时应该返回 True"
+
+    def test_load_cron_state_corrupted_file(self, schedule_service_with_temp_state, temp_state_file):
+        """测试加载损坏的状态文件"""
+        # 创建损坏的 JSON 文件
+        temp_state_file.parent.mkdir(parents=True, exist_ok=True)
+        temp_state_file.write_text("invalid json content", encoding='utf-8')
+
+        # 加载状态应该返回空字典并记录警告
+        state = schedule_service_with_temp_state._load_cron_state()
+        assert state == {}, "损坏的状态文件应返回空字典"
+
+    def test_state_file_json_format(self, schedule_service_with_temp_state, temp_state_file):
+        """测试状态文件的 JSON 格式"""
+        # 保存状态
+        schedule_service_with_temp_state._save_cron_state("update_memory", "2026-05-22")
+
+        # 读取文件内容
+        with open(temp_state_file, 'r', encoding='utf-8') as f:
+            content = json.load(f)
+
+        # 验证格式
+        assert isinstance(content, dict), "状态文件应该是 JSON 对象"
+        assert "update_memory" in content, "应该包含任务 ID"
+        assert content["update_memory"] == "2026-05-22", "应该包含正确的日期"
+
+    @pytest.mark.asyncio
+    async def test_execute_cron_with_state(self, schedule_service_with_temp_state):
+        """测试执行 Cron 任务并记录状态"""
+        from datetime import datetime
+
+        execution_count = 0
+
+        async def test_func():
+            nonlocal execution_count
+            execution_count += 1
+
+        # 执行任务
+        await schedule_service_with_temp_state._execute_cron_with_state(test_func, "test_job")
+
+        # 验证任务被执行
+        assert execution_count == 1, "任务应该被执行一次"
+
+        # 验证状态被保存
+        state = schedule_service_with_temp_state._load_cron_state()
+        today = datetime.now().strftime("%Y-%m-%d")
+        assert state.get("test_job") == today, "执行后应该保存今天的日期"
+
+    @pytest.mark.asyncio
+    async def test_execute_cron_with_state_on_failure(self, schedule_service_with_temp_state):
+        """测试 Cron 任务执行失败时不保存状态"""
+        async def failing_func():
+            raise Exception("Test error")
+
+        # 执行任务（应该捕获异常）
+        await schedule_service_with_temp_state._execute_cron_with_state(failing_func, "failing_job")
+
+        # 验证状态未被保存
+        state = schedule_service_with_temp_state._load_cron_state()
+        assert "failing_job" not in state, "失败的任务不应该保存状态"
