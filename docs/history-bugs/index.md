@@ -1,3 +1,10 @@
+## 2026-05-22-floating-window-dialog-memory-leak
+
+- updated_at: 2026-05-22
+- path: `docs/history-bugs/2026-05-22-floating-window-dialog-memory-leak.md`
+- 触发规则：在排查浮窗或对话框相关的内存泄露问题、实现新的对话框通信机制、发现监听器未被清理的问题、排查 Promise 永久挂起的问题、实现窗口间通信时阅读
+- 内容摘要：记录了 What Am I Doing 浮窗中 `record-activity` 对话框被直接关闭时，监听器未被清理导致的内存泄露问题。修复方案包括注册 `dialog-closed` 监听器、实现清理逻辑、确保 Promise 正确 resolve。包含两种对话框通信模式的对比和最佳实践。
+
 ## 2026-04-30-screenshot-timestamp-format-mismatch
 
 - updated_at: 2026-04-30

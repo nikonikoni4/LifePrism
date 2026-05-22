@@ -27,6 +27,12 @@ async function openRecordActivityDialog(
     onDurationAdded?: (todoId: string, minutes: number) => void
 ): Promise<void> {
     return new Promise((resolve, reject) => {
+        // 清理所有监听器的辅助函数
+        const cleanupListeners = () => {
+            window.electronAPI?.removeMessageListener?.('activity-recorded', handleActivityRecorded);
+            window.electronAPI?.removeMessageListener?.('dialog-closed', handleDialogClosed);
+        };
+
         // 监听对话框返回的消息
         const handleActivityRecorded = async (data: {
             content: string;
@@ -49,17 +55,27 @@ async function openRecordActivityDialog(
                 onDurationAdded?.(data.todoId, data.duration);
 
                 // 清理监听器
-                window.electronAPI?.removeMessageListener?.('activity-recorded', handleActivityRecorded);
+                cleanupListeners();
                 resolve();
             } catch (e) {
                 console.error('[openRecordActivityDialog] Failed to create CustomBlock:', e);
-                window.electronAPI?.removeMessageListener?.('activity-recorded', handleActivityRecorded);
+                cleanupListeners();
                 reject(e);
+            }
+        };
+
+        // 监听对话框关闭事件（用户点击X按钮或右键关闭）
+        const handleDialogClosed = (data: { dialogId: string }) => {
+            if (data.dialogId === 'record-activity') {
+                console.log('[openRecordActivityDialog] Dialog closed, cleaning up listeners');
+                cleanupListeners();
+                resolve(); // 对话框关闭时也 resolve，不创建 CustomBlock
             }
         };
 
         // 注册监听器
         window.electronAPI?.onMessage?.('activity-recorded', handleActivityRecorded);
+        window.electronAPI?.onMessage?.('dialog-closed', handleDialogClosed);
 
         // 打开对话框
         const params = new URLSearchParams({
@@ -75,7 +91,7 @@ async function openRecordActivityDialog(
             { query: params.toString() }
         ).catch((e: Error) => {
             console.error('[openRecordActivityDialog] Failed to open dialog:', e);
-            window.electronAPI?.removeMessageListener?.('activity-recorded', handleActivityRecorded);
+            cleanupListeners();
             reject(e);
         });
     });

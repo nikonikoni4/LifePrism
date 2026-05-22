@@ -533,9 +533,16 @@ ipcMain.handle('open-dialog-window', (_event, dialogId, options = {}) => {
         menu.popup({ window: win });
     });
 
-    // 关闭时清理引用
+    // 关闭时清理引用，并通知所有浮窗对话框已关闭
     win.on('closed', () => {
         delete dialogWindows[dialogId];
+        
+        // 向所有浮窗广播 dialog-closed 消息，用于清理监听器
+        for (const [floatingId, floatingWin] of Object.entries(floatingWindows)) {
+            if (floatingWin && !floatingWin.isDestroyed()) {
+                floatingWin.webContents.send('dialog-closed', { dialogId });
+            }
+        }
     });
 
     dialogWindows[dialogId] = win;
