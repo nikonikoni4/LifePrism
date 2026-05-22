@@ -1,4 +1,6 @@
 # context 模块负责加载各种外置文件，构建system prompt
+import json
+import re
 from typing import Any
 from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType
 from lifeprism.config import settings,ALLOWED_DIRS
@@ -13,10 +15,31 @@ class Context:
         pass
 
     @staticmethod
-    def _read_file(path: str) -> str | None:
+    def _read_file(path: str, **kwargs) -> str | None:
+        """
+        读取文件并注入参数
+
+        Args:
+            path: 文件路径
+            **kwargs: 要注入的参数，文件中的 {key} 会被替换为对应的值
+
+        Returns:
+            str | None: 文件内容，如果文件不存在返回 None
+        """
         p = Path(path)
         if p.exists():
-            return p.read_text(encoding="utf-8")
+            content = p.read_text(encoding="utf-8")
+            if kwargs:
+                # 提取文档中所有的 {key} 参数
+                placeholders = set(re.findall(r'\{(\w+)\}', content))
+                missing_keys = placeholders - set(kwargs.keys())
+                if missing_keys:
+                    logger.warning(f"文件 {path} 中存在未注入的参数: {missing_keys}")
+                class SafeDict(dict):
+                    def __missing__(self, key):
+                        return '{' + key + '}'
+                content = content.format_map(SafeDict(kwargs))
+            return content
         return None
 
     @staticmethod
@@ -74,6 +97,28 @@ class Context:
         content += f"\n你当前工作目录是：{str(settings.lifeprism_data_path.resolve())},你能够阅读和操作的目录是：{str(settings.lifeprism_data_path.resolve())}/{ALLOWED_DIRS}"
         return content
     @staticmethod
+    def _build_expand_dir() -> str:
+        """构建额外工作目录列表"""
+        expand_meta_path = settings.lifeprism_data_path / "localData/expand_dir/expand_meta_data.json"
+        if not expand_meta_path.exists():
+            return "无"
+        try:
+            with open(expand_meta_path, 'r', encoding='utf-8') as f:
+                expand_list = json.load(f)
+            if not expand_list:
+                return "无"
+            lines = []
+            for item in expand_list:
+                path = item.get("path", "")
+                path_name = item.get("path_name", "")
+                description = item.get("description", "")
+                lines.append(f"- {path} ({path_name}): {description}")
+            return "\n".join(lines)
+        except Exception as e:
+            logger.warning(f"读取 expand_meta_data.json 失败: {e}")
+            return "无"
+
+    @staticmethod
     def _build_bootstrap()->str:
         """构建引导文档提示词"""
         parts = []
@@ -89,8 +134,16 @@ class Context:
         tool_path = str(settings.lifeprism_data_path / "agent/chat/tool.md")
         user_path = str(settings.lifeprism_data_path / "user/user.md")
 
+        # 构建 agent.md 的注入参数
+        agent_params = {
+            "agent_path": str(settings.lifeprism_data_path / "agent"),
+            "user_path": str(settings.lifeprism_data_path / "user"),
+            "diary_path": str(settings.lifeprism_data_path / "diary"),
+            "expand_dir": Context._build_expand_dir()
+        }
+
         soul_content = Context._read_file(soul_path)
-        agent_content = Context._read_file(agent_path)
+        agent_content = Context._read_file(agent_path, **agent_params)
         tool_content = Context._read_file(tool_path)
         user_content = Context._read_file(user_path)
         
