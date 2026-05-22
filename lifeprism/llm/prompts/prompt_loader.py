@@ -91,6 +91,10 @@ class PromptLoader:
         # 缓存已加载的 prompt 文件
         self._cache: Dict[str, Dict[str, Any]] = {}
 
+        # 使用统计数据
+        self._usage_stats: Dict[str, Dict[str, Any]] = {}
+        self._load_usage_stats()
+
     def _sync_dev_prompts(self,target_dir: Path) -> None:
         """开发环境：将 templates/prompts 同步到目标目录"""
         # 项目根目录 = lifeprism 包的上两级
@@ -114,10 +118,6 @@ class PromptLoader:
             shutil.copy2(md_file, target_file)
         
         logger.debug(f"开发环境已同步 .md prompts: {source_dir} -> {target_dir}")
-
-        # 使用统计数据
-        self._usage_stats: Dict[str, Dict[str, Any]] = {}
-        self._load_usage_stats()
 
     def _load_usage_stats(self) -> None:
         """加载使用统计数据"""
