@@ -14,13 +14,26 @@ export const RecordActivityDialog: React.FC = () => {
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        // 从 URL query params 解析参数
-        const urlParams = new URLSearchParams(window.location.search);
+        // 从 URL hash 中解析 query params
+        // 格式: #/dialog/record-activity?taskName=xxx&startTime=xxx...
+        const hash = window.location.hash;
+        const queryStart = hash.indexOf('?');
+
+        if (queryStart === -1) {
+            console.error('[RecordActivity] No query params in hash:', hash);
+            return;
+        }
+
+        const queryString = hash.substring(queryStart + 1);
+        const urlParams = new URLSearchParams(queryString);
+
         const taskName = urlParams.get('taskName') || '';
         const startTime = urlParams.get('startTime') || '';
         const endTime = urlParams.get('endTime') || '';
         const duration = parseInt(urlParams.get('duration') || '0', 10);
         const todoId = urlParams.get('todoId') || '';
+
+        console.log('[RecordActivity] Parsed params:', { taskName, startTime, endTime, duration, todoId });
 
         setParams({ taskName, startTime, endTime, duration, todoId });
         setContent(taskName); // 默认内容为任务名称
@@ -33,12 +46,20 @@ export const RecordActivityDialog: React.FC = () => {
             return date.toLocaleTimeString('zh-CN', {
                 hour: '2-digit',
                 minute: '2-digit',
-                second: '2-digit',
                 hour12: false
             });
         } catch {
             return '';
         }
+    };
+
+    const formatDuration = (minutes: number): string => {
+        if (minutes < 60) {
+            return `${minutes} 分钟`;
+        }
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return mins > 0 ? `${hours} 小时 ${mins} 分钟` : `${hours} 小时`;
     };
 
     const handleConfirm = async () => {
@@ -86,42 +107,20 @@ export const RecordActivityDialog: React.FC = () => {
             </div>
 
             {/* 内容区域 */}
-            <div className="flex-1 flex flex-col px-4 py-4 gap-4 overflow-y-auto">
-                {/* 任务名称（只读） */}
-                <div>
-                    <label className="block text-xs text-white/50 mb-1.5">任务名称</label>
-                    <div className="px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white/70">
-                        {params.taskName}
-                    </div>
-                </div>
-
-                {/* 时间信息 */}
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="block text-xs text-white/50 mb-1.5">开始时间</label>
-                        <div className="px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white/70">
-                            {formatTime(params.startTime)}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-xs text-white/50 mb-1.5">结束时间</label>
-                        <div className="px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white/70">
-                            {formatTime(params.endTime)}
-                        </div>
-                    </div>
-                </div>
-
-                {/* 时长 */}
-                <div>
-                    <label className="block text-xs text-white/50 mb-1.5">时长</label>
-                    <div className="px-3 py-2 rounded bg-white/5 border border-white/10 text-sm text-white/70">
-                        {params.duration} 分钟
+            <div className="flex-1 flex flex-col px-4 py-4 gap-3 overflow-y-auto">
+                {/* 任务信息提示 */}
+                <div className="px-3 py-2 rounded bg-emerald-600/10 border border-emerald-600/20">
+                    <div className="text-xs text-emerald-400/70 mb-1">任务：{params.taskName}</div>
+                    <div className="text-xs text-white/50">
+                        {formatTime(params.startTime)} - {formatTime(params.endTime)} ({formatDuration(params.duration)})
                     </div>
                 </div>
 
                 {/* 活动内容输入框 */}
                 <div className="flex-1 flex flex-col">
-                    <label className="block text-xs text-white/50 mb-1.5">活动内容</label>
+                    <label className="block text-xs text-white/50 mb-1.5">
+                        活动内容 <span className="text-emerald-400">*</span>
+                    </label>
                     <textarea
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
