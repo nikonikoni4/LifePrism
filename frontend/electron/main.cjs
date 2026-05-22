@@ -687,7 +687,7 @@ app.whenReady().then(() => {
     setTimeout(() => {
         createWindow();
         setMainWindow(mainWindow);
-    }, 3000);
+    }, 10000);
 });
 
 // 应用退出前的清理工作
