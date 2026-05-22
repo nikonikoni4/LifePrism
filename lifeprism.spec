@@ -26,7 +26,6 @@ a = Analysis(
         ('lifeprism/config/__init__.py', 'lifeprism/config'),
         ('lifeprism/config/crawler.py', 'lifeprism/config'),
         ('lifeprism/config/database.py', 'lifeprism/config'),
-        ('lifeprism/config/settings.py', 'lifeprism/config'),
         ('lifeprism/config/settings_manager.py', 'lifeprism/config'),
 
         # 资源模板文件（启动时按需复制到数据目录）
