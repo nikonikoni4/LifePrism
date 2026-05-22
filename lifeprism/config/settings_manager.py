@@ -61,10 +61,10 @@ class SettingsManager:
         'is_vlm': {},  # Dict[str, bool], key = "provider_id/model_name"
         'screenshot_monitor': False,
         'screen_analysis_ignore': [],  # 截图分析忽略的分类 ID 列表
-        'auto_diary_summary': False,  # 每日自动总结日记
-        'llm_call_logger_enabled': False,  # LLM 调用记录器开关
-        'auto_summary_session': False,  # 自动总结会话
-        'auto_update_memory': False,  # 自动更新记忆
+        'auto_diary_summary': True,  # 每日自动总结日记
+        'llm_call_logger_enabled': True,  # LLM 调用记录器开关
+        'auto_summary_session': True,  # 自动总结会话
+        'auto_update_memory': True,  # 自动更新记忆
     }
     
     def __new__(cls) -> 'SettingsManager':
