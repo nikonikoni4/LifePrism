@@ -42,6 +42,9 @@ def initialize_resources() -> None:
         logger.warning(f"内嵌 templates 目录不存在，跳过资源初始化: {templates_dir}")
         return
 
+    # 记录初始化前 agent/chat 目录是否已存在，用于决定是否跳过 bootstrap.md 复制
+    agent_chat_existed_before = (data_path / "agent/chat").exists()
+
     for source in templates_dir.rglob("*"):
         if not source.is_file():
             continue
@@ -60,6 +63,11 @@ def initialize_resources() -> None:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
             logger.info(f"已强制覆盖资源文件: {target}")
+            continue
+
+        # 特殊处理：如果 agent/chat 目录在初始化前已存在，跳过复制 bootstrap.md
+        if str(rel) == "agent/chat/bootstrap.md" and agent_chat_existed_before:
+            logger.info(f"agent/chat 目录已存在，跳过复制 bootstrap.md: {target}")
             continue
 
         if target.exists():
