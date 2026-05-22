@@ -16,7 +16,12 @@ from .provider_manager import (
     ProviderManager,
     provider_manager,
 )
-
+try:
+    from tzlocal import get_localzone
+    LOCAL_TIMEZONE = str(get_localzone())
+except ImportError:
+    # 如果没有安装 tzlocal，使用默认值
+    LOCAL_TIMEZONE = 'Asia/Shanghai'  
 __all__ = [
     "settings",
     "database",
@@ -29,4 +34,5 @@ __all__ = [
     "provider_manager",
     "ProviderManager",
     "ALLOWED_DIRS",
+    "LOCAL_TIMEZONE"
 ]
