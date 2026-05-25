@@ -32,13 +32,13 @@ class MessageContent(list):
 
     def __init__(self, value: MessageContentInput | MessageContent = None):
         super().__init__()
-        self.add_end_message(value)
+        self.add_tail(value)
 
-    def add_head_message(self, value: MessageContentInput | MessageContent) -> None:
+    def add_head(self, value: MessageContentInput | MessageContent) -> None:
         blocks = self._normalize(value)
         self[:0] = blocks
 
-    def add_end_message(self, value: MessageContentInput | MessageContent) -> None:
+    def add_tail(self, value: MessageContentInput | MessageContent) -> None:
         self.extend(self._normalize(value))
 
     @property
