@@ -49,6 +49,13 @@ def initialize_resources_copy(templates_dir: Path, data_path: Path) -> None:
             logger.info(f"已强制覆盖资源文件: {target}")
             continue
 
+        # 特殊处理：如果 agent/chat 目录存在，跳过复制 bootstrap.md
+        if str(rel) == "agent/chat/bootstrap.md":
+            agent_chat_path = data_path / "agent/chat"
+            if agent_chat_path.exists():
+                logger.info(f"agent/chat 目录已存在，跳过复制 bootstrap.md: {target}")
+                continue
+
         if target.exists():
             continue
 
