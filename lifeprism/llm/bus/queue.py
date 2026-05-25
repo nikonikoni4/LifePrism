@@ -3,14 +3,15 @@ import time
 from collections import deque
 from lifeprism.llm.bus.events import InboundMessage, OutboundMessage
 from lifeprism.utils.lazy_singleton import LazySingleton
-from lifeprism.utils.logger import get_logger, INFO
+from lifeprism.utils.logger import get_logger, INFO,DEBUG
 
 logger = get_logger(__name__)
-logger.setLevel(INFO)
+logger.setLevel(DEBUG)
 
-TIMEOUT_MAX = 600.0
+TIMEOUT_MAX = 1000.0
 RATE_LIMIT = 60
 RATE_WINDOW = 60.0
+RATE_SAFETY_FACTOR = 0.7
 
 # ─────────────────────────────────────────
 #MessageQueue：双向队列，纯数据通道
@@ -23,6 +24,8 @@ class MessageQueue:
         self.stop_receive = False
         self._receive_task: asyncio.Task | None = None
         self._rate_timestamps: deque[float] = deque()
+        self._rate_lock = asyncio.Lock()
+        self._last_request_at: float | None = None
 
     @property
     def inbound(self) -> asyncio.Queue[InboundMessage]:
@@ -48,6 +51,17 @@ class MessageQueue:
     async def consume_outbound(self) -> OutboundMessage:
         return await self.outbound.get()
 
+    def _content_preview(self, content: str | list | None) -> str:
+        if isinstance(content, list):
+            text_parts: list[str] = []
+            for item in content:
+                if isinstance(item, str):
+                    text_parts.append(item)
+                elif isinstance(item, dict) and isinstance(item.get("text"), str):
+                    text_parts.append(item["text"])
+            return "".join(text_parts)[:20]
+        return str(content or "")[:20]
+
     def _ensure_receive_task(self):
         """懒启动接收循环，确保在事件循环中调用"""
         if self._receive_task is None or self._receive_task.done():
@@ -66,19 +80,30 @@ class MessageQueue:
         self._receive_task = None
 
     async def _wait_for_rate_limit(self):
-        """滑动窗口限速：确保每分钟请求数不超过 RATE_LIMIT"""
-        while True:
-            now = time.monotonic()
-            # 清除窗口外的旧记录
-            while self._rate_timestamps and now - self._rate_timestamps[0] >= RATE_WINDOW:
-                self._rate_timestamps.popleft()
-            if len(self._rate_timestamps) < RATE_LIMIT:
-                self._rate_timestamps.append(now)
-                return
-            # 等到最早的请求滑出窗口
-            wait = RATE_WINDOW - (now - self._rate_timestamps[0])
-            logger.debug(f"[MessageQueue] 限速等待 {wait:.2f}s")
-            await asyncio.sleep(wait)
+        """滑动窗口限速，并按安全系数平滑请求间隔。"""
+        async with self._rate_lock:
+            while True:
+                now = time.monotonic()
+
+                if self._last_request_at is not None:
+                    request_interval = RATE_WINDOW / (RATE_LIMIT * RATE_SAFETY_FACTOR)
+                    interval_wait = request_interval - (now - self._last_request_at)
+                    if interval_wait > 0:
+                        logger.debug(f"[MessageQueue] 请求间隔等待 {interval_wait:.2f}s")
+                        await asyncio.sleep(interval_wait)
+                        now = time.monotonic()
+
+                # 清除窗口外的旧记录
+                while self._rate_timestamps and now - self._rate_timestamps[0] >= RATE_WINDOW:
+                    self._rate_timestamps.popleft()
+                if len(self._rate_timestamps) < RATE_LIMIT:
+                    self._rate_timestamps.append(now)
+                    self._last_request_at = now
+                    return
+                # 等到最早的请求滑出窗口
+                wait = RATE_WINDOW - (now - self._rate_timestamps[0])
+                logger.debug(f"[MessageQueue] 限速等待 {wait:.2f}s")
+                await asyncio.sleep(wait)
 
     async def send(self, msg:InboundMessage) -> OutboundMessage:
         """发送消息并等待结果
@@ -90,7 +115,7 @@ class MessageQueue:
         self._ensure_receive_task()
         await self._wait_for_rate_limit()
         # 1. 创建消息
-        logger.debug(f"[MessageQueue] 发送 id={msg.id} content={msg.content!r}")
+        logger.info(f"[MessageQueue] 发送 content={self._content_preview(msg.content)!r}")
 
         # 2. 创建future，并入pending
         loop = asyncio.get_running_loop()
