@@ -65,6 +65,7 @@ class AgentLoop:
             messages=messages,
             tools=tools
         )
+        logger.debug(f"[测试完整的输入]:{messages}")
         session.add_message(
             'assistant',
             content=response.content or '',
@@ -165,9 +166,10 @@ class AgentLoop:
         return
             None | OutboundMessage
         """
+        message_text = self._message_text(msg)
         # 1. 当前只有微信有命令行工具 /new
         if msg.channel == ChannelType.WECHAT:
-            if msg.content.startswith("/new"):
+            if message_text.startswith("/new"):
                 # 新建会话
                 new_session = session_manager.get_or_create_session()
                 # 立即保存 session 到文件，避免重启后丢失
@@ -179,10 +181,10 @@ class AgentLoop:
                     response=LLMResponse(content=response_text),
                     session_id=new_session.id
                 )
-            elif msg.content.startswith("/continue"):
+            elif message_text.startswith("/continue"):
                 # 继续会话
                 # 1.去除/continue 和空格，获取session_id
-                session_id = msg.content.replace("/continue","").strip()
+                session_id = message_text.replace("/continue","").strip()
 
                 # 2. 先检查是否提供了参数
                 if not session_id:
@@ -206,9 +208,9 @@ class AgentLoop:
                         response=LLMResponse(content=f"[SUCCESS] 继续会话 {session_id}"),
                         session_id=session_id
                     )
-            elif msg.content.startswith("/session-list"):
+            elif message_text.startswith("/session-list"):
                 # 判断是否有日期
-                date = msg.content.replace("/session-list","").strip()
+                date = message_text.replace("/session-list","").strip()
 
                 # 列出所有会话
                 sessions = session_manager.show_session_content_list(date)
@@ -231,6 +233,19 @@ class AgentLoop:
                 )
         else :
             return None
+
+    @staticmethod
+    def _message_text(msg: InboundMessage) -> str:
+        """Extract plain text from normalized message content blocks."""
+        if isinstance(msg.content, str):
+            return msg.content
+        if isinstance(msg.content, list):
+            return "".join(
+                block.get("text", "")
+                for block in msg.content
+                if isinstance(block, dict) and isinstance(block.get("text"), str)
+            )
+        return ""
 
 
 
@@ -297,6 +312,8 @@ class AgentLoop:
             # 6. 保存session
             if msg.type == MessageType.CHAT: # 只有聊天数据才保存
                 session_manager.save_session(session)
+        except ValueError as e:
+            raise 
         except Exception as e:
             logger.error(f"[AgentLoop] 处理消息 id={msg.id} 时出错: {e}", exc_info=True)
             await self._bus.publish_outbound(
@@ -323,8 +340,15 @@ class AgentLoop:
             # 3. 注册任务激活
             self._active_tasks.setdefault(msg.id,[]).append(task)
 
-            # 4. 添加任务注销函数
-            task.add_done_callback(lambda t,k = msg.id: self._active_tasks.get(k,[]).remove(t) if t in self._active_tasks.get(k,[]) else None  )
+            # 4. 添加任务注销函数，并确保异常不被静默处理
+            def _handle_task_done(t: "Task", k: str):
+                if t in self._active_tasks.get(k, []):
+                    self._active_tasks.get(k, []).remove(t)
+                exc = t.exception()
+                if exc is not None:
+                    logger.error(f"[AgentLoop] Task exception was never retrieved: {exc}", exc_info=exc)
+
+            task.add_done_callback(lambda t, k=msg.id: _handle_task_done(t, k))
 
     def stop(self):
         self._running = False
@@ -354,7 +378,15 @@ class AgentLoop:
         compact_content = json.dumps(messages, ensure_ascii=False)
         messages = [
             {"role":"system","content":compact_system_prompt},
-            {"role":"user","content":f"## 需要压缩的内容 \n {compact_content}"}
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"## 需要压缩的内容 \n {compact_content}",
+                    }
+                ],
+            }
         ]
         try : 
             response:LLMResponse= await llm.chat(messages)

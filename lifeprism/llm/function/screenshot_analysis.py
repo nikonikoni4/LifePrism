@@ -372,8 +372,8 @@ async def analyze_chunk_screenshots(
 
         if response:
             # 清理 LLM 响应中的 Markdown 格式
-            cleaned_response = _clean_llm_response(response)
-
+            # cleaned_response = _clean_llm_response(response)
+            cleaned_response = response
             # 写入数据库前，将 ISO 格式（带 T）转换为数据库格式（空格分隔）
             start_time_db = chunk['start'].replace('T', ' ')
             end_time_db = chunk['end'].replace('T', ' ')
@@ -389,6 +389,9 @@ async def analyze_chunk_screenshots(
             return data
         else:
             return None
+    except ValueError as e:
+        logger.warning(f"参数错误: {e}")
+        raise
     except Exception as e:
         logger.error(f"LLM 调用失败: {e}", exc_info=True)
         return None
@@ -635,28 +638,40 @@ async def screenshot_behavior_summary( analysis_results_list : list[dict[str,Any
 
 
 if __name__ == "__main__":
-    # from lifeprism.llm.agent.loop import agent_loop
-    # import asyncio
-    # todolist = ""
-    # async def main():
-    #     loop_task = asyncio.create_task(agent_loop.loop())
-    #     # logger.info("[STARTUP] AgentLoop started") # logger is not imported in this file
-    #     response = await screenshot_analysis("2026-04-20 02:45:00","2026-04-20 03:00:00",todolist)
-    #     print(response)
-    #     loop_task.cancel() # Cancel the loop task when done to exit cleanly
-        
-    # asyncio.run(main())
-    raw_results,_ = raw_behavior_analysis_repository.query_raw_behaviors(QueryOptions(time_range=("2026-04-28 12:00:05","2026-04-28 17:05:00")))
-    merged_results = merage_results_list(raw_results)
-    for result in raw_results:
-        print(f"{result['start_time']}~{result['end_time']}")
-        
-    
-    for result in merged_results:
-        print("="*20)
-        print(f"{result['start_time']}~{result['end_time']}")
+    import asyncio
 
-        print("="*20)
+    async def test_single_chunk():
+        from lifeprism.llm.agent.loop import agent_loop
+        loop_task = asyncio.create_task(agent_loop.loop())
+
+        """测试单个 chunk 的 LLM 分析，验证 _clean_llm_response 过滤问题"""
+        # 使用日志中有截图但 behavior=None 的时间段
+        chunk = {
+            "start": "2026-05-24T00:15:25",
+            "end": "2026-05-24T00:25:25"
+        }
+
+        # 获取该时间段的截图
+        screenshots = get_active_screenshots(chunk["start"], chunk["end"])
+        print(f"截图数量: {len(screenshots)}")
+        for sc in screenshots:
+            print(f"  - {sc['captured_at']} | {sc['window_app']} | {sc.get('window_title', '')[:50]}")
+
+        if not screenshots:
+            print("无截图，退出")
+            return
+
+        # 调用 LLM 分析
+        result = await analyze_chunk_screenshots(chunk, screenshots, todolist="")
+
+        # 打印结果
+        print("\n" + "="*50)
+        if result:
+            print(f"behavior 字段:\n{result['behavior']}")
+        else:
+            print("结果为 None")
+
+    asyncio.run(test_single_chunk())
 
 
     print('2026-04-28 12:15:05' == '2026-04-28 12:15:05')

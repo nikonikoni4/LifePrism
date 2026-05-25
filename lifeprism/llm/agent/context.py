@@ -9,7 +9,6 @@ from lifeprism.llm.agent.skill import SkillLoad
 from datetime import datetime
 from lifeprism.utils import get_logger,DEBUG
 logger = get_logger(__name__)
-logger.setLevel(DEBUG)
 class Context:
     def __init__(self):
         pass
@@ -169,10 +168,16 @@ class Context:
         return f"## runtime\n 当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n 当前对话方式：{channel_type}\n"
 
     @staticmethod
-    def _build_user_message(msg:InboundMessage)->str:
+    def _build_user_message(msg:InboundMessage)->list[dict[str, Any]]:
         """构建用户消息提示词"""
-        logger.debug("user message\n"+f"{Context._build_run_context(msg)}## user's message \n {msg.content}")
-        return f"{Context._build_run_context(msg)}## user's message \n {msg.content}"
+       
+        return [
+            {
+                "type": "text",
+                "text": f"{Context._build_run_context(msg)}## user's message",
+            },
+            *msg.content,
+        ]
 
 
     @staticmethod

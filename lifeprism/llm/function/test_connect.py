@@ -26,7 +26,12 @@ async def test_connect() -> dict:
         llm = create_llm_client()
         
         # 发送简单的测试请求
-        message = [{"role":"user","content":"请回复'连接成功'这四个字"}]
+        message = [
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": "请回复'连接成功'这四个字"}],
+            }
+        ]
         # 使用异步调用 LLM
         output = await llm.chat(messages=message)
         

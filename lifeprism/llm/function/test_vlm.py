@@ -78,7 +78,7 @@ async def test_vlm() -> dict:
 
         # 发送多模态请求
         output = await llm.chat(messages=messages)
-
+        print(output.usage)
         # 获取回复内容
         response_content = output.content if hasattr(output, 'content') else str(output)
 

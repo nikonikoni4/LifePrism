@@ -1,6 +1,9 @@
 """消息中转类型定义"""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from typing import Any
 from lifeprism.llm.providers.llm_providers.base import LLMResponse
 import uuid
 
@@ -16,12 +19,74 @@ class ChannelType:
 MESSAGE_TYPE = [MessageType.CLASSIFY, MessageType.CHAT,MessageType.GENERAL_TASK,MessageType.DREAM_TASK]
 CHANNEL_TYPE = [ChannelType.WECHAT, ChannelType.LOCAL]
 
+MessageContentInput = str | dict[str, Any] | list[dict[str, Any]] | None
+
+
+class MessageContent(list):
+    """Normalized multimodal message content blocks.
+
+    External callers may provide plain text, a single content block, a list of
+    content blocks, None, or another MessageContent. Internally the value is
+    always a list of provider-compatible content blocks.
+    """
+
+    def __init__(self, value: MessageContentInput | MessageContent = None):
+        super().__init__()
+        self.add_end_message(value)
+
+    def add_head_message(self, value: MessageContentInput | MessageContent) -> None:
+        blocks = self._normalize(value)
+        self[:0] = blocks
+
+    def add_end_message(self, value: MessageContentInput | MessageContent) -> None:
+        self.extend(self._normalize(value))
+
+    @property
+    def blocks(self) -> list[dict[str, Any]]:
+        return list(self)
+
+    @classmethod
+    def _normalize(cls, value: MessageContentInput | MessageContent) -> list[dict[str, Any]]:
+        if value is None:
+            return []
+        if isinstance(value, MessageContent):
+            return value.blocks
+        if isinstance(value, str):
+            return [{"type": "text", "text": value}]
+        if isinstance(value, dict):
+            cls._validate_block(value)
+            return [value]
+        if isinstance(value, list):
+            for block in value:
+                cls._validate_block(block)
+            return value
+        raise TypeError(f"content 必须是 str、dict、list、MessageContent 或 None，当前类型为 {type(value)!r}")
+
+    @staticmethod
+    def _validate_block(block: dict[str, Any]) -> None:
+        if not isinstance(block, dict):
+            raise TypeError(f"content block 必须是 dict，当前类型为 {type(block)!r}")
+
+        block_type = block.get("type")
+        if block_type == "text":
+            if not isinstance(block.get("text"), str):
+                raise ValueError("text block 必须包含字符串字段 text")
+            return
+
+        if block_type == "image_url":
+            image_url = block.get("image_url")
+            if not isinstance(image_url, dict) or not isinstance(image_url.get("url"), str):
+                raise ValueError("image_url block 必须包含字符串字段 image_url.url")
+            return
+
+        raise ValueError(f"不支持的 content block type: {block_type!r}")
+
 @dataclass
 class InboundMessage:
     type : str # 功能类型， 具体的功能类型会影响cotext模块最初的system prompt的构建
     id : str = field(default_factory=lambda : str(uuid.uuid4())[:4]) # 随机id,用于进行任务的
     channel : str = ChannelType.LOCAL
-    content : str | list | None = '' # 消息内容，支持文本、多模态列表（图片+文本）或空值
+    content : MessageContentInput = '' # 消息内容，统一归一化为多模态列表
     session_id : str | None = None # 用户继续会话的id，未传入时会自动创建session
     token_type : str | None = None # token 统计类型，为空时使用 type
     extra : dict | None = None 
@@ -35,6 +100,7 @@ class InboundMessage:
             raise ValueError(f"无效的消息类型: {self.type!r}，合法值为 {MESSAGE_TYPE}")
         if self.channel not in CHANNEL_TYPE:
             raise ValueError(f"无效的channel: {self.channel!r}，合法值为 {CHANNEL_TYPE}")
+        self.content = MessageContent(self.content)
 
 @dataclass
 class OutboundMessage:
