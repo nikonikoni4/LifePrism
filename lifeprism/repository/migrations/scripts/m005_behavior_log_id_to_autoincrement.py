@@ -39,7 +39,7 @@ def upgrade(cursor) -> None:
         )
     """)
 
-    # 2. 复制数据（不包括旧的 id 字段，让新表自动生成 id）
+    # 2. 复制数据（按 start_time 排序，让 id 按时间顺序递增）
     cursor.execute("""
         INSERT OR IGNORE INTO user_app_behavior_log_new (
             start_time, end_time, duration, app, title,
@@ -51,6 +51,7 @@ def upgrade(cursor) -> None:
             is_multipurpose_app, category_id, sub_category_id,
             link_to_goal_id, created_at
         FROM user_app_behavior_log
+        ORDER BY start_time ASC
     """)
     copied_count = cursor.rowcount
 
