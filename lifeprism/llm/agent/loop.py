@@ -65,7 +65,6 @@ class AgentLoop:
             messages=messages,
             tools=tools
         )
-        logger.debug(f"[测试完整的输入]:{messages}")
         session.add_message(
             'assistant',
             content=response.content or '',
