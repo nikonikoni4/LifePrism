@@ -719,17 +719,14 @@ class LWBaseDataProvider:
         
         Args:
             cleaned_events_df: 清洗后的事件数据 DataFrame
-        
+
         Returns:
             int: 实际插入的行数
         """
         try:
             data_list = []
             for _, row in cleaned_events_df.iterrows():
-                event_id = row.get('id', f"event_{row.get('start_time', '')}_{row.get('app', 'unknown')}")
-                
                 data_list.append({
-                    'id': event_id,
                     'start_time': row['start_time'],
                     'end_time': row['end_time'],
                     'duration': row.get('duration'),
@@ -740,21 +737,21 @@ class LWBaseDataProvider:
                     'sub_category_id': row.get('sub_category_id'),
                     'link_to_goal_id': row.get('link_to_goal_id')
                 })
-            
+
             if not data_list:
                 return 0
-            
+
             columns = list(data_list[0].keys())
             columns_str = ', '.join(columns)
             placeholders = ', '.join(['?' for _ in columns])
-            set_clause = ', '.join([f"{col} = excluded.{col}" for col in columns if col not in ('id', 'app', 'start_time')])
-            sql = f"INSERT INTO user_app_behavior_log ({columns_str}) VALUES ({placeholders}) ON CONFLICT(app, start_time) DO UPDATE SET {set_clause}"
-            
+            # 使用 INSERT OR IGNORE 忽略重复数据（基于 UNIQUE(app, start_time) 约束）
+            sql = f"INSERT OR IGNORE INTO user_app_behavior_log ({columns_str}) VALUES ({placeholders})"
+
             values_list = [
                 [row.get(col) for col in columns]
                 for row in data_list
             ]
-            
+
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.executemany(sql, values_list)

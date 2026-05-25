@@ -188,9 +188,9 @@ USER_APP_BEHAVIOR_LOG_CONFIG = {
     'table_name': 'user_app_behavior_log',
     'columns': {
         'id': {
-            'type': 'TEXT',
-            'constraints': ['PRIMARY KEY'],
-            'comment': 'ActivityWatch事件ID（原生态ID，与ActivityWatch系统匹配）'
+            'type': 'INTEGER',
+            'constraints': ['PRIMARY KEY', 'AUTOINCREMENT'],
+            'comment': '自增主键'
         },
         'start_time': {
             'type': 'TEXT',

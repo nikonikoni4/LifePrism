@@ -311,7 +311,13 @@ def clean_activitywatch_data_old(
     # 一次性创建DataFrame，避免循环中的concat警告
     if filtered_events_list:
         filtered_events_df = pd.DataFrame(filtered_events_list)
-    
+        # 去重：ActivityWatch 可能返回重复事件（相同 app + timestamp）
+        before_count = len(filtered_events_df)
+        filtered_events_df = filtered_events_df.drop_duplicates(subset=['app', 'start_time'], keep='first')
+        after_count = len(filtered_events_df)
+        if before_count != after_count:
+            logger.info(f"[DEDUP] 去除重复事件: {before_count} -> {after_count} (移除 {before_count - after_count} 条)")
+
     # 构建 classifyState
     classify_state = classifyState(
         app_registry=app_registry,
