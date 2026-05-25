@@ -50,8 +50,6 @@ class Prompts:
         UPDATE_DIARY_SUMMARY = PromptRef("schedule", "update_diary_summary")
         SCREENSHOT_ANALYSIS = PromptRef("schedule", "screenshot_analysis")
         SCREEN_BEHAVIOR_SUMMARY = PromptRef("schedule", "screen_behavior_summary")
-        SCREENSHOT_ANALYSIS = PromptRef("schedule", "screenshot_analysis")
-        SCREENSHOT_BEHAVIOR_SUMMARY = PromptRef("schedule", "screen_behavior_summary")
 class PromptLoader:
     """
     Prompt 加载器类
