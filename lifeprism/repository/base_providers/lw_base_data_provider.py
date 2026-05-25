@@ -747,8 +747,8 @@ class LWBaseDataProvider:
             columns = list(data_list[0].keys())
             columns_str = ', '.join(columns)
             placeholders = ', '.join(['?' for _ in columns])
-            set_clause = ', '.join([f"{col} = excluded.{col}" for col in columns if col != 'id'])
-            sql = f"INSERT INTO user_app_behavior_log ({columns_str}) VALUES ({placeholders}) ON CONFLICT(id) DO UPDATE SET {set_clause}"
+            set_clause = ', '.join([f"{col} = excluded.{col}" for col in columns if col not in ('id', 'app', 'start_time')])
+            sql = f"INSERT INTO user_app_behavior_log ({columns_str}) VALUES ({placeholders}) ON CONFLICT(app, start_time) DO UPDATE SET {set_clause}"
             
             values_list = [
                 [row.get(col) for col in columns]
