@@ -42,6 +42,7 @@ class CustomProvider(LLMProvider):
                    model: str | None = None, max_tokens: int = 4096, temperature: float = 0.7,
                    reasoning_effort: str | None = None,
                    tool_choice: str | dict[str, Any] | None = None) -> LLMResponse:
+        self._validate_last_user_content_is_multimodal(messages)
         kwargs: dict[str, Any] = {
             "model": model or self.default_model,
             "messages": self._sanitize_empty_content(messages),

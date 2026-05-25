@@ -150,6 +150,22 @@ class LLMProvider(ABC):
             sanitized.append(clean)
         return sanitized
 
+    @staticmethod
+    def _validate_last_user_content_is_multimodal(messages: list[dict[str, Any]]) -> None:
+        """Reject string content on the final user message.
+
+        InboundMessage normalizes text to text blocks before provider calls. If a
+        final user message reaches providers as a string, a caller bypassed that
+        contract and may have stringified multimodal image blocks.
+        """
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                if isinstance(msg.get("content"), str):
+                    raise ValueError(
+                        "last user message content must be a multimodal list, got str"
+                    )
+                return
+
     @abstractmethod
     async def chat(
         self,

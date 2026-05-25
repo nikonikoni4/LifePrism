@@ -41,7 +41,9 @@ def create_llm_client():
 if __name__ == "__main__":
     llm_client = create_llm_client()
     async def main():
-        response = await llm_client.chat([{"role":"user","content":"你好"}])
+        response = await llm_client.chat([
+            {"role": "user", "content": [{"type": "text", "text": "你好"}]}
+        ])
         print(response)
     import asyncio
     asyncio.run(main())
