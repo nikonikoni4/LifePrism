@@ -8,6 +8,23 @@ INFO = logging.INFO
 WARNING = logging.WARNING
 ERROR = logging.ERROR
 
+# 单条日志消息最大长度，超出部分截断
+MAX_LOG_MESSAGE_LENGTH = 2000
+
+
+class TruncatingFormatter(logging.Formatter):
+    """自定义 Formatter，自动截断超长日志消息，防止图片 base64 等大内容撑爆日志"""
+
+    def __init__(self, fmt=None, datefmt=None, max_length=MAX_LOG_MESSAGE_LENGTH, **kwargs):
+        super().__init__(fmt, datefmt, **kwargs)
+        self.max_length = max_length
+
+    def format(self, record):
+        msg = super().format(record)
+        if len(msg) > self.max_length:
+            msg = msg[:self.max_length] + f"... [截断, 原始长度 {len(msg)}]"
+        return msg
+
 _LOG_FORMAT = "%(asctime)s %(levelname)s %(filename)s func:%(funcName)s line %(lineno)d : %(message)s"
 
 # 模块级只配置 StreamHandler（控制台输出）
@@ -25,6 +42,9 @@ logging.basicConfig(
         logging.StreamHandler(stream=_stream),
     ]
 )
+# 替换 basicConfig 默认 Formatter 为 TruncatingFormatter
+for _h in logging.getLogger().handlers:
+    _h.setFormatter(TruncatingFormatter(_LOG_FORMAT))
 
 _file_handler_added = False
 _file_handler: logging.FileHandler | None = None
@@ -52,7 +72,7 @@ def setup_file_logging(log_dir: Path) -> None:
         if log_file.exists():
             log_file.write_text('', encoding='utf-8')
         file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
-        file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+        file_handler.setFormatter(TruncatingFormatter(_LOG_FORMAT))
         logging.getLogger().addHandler(file_handler)
         _file_handler = file_handler
         _file_handler_added = True
