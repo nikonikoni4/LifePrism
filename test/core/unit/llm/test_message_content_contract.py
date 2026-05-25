@@ -4,7 +4,7 @@ import pytest
 
 from lifeprism.llm.agent.context import Context
 from lifeprism.llm.agent.loop import AgentLoop
-from lifeprism.llm.bus import InboundMessage, MessageType
+from lifeprism.llm.bus import InboundMessage, MessageContent, MessageType
 from lifeprism.llm.providers.llm_providers.base import LLMProvider
 
 
@@ -12,7 +12,28 @@ from lifeprism.llm.providers.llm_providers.base import LLMProvider
 def test_inbound_message_converts_text_content_to_text_block():
     msg = InboundMessage(type=MessageType.GENERAL_TASK, content="hello")
 
-    assert msg.content == [{"type": "text", "text": "hello"}]
+    assert isinstance(msg.content, MessageContent)
+    assert msg.content.blocks == [{"type": "text", "text": "hello"}]
+
+
+@pytest.mark.core
+def test_message_content_adds_head_and_end_messages():
+    content = MessageContent({"type": "text", "text": "middle"})
+
+    content.add_head("head")
+    content.add_tail({"type": "text", "text": "tail"})
+
+    assert content.blocks == [
+        {"type": "text", "text": "head"},
+        {"type": "text", "text": "middle"},
+        {"type": "text", "text": "tail"},
+    ]
+
+
+@pytest.mark.core
+def test_message_content_rejects_invalid_block_shape():
+    with pytest.raises(ValueError, match="不支持的 content block type"):
+        MessageContent({"type": "unknown"})
 
 
 @pytest.mark.core

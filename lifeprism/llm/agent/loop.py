@@ -237,15 +237,11 @@ class AgentLoop:
     @staticmethod
     def _message_text(msg: InboundMessage) -> str:
         """Extract plain text from normalized message content blocks."""
-        if isinstance(msg.content, str):
-            return msg.content
-        if isinstance(msg.content, list):
-            return "".join(
-                block.get("text", "")
-                for block in msg.content
-                if isinstance(block, dict) and isinstance(block.get("text"), str)
-            )
-        return ""
+        return "".join(
+            block.get("text", "")
+            for block in msg.content
+            if isinstance(block, dict) and isinstance(block.get("text"), str)
+        )
 
 
 

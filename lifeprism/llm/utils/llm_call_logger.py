@@ -37,6 +37,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
 
 from lifeprism.config import settings
+from lifeprism.llm.bus.events import MessageContent
 from lifeprism.utils.logger import get_logger,DEBUG
 from lifeprism.utils.lazy_singleton import LazySingleton
 
@@ -174,13 +175,13 @@ class LLMCallLogger:
 
     def _process_content(
         self,
-        content: Any,
+        content: MessageContent,
         extra: Optional[Dict[str, Any]]
     ) -> Tuple[str, List[str]]:
         """处理 content 和 extra，提取文本和图片
 
         Args:
-            content: 消息内容（str | list | None）
+            content: 消息内容（MessageContent，已归一化的多模态列表）
             extra: 额外数据
 
         Returns:
@@ -189,30 +190,22 @@ class LLMCallLogger:
         text_parts = []
         image_filenames = []
 
-        # 1. 处理 content
-        if content is None:
-            text_content = ""
-        elif isinstance(content, str):
-            text_content = content
-        elif isinstance(content, list):
-            # 多模态内容
-            for part in content:
-                if isinstance(part, dict):
-                    if part.get("type") == "text":
-                        text_parts.append(part.get("text", ""))
-                    elif part.get("type") == "image_url":
-                        # Base64 图片
-                        image_url = part.get("image_url", {})
-                        base64_url = image_url.get("url", "")
-                        if base64_url:
-                            try:
-                                filename = self._save_base64_image(base64_url)
-                                image_filenames.append(filename)
-                            except Exception as e:
-                                logger.warning(f"保存 base64 图片失败: {e}")
-            text_content = "\n".join(text_parts)
-        else:
-            text_content = str(content)
+        # 1. 处理 content（MessageContent 始终是 list）
+        for part in content:
+            if isinstance(part, dict):
+                if part.get("type") == "text":
+                    text_parts.append(part.get("text", ""))
+                elif part.get("type") == "image_url":
+                    # Base64 图片
+                    image_url = part.get("image_url", {})
+                    base64_url = image_url.get("url", "")
+                    if base64_url:
+                        try:
+                            filename = self._save_base64_image(base64_url)
+                            image_filenames.append(filename)
+                        except Exception as e:
+                            logger.warning(f"保存 base64 图片失败: {e}")
+        text_content = "\n".join(text_parts)
 
         # 2. 处理 extra["media"]（文件路径）
         if extra and "media" in extra:

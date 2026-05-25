@@ -1,7 +1,7 @@
 import asyncio
 import time
 from collections import deque
-from lifeprism.llm.bus.events import InboundMessage, OutboundMessage
+from lifeprism.llm.bus.events import InboundMessage, OutboundMessage, MessageContent
 from lifeprism.utils.lazy_singleton import LazySingleton
 from lifeprism.utils.logger import get_logger, INFO,DEBUG
 
@@ -51,16 +51,12 @@ class MessageQueue:
     async def consume_outbound(self) -> OutboundMessage:
         return await self.outbound.get()
 
-    def _content_preview(self, content: str | list | None) -> str:
-        if isinstance(content, list):
-            text_parts: list[str] = []
-            for item in content:
-                if isinstance(item, str):
-                    text_parts.append(item)
-                elif isinstance(item, dict) and isinstance(item.get("text"), str):
-                    text_parts.append(item["text"])
-            return "".join(text_parts)[:20]
-        return str(content or "")[:20]
+    def _content_preview(self, content: MessageContent) -> str:
+        text_parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict) and isinstance(item.get("text"), str):
+                text_parts.append(item["text"])
+        return "".join(text_parts)[:20]
 
     def _ensure_receive_task(self):
         """懒启动接收循环，确保在事件循环中调用"""

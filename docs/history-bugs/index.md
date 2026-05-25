@@ -1,3 +1,17 @@
+## 2026-05-26-message-content-type-mismatch
+
+- updated_at: 2026-05-26
+- path: `docs/history-bugs/2026-05-26-message-content-type-mismatch.md`
+- 触发规则：在排查图片/多模态消息丢失、上下文长度异常膨胀、InboundMessage.content 类型错误、MessageContent 类使用时阅读
+- 内容摘要：记录了 `InboundMessage.content` 类型不统一（str | list | None）导致的两个问题：1. f-string 拼接 list 使图片变成纯文本字符串无法识别 2. Base64 图片 list 被字符串化导致 token 爆炸。解决方案包括新增 `MessageContent` 类统一归一化、`InboundMessage.__post_init__` 强制转换、context.py 返回多模态列表、llm_provider 增加类型校验。
+
+## 2026-05-26-screenshot-analysis-clean-response-too-strict
+
+- updated_at: 2026-05-26
+- path: `docs/history-bugs/2026-05-26-screenshot-analysis-clean-response-too-strict.md`
+- 触发规则：在排查截图分析结果为 None、LLM 有输出但行为分析为空、调整 `_clean_llm_response` 清洗策略、恢复 `cleaned_response = _clean_llm_response(response)` 调用时阅读
+- 内容摘要：记录了 `screenshot_analysis.py` 中 LLM 响应清洗策略过严的问题；当模型没有严格按照预期格式输出时，有效内容可能被过滤为空并返回 `"None"`。建议采用宽松清洗和原文兜底，避免截图分析结果丢失。
+
 ## 2026-05-22-floating-window-dialog-memory-leak
 
 - updated_at: 2026-05-22
@@ -32,4 +46,3 @@
 - path: `docs/history-bugs/2026-04-19-chain-node-menu-occlusion.md`
 - 触发规则：在排查包含弹窗、拖拽操作或多层嵌套列表组件导致的 z-index 层叠/遮挡等渲染错误时阅读
 - 内容摘要：整理了 dnd-kit 修改 transform 引起的”层叠上下文封闭”从而致菜单被底部节点遮挡的原理，以及应用 React Portals 和 Floating UI 的标准处理方案。
-
