@@ -25,17 +25,20 @@ TEST_CRON_AFTER_MINUTES = 1         # 定时任务测试参数（启动后N分�
 # ====================================================
 
 async def _dreaming():
+    # 每天10点执行时，获取昨天的完整数据（昨天04:00 ~ 今天04:00）
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    logger.info(f"[dreaming] 开始执行, 目标日期: {yesterday}")
+
     if settings.auto_diary_summary:
         try:
-            await generate_diary_ai_summary(datetime.now().strftime("%Y-%m-%d"))
-            
+            await generate_diary_ai_summary(yesterday)
         except Exception as e:
             logger.error(f"生成日记总结失败: {e}")
     if settings.auto_update_memory:
-        try: 
-            await dreaming(datetime.now().strftime("%Y-%m-%d"))
+        try:
+            await dreaming(yesterday)
         except Exception as e:
-                logger.error(f"更新记忆失败: {e}")
+            logger.error(f"更新记忆失败: {e}")
 async def _process_session_message():
     try:
         await process_session_message()
