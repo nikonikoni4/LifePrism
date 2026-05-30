@@ -13,7 +13,7 @@ sync_service = LazySingleton(SyncService)
 
 
 @router.post("/activitywatch", response_model=SyncResponse, summary="增量同步ActivityWatch数据")
-async def sync_from_activitywatch(
+async def incremental_sync(
     sync_request: SyncRequest = SyncRequest()
 ):
     """
@@ -54,14 +54,14 @@ async def sync_from_activitywatch(
                 "message": f"LLM 连接失败，已跳过同步: {connect_result['message']}"
             }
 
-    result = await sync_service.sync_from_activitywatch(
+    result = await sync_service.incremental_sync(
         auto_classify=sync_request.auto_classify
     )
     return result
 
 
 @router.post("/activitywatch/timerange", response_model=SyncResponse, summary="按时间范围同步ActivityWatch数据")
-async def sync_from_activitywatch_by_time_range(
+async def incremental_sync_by_time_range(
     sync_request: SyncTimeRangeRequest
 ):
     """

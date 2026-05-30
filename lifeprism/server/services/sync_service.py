@@ -70,12 +70,12 @@ class SyncService:
     def __init__(self):
         self.data_processor = DataProcessingService()
     
-    async def sync_from_activitywatch(
+    async def incremental_sync(
         self,
         auto_classify: bool = True
     ) -> Dict:
         """
-        增量同步 ActivityWatch 数据（从数据库最新时间同步到现在）
+        增量同步 ActivityWatch 数据 /  lifeprism windows_events（从数据库最新时间同步到现在）
 
         Args:
             auto_classify: 是否自动分类新应用
