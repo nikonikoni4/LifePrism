@@ -16,6 +16,7 @@ from lifeprism.server.services.diary_service import generate_diary_ai_summary
 from lifeprism.utils import get_logger
 from datetime import datetime, timedelta
 from lifeprism.llm.function.agent_schedule_job import dreaming,process_session_message
+from lifeprism.server.services.sync_service import SyncService
 logger = get_logger(__name__)
 
 # ===================== 测试配置 =====================
@@ -28,6 +29,16 @@ async def _dreaming():
     # 每天10点执行时，获取昨天的完整数据（昨天04:00 ~ 今天04:00）
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     logger.info(f"[dreaming] 开始执行, 目标日期: {yesterday}")
+
+    # 先执行增量同步，确保数据已分类和总结
+    try:
+        sync_service = SyncService()
+        logger.info(f"[dreaming] 开始增量同步数据")
+        sync_result = await sync_service.incremental_sync(auto_classify=True)
+        logger.info(f"[dreaming] 增量同步完成: {sync_result.get('message', '')}")
+    except Exception as e:
+        logger.error(f"[dreaming] 增量同步失败: {e}")
+        # 同步失败不应阻止后续流程，继续执行
 
     if settings.auto_diary_summary:
         try:

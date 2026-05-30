@@ -16,6 +16,9 @@ from lifeprism.llm.function import screenshot_analysis,screenshot_behavior_summa
 from lifeprism.config import settings
 from lifeprism.server.schemas.timeline_schemas import BehaviorAnalysisItem
 from lifeprism.repository import todo_repository,QueryOptions
+from lifeprism.utils import get_logger
+
+logger = get_logger(__name__)
 
 async def screen_behavior_anlysis(start_time:str,end_time:str) ->list[BehaviorAnalysisItem]:
     """
@@ -63,13 +66,16 @@ async def screen_behavior_anlysis(start_time:str,end_time:str) ->list[BehaviorAn
 class SyncService:
     """
     数据同步服务
-    
+
     整合现有业务逻辑，实现从 ActivityWatch 同步数据的完整流程
     """
-    
+
+    # 类级别的锁，确保所有实例共享同一个锁
+    _sync_lock = asyncio.Lock()
+
     def __init__(self):
         self.data_processor = DataProcessingService()
-    
+
     async def incremental_sync(
         self,
         auto_classify: bool = True
@@ -83,50 +89,66 @@ class SyncService:
         Returns:
             Dict: 同步结果
         """
-        start_time = time.time()
-
-
-        # 使用 DataProcessingService 处理增量同步
-        result = await self.data_processor.process_activitywatch_data(
-            auto_classify=auto_classify
-        )
-
-        if settings.monitor_type == "lifeprism" and settings.get("screenshot_monitor", False):
-            # 查询 behavior_analysis 表中最后一条记录的 end_time
-            from lifeprism.repository import behavior_analysis_repository, QueryOptions
-
-            # 获取最后一条记录（按 end_time 降序）
-            options = QueryOptions().with_order('end_time', desc=True).with_limit(1)
-            last_records, _ = behavior_analysis_repository.query_behaviors(options)
-
-            if last_records:
-                # 使用最后一条记录的 end_time 作为起始时间
-                analysis_start_time = last_records[0]['end_time']
-            else:
-                # 如果表为空，使用当前时间往前推 1 天
-                analysis_start_time = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
-
-            # 使用当前时间作为结束时间
-            analysis_end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            # 后台执行截图分析，不阻塞 sync 响应
-            asyncio.create_task(screen_behavior_anlysis(analysis_start_time, analysis_end_time))
-        duration = time.time() - start_time
-        return {
-            "status": "success",
-            "synced_events": result["saved_events"],
-            "new_apps_classified": result["classified_apps"],
-            "duration": round(duration, 2),
-            "message": f"成功同步数据（增量模式）",
-            "details": {
-                "sync_mode": result["sync_mode"],
-                "time_range": result["time_range"],
-                "total_events": result["total_events"],
-                "filtered_events": result["filtered_events"],
-                "apps_to_classify": result["apps_to_classify"],
-                "unclassified_events": result["unclassified_events"]
+        # 尝试获取锁，如果已被占用则立即返回
+        if self._sync_lock.locked():
+            logger.warning("[incremental_sync] 同步正在进行中，跳过本次请求")
+            return {
+                "status": "skipped",
+                "synced_events": 0,
+                "new_apps_classified": 0,
+                "duration": 0,
+                "message": "同步正在进行中，请稍后再试",
+                "details": {}
             }
-        }
+
+        async with self._sync_lock:
+            logger.info("[incremental_sync] 获取同步锁，开始执行")
+            start_time = time.time()
+
+            # 使用 DataProcessingService 处理增量同步
+            result = await self.data_processor.process_activitywatch_data(
+                auto_classify=auto_classify
+            )
+
+            if settings.monitor_type == "lifeprism" and settings.get("screenshot_monitor", False):
+                # 查询 behavior_analysis 表中最后一条记录的 end_time
+                from lifeprism.repository import behavior_analysis_repository, QueryOptions
+
+                # 获取最后一条记录（按 end_time 降序）
+                options = QueryOptions().with_order('end_time', desc=True).with_limit(1)
+                last_records, _ = behavior_analysis_repository.query_behaviors(options)
+
+                if last_records:
+                    # 使用最后一条记录的 end_time 作为起始时间
+                    analysis_start_time = last_records[0]['end_time']
+                else:
+                    # 如果表为空，使用当前时间往前推 1 天
+                    analysis_start_time = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+
+                # 使用当前时间作为结束时间
+                analysis_end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                # 后台执行截图分析，不阻塞 sync 响应
+                asyncio.create_task(screen_behavior_anlysis(analysis_start_time, analysis_end_time))
+
+            duration = time.time() - start_time
+            logger.info(f"[incremental_sync] 同步完成，耗时 {duration:.2f}s")
+
+            return {
+                "status": "success",
+                "synced_events": result["saved_events"],
+                "new_apps_classified": result["classified_apps"],
+                "duration": round(duration, 2),
+                "message": f"成功同步数据（增量模式）",
+                "details": {
+                    "sync_mode": result["sync_mode"],
+                    "time_range": result["time_range"],
+                    "total_events": result["total_events"],
+                    "filtered_events": result["filtered_events"],
+                    "apps_to_classify": result["apps_to_classify"],
+                    "unclassified_events": result["unclassified_events"]
+                }
+            }
         
         
     
@@ -138,50 +160,65 @@ class SyncService:
     ) -> Dict:
         """
         按时间范围同步 ActivityWatch 数据
-        
+
         Args:
             start_time: 开始时间，格式: YYYY-MM-DD HH:MM:SS
             end_time: 结束时间，格式: YYYY-MM-DD HH:MM:SS
             auto_classify: 是否自动分类新应用
-            
+
         Returns:
             Dict: 同步结果
         """
-        sync_start = time.time()
-        
-        
-        # 解析时间字符串
-        start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-        end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-        
-        # 使用 DataProcessingService 处理数据
-        result = await self.data_processor.process_activitywatch_data_by_time_range(
-            start_time=start_dt,
-            end_time=end_dt,
-            auto_classify=auto_classify
-        )
-        if settings.monitor_type == "lifeprism" and settings.get("screenshot_monitor", False):
-            # time_range 格式: "2026-04-19 11:00:00 ~ 2026-04-19 11:15:00"
-            time_parts = result["time_range"].split(" ~ ")
-            # 后台执行截图分析，不阻塞 sync 响应
-            asyncio.create_task(screen_behavior_anlysis(time_parts[0], time_parts[1]))
-        duration = time.time() - sync_start
-        
-        return {
-            "status": "success",
-            "synced_events": result["saved_events"],
-            "new_apps_classified": result["classified_apps"],
-            "duration": round(duration, 2),
-            "message": f"成功同步时间范围数据",
-            "details": {
-                "sync_mode": "time_range",
-                "time_range": result["time_range"],
-                "total_events": result["total_events"],
-                "filtered_events": result["filtered_events"],
-                "apps_to_classify": result["apps_to_classify"],
-                "unclassified_events": result["unclassified_events"]
+        # 尝试获取锁，如果已被占用则立即返回
+        if self._sync_lock.locked():
+            logger.warning("[sync_by_time_range] 同步正在进行中，跳过本次请求")
+            return {
+                "status": "skipped",
+                "synced_events": 0,
+                "new_apps_classified": 0,
+                "duration": 0,
+                "message": "同步正在进行中，请稍后再试",
+                "details": {}
             }
-        }
+
+        async with self._sync_lock:
+            logger.info(f"[sync_by_time_range] 获取同步锁，开始执行 ({start_time} ~ {end_time})")
+            sync_start = time.time()
+
+            # 解析时间字符串
+            start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+            end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+
+            # 使用 DataProcessingService 处理数据
+            result = await self.data_processor.process_activitywatch_data_by_time_range(
+                start_time=start_dt,
+                end_time=end_dt,
+                auto_classify=auto_classify
+            )
+            if settings.monitor_type == "lifeprism" and settings.get("screenshot_monitor", False):
+                # time_range 格式: "2026-04-19 11:00:00 ~ 2026-04-19 11:15:00"
+                time_parts = result["time_range"].split(" ~ ")
+                # 后台执行截图分析，不阻塞 sync 响应
+                asyncio.create_task(screen_behavior_anlysis(time_parts[0], time_parts[1]))
+
+            duration = time.time() - sync_start
+            logger.info(f"[sync_by_time_range] 同步完成，耗时 {duration:.2f}s")
+
+            return {
+                "status": "success",
+                "synced_events": result["saved_events"],
+                "new_apps_classified": result["classified_apps"],
+                "duration": round(duration, 2),
+                "message": f"成功同步时间范围数据",
+                "details": {
+                    "sync_mode": "time_range",
+                    "time_range": result["time_range"],
+                    "total_events": result["total_events"],
+                    "filtered_events": result["filtered_events"],
+                    "apps_to_classify": result["apps_to_classify"],
+                    "unclassified_events": result["unclassified_events"]
+                }
+            }
          
 if __name__ == "__main__":
     from lifeprism.llm.agent.loop import agent_loop
