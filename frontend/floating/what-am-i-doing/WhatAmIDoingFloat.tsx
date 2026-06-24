@@ -34,6 +34,7 @@ export const WhatAmIDoingFloat: React.FC = () => {
     const [isCreating, setIsCreating] = useState(false);
     const [newTaskContent, setNewTaskContent] = useState('');
     const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const contentRef = useRef<HTMLDivElement>(null);
     const newTaskInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,6 +45,15 @@ export const WhatAmIDoingFloat: React.FC = () => {
 
     const toggleCollapse = useCallback((id: string) => {
         setCollapsedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const toggleExpand = useCallback((id: string) => {
+        setExpandedIds((prev) => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
             else next.add(id);
@@ -291,12 +301,14 @@ export const WhatAmIDoingFloat: React.FC = () => {
                             accumulatedMinutes={accumulated[item.id] || 0}
                             collapsed={isCollapsed}
                             hasChildren={hasChildren}
+                            isExpanded={expandedIds.has(item.id) || activeTimerId === item.id}
                             onToggleComplete={handleToggleComplete}
                             onStartTimer={startTimer}
                             onStopTimer={stopTimer}
                             onContentChange={handleContentChange}
                             onRemove={handleRemove}
                             onToggleCollapse={toggleCollapse}
+                            onToggleExpand={toggleExpand}
                         >
                             {hasChildren && !isCollapsed
                                 ? renderTodoTree(item.children as TodoItem[], level + 1)

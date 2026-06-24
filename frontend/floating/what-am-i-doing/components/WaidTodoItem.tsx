@@ -12,12 +12,14 @@ interface WaidTodoItemProps {
     accumulatedMinutes: number;
     collapsed: boolean;
     hasChildren: boolean;
+    isExpanded: boolean;
     onToggleComplete: (id: string) => void;
     onStartTimer: (item: TodoItem) => void;
     onStopTimer: () => void;
     onContentChange: (id: string, content: string) => void;
     onRemove: (id: string) => void;
     onToggleCollapse: (id: string) => void;
+    onToggleExpand: (id: string) => void;
     children?: React.ReactNode;
 }
 
@@ -29,12 +31,14 @@ export function WaidTodoItem({
     accumulatedMinutes,
     collapsed,
     hasChildren,
+    isExpanded,
     onToggleComplete,
     onStartTimer,
     onStopTimer,
     onContentChange,
     onRemove,
     onToggleCollapse,
+    onToggleExpand,
     children,
 }: WaidTodoItemProps) {
     const [isEditing, setIsEditing] = useState(false);
@@ -167,8 +171,9 @@ export function WaidTodoItem({
                     />
                 ) : (
                     <span
-                        className={`flex-1 min-w-0 text-sm truncate cursor-text ${isCompleted ? 'line-through text-white/40' : 'text-white/90'
-                            }`}
+                        className={`flex-1 min-w-0 text-sm cursor-text ${
+                            isExpanded ? 'whitespace-normal break-words' : 'truncate'
+                        } ${isCompleted ? 'line-through text-white/40' : 'text-white/90'}`}
                         onDoubleClick={() => {
                             if (!isCompleted) {
                                 setEditValue(item.content);
@@ -213,6 +218,23 @@ export function WaidTodoItem({
                         )}
                     </button>
                 )}
+
+                {/* 展开/收缩按钮 */}
+                <button
+                    onClick={() => onToggleExpand(item.id)}
+                    className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-all"
+                    title={isExpanded ? 'Collapse' : 'Expand'}
+                >
+                    {isExpanded ? (
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M6 2H3a1 1 0 0 0-1 1v3M10 2h3a1 1 0 0 1 1 1v3M6 14H3a1 1 0 0 1-1-1v-3M10 14h3a1 1 0 0 0 1-1v-3" />
+                        </svg>
+                    ) : (
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M2 6V3a1 1 0 0 1 1-1h3M14 6V3a1 1 0 0 0-1-1h-3M2 10v3a1 1 0 0 0 1 1h3M14 10v3a1 1 0 0 1-1 1h-3" />
+                        </svg>
+                    )}
+                </button>
 
                 {/* 更多菜单 */}
                 <div className="relative flex-shrink-0" ref={menuRef}>
