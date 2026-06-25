@@ -299,6 +299,60 @@ class LiteLLMProvider(LLMProvider):
                 finish_reason="error",
             )
 
+    @staticmethod
+    def _parse_xml_tool_calls(content: str) -> list[ToolCallRequest]:
+        """Parse XML-format tool calls from content (for MIMO and similar models).
+
+        Handles formats like:
+        <tool_call>
+        <function=read_file>
+        <parameter=file_path>path/to/file</parameter>
+        <parameter=offset>1</parameter>
+        </function>
+        </tool_call>
+        """
+        import re
+
+        tool_calls = []
+        # Match <tool_call>...</tool_call> blocks
+        tool_call_pattern = r'<tool_call>(.*?)</tool_call>'
+        matches = re.findall(tool_call_pattern, content, re.DOTALL)
+
+        for match in matches:
+            # Extract function name from <function=name>
+            func_match = re.search(r'<function=([^>]+)>', match)
+            if not func_match:
+                continue
+
+            function_name = func_match.group(1)
+
+            # Extract all parameters
+            param_pattern = r'<parameter=([^>]+)>([^<]*)</parameter>'
+            params = re.findall(param_pattern, match)
+
+            # Build arguments dict
+            arguments = {}
+            for param_name, param_value in params:
+                # Try to parse as JSON if it looks like a number or boolean
+                param_value = param_value.strip()
+                if param_value.lower() in ('true', 'false'):
+                    arguments[param_name] = param_value.lower() == 'true'
+                elif param_value.isdigit():
+                    arguments[param_name] = int(param_value)
+                else:
+                    try:
+                        arguments[param_name] = float(param_value)
+                    except ValueError:
+                        arguments[param_name] = param_value
+
+            tool_calls.append(ToolCallRequest(
+                id=_short_tool_id(),
+                name=function_name,
+                arguments=arguments,
+            ))
+
+        return tool_calls
+
     def _parse_response(self, response: Any) -> LLMResponse:
         """Parse LiteLLM response into our standard format."""
         choice = response.choices[0]
@@ -341,6 +395,15 @@ class LiteLLMProvider(LLMProvider):
                 provider_specific_fields=provider_specific_fields,
                 function_provider_specific_fields=function_provider_specific_fields,
             ))
+
+        # Handle XML-format tool calls (MIMO, MiniMax, etc.)
+        # If finish_reason is 'tool_calls' but tool_calls is empty, and content contains XML tool calls
+        if finish_reason == "tool_calls" and not tool_calls and content and "<tool_call>" in content:
+            logger.debug("Detected XML-format tool calls in content, parsing...")
+            xml_tool_calls = self._parse_xml_tool_calls(content)
+            if xml_tool_calls:
+                tool_calls = xml_tool_calls
+                content = None  # Clear content since it was a tool call, not text
 
         usage = {}
         if hasattr(response, "usage") and response.usage:
