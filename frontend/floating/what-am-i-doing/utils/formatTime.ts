@@ -1,19 +1,17 @@
 /**
  * 时间格式化工具
- * 注意：不使用 toISOString()，因为它会转为 UTC 并带毫秒
+ *
+ * 日期→字符串的转换统一使用 @core/utils/dateUtils（SSOT）
+ * 本文件仅保留纯展示格式化函数
  */
 
-/** 本地时间格式化为 YYYY-MM-DDTHH:MM:SS */
-export function formatLocalDateTime(date: Date): string {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-}
+export { toLocalDateTimeString as formatLocalDateTime } from '../../../core/utils/dateUtils';
+
+import { toLocalDateString } from '../../../core/utils/dateUtils';
 
 /** 获取今天的日期字符串 YYYY-MM-DD */
 export function getTodayStr(): string {
-    const d = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    return toLocalDateString(new Date());
 }
 
 /** 秒数格式化为 MM:SS */

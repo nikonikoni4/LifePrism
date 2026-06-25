@@ -80,8 +80,8 @@ async function openRecordActivityDialog(
         // 打开对话框
         const params = new URLSearchParams({
             taskName,
-            startTime: startTime.toISOString(),
-            endTime: endTime.toISOString(),
+            startTime: formatLocalDateTime(startTime),
+            endTime: formatLocalDateTime(endTime),
             duration: duration.toString(),
             todoId,
         });

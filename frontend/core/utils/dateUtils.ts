@@ -20,3 +20,16 @@ export function toLocalDateString(date: Date): string {
     const d = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
 }
+
+/**
+ * 将 Date 对象格式化为本地日期时间字符串 YYYY-MM-DDTHH:MM:SS
+ *
+ * ⚠️ 请勿使用 date.toISOString() 替代此函数，
+ *    toISOString 返回的是 UTC 时间，在 UTC+ 时区会导致日期偏移。
+ *
+ * 用于存储到数据库的日期时间字段（后端按本地时间字符串做日期范围查询）。
+ */
+export function toLocalDateTimeString(date: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}

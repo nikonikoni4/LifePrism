@@ -11,7 +11,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "electron:dev": "vite build && electron .",
-    "electron:build": "vite build && electron-builder --win"
+    "electron:build": "vite build && electron-builder --win",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -69,7 +71,8 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vitest": "^4.1.8"
   },
   "build": {
     "appId": "com.lifeprism.app",
