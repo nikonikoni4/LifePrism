@@ -12,6 +12,12 @@ class MessageType:
     CHAT = "chat" # 会添加专门的系统提示词
     GENERAL_TASK = "general_task" # 不会添加任何系统提示词，可以自行通过extra传递
     DREAM_TASK = "dream_task" # 1. 从聊天数据中提取内容在chat_history.json和user.md 2. 从chat_history提取内容到behavior.md 3. 从behavior.md提取内容到recent_state.md
+class TokenType:
+    CLASSIFY = "classify"  # 从extra 中 提供 分类提示词 + templates\agent\classify\classify_preference.md 分类偏好
+    CHAT = "chat" # 会添加专门的系统提示词
+    GENERAL_TASK = "general_task" # 不会添加任何系统提示词，可以自行通过extra传递
+    DREAM_TASK = "dream_task" # 1. 从聊天数据中提取内容在chat_history.json和user.md 2. 从chat_history提取内容到behavior.md 3. 从behavior.md提取内容到recent_state.md
+
 class ChannelType:
     WECHAT = "wechat" # 微信渠道
     LOCAL = "local" # 本机渠道

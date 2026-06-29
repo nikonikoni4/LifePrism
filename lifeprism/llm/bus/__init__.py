@@ -1,5 +1,5 @@
 
-from .events import OutboundMessage,InboundMessage,MessageContent,MessageType,ChannelType
+from .events import OutboundMessage,InboundMessage,MessageContent,MessageType,ChannelType,TokenType
 from .queue import bus, MessageQueue
 __all__ = [
     "OutboundMessage",
@@ -9,4 +9,5 @@ __all__ = [
     "MessageQueue",
     "MessageType",
     "ChannelType"
+    "TokenType"
 ]
