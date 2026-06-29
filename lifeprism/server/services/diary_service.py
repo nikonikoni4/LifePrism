@@ -7,7 +7,6 @@ Diary 服务层 - 日记业务逻辑
 
 架构：纯函数模块（无内存缓存，不需要单例）
 """
-import asyncio
 import hashlib
 import json
 from typing import Any, Optional
@@ -344,26 +343,19 @@ async def generate_diary_ai_summary_range(request: GenerateDiaryAISummaryRangeRe
             else:
                 skipped.append(date)
 
-    # 第二阶段：并发处理
-    async def process_one(date: str, is_update: bool) -> tuple[str, bool] | tuple[None, None]:
-        try:
-            await generate_diary_ai_summary(date)
-            return (date, is_update)
-        except ValueError:
-            return (None, None)
-
-    results = await asyncio.gather(*[process_one(d, u) for d, u in to_process])
-
+    # 第二阶段：顺序处理（behavior.md 不支持并发写入）
     created: list[str] = []
     updated: list[str] = []
-    for i, r in enumerate(results):
-        d, is_up = r
-        if d is None:
-            skipped.append(to_process[i][0])
-        elif is_up:
-            updated.append(d)
-        else:
-            created.append(d)
+
+    for date, is_update in to_process:
+        try:
+            await generate_diary_ai_summary(date)
+            if is_update:
+                updated.append(date)
+            else:
+                created.append(date)
+        except ValueError:
+            skipped.append(date)
 
     return GenerateDiaryAISummaryRangeResponse(
         created_dates=created,

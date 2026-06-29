@@ -121,3 +121,26 @@ def _parse_error_message(response_content: str) -> str:
 
     # 如果解析失败，返回截断的原始内容
     return f"模型返回错误: {response_content[:200]}"
+
+
+if __name__ == "__main__":
+    import asyncio
+    # ---------- 测试 test_connect ----------
+    print("\n[2] 测试 test_connect（LLM 连接）")
+    print("  正在测试 LLM 连接...")
+    result = asyncio.run(test_connect())
+
+    print(f"  success: {result['success']}")
+    print(f"  message: {result['message']}")
+    print(f"  provider: {result['provider']}")
+    print(f"  model: {result['model']}")
+    if result["model_response"]:
+        print(f"  model_response: {result['model_response'][:200]}")
+
+    if result["success"]:
+        print("\n  LLM 连接测试通过 ✅")
+    else:
+        print("\n  LLM 连接测试失败 ❌")
+
+    print("\n" + "=" * 60)
+    print("测试完成")

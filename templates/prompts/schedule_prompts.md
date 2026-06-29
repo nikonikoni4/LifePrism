@@ -9,7 +9,7 @@ author: nikonikoni4
 ## metadata
 
 ```yaml
-active_version: v2
+active_version: v3
 version_history:
   v1:
     created_at: 2026-05-13
@@ -17,6 +17,12 @@ version_history:
   v2:
     created_at: 2026-05-15
     change_reason: v1版本没有规定输出格式，v2版本加强输出限制
+  v3:
+    created_at: 2026-06-28
+    change_reason: v2版本没有给总结的时间参数，反常设计（当前总结的时间是头一天4:00开始，但是llm会认为是从0：00开始），所以需要传入参数
+    params:
+      - start_time
+      - end_time
 ```
 
 ## v1
@@ -58,11 +64,42 @@ version_history:
 5. 用户待办事项 ：今日打算做的事情
 
 ### 输出契约
+使用序号1. 2. 3. 分点写出而不是使用`##`等md标题
 <output_template>
 1. 今日概览：以用户自定义备注和AI分析行为为核心，辅以待办事项，全面回顾今日动态。
 2. 电脑使用总览：简要概括电脑使用情况，列出各分类的时长与占比。
 3. 高频使用时段：列出各高频使用时段的时间和主要活动内容。
-<\output_template>
+</output_template>
+```
+
+## v3
+
+```md
+## task
+你需要依据用户数据总结用户在指定时间段内都做了什么
+
+### 时间说明
+- 总结的时间范围：{start_time} 到 {end_time}
+- 一天的定义是从 04:00:00 开始到次日 04:00:00，请不要默认从 00:00:00 开始计算
+
+### 核心原则
+1. 保持客观，不推论，不猜测
+2. 保持简洁
+
+### 输入数据说明
+1. 电脑总体统计数据: 展示整个时间段内各分类的总时间和占比
+2. 电脑高频使用时段数据分析：按高密度时间段分组展示分类占比
+3. 用户自定义行为备注：用户自行记录的时间备注，可信度更高
+4. AI分析行为备注 ： 依据电脑在高密度活动区间的截图进行分析的数据，仅供参考
+5. 用户待办事项 ：今日打算做的事情
+
+### 输出契约
+使用序号1. 2. 3. 分点写出而不是使用`##`等md标题
+<output_template>
+1. 今日概览：以用户自定义备注和AI分析行为为核心，辅以待办事项，全面回顾今日动态。
+2. 电脑使用总览：简要概括电脑使用情况，列出各分类的时长与占比。
+3. 高频使用时段：列出各高频使用时段的时间和主要活动内容。
+</output_template>
 ```
 ---
 
@@ -107,7 +144,7 @@ version_history:
 ## 用户信息提取
 1. 用户偏好：涵盖范围比较广，包括但不限于喜欢什么，讨厌什么，抗拒什么，害怕什么。可以是具体的人、事件，物品、动植物等，也可以是抽象的价值，理想等
 2. 与人的关系：家庭成员，朋友，老师等社会关系以及对从事件中能反应出对他们的态度或亲疏情况。注意社会关系不要指带与一类人群的关系，太过模糊
-<\template>
+</template>
 ```
 ---
 
@@ -159,7 +196,7 @@ version_history:
 由用户添加的心情数据总结而来，注意心情数据仅反映特定时刻的情绪状态，并不具备长期代表性
 ### 聊天总结
 ### 日记总结
-<\behavior_md_template>
+</behavior_md_template>
 心情，聊天，日记总结都注重于总结具体事件的发生，经过，用户的情绪反应和情绪反应之后的反应。
 ## recent_state.md更新方法
 ### 文档组成与内容说明
@@ -184,7 +221,7 @@ version_history:
 编写例如：用户近期多次在日记中提到近期睡眠不佳导致生理状态不好，精神...
 ## 时间花费与目标
 ## 旧版本总结
-<\recent_state_template>
+</recent_state_template>
 
 ## 更新流程
 <update_process>
@@ -192,7 +229,7 @@ version_history:
 2. 阅读旧版本的recent_state.md，确认有哪些重复的内容
 3. 排除旧版本recent_state.md重复内容，编写旧版本总结
 4. 使用write_file工具覆盖recent_state.md
-<\update_process>
+</update_process>
 
 ## 输出目录
 recent_state.md  : {recent_state_path}
@@ -221,7 +258,7 @@ recent_state.md  : {recent_state_path}
 由用户添加的心情数据总结而来，注意心情数据仅反映特定时刻的情绪状态，并不具备长期代表性
 ### 聊天总结
 ### 日记总结
-<\behavior_md_template>
+</behavior_md_template>
 心情，聊天，日记总结都注重于总结具体事件的发生，经过，用户的情绪反应和情绪反应之后的反应。
 ## recent_state.md更新方法
 ### 文档组成与内容说明
@@ -250,7 +287,7 @@ recent_state.md  : {recent_state_path}
 编写例如：用户近期多次在日记中提到近期睡眠不佳导致生理状态不好，精神...
 ## 时间花费与目标
 ## 旧版本总结
-<\recent_state_template>
+</recent_state_template>
 
 ## 更新流程
 <update_process>
@@ -258,7 +295,7 @@ recent_state.md  : {recent_state_path}
 2. 阅读旧版本的recent_state.md，确认有哪些重复的内容
 3. 排除旧版本recent_state.md重复内容，编写旧版本总结
 4. 使用write_file工具覆盖recent_state.md
-<\update_process>
+</update_process>
 
 ## 输出目录
 recent_state.md  : {recent_state_path}
@@ -290,7 +327,7 @@ recent_state.md 字数不能超过 {upper_limit}
 由用户添加的心情数据总结而来，注意心情数据仅反映特定时刻的情绪状态，并不具备长期代表性
 ### 聊天总结
 ### 日记总结
-<\behavior_md_template>
+</behavior_md_template>
 心情，聊天，日记总结都注重于总结具体事件的发生，经过，用户的情绪反应和情绪反应之后的反应。
 ## recent_state.md更新方法
 ### 文档组成与内容说明
@@ -325,7 +362,7 @@ recent_state.md 字数不能超过 {upper_limit}
 [YYYY~MM-DD~YYYY-MM-DD]
 1. 重要事件
 2. 生理和心理状态
-<\recent_state_template>
+</recent_state_template>
 
 ## 更新流程
 <update_process>
@@ -333,7 +370,7 @@ recent_state.md 字数不能超过 {upper_limit}
 2. 阅读旧版本的recent_state.md，确认有哪些重复的内容
 3. 排除旧版本recent_state.md重复内容，编写旧版本总结
 4. 使用write_file工具覆盖recent_state.md
-<\update_process>
+</update_process>
 
 ## 输出目录
 recent_state.md  : {recent_state_path}
@@ -418,7 +455,7 @@ version_history:
 ## 用户信息提取
 1. 用户偏好：
 2. 社会关系：
-<\template>
+</template>
 ```
 ## v3
 
@@ -450,7 +487,7 @@ version_history:
 ## 用户信息提取
 1. 用户偏好：
 2. 与人的关系：
-<\template>
+</template>
 ```
 ## v4
 
@@ -482,7 +519,7 @@ version_history:
 #### 用户信息提取
 1. 用户偏好：
 2. 与人的关系：
-<\template>
+</template>
 ```
 ---
 
@@ -568,7 +605,7 @@ version_history:
 用户信息仅作为补充内容，不作为总结内容和事实依据，一切仍以日记为主
 <user_md>
 {user_md}
-<\user_md>
+</user_md>
 
 ## 输出契约
 总字数不得超过{upper_limit}
@@ -582,7 +619,7 @@ version_history:
 4. 整体状态：
     1. 心理状态：
     2. 生理状态：
-<\template>
+</template>
 ```
 
 ## v3
@@ -623,7 +660,7 @@ version_history:
 用户信息仅作为补充内容，不作为总结内容和事实依据，一切仍以日记为主
 <user_md>
 {user_md}
-<\user_md>
+</user_md>
 
 ## 输出契约
 总字数不得超过{upper_limit}
@@ -637,7 +674,7 @@ version_history:
 4. 整体状态：
   1. 心理状态：[未知时间] 心理状态，或发生时间，心理状态
   2. 生理状态：[未知时间] 心理状态，或发生时间，心理状态
-<\template>
+</template>
 ```
 
 ## v4
@@ -697,7 +734,7 @@ version_history:
 用户信息仅作为补充内容，不作为总结内容和事实依据，一切仍以日记为主
 <user_md>
 {user_md}
-<\user_md>
+</user_md>
 
 ## 输出契约
 总字数不得超过{upper_limit}
@@ -718,7 +755,7 @@ version_history:
 4. 整体状态：
    1. 心理状态：[2026-04-10] 心情低沉. [过去某段时间],xxx
    2. 生理状态：[2026-04-10] 睡眠良好，进行了运动
-<\template>
+</template>
 
 **注意**：模板中的示例仅供参考格式，实际输出需要根据日记内容进行总结，不要照搬示例内容
 ```

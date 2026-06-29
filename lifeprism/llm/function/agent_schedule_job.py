@@ -9,12 +9,13 @@
 """
 import asyncio
 import json
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from lifeprism.config import settings
 from lifeprism.llm.agent.tools.lifeprismsystem import query_user_activity_summary, query_user_mood
-from lifeprism.llm.bus import InboundMessage, bus, MessageType, OutboundMessage
+from lifeprism.llm.bus import InboundMessage, bus, MessageType, OutboundMessage,TokenType
 from lifeprism.llm.prompts import prompt_loader, Prompts
 from lifeprism.llm.session import Session, session_manager, ChatHistoryManager
 from lifeprism.llm.utils.md_os import write_date_md, extract_date_logs_from_file, read_md
@@ -30,26 +31,64 @@ DEFAULT_DATE_OFFSET = 7  # 默认日期偏移量（天）
 DEFAULT_DAYS_OFFSET = 3  # 默认处理日期限制（天）
 
 
-async def summary_activities(activities: str) -> str:
+def _normalize_activity_summary_format(content: str) -> str:
+    """将 LLM 可能输出的 markdown 标题格式强制替换为序号格式
+
+    部分 LLM 模型会忽略 prompt 中的格式约束，输出 ### 今日概览 / ## 电脑使用总览
+    等 markdown 标题，这里统一替换为 prompt 要求的分点序号格式。
+
+    Args:
+        content: LLM 原始输出
+
+    Returns:
+        str: 规范化后的内容
+    """
+    replacements = [
+        # 纯 markdown 标题：### 今日概览 → 1. 今日概览
+        (r'^#{1,3}\s+今日概览\s*$', r'1. 今日概览', re.MULTILINE),
+        (r'^#{1,3}\s+电脑使用总览\s*$', r'2. 电脑使用总览', re.MULTILINE),
+        (r'^#{1,3}\s+高频使用时段\s*$', r'3. 高频使用时段', re.MULTILINE),
+        # 混合格式：### 1. 今日概览（附注）→ 1. 今日概览
+        (r'^#{1,3}\s+1\.\s*今日概览.*$', r'1. 今日概览', re.MULTILINE),
+        (r'^#{1,3}\s+2\.\s*电脑使用总览.*$', r'2. 电脑使用总览', re.MULTILINE),
+        (r'^#{1,3}\s+3\.\s*高频使用时段.*$', r'3. 高频使用时段', re.MULTILINE),
+    ]
+    for pattern, replacement, flags in replacements:
+        new_content = re.sub(pattern, replacement, content, flags=flags)
+        if new_content != content:
+            logger.debug(f"[_normalize] 替换了格式: {pattern}")
+            content = new_content
+    return content
+
+
+async def summary_activities(activities: str, start_time: str, end_time: str) -> str:
     """总结活动数据
 
     Args:
         activities: 活动数据字符串
+        start_time: 总结的开始时间，格式为 'YYYY-MM-DD HH:MM:SS'
+        end_time: 总结的结束时间，格式为 'YYYY-MM-DD HH:MM:SS'
 
     Returns:
         str: 活动总结内容
     """
-    logger.debug(f"[summary_activities] 开始活动总结")
+    logger.debug(f"[summary_activities] 开始活动总结, 时间范围: {start_time} ~ {end_time}")
     logger.debug(f"[summary_activities] 输入数据长度: {len(activities) if activities else 0} 字符")
-    
-    # 加载 prompt
-    activity_summary_prompt = prompt_loader.load_prompt(Prompts.Schedule.ACTIVITY_SUMMARY)
+
+    # 加载 prompt，注入时间参数
+    activity_summary_prompt = prompt_loader.load_prompt(
+        Prompts.Schedule.ACTIVITY_SUMMARY,
+        start_time=start_time,
+        end_time=end_time,
+    )
     logger.debug(f"[summary_activities] 已加载 prompt, 长度: {len(activity_summary_prompt) if activity_summary_prompt else 0} 字符")
 
     if activities:
         logger.debug(f"[summary_activities] 发送 LLM 请求进行活动总结")
         msg = InboundMessage(
-            MessageType.DREAM_TASK,
+            type=MessageType.GENERAL_TASK,
+            token_type=TokenType.DREAM_TASK,
+            content=activities,
             extra={"system_prompt": activity_summary_prompt}
         )
         result = await bus.send(msg)
@@ -57,7 +96,8 @@ async def summary_activities(activities: str) -> str:
         
         if result.response and result.response.content:
             logger.debug(f"[summary_activities] LLM 返回成功, 结果长度: {len(result.response.content)} 字符")
-            return result.response.content
+            normalized = _normalize_activity_summary_format(result.response.content)
+            return normalized
         else:
             logger.error(f"[summary_activities] 活动总结llm返回数据错误,{result}")
             raise ExternalServiceError(f"活动总结llm返回数据错误,{result}")
@@ -226,7 +266,7 @@ async def dreaming(date: str) -> None:
         logger.debug(f"[dreaming] 活动数据前200字符: {activities[:200]}")
     
     logger.info(f"[dreaming] 阶段1: 总结活动数据")
-    activities_summary_content = await summary_activities(activities)
+    activities_summary_content = await summary_activities(activities, start_time, end_time)
     logger.debug(f"[dreaming] 活动总结结果长度: {len(activities_summary_content) if activities_summary_content else 0} 字符")
     logger.debug(f"[dreaming] 活动总结结果前200字符: {activities_summary_content[:200] if activities_summary_content else '无'}")
 
@@ -431,14 +471,25 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
     logger.debug(f"[process_session_message] 会话消息处理完成")
 
 if __name__ == "__main__":
+    from datetime import timedelta
     from lifeprism.llm.agent.loop import agent_loop
-    
+
     async def main():
         loop_task = asyncio.create_task(agent_loop.loop())
         try:
-            await process_session_message(10)
+            start = datetime(2026, 4, 1)
+            end = datetime(2026, 6, 28)
+            current = start
+            while current <= end:
+                date_str = current.strftime("%Y-%m-%d")
+                print(f"\n{'='*60}")
+                print(f"开始处理: {date_str}")
+                print(f"{'='*60}")
+                await dreaming(date_str)
+                current += timedelta(days=1)
+            print("\n全部完成 ✅")
         finally:
             loop_task.cancel()
-    
+
     asyncio.run(main())
     
