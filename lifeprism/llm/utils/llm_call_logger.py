@@ -135,7 +135,12 @@ class LLMCallLogger:
                 output_content = outbound_msg.response.content
                 tokens = outbound_msg.response.usage
 
-            # 5. 构建记录
+            # 5. 提取工具调用链
+            tool_call_chain = None
+            if outbound_msg and outbound_msg.extra and "tool_call_chain" in outbound_msg.extra:
+                tool_call_chain = outbound_msg.extra["tool_call_chain"]
+
+            # 6. 构建记录
             record = {
                 "id": str(uuid.uuid4()),
                 "timestamp": datetime.now().isoformat(),
@@ -158,12 +163,13 @@ class LLMCallLogger:
                 "output": {
                     "content": output_content
                 },
+                "tool_call_chain": tool_call_chain,
                 "model": model,
                 "tokens": tokens,
                 "error": None
             }
 
-            # 6. 写入文件
+            # 7. 写入文件
             self._write_record(record)
 
             logger.debug(f"成功记录 LLM 调用: {record['id']}")

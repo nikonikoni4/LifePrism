@@ -1,10 +1,16 @@
 ---
-version: 1.3
+version: 1.4
 created_at: 2026-04-10
-updated_at: 2026-06-29
-last_updated: 新增日记组件架构重构决策文档索引
+updated_at: 2026-06-30
+last_updated: 新增工具调用链完整记录功能决策文档索引
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## tool-call-chain-logging
+- updated_at: 2026-06-30
+- path: `docs/design-decisions/2026-06-30-tool-call-chain-logging.md`
+- 触发规则：当需要理解工具调用链的记录机制、调试多轮工具调用问题、或扩展 llm_call_logger 功能时读取
+- 内容摘要：在 llm_call_logger 中实现完整的工具调用链记录功能。在 `_run_agent_loop` 中记录每一轮的工具调用（包括工具名、参数、结果），通过 `OutboundMessage.extra` 传递，最终保存到日志文件的 `tool_call_chain` 字段。解决了只记录最后一轮工具调用导致的调试困难问题，工具结果全量保存便于问题排查。
 
 ## diary-component-refactoring
 - updated_at: 2026-06-29

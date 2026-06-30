@@ -1,3 +1,17 @@
+## 2026-06-30-read-file-max-chars-causes-excessive-tool-calls
+
+- updated_at: 2026-06-30
+- path: `docs/history-bugs/2026-06-30-read-file-max-chars-causes-excessive-tool-calls.md`
+- 触发规则：在排查 DREAM_TASK 工具调用次数异常多（接近 MAX_TOOL_CALL=20）、LLM 反复读取同一文件、read_ratio 永远 < 1.0、read_file 返回内容被截断时阅读
+- 内容摘要：记录了 `read_file` 工具 `max_chars` 默认值 1024 导致内容被硬截断，`read_ratio` 永远 < 1.0，LLM 误以为文件未读完而反复尝试不同参数读取，一次 `update_memory` 消耗全部 20 次工具调用预算。解决方案是去掉 `max_chars`，用 `limit` 控制输出量，`read_ratio` 恢复准确。
+
+## 2026-06-30-custom-provider-missing-xml-tool-call-parsing
+
+- updated_at: 2026-06-30
+- path: `docs/history-bugs/2026-06-30-custom-provider-missing-xml-tool-call-parsing.md`
+- 触发规则：在排查 `is_direct: true` 的 provider（Xiaomi MIMO、Azure OpenAI 等）工具调用不执行、`llm_call_logger` 记录的 output 是 `<tool_call>` XML 文本而非最终回复、多轮工具调用第二次失败时阅读
+- 内容摘要：记录了 `CustomProvider._parse()` 缺少 XML 工具调用解析，而模型 mimo-v2.5 在多轮对话中第二次响应将工具调用以 XML 格式写入 `content` 而非原生 `msg.tool_calls`，导致 `tool_calls=[]`、工具链中断、XML 文本被当作最终输出记录到日志。解决方案是从 `LiteLLMProvider` 搬来 `_parse_xml_tool_calls` 和回退逻辑。
+
 ## 2026-06-29-diary-calendar-scroll-race-condition
 
 - updated_at: 2026-06-29

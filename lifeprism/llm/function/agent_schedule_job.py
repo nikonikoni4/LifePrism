@@ -470,7 +470,9 @@ if __name__ == "__main__":
     async def main():
         loop_task = asyncio.create_task(agent_loop.loop())
         try:
-           await process_session_message(30)
+            # mood_data = get_mood_data("2026-06-30 00:00:00", "2026-07-01 00:00:00")
+            # await summary_moods(mood_data)
+            await dreaming("2026-06-30")
         finally:
             loop_task.cancel()
 

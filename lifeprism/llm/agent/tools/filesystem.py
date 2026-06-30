@@ -60,7 +60,7 @@ class ReadFileTool(_FileTool):
     @property
     def description(self) -> str:
         return ("读取文件内容，支持按行号范围读取正文或读取 frontmatter。"
-                "返回：content(内容), read_ratio(已读内容占全文比例), last_line(最后行号)")
+                "使用 limit 控制读取行数。返回：content(内容), read_ratio(已读内容占全文字符数比例，1.0=已读完), last_line(最后行号)")
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -89,13 +89,6 @@ class ReadFileTool(_FileTool):
                     "description": "是否只返回 frontmatter 内容（忽略 offset 和 limit）",
                     "default": False,
                 },
-                "max_chars": {
-                    "type": "integer",
-                    "description": "最大字符数限制",
-                    "minimum": 1,
-                    "maximum": 5000,
-                    "default": 1024,
-                },
             },
             "required": ["file_path"],
         }
@@ -104,7 +97,7 @@ class ReadFileTool(_FileTool):
         """执行文件读取操作
 
         Args:
-            **kwargs: 工具参数（file_path, offset, limit, only_frontmatter, max_chars）
+            **kwargs: 工具参数（file_path, offset, limit, only_frontmatter）
 
         Returns:
             str: 执行结果（成功返回 JSON 格式的结果，失败返回错误信息）
@@ -116,7 +109,6 @@ class ReadFileTool(_FileTool):
         offset = kwargs.get("offset", 1)
         limit = kwargs.get("limit", None)
         only_frontmatter = kwargs.get("only_frontmatter", False)
-        max_chars = kwargs.get("max_chars", 1024)
 
         if not file_path:
             return f"{ERROR}文件路径不能为空"
@@ -139,7 +131,6 @@ class ReadFileTool(_FileTool):
             start_line=start_line,
             end_line=end_line,
             only_frontmatter=only_frontmatter,
-            max_chars=max_chars,
         )
 
         # 检查是否有错误
@@ -156,7 +147,6 @@ def _read_file(
     start_line: int = 0,
     end_line: Optional[int] = None,
     only_frontmatter: bool = False,
-    max_chars: int = 1024
 ) -> Dict[str, Any]:
     """读取文件内容
 
@@ -165,12 +155,11 @@ def _read_file(
         start_line: 开始行号（从0开始，相对于正文，only_frontmatter=True时忽略）
         end_line: 结束行号（None表示读取到文件末尾，相对于正文，only_frontmatter=True时忽略）
         only_frontmatter: 是否只返回frontmatter内容
-        max_chars: 最大字符数限制
 
     Returns:
         dict: 包含以下字段
             - content (str): 文件内容（only_frontmatter=True时返回frontmatter，否则返回正文）
-            - read_ratio (float): 已读取内容占总内容的比例
+            - read_ratio (float): 已读取内容占全文字符数的比例（1.0=已读完正文）
             - last_line (int): 当前返回内容的最后一行行号（从0开始）
     """
     try:
@@ -210,12 +199,8 @@ def _read_file(
             content = "".join(frontmatter_lines)
             total_chars = sum(len(line) for line in frontmatter_lines)
 
-            # 应用字符数限制
-            if len(content) > max_chars:
-                content = content[:max_chars]
-
             # 计算读取比例和最后一行
-            read_ratio = len(content) / total_chars if total_chars > 0 else 0.0
+            read_ratio = 1.0 if total_chars > 0 else 0.0
             last_line = len(frontmatter_lines) - 1 if frontmatter_lines else -1
 
             logger.debug(
@@ -260,25 +245,12 @@ def _read_file(
         selected_lines = body_lines[start_line:actual_end_line + 1]
         content = "".join(selected_lines)
 
-        # 应用字符数限制
-        actual_last_line = actual_end_line
-        if len(content) > max_chars:
-            # 截断内容并重新计算最后一行
-            content = content[:max_chars]
-            # 计算截断后的实际行数
-            char_count = 0
-            for i, line in enumerate(selected_lines):
-                char_count += len(line)
-                if char_count >= max_chars:
-                    actual_last_line = start_line + i
-                    break
-
         # 计算读取比例
         read_ratio = len(content) / total_body_chars if total_body_chars > 0 else 0.0
 
         logger.debug(
             f"读取文件 {file_path}: "
-            f"行范围 [{start_line}, {actual_last_line}], "
+            f"行范围 [{start_line}, {actual_end_line}], "
             f"字符数 {len(content)}/{total_body_chars}, "
             f"比例 {read_ratio:.2%}"
         )
@@ -286,7 +258,7 @@ def _read_file(
         return {
             "content": content,
             "read_ratio": read_ratio,
-            "last_line": actual_last_line
+            "last_line": actual_end_line
         }
 
     except UnicodeDecodeError as e:

@@ -58,7 +58,19 @@ class AgentLoop:
         self._background_tasks: list[asyncio.Task] = []
         self._running = True
         self._tool_registry = ToolRegistry()
-    async def _run_agent_loop(self, session: Session, system_prompt: str, tools: list[dict[str, Any]]) -> LLMResponse:
+    async def _run_agent_loop(self, session: Session, system_prompt: str, tools: list[dict[str, Any]]) -> tuple[LLMResponse, list[dict[str, Any]]]:
+        """执行 Agent 循环
+
+        Args:
+            session: 会话对象
+            system_prompt: 系统提示词
+            tools: 工具定义列表
+
+        Returns:
+            tuple: (LLMResponse, tool_call_chain)
+                - LLMResponse: 最终的 LLM 响应
+                - tool_call_chain: 完整的工具调用链，格式为 [{"round": 1, "tool_calls": [{"name": "...", "arguments": {...}, "result": "..."}]}, ...]
+        """
         llm = create_llm_client()
         messages = Context.build_prompt(system_prompt, session.get_history_message())
         response: LLMResponse = await llm.chat(
@@ -81,12 +93,17 @@ class AgentLoop:
             reasoning_content=response.reasoning_content
         )
 
+        # 工具调用链记录
+        tool_call_chain: list[dict[str, Any]] = []
 
         # 工具调用实现
         tool_call_count = 1
         # 工具调用错误统计
         tool_error = defaultdict(int)
         while response.tool_calls and tool_call_count <=MAX_TOOL_CALL:
+            # 记录当前轮次的工具调用
+            round_tool_calls = []
+
             # 将模型回复（包含tool_calls）添加到messages中
             for tool_call in response.tool_calls:
                 logger.debug(f"工具调用 ： {tool_call.name} ，调用参数{tool_call.arguments}")
@@ -94,6 +111,15 @@ class AgentLoop:
                 logger.debug(f"工具结果 ： {tool_call.name} - {result}")
                 logger.debug(f"工具结果是否为字符串: {isinstance(result,str)}")
                 logger.debug(f"工具结果是否以错误开头: {result.startswith(ERROR)}")
+
+                # 记录工具调用到当前轮次
+                round_tool_calls.append({
+                    "id": tool_call.id,
+                    "name": tool_call.name,
+                    "arguments": tool_call.arguments,
+                    "result": result
+                })
+
                 # 只有在出错时才累加错误计数并检查阈值
                 if isinstance(result,str) and result.startswith(ERROR):
                     tool_error[tool_call.name] += 1
@@ -102,6 +128,12 @@ class AgentLoop:
                         logger.warning(f"工具 {tool_call.name} 超过最大错误次数，添加警告信息")
                         result += f"，已连续调用{tool_error[tool_call.name]}次，超过最大错误次数{MAX_TOOL_ERROR_COUNT}，请立即放弃该工具调用，尝试切换其他工具。若无可替代工具，向用户说明情况"
                 session.add_message('tool', result, tool_call_id=tool_call.id)
+
+            # 将当前轮次的工具调用添加到链中
+            tool_call_chain.append({
+                "round": tool_call_count,
+                "tool_calls": round_tool_calls
+            })
             messages = Context.build_prompt(system_prompt, session.get_history_message())
             logger.debug(f"第{tool_call_count+1}次 llm调用开始， message 长度 {len(messages)}")
             logger.debug(messages)
@@ -155,7 +187,7 @@ class AgentLoop:
             )
             logger.debug(f"强制文本回复: {response}")
 
-        return response
+        return response, tool_call_chain
     
     def _process_cmd(self,msg:InboundMessage)->None | OutboundMessage:
         """
@@ -299,10 +331,17 @@ class AgentLoop:
                 session_manager.save_session(session)
 
             # 4. 调用 LLM
-            result = await self._run_agent_loop(session, system_prompt, tools)
+            result, tool_call_chain = await self._run_agent_loop(session, system_prompt, tools)
 
             # 5. 保存 assistant 回复并发布结果
-            await self._bus.publish_outbound(OutboundMessage(id=msg.id, response=result,session_id=session.id))
+            await self._bus.publish_outbound(
+                OutboundMessage(
+                    id=msg.id,
+                    response=result,
+                    session_id=session.id,
+                    extra={"tool_call_chain": tool_call_chain} if tool_call_chain else None
+                )
+            )
 
             # 6. 保存session
             if msg.type == MessageType.CHAT: # 只有聊天数据才保存
