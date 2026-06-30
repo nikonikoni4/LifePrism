@@ -69,7 +69,7 @@ class AgentLoop:
         Returns:
             tuple: (LLMResponse, tool_call_chain)
                 - LLMResponse: 最终的 LLM 响应
-                - tool_call_chain: 完整的工具调用链，格式为 [{"round": 1, "tool_calls": [{"name": "...", "arguments": {...}, "result": "..."}]}, ...]
+                - tool_call_chain: 完整的工具调用链，每轮包含 reasoning 和 tool_calls
         """
         llm = create_llm_client()
         messages = Context.build_prompt(system_prompt, session.get_history_message())
@@ -129,9 +129,10 @@ class AgentLoop:
                         result += f"，已连续调用{tool_error[tool_call.name]}次，超过最大错误次数{MAX_TOOL_ERROR_COUNT}，请立即放弃该工具调用，尝试切换其他工具。若无可替代工具，向用户说明情况"
                 session.add_message('tool', result, tool_call_id=tool_call.id)
 
-            # 将当前轮次的工具调用添加到链中
+            # 将当前轮次的工具调用添加到链中（含推理内容）
             tool_call_chain.append({
                 "round": tool_call_count,
+                "reasoning": response.reasoning_content,
                 "tool_calls": round_tool_calls
             })
             messages = Context.build_prompt(system_prompt, session.get_history_message())
@@ -186,6 +187,14 @@ class AgentLoop:
                 reasoning_content=response.reasoning_content
             )
             logger.debug(f"强制文本回复: {response}")
+
+        # 记录最后一轮的 reasoning（即使没有工具调用也记录，避免丢失最终的思考过程）
+        if response.reasoning_content:
+            tool_call_chain.append({
+                "round": tool_call_count,
+                "reasoning": response.reasoning_content,
+                "tool_calls": []
+            })
 
         return response, tool_call_chain
     

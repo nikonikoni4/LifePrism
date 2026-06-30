@@ -95,6 +95,7 @@ class LLMCallLogger:
         model: Optional[str] = None,
         workflow_id: Optional[str] = None,
         score: Optional[float] = None,
+        system_prompt: Optional[str] = None,
     ) -> Optional[str]:
         """记录一次 LLM 调用
 
@@ -106,7 +107,8 @@ class LLMCallLogger:
             prompt_version: prompt 版本（可选）
             model: 使用的模型（可选，未传时自动从 settings 获取）
             workflow_id: workflow ID（可选）
-            score: 评分（可选，默认 None 不写入 JSON，可由后续 update_score 设置）
+            score: 评分（可选，默认 None，由后续 update_score 设置）
+            system_prompt: system prompt（可选，优先使用此值，未传则从 inbound_msg.extra 读取）
 
         Returns:
             记录 ID，如果未启用则返回 None
@@ -125,10 +127,13 @@ class LLMCallLogger:
             # 2. 获取调用位置
             caller = self._get_caller_info()
 
-            # 3. 提取 system prompt
-            system_prompt = ""
-            if inbound_msg.extra and "system_prompt" in inbound_msg.extra:
-                system_prompt = inbound_msg.extra["system_prompt"]
+            # 3. 提取 system prompt（优先使用传入值，否则从 extra 读取）
+            if system_prompt is not None:
+                system_prompt_content = system_prompt
+            elif inbound_msg.extra and "system_prompt" in inbound_msg.extra:
+                system_prompt_content = inbound_msg.extra["system_prompt"]
+            else:
+                system_prompt_content = ""
 
             # 4. 提取输出内容
             output_content = None
@@ -159,7 +164,7 @@ class LLMCallLogger:
                     "module": prompt_module,
                     "name": prompt_name,
                     "version": prompt_version,
-                    "content": system_prompt
+                    "content": system_prompt_content
                 },
                 "input": {
                     "content_type": "multimodal" if image_filenames else "text",

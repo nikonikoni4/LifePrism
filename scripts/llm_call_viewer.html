@@ -315,6 +315,84 @@
   }
   .section-content:hover .copy-btn { opacity: 1; }
 
+  /* ========== Tool Call Chain ========== */
+  .tcc-round {
+    margin-bottom: 14px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .tcc-round:last-child { margin-bottom: 0; }
+  .tcc-round-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-hover);
+    font-size: 14px; font-weight: 600;
+    color: var(--text-bright);
+  }
+  .tcc-round-header .tcc-round-num {
+    color: var(--accent);
+  }
+  .tcc-reasoning {
+    padding: 10px 12px;
+    background: rgba(34,184,207,.06);
+    border-bottom: 1px solid var(--border-light);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--cyan);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .tcc-reasoning::before {
+    content: "💭 ";
+    font-size: 15px;
+  }
+  .tcc-reasoning-label {
+    font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .4px;
+    color: var(--cyan);
+    opacity: .7;
+    margin-bottom: 4px;
+  }
+  .tcc-tool-list {
+    padding: 6px 12px 10px;
+  }
+  .tcc-tool-item {
+    display: flex; align-items: flex-start; gap: 6px;
+    padding: 6px 0;
+    font-size: 14px;
+    font-family: var(--mono);
+    border-bottom: 1px solid var(--border-light);
+  }
+  .tcc-tool-item:last-child { border-bottom: none; }
+  .tcc-tool-icon { flex-shrink: 0; color: var(--text-dim); }
+  .tcc-tool-name { color: var(--accent); font-weight: 500; }
+  .tcc-tool-args {
+    color: var(--text-dim);
+    overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 300px;
+  }
+  .tcc-tool-result {
+    margin-top: 4px;
+    padding: 6px 8px;
+    background: var(--bg);
+    border-radius: 3px;
+    font-size: 13px;
+    color: var(--text-dim);
+    max-height: 80px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .tcc-no-reasoning {
+    padding: 10px 12px;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-style: italic;
+    border-bottom: 1px solid var(--border-light);
+  }
+
   /* ========== Info Grid ========== */
   .info-grid {
     display: grid;
@@ -787,10 +865,7 @@ function createCard(rec) {
 
   // Tool call chain
   if (rec.tool_call_chain) {
-    let tccText = typeof rec.tool_call_chain === 'string'
-      ? rec.tool_call_chain
-      : JSON.stringify(rec.tool_call_chain, null, 2);
-    body.appendChild(createSection('🔧 Tool Call Chain', tccText, 'code'));
+    body.appendChild(createToolCallChainSection(rec.tool_call_chain));
   }
 
   // Error
@@ -953,6 +1028,105 @@ function createImageSection(imageNames) {
   contentEl.style.whiteSpace = 'pre';
   contentEl.style.fontSize = '15px';
   section.appendChild(contentEl);
+
+  return section;
+}
+
+// ======================== Tool Call Chain ========================
+function createToolCallChainSection(chain) {
+  const section = document.createElement('div');
+  section.className = 'section';
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'section-title';
+  titleEl.textContent = '🔧 工具调用链';
+  section.appendChild(titleEl);
+
+  const rounds = Array.isArray(chain) ? chain : [];
+
+  for (const round of rounds) {
+    const roundEl = document.createElement('div');
+    roundEl.className = 'tcc-round';
+
+    // Round header
+    const header = document.createElement('div');
+    header.className = 'tcc-round-header';
+    header.innerHTML = `<span class="tcc-round-num">#${round.round || '?'}</span> 推理 + 工具调用`;
+    roundEl.appendChild(header);
+
+    // Reasoning
+    if (round.reasoning) {
+      const reasoningEl = document.createElement('div');
+      reasoningEl.className = 'tcc-reasoning';
+      reasoningEl.textContent = round.reasoning;
+      roundEl.appendChild(reasoningEl);
+    } else {
+      const noReasoning = document.createElement('div');
+      noReasoning.className = 'tcc-no-reasoning';
+      noReasoning.textContent = '（无推理过程）';
+      roundEl.appendChild(noReasoning);
+    }
+
+    // Tool calls
+    const toolCalls = round.tool_calls || [];
+    if (toolCalls.length > 0) {
+      const toolList = document.createElement('div');
+      toolList.className = 'tcc-tool-list';
+      for (const tc of toolCalls) {
+        const item = document.createElement('div');
+        item.className = 'tcc-tool-item';
+
+        const icon = document.createElement('span');
+        icon.className = 'tcc-tool-icon';
+        icon.textContent = '🛠';
+        item.appendChild(icon);
+
+        const info = document.createElement('div');
+        info.style.flex = '1';
+
+        const nameArgs = document.createElement('div');
+        const argsStr = tc.arguments ? JSON.stringify(tc.arguments) : '';
+        nameArgs.innerHTML = `<span class="tcc-tool-name">${escapeHtml(tc.name || '?')}</span> <span class="tcc-tool-args">${escapeHtml(argsStr)}</span>`;
+        info.appendChild(nameArgs);
+
+        if (tc.result) {
+          const resultEl = document.createElement('div');
+          resultEl.className = 'tcc-tool-result';
+          const resultStr = typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result, null, 2);
+          resultEl.textContent = resultStr.length > 500 ? resultStr.substring(0, 500) + '...' : resultStr;
+          info.appendChild(resultEl);
+        }
+
+        item.appendChild(info);
+        toolList.appendChild(item);
+      }
+      roundEl.appendChild(toolList);
+    }
+
+    section.appendChild(roundEl);
+  }
+
+  // Raw JSON toggle
+  const rawJson = JSON.stringify(chain, null, 2);
+  const toggleBtn = document.createElement('button');
+  toggleBtn.className = 'btn btn-sm';
+  toggleBtn.textContent = '📄 显示原始 JSON';
+  toggleBtn.style.marginTop = '8px';
+  let showingRaw = false;
+  const rawEl = document.createElement('div');
+  rawEl.className = 'section-content code';
+  rawEl.style.display = 'none';
+  rawEl.textContent = rawJson;
+
+  toggleBtn.onclick = (e) => {
+    e.stopPropagation();
+    showingRaw = !showingRaw;
+    rawEl.style.display = showingRaw ? 'block' : 'none';
+    toggleBtn.textContent = showingRaw ? '📄 隐藏原始 JSON' : '📄 显示原始 JSON';
+  };
+
+  section.appendChild(toggleBtn);
+  section.appendChild(rawEl);
 
   return section;
 }
