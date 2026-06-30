@@ -222,7 +222,8 @@ async def update_memory(date: str, date_offset: int = DEFAULT_DATE_OFFSET) -> No
     
     logger.debug(f"[update_memory] 发送 LLM 请求更新记忆文档")
     msg = InboundMessage(
-        MessageType.DREAM_TASK,
+        type = MessageType.DREAM_TASK, # 这里需要工具，因为他需要变更user和state，其他的四个子任务不需要工具调用
+        token_type = TokenType.DREAM_TASK,
         content=content,
         extra={'system_prompt': update_memory_prompt}
     )
