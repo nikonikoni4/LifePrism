@@ -9,19 +9,12 @@ import TemplateManager from './TemplateManager';
 import RangeSummaryModal from './RangeSummaryModal';
 import { DiaryAPI } from './diaryApi';
 import { BG_PRESETS } from './diaryConstants';
-import type { ExistingSummaryMode } from './diaryTypes';
+import type { DiaryItem, MoodLevel, ImportanceLevel, ExistingSummaryMode } from './diaryTypes';
 import { toLocalDateString } from '../../../../core/utils/dateUtils';
-import { useDiaryData } from './useDiaryData';
-import { useCalendarScroll } from './useCalendarScroll';
-import { useBackgroundColor } from './useBackgroundColor';
-import { debugLog } from './diaryDebug';
 
 /**
- * JournalView - 重构版日记组件
- * 架构改进：
- * 1. 分离关注点：数据管理、滚动控制、背景色管理通过自定义 hooks 分离
- * 2. 简化滚动逻辑：只在初始化时滚动，用户点击日历不触发滚动
- * 3. 清晰的状态管理：移除复杂的 ref 追踪
+ * JournalView - 禅意日记书写空间
+ * 集成 MarkdownEditor、心情/重要程度标签、模板管理
  */
 
 interface JournalViewProps {
@@ -29,100 +22,224 @@ interface JournalViewProps {
   onOpenGuide?: () => void;
 }
 
+const STORAGE_KEY_HSL = 'diary-bg-hsl';
+
 const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
-  // ========== 核心状态 ==========
+  // 日记数据
+  const [diary, setDiary] = useState<DiaryItem | null>(null);
+  const [content, setContent] = useState('');
   const [activeDate, setActiveDate] = useState(new Date());
+  const [loading, setLoading] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
-  // ========== UI 状态 ==========
+  // UI 状态
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [settingsView, setSettingsView] = useState(false);
   const [showSettingsPopover, setShowSettingsPopover] = useState(false);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [showRangeSummaryModal, setShowRangeSummaryModal] = useState(false);
+  // 使用 ref 而非 state，避免竞态条件导致的滚动触发
+  const shouldScrollToDateRef = useRef(true);
 
-  // ========== 自定义 Hooks ==========
-  const {
-    diary,
-    setDiary,
-    content,
-    setContent,
-    loading,
-    loadDiary,
-    saveContentDebounced,
-    saveContentNow,
-    flushPendingSave,
-    updateMood,
-    updateImportance,
-    updateCustomTags,
-  } = useDiaryData({
-    onSaveSuccess: () => toast.success('日记已自动保存'),
-    onSaveError: (msg) => toast.error(msg),
+  // 背景色（localStorage 持久化）
+  const [hsl, setHsl] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_HSL);
+      return saved ? JSON.parse(saved) : { h: 200, s: 15, l: 92 };
+    } catch { return { h: 200, s: 15, l: 92 }; }
   });
+  const bgColor = `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
+  const neutralDark = '#262626';
 
-  debugLog('scroll', '[JournalView] Calling useCalendarScroll with:', {
-    activeDate: activeDate.toISOString(),
-    enabled: !settingsView,
-    settingsView
-  });
-
-  const { resetScroll } = useCalendarScroll(activeDate, !settingsView);
-  const { hsl, setHsl, handleHslChange, bgColor } = useBackgroundColor();
-
-  // ========== Refs ==========
   const editorRef = useRef<MarkdownEditorRef>(null);
   const settingsBtnRef = useRef<HTMLButtonElement>(null);
-  const isEditorHydratingRef = useRef(false);
-  const neutralDark = '#262626';
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 编辑器重挂载/切日期时的水合保护期，忽略编辑器内部初始化 onChange 噪音
+  const isHydratingEditorRef = useRef(true);
+  const hydrationReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 用于在日期切换时 flush 挂起的保存，存储当前待保存的 {date, content}
+  const pendingSaveRef = useRef<{ dateStr: string; content: string } | null>(null);
+  // 追踪正在执行中的保存请求，避免 flush 遗漏 in-flight 请求
+  const inflightSaveRef = useRef<Promise<void> | null>(null);
+  // 区分首次挂载加载 vs 后续日期切换：首次加载不 flush（避免虚假空内容覆盖）
+  const isInitialLoadRef = useRef(true);
 
   // ========== 日期格式化 ==========
   const formatDate = toLocalDateString;
+
   const isSameDay = (d1: Date, d2: Date) =>
     d1.getFullYear() === d2.getFullYear() &&
     d1.getMonth() === d2.getMonth() &&
     d1.getDate() === d2.getDate();
 
-  // ========== 加载日记 ==========
-  useEffect(() => {
-    debugLog('dataLoad', '[JournalView] activeDate changed, loading diary:', activeDate.toISOString());
-    loadDiary(activeDate);
-  }, [activeDate, loadDiary]);
+  // ========== Flush 挂起的保存 ==========
+  // 返回值：true 表示实际执行了保存（pending 被写入或 inflight 请求被等待）
+  const flushPendingSave = useCallback(async (): Promise<boolean> => {
+    let didSave = false;
+    // 取消定时器
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    // 等待正在执行中的保存请求完成
+    if (inflightSaveRef.current) {
+      await inflightSaveRef.current;
+      inflightSaveRef.current = null;
+    }
+    // 如果有挂起的保存数据（定时器还没触发的），立即执行保存
+    const pending = pendingSaveRef.current;
+    if (pending) {
+      pendingSaveRef.current = null;
+      try {
+        await DiaryAPI.saveContent(pending.dateStr, { content: pending.content });
+        didSave = true;
+      } catch (e) {
+        console.error('flush 保存日记内容失败:', e);
+        toast.error('自动保存失败，请重试');
+      }
+    }
+    return didSave;
+  }, []);
 
-  // ========== 同步编辑器内容 ==========
-  useEffect(() => {
-    if (editorRef.current && !loading) {
-      isEditorHydratingRef.current = true;
-      editorRef.current.setMarkdown(content);
-      setTimeout(() => {
-        isEditorHydratingRef.current = false;
+  // ========== 加载日记 ==========
+  const loadDiary = useCallback(async (date: Date) => {
+    const dateStr = formatDate(date);
+    try {
+      isHydratingEditorRef.current = true;
+      // 先进入 loading 状态隐藏编辑器，防止 flush 期间用户继续输入导致跨日期写入
+      setLoading(true);
+      if (isInitialLoadRef.current) {
+        // 首次挂载：丢弃由 MarkdownEditor 初始化（value='' → onUpdate → handleContentChange('')）
+        // 产生的虚假 pending 数据，避免空内容覆盖后端已保存的日记
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+        }
+        pendingSaveRef.current = null;
+        // 仍需等待 inflight 请求完成（虽然首次挂载极少有 inflight）
+        if (inflightSaveRef.current) {
+          await inflightSaveRef.current;
+          inflightSaveRef.current = null;
+        }
+      } else {
+        // 后续日期切换：正常 flush 上一个日期挂起的保存，确保数据不丢失
+        const saved = await flushPendingSave();
+        if (saved) toast.success('日记已自动保存');
+      }
+      const data = await DiaryAPI.getDiary(dateStr);
+      setDiary(data);
+      const newContent = data.content || '';
+      setContent(newContent);
+      // 同步到编辑器
+      if (editorRef.current) {
+        editorRef.current.setMarkdown(newContent);
+      }
+    } catch (e) {
+      console.error('加载日记失败:', e);
+      setDiary(null);
+      setContent('');
+      if (editorRef.current) {
+        editorRef.current.setMarkdown('');
+      }
+    } finally {
+      setLoading(false);
+      if (hydrationReleaseTimerRef.current) {
+        clearTimeout(hydrationReleaseTimerRef.current);
+      }
+      hydrationReleaseTimerRef.current = setTimeout(() => {
+        isHydratingEditorRef.current = false;
+        isInitialLoadRef.current = false;
+        hydrationReleaseTimerRef.current = null;
       }, 0);
     }
-  }, [content, loading]);
-
-  // ========== 组件卸载时保存 ==========
-  useEffect(() => {
-    return () => {
-      flushPendingSave();
-    };
   }, [flushPendingSave]);
 
-  // ========== 内容变化处理 ==========
-  const handleContentChange = useCallback((md: string) => {
-    if (isEditorHydratingRef.current) return;
-    saveContentDebounced(md);
-  }, [saveContentDebounced]);
+  useEffect(() => { loadDiary(activeDate); }, [activeDate, loadDiary]);
 
-  // ========== 手动保存 ==========
+  // ========== 保存背景色 ==========
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_HSL, JSON.stringify(hsl));
+  }, [hsl]);
+
+  // ========== 内容自动保存（防抖 1.5s） ==========
+  const handleContentChange = useCallback((md: string) => {
+    if (isHydratingEditorRef.current) return;
+    // 双重防护：loadDiary 尚未完成首次加载时，忽略编辑器初始化产生的噪音内容
+    // 这处理 MarkdownEditor 的 onUpdate 比 loadDiary useEffect 更晚触发的竞态情况
+    if (isInitialLoadRef.current && (md === '' || md === '\n\n')) return;
+    setContent(md);
+    const dateStr = formatDate(activeDate);
+    // 记录待保存数据，供 flush 使用
+    pendingSaveRef.current = { dateStr, content: md };
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      // 定时器触发时清除 pending 标记和定时器引用
+      pendingSaveRef.current = null;
+      saveTimerRef.current = null;
+      // 将保存请求存入 inflightSaveRef，供 flush 追踪
+      const savePromise = (async () => {
+        try {
+          const updated = await DiaryAPI.saveContent(dateStr, { content: md });
+          setDiary(prev => prev ? { ...prev, word_count: updated.word_count, updated_at: updated.updated_at } : prev);
+          toast.success('日记已自动保存');
+        } catch (e) {
+          console.error('保存日记内容失败:', e);
+          toast.error('自动保存失败，请重试');
+        } finally {
+          // 请求完成后清除 inflight 引用
+          if (inflightSaveRef.current === savePromise) {
+            inflightSaveRef.current = null;
+          }
+        }
+      })();
+      inflightSaveRef.current = savePromise;
+    }, 1500);
+  }, [activeDate]);
+
+  // 组件卸载时 flush 挂起的保存（退出日记界面时）
+  useEffect(() => () => {
+    if (hydrationReleaseTimerRef.current) {
+      clearTimeout(hydrationReleaseTimerRef.current);
+      hydrationReleaseTimerRef.current = null;
+    }
+    flushPendingSave();
+  }, [flushPendingSave]);
+
+  // ========== 手动保存（按钮 / Ctrl+S） ==========
   const handleManualSave = useCallback(async () => {
-    if (!content.trim()) {
+    const hasPending = !!pendingSaveRef.current;
+    const hasInflight = !!inflightSaveRef.current;
+    // 如果既没有 pending 也没有 inflight，说明无新改动
+    if (!hasPending && !hasInflight) {
       toast.info('无新改动');
       return;
     }
-    await flushPendingSave();
-    toast.success('日记已保存');
-  }, [content, flushPendingSave]);
+    try {
+      // 取消防抖定时器，取当前 pending 内容立即保存
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      // 等待任何 inflight 请求
+      if (inflightSaveRef.current) {
+        await inflightSaveRef.current;
+        inflightSaveRef.current = null;
+      }
+      // 若还有 pending 内容则立即保存（使用 pending.dateStr 而非 activeDate，防止日期切换时写错日期）
+      const pending = pendingSaveRef.current;
+      if (pending) {
+        pendingSaveRef.current = null;
+        const updated = await DiaryAPI.saveContent(pending.dateStr, { content: pending.content });
+        setDiary(prev => prev ? { ...prev, word_count: updated.word_count, updated_at: updated.updated_at } : prev);
+      }
+      toast.success('日记已保存');
+    } catch (e) {
+      console.error('手动保存日记失败:', e);
+      toast.error('保存失败，请重试');
+    }
+  }, []);
 
-  // ========== Ctrl+S 快捷键 ==========
+  // ========== Ctrl+S 全局快捷键 ==========
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 's') {
@@ -135,6 +252,21 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   }, [handleManualSave]);
 
   // ========== AI 总结 ==========
+  const handleRangeSummarySubmit = useCallback(async (payload: { start_date: string; end_date: string; existing_summary_mode: ExistingSummaryMode }) => {
+    try {
+      const response = await DiaryAPI.generateAiSummaryRange({
+        start_date: payload.start_date,
+        end_date: payload.end_date,
+        existing_summary_mode: payload.existing_summary_mode
+      });
+      toast.success(`已生成 ${response.created_dates.length} 条，更新 ${response.updated_dates.length} 条`);
+      await loadDiary(activeDate);
+    } catch (e) {
+      console.error('生成范围 AI 总结失败:', e);
+      toast.error('范围总结生成失败');
+    }
+  }, [activeDate, loadDiary]);
+
   const handleGenerateSummary = useCallback(async () => {
     const dateStr = formatDate(activeDate);
     if (!content.trim()) {
@@ -154,26 +286,32 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
     } finally {
       setIsGeneratingSummary(false);
     }
-  }, [activeDate, content, flushPendingSave, setDiary]);
+  }, [activeDate, content, flushPendingSave]);
 
-  const handleRangeSummarySubmit = useCallback(async (payload: {
-    start_date: string;
-    end_date: string;
-    existing_summary_mode: ExistingSummaryMode
-  }) => {
+  // ========== Meta 更新 ==========
+  const handleMoodChange = async (mood: MoodLevel) => {
+    const dateStr = formatDate(activeDate);
     try {
-      const response = await DiaryAPI.generateAiSummaryRange({
-        start_date: payload.start_date,
-        end_date: payload.end_date,
-        existing_summary_mode: payload.existing_summary_mode
-      });
-      toast.success(`已生成 ${response.created_dates.length} 条，更新 ${response.updated_dates.length} 条`);
-      await loadDiary(activeDate);
-    } catch (e) {
-      console.error('生成范围 AI 总结失败:', e);
-      toast.error('范围总结生成失败');
-    }
-  }, [activeDate, loadDiary]);
+      const updated = await DiaryAPI.updateMeta(dateStr, { mood });
+      setDiary(prev => prev ? { ...prev, mood: updated.mood } : prev);
+    } catch (e) { console.error('更新心情失败:', e); }
+  };
+
+  const handleImportanceChange = async (importance: ImportanceLevel) => {
+    const dateStr = formatDate(activeDate);
+    try {
+      const updated = await DiaryAPI.updateMeta(dateStr, { importance });
+      setDiary(prev => prev ? { ...prev, importance: updated.importance } : prev);
+    } catch (e) { console.error('更新重要程度失败:', e); }
+  };
+
+  const handleCustomTagsChange = async (tags: string[]) => {
+    const dateStr = formatDate(activeDate);
+    try {
+      const updated = await DiaryAPI.updateMeta(dateStr, { custom_tags: tags });
+      setDiary(prev => prev ? { ...prev, custom_tags: updated.custom_tags } : prev);
+    } catch (e) { console.error('更新自定义标签失败:', e); }
+  };
 
   // ========== 模板应用 ==========
   const handleApplyTemplate = (templateContent: string) => {
@@ -182,15 +320,33 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
     if (editorRef.current) {
       editorRef.current.setMarkdown(newContent);
     }
-    saveContentDebounced(newContent);
+    handleContentChange(newContent);
   };
 
-  // ========== 回到今天 ==========
+  // ========== HSL 控制 ==========
+  const handleHslChange = (key: string, value: string) => {
+    setHsl((prev: any) => ({ ...prev, [key]: parseInt(value) }));
+  };
+
   const handleBackToToday = () => {
     setActiveDate(new Date());
     setSettingsView(false);
-    resetScroll();
+    shouldScrollToDateRef.current = true;
   };
+
+  // ========== 初始定位与滚动 ==========
+  useEffect(() => {
+    if (settingsView || !shouldScrollToDateRef.current) return;
+    const timer = setTimeout(() => {
+      const scrollId = `diary-date-${activeDate.getFullYear()}-${activeDate.getMonth()}-${activeDate.getDate()}`;
+      const el = document.getElementById(scrollId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      shouldScrollToDateRef.current = false;
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [activeDate, settingsView]);
 
   // ========== 月历数据 ==========
   const [monthList] = useState(() => {
@@ -241,8 +397,8 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
                 key={`${year}-${month}-${day}`}
                 id={`diary-date-${year}-${month}-${day}`}
                 onClick={() => {
-                  debugLog('userAction', '[MonthBlock] Date clicked:', currentDate.toISOString());
                   setActiveDate(currentDate);
+                  shouldScrollToDateRef.current = false;
                 }}
                 className={`aspect-square rounded-full flex items-center justify-center transition-all duration-300 relative text-sm group ${isActive
                   ? 'text-white scale-110 shadow-[0_8px_20px_-5px_rgba(0,0,0,0.3)] z-10'
@@ -285,7 +441,7 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
             <p className="text-xl font-serif mt-2 italic text-gray-400 opacity-60 leading-none">时间长廊</p>
           </header>
 
-          <div id="diary-calendar-container" className="flex-1 overflow-y-auto no-scrollbar px-10 relative scroll-smooth py-8">
+          <div className="flex-1 overflow-y-auto no-scrollbar px-10 relative scroll-smooth py-8">
             {!settingsView ? (
               <div className="animate-in fade-in slide-in-from-left-2 duration-700">
                 {monthList.map(m => <MonthBlock key={m.toISOString()} date={m} />)}
@@ -296,18 +452,18 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">氛围实验室</p>
                   <div className="space-y-5 px-2">
                     {[
-                      { label: '色相', key: 'h' as const, max: 360, bg: 'linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)' },
-                      { label: '饱和', key: 's' as const, max: 100, bg: `linear-gradient(to right, #888, hsl(${hsl.h}, 100%, 50%))` },
-                      { label: '亮度', key: 'l' as const, max: 100, bg: `linear-gradient(to right, #333, hsl(${hsl.h}, ${hsl.s}%, 50%), #fff)` },
+                      { label: '色相', key: 'h', max: 360, bg: 'linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)' },
+                      { label: '饱和', key: 's', max: 100, bg: `linear-gradient(to right, #888, hsl(${hsl.h}, 100%, 50%))` },
+                      { label: '亮度', key: 'l', max: 100, bg: `linear-gradient(to right, #333, hsl(${hsl.h}, ${hsl.s}%, 50%), #fff)` },
                     ].map(slider => (
                       <div key={slider.key} className="space-y-2">
                         <div className="flex justify-between text-[9px] text-gray-400 uppercase font-medium tracking-tighter">
                           <span>{slider.label}</span>
-                          <span>{hsl[slider.key]}{slider.key === 'h' ? '°' : '%'}</span>
+                          <span>{(hsl as any)[slider.key]}{slider.key === 'h' ? '°' : '%'}</span>
                         </div>
                         <input
                           type="range" min="0" max={slider.max}
-                          value={hsl[slider.key]}
+                          value={(hsl as any)[slider.key]}
                           onChange={e => handleHslChange(slider.key, e.target.value)}
                           className="w-full h-[3px] rounded-full appearance-none cursor-pointer bg-black/5"
                           style={{ background: slider.bg }}
@@ -416,10 +572,11 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
             mood={diary?.mood || null}
             importance={diary?.importance || null}
             customTags={diary?.custom_tags || []}
-            onMoodChange={updateMood}
-            onImportanceChange={updateImportance}
-            onCustomTagsChange={updateCustomTags}
+            onMoodChange={handleMoodChange}
+            onImportanceChange={handleImportanceChange}
+            onCustomTagsChange={handleCustomTagsChange}
           />
+
         </header>
 
         {/* 滚动区域：包含 AI 总结和编辑区 */}
@@ -432,7 +589,7 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
                   onClick={handleGenerateSummary}
                   className="flex items-center text-[12px] font-medium tracking-[0.25em] text-gray-400 hover:text-black transition-colors duration-300 group"
                 >
-                  <span className="mr-1.5 opacity-50 group-hover:opacity-100 transition-opacity">✨</span>
+                  <span className="mr-1.5 opacity-50 group-hover:opacity-100 transition-opacity">✨</span> 
                   生成 AI 总结
                 </button>
               ) : (
@@ -557,4 +714,3 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
 };
 
 export default JournalView;
-

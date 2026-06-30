@@ -1,10 +1,16 @@
 ---
-version: 1.2
+version: 1.3
 created_at: 2026-04-10
-updated_at: 2026-04-24
-last_updated: 新增 repository 接口强封装决策文档索引
+updated_at: 2026-06-29
+last_updated: 新增日记组件架构重构决策文档索引
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## diary-component-refactoring
+- updated_at: 2026-06-29
+- path: `docs/design-decisions/2026-06-29-diary-component-refactoring.md`
+- 触发规则：当需要理解日记组件架构设计、滚动控制方案、自定义 hooks 分离逻辑、或排查日记界面相关问题时读取
+- 内容摘要：日记组件架构重构，采用关注点分离原则将 700+ 行单文件重构为主组件 + 3 个自定义 hooks（useDiaryData、useCalendarScroll、useBackgroundColor）。彻底解决了反复出现的日历点击滚动 bug：通过简化滚动逻辑（只在初始化时滚动，用户点击不触发）从根本上消除竞态条件。记录了防抖保存、编辑器水合处理、跨日期保存保护等关键实现细节。
 
 ## repository-interface-encapsulation
 - updated_at: 2026-04-24

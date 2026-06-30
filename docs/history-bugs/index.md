@@ -1,3 +1,10 @@
+## 2026-06-29-diary-calendar-scroll-race-condition
+
+- updated_at: 2026-06-29
+- path: `docs/history-bugs/2026-06-29-diary-calendar-scroll-race-condition.md`
+- 触发规则：在排查日记界面日历点击后自动滚动、滚动条跳到顶部、React 状态更新竞态条件、useEffect 依赖竞态问题时阅读
+- 内容摘要：记录了日记界面右侧日历点击后左侧滚动条自动跳到顶部的反复出现的 bug。根本原因是 React 状态更新的竞态条件：onClick 中 `setActiveDate` 和 `setShouldScrollToDate(false)` 都是异步的，useEffect 触发时 shouldScrollToDate 可能还未更新为 false，导致滚动逻辑执行。解决方案是使用 useRef 替代 useState，因为 ref.current 修改是同步的，完全避免竞态条件。
+
 ## 2026-05-26-message-content-type-mismatch
 
 - updated_at: 2026-05-26
