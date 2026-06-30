@@ -17,6 +17,7 @@ from lifeprism.llm.providers import LLMResponse
 from lifeprism.config.settings_manager import settings
 from lifeprism.utils.logger import get_logger
 from lifeprism.llm.session import session_manager
+from lifeprism.llm.utils.llm_call_logger import llm_call_logger
 logger = get_logger(__name__)
 
 
@@ -304,6 +305,19 @@ class WechatChannel(BaseChannel):
             logger.info(f"发送消息")
             try:
                 response: OutboundMessage = await self.bus.send(inbound_msg)
+
+                # 记录 LLM 调用（命令消息如 /new /continue 不记录）
+                if not content.startswith('/'):
+                    try:
+                        llm_call_logger.log_call(
+                            inbound_msg=inbound_msg,
+                            outbound_msg=response,
+                            prompt_module="chat",
+                            prompt_name="wechat_chat",
+                        )
+                    except Exception as log_e:
+                        logger.warning(f"记录 LLM 调用日志失败: {log_e}")
+
                 if response.session_id:
                     # 使用最新的session_id继续处理
                     logger.debug(f"更新session_id {session_id} -> {response.session_id}")

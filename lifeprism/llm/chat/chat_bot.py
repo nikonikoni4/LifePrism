@@ -2,6 +2,7 @@ from typing import List, Optional
 from lifeprism.llm.bus import MessageType, OutboundMessage, bus, InboundMessage
 from lifeprism.llm.providers.llm_providers.base import LLMResponse
 from lifeprism.llm.session.manager import session_manager, Session
+from lifeprism.llm.utils.llm_call_logger import llm_call_logger
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -27,7 +28,18 @@ class ChatBot:
                 extra=extra
             )
             response_data = await self._bus.send(msg)
-            
+
+            # 记录 LLM 调用
+            try:
+                llm_call_logger.log_call(
+                    inbound_msg=msg,
+                    outbound_msg=response_data if isinstance(response_data, OutboundMessage) else None,
+                    prompt_module="chat",
+                    prompt_name="chat",
+                )
+            except Exception as log_e:
+                logger.warning(f"记录 LLM 调用日志失败: {log_e}")
+
             # 3. 包装响应
             if isinstance(response_data,OutboundMessage):
                 return response_data.response

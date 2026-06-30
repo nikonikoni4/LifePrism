@@ -94,6 +94,7 @@ class LLMCallLogger:
         prompt_version: Optional[str] = None,
         model: Optional[str] = None,
         workflow_id: Optional[str] = None,
+        score: Optional[float] = None,
     ) -> Optional[str]:
         """记录一次 LLM 调用
 
@@ -103,8 +104,9 @@ class LLMCallLogger:
             prompt_module: prompt 模块名（可选）
             prompt_name: prompt 名称（可选）
             prompt_version: prompt 版本（可选）
-            model: 使用的模型（可选）
+            model: 使用的模型（可选，未传时自动从 settings 获取）
             workflow_id: workflow ID（可选）
+            score: 评分（可选，默认 None 不写入 JSON，可由后续 update_score 设置）
 
         Returns:
             记录 ID，如果未启用则返回 None
@@ -140,7 +142,11 @@ class LLMCallLogger:
             if outbound_msg and outbound_msg.extra and "tool_call_chain" in outbound_msg.extra:
                 tool_call_chain = outbound_msg.extra["tool_call_chain"]
 
-            # 6. 构建记录
+            # 6. model 自动兜底：未传时从 settings 获取默认模型
+            if model is None:
+                model = settings.get('model', None) or getattr(settings, 'model', None)
+
+            # 7. 构建记录
             record = {
                 "id": str(uuid.uuid4()),
                 "timestamp": datetime.now().isoformat(),
@@ -166,10 +172,11 @@ class LLMCallLogger:
                 "tool_call_chain": tool_call_chain,
                 "model": model,
                 "tokens": tokens,
-                "error": None
+                "error": None,
+                "score": score,  # 评分，默认为 null，由后续 agent 通过 update_score 赋值
             }
 
-            # 7. 写入文件
+            # 8. 写入文件
             self._write_record(record)
 
             logger.debug(f"成功记录 LLM 调用: {record['id']}")
@@ -400,9 +407,11 @@ class LLMCallLogger:
                         dataset.append({
                             "id": call.get("id"),
                             "timestamp": call.get("timestamp"),
+                            "model": call.get("model"),
                             "input": call.get("input"),
                             "output": call.get("output"),
                             "tokens": call.get("tokens"),
+                            "score": call.get("score"),
                         })
             except Exception as e:
                 logger.error(f"读取日志文件失败 {log_file}: {e}")

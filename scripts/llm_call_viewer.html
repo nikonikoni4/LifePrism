@@ -217,6 +217,30 @@
     overflow: hidden; text-overflow: ellipsis;
   }
   .card-header .prompt-tag.no-prompt { background: rgba(134,142,150,.15); color: var(--text-dim); }
+  .card-header .model-tag {
+    font-size: 13px;
+    padding: 2px 10px;
+    border-radius: 99px;
+    background: rgba(34,184,207,.12);
+    color: var(--cyan);
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden; text-overflow: ellipsis;
+    flex-shrink: 0;
+  }
+  .card-header .model-tag.no-model { display: none; }
+  .card-header .score-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 13px; font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 99px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .card-header .score-badge.s-score { background: rgba(81,207,102,.15); color: var(--success); }
+  .card-header .score-badge.a-score { background: rgba(76,154,255,.15); color: var(--accent); }
+  .card-header .score-badge.b-score { background: rgba(252,196,25,.15); color: var(--warning); }
+  .card-header .score-badge.c-score { background: rgba(255,107,107,.15); color: var(--error); }
   .card-header .type-badge {
     font-size: 12px; font-weight: 600;
     padding: 2px 10px;
@@ -670,6 +694,26 @@ function createCard(rec) {
   promptEl.textContent = promptLabel || '(无 prompt)';
   header.appendChild(promptEl);
 
+  // Model tag
+  const modelTag = document.createElement('span');
+  modelTag.className = 'model-tag' + (rec.model ? '' : ' no-model');
+  modelTag.textContent = rec.model || '';
+  header.appendChild(modelTag);
+
+  // Score badge
+  if (rec.score != null) {
+    const scoreBadge = document.createElement('span');
+    const scoreVal = typeof rec.score === 'number' ? rec.score : parseFloat(rec.score);
+    let scoreClass = 'b-score';
+    if (scoreVal >= 8) scoreClass = 's-score';
+    else if (scoreVal >= 6) scoreClass = 'a-score';
+    else if (scoreVal >= 4) scoreClass = 'b-score';
+    else scoreClass = 'c-score';
+    scoreBadge.className = `score-badge ${scoreClass}`;
+    scoreBadge.textContent = `⭐ ${scoreVal}`;
+    header.appendChild(scoreBadge);
+  }
+
   // Type badge
   const type = rec.message_type || 'unknown';
   const typeEl = document.createElement('span');
@@ -831,17 +875,23 @@ function createInfoGrid(rec) {
     { label: 'Channel', value: rec.channel },
     { label: 'Workflow ID', value: rec.workflow_id },
     { label: 'Model', value: rec.model },
+    { label: 'Score', value: rec.score },
     { label: 'Prompt Module', value: rec.prompt?.module },
     { label: 'Prompt Name', value: rec.prompt?.name },
     { label: 'Prompt Version', value: rec.prompt?.version },
   ];
-  // Only show model if it exists
-  const showFields = fields.filter(f => f.value != null);
+  // Only show fields that have a value (score=0 is a valid value to show)
+  // Score 总是显示，null 时显示 "null"
+  const showFields = fields.filter(f => {
+    if (f.label === 'Score') return true;
+    return f.value != null && f.value !== '';
+  });
 
   for (const f of showFields) {
     const item = document.createElement('div');
     item.className = 'info-item';
-    item.innerHTML = `<span class="label">${f.label}:</span><span class="value">${escapeHtml(String(f.value))}</span>`;
+    const displayValue = f.value != null && f.value !== '' ? escapeHtml(String(f.value)) : '<span class="value null">null</span>';
+    item.innerHTML = `<span class="label">${f.label}:</span><span class="value">${displayValue}</span>`;
     grid.appendChild(item);
   }
   section.appendChild(grid);
@@ -929,6 +979,7 @@ function applyFilters() {
         rec.prompt?.module, rec.prompt?.name, rec.prompt?.content,
         rec.input?.text, rec.output?.content,
         rec.tool_call_chain ? JSON.stringify(rec.tool_call_chain) : '',
+        String(rec.score ?? ''),
       ].filter(Boolean).join(' ').toLowerCase();
       if (!searchable.includes(query)) return false;
     }
