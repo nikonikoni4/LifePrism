@@ -30,7 +30,7 @@ from lifeprism.repository import (
     screen_capture_repository,
 )
 logger = get_logger(__name__)
-logger.setLevel(DEBUG)
+# logger.setLevel(DEBUG)
 
 # logger.setLevel(DEBUG)
 # ==================== 常量配置 ====================
