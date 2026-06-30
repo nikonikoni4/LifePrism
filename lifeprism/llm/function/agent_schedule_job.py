@@ -147,7 +147,8 @@ async def summary_moods(mood_data: str) -> str:
     # 调用 LLM 进行总结
     logger.debug(f"[summary_moods] 发送 LLM 请求进行心情总结")
     msg = InboundMessage(
-        MessageType.DREAM_TASK,
+        type = MessageType.GENERAL_TASK,
+        token_type = TokenType.DREAM_TASK,
         content=f"## 需要总结的心情数据\n{mood_data}",
         extra={"system_prompt": mood_summary_prompt}
     )
