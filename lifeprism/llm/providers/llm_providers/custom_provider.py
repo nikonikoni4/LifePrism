@@ -6,6 +6,7 @@ Licensed under the MIT License.
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any
 
@@ -64,6 +65,53 @@ class CustomProvider(LLMProvider):
                 return LLMResponse(content=f"Error: {body.strip()[:500]}", finish_reason="error")
             return LLMResponse(content=f"Error: {e}", finish_reason="error")
 
+    @staticmethod
+    def _parse_xml_tool_calls(content: str) -> list[ToolCallRequest]:
+        """Parse XML-format tool calls from content (for MIMO and similar models).
+
+        Handles formats like:
+        <tool_call>
+        <function=read_file>
+        <parameter=file_path>path/to/file</parameter>
+        <parameter=offset>1</parameter>
+        </function>
+        </tool_call>
+        """
+        tool_calls = []
+        tool_call_pattern = r'<tool_call>(.*?)</tool_call>'
+        matches = re.findall(tool_call_pattern, content, re.DOTALL)
+
+        for match in matches:
+            func_match = re.search(r'<function=([^>]+)>', match)
+            if not func_match:
+                continue
+
+            function_name = func_match.group(1)
+
+            param_pattern = r'<parameter=([^>]+)>([^<]*)</parameter>'
+            params = re.findall(param_pattern, match)
+
+            arguments = {}
+            for param_name, param_value in params:
+                param_value = param_value.strip()
+                if param_value.lower() in ('true', 'false'):
+                    arguments[param_name] = param_value.lower() == 'true'
+                elif param_value.isdigit():
+                    arguments[param_name] = int(param_value)
+                else:
+                    try:
+                        arguments[param_name] = float(param_value)
+                    except ValueError:
+                        arguments[param_name] = param_value
+
+            tool_calls.append(ToolCallRequest(
+                id=str(uuid.uuid4())[:9],
+                name=function_name,
+                arguments=arguments,
+            ))
+
+        return tool_calls
+
     def _parse(self, response: Any) -> LLMResponse:
         if not response.choices:
             return LLMResponse(
@@ -72,14 +120,27 @@ class CustomProvider(LLMProvider):
             )
         choice = response.choices[0]
         msg = choice.message
+        content = msg.content
+        finish_reason = choice.finish_reason
+
         tool_calls = [
             ToolCallRequest(id=tc.id, name=tc.function.name,
                             arguments=json_repair.loads(tc.function.arguments) if isinstance(tc.function.arguments, str) else tc.function.arguments)
             for tc in (msg.tool_calls or [])
         ]
+
+        # Handle XML-format tool calls (MIMO, MiniMax, etc.)
+        # If finish_reason is 'tool_calls' but native tool_calls is empty,
+        # and content contains XML-format tool calls, parse them from content.
+        if finish_reason == "tool_calls" and not tool_calls and content and "<tool_call>" in content:
+            xml_tool_calls = self._parse_xml_tool_calls(content)
+            if xml_tool_calls:
+                tool_calls = xml_tool_calls
+                content = None  # Clear content since it was a tool call, not text
+
         u = response.usage
         return LLMResponse(
-            content=msg.content, tool_calls=tool_calls, finish_reason=choice.finish_reason or "stop",
+            content=content, tool_calls=tool_calls, finish_reason=finish_reason or "stop",
             usage={"prompt_tokens": u.prompt_tokens, "completion_tokens": u.completion_tokens, "total_tokens": u.total_tokens} if u else {},
             reasoning_content=getattr(msg, "reasoning_content", None) or None,
         )
