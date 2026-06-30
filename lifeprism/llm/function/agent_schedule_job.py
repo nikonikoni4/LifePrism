@@ -338,32 +338,23 @@ def format_chat_history(history: list[dict]) -> str:
     """
     格式化聊天历史记录为 Markdown 格式
 
+    每条 history 是 LLM 对一次对话的提取结果，内部已有 `一、` `二、` 层级结构。
+    多条记录之间用空行分隔，不再添加序号前缀（避免与内容自身编号冲突）。
+
     Args:
         history: 聊天历史记录列表，每项包含 content 字段
 
     Returns:
         str: 格式化后的 Markdown 字符串，如果没有有效内容则返回空字符串
-
-    Example:
-        >>> history = [
-        ...     {"timestamp": "2026-05-12T14:30:45", "content": "讨论了异步编程"},
-        ...     {"timestamp": "2026-05-12T15:45:30", "content": "设计数据库方案"}
-        ... ]
-        >>> print(format_chat_history(history))
-        1. 讨论了异步编程
-
-        2. 设计数据库方案
     """
     if not history:
         return ""
 
     formatted_history = []
-    index = 1
     for item in history:
         content = item.get("content", "")
         if content:
-            formatted_history.append(f"{index}. {content}")
-            index += 1
+            formatted_history.append(content)
 
     return "\n\n".join(formatted_history) if formatted_history else ""
 
@@ -477,17 +468,7 @@ if __name__ == "__main__":
     async def main():
         loop_task = asyncio.create_task(agent_loop.loop())
         try:
-            start = datetime(2026, 4, 1)
-            end = datetime(2026, 6, 28)
-            current = start
-            while current <= end:
-                date_str = current.strftime("%Y-%m-%d")
-                print(f"\n{'='*60}")
-                print(f"开始处理: {date_str}")
-                print(f"{'='*60}")
-                await dreaming(date_str)
-                current += timedelta(days=1)
-            print("\n全部完成 ✅")
+           await process_session_message(30)
         finally:
             loop_task.cancel()
 

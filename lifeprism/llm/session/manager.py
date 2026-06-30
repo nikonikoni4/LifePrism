@@ -324,14 +324,25 @@ class ChatHistoryManager:
         self.load_histories()
 
     def load_histories(self)->list[dict]:
-        """加载jsonl文件和meta_date"""
+        """加载jsonl文件和meta_date
+
+        兼容两种格式：
+        - JSONL 格式（正确）：每行一个 JSON 对象
+        - 旧格式（bug）：第二行为整个 JSON 数组 [{...}, {...}]
+        """
         if self.path.exists():
             with self.path.open('r',encoding='utf-8') as f:
                 for line in f:
                     line  = line.strip()
                     if not line:
                         continue
-                    data:dict = json.loads(line)
+                    data = json.loads(line)
+                    # 兼容旧格式：如果解析出来是 list，展开添加每个元素
+                    if isinstance(data, list):
+                        for entry in data:
+                            if isinstance(entry, dict):
+                                self.histories.append(entry)
+                        continue
                     if data.get("_type",None):
                         self.last_processed_time = datetime.fromisoformat(data.get("last_processed_time",None)) if data.get("last_processed_time",None) else datetime.now()
                     else:
@@ -374,7 +385,8 @@ class ChatHistoryManager:
                 }
             f.write(json.dumps(metadata_line, ensure_ascii=False)+"\n")
             if self.histories:
-                f.write(json.dumps(self.histories, ensure_ascii=False))
+                for entry in self.histories:
+                    f.write(json.dumps(entry, ensure_ascii=False)+"\n")
 
     
 

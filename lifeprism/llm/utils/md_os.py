@@ -37,6 +37,24 @@ def read_md(file_path: Path | str) -> str:
     return file_path.read_text(encoding="utf-8")
 
 
+def _sanitize_behavior_content(content: str) -> str:
+    """过滤 LLM 输出中的 markdown 标题语法，保持 behavior.md 层级干净。
+
+    behavior.md 使用 ``## date`` 和 ``### subheading`` 管理文档结构，
+    子标题下的内容中不能再出现 markdown 标题（#、##、### 等），
+    否则会导致提取时和人工阅读时层级混乱。
+
+    处理规则：去除每行行首的 ``#{1,6} `` 标记，保留标题文本本身。
+
+    Args:
+        content: LLM 生成的原始内容
+
+    Returns:
+        str: 过滤后的内容
+    """
+    return re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)
+
+
 def write_date_md(
     file_path: Path | str,
     date: str,
@@ -78,6 +96,9 @@ def write_date_md(
     """
     if not subheading:
         raise ValueError("write_date_md requires a non-empty subheading")
+
+    # 统一过滤：去除内容中的 markdown 标题语法，避免与 ## date / ### subheading 层级冲突
+    content = _sanitize_behavior_content(content)
 
     if isinstance(file_path, str):
         file_path = Path(file_path)
