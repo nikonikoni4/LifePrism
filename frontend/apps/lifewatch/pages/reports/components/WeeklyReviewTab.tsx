@@ -10,7 +10,6 @@ import TimeOverviewWidget from './TimeOverviewWidget';
 import TimeDistributionChart from './TimeDistributionChart';
 import GoalProgressCard from './GoalProgressCard';
 import TodoStatsCard from './TodoStatsCard';
-import AISummaryCard from './AISummaryCard';
 import TrendComparisonCard from './TrendComparisonCard';
 import { ReportsAPI } from '../api';
 import { WeeklyReportData } from '../types';
@@ -251,16 +250,7 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '', onNav
                     />
                 </div>
 
-                <div className="lg:col-span-12 space-y-6">
-                    {/* AI Summary */}
-                    <AISummaryCard
-                        title="AI 规律总结"
-                        reportType="weekly"
-                        weekStartDate={startDate}
-                        weekEndDate={endDate}
-                        content={displayData.aiSummary}
-                    />
-                </div>
+                {/* TODO: 周报 AI 总结已废弃，仅日报支持 AI 总结（每天 10:00 自动更新） */}
             </div>
         </div>
     );

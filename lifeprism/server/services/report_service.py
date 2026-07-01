@@ -30,9 +30,39 @@ from lifeprism.repository import todo_repository, goal_repository
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
 from lifeprism.server.services.category_service import category_service
+from lifeprism.config import settings
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
+
+
+# ==================== 辅助：从 behavior.md 读取 AI 总结 ====================
+
+def _get_behavior_content(date: str) -> str:
+    """
+    从 behavior.md 读取指定日期的 AI 总结内容
+
+    behavior.md 由每天 10:00 的定时任务 (dreaming) 自动更新，
+    存放前一天的 AI 行为总结和心情总结。
+
+    Args:
+        date: 日期 YYYY-MM-DD
+
+    Returns:
+        str: 该日期的 behavior 内容，如果文件不存在或日期无数据则返回空字符串
+    """
+    from lifeprism.llm.utils.md_os import read_md, extract_date_md
+
+    behavior_path = settings.lifeprism_data_path / "user/daily_data/behavior.md"
+    try:
+        content = read_md(behavior_path)
+        if not content:
+            return ""
+        result = extract_date_md(content, date)
+        return result.get(date, "")
+    except (FileNotFoundError, OSError, ValueError) as e:
+        logger.warning(f"读取 behavior.md 失败 (date={date}): {e}")
+        return ""
 
 
 # ==================== 主要接口 ====================
@@ -74,6 +104,8 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
         )
         response = _daily_dict_to_response(cached)
         response.comparison_data = comparison_data
+        # AI 总结从 behavior.md 实时读取（每天 10:00 自动更新）
+        response.ai_summary = _get_behavior_content(date)
         return response
     
     # 3. 重新计算各板块数据
@@ -111,8 +143,7 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
     
     daily_report_provider.upsert_daily_report(date, report_data)
     
-    # 5. 返回报告数据（保留已有的 ai_summary）
-    existing_ai_summary = cached.get('ai_summary') if cached else None
+    # 5. 返回报告数据（AI 总结从 behavior.md 实时读取）
     return DailyReportResponse(
         date=date,
         sunburst_data=sunburst_data,
@@ -120,7 +151,7 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
         goal_data=goal_data,
         daily_trend_data=daily_trend_data,
         comparison_data=comparison_data,
-        ai_summary=existing_ai_summary,
+        ai_summary=_get_behavior_content(date),
         state=state,
         data_version=1
     )
@@ -168,6 +199,8 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
         )
         response = _weekly_dict_to_response(cached, week_start_date, week_end_date)
         response.comparison_data = comparison_data
+        # 周报暂无 AI 总结
+        response.ai_summary = None
         return response
     
     # 3. 重新计算各板块数据
@@ -205,8 +238,7 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
     
     weekly_report_provider.upsert_weekly_report(week_start_date, report_data)
     
-    # 5. 返回报告数据（保留已有的 ai_summary）
-    existing_ai_summary = cached.get('ai_summary') if cached else None
+    # 5. 返回报告数据（周报暂无 AI 总结）
     return WeeklyReportResponse(
         week_start_date=week_start_date,
         week_end_date=week_end_date,
@@ -215,7 +247,7 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
         goal_data=goal_data,
         daily_trend_data=daily_trend_data,
         comparison_data=comparison_data,
-        ai_summary=existing_ai_summary,
+        ai_summary=None,
         state=state,
         data_version=1
     )
@@ -266,6 +298,8 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
         )
         response = _monthly_dict_to_response(cached, month_start_date, month_end_date)
         response.comparison_data = comparison_data
+        # 月报暂无 AI 总结
+        response.ai_summary = None
         return response
     
     # 3. 重新计算各板块数据
@@ -308,8 +342,7 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
     
     monthly_report_provider.upsert_monthly_report(month_start_date, report_data)
     
-    # 5. 返回报告数据（保留已有的 ai_summary）
-    existing_ai_summary = cached.get('ai_summary') if cached else None
+    # 5. 返回报告数据（月报暂无 AI 总结）
     return MonthlyReportResponse(
         month_start_date=month_start_date,
         month_end_date=month_end_date,
@@ -319,120 +352,10 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
         daily_trend_data=daily_trend_data,
         heatmap_data=heatmap_data,
         comparison_data=comparison_data,
-        ai_summary=existing_ai_summary,
+        ai_summary=None,
         state=state,
         data_version=1
     )
-
-
-async def get_daily_ai_summary(date: str, pattern: str) -> dict:
-    """
-    获取每日 AI 总结（异步版本）
-    
-    调用 LLM 生成每日活动的智能分析总结，并保存到 daily_report 表
-    
-    Args:
-        date: 日期 YYYY-MM-DD
-        pattern: 总结模式
-            - complex: 复杂模式，包含更多统计信息
-            - simple: 简单模式，只包含基本统计信息
-        
-    Returns:
-        dict: 包含 content 和 tokens_usage 的字典
-            - content: AI 生成的总结内容
-            - tokens_usage: Token 使用量统计
-    """
-    from lifeprism.llm.function.report_summary import daily_summary
-    
-    logger.info(f"生成每日 AI 总结 {date}, pattern={pattern}")
-    result = await daily_summary(date=date, pattern=pattern)
-    
-    # 保存 AI 总结到 daily_report 表
-    try:
-        daily_report_provider.upsert_daily_report(date, {
-            'ai_summary': result['content']
-        })
-        logger.info(f"已保存 AI 总结到日报告 {date}")
-    except Exception as e:
-        logger.error(f"保存 AI 总结失败: {e}")
-    
-    return result
-
-
-async def get_weekly_ai_summary(week_start_date: str, week_end_date: str, pattern: str) -> dict:
-    """
-    获取周 AI 总结（异步版本）
-    
-    调用 LLM 生成每周活动的智能分析总结，并保存到 weekly_report 表
-    
-    Args:
-        week_start_date: 周开始日期 YYYY-MM-DD（周一）
-        week_end_date: 周结束日期 YYYY-MM-DD（周日）
-        pattern: 总结模式，可选值: "simple", "complex", "custom"
-        
-    Returns:
-        dict: 包含 content 和 tokens_usage 的字典
-            - content: AI 生成的总结内容
-            - tokens_usage: Token 使用量统计
-    """
-    from lifeprism.llm.function.report_summary import multi_days_summary
-    
-    logger.info(f"生成周 AI 总结 {week_start_date} ~ {week_end_date}, pattern={pattern}")
-    
-    result = await multi_days_summary(
-        start_date=week_start_date,
-        end_date=week_end_date,
-        pattern=pattern
-    )
-    
-    # 保存 AI 总结到 weekly_report 表
-    try:
-        weekly_report_provider.upsert_weekly_report(week_start_date, {
-            'ai_summary': result['content']
-        })
-        logger.info(f"已保存 AI 总结到周报告 {week_start_date}")
-    except Exception as e:
-        logger.error(f"保存周 AI 总结失败: {e}")
-    
-    return result
-
-
-async def get_monthly_ai_summary(month_start_date: str, month_end_date: str, pattern: str = "custom") -> dict:
-    """
-    获取月 AI 总结（异步版本）
-    
-    调用 LLM 生成每月活动的智能分析总结，并保存到 monthly_report 表
-    
-    Args:
-        month_start_date: 月开始日期 YYYY-MM-01
-        month_end_date: 月结束日期 YYYY-MM-DD（月末）
-        pattern: 总结模式，可选值: "simple", "complex", "custom"
-        
-    Returns:
-        dict: 包含 content 和 tokens_usage 的字典
-            - content: AI 生成的总结内容
-            - tokens_usage: Token 使用量统计
-    """
-    from lifeprism.llm.function.report_summary import multi_days_summary
-    
-    logger.info(f"生成月 AI 总结 {month_start_date} ~ {month_end_date}, pattern={pattern}")
-    
-    result = await multi_days_summary(
-        start_date=month_start_date,
-        end_date=month_end_date,
-        pattern=pattern
-    )
-    
-    # 保存 AI 总结到 monthly_report 表
-    try:
-        monthly_report_provider.upsert_monthly_report(month_start_date, {
-            'ai_summary': result['content']
-        })
-        logger.info(f"已保存 AI 总结到月报告 {month_start_date}")
-    except Exception as e:
-        logger.error(f"保存月 AI 总结失败: {e}")
-    
-    return result
 
 
 def _calc_comparison_data(

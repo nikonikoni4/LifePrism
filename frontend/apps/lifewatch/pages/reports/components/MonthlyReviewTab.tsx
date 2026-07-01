@@ -10,7 +10,6 @@ import TimeOverviewWidget from './TimeOverviewWidget';
 import CalendarHeatmap from './CalendarHeatmap';
 import GoalProgressCard from './GoalProgressCard';
 import TodoStatsCard from './TodoStatsCard';
-import AISummaryCard from './AISummaryCard';
 import TimeDistributionChart from './TimeDistributionChart';
 import TrendComparisonCard from './TrendComparisonCard';
 import { ReportsAPI } from '../api';
@@ -289,16 +288,7 @@ const MonthlyReviewTab: React.FC<MonthlyReviewTabProps> = ({ className = '', onN
                     />
                 </div>
 
-                <div className="lg:col-span-12 space-y-6">
-                    {/* AI Summary */}
-                    <AISummaryCard
-                        title="AI 全局总结"
-                        reportType="monthly"
-                        monthStartDate={`${selectedMonth}-01`}
-                        monthEndDate={getMonthEndDate(selectedMonth)}
-                        content={displayData.aiSummary}
-                    />
-                </div>
+                {/* TODO: 月报 AI 总结已废弃，仅日报支持 AI 总结（每天 10:00 自动更新） */}
             </div>
         </div>
     );

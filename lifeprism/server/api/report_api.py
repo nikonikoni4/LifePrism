@@ -10,19 +10,11 @@ from lifeprism.server.schemas.report_schemas import (
     DailyReportListResponse,
     WeeklyReportResponse,
     MonthlyReportResponse,
-    AISummaryResponse,
-    AISummaryRequest,
-    WeeklyAISummaryRequest,
-    MonthlyAISummaryRequest,
-    TokenUsage,
 )
 from lifeprism.server.services.report_service import (
     get_daily_report as service_get_daily_report,
     get_weekly_report as service_get_weekly_report,
     get_monthly_report as service_get_monthly_report,
-    get_daily_ai_summary as service_get_daily_ai_summary,
-    get_weekly_ai_summary as service_get_weekly_ai_summary,
-    get_monthly_ai_summary as service_get_monthly_ai_summary,
     _daily_dict_to_response,
     _weekly_dict_to_response,
     _monthly_dict_to_response,
@@ -55,37 +47,6 @@ async def get_daily_report(
     - **daily_trend_data**: 24小时时间趋势
     """
     return service_get_daily_report(date, force_refresh)
-
-
-@router.post("/daily/ai_summary", response_model=AISummaryResponse)
-async def get_daily_ai_summary(
-    request: AISummaryRequest
-):
-    """
-    获取每日 AI 总结
-    
-    调用 LLM 生成每日活动的智能分析总结
-    
-    请求体参数:
-    - **date**: 日期 YYYY-MM-DD
-    - **pattern**: 总结模式（可选，默认 "complex"）
-      - complex: 复杂模式，包含更多统计信息
-      - simple: 简单模式，只包含基本统计信息
-    
-    返回:
-    - **content**: AI 生成的总结内容
-    - **tokens_usage**: Token 使用量统计
-    """
-    
-    result = await service_get_daily_ai_summary(request.date, request.pattern)
-    return AISummaryResponse(
-        content=result['content'],
-        tokens_usage=TokenUsage(
-            input_tokens=result['tokens_usage']['input_tokens'],
-            output_tokens=result['tokens_usage']['output_tokens'],
-            total_tokens=result['tokens_usage']['total_tokens']
-        )
-    )
 
 
 @router.get("/daily/range", response_model=DailyReportListResponse)
@@ -162,39 +123,6 @@ async def get_weekly_report(
     return service_get_weekly_report(week_start_date, force_refresh)
 
 
-@router.post("/weekly/ai_summary", response_model=AISummaryResponse)
-async def get_weekly_ai_summary(
-    request: WeeklyAISummaryRequest
-):
-    """
-    获取周 AI 总结
-    
-    调用 LLM 生成每周活动的智能分析总结
-    
-    请求体参数:
-    - **week_start_date**: 周开始日期 YYYY-MM-DD（周一）
-    - **week_end_date**: 周结束日期 YYYY-MM-DD（周日）
-    - **pattern**: 总结模式（可选，默认 "complex"）
-    
-    返回:
-    - **content**: AI 生成的总结内容
-    - **tokens_usage**: Token 使用量统计
-    """
-    result = await service_get_weekly_ai_summary(
-        request.week_start_date, 
-        request.week_end_date, 
-        request.pattern
-    )
-    return AISummaryResponse(
-        content=result['content'],
-        tokens_usage=TokenUsage(
-            input_tokens=result['tokens_usage']['input_tokens'],
-            output_tokens=result['tokens_usage']['output_tokens'],
-            total_tokens=result['tokens_usage']['total_tokens']
-        )
-    )
-
-
 @router.delete("/weekly/{week_start_date}")
 async def delete_weekly_report(
     week_start_date: str = Path(..., description="周开始日期 YYYY-MM-DD（周一）")
@@ -260,39 +188,6 @@ async def get_monthly_report(
     - **heatmap_data**: 热力图数据（每日总分钟数和分类分解）
     """
     return service_get_monthly_report(month, force_refresh)
-
-
-@router.post("/monthly/ai_summary", response_model=AISummaryResponse)
-async def get_monthly_ai_summary(
-    request: MonthlyAISummaryRequest
-):
-    """
-    获取月 AI 总结
-    
-    调用 LLM 生成每月活动的智能分析总结
-    
-    请求体参数:
-    - **month_start_date**: 月开始日期 YYYY-MM-01
-    - **month_end_date**: 月结束日期 YYYY-MM-DD（月末）
-    - **pattern**: 总结模式（可选，默认 "complex"）
-    
-    返回:
-    - **content**: AI 生成的总结内容
-    - **tokens_usage**: Token 使用量统计
-    """
-    result = await service_get_monthly_ai_summary(
-        request.month_start_date, 
-        request.month_end_date, 
-        request.pattern
-    )
-    return AISummaryResponse(
-        content=result['content'],
-        tokens_usage=TokenUsage(
-            input_tokens=result['tokens_usage']['input_tokens'],
-            output_tokens=result['tokens_usage']['output_tokens'],
-            total_tokens=result['tokens_usage']['total_tokens']
-        )
-    )
 
 
 @router.delete("/monthly/{month_start_date}")
