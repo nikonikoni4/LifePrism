@@ -212,7 +212,9 @@ async def update_memory(date: str, date_offset: int = DEFAULT_DATE_OFFSET) -> No
     content = f"""
     你需要帮我更新recent_state.md 文档，如果涉及到user.md相关内容,也需要更新user.md文档。
     ## 近{date_offset}天的behavior.md内容
+    <behavior_md content>
     {behavior_md}
+    </behavior_md content>
     ## 近{date_offset}天的电脑使用总览
     {computer_overview}
     ## 之前的recent_state.md内容仅作参考

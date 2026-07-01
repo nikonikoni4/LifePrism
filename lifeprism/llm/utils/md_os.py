@@ -235,14 +235,14 @@ def extract_date_md(
         Dict[str, str]: 字典，key 为日期字符串（'YYYY-MM-DD'），value 为该日期下的内容。
             - 如果指定日期不存在，不会出现在返回字典中
             - 如果指定日期存在但内容为空，value 为空字符串
-            - 内容不包含日期标题和子标题本身，只包含正文
+            - 内容不包含日期标题（`## YYYY-MM-DD`），但保留子标题（`### subheading`）
 
     Example:
         >>> content = "## 2026-05-08\\n### 工作\\n完成开发\\n## 2026-05-09\\n### 工作\\n修复bug"
         >>> extract_date_md(content, "2026-05-08")
-        {'2026-05-08': '完成开发'}
+        {'2026-05-08': '### 工作\\n完成开发'}
         >>> extract_date_md(content, "2026-05-08", "2026-05-09")
-        {'2026-05-08': '完成开发', '2026-05-09': '修复bug'}
+        {'2026-05-08': '### 工作\\n完成开发', '2026-05-09': '### 工作\\n修复bug'}
     """
     if end_date is None:
         end_date = start_date
@@ -300,29 +300,36 @@ def _extract_all_subheadings(date_block: str) -> str:
     从日期块中提取所有子标题的内容并合并。
 
     该函数是内部辅助函数，用于处理一个日期标题下的所有子标题内容。
-    会自动过滤掉子标题行本身，只保留正文内容。
+    保留子标题行（### subheading），并在各子标题块之间使用 ``\\n\\n`` 分隔。
 
     Args:
         date_block (str): 日期块的内容，不包含日期标题本身（`## YYYY-MM-DD`）。
             应包含一个或多个 `### subheading` 格式的子标题及其内容。
 
     Returns:
-        str: 所有子标题下的正文内容合并后的字符串，使用 `\\n\\n` 分隔。
-            如果没有任何内容，返回空字符串。
-            返回内容不包含子标题行本身。
+        str: 所有子标题块合并后的字符串，保留子标题行。
+            如果没有任何子标题，返回原始内容（去除首尾空白）。
     """
     # 匹配 ### subheading 或 ## subheading 格式的子标题
-    subheading_pattern = re.compile(r'^#{1,3}\s+\S+.*$', re.MULTILINE)
+    subheading_pattern = re.compile(r'^(#{1,3}\s+\S+.*)$', re.MULTILINE)
 
-    parts = subheading_pattern.split(date_block)
-    # parts[0] 是第一个子标题之前的内容（通常为空或只有空白）
-    # parts[1:] 包含各子标题之间的内容
+    matches = list(subheading_pattern.finditer(date_block))
+
+    if not matches:
+        # 没有子标题，直接返回原始内容
+        return date_block.strip()
 
     contents = []
-    for i in range(1, len(parts)):
-        content = parts[i].strip()
-        if content:
-            contents.append(content)
+    for i, match in enumerate(matches):
+        heading = match.group(1)
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(date_block)
+        body = date_block[start:end].strip()
+
+        if body:
+            contents.append(f"{heading}\n{body}")
+        else:
+            contents.append(heading)
 
     return "\n\n".join(contents)
 
@@ -395,7 +402,7 @@ def extract_date_logs_from_file(
 
     Example:
         >>> extract_date_logs_from_file("log.md", "2026-05-08")
-        {'2026-05-08': '完成开发'}
+        {'2026-05-08': '### 工作\\n完成开发'}
         >>> extract_date_logs_from_file("log.md", "2026-05-08", "2026-05-09", "工作")
         {'2026-05-08': '完成开发', '2026-05-09': '修复bug'}
     """
