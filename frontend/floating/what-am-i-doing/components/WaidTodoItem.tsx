@@ -44,7 +44,7 @@ export function WaidTodoItem({
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(item.content);
     const [showMenu, setShowMenu] = useState(false);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const isCompleted = item.state === 'completed';
 
@@ -63,12 +63,31 @@ export function WaidTodoItem({
         opacity: isDragging ? 0.5 : 1,
     };
 
+    // 编辑时自动聚焦和选中
     useEffect(() => {
-        if (isEditing && inputRef.current) {
-            inputRef.current.focus();
-            inputRef.current.select();
+        if (isEditing && textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.select();
+            // 自动调整高度
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
         }
     }, [isEditing]);
+
+    // 编辑时自动触发展开
+    useEffect(() => {
+        if (isEditing && !isExpanded) {
+            onToggleExpand(item.id);
+        }
+    }, [isEditing, isExpanded, onToggleExpand, item.id]);
+
+    // textarea 内容变化时自动调整高度
+    useEffect(() => {
+        if (isEditing && textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+    }, [editValue, isEditing]);
 
     // 点击外部关闭菜单
     useEffect(() => {
@@ -93,8 +112,9 @@ export function WaidTodoItem({
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            (e.target as HTMLInputElement).blur();
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            // Ctrl+Enter 或 Cmd+Enter 保存
+            (e.target as HTMLTextAreaElement).blur();
         } else if (e.key === 'Escape') {
             setEditValue(item.content);
             setIsEditing(false);
@@ -161,18 +181,20 @@ export function WaidTodoItem({
 
                 {/* 任务名称 */}
                 {isEditing ? (
-                    <input
-                        ref={inputRef}
+                    <textarea
+                        ref={textareaRef}
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         onBlur={handleBlur}
                         onKeyDown={handleKeyDown}
-                        className="flex-1 min-w-0 bg-white/10 text-white text-sm px-1.5 py-0.5 rounded outline-none focus:ring-1 focus:ring-white/30"
+                        className="flex-1 min-w-0 bg-white/10 text-white text-sm px-1.5 py-0.5 rounded outline-none focus:ring-1 focus:ring-white/30 resize-none overflow-hidden"
+                        rows={1}
+                        style={{ minHeight: '1.5rem' }}
                     />
                 ) : (
                     <span
                         className={`flex-1 min-w-0 text-sm cursor-text ${
-                            isExpanded ? 'whitespace-normal break-words' : 'truncate'
+                            isExpanded ? 'whitespace-pre-wrap break-words' : 'truncate'
                         } ${isCompleted ? 'line-through text-white/40' : 'text-white/90'}`}
                         onDoubleClick={() => {
                             if (!isCompleted) {
