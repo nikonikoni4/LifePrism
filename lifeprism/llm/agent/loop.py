@@ -70,6 +70,7 @@ class AgentLoop:
             tuple: (LLMResponse, tool_call_chain)
                 - LLMResponse: 最终的 LLM 响应
                 - tool_call_chain: 完整的工具调用链，每轮包含 reasoning 和 tool_calls
+                  每个 tool_call 包含: id, name, arguments, result, is_error(bool)
         """
         llm = create_llm_client()
         messages = Context.build_prompt(system_prompt, session.get_history_message())
@@ -109,19 +110,23 @@ class AgentLoop:
                 logger.debug(f"工具调用 ： {tool_call.name} ，调用参数{tool_call.arguments}")
                 result = await self._tool_registry.execute(tool_call.name,tool_call.arguments)
                 logger.debug(f"工具结果 ： {tool_call.name} - {result}")
-                logger.debug(f"工具结果是否为字符串: {isinstance(result,str)}")
-                logger.debug(f"工具结果是否以错误开头: {result.startswith(ERROR)}")
 
-                # 记录工具调用到当前轮次
+                # 先判断工具调用是否出错
+                is_error = isinstance(result, str) and result.startswith(ERROR)
+                logger.debug(f"工具结果是否为字符串: {isinstance(result, str)}")
+                logger.debug(f"工具结果是否以错误开头: {is_error}")
+
+                # 记录工具调用到当前轮次（含错误标记）
                 round_tool_calls.append({
                     "id": tool_call.id,
                     "name": tool_call.name,
                     "arguments": tool_call.arguments,
-                    "result": result
+                    "result": result,
+                    "is_error": is_error
                 })
 
                 # 只有在出错时才累加错误计数并检查阈值
-                if isinstance(result,str) and result.startswith(ERROR):
+                if is_error:
                     tool_error[tool_call.name] += 1
                     logger.debug(f"工具 {tool_call.name} 错误计数: {tool_error[tool_call.name]}/{MAX_TOOL_ERROR_COUNT}")
                     if tool_error[tool_call.name] > MAX_TOOL_ERROR_COUNT:
