@@ -19,7 +19,15 @@ def test_outbound_message_structure():
                     "id": "call_123",
                     "name": "query_activity",
                     "arguments": {"date": "2026-06-30"},
-                    "result": "查询成功"
+                    "result": "查询成功",
+                    "is_error": False
+                },
+                {
+                    "id": "call_789",
+                    "name": "bad_tool",
+                    "arguments": {"param": "bad"},
+                    "result": "ERROR工具调用失败",
+                    "is_error": True
                 }
             ]
         },
@@ -30,7 +38,8 @@ def test_outbound_message_structure():
                     "id": "call_456",
                     "name": "summarize",
                     "arguments": {"content": "..."},
-                    "result": "总结完成"
+                    "result": "总结完成",
+                    "is_error": False
                 }
             ]
         }
@@ -61,6 +70,9 @@ def test_outbound_message_structure():
     for i, round_data in enumerate(msg.extra["tool_call_chain"], 1):
         assert "round" in round_data, f"第 {i} 轮缺少 round 字段"
         assert "tool_calls" in round_data, f"第 {i} 轮缺少 tool_calls 字段"
+        for tc in round_data["tool_calls"]:
+            assert "is_error" in tc, f"工具调用 {tc.get('name')} 缺少 is_error 字段"
+            assert isinstance(tc["is_error"], bool), f"is_error 应为布尔类型"
         print(f"  - 第 {round_data['round']} 轮: {len(round_data['tool_calls'])} 个工具调用")
 
     print("\n" + "=" * 60)
@@ -92,7 +104,8 @@ def test_llm_call_logger_structure():
                     "id": "call_789",
                     "name": "test_tool",
                     "arguments": {"param": "value"},
-                    "result": "测试结果"
+                    "result": "测试结果",
+                    "is_error": False
                 }
             ]
         }

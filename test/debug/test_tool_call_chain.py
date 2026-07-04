@@ -37,7 +37,8 @@ async def test_tool_call_chain():
             tool_calls = round_data["tool_calls"]
             print(f"\n  第 {round_num} 轮:")
             for tc in tool_calls:
-                print(f"    - 工具: {tc['name']}")
+                error_flag = " ❌[ERROR]" if tc.get('is_error') else ""
+                print(f"    - 工具: {tc['name']}{error_flag}")
                 print(f"      参数: {json.dumps(tc['arguments'], ensure_ascii=False)}")
                 result_preview = tc['result'][:100] if len(tc['result']) > 100 else tc['result']
                 print(f"      结果: {result_preview}...")

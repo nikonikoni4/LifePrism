@@ -365,8 +365,16 @@
     border-bottom: 1px solid var(--border-light);
   }
   .tcc-tool-item:last-child { border-bottom: none; }
+  .tcc-tool-item.error {
+    background: rgba(255, 80, 80, 0.06);
+    border-left: 3px solid #ff5050;
+    padding-left: 10px;
+    border-radius: 4px;
+  }
   .tcc-tool-icon { flex-shrink: 0; color: var(--text-dim); }
+  .tcc-tool-icon.error-icon { color: #ff5050; }
   .tcc-tool-name { color: var(--accent); font-weight: 500; }
+  .tcc-tool-name.error-name { color: #ff5050; }
   .tcc-tool-args {
     color: var(--text-dim);
     overflow: hidden; text-overflow: ellipsis;
@@ -1051,7 +1059,10 @@ function createToolCallChainSection(chain) {
     // Round header
     const header = document.createElement('div');
     header.className = 'tcc-round-header';
-    header.innerHTML = `<span class="tcc-round-num">#${round.round || '?'}</span> 推理 + 工具调用`;
+    const toolCalls = round.tool_calls || [];
+	    const errorCount = toolCalls.filter(tc => tc.is_error === true).length;
+	    const errorBadge = errorCount > 0 ? ` <span style="color:#ff5050;font-size:12px;">(${errorCount} 个错误)</span>` : '';
+	    header.innerHTML = `<span class="tcc-round-num">#${round.round || '?'}</span> 推理 + 工具调用${errorBadge}`;
     roundEl.appendChild(header);
 
     // Reasoning
@@ -1068,17 +1079,18 @@ function createToolCallChainSection(chain) {
     }
 
     // Tool calls
-    const toolCalls = round.tool_calls || [];
     if (toolCalls.length > 0) {
       const toolList = document.createElement('div');
       toolList.className = 'tcc-tool-list';
       for (const tc of toolCalls) {
+        const isError = tc.is_error === true;
+
         const item = document.createElement('div');
-        item.className = 'tcc-tool-item';
+        item.className = 'tcc-tool-item' + (isError ? ' error' : '');
 
         const icon = document.createElement('span');
-        icon.className = 'tcc-tool-icon';
-        icon.textContent = '🛠';
+        icon.className = 'tcc-tool-icon' + (isError ? ' error-icon' : '');
+        icon.textContent = isError ? '❌' : '🛠';
         item.appendChild(icon);
 
         const info = document.createElement('div');
@@ -1086,7 +1098,7 @@ function createToolCallChainSection(chain) {
 
         const nameArgs = document.createElement('div');
         const argsStr = tc.arguments ? JSON.stringify(tc.arguments) : '';
-        nameArgs.innerHTML = `<span class="tcc-tool-name">${escapeHtml(tc.name || '?')}</span> <span class="tcc-tool-args">${escapeHtml(argsStr)}</span>`;
+        nameArgs.innerHTML = `<span class="tcc-tool-name${isError ? ' error-name' : ''}">${escapeHtml(tc.name || '?')}</span> <span class="tcc-tool-args">${escapeHtml(argsStr)}</span>`;
         info.appendChild(nameArgs);
 
         if (tc.result) {

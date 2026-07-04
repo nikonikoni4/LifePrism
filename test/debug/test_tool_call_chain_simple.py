@@ -40,7 +40,9 @@ async def main():
             chain = result.extra["tool_call_chain"]
             print(f"   [成功] 找到 tool_call_chain，共 {len(chain)} 轮")
             for r in chain:
-                print(f"      - 第 {r['round']} 轮: {len(r['tool_calls'])} 个工具调用")
+                error_count = sum(1 for tc in r['tool_calls'] if tc.get('is_error'))
+                error_info = f" (含 {error_count} 个错误)" if error_count > 0 else ""
+                print(f"      - 第 {r['round']} 轮: {len(r['tool_calls'])} 个工具调用{error_info}")
         else:
             print(f"   [提示] 没有 tool_call_chain（可能此消息未触发工具调用）")
     else:
