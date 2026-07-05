@@ -303,6 +303,154 @@ body {
   line-height: 1.7;
 }
 
+/* ============ FEEDBACK LOOP ============ */
+.feedback-section {
+  background: var(--bg-deep);
+  padding: 80px 24px;
+}
+
+.feedback-section .section-inner {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.feedback-loop {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 0;
+}
+
+.feedback-svg {
+  width: 100%;
+  height: 400px;
+}
+
+.feedback-node {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.feedback-node:hover {
+  filter: drop-shadow(0 4px 12px rgba(192,88,59,0.2));
+}
+
+.feedback-node circle {
+  transition: all 0.3s ease;
+}
+
+.feedback-node:hover circle {
+  stroke-width: 3;
+}
+
+.feedback-node text {
+  font-size: 13px;
+  font-weight: 500;
+  fill: var(--ink);
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.feedback-node-label {
+  font-size: 12px;
+  fill: var(--ink-light);
+}
+
+.feedback-arrow {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 2;
+  stroke-dasharray: 8 4;
+  animation: dash 20s linear infinite;
+}
+
+.feedback-arrow.positive {
+  stroke: var(--green);
+}
+
+.feedback-arrow.negative {
+  stroke: var(--accent);
+  stroke-dasharray: 6 3;
+}
+
+@keyframes dash {
+  to { stroke-dashoffset: -1000; }
+}
+
+.feedback-center {
+  text-align: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.feedback-center h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.feedback-center p {
+  font-size: 14px;
+  color: var(--ink-light);
+}
+
+.feedback-tooltip {
+  position: absolute;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  font-size: 14px;
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  max-width: 240px;
+  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  pointer-events: none;
+}
+
+.feedback-tooltip.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.feedback-tooltip h4 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--accent);
+}
+
+.feedback-tooltip p {
+  font-size: 13px;
+  color: var(--ink-light);
+  line-height: 1.6;
+}
+
+.feedback-explanation {
+  max-width: 640px;
+  margin: 40px auto 0;
+  text-align: center;
+}
+
+.feedback-explanation p {
+  font-size: 15px;
+  color: var(--ink-light);
+  line-height: 1.8;
+}
+
+.feedback-explanation strong {
+  color: var(--ink);
+}
+
 /* ============ VALUE ============ */
 .value-grid {
   display: grid;
@@ -633,6 +781,112 @@ body {
   </div>
 </section>
 
+<!-- ======== FEEDBACK LOOP ======== -->
+<section class="feedback-section">
+  <div class="section-inner">
+    <div class="section-label">System Design</div>
+    <h2 class="section-title" style="text-align:center;margin-bottom:16px;">成长的负反馈机制</h2>
+    <p class="section-subtitle" style="text-align:center;margin-bottom:40px;">个人数据如何驱动持续成长——借鉴自动控制系统的经典负反馈原理</p>
+
+    <div class="feedback-loop">
+      <svg class="feedback-svg" viewBox="0 0 800 400">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="var(--ink-faint)"/>
+          </marker>
+          <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="var(--green)"/>
+          </marker>
+          <marker id="arrowhead-accent" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="var(--accent)"/>
+          </marker>
+        </defs>
+        
+        <g class="feedback-node" id="node-goal" data-tooltip="goal">
+          <circle cx="400" cy="60" r="45" fill="white" stroke="var(--accent)" stroke-width="2"/>
+          <text y="57" font-size="14">目标设定</text>
+          <text y="75" class="feedback-node-label">Goal</text>
+        </g>
+        
+        <g class="feedback-node" id="node-action" data-tooltip="action">
+          <circle cx="680" cy="120" r="40" fill="white" stroke="var(--green)" stroke-width="2"/>
+          <text y="117" font-size="13">行动执行</text>
+          <text y="133" class="feedback-node-label">Action</text>
+        </g>
+        
+        <g class="feedback-node" id="node-output" data-tooltip="output">
+          <circle cx="680" cy="280" r="40" fill="white" stroke="var(--blue)" stroke-width="2"/>
+          <text y="277" font-size="13">成果产出</text>
+          <text y="293" class="feedback-node-label">Output</text>
+        </g>
+        
+        <g class="feedback-node" id="node-collect" data-tooltip="collect">
+          <circle cx="400" cy="340" r="45" fill="white" stroke="var(--accent)" stroke-width="2"/>
+          <text y="337" font-size="14">数据采集</text>
+          <text y="355" class="feedback-node-label">Collect</text>
+        </g>
+        
+        <g class="feedback-node" id="node-analyze" data-tooltip="analyze">
+          <circle cx="120" cy="280" r="40" fill="white" stroke="var(--blue)" stroke-width="2"/>
+          <text y="277" font-size="13">偏差分析</text>
+          <text y="293" class="feedback-node-label">Analyze</text>
+        </g>
+        
+        <g class="feedback-node" id="node-adjust" data-tooltip="adjust">
+          <circle cx="120" cy="120" r="40" fill="white" stroke="var(--green)" stroke-width="2"/>
+          <text y="117" font-size="13">策略调整</text>
+          <text y="133" class="feedback-node-label">Adjust</text>
+        </g>
+        
+        <path class="feedback-arrow positive" d="M400,105 C540,105 540,105 640,120" marker-end="url(#arrowhead-green)"/>
+        <path class="feedback-arrow positive" d="M680,160 C680,220 680,220 680,240" marker-end="url(#arrowhead-green)"/>
+        <path class="feedback-arrow" d="M640,280 C540,300 540,300 445,340" marker-end="url(#arrowhead)"/>
+        <path class="feedback-arrow negative" d="M355,340 C260,300 260,300 160,280" marker-end="url(#arrowhead-accent)"/>
+        <path class="feedback-arrow negative" d="M120,240 C120,180 120,180 120,160" marker-end="url(#arrowhead-accent)"/>
+        <path class="feedback-arrow" d="M160,120 C260,105 260,105 355,60" marker-end="url(#arrowhead)"/>
+        
+        <circle cx="400" cy="200" r="8" fill="var(--accent)"/>
+        <text x="400" y="225" text-anchor="middle" font-size="12" fill="var(--ink-faint)">偏差校正</text>
+      </svg>
+      
+      <div class="feedback-center">
+        <h3>负反馈闭环</h3>
+        <p>持续趋近目标的核心机制</p>
+      </div>
+      
+      <div id="tooltip-goal" class="feedback-tooltip">
+        <h4>目标设定</h4>
+        <p>LifePrism GoalMaster 将宏大愿景拆解为四层目标架构，建立明确的期望值参考点。</p>
+      </div>
+      <div id="tooltip-action" class="feedback-tooltip">
+        <h4>行动执行</h4>
+        <p>通过智能日历、桌面浮窗 WAID，将计划转化为可执行的日常行动和时间投入。</p>
+      </div>
+      <div id="tooltip-output" class="feedback-tooltip">
+        <h4>成果产出</h4>
+        <p>记录完成的任务、产生的成果，以及过程中的心情变化和体验反馈。</p>
+      </div>
+      <div id="tooltip-collect" class="feedback-tooltip">
+        <h4>数据采集</h4>
+        <p>VLM 截图分析 + 自动分类技术，将时间记录门槛降至"无感采集"，确保数据客观真实。</p>
+      </div>
+      <div id="tooltip-analyze" class="feedback-tooltip">
+        <h4>偏差分析</h4>
+        <p>AI 周报自动对比实际执行与目标期望的偏差，识别低效时段、拖延模式和能量波动。</p>
+      </div>
+      <div id="tooltip-adjust" class="feedback-tooltip">
+        <h4>策略调整</h4>
+        <p>基于数据洞察，重新优化目标权重、调整时间分配、改进行动策略，形成新一轮循环。</p>
+      </div>
+    </div>
+    
+    <div class="feedback-explanation">
+      <p>负反馈系统的核心价值在于<strong>稳定性</strong>与<strong>收敛性</strong>。没有数据的个人成长就像开一辆没有仪表盘的汽车——你永远不知道自己的速度、方向是否正确，也无法及时校正。</p>
+      <p style="margin-top:16px;">LifePrism 通过持续的数据采集与分析，让你看到「实际状态」与「期望状态」之间的偏差，并提供 AI 驱动的校正信号。这种机制确保你的成长路径始终<strong>围绕目标螺旋上升</strong>，而不是随机游走。</p>
+    </div>
+  </div>
+</section>
+
 <!-- ======== VALUE ======== -->
 <section class="section">
   <div class="section-label">Value</div>
@@ -686,6 +940,35 @@ body {
   <p>LifePrism -- TRAE Creative Challenge Entry</p>
   <p style="margin-top:4px;">Built with TRAE Work | Powered by AI</p>
 </footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var nodes = document.querySelectorAll('.feedback-node');
+  nodes.forEach(function(node) {
+    node.addEventListener('mouseenter', function(e) {
+      var tooltipId = this.getAttribute('data-tooltip');
+      var tooltip = document.getElementById('tooltip-' + tooltipId);
+      if (tooltip) {
+        tooltip.classList.add('show');
+        var rect = this.getBoundingClientRect();
+        var parentRect = this.closest('.feedback-loop').getBoundingClientRect();
+        tooltip.style.left = (rect.left - parentRect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+        tooltip.style.top = (rect.top - parentRect.top - tooltip.offsetHeight - 10) + 'px';
+      }
+      this.style.transform = 'scale(1.1)';
+    });
+    
+    node.addEventListener('mouseleave', function(e) {
+      var tooltipId = this.getAttribute('data-tooltip');
+      var tooltip = document.getElementById('tooltip-' + tooltipId);
+      if (tooltip) {
+        tooltip.classList.remove('show');
+      }
+      this.style.transform = 'scale(1)';
+    });
+  });
+});
+</script>
 
 </body>
 </html>
