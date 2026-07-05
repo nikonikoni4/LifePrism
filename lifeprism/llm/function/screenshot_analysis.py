@@ -19,15 +19,15 @@ from lifeprism.llm.utils.parse_utils import extract_json_from_response
 from lifeprism.llm.bus import OutboundMessage, bus, MessageType, InboundMessage
 from lifeprism.config import settings
 from lifeprism.utils import get_logger,DEBUG
-from lifeprism.llm.providers.dataset_providers import llm_dataset_provider
 from lifeprism.llm.prompts import prompt_loader, Prompts
 from lifeprism.repository import (
     map_cache_repository,
-    raw_behavior_analysis_repository, 
+    raw_behavior_analysis_repository,
     behavior_analysis_repository,
     category_repository,
     QueryOptions,
     screen_capture_repository,
+    LWBaseDataProvider,
 )
 logger = get_logger(__name__)
 # logger.setLevel(DEBUG)
@@ -433,7 +433,8 @@ async def screenshot_analysis(
     logger.info(f"开始截图语义分析: {start_time} -> {end_time}, 频率等级={frequency_level}, chunk大小={chunk_minutes}分钟")
 
     # Step 1: 查询活动日志
-    logs, total = llm_dataset_provider.get_activity_logs(start_time=start_time, end_time=end_time)
+    provider = LWBaseDataProvider()
+    logs, total = provider.get_activity_logs(start_time=start_time, end_time=end_time)
     logger.info(f"查询到 {total} 条行为记录")
 
     adapted_logs = []

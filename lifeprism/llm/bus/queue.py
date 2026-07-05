@@ -134,12 +134,23 @@ class MessageQueue:
         # 5. 异步保存统计信息 (不阻塞消息返回)
         if result.response and result.response.usage:
             try:
-                from lifeprism.llm.providers.dataset_providers import llm_dataset_provider
+                from lifeprism.repository import LWBaseDataProvider
+
+                # 创建 provider 实例
+                provider = LWBaseDataProvider()
+
+                # 适配 usage 数据格式
+                usage_data = {
+                    'input_tokens': result.response.usage.get('prompt_tokens', 0),
+                    'output_tokens': result.response.usage.get('completion_tokens', 0),
+                    'total_tokens': result.response.usage.get('total_tokens', 0),
+                    'mode': msg.token_type or msg.type
+                }
+
                 asyncio.create_task(asyncio.to_thread(
-                    llm_dataset_provider.save_usage,
-                    session_id=result.session_id,
-                    usage=result.response.usage,
-                    mode=msg.token_type or msg.type
+                    provider.upsert_session_tokens_usage,
+                    result.session_id,
+                    usage_data
                 ))
             except Exception as e:
                 logger.error(f"[MessageQueue] 保存 token 使用情况失败: {e}")
