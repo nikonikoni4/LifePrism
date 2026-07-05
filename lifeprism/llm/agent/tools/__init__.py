@@ -15,6 +15,7 @@ from .filesystem import (
     SearchFileTool,
     SearchStringTool
 )
+from .session_query import QuerySessionListTool, QuerySessionHistoryTool
 from .base import ERROR
 __all__ = [
     "ToolRegistry",
@@ -30,5 +31,7 @@ __all__ = [
     "FileTreeTool",
     "SearchFileTool",
     "SearchStringTool",
+    "QuerySessionListTool",
+    "QuerySessionHistoryTool",
     "ERROR"
 ]

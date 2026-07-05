@@ -29,6 +29,8 @@ from lifeprism.llm.agent.tools import (
     FileTreeTool,
     SearchFileTool,
     SearchStringTool,
+    QuerySessionListTool,
+    QuerySessionHistoryTool,
     ERROR
 )
 from collections import defaultdict
@@ -320,6 +322,8 @@ class AgentLoop:
                 self._tool_registry.register(FileTreeTool())
                 self._tool_registry.register(SearchFileTool())
                 self._tool_registry.register(SearchStringTool())
+                self._tool_registry.register(QuerySessionListTool())
+                self._tool_registry.register(QuerySessionHistoryTool())
                 if (settings.lifeprism_data_path / 'agent/chat/bootstrap.md').exists():
                     self._tool_registry.register(DeleteBootstrapTool())
                 tools: list[dict[str, Any]] = self._tool_registry.get_definitions()
