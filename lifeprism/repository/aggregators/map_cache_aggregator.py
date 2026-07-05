@@ -9,6 +9,7 @@ from lifeprism.repository.providers.map_cache_providers import (
     MultiPurposeMapCacheProvider,
     SinglePurposeMapCacheProvider,
 )
+from lifeprism.utils.exceptions import DataAccessError
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -50,12 +51,15 @@ class MapCacheAggregator:
                 'multi_purpose': multi_purpose_caches,
                 'single_purpose': single_purpose_caches
             }
+        except DataAccessError:
+            raise
         except Exception as e:
-            logger.error(f"获取所有缓存数据失败: {e}")
-            return {
-                'multi_purpose': [],
-                'single_purpose': []
-            }
+            logger.error("获取所有缓存数据失败: error=%s", e, exc_info=True)
+            raise DataAccessError(
+                message="获取所有缓存数据失败",
+                details={"error": str(e)},
+                cause=e,
+            ) from e
 
     def get_cache_by_purpose(
         self,
@@ -85,9 +89,18 @@ class MapCacheAggregator:
                 options = QueryOptions(filters={'app': purpose}, order_by='id')
                 results, _ = self.single_purpose_provider.query_single_purpose_map_cache(options)
                 return results[0] if results else None
+        except DataAccessError:
+            raise
         except Exception as e:
-            logger.error(f"按用途查找缓存失败 (purpose={purpose}, is_multi_purpose={is_multi_purpose}): {e}")
-            return None
+            logger.error(
+                "按用途查找缓存失败: purpose=%s, is_multi_purpose=%s, error=%s",
+                purpose, is_multi_purpose, e, exc_info=True
+            )
+            raise DataAccessError(
+                message="按用途查找缓存失败",
+                details={"purpose": purpose, "is_multi_purpose": is_multi_purpose, "error": str(e)},
+                cause=e,
+            ) from e
 
     # ==================== MultiPurposeMapCache 核心 CRUD 透传 ====================
 
@@ -181,13 +194,15 @@ class MapCacheAggregator:
                 'single_purpose_deleted': single_deleted,
                 'total_deleted': total_deleted
             }
+        except DataAccessError:
+            raise
         except Exception as e:
-            logger.error(f"清理所有缓存失败: {e}")
-            return {
-                'multi_purpose_deleted': 0,
-                'single_purpose_deleted': 0,
-                'total_deleted': 0
-            }
+            logger.error("清理所有缓存失败: error=%s", e, exc_info=True)
+            raise DataAccessError(
+                message="清理所有缓存失败",
+                details={"error": str(e)},
+                cause=e,
+            ) from e
 
 
 # ==================== 导出单例 ====================

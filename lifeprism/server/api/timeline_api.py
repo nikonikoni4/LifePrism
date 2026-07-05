@@ -16,6 +16,10 @@ from lifeprism.server.schemas.timeline_schemas import (
 from lifeprism.server.schemas.todo_schemas import BatchDurationRequest, BatchDurationResponse
 from lifeprism.server.services import timeline_service
 from lifeprism.repository import custom_block_repository
+from lifeprism.utils.exceptions import LWBaseError
+from lifeprism.utils import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/timeline", tags=["Timeline V2"])
 
@@ -172,5 +176,12 @@ async def get_behavior_summary(
     """
     try :
         return timeline_service.get_behavior_analysis(date)
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("获取行为分析失败: date=%s, error=%s", date, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")

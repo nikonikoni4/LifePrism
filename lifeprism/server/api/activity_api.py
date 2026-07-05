@@ -18,6 +18,7 @@ from lifeprism.server.schemas.activity_schemas import (
 from lifeprism.server.schemas.common_schemas import StandardResponse
 from lifeprism.server.services import activity_service
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import LWBaseError
 
 logger = get_logger(__name__)
 
@@ -89,10 +90,15 @@ async def get_activity_stats(
             category_id=category_id,
             sub_category_id=sub_category_id
         )
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取活动统计失败: {str(e)}")
+        logger.error(f"获取活动统计失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 # ============================================================================
@@ -178,12 +184,16 @@ async def get_activity_logs(
             page=page,
             page_size=page_size
         )
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
     except ValueError as e:
         logger.error(f"获取活动日志失败: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"获取活动日志失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"获取活动日志失败: {str(e)}")
+        logger.error(f"获取活动日志失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.get("/logs/{log_id}", summary="获取单条活动日志详情")
@@ -199,10 +209,13 @@ async def get_activity_log_detail(log_id: str):
         if result is None:
             raise HTTPException(status_code=404, detail=f"日志 '{log_id}' 不存在")
         return result
+    except LWBaseError:
+        raise
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取日志详情失败: {str(e)}")
+        logger.error(f"获取日志详情失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 # ============================================================================
@@ -246,10 +259,15 @@ async def update_log_category(
             success=success,
             message=f"日志 '{log_id}' 分类更新{'成功' if success else '失败'}"
         )
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"更新分类失败: {str(e)}")
+        logger.error(f"更新日志分类失败: log_id={log_id}, category_id={category_id}, error={e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.post("/manage/logs/batch-category", summary="批量更新日志分类", response_model=StandardResponse)
@@ -288,8 +306,15 @@ async def batch_update_log_category(
             data={"updated_count": updated_count},
             message=f"成功更新 {updated_count} 条日志"
         )
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"批量更新分类失败: {str(e)}")
+        logger.error(f"批量更新日志分类失败: log_ids={log_ids}, error={e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.delete("/manage/logs/batch", summary="批量删除日志", response_model=StandardResponse)
@@ -316,8 +341,15 @@ async def batch_delete_logs(
             data={"deleted_count": deleted_count},
             message=f"成功删除 {deleted_count} 条日志"
         )
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"批量删除失败: {str(e)}")
+        logger.error(f"批量删除日志失败: log_ids={log_ids}, error={e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.delete("/manage/logs/{log_id}", summary="删除日志", response_model=StandardResponse)
@@ -338,8 +370,15 @@ async def delete_log(log_id: str) -> StandardResponse:
             success=success,
             message=f"日志 '{log_id}' 删除{'成功' if success else '失败'}"
         )
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"删除日志失败: {str(e)}")
+        logger.error(f"删除日志失败: log_id={log_id}, error={e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.post("/manage/logs/update-by-cache", summary="根据缓存更新日志分类", response_model=StandardResponse)
@@ -398,13 +437,15 @@ async def update_logs_by_cache(
             data={"updated_count": updated_count},
             message=f"成功更新 {updated_count} 条日志"
         )
+    except LWBaseError:
+        raise
     except HTTPException:
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"根据缓存更新日志分类失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"更新日志分类失败: {str(e)}")
+        logger.error(f"根据缓存更新日志分类失败: app={app}, title={title}, error={e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 

@@ -20,7 +20,7 @@ from lifeprism.llm.prompts import prompt_loader, Prompts
 from lifeprism.llm.session import Session, session_manager, ChatHistoryManager
 from lifeprism.llm.utils.md_os import write_date_md, extract_date_logs_from_file, read_md
 from lifeprism.utils import get_logger,DEBUG
-from lifeprism.utils.exceptions import ExternalServiceError
+from lifeprism.llm.exceptions import LLMResponseError
 from lifeprism.llm.utils import llm_call_logger
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
@@ -99,8 +99,14 @@ async def summary_activities(activities: str, start_time: str, end_time: str) ->
             normalized = _normalize_activity_summary_format(result.response.content)
             return normalized
         else:
-            logger.error(f"[summary_activities] 活动总结llm返回数据错误,{result}")
-            raise ExternalServiceError(f"活动总结llm返回数据错误,{result}")
+            logger.error(
+                "[summary_activities] 活动总结 LLM 返回空内容: model=%s, result=%s",
+                settings.model, str(result)[:200]
+            )
+            raise LLMResponseError(
+                model=settings.model,
+                raw_response=str(result)[:500]
+            )
     else:
         logger.info("[summary_activities] 没有活动数据，跳过总结")
         return "无今日活动数据"
@@ -160,8 +166,14 @@ async def summary_moods(mood_data: str) -> str:
         logger.debug(f"[summary_moods] LLM 返回成功, 结果长度: {len(result.response.content)} 字符")
         return result.response.content
     else:
-        logger.error(f"[summary_moods] 心情总结 LLM 返回数据错误: {result}")
-        raise ExternalServiceError(f"心情总结 LLM 返回数据错误: {result}")
+        logger.error(
+            "[summary_moods] 心情总结 LLM 返回空内容: model=%s, result=%s",
+            settings.model, str(result)[:200]
+        )
+        raise LLMResponseError(
+            model=settings.model,
+            raw_response=str(result)[:500]
+        )
 
 async def update_memory(date: str, date_offset: int = DEFAULT_DATE_OFFSET) -> None:
     """依据behavior.md更新记忆文档

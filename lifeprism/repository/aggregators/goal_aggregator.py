@@ -12,6 +12,7 @@ from lifeprism.repository.providers.goal_providers import (
     GoalStatsProvider,
 )
 from lifeprism.utils import get_logger
+from lifeprism.repository.exceptions import EntityNotFoundError
 
 logger = get_logger(__name__)
 
@@ -179,28 +180,34 @@ class GoalAggregator:
 
         Returns:
             bool: 是否成功
-        """
-        try:
-            # 验证目标是否存在
-            goal = self.goal_provider.get_goal_by_id(goal_id)
-            if not goal:
-                logger.error(f"目标 {goal_id} 不存在")
-                return False
 
-            # 调用 stats_provider 的同步方法
-            success = self.stats_provider.sync_stats_to_date(
-                goal_id=goal_id,
-                target_date=target_date,
-                start_date=start_date
+        Raises:
+            EntityNotFoundError: 目标不存在
+            DataAccessError: 数据库操作失败（由 stats_provider 抛出）
+        """
+        # 验证目标是否存在
+        goal = self.goal_provider.get_goal_by_id(goal_id)
+        if not goal:
+            logger.error(
+                "同步目标统计数据失败: goal_id=%s, target_date=%s, 目标不存在",
+                goal_id, target_date
+            )
+            raise EntityNotFoundError(
+                entity_type="Goal",
+                entity_id=goal_id,
             )
 
-            if success:
-                logger.info(f"目标 {goal_id} 统计数据同步成功")
-            return success
+        # 调用 stats_provider 的同步方法
+        # stats_provider.sync_stats_to_date 内部已处理 sqlite3.Error 并抛出 DataAccessError
+        success = self.stats_provider.sync_stats_to_date(
+            goal_id=goal_id,
+            target_date=target_date,
+            start_date=start_date
+        )
 
-        except Exception as e:
-            logger.error(f"同步目标 {goal_id} 统计数据失败: {e}")
-            return False
+        if success:
+            logger.info("目标 %s 统计数据同步成功", goal_id)
+        return success
 
 
 # ==================== 导出单例 ====================

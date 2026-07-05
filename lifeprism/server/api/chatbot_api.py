@@ -20,6 +20,10 @@ from lifeprism.server.schemas.chatbot_schemas import (
     TokenUsageEstimate,
 )
 from lifeprism.server.services.chatbot_service import chatbot_service
+from lifeprism.utils.exceptions import LWBaseError
+from lifeprism.utils import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/chatbot", tags=["Chatbot"])
 
@@ -58,8 +62,15 @@ async def update_session(
     try:
         await chatbot_service.update_session(session_id, request)
         return {"success": True}
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        logger.error("更新会话失败: session_id=%s, error=%s", session_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.delete("/sessions/{session_id}")
@@ -178,6 +189,7 @@ async def chat_stream(request: ChatMessageRequest):
                 yield f"data: {event.model_dump_json(exclude_none=True)}\n\n"
 
         except Exception as e:
+            # LEGITIMATE: SSE 流边界兜底 — 将未预期异常格式化为流错误事件
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
     
     return StreamingResponse(

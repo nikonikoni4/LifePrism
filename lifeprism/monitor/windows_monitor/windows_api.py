@@ -49,6 +49,7 @@ def is_any_video_playing() -> bool:
                 return True
         return False
     except Exception as e:
+        # LEGITIMATE: 第三方未知错误 — Windows API 可能抛非预期异常
         logger.debug(f"Failed to check power requests: {e}")
         return False
 
@@ -65,6 +66,7 @@ def get_window_title(hwnd: int) -> str:
     try:
         return win32gui.GetWindowText(hwnd)
     except Exception as e:
+        # LEGITIMATE: 第三方未知错误 — Windows API 可能抛非预期异常
         logger.error(f"获取窗口标题失败 (HWND: {hwnd}): {e}")
         return ""
 
@@ -85,6 +87,7 @@ def get_app_name(hwnd: int) -> str:
         # 可能是以管理员权限运行的进程
         return _get_app_name_fallback(hwnd)
     except Exception as e:
+        # LEGITIMATE: 第三方未知错误 — Windows API 可能抛非预期异常
         logger.debug(f"获取应用名称失败 (HWND: {hwnd}): {e}")
         return "unknown"
 
@@ -102,6 +105,7 @@ def get_app_path(hwnd: int) -> str:
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return _get_app_path_fallback(hwnd)
     except Exception as e:
+        # LEGITIMATE: 第三方未知错误 — Windows API 可能抛非预期异常
         logger.debug(f"获取应用路径失败 (HWND: {hwnd}): {e}")
         return ""
 
@@ -120,6 +124,7 @@ def _get_app_name_fallback(hwnd: int) -> str:
     except ImportError:
         logger.debug("wmi 库未安装，无法使用 WMI fallback")
     except Exception as e:
+        # LEGITIMATE: 第三方未知错误 — Windows API 可能抛非预期异常
         logger.debug(f"WMI fallback 获取应用名称失败: {e}")
 
     return "unknown"
@@ -137,6 +142,7 @@ def _get_app_path_fallback(hwnd: int) -> str:
     except ImportError:
         pass
     except Exception as e:
+        # LEGITIMATE: 第三方未知错误 — Windows API 可能抛非预期异常
         logger.debug(f"WMI fallback 获取应用路径失败: {e}")
 
     return ""

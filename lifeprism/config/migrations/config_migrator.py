@@ -68,6 +68,7 @@ def run_config_migrations(config_path: Path, migrations: list) -> dict:
                 data["config_version"] = migration.VERSION
                 logger.info(f"迁移 {migration.NAME} (v{migration.VERSION}) 完成")
         except Exception:
+            # LEGITIMATE: 辅助操作兜底 — 迁移失败不阻塞启动
             logger.exception(
                 f"迁移 {migration.NAME} (v{migration.VERSION}) 失败，"
                 f"备份保留于 {config_path.parent}，本次使用迁移前数据"
@@ -89,6 +90,7 @@ def _load_yaml(path: Path) -> dict[str, Any] | None:
             result = yaml.safe_load(f)
         return result if isinstance(result, dict) else {}
     except Exception:
+        # LEGITIMATE: 辅助操作兜底 — 迁移失败不阻塞启动
         logger.exception(f"读取 {path.name} 失败")
         return None
 
@@ -99,6 +101,7 @@ def _save_yaml(path: Path, data: dict) -> None:
         with open(path, "w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True, sort_keys=False)
     except Exception:
+        # LEGITIMATE: 辅助操作兜底 — 迁移失败不阻塞启动
         logger.exception(f"写入 {path.name} 失败")
 
 
@@ -112,6 +115,7 @@ def _backup_config(config_path: Path, current_version: int) -> None:
         logger.info(f"已备份 {config_path.name} → {backup_path.name}")
         _cleanup_old_backups(config_path)
     except Exception:
+        # LEGITIMATE: 辅助操作兜底 — 迁移失败不阻塞启动
         logger.exception(f"备份 {config_path.name} 失败")
 
 

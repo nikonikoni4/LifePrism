@@ -8,6 +8,11 @@
 1. multi_purpose_app_cache
 2. single_purpose_map_cache
 """
+from lifeprism.config.exceptions import InvalidConfigError
+from lifeprism.utils import get_logger
+
+logger = get_logger(__name__)
+
 MULTI_PURPOSE_MAP_CACHE_CONFIG = {
     'table_name': 'multi_purpose_map_cache',
     'columns': {
@@ -1671,10 +1676,18 @@ def get_table_config(table_name: str) -> dict:
         dict: 表配置字典
         
     Raises:
-        ValueError: 如果表名不存在
+        InvalidConfigError: 如果表名不存在
     """
     if table_name not in TABLE_CONFIGS:
-        raise ValueError(f"未找到表 '{table_name}' 的配置")
+        logger.error(
+            "表配置缺失: table_name=%s, 可用表=%s",
+            table_name, list(TABLE_CONFIGS.keys())
+        )
+        raise InvalidConfigError(
+            key=table_name,
+            expected="valid table name",
+            actual="not found",
+        )
     return TABLE_CONFIGS[table_name]
 
 

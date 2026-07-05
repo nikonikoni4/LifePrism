@@ -11,7 +11,10 @@ from lifeprism.server.schemas.value_schemas import (
     UpdateValueRequest,
 )
 from lifeprism.server.services import value_service
-from lifeprism.utils import ConflictError
+from lifeprism.utils.exceptions import LWBaseError, ConflictError
+from lifeprism.utils import get_logger
+
+logger = get_logger(__name__)
 
 value_router = APIRouter(prefix="/value", tags=["Value"])
 
@@ -39,8 +42,17 @@ async def create_value(request: CreateValueRequest):
         if not result:
             raise HTTPException(status_code=500, detail="创建价值失败")
         return result
-    except ConflictError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+    except ConflictError:
+        raise
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("创建价值失败: error=%s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @value_router.patch("/{value_id}", response_model=ValueItem, summary="更新价值")

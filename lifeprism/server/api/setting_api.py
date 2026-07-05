@@ -23,6 +23,10 @@ from lifeprism.server.schemas.setting_schemas import (
 )
 from lifeprism.server.services import setting_service
 from lifeprism.config.provider_manager import provider_manager
+from lifeprism.utils.exceptions import LWBaseError
+from lifeprism.utils import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["Settings - 配置管理"])
 
@@ -79,8 +83,15 @@ async def update_api_key(request: UpdateApiKeyRequest):
         setting_service.update_api_key(request.api_key, request.provider_id)
         provider_msg = f" ({request.provider_id})" if request.provider_id else ""
         return UpdateApiKeyResponse(success=True, message=f"API Key{provider_msg} 已安全保存")
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"保存 API Key 失败: {str(e)}")
+        logger.error("保存 API Key 失败: provider_id=%s, error=%s", request.provider_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.get("/api-key/status")
@@ -114,8 +125,15 @@ async def test_llm_connection():
     try:
         result = await test_connect()
         return result
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"连接测试失败: {str(e)}")
+        logger.error("LLM 连接测试失败: error=%s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.post("/test-vlm", response_model=TestVlmResponse, summary="测试 VLM 图像理解能力")
@@ -135,8 +153,15 @@ async def test_vlm_capability():
     try:
         result = await setting_service.test_vlm_capability()
         return TestVlmResponse(**result)
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"VLM 测试失败: {str(e)}")
+        logger.error("VLM 测试失败: error=%s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.get("/providers", response_model=ProviderListResponse, summary="获取所有支持的服务商列表")
@@ -218,11 +243,15 @@ async def get_qrcode(channel: str = Query(..., description="通道类型，如 w
     try:
         result = await setting_service.get_qrcode(channel)
         return QRCodeResponse(**result)
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"获取 QR 码失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取 QR 码失败: {str(e)}")
+        logger.error("获取 QR 码失败: channel=%s, error=%s", channel, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.get("/qrcode/status", response_model=QRCodeStatusResponse, summary="查询 QR 码状态")
@@ -243,8 +272,12 @@ async def get_qrcode_status(
     try:
         result = await setting_service.get_qrcode_status(channel, qrcode_id)
         return QRCodeStatusResponse(**result)
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"查询 QR 码状态失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"查询状态失败: {str(e)}")
+        logger.error("查询 QR 码状态失败: channel=%s, qrcode_id=%s, error=%s", channel, qrcode_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")

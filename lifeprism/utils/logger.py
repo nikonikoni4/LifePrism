@@ -33,6 +33,7 @@ _LOG_FORMAT = "%(asctime)s %(levelname)s %(filename)s func:%(funcName)s line %(l
 try:
     _stream = open(sys.stdout.fileno(), mode='w', encoding='utf-8', closefd=False)
 except Exception:
+    # LEGITIMATE: 辅助操作兜底 — 日志配置失败不影响主流程
     _stream = open(os.devnull, mode='w', encoding='utf-8')
 
 logging.basicConfig(
@@ -77,6 +78,7 @@ def setup_file_logging(log_dir: Path) -> None:
         _file_handler = file_handler
         _file_handler_added = True
     except Exception as e:
+        # LEGITIMATE: 辅助操作兜底 — 日志配置失败不影响主流程
         print(f"[WARNING] 无法创建日志文件: {e}")
 
 

@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional, List, Tuple, Set
 from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
+from lifeprism.repository.exceptions import EntityNotFoundError
 
 logger = get_logger(__name__)
 
@@ -124,7 +125,11 @@ class ComputerUsageProvider(LWBaseDataProvider):
         )
         if affected_rows > 0:
             return self.get_computer_usage_by_id(record_id)
-        return None
+        logger.error(
+            "更新ComputerUsage失败: record_id=%s, 记录不存在",
+            record_id
+        )
+        raise EntityNotFoundError("ComputerUsage", record_id)
 
     def delete_computer_usage(self, record_id: str) -> bool:
         """

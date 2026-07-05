@@ -15,6 +15,11 @@ import keyring
 from pathlib import Path
 from typing import Any, Optional, List, Dict
 
+from lifeprism.config.exceptions import InvalidConfigError
+from lifeprism.utils import get_logger
+
+logger = get_logger(__name__)
+
 ALLOWED_DIRS = ['user','diary','agent']
 
 # Keyring 服务名称
@@ -465,13 +470,29 @@ class SettingsManager:
         if 'screenshot_retention_days' in updates:
             days = updates['screenshot_retention_days']
             if days < 3:
-                raise ValueError(f"截图保留天数不能小于3天，当前值：{days}")
+                logger.error(
+                    "配置验证失败: screenshot_retention_days=%s, 期望 >=3, 当前配置项总数=%d",
+                    days, len(updates)
+                )
+                raise InvalidConfigError(
+                    key="screenshot_retention_days",
+                    expected=">=3",
+                    actual=days,
+                )
 
         # 验证 active_screenshot_frequency_level
         if 'active_screenshot_frequency_level' in updates:
             level = updates['active_screenshot_frequency_level']
             if level not in [1, 2, 3]:
-                raise ValueError(f"频率等级必须是1、2或3，当前值：{level}")
+                logger.error(
+                    "配置验证失败: active_screenshot_frequency_level=%s, 期望 1/2/3, 当前配置项总数=%d",
+                    level, len(updates)
+                )
+                raise InvalidConfigError(
+                    key="active_screenshot_frequency_level",
+                    expected="1, 2, or 3",
+                    actual=level,
+                )
 
         # 分离出 api_key
         if 'api_key' in updates:

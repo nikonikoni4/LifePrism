@@ -126,6 +126,7 @@ class WindowMonitor:
 
                 time.sleep(self.poll_time)
         except Exception as e:
+            # LEGITIMATE: API 边界兜底 — 监控主循环异常退出
             logger.error(f"Monitor loop error: {e}")
         finally:
             self.stop()

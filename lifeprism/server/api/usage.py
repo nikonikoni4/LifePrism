@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query, HTTPException
 
 from lifeprism.server.schemas.usage_schemas import UsageStatsResponse
 from lifeprism.server.services import usage_service
+from lifeprism.utils.exceptions import LWBaseError
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -63,10 +64,14 @@ async def get_usage_stats(
     """
     try:
         return usage_service.get_usage_stats(date=date)
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
     except ValueError as e:
-        logger.error(f"参数错误: {str(e)}")
+        logger.error("参数错误: date=%s, error=%s", date, e)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"获取使用统计失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"获取使用统计失败: {str(e)}")
+        logger.error("获取使用统计失败: date=%s, error=%s", date, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 

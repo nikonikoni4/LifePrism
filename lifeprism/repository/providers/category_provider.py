@@ -105,19 +105,35 @@ class CategoryProvider(LWBaseDataProvider):
         Raises:
             DataAccessError: 数据库操作失败
         """
+        # 白名单验证
+        allowed_fields = self._UPDATE_FIELDS | {self._PRIMARY_KEY}
+        invalid_fields = set(data.keys()) - allowed_fields
+        if invalid_fields:
+            logger.error(
+                "创建分类失败: 无效字段=%s, 允许字段=%s, 输入data=%s",
+                invalid_fields, allowed_fields, data
+            )
+            raise ValidationError(
+                message=f"无效的插入字段: {invalid_fields}",
+                code="VALIDATION_FAILED",
+                details={"invalid_fields": list(invalid_fields), "allowed_fields": list(allowed_fields)}
+            )
+
+        # 必填字段检查
+        required_fields = {'id', 'name', 'color'}
+        missing_fields = required_fields - set(data.keys())
+        if missing_fields:
+            logger.error(
+                "创建分类失败: 缺少必填字段=%s, 已提供字段=%s",
+                missing_fields, list(data.keys())
+            )
+            raise ValidationError(
+                message=f"缺少必填字段: {missing_fields}",
+                code="VALIDATION_FAILED",
+                details={"missing_fields": list(missing_fields), "provided_fields": list(data.keys())}
+            )
+
         try:
-            # 白名单验证
-            allowed_fields = self._UPDATE_FIELDS | {self._PRIMARY_KEY}
-            invalid_fields = set(data.keys()) - allowed_fields
-            if invalid_fields:
-                raise ValueError(f"Invalid insert fields: {invalid_fields}")
-
-            # 必填字段检查
-            required_fields = {'id', 'name', 'color'}
-            missing_fields = required_fields - set(data.keys())
-            if missing_fields:
-                raise ValueError(f"Missing required fields: {missing_fields}")
-
             self._generic_insert(data)
             logger.info(f"创建分类成功: {data.get('id')}")
             return True
@@ -142,12 +158,20 @@ class CategoryProvider(LWBaseDataProvider):
         if not data:
             return True
 
-        try:
-            # 白名单验证
-            invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
-            if invalid_fields:
-                raise ValueError(f"Invalid update fields: {invalid_fields}")
+        # 白名单验证
+        invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
+        if invalid_fields:
+            logger.error(
+                "更新分类失败: category_id=%s, 无效字段=%s, 允许字段=%s",
+                category_id, invalid_fields, self._UPDATE_FIELDS
+            )
+            raise ValidationError(
+                message=f"无效的更新字段: {invalid_fields}",
+                code="VALIDATION_FAILED",
+                details={"category_id": category_id, "invalid_fields": list(invalid_fields), "allowed_fields": list(self._UPDATE_FIELDS)}
+            )
 
+        try:
             return self._generic_update(category_id, data)
         except Exception as e:
             logger.error(f"更新分类 {category_id} 失败: {e}")
@@ -267,19 +291,35 @@ class SubCategoryProvider(LWBaseDataProvider):
         Raises:
             DataAccessError: 数据库操作失败
         """
+        # 白名单验证
+        allowed_fields = self._UPDATE_FIELDS | {self._PRIMARY_KEY}
+        invalid_fields = set(data.keys()) - allowed_fields
+        if invalid_fields:
+            logger.error(
+                "创建子分类失败: 无效字段=%s, 允许字段=%s, 输入data=%s",
+                invalid_fields, allowed_fields, data
+            )
+            raise ValidationError(
+                message=f"无效的插入字段: {invalid_fields}",
+                code="VALIDATION_FAILED",
+                details={"invalid_fields": list(invalid_fields), "allowed_fields": list(allowed_fields)}
+            )
+
+        # 必填字段检查
+        required_fields = {'id', 'category_id', 'name'}
+        missing_fields = required_fields - set(data.keys())
+        if missing_fields:
+            logger.error(
+                "创建子分类失败: 缺少必填字段=%s, 已提供字段=%s",
+                missing_fields, list(data.keys())
+            )
+            raise ValidationError(
+                message=f"缺少必填字段: {missing_fields}",
+                code="VALIDATION_FAILED",
+                details={"missing_fields": list(missing_fields), "provided_fields": list(data.keys())}
+            )
+
         try:
-            # 白名单验证
-            allowed_fields = self._UPDATE_FIELDS | {self._PRIMARY_KEY}
-            invalid_fields = set(data.keys()) - allowed_fields
-            if invalid_fields:
-                raise ValueError(f"Invalid insert fields: {invalid_fields}")
-
-            # 必填字段检查
-            required_fields = {'id', 'category_id', 'name'}
-            missing_fields = required_fields - set(data.keys())
-            if missing_fields:
-                raise ValueError(f"Missing required fields: {missing_fields}")
-
             self._generic_insert(data)
             logger.info(f"创建子分类成功: {data.get('id')}")
             return True
@@ -304,12 +344,20 @@ class SubCategoryProvider(LWBaseDataProvider):
         if not data:
             return True
 
-        try:
-            # 白名单验证
-            invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
-            if invalid_fields:
-                raise ValueError(f"Invalid update fields: {invalid_fields}")
+        # 白名单验证
+        invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
+        if invalid_fields:
+            logger.error(
+                "更新子分类失败: sub_category_id=%s, 无效字段=%s, 允许字段=%s",
+                sub_category_id, invalid_fields, self._UPDATE_FIELDS
+            )
+            raise ValidationError(
+                message=f"无效的更新字段: {invalid_fields}",
+                code="VALIDATION_FAILED",
+                details={"sub_category_id": sub_category_id, "invalid_fields": list(invalid_fields), "allowed_fields": list(self._UPDATE_FIELDS)}
+            )
 
+        try:
             return self._generic_update(sub_category_id, data)
         except Exception as e:
             logger.error(f"更新子分类 {sub_category_id} 失败: {e}")

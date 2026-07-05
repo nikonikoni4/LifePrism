@@ -599,6 +599,7 @@ class ProviderManager:
                 f"Loaded {len(self._raw_specs)} providers from {self._config_path}"
             )
         except Exception:
+            # LEGITIMATE: 辅助操作兜底 — 回退到默认 provider 配置
             logger.exception(f"Failed to load providers.yaml from {self._config_path}")
             self._raw_specs = DEFAULT_PROVIDER_CONFIG.get("providers", [])
             self._allowed_providers = DEFAULT_PROVIDER_CONFIG.get(

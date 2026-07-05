@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from lifeprism.server.services import being_service
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import LWBaseError
 from lifeprism.server.schemas.being_schemas import (
     BeingTestContent,
     BeingTestResponse,
@@ -99,13 +100,23 @@ def create_test(
 ):
     """
     创建新版本的测试记录
-    
+
     版本号自动递增
     """
-    result = being_service.save_test_result(user_id, mode, body.content)
-    if not result:
-        raise HTTPException(status_code=500, detail="创建测试记录失败")
-    return result
+    try:
+        result = being_service.save_test_result(user_id, mode, body.content)
+        if not result:
+            raise HTTPException(status_code=500, detail="创建测试记录失败")
+        return result
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"创建{mode}模式测试记录失败: user_id={user_id}, error={e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.put(
@@ -122,13 +133,23 @@ def update_test(
     """
     更新指定版本的测试内容
     """
-    success = being_service.update_test_result(user_id, mode, version, body.content)
-    if not success:
-        raise HTTPException(
-            status_code=404, 
-            detail=f"更新失败，未找到 {mode} 模式版本 {version} 的记录"
-        )
-    return SuccessResponse(success=True, message="更新成功")
+    try:
+        success = being_service.update_test_result(user_id, mode, version, body.content)
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail=f"更新失败，未找到 {mode} 模式版本 {version} 的记录"
+            )
+        return SuccessResponse(success=True, message="更新成功")
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"更新{mode}模式测试记录失败: user_id={user_id}, version={version}, error={e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 # ==================== 删除接口 ====================
@@ -146,13 +167,23 @@ def delete_test(
     """
     删除指定版本的测试记录
     """
-    success = being_service.delete_test_result(user_id, mode, version)
-    if not success:
-        raise HTTPException(
-            status_code=404, 
-            detail=f"删除失败，未找到 {mode} 模式版本 {version} 的记录"
-        )
-    return SuccessResponse(success=True, message="删除成功")
+    try:
+        success = being_service.delete_test_result(user_id, mode, version)
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail=f"删除失败，未找到 {mode} 模式版本 {version} 的记录"
+            )
+        return SuccessResponse(success=True, message="删除成功")
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"删除{mode}模式测试记录失败: user_id={user_id}, version={version}, error={e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 # ==================== AI 总结接口（预留） ====================

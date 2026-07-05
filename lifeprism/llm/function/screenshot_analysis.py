@@ -15,6 +15,7 @@ import mimetypes
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
+from lifeprism.llm.exceptions import LLMResponseError, LLMOutputParseError
 from lifeprism.llm.utils.parse_utils import extract_json_from_response
 from lifeprism.llm.bus import OutboundMessage, bus, MessageType, InboundMessage
 from lifeprism.config import settings
@@ -361,19 +362,19 @@ async def analyze_chunk_screenshots(
     try:
         # 加载截图分析 prompt
         analysis_prompt = prompt_loader.load_prompt(Prompts.Schedule.SCREENSHOT_ANALYSIS)
-        
+
         msg = InboundMessage(
             content=user_content,
             type=MessageType.GENERAL_TASK,
             extra={'system_prompt' : analysis_prompt}
         )
-        response :OutboundMessage = await bus.send(msg)
-        response = response.response.content
+        llm_result :OutboundMessage = await bus.send(msg)
+        response_content = llm_result.response.content
 
-        if response:
+        if response_content:
             # 清理 LLM 响应中的 Markdown 格式
-            # cleaned_response = _clean_llm_response(response)
-            cleaned_response = response
+            # cleaned_response = _clean_llm_response(response_content)
+            cleaned_response = response_content
             # 写入数据库前，将 ISO 格式（带 T）转换为数据库格式（空格分隔）
             start_time_db = chunk['start'].replace('T', ' ')
             end_time_db = chunk['end'].replace('T', ' ')
@@ -388,13 +389,29 @@ async def analyze_chunk_screenshots(
             raw_behavior_analysis_repository.create_raw_behavior(data)
             return data
         else:
-            return None
+            logger.error(
+                "截图分析 LLM 返回空内容: chunk_start=%s, chunk_end=%s, model=%s",
+                chunk['start'], chunk['end'], settings.model
+            )
+            raise LLMResponseError(
+                model=settings.model,
+                raw_response="(empty response)"
+            )
     except ValueError as e:
-        logger.warning(f"参数错误: {e}")
+        logger.error(f"截图分析参数错误: chunk={chunk}, error={e}")
+        raise
+    except LLMResponseError:
         raise
     except Exception as e:
-        logger.error(f"LLM 调用失败: {e}", exc_info=True)
-        return None
+        logger.error(
+            "截图分析 LLM 调用失败: chunk_start=%s, chunk_end=%s, model=%s, error=%s",
+            chunk['start'], chunk['end'], settings.model, e
+        )
+        raise LLMResponseError(
+            model=settings.model,
+            raw_response=str(e)[:500],
+            cause=e
+        ) from e
 
 
 async def screenshot_analysis(
@@ -549,13 +566,13 @@ async def _behavior_summary(start_time:str,end_time:str,screen_count:int,behavio
             type=MessageType.GENERAL_TASK,
             extra={"system_prompt": summary_prompt},
         )
-        response :OutboundMessage = await bus.send(msg)
-        response = response.response.content
-        if response:
+        llm_result :OutboundMessage = await bus.send(msg)
+        response_content = llm_result.response.content
+        if response_content:
             # 解析json字符串
-           
-            response = extract_json_from_response(response)
-            data : dict = json.loads(response)
+
+            extracted = extract_json_from_response(response_content)
+            data : dict = json.loads(extracted)
             if "behavior_summary" in data and "title" in data:
                 # 写入数据库前，将 ISO 格式（带 T）转换为数据库格式（空格分隔）
                 start_time_db = start_time.replace('T', ' ') if 'T' in start_time else start_time
@@ -571,14 +588,38 @@ async def _behavior_summary(start_time:str,end_time:str,screen_count:int,behavio
                 )
                 return data
             else:
-                raise ValueError(f"截图分析行为总结-llm输出字段错误:{data.keys()}")
-            
+                logger.error(
+                    "截图分析行为总结 LLM 输出解析失败: 期望字段 behavior_summary+title, 实际字段=%s, 原始输出片段=%s",
+                    list(data.keys()), response_content[:500]
+                )
+                raise LLMOutputParseError(
+                    expected_fields=["behavior_summary", "title"],
+                    actual_keys=list(data.keys()),
+                    raw_output=response_content[:500]
+                )
+
         else:
-            raise ValueError("截图分析行为总结-llm输出为空")
-       
-    except json.JSONDecodeError:
-        logger.error(f"截图分析行为总结-json解析失败: {response}")
-        return None
+            logger.error(
+                "截图分析行为总结 LLM 返回空内容: start_time=%s, end_time=%s, model=%s",
+                start_time, end_time, settings.model
+            )
+            raise LLMResponseError(
+                model=settings.model,
+                raw_response="(empty response)"
+            )
+
+    except json.JSONDecodeError as e:
+        logger.error(
+            "截图分析行为总结 JSON 解析失败: start_time=%s, end_time=%s, 原始输出片段=%s",
+            start_time, end_time, response_content[:500] if 'response_content' in dir() else "(unknown)"
+        )
+        raise LLMOutputParseError(
+            expected_fields=["behavior_summary", "title"],
+            actual_keys=[],
+            raw_output=response_content[:500] if 'response_content' in dir() else "(unknown)"
+        ) from e
+    except (LLMResponseError, LLMOutputParseError):
+        raise
 
 def merage_results_list(analysis_results_list : list[dict[str,Any]])->list[dict[str,Any]]:
     """ 对相邻的结果进行合并"""

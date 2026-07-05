@@ -14,6 +14,7 @@ import yaml
 
 from lifeprism.config import settings
 from lifeprism.utils import get_logger
+from lifeprism.llm.exceptions import PromptNotFoundError
 from lifeprism.llm.utils.md_os import prompts_md_load
 
 logger = get_logger(__name__)
@@ -181,7 +182,7 @@ class PromptLoader:
             解析后的 prompt 文件数据
 
         Raises:
-            FileNotFoundError: 文件不存在
+            PromptNotFoundError: 文件不存在
             ValueError: 文件格式错误
         """
         # 检查缓存
@@ -192,7 +193,14 @@ class PromptLoader:
         file_path = self.prompts_dir / f"{module}_prompts.md"
 
         if not file_path.exists():
-            raise FileNotFoundError(f"Prompt 文件不存在: {file_path}")
+            logger.error(
+                "Prompt 文件缺失: module=%s, prompt_name=%s_prompts.md, file_path=%s",
+                module, module, str(file_path)
+            )
+            raise PromptNotFoundError(
+                prompt_name=f"{module}_prompts.md",
+                module=module
+            )
 
         # 加载文件
         try:
@@ -276,7 +284,7 @@ class PromptLoader:
             prompt 内容字符串
 
         Raises:
-            FileNotFoundError: 文件不存在
+            PromptNotFoundError: 文件不存在
             ValueError: prompt 不存在或版本不存在，或参数错误
         """
         # 解析 prompt 参数
@@ -354,7 +362,7 @@ class PromptLoader:
             元数据字典，包含 active_version 和 version_history
 
         Raises:
-            FileNotFoundError: 文件不存在
+            PromptNotFoundError: 文件不存在
             ValueError: prompt 不存在
         """
         data = self._load_prompt_file(module)
@@ -376,7 +384,7 @@ class PromptLoader:
             版本列表
 
         Raises:
-            FileNotFoundError: 文件不存在
+            PromptNotFoundError: 文件不存在
             ValueError: prompt 不存在
         """
         data = self._load_prompt_file(module)

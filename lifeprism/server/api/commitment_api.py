@@ -11,6 +11,10 @@ from lifeprism.server.schemas.commitment_schemas import (
     UpdateCommitmentRequest,
 )
 from lifeprism.server.services import commitment_service
+from lifeprism.utils.exceptions import LWBaseError
+from lifeprism.utils import get_logger
+
+logger = get_logger(__name__)
 
 commitment_router = APIRouter(prefix="/commitment", tags=["Commitment"])
 
@@ -23,8 +27,15 @@ async def get_commitments(
     """获取承诺列表，支持状态和价值筛选"""
     try:
         return commitment_service.get_commitments(status, value_id)
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("获取承诺列表失败: status=%s, value_id=%s, error=%s", status, value_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @commitment_router.get("/{commitment_id}", response_model=CommitmentItem, summary="获取承诺详情")
@@ -44,8 +55,15 @@ async def create_commitment(request: CreateCommitmentRequest):
         if not result:
             raise HTTPException(status_code=500, detail="创建承诺失败")
         return result
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("创建承诺失败: error=%s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @commitment_router.patch("/{commitment_id}", response_model=CommitmentItem, summary="更新承诺")
@@ -58,8 +76,15 @@ async def update_commitment(
         if not result:
             raise HTTPException(status_code=404, detail=f"承诺不存在: {commitment_id}")
         return result
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("更新承诺失败: commitment_id=%s, error=%s", commitment_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @commitment_router.delete("/{commitment_id}", summary="删除承诺")

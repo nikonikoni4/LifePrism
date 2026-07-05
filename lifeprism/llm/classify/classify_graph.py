@@ -5,6 +5,8 @@ date: 2025.12.17
 import asyncio
 import json
 import logging
+from lifeprism.config import settings
+from lifeprism.llm.exceptions import LLMResponseError, LLMError
 from lifeprism.llm.schemas.classify_shemas import classifyState, LogItem
 from lifeprism.llm.utils import (
     format_goals_for_prompt,
@@ -87,7 +89,7 @@ class ClassifyGraph:
                     logger.info(f"获取 {app} 描述成功: {result[:50]}")
                     return
                 logger.warning(f"获取 {app} 描述为空（第 {attempt}/{MAX_RETRIES} 次）")
-            except Exception as e:
+            except (asyncio.TimeoutError, LLMError, ConnectionError, OSError) as e:
                 logger.warning(f"获取 {app} 描述异常（第 {attempt}/{MAX_RETRIES} 次）: {e}")
             if attempt < MAX_RETRIES:
                 await asyncio.sleep(0.5)
@@ -123,12 +125,19 @@ class ClassifyGraph:
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
         )
-        raw :OutboundMessage = await bus.send(msg)
-        raw = raw.response.content
-        clean = extract_json_from_response(raw)
+        result :OutboundMessage = await bus.send(msg)
+        raw_content = result.response.content
+        clean = extract_json_from_response(raw_content)
         if not clean:
-            logger.error(f"single_classify 批次 {batch_num} 返回空内容，跳过")
-            return
+            model = settings.model
+            logger.error(
+                "single_classify 批次 %d LLM 返回空内容: model=%s, raw=%s",
+                batch_num, model, (raw_content or "")[:200]
+            )
+            raise LLMResponseError(
+                model=model,
+                raw_response=(raw_content or "")[:500]
+            )
         parse_classification_result(result_items, json.loads(clean), "single_classify")
 
     async def single_classify(self, state: classifyState, items: list[LogItem]) -> list[LogItem]:
@@ -166,12 +175,19 @@ class ClassifyGraph:
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
         )
-        raw :OutboundMessage = await bus.send(msg)
-        raw = raw.response.content
-        clean = extract_json_from_response(raw)
+        result :OutboundMessage = await bus.send(msg)
+        raw_content = result.response.content
+        clean = extract_json_from_response(raw_content)
         if not clean:
-            logger.error(f"multi_classify_short 批次 {batch_num} 返回空内容，跳过")
-            return
+            model = settings.model
+            logger.error(
+                "multi_classify_short 批次 %d LLM 返回空内容: model=%s, raw=%s",
+                batch_num, model, (raw_content or "")[:200]
+            )
+            raise LLMResponseError(
+                model=model,
+                raw_response=(raw_content or "")[:500]
+            )
         parse_classification_result(result_items, json.loads(clean), "multi_classify_short")
 
     async def multi_classify_short(self, state: classifyState, items: list[LogItem]) -> list[LogItem]:
@@ -234,12 +250,19 @@ class ClassifyGraph:
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
         )
-        raw :OutboundMessage = await bus.send(msg)
-        raw = raw.response.content
-        clean = extract_json_from_response(raw)
+        result :OutboundMessage = await bus.send(msg)
+        raw_content = result.response.content
+        clean = extract_json_from_response(raw_content)
         if not clean:
-            logger.error(f"multi_classify_long 批次 {batch_num} 返回空内容，跳过")
-            return
+            model = settings.model
+            logger.error(
+                "multi_classify_long 批次 %d LLM 返回空内容: model=%s, raw=%s",
+                batch_num, model, (raw_content or "")[:200]
+            )
+            raise LLMResponseError(
+                model=model,
+                raw_response=(raw_content or "")[:500]
+            )
         parse_classification_result(result_items, json.loads(clean), "multi_classify_long")
 
     async def multi_classify_long(self, state: classifyState, items: list[LogItem]) -> list[LogItem]:

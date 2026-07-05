@@ -136,7 +136,7 @@ class TodoProvider(LWBaseDataProvider):
 
                 return [dict(zip(columns, row)) for row in rows]
 
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"获取任务列表失败 (date={date}): {e}")
             raise DataAccessError(
                 message=f"获取任务列表失败",
@@ -204,7 +204,7 @@ class TodoProvider(LWBaseDataProvider):
 
         except ValidationError:
             raise
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"创建任务失败: {e}")
             raise DataAccessError(
                 message=f"创建任务失败",
@@ -264,7 +264,7 @@ class TodoProvider(LWBaseDataProvider):
 
         except ValidationError:
             raise
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"更新任务 {todo_id} 失败: {e}")
             raise DataAccessError(
                 message=f"更新任务失败",
@@ -289,7 +289,7 @@ class TodoProvider(LWBaseDataProvider):
             if success:
                 logger.info(f"删除任务 {todo_id} 成功")
             return success
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"删除任务 {todo_id} 失败: {e}")
             raise DataAccessError(
                 message=f"删除任务失败",
@@ -339,7 +339,7 @@ class TodoProvider(LWBaseDataProvider):
                 logger.info(f"级联删除任务 {todo_id} 成功，共删除 {deleted_count} 个任务")
                 return deleted_count
 
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"级联删除任务 {todo_id} 失败: {e}")
             raise DataAccessError(
                 message=f"级联删除任务失败",
@@ -367,7 +367,7 @@ class TodoProvider(LWBaseDataProvider):
             )
             results, _ = self._generic_query(options)
             return results
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"获取子任务列表失败 (parent_id={parent_id}): {e}")
             raise DataAccessError(
                 message=f"获取子任务列表失败",
@@ -403,7 +403,7 @@ class TodoProvider(LWBaseDataProvider):
                 logger.info(f"批量删除 {deleted_count} 个任务成功")
                 return deleted_count
 
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"批量删除任务失败: {e}")
             raise DataAccessError(
                 message=f"批量删除任务失败",
@@ -436,7 +436,7 @@ class TodoProvider(LWBaseDataProvider):
                 logger.info(f"重排序 {len(todo_ids)} 个任务成功")
                 return True
 
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"重排序任务失败: {e}")
             raise DataAccessError(
                 message=f"重排序任务失败",
@@ -476,7 +476,7 @@ class TodoProvider(LWBaseDataProvider):
             results, _ = self._generic_query(options)
             return results
 
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"获取任务列表失败 (state={state}): {e}")
             raise DataAccessError(
                 message=f"获取任务列表失败",
@@ -509,7 +509,7 @@ class TodoProvider(LWBaseDataProvider):
                 logger.info(f"重排序任务池 {len(todo_ids)} 个任务成功")
                 return True
 
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"重排序任务池失败: {e}")
             raise DataAccessError(
                 message=f"重排序任务池失败",
@@ -532,7 +532,7 @@ class TodoProvider(LWBaseDataProvider):
         """
         try:
             return self._generic_update(todo_id, {'folder_id': folder_id})
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"移动任务失败 (todo_id={todo_id}): {e}")
             raise DataAccessError(
                 message=f"移动任务失败",
@@ -583,7 +583,7 @@ class TodoProvider(LWBaseDataProvider):
             results, _ = self._generic_query(options)
             return results
 
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"获取任务池任务失败: {e}")
             raise DataAccessError(
                 message=f"获取任务池任务失败",
@@ -611,7 +611,7 @@ class TodoProvider(LWBaseDataProvider):
             )
             results, _ = self._generic_query(options)
             return results
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"获取计划书任务失败 (plan_doc={plan_doc_id}): {e}")
             raise DataAccessError(
                 message=f"获取计划书任务失败",
@@ -680,7 +680,7 @@ class TodoProvider(LWBaseDataProvider):
             if "UNIQUE constraint" in str(e):
                 raise ConflictError(f"任务已存在") from e
             raise DataAccessError(f"数据完整性错误") from e
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"批量创建任务失败: {e}")
             raise DataAccessError(
                 message=f"批量创建任务失败",
@@ -734,7 +734,7 @@ class TodoProvider(LWBaseDataProvider):
                 logger.info(f"批量更新 {updated_count} 个任务成功")
                 return updated_count
 
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"批量更新任务失败: {e}")
             raise DataAccessError(
                 message=f"批量更新任务失败",
@@ -764,7 +764,7 @@ class TodoProvider(LWBaseDataProvider):
                     return []
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in rows]
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"获取 WAID todo 列表失败: {e}")
             raise DataAccessError(
                 message=f"获取 WAID todo 列表失败",
@@ -794,7 +794,7 @@ class TodoProvider(LWBaseDataProvider):
                     )
                 logger.info(f"批量更新 WAID 排序成功，共 {len(todo_ids)} 个")
                 return True
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"批量更新 WAID 排序失败: {e}")
             raise DataAccessError(
                 message=f"批量更新 WAID 排序失败",
@@ -816,7 +816,7 @@ class TodoProvider(LWBaseDataProvider):
         """
         try:
             return self._generic_update(todo_id, {'waid_order': None})
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"清除 WAID 排序失败 (todo_id={todo_id}): {e}")
             raise DataAccessError(
                 message=f"清除 WAID 排序失败",

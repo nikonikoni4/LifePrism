@@ -12,6 +12,7 @@ from lifeprism.repository.providers.mood_providers import (
     QueryOptions
 )
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
 
@@ -56,7 +57,11 @@ class MoodAggregator:
             return entry
         except Exception as e:
             logger.error(f"获取心情条目详情失败 (entry_id={entry_id}): {e}")
-            return None
+            raise DataAccessError(
+                message="获取心情条目详情失败",
+                details={"entry_id": entry_id, "error": str(e)},
+                cause=e,
+            ) from e
 
     def get_mood_entries_with_types(
         self,
@@ -92,7 +97,11 @@ class MoodAggregator:
             return entries
         except Exception as e:
             logger.error(f"获取心情条目列表失败 (start={start_date}, end={end_date}): {e}")
-            return []
+            raise DataAccessError(
+                message="获取心情条目列表失败",
+                details={"start_date": start_date, "end_date": end_date, "error": str(e)},
+                cause=e,
+            ) from e
 
     def get_mood_type_with_stats(self, mood_type_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -117,7 +126,11 @@ class MoodAggregator:
             return mood_type
         except Exception as e:
             logger.error(f"获取心情类型详情失败 (mood_type_id={mood_type_id}): {e}")
-            return None
+            raise DataAccessError(
+                message="获取心情类型详情失败",
+                details={"mood_type_id": mood_type_id, "error": str(e)},
+                cause=e,
+            ) from e
 
     def get_mood_analysis_with_impacts(
         self,
@@ -158,15 +171,11 @@ class MoodAggregator:
             return analysis
         except Exception as e:
             logger.error(f"获取心情分析失败 (start={start_date}, end={end_date}): {e}")
-            return {
-                'entries': [],
-                'impacts': [],
-                'summary': {
-                    'total_entries': 0,
-                    'total_impacts': 0,
-                    'date_range': {'start': start_date, 'end': end_date}
-                }
-            }
+            raise DataAccessError(
+                message="获取心情分析失败",
+                details={"start_date": start_date, "end_date": end_date, "error": str(e)},
+                cause=e,
+            ) from e
 
     # ==================== MoodType 核心 CRUD 透传 ====================
 

@@ -12,6 +12,7 @@
 """
 
 from lifeprism.llm.bus import OutboundMessage, bus, MessageType, InboundMessage
+from lifeprism.llm.exceptions import LLMResponseError
 from lifeprism.llm.providers import LLMResponse
 from lifeprism.config import settings
 from pathlib import Path
@@ -19,6 +20,9 @@ from lifeprism.llm.utils.md_os import read_md,write_date_md,extract_date_logs_fr
 from lifeprism.repository import diary_repository
 from lifeprism.llm.prompts import prompt_loader, Prompts
 from lifeprism.llm.utils import llm_call_logger
+from lifeprism.utils import get_logger
+
+logger = get_logger(__name__)
 
 async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:list[str], outdate_summary: str | None = None)->LLMResponse:
     """
@@ -103,17 +107,37 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
         token_type=MessageType.DREAM_TASK,
         extra={'system_prompt':system_prompt}
     )
-    result :OutboundMessage = await bus.send(msg) 
-    result = result.response.content
-    llm_call_logger.log_call(msg,result,)
-    if result : 
-        # 将ai summary写入lifeprismData\user\daily_data\behavior.md
-        if label_to_save:
-            result = f"{label_to_save}\n" + result
-        write_date_md(behavior_md_path, date, result, subheading="日记总结", mode='overwrite' if outdate_summary else 'append')
-        return result
-        
-    return None
+    try:
+        llm_result :OutboundMessage = await bus.send(msg)
+        result_content = llm_result.response.content
+        llm_call_logger.log_call(msg, llm_result)
+        if result_content:
+            # 将ai summary写入lifeprismData\user\daily_data\behavior.md
+            if label_to_save:
+                result_content = f"{label_to_save}\n" + result_content
+            write_date_md(behavior_md_path, date, result_content, subheading="日记总结", mode='overwrite' if outdate_summary else 'append')
+            return result_content
+        else:
+            logger.error(
+                "日记总结 LLM 返回空内容: date=%s, model=%s",
+                date, settings.model
+            )
+            raise LLMResponseError(
+                model=settings.model,
+                raw_response="(empty response)"
+            )
+    except LLMResponseError:
+        raise
+    except Exception as e:
+        logger.error(
+            "日记总结 LLM 调用失败: date=%s, model=%s, error=%s",
+            date, settings.model, e
+        )
+        raise LLMResponseError(
+            model=settings.model,
+            raw_response=str(e)[:500],
+            cause=e
+        ) from e
 
 
 if __name__ == "__main__":
