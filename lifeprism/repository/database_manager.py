@@ -14,8 +14,9 @@ import threading
 import atexit
 import logging
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError
 from lifeprism.config.database import (
-    get_table_config, 
+    get_table_config,
 )
 
 # 配置日志
@@ -139,10 +140,17 @@ class DatabaseManager:
             try:
                 yield conn
                 conn.commit()
-            except Exception as e:
+            except sqlite3.Error as e:
                 conn.rollback()
-                logger.error(f"数据库操作失败，已回滚: {e}")
-                raise
+                logger.error(
+                    "数据库操作失败，已回滚: db_path=%s, error=%s",
+                    self.DB_PATH, e
+                )
+                raise DataAccessError(
+                    message="数据库操作失败，已回滚",
+                    details={"db_path": str(self.DB_PATH), "error": str(e)},
+                    cause=e,
+                ) from e
             finally:
                 # 归还连接到池
                 self._return_pooled_connection(conn)
@@ -152,10 +160,17 @@ class DatabaseManager:
             try:
                 yield conn
                 conn.commit()
-            except Exception as e:
+            except sqlite3.Error as e:
                 conn.rollback()
-                logger.error(f"数据库操作失败，已回滚: {e}")
-                raise
+                logger.error(
+                    "数据库操作失败，已回滚: db_path=%s, error=%s",
+                    self.DB_PATH, e
+                )
+                raise DataAccessError(
+                    message="数据库操作失败，已回滚",
+                    details={"db_path": str(self.DB_PATH), "error": str(e)},
+                    cause=e,
+                ) from e
             finally:
                 conn.close()
     
@@ -215,10 +230,16 @@ class DatabaseManager:
                 logger.info(f"查询成功，返回 {len(df)} 行数据")
                 return df if not df.empty else pd.DataFrame()
                 
-        except Exception as e:
-            logger.error(f"查询失败: {e}")
-            logger.info(f"查询失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "查询失败: table=%s, error=%s",
+                table_name, e
+            )
+            raise DataAccessError(
+                message=f"查询表 {table_name} 失败",
+                details={"table": table_name, "error": str(e)},
+                cause=e,
+            ) from e
     
     def get_by_id(self, table_name: str, id_column: str, id_value: Any) -> Optional[Dict]:
         """
@@ -261,9 +282,16 @@ class DatabaseManager:
                 logger.debug(f"插入成功: {table_name}")
                 return cursor.rowcount
                 
-        except Exception as e:
-            logger.error(f"插入失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "插入失败: table=%s, error=%s",
+                table_name, e
+            )
+            raise DataAccessError(
+                message=f"插入表 {table_name} 失败",
+                details={"table": table_name, "error": str(e)},
+                cause=e,
+            ) from e
     
     def insert_many(self, table_name: str, data_list: List[Dict[str, Any]]) -> int:
         """
@@ -298,9 +326,16 @@ class DatabaseManager:
                 logger.info(f"批量插入成功: {table_name}, {cursor.rowcount} 行")
                 return cursor.rowcount
                 
-        except Exception as e:
-            logger.error(f"批量插入失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "批量插入失败: table=%s, rows=%d, error=%s",
+                table_name, len(data_list), e
+            )
+            raise DataAccessError(
+                message=f"批量插入表 {table_name} 失败",
+                details={"table": table_name, "row_count": len(data_list), "error": str(e)},
+                cause=e,
+            ) from e
     
     def upsert(self, 
                table_name: str, 
@@ -353,9 +388,16 @@ class DatabaseManager:
                 logger.debug(f"UPSERT成功: {table_name}")
                 return cursor.rowcount
                 
-        except Exception as e:
-            logger.error(f"UPSERT失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "UPSERT 失败: table=%s, error=%s",
+                table_name, e
+            )
+            raise DataAccessError(
+                message=f"UPSERT 表 {table_name} 失败",
+                details={"table": table_name, "error": str(e)},
+                cause=e,
+            ) from e
     
     def upsert_many(self, 
                     table_name: str, 
@@ -420,9 +462,16 @@ class DatabaseManager:
                 logger.info(f"批量UPSERT成功: {table_name}, {total_affected} 行")
                 return total_affected
                 
-        except Exception as e:
-            logger.error(f"批量UPSERT失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "批量 UPSERT 失败: table=%s, rows=%d, error=%s",
+                table_name, len(data_list), e
+            )
+            raise DataAccessError(
+                message=f"批量 UPSERT 表 {table_name} 失败",
+                details={"table": table_name, "row_count": len(data_list), "error": str(e)},
+                cause=e,
+            ) from e
     
     # ==================== 通用更新操作 (UPDATE) ====================
     
@@ -459,9 +508,16 @@ class DatabaseManager:
                 logger.debug(f"更新成功: {table_name}, {cursor.rowcount} 行")
                 return cursor.rowcount
                 
-        except Exception as e:
-            logger.error(f"更新失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "更新失败: table=%s, error=%s",
+                table_name, e
+            )
+            raise DataAccessError(
+                message=f"更新表 {table_name} 失败",
+                details={"table": table_name, "error": str(e)},
+                cause=e,
+            ) from e
     
     def update_by_id(self, 
                      table_name: str, 
@@ -508,9 +564,16 @@ class DatabaseManager:
                 logger.info(f"删除成功: {table_name}, {cursor.rowcount} 行")
                 return cursor.rowcount
                 
-        except Exception as e:
-            logger.error(f"删除失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "删除失败: table=%s, error=%s",
+                table_name, e
+            )
+            raise DataAccessError(
+                message=f"删除表 {table_name} 失败",
+                details={"table": table_name, "error": str(e)},
+                cause=e,
+            ) from e
     
     def delete_by_id(self, 
                      table_name: str, 
@@ -615,9 +678,16 @@ class DatabaseManager:
                 logger.debug(f"高级查询成功，返回 {len(df)} 行数据")
                 return df if not df.empty else pd.DataFrame()
                 
-        except Exception as e:
-            logger.error(f"高级查询失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "高级查询失败: table=%s, error=%s",
+                table_name, e
+            )
+            raise DataAccessError(
+                message=f"高级查询表 {table_name} 失败",
+                details={"table": table_name, "error": str(e)},
+                cause=e,
+            ) from e
     
     def execute_raw(self, 
                     sql: str, 
@@ -663,9 +733,16 @@ class DatabaseManager:
                     logger.debug(f"原始 SQL 执行成功，影响 {cursor.rowcount} 行")
                     return None
                     
-        except Exception as e:
-            logger.error(f"原始 SQL 执行失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "原始 SQL 执行失败: sql=%s, error=%s",
+                sql[:200], e
+            )
+            raise DataAccessError(
+                message="原始 SQL 执行失败",
+                details={"sql": sql[:500], "error": str(e)},
+                cause=e,
+            ) from e
     
     def truncate(self, table_name: str):
         """
@@ -680,8 +757,15 @@ class DatabaseManager:
                 cursor.execute(f"DELETE FROM {table_name}")
                 logger.warning(f"表 '{table_name}' 已清空, {cursor.rowcount} 行被删除")
                 
-        except Exception as e:
-            logger.error(f"清空表失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "清空表失败: table=%s, error=%s",
+                table_name, e
+            )
+            raise DataAccessError(
+                message=f"清空表 {table_name} 失败",
+                details={"table": table_name, "error": str(e)},
+                cause=e,
+            ) from e
 
 

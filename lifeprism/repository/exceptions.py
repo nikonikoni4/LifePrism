@@ -19,12 +19,15 @@ class EntityNotFoundError(NotFoundError):
 
     替代目前在 Provider 中 return None 的做法，
     让调用方能区分"不存在"和"数据库故障"。
+
+    code 固定为 "ENTITY_NOT_FOUND" → 全局 handler 映射为 404。
+    entity_type / entity_id 在 details 中，供前端区分具体实体类型。
     """
 
     def __init__(self, entity_type: str, entity_id: str, **extra_details):
         super().__init__(
             message=f"{entity_type} 未找到: {entity_id}",
-            code=f"{entity_type.upper()}_NOT_FOUND",
+            code="ENTITY_NOT_FOUND",
             details={
                 "entity_type": entity_type,
                 "entity_id": entity_id,
@@ -34,7 +37,10 @@ class EntityNotFoundError(NotFoundError):
 
 
 class DuplicateEntityError(ConflictError):
-    """唯一约束冲突（INSERT 时已存在）。"""
+    """唯一约束冲突（INSERT 时已存在）。
+
+    code 固定为 "ENTITY_ALREADY_EXISTS" → 全局 handler 映射为 409。
+    """
 
     def __init__(self, entity_type: str, entity_id: str, conflict_field: str = ""):
         msg = f"{entity_type} 已存在: {entity_id}"
@@ -42,7 +48,7 @@ class DuplicateEntityError(ConflictError):
             msg += f" (冲突字段: {conflict_field})"
         super().__init__(
             message=msg,
-            code=f"{entity_type.upper()}_ALREADY_EXISTS",
+            code="ENTITY_ALREADY_EXISTS",
             details={
                 "entity_type": entity_type,
                 "entity_id": entity_id,

@@ -669,9 +669,16 @@ class LWBaseDataProvider:
                     logger.info("数据库为空，没有历史数据")
                 
                 return latest_time
-        except Exception as e:
-            logger.error(f"获取最新 end_time 失败: {e}")
-            return None
+        except sqlite3.Error as e:
+            logger.error(
+                "获取最新 end_time 失败: db_path=%s, error=%s",
+                self.db.DB_PATH, e
+            )
+            raise DataAccessError(
+                message="获取最新 end_time 失败",
+                details={"error": str(e)},
+                cause=e,
+            ) from e
     
     def load_user_app_behavior_log(self, 
                                    start_time: str = None,
@@ -807,9 +814,16 @@ class LWBaseDataProvider:
             logger.info(f"成功保存 {affected} 条 token 使用记录到数据库")
             return affected
             
-        except Exception as e:
-            logger.error(f"保存 token 使用数据失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "保存 token 使用数据失败: count=%d, error=%s",
+                len(tokens_usage_data), e
+            )
+            raise DataAccessError(
+                message="保存 token 使用数据到数据库失败",
+                details={"row_count": len(tokens_usage_data), "error": str(e)},
+                cause=e,
+            ) from e
     
     def get_session_tokens_usage(self, session_id: str) -> Optional[Dict]:
         """
@@ -847,9 +861,16 @@ class LWBaseDataProvider:
                 }
             return None
             
-        except Exception as e:
-            logger.error(f"获取会话 {session_id} 的 token 使用数据失败: {e}")
-            return None
+        except sqlite3.Error as e:
+            logger.error(
+                "获取会话 token 使用数据失败: session_id=%s, error=%s",
+                session_id, e
+            )
+            raise DataAccessError(
+                message="获取会话 token 使用数据失败",
+                details={"session_id": session_id, "error": str(e)},
+                cause=e,
+            ) from e
     
     def upsert_session_tokens_usage(self, session_id: str, usage_data: Dict) -> int:
         """
@@ -896,9 +917,16 @@ class LWBaseDataProvider:
             
             return affected
             
-        except Exception as e:
-            logger.error(f"保存会话 {session_id} 的 token 使用数据失败: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "保存会话 token 使用数据失败: session_id=%s, error=%s",
+                session_id, e
+            )
+            raise DataAccessError(
+                message="保存会话 token 使用数据失败",
+                details={"session_id": session_id, "error": str(e)},
+                cause=e,
+            ) from e
 
 
     # ==================== 通用 CRUD 方法 ====================
@@ -1093,9 +1121,16 @@ class LWBaseDataProvider:
                     return None
 
                 return data.get('id', str(cursor.lastrowid))
-        except Exception as e:
-            logger.error(f"Failed to insert into {self._TABLE_NAME}: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "通用插入失败: table=%s, error=%s",
+                self._TABLE_NAME, e
+            )
+            raise DataAccessError(
+                message=f"插入表 {self._TABLE_NAME} 失败",
+                details={"table": self._TABLE_NAME, "error": str(e)},
+                cause=e,
+            ) from e
 
     def _generic_update(
         self,
@@ -1160,9 +1195,16 @@ class LWBaseDataProvider:
                 cursor.execute(sql, values)
                 conn.commit()
                 return cursor.rowcount > 0
-        except Exception as e:
-            logger.error(f"Failed to update {self._TABLE_NAME}: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "通用更新失败: table=%s, record_id=%s, error=%s",
+                self._TABLE_NAME, record_id, e
+            )
+            raise DataAccessError(
+                message=f"更新表 {self._TABLE_NAME} 失败",
+                details={"table": self._TABLE_NAME, "record_id": record_id, "error": str(e)},
+                cause=e,
+            ) from e
 
     def _generic_delete(self, record_id: str) -> bool:
         """
@@ -1192,9 +1234,16 @@ class LWBaseDataProvider:
                 cursor.execute(sql, (record_id,))
                 conn.commit()
                 return cursor.rowcount > 0
-        except Exception as e:
-            logger.error(f"Failed to delete from {self._TABLE_NAME}: {e}")
-            raise
+        except sqlite3.Error as e:
+            logger.error(
+                "通用删除失败: table=%s, record_id=%s, error=%s",
+                self._TABLE_NAME, record_id, e
+            )
+            raise DataAccessError(
+                message=f"删除表 {self._TABLE_NAME} 失败",
+                details={"table": self._TABLE_NAME, "record_id": record_id, "error": str(e)},
+                cause=e,
+            ) from e
 
     # ==================== 辅助方法（构建 SQL 子句） ====================
 
