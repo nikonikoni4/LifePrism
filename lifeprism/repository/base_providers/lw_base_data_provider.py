@@ -4,7 +4,10 @@ LifeWatch 基础数据提供者
 """
 import pandas as pd
 import logging
+import sqlite3
 from typing import Set, Optional, List, Dict, Any, Tuple
+
+from lifeprism.utils.exceptions import DataAccessError
 
 logger = logging.getLogger(__name__)
 
@@ -579,9 +582,13 @@ class LWBaseDataProvider:
                 # 保存多用途，'app', 'title', 'state' 为冲突键
                 affected += self.db.upsert_many('multi_purpose_map_cache', multi_purpose_data, conflict_columns=['app', 'title', 'state'])
             return affected
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"保存AI元数据失败: {e}")
-            return 0
+            raise DataAccessError(
+                message="保存AI元数据到缓存表失败",
+                details={"error": str(e)},
+                cause=e,
+            ) from e
 
     # def save_category_map_cache(self, ai_metadata_df: pd.DataFrame) -> int:
     #     """
@@ -759,9 +766,13 @@ class LWBaseDataProvider:
                 logger.info(f"成功保存 {affected} 行清洗数据到数据库（共尝试 {len(data_list)} 行）")
                 return affected
                 
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"保存清洗数据失败: {e}")
-            raise
+            raise DataAccessError(
+                message="保存清洗数据到数据库失败",
+                details={"error": str(e)},
+                cause=e,
+            ) from e
 
     def save_tokens_usage(self, tokens_usage_data: List[Dict]) -> int:
         """

@@ -154,5 +154,15 @@ async def dreaming_task(self, date: str):
 - ❌ ERROR 日志缺少上下文（只有错误消息）
 - ❌ 循环内使用 INFO（应该汇总后记录）
 - ❌ 辅助函数使用 INFO（应该用 DEBUG）
-- ❌ `except Exception` 吞掉异常
+- ❌ `except Exception` 吞掉异常（除非满足合法场景：API 边界兜底 / 辅助操作兜底 / 第三方未知错误）
 - ❌ 不捕获外部错误，让原始异常直接冒泡
+
+## `except Exception` 合法场景
+
+**默认禁止**，仅在以下场景合法：
+
+1. **API 边界兜底**：全局异常处理器
+2. **辅助操作兜底**：日志记录、指标上报等失败不应影响主流程
+3. **第三方未知错误**：外部服务 API（微信、支付等）可能抛出未知异常且影响系统稳定性
+
+详细规则见 `docs/coding-rules/backend-error-handling.md#4-except-exception-禁止规则`

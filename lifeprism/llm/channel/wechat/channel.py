@@ -12,6 +12,7 @@ from lifeprism.llm.channel.wechat.client import WechatClient
 from lifeprism.llm.channel.wechat.auth import WechatAuth
 from lifeprism.llm.channel.wechat.media import WechatMedia
 from lifeprism.llm.channel.wechat.exceptions import WechatAPIError, WechatMessageError
+from lifeprism.utils.exceptions import LWBaseError
 from lifeprism.llm.bus import MessageQueue,OutboundMessage,MessageType,ChannelType,InboundMessage
 from lifeprism.llm.providers import LLMResponse
 from lifeprism.config.settings_manager import settings
@@ -319,6 +320,7 @@ class WechatChannel(BaseChannel):
                             system_prompt=system_prompt,
                         )
                     except Exception as log_e:
+                        # ✅ 日志记录是辅助操作，允许 except Exception 防止影响主流程
                         logger.warning(f"记录 LLM 调用日志失败: {log_e}")
 
                 if response.session_id:
@@ -339,7 +341,7 @@ class WechatChannel(BaseChannel):
                         }
                         self.auth.save_state(state)
                         logger.debug(f"已保存用户 {wechat_user_id} 的数据")
-                    except Exception as save_error:
+                    except (OSError, IOError) as save_error:
                         logger.error(f"保存用户数据失败: {save_error}", exc_info=True)
 
                 # 将用户ID传递到响应中
@@ -349,18 +351,19 @@ class WechatChannel(BaseChannel):
 
                 logger.info(f"发送响应消息->wechat")
                 await self.send(response)
-            except Exception as e:
+            except LWBaseError as e:
                 logger.error(f"处理消息失败: {e}", exc_info=True)
                 # 发送错误消息给用户
                 error_response = OutboundMessage(
                     id=inbound_msg.id,
-                    response=LLMResponse(content=f"[ERROR] 处理消息时出错: {e}"),
+                    response=LLMResponse(content=f"[ERROR] 处理消息时出错: {e.message or str(e)}"),
                     extra={"wechat_user_id": wechat_user_id}  # 传递用户ID
                 )
                 
                 try:
                     await self.send(error_response)
                 except Exception as send_error:
+                    # ✅ 发送错误消息失败时，允许 except Exception（未知的第三方 API 错误）
                     logger.error(f"发送错误消息也失败: {send_error}", exc_info=True)
             
         except (KeyError, ValueError, TypeError) as e:

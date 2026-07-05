@@ -328,72 +328,50 @@ _log_startup_time("[OK] CORS middleware configured", _cors_start)
 print("[STARTUP] 正在注册全局异常处理器...")
 _exception_start = time.perf_counter()
 
-from lifeprism.utils.exceptions import (
-    NotFoundError,
-    ValidationError,
-    DataAccessError,
-    ConflictError,
-    ExternalServiceError,
-)
+from lifeprism.utils.exceptions import LWBaseError
+from lifeprism.server.errors import to_http_exception
 
-@app.exception_handler(NotFoundError)
-async def not_found_handler(request: Request, exc: NotFoundError):
-    """处理资源不存在异常 → 404"""
-    logger.warning(f"资源不存在: {exc.message} (路径: {request.url.path})")
+
+@app.exception_handler(LWBaseError)
+async def lw_base_error_handler(request: Request, exc: LWBaseError):
+    """统一处理所有 LWBaseError 子类异常。
+
+    映射关系（由 _fallback_code + ERROR_CODE_TO_STATUS 决定）：
+    - NotFoundError       → 404
+    - ConflictError       → 409
+    - ValidationError     → 422
+    - DataAccessError     → 500
+    - ExternalServiceError → 503
+    """
+    http_exc = to_http_exception(exc)
+    log_msg = f"{type(exc).__name__}: {exc.message} (code={exc.code}, path={request.url.path})"
+    if http_exc.status_code < 500:
+        logger.warning(log_msg)
+    else:
+        logger.error(log_msg, exc_info=True)
     return JSONResponse(
-        status_code=404,
-        content={"detail": exc.message, "code": exc.code}
+        status_code=http_exc.status_code,
+        content=http_exc.detail,
     )
 
-@app.exception_handler(ValidationError)
-async def validation_error_handler(request: Request, exc: ValidationError):
-    """处理业务验证错误 → 422"""
-    logger.warning(f"验证错误: {exc.message} (路径: {request.url.path})")
-    return JSONResponse(
-        status_code=422,
-        content={"detail": exc.message, "code": exc.code, "details": exc.details}
-    )
-
-@app.exception_handler(ConflictError)
-async def conflict_error_handler(request: Request, exc: ConflictError):
-    """处理资源冲突 → 409"""
-    logger.warning(f"资源冲突: {exc.message} (路径: {request.url.path})")
-    return JSONResponse(
-        status_code=409,
-        content={"detail": exc.message, "code": exc.code}
-    )
-
-@app.exception_handler(DataAccessError)
-async def data_access_error_handler(request: Request, exc: DataAccessError):
-    """处理数据访问错误 → 500"""
-    logger.error(f"数据访问错误: {exc.message} (路径: {request.url.path})", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "服务器内部错误", "code": exc.code}
-    )
-
-@app.exception_handler(ExternalServiceError)
-async def external_service_error_handler(request: Request, exc: ExternalServiceError):
-    """处理外部服务错误 → 503"""
-    logger.error(f"外部服务错误: {exc.message} (路径: {request.url.path})", exc_info=True)
-    return JSONResponse(
-        status_code=503,
-        content={"detail": "外部服务暂时不可用", "code": exc.code}
-    )
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """全局兜底异常处理器 → 500"""
+    """全局兜底异常处理器 → 500。捕获所有非 LWBaseError 的未知异常。"""
     logger.error(
         f"未处理的异常: {type(exc).__name__}: {str(exc)} (路径: {request.url.path})",
         exc_info=True
     )
     return JSONResponse(
         status_code=500,
-        content={"detail": "服务器内部错误"}
+        content={
+            "error_code": "INTERNAL_ERROR",
+            "message": "服务器内部错误",
+            "details": {},
+        }
     )
 
-_log_startup_time("[OK] Exception handlers registered (6 handlers)", _exception_start)
+_log_startup_time("[OK] Exception handlers registered (LWBaseError + Exception)", _exception_start)
 
 # ==================== 注册 API 路由 ====================
 print("[STARTUP] 正在注册 API 路由...")

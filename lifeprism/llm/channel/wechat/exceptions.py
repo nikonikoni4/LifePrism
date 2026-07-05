@@ -1,8 +1,10 @@
-"""微信 Channel 自定义异常模块"""
+"""微信 Channel 自定义异常模块。"""
+
+from lifeprism.utils.exceptions import ExternalServiceError
 
 
-class WechatError(Exception):
-    """微信 Channel 基础异常"""
+class WechatError(ExternalServiceError):
+    """微信 Channel 基础异常。"""
     pass
 
 
