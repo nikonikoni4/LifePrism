@@ -401,30 +401,34 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
     # 处理消息（分组处理，每组最多10个）
     history_manager = ChatHistoryManager()
     if _session_to_process:
-        all_results = []
+        all_results = []  # 存储 (session_id, content) 元组
 
         try:
             # 分组处理
             total_batches = (len(_session_to_process) + SESSION_BATCH_SIZE - 1) // SESSION_BATCH_SIZE
             logger.debug(f"[process_session_message] 开始分组处理, 每组 {SESSION_BATCH_SIZE} 个, 共 {total_batches} 组")
-            
+
             for i in range(0, len(_session_to_process), SESSION_BATCH_SIZE):
                 batch = _session_to_process[i:i + SESSION_BATCH_SIZE]
                 batch_num = i // SESSION_BATCH_SIZE + 1
                 logger.debug(f"[process_session_message] 处理第 {batch_num}/{total_batches} 组: {batch}")
-                
+
                 # 先加载 session 对象
                 sessions = [session_manager._load_session(sid) for sid in batch]
                 logger.debug(f"[process_session_message] 第 {batch_num} 组 session 加载完成")
-                
+
                 batch_results = await asyncio.gather(
                     *[extract_from_chat_messages(session) for session in sessions]
                 )
-                
-                valid_results = [r for r in batch_results if r is not None]
-                logger.debug(f"[process_session_message] 第 {batch_num} 组处理完成, 获取 {len(valid_results)}/{len(batch_results)} 个有效结果")
-                all_results.extend(valid_results)
-                
+
+                # 保持 session_id 和结果的对应关系
+                for session, result in zip(sessions, batch_results):
+                    if result is not None:
+                        all_results.append((session.id, result))
+
+                valid_count = len([r for r in batch_results if r is not None])
+                logger.debug(f"[process_session_message] 第 {batch_num} 组处理完成, 获取 {valid_count}/{len(batch_results)} 个有效结果")
+
         finally:
             # 删除加载的session_id
             logger.debug(f"[process_session_message] 清理 session 缓存, 共 {len(_session_to_process)} 个")
@@ -434,8 +438,8 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
 
         # 创建history
         logger.debug(f"[process_session_message] 开始保存历史记录, 共 {len(all_results)} 条结果")
-        for content in all_results:
-            history_manager.add_content(content)
+        for session_id, content in all_results:
+            history_manager.add_content(content, session_id=session_id)
         history_manager.save_history()
         logger.debug(f"[process_session_message] 历史记录保存完成")
     else:

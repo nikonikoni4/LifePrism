@@ -360,13 +360,35 @@ class ChatHistoryManager:
                 if datetime.fromisoformat(history["timestamp"]) > self.last_processed_time:
                     result.append(history)
         return result
-    def add_content(self,content):
-        """添加数据"""
+    def add_content(self, content: str, session_id: str | None = None) -> None:
+        """添加聊天历史记录
+
+        Args:
+            content: 总结内容
+            session_id: 会话 ID，为 None 时不关联会话
+
+        Returns:
+            None
+        """
         if not content:
             logger.warning("chat_history.json添加失败，content为None")
-            return 
+            return
         self.path.parent.parent.mkdir(parents=True, exist_ok=True)
-        self.histories.append({"timestamp":datetime.now().isoformat(),"content":content})
+
+        # 构建历史记录项
+        history_item = {
+            "timestamp": datetime.now().isoformat(),
+            "content": content
+        }
+
+        # 只有当 session_id 不为 None 时才添加该字段
+        if session_id is not None:
+            history_item["session_id"] = session_id
+            logger.info(f"添加聊天历史: session_id={session_id}")
+        else:
+            logger.info("添加聊天历史: 未关联session")
+
+        self.histories.append(history_item)
         
 
     def save_history(self,last_processed_time:datetime|None = None):
