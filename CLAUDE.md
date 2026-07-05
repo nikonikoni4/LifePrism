@@ -15,7 +15,7 @@
 | **文档规则** | `docs/docs-rules/` | 编写 docs 时必须遵守的规范、约束、触发场景 |
 | **权威参考** | `docs/authority/` | 系统中特定且关键的实现知识,用于承接不适合放在 `rules` 里的重要实现事实 |
 | **产品规格** | `docs/specs/` | 对于正式 `spec`,承载业务意图、业务规则、领域概念,以及规范性技术契约 |
-| **架构决策** | `docs/design-decisions/` | 记录对于长期具有重要的作用的修改决定 |
+| **架构决策** | `docs/adr/` | 记录对于长期具有重要的作用的修改决定 |
 | **自动生成** | `docs/generated/` | 代码镜像,不手工维护正文,用于快速了解当前实现事实及 CI 结果 |
 | **执行计划** | `docs/plans/` | 执行过程中的任务分解和执行记录,也是历史执行资产 |
 | **重要bug历史记录**  | `docs/history-bugs`      | 存放可复用的bug经验   
@@ -47,6 +47,20 @@
 5. **Bug 先测试**：修 bug 先写复现测试，再修复直到通过。
 
 6. **记录教训**：每次被纠正后，在 `docs/temp/temp_lecture_record/temp_lecture_record.md` 记录经验教训
+
+## Agent skills
+
+### Issue tracker
+
+Issues 以本地 Markdown 文件形式存放在 `.scratch/<feature-slug>/` 目录下。详见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+使用标准五标签体系：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。详见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+单上下文（single-context）布局：一个全局 `CONTEXT.md` + `docs/adr/`。详见 `docs/agents/domain.md`。
 
 
 
