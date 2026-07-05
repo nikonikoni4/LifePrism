@@ -8,6 +8,7 @@ from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
 from lifeprism.repository.exceptions import EntityNotFoundError
+from lifeprism.utils.exceptions import ValidationError
 
 logger = get_logger(__name__)
 
@@ -92,7 +93,11 @@ class ComputerUsageProvider(LWBaseDataProvider):
         allowed_fields = self._UPDATE_FIELDS | {self._PRIMARY_KEY}
         invalid_fields = set(data.keys()) - allowed_fields
         if invalid_fields:
-            raise ValueError(f"Invalid insert fields: {invalid_fields}")
+            raise ValidationError(
+                message=f"无效的插入字段: {invalid_fields}",
+                code="VALIDATION_FAILED",
+                details={"invalid_fields": list(invalid_fields)},
+            )
 
         record_id = self._generic_insert(data)
         if record_id:
@@ -116,7 +121,11 @@ class ComputerUsageProvider(LWBaseDataProvider):
 
         invalid_fields = set(update_data.keys()) - self._UPDATE_FIELDS
         if invalid_fields:
-            raise ValueError(f"Invalid update fields: {invalid_fields}")
+            raise ValidationError(
+                message=f"无效的更新字段: {invalid_fields}",
+                code="VALIDATION_FAILED",
+                details={"invalid_fields": list(invalid_fields)},
+            )
 
         affected_rows = self.db.update(
             self._TABLE_NAME,

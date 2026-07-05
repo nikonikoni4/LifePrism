@@ -137,7 +137,7 @@ class CategoryProvider(LWBaseDataProvider):
             self._generic_insert(data)
             logger.info(f"创建分类成功: {data.get('id')}")
             return True
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"创建分类失败: {e}")
             raise DataAccessError(f"创建分类失败: {e}") from e
 
@@ -173,7 +173,7 @@ class CategoryProvider(LWBaseDataProvider):
 
         try:
             return self._generic_update(category_id, data)
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"更新分类 {category_id} 失败: {e}")
             raise DataAccessError(f"更新分类 {category_id} 失败: {e}") from e
 
@@ -195,7 +195,7 @@ class CategoryProvider(LWBaseDataProvider):
             if success:
                 logger.info(f"删除分类 {category_id} 成功")
             return success
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"删除分类 {category_id} 失败: {e}")
             raise DataAccessError(f"删除分类 {category_id} 失败: {e}") from e
 
@@ -323,7 +323,7 @@ class SubCategoryProvider(LWBaseDataProvider):
             self._generic_insert(data)
             logger.info(f"创建子分类成功: {data.get('id')}")
             return True
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"创建子分类失败: {e}")
             raise DataAccessError(f"创建子分类失败: {e}") from e
 
@@ -359,7 +359,7 @@ class SubCategoryProvider(LWBaseDataProvider):
 
         try:
             return self._generic_update(sub_category_id, data)
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"更新子分类 {sub_category_id} 失败: {e}")
             raise DataAccessError(f"更新子分类 {sub_category_id} 失败: {e}") from e
 
@@ -381,6 +381,6 @@ class SubCategoryProvider(LWBaseDataProvider):
             if success:
                 logger.info(f"删除子分类 {sub_category_id} 成功")
             return success
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"删除子分类 {sub_category_id} 失败: {e}")
             raise DataAccessError(f"删除子分类 {sub_category_id} 失败: {e}") from e
