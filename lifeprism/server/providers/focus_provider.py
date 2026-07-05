@@ -44,7 +44,7 @@
 #                 return None
 
 #         except Exception as e:
-#             logger.error(f"获取日焦点失败: {e}")
+#             logger.error("获取日焦点失败: error=%s", e)
 #             return None
 
 #     def upsert_daily_focus(self, date: str, content: str) -> bool:
@@ -66,11 +66,11 @@
 #                        ON CONFLICT(date) DO UPDATE SET content = excluded.content""",
 #                     (date, content)
 #                 )
-#                 logger.info(f"更新日焦点成功: {date}")
+#                 logger.info("更新日焦点成功: %s", date)
 #                 return True
 
 #         except Exception as e:
-#             logger.error(f"更新日焦点失败: {e}")
+#             logger.error("更新日焦点失败: error=%s", e)
 #             return False
 
 #     def get_daily_focuses_in_range(
@@ -102,7 +102,7 @@
 #                 return [dict(zip(columns, row)) for row in rows]
 
 #         except Exception as e:
-#             logger.error(f"获取日焦点范围失败: {e}")
+#             logger.error("获取日焦点范围失败: error=%s", e)
 #             return []
 
 #     # ==================== Weekly Focus 操作 ====================
@@ -139,7 +139,7 @@
 #                 return None
 
 #         except Exception as e:
-#             logger.error(f"获取周焦点失败: {e}")
+#             logger.error("获取周焦点失败: error=%s", e)
 #             return None
 
 #     def upsert_weekly_focus(
@@ -169,11 +169,11 @@
 #                        ON CONFLICT(year, month, week_num) DO UPDATE SET content = excluded.content""",
 #                     (year, month, week_num, content)
 #                 )
-#                 logger.info(f"更新周焦点成功: {year}-{month} W{week_num}")
+#                 logger.info("更新周焦点成功: %s-%s W%s", year, month, week_num)
 #                 return True
 
 #         except Exception as e:
-#             logger.error(f"更新周焦点失败: {e}")
+#             logger.error("更新周焦点失败: error=%s", e)
 #             return False
 
 #     def get_weekly_focuses_in_month(
@@ -205,7 +205,7 @@
 #                 return [dict(zip(columns, row)) for row in rows]
 
 #         except Exception as e:
-#             logger.error(f"获取月份周焦点失败: {e}")
+#             logger.error("获取月份周焦点失败: error=%s", e)
 #             return []
 
 

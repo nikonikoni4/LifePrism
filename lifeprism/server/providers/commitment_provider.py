@@ -2,12 +2,14 @@
 Commitment 数据提供者
 提供 commitments 表的 CRUD 操作（含 LEFT JOIN user_values 获取 value_keyword）
 """
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
 
@@ -62,9 +64,12 @@ class CommitmentProvider(LWBaseDataProvider):
                 cursor.execute(sql, params)
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as e:
-            logger.error(f"获取承诺列表失败: {e}")
-            return []
+        except sqlite3.Error as e:
+            logger.error("获取承诺列表失败: error=%s", e)
+            raise DataAccessError(
+                message="获取承诺列表失败",
+                details={"error": str(e)}
+            ) from e
 
     def get_commitment_by_id(self, commitment_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -90,9 +95,12 @@ class CommitmentProvider(LWBaseDataProvider):
                     columns = [desc[0] for desc in cursor.description]
                     return dict(zip(columns, row))
                 return None
-        except Exception as e:
-            logger.error(f"获取承诺 {commitment_id} 失败: {e}")
-            return None
+        except sqlite3.Error as e:
+            logger.error("获取承诺失败: commitment_id=%s, error=%s", commitment_id, e)
+            raise DataAccessError(
+                message="获取承诺失败",
+                details={"commitment_id": commitment_id, "error": str(e)}
+            ) from e
 
     def get_commitments_by_value(self, value_id: str) -> List[Dict[str, Any]]:
         """
@@ -116,9 +124,12 @@ class CommitmentProvider(LWBaseDataProvider):
                 """, (value_id,))
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as e:
-            logger.error(f"获取价值 {value_id} 的承诺列表失败: {e}")
-            return []
+        except sqlite3.Error as e:
+            logger.error("获取价值承诺列表失败: value_id=%s, error=%s", value_id, e)
+            raise DataAccessError(
+                message="获取价值承诺列表失败",
+                details={"value_id": value_id, "error": str(e)}
+            ) from e
 
     def create_commitment(self, data: Dict[str, Any]) -> Optional[str]:
         """
@@ -138,11 +149,14 @@ class CommitmentProvider(LWBaseDataProvider):
                     INSERT INTO commitments (id, content, value_id, status)
                     VALUES (?, ?, ?, 'active')
                 """, (new_id, data['content'], data.get('value_id')))
-            logger.info(f"创建承诺成功: {new_id}")
+            logger.info("创建承诺成功: id=%s", new_id)
             return new_id
-        except Exception as e:
-            logger.error(f"创建承诺失败: {e}")
-            return None
+        except sqlite3.Error as e:
+            logger.error("创建承诺失败: error=%s", e)
+            raise DataAccessError(
+                message="创建承诺失败",
+                details={"error": str(e)}
+            ) from e
 
     def update_commitment(self, commitment_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -175,9 +189,12 @@ class CommitmentProvider(LWBaseDataProvider):
                 sql = f"UPDATE commitments SET {', '.join(set_clauses)} WHERE id = ?"
                 cursor.execute(sql, values)
                 return cursor.rowcount > 0
-        except Exception as e:
-            logger.error(f"更新承诺 {commitment_id} 失败: {e}")
-            return False
+        except sqlite3.Error as e:
+            logger.error("更新承诺失败: commitment_id=%s, error=%s", commitment_id, e)
+            raise DataAccessError(
+                message="更新承诺失败",
+                details={"commitment_id": commitment_id, "error": str(e)}
+            ) from e
 
     def delete_commitment(self, commitment_id: str) -> bool:
         """
@@ -194,9 +211,12 @@ class CommitmentProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM commitments WHERE id = ?", (commitment_id,))
                 return cursor.rowcount > 0
-        except Exception as e:
-            logger.error(f"删除承诺 {commitment_id} 失败: {e}")
-            return False
+        except sqlite3.Error as e:
+            logger.error("删除承诺失败: commitment_id=%s, error=%s", commitment_id, e)
+            raise DataAccessError(
+                message="删除承诺失败",
+                details={"commitment_id": commitment_id, "error": str(e)}
+            ) from e
 
 
 commitment_provider = LazySingleton(CommitmentProvider)

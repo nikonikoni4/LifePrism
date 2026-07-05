@@ -76,7 +76,7 @@ class LWBaseDataProvider:
                 for table_name, config in TABLE_CONFIGS.items()
                 if config.get('update_at', False)
             }
-            logger.debug(f"初始化 update_at 缓存，共 {len(cls._TABLES_WITH_UPDATE_AT)} 个表需要自动更新时间戳")
+            logger.debug("初始化 update_at 缓存，共 %s 个表需要自动更新时间戳", len(cls._TABLES_WITH_UPDATE_AT))
 
     def __init__(self, db_manager=None):
         """
@@ -266,7 +266,7 @@ class LWBaseDataProvider:
                 log_item[col_name] = value
             logs.append(log_item)
         
-        logger.debug(f"获取活动日志: {len(logs)} 条, 总数: {total}")
+        logger.debug("获取活动日志: %s 条, 总数: %s", len(logs), total)
         return logs, total
 
     
@@ -583,7 +583,7 @@ class LWBaseDataProvider:
                 affected += self.db.upsert_many('multi_purpose_map_cache', multi_purpose_data, conflict_columns=['app', 'title', 'state'])
             return affected
         except sqlite3.Error as e:
-            logger.error(f"保存AI元数据失败: {e}")
+            logger.error("保存AI元数据失败: error=%s", e)
             raise DataAccessError(
                 message="保存AI元数据到缓存表失败",
                 details={"error": str(e)},
@@ -621,7 +621,7 @@ class LWBaseDataProvider:
     #         logger.info(f"成功保存 {len(data_list)} 行AI元数据到数据库")
     #         return affected
     #     except Exception as e:
-    #         logger.error(f"保存AI元数据失败: {e}")
+    #         logger.error("保存AI元数据失败: error=%s", e)
     #         raise
     
     # ==================== category 表 ====================
@@ -664,7 +664,7 @@ class LWBaseDataProvider:
                 latest_time = result[0] if result and result[0] else None
                 
                 if latest_time:
-                    logger.info(f"数据库中最新的 end_time: {latest_time}")
+                    logger.info("数据库中最新的 end_time: %s", latest_time)
                 else:
                     logger.info("数据库为空，没有历史数据")
                 
@@ -770,11 +770,11 @@ class LWBaseDataProvider:
                 cursor = conn.cursor()
                 cursor.executemany(sql, values_list)
                 affected = cursor.rowcount
-                logger.info(f"成功保存 {affected} 行清洗数据到数据库（共尝试 {len(data_list)} 行）")
+                logger.info("成功保存 %s 行清洗数据到数据库（共尝试 %s 行）", affected, len(data_list))
                 return affected
                 
         except sqlite3.Error as e:
-            logger.error(f"保存清洗数据失败: {e}")
+            logger.error("保存清洗数据失败: error=%s", e)
             raise DataAccessError(
                 message="保存清洗数据到数据库失败",
                 details={"error": str(e)},
@@ -811,7 +811,7 @@ class LWBaseDataProvider:
             
             # 使用 insert_many 插入数据
             affected = self.db.insert_many('tokens_usage_log', tokens_usage_data)
-            logger.info(f"成功保存 {affected} 条 token 使用记录到数据库")
+            logger.info("成功保存 %s 条 token 使用记录到数据库", affected)
             return affected
             
         except sqlite3.Error as e:
@@ -908,12 +908,12 @@ class LWBaseDataProvider:
             if existing:
                 # 存在则 UPDATE
                 affected = self.db.update('tokens_usage_log', data, where={'session_id': session_id})
-                logger.debug(f"更新会话 {session_id} 的 token 使用记录")
+                logger.debug("更新会话 %s 的 token 使用记录", session_id)
             else:
                 # 不存在则 INSERT
                 data['session_id'] = session_id
                 affected = self.db.insert('tokens_usage_log', data)
-                logger.debug(f"插入会话 {session_id} 的 token 使用记录")
+                logger.debug("插入会话 %s 的 token 使用记录", session_id)
             
             return affected
             
@@ -1117,7 +1117,7 @@ class LWBaseDataProvider:
 
                 # 对于 ignore 模式，如果发生冲突（rowcount=0），返回 None
                 if conflict_strategy == 'ignore' and cursor.rowcount == 0:
-                    logger.debug(f"Insert ignored due to conflict in {self._TABLE_NAME}")
+                    logger.debug("Insert ignored due to conflict in %s", self._TABLE_NAME)
                     return None
 
                 return data.get('id', str(cursor.lastrowid))

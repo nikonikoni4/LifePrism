@@ -30,10 +30,10 @@ class ScreenshotDataProvider(LWBaseDataProvider):
         try:
             return self.db.insert("screen_captures", data) > 0
         except sqlite3.Error as exc:
-            logger.error(f"保存截图元数据失败: {exc}")
+            logger.error("保存截图元数据失败: %s", exc)
             raise DataAccessError(f"Failed to insert screenshot metadata: {exc}") from exc
         except OSError as exc:
-            logger.error(f"数据库 I/O 错误: {exc}")
+            logger.error("数据库 I/O 错误: %s", exc)
             raise DataAccessError(f"Database I/O error: {exc}") from exc
 
     def list_expired_captures(self, cutoff_iso: str) -> List[Dict[str, Any]]:
@@ -63,7 +63,7 @@ class ScreenshotDataProvider(LWBaseDataProvider):
                 columns = [description[0] for description in cursor.description]
             return [dict(zip(columns, row)) for row in rows]
         except sqlite3.Error as exc:
-            logger.error(f"查询过期截图失败: {exc}")
+            logger.error("查询过期截图失败: %s", exc)
             raise DataAccessError(f"Failed to query expired captures: {exc}") from exc
 
     def delete_capture(self, capture_id: str) -> bool:
@@ -82,8 +82,8 @@ class ScreenshotDataProvider(LWBaseDataProvider):
         try:
             return self.db.delete("screen_captures", {"id": capture_id}) > 0
         except sqlite3.Error as exc:
-            logger.error(f"删除截图元数据失败: {exc}")
+            logger.error("删除截图元数据失败: %s", exc)
             raise DataAccessError(f"Failed to delete screenshot metadata: {exc}") from exc
         except OSError as exc:
-            logger.error(f"数据库 I/O 错误: {exc}")
+            logger.error("数据库 I/O 错误: %s", exc)
             raise DataAccessError(f"Database I/O error: {exc}") from exc

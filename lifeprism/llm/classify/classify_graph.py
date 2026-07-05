@@ -86,14 +86,14 @@ class ClassifyGraph:
                 result = result.response.content
                 if result and result.strip() and result.strip().lower() != "none":
                     app_info.description = result.strip()
-                    logger.info(f"获取 {app} 描述成功: {result[:50]}")
+                    logger.info("获取 %s 描述成功: %s", app, result[:50])
                     return
-                logger.warning(f"获取 {app} 描述为空（第 {attempt}/{MAX_RETRIES} 次）")
+                logger.warning("获取 %s 描述为空（第 %s/%s 次）", app, attempt, MAX_RETRIES)
             except (asyncio.TimeoutError, LLMError, ConnectionError, OSError) as e:
-                logger.warning(f"获取 {app} 描述异常（第 {attempt}/{MAX_RETRIES} 次）: {e}")
+                logger.warning("获取 %s 描述异常（第 %s/%s 次）: %s", app, attempt, MAX_RETRIES, e)
             if attempt < MAX_RETRIES:
                 await asyncio.sleep(0.5)
-        logger.warning(f"获取 {app} 描述失败，已重试 {MAX_RETRIES} 次，跳过")
+        logger.warning("获取 %s 描述失败，已重试 %s 次，跳过", app, MAX_RETRIES)
 
     async def get_app_description(self, state: classifyState) -> classifyState:
         """node 1: 并发为没有描述的 app 获取描述"""
@@ -160,7 +160,7 @@ class ClassifyGraph:
 """
         result_items = list(items)
         batches = [items[i:i + MAX_LOG_ITEMS] for i in range(0, len(items), MAX_LOG_ITEMS)]
-        logger.info(f"single_classify 共 {len(items)} 条，分 {len(batches)} 批并发")
+        logger.info("single_classify 共 %s 条，分 %s 批并发", len(items), len(batches))
         await asyncio.gather(*[
             self._single_classify_batch(batch, i + 1, system_prompt, state.app_registry, result_items)
             for i, batch in enumerate(batches)
@@ -209,7 +209,7 @@ class ClassifyGraph:
 """
         result_items = list(items)
         batches = [items[i:i + MAX_LOG_ITEMS] for i in range(0, len(items), MAX_LOG_ITEMS)]
-        logger.info(f"multi_classify_short 共 {len(items)} 条，分 {len(batches)} 批并发")
+        logger.info("multi_classify_short 共 %s 条，分 %s 批并发", len(items), len(batches))
         await asyncio.gather(*[
             self._multi_classify_short_batch(batch, i + 1, system_prompt, result_items)
             for i, batch in enumerate(batches)
@@ -228,7 +228,7 @@ class ClassifyGraph:
             ))
             item.title_analysis = result.response.content
         except Exception as e:
-            logger.warning(f"get_titles 分析 title={item.title!r} 失败: {e}")
+            logger.warning("get_titles 分析 title=%r 失败: %s", item.title, e)
 
     async def get_titles(self, items: list[LogItem]) -> list[LogItem]:
         """node 3: 并发为长时长多用途条目获取 title 分析"""
@@ -285,7 +285,7 @@ class ClassifyGraph:
 """
         result_items = list(items)
         batches = [items[i:i + MAX_LOG_ITEMS] for i in range(0, len(items), MAX_LOG_ITEMS)]
-        logger.info(f"multi_classify_long 共 {len(items)} 条，分 {len(batches)} 批并发")
+        logger.info("multi_classify_long 共 %s 条，分 %s 批并发", len(items), len(batches))
         await asyncio.gather(*[
             self._multi_classify_long_batch(batch, i + 1, system_prompt, result_items)
             for i, batch in enumerate(batches)

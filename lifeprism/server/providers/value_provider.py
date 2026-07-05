@@ -9,6 +9,7 @@ from typing import Optional, List, Dict, Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
 
@@ -36,9 +37,12 @@ class ValueProvider(LWBaseDataProvider):
                 cursor.execute("SELECT * FROM user_values ORDER BY sort_order DESC, created_at DESC")
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as e:
-            logger.error(f"获取价值列表失败: {e}")
-            return []
+        except sqlite3.Error as e:
+            logger.error("获取价值列表失败: error=%s", e)
+            raise DataAccessError(
+                message="获取价值列表失败",
+                details={"error": str(e)}
+            ) from e
 
     def get_value_by_id(self, value_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -59,9 +63,12 @@ class ValueProvider(LWBaseDataProvider):
                     columns = [desc[0] for desc in cursor.description]
                     return dict(zip(columns, row))
                 return None
-        except Exception as e:
-            logger.error(f"获取价值 {value_id} 失败: {e}")
-            return None
+        except sqlite3.Error as e:
+            logger.error("获取价值失败: value_id=%s, error=%s", value_id, e)
+            raise DataAccessError(
+                message="获取价值失败",
+                details={"value_id": value_id, "error": str(e)}
+            ) from e
 
     def create_value(self, data: Dict[str, Any]) -> Optional[str]:
         """
@@ -85,9 +92,12 @@ class ValueProvider(LWBaseDataProvider):
             return new_id
         except sqlite3.IntegrityError:
             raise
-        except Exception as e:
-            logger.error(f"创建价值失败: {e}")
-            return None
+        except sqlite3.Error as e:
+            logger.error("创建价值失败: keywords=%s, error=%s", data.get('keywords'), e)
+            raise DataAccessError(
+                message="创建价值失败",
+                details={"keywords": data.get('keywords'), "error": str(e)}
+            ) from e
 
     def update_value(self, value_id: str, data: Dict[str, Any]) -> bool:
         """
@@ -120,9 +130,12 @@ class ValueProvider(LWBaseDataProvider):
                 sql = f"UPDATE user_values SET {', '.join(set_clauses)} WHERE id = ?"
                 cursor.execute(sql, values)
                 return cursor.rowcount > 0
-        except Exception as e:
-            logger.error(f"更新价值 {value_id} 失败: {e}")
-            return False
+        except sqlite3.Error as e:
+            logger.error("更新价值失败: value_id=%s, error=%s", value_id, e)
+            raise DataAccessError(
+                message="更新价值失败",
+                details={"value_id": value_id, "error": str(e)}
+            ) from e
 
     def delete_value_with_cascade(self, value_id: str, cascade: bool) -> bool:
         """
@@ -147,9 +160,12 @@ class ValueProvider(LWBaseDataProvider):
             if deleted:
                 logger.info(f"删除价值成功: {value_id} (cascade={cascade})")
             return deleted
-        except Exception as e:
-            logger.error(f"删除价值 {value_id} 失败: {e}")
-            return False
+        except sqlite3.Error as e:
+            logger.error("删除价值失败: value_id=%s, cascade=%s, error=%s", value_id, cascade, e)
+            raise DataAccessError(
+                message="删除价值失败",
+                details={"value_id": value_id, "cascade": cascade, "error": str(e)}
+            ) from e
 
     def count_commitments_by_value(self, value_id: str) -> int:
         """
@@ -166,9 +182,12 @@ class ValueProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) FROM commitments WHERE value_id = ?", (value_id,))
                 return cursor.fetchone()[0]
-        except Exception as e:
-            logger.error(f"统计价值 {value_id} 关联承诺数失败: {e}")
-            return -1
+        except sqlite3.Error as e:
+            logger.error("统计价值关联承诺数失败: value_id=%s, error=%s", value_id, e)
+            raise DataAccessError(
+                message="统计价值关联承诺数失败",
+                details={"value_id": value_id, "error": str(e)}
+            ) from e
 
 
 value_provider = LazySingleton(ValueProvider)

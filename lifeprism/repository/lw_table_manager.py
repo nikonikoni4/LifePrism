@@ -42,10 +42,10 @@ class LWTableManager:
                 for table_name, config in TABLE_CONFIGS.items():
                     self._create_table_from_config(cursor, config)
                 
-                logger.info(f"数据库初始化成功，共创建 {len(TABLE_CONFIGS)} 个表")
+                logger.info("数据库初始化成功，共创建 %s 个表", len(TABLE_CONFIGS))
                 
         except Exception as e:
-            logger.error(f"数据库初始化失败: {e}")
+            logger.error("数据库初始化失败: error=%s", e)
             raise
     
     def _create_table_from_config(self, cursor: sqlite3.Cursor, config: dict):
@@ -107,7 +107,7 @@ class LWTableManager:
             ON {table_name}({index_columns});
             """
             cursor.execute(create_index_sql)
-            logger.debug(f"索引 '{index_name}' 创建成功")
+            logger.debug("索引 '%s' 创建成功", index_name)
     
 
 # ==================== 便捷函数 ====================

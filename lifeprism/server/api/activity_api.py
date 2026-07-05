@@ -97,7 +97,7 @@ async def get_activity_stats(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"获取活动统计失败: {e}", exc_info=True)
+        logger.error("获取活动统计失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -189,10 +189,10 @@ async def get_activity_logs(
     except HTTPException:
         raise
     except ValueError as e:
-        logger.error(f"获取活动日志失败: {str(e)}")
+        logger.error("获取活动日志失败: %s", str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"获取活动日志失败: {e}", exc_info=True)
+        logger.error("获取活动日志失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -214,7 +214,7 @@ async def get_activity_log_detail(log_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"获取日志详情失败: {e}", exc_info=True)
+        logger.error("获取日志详情失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -266,7 +266,7 @@ async def update_log_category(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"更新日志分类失败: log_id={log_id}, category_id={category_id}, error={e}", exc_info=True)
+        logger.error("更新日志分类失败: log_id=%s, category_id=%s, error=%s", log_id, category_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -313,7 +313,7 @@ async def batch_update_log_category(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"批量更新日志分类失败: log_ids={log_ids}, error={e}", exc_info=True)
+        logger.error("批量更新日志分类失败: log_ids=%s, error=%s", log_ids, e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -348,7 +348,7 @@ async def batch_delete_logs(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"批量删除日志失败: log_ids={log_ids}, error={e}", exc_info=True)
+        logger.error("批量删除日志失败: log_ids=%s, error=%s", log_ids, e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -377,7 +377,7 @@ async def delete_log(log_id: str) -> StandardResponse:
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"删除日志失败: log_id={log_id}, error={e}", exc_info=True)
+        logger.error("删除日志失败: log_id=%s, error=%s", log_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -444,7 +444,7 @@ async def update_logs_by_cache(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"根据缓存更新日志分类失败: app={app}, title={title}, error={e}", exc_info=True)
+        logger.error("根据缓存更新日志分类失败: app=%s, title=%s, error=%s", app, title, e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 

@@ -132,7 +132,7 @@ class SyncService:
                 asyncio.create_task(screen_behavior_anlysis(analysis_start_time, analysis_end_time))
 
             duration = time.time() - start_time
-            logger.info(f"[incremental_sync] 同步完成，耗时 {duration:.2f}s")
+            logger.info("[incremental_sync] 同步完成，耗时 %.2fs", duration)
 
             return {
                 "status": "success",
@@ -182,7 +182,7 @@ class SyncService:
             }
 
         async with self._sync_lock:
-            logger.info(f"[sync_by_time_range] 获取同步锁，开始执行 ({start_time} ~ {end_time})")
+            logger.info("[sync_by_time_range] 获取同步锁，开始执行 (%s ~ %s)", start_time, end_time)
             sync_start = time.time()
 
             # 解析时间字符串
@@ -202,7 +202,7 @@ class SyncService:
                 asyncio.create_task(screen_behavior_anlysis(time_parts[0], time_parts[1]))
 
             duration = time.time() - sync_start
-            logger.info(f"[sync_by_time_range] 同步完成，耗时 {duration:.2f}s")
+            logger.info("[sync_by_time_range] 同步完成，耗时 %.2fs", duration)
 
             return {
                 "status": "success",

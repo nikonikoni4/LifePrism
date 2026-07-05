@@ -15,6 +15,7 @@ from lifeprism.server.schemas.chatbot_schemas import (
     SSEEventType,
 )
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import NotFoundError
 
 logger = get_logger(__name__)
 
@@ -146,7 +147,7 @@ class ChatbotService:
                 updated_at=session.updated_at.isoformat() if session.updated_at else datetime.now().isoformat(),
                 message_count=len(session.messages)
             )
-        raise Exception(f"更新会话失败: {session_id}")
+        raise NotFoundError(message=f"会话 {session_id} 不存在", code="SESSION_NOT_FOUND")
 
     async def delete_session(self, session_id: str) -> bool:
         """删除会话"""
@@ -228,7 +229,7 @@ class ChatbotService:
             )
 
         except Exception as e:
-            logger.error(f"对话失败: {e}")
+            logger.error("对话失败: error=%s", e)
             yield ChatStreamEvent(
                 type=SSEEventType.ERROR,
                 error=str(e)

@@ -156,9 +156,9 @@ class CategoryAggregator:
                 sub_cat_data['category_id'] = category_id
                 sub_success = self.sub_category_provider.create_sub_category(sub_cat_data)
                 if not sub_success:
-                    logger.warning(f"创建子分类失败: {sub_cat_data.get('id')}")
+                    logger.warning("创建子分类失败: %s", sub_cat_data.get('id'))
 
-        logger.info(f"创建分类 {category_id}，包含 {len(sub_categories_data) if sub_categories_data else 0} 个子分类")
+        logger.info("创建分类 %s，包含 %s 个子分类", category_id, len(sub_categories_data) if sub_categories_data else 0)
         return True
 
     def delete_category_with_subs(self, category_id: str) -> bool:
@@ -179,12 +179,12 @@ class CategoryAggregator:
         for sub_cat in sub_categories:
             sub_success = self.sub_category_provider.delete_sub_category(sub_cat['id'])
             if not sub_success:
-                logger.warning(f"删除子分类失败: {sub_cat['id']}")
+                logger.warning("删除子分类失败: %s", sub_cat['id'])
 
         # 删除主分类
         success = self.category_provider.delete_category(category_id)
         if success:
-            logger.info(f"删除分类 {category_id} 及其 {len(sub_categories)} 个子分类")
+            logger.info("删除分类 %s 及其 %s 个子分类", category_id, len(sub_categories))
 
         return success
 

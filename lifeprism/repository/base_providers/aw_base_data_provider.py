@@ -157,7 +157,7 @@ class AWBaseDataProvider:
         start_time_str = start_utc.isoformat().replace('T', ' ')
         end_time_str = end_utc.isoformat().replace('T', ' ')
         
-        logger.info(f"获取窗口事件(UTC): {start_time_str} ~ {end_time_str}")
+        logger.info("获取窗口事件(UTC): %s ~ %s", start_time_str, end_time_str)
         
         # 获取 window bucket key
         bucket_key = self._get_bucket_key_by_type('currentwindow')
@@ -174,7 +174,7 @@ class AWBaseDataProvider:
             return []
         
         events = self._get_events(bucket_key, start_time_str, end_time_str, limit=limit)
-        logger.info(f"获取到 {len(events)} 个窗口事件")
+        logger.info("获取到 %s 个窗口事件", len(events))
         
         return events
     
@@ -200,7 +200,7 @@ class AWBaseDataProvider:
             bucket_row = cursor.fetchone()
             
             if not bucket_row:
-                logger.warning(f"未找到存储桶: {bucket_key}")
+                logger.warning("未找到存储桶: %s", bucket_key)
                 return []
             
             bucket_id = bucket_row['key']

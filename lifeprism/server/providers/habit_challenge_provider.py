@@ -51,7 +51,7 @@
 #                     data.get("finished_at"),
 #                 ),
 #             )
-#         logger.info(f"创建挑战成功: {challenge_id} (habit_id={data['habit_id']})")
+#         logger.info("创建挑战成功: %s (habit_id=%s)", challenge_id, data['habit_id'])
 #         return challenge_id
 
 #     def get_challenge_by_id(self, challenge_id: str) -> Optional[Dict[str, Any]]:

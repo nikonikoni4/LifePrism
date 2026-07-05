@@ -48,7 +48,7 @@ class TodoAggregator:
                 )
                 return cursor.fetchone()[0]
         except Exception as e:
-            logger.error(f"获取下一个 order_index 失败 (date={date}): {e}")
+            logger.error("获取下一个 order_index 失败: date=%s, error=%s", date, e)
             raise DataAccessError(
                 message=f"获取下一个 order_index 失败",
                 details={"date": date, "error": str(e)}

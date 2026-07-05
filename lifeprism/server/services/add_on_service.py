@@ -40,10 +40,10 @@ def _read_data() -> dict:
         with open(file_path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except json.JSONDecodeError as e:
-        logger.error(f"JSON 文件损坏: {e}")
+        logger.error("JSON 文件损坏: error=%s", e)
         raise ValueError(f"配置文件格式错误: {e}")
-    except Exception as e:
-        logger.error(f"读取配置文件失败: {e}")
+    except (OSError, json.JSONDecodeError) as e:
+        logger.error("读取配置文件失败: error=%s", e)
         raise IOError(f"无法读取配置文件: {e}")
 
 
@@ -61,14 +61,14 @@ def _save_data(data: dict) -> None:
             json.dump(data, f, ensure_ascii=False, indent=2)
         # 原子性重命名
         os.replace(temp_path, file_path)
-    except Exception as e:
+    except OSError as e:
         # 清理临时文件
         try:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
-        except Exception as cleanup_error:
-            logger.warning(f"清理临时文件失败: {cleanup_error}")
-        logger.error(f"保存配置文件失败: {e}")
+        except OSError as cleanup_error:
+            logger.warning("清理临时文件失败: error=%s", cleanup_error)
+        logger.error("保存配置文件失败: error=%s", e)
         raise RuntimeError("保存配置失败") from e
 
 
@@ -105,13 +105,14 @@ def _validate_path(path: str) -> bool:
         for forbidden in forbidden_dirs:
             try:
                 if p.is_relative_to(forbidden.resolve()):
-                    logger.warning(f"拒绝访问系统目录: {p}")
+                    logger.warning("拒绝访问系统目录: path=%s", p)
                     return False
             except (ValueError, OSError):
                 continue
 
         return p.exists() and p.is_dir()
-    except Exception:
+    except (OSError, ValueError) as e:
+        logger.warning("路径验证失败: path=%s, error=%s", str(p), e)
         return False
 
 
@@ -135,7 +136,7 @@ def get_all_expand_dirs() -> List[ExpandDirItem]:
         try:
             result.append(ExpandDirItem(**item))
         except Exception as e:
-            logger.warning(f"跳过无效的配置项: {e}")
+            logger.warning("跳过无效的配置项: error=%s", e)
             continue
 
     # 按 ID 升序排列

@@ -56,7 +56,7 @@ class MoodAggregator:
 
             return entry
         except Exception as e:
-            logger.error(f"获取心情条目详情失败 (entry_id={entry_id}): {e}")
+            logger.error("获取心情条目详情失败: entry_id=%s, error=%s", entry_id, e)
             raise DataAccessError(
                 message="获取心情条目详情失败",
                 details={"entry_id": entry_id, "error": str(e)},
@@ -96,7 +96,7 @@ class MoodAggregator:
 
             return entries
         except Exception as e:
-            logger.error(f"获取心情条目列表失败 (start={start_date}, end={end_date}): {e}")
+            logger.error("获取心情条目列表失败: start=%s, end=%s, error=%s", start_date, end_date, e)
             raise DataAccessError(
                 message="获取心情条目列表失败",
                 details={"start_date": start_date, "end_date": end_date, "error": str(e)},
@@ -125,7 +125,7 @@ class MoodAggregator:
 
             return mood_type
         except Exception as e:
-            logger.error(f"获取心情类型详情失败 (mood_type_id={mood_type_id}): {e}")
+            logger.error("获取心情类型详情失败: mood_type_id=%s, error=%s", mood_type_id, e)
             raise DataAccessError(
                 message="获取心情类型详情失败",
                 details={"mood_type_id": mood_type_id, "error": str(e)},
@@ -170,7 +170,7 @@ class MoodAggregator:
 
             return analysis
         except Exception as e:
-            logger.error(f"获取心情分析失败 (start={start_date}, end={end_date}): {e}")
+            logger.error("获取心情分析失败: start=%s, end=%s, error=%s", start_date, end_date, e)
             raise DataAccessError(
                 message="获取心情分析失败",
                 details={"start_date": start_date, "end_date": end_date, "error": str(e)},

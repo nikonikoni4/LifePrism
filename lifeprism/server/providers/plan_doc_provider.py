@@ -43,7 +43,7 @@
 #                 return [dict(zip(columns, row)) for row in rows]
 
 #         except Exception as e:
-#             logger.error(f"获取所有计划书失败: {e}")
+#             logger.error("获取所有计划书失败: error=%s", e)
 #             return []
 
 #     def get_plan_docs_by_goal(self, goal_id: str) -> List[Dict[str, Any]]:
@@ -74,7 +74,7 @@
 #                 return [dict(zip(columns, row)) for row in rows]
 
 #         except Exception as e:
-#             logger.error(f"获取目标 {goal_id} 的计划书失败: {e}")
+#             logger.error("获取目标 %s 的计划书失败: error=%s", goal_id, e)
 #             return []
 
 #     def get_plan_doc_by_id(self, doc_id: str) -> Optional[Dict[str, Any]]:
@@ -99,7 +99,7 @@
 #                 return None
 
 #         except Exception as e:
-#             logger.error(f"获取计划书 {doc_id} 失败: {e}")
+#             logger.error("获取计划书 %s 失败: error=%s", doc_id, e)
 #             return None
 
 #     def create_plan_doc(self, data: Dict[str, Any]) -> Optional[str]:
@@ -148,11 +148,11 @@
 #                     values
 #                 )
 
-#                 logger.info(f"创建计划书成功，ID: {doc_id}")
+#                 logger.info("创建计划书成功，ID: %s", doc_id)
 #                 return doc_id
 
 #         except Exception as e:
-#             logger.error(f"创建计划书失败: {e}")
+#             logger.error("创建计划书失败: error=%s", e)
 #             return None
 
 #     def update_plan_doc(self, doc_id: str, data: Dict[str, Any]) -> bool:
@@ -198,11 +198,11 @@
 #                 success = cursor.rowcount > 0
 
 #                 if success:
-#                     logger.info(f"更新计划书 {doc_id} 成功")
+#                     logger.info("更新计划书 %s 成功", doc_id)
 #                 return success
 
 #         except Exception as e:
-#             logger.error(f"更新计划书 {doc_id} 失败: {e}")
+#             logger.error("更新计划书 %s 失败: error=%s", doc_id, e)
 #             return False
 
 #     def delete_plan_doc(self, doc_id: str) -> bool:
@@ -222,11 +222,11 @@
 
 #                 success = cursor.rowcount > 0
 #                 if success:
-#                     logger.info(f"删除计划书 {doc_id} 成功")
+#                     logger.info("删除计划书 %s 成功", doc_id)
 #                 return success
 
 #         except Exception as e:
-#             logger.error(f"删除计划书 {doc_id} 失败: {e}")
+#             logger.error("删除计划书 %s 失败: error=%s", doc_id, e)
 #             return False
 
 #     def rename_plan_doc(self, old_id: str, new_id: str) -> bool:
@@ -253,7 +253,7 @@
 #                 )
                 
 #                 if cursor.rowcount == 0:
-#                     logger.warning(f"重命名失败: 计划书 {old_id} 不存在")
+#                     logger.warning("重命名失败: 计划书 %s 不存在", old_id)
 #                     return False
                 
 #                 # 2. 级联更新 todo_list 表 (Task Pool) 中的引用
@@ -263,11 +263,11 @@
 #                     (new_id, old_id)
 #                 )
                 
-#                 logger.info(f"重命名计划书成功: {old_id} -> {new_id}, 关联任务更新数: {cursor.rowcount}")
+#                 logger.info("重命名计划书成功: %s -> %s, 关联任务更新数: %s", old_id, new_id, cursor.rowcount)
 #                 return True
 
 #         except Exception as e:
-#             logger.error(f"重命名计划书 {old_id} -> {new_id} 失败: {e}")
+#             logger.error("重命名计划书 %s -> %s 失败: error=%s", old_id, new_id, e)
 #             return False
 
 

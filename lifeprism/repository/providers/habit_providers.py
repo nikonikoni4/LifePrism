@@ -143,7 +143,7 @@ class HabitProvider(LWBaseDataProvider):
             'paused_at': None,
         }
         self._generic_insert(insert_data)
-        logger.info(f"创建习惯成功: {habit_id}")
+        logger.info("创建习惯成功: %s", habit_id)
         return habit_id
 
     def update_habit(self, habit_id: str, update_data: Dict[str, Any]) -> bool:
@@ -163,7 +163,7 @@ class HabitProvider(LWBaseDataProvider):
         # 白名单验证
         invalid_fields = set(update_data.keys()) - self._UPDATE_FIELDS
         if invalid_fields:
-            logger.warning(f"忽略非法更新字段: {invalid_fields}")
+            logger.warning("忽略非法更新字段: %s", invalid_fields)
             update_data = {k: v for k, v in update_data.items() if k in self._UPDATE_FIELDS}
 
         if not update_data:
@@ -183,7 +183,7 @@ class HabitProvider(LWBaseDataProvider):
         """
         success = self._generic_delete(habit_id)
         if success:
-            logger.info(f"删除习惯 {habit_id} 成功")
+            logger.info("删除习惯 %s 成功", habit_id)
         return success
 
 
@@ -274,7 +274,7 @@ class HabitChallengeProvider(LWBaseDataProvider):
             'finished_at': data.get('finished_at'),
         }
         self._generic_insert(insert_data)
-        logger.info(f"创建挑战成功: {challenge_id} (habit_id={data['habit_id']})")
+        logger.info("创建挑战成功: %s (habit_id=%s)", challenge_id, data['habit_id'])
         return challenge_id
 
     def get_challenge_by_id(self, challenge_id: str) -> Optional[Dict[str, Any]]:
@@ -350,7 +350,7 @@ class HabitChallengeProvider(LWBaseDataProvider):
         # 白名单验证
         invalid_fields = set(update_data.keys()) - self._UPDATE_FIELDS
         if invalid_fields:
-            logger.warning(f"忽略非法更新字段: {invalid_fields}")
+            logger.warning("忽略非法更新字段: %s", invalid_fields)
             update_data = {k: v for k, v in update_data.items() if k in self._UPDATE_FIELDS}
 
         if not update_data:
@@ -536,10 +536,10 @@ class HabitCheckinProvider(LWBaseDataProvider):
 
         try:
             self._generic_insert(insert_data)
-            logger.info(f"创建打卡记录成功: {checkin_id}")
+            logger.info("创建打卡记录成功: %s", checkin_id)
             return checkin_id
         except sqlite3.IntegrityError:
-            logger.warning(f"打卡记录已存在: habit_id={data['habit_id']}, date={data['date']}")
+            logger.warning("打卡记录已存在: habit_id=%s, date=%s", data['habit_id'], data['date'])
             return None  # 重复打卡
 
     def get_checkin_by_date(self, habit_id: str, checkin_date: str) -> Optional[Dict[str, Any]]:

@@ -212,7 +212,7 @@ def generate_ai_abstract(user_id: int, mode: str, version: int) -> Optional[str]
     # TODO: 接入 LLM 生成总结
     record = being_provider.get_by_user_mode_version(user_id, mode, version)
     if not record:
-        logger.error(f"记录不存在 (user_id={user_id}, mode={mode}, version={version})")
+        logger.error("记录不存在: user_id=%s, mode=%s, version=%s", user_id, mode, version)
         return None
     
     # 占位：后续接入 LLM

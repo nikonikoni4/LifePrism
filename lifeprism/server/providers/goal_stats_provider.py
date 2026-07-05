@@ -54,7 +54,7 @@
 #                 return items
                 
 #         except Exception as e:
-#             logger.error(f"获取目标 {goal_id} 统计数据失败: {e}")
+#             logger.error("获取目标 %s 统计数据失败: error=%s", goal_id, e)
 #             return []
     
 #     def get_latest_stat_date(self, goal_id: str) -> Optional[str]:
@@ -78,7 +78,7 @@
 #                 return result[0] if result and result[0] else None
                 
 #         except Exception as e:
-#             logger.error(f"获取目标 {goal_id} 最新统计日期失败: {e}")
+#             logger.error("获取目标 %s 最新统计日期失败: error=%s", goal_id, e)
 #             return None
     
 #     def get_stat_by_date(self, goal_id: str, date: str) -> Optional[Dict[str, Any]]:
@@ -107,7 +107,7 @@
 #                 return None
                 
 #         except Exception as e:
-#             logger.error(f"获取目标 {goal_id} 在 {date} 的统计数据失败: {e}")
+#             logger.error("获取目标 %s 在 %s 的统计数据失败: error=%s", goal_id, date, e)
 #             return None
     
 #     # ==================== 更新操作 ====================
@@ -150,11 +150,11 @@
 #                         VALUES (?, ?, ?, ?)
 #                     """, (goal_id, date, time_spent, todo_count))
                 
-#                 logger.debug(f"目标 {goal_id} 在 {date} 的统计数据已更新")
+#                 logger.debug("目标 %s 在 %s 的统计数据已更新", goal_id, date)
 #                 return True
                 
 #         except Exception as e:
-#             logger.error(f"更新目标 {goal_id} 在 {date} 的统计数据失败: {e}")
+#             logger.error("更新目标 %s 在 %s 的统计数据失败: error=%s", goal_id, date, e)
 #             return False
     
 #     # ==================== 聚合操作 ====================
@@ -187,11 +187,11 @@
                 
 #                 result = cursor.fetchone()
 #                 total = int(result[0]) if result and result[0] else 0
-#                 logger.debug(f"aggregate_time_spent: goal_id={goal_id}, date={date}, total={total}")
+#                 logger.debug("aggregate_time_spent: goal_id=%s, date=%s, total=%s", goal_id, date, total)
 #                 return total
                 
 #         except Exception as e:
-#             logger.error(f"聚合目标 {goal_id} 在 {date} 的时间花费失败: {e}")
+#             logger.error("聚合目标 %s 在 %s 的时间花费失败: error=%s", goal_id, date, e)
 #             return 0
     
 #     def aggregate_completed_todos(self, goal_id: str, date: str) -> int:
@@ -221,7 +221,7 @@
 #                 return int(result[0]) if result and result[0] else 0
                 
 #         except Exception as e:
-#             logger.error(f"统计目标 {goal_id} 在 {date} 完成的待办数量失败: {e}")
+#             logger.error("统计目标 %s 在 %s 完成的待办数量失败: error=%s", goal_id, date, e)
 #             return 0
     
 #     def sync_stats_to_date(self, goal_id: str, target_date: str, start_date: str = None) -> bool:
@@ -240,7 +240,7 @@
 #         """
 #         try:
 #             last_date = self.get_latest_stat_date(goal_id)
-#             logger.debug(f"sync_stats_to_date: goal_id={goal_id}, target_date={target_date}, start_date={start_date}, last_date={last_date}")
+#             logger.debug("sync_stats_to_date: goal_id=%s, target_date=%s, start_date=%s, last_date=%s", goal_id, target_date, start_date, last_date)
             
 #             target_dt = datetime.strptime(target_date, "%Y-%m-%d")
             
@@ -312,11 +312,11 @@
 #                 todo_count = self.aggregate_completed_todos(goal_id, date)
 #                 self.upsert_stat(goal_id, date, time_spent, todo_count)
             
-#             logger.info(f"目标 {goal_id} 同步了 {len(dates_to_sync)} 天的统计数据")
+#             logger.info("目标 %s 同步了 %s 天的统计数据", goal_id, len(dates_to_sync))
 #             return True
             
 #         except Exception as e:
-#             logger.error(f"同步目标 {goal_id} 统计数据失败: {e}")
+#             logger.error("同步目标 %s 统计数据失败: error=%s", goal_id, e)
 #             return False
     
 #     def _get_earliest_stat_date(self, goal_id: str) -> Optional[str]:
@@ -334,7 +334,7 @@
 #                 return result[0] if result and result[0] else None
                 
 #         except Exception as e:
-#             logger.error(f"获取目标 {goal_id} 最早统计日期失败: {e}")
+#             logger.error("获取目标 %s 最早统计日期失败: error=%s", goal_id, e)
 #             return None
     
 #     def get_cumulative_stats(self, goal_id: str, limit: int = 30) -> List[Dict[str, Any]]:

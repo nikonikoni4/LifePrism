@@ -116,7 +116,7 @@ class PromptLoader:
             target_file.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(md_file, target_file)
         
-        logger.debug(f"开发环境已同步 .md prompts: {source_dir} -> {target_dir}")
+        logger.debug("开发环境已同步 .md prompts: %s -> %s", source_dir, target_dir)
 
     def _load_usage_stats(self) -> None:
         """加载使用统计数据"""
@@ -125,7 +125,7 @@ class PromptLoader:
                 with open(self.usage_stats_file, 'r', encoding='utf-8') as f:
                     self._usage_stats = yaml.safe_load(f) or {}
             except Exception as e:
-                logger.error(f"加载使用统计文件失败: {e}")
+                logger.error("加载使用统计文件失败: %s", e)
                 self._usage_stats = {}
         else:
             self._usage_stats = {}
@@ -139,7 +139,7 @@ class PromptLoader:
             with open(self.usage_stats_file, 'w', encoding='utf-8') as f:
                 yaml.dump(self._usage_stats, f, allow_unicode=True, default_flow_style=False)
         except Exception as e:
-            logger.error(f"保存使用统计文件失败: {e}")
+            logger.error("保存使用统计文件失败: %s", e)
 
     def _update_usage_stats(self, prompt_name: str, version: str) -> None:
         """
@@ -206,10 +206,10 @@ class PromptLoader:
         try:
             data = prompts_md_load(file_path)
             self._cache[module] = data
-            logger.debug(f"成功加载 prompt 文件: {file_path}")
+            logger.debug("成功加载 prompt 文件: %s", file_path)
             return data
         except Exception as e:
-            logger.error(f"加载 prompt 文件失败 {file_path}: {e}")
+            logger.error("加载 prompt 文件失败 %s: %s", file_path, e)
             raise
 
     def _validate_params(
@@ -341,12 +341,12 @@ class PromptLoader:
             try:
                 prompt_content = prompt_content.format(**params)
             except KeyError as e:
-                logger.warning(f"参数注入失败，缺少参数: {e}")
+                logger.warning("参数注入失败，缺少参数: %s", e)
 
         # 更新使用统计
         self._update_usage_stats(prompt_name, version)
 
-        logger.debug(f"成功加载 prompt: {module}.{prompt_name} (version: {version})")
+        logger.debug("成功加载 prompt: %s.%s (version: %s)", module, prompt_name, version)
 
         return prompt_content
 

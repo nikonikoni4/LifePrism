@@ -70,14 +70,14 @@ class EventTransformer:
         
         # 5. 多用途应用必须有 title，否则视为脏数据过滤掉
         if is_multipurpose and not title:
-            logger.debug(f"过滤脏数据: 多用途应用 {app_name} 无 title")
+            logger.debug("过滤脏数据: 多用途应用 %s 无 title", app_name)
             return None
 
         # 6. 转换时间戳
         timestamp_str = raw_event.get('timestamp', '')
         start_time = self._convert_timestamp(timestamp_str)
         if not start_time:
-            logger.warning(f"时间戳转换失败: {timestamp_str}")
+            logger.warning("时间戳转换失败: %s", timestamp_str)
             return None
         
         # 7. 计算结束时间
@@ -164,5 +164,5 @@ class EventTransformer:
             
             return dt_local.strftime('%Y-%m-%d %H:%M:%S')
         except Exception as e:
-            logger.warning(f"时间戳转换失败: {utc_timestamp_str} -> {str(e)}")
+            logger.warning("时间戳转换失败: %s -> %s", utc_timestamp_str, str(e))
             return None

@@ -41,7 +41,7 @@
 #                     return dict(zip(columns, row))
 #                 return None
 #         except Exception as e:
-#             logger.error(f"获取日记 {date} 失败: {e}")
+#             logger.error("获取日记 %s 失败: error=%s", date, e)
 #             return None
 
 #     def get_diaries_by_date_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
@@ -66,7 +66,7 @@
 #                 rows = cursor.fetchall()
 #                 return [dict(zip(columns, row)) for row in rows]
 #         except Exception as e:
-#             logger.error(f"获取日记列表 {start_date}~{end_date} 失败: {e}")
+#             logger.error("获取日记列表 %s~%s 失败: error=%s", start_date, end_date, e)
 #             return []
 
 #     def create_diary(self, date: str) -> bool:
@@ -83,10 +83,10 @@
 #             with self.db.get_connection() as conn:
 #                 cursor = conn.cursor()
 #                 cursor.execute("INSERT INTO diary (date) VALUES (?)", (date,))
-#                 logger.info(f"创建日记 {date} 成功")
+#                 logger.info("创建日记 %s 成功", date)
 #                 return True
 #         except Exception as e:
-#             logger.error(f"创建日记 {date} 失败: {e}")
+#             logger.error("创建日记 %s 失败: error=%s", date, e)
 #             return False
 
 #     def update_diary(self, date: str, data: Dict[str, Any]) -> bool:
@@ -126,7 +126,7 @@
 #                 cursor.execute(sql, values)
 #                 return cursor.rowcount > 0
 #         except Exception as e:
-#             logger.error(f"更新日记 {date} 失败: {e}")
+#             logger.error("更新日记 %s 失败: error=%s", date, e)
 #             return False
 
 

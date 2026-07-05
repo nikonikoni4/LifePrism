@@ -14,7 +14,7 @@ class _FileTool(Tool):
 
     def __init__(self):
         self.allowed_dir_path: list[Path] = settings.allowed_dir_path
-        logger.debug(f"允许的工作目录: {self.allowed_dir_path}")
+        logger.debug("允许的工作目录: %s", self.allowed_dir_path)
         
     
     
@@ -166,7 +166,7 @@ def _read_file(
         # 读取文件所有行
         file_path_obj = Path(file_path)
         if not file_path_obj.exists():
-            logger.warning(f"文件不存在: {file_path}")
+            logger.warning("文件不存在: %s", file_path)
             return {
                 "content": "",
                 "read_ratio": 0.0,
@@ -204,9 +204,8 @@ def _read_file(
             last_line = len(frontmatter_lines) - 1 if frontmatter_lines else -1
 
             logger.debug(
-                f"读取文件 {file_path} frontmatter: "
-                f"字符数 {len(content)}/{total_chars}, "
-                f"比例 {read_ratio:.2%}"
+                "读取文件 %s frontmatter: 字符数 %s/%s, 比例 %.2f%%",
+                file_path, len(content), total_chars, read_ratio * 100
             )
 
             return {
@@ -221,7 +220,7 @@ def _read_file(
 
         # 处理行号范围
         if start_line >= total_body_lines:
-            logger.debug(f"start_line ({start_line}) 超出文件行数 ({total_body_lines})")
+            logger.debug("start_line (%s) 超出文件行数 (%s)", start_line, total_body_lines)
             return {
                 "content": "",
                 "read_ratio": 0.0,
@@ -234,7 +233,7 @@ def _read_file(
 
         # 检查行号范围有效性
         if start_line > actual_end_line:
-            logger.debug(f"start_line ({start_line}) > end_line ({actual_end_line})")
+            logger.debug("start_line (%s) > end_line (%s)", start_line, actual_end_line)
             return {
                 "content": "",
                 "read_ratio": 0.0,
@@ -249,10 +248,8 @@ def _read_file(
         read_ratio = len(content) / total_body_chars if total_body_chars > 0 else 0.0
 
         logger.debug(
-            f"读取文件 {file_path}: "
-            f"行范围 [{start_line}, {actual_end_line}], "
-            f"字符数 {len(content)}/{total_body_chars}, "
-            f"比例 {read_ratio:.2%}"
+            "读取文件 %s: 行范围 [%s, %s], 字符数 %s/%s, 比例 %.2f%%",
+            file_path, start_line, actual_end_line, len(content), total_body_chars, read_ratio * 100
         )
 
         return {
@@ -262,7 +259,7 @@ def _read_file(
         }
 
     except UnicodeDecodeError as e:
-        logger.error(f"文件编码错误 {file_path}: {e}")
+        logger.error("文件编码错误 %s: %s", file_path, e)
         return {
             "content": "",
             "read_ratio": 0.0,
@@ -270,7 +267,7 @@ def _read_file(
             "error": f"文件编码错误: {str(e)}"
         }
     except Exception as e:
-        logger.error(f"读取文件 {file_path} 时出错: {e}")
+        logger.error("读取文件 %s 时出错: %s", file_path, e)
         return {
             "content": "",
             "read_ratio": 0.0,
@@ -364,7 +361,7 @@ def _replace_content(
         # 检查文件是否存在
         file_path_obj = Path(file_path)
         if not file_path_obj.exists():
-            logger.warning(f"文件不存在: {file_path}")
+            logger.warning("文件不存在: %s", file_path)
             return {"error": f"文件 {file_path} 不存在"}
 
         # 读取文件全部内容
@@ -373,7 +370,7 @@ def _replace_content(
 
         # 检查 old_content 是否存在
         if old_content not in original_content:
-            logger.warning(f"未找到要替换的内容: {file_path}")
+            logger.warning("未找到要替换的内容: %s", file_path)
             return {"error": "未找到要替换的内容"}
 
         # 计算匹配次数
@@ -406,13 +403,13 @@ def _replace_content(
         }
 
     except UnicodeDecodeError as e:
-        logger.error(f"文件编码错误 {file_path}: {e}")
+        logger.error("文件编码错误 %s: %s", file_path, e)
         return {"error": f"文件编码错误: {str(e)}"}
     except PermissionError as e:
-        logger.error(f"没有权限写入文件 {file_path}: {e}")
+        logger.error("没有权限写入文件 %s: %s", file_path, e)
         return {"error": f"没有权限写入文件: {str(e)}"}
     except Exception as e:
-        logger.error(f"更新文件 {file_path} 时出错: {e}")
+        logger.error("更新文件 %s 时出错: %s", file_path, e)
         return {"error": f"更新文件时出错: {str(e)}"}
 
 class EditFileTool(_FileTool):
@@ -602,10 +599,10 @@ class FileTreeTool(_FileTool):
             return f"{SUCCESS}{output}"
 
         except PermissionError as e:
-            logger.error(f"没有权限访问目录 {dir_path}: {e}")
+            logger.error("没有权限访问目录 %s: %s", dir_path, e)
             return f"{ERROR}没有权限访问目录: {dir_path}"
         except Exception as e:
-            logger.error(f"获取文件树 {dir_path} 时出错: {e}")
+            logger.error("获取文件树 %s 时出错: %s", dir_path, e)
             return f"{ERROR}获取文件树时出错: {str(e)}"
 
 
@@ -865,7 +862,7 @@ def _search_files_py(
         except Exception as e:
             return {"error": f"搜索目录 {search_dir} 时出错: {e}"}
 
-        logger.debug(f"搜索文件 '{file_name}' in '{search_dir}': 找到 {len(matched_files)} 个匹配项")
+        logger.debug("搜索文件 '%s' in '%s': 找到 %s 个匹配项", file_name, search_dir, len(matched_files))
 
         return {
             "files": matched_files,
@@ -873,7 +870,7 @@ def _search_files_py(
         }
 
     except Exception as e:
-        logger.error(f"搜索文件 '{file_name}' 时出错: {e}")
+        logger.error("搜索文件 '%s' 时出错: %s", file_name, e)
         return {"error": f"搜索文件时出错: {str(e)}"}
 
 
@@ -1101,7 +1098,7 @@ def _search_string_py(
                 # 跳过二进制文件或无权限的文件
                 continue
             except Exception as e:
-                logger.warning(f"搜索文件 {file_path} 时出错: {e}")
+                logger.warning("搜索文件 %s 时出错: %s", file_path, e)
                 continue
 
         # 格式化输出
@@ -1126,11 +1123,11 @@ def _search_string_py(
         if total_matches >= max_results:
             result_text += f"（已达到最大结果数 {max_results}，可能还有更多匹配项）"
 
-        logger.debug(f"搜索完成: pattern={pattern}, path={path}, matches={total_matches}")
+        logger.debug("搜索完成: pattern=%s, path=%s, matches=%s", pattern, path, total_matches)
         return {"result": result_text}
 
     except Exception as e:
-        logger.error(f"搜索字符串时出错: {e}")
+        logger.error("搜索字符串时出错: %s", e)
         return {"error": f"搜索时出错: {str(e)}"}
 
 

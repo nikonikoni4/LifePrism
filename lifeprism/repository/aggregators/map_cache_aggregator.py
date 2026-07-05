@@ -187,7 +187,7 @@ class MapCacheAggregator:
 
             total_deleted = multi_deleted + single_deleted
 
-            logger.info(f"清理缓存完成: 多用途={multi_deleted}, 单用途={single_deleted}, 总计={total_deleted}")
+            logger.info("清理缓存完成: 多用途=%s, 单用途=%s, 总计=%s", multi_deleted, single_deleted, total_deleted)
 
             return {
                 'multi_purpose_deleted': multi_deleted,

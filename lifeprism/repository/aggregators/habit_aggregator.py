@@ -130,7 +130,7 @@ class HabitAggregator:
             challenge_data['habit_id'] = habit_id
             self.challenge_provider.create_challenge(challenge_data)
 
-        logger.info(f"创建习惯 {habit_id}，包含挑战: {challenge_data is not None}")
+        logger.info("创建习惯 %s，包含挑战: %s", habit_id, challenge_data is not None)
         return habit_id
 
     # ==================== Habit 核心 CRUD 透传 ====================

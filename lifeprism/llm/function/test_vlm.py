@@ -86,7 +86,7 @@ async def test_vlm() -> dict:
 
         # 失败条件1: 包含错误信息
         if "error" in response_content.lower():
-            logger.error(f"VLM 测试失败: 模型返回错误 (provider={settings.provider}, model={settings.model}): {response_content[:200]}")
+            logger.error("VLM 测试失败: 模型返回错误 (provider=%s, model=%s): %s", settings.provider, settings.model, response_content[:200])
             return {
                 "success": False,
                 "message": f"VLM 测试失败: 模型返回错误",
@@ -98,7 +98,7 @@ async def test_vlm() -> dict:
 
         # 失败条件2: 未收到图片
         if "未收到图片" in response_content:
-            logger.error(f"VLM 测试失败: 模型未收到图片 (provider={settings.provider}, model={settings.model})")
+            logger.error("VLM 测试失败: 模型未收到图片 (provider=%s, model=%s)", settings.provider, settings.model)
             return {
                 "success": False,
                 "message": "VLM 测试失败: 模型未收到图片",
@@ -111,8 +111,9 @@ async def test_vlm() -> dict:
         # 成功条件: 识别出猫
         if "猫" in response_content or "cat" in response_content.lower():
             logger.info(
-                f"VLM 测试成功 (provider={settings.provider}, model={settings.model}): "
-                f"{response_content[:100] if response_content else 'None'}..."
+                "VLM 测试成功 (provider=%s, model=%s): %s...",
+                settings.provider, settings.model,
+                response_content[:100] if response_content else 'None'
             )
             return {
                 "success": True,
@@ -124,7 +125,7 @@ async def test_vlm() -> dict:
             }
 
         # 失败条件3 (默认): 未识别出猫
-        logger.error(f"VLM 测试失败: 模型未识别出猫 (provider={settings.provider}, model={settings.model}): {response_content[:100]}...")
+        logger.error("VLM 测试失败: 模型未识别出猫 (provider=%s, model=%s): %s...", settings.provider, settings.model, response_content[:100])
         return {
             "success": False,
             "message": "VLM 测试失败",
@@ -136,7 +137,7 @@ async def test_vlm() -> dict:
 
     except FileNotFoundError as e:
         error_msg = str(e)
-        logger.error(f"VLM 测试失败: 图片文件不存在 - {error_msg}")
+        logger.error("VLM 测试失败: 图片文件不存在 - %s", error_msg)
         return {
             "success": False,
             "message": f"测试失败: 图片文件不存在 - {error_msg}",
@@ -149,8 +150,8 @@ async def test_vlm() -> dict:
     except Exception as e:
         error_msg = str(e)
         logger.error(
-            f"VLM 测试失败 (provider={settings.provider}, model={settings.model}): "
-            f"{error_msg}"
+            "VLM 测试失败 (provider=%s, model=%s): %s",
+            settings.provider, settings.model, error_msg
         )
 
         return {

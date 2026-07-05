@@ -130,10 +130,10 @@ class MoodTypeProvider(LWBaseDataProvider):
 
             insert_data.update(data)
             self._generic_insert(insert_data)
-            logger.info(f"创建心情类型成功: {new_id}")
+            logger.info("创建心情类型成功: %s", new_id)
             return new_id
         except Exception as e:
-            logger.error(f"创建心情类型失败: {e}")
+            logger.error("创建心情类型失败: %s", e)
             raise DataAccessError(f"创建心情类型失败: {e}") from e
 
     def update_mood_type(self, mood_type_id: str, data: Dict[str, Any]) -> bool:
@@ -161,7 +161,7 @@ class MoodTypeProvider(LWBaseDataProvider):
 
             return self._generic_update(mood_type_id, data)
         except Exception as e:
-            logger.error(f"更新心情类型 {mood_type_id} 失败: {e}")
+            logger.error("更新心情类型 %s 失败: %s", mood_type_id, e)
             raise DataAccessError(f"更新心情类型 {mood_type_id} 失败: {e}") from e
 
     def delete_mood_type(self, mood_type_id: str) -> bool:
@@ -180,10 +180,10 @@ class MoodTypeProvider(LWBaseDataProvider):
         try:
             success = self._generic_delete(mood_type_id)
             if success:
-                logger.info(f"删除心情类型 {mood_type_id} 成功")
+                logger.info("删除心情类型 %s 成功", mood_type_id)
             return success
         except Exception as e:
-            logger.error(f"删除心情类型 {mood_type_id} 失败: {e}")
+            logger.error("删除心情类型 %s 失败: %s", mood_type_id, e)
             raise DataAccessError(f"删除心情类型 {mood_type_id} 失败: {e}") from e
 
     def count_entries_by_type(self, mood_type_id: str) -> int:
@@ -205,7 +205,7 @@ class MoodTypeProvider(LWBaseDataProvider):
                 cursor.execute("SELECT COUNT(*) FROM mood_entries WHERE mood_type_id = ?", (mood_type_id,))
                 return cursor.fetchone()[0]
         except Exception as e:
-            logger.error(f"统计心情类型 {mood_type_id} 关联记录数失败: {e}")
+            logger.error("统计心情类型 %s 关联记录数失败: %s", mood_type_id, e)
             raise DataAccessError(f"统计心情类型 {mood_type_id} 关联记录数失败: {e}") from e
 
 
@@ -301,7 +301,7 @@ class MoodEntryProvider(LWBaseDataProvider):
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
         except Exception as e:
-            logger.error(f"获取心情记录列表失败: {e}")
+            logger.error("获取心情记录列表失败: %s", e)
             raise DataAccessError(f"获取心情记录列表失败: {e}") from e
 
     def get_mood_entry_by_id(self, entry_id: str) -> Optional[Dict[str, Any]]:
@@ -343,10 +343,10 @@ class MoodEntryProvider(LWBaseDataProvider):
 
             insert_data.update(data)
             self._generic_insert(insert_data)
-            logger.info(f"创建心情记录成功: {new_id}")
+            logger.info("创建心情记录成功: %s", new_id)
             return new_id
         except Exception as e:
-            logger.error(f"创建心情记录失败: {e}")
+            logger.error("创建心情记录失败: %s", e)
             raise DataAccessError(f"创建心情记录失败: {e}") from e
 
     def update_mood_entry(self, entry_id: str, data: Dict[str, Any]) -> bool:
@@ -374,7 +374,7 @@ class MoodEntryProvider(LWBaseDataProvider):
 
             return self._generic_update(entry_id, data)
         except Exception as e:
-            logger.error(f"更新心情记录 {entry_id} 失败: {e}")
+            logger.error("更新心情记录 %s 失败: %s", entry_id, e)
             raise DataAccessError(f"更新心情记录 {entry_id} 失败: {e}") from e
 
     def delete_mood_entry(self, entry_id: str) -> bool:
@@ -393,10 +393,10 @@ class MoodEntryProvider(LWBaseDataProvider):
         try:
             success = self._generic_delete(entry_id)
             if success:
-                logger.info(f"删除心情记录 {entry_id} 成功")
+                logger.info("删除心情记录 %s 成功", entry_id)
             return success
         except Exception as e:
-            logger.error(f"删除心情记录 {entry_id} 失败: {e}")
+            logger.error("删除心情记录 %s 失败: %s", entry_id, e)
             raise DataAccessError(f"删除心情记录 {entry_id} 失败: {e}") from e
 
 
@@ -503,10 +503,10 @@ class MoodImpactProvider(LWBaseDataProvider):
                     VALUES (?, ?)
                 """, (data['name'], data.get('sort_order', 0)))
                 new_id = cursor.lastrowid
-                logger.info(f"创建影响因素成功: {data['name']}")
+                logger.info("创建影响因素成功: %s", data['name'])
                 return new_id
         except Exception as e:
-            logger.error(f"创建影响因素失败: {e}")
+            logger.error("创建影响因素失败: %s", e)
             raise DataAccessError(f"创建影响因素失败: {e}") from e
 
     def delete_mood_impact(self, impact_id: int) -> bool:
@@ -525,10 +525,10 @@ class MoodImpactProvider(LWBaseDataProvider):
         try:
             success = self._generic_delete(impact_id)
             if success:
-                logger.info(f"删除影响因素 {impact_id} 成功")
+                logger.info("删除影响因素 %s 成功", impact_id)
             return success
         except Exception as e:
-            logger.error(f"删除影响因素 {impact_id} 失败: {e}")
+            logger.error("删除影响因素 %s 失败: %s", impact_id, e)
             raise DataAccessError(f"删除影响因素 {impact_id} 失败: {e}") from e
 
 

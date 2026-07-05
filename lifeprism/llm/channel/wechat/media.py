@@ -91,7 +91,7 @@ class WechatMedia:
                 data = self._decrypt_aes_ecb(data, aes_key)
 
             if not data:
-                logger.warning(f"下载的媒体数据为空: {media_type}")
+                logger.warning("下载的媒体数据为空: %s", media_type)
                 return None
 
             # 保存
@@ -101,14 +101,14 @@ class WechatMedia:
             file_path = self.media_dir / filename
             file_path.write_bytes(data)
 
-            logger.info(f"媒体文件已保存: {file_path}, 类型: {media_type}, 大小: {len(data)} bytes")
+            logger.info("媒体文件已保存: %s, 类型: %s, 大小: %s bytes", file_path, media_type, len(data))
             return str(file_path)
         except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
-            logger.error(f"下载媒体网络错误: {e}, 类型: {media_type}", exc_info=True)
+            logger.error("下载媒体网络错误: %s, 类型: %s", e, media_type, exc_info=True)
             raise WechatMediaError(f"媒体下载失败: {e}") from e
         except (KeyError, ValueError) as e:
-            logger.error(f"媒体数据解析错误: {e}, 类型: {media_type}", exc_info=True)
+            logger.error("媒体数据解析错误: %s, 类型: %s", e, media_type, exc_info=True)
             raise WechatMediaError(f"媒体数据格式错误: {e}") from e
         except OSError as e:
-            logger.error(f"媒体文件保存错误: {e}, 类型: {media_type}", exc_info=True)
+            logger.error("媒体文件保存错误: %s, 类型: %s", e, media_type, exc_info=True)
             raise WechatMediaError(f"媒体文件保存失败: {e}") from e

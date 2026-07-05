@@ -135,10 +135,10 @@ class CategoryProvider(LWBaseDataProvider):
 
         try:
             self._generic_insert(data)
-            logger.info(f"创建分类成功: {data.get('id')}")
+            logger.info("创建分类成功: %s", data.get('id'))
             return True
         except sqlite3.Error as e:
-            logger.error(f"创建分类失败: {e}")
+            logger.error("创建分类失败: %s", e)
             raise DataAccessError(f"创建分类失败: {e}") from e
 
     def update_category(self, category_id: str, data: Dict[str, Any]) -> bool:
@@ -174,7 +174,7 @@ class CategoryProvider(LWBaseDataProvider):
         try:
             return self._generic_update(category_id, data)
         except sqlite3.Error as e:
-            logger.error(f"更新分类 {category_id} 失败: {e}")
+            logger.error("更新分类 %s 失败: %s", category_id, e)
             raise DataAccessError(f"更新分类 {category_id} 失败: {e}") from e
 
     def delete_category(self, category_id: str) -> bool:
@@ -193,10 +193,10 @@ class CategoryProvider(LWBaseDataProvider):
         try:
             success = self._generic_delete(category_id)
             if success:
-                logger.info(f"删除分类 {category_id} 成功")
+                logger.info("删除分类 %s 成功", category_id)
             return success
         except sqlite3.Error as e:
-            logger.error(f"删除分类 {category_id} 失败: {e}")
+            logger.error("删除分类 %s 失败: %s", category_id, e)
             raise DataAccessError(f"删除分类 {category_id} 失败: {e}") from e
 
 
@@ -321,10 +321,10 @@ class SubCategoryProvider(LWBaseDataProvider):
 
         try:
             self._generic_insert(data)
-            logger.info(f"创建子分类成功: {data.get('id')}")
+            logger.info("创建子分类成功: %s", data.get('id'))
             return True
         except sqlite3.Error as e:
-            logger.error(f"创建子分类失败: {e}")
+            logger.error("创建子分类失败: %s", e)
             raise DataAccessError(f"创建子分类失败: {e}") from e
 
     def update_sub_category(self, sub_category_id: str, data: Dict[str, Any]) -> bool:
@@ -360,7 +360,7 @@ class SubCategoryProvider(LWBaseDataProvider):
         try:
             return self._generic_update(sub_category_id, data)
         except sqlite3.Error as e:
-            logger.error(f"更新子分类 {sub_category_id} 失败: {e}")
+            logger.error("更新子分类 %s 失败: %s", sub_category_id, e)
             raise DataAccessError(f"更新子分类 {sub_category_id} 失败: {e}") from e
 
     def delete_sub_category(self, sub_category_id: str) -> bool:
@@ -379,8 +379,8 @@ class SubCategoryProvider(LWBaseDataProvider):
         try:
             success = self._generic_delete(sub_category_id)
             if success:
-                logger.info(f"删除子分类 {sub_category_id} 成功")
+                logger.info("删除子分类 %s 成功", sub_category_id)
             return success
         except sqlite3.Error as e:
-            logger.error(f"删除子分类 {sub_category_id} 失败: {e}")
+            logger.error("删除子分类 %s 失败: %s", sub_category_id, e)
             raise DataAccessError(f"删除子分类 {sub_category_id} 失败: {e}") from e

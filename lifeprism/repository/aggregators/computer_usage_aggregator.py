@@ -39,7 +39,7 @@ class ComputerUsageAggregator:
             sub_categories, _ = self.sub_category_provider.query_sub_categories(QueryOptions())
             self._sub_category_map = {s['id']: s['name'] for s in sub_categories}
         except Exception as e:
-            logger.error(f"刷新分类缓存失败: {e}")
+            logger.error("刷新分类缓存失败: %s", e)
 
     def _enrich_with_names(self, record: Dict[str, Any]) -> Dict[str, Any]:
         """为记录添加分类名称"""

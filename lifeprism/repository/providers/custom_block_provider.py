@@ -162,7 +162,7 @@ class CustomBlockProvider(LWBaseDataProvider):
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"创建自定义时间块失败: {e}")
+            logger.error("创建自定义时间块失败: %s", e)
             raise DataAccessError(f"创建自定义时间块失败: {e}") from e
 
     def update_custom_block(self, block_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -235,10 +235,10 @@ class CustomBlockProvider(LWBaseDataProvider):
             affected_rows = self.db.delete(self._TABLE_NAME, where={"id": block_id})
             success = affected_rows > 0
             if success:
-                logger.info(f"删除时间块 {block_id} 成功")
+                logger.info("删除时间块 %s 成功", block_id)
             return success
         except Exception as e:
-            logger.error(f"删除时间块 {block_id} 失败: {e}")
+            logger.error("删除时间块 %s 失败: %s", block_id, e)
             raise DataAccessError(f"删除时间块 {block_id} 失败") from e
 
     # ============================================================================
@@ -270,7 +270,7 @@ class CustomBlockProvider(LWBaseDataProvider):
                 )
                 return cursor.fetchone()[0]
         except Exception as e:
-            logger.error(f"查询 todo {todo_id} 累计时长失败: {e}")
+            logger.error("查询 todo %s 累计时长失败: %s", todo_id, e)
             raise DataAccessError(f"查询 todo {todo_id} 累计时长失败") from e
 
     def batch_get_duration_by_todos(self, todo_ids: List[str], date: str) -> Dict[str, int]:
@@ -308,7 +308,7 @@ class CustomBlockProvider(LWBaseDataProvider):
                         result[tid] = 0
                 return result
         except Exception as e:
-            logger.error(f"批量查询累计时长失败: {e}")
+            logger.error("批量查询累计时长失败: %s", e)
             raise DataAccessError(f"批量查询累计时长失败") from e
 
     # ============================================================================

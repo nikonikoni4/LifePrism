@@ -98,20 +98,23 @@ def parse_classification_result(
                     id_to_item[item_id].link_to_goal = link_to_goal
                     
                     logger.debug(
-                        f"[{node_name}] 已更新 log_item {item_id}: "
-                        f"category={category}, sub_category={sub_category}, link_to_goal={link_to_goal}"
+                        "[%s] 已更新 log_item %s: "
+                        "category=%s, sub_category=%s, link_to_goal=%s",
+                        node_name, item_id, category, sub_category, link_to_goal
                     )
                 else:
                     logger.error(
-                        f"[{node_name}] 分类结果格式错误: item_id={item_id}, "
-                        f"classification={classification}, 期望列表格式 [category, sub_category, link_to_goal]"
+                        "[%s] 分类结果格式错误: item_id=%s, "
+                        "classification=%s, 期望列表格式 [category, sub_category, link_to_goal]",
+                        node_name, item_id, classification
                     )
             else:
-                logger.warning(f"[{node_name}] 分类结果中的 id {item_id} 在 log_items 中不存在")
+                logger.warning("[%s] 分类结果中的 id %s 在 log_items 中不存在", node_name, item_id)
         except (ValueError, TypeError) as e:
             logger.error(
-                f"[{node_name}] 解析分类结果时出错: "
-                f"item_id={item_id_str}, classification={classification}, error={e}"
+                "[%s] 解析分类结果时出错: "
+                "item_id=%s, classification=%s, error=%s",
+                node_name, item_id_str, classification, e
             )
     
     return log_items

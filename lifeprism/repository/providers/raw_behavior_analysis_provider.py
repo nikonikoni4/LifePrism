@@ -151,14 +151,14 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
 
             # 使用 _generic_insert（_ON_CONFLICT = "replace"）
             self._generic_insert(data,on_conflict=self._ON_CONFLICT)
-            logger.info(f"创建原始行为分析记录: {data['start_time']}")
+            logger.info("创建原始行为分析记录: %s", data['start_time'])
 
             # 返回刚插入的记录
             return self.get_raw_behavior_by_start_time(data['start_time']) or {}
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"创建原始行为分析记录失败: {e}")
+            logger.error("创建原始行为分析记录失败: %s", e)
             raise DataAccessError(f"创建原始行为分析记录失败: {e}") from e
 
     def batch_create_raw_behaviors(self, data_list: List[Dict[str, Any]]) -> int:
@@ -203,10 +203,10 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
                     )
                     success_count += 1
                 except Exception as e:
-                    logger.warning(f"插入记录失败 {data['start_time']}: {e}")
+                    logger.warning("插入记录失败 %s: %s", data['start_time'], e)
                     continue
 
-        logger.info(f"批量创建原始行为分析记录: {success_count}/{len(data_list)}")
+        logger.info("批量创建原始行为分析记录: %s/%s", success_count, len(data_list))
         return success_count
 
     def update_raw_behavior(self, start_time: str, data: Dict[str, Any]) -> bool:
@@ -227,13 +227,13 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
         try:
             success = self._generic_update(start_time, data)
             if success:
-                logger.info(f"更新原始行为分析记录 {start_time} 成功")
+                logger.info("更新原始行为分析记录 %s 成功", start_time)
             return success
         except ValueError as e:
-            logger.error(f"更新原始行为分析记录 {start_time} 失败: {e}")
+            logger.error("更新原始行为分析记录 %s 失败: %s", start_time, e)
             raise ValidationError(str(e)) from e
         except Exception as e:
-            logger.error(f"更新原始行为分析记录 {start_time} 失败: {e}")
+            logger.error("更新原始行为分析记录 %s 失败: %s", start_time, e)
             raise DataAccessError(f"更新原始行为分析记录失败: {e}") from e
 
     def delete_raw_behaviors_by_date_range(
@@ -266,10 +266,10 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
                     (start_datetime, end_datetime)
                 )
                 affected_rows = cursor.rowcount
-                logger.info(f"删除原始行为分析记录: {start_date} 至 {end_date}，共 {affected_rows} 条")
+                logger.info("删除原始行为分析记录: %s 至 %s，共 %s 条", start_date, end_date, affected_rows)
                 return affected_rows
         except Exception as e:
-            logger.error(f"删除原始行为分析记录失败: {e}")
+            logger.error("删除原始行为分析记录失败: %s", e)
             raise DataAccessError(f"删除原始行为分析记录失败: {e}") from e
 
 

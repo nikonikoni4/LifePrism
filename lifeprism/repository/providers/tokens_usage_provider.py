@@ -138,10 +138,10 @@ class TokensUsageProvider(LWBaseDataProvider):
                 data['result_items_count'] = 0
 
             self._generic_insert(data)
-            logger.info(f"创建 token 使用记录成功: {data.get('session_id')}")
+            logger.info("创建 token 使用记录成功: %s", data.get('session_id'))
             return True
         except Exception as e:
-            logger.error(f"创建 token 使用记录失败: {e}")
+            logger.error("创建 token 使用记录失败: %s", e)
             raise DataAccessError(f"创建 token 使用记录失败: {e}") from e
 
     def update_tokens_usage(self, session_id: str, data: Dict[str, Any]) -> bool:
@@ -169,7 +169,7 @@ class TokensUsageProvider(LWBaseDataProvider):
 
             return self._generic_update(session_id, data)
         except Exception as e:
-            logger.error(f"更新 token 使用记录 {session_id} 失败: {e}")
+            logger.error("更新 token 使用记录 %s 失败: %s", session_id, e)
             raise DataAccessError(f"更新 token 使用记录 {session_id} 失败: {e}") from e
 
     def delete_tokens_usage(self, session_id: str) -> bool:
@@ -188,10 +188,10 @@ class TokensUsageProvider(LWBaseDataProvider):
         try:
             success = self._generic_delete(session_id)
             if success:
-                logger.info(f"删除 token 使用记录 {session_id} 成功")
+                logger.info("删除 token 使用记录 %s 成功", session_id)
             return success
         except Exception as e:
-            logger.error(f"删除 token 使用记录 {session_id} 失败: {e}")
+            logger.error("删除 token 使用记录 %s 失败: %s", session_id, e)
             raise DataAccessError(f"删除 token 使用记录 {session_id} 失败: {e}") from e
 
     def upsert_tokens_usage(self, session_id: str, data: Dict[str, Any]) -> bool:
@@ -222,7 +222,7 @@ class TokensUsageProvider(LWBaseDataProvider):
                 data['session_id'] = session_id
                 return self.create_tokens_usage(data)
         except Exception as e:
-            logger.error(f"Upsert token 使用记录 {session_id} 失败: {e}")
+            logger.error("Upsert token 使用记录 %s 失败: %s", session_id, e)
             raise DataAccessError(f"Upsert token 使用记录 {session_id} 失败: {e}") from e
 
     def batch_insert_tokens_usage(self, data_list: List[Dict[str, Any]]) -> int:
@@ -255,8 +255,8 @@ class TokensUsageProvider(LWBaseDataProvider):
                     data['result_items_count'] = 0
 
             affected = self.db.insert_many(self._TABLE_NAME, data_list)
-            logger.info(f"批量插入 {affected} 条 token 使用记录成功")
+            logger.info("批量插入 %s 条 token 使用记录成功", affected)
             return affected
         except Exception as e:
-            logger.error(f"批量插入 token 使用记录失败: {e}")
+            logger.error("批量插入 token 使用记录失败: %s", e)
             raise DataAccessError(f"批量插入 token 使用记录失败: {e}") from e

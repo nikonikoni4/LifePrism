@@ -49,7 +49,7 @@ class JournalProvider(LWBaseDataProvider):
                 return [dict(zip(columns, row)) for row in rows]
 
         except Exception as e:
-            logger.error(f"获取目标 {goal_id} 的日志失败: {e}")
+            logger.error("获取目标 %s 的日志失败: error=%s", goal_id, e)
             return []
 
     def get_journal_by_id(self, journal_id: str) -> Optional[Dict[str, Any]]:
@@ -74,7 +74,7 @@ class JournalProvider(LWBaseDataProvider):
                 return None
 
         except Exception as e:
-            logger.error(f"获取日志 {journal_id} 失败: {e}")
+            logger.error("获取日志 %s 失败: error=%s", journal_id, e)
             return None
 
     def create_journal(self, data: Dict[str, Any]) -> Optional[str]:
@@ -118,11 +118,11 @@ class JournalProvider(LWBaseDataProvider):
                     values
                 )
 
-                logger.info(f"创建日志成功，ID: {journal_id}")
+                logger.info("创建日志成功，ID: %s", journal_id)
                 return journal_id
 
         except Exception as e:
-            logger.error(f"创建日志失败: {e}")
+            logger.error("创建日志失败: error=%s", e)
             return None
 
     def update_journal(self, journal_id: str, data: Dict[str, Any]) -> bool:
@@ -165,11 +165,11 @@ class JournalProvider(LWBaseDataProvider):
                 success = cursor.rowcount > 0
 
                 if success:
-                    logger.info(f"更新日志 {journal_id} 成功")
+                    logger.info("更新日志 %s 成功", journal_id)
                 return success
 
         except Exception as e:
-            logger.error(f"更新日志 {journal_id} 失败: {e}")
+            logger.error("更新日志 %s 失败: error=%s", journal_id, e)
             return False
 
     def delete_journal(self, journal_id: str) -> bool:
@@ -189,11 +189,11 @@ class JournalProvider(LWBaseDataProvider):
 
                 success = cursor.rowcount > 0
                 if success:
-                    logger.info(f"删除日志 {journal_id} 成功")
+                    logger.info("删除日志 %s 成功", journal_id)
                 return success
 
         except Exception as e:
-            logger.error(f"删除日志 {journal_id} 失败: {e}")
+            logger.error("删除日志 %s 失败: error=%s", journal_id, e)
             return False
 
 

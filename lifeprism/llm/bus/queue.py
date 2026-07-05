@@ -85,7 +85,7 @@ class MessageQueue:
                     request_interval = RATE_WINDOW / (RATE_LIMIT * RATE_SAFETY_FACTOR)
                     interval_wait = request_interval - (now - self._last_request_at)
                     if interval_wait > 0:
-                        logger.debug(f"[MessageQueue] 请求间隔等待 {interval_wait:.2f}s")
+                        logger.debug("[MessageQueue] 请求间隔等待 %.2fs", interval_wait)
                         await asyncio.sleep(interval_wait)
                         now = time.monotonic()
 
@@ -98,7 +98,7 @@ class MessageQueue:
                     return
                 # 等到最早的请求滑出窗口
                 wait = RATE_WINDOW - (now - self._rate_timestamps[0])
-                logger.debug(f"[MessageQueue] 限速等待 {wait:.2f}s")
+                logger.debug("[MessageQueue] 限速等待 %.2fs", wait)
                 await asyncio.sleep(wait)
 
     async def send(self, msg:InboundMessage) -> OutboundMessage:
@@ -111,7 +111,7 @@ class MessageQueue:
         self._ensure_receive_task()
         await self._wait_for_rate_limit()
         # 1. 创建消息
-        logger.info(f"[MessageQueue] 发送 content={self._content_preview(msg.content)!r}")
+        logger.info("[MessageQueue] 发送 content=%r", self._content_preview(msg.content))
 
         # 2. 创建future，并入pending
         loop = asyncio.get_running_loop()
@@ -124,9 +124,9 @@ class MessageQueue:
         # 4. 等待对应future回复（600s 超时，防止 agent 异常时永久挂起）
         try:
             result: OutboundMessage = await asyncio.wait_for(future, timeout=TIMEOUT_MAX)
-            logger.debug(f"[MessageQueue] 收到回复: {result.response!r}")
+            logger.debug("[MessageQueue] 收到回复: %r", result.response)
         except asyncio.TimeoutError:
-            logger.error(f"[MessageQueue] 消息 {msg.id} 超时")
+            logger.error("[MessageQueue] 消息 %s 超时", msg.id)
             raise
         finally:
             self._pending.pop(msg.id, None)  # 确保清理，避免内存泄漏
@@ -153,7 +153,7 @@ class MessageQueue:
                     usage_data
                 ))
             except Exception as e:
-                logger.error(f"[MessageQueue] 保存 token 使用情况失败: {e}")
+                logger.error("[MessageQueue] 保存 token 使用情况失败: %s", e)
 
         return result
 
@@ -172,7 +172,7 @@ class MessageQueue:
             self._pending.clear()
             raise
         except Exception as e:
-            logger.error(f"[MessageQueue] 接收循环异常: {e}")
+            logger.error("[MessageQueue] 接收循环异常: %s", e)
             raise
 
 bus:MessageQueue = LazySingleton(MessageQueue) # 单一实例代理

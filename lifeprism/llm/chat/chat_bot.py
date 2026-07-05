@@ -41,7 +41,7 @@ class ChatBot:
                     system_prompt=system_prompt,
                 )
             except Exception as log_e:
-                logger.warning(f"记录 LLM 调用日志失败: {log_e}")
+                logger.warning("记录 LLM 调用日志失败: %s", log_e)
 
             # 3. 包装响应
             if isinstance(response_data,OutboundMessage):
@@ -53,7 +53,7 @@ class ChatBot:
 
             return response_data
         except Exception as e:
-            logger.error(f"[ChatBot] Chat error: {e}", exc_info=True)
+            logger.error("[ChatBot] Chat error: %s", e, exc_info=True)
             raise
 
     # ========== 会话管理 API ==========

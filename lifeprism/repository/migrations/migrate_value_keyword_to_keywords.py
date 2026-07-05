@@ -27,10 +27,10 @@ def get_db_path() -> Path:
 def run_migration():
     db_path = get_db_path()
     if not db_path.exists():
-        logger.error(f"数据库文件不存在: {db_path}")
+        logger.error("数据库文件不存在: %s", db_path)
         return False
 
-    logger.info(f"开始迁移数据库: {db_path}")
+    logger.info("开始迁移数据库: %s", db_path)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -51,7 +51,7 @@ def run_migration():
         # 记录迁移前行数
         cursor.execute("SELECT COUNT(*) FROM user_values")
         count_before = cursor.fetchone()[0]
-        logger.info(f"迁移前: user_values={count_before} 行")
+        logger.info("迁移前: user_values=%s 行", count_before)
 
         # 步骤 1: 重建表（keyword → keywords, content → content_positive + content_negative）
         logger.info("步骤 1: 重建 user_values 表...")
@@ -66,7 +66,7 @@ def run_migration():
         return True
 
     except Exception as e:
-        logger.error(f"迁移失败: {e}")
+        logger.error("迁移失败: error=%s", e)
         conn.rollback()
         return False
     finally:
@@ -99,7 +99,7 @@ def _rebuild_user_values(cursor: sqlite3.Cursor):
 
     cursor.execute("DROP TABLE user_values")
     cursor.execute("ALTER TABLE user_values_new RENAME TO user_values")
-    logger.info(f"  迁移 {migrated} 条记录")
+    logger.info("  迁移 %s 条记录", migrated)
 
 
 def _verify_migration(cursor: sqlite3.Cursor, expected_count: int):
@@ -143,10 +143,10 @@ def _verify_migration(cursor: sqlite3.Cursor, expected_count: int):
 
     if errors:
         for e in errors:
-            logger.error(f"  验证失败: {e}")
+            logger.error("  验证失败: %s", e)
         raise RuntimeError("迁移验证失败: " + "; ".join(errors))
 
-    logger.info(f"  验证通过: 记录数={actual_count}, keywords/content_positive 字段正常, UNIQUE 约束存在")
+    logger.info("  验证通过: 记录数=%s, keywords/content_positive 字段正常, UNIQUE 约束存在", actual_count)
 
 
 def check_migration_status():

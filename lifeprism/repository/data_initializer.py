@@ -140,7 +140,7 @@ class DataInitializer:
             self._initialize_daily_goal()
             logger.info("默认数据初始化检查完成")
         except Exception as e:
-            logger.error(f"初始化默认数据失败: {e}")
+            logger.error("初始化默认数据失败: error=%s", e)
             raise
 
     def _is_table_empty(self, table_name: str) -> bool:
@@ -160,7 +160,7 @@ class DataInitializer:
                 count = cursor.fetchone()[0]
                 return count == 0
         except Exception as e:
-            logger.error(f"检查表 {table_name} 是否为空失败: {e}")
+            logger.error("检查表 %s 是否为空失败: error=%s", table_name, e)
             return False
 
     def _initialize_default_categories(self):
@@ -183,10 +183,10 @@ class DataInitializer:
                         VALUES (?, ?, ?, 1)
                     """, (cat['id'], cat['name'], cat['color']))
 
-                logger.info(f"成功初始化 {len(DEFAULT_CATEGORIES)} 个默认分类")
+                logger.info("成功初始化 %s 个默认分类", len(DEFAULT_CATEGORIES))
 
         except Exception as e:
-            logger.error(f"初始化默认分类失败: {e}")
+            logger.error("初始化默认分类失败: error=%s", e)
             raise
 
     def _initialize_default_sub_categories(self):
@@ -209,10 +209,10 @@ class DataInitializer:
                         VALUES (?, ?, ?, 1)
                     """, (sub['id'], sub['category_id'], sub['name']))
 
-                logger.info(f"成功初始化 {len(DEFAULT_SUB_CATEGORIES)} 个默认子分类")
+                logger.info("成功初始化 %s 个默认子分类", len(DEFAULT_SUB_CATEGORIES))
 
         except Exception as e:
-            logger.error(f"初始化默认子分类失败: {e}")
+            logger.error("初始化默认子分类失败: error=%s", e)
             raise
 
     def _initialize_example_goal(self):
@@ -249,10 +249,10 @@ class DataInitializer:
                     EXAMPLE_GOAL['order_index'],
                 ))
 
-                logger.info(f"成功初始化示例目标，ID: {EXAMPLE_GOAL['id']}")
+                logger.info("成功初始化示例目标，ID: %s", EXAMPLE_GOAL['id'])
 
         except Exception as e:
-            logger.error(f"初始化示例目标失败: {e}")
+            logger.error("初始化示例目标失败: error=%s", e)
             raise
 
     def _initialize_example_plan_doc(self):
@@ -282,13 +282,13 @@ class DataInitializer:
                     EXAMPLE_PLAN_DOC['order_index'],
                 ))
 
-                logger.info(f"成功初始化示例计划书，ID: {EXAMPLE_PLAN_DOC['id']}")
+                logger.info("成功初始化示例计划书，ID: %s", EXAMPLE_PLAN_DOC['id'])
 
             # 生成示例 MD 文件
             # self._generate_example_plan_doc_md()
 
         except Exception as e:
-            logger.error(f"初始化示例计划书失败: {e}")
+            logger.error("初始化示例计划书失败: error=%s", e)
             raise
 
     def _generate_example_plan_doc_md(self):
@@ -305,13 +305,13 @@ class DataInitializer:
             md_path = plan_dir / EXAMPLE_PLAN_DOC_MD_FILENAME
 
             if md_path.exists():
-                logger.debug(f"示例计划书 MD 文件已存在，跳过: {md_path}")
+                logger.debug("示例计划书 MD 文件已存在，跳过: %s", md_path)
                 return
 
             import sys
             if not getattr(sys, 'frozen', False):
                 # 开发环境：source == target，无法复制，仅记录
-                logger.debug(f"开发环境，示例计划书不存在: {md_path}")
+                logger.debug("开发环境，示例计划书不存在: %s", md_path)
                 return
 
             # 打包环境：从 exe 内嵌资源读取（兜底，正常由 resource_initializer 处理）
@@ -319,11 +319,11 @@ class DataInitializer:
             if source.exists():
                 content = source.read_text(encoding='utf-8')
                 md_path.write_text(content, encoding='utf-8')
-                logger.info(f"生成示例计划书 MD 文件: {md_path}")
+                logger.info("生成示例计划书 MD 文件: %s", md_path)
             else:
-                logger.warning(f"示例计划书源文件不存在: {source}")
+                logger.warning("示例计划书源文件不存在: %s", source)
         except Exception as e:
-            logger.error(f"生成示例计划书 MD 文件失败: {e}")
+            logger.error("生成示例计划书 MD 文件失败: error=%s", e)
 
     def _initialize_default_mood_types(self):
         """
@@ -344,9 +344,9 @@ class DataInitializer:
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                     """, (mt['id'], mt['name'], mt['icon'], mt['color'],
                           mt['score'], mt['is_dark'], mt['sort_order']))
-                logger.info(f"成功初始化 {len(DEFAULT_MOOD_TYPES)} 个默认心情类型")
+                logger.info("成功初始化 %s 个默认心情类型", len(DEFAULT_MOOD_TYPES))
         except Exception as e:
-            logger.error(f"初始化默认心情类型失败: {e}")
+            logger.error("初始化默认心情类型失败: error=%s", e)
             raise
 
     def _initialize_default_mood_impacts(self):
@@ -368,9 +368,9 @@ class DataInitializer:
                         INSERT INTO mood_impacts (name, sort_order)
                         VALUES (?, ?)
                     """, (name, total - idx))
-                logger.info(f"成功初始化 {total} 个默认影响因素")
+                logger.info("成功初始化 %s 个默认影响因素", total)
         except Exception as e:
-            logger.error(f"初始化默认影响因素失败: {e}")
+            logger.error("初始化默认影响因素失败: error=%s", e)
             raise
 
     def _initialize_daily_goal(self):
@@ -420,12 +420,13 @@ class DataInitializer:
                         DAILY_GOAL['time_invested'],
                         DAILY_GOAL['order_index'],
                     ))
-                    logger.info(f"成功初始化每日目标，ID: {DAILY_GOAL_ID}")
+                    logger.info("成功初始化每日目标，ID: %s", DAILY_GOAL_ID)
 
                 # 情况6：极端情况（多条冲突记录），跳过
                 elif len(conflicts) > 1:
                     logger.warning(
-                        f"检测到多条冲突记录，跳过每日目标初始化。冲突记录：{conflicts}"
+                        "检测到多条冲突记录，跳过每日目标初始化。冲突记录：%s",
+                        conflicts
                     )
 
                 # 单条冲突记录，进一步判断
@@ -434,12 +435,13 @@ class DataInitializer:
 
                     # 情况2：同名且同id，跳过
                     if existing_id == DAILY_GOAL_ID and existing_name == DAILY_GOAL['name']:
-                        logger.debug(f"每日目标已存在，跳过初始化，ID: {DAILY_GOAL_ID}")
+                        logger.debug("每日目标已存在，跳过初始化，ID: %s", DAILY_GOAL_ID)
 
                     # 情况3：id相同但名不同，跳过
                     elif existing_id == DAILY_GOAL_ID and existing_name != DAILY_GOAL['name']:
                         logger.debug(
-                            f"检测到固定id目标名称已被修改（'{existing_name}'），跳过初始化"
+                            "检测到固定id目标名称已被修改（'%s'），跳过初始化",
+                            existing_name
                         )
 
                     # 情况4：同名但不同id，修改id
@@ -449,7 +451,8 @@ class DataInitializer:
                             (DAILY_GOAL_ID, existing_id)
                         )
                         logger.info(
-                            f"检测到同名目标 '{existing_name}'（id={existing_id}），已更新为固定id '{DAILY_GOAL_ID}'"
+                            "检测到同名目标 '%s'（id=%s），已更新为固定id '%s'",
+                            existing_name, existing_id, DAILY_GOAL_ID
                         )
 
                 # 检查每日目标计划书是否存在
@@ -469,12 +472,12 @@ class DataInitializer:
                         DAILY_PLAN_DOC['status'],
                         DAILY_PLAN_DOC['order_index'],
                     ))
-                    logger.info(f"成功初始化每日目标计划书，ID: {DAILY_PLAN_DOC['id']}")
+                    logger.info("成功初始化每日目标计划书，ID: %s", DAILY_PLAN_DOC['id'])
                 else:
-                    logger.debug(f"每日目标计划书已存在，跳过初始化，ID: {DAILY_PLAN_DOC['id']}")
+                    logger.debug("每日目标计划书已存在，跳过初始化，ID: %s", DAILY_PLAN_DOC['id'])
 
         except Exception as e:
-            logger.error(f"初始化每日目标失败: {e}")
+            logger.error("初始化每日目标失败: error=%s", e)
             raise
 
 

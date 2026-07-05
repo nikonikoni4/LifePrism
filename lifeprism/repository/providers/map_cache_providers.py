@@ -121,7 +121,7 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                 raise ValidationError("Missing required fields: id, app, title")
 
             self._generic_insert(data)
-            logger.info(f"创建 multi_purpose_map_cache 记录成功: {data.get('id')}")
+            logger.info("创建 multi_purpose_map_cache 记录成功: %s", data.get('id'))
             return True
         except ValidationError:
             raise
@@ -130,7 +130,7 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                 raise ConflictError(f"记录已存在: {data.get('id')}") from e
             raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
-            logger.error(f"创建 multi_purpose_map_cache 记录失败: {e}")
+            logger.error("创建 multi_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
                 message=f"创建 multi_purpose_map_cache 记录失败",
                 details={"id": data.get('id'), "error": str(e)}
@@ -167,7 +167,7 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                 raise ConflictError(f"记录已存在") from e
             raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
-            logger.error(f"更新 multi_purpose_map_cache 记录 {cache_id} 失败: {e}")
+            logger.error("更新 multi_purpose_map_cache 记录 %s 失败: %s", cache_id, e)
             raise DataAccessError(
                 message=f"更新 multi_purpose_map_cache 记录失败",
                 details={"cache_id": cache_id, "error": str(e)}
@@ -189,10 +189,10 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
         try:
             success = self._generic_delete(cache_id)
             if success:
-                logger.info(f"删除 multi_purpose_map_cache 记录 {cache_id} 成功")
+                logger.info("删除 multi_purpose_map_cache 记录 %s 成功", cache_id)
             return success
         except Exception as e:
-            logger.error(f"删除 multi_purpose_map_cache 记录 {cache_id} 失败: {e}")
+            logger.error("删除 multi_purpose_map_cache 记录 %s 失败: %s", cache_id, e)
             raise DataAccessError(
                 message=f"删除 multi_purpose_map_cache 记录失败",
                 details={"cache_id": cache_id, "error": str(e)}
@@ -243,7 +243,7 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
                 conn.commit()
 
-            logger.info(f"批量插入 {count} 条 multi_purpose_map_cache 记录")
+            logger.info("批量插入 %s 条 multi_purpose_map_cache 记录", count)
             return count
         except ValidationError:
             raise
@@ -252,7 +252,7 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                 raise ConflictError(f"记录已存在") from e
             raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
-            logger.error(f"批量插入 multi_purpose_map_cache 记录失败: {e}")
+            logger.error("批量插入 multi_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
                 message=f"批量插入 multi_purpose_map_cache 记录失败",
                 details={"count": len(data_list), "error": str(e)}
@@ -306,7 +306,7 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                 conn.commit()
                 count = cursor.rowcount
 
-            logger.info(f"批量更新 {count} 条 multi_purpose_map_cache 记录")
+            logger.info("批量更新 %s 条 multi_purpose_map_cache 记录", count)
             return count
         except ValidationError:
             raise
@@ -315,7 +315,7 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                 raise ConflictError(f"记录已存在") from e
             raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
-            logger.error(f"批量更新 multi_purpose_map_cache 记录失败: {e}")
+            logger.error("批量更新 multi_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
                 message=f"批量更新 multi_purpose_map_cache 记录失败",
                 details={"count": len(cache_ids), "error": str(e)}
@@ -348,10 +348,10 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                 conn.commit()
                 count = cursor.rowcount
 
-            logger.info(f"批量删除 {count} 条 multi_purpose_map_cache 记录")
+            logger.info("批量删除 %s 条 multi_purpose_map_cache 记录", count)
             return count
         except Exception as e:
-            logger.error(f"批量删除 multi_purpose_map_cache 记录失败: {e}")
+            logger.error("批量删除 multi_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
                 message=f"批量删除 multi_purpose_map_cache 记录失败",
                 details={"count": len(cache_ids), "error": str(e)}
@@ -466,7 +466,7 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                 raise ValidationError("Missing required fields: id, app, title")
 
             self._generic_insert(data)
-            logger.info(f"创建 single_purpose_map_cache 记录成功: {data.get('id')}")
+            logger.info("创建 single_purpose_map_cache 记录成功: %s", data.get('id'))
             return True
         except ValidationError:
             raise
@@ -475,7 +475,7 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                 raise ConflictError(f"记录已存在: {data.get('id')}") from e
             raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
-            logger.error(f"创建 single_purpose_map_cache 记录失败: {e}")
+            logger.error("创建 single_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
                 message=f"创建 single_purpose_map_cache 记录失败",
                 details={"id": data.get('id'), "error": str(e)}
@@ -512,7 +512,7 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                 raise ConflictError(f"记录已存在") from e
             raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
-            logger.error(f"更新 single_purpose_map_cache 记录 {cache_id} 失败: {e}")
+            logger.error("更新 single_purpose_map_cache 记录 %s 失败: %s", cache_id, e)
             raise DataAccessError(
                 message=f"更新 single_purpose_map_cache 记录失败",
                 details={"cache_id": cache_id, "error": str(e)}
@@ -534,10 +534,10 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
         try:
             success = self._generic_delete(cache_id)
             if success:
-                logger.info(f"删除 single_purpose_map_cache 记录 {cache_id} 成功")
+                logger.info("删除 single_purpose_map_cache 记录 %s 成功", cache_id)
             return success
         except Exception as e:
-            logger.error(f"删除 single_purpose_map_cache 记录 {cache_id} 失败: {e}")
+            logger.error("删除 single_purpose_map_cache 记录 %s 失败: %s", cache_id, e)
             raise DataAccessError(
                 message=f"删除 single_purpose_map_cache 记录失败",
                 details={"cache_id": cache_id, "error": str(e)}
@@ -588,7 +588,7 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
                 conn.commit()
 
-            logger.info(f"批量插入 {count} 条 single_purpose_map_cache 记录")
+            logger.info("批量插入 %s 条 single_purpose_map_cache 记录", count)
             return count
         except ValidationError:
             raise
@@ -597,7 +597,7 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                 raise ConflictError(f"记录已存在") from e
             raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
-            logger.error(f"批量插入 single_purpose_map_cache 记录失败: {e}")
+            logger.error("批量插入 single_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
                 message=f"批量插入 single_purpose_map_cache 记录失败",
                 details={"count": len(data_list), "error": str(e)}
@@ -651,7 +651,7 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                 conn.commit()
                 count = cursor.rowcount
 
-            logger.info(f"批量更新 {count} 条 single_purpose_map_cache 记录")
+            logger.info("批量更新 %s 条 single_purpose_map_cache 记录", count)
             return count
         except ValidationError:
             raise
@@ -660,7 +660,7 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                 raise ConflictError(f"记录已存在") from e
             raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
-            logger.error(f"批量更新 single_purpose_map_cache 记录失败: {e}")
+            logger.error("批量更新 single_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
                 message=f"批量更新 single_purpose_map_cache 记录失败",
                 details={"count": len(cache_ids), "error": str(e)}
@@ -693,10 +693,10 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                 conn.commit()
                 count = cursor.rowcount
 
-            logger.info(f"批量删除 {count} 条 single_purpose_map_cache 记录")
+            logger.info("批量删除 %s 条 single_purpose_map_cache 记录", count)
             return count
         except Exception as e:
-            logger.error(f"批量删除 single_purpose_map_cache 记录失败: {e}")
+            logger.error("批量删除 single_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
                 message=f"批量删除 single_purpose_map_cache 记录失败",
                 details={"count": len(cache_ids), "error": str(e)}

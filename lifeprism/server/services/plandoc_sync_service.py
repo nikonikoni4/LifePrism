@@ -50,8 +50,8 @@ def _read_plan_doc_content(doc_id: str) -> Optional[str]:
         if file_path.exists():
             return file_path.read_text(encoding='utf-8')
         return None
-    except Exception as e:
-        logger.error(f"读取计划书文件失败 {doc_id}: {e}")
+    except OSError as e:
+        logger.error("读取计划书文件失败 %s: %s", doc_id, e)
         return None
 
 
@@ -62,8 +62,8 @@ def _write_plan_doc_content(doc_id: str, content: str) -> bool:
         _get_plan_doc_dir().mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding='utf-8')
         return True
-    except Exception as e:
-        logger.error(f"写入计划书文件失败 {doc_id}: {e}")
+    except OSError as e:
+        logger.error("写入计划书文件失败 %s: %s", doc_id, e)
         return False
 
 
@@ -257,7 +257,7 @@ def insert_todo_to_md(
     """
     md_content = _read_plan_doc_content(plan_doc_id)
     if md_content is None:
-        logger.info(f"MD 文件不存在，创建新文件: {plan_doc_id}")
+        logger.info("MD 文件不存在，创建新文件: %s", plan_doc_id)
         file_path = _get_plan_doc_path(plan_doc_id)
 
         # 确保目录存在
@@ -266,17 +266,17 @@ def insert_todo_to_md(
         # 创建初始 MD 内容
         initial_content = f"# {plan_doc_id}\n\n## 任务列表\n"
         if not _write_plan_doc_content(plan_doc_id, initial_content):
-            logger.error(f"创建 MD 文件失败: {plan_doc_id}")
+            logger.error("创建 MD 文件失败: %s", plan_doc_id)
             return None
 
         md_content = initial_content
 
     blocks = _get_all_todoblocks(md_content)
     if not blocks:
-        logger.info(f"无 todoblock，自动创建: {plan_doc_id}")
+        logger.info("无 todoblock，自动创建: %s", plan_doc_id)
         md_content = _ensure_todoblock_exists(md_content)
         if not _write_plan_doc_content(plan_doc_id, md_content):
-            logger.error(f"写入 todoblock 失败: {plan_doc_id}")
+            logger.error("写入 todoblock 失败: %s", plan_doc_id)
             return None
         blocks = _get_all_todoblocks(md_content)
 
@@ -324,7 +324,7 @@ def insert_todo_to_md(
 
     new_md_content = _update_system_section(new_md_content, plan_doc_id)
     if _write_plan_doc_content(plan_doc_id, new_md_content):
-        logger.info(f"插入任务到 MD 成功: {plan_doc_id}/{new_anchor} (block {target_block_index})")
+        logger.info("插入任务到 MD 成功: %s/%s (block %s)", plan_doc_id, new_anchor, target_block_index)
         return new_anchor
 
     return None
@@ -339,7 +339,7 @@ def update_todo_in_md(plan_doc_id: str, anchor_id: str, new_content: str) -> boo
     """
     md_content = _read_plan_doc_content(plan_doc_id)
     if md_content is None:
-        logger.warning(f"更新失败：MD 文件不存在 {plan_doc_id}")
+        logger.warning("更新失败：MD 文件不存在 %s", plan_doc_id)
         return False
 
     pattern = re.compile(
@@ -349,7 +349,7 @@ def update_todo_in_md(plan_doc_id: str, anchor_id: str, new_content: str) -> boo
 
     match = pattern.search(md_content)
     if not match:
-        logger.warning(f"更新失败：未找到锚点 {anchor_id}")
+        logger.warning("更新失败：未找到锚点 %s", anchor_id)
         return False
 
     tabs = match.group(1)
@@ -361,7 +361,7 @@ def update_todo_in_md(plan_doc_id: str, anchor_id: str, new_content: str) -> boo
 
     new_md_content = _update_system_section(new_md_content, plan_doc_id)
     if _write_plan_doc_content(plan_doc_id, new_md_content):
-        logger.info(f"更新任务内容成功: {plan_doc_id}/{anchor_id}")
+        logger.info("更新任务内容成功: %s/%s", plan_doc_id, anchor_id)
         return True
 
     return False
@@ -376,17 +376,17 @@ def delete_todo_from_md(plan_doc_id: str, anchor_id: str) -> bool:
     """
     md_content = _read_plan_doc_content(plan_doc_id)
     if md_content is None:
-        logger.warning(f"删除失败：MD 文件不存在 {plan_doc_id}")
+        logger.warning("删除失败：MD 文件不存在 %s", plan_doc_id)
         return False
 
     blocks = _get_all_todoblocks(md_content)
     if not blocks:
-        logger.warning(f"删除失败：无 todoblock {plan_doc_id}")
+        logger.warning("删除失败：无 todoblock %s", plan_doc_id)
         return False
 
     target_block_index = _find_anchor_in_blocks(md_content, anchor_id)
     if target_block_index is None:
-        logger.warning(f"删除失败：未找到锚点 {anchor_id}")
+        logger.warning("删除失败：未找到锚点 %s", anchor_id)
         return False
 
     target_block = blocks[target_block_index]
@@ -431,7 +431,7 @@ def delete_todo_from_md(plan_doc_id: str, anchor_id: str) -> bool:
 
     new_md_content = _update_system_section(new_md_content, plan_doc_id)
     if _write_plan_doc_content(plan_doc_id, new_md_content):
-        logger.info(f"从 MD 删除任务成功: {plan_doc_id}/{anchor_id} (block {target_block_index})")
+        logger.info("从 MD 删除任务成功: %s/%s (block %s)", plan_doc_id, anchor_id, target_block_index)
         return True
 
     return False
@@ -462,7 +462,7 @@ def sync_plan_doc(
     # 1. 验证计划书存在
     plan_doc = plan_doc_repository.get_plan_doc_by_id(plan_doc_id)
     if not plan_doc:
-        logger.warning(f"计划书不存在: {plan_doc_id}")
+        logger.warning("计划书不存在: %s", plan_doc_id)
         return result
 
     goal_id = plan_doc.get('goal_id')
@@ -470,18 +470,18 @@ def sync_plan_doc(
     # 2. 读取 MD 内容
     content = _read_plan_doc_content(plan_doc_id)
     if content is None:
-        logger.warning(f"计划书 MD 文件不存在: {plan_doc_id}")
+        logger.warning("计划书 MD 文件不存在: %s", plan_doc_id)
         return result
 
     # 3. 获取所有 todoblock
     blocks = _get_all_todoblocks(content)
     if not blocks:
-        logger.info(f"计划书无 todoblock，自动创建: {plan_doc_id}")
+        logger.info("计划书无 todoblock，自动创建: %s", plan_doc_id)
         content = _ensure_todoblock_exists(content)
         _write_plan_doc_content(plan_doc_id, content)
         blocks = _get_all_todoblocks(content)
         if not blocks:
-            logger.error(f"创建 todoblock 失败: {plan_doc_id}")
+            logger.error("创建 todoblock 失败: %s", plan_doc_id)
             return result
 
     # 4. 解析所有 block 中的任务
@@ -615,7 +615,7 @@ def sync_plan_doc(
             for todo in todos_to_delete
         ]
         result.total = len(existing_todos)
-        logger.info(f"同步预检 {plan_doc_id}: to_create={result.created}, to_update={result.updated}, to_delete={len(todos_to_delete)}")
+        logger.info("同步预检 %s: to_create=%s, to_update=%s, to_delete=%s", plan_doc_id, result.created, result.updated, len(todos_to_delete))
         return result
 
     # 11. 执行数据库操作
@@ -650,7 +650,7 @@ def sync_plan_doc(
                 })
         if parent_updates_existing:
             todo_repository.batch_update_todos(parent_updates_existing)
-            logger.info(f"更新 {len(parent_updates_existing)} 个任务的 parent_id")
+            logger.info("更新 %s 个任务的 parent_id", len(parent_updates_existing))
 
     # 12. 处理删除
     if confirm_delete and todos_to_delete:
@@ -658,7 +658,7 @@ def sync_plan_doc(
         for todo_id in delete_ids:
             deleted_count = todo_repository.delete_todo_cascade(todo_id)
             result.deleted += deleted_count if deleted_count > 0 else 1
-        logger.info(f"删除 {result.deleted} 个任务")
+        logger.info("删除 %s 个任务", result.deleted)
 
     # 13. 更新系统展示区并保存 MD
     content = _update_system_section(content, plan_doc_id)
@@ -667,7 +667,7 @@ def sync_plan_doc(
     # 14. 统计总数
     result.total = len(todo_repository.get_todos_by_plan_doc(plan_doc_id))
 
-    logger.info(f"同步计划书 {plan_doc_id} 完成: created={result.created}, updated={result.updated}, deleted={result.deleted}")
+    logger.info("同步计划书 %s 完成: created=%s, updated=%s, deleted=%s", plan_doc_id, result.created, result.updated, result.deleted)
     return result
 
 
@@ -683,7 +683,7 @@ def writeback_completion_to_md(plan_doc_id: str, anchor_id: str) -> bool:
     """
     content = _read_plan_doc_content(plan_doc_id)
     if not content:
-        logger.warning(f"回写失败：MD 文件不存在 {plan_doc_id}")
+        logger.warning("回写失败：MD 文件不存在 %s", plan_doc_id)
         return False
 
     anchor_pattern = re.compile(
@@ -693,7 +693,7 @@ def writeback_completion_to_md(plan_doc_id: str, anchor_id: str) -> bool:
 
     match = anchor_pattern.search(content)
     if not match:
-        logger.warning(f"回写失败：未找到锚点 {anchor_id}")
+        logger.warning("回写失败：未找到锚点 %s", anchor_id)
         return False
 
     tabs = match.group(1)
@@ -705,7 +705,7 @@ def writeback_completion_to_md(plan_doc_id: str, anchor_id: str) -> bool:
     content = _update_system_section(content, plan_doc_id)
 
     if _write_plan_doc_content(plan_doc_id, content):
-        logger.info(f"回写完成状态成功: {plan_doc_id}/{anchor_id}")
+        logger.info("回写完成状态成功: %s/%s", plan_doc_id, anchor_id)
         return True
 
     return False
@@ -719,7 +719,7 @@ def writeback_uncomplete_to_md(plan_doc_id: str, anchor_id: str) -> bool:
     """
     content = _read_plan_doc_content(plan_doc_id)
     if not content:
-        logger.warning(f"回写失败：MD 文件不存在 {plan_doc_id}")
+        logger.warning("回写失败：MD 文件不存在 %s", plan_doc_id)
         return False
 
     anchor_pattern = re.compile(
@@ -729,7 +729,7 @@ def writeback_uncomplete_to_md(plan_doc_id: str, anchor_id: str) -> bool:
 
     match = anchor_pattern.search(content)
     if not match:
-        logger.warning(f"回写失败：未找到已完成的锚点 {anchor_id}")
+        logger.warning("回写失败：未找到已完成的锚点 %s", anchor_id)
         return False
 
     tabs = match.group(1)
@@ -741,7 +741,7 @@ def writeback_uncomplete_to_md(plan_doc_id: str, anchor_id: str) -> bool:
     content = _update_system_section(content, plan_doc_id)
 
     if _write_plan_doc_content(plan_doc_id, content):
-        logger.info(f"回写取消完成状态成功: {plan_doc_id}/{anchor_id}")
+        logger.info("回写取消完成状态成功: %s/%s", plan_doc_id, anchor_id)
         return True
 
     return False
@@ -814,7 +814,7 @@ def regenerate_summary(plan_doc_id: str) -> bool:
     """
     content = _read_plan_doc_content(plan_doc_id)
     if content is None:
-        logger.warning(f"重新生成失败：MD 文件不存在 {plan_doc_id}")
+        logger.warning("重新生成失败：MD 文件不存在 %s", plan_doc_id)
         return False
 
     content = _update_system_section(content, plan_doc_id)

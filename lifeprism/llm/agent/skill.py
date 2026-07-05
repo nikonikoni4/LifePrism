@@ -48,7 +48,7 @@ class SkillLoad:
             return self._strip_frontmatter(content)
 
         else:
-            logger.warning(f"{str(path)}不存在，无法加载{skill_name}skill, ")
+            logger.warning("%s不存在，无法加载%s skill,", str(path), skill_name)
         return None
 
 
@@ -56,7 +56,7 @@ class SkillLoad:
         """加载 skill.md 顶部的 YAML frontmatter，解析为 dict。无文件、无 frontmatter 或解析失败时返回 None。"""
         path = self.skill_path / f"{skill_name}/skill.md"
         if not path.exists():
-            logger.warning(f"{str(path)}不存在，无法加载{skill_name}skill, ")
+            logger.warning("%s不存在，无法加载%s skill,", str(path), skill_name)
             return None
         content = path.read_text(encoding="utf-8")
         if not content.startswith("---"):
@@ -68,12 +68,12 @@ class SkillLoad:
         try:
             parsed = yaml.safe_load(yaml_block)
         except yaml.YAMLError as e:
-            logger.warning(f"{path} frontmatter YAML 解析失败: {e}")
+            logger.warning("%s frontmatter YAML 解析失败: %s", path, e)
             return None
         if parsed is None:
             return None
         if not isinstance(parsed, dict):
-            logger.warning(f"{path} frontmatter 根节点不是 YAML mapping（dict）")
+            logger.warning("%s frontmatter 根节点不是 YAML mapping（dict）", path)
             return None
         return parsed
 
@@ -151,7 +151,7 @@ class SkillLoad:
             list[str]: skill名称列表，如果目录不存在则返回空列表
         """
         if not self.skill_path.exists():
-            logger.warning(f"skills目录不存在: {self.skill_path}, 已创建")
+            logger.warning("skills目录不存在: %s, 已创建", self.skill_path)
             self.skill_path.mkdir(parents=True, exist_ok=True)
             return []
         return  [f.name for f in self.skill_path.iterdir() if f.is_dir()]

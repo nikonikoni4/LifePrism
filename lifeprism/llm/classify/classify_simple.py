@@ -47,7 +47,7 @@ class ClassifySimple:
         raw = raw.response.content
         clean = extract_json_from_response(raw)
         if not clean:
-            logger.error(f"classify_simple 批次 {batch_num} 返回空内容，跳过")
+            logger.error("classify_simple 批次 %s 返回空内容，跳过", batch_num)
             return
         parse_classification_result(result_items, json.loads(clean), "classify_simple")
 
@@ -78,7 +78,7 @@ class ClassifySimple:
 """
         all_result_items = list(state.log_items)
         batches = [state.log_items[i:i + MAX_LOG_ITEMS] for i in range(0, len(state.log_items), MAX_LOG_ITEMS)]
-        logger.info(f"classify_simple 共 {len(state.log_items)} 条，分 {len(batches)} 批并发")
+        logger.info("classify_simple 共 %s 条，分 %s 批并发", len(state.log_items), len(batches))
         await asyncio.gather(*[
             self._classify_batch(batch, i + 1, system_prompt, state.app_registry, all_result_items)
             for i, batch in enumerate(batches)

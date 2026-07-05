@@ -75,7 +75,7 @@ def _ensure_diary_dir():
     try:
         _get_diary_dir().mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        logger.error(f"创建日记目录失败: {e}")
+        logger.error("创建日记目录失败: %s", e)
 
 
 def _ensure_template_dir():
@@ -83,7 +83,7 @@ def _ensure_template_dir():
     try:
         _get_template_dir().mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        logger.error(f"创建模板目录失败: {e}")
+        logger.error("创建模板目录失败: %s", e)
 
 
 def _read_diary_content(date: str) -> str:
@@ -94,7 +94,7 @@ def _read_diary_content(date: str) -> str:
             return file_path.read_text(encoding='utf-8')
         return ""
     except Exception as e:
-        logger.error(f"读取日记文件 {date} 失败: {e}")
+        logger.error("读取日记文件 %s 失败: %s", date, e)
         return ""
 
 
@@ -105,7 +105,7 @@ def _write_diary_content(date: str, content: str):
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding='utf-8')
     except Exception as e:
-        logger.error(f"写入日记文件 {date} 失败: {e}")
+        logger.error("写入日记文件 %s 失败: %s", date, e)
 
 
 def _calculate_word_count(content: str) -> int:
@@ -414,7 +414,7 @@ def get_template(name: str) -> Optional[TemplateItem]:
         content = file_path.read_text(encoding='utf-8')
         return TemplateItem(name=name, content=content)
     except Exception as e:
-        logger.error(f"读取模板 {name} 失败: {e}")
+        logger.error("读取模板 %s 失败: %s", name, e)
         return None
 
 
@@ -437,7 +437,7 @@ def create_template(request: CreateTemplateRequest) -> TemplateItem:
 
     _ensure_template_dir()
     file_path.write_text(request.content, encoding='utf-8')
-    logger.info(f"创建模板 {request.name} 成功")
+    logger.info("创建模板 %s 成功", request.name)
     return TemplateItem(name=request.name, content=request.content)
 
 
@@ -457,7 +457,7 @@ def update_template(name: str, request: UpdateTemplateRequest) -> Optional[Templ
         return None
 
     file_path.write_text(request.content, encoding='utf-8')
-    logger.info(f"更新模板 {name} 成功")
+    logger.info("更新模板 %s 成功", name)
     return TemplateItem(name=name, content=request.content)
 
 
@@ -477,8 +477,8 @@ def delete_template(name: str) -> bool:
 
     try:
         file_path.unlink()
-        logger.info(f"删除模板 {name} 成功")
+        logger.info("删除模板 %s 成功", name)
         return True
     except Exception as e:
-        logger.error(f"删除模板 {name} 失败: {e}")
+        logger.error("删除模板 %s 失败: %s", name, e)
         return False

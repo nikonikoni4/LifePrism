@@ -106,7 +106,7 @@ class SessionManager:
                 updated_at = updated_at
             )
         else:
-            logger.warning(f'在{path}中，找不到{session_id}.jsonl文件')
+            logger.warning("在%s中，找不到%s.jsonl文件", path, session_id)
             raise NotFoundError(f'在{path}中，找不到{session_id}.jsonl文件') # 需要在上层捕获这个错误
             
 
@@ -210,7 +210,7 @@ class SessionManager:
         """
         path = SessionManager.get_session_path_by_id(session_id)
         if not path.exists():
-            logger.warning(f"Session 文件不存在: {path}")
+            logger.warning("Session 文件不存在: %s", path)
             return None
 
         try:
@@ -220,10 +220,10 @@ class SessionManager:
                     data = json.loads(first_line)
                     if data.get("_type") == "metadata":
                         return data
-            logger.warning(f"Session {session_id} 的 metadata 格式错误")
+            logger.warning("Session %s 的 metadata 格式错误", session_id)
             return None
         except Exception as e:
-            logger.error(f"读取 session {session_id} metadata 失败: {e}")
+            logger.error("读取 session %s metadata 失败: %s", session_id, e)
             return None
 
     def remove_from_cache(self, session_id: str) -> bool:
@@ -238,10 +238,10 @@ class SessionManager:
         """
         if session_id in self._cache:
             del self._cache[session_id]
-            logger.debug(f"已从缓存中移除 session: {session_id}")
+            logger.debug("已从缓存中移除 session: %s", session_id)
             return True
         else:
-            logger.debug(f"Session {session_id} 不在缓存中")
+            logger.debug("Session %s 不在缓存中", session_id)
             return False
 
     @staticmethod
@@ -284,7 +284,7 @@ class SessionManager:
                         elif data.get('role') == 'user':
                             last_user_msg = data.get('content', '')
             except Exception as e:
-                logger.warning(f"读取 session {session_id} 失败: {e}")
+                logger.warning("读取 session %s 失败: %s", session_id, e)
                 continue
 
             # 日期筛选
@@ -384,7 +384,7 @@ class ChatHistoryManager:
         # 只有当 session_id 不为 None 时才添加该字段
         if session_id is not None:
             history_item["session_id"] = session_id
-            logger.info(f"添加聊天历史: session_id={session_id}")
+            logger.info("添加聊天历史: session_id=%s", session_id)
         else:
             logger.info("添加聊天历史: 未关联session")
 

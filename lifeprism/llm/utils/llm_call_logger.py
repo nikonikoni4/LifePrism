@@ -60,7 +60,7 @@ class LLMCallLogger:
         if log_dir is None:
 
             log_dir = settings.lifeprism_data_path / "debug_logs" / "llm_logs"
-            logger.info(f"llm_call_输出目录：{log_dir}")
+            logger.info("llm_call_输出目录：%s", log_dir)
 
         self.log_dir = Path(log_dir)
         self.image_dir = self.log_dir / "images"
@@ -72,7 +72,7 @@ class LLMCallLogger:
         # 从配置读取记录标志位
         self._enabled = settings.get('llm_call_logger_enabled', False)
 
-        logger.debug(f"LLM 调用记录器初始化完成，日志目录: {self.log_dir}, 启用状态: {self._enabled}")
+        logger.debug("LLM 调用记录器初始化完成，日志目录: %s, 启用状态: %s", self.log_dir, self._enabled)
 
     @property
     def enabled(self) -> bool:
@@ -83,7 +83,7 @@ class LLMCallLogger:
     def enabled(self, value: bool):
         """设置记录标志位"""
         self._enabled = value
-        logger.info(f"LLM 调用记录器已{'启用' if value else '禁用'}")
+        logger.info("LLM 调用记录器已%s", "启用" if value else "禁用")
 
     def log_call(
         self,
@@ -184,11 +184,11 @@ class LLMCallLogger:
             # 8. 写入文件
             self._write_record(record)
 
-            logger.debug(f"成功记录 LLM 调用: {record['id']}")
+            logger.debug("成功记录 LLM 调用: %s", record["id"])
             return record["id"]
 
         except Exception as e:
-            logger.error(f"记录 LLM 调用失败: {e}", exc_info=True)
+            logger.error("记录 LLM 调用失败: %s", e, exc_info=True)
             return None
 
     def _process_content(
@@ -222,7 +222,7 @@ class LLMCallLogger:
                             filename = self._save_base64_image(base64_url)
                             image_filenames.append(filename)
                         except Exception as e:
-                            logger.warning(f"保存 base64 图片失败: {e}")
+                            logger.warning("保存 base64 图片失败: %s", e)
         text_content = "\n".join(text_parts)
 
         # 2. 处理 extra["media"]（文件路径）
@@ -234,7 +234,7 @@ class LLMCallLogger:
                         filename = self._copy_media_file(media_path)
                         image_filenames.append(filename)
                     except Exception as e:
-                        logger.warning(f"拷贝媒体文件失败 {media_path}: {e}")
+                        logger.warning("拷贝媒体文件失败 %s: %s", media_path, e)
 
         return text_content, image_filenames
 
@@ -267,7 +267,7 @@ class LLMCallLogger:
         with open(image_path, "wb") as f:
             f.write(image_data)
 
-        logger.debug(f"保存 base64 图片: {filename}")
+        logger.debug("保存 base64 图片: %s", filename)
         return filename
 
     def _copy_media_file(self, media_path: str) -> str:
@@ -294,7 +294,7 @@ class LLMCallLogger:
         target_path = self.image_dir / filename
         shutil.copy2(source_path, target_path)
 
-        logger.debug(f"拷贝媒体文件: {media_path} -> {filename}")
+        logger.debug("拷贝媒体文件: %s -> %s", media_path, filename)
         return filename
 
     def _get_caller_info(self) -> str:
@@ -343,7 +343,7 @@ class LLMCallLogger:
                 with open(log_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
             except Exception as e:
-                logger.error(f"读取日志文件失败 {log_file}: {e}")
+                logger.error("读取日志文件失败 %s: %s", log_file, e)
                 data = {
                     "version": "1.0",
                     "date": date_str,
@@ -364,7 +364,7 @@ class LLMCallLogger:
             with open(log_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            logger.error(f"写入日志文件失败 {log_file}: {e}")
+            logger.error("写入日志文件失败 %s: %s", log_file, e)
             raise
 
     def export_by_prompt(
@@ -419,9 +419,9 @@ class LLMCallLogger:
                             "score": call.get("score"),
                         })
             except Exception as e:
-                logger.error(f"读取日志文件失败 {log_file}: {e}")
+                logger.error("读取日志文件失败 %s: %s", log_file, e)
 
-        logger.info(f"导出 {prompt_module}.{prompt_name} 数据集，共 {len(dataset)} 条记录")
+        logger.info("导出 %s.%s 数据集，共 %s 条记录", prompt_module, prompt_name, len(dataset))
         return dataset
 
     def export_by_workflow(
@@ -450,12 +450,12 @@ class LLMCallLogger:
                     if call.get("workflow_id") == workflow_id:
                         records.append(call)
             except Exception as e:
-                logger.error(f"读取日志文件失败 {log_file}: {e}")
+                logger.error("读取日志文件失败 %s: %s", log_file, e)
 
         # 按时间戳排序
         records.sort(key=lambda x: x.get("timestamp", ""))
 
-        logger.info(f"导出 workflow {workflow_id} 数据，共 {len(records)} 条记录")
+        logger.info("导出 workflow %s 数据，共 %s 条记录", workflow_id, len(records))
         return records
 
     def _get_log_files(

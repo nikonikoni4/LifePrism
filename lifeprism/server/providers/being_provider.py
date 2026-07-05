@@ -3,10 +3,12 @@ Being 数据提供者
 提供 time_paradoxes 表的数据库操作（过去/现在/未来自我探索测试）
 """
 import json
+import sqlite3
 from typing import Optional, List, Dict, Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
 
@@ -41,9 +43,15 @@ class BeingProvider(LWBaseDataProvider):
             if result:
                 return self._deserialize_content(result)
             return None
-        except Exception as e:
-            logger.error(f"获取记录 {record_id} 失败: {e}")
-            return None
+        except sqlite3.Error as e:
+            logger.error(
+                "获取记录失败: record_id=%s, error=%s",
+                record_id, e
+            )
+            raise DataAccessError(
+                message="获取记录失败",
+                details={"record_id": record_id, "error": str(e)}
+            ) from e
     
     def get_by_user_mode_version(
         self, 
@@ -72,9 +80,15 @@ class BeingProvider(LWBaseDataProvider):
                 return None
             result = df.iloc[0].to_dict()
             return self._deserialize_content(result)
-        except Exception as e:
-            logger.error(f"获取记录失败 (user_id={user_id}, mode={mode}, version={version}): {e}")
-            return None
+        except sqlite3.Error as e:
+            logger.error(
+                "获取记录失败: user_id=%s, mode=%s, version=%s, error=%s",
+                user_id, mode, version, e
+            )
+            raise DataAccessError(
+                message="获取记录失败",
+                details={"user_id": user_id, "mode": mode, "version": version, "error": str(e)}
+            ) from e
     
     def get_all_by_user_mode(
         self, 
@@ -100,9 +114,15 @@ class BeingProvider(LWBaseDataProvider):
             if df.empty:
                 return []
             return [self._deserialize_content(row.to_dict()) for _, row in df.iterrows()]
-        except Exception as e:
-            logger.error(f"获取记录列表失败 (user_id={user_id}, mode={mode}): {e}")
-            return []
+        except sqlite3.Error as e:
+            logger.error(
+                "获取记录列表失败: user_id=%s, mode=%s, error=%s",
+                user_id, mode, e
+            )
+            raise DataAccessError(
+                message="获取记录列表失败",
+                details={"user_id": user_id, "mode": mode, "error": str(e)}
+            ) from e
     
     def get_latest_version(self, user_id: int, mode: str) -> int:
         """
@@ -124,9 +144,15 @@ class BeingProvider(LWBaseDataProvider):
                 )
                 result = cursor.fetchone()
                 return result[0] if result[0] is not None else 0
-        except Exception as e:
-            logger.error(f"获取最新版本号失败 (user_id={user_id}, mode={mode}): {e}")
-            return 0
+        except sqlite3.Error as e:
+            logger.error(
+                "获取最新版本号失败: user_id=%s, mode=%s, error=%s",
+                user_id, mode, e
+            )
+            raise DataAccessError(
+                message="获取最新版本号失败",
+                details={"user_id": user_id, "mode": mode, "error": str(e)}
+            ) from e
     
     def get_latest_record(self, user_id: int, mode: str) -> Optional[Dict[str, Any]]:
         """
@@ -150,9 +176,15 @@ class BeingProvider(LWBaseDataProvider):
                 return None
             result = df.iloc[0].to_dict()
             return self._deserialize_content(result)
-        except Exception as e:
-            logger.error(f"获取最新记录失败 (user_id={user_id}, mode={mode}): {e}")
-            return None
+        except sqlite3.Error as e:
+            logger.error(
+                "获取最新记录失败: user_id=%s, mode=%s, error=%s",
+                user_id, mode, e
+            )
+            raise DataAccessError(
+                message="获取最新记录失败",
+                details={"user_id": user_id, "mode": mode, "error": str(e)}
+            ) from e
     
     # ==================== 创建操作 ====================
     
@@ -177,11 +209,17 @@ class BeingProvider(LWBaseDataProvider):
                 sql = f"INSERT INTO {self.TABLE_NAME} ({columns}) VALUES ({placeholders})"
                 cursor.execute(sql, list(insert_data.values()))
                 new_id = cursor.lastrowid
-                logger.info(f"创建 Being 记录成功，ID: {new_id}")
+                logger.info("创建 Being 记录成功，ID: %s", new_id)
                 return new_id
-        except Exception as e:
-            logger.error(f"创建记录失败: {e}")
-            return None
+        except sqlite3.Error as e:
+            logger.error(
+                "创建记录失败: error=%s",
+                e
+            )
+            raise DataAccessError(
+                message="创建记录失败",
+                details={"error": str(e)}
+            ) from e
     
     def create_new_version(
         self, 
@@ -219,9 +257,15 @@ class BeingProvider(LWBaseDataProvider):
             if new_id:
                 return self.get_by_id(new_id)
             return None
-        except Exception as e:
-            logger.error(f"创建新版本失败: {e}")
-            return None
+        except sqlite3.Error as e:
+            logger.error(
+                "创建新版本失败: user_id=%s, mode=%s, error=%s",
+                user_id, mode, e
+            )
+            raise DataAccessError(
+                message="创建新版本失败",
+                details={"user_id": user_id, "mode": mode, "error": str(e)}
+            ) from e
     
     # ==================== 更新操作 ====================
     
@@ -244,12 +288,18 @@ class BeingProvider(LWBaseDataProvider):
                 where={'id': record_id}
             )
             if rows_affected > 0:
-                logger.info(f"更新 Being 记录 {record_id} 成功")
+                logger.info("更新 Being 记录 %s 成功", record_id)
                 return True
             return False
-        except Exception as e:
-            logger.error(f"更新记录 {record_id} 失败: {e}")
-            return False
+        except sqlite3.Error as e:
+            logger.error(
+                "更新记录失败: record_id=%s, error=%s",
+                record_id, e
+            )
+            raise DataAccessError(
+                message="更新记录失败",
+                details={"record_id": record_id, "error": str(e)}
+            ) from e
     
     def update_by_user_mode_version(
         self, 
@@ -278,12 +328,18 @@ class BeingProvider(LWBaseDataProvider):
                 where={'user_id': user_id, 'mode': mode, 'version': version}
             )
             if rows_affected > 0:
-                logger.info(f"更新 Being 记录成功 (user_id={user_id}, mode={mode}, version={version})")
+                logger.info("更新 Being 记录成功: user_id=%s, mode=%s, version=%s", user_id, mode, version)
                 return True
             return False
-        except Exception as e:
-            logger.error(f"更新记录失败: {e}")
-            return False
+        except sqlite3.Error as e:
+            logger.error(
+                "更新记录失败: user_id=%s, mode=%s, version=%s, error=%s",
+                user_id, mode, version, e
+            )
+            raise DataAccessError(
+                message="更新记录失败",
+                details={"user_id": user_id, "mode": mode, "version": version, "error": str(e)}
+            ) from e
     
     def upsert(
         self, 
@@ -320,11 +376,17 @@ class BeingProvider(LWBaseDataProvider):
                 data,
                 conflict_columns=['user_id', 'mode', 'version']
             )
-            logger.info(f"UPSERT Being 记录成功 (user_id={user_id}, mode={mode}, version={version})")
+            logger.info("UPSERT Being 记录成功: user_id=%s, mode=%s, version=%s", user_id, mode, version)
             return True
-        except Exception as e:
-            logger.error(f"UPSERT 记录失败: {e}")
-            return False
+        except sqlite3.Error as e:
+            logger.error(
+                "UPSERT 记录失败: user_id=%s, mode=%s, version=%s, error=%s",
+                user_id, mode, version, e
+            )
+            raise DataAccessError(
+                message="UPSERT 记录失败",
+                details={"user_id": user_id, "mode": mode, "version": version, "error": str(e)}
+            ) from e
     
     # ==================== 删除操作 ====================
     
@@ -341,12 +403,18 @@ class BeingProvider(LWBaseDataProvider):
         try:
             rows_affected = self.db.delete(self.TABLE_NAME, where={'id': record_id})
             if rows_affected > 0:
-                logger.info(f"删除 Being 记录 {record_id} 成功")
+                logger.info("删除 Being 记录 %s 成功", record_id)
                 return True
             return False
-        except Exception as e:
-            logger.error(f"删除记录 {record_id} 失败: {e}")
-            return False
+        except sqlite3.Error as e:
+            logger.error(
+                "删除记录失败: record_id=%s, error=%s",
+                record_id, e
+            )
+            raise DataAccessError(
+                message="删除记录失败",
+                details={"record_id": record_id, "error": str(e)}
+            ) from e
     
     def delete_by_user_mode_version(
         self, 
@@ -371,12 +439,18 @@ class BeingProvider(LWBaseDataProvider):
                 where={'user_id': user_id, 'mode': mode, 'version': version}
             )
             if rows_affected > 0:
-                logger.info(f"删除 Being 记录成功 (user_id={user_id}, mode={mode}, version={version})")
+                logger.info("删除 Being 记录成功: user_id=%s, mode=%s, version=%s", user_id, mode, version)
                 return True
             return False
-        except Exception as e:
-            logger.error(f"删除记录失败: {e}")
-            return False
+        except sqlite3.Error as e:
+            logger.error(
+                "删除记录失败: user_id=%s, mode=%s, version=%s, error=%s",
+                user_id, mode, version, e
+            )
+            raise DataAccessError(
+                message="删除记录失败",
+                details={"user_id": user_id, "mode": mode, "version": version, "error": str(e)}
+            ) from e
     
     # ==================== 辅助方法 ====================
     

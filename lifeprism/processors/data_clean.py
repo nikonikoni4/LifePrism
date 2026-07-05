@@ -82,7 +82,7 @@ def convert_utc_to_local(utc_timestamp_str: str, target_tz: str ) -> str:
     except Exception as e:
         # 错误处理：如果解析失败，返回原始字符串并记录警告
         # print(f"⚠️  时间戳转换失败: {utc_timestamp_str} -> {str(e)}")
-        logger.warning(f"时间戳转换失败: {utc_timestamp_str} -> {str(e)}")
+        logger.warning("时间戳转换失败: %s -> %s", utc_timestamp_str, str(e))
         return utc_timestamp_str
 
 
@@ -122,8 +122,8 @@ def clean_activitywatch_data_old(
         end_time=end_time
     )
     
-    logger.info(f"🧹 开始数据清洗流程...")
-    logger.info(f"📥 原始数据: {len(raw_events)} 个事件")
+    logger.info("🧹 开始数据清洗流程...")
+    logger.info("📥 原始数据: %d 个事件", len(raw_events))
     
     lower_bound = settings.data_cleaning_threshold
     removed_count = 0  # 初始化被过滤事件计数
@@ -140,13 +140,13 @@ def clean_activitywatch_data_old(
     
     # 已经分类的应用（单一用途app和多用途title）
     # 以及已存在的app_description，避免LLM重复搜索
-    logger.debug(f"原始 category_map_cache_df 长度: {len(category_map_cache_df) if category_map_cache_df is not None else 0}")
+    logger.debug("原始 category_map_cache_df 长度: %d", len(category_map_cache_df) if category_map_cache_df is not None else 0)
     if category_map_cache_df is not None and not category_map_cache_df.empty:
         # 直接使用 state 字段过滤（state=0 表示对应的分类被禁用）
         valid_df = category_map_cache_df[
             category_map_cache_df.get('state', 1) == 1
         ].copy() if 'state' in category_map_cache_df.columns else category_map_cache_df.copy()
-        logger.debug(f"过滤后的 valid_df 长度: {len(valid_df)}")
+        logger.debug("过滤后的 valid_df 长度: %d", len(valid_df))
         # 获取已存在的单一用途的应用集合（只包含 is_multipurpose_app == 0 的）
         single_purpose_df = valid_df[valid_df['is_multipurpose_app'] == 0]
         categorized_single_purpose_apps = set(single_purpose_df['app'].unique())
@@ -169,7 +169,7 @@ def clean_activitywatch_data_old(
             is_multi = row.get('is_multipurpose_app', 0)
             if app == "antigravity":
                 logger.debug("="*20)
-                logger.debug(f"app: {app}, goal_id: {goal_id}")
+                logger.debug("app: %s, goal_id: %s", app, goal_id)
                 logger.debug("="*20)
             
             if app and cat_id:
@@ -237,7 +237,7 @@ def clean_activitywatch_data_old(
                         filtered_event['category_id'] = cat_ids[0]
                         filtered_event['sub_category_id'] = cat_ids[1]
                         filtered_event['link_to_goal_id'] = cat_ids[2] if len(cat_ids) > 2 else None
-                        logger.debug(f"✅ 成功获取分类数据: category_id={cat_ids[0]}, sub_category_id={cat_ids[1]}, link_to_goal_id={cat_ids[2] if len(cat_ids) > 2 else None}")
+                        logger.debug("✅ 成功获取分类数据: category_id=%s, sub_category_id=%s, link_to_goal_id=%s", cat_ids[0], cat_ids[1], cat_ids[2] if len(cat_ids) > 2 else None)
                 
                 # 2.多用途app已经被分类 且 对应的title也有分类记录 ： 根据title获取分类
                 elif app_name in categorized_multipurpose_apps and title and title in categorized_mutilpurpose_titles:
@@ -247,8 +247,8 @@ def clean_activitywatch_data_old(
                         filtered_event['category_id'] = cat_ids[0]
                         filtered_event['sub_category_id'] = cat_ids[1]
                         filtered_event['link_to_goal_id'] = cat_ids[2] if len(cat_ids) > 2 else None
-                        logger.debug(f"✅ 成功获取分类数据: category_id={cat_ids[0]}, sub_category_id={cat_ids[1]}, link_to_goal_id={cat_ids[2] if len(cat_ids) > 2 else None}")
-                        logger.debug(f"✅ 多用途匹配成功: app_name={app_name}, title={title}")
+                        logger.debug("✅ 成功获取分类数据: category_id=%s, sub_category_id=%s, link_to_goal_id=%s", cat_ids[0], cat_ids[1], cat_ids[2] if len(cat_ids) > 2 else None)
+                        logger.debug("✅ 多用途匹配成功: app_name=%s, title=%s", app_name, title)
                 # 3. app未被分类，且是单一用途的 
                 elif not is_multipurpose:
                     # 3.1 app未被分类，且是单一用途的 且 未被添加到待分类列表 ： 加入待分类列表
@@ -316,7 +316,7 @@ def clean_activitywatch_data_old(
         filtered_events_df = filtered_events_df.drop_duplicates(subset=['app', 'start_time'], keep='first')
         after_count = len(filtered_events_df)
         if before_count != after_count:
-            logger.info(f"[DEDUP] 去除重复事件: {before_count} -> {after_count} (移除 {before_count - after_count} 条)")
+            logger.info("[DEDUP] 去除重复事件: %d -> %d (移除 %d 条)", before_count, after_count, before_count - after_count)
 
     # 构建 classifyState
     classify_state = classifyState(
@@ -329,9 +329,9 @@ def clean_activitywatch_data_old(
     single_count = len([item for item in log_items if not app_registry.get(item.app, AppInFo(description="", is_multipurpose=False)).is_multipurpose])
     multi_count = len([item for item in log_items if app_registry.get(item.app, AppInFo(description="", is_multipurpose=False)).is_multipurpose])
     
-    logger.info(f"[STAT] 过滤统计: 总事件 {len(raw_events)} -> 保留 {len(filtered_events_df)} -> 删除 {removed_count}")
-    logger.info(f"[STAT] 待分类统计: 总项目 {len(log_items)} -> 单用途 {single_count} -> 多用途 {multi_count}")
-    logger.info(f"[STAT] 应用注册表: {len(app_registry)} 个应用")
+    logger.info("[STAT] 过滤统计: 总事件 %d -> 保留 %d -> 删除 %d", len(raw_events), len(filtered_events_df), removed_count)
+    logger.info("[STAT] 待分类统计: 总项目 %d -> 单用途 %d -> 多用途 %d", len(log_items), single_count, multi_count)
+    logger.info("[STAT] 应用注册表: %d 个应用", len(app_registry))
     return filtered_events_df, classify_state
 
 
@@ -426,7 +426,7 @@ def clean_activitywatch_data(
             - filtered_events_df: 清洗后的事件数据 DataFrame
             - classify_state: 包含待分类应用信息的 classifyState 对象
     """
-    logger.info(f"🧹 开始数据清洗流程 (v2)...")
+    logger.info("🧹 开始数据清洗流程 (v2)...")
     
     # 1. 获取原始数据
     # 根据监控类型选择 Provider
@@ -443,7 +443,7 @@ def clean_activitywatch_data(
             end_time=end_time
         )
     total_events = len(raw_events)
-    logger.info(f"📥 原始数据: {total_events} 个事件")
+    logger.info("📥 原始数据: %d 个事件", total_events)
     
     # 2. 初始化组件（全局共享，跨批次累积状态）
     cache = CategoryCache(category_map_cache_df)
@@ -451,7 +451,7 @@ def clean_activitywatch_data(
     matcher = CacheMatcher(cache)
     collector = ClassifyCollector(cache)
     
-    logger.debug(f"📦 缓存统计: {cache.get_stats()}")
+    logger.debug("📦 缓存统计: %s", cache.get_stats())
     
     # 3. 分批处理
     all_events: List[ProcessedEvent] = []
@@ -464,11 +464,11 @@ def clean_activitywatch_data(
         )
         all_events = events
         total_removed = removed_count
-        logger.debug(f"🔄 事件转换完成: 有效 {len(events)}, 过滤 {removed_count}")
+        logger.debug("🔄 事件转换完成: 有效 %d, 过滤 %d", len(events), removed_count)
     else:
         # 数据量较大，分批处理
         num_batches = (total_events + batch_size - 1) // batch_size
-        logger.info(f"📦 数据量较大，分 {num_batches} 批处理 (每批 {batch_size} 条)")
+        logger.info("📦 数据量较大，分 %d 批处理 (每批 %d 条)", num_batches, batch_size)
         
         for batch_idx in range(num_batches):
             batch_start = batch_idx * batch_size
@@ -482,8 +482,10 @@ def clean_activitywatch_data(
             total_removed += removed_count
             
             logger.debug(
-                f"  批次 {batch_idx + 1}/{num_batches}: "
-                f"处理 {len(batch_events)} 条, 有效 {len(events)}, 过滤 {removed_count}"
+                "  批次 %d/%d: "
+                "处理 %d 条, 有效 %d, 过滤 %d",
+                batch_idx + 1, num_batches,
+                len(batch_events), len(events), removed_count,
             )
     
     # 4. 构建输出
@@ -494,10 +496,10 @@ def clean_activitywatch_data(
     match_stats = matcher.get_stats()
     collect_stats = collector.get_stats()
     
-    logger.info(f"[STAT] 过滤统计: 总事件 {total_events} -> 保留 {len(all_events)} -> 删除 {total_removed}")
-    logger.info(f"[STAT] 缓存匹配: 命中 {match_stats['matched']}, 未命中 {match_stats['missed']}")
-    logger.info(f"[STAT] 待分类统计: 总项目 {collect_stats['total']} -> 单用途 {collect_stats['single']} -> 多用途 {collect_stats['multi']}")
-    logger.info(f"[STAT] 应用注册表: {collect_stats['apps']} 个应用")
+    logger.info("[STAT] 过滤统计: 总事件 %d -> 保留 %d -> 删除 %d", total_events, len(all_events), total_removed)
+    logger.info("[STAT] 缓存匹配: 命中 %d, 未命中 %d", match_stats['matched'], match_stats['missed'])
+    logger.info("[STAT] 待分类统计: 总项目 %d -> 单用途 %d -> 多用途 %d", collect_stats['total'], collect_stats['single'], collect_stats['multi'])
+    logger.info("[STAT] 应用注册表: %d 个应用", collect_stats['apps'])
     
     return filtered_events_df, classify_state
 

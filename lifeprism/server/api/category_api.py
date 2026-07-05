@@ -61,7 +61,7 @@ async def get_category_tree(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"获取分类结构失败: {e}", exc_info=True)
+        logger.error("获取分类结构失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -153,7 +153,7 @@ async def get_category_stats(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"获取分类统计失败: {e}", exc_info=True)
+        logger.error("获取分类统计失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -185,7 +185,7 @@ async def create_category(request: CreateCategoryRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"创建分类失败: {e}", exc_info=True)
+        logger.error("创建分类失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -218,7 +218,7 @@ async def update_category(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"更新分类失败: {e}", exc_info=True)
+        logger.error("更新分类失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -251,7 +251,7 @@ async def delete_category(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"删除分类失败: {e}", exc_info=True)
+        logger.error("删除分类失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -282,7 +282,7 @@ async def create_sub_category(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"创建子分类失败: {e}", exc_info=True)
+        logger.error("创建子分类失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -316,7 +316,7 @@ async def update_sub_category(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"更新子分类失败: {e}", exc_info=True)
+        logger.error("更新子分类失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -347,7 +347,7 @@ async def delete_sub_category(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"删除子分类失败: {e}", exc_info=True)
+        logger.error("删除子分类失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -379,7 +379,7 @@ async def toggle_category_state(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"切换分类状态失败: {e}", exc_info=True)
+        logger.error("切换分类状态失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -409,7 +409,7 @@ async def toggle_sub_category_state(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"切换子分类状态失败: {e}", exc_info=True)
+        logger.error("切换子分类状态失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -447,7 +447,7 @@ async def get_category_map_cache_list(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"获取分类缓存列表失败: {e}", exc_info=True)
+        logger.error("获取分类缓存列表失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -468,7 +468,7 @@ async def batch_update_category_map_cache(
     # 提取 ids 并移除（不属于更新字段）
     record_ids = update_fields.pop('ids', [])
     
-    logger.info(f"批量更新记录 {record_ids}，传递的字段: {update_fields}")
+    logger.info("批量更新记录 %s，传递的字段: %s", record_ids, update_fields)
     
     # 参数校验：至少需要一个可更新的字段
     updatable_fields = {'category_id', 'sub_category_id', 'app_description', 'link_to_goal_id'}
@@ -495,7 +495,7 @@ async def batch_update_category_map_cache(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"批量更新分类缓存记录失败: {e}", exc_info=True)
+        logger.error("批量更新分类缓存记录失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -518,7 +518,7 @@ async def update_category_map_cache(
     # 移除 id 字段（路径参数已提供）
     update_fields.pop('id', None)
     
-    logger.info(f"更新记录 {record_id}，传递的字段: {update_fields}")
+    logger.info("更新记录 %s，传递的字段: %s", record_id, update_fields)
     
     # 参数校验：至少需要一个可更新的字段
     updatable_fields = {'category_id', 'sub_category_id', 'app_description', 'title_analysis', 'link_to_goal_id'}
@@ -547,7 +547,7 @@ async def update_category_map_cache(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"更新分类缓存记录失败: {e}", exc_info=True)
+        logger.error("更新分类缓存记录失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -573,7 +573,7 @@ async def batch_delete_category_map_cache(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"批量删除分类缓存记录失败: {e}", exc_info=True)
+        logger.error("批量删除分类缓存记录失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -600,5 +600,5 @@ async def delete_category_map_cache(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"删除分类缓存记录失败: {e}", exc_info=True)
+        logger.error("删除分类缓存记录失败: error=%s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")

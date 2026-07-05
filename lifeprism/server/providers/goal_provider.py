@@ -85,7 +85,7 @@
 #                 return items, total
                 
 #         except Exception as e:
-#             logger.error(f"获取目标列表失败: {e}")
+#             logger.error("获取目标列表失败: error=%s", e)
 #             return [], 0
     
 #     def get_goal_by_id(self, goal_id: str) -> Optional[Dict[str, Any]]:
@@ -110,7 +110,7 @@
 #                 return None
                 
 #         except Exception as e:
-#             logger.error(f"获取目标 {goal_id} 失败: {e}")
+#             logger.error("获取目标 %s 失败: error=%s", goal_id, e)
 #             return None
     
 #     def create_goal(self, data: Dict[str, Any]) -> Optional[str]:
@@ -170,11 +170,11 @@
 #                     values
 #                 )
                 
-#                 logger.info(f"创建目标成功，ID: {goal_id}")
+#                 logger.info("创建目标成功，ID: %s", goal_id)
 #                 return goal_id
                 
 #         except Exception as e:
-#             logger.error(f"创建目标失败: {e}")
+#             logger.error("创建目标失败: error=%s", e)
 #             return None
     
 #     def update_goal(self, goal_id: str, data: Dict[str, Any]) -> bool:
@@ -222,11 +222,11 @@
 #                 success = cursor.rowcount > 0
                 
 #                 if success:
-#                     logger.info(f"更新目标 {goal_id} 成功")
+#                     logger.info("更新目标 %s 成功", goal_id)
 #                 return success
                 
 #         except Exception as e:
-#             logger.error(f"更新目标 {goal_id} 失败: {e}")
+#             logger.error("更新目标 %s 失败: error=%s", goal_id, e)
 #             return False
     
 #     def delete_goal(self, goal_id: str) -> bool:
@@ -250,18 +250,18 @@
 #                 )
 #                 cleared_count = cursor.rowcount
 #                 if cleared_count > 0:
-#                     logger.info(f"清除了 {cleared_count} 个任务的目标关联")
+#                     logger.info("清除了 %s 个任务的目标关联", cleared_count)
                 
 #                 # 然后删除目标
 #                 cursor.execute("DELETE FROM goal WHERE id = ?", (goal_id,))
                 
 #                 success = cursor.rowcount > 0
 #                 if success:
-#                     logger.info(f"删除目标 {goal_id} 成功")
+#                     logger.info("删除目标 %s 成功", goal_id)
 #                 return success
                 
 #         except Exception as e:
-#             logger.error(f"删除目标 {goal_id} 失败: {e}")
+#             logger.error("删除目标 %s 失败: error=%s", goal_id, e)
 #             return False
     
 #     def reorder_goals(self, goal_ids: List[str]) -> bool:
@@ -284,11 +284,11 @@
 #                         (index, goal_id)
 #                     )
                 
-#                 logger.info(f"重排序 {len(goal_ids)} 个目标成功")
+#                 logger.info("重排序 %s 个目标成功", len(goal_ids))
 #                 return True
                 
 #         except Exception as e:
-#             logger.error(f"重排序目标失败: {e}")
+#             logger.error("重排序目标失败: error=%s", e)
 #             return False
     
 #     def get_active_goals(self) -> List[Dict[str, Any]]:
@@ -311,7 +311,7 @@
 #                 return [dict(zip(columns, row)) for row in rows]
                 
 #         except Exception as e:
-#             logger.error(f"获取活跃目标列表失败: {e}")
+#             logger.error("获取活跃目标列表失败: error=%s", e)
 #             return []
     
 #     def get_active_goals_with_category(self) -> List[Dict[str, Any]]:
@@ -339,7 +339,7 @@
 #                 return [dict(zip(columns, row)) for row in rows]
                 
 #         except Exception as e:
-#             logger.error(f"获取绑定分类的活跃目标列表失败: {e}")
+#             logger.error("获取绑定分类的活跃目标列表失败: error=%s", e)
 #             return []
     
 #     def get_goals_linked_to_category(self, category_id: str) -> List[Dict[str, Any]]:
@@ -366,7 +366,7 @@
 #                 return [dict(zip(columns, row)) for row in rows]
                 
 #         except Exception as e:
-#             logger.error(f"获取分类关联目标失败: {e}")
+#             logger.error("获取分类关联目标失败: error=%s", e)
 #             return []
 
 #     def get_active_goals_for_classify(self) -> List[Dict[str, Any]]:
@@ -405,7 +405,7 @@
 #                 return [dict(zip(columns, row)) for row in rows]
 
 #         except Exception as e:
-#             logger.error(f"获取活跃目标列表（用于分类）失败: {e}")
+#             logger.error("获取活跃目标列表（用于分类）失败: error=%s", e)
 #             return []
 
 #     def calculate_time_invested(self, goal_id: str) -> int:
@@ -432,7 +432,7 @@
 #                 return total_seconds
 
 #         except Exception as e:
-#             logger.error(f"计算目标 {goal_id} 投入时间失败: {e}")
+#             logger.error("计算目标 %s 投入时间失败: error=%s", goal_id, e)
 #             return 0
 
 #     def update_time_invested(self, goal_id: str, time_invested: int) -> bool:
@@ -459,11 +459,11 @@
 
 #                 success = cursor.rowcount > 0
 #                 if success:
-#                     logger.debug(f"更新目标 {goal_id} 投入时间: {time_invested} 分钟")
+#                     logger.debug("更新目标 %s 投入时间: %s 分钟", goal_id, time_invested)
 #                 return success
 
 #         except Exception as e:
-#             logger.error(f"更新目标 {goal_id} 投入时间失败: {e}")
+#             logger.error("更新目标 %s 投入时间失败: error=%s", goal_id, e)
 #             return False
 
 

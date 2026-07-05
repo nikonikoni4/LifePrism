@@ -123,10 +123,10 @@ class ScreenCaptureProvider(LWBaseDataProvider):
                 insert_data.update(data)
 
             self._generic_insert(insert_data)
-            logger.info(f"创建截屏记录 {capture_id} 成功")
+            logger.info("创建截屏记录 %s 成功", capture_id)
             return True
         except Exception as e:
-            logger.error(f"创建截屏记录 {capture_id} 失败: {e}")
+            logger.error("创建截屏记录 %s 失败: %s", capture_id, e)
             raise DataAccessError(f"创建截屏记录 {capture_id} 失败") from e
 
     def update_screen_capture(self, capture_id: str, data: Dict[str, Any]) -> bool:
@@ -154,7 +154,7 @@ class ScreenCaptureProvider(LWBaseDataProvider):
 
             return self._generic_update(capture_id, data)
         except Exception as e:
-            logger.error(f"更新截屏记录 {capture_id} 失败: {e}")
+            logger.error("更新截屏记录 %s 失败: %s", capture_id, e)
             raise DataAccessError(f"更新截屏记录 {capture_id} 失败") from e
 
     def delete_screen_capture(self, capture_id: str) -> bool:
@@ -173,10 +173,10 @@ class ScreenCaptureProvider(LWBaseDataProvider):
         try:
             success = self._generic_delete(capture_id)
             if success:
-                logger.info(f"删除截屏记录 {capture_id} 成功")
+                logger.info("删除截屏记录 %s 成功", capture_id)
             return success
         except Exception as e:
-            logger.error(f"删除截屏记录 {capture_id} 失败: {e}")
+            logger.error("删除截屏记录 %s 失败: %s", capture_id, e)
             raise DataAccessError(f"删除截屏记录 {capture_id} 失败") from e
 
     # ==================== 便捷方法 ====================

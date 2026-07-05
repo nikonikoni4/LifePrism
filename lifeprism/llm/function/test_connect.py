@@ -43,7 +43,7 @@ async def test_connect() -> dict:
         # 失败条件1: 包含错误信息
         if "error" in response_content.lower():
             error_message = _parse_error_message(response_content)
-            logger.error(f"LLM 连接测试失败: 模型返回错误 (provider={settings.provider}, model={settings.model}): {response_content[:200]}")
+            logger.error("LLM 连接测试失败: 模型返回错误 (provider=%s, model=%s): %s", settings.provider, settings.model, response_content[:200])
             return {
                 "success": False,
                 "message": f"连接失败: {error_message}",
@@ -54,7 +54,7 @@ async def test_connect() -> dict:
 
         # 成功条件: 包含"连接成功"
         if "连接成功" in response_content:
-            logger.info(f"LLM 连接测试成功 (provider={settings.provider}, model={settings.model}): {response_content}")
+            logger.info("LLM 连接测试成功 (provider=%s, model=%s): %s", settings.provider, settings.model, response_content)
             return {
                 "success": True,
                 "message": "LLM 连接测试成功",
@@ -64,7 +64,7 @@ async def test_connect() -> dict:
             }
 
         # 失败条件2 (默认): 未返回预期内容
-        logger.error(f"LLM 连接测试失败: 模型未返回预期内容 (provider={settings.provider}, model={settings.model}): {response_content[:100]}")
+        logger.error("LLM 连接测试失败: 模型未返回预期内容 (provider=%s, model=%s): %s", settings.provider, settings.model, response_content[:100])
         return {
             "success": False,
             "message": "连接失败: 模型未返回预期内容",
@@ -75,7 +75,7 @@ async def test_connect() -> dict:
         
     except Exception as e:
         error_msg = str(e)
-        logger.error(f"LLM 连接测试失败 (provider={settings.provider}, model={settings.model}): {error_msg}")
+        logger.error("LLM 连接测试失败 (provider=%s, model=%s): %s", settings.provider, settings.model, error_msg)
 
         return {
             "success": False,

@@ -109,14 +109,14 @@ class AgentLoop:
 
             # 将模型回复（包含tool_calls）添加到messages中
             for tool_call in response.tool_calls:
-                logger.debug(f"工具调用 ： {tool_call.name} ，调用参数{tool_call.arguments}")
+                logger.debug("工具调用 ： %s ，调用参数%s", tool_call.name, tool_call.arguments)
                 result = await self._tool_registry.execute(tool_call.name,tool_call.arguments)
-                logger.debug(f"工具结果 ： {tool_call.name} - {result}")
+                logger.debug("工具结果 ： %s - %s", tool_call.name, result)
 
                 # 先判断工具调用是否出错
                 is_error = isinstance(result, str) and result.startswith(ERROR)
-                logger.debug(f"工具结果是否为字符串: {isinstance(result, str)}")
-                logger.debug(f"工具结果是否以错误开头: {is_error}")
+                logger.debug("工具结果是否为字符串: %s", isinstance(result, str))
+                logger.debug("工具结果是否以错误开头: %s", is_error)
 
                 # 记录工具调用到当前轮次（含错误标记）
                 round_tool_calls.append({
@@ -130,9 +130,9 @@ class AgentLoop:
                 # 只有在出错时才累加错误计数并检查阈值
                 if is_error:
                     tool_error[tool_call.name] += 1
-                    logger.debug(f"工具 {tool_call.name} 错误计数: {tool_error[tool_call.name]}/{MAX_TOOL_ERROR_COUNT}")
+                    logger.debug("工具 %s 错误计数: %s/%s", tool_call.name, tool_error[tool_call.name], MAX_TOOL_ERROR_COUNT)
                     if tool_error[tool_call.name] > MAX_TOOL_ERROR_COUNT:
-                        logger.warning(f"工具 {tool_call.name} 超过最大错误次数，添加警告信息")
+                        logger.warning("工具 %s 超过最大错误次数，添加警告信息", tool_call.name)
                         result += f"，已连续调用{tool_error[tool_call.name]}次，超过最大错误次数{MAX_TOOL_ERROR_COUNT}，请立即放弃该工具调用，尝试切换其他工具。若无可替代工具，向用户说明情况"
                 session.add_message('tool', result, tool_call_id=tool_call.id)
 
@@ -143,7 +143,7 @@ class AgentLoop:
                 "tool_calls": round_tool_calls
             })
             messages = Context.build_prompt(system_prompt, session.get_history_message())
-            logger.debug(f"第{tool_call_count+1}次 llm调用开始， message 长度 {len(messages)}")
+            logger.debug("第%s次 llm调用开始， message 长度 %s", tool_call_count+1, len(messages))
             logger.debug(messages)
             response: LLMResponse = await llm.chat(
                 messages=messages,
@@ -164,14 +164,14 @@ class AgentLoop:
                 ],
                 reasoning_content=response.reasoning_content
             )
-            logger.debug(f"模型返回 ： {response}")
-            logger.debug(f"模型工具调用 ： {response.tool_calls}")
+            logger.debug("模型返回 ： %s", response)
+            logger.debug("模型工具调用 ： %s", response.tool_calls)
             logger.debug("="*50)
             tool_call_count += 1
 
         # 如果因为达到MAX_TOOL_CALL而退出，且response仍有tool_calls，需要强制生成文本回复
         if response.tool_calls and tool_call_count > MAX_TOOL_CALL:
-            logger.warning(f"达到最大工具调用次数 {MAX_TOOL_CALL}，强制生成文本回复")
+            logger.warning("达到最大工具调用次数 %s，强制生成文本回复", MAX_TOOL_CALL)
             session.add_message(
                 'system',
                 content=f'已达到最大工具调用次数 {MAX_TOOL_CALL}，请直接向用户说明当前情况，让用户判断是否继续工作。'
@@ -193,7 +193,7 @@ class AgentLoop:
                 ],
                 reasoning_content=response.reasoning_content
             )
-            logger.debug(f"强制文本回复: {response}")
+            logger.debug("强制文本回复: %s", response)
 
         # 记录最后一轮的 reasoning（即使没有工具调用也记录，避免丢失最终的思考过程）
         if response.reasoning_content:
@@ -219,7 +219,7 @@ class AgentLoop:
             if message_text.startswith("/new"):
                 # 获取当前 session_id（用于恢复提示）
                 old_session_id = msg.session_id
-                logger.info(f"创建新会话，上一个会话 ID: {old_session_id}")
+                logger.info("创建新会话，上一个会话 ID: %s", old_session_id)
 
                 # 新建会话
                 new_session = session_manager.get_or_create_session()
@@ -252,8 +252,8 @@ class AgentLoop:
 
                 # 3. 检查session_id是否存在
                 if session_id not in session_manager.show_session_list():
-                    logger.info(f"session_id ： {session_id}")
-                    logger.info(f"session_list ： {session_manager.show_session_list()}")
+                    logger.info("session_id ： %s", session_id)
+                    logger.info("session_list ： %s", session_manager.show_session_list())
                     return OutboundMessage(
                         id=msg.id,
                         response=LLMResponse(content=f"[ERROR] 会话 {session_id} 不存在")
@@ -261,7 +261,7 @@ class AgentLoop:
                 else:
                     # 4. 加载 session 并提取最后两轮对话
                     session = session_manager.get_or_create_session(session_id)
-                    logger.info(f"继续会话 {session_id}，提取最后两轮对话")
+                    logger.info("继续会话 %s，提取最后两轮对话", session_id)
 
                     # 提取最后的 user 和 assistant 消息
                     last_user_msg = None
@@ -424,7 +424,7 @@ class AgentLoop:
         except ValueError as e:
             raise 
         except Exception as e:
-            logger.error(f"[AgentLoop] 处理消息 id={msg.id} 时出错: {e}", exc_info=True)
+            logger.error("[AgentLoop] 处理消息 id=%s 时出错: %s", msg.id, e, exc_info=True)
             await self._bus.publish_outbound(
                 OutboundMessage(
                     id=msg.id,
@@ -455,7 +455,7 @@ class AgentLoop:
                     self._active_tasks.get(k, []).remove(t)
                 exc = t.exception()
                 if exc is not None:
-                    logger.error(f"[AgentLoop] Task exception was never retrieved: {exc}", exc_info=exc)
+                    logger.error("[AgentLoop] Task exception was never retrieved: %s", exc, exc_info=exc)
 
             task.add_done_callback(lambda t, k=msg.id: _handle_task_done(t, k))
 
@@ -500,7 +500,7 @@ class AgentLoop:
         try : 
             response:LLMResponse= await llm.chat(messages)
         except Exception as e:
-            logger.error(f"auto compact llm 处理出错, {e}")
+            logger.error("auto compact llm 处理出错, %s", e)
             return session
         # 3.记录compact位置
         session.last_compacted_loc = len(session.messages)

@@ -58,8 +58,8 @@ class MonitorDataProvider(LWBaseDataProvider):
             return result > 0
 
         except sqlite3.Error as exc:
-            logger.error(f"保存窗口事件失败: {exc}")
+            logger.error("保存窗口事件失败: %s", exc)
             raise DataAccessError(f"Failed to insert window event: {exc}") from exc
         except OSError as exc:
-            logger.error(f"数据库 I/O 错误: {exc}")
+            logger.error("数据库 I/O 错误: %s", exc)
             raise DataAccessError(f"Database I/O error: {exc}") from exc

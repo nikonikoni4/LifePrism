@@ -115,7 +115,7 @@ def encode_image_to_base64(file_path: str) -> Optional[str]:
 
         return f"data:{mime_type};base64,{b64_data}"
     except Exception as e:
-        logger.warning(f"读取图片失败 {file_path}: {e}")
+        logger.warning("读取图片失败 %s: %s", file_path, e)
         return None
 
 def _get_screenshot_category_info(app: str, title: str) -> Dict[str, Any]:
@@ -178,7 +178,7 @@ def _get_screenshot_category_info(app: str, title: str) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.warning(f"获取截图分类信息失败 (app={app}, title={title}): {e}")
+        logger.warning("获取截图分类信息失败 (app=%s, title=%s): %s", app, title, e)
         return {
             "category_id": None,
             "category_name": None,
@@ -290,7 +290,7 @@ async def analyze_chunk_screenshots(
     # 限制截图数量，直接截断
     if len(screenshots) > MAX_SCREENSHOTS_PER_CHUNK:
         screenshots = screenshots[:MAX_SCREENSHOTS_PER_CHUNK]
-        logger.warning(f"截图数量超过 {MAX_SCREENSHOTS_PER_CHUNK}，已截断至 {len(screenshots)} 张")
+        logger.warning("截图数量超过 %s，已截断至 %s 张", MAX_SCREENSHOTS_PER_CHUNK, len(screenshots))
 
     # 准备图片消息
     content_parts = []
@@ -323,17 +323,17 @@ async def analyze_chunk_screenshots(
                         "type": "text",
                         "text": f"[{img_idx}] | timestamp: {captured_at} app: {app} | title: {title}"
                     })
-                    logger.debug(f"[{img_idx}] | timestamp: {captured_at} app: {app} | title: {title} (首张截图，保留)")
+                    logger.debug("[%s] | timestamp: %s app: %s | title: %s (首张截图，保留)", img_idx, captured_at, app, title)
                     img_idx += 1
             else:
                 # 非第一张截图：用文字替换
-                logger.debug(f"截图 {sc['file_path']} 被忽略，app: {app}")
+                logger.debug("截图 %s 被忽略，app: %s", sc['file_path'], app)
                 category_name = category_info['category_name'] or "未分类"
                 content_parts.append({
                     "type": "text",
                     "text": f"[无截图] timestamp: {captured_at} | app: {app} | title: {title} | category: {category_name} | description: {category_info['app_description']}"
                 })
-                logger.debug(f"[无截图] timestamp: {captured_at} | app: {app} | title: {title} | category: {category_name} | description: {category_info['app_description']}")
+                logger.debug("[无截图] timestamp: %s | app: %s | title: %s | category: %s | description: %s", captured_at, app, title, category_name, category_info['app_description'])
             continue
 
         # 不忽略，正常处理图片
@@ -348,7 +348,7 @@ async def analyze_chunk_screenshots(
                 "type": "text",
                 "text": f"[{img_idx}] | timestamp: {captured_at} app: {app} | title: {title}"
             })
-            logger.debug(f"[{img_idx}] | timestamp: {captured_at} app: {app} | title: {title}")
+            logger.debug("[%s] | timestamp: %s app: %s | title: %s", img_idx, captured_at, app, title)
             img_idx += 1
 
     # 构建 user content
@@ -398,7 +398,7 @@ async def analyze_chunk_screenshots(
                 raw_response="(empty response)"
             )
     except ValueError as e:
-        logger.error(f"截图分析参数错误: chunk={chunk}, error={e}")
+        logger.error("截图分析参数错误: chunk=%s, error=%s", chunk, e)
         raise
     except LLMResponseError:
         raise
@@ -447,12 +447,12 @@ async def screenshot_analysis(
     """
     # 根据频率等级获取chunk大小
     chunk_minutes = CHUNK_MINUTES_BY_LEVEL.get(frequency_level, 10)
-    logger.info(f"开始截图语义分析: {start_time} -> {end_time}, 频率等级={frequency_level}, chunk大小={chunk_minutes}分钟")
+    logger.info("开始截图语义分析: %s -> %s, 频率等级=%s, chunk大小=%s分钟", start_time, end_time, frequency_level, chunk_minutes)
 
     # Step 1: 查询活动日志
     provider = LWBaseDataProvider()
     logs, total = provider.get_activity_logs(start_time=start_time, end_time=end_time)
-    logger.info(f"查询到 {total} 条行为记录")
+    logger.info("查询到 %s 条行为记录", total)
 
     adapted_logs = []
     for log in logs:
@@ -476,14 +476,14 @@ async def screenshot_analysis(
         bucket_minutes=10,  # 与原来的 TIME_BUCKET_MINUTES 保持一致
         max_bridge_buckets=1,  # 与原来的 MAX_BRIDGE_BUCKETS 保持一致
     )
-    logger.info(f"获取到 {len(high_density_segments)} 个高密度时间段, {high_density_segments}")
+    logger.info("获取到 %s 个高密度时间段, %s", len(high_density_segments), high_density_segments)
 
     # Step 3: 切分为 chunk
     all_chunks = []
     for seg in high_density_segments:
         chunks = split_segment_into_chunks(seg, chunk_minutes)
         all_chunks.extend(chunks)
-    logger.info(f"切分为 {len(all_chunks)} 个 {chunk_minutes} 分钟块")
+    logger.info("切分为 %s 个 %s 分钟块", len(all_chunks), chunk_minutes)
 
     # Step 4: 分析每个 chunk
     results = []
@@ -497,8 +497,8 @@ async def screenshot_analysis(
         screen_count = len(screenshots)
 
         logger.info(
-            f"[{i}/{len(all_chunks)}] {chunk_start} -> {chunk_end}, "
-            f"截图数量: {screen_count}"
+            "[%s/%s] %s -> %s, 截图数量: %s",
+            i, len(all_chunks), chunk_start, chunk_end, screen_count
         )
 
         if not screenshots:
@@ -518,7 +518,7 @@ async def screenshot_analysis(
             if analysis_result:
                 results.append(analysis_result)
 
-    logger.info(f"截图语义分析完成，共分析 {len(results)} 个 chunk")
+    logger.info("截图语义分析完成，共分析 %s 个 chunk", len(results))
     return results
 
 

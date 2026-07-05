@@ -48,7 +48,7 @@ class PlanDocAggregator:
                 )
                 return cursor.fetchone()[0]
         except Exception as e:
-            logger.error(f"获取下一个 order_index 失败 (goal_id={goal_id}): {e}")
+            logger.error("获取下一个 order_index 失败: goal_id=%s, error=%s", goal_id, e)
             raise DataAccessError(
                 message=f"获取下一个 order_index 失败",
                 details={"goal_id": goal_id, "error": str(e)}

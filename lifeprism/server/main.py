@@ -135,7 +135,8 @@ _log_startup_time("  - resource_initializer.initialize_resources", _import_start
 
 _step_start = _log_startup_time("[OK] Database modules imported", _step_start)
 
-logger = logging.getLogger(__name__)
+from lifeprism.utils import get_logger
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -159,7 +160,7 @@ async def lifespan(app: FastAPI):
         initialize_resources()
         _log_startup_time("[OK] Resource files init (initialize_resources)", _resource_start)
     except Exception as e:
-        logger.warning(f"资源文件初始化失败（非致命）: {e}")
+        logger.warning("资源文件初始化失败（非致命）: error=%s", e)
 
     # 启动时：初始化数据库表结构
     logger.info("正在初始化 LifeWatch 数据库...")
@@ -188,7 +189,7 @@ async def lifespan(app: FastAPI):
                 app.state.monitor_process = start_monitor_process()
                 logger.info("内置监控进程启动成功")
             except Exception as e:
-                logger.error(f"启动内置监控进程失败: {e}")
+                logger.error("启动内置监控进程失败: error=%s", e)
                 app.state.monitor_process = None
         else:
             app.state.monitor_process = None
@@ -199,7 +200,7 @@ async def lifespan(app: FastAPI):
             await wechat_channel.start()
             logger.info("微信渠道启动成功")
         except Exception as e:
-            logger.error(f"启动微信渠道失败: {e}")
+            logger.error("启动微信渠道失败: error=%s", e)
 
         _total_lifespan = (time.perf_counter() - _startup_timer) * 1000
         print(f"\n{'='*60}")
@@ -208,7 +209,7 @@ async def lifespan(app: FastAPI):
         
         logger.info("[DONE] Database initialized successfully")
     except Exception as e:
-        logger.error(f"[ERROR] Database init failed: {e}")
+        logger.error("[ERROR] Database init failed: error=%s", e)
         raise
     
     
@@ -221,7 +222,7 @@ async def lifespan(app: FastAPI):
         schedule_service.start()
         logger.info("[STARTUP] ScheduleService started")
     except Exception as e:
-        logger.error(f"启动定时任务服务失败: {e}")
+        logger.error("启动定时任务服务失败: error=%s", e)
 
     # 初始化 ChatBot 服务和 AgentLoop
     from lifeprism.llm.agent.loop import agent_loop
@@ -236,7 +237,7 @@ async def lifespan(app: FastAPI):
     if hasattr(app.state, "monitor_process") and app.state.monitor_process:
         proc = app.state.monitor_process
         if proc.is_alive():
-            logger.info(f"正在终止监控进程 (PID: {proc.pid})...")
+            logger.info("正在终止监控进程 (PID: %s)...", proc.pid)
             proc.terminate()
             proc.join(timeout=5)
             if proc.is_alive():
@@ -260,14 +261,14 @@ async def lifespan(app: FastAPI):
         schedule_service.shutdown()
         logger.info("[SHUTDOWN] ScheduleService stopped")
     except Exception as e:
-        logger.warning(f"定时任务服务关闭时出现警告: {e}")
+        logger.warning("定时任务服务关闭时出现警告: error=%s", e)
 
     # 关闭时：清理 ChatBot 资源
     try:
         from lifeprism.server.services.chatbot_service import chatbot_service
         await chatbot_service.shutdown()
     except Exception as e:
-        logger.warning(f"ChatBot 服务关闭时出现警告: {e}")
+        logger.warning("ChatBot 服务关闭时出现警告: error=%s", e)
 
 # ==================== 创建 FastAPI 应用实例 ====================
 print("[STARTUP] 正在创建 FastAPI 应用实例...")
@@ -344,11 +345,17 @@ async def lw_base_error_handler(request: Request, exc: LWBaseError):
     - ExternalServiceError → 503
     """
     http_exc = to_http_exception(exc)
-    log_msg = f"{type(exc).__name__}: {exc.message} (code={exc.code}, path={request.url.path})"
     if http_exc.status_code < 500:
-        logger.warning(log_msg)
+        logger.warning(
+            "%s: %s (code=%s, path=%s)",
+            type(exc).__name__, exc.message, exc.code, request.url.path
+        )
     else:
-        logger.error(log_msg, exc_info=True)
+        logger.error(
+            "%s: %s (code=%s, path=%s)",
+            type(exc).__name__, exc.message, exc.code, request.url.path,
+            exc_info=True
+        )
     return JSONResponse(
         status_code=http_exc.status_code,
         content=http_exc.detail,
@@ -359,7 +366,8 @@ async def lw_base_error_handler(request: Request, exc: LWBaseError):
 async def global_exception_handler(request: Request, exc: Exception):
     """全局兜底异常处理器 → 500。捕获所有非 LWBaseError 的未知异常。"""
     logger.error(
-        f"未处理的异常: {type(exc).__name__}: {str(exc)} (路径: {request.url.path})",
+        "未处理的异常: type=%s, error=%s, path=%s",
+        type(exc).__name__, str(exc), request.url.path,
         exc_info=True
     )
     return JSONResponse(
@@ -487,10 +495,10 @@ def find_available_port(config_path: str = None) -> int:
     # 按顺序尝试端口
     for port in fallback_list:
         if is_port_available(port):
-            logger.info(f"[STARTUP] 端口 {port} 可用")
+            logger.info("[STARTUP] 端口 %s 可用", port)
             return port
         else:
-            logger.warning(f"[STARTUP] 端口 {port} 被占用，尝试下一个...")
+            logger.warning("[STARTUP] 端口 %s 被占用，尝试下一个...", port)
 
     # 所有端口都被占用，返回默认端口（让 uvicorn 报错）
     print(f"[STARTUP] 警告：所有备用端口都被占用，将尝试使用端口 {default_port}")

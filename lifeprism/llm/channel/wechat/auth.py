@@ -57,7 +57,7 @@ class WechatAuth:
             token = keyring.get_password(KEYRING_SERVICE_NAME, KEYRING_WECHAT_TOKEN_USERNAME)
             return token if token else ""
         except (keyring.errors.KeyringError, OSError) as e:
-            logger.debug(f"从 keyring 加载 token 失败: {e}")
+            logger.debug("从 keyring 加载 token 失败: %s", e)
             return ""
 
     @staticmethod
@@ -75,7 +75,7 @@ class WechatAuth:
             logger.info("Token 已保存到 keyring")
             return True
         except (keyring.errors.KeyringError, OSError) as e:
-            logger.error(f"保存 token 到 keyring 失败: {e}", exc_info=True)
+            logger.error("保存 token 到 keyring 失败: %s", e, exc_info=True)
             return False
 
     def _save_state_to_file(self, state: dict[str, Any]) -> None:
@@ -108,7 +108,7 @@ class WechatAuth:
         except keyring.errors.PasswordDeleteError:
             logger.debug("Keyring 中没有 token")
         except (keyring.errors.KeyringError, OSError) as e:
-            logger.error(f"从 keyring 删除 token 失败: {e}", exc_info=True)
+            logger.error("从 keyring 删除 token 失败: %s", e, exc_info=True)
             success = False
         # 2. 从文件删除（如果存在）
         if self.state_file.exists():
@@ -119,7 +119,7 @@ class WechatAuth:
                     self._save_state_to_file(file_state)
                     logger.info("已从文件删除 token")
             except (OSError, json.JSONDecodeError, TypeError) as e:
-                logger.error(f"从文件删除 token 失败: {e}", exc_info=True)
+                logger.error("从文件删除 token 失败: %s", e, exc_info=True)
                 success = False
 
         return success
@@ -170,7 +170,7 @@ class WechatAuth:
                         self._save_state_to_file(file_state)
                         logger.info("文件中的旧 token 已清理")
                     except (OSError, TypeError) as e:
-                        logger.warning(f"清理文件中的旧 token 失败: {e}")
+                        logger.warning("清理文件中的旧 token 失败: %s", e)
 
                 # 加载用户数据（支持新旧格式）
                 # 新格式：user_data = {user_id: {"context_token": "xxx", "last_session_id": "xxx"}}
@@ -194,22 +194,22 @@ class WechatAuth:
                         self._save_state_to_file(new_file_state)
                         logger.info("已将旧格式迁移并保存为新格式")
                     except (OSError, TypeError) as e:
-                        logger.warning(f"迁移后保存失败: {e}")
+                        logger.warning("迁移后保存失败: %s", e)
                 else:
                     # 空数据
                     state["user_data"] = {}
 
             except json.JSONDecodeError as e:
-                logger.error(f"状态文件格式错误: {e}", exc_info=True)
+                logger.error("状态文件格式错误: %s", e, exc_info=True)
                 # 尝试备份损坏的文件
                 try:
                     backup_path = self.state_file.with_suffix('.json.backup')
                     self.state_file.rename(backup_path)
-                    logger.info(f"已备份损坏的状态文件到: {backup_path}")
+                    logger.info("已备份损坏的状态文件到: %s", backup_path)
                 except OSError:
                     pass
             except OSError as e:
-                logger.error(f"加载状态文件失败: {e}", exc_info=True)
+                logger.error("加载状态文件失败: %s", e, exc_info=True)
 
         return state
 
@@ -267,7 +267,7 @@ class WechatAuth:
             start_time = asyncio.get_event_loop().time()
             while True:
                 if asyncio.get_event_loop().time() - start_time > timeout:
-                    logger.error(f"登录超时（{timeout}秒）")
+                    logger.error("登录超时（%s秒）", timeout)
                     return False
 
                 status_data = await self.client.api_get(
@@ -288,7 +288,7 @@ class WechatAuth:
                             logger.info("登录成功")
                             return True
                         except (OSError, TypeError) as e:
-                            logger.error(f"保存登录状态失败: {e}")
+                            logger.error("保存登录状态失败: %s", e)
                             return False
                 elif status == "expired":
                     logger.error("QR 码已过期")
@@ -298,8 +298,8 @@ class WechatAuth:
 
                 await asyncio.sleep(1)
         except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
-            logger.error(f"登录网络错误: {e}", exc_info=True)
+            logger.error("登录网络错误: error=%s", e, exc_info=True)
             raise WechatAuthError(f"登录失败: {e}") from e
         except (KeyError, ValueError) as e:
-            logger.error(f"登录响应解析错误: {e}", exc_info=True)
+            logger.error("登录响应解析错误: error=%s", e, exc_info=True)
             raise WechatAuthError(f"登录响应格式错误: {e}") from e

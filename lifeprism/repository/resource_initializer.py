@@ -39,7 +39,7 @@ def initialize_resources() -> None:
     config_path = settings.config_base_path
 
     if not templates_dir.exists():
-        logger.warning(f"内嵌 templates 目录不存在，跳过资源初始化: {templates_dir}")
+        logger.warning("内嵌 templates 目录不存在，跳过资源初始化: %s", templates_dir)
         return
 
     # 记录初始化前 agent/chat 目录是否已存在，用于决定是否跳过 bootstrap.md 复制
@@ -62,12 +62,12 @@ def initialize_resources() -> None:
         if rel.parts[0] in OVERWRITE_DIR_LIST:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
-            logger.info(f"已强制覆盖资源文件: {target}")
+            logger.info("已强制覆盖资源文件: %s", target)
             continue
 
         # 特殊处理：如果 agent/chat 目录在初始化前已存在，跳过复制 bootstrap.md
         if str(rel) == "agent/chat/bootstrap.md" and agent_chat_existed_before:
-            logger.info(f"agent/chat 目录已存在，跳过复制 bootstrap.md: {target}")
+            logger.info("agent/chat 目录已存在，跳过复制 bootstrap.md: %s", target)
             continue
 
         if target.exists():
@@ -75,4 +75,4 @@ def initialize_resources() -> None:
 
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
-        logger.info(f"已初始化资源文件: {target}")
+        logger.info("已初始化资源文件: %s", target)

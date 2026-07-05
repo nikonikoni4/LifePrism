@@ -40,10 +40,10 @@ def run_migrations(db_path: str) -> None:
         pending = [m for m in MIGRATIONS if m.VERSION > current_version]
 
         if not pending:
-            logger.info(f"数据库版本 v{current_version}，无待执行迁移")
+            logger.info("数据库版本 v%s，无待执行迁移", current_version)
             return
 
-        logger.info(f"数据库版本 v{current_version}，待执行 {len(pending)} 个迁移")
+        logger.info("数据库版本 v%s，待执行 %s 个迁移", current_version, len(pending))
 
         # 备份数据库
         _backup_database(db_file, current_version)
@@ -52,7 +52,7 @@ def run_migrations(db_path: str) -> None:
         for migration in pending:
             _execute_migration(conn, migration)
 
-        logger.info(f"所有迁移执行完成，当前版本 v{pending[-1].VERSION}")
+        logger.info("所有迁移执行完成，当前版本 v%s", pending[-1].VERSION)
     finally:
         conn.close()
 
@@ -87,7 +87,7 @@ def _backup_database(db_file: Path, current_version: int) -> None:
             conn.close()
 
         shutil.copy2(str(db_file), str(backup_path))
-        logger.info(f"数据库已备份: {backup_path.name}")
+        logger.info("数据库已备份: %s", backup_path.name)
     except Exception as e:
         raise RuntimeError(f"数据库备份失败，迁移中止: {e}") from e
 
@@ -101,7 +101,7 @@ def _cleanup_old_backups(db_file: Path, keep: int = 3) -> None:
     backups = sorted(db_file.parent.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
     for old_backup in backups[keep:]:
         old_backup.unlink()
-        logger.info(f"清理旧备份: {old_backup.name}")
+        logger.info("清理旧备份: %s", old_backup.name)
 
 
 def _execute_migration(conn: sqlite3.Connection, migration) -> None:
@@ -116,11 +116,11 @@ def _execute_migration(conn: sqlite3.Connection, migration) -> None:
     try:
         already_applied = migration.check_if_applied(cursor)
         if already_applied:
-            logger.info(f"迁移 v{migration.VERSION} ({migration.NAME}) 已生效，补录版本记录")
+            logger.info("迁移 v%s (%s) 已生效，补录版本记录", migration.VERSION, migration.NAME)
         else:
-            logger.info(f"执行迁移 v{migration.VERSION} ({migration.NAME})...")
+            logger.info("执行迁移 v%s (%s)...", migration.VERSION, migration.NAME)
             migration.upgrade(cursor)
-            logger.info(f"迁移 v{migration.VERSION} ({migration.NAME}) 执行成功")
+            logger.info("迁移 v%s (%s) 执行成功", migration.VERSION, migration.NAME)
 
         cursor.execute(
             "INSERT OR IGNORE INTO schema_version (version, name) VALUES (?, ?)",

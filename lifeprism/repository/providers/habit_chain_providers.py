@@ -98,7 +98,7 @@ class HabitChainProvider(LWBaseDataProvider):
                 ),
             )
             chain_id = cursor.lastrowid
-            logger.info(f"创建链条成功: {chain_id}")
+            logger.info("创建链条成功: %s", chain_id)
             return chain_id
 
     def get_chain_by_id(self, chain_id: int) -> Optional[Dict[str, Any]]:
@@ -154,7 +154,7 @@ class HabitChainProvider(LWBaseDataProvider):
         # 白名单验证
         invalid_fields = set(update_data.keys()) - self._UPDATE_FIELDS
         if invalid_fields:
-            logger.warning(f"忽略非法更新字段: {invalid_fields}")
+            logger.warning("忽略非法更新字段: %s", invalid_fields)
             update_data = {k: v for k, v in update_data.items() if k in self._UPDATE_FIELDS}
 
         if not update_data:
@@ -182,7 +182,7 @@ class HabitChainProvider(LWBaseDataProvider):
             conn.execute(
                 "DELETE FROM habit_chains WHERE id = ?", (chain_id,)
             )
-        logger.info(f"删除链条 {chain_id} 及其节点成功")
+        logger.info("删除链条 %s 及其节点成功", chain_id)
         return True
 
 
@@ -268,7 +268,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
                 ),
             )
             node_id = cursor.lastrowid
-            logger.info(f"创建节点成功: {node_id}")
+            logger.info("创建节点成功: %s", node_id)
             return node_id
 
     def get_nodes_by_chain(self, chain_id: int) -> List[Dict[str, Any]]:
@@ -324,7 +324,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         # 白名单验证
         invalid_fields = set(update_data.keys()) - self._UPDATE_FIELDS
         if invalid_fields:
-            logger.warning(f"忽略非法更新字段: {invalid_fields}")
+            logger.warning("忽略非法更新字段: %s", invalid_fields)
             update_data = {k: v for k, v in update_data.items() if k in self._UPDATE_FIELDS}
 
         if not update_data:
@@ -344,7 +344,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         """
         success = self._generic_delete(node_id)
         if success:
-            logger.info(f"删除节点 {node_id} 成功")
+            logger.info("删除节点 %s 成功", node_id)
         return success
 
     def batch_update_sort_order(self, updates: List[Dict[str, Any]]) -> bool:
@@ -364,7 +364,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
                     "UPDATE habit_chain_nodes SET sort_order = ?, updated_at = ? WHERE id = ?",
                     (item["sort_order"], now, item["node_id"]),
                 )
-        logger.info(f"批量更新 {len(updates)} 个节点排序成功")
+        logger.info("批量更新 %s 个节点排序成功", len(updates))
         return True
 
     def increment_sort_order_after(self, chain_id: int, after_order: int) -> bool:
@@ -404,7 +404,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
                 "UPDATE habit_chain_nodes SET habit_id = NULL WHERE habit_id = ?",
                 (habit_id,),
             )
-        logger.info(f"解除习惯 {habit_id} 与节点的关联")
+        logger.info("解除习惯 %s 与节点的关联", habit_id)
         return True
 
     # ==================== 跨表查询 ====================

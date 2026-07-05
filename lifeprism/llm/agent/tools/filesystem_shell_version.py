@@ -70,7 +70,7 @@ def _check_command_safety(command: str) -> Tuple[bool, str]:
         match = re.search(pattern, command, re.IGNORECASE)
         if match:
             matched = match.group()
-            logger.warning(f"检测到高危命令: {matched} in command: {command}")
+            logger.warning("检测到高危命令: %s in command: %s", matched, command)
             return False, f"检测到高危命令模式: {matched}，已阻止执行"
 
     return True, ""
@@ -92,7 +92,7 @@ class _FileTool(Tool):
 
     def __init__(self):
         self.allowed_dir_path: list[Path] = settings.allowed_dir_path
-        logger.debug(f"允许的工作目录: {self.allowed_dir_path}")
+        logger.debug("允许的工作目录: %s", self.allowed_dir_path)
         
     
     
@@ -247,7 +247,7 @@ def _read_file(
         # 读取文件所有行
         file_path_obj = Path(file_path)
         if not file_path_obj.exists():
-            logger.warning(f"文件不存在: {file_path}")
+            logger.warning("文件不存在: %s", file_path)
             return {
                 "content": "",
                 "read_ratio": 0.0,
@@ -289,9 +289,8 @@ def _read_file(
             last_line = len(frontmatter_lines) - 1 if frontmatter_lines else -1
 
             logger.debug(
-                f"读取文件 {file_path} frontmatter: "
-                f"字符数 {len(content)}/{total_chars}, "
-                f"比例 {read_ratio:.2%}"
+                "读取文件 %s frontmatter: 字符数 %s/%s, 比例 %.2f%%",
+                file_path, len(content), total_chars, read_ratio * 100
             )
 
             return {
@@ -306,7 +305,7 @@ def _read_file(
 
         # 处理行号范围
         if start_line >= total_body_lines:
-            logger.debug(f"start_line ({start_line}) 超出文件行数 ({total_body_lines})")
+            logger.debug("start_line (%s) 超出文件行数 (%s)", start_line, total_body_lines)
             return {
                 "content": "",
                 "read_ratio": 0.0,
@@ -319,7 +318,7 @@ def _read_file(
 
         # 检查行号范围有效性
         if start_line > actual_end_line:
-            logger.debug(f"start_line ({start_line}) > end_line ({actual_end_line})")
+            logger.debug("start_line (%s) > end_line (%s)", start_line, actual_end_line)
             return {
                 "content": "",
                 "read_ratio": 0.0,
@@ -347,10 +346,8 @@ def _read_file(
         read_ratio = len(content) / total_body_chars if total_body_chars > 0 else 0.0
 
         logger.debug(
-            f"读取文件 {file_path}: "
-            f"行范围 [{start_line}, {actual_last_line}], "
-            f"字符数 {len(content)}/{total_body_chars}, "
-            f"比例 {read_ratio:.2%}"
+            "读取文件 %s: 行范围 [%s, %s], 字符数 %s/%s, 比例 %.2f%%",
+            file_path, start_line, actual_last_line, len(content), total_body_chars, read_ratio * 100
         )
 
         return {
@@ -360,7 +357,7 @@ def _read_file(
         }
 
     except UnicodeDecodeError as e:
-        logger.error(f"文件编码错误 {file_path}: {e}")
+        logger.error("文件编码错误 %s: %s", file_path, e)
         return {
             "content": "",
             "read_ratio": 0.0,
@@ -368,7 +365,7 @@ def _read_file(
             "error": f"文件编码错误: {str(e)}"
         }
     except Exception as e:
-        logger.error(f"读取文件 {file_path} 时出错: {e}")
+        logger.error("读取文件 %s 时出错: %s", file_path, e)
         return {
             "content": "",
             "read_ratio": 0.0,
@@ -462,7 +459,7 @@ def _replace_content(
         # 检查文件是否存在
         file_path_obj = Path(file_path)
         if not file_path_obj.exists():
-            logger.warning(f"文件不存在: {file_path}")
+            logger.warning("文件不存在: %s", file_path)
             return {"error": f"文件 {file_path} 不存在"}
 
         # 读取文件全部内容
@@ -471,7 +468,7 @@ def _replace_content(
 
         # 检查 old_content 是否存在
         if old_content not in original_content:
-            logger.warning(f"未找到要替换的内容: {file_path}")
+            logger.warning("未找到要替换的内容: %s", file_path)
             return {"error": "未找到要替换的内容"}
 
         # 计算匹配次数
@@ -504,13 +501,13 @@ def _replace_content(
         }
 
     except UnicodeDecodeError as e:
-        logger.error(f"文件编码错误 {file_path}: {e}")
+        logger.error("文件编码错误 %s: %s", file_path, e)
         return {"error": f"文件编码错误: {str(e)}"}
     except PermissionError as e:
-        logger.error(f"没有权限写入文件 {file_path}: {e}")
+        logger.error("没有权限写入文件 %s: %s", file_path, e)
         return {"error": f"没有权限写入文件: {str(e)}"}
     except Exception as e:
-        logger.error(f"更新文件 {file_path} 时出错: {e}")
+        logger.error("更新文件 %s 时出错: %s", file_path, e)
         return {"error": f"更新文件时出错: {str(e)}"}
 
 class EditFileTool(_FileTool):
@@ -705,7 +702,7 @@ class FileTreeTool(_FileTool):
         # 安全检查：防止命令注入
         is_safe, error_msg = _check_command_safety(cmd)
         if not is_safe:
-            logger.error(f"FileTreeTool 命令安全检查失败: {error_msg}")
+            logger.error("FileTreeTool 命令安全检查失败: %s", error_msg)
             return f"{ERROR}{error_msg}"
 
         try:
@@ -722,7 +719,7 @@ class FileTreeTool(_FileTool):
 
             if process.returncode != 0:
                 error_msg = stderr.strip()
-                logger.error(f"执行 PowerShell 命令失败: {error_msg}")
+                logger.error("执行 PowerShell 命令失败: %s", error_msg)
                 return f"{ERROR}执行命令失败: {error_msg}"
 
             output = stdout.strip()
@@ -731,12 +728,12 @@ class FileTreeTool(_FileTool):
                 return f"{SUCCESS}目录: {dir_path_obj}\n(空目录)"
 
             result = f"目录: {dir_path_obj}\n{output}"
-            logger.debug(f"获取文件树 {dir_path} 成功")
+            logger.debug("获取文件树 %s 成功", dir_path)
 
             return f"{SUCCESS}{result}"
 
         except Exception as e:
-            logger.error(f"获取文件树 {dir_path} 时出错: {e}")
+            logger.error("获取文件树 %s 时出错: %s", dir_path, e)
             return f"{ERROR}获取文件树时出错: {str(e)}"
 
 
@@ -857,7 +854,7 @@ async def _search_files(
             # 安全检查：防止命令注入
             is_safe, error_msg = _check_command_safety(shell_cmd)
             if not is_safe:
-                logger.error(f"SearchFileTool 命令安全检查失败: {error_msg}")
+                logger.error("SearchFileTool 命令安全检查失败: %s", error_msg)
                 continue  # 跳过这个目录，继续搜索其他目录
 
             try:
@@ -878,7 +875,7 @@ async def _search_files(
                     )
 
                 except asyncio.TimeoutError:
-                    logger.warning(f"搜索目录 {allowed_dir} 超时")
+                    logger.warning("搜索目录 %s 超时", allowed_dir)
                     try:
                         process.kill()
                         await process.wait()
@@ -898,13 +895,13 @@ async def _search_files(
                                 break
 
             except Exception as e:
-                logger.warning(f"搜索目录 {allowed_dir} 时出错: {e}")
+                logger.warning("搜索目录 %s 时出错: %s", allowed_dir, e)
                 continue
 
             if len(matched_files) >= max_results:
                 break
 
-        logger.debug(f"搜索文件 '{file_name}': 找到 {len(matched_files)} 个匹配项")
+        logger.debug("搜索文件 '%s': 找到 %s 个匹配项", file_name, len(matched_files))
 
         return {
             "files": matched_files,
@@ -912,7 +909,7 @@ async def _search_files(
         }
 
     except Exception as e:
-        logger.error(f"搜索文件 '{file_name}' 时出错: {e}")
+        logger.error("搜索文件 '%s' 时出错: %s", file_name, e)
         return {"error": f"搜索文件时出错: {str(e)}"}
 
 # ==========================================
@@ -1023,7 +1020,7 @@ async def _search_string(
         # 检查路径是否存在
         path_obj = Path(path)
         if not path_obj.exists():
-            logger.warning(f"路径不存在: {path}")
+            logger.warning("路径不存在: %s", path)
             return {"error": f"路径 {path} 不存在"}
 
         # 构建 PowerShell 命令
@@ -1041,13 +1038,13 @@ async def _search_string(
         if context_lines > 0:
             cmd += f" -Context {context_lines}"
 
-        logger.debug(f"执行搜索命令: {cmd}")
+        logger.debug("执行搜索命令: %s", cmd)
 
         # 安全检查：防止命令注入
         full_cmd = f"powershell.exe -NoProfile -Command \"{cmd}\""
         is_safe, error_msg = _check_command_safety(full_cmd)
         if not is_safe:
-            logger.error(f"SearchStringTool 命令安全检查失败: {error_msg}")
+            logger.error("SearchStringTool 命令安全检查失败: %s", error_msg)
             return {"error": error_msg}
 
         # 异步执行命令
@@ -1062,19 +1059,19 @@ async def _search_string(
 
         # 检查错误
         if process.returncode != 0 and stderr:
-            logger.error(f"搜索命令执行失败: {stderr}")
+            logger.error("搜索命令执行失败: %s", stderr)
             return {"error": f"搜索失败: {stderr}"}
 
         # 如果没有匹配结果
         if not stdout.strip():
-            logger.debug(f"未找到匹配项: pattern={pattern}, path={path}")
+            logger.debug("未找到匹配项: pattern=%s, path=%s", pattern, path)
             return {"result": "未找到匹配项"}
 
-        logger.debug(f"搜索完成: pattern={pattern}, path={path}")
+        logger.debug("搜索完成: pattern=%s, path=%s", pattern, path)
         return {"result": stdout}
 
     except Exception as e:
-        logger.error(f"搜索字符串时出错: {e}")
+        logger.error("搜索字符串时出错: %s", e)
         return {"error": f"搜索时出错: {str(e)}"}
 
 

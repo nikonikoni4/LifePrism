@@ -61,9 +61,9 @@ class GoalService:
                 if goal_id and name:
                     self.goal_name_map[goal_id] = name
             
-            logger.debug(f"刷新目标缓存成功，共 {len(self.goal_name_map)} 个目标")
+            logger.debug("刷新目标缓存成功，共 %s 个目标", len(self.goal_name_map))
         except Exception as e:
-            logger.error(f"刷新目标缓存失败: {e}")
+            logger.error("刷新目标缓存失败: %s", e)
     
     def _get_category_name(self, category_id: Optional[str]) -> Optional[str]:
         """
@@ -143,7 +143,7 @@ class GoalService:
                 ]
             return []
         except Exception as e:
-            logger.error(f"解析里程碑失败: {e}")
+            logger.error("解析里程碑失败: %s", e)
             return []
 
     def _get_journals_for_goal(self, goal_id: str) -> List[JournalEntry]:
@@ -171,7 +171,7 @@ class GoalService:
                 for j in journals
             ]
         except Exception as e:
-            logger.error(f"获取目标 {goal_id} 的日志失败: {e}")
+            logger.error("获取目标 %s 的日志失败: %s", goal_id, e)
             return []
 
     def _should_update_time_invested(self, item: Dict[str, Any]) -> bool:
@@ -229,7 +229,7 @@ class GoalService:
         # 更新内存中的记录
         item['time_invested'] = time_invested
         item['time_invested_updated_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        logger.debug(f"自动更新目标 {goal_id} 投入时间: {time_invested} 秒")
+        logger.debug("自动更新目标 %s 投入时间: %s 秒", goal_id, time_invested)
 
         return item
 
@@ -247,7 +247,7 @@ class GoalService:
             # 检查目标是否存在
             item = self.goal_repository.get_goal_by_id(goal_id)
             if not item:
-                logger.warning(f"刷新投入时间失败：目标 {goal_id} 不存在")
+                logger.warning("刷新投入时间失败：目标 %s 不存在", goal_id)
                 return None
 
             # 计算并更新
@@ -255,12 +255,12 @@ class GoalService:
             success = self.goal_repository.update_time_invested(goal_id, time_invested)
 
             if success:
-                logger.info(f"手动刷新目标 {goal_id} 投入时间: {time_invested} 秒")
+                logger.info("手动刷新目标 %s 投入时间: %s 秒", goal_id, time_invested)
                 return time_invested
             return None
 
         except Exception as e:
-            logger.error(f"刷新目标 {goal_id} 投入时间失败: {e}")
+            logger.error("刷新目标 %s 投入时间失败: %s", goal_id, e)
             return None
     
     def get_goal_name(self, goal_id: str) -> Optional[str]:
@@ -509,7 +509,7 @@ class GoalService:
                 break
 
         if not updated:
-            logger.warning(f"未找到里程碑 {milestone_id}")
+            logger.warning("未找到里程碑 %s", milestone_id)
             return None
 
         # 保存更新

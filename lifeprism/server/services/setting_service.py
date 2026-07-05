@@ -60,7 +60,7 @@ def update_settings(request: UpdateSettingsRequest) -> SettingItems:
     """
     updates = request.model_dump(exclude_none=True)
     if updates:
-        logger.info(f"更新配置: {list(updates.keys())}")
+        logger.info("更新配置: %s", list(updates.keys()))
 
         # 检查 screenshot_monitor 开启时的 is_vlm 校验
         if updates.get('screenshot_monitor') is True:
@@ -85,11 +85,11 @@ def update_settings(request: UpdateSettingsRequest) -> SettingItems:
 
         if provider_id and api_base is not None:
             settings.set_provider_api_base(provider_id, api_base)
-            logger.info(f"已更新 {provider_id} 的 API Base 历史")
+            logger.info("已更新 %s 的 API Base 历史", provider_id)
 
         if provider_id and model:
             settings.add_model_to_history(provider_id, model, api_base)
-            logger.info(f"已将模型 {model} 添加到 {provider_id} 的历史记录")
+            logger.info("已将模型 %s 添加到 %s 的历史记录", model, provider_id)
 
         settings.update(updates)
     return get_settings()
@@ -110,9 +110,9 @@ def update_api_key(api_key: str, provider_id: Optional[str] = None) -> bool:
     if provider_id:
         # 将显示名称转换为 provider_id（如果传入的是显示名称）
         actual_provider_id = provider_manager.get_provider_id(provider_id)
-        logger.info(f"正在更新 {actual_provider_id} 的 API Key...")
+        logger.info("正在更新 %s 的 API Key...", actual_provider_id)
         settings.set_api_key(api_key, actual_provider_id)
-        logger.info(f"{actual_provider_id} 的 API Key 已安全保存到系统密钥管理器")
+        logger.info("%s 的 API Key 已安全保存到系统密钥管理器", actual_provider_id)
     else:
         logger.info("正在更新 API Key...")
         settings.set('api_key', api_key)
@@ -161,7 +161,7 @@ def remove_model_from_history(provider_id: str, model: str) -> bool:
     """
     result = settings.remove_model_from_history(provider_id, model)
     if result:
-        logger.info(f"已从 {provider_id} 的历史记录中删除模型 {model}")
+        logger.info("已从 %s 的历史记录中删除模型 %s", provider_id, model)
     return result
 
 
@@ -308,7 +308,7 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
         try:
             lw_db_manager._close_connection_pool()
         except Exception as e:
-            logger.error(f"关闭连接池失败: {e}")
+            logger.error("关闭连接池失败: %s", e)
             return MigrateDataPathResponse(
                 success=False,
                 message=f"关闭数据库连接失败: {e}"
@@ -322,12 +322,12 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
                 dst = new_path / subdir
                 if src.exists() and src.is_dir():
                     shutil.copytree(str(src), str(dst), dirs_exist_ok=True)
-                    logger.info(f"已复制: {src} -> {dst}")
+                    logger.info("已复制: %s -> %s", src, dst)
                 else:
                     dst.mkdir(parents=True, exist_ok=True)
-                    logger.info(f"源目录不存在，已创建空目录: {dst}")
+                    logger.info("源目录不存在，已创建空目录: %s", dst)
         except Exception as e:
-            logger.error(f"复制数据失败: {e}")
+            logger.error("复制数据失败: %s", e)
             return MigrateDataPathResponse(
                 success=False,
                 message=f"复制数据失败: {e}"
@@ -338,9 +338,9 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
             new_path.mkdir(parents=True, exist_ok=True)
             for subdir in _get_subdirs_to_migrate(current_path):
                 (new_path / subdir).mkdir(parents=True, exist_ok=True)
-            logger.info(f"仅切换路径，已创建空目录结构: {new_path}")
+            logger.info("仅切换路径，已创建空目录结构: %s", new_path)
         except Exception as e:
-            logger.error(f"创建目录结构失败: {e}")
+            logger.error("创建目录结构失败: %s", e)
             return MigrateDataPathResponse(
                 success=False,
                 message=f"创建目录结构失败: {e}"
@@ -349,9 +349,9 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
     # 6. 更新配置（写入旧路径的 config.yaml，重启后后端会从中读取新路径）
     try:
         settings.update({"lifeprism_data_path": str(new_path)})
-        logger.info(f"数据迁移完成: {current_path} -> {new_path}")
+        logger.info("数据迁移完成: %s -> %s", current_path, new_path)
     except Exception as e:
-        logger.error(f"更新配置失败: {e}")
+        logger.error("更新配置失败: %s", e)
         return MigrateDataPathResponse(
             success=False,
             message=f"数据已复制但更新配置失败: {e}"
@@ -405,7 +405,7 @@ async def test_vlm_capability() -> dict:
         is_vlm_cache = settings.get('is_vlm', {})
         is_vlm_cache[key] = is_vlm
         settings.set('is_vlm', is_vlm_cache)
-        logger.info(f"VLM 能力测试完成: {key} = {is_vlm}")
+        logger.info("VLM 能力测试完成: %s = %s", key, is_vlm)
         cache_updated = True
 
     return {
@@ -437,22 +437,22 @@ async def get_qrcode(channel: str) -> dict:
     config = WechatConfig()
     base_url = config.base_url
 
-    logger.info(f"正在获取 {channel} 通道的 QR 码")
+    logger.info("正在获取 %s 通道的 QR 码", channel)
     async with WechatClient(base_url) as client:
         try:
             data = await client.api_get("ilink/bot/get_bot_qrcode", params={"bot_type": "3"}, auth=False)
         except Exception as e:
-            logger.error(f"获取 QR 码失败: {e}", exc_info=True)
+            logger.error("获取 QR 码失败: %s", e, exc_info=True)
             raise ValueError(f"获取 QR 码失败: {str(e)}")
 
         qrcode_id = data.get("qrcode", "")
         qrcode_img = data.get("qrcode_img_content", qrcode_id)
 
         if not qrcode_id:
-            logger.error(f"获取 QR 码失败，返回数据: {data}")
+            logger.error("获取 QR 码失败，返回数据: %s", data)
             raise ValueError("获取 QR 码失败")
 
-        logger.info(f"成功获取 QR 码，ID: {qrcode_id[:20]}...")
+        logger.info("成功获取 QR 码，ID: %s...", qrcode_id[:20])
         return {
             "qr_string": qrcode_img,
             "qrcode_id": qrcode_id
@@ -477,12 +477,12 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
     config = WechatConfig()
     base_url = config.base_url
 
-    logger.info(f"正在查询 QR 码状态: {qrcode_id[:20]}...")
+    logger.info("正在查询 QR 码状态: %s...", qrcode_id[:20])
     async with WechatClient(base_url) as client:
         try:
             data = await client.api_get("ilink/bot/get_qrcode_status", params={"qrcode": qrcode_id}, auth=False)
         except Exception as e:
-            logger.error(f"查询 QR 码状态失败: {e}", exc_info=True)
+            logger.error("查询 QR 码状态失败: %s", e, exc_info=True)
             raise ValueError(f"查询 QR 码状态失败: {str(e)}")
 
         raw_status = data.get("status", "")
@@ -497,7 +497,7 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
         }
         mapped_status = status_map.get(raw_status, "waiting")
 
-        logger.info(f"QR 码状态: {raw_status} -> {mapped_status}")
+        logger.info("QR 码状态: %s -> %s", raw_status, mapped_status)
 
         # 如果状态为 confirmed，保存 token
         if mapped_status == "confirmed":
@@ -516,7 +516,7 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
                     account_data = {"context_tokens": {}}
                     with open(account_file, "w", encoding="utf-8") as f:
                         json.dump(account_data, f, ensure_ascii=False, indent=2)
-                    logger.info(f"已保存 bot_token 到 keyring 和 context_tokens 到 {account_file}")
+                    logger.info("已保存 bot_token 到 keyring 和 context_tokens 到 %s", account_file)
                     
                 else:
                     # keyring 不可用，fallback 到文件存储
@@ -525,7 +525,7 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
                     with open(account_file, "w", encoding="utf-8") as f:
                         json.dump(account_data, f, ensure_ascii=False, indent=2)
 
-                    logger.info(f"已保存 bot_token 到 {account_file}（文件模式）")
+                    logger.info("已保存 bot_token 到 %s（文件模式）", account_file)
                     
 
                 # 启动微信channel

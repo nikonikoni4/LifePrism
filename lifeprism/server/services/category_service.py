@@ -120,7 +120,7 @@ class CategoryService:
             return CategoryTreeResponse(data=category_tree)
             
         except Exception as e:
-            logger.error(f"获取分类树失败: {e}")
+            logger.error("获取分类树失败: %s", e)
             raise
 
     def get_category_stats(self,
@@ -247,7 +247,7 @@ class CategoryService:
             )
             
         except Exception as e:
-            logger.error(f"获取分类状态失败: {e}")
+            logger.error("获取分类状态失败: %s", e)
             raise
     
     def _build_subcategory_stats(self,
@@ -450,7 +450,7 @@ class CategoryService:
             if not success:
                 raise Exception("插入数据库失败")
 
-            logger.info(f"成功创建分类: {category_id} - {name}")
+            logger.info("成功创建分类: %s - %s", category_id, name)
 
             # 刷新缓存
             self._refresh_cache()
@@ -463,7 +463,7 @@ class CategoryService:
             )
 
         except Exception as e:
-            logger.error(f"创建分类失败: {e}")
+            logger.error("创建分类失败: %s", e)
             raise
     
     def update_category(self, category_id: str, name: str, color: str) -> CategoryTreeItem:
@@ -503,7 +503,7 @@ class CategoryService:
             if not success:
                 raise Exception("更新数据库失败")
 
-            logger.info(f"成功更新分类: {category_id}")
+            logger.info("成功更新分类: %s", category_id)
 
             # 刷新缓存
             self._refresh_cache()
@@ -514,7 +514,7 @@ class CategoryService:
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"更新分类失败: {e}")
+            logger.error("更新分类失败: %s", e)
             raise
     
     def delete_category(self, category_id: str, reassign_to: str) -> bool:
@@ -544,7 +544,7 @@ class CategoryService:
             )
 
             if not behavior_logs.empty:
-                logger.info(f"找到 {len(behavior_logs)} 条关联记录，重新分配到 '{reassign_to}'")
+                logger.info("找到 %s 条关联记录，重新分配到 '%s'", len(behavior_logs), reassign_to)
                 self.db.update(
                     'user_app_behavior_log',
                     {'category_id': reassign_to, 'sub_category_id': 'untracked'},
@@ -556,7 +556,7 @@ class CategoryService:
             if not success:
                 raise Exception("删除数据库记录失败")
 
-            logger.info(f"成功删除分类: {category_id}")
+            logger.info("成功删除分类: %s", category_id)
 
             # 刷新缓存
             self._refresh_cache()
@@ -566,7 +566,7 @@ class CategoryService:
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"删除分类失败: {e}")
+            logger.error("删除分类失败: %s", e)
             raise
     
     def create_sub_category(self, category_id: str, name: str) -> SubCategoryTreeItem:
@@ -603,7 +603,7 @@ class CategoryService:
             if not success:
                 raise Exception("插入数据库失败")
 
-            logger.info(f"成功创建子分类: {sub_id} - {name}")
+            logger.info("成功创建子分类: %s - %s", sub_id, name)
 
             # 刷新缓存
             self._refresh_cache()
@@ -617,7 +617,7 @@ class CategoryService:
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"创建子分类失败: {e}")
+            logger.error("创建子分类失败: %s", e)
             raise
     
     def update_sub_category(self, category_id: str, sub_id: str, name: str) -> SubCategoryTreeItem:
@@ -654,7 +654,7 @@ class CategoryService:
             if not success:
                 raise Exception("更新数据库失败")
 
-            logger.info(f"成功更新子分类: {sub_id}")
+            logger.info("成功更新子分类: %s", sub_id)
 
             # 刷新缓存
             self._refresh_cache()
@@ -668,7 +668,7 @@ class CategoryService:
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"更新子分类失败: {e}")
+            logger.error("更新子分类失败: %s", e)
             raise
 
     def delete_sub_category(self, category_id: str, sub_id: str) -> bool:
@@ -706,7 +706,7 @@ class CategoryService:
             )
 
             if not behavior_logs.empty:
-                logger.info(f"找到 {len(behavior_logs)} 条关联记录，重新分配到 'untracked'")
+                logger.info("找到 %s 条关联记录，重新分配到 'untracked'", len(behavior_logs))
                 self.db.update(
                     'user_app_behavior_log',
                     {'sub_category_id': 'untracked'},
@@ -718,7 +718,7 @@ class CategoryService:
             if not success:
                 raise Exception("删除数据库记录失败")
 
-            logger.info(f"成功删除子分类: {sub_id}")
+            logger.info("成功删除子分类: %s", sub_id)
 
             # 刷新缓存
             self._refresh_cache()
@@ -728,7 +728,7 @@ class CategoryService:
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"删除子分类失败: {e}")
+            logger.error("删除子分类失败: %s", e)
             raise
     
     def _get_category_by_id(self, category_id: str) -> CategoryTreeItem:
@@ -818,7 +818,7 @@ class CategoryService:
             if not success:
                 raise Exception("更新数据库失败")
 
-            logger.info(f"成功切换分类 '{category_id}' 状态为 {state}")
+            logger.info("成功切换分类 '%s' 状态为 %s", category_id, state)
 
             # 同步更新 single_purpose_category_map和 multi_purpose_category_map 表的 state
             if state == 0:
@@ -837,7 +837,7 @@ class CategoryService:
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"切换分类状态失败: {e}")
+            logger.error("切换分类状态失败: %s", e)
             raise
     
     def toggle_sub_category_state(self, category_id: str, sub_id: str, state: int) -> SubCategoryTreeItem:
@@ -876,7 +876,7 @@ class CategoryService:
             if not success:
                 raise Exception("更新数据库失败")
 
-            logger.info(f"成功切换子分类 '{sub_id}' 状态为 {state}")
+            logger.info("成功切换子分类 '%s' 状态为 %s", sub_id, state)
 
             # 同步更新 single_purpose_category_map和 multi_purpose_category_map 表的 state
             if state == 0:
@@ -900,7 +900,7 @@ class CategoryService:
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"切换子分类状态失败: {e}")
+            logger.error("切换子分类状态失败: %s", e)
             raise
     
     # ==================== category_map_cache 状态同步方法 ====================
@@ -931,9 +931,9 @@ class CategoryService:
                 total_affected += cursor.rowcount
                 
                 conn.commit()
-                logger.info(f"禁用分类 '{category_id}' 时，置 {total_affected} 条记录为无效")
+                logger.info("禁用分类 '%s' 时，置 %s 条记录为无效", category_id, total_affected)
         except Exception as e:
-            logger.error(f"禁用分类记录失败: {e}")
+            logger.error("禁用分类记录失败: %s", e)
             raise
     
     def _disable_category_map_records_by_sub_category(self, sub_category_id: str):
@@ -962,9 +962,9 @@ class CategoryService:
                 total_affected += cursor.rowcount
                 
                 conn.commit()
-                logger.info(f"禁用子分类 '{sub_category_id}' 时，置 {total_affected} 条记录为无效")
+                logger.info("禁用子分类 '%s' 时，置 %s 条记录为无效", sub_category_id, total_affected)
         except Exception as e:
-            logger.error(f"禁用子分类记录失败: {e}")
+            logger.error("禁用子分类记录失败: %s", e)
             raise
     
     def _enable_category_map_records_by_category(self, category_id: str):
@@ -1046,10 +1046,10 @@ class CategoryService:
                     total_enabled += cursor.rowcount
                 
                 conn.commit()
-                logger.info(f"启用分类 '{category_id}' 时，恢复 {total_enabled} 条记录，删除 {total_deleted} 条冲突记录")
+                logger.info("启用分类 '%s' 时，恢复 %s 条记录，删除 %s 条冲突记录", category_id, total_enabled, total_deleted)
                 
         except Exception as e:
-            logger.error(f"启用分类记录失败: {e}")
+            logger.error("启用分类记录失败: %s", e)
             raise
     
     def _enable_category_map_records_by_sub_category(self, sub_category_id: str, category_id: str):
@@ -1070,7 +1070,7 @@ class CategoryService:
                 result = cursor.fetchone()
                 if not result or result[0] == 0:
                     # 主分类还是禁用状态，不恢复
-                    logger.info(f"主分类 '{category_id}' 仍处于禁用状态，跳过恢复子分类记录")
+                    logger.info("主分类 '%s' 仍处于禁用状态，跳过恢复子分类记录", category_id)
                     return
                 
                 total_enabled = 0
@@ -1127,10 +1127,10 @@ class CategoryService:
                     total_enabled += cursor.rowcount
                 
                 conn.commit()
-                logger.info(f"启用子分类 '{sub_category_id}' 时，恢复 {total_enabled} 条记录，删除 {total_deleted} 条冲突记录")
+                logger.info("启用子分类 '%s' 时，恢复 %s 条记录，删除 %s 条冲突记录", sub_category_id, total_enabled, total_deleted)
                 
         except Exception as e:
-            logger.error(f"启用子分类记录失败: {e}")
+            logger.error("启用子分类记录失败: %s", e)
             raise
 
     # ==================== category_map_cache 数据管理 ====================
@@ -1226,7 +1226,7 @@ class CategoryService:
             )
             
         except Exception as e:
-            logger.error(f"获取 category_map_cache 列表失败: {e}")
+            logger.error("获取 category_map_cache 列表失败: %s", e)
             raise
     
     def _get_category_state_from_cache(self, category_id: str) -> int:
@@ -1284,18 +1284,17 @@ class CategoryService:
                     data=update_fields
                 )
             else:
-                logger.error(f"无效的 record_id 格式: {record_id}")
+                logger.error("无效的 record_id 格式: %s", record_id)
                 return False
 
             if result:
-                logger.info(f"成功更新 category_map_cache 记录 ID={record_id} 的分类")
+                logger.info("成功更新 category_map_cache 记录 ID=%s 的分类", record_id)
             else:
-                logger.warning(f"未找到 category_map_cache 记录 ID={record_id}")
-
+                logger.warning("未找到 category_map_cache 记录 ID=%s", record_id)
             return result
 
         except Exception as e:
-            logger.error(f"更新 category_map_cache 记录失败: {e}")
+            logger.error("更新 category_map_cache 记录失败: %s", e)
             raise
     
     def batch_update_category_map_cache(
@@ -1342,11 +1341,11 @@ class CategoryService:
                     data=update_fields
                 )
 
-            logger.info(f"批量更新 {count} 条 category_map_cache 记录的分类")
+            logger.info("批量更新 %s 条 category_map_cache 记录的分类", count)
             return count
 
         except Exception as e:
-            logger.error(f"批量更新 category_map_cache 记录失败: {e}")
+            logger.error("批量更新 category_map_cache 记录失败: %s", e)
             raise
     
     def delete_category_map_cache(self, record_id: str) -> bool:
@@ -1366,18 +1365,17 @@ class CategoryService:
             elif record_id.startswith('s-'):
                 result = self.map_cache_repository.delete_single_purpose_map_cache(record_id)
             else:
-                logger.error(f"无效的 record_id 格式: {record_id}")
+                logger.error("无效的 record_id 格式: %s", record_id)
                 return False
 
             if result:
-                logger.info(f"成功删除 category_map_cache 记录 ID={record_id}")
+                logger.info("成功删除 category_map_cache 记录 ID=%s", record_id)
             else:
-                logger.warning(f"未找到 category_map_cache 记录 ID={record_id}")
-
+                logger.warning("未找到 category_map_cache 记录 ID=%s", record_id)
             return result
 
         except Exception as e:
-            logger.error(f"删除 category_map_cache 记录失败: {e}")
+            logger.error("删除 category_map_cache 记录失败: %s", e)
             raise
     
     def batch_delete_category_map_cache(self, record_ids: list[str]) -> int:
@@ -1405,11 +1403,11 @@ class CategoryService:
             if single_ids:
                 count += self.map_cache_repository.batch_delete_single_purpose_map_cache(single_ids)
 
-            logger.info(f"批量删除 {count} 条 category_map_cache 记录")
+            logger.info("批量删除 %s 条 category_map_cache 记录", count)
             return count
 
         except Exception as e:
-            logger.error(f"批量删除 category_map_cache 记录失败: {e}")
+            logger.error("批量删除 category_map_cache 记录失败: %s", e)
             raise
 
 

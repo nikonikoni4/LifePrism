@@ -157,7 +157,7 @@ class HabitChainAggregator:
             node_data['chain_id'] = chain_id
             self.node_provider.create_node(node_data)
 
-        logger.info(f"创建习惯链 {chain_id}，包含 {len(nodes_data)} 个节点")
+        logger.info("创建习惯链 %s，包含 %s 个节点", chain_id, len(nodes_data))
         return chain_id
 
     def delete_chain_with_nodes(self, chain_id: int) -> bool:

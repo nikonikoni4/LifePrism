@@ -33,7 +33,7 @@ class Context:
                 placeholders = set(re.findall(r'\{(\w+)\}', content))
                 missing_keys = placeholders - set(kwargs.keys())
                 if missing_keys:
-                    logger.warning(f"文件 {path} 中存在未注入的参数: {missing_keys}")
+                    logger.warning("文件 %s 中存在未注入的参数: %s", path, missing_keys)
                 class SafeDict(dict):
                     def __missing__(self, key):
                         return '{' + key + '}'
@@ -114,7 +114,7 @@ class Context:
                 lines.append(f"- {path} ({path_name}): {description}")
             return "\n".join(lines)
         except Exception as e:
-            logger.warning(f"读取 expand_meta_data.json 失败: {e}")
+            logger.warning("读取 expand_meta_data.json 失败: %s", e)
             return "无"
 
     @staticmethod

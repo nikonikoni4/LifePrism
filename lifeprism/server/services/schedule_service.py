@@ -28,33 +28,33 @@ TEST_CRON_AFTER_MINUTES = 1         # 定时任务测试参数（启动后N分�
 async def _dreaming():
     # 每天10点执行时，获取昨天的完整数据（昨天04:00 ~ 今天04:00）
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    logger.info(f"[dreaming] 开始执行, 目标日期: {yesterday}")
+    logger.info("[dreaming] 开始执行, 目标日期: %s", yesterday)
 
     # 先执行增量同步，确保数据已分类和总结
     try:
         sync_service = SyncService()
-        logger.info(f"[dreaming] 开始增量同步数据")
+        logger.info("[dreaming] 开始增量同步数据")
         sync_result = await sync_service.incremental_sync(auto_classify=True)
-        logger.info(f"[dreaming] 增量同步完成: {sync_result.get('message', '')}")
+        logger.info("[dreaming] 增量同步完成: %s", sync_result.get('message', ''))
     except Exception as e:
-        logger.error(f"[dreaming] 增量同步失败: {e}")
+        logger.error("[dreaming] 增量同步失败: error=%s", e)
         # 同步失败不应阻止后续流程，继续执行
 
     if settings.auto_diary_summary:
         try:
             await generate_diary_ai_summary(yesterday)
         except Exception as e:
-            logger.error(f"生成日记总结失败: {e}")
+            logger.error("生成日记总结失败: error=%s", e)
     if settings.auto_update_memory:
         try:
             await dreaming(yesterday)
         except Exception as e:
-            logger.error(f"更新记忆失败: {e}")
+            logger.error("更新记忆失败: error=%s", e)
 async def _process_session_message():
     try:
         await process_session_message()
     except Exception as e:
-        logger.error(f"提取历史对话消息信息失败: {e}")
+        logger.error("提取历史对话消息信息失败: error=%s", e)
 class ScheduleService:
     """定时任务调度服务（单例）
 
@@ -137,7 +137,7 @@ class ScheduleService:
             with open(self._state_file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            logger.warning(f"加载任务状态文件失败: {e}，将使用空状态")
+            logger.warning("加载任务状态文件失败: %s，将使用空状态", e)
             return {}
 
     def _save_cron_state(self, job_id: str, execution_date: str) -> None:
@@ -155,9 +155,9 @@ class ScheduleService:
             with open(self._state_file_path, 'w', encoding='utf-8') as f:
                 json.dump(state, f, ensure_ascii=False, indent=2)
 
-            logger.debug(f"保存任务状态: {job_id} -> {execution_date}")
+            logger.debug("保存任务状态: %s -> %s", job_id, execution_date)
         except Exception as e:
-            logger.error(f"保存任务状态失败: {e}")
+            logger.error("保存任务状态失败: error=%s", e)
 
     def _should_execute_cron_today(self, job_id: str) -> bool:
         """判断 Cron 任务今天是否应该执行
@@ -173,7 +173,7 @@ class ScheduleService:
         last_execution = state.get(job_id)
 
         if last_execution == today:
-            logger.info(f"任务 {job_id} 今天已执行过（{today}），跳过")
+            logger.info("任务 %s 今天已执行过（%s），跳过", job_id, today)
             return False
 
         return True
@@ -213,12 +213,12 @@ class ScheduleService:
 
                     if now.hour > target_hour or (now.hour == target_hour and now.minute >= target_minute):
                         if self._should_execute_cron_today(job_id):
-                            logger.info(f"已过今日 {target_hour}:{target_minute:02d}，异步执行一次 {job_id}")
+                            logger.info("已过今日 %s:%02d，异步执行一次 %s", target_hour, target_minute, job_id)
                             asyncio.get_event_loop().create_task(self._execute_cron_with_state(job_config["func"], job_id))
                         else:
-                            logger.info(f"任务 {job_id} 今天已执行过，跳过补偿执行")
+                            logger.info("任务 %s 今天已执行过，跳过补偿执行", job_id)
             except Exception as e:
-                logger.error(f"添加系统任务 {job_config['job_id']} 失败: {e}")
+                logger.error("添加系统任务 %s 失败: error=%s", job_config['job_id'], e)
 
     async def _execute_cron_with_state(self, func: Callable, job_id: str) -> None:
         """执行 Cron 任务并记录状态
@@ -232,7 +232,7 @@ class ScheduleService:
             today = datetime.now().strftime("%Y-%m-%d")
             self._save_cron_state(job_id, today)
         except Exception as e:
-            logger.error(f"执行任务 {job_id} 失败: {e}")
+            logger.error("执行任务 %s 失败: error=%s", job_id, e)
 
     def shutdown(self) -> None:
         """关闭调度器
@@ -290,9 +290,8 @@ class ScheduleService:
         job: Job = self._scheduler.add_job(func, trigger, id=job_id)
 
         logger.info(
-            f"添加间隔任务: {func.__name__}, "
-            f"间隔={seconds}s/{minutes}m/{hours}h, "
-            f"job_id={job.id}"
+            "添加间隔任务: %s, 间隔=%ss/%sm/%sh, job_id=%s",
+            func.__name__, seconds, minutes, hours, job.id
         )
         return job.id
 
@@ -329,7 +328,7 @@ class ScheduleService:
 
         job: Job = self._scheduler.add_job(wrapped_func, trigger, id=job_id)
 
-        logger.info(f"添加 Cron 任务: {func.__name__}, cron={cron_expr}, job_id={job.id}")
+        logger.info("添加 Cron 任务: %s, cron=%s, job_id=%s", func.__name__, cron_expr, job.id)
         return job.id
 
     def remove_job(self, job_id: str) -> None:
@@ -345,7 +344,7 @@ class ScheduleService:
             raise RuntimeError("调度器未启动，请先调用 start()")
 
         self._scheduler.remove_job(job_id)
-        logger.info(f"移除任务: job_id={job_id}")
+        logger.info("移除任务: job_id=%s", job_id)
 
     def get_jobs(self) -> list:
         """获取所有任务列表

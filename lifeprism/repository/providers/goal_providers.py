@@ -179,7 +179,7 @@ class GoalProvider(LWBaseDataProvider):
                 raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
             self._generic_insert(data)
-            logger.info(f"创建目标成功，ID: {goal_id}")
+            logger.info("创建目标成功，ID: %s", goal_id)
             return goal_id
 
         except ValidationError:
@@ -189,7 +189,7 @@ class GoalProvider(LWBaseDataProvider):
                 raise ConflictError(f"目标记录已存在") from e
             raise DataAccessError(f"数据完整性错误") from e
         except Exception as e:
-            logger.error(f"创建目标失败: {e}")
+            logger.error("创建目标失败: %s", e)
             raise DataAccessError(
                 message=f"创建目标失败",
                 details={"goal_id": goal_id, "error": str(e)}
@@ -229,13 +229,13 @@ class GoalProvider(LWBaseDataProvider):
                 success = cursor.rowcount > 0
 
             if success:
-                logger.info(f"更新目标 {goal_id} 成功")
+                logger.info("更新目标 %s 成功", goal_id)
             return success
 
         except ValidationError:
             raise
         except Exception as e:
-            logger.error(f"更新目标 {goal_id} 失败: {e}")
+            logger.error("更新目标 %s 失败: %s", goal_id, e)
             raise DataAccessError(
                 message=f"更新目标失败",
                 details={"goal_id": goal_id, "error": str(e)}
@@ -264,16 +264,16 @@ class GoalProvider(LWBaseDataProvider):
                 )
                 cleared_count = cursor.rowcount
                 if cleared_count > 0:
-                    logger.info(f"清除了 {cleared_count} 个任务的目标关联")
+                    logger.info("清除了 %s 个任务的目标关联", cleared_count)
 
             # 然后删除目标
             success = self._generic_delete(goal_id)
             if success:
-                logger.info(f"删除目标 {goal_id} 成功")
+                logger.info("删除目标 %s 成功", goal_id)
             return success
 
         except Exception as e:
-            logger.error(f"删除目标 {goal_id} 失败: {e}")
+            logger.error("删除目标 %s 失败: %s", goal_id, e)
             raise DataAccessError(
                 message=f"删除目标失败",
                 details={"goal_id": goal_id, "error": str(e)}
@@ -304,11 +304,11 @@ class GoalProvider(LWBaseDataProvider):
                         (index, goal_id)
                     )
 
-                logger.info(f"重排序 {len(goal_ids)} 个目标成功")
+                logger.info("重排序 %s 个目标成功", len(goal_ids))
                 return True
 
         except Exception as e:
-            logger.error(f"重排序目标失败: {e}")
+            logger.error("重排序目标失败: %s", e)
             raise DataAccessError(
                 message=f"重排序目标失败",
                 details={"goal_count": len(goal_ids), "error": str(e)}
@@ -358,7 +358,7 @@ class GoalProvider(LWBaseDataProvider):
                 return [dict(zip(columns, row)) for row in rows]
 
         except Exception as e:
-            logger.error(f"获取绑定分类的活跃目标列表失败: {e}")
+            logger.error("获取绑定分类的活跃目标列表失败: %s", e)
             raise DataAccessError(
                 message=f"获取绑定分类的活跃目标列表失败",
                 details={"error": str(e)}
@@ -421,7 +421,7 @@ class GoalProvider(LWBaseDataProvider):
                 return [dict(zip(columns, row)) for row in rows]
 
         except Exception as e:
-            logger.error(f"获取活跃目标列表（用于分类）失败: {e}")
+            logger.error("获取活跃目标列表（用于分类）失败: %s", e)
             raise DataAccessError(
                 message=f"获取活跃目标列表（用于分类）失败",
                 details={"error": str(e)}
@@ -454,7 +454,7 @@ class GoalProvider(LWBaseDataProvider):
                 return total_seconds
 
         except Exception as e:
-            logger.error(f"计算目标 {goal_id} 投入时间失败: {e}")
+            logger.error("计算目标 %s 投入时间失败: %s", goal_id, e)
             raise DataAccessError(
                 message=f"计算目标投入时间失败",
                 details={"goal_id": goal_id, "error": str(e)}
@@ -482,11 +482,11 @@ class GoalProvider(LWBaseDataProvider):
             }
             success = self._generic_update(goal_id, data)
             if success:
-                logger.debug(f"更新目标 {goal_id} 投入时间: {time_invested} 秒")
+                logger.debug("更新目标 %s 投入时间: %s 秒", goal_id, time_invested)
             return success
 
         except Exception as e:
-            logger.error(f"更新目标 {goal_id} 投入时间失败: {e}")
+            logger.error("更新目标 %s 投入时间失败: %s", goal_id, e)
             raise DataAccessError(
                 message=f"更新目标投入时间失败",
                 details={"goal_id": goal_id, "time_invested": time_invested, "error": str(e)}
@@ -600,7 +600,7 @@ class GoalStatsProvider(LWBaseDataProvider):
                 return result[0] if result and result[0] else None
 
         except Exception as e:
-            logger.error(f"获取目标 {goal_id} 最新统计日期失败: {e}")
+            logger.error("获取目标 %s 最新统计日期失败: %s", goal_id, e)
             raise DataAccessError(
                 message=f"获取目标最新统计日期失败",
                 details={"goal_id": goal_id, "error": str(e)}
@@ -669,11 +669,11 @@ class GoalStatsProvider(LWBaseDataProvider):
                         VALUES (?, ?, ?, ?)
                     """, (goal_id, date, time_spent, todo_count))
 
-                logger.debug(f"目标 {goal_id} 在 {date} 的统计数据已更新")
+                logger.debug("目标 %s 在 %s 的统计数据已更新", goal_id, date)
                 return True
 
         except Exception as e:
-            logger.error(f"更新目标 {goal_id} 在 {date} 的统计数据失败: {e}")
+            logger.error("更新目标 %s 在 %s 的统计数据失败: %s", goal_id, date, e)
             raise DataAccessError(
                 message=f"更新目标统计数据失败",
                 details={"goal_id": goal_id, "date": date, "error": str(e)}
@@ -711,11 +711,11 @@ class GoalStatsProvider(LWBaseDataProvider):
 
                 result = cursor.fetchone()
                 total = int(result[0]) if result and result[0] else 0
-                logger.debug(f"aggregate_time_spent: goal_id={goal_id}, date={date}, total={total}")
+                logger.debug("aggregate_time_spent: goal_id=%s, date=%s, total=%s", goal_id, date, total)
                 return total
 
         except Exception as e:
-            logger.error(f"聚合目标 {goal_id} 在 {date} 的时间花费失败: {e}")
+            logger.error("聚合目标 %s 在 %s 的时间花费失败: %s", goal_id, date, e)
             raise DataAccessError(
                 message=f"聚合目标时间花费失败",
                 details={"goal_id": goal_id, "date": date, "error": str(e)}
@@ -751,7 +751,7 @@ class GoalStatsProvider(LWBaseDataProvider):
                 return int(result[0]) if result and result[0] else 0
 
         except Exception as e:
-            logger.error(f"统计目标 {goal_id} 在 {date} 完成的待办数量失败: {e}")
+            logger.error("统计目标 %s 在 %s 完成的待办数量失败: %s", goal_id, date, e)
             raise DataAccessError(
                 message=f"统计目标完成的待办数量失败",
                 details={"goal_id": goal_id, "date": date, "error": str(e)}
@@ -776,7 +776,7 @@ class GoalStatsProvider(LWBaseDataProvider):
         """
         try:
             last_date = self.get_latest_stat_date(goal_id)
-            logger.debug(f"sync_stats_to_date: goal_id={goal_id}, target_date={target_date}, start_date={start_date}, last_date={last_date}")
+            logger.debug("sync_stats_to_date: goal_id=%s, target_date=%s, start_date=%s, last_date=%s", goal_id, target_date, start_date, last_date)
 
             target_dt = datetime.strptime(target_date, "%Y-%m-%d")
 
@@ -847,11 +847,11 @@ class GoalStatsProvider(LWBaseDataProvider):
                 todo_count = self.aggregate_completed_todos(goal_id, date)
                 self.upsert_stat(goal_id, date, time_spent, todo_count)
 
-            logger.info(f"目标 {goal_id} 同步了 {len(dates_to_sync)} 天的统计数据")
+            logger.info("目标 %s 同步了 %s 天的统计数据", goal_id, len(dates_to_sync))
             return True
 
         except Exception as e:
-            logger.error(f"同步目标 {goal_id} 统计数据失败: {e}")
+            logger.error("同步目标 %s 统计数据失败: %s", goal_id, e)
             raise DataAccessError(
                 message=f"同步目标统计数据失败",
                 details={"goal_id": goal_id, "target_date": target_date, "error": str(e)}
@@ -881,7 +881,7 @@ class GoalStatsProvider(LWBaseDataProvider):
                 return result[0] if result and result[0] else None
 
         except Exception as e:
-            logger.error(f"获取目标 {goal_id} 最早统计日期失败: {e}")
+            logger.error("获取目标 %s 最早统计日期失败: %s", goal_id, e)
             raise DataAccessError(
                 message=f"获取目标最早统计日期失败",
                 details={"goal_id": goal_id, "error": str(e)}

@@ -30,24 +30,24 @@ def run_config_migrations(config_path: Path, migrations: list) -> dict:
         迁移完成后的 dict 数据（调用方负责写入文件或继续使用）
     """
     if not config_path.exists():
-        logger.debug(f"{config_path.name} 不存在，跳过迁移")
+        logger.debug("%s 不存在，跳过迁移", config_path.name)
         return {}
 
     data = _load_yaml(config_path)
     if data is None:
-        logger.warning(f"{config_path.name} 解析失败，跳过迁移")
+        logger.warning("%s 解析失败，跳过迁移", config_path.name)
         return {}
 
     current_version = data.get("config_version", 0)
     pending = [m for m in migrations if m.VERSION > current_version]
 
     if not pending:
-        logger.debug(f"{config_path.name} 版本 v{current_version}，无待执行迁移")
+        logger.debug("%s 版本 v%s，无待执行迁移", config_path.name, current_version)
         return data
 
     logger.info(
-        f"{config_path.name} 版本 v{current_version}，"
-        f"待执行 {len(pending)} 个迁移"
+        "%s 版本 v%s，待执行 %s 个迁移",
+        config_path.name, current_version, len(pending),
     )
 
     # 备份原文件
@@ -58,20 +58,20 @@ def run_config_migrations(config_path: Path, migrations: list) -> dict:
         try:
             if migration.check_if_applied(data):
                 logger.info(
-                    f"迁移 {migration.NAME} (v{migration.VERSION}) 已生效，"
-                    f"补录版本记录"
+                    "迁移 %s (v%s) 已生效，补录版本记录",
+                    migration.NAME, migration.VERSION,
                 )
                 data["config_version"] = migration.VERSION
             else:
-                logger.info(f"执行迁移 {migration.NAME} (v{migration.VERSION})...")
+                logger.info("执行迁移 %s (v%s)...", migration.NAME, migration.VERSION)
                 data = migration.upgrade(data)
                 data["config_version"] = migration.VERSION
-                logger.info(f"迁移 {migration.NAME} (v{migration.VERSION}) 完成")
+                logger.info("迁移 %s (v%s) 完成", migration.NAME, migration.VERSION)
         except Exception:
             # LEGITIMATE: 辅助操作兜底 — 迁移失败不阻塞启动
             logger.exception(
-                f"迁移 {migration.NAME} (v{migration.VERSION}) 失败，"
-                f"备份保留于 {config_path.parent}，本次使用迁移前数据"
+                "迁移 %s (v%s) 失败，备份保留于 %s，本次使用迁移前数据",
+                migration.NAME, migration.VERSION, config_path.parent,
             )
             # 失败不阻塞启动，返回迁移到此为止的数据
             return data
@@ -79,7 +79,8 @@ def run_config_migrations(config_path: Path, migrations: list) -> dict:
     # 写回 YAML
     _save_yaml(config_path, data)
     logger.info(
-        f"{config_path.name} 迁移完成，当前版本 v{pending[-1].VERSION}"
+        "%s 迁移完成，当前版本 v%s",
+        config_path.name, pending[-1].VERSION,
     )
     return data
 
@@ -91,7 +92,7 @@ def _load_yaml(path: Path) -> dict[str, Any] | None:
         return result if isinstance(result, dict) else {}
     except Exception:
         # LEGITIMATE: 辅助操作兜底 — 迁移失败不阻塞启动
-        logger.exception(f"读取 {path.name} 失败")
+        logger.exception("读取 %s 失败", path.name)
         return None
 
 
@@ -102,7 +103,7 @@ def _save_yaml(path: Path, data: dict) -> None:
             yaml.dump(data, f, allow_unicode=True, sort_keys=False)
     except Exception:
         # LEGITIMATE: 辅助操作兜底 — 迁移失败不阻塞启动
-        logger.exception(f"写入 {path.name} 失败")
+        logger.exception("写入 %s 失败", path.name)
 
 
 def _backup_config(config_path: Path, current_version: int) -> None:
@@ -112,11 +113,11 @@ def _backup_config(config_path: Path, current_version: int) -> None:
     )
     try:
         shutil.copy2(config_path, backup_path)
-        logger.info(f"已备份 {config_path.name} → {backup_path.name}")
+        logger.info("已备份 %s → %s", config_path.name, backup_path.name)
         _cleanup_old_backups(config_path)
     except Exception:
         # LEGITIMATE: 辅助操作兜底 — 迁移失败不阻塞启动
-        logger.exception(f"备份 {config_path.name} 失败")
+        logger.exception("备份 %s 失败", config_path.name)
 
 
 def _cleanup_old_backups(config_path: Path, keep: int = 3) -> None:
@@ -129,4 +130,4 @@ def _cleanup_old_backups(config_path: Path, keep: int = 3) -> None:
     )
     for old in backups[keep:]:
         old.unlink()
-        logger.info(f"清理旧备份: {old.name}")
+        logger.info("清理旧备份: %s", old.name)

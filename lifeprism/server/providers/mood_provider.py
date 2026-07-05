@@ -37,7 +37,7 @@
 #                 columns = [desc[0] for desc in cursor.description]
 #                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
 #         except Exception as e:
-#             logger.error(f"获取心情类型列表失败: {e}")
+#             logger.error("获取心情类型列表失败: error=%s", e)
 #             return []
 
 #     def get_mood_type_by_id(self, mood_type_id: str) -> Optional[Dict[str, Any]]:
@@ -60,7 +60,7 @@
 #                     return dict(zip(columns, row))
 #                 return None
 #         except Exception as e:
-#             logger.error(f"获取心情类型 {mood_type_id} 失败: {e}")
+#             logger.error("获取心情类型 %s 失败: error=%s", mood_type_id, e)
 #             return None
 
 #     def create_mood_type(self, data: Dict[str, Any]) -> Optional[str]:
@@ -82,10 +82,10 @@
 #                     VALUES (?, ?, ?, ?, ?, ?, ?)
 #                 """, (new_id, data['name'], data['icon'], data['color'],
 #                       data['score'], data.get('is_dark', 0), data.get('sort_order', 0)))
-#             logger.info(f"创建心情类型成功: {new_id}")
+#             logger.info("创建心情类型成功: %s", new_id)
 #             return new_id
 #         except Exception as e:
-#             logger.error(f"创建心情类型失败: {e}")
+#             logger.error("创建心情类型失败: error=%s", e)
 #             return None
 
 #     def update_mood_type(self, mood_type_id: str, data: Dict[str, Any]) -> bool:
@@ -118,7 +118,7 @@
 #                 cursor.execute(sql, values)
 #                 return cursor.rowcount > 0
 #         except Exception as e:
-#             logger.error(f"更新心情类型 {mood_type_id} 失败: {e}")
+#             logger.error("更新心情类型 %s 失败: error=%s", mood_type_id, e)
 #             return False
 
 #     def delete_mood_type(self, mood_type_id: str) -> bool:
@@ -137,7 +137,7 @@
 #                 cursor.execute("DELETE FROM mood_types WHERE id = ?", (mood_type_id,))
 #                 return cursor.rowcount > 0
 #         except Exception as e:
-#             logger.error(f"删除心情类型 {mood_type_id} 失败: {e}")
+#             logger.error("删除心情类型 %s 失败: error=%s", mood_type_id, e)
 #             return False
 
 #     def count_entries_by_type(self, mood_type_id: str) -> int:
@@ -156,7 +156,7 @@
 #                 cursor.execute("SELECT COUNT(*) FROM mood_entries WHERE mood_type_id = ?", (mood_type_id,))
 #                 return cursor.fetchone()[0]
 #         except Exception as e:
-#             logger.error(f"统计心情类型 {mood_type_id} 关联记录数失败: {e}")
+#             logger.error("统计心情类型 %s 关联记录数失败: error=%s", mood_type_id, e)
 #             return -1
 
 #     # ==================== mood_entries ====================
@@ -188,7 +188,7 @@
 #                 columns = [desc[0] for desc in cursor.description]
 #                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
 #         except Exception as e:
-#             logger.error(f"获取心情记录列表失败: {e}")
+#             logger.error("获取心情记录列表失败: error=%s", e)
 #             return []
 
 #     def get_mood_entry_by_id(self, entry_id: str) -> Optional[Dict[str, Any]]:
@@ -211,7 +211,7 @@
 #                     return dict(zip(columns, row))
 #                 return None
 #         except Exception as e:
-#             logger.error(f"获取心情记录 {entry_id} 失败: {e}")
+#             logger.error("获取心情记录 %s 失败: error=%s", entry_id, e)
 #             return None
 
 #     def create_mood_entry(self, data: Dict[str, Any]) -> Optional[str]:
@@ -233,10 +233,10 @@
 #                     VALUES (?, ?, ?, ?, ?)
 #                 """, (new_id, data['mood_type_id'], data['score'],
 #                       data.get('content'), data.get('factors')))
-#             logger.info(f"创建心情记录成功: {new_id}")
+#             logger.info("创建心情记录成功: %s", new_id)
 #             return new_id
 #         except Exception as e:
-#             logger.error(f"创建心情记录失败: {e}")
+#             logger.error("创建心情记录失败: error=%s", e)
 #             return None
 
 #     def update_mood_entry(self, entry_id: str, data: Dict[str, Any]) -> bool:
@@ -269,7 +269,7 @@
 #                 cursor.execute(sql, values)
 #                 return cursor.rowcount > 0
 #         except Exception as e:
-#             logger.error(f"更新心情记录 {entry_id} 失败: {e}")
+#             logger.error("更新心情记录 %s 失败: error=%s", entry_id, e)
 #             return False
 
 #     def delete_mood_entry(self, entry_id: str) -> bool:
@@ -288,7 +288,7 @@
 #                 cursor.execute("DELETE FROM mood_entries WHERE id = ?", (entry_id,))
 #                 return cursor.rowcount > 0
 #         except Exception as e:
-#             logger.error(f"删除心情记录 {entry_id} 失败: {e}")
+#             logger.error("删除心情记录 %s 失败: error=%s", entry_id, e)
 #             return False
 
 #     # ==================== mood_impacts ====================
@@ -307,7 +307,7 @@
 #                 columns = [desc[0] for desc in cursor.description]
 #                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
 #         except Exception as e:
-#             logger.error(f"获取影响因素列表失败: {e}")
+#             logger.error("获取影响因素列表失败: error=%s", e)
 #             return []
 
 #     def create_mood_impact(self, data: Dict[str, Any]) -> Optional[int]:
@@ -327,10 +327,10 @@
 #                     INSERT INTO mood_impacts (name, sort_order)
 #                     VALUES (?, ?)
 #                 """, (data['name'], data.get('sort_order', 0)))
-#                 logger.info(f"创建影响因素成功: {data['name']}")
+#                 logger.info("创建影响因素成功: %s", data['name'])
 #                 return cursor.lastrowid
 #         except Exception as e:
-#             logger.error(f"创建影响因素失败: {e}")
+#             logger.error("创建影响因素失败: error=%s", e)
 #             return None
 
 #     def delete_mood_impact(self, impact_id: int) -> bool:
@@ -349,7 +349,7 @@
 #                 cursor.execute("DELETE FROM mood_impacts WHERE id = ?", (impact_id,))
 #                 return cursor.rowcount > 0
 #         except Exception as e:
-#             logger.error(f"删除影响因素 {impact_id} 失败: {e}")
+#             logger.error("删除影响因素 %s 失败: error=%s", impact_id, e)
 #             return False
 
 

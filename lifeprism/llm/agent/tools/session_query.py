@@ -68,7 +68,7 @@ class QuerySessionListTool(Tool):
             # 1. 遍历所有 session 文件
             session_path = settings.session_path
             if not session_path.exists():
-                logger.warning(f"Session 路径不存在: {session_path}")
+                logger.warning("Session 路径不存在: %s", session_path)
                 return {}
 
             session_data = {}  # {session_id: {"updated_at": str, "last_user_message": str}}
@@ -107,7 +107,7 @@ class QuerySessionListTool(Tool):
 
                         # 检查是否有 metadata
                         if not metadata:
-                            logger.warning(f"Session {session_id} 缺少 metadata，跳过")
+                            logger.warning("Session %s 缺少 metadata，跳过", session_id)
                             continue
 
                         updated_at = metadata.get('updated_at', '')
@@ -124,7 +124,7 @@ class QuerySessionListTool(Tool):
                         }
 
                 except Exception as e:
-                    logger.warning(f"读取 session {session_id} 失败: {e}，跳过该文件")
+                    logger.warning("读取 session %s 失败: %s，跳过该文件", session_id, e)
                     continue
 
             # 2. 加载 chat_history.json
@@ -132,7 +132,7 @@ class QuerySessionListTool(Tool):
                 history_manager = ChatHistoryManager()
                 histories = history_manager.histories
             except Exception as e:
-                logger.error(f"加载 chat_history.json 失败: {e}")
+                logger.error("加载 chat_history.json 失败: %s", e)
                 histories = []
 
             # 3. 按 session_id 分组，取每个 session 的最新总结
@@ -172,11 +172,11 @@ class QuerySessionListTool(Tool):
                     "last_user_message": data["last_user_message"]
                 }
 
-            logger.info(f"查询会话列表: date_filter={date_filter}, 结果数={len(result)}")
+            logger.info("查询会话列表: date_filter=%s, 结果数=%s", date_filter, len(result))
             return result
 
         except Exception as e:
-            logger.error(f"查询会话列表失败: {e}")
+            logger.error("查询会话列表失败: %s", e)
             return f"{ERROR}查询会话列表失败: {e}"
 
 
@@ -244,7 +244,7 @@ class QuerySessionHistoryTool(Tool):
 
             # 检查文件是否存在
             if not session_path.exists():
-                logger.warning(f"会话 {session_id} 不存在")
+                logger.warning("会话 %s 不存在", session_id)
                 return f"{ERROR}会话 {session_id} 不存在"
 
             # 读取 session 文件
@@ -267,16 +267,16 @@ class QuerySessionHistoryTool(Tool):
                                 'timestamp': data.get('timestamp', '')
                             })
             except Exception as e:
-                logger.error(f"读取 session {session_id} 失败: {e}")
+                logger.error("读取 session %s 失败: %s", session_id, e)
                 return f"{ERROR}读取会话失败: {e}"
 
             # 按 timestamp 倒序，取最近 limit 条（最大 50）
             messages.reverse()
             result = messages[:min(limit, 50)]
 
-            logger.info(f"查询会话历史: session_id={session_id}, limit={limit}, 结果数={len(result)}")
+            logger.info("查询会话历史: session_id=%s, limit=%s, 结果数=%s", session_id, limit, len(result))
             return result
 
         except Exception as e:
-            logger.error(f"查询会话历史失败: {e}")
+            logger.error("查询会话历史失败: %s", e)
             return f"{ERROR}查询会话历史失败: {e}"

@@ -173,7 +173,7 @@ def update_todo_with_writeback(
     # 1. 获取现有任务
     existing = todo_repository.get_todo_by_id(todo_id)
     if not existing:
-        logger.warning(f"任务不存在: {todo_id}")
+        logger.warning("任务不存在: %s", todo_id)
         return None
 
     # 2. 处理状态变更副作用

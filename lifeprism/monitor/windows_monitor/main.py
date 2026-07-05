@@ -22,7 +22,7 @@ def main():
     except KeyboardInterrupt:
         handle_signal(None, None)
     except Exception as e:
-        logger.error(f"主程序异常退出: {e}")
+        logger.error("主程序异常退出: error=%s", e)
         runtime.stop()
         sys.exit(1)
 
@@ -35,7 +35,7 @@ def start_monitor_process():
     # 注意：在 Windows 上，必须确保 target 函数所在的模块可以被安全导入
     process = multiprocessing.Process(target=main, name="LifePrism-Monitor")
     process.start()
-    logger.info(f"监控进程已启动 (PID: {process.pid})")
+    logger.info("监控进程已启动 (PID: %s)", process.pid)
     return process
 
 

@@ -121,10 +121,10 @@ class DiaryProvider(LWBaseDataProvider):
                 insert_data.update(data)
 
             self._generic_insert(insert_data)
-            logger.info(f"创建日记 {date} 成功")
+            logger.info("创建日记 %s 成功", date)
             return True
         except Exception as e:
-            logger.error(f"创建日记 {date} 失败: {e}")
+            logger.error("创建日记 %s 失败: %s", date, e)
             raise DataAccessError(f"创建日记 {date} 失败") from e
 
     def update_diary(self, date: str, data: Dict[str, Any]) -> bool:
@@ -172,7 +172,7 @@ class DiaryProvider(LWBaseDataProvider):
                 # 如果已经提供了 updated_at，使用通用方法
                 return self._generic_update(date, data)
         except Exception as e:
-            logger.error(f"更新日记 {date} 失败: {e}")
+            logger.error("更新日记 %s 失败: %s", date, e)
             raise DataAccessError(f"更新日记 {date} 失败") from e
 
     def delete_diary(self, date: str) -> bool:
@@ -192,10 +192,10 @@ class DiaryProvider(LWBaseDataProvider):
             # 现在可以使用通用删除方法（支持自定义主键）
             success = self._generic_delete(date)
             if success:
-                logger.info(f"删除日记 {date} 成功")
+                logger.info("删除日记 %s 成功", date)
             return success
         except Exception as e:
-            logger.error(f"删除日记 {date} 失败: {e}")
+            logger.error("删除日记 %s 失败: %s", date, e)
             raise DataAccessError(f"删除日记 {date} 失败") from e
 
     # ==================== 特殊方法（兼容旧接口）====================

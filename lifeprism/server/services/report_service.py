@@ -61,7 +61,7 @@ def _get_behavior_content(date: str) -> str:
         result = extract_date_md(content, date)
         return result.get(date, "")
     except (FileNotFoundError, OSError, ValueError) as e:
-        logger.warning(f"读取 behavior.md 失败 (date={date}): {e}")
+        logger.warning("读取 behavior.md 失败 (date=%s): %s", date, e)
         return ""
 
 
@@ -95,7 +95,7 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
     )
     
     if not need_recalc and cached:
-        logger.info(f"返回缓存的日报告 {date}")
+        logger.info("返回缓存的日报告 %s", date)
         # 环比数据始终实时计算（不缓存）
         comparison_data = _calc_comparison_data(
             current_start=f"{date} 00:00:00",
@@ -109,7 +109,7 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
         return response
     
     # 3. 重新计算各板块数据
-    logger.info(f"重新计算日报告 {date}")
+    logger.info("重新计算日报告 %s", date)
     
     sunburst_data = _calc_sunburst_data(
         start_date=date, 
@@ -190,7 +190,7 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
     )
     
     if not need_recalc and cached:
-        logger.info(f"返回缓存的周报告 {week_start_date}")
+        logger.info("返回缓存的周报告 %s", week_start_date)
         # 环比数据始终实时计算（不缓存）
         comparison_data = _calc_comparison_data(
             current_start=f"{week_start_date} 00:00:00",
@@ -204,7 +204,7 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
         return response
     
     # 3. 重新计算各板块数据
-    logger.info(f"重新计算周报告 {week_start_date} ~ {week_end_date}")
+    logger.info("重新计算周报告 %s ~ %s", week_start_date, week_end_date)
     
     sunburst_data = _calc_sunburst_data(
         start_date=week_start_date, 
@@ -289,7 +289,7 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
     )
     
     if not need_recalc and cached:
-        logger.info(f"返回缓存的月报告 {month}")
+        logger.info("返回缓存的月报告 %s", month)
         # 环比数据始终实时计算（不缓存）
         comparison_data = _calc_comparison_data(
             current_start=f"{month_start_date} 00:00:00",
@@ -303,7 +303,7 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
         return response
     
     # 3. 重新计算各板块数据
-    logger.info(f"重新计算月报告 {month_start_date} ~ {month_end_date}")
+    logger.info("重新计算月报告 %s ~ %s", month_start_date, month_end_date)
     
     # 计算月份总分钟数
     total_range_minutes = last_day * 24 * 60
@@ -416,7 +416,7 @@ def _calc_comparison_data(
     previous_start = previous_start_dt.strftime("%Y-%m-%d %H:%M:%S")
     previous_end = previous_end_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    logger.info(f"计算环比对比数据: {current_start} ~ {current_end} vs {previous_start} ~ {previous_end}")
+    logger.info("计算环比对比数据: %s ~ %s vs %s ~ %s", current_start, current_end, previous_start, previous_end)
 
     # 调用 provider 获取原始数据
     raw_data = comparison_data_provider.get_period_comparison(
@@ -554,7 +554,7 @@ def _calc_sunburst_data(
         )
         
     except Exception as e:
-        logger.error(f"计算旭日图数据失败: {e}")
+        logger.error("计算旭日图数据失败: %s", e)
         return _build_empty_sunburst(start_date, end_date, title, total_range_minutes)
 
 
@@ -600,7 +600,7 @@ def _calc_todo_stats(start_date: str, end_date: str) -> TodoStatsData:
         )
         
     except Exception as e:
-        logger.error(f"计算 Todo 统计失败: {e}")
+        logger.error("计算 Todo 统计失败: %s", e)
         return TodoStatsData(total=0, completed=0, pending=0, procrastination_rate=0)
 
 
@@ -669,7 +669,7 @@ def _calc_goal_progress(start_date: str, end_date: str) -> List[GoalProgressData
         return result
         
     except Exception as e:
-        logger.error(f"计算 Goal 进度失败: {e}")
+        logger.error("计算 Goal 进度失败: %s", e)
         return []
 
 
@@ -706,7 +706,7 @@ def _calc_goal_time_invested(goal_id: str, start_date: str, end_date: str) -> in
         return int(goal_df['duration_minutes'].sum())
         
     except Exception as e:
-        logger.error(f"计算目标 {goal_id} 时间投入失败: {e}")
+        logger.error("计算目标 %s 时间投入失败: %s", goal_id, e)
         return 0
 
 
@@ -775,7 +775,7 @@ def _calc_hourly_trend(date: str) -> List[Dict[str, Any]]:
         return result
         
     except Exception as e:
-        logger.error(f"计算24小时趋势失败: {e}")
+        logger.error("计算24小时趋势失败: %s", e)
         return _build_empty_hourly_trend()
 
 
@@ -841,7 +841,7 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
         return result
         
     except Exception as e:
-        logger.error(f"计算周趋势数据失败: {e}")
+        logger.error("计算周趋势数据失败: %s", e)
         return _build_empty_weekly_trend(start_date)
 
 
@@ -910,7 +910,7 @@ def _calc_monthly_trend(start_date: str, end_date: str) -> List[Dict[str, Any]]:
         return result
         
     except Exception as e:
-        logger.error(f"计算月趋势数据失败: {e}")
+        logger.error("计算月趋势数据失败: %s", e)
         return _build_empty_monthly_trend(start_date, end_date)
 
 
@@ -977,7 +977,7 @@ def _calc_heatmap_data(start_date: str, end_date: str) -> List[HeatmapDataItem]:
         return result
         
     except Exception as e:
-        logger.error(f"计算热力图数据失败: {e}")
+        logger.error("计算热力图数据失败: %s", e)
         return _build_empty_heatmap(start_date, end_date)
 
 

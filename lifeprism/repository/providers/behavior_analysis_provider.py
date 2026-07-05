@@ -181,14 +181,14 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
 
             # 使用 _generic_insert（_ON_CONFLICT = "replace"）
             self._generic_insert(data,on_conflict=self._ON_CONFLICT)
-            logger.info(f"创建行为分析记录: {data['start_time']}")
+            logger.info("创建行为分析记录: %s", data['start_time'])
 
             # 返回刚插入的记录
             return self.get_behavior_by_start_time(data['start_time']) or {}
         except ValueError:
             raise
         except Exception as e:
-            logger.error(f"创建行为分析记录失败: {e}")
+            logger.error("创建行为分析记录失败: %s", e)
             raise DataAccessError(f"创建行为分析记录失败: {e}") from e
 
     def update_behavior(self, start_time: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -219,7 +219,7 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
             where={"start_time": start_time}
         )
         if affected_rows > 0:
-            logger.info(f"更新行为分析记录: {start_time}")
+            logger.info("更新行为分析记录: %s", start_time)
             return self.get_behavior_by_start_time(start_time)
         return None
 
@@ -253,10 +253,10 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
                     (start_datetime, end_datetime)
                 )
                 affected_rows = cursor.rowcount
-                logger.info(f"删除行为分析记录: {start_date} 至 {end_date}，共 {affected_rows} 条")
+                logger.info("删除行为分析记录: %s 至 %s，共 %s 条", start_date, end_date, affected_rows)
                 return affected_rows
         except Exception as e:
-            logger.error(f"删除行为分析记录失败: {e}")
+            logger.error("删除行为分析记录失败: %s", e)
             raise DataAccessError(f"删除行为分析记录失败: {e}") from e
 
     def batch_create_behaviors(self, data_list: List[Dict[str, Any]]) -> int:
@@ -309,10 +309,10 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
                     )
                     success_count += 1
                 except Exception as e:
-                    logger.warning(f"插入记录失败 {data['start_time']}: {e}")
+                    logger.warning("插入记录失败 %s: %s", data['start_time'], e)
                     continue
 
-        logger.info(f"批量创建行为分析记录: {success_count}/{len(data_list)}")
+        logger.info("批量创建行为分析记录: %s/%s", success_count, len(data_list))
         return success_count
 
 

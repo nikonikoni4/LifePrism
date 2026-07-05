@@ -67,7 +67,7 @@ class WindowMonitor:
 
     def run(self):
         self._running = True
-        logger.info(f"WindowMonitor started (poll_time: {self.poll_time}s, afk_timeout: {self.afk_timeout}s)")
+        logger.info("WindowMonitor started (poll_time: %ss, afk_timeout: %ss)", self.poll_time, self.afk_timeout)
 
         try:
             while self._running:
@@ -82,7 +82,7 @@ class WindowMonitor:
                 if currently_afk:
                     if not self.is_afk:
                         # 刚进入 AFK 状态，保存当前窗口并清空状态（不追踪 AFK 时间段）
-                        logger.info(f"User is AFK (idle for {idle_time:.1f}s)")
+                        logger.info("User is AFK (idle for %.1fs)", idle_time)
                         self._flush()
                         with self._state_lock:
                             self.is_afk = True
@@ -127,7 +127,7 @@ class WindowMonitor:
                 time.sleep(self.poll_time)
         except Exception as e:
             # LEGITIMATE: API 边界兜底 — 监控主循环异常退出
-            logger.error(f"Monitor loop error: {e}")
+            logger.error("Monitor loop error: %s", e)
         finally:
             self.stop()
 

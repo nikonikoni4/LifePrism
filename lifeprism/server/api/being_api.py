@@ -115,7 +115,7 @@ def create_test(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"创建{mode}模式测试记录失败: user_id={user_id}, error={e}", exc_info=True)
+        logger.error("创建%s模式测试记录失败: user_id=%s, error=%s", mode, user_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -148,7 +148,7 @@ def update_test(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"更新{mode}模式测试记录失败: user_id={user_id}, version={version}, error={e}", exc_info=True)
+        logger.error("更新%s模式测试记录失败: user_id=%s, version=%s, error=%s", mode, user_id, version, e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
@@ -182,7 +182,7 @@ def delete_test(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"删除{mode}模式测试记录失败: user_id={user_id}, version={version}, error={e}", exc_info=True)
+        logger.error("删除%s模式测试记录失败: user_id=%s, version=%s, error=%s", mode, user_id, version, e, exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 

@@ -31,7 +31,7 @@ def _ensure_plan_doc_dir():
     try:
         _get_plan_doc_dir().mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        logger.error(f"创建计划书目录失败: {e}")
+        logger.error("创建计划书目录失败: %s", e)
 
 
 def _get_plan_doc_path(doc_id: str) -> Path:
@@ -47,7 +47,7 @@ def _read_content_from_file(doc_id: str) -> str:
             return file_path.read_text(encoding='utf-8')
         return ""
     except Exception as e:
-        logger.error(f"读取计划书文件 {doc_id} 失败: {e}")
+        logger.error("读取计划书文件 %s 失败: %s", doc_id, e)
         return ""
 
 
@@ -57,9 +57,9 @@ def _write_content_to_file(doc_id: str, content: str):
     try:
         _ensure_plan_doc_dir()
         file_path.write_text(content, encoding='utf-8')
-        logger.info(f"写入计划书文件 {doc_id} 成功")
+        logger.info("写入计划书文件 %s 成功", doc_id)
     except Exception as e:
-        logger.error(f"写入计划书文件 {doc_id} 失败: {e}")
+        logger.error("写入计划书文件 %s 失败: %s", doc_id, e)
 
 
 def _delete_content_file(doc_id: str):
@@ -68,9 +68,9 @@ def _delete_content_file(doc_id: str):
     try:
         if file_path.exists():
             file_path.unlink()
-            logger.info(f"删除计划书文件 {doc_id} 成功")
+            logger.info("删除计划书文件 %s 成功", doc_id)
     except Exception as e:
-        logger.error(f"删除计划书文件 {doc_id} 失败: {e}")
+        logger.error("删除计划书文件 %s 失败: %s", doc_id, e)
 
 
 def _convert_db_item_to_plan_doc_item(item: dict, include_content: bool = False) -> PlanDocItem:
@@ -192,7 +192,7 @@ def create_plan_doc(request: CreatePlanDocRequest) -> Optional[PlanDocItem]:
     # 前置检查：ID 是否已存在
     exists, conflict_source = _check_plan_doc_id_exists(request.id)
     if exists:
-        logger.warning(f"创建计划书失败: {conflict_source}, ID: {request.id}")
+        logger.warning("创建计划书失败: %s, ID: %s", conflict_source, request.id)
         raise ValueError(f"{conflict_source}: {request.id}")
 
     data = {
@@ -227,7 +227,7 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
     # 先检查文档是否存在
     existing = plan_doc_repository.get_plan_doc_by_id(doc_id)
     if not existing:
-        logger.warning(f"计划书 {doc_id} 不存在")
+        logger.warning("计划书 %s 不存在", doc_id)
         return None
 
     explicitly_set_fields = request.model_fields_set
@@ -235,12 +235,12 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
     # 处理重命名逻辑 (当 new_id 存在时)
     if 'new_id' in explicitly_set_fields and request.new_id and request.new_id != doc_id:
         new_id = request.new_id
-        logger.info(f"检测到重命名操作: {doc_id} -> {new_id}")
+        logger.info("检测到重命名操作: %s -> %s", doc_id, new_id)
 
         # 1. 检查新 ID 是否已存在（数据库 + 文件系统）
         exists, conflict_source = _check_plan_doc_id_exists(new_id)
         if exists:
-            logger.warning(f"重命名失败: {conflict_source}, ID: {new_id}")
+            logger.warning("重命名失败: %s, ID: %s", conflict_source, new_id)
             raise ValueError(f"{conflict_source}: {new_id}")
 
         # 2. 文件层操作：另存为新文件 (保留旧文件做备份)
@@ -256,7 +256,7 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
         success = plan_doc_repository.rename_plan_doc(doc_id, new_id)
 
         if not success:
-            logger.error(f"数据库重命名失败，回滚文件操作 (删除 {new_id}.md)")
+            logger.error("数据库重命名失败，回滚文件操作 (删除 %s.md)", new_id)
             _delete_content_file(new_id)
             return None
             

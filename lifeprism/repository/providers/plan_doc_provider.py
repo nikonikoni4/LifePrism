@@ -100,7 +100,7 @@ class PlanDocProvider(LWBaseDataProvider):
                 return [dict(zip(columns, row)) for row in rows]
 
         except Exception as e:
-            logger.error(f"获取所有计划书失败: {e}")
+            logger.error("获取所有计划书失败: %s", e)
             raise DataAccessError(f"获取所有计划书失败: {e}") from e
 
     def get_plan_docs_by_goal(self, goal_id: str) -> List[Dict[str, Any]]:
@@ -135,7 +135,7 @@ class PlanDocProvider(LWBaseDataProvider):
                 return [dict(zip(columns, row)) for row in rows]
 
         except Exception as e:
-            logger.error(f"获取目标 {goal_id} 的计划书失败: {e}")
+            logger.error("获取目标 %s 的计划书失败: %s", goal_id, e)
             raise DataAccessError(f"获取目标 {goal_id} 的计划书失败: {e}") from e
 
     def get_plan_doc_by_id(self, doc_id: str) -> Optional[Dict[str, Any]]:
@@ -189,13 +189,13 @@ class PlanDocProvider(LWBaseDataProvider):
 
             # 使用 _generic_insert
             result_id = self._generic_insert(data, on_conflict=self._ON_CONFLICT)
-            logger.info(f"创建计划书成功，ID: {doc_id}")
+            logger.info("创建计划书成功，ID: %s", doc_id)
             return doc_id
 
         except ValidationError:
             raise
         except Exception as e:
-            logger.error(f"创建计划书失败: {e}")
+            logger.error("创建计划书失败: %s", e)
             raise DataAccessError(f"创建计划书失败: {e}") from e
 
     def update_plan_doc(self, doc_id: str, data: Dict[str, Any]) -> bool:
@@ -245,13 +245,13 @@ class PlanDocProvider(LWBaseDataProvider):
                 success = cursor.rowcount > 0
 
                 if success:
-                    logger.info(f"更新计划书 {doc_id} 成功")
+                    logger.info("更新计划书 %s 成功", doc_id)
                 return success
 
         except ValidationError:
             raise
         except Exception as e:
-            logger.error(f"更新计划书 {doc_id} 失败: {e}")
+            logger.error("更新计划书 %s 失败: %s", doc_id, e)
             raise DataAccessError(f"更新计划书 {doc_id} 失败: {e}") from e
 
     def delete_plan_doc(self, doc_id: str) -> bool:
@@ -274,11 +274,11 @@ class PlanDocProvider(LWBaseDataProvider):
 
                 success = cursor.rowcount > 0
                 if success:
-                    logger.info(f"删除计划书 {doc_id} 成功")
+                    logger.info("删除计划书 %s 成功", doc_id)
                 return success
 
         except Exception as e:
-            logger.error(f"删除计划书 {doc_id} 失败: {e}")
+            logger.error("删除计划书 %s 失败: %s", doc_id, e)
             raise DataAccessError(f"删除计划书 {doc_id} 失败: {e}") from e
 
     def rename_plan_doc(self, old_id: str, new_id: str) -> bool:
@@ -307,7 +307,7 @@ class PlanDocProvider(LWBaseDataProvider):
                 )
 
                 if cursor.rowcount == 0:
-                    logger.warning(f"重命名失败: 计划书 {old_id} 不存在")
+                    logger.warning("重命名失败: 计划书 %s 不存在", old_id)
                     return False
 
                 # 2. 级联更新 todo_list 表 (Task Pool) 中的引用
@@ -316,12 +316,12 @@ class PlanDocProvider(LWBaseDataProvider):
                     (new_id, old_id)
                 )
 
-                logger.info(f"重命名计划书成功: {old_id} -> {new_id}, 关联任务更新数: {cursor.rowcount}")
+                logger.info("重命名计划书成功: %s -> %s, 关联任务更新数: %s", old_id, new_id, cursor.rowcount)
                 return True
 
         except sqlite3.IntegrityError as e:
-            logger.error(f"重命名计划书 {old_id} -> {new_id} 失败: {e}")
+            logger.error("重命名计划书 %s -> %s 失败: %s", old_id, new_id, e)
             raise ConflictError(f"重命名计划书失败，新 ID 已存在: {new_id}") from e
         except Exception as e:
-            logger.error(f"重命名计划书 {old_id} -> {new_id} 失败: {e}")
+            logger.error("重命名计划书 %s -> %s 失败: %s", old_id, new_id, e)
             raise DataAccessError(f"重命名计划书 {old_id} -> {new_id} 失败: {e}") from e

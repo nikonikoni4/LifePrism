@@ -30,10 +30,10 @@ def get_db_path() -> Path:
 def run_migration():
     db_path = get_db_path()
     if not db_path.exists():
-        logger.error(f"数据库文件不存在: {db_path}")
+        logger.error("数据库文件不存在: %s", db_path)
         return False
 
-    logger.info(f"开始迁移数据库: {db_path}")
+    logger.info("开始迁移数据库: %s", db_path)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -51,7 +51,7 @@ def run_migration():
         todo_count_before = cursor.fetchone()[0]
         cursor.execute("SELECT COUNT(*) FROM timeline_custom_block")
         timeline_count_before = cursor.fetchone()[0]
-        logger.info(f"迁移前: todo_list={todo_count_before} 行, timeline_custom_block={timeline_count_before} 行")
+        logger.info("迁移前: todo_list=%s 行, timeline_custom_block=%s 行", todo_count_before, timeline_count_before)
 
         # 步骤 1: 创建临时映射表
         logger.info("步骤 1: 创建 ID 映射表...")
@@ -82,7 +82,7 @@ def run_migration():
         return True
 
     except Exception as e:
-        logger.error(f"迁移失败: {e}")
+        logger.error("迁移失败: error=%s", e)
         conn.rollback()
         return False
     finally:
@@ -109,7 +109,7 @@ def _create_id_map(cursor: sqlite3.Cursor):
         FROM todo_list
     """)
     mapped = cursor.rowcount
-    logger.info(f"  映射 {mapped} 条记录")
+    logger.info("  映射 %s 条记录", mapped)
 
 
 def _rebuild_timeline_custom_block(cursor: sqlite3.Cursor):
@@ -152,7 +152,7 @@ def _rebuild_timeline_custom_block(cursor: sqlite3.Cursor):
     migrated = cursor.rowcount
     cursor.execute("DROP TABLE timeline_custom_block")
     cursor.execute("ALTER TABLE timeline_custom_block_new RENAME TO timeline_custom_block")
-    logger.info(f"  迁移 {migrated} 条 timeline 记录")
+    logger.info("  迁移 %s 条 timeline 记录", migrated)
 
 
 def _rebuild_todo_list(cursor: sqlite3.Cursor):
@@ -200,7 +200,7 @@ def _rebuild_todo_list(cursor: sqlite3.Cursor):
     migrated = cursor.rowcount
     cursor.execute("DROP TABLE todo_list")
     cursor.execute("ALTER TABLE todo_list_new RENAME TO todo_list")
-    logger.info(f"  迁移 {migrated} 条 todo 记录")
+    logger.info("  迁移 %s 条 todo 记录", migrated)
 
 
 def _rebuild_indexes(cursor: sqlite3.Cursor):
@@ -219,7 +219,7 @@ def _rebuild_indexes(cursor: sqlite3.Cursor):
     ]
     for name, table, cols in indexes:
         cursor.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {table}({cols})")
-        logger.info(f"  创建索引: {name}")
+        logger.info("  创建索引: %s", name)
 
 
 def _verify_migration(cursor: sqlite3.Cursor, todo_expected: int, timeline_expected: int):
@@ -269,10 +269,10 @@ def _verify_migration(cursor: sqlite3.Cursor, todo_expected: int, timeline_expec
 
     if errors:
         for e in errors:
-            logger.error(f"  验证失败: {e}")
+            logger.error("  验证失败: %s", e)
         raise RuntimeError("迁移验证失败: " + "; ".join(errors))
 
-    logger.info(f"  验证通过: todo={todo_actual}, timeline={timeline_actual}, 无孤儿引用")
+    logger.info("  验证通过: todo=%s, timeline=%s, 无孤儿引用", todo_actual, timeline_actual)
 
 
 def check_migration_status():

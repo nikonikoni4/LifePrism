@@ -55,7 +55,7 @@ class CategoryCache:
         else:
             valid_df = cache_df.copy()
         
-        logger.debug(f"构建缓存索引: 原始 {len(cache_df)} 行, 有效 {len(valid_df)} 行")
+        logger.debug("构建缓存索引: 原始 %d 行, 有效 %d 行", len(cache_df), len(valid_df))
         
         # 分离单用途和多用途记录
         single_purpose_df = valid_df[valid_df['is_multipurpose_app'] == 0]
@@ -110,10 +110,14 @@ class CategoryCache:
                     self._app_description_map[app] = desc
         
         logger.debug(
-            f"索引构建完成: 单用途(有分类) {len(self._single_purpose_apps)} 个, "
-            f"多用途(有分类) {len(self._multipurpose_apps)} 个, "
-            f"titles(有分类) {len(self._multipurpose_titles)} 个, "
-            f"描述 {len(self._app_description_map)} 个"
+            "索引构建完成: 单用途(有分类) %d 个, "
+            "多用途(有分类) %d 个, "
+            "titles(有分类) %d 个, "
+            "描述 %d 个",
+            len(self._single_purpose_apps),
+            len(self._multipurpose_apps),
+            len(self._multipurpose_titles),
+            len(self._app_description_map),
         )
     
     def get_single_purpose_category(self, app: str) -> Optional[Tuple[str, Optional[str], Optional[str]]]:

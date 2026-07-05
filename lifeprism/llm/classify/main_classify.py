@@ -33,7 +33,7 @@ class LLMClassify:
         """根据名称创建分类器实例"""
         if classify_mode not in CLASSIFIER_REGISTRY:
             available = list(CLASSIFIER_REGISTRY.keys())
-            logger.warning(f"classify_mode: {classify_mode} 无效，必须为 {available} 中的一项")
+            logger.warning("classify_mode: %s 无效，必须为 %s 中的一项", classify_mode, available)
             return None
         
         classifier_class = CLASSIFIER_REGISTRY[classify_mode]

@@ -82,7 +82,7 @@ class DailyReportProvider(LWBaseDataProvider):
                 return self._deserialize_json_fields(result)
             return None
         except Exception as e:
-            logger.error(f"获取日报告 {date} 失败: {e}")
+            logger.error("获取日报告 %s 失败: error=%s", date, e)
             return None
     
     def upsert_daily_report(self, date: str, data: Dict[str, Any]) -> bool:
@@ -117,7 +117,7 @@ class DailyReportProvider(LWBaseDataProvider):
                 )
                 
                 if rows_affected > 0:
-                    logger.info(f"更新日报告 {date} 成功")
+                    logger.info("更新日报告 %s 成功", date)
                 return True
             else:
                 # INSERT
@@ -128,11 +128,11 @@ class DailyReportProvider(LWBaseDataProvider):
                 insert_data = self._serialize_json_fields(insert_data)
                 
                 self.db.insert(self.TABLE_NAME, insert_data)
-                logger.info(f"创建日报告 {date} 成功")
+                logger.info("创建日报告 %s 成功", date)
                 return True
                 
         except Exception as e:
-            logger.error(f"保存日报告 {date} 失败: {e}")
+            logger.error("保存日报告 %s 失败: error=%s", date, e)
             return False
     
     def update_report_state(self, date: str, state: str) -> bool:
@@ -156,11 +156,11 @@ class DailyReportProvider(LWBaseDataProvider):
             
             success = rows_affected > 0
             if success:
-                logger.info(f"更新日报告 {date} 状态为 {state}")
+                logger.info("更新日报告 %s 状态为 %s", date, state)
             return success
             
         except Exception as e:
-            logger.error(f"更新日报告 {date} 状态失败: {e}")
+            logger.error("更新日报告 %s 状态失败: error=%s", date, e)
             return False
     
     def delete_daily_report(self, date: str) -> bool:
@@ -182,11 +182,11 @@ class DailyReportProvider(LWBaseDataProvider):
             
             success = rows_affected > 0
             if success:
-                logger.info(f"删除日报告 {date} 成功")
+                logger.info("删除日报告 %s 成功", date)
             return success
             
         except Exception as e:
-            logger.error(f"删除日报告 {date} 失败: {e}")
+            logger.error("删除日报告 %s 失败: error=%s", date, e)
             return False
     
     def get_reports_in_range(
@@ -217,7 +217,7 @@ class DailyReportProvider(LWBaseDataProvider):
             return self._df_to_dict_list(df)
             
         except Exception as e:
-            logger.error(f"获取日期范围 {start_date} 至 {end_date} 报告失败: {e}")
+            logger.error("获取日期范围 %s 至 %s 报告失败: error=%s", start_date, end_date, e)
             return []
     
     def get_completed_report_dates(
@@ -252,7 +252,7 @@ class DailyReportProvider(LWBaseDataProvider):
             return df[self.ID_COLUMN].tolist()
             
         except Exception as e:
-            logger.error(f"获取已完成报告日期失败: {e}")
+            logger.error("获取已完成报告日期失败: error=%s", e)
             return []
 
 
@@ -329,7 +329,7 @@ class WeeklyReportProvider(LWBaseDataProvider):
                 return self._deserialize_json_fields(result)
             return None
         except Exception as e:
-            logger.error(f"获取周报告 {week_start_date} 失败: {e}")
+            logger.error("获取周报告 %s 失败: error=%s", week_start_date, e)
             return None
     
     def upsert_weekly_report(self, week_start_date: str, data: Dict[str, Any]) -> bool:
@@ -364,7 +364,7 @@ class WeeklyReportProvider(LWBaseDataProvider):
                 )
                 
                 if rows_affected > 0:
-                    logger.info(f"更新周报告 {week_start_date} 成功")
+                    logger.info("更新周报告 %s 成功", week_start_date)
                 return True
             else:
                 # INSERT
@@ -375,11 +375,11 @@ class WeeklyReportProvider(LWBaseDataProvider):
                 insert_data = self._serialize_json_fields(insert_data)
                 
                 self.db.insert(self.TABLE_NAME, insert_data)
-                logger.info(f"创建周报告 {week_start_date} 成功")
+                logger.info("创建周报告 %s 成功", week_start_date)
                 return True
                 
         except Exception as e:
-            logger.error(f"保存周报告 {week_start_date} 失败: {e}")
+            logger.error("保存周报告 %s 失败: error=%s", week_start_date, e)
             return False
     
     def update_report_state(self, week_start_date: str, state: str) -> bool:
@@ -403,11 +403,11 @@ class WeeklyReportProvider(LWBaseDataProvider):
             
             success = rows_affected > 0
             if success:
-                logger.info(f"更新周报告 {week_start_date} 状态为 {state}")
+                logger.info("更新周报告 %s 状态为 %s", week_start_date, state)
             return success
             
         except Exception as e:
-            logger.error(f"更新周报告 {week_start_date} 状态失败: {e}")
+            logger.error("更新周报告 %s 状态失败: error=%s", week_start_date, e)
             return False
     
     def delete_weekly_report(self, week_start_date: str) -> bool:
@@ -429,11 +429,11 @@ class WeeklyReportProvider(LWBaseDataProvider):
             
             success = rows_affected > 0
             if success:
-                logger.info(f"删除周报告 {week_start_date} 成功")
+                logger.info("删除周报告 %s 成功", week_start_date)
             return success
             
         except Exception as e:
-            logger.error(f"删除周报告 {week_start_date} 失败: {e}")
+            logger.error("删除周报告 %s 失败: error=%s", week_start_date, e)
             return False
     
     def get_reports_in_range(
@@ -464,7 +464,7 @@ class WeeklyReportProvider(LWBaseDataProvider):
             return self._df_to_dict_list(df)
             
         except Exception as e:
-            logger.error(f"获取日期范围 {start_date} 至 {end_date} 周报告失败: {e}")
+            logger.error("获取日期范围 %s 至 %s 周报告失败: error=%s", start_date, end_date, e)
             return []
 
 
@@ -541,7 +541,7 @@ class MonthlyReportProvider(LWBaseDataProvider):
                 return self._deserialize_json_fields(result)
             return None
         except Exception as e:
-            logger.error(f"获取月报告 {month_start_date} 失败: {e}")
+            logger.error("获取月报告 %s 失败: error=%s", month_start_date, e)
             return None
     
     def upsert_monthly_report(self, month_start_date: str, data: Dict[str, Any]) -> bool:
@@ -576,7 +576,7 @@ class MonthlyReportProvider(LWBaseDataProvider):
                 )
                 
                 if rows_affected > 0:
-                    logger.info(f"更新月报告 {month_start_date} 成功")
+                    logger.info("更新月报告 %s 成功", month_start_date)
                 return True
             else:
                 # INSERT
@@ -587,11 +587,11 @@ class MonthlyReportProvider(LWBaseDataProvider):
                 insert_data = self._serialize_json_fields(insert_data)
                 
                 self.db.insert(self.TABLE_NAME, insert_data)
-                logger.info(f"创建月报告 {month_start_date} 成功")
+                logger.info("创建月报告 %s 成功", month_start_date)
                 return True
                 
         except Exception as e:
-            logger.error(f"保存月报告 {month_start_date} 失败: {e}")
+            logger.error("保存月报告 %s 失败: error=%s", month_start_date, e)
             return False
     
     def update_report_state(self, month_start_date: str, state: str) -> bool:
@@ -615,11 +615,11 @@ class MonthlyReportProvider(LWBaseDataProvider):
             
             success = rows_affected > 0
             if success:
-                logger.info(f"更新月报告 {month_start_date} 状态为 {state}")
+                logger.info("更新月报告 %s 状态为 %s", month_start_date, state)
             return success
             
         except Exception as e:
-            logger.error(f"更新月报告 {month_start_date} 状态失败: {e}")
+            logger.error("更新月报告 %s 状态失败: error=%s", month_start_date, e)
             return False
     
     def delete_monthly_report(self, month_start_date: str) -> bool:
@@ -641,7 +641,7 @@ class MonthlyReportProvider(LWBaseDataProvider):
             
             success = rows_affected > 0
             if success:
-                logger.info(f"删除月报告 {month_start_date} 成功")
+                logger.info("删除月报告 %s 成功", month_start_date)
             return success
             
         except Exception as e:
