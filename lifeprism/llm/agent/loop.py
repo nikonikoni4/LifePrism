@@ -217,12 +217,22 @@ class AgentLoop:
         # 1. 当前只有微信有命令行工具 /new
         if msg.channel == ChannelType.WECHAT:
             if message_text.startswith("/new"):
+                # 获取当前 session_id（用于恢复提示）
+                old_session_id = msg.session_id
+                logger.info(f"创建新会话，上一个会话 ID: {old_session_id}")
+
                 # 新建会话
                 new_session = session_manager.get_or_create_session()
                 # 立即保存 session 到文件，避免重启后丢失
                 session_manager.save_session(new_session)
-                # 传出新的session_id , channel 下一次使用时必须使用上一次消息传出的session_id
-                response_text = f"[SUCCESS] 新建会话 {new_session.id} ---\n 可以开始新的聊天了！"
+
+                # 构造响应文本
+                response_text = f"[SUCCESS] 新建会话 {new_session.id} --- 可以开始新的聊天了！"
+
+                # 如果有上一个会话，提示如何恢复
+                if old_session_id is not None:
+                    response_text += f"\n\n可以通过使用以下指令恢复上一个会话：\n/continue {old_session_id}"
+
                 return OutboundMessage(
                     id=msg.id,
                     response=LLMResponse(content=response_text),
@@ -249,10 +259,57 @@ class AgentLoop:
                         response=LLMResponse(content=f"[ERROR] 会话 {session_id} 不存在")
                     )
                 else:
-                    # 存在则返回session_id
+                    # 4. 加载 session 并提取最后两轮对话
+                    session = session_manager.get_or_create_session(session_id)
+                    logger.info(f"继续会话 {session_id}，提取最后两轮对话")
+
+                    # 提取最后的 user 和 assistant 消息
+                    last_user_msg = None
+                    last_assistant_msg = None
+
+                    # 倒序查找最后一条 user 消息和 assistant 消息
+                    for message in reversed(session.messages):
+                        if message.get('role') == 'user' and last_user_msg is None:
+                            content = message.get('content', '')
+                            # 处理多模态消息（content 是 list）
+                            if isinstance(content, list):
+                                last_user_msg = ''.join(
+                                    block.get('text', '')
+                                    for block in content
+                                    if isinstance(block, dict) and block.get('type') == 'text'
+                                )
+                            else:
+                                last_user_msg = content
+
+                        if message.get('role') == 'assistant' and last_assistant_msg is None:
+                            content = message.get('content', '')
+                            # 处理多模态消息（content 是 list）
+                            if isinstance(content, list):
+                                last_assistant_msg = ''.join(
+                                    block.get('text', '')
+                                    for block in content
+                                    if isinstance(block, dict) and block.get('type') == 'text'
+                                )
+                            else:
+                                last_assistant_msg = content
+
+                        # 如果两条消息都找到了，提前退出
+                        if last_user_msg is not None and last_assistant_msg is not None:
+                            break
+
+                    # 构造响应文本
+                    response_text = f"[SUCCESS] 继续会话 {session_id}"
+
+                    if last_user_msg or last_assistant_msg:
+                        response_text += "\n\n最后两轮对话："
+                        if last_user_msg:
+                            response_text += f"\nuser:\n{last_user_msg}"
+                        if last_assistant_msg:
+                            response_text += f"\n\nA:\n{last_assistant_msg}"
+
                     return OutboundMessage(
                         id=msg.id,
-                        response=LLMResponse(content=f"[SUCCESS] 继续会话 {session_id}"),
+                        response=LLMResponse(content=response_text),
                         session_id=session_id
                     )
             elif message_text.startswith("/session-list"):
