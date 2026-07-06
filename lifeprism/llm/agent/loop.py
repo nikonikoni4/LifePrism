@@ -77,6 +77,23 @@ class AgentLoop:
         llm = create_llm_client()
         messages = Context.build_prompt(system_prompt, session.get_history_message())
         logger.info("LLM 调用开始, session=%s", session.id)
+        # logger.debug("构建的 messages 数量=%s", len(messages))
+        # for idx, msg in enumerate(messages):
+        #     logger.debug(
+        #         "Message[%s]: role=%s, content_type=%s, content_length=%s, has_tool_calls=%s",
+        #         idx, msg.get('role'), type(msg.get('content')).__name__,
+        #         len(str(msg.get('content', ''))) if msg.get('content') else 0,
+        #         'tool_calls' in msg
+        #     )
+        #     if isinstance(msg.get('content'), list):
+        #         for block_idx, block in enumerate(msg['content']):
+        #             if isinstance(block, dict):
+        #                 logger.debug(
+        #                     "  Block[%s]: type=%s, has_text=%s, text_length=%s",
+        #                     block_idx, block.get('type'),
+        #                     'text' in block,
+        #                     len(block.get('text', '')) if 'text' in block else 0
+        #                 )
         response: LLMResponse = await llm.chat(
             messages=messages,
             tools=tools
@@ -135,7 +152,14 @@ class AgentLoop:
                     if tool_error[tool_call.name] > MAX_TOOL_ERROR_COUNT:
                         logger.warning("工具 %s 超过最大错误次数，添加警告信息", tool_call.name)
                         result += f"，已连续调用{tool_error[tool_call.name]}次，超过最大错误次数{MAX_TOOL_ERROR_COUNT}，请立即放弃该工具调用，尝试切换其他工具。若无可替代工具，向用户说明情况"
-                session.add_message('tool', result, tool_call_id=tool_call.id)
+
+                # 将工具结果转换为字符串（如果是 dict/list，转为 JSON）
+                if isinstance(result, (dict, list)):
+                    result_content = json.dumps(result, ensure_ascii=False)
+                else:
+                    result_content = str(result)
+
+                session.add_message('tool', result_content, tool_call_id=tool_call.id)
 
             # 将当前轮次的工具调用添加到链中（含推理内容）
             tool_call_chain.append({
@@ -146,6 +170,21 @@ class AgentLoop:
             messages = Context.build_prompt(system_prompt, session.get_history_message())
             logger.debug("第%s次 llm调用开始， message 长度 %s", tool_call_count+1, len(messages))
             logger.debug(messages)
+            # # 添加详细的消息结构日志
+            # for idx, msg in enumerate(messages):
+            #     logger.debug(
+            #         "Message[%s]: role=%s, content_type=%s, content=%s",
+            #         idx, msg.get('role'), type(msg.get('content')).__name__,
+            #         str(msg.get('content'))[:200] if msg.get('content') else 'None'
+            #     )
+            #     if isinstance(msg.get('content'), list):
+            #         for block_idx, block in enumerate(msg['content']):
+            #             if isinstance(block, dict):
+            #                 logger.debug(
+            #                     "  Block[%s]: type=%s, text=%s",
+            #                     block_idx, block.get('type'),
+            #                     str(block.get('text', ''))[:100] if 'text' in block else 'N/A'
+            #                 )
             response: LLMResponse = await llm.chat(
                 messages=messages,
                 tools=tools

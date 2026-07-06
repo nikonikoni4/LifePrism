@@ -47,7 +47,7 @@ class QuerySessionListTool(Tool):
             "required": []
         }
 
-    async def execute(self, **kwargs: Any) -> Any:
+    async def execute(self, **kwargs: Any) -> str:
         """
         使用给定参数执行工具
 
@@ -56,20 +56,27 @@ class QuerySessionListTool(Tool):
                 - date_filter: 日期筛选（可选，格式 YYYY-MM-DD）
 
         返回:
-            dict[str, dict[str, str]]: 格式为 {"session_id": {"last_summary": str, "last_user_message": str}}
+            str: JSON 格式的字符串，内容为 {"session_id": {"last_summary": str, "last_user_message": str}}
         """
         try:
             date_filter = kwargs.get('date_filter')
 
             # 验证日期格式
             if date_filter and not re.match(r'^\d{4}-\d{2}-\d{2}$', date_filter):
+                logger.error(
+                    "查询会话列表失败: date_filter=%s, 日期格式错误",
+                    date_filter
+                )
                 return f"{ERROR}日期格式错误，应为 YYYY-MM-DD"
 
             # 1. 遍历所有 session 文件
             session_path = settings.session_path
             if not session_path.exists():
-                logger.warning("Session 路径不存在: %s", session_path)
-                return {}
+                logger.error(
+                    "查询会话列表失败: session_path=%s, 路径不存在",
+                    session_path
+                )
+                return json.dumps({}, ensure_ascii=False)
 
             session_data = {}  # {session_id: {"updated_at": str, "last_user_message": str}}
 
@@ -107,7 +114,10 @@ class QuerySessionListTool(Tool):
 
                         # 检查是否有 metadata
                         if not metadata:
-                            logger.warning("Session %s 缺少 metadata，跳过", session_id)
+                            logger.warning(
+                                "Session %s 缺少 metadata，跳过: file=%s",
+                                session_id, file
+                            )
                             continue
 
                         updated_at = metadata.get('updated_at', '')
@@ -124,7 +134,10 @@ class QuerySessionListTool(Tool):
                         }
 
                 except Exception as e:
-                    logger.warning("读取 session %s 失败: %s，跳过该文件", session_id, e)
+                    logger.warning(
+                        "读取 session %s 失败，跳过: file=%s, error=%s",
+                        session_id, file, e
+                    )
                     continue
 
             # 2. 加载 chat_history.json
@@ -172,11 +185,17 @@ class QuerySessionListTool(Tool):
                     "last_user_message": data["last_user_message"]
                 }
 
-            logger.debug("查询会话列表: date_filter=%s, 结果数=%s", date_filter, len(result))
-            return result
+            logger.info(
+                "查询会话列表完成: date_filter=%s, 结果数=%s",
+                date_filter, len(result)
+            )
+            return json.dumps(result, ensure_ascii=False)
 
         except Exception as e:
-            logger.error("查询会话列表失败: %s", e)
+            logger.error(
+                "查询会话列表失败: date_filter=%s, error=%s",
+                kwargs.get('date_filter'), e
+            )
             return f"{ERROR}查询会话列表失败: {e}"
 
 
@@ -220,7 +239,7 @@ class QuerySessionHistoryTool(Tool):
             "required": ["session_id"]
         }
 
-    async def execute(self, **kwargs: Any) -> Any:
+    async def execute(self, **kwargs: Any) -> str:
         """
         使用给定参数执行工具
 
@@ -230,7 +249,7 @@ class QuerySessionHistoryTool(Tool):
                 - limit: 返回的消息轮数（默认 10）
 
         返回:
-            list[dict[str, str]]: 历史消息列表，每项包含 role, content, timestamp
+            str: JSON 格式的字符串，内容为历史消息列表或错误消息
         """
         try:
             session_id = kwargs.get('session_id', '')
@@ -244,7 +263,10 @@ class QuerySessionHistoryTool(Tool):
 
             # 检查文件是否存在
             if not session_path.exists():
-                logger.warning("会话 %s 不存在", session_id)
+                logger.error(
+                    "查询会话历史失败: session_id=%s, 会话文件不存在, path=%s",
+                    session_id, session_path
+                )
                 return f"{ERROR}会话 {session_id} 不存在"
 
             # 读取 session 文件
@@ -267,16 +289,71 @@ class QuerySessionHistoryTool(Tool):
                                 'timestamp': data.get('timestamp', '')
                             })
             except Exception as e:
-                logger.error("读取 session %s 失败: %s", session_id, e)
+                logger.error(
+                    "读取会话文件失败: session_id=%s, path=%s, error=%s",
+                    session_id, session_path, e
+                )
                 return f"{ERROR}读取会话失败: {e}"
 
             # 按 timestamp 倒序，取最近 limit 条（最大 50）
             messages.reverse()
-            result = messages[:min(limit, 50)]
+            messages = messages[:min(limit, 50)]
 
-            logger.debug("查询会话历史: session_id=%s, limit=%s, 结果数=%s", session_id, limit, len(result))
-            return result
+            # 格式化为人类可读的 Markdown
+            if not messages:
+                return f"会话 {session_id[:8]}...{session_id[-8:]} 暂无对话记录"
+
+            lines = [f"会话 {session_id[:8]}...{session_id[-8:]} 的最近 {len(messages)} 轮对话：\n"]
+
+            for idx, msg in enumerate(messages, 1):
+                role = "用户" if msg['role'] == 'user' else "助手"
+                timestamp = msg['timestamp']
+                content = msg['content']
+
+                # 解析时间戳为 MM-DD HH:MM 格式
+                try:
+                    dt = datetime.fromisoformat(timestamp)
+                    time_str = dt.strftime("%m-%d %H:%M")
+                except Exception:
+                    time_str = timestamp[:16] if len(timestamp) >= 16 else timestamp
+
+                # 处理内容
+                if not content or (isinstance(content, str) and not content.strip()):
+                    content_str = "(空消息)"
+                elif isinstance(content, list):
+                    # 多模态消息，提取文本
+                    text_parts = []
+                    for block in content:
+                        if isinstance(block, dict) and block.get('type') == 'text':
+                            text_parts.append(block.get('text', ''))
+                        elif isinstance(block, str):
+                            text_parts.append(block)
+                    content_str = ' '.join(text_parts) if text_parts else "(空消息)"
+                else:
+                    content_str = str(content)
+
+                # 截断过长内容
+                if len(content_str) > 100:
+                    content_str = content_str[:80] + "...\n(内容较长，已省略)"
+
+                # 压缩连续换行
+                content_str = re.sub(r'\n{3,}', '\n\n', content_str)
+
+                lines.append(f"[{idx}] {role} {time_str}")
+                lines.append(content_str)
+                lines.append("")  # 空行分隔
+
+            result_text = '\n'.join(lines).rstrip()
+
+            logger.info(
+                "查询会话历史完成: session_id=%s, limit=%s, 结果数=%s",
+                session_id, limit, len(messages)
+            )
+            return result_text
 
         except Exception as e:
-            logger.error("查询会话历史失败: %s", e)
+            logger.error(
+                "查询会话历史失败: session_id=%s, limit=%s, error=%s",
+                kwargs.get('session_id'), kwargs.get('limit', 10), e
+            )
             return f"{ERROR}查询会话历史失败: {e}"

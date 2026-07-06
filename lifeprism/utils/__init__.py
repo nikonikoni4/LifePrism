@@ -3,7 +3,7 @@ from .common_utils import is_multipurpose_app
 from .logger import get_logger, setup_file_logging, DEBUG, INFO, WARNING, ERROR
 from .lazy_singleton import LazySingleton
 from .exceptions import ConflictError,NotFoundError
-
+from .exceptions import LWBaseError
 
 __all__ = [
     "get_logger",
@@ -17,4 +17,5 @@ __all__ = [
     "ERROR",
     "NotFoundError",
     "LLMCallLogger",
+    "LWBaseError"
 ]

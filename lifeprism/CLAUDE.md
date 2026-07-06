@@ -2,6 +2,35 @@
 
 错误处理详见 `docs/coding-rules/backend-error-handling.md`
 
+## 类型注解规范
+
+**禁止使用 `Any` 作为返回类型**：
+
+```python
+# ❌ 错误：返回类型使用 Any
+async def execute(self, **kwargs: Any) -> Any:
+    return {"key": "value"}  # 调用方无法知道返回什么类型
+
+# ✅ 正确：明确返回类型
+async def execute(self, **kwargs: Any) -> dict[str, str]:
+    return {"key": "value"}
+
+# ✅ 正确：多种返回类型使用 Union
+async def execute(self, **kwargs: Any) -> dict[str, Any] | str:
+    if error:
+        return "ERROR: ..."
+    return {"data": [...]}
+```
+
+**为什么禁止 `Any`**：
+1. 丧失类型检查能力，IDE 无法提供自动补全
+2. 调用方无法知道返回什么类型，容易出错
+3. 违反"明确优于隐式"的 Python 设计原则
+
+**例外情况**：
+- 参数类型可以使用 `**kwargs: Any`（kwargs 本身就是动态的）
+- 处理真正动态的 JSON 数据时，可以用 `dict[str, Any]`（但应注明具体结构）
+
 ## 错误处理
 
 **分层规则**：

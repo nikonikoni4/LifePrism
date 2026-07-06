@@ -99,19 +99,27 @@ class TestQuerySessionHistoryTool:
 
     @pytest.mark.asyncio
     async def test_basic_query(self, sample_session_file):
-        """测试基本查询功能：返回指定数量的历史消息"""
+        """测试基本查询功能：返回格式化的 Markdown 字符串"""
         session_id, _ = sample_session_file
         tool = QuerySessionHistoryTool()
 
         # 查询最近 3 条
         result = await tool.execute(session_id=session_id, limit=3)
 
-        assert isinstance(result, list)
-        assert len(result) == 3
-        # 验证返回的是倒序（最新的在前）
-        assert result[0]['content'] == "第三条助手回复"
-        assert result[1]['content'] == "第三条用户消息"
-        assert result[2]['content'] == "第二条助手回复"
+        assert isinstance(result, str)
+        # 验证标题格式
+        assert f"会话 {session_id[:8]}...{session_id[-8:]}" in result
+        assert "最近 3 轮对话" in result
+        # 验证包含序号和角色
+        assert "[1]" in result
+        assert "[2]" in result
+        assert "[3]" in result
+        assert "用户" in result
+        assert "助手" in result
+        # 验证内容存在（注意顺序是正序，最早的在前）
+        assert "第二条助手回复" in result
+        assert "第三条用户消息" in result
+        assert "第三条助手回复" in result
 
     @pytest.mark.asyncio
     async def test_default_limit(self, sample_session_file):
@@ -122,9 +130,12 @@ class TestQuerySessionHistoryTool:
         # 不传 limit，应该使用默认值 10
         result = await tool.execute(session_id=session_id)
 
-        assert isinstance(result, list)
-        # 实际消息只有 6 条（不包括 tool 消息），所以返回 6 条
-        assert len(result) == 6
+        assert isinstance(result, str)
+        # 验证标题中包含实际返回的消息数量（6 条）
+        assert "最近 6 轮对话" in result
+        # 验证包含所有 6 条消息的序号
+        for i in range(1, 7):
+            assert f"[{i}]" in result
 
     @pytest.mark.asyncio
     async def test_limit_validation(self, sample_session_file):
@@ -135,9 +146,9 @@ class TestQuerySessionHistoryTool:
         # 请求超过 50 条，应该被限制为 50
         result = await tool.execute(session_id=session_id, limit=100)
 
-        assert isinstance(result, list)
+        assert isinstance(result, str)
         # 实际消息只有 6 条，返回 6 条
-        assert len(result) == 6
+        assert "最近 6 轮对话" in result
 
     @pytest.mark.asyncio
     async def test_filter_tool_messages(self, sample_session_file):
@@ -147,10 +158,12 @@ class TestQuerySessionHistoryTool:
 
         result = await tool.execute(session_id=session_id, limit=10)
 
-        # 验证返回的消息中没有 tool 角色
-        for msg in result:
-            assert msg['role'] in ['user', 'assistant']
-            assert msg['role'] != 'tool'
+        # 验证返回的字符串中只包含用户和助手的消息，不包含 tool
+        assert isinstance(result, str)
+        assert "用户" in result
+        assert "助手" in result
+        # tool 消息应该被过滤掉，不出现在结果中
+        assert "工具调用结果" not in result
 
     @pytest.mark.asyncio
     async def test_session_not_exists(self, temp_session_dir, monkeypatch):
@@ -177,22 +190,17 @@ class TestQuerySessionHistoryTool:
 
     @pytest.mark.asyncio
     async def test_message_format(self, sample_session_file):
-        """测试返回消息的格式"""
+        """测试返回消息的格式：验证时间戳格式为 MM-DD HH:MM"""
         session_id, _ = sample_session_file
         tool = QuerySessionHistoryTool()
 
         result = await tool.execute(session_id=session_id, limit=1)
 
-        assert len(result) == 1
-        msg = result[0]
-        # 验证必须包含的字段
-        assert 'role' in msg
-        assert 'content' in msg
-        assert 'timestamp' in msg
-        # 验证字段类型
-        assert isinstance(msg['role'], str)
-        assert isinstance(msg['content'], str)
-        assert isinstance(msg['timestamp'], str)
+        assert isinstance(result, str)
+        # 验证时间戳格式为 MM-DD HH:MM
+        assert "07-01 11:01" in result  # 最新的一条消息时间
+        # 验证包含角色标识
+        assert "助手" in result
 
     @pytest.mark.asyncio
     async def test_tool_schema(self):
@@ -212,6 +220,138 @@ class TestQuerySessionHistoryTool:
         assert params['properties']['limit']['minimum'] == 1
         assert params['properties']['limit']['maximum'] == 50
         assert params['properties']['limit']['default'] == 10
+
+    @pytest.mark.asyncio
+    async def test_empty_message_handling(self, temp_session_dir, monkeypatch):
+        """测试空消息处理：显示 (空消息)"""
+        from lifeprism.config.settings_manager import settings
+        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: temp_session_dir))
+
+        session_id = "test-empty-msg"
+        session_path = temp_session_dir / f"{session_id}.jsonl"
+
+        metadata = {
+            "_type": "metadata",
+            "created_at": "2026-07-01T10:00:00",
+            "updated_at": "2026-07-01T10:00:00"
+        }
+        messages = [
+            {"role": "user", "content": "", "timestamp": "2026-07-01T10:01:00"},
+            {"role": "assistant", "content": "   ", "timestamp": "2026-07-01T10:02:00"}
+        ]
+
+        with open(session_path, 'w', encoding='utf-8') as f:
+            f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+            for msg in messages:
+                f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+
+        tool = QuerySessionHistoryTool()
+        result = await tool.execute(session_id=session_id)
+
+        assert "(空消息)" in result
+        # 应该出现两次（两条空消息）
+        assert result.count("(空消息)") == 2
+
+    @pytest.mark.asyncio
+    async def test_long_message_truncation(self, temp_session_dir, monkeypatch):
+        """测试长消息截断：超过 100 字符截断为 80 字符 + 省略提示"""
+        from lifeprism.config.settings_manager import settings
+        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: temp_session_dir))
+
+        session_id = "test-long-msg"
+        session_path = temp_session_dir / f"{session_id}.jsonl"
+
+        long_content = "这是一条非常长的消息内容" * 20  # 超过 100 字符
+
+        metadata = {
+            "_type": "metadata",
+            "created_at": "2026-07-01T10:00:00",
+            "updated_at": "2026-07-01T10:00:00"
+        }
+        messages = [
+            {"role": "user", "content": long_content, "timestamp": "2026-07-01T10:01:00"}
+        ]
+
+        with open(session_path, 'w', encoding='utf-8') as f:
+            f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+            for msg in messages:
+                f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+
+        tool = QuerySessionHistoryTool()
+        result = await tool.execute(session_id=session_id)
+
+        assert "(内容较长，已省略)" in result
+        # 验证截断后的内容不超过原始内容
+        assert len(result) < len(long_content)
+
+    @pytest.mark.asyncio
+    async def test_cross_day_timestamp(self, temp_session_dir, monkeypatch):
+        """测试跨天时间戳：验证日期部分正确显示"""
+        from lifeprism.config.settings_manager import settings
+        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: temp_session_dir))
+
+        session_id = "test-cross-day"
+        session_path = temp_session_dir / f"{session_id}.jsonl"
+
+        metadata = {
+            "_type": "metadata",
+            "created_at": "2026-07-05T10:00:00",
+            "updated_at": "2026-07-06T10:00:00"
+        }
+        messages = [
+            {"role": "user", "content": "第一天的消息", "timestamp": "2026-07-05T23:30:00"},
+            {"role": "assistant", "content": "第二天的回复", "timestamp": "2026-07-06T00:15:00"}
+        ]
+
+        with open(session_path, 'w', encoding='utf-8') as f:
+            f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+            for msg in messages:
+                f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+
+        tool = QuerySessionHistoryTool()
+        result = await tool.execute(session_id=session_id)
+
+        # 验证两个不同的日期都出现
+        assert "07-05 23:30" in result
+        assert "07-06 00:15" in result
+
+    @pytest.mark.asyncio
+    async def test_multimodal_content_extraction(self, temp_session_dir, monkeypatch):
+        """测试多模态消息内容提取：正确提取文本部分"""
+        from lifeprism.config.settings_manager import settings
+        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: temp_session_dir))
+
+        session_id = "test-multimodal"
+        session_path = temp_session_dir / f"{session_id}.jsonl"
+
+        metadata = {
+            "_type": "metadata",
+            "created_at": "2026-07-01T10:00:00",
+            "updated_at": "2026-07-01T10:00:00"
+        }
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "这是文本部分"},
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+                ],
+                "timestamp": "2026-07-01T10:01:00"
+            }
+        ]
+
+        with open(session_path, 'w', encoding='utf-8') as f:
+            f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+            for msg in messages:
+                f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+
+        tool = QuerySessionHistoryTool()
+        result = await tool.execute(session_id=session_id)
+
+        # 验证提取了文本部分
+        assert "这是文本部分" in result
+        # 验证不包含图片 URL
+        assert "base64" not in result
 
 
 @pytest.mark.core
@@ -344,27 +484,30 @@ class TestQuerySessionListTool:
 
     @pytest.mark.asyncio
     async def test_basic_query(self, sample_sessions_with_history):
-        """测试基本功能：返回格式正确，包含 last_summary 和 last_user_message"""
+        """测试基本功能：返回 JSON 字符串，包含 last_summary 和 last_user_message"""
         tool = QuerySessionListTool()
         result = await tool.execute()
 
-        assert isinstance(result, dict)
-        assert len(result) == 3  # 三个 session
+        assert isinstance(result, str)
+        # 解析 JSON
+        data = json.loads(result)
+        assert isinstance(data, dict)
+        assert len(data) == 3  # 三个 session
 
         # 验证 session-001
-        assert "session-001" in result
-        assert result["session-001"]["last_summary"] == "session-001 的最新总结"
-        assert result["session-001"]["last_user_message"] == "第一个会话的第二条消息"
+        assert "session-001" in data
+        assert data["session-001"]["last_summary"] == "session-001 的最新总结"
+        assert data["session-001"]["last_user_message"] == "第一个会话的第二条消息"
 
         # 验证 session-002
-        assert "session-002" in result
-        assert result["session-002"]["last_summary"] == "session-002 的总结"
-        assert result["session-002"]["last_user_message"] == "第二个会话的唯一消息"
+        assert "session-002" in data
+        assert data["session-002"]["last_summary"] == "session-002 的总结"
+        assert data["session-002"]["last_user_message"] == "第二个会话的唯一消息"
 
         # 验证 session-003（没有总结）
-        assert "session-003" in result
-        assert result["session-003"]["last_summary"] == ""
-        assert result["session-003"]["last_user_message"] == "多模态消息"
+        assert "session-003" in data
+        assert data["session-003"]["last_summary"] == ""
+        assert data["session-003"]["last_user_message"] == "多模态消息"
 
     @pytest.mark.asyncio
     async def test_date_filter(self, sample_sessions_with_history):
@@ -372,20 +515,24 @@ class TestQuerySessionListTool:
         tool = QuerySessionListTool()
         result = await tool.execute(date_filter="2026-07-02")
 
-        assert isinstance(result, dict)
-        assert len(result) == 1
-        assert "session-002" in result
-        assert "session-001" not in result
-        assert "session-003" not in result
+        assert isinstance(result, str)
+        data = json.loads(result)
+        assert isinstance(data, dict)
+        assert len(data) == 1
+        assert "session-002" in data
+        assert "session-001" not in data
+        assert "session-003" not in data
 
     @pytest.mark.asyncio
     async def test_date_filter_no_match(self, sample_sessions_with_history):
-        """测试日期过滤：没有符合条件的 session 时返回空 dict"""
+        """测试日期过滤：没有符合条件的 session 时返回空 JSON 对象"""
         tool = QuerySessionListTool()
         result = await tool.execute(date_filter="2026-07-10")
 
-        assert isinstance(result, dict)
-        assert len(result) == 0
+        assert isinstance(result, str)
+        data = json.loads(result)
+        assert isinstance(data, dict)
+        assert len(data) == 0
 
     @pytest.mark.asyncio
     async def test_invalid_date_format(self, sample_sessions_with_history):
@@ -404,12 +551,14 @@ class TestQuerySessionListTool:
         result = await tool.execute()
 
         # 验证查询成功，且返回了三个 session（旧数据被跳过）
-        assert isinstance(result, dict)
-        assert len(result) == 3
+        assert isinstance(result, str)
+        data = json.loads(result)
+        assert isinstance(data, dict)
+        assert len(data) == 3
 
     @pytest.mark.asyncio
     async def test_empty_session_path(self, temp_session_dir, temp_data_dir, monkeypatch):
-        """测试 session_path 不存在时返回空 dict"""
+        """测试 session_path 不存在时返回空 JSON 对象"""
         from lifeprism.config.settings_manager import settings
         non_existent_path = temp_session_dir / "non_existent"
         monkeypatch.setattr(type(settings), 'session_path', property(lambda self: non_existent_path))
@@ -418,8 +567,10 @@ class TestQuerySessionListTool:
         tool = QuerySessionListTool()
         result = await tool.execute()
 
-        assert isinstance(result, dict)
-        assert len(result) == 0
+        assert isinstance(result, str)
+        data = json.loads(result)
+        assert isinstance(data, dict)
+        assert len(data) == 0
 
     @pytest.mark.asyncio
     async def test_multimodal_content_handling(self, sample_sessions_with_history):
@@ -428,8 +579,10 @@ class TestQuerySessionListTool:
         result = await tool.execute()
 
         # 验证 session-003 的多模态消息被正确提取
-        assert "session-003" in result
-        assert result["session-003"]["last_user_message"] == "多模态消息"
+        assert isinstance(result, str)
+        data = json.loads(result)
+        assert "session-003" in data
+        assert data["session-003"]["last_user_message"] == "多模态消息"
 
     @pytest.mark.asyncio
     async def test_tool_schema(self):
