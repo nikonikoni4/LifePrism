@@ -1,11 +1,9 @@
-from pathlib import Path
-
-
-import os
 import re
-import yaml
 from datetime import datetime
-from typing import Optional, Dict, Any
+from pathlib import Path
+from typing import Any
+
+import yaml
 
 
 def read_md(file_path: Path | str) -> str:
@@ -27,13 +25,13 @@ def read_md(file_path: Path | str) -> str:
     """
     if isinstance(file_path, str):
         file_path = Path(file_path)
-        
+
     if not file_path.exists():
         # 如果目录不存在，创建父目录
         file_path.parent.mkdir(parents=True, exist_ok=True)
         # 创建空白文件
         file_path.touch()
-        
+
     return file_path.read_text(encoding="utf-8")
 
 
@@ -52,15 +50,11 @@ def _sanitize_behavior_content(content: str) -> str:
     Returns:
         str: 过滤后的内容
     """
-    return re.sub(r'^#{1,6}\s+', '', content, flags=re.MULTILINE)
+    return re.sub(r"^#{1,6}\s+", "", content, flags=re.MULTILINE)
 
 
 def write_date_md(
-    file_path: Path | str,
-    date: str,
-    content: str,
-    subheading: str,
-    mode: str = "append"
+    file_path: Path | str, date: str, content: str, subheading: str, mode: str = "append"
 ) -> None:
     """
     向按日期组织的 Markdown 文件中写入内容，支持追加和覆盖两种模式。
@@ -111,12 +105,12 @@ def write_date_md(
     full_content = file_path.read_text(encoding="utf-8")
 
     # 匹配精确的日期标题
-    date_pattern = re.compile(rf'^(##\s+{re.escape(date)}\s*)$', re.MULTILINE)
+    date_pattern = re.compile(rf"^(##\s+{re.escape(date)}\s*)$", re.MULTILINE)
     date_match = date_pattern.search(full_content)
 
     if not date_match:
         # 日期标题不存在，按日期升序找到正确的插入位置
-        all_dates_pattern = re.compile(r'^##\s+(\d{4}-\d{2}-\d{2})\s*$', re.MULTILINE)
+        all_dates_pattern = re.compile(r"^##\s+(\d{4}-\d{2}-\d{2})\s*$", re.MULTILINE)
         new_block = f"## {date}\n### {subheading}\n{content}\n\n"
 
         # 找第一个比 date 更大的日期节，将新内容插入其前面
@@ -128,19 +122,19 @@ def write_date_md(
 
         if insert_pos is None:
             # 新日期是最大的，追加到末尾
-            if full_content and not full_content.endswith('\n'):
-                full_content += '\n'
-            if not full_content.endswith('\n\n'):
-                full_content += '\n'
+            if full_content and not full_content.endswith("\n"):
+                full_content += "\n"
+            if not full_content.endswith("\n\n"):
+                full_content += "\n"
             full_content += new_block
         else:
             # 插入到 insert_pos 前面，确保前面有空行分隔
             before = full_content[:insert_pos]
             after = full_content[insert_pos:]
-            if before and not before.endswith('\n\n'):
-                if not before.endswith('\n'):
-                    before += '\n'
-                before += '\n'
+            if before and not before.endswith("\n\n"):
+                if not before.endswith("\n"):
+                    before += "\n"
+                before += "\n"
             full_content = before + new_block + after
 
         file_path.write_text(full_content, encoding="utf-8")
@@ -148,27 +142,24 @@ def write_date_md(
 
     # 日期标题存在，查找该日期下的指定子标题块
     # 子标题格式为 ### subheading
-    subheading_pattern = re.compile(rf'^###\s+{re.escape(subheading)}\s*$', re.MULTILINE)
+    subheading_pattern = re.compile(rf"^###\s+{re.escape(subheading)}\s*$", re.MULTILINE)
     subheading_match = subheading_pattern.search(full_content, date_match.end())
 
     if not subheading_match:
         # 子标题不存在，在当前日期块下添加新的子标题块
         # 找到下一个日期或文件结束的位置
-        next_date_pattern = re.compile(r'^##\s+\d{4}-\d{2}-\d{2}\s*$', re.MULTILINE)
+        next_date_pattern = re.compile(r"^##\s+\d{4}-\d{2}-\d{2}\s*$", re.MULTILINE)
         next_date_match = next_date_pattern.search(full_content, date_match.end())
 
-        if next_date_match:
-            insert_pos = next_date_match.start()
-        else:
-            insert_pos = len(full_content)
+        insert_pos = next_date_match.start() if next_date_match else len(full_content)
 
         # 确保在插入点前有空行分隔
         before = full_content[:insert_pos]
         after = full_content[insert_pos:]
-        if before and not before.endswith('\n\n'):
-            if not before.endswith('\n'):
-                before += '\n'
-            before += '\n'
+        if before and not before.endswith("\n\n"):
+            if not before.endswith("\n"):
+                before += "\n"
+            before += "\n"
 
         new_block = f"### {subheading}\n{content}\n\n"
         full_content = before + new_block + after
@@ -176,13 +167,13 @@ def write_date_md(
         return
 
     # 子标题存在，找到紧接着的下一个子标题或日期
-    next_subheading_pattern = re.compile(r'^#{1,3}\s+\S+.*$', re.MULTILINE)
+    next_subheading_pattern = re.compile(r"^#{1,3}\s+\S+.*$", re.MULTILINE)
     next_match = next_subheading_pattern.search(full_content, subheading_match.end())
 
     next_pos = next_match.start() if next_match else len(full_content)
 
     # 提取当前子标题的已有内容块
-    existing_block = full_content[subheading_match.end():next_pos]
+    existing_block = full_content[subheading_match.end() : next_pos]
 
     if mode == "append":
         # 追加模式，清理现有的末尾空白然后再拼接
@@ -198,18 +189,15 @@ def write_date_md(
         raise ValueError(f"Unknown mode: {mode}")
 
     # 替换其中的内容
-    new_full_content = full_content[:subheading_match.end()] + new_block + full_content[next_pos:]
+    new_full_content = full_content[: subheading_match.end()] + new_block + full_content[next_pos:]
 
     # 写入文件
     file_path.write_text(new_full_content, encoding="utf-8")
 
 
 def extract_date_md(
-    markdown_content: str,
-    start_date: str,
-    end_date: Optional[str] = None,
-    subheading: str = "all"
-) -> Dict[str, str]:
+    markdown_content: str, start_date: str, end_date: str | None = None, subheading: str = "all"
+) -> dict[str, str]:
     """
     从按日期组织的 Markdown 文本中提取指定日期范围的内容。
 
@@ -248,8 +236,8 @@ def extract_date_md(
         end_date = start_date
 
     # 将输入转化为 datetime 对象用于做范围比较
-    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-    end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
 
     # 容错：如果用户传反了起止时间，自动进行对调
     if start_dt > end_dt:
@@ -257,7 +245,7 @@ def extract_date_md(
 
     # 正则：匹配行首的 `## YYYY-MM-DD` 并将其日期捕获为单独的分组
     # re.MULTILINE 表示 ^ 匹配每一行的开头
-    date_pattern = re.compile(r'^##\s+(\d{4}-\d{2}-\d{2})\s*$', re.MULTILINE)
+    date_pattern = re.compile(r"^##\s+(\d{4}-\d{2}-\d{2})\s*$", re.MULTILINE)
 
     # re.split 返回列表：[匹配头部内容, 捕获的日期1, 日期1下方的内容, 捕获的日期2, 日期2下方的内容...]
     date_parts = date_pattern.split(markdown_content)
@@ -268,10 +256,10 @@ def extract_date_md(
     # 后面的元素总是：索引为奇数的是"日期字符串"，紧随其后的偶数索引是"正文区块"
     for i in range(1, len(date_parts), 2):
         current_date_str = date_parts[i]
-        date_block = date_parts[i+1]
+        date_block = date_parts[i + 1]
 
         try:
-            current_dt = datetime.strptime(current_date_str, '%Y-%m-%d')
+            current_dt = datetime.strptime(current_date_str, "%Y-%m-%d")
         except ValueError:
             # 如果匹配到的格式仍然无法解析为真实日期（比如 2026-99-99）则跳过
             continue
@@ -311,7 +299,7 @@ def _extract_all_subheadings(date_block: str) -> str:
             如果没有任何子标题，返回原始内容（去除首尾空白）。
     """
     # 匹配 ### subheading 或 ## subheading 格式的子标题
-    subheading_pattern = re.compile(r'^(#{1,3}\s+\S+.*)$', re.MULTILINE)
+    subheading_pattern = re.compile(r"^(#{1,3}\s+\S+.*)$", re.MULTILINE)
 
     matches = list(subheading_pattern.finditer(date_block))
 
@@ -352,33 +340,27 @@ def _extract_single_subheading(date_block: str, subheading: str) -> str:
             返回内容不包含子标题行本身。
     """
     # 匹配 ### subheading 格式（子标题）
-    target_subheading_pattern = re.compile(
-        rf'^###\s+{re.escape(subheading)}\s*$',
-        re.MULTILINE
-    )
+    target_subheading_pattern = re.compile(rf"^###\s+{re.escape(subheading)}\s*$", re.MULTILINE)
     target_match = target_subheading_pattern.search(date_block)
 
     if not target_match:
         return ""
 
     # 找到下一个子标题（### 或 ## 开头）或者日期块结束
-    next_subheading_pattern = re.compile(r'^#{1,3}\s+\S+.*$', re.MULTILINE)
+    next_subheading_pattern = re.compile(r"^#{1,3}\s+\S+.*$", re.MULTILINE)
     next_match = next_subheading_pattern.search(date_block, target_match.end())
 
     if next_match:
-        content = date_block[target_match.end():next_match.start()]
+        content = date_block[target_match.end() : next_match.start()]
     else:
-        content = date_block[target_match.end():]
+        content = date_block[target_match.end() :]
 
     return content.strip()
 
 
 def extract_date_logs_from_file(
-    file_path: Path | str,
-    start_date: str,
-    end_date: Optional[str] = None,
-    subheading: str = "all"
-) -> Dict[str, str]:
+    file_path: Path | str, start_date: str, end_date: str | None = None, subheading: str = "all"
+) -> dict[str, str]:
     """
     从按日期组织的 Markdown 文件中读取并提取指定日期范围的内容。
 
@@ -410,7 +392,7 @@ def extract_date_logs_from_file(
     return extract_date_md(content, start_date, end_date, subheading)
 
 
-def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
+def prompts_md_load(file_path: Path | str) -> dict[str, Any]:
     """
     从 prompt markdown 文件中加载所有 prompts 及其元数据。
 
@@ -468,7 +450,7 @@ def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
     content = file_path.read_text(encoding="utf-8")
 
     # 1. 解析文件级 frontmatter
-    frontmatter_pattern = re.compile(r'^---\s*\n(.*?)\n---\s*\n', re.DOTALL | re.MULTILINE)
+    frontmatter_pattern = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL | re.MULTILINE)
     frontmatter_match = frontmatter_pattern.match(content)
 
     if not frontmatter_match:
@@ -478,10 +460,10 @@ def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
     frontmatter = yaml.safe_load(frontmatter_yaml)
 
     # 提取 frontmatter 后的正文内容
-    body_content = content[frontmatter_match.end():]
+    body_content = content[frontmatter_match.end() :]
 
     # 2. 按 --- 分割 prompt 块
-    prompt_blocks = re.split(r'\n---\s*\n', body_content)
+    prompt_blocks = re.split(r"\n---\s*\n", body_content)
 
     prompts = {}
 
@@ -491,7 +473,7 @@ def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
             continue
 
         # 3. 提取一级标题作为 prompt 名称
-        title_pattern = re.compile(r'^#\s+(\S+)', re.MULTILINE)
+        title_pattern = re.compile(r"^#\s+(\S+)", re.MULTILINE)
         title_match = title_pattern.search(block)
 
         if not title_match:
@@ -501,8 +483,7 @@ def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
 
         # 4. 提取 metadata 部分
         metadata_pattern = re.compile(
-            r'^##\s+metadata\s*\n```yaml\s*\n(.*?)\n```',
-            re.MULTILINE | re.DOTALL
+            r"^##\s+metadata\s*\n```yaml\s*\n(.*?)\n```", re.MULTILINE | re.DOTALL
         )
         metadata_match = metadata_pattern.search(block)
 
@@ -514,7 +495,7 @@ def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
 
         # 5. 提取所有版本内容
         versions = {}
-        version_pattern = re.compile(r'^##\s+(v\d+)\s*\n', re.MULTILINE)
+        version_pattern = re.compile(r"^##\s+(v\d+)\s*\n", re.MULTILINE)
 
         for version_match in version_pattern.finditer(block):
             version_name = version_match.group(1)
@@ -529,15 +510,15 @@ def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
 
             while pos < len(block):
                 # 检查是否是代码块标记
-                if block[pos:pos+3] == '```':
+                if block[pos : pos + 3] == "```":
                     # 检查后面的字符来判断是开始还是结束
                     next_char_pos = pos + 3
                     # 跳过空白字符（空格和制表符）
-                    while next_char_pos < len(block) and block[next_char_pos] in ' \t':
+                    while next_char_pos < len(block) and block[next_char_pos] in " \t":
                         next_char_pos += 1
 
                     # 判断是开始还是结束
-                    if next_char_pos < len(block) and block[next_char_pos] not in '\n\r':
+                    if next_char_pos < len(block) and block[next_char_pos] not in "\n\r":
                         # 后面有非换行字符（语言标识），这是代码块开始
                         code_block_depth += 1
                     else:
@@ -548,13 +529,15 @@ def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
                     pos += 3
                     continue
 
-                # 如果不在代码块内部，检查是否是二级标题
-                if code_block_depth == 0:
-                    # 检查是否是行首的 ##
-                    if pos == 0 or block[pos-1] == '\n':
-                        if block[pos:pos+2] == '##' and (pos+2 >= len(block) or block[pos+2] in ' \n'):
-                            version_end = pos
-                            break
+                # 如果不在代码块内部，检查是否是行首的 ##
+                if (
+                    code_block_depth == 0
+                    and (pos == 0 or block[pos - 1] == "\n")
+                    and block[pos : pos + 2] == "##"
+                    and (pos + 2 >= len(block) or block[pos + 2] in " \n")
+                ):
+                    version_end = pos
+                    break
 
                 pos += 1
 
@@ -562,32 +545,32 @@ def prompts_md_load(file_path: Path | str) -> Dict[str, Any]:
 
             # 解析 ```md ``` 代码块，只提取代码块内的内容
             # 由于前面的 version_end 查找已经正确处理了嵌套，这里只需要简单去掉最外层标记
-            if version_content.startswith('```md'):
+            if version_content.startswith("```md"):
                 # 找到第一个换行后的内容
-                first_newline = version_content.find('\n')
+                first_newline = version_content.find("\n")
                 if first_newline != -1:
                     # 找到最后一个 ```（这应该是最外层的结束标记）
-                    last_backticks = version_content.rfind('```')
+                    last_backticks = version_content.rfind("```")
                     if last_backticks > first_newline:
-                        version_content = version_content[first_newline+1:last_backticks].strip()
+                        version_content = version_content[
+                            first_newline + 1 : last_backticks
+                        ].strip()
 
             versions[version_name] = version_content
 
-        prompts[prompt_name] = {
-            "metadata": metadata,
-            "versions": versions
-        }
+        prompts[prompt_name] = {"metadata": metadata, "versions": versions}
 
     return {
         "module": frontmatter.get("module", ""),
         "description": frontmatter.get("description", ""),
         "author": frontmatter.get("author", ""),
-        "prompts": prompts
+        "prompts": prompts,
     }
+
 
 # 如果直接运行当前脚本，可以作为一个轻量的命令行测试使用
 if __name__ == "__main__":
-    sample_md = '''
+    sample_md = """
 # 个人行为日志汇总
 
 ## 2026-04-10
@@ -604,10 +587,10 @@ if __name__ == "__main__":
 
 ## 2026-04-20
 这是未来的日子。
-'''
+"""
     print("=== 测试只取单天 ===")
     print(extract_date_md(sample_md, "2026-04-16"))
-    
+
     print("\n=== 测试取范围 (10号到16号) 包含边界 ===")
     res = extract_date_md(sample_md, "2026-04-10", "2026-04-16")
     for date, txt in res.items():

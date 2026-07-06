@@ -3,12 +3,13 @@ Timeline 数据提供者（重构版）
 
 职责：提供 timeline_custom_block 表的所有数据访问接口
 """
-import sqlite3
-from typing import Dict, Any, Optional, List, Tuple, Set
+
+from typing import Any
+
 from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
-from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
+from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
 
@@ -29,30 +30,49 @@ class CustomBlockProvider(LWBaseDataProvider):
     _ON_CONFLICT = "abort"  # 自定义时间块不应该有重复 ID，冲突时应该报错
 
     # 白名单字段集合（用于防止 SQL 注入）
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'start_time', 'end_time', 'duration', 'content',
-        'todo_id', 'color', 'category_id', 'sub_category_id',
-        'created_at', 'updated_at'
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "start_time",
+        "end_time",
+        "duration",
+        "content",
+        "todo_id",
+        "color",
+        "category_id",
+        "sub_category_id",
+        "created_at",
+        "updated_at",
     }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'start_time', 'end_time', 'created_at'
+    _ORDER_FIELDS: set[str] = {"id", "start_time", "end_time", "created_at"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "start_time",
+        "end_time",
+        "duration",
+        "content",
+        "todo_id",
+        "color",
+        "category_id",
+        "sub_category_id",
+        "created_at",
+        "updated_at",
     }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'start_time', 'end_time', 'duration', 'content',
-        'todo_id', 'color', 'category_id', 'sub_category_id',
-        'created_at', 'updated_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'start_time', 'end_time', 'duration', 'content',
-        'todo_id', 'color', 'category_id', 'sub_category_id'
+    _UPDATE_FIELDS: set[str] = {
+        "start_time",
+        "end_time",
+        "duration",
+        "content",
+        "todo_id",
+        "color",
+        "category_id",
+        "sub_category_id",
     }
 
     # ==================== 核心 CRUD 方法 ====================
 
     def query_custom_blocks(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -77,7 +97,7 @@ class CustomBlockProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_custom_block_by_id(self, block_id: int) -> Optional[Dict[str, Any]]:
+    def get_custom_block_by_id(self, block_id: int) -> dict[str, Any] | None:
         """
         根据 ID 获取单条自定义时间块
 
@@ -87,14 +107,11 @@ class CustomBlockProvider(LWBaseDataProvider):
         Returns:
             dict | None: 记录或 None
         """
-        options = QueryOptions(
-            filters={self._PRIMARY_KEY: block_id},
-            order_by='id'
-        )
+        options = QueryOptions(filters={self._PRIMARY_KEY: block_id}, order_by="id")
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def get_custom_blocks_by_date(self, date: str) -> List[Dict[str, Any]]:
+    def get_custom_blocks_by_date(self, date: str) -> list[dict[str, Any]]:
         """
         获取指定日期的所有自定义时间块
 
@@ -122,9 +139,9 @@ class CustomBlockProvider(LWBaseDataProvider):
             if not rows:
                 return []
             columns = [desc[0] for desc in cursor.description]
-            return [dict(zip(columns, row)) for row in rows]
+            return [dict(zip(columns, row, strict=False)) for row in rows]
 
-    def create_custom_block(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_custom_block(self, data: dict[str, Any]) -> dict[str, Any]:
         """
         创建用户自定义时间块
 
@@ -140,10 +157,10 @@ class CustomBlockProvider(LWBaseDataProvider):
         """
         try:
             # 将 ISO 格式的时间（带 T）转换为标准格式（用空格分隔）
-            if 'start_time' in data and data['start_time']:
-                data['start_time'] = data['start_time'].replace('T', ' ')
-            if 'end_time' in data and data['end_time']:
-                data['end_time'] = data['end_time'].replace('T', ' ')
+            if "start_time" in data and data["start_time"]:
+                data["start_time"] = data["start_time"].replace("T", " ")
+            if "end_time" in data and data["end_time"]:
+                data["end_time"] = data["end_time"].replace("T", " ")
 
             # 白名单验证
             allowed_fields = self._UPDATE_FIELDS
@@ -165,7 +182,7 @@ class CustomBlockProvider(LWBaseDataProvider):
             logger.error("创建自定义时间块失败: %s", e)
             raise DataAccessError(f"创建自定义时间块失败: {e}") from e
 
-    def update_custom_block(self, block_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_custom_block(self, block_id: int, data: dict[str, Any]) -> dict[str, Any] | None:
         """
         更新用户自定义时间块
 
@@ -181,13 +198,13 @@ class CustomBlockProvider(LWBaseDataProvider):
             - 其他字段（content, start_time 等）不接受 None 值
         """
         # 将 ISO 格式的时间（带 T）转换为标准格式（用空格分隔）
-        if 'start_time' in data and data['start_time']:
-            data['start_time'] = data['start_time'].replace('T', ' ')
-        if 'end_time' in data and data['end_time']:
-            data['end_time'] = data['end_time'].replace('T', ' ')
+        if "start_time" in data and data["start_time"]:
+            data["start_time"] = data["start_time"].replace("T", " ")
+        if "end_time" in data and data["end_time"]:
+            data["end_time"] = data["end_time"].replace("T", " ")
 
         # 可清空的字段列表（这些字段允许显式设置为 None）
-        nullable_fields = {'todo_id', 'category_id', 'sub_category_id'}
+        nullable_fields = {"todo_id", "category_id", "sub_category_id"}
 
         # 构建更新数据：
         # - 可清空字段：保留 None 值（用于清除绑定）
@@ -209,11 +226,7 @@ class CustomBlockProvider(LWBaseDataProvider):
         if invalid_fields:
             raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-        affected_rows = self.db.update(
-            self._TABLE_NAME,
-            data=update_data,
-            where={"id": block_id}
-        )
+        affected_rows = self.db.update(self._TABLE_NAME, data=update_data, where={"id": block_id})
         if affected_rows > 0:
             logger.info("更新自定义时间块: block_id=%s", block_id)
             return self.get_custom_block_by_id(block_id)
@@ -267,14 +280,14 @@ class CustomBlockProvider(LWBaseDataProvider):
                 cursor.execute(
                     f"""SELECT COALESCE(SUM(duration), 0) FROM {self._TABLE_NAME}
                        WHERE todo_id = ? AND start_time >= ? AND start_time <= ?""",
-                    (todo_id, start_of_day, end_of_day)
+                    (todo_id, start_of_day, end_of_day),
                 )
                 return cursor.fetchone()[0]
         except Exception as e:
             logger.error("查询 todo %s 累计时长失败: %s", todo_id, e)
             raise DataAccessError(f"查询 todo {todo_id} 累计时长失败") from e
 
-    def batch_get_duration_by_todos(self, todo_ids: List[str], date: str) -> Dict[str, int]:
+    def batch_get_duration_by_todos(self, todo_ids: list[str], date: str) -> dict[str, int]:
         """批量查询多个 todo 在指定日期的累计时长
 
         Args:
@@ -292,7 +305,7 @@ class CustomBlockProvider(LWBaseDataProvider):
         try:
             start_of_day = f"{date} 00:00:00"
             end_of_day = f"{date} 23:59:59"
-            placeholders = ','.join('?' * len(todo_ids))
+            placeholders = ",".join("?" * len(todo_ids))
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
@@ -301,7 +314,7 @@ class CustomBlockProvider(LWBaseDataProvider):
                         WHERE todo_id IN ({placeholders})
                           AND start_time >= ? AND start_time <= ?
                         GROUP BY todo_id""",
-                    (*todo_ids, start_of_day, end_of_day)
+                    (*todo_ids, start_of_day, end_of_day),
                 )
                 result = {row[0]: row[1] for row in cursor.fetchall()}
                 for tid in todo_ids:
@@ -310,13 +323,13 @@ class CustomBlockProvider(LWBaseDataProvider):
                 return result
         except Exception as e:
             logger.error("批量查询累计时长失败: %s", e)
-            raise DataAccessError(f"批量查询累计时长失败") from e
+            raise DataAccessError("批量查询累计时长失败") from e
 
     # ============================================================================
     # 兼容旧接口（保留用于 timeline_builder）
     # ============================================================================
 
-    def get_timeline_events_by_date(self, date: str, channel: str = 'pc') -> List[Dict[str, Any]]:
+    def get_timeline_events_by_date(self, date: str, channel: str = "pc") -> list[dict[str, Any]]:
         """
         获取指定日期的时间线事件数据
 
@@ -332,28 +345,38 @@ class CustomBlockProvider(LWBaseDataProvider):
         # 调用基类方法
         logs, _ = self.get_activity_logs(
             date=date,
-            query_fields=["id", "start_time", "end_time", "duration", "app", "title",
-                         "category_id", "sub_category_id"],
-            order_desc=False  # 升序
+            query_fields=[
+                "id",
+                "start_time",
+                "end_time",
+                "duration",
+                "app",
+                "title",
+                "category_id",
+                "sub_category_id",
+            ],
+            order_desc=False,  # 升序
         )
 
         # 转换为 timeline 格式
         events = []
         for log in logs:
-            events.append({
-                "id": log.get("id"),
-                "start_time": log.get("start_time"),
-                "end_time": log.get("end_time"),
-                "duration": log.get("duration"),
-                "app": log.get("app"),
-                "title": log.get("title"),
-                "category_id": log.get("category_id") or "",
-                "category_name": log.get("category_name") or "",
-                "sub_category_id": log.get("sub_category_id") or "",
-                "sub_category_name": log.get("sub_category_name") or "",
-                "app_description": "",  # 保留字段
-                "title_analysis": "",   # 保留字段
-                "device_type": "pc"
-            })
+            events.append(
+                {
+                    "id": log.get("id"),
+                    "start_time": log.get("start_time"),
+                    "end_time": log.get("end_time"),
+                    "duration": log.get("duration"),
+                    "app": log.get("app"),
+                    "title": log.get("title"),
+                    "category_id": log.get("category_id") or "",
+                    "category_name": log.get("category_name") or "",
+                    "sub_category_id": log.get("sub_category_id") or "",
+                    "sub_category_name": log.get("sub_category_name") or "",
+                    "app_description": "",  # 保留字段
+                    "title_analysis": "",  # 保留字段
+                    "device_type": "pc",
+                }
+            )
 
         return events

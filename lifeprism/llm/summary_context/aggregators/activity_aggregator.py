@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-
 TIME_BUCKET_MINUTES = 10
 MAX_BRIDGE_BUCKETS = 1
 ACTIVE_SEGMENT_DENSITY_THRESHOLD = 0.2
@@ -120,7 +119,9 @@ def _build_category_breakdown_for_segment(
     return items
 
 
-def _collect_buckets(logs: list[dict], range_start: str, range_end: str, threshold: float) -> list[dict]:
+def _collect_buckets(
+    logs: list[dict], range_start: str, range_end: str, threshold: float
+) -> list[dict]:
     """将时间范围切分为固定大小的时间桶，并计算每个桶的密度和是否匹配阈值"""
     start_dt = _to_dt(range_start)
     end_dt = _to_dt(range_end)
@@ -169,7 +170,9 @@ def _build_segment_item(
         "segment_type": segment_type,
         "density_threshold": threshold,
         "bridge_bucket_count": sum(1 for item in merged_buckets if not item["matched"]),
-        "top_categories": _build_category_breakdown_for_segment(segment_logs, segment_start, segment_end)[:3],
+        "top_categories": _build_category_breakdown_for_segment(
+            segment_logs, segment_start, segment_end
+        )[:3],
     }
 
 
@@ -273,6 +276,8 @@ def build_activity_context(logs: list[dict], range_start: str, range_end: str) -
         ),
         "work_entertainment_mix": {
             "should_analyze": has_work and has_entertainment,
-            "reason": "ready" if has_work and has_entertainment else "missing_required_main_categories",
+            "reason": "ready"
+            if has_work and has_entertainment
+            else "missing_required_main_categories",
         },
     }

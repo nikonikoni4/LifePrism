@@ -7,29 +7,30 @@ Diary 服务层 - 日记业务逻辑
 
 架构：纯函数模块（无内存缓存，不需要单例）
 """
+
 import hashlib
 import json
-from typing import Any, Optional
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 from lifeprism.llm.function.diary_summary import ai_diary_summary
+from lifeprism.repository import diary_repository
 from lifeprism.server.schemas.diary_schemas import (
-    DiaryItem,
-    DiaryMetaItem,
-    DiaryListResponse,
+    CreateTemplateRequest,
     DiaryAISummaryResponse,
-    UpdateDiaryMetaRequest,
+    DiaryItem,
+    DiaryListResponse,
+    DiaryMetaItem,
+    ExistingSummaryMode,
+    GenerateDiaryAISummaryRangeRequest,
+    GenerateDiaryAISummaryRangeResponse,
     SaveDiaryContentRequest,
     TemplateItem,
     TemplateListResponse,
-    CreateTemplateRequest,
+    UpdateDiaryMetaRequest,
     UpdateTemplateRequest,
-    GenerateDiaryAISummaryRangeRequest,
-    GenerateDiaryAISummaryRangeResponse,
-    ExistingSummaryMode,
 )
-from lifeprism.repository import diary_repository
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -51,9 +52,11 @@ _IMPORTANCE_LABEL_MAP = {
 
 # ==================== 文件路径工具 ====================
 
+
 def _get_diary_dir() -> Path:
     """获取日记目录路径"""
     from lifeprism.config.settings_manager import settings
+
     return settings.lifeprism_data_path / "diary"
 
 
@@ -91,7 +94,7 @@ def _read_diary_content(date: str) -> str:
     try:
         file_path = _get_diary_file_path(date)
         if file_path.exists():
-            return file_path.read_text(encoding='utf-8')
+            return file_path.read_text(encoding="utf-8")
         return ""
     except Exception as e:
         logger.error("读取日记文件 %s 失败: %s", date, e)
@@ -103,7 +106,7 @@ def _write_diary_content(date: str, content: str):
     try:
         file_path = _get_diary_file_path(date)
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(content, encoding='utf-8')
+        file_path.write_text(content, encoding="utf-8")
     except Exception as e:
         logger.error("写入日记文件 %s 失败: %s", date, e)
 
@@ -113,7 +116,7 @@ def _calculate_word_count(content: str) -> int:
     return len(content.replace(" ", "").replace("\n", "").replace("\r", "").replace("\t", ""))
 
 
-def _parse_custom_tags(tags_json: Optional[str]) -> list:
+def _parse_custom_tags(tags_json: str | None) -> list:
     """JSON 字符串 → List[str]"""
     if not tags_json:
         return []
@@ -124,15 +127,17 @@ def _parse_custom_tags(tags_json: Optional[str]) -> list:
         return []
 
 
-def _map_diary_meta_for_summary(item: dict) -> tuple[Optional[str], Optional[str], list[str]]:
+def _map_diary_meta_for_summary(item: dict) -> tuple[str | None, str | None, list[str]]:
     """将日记 meta 枚举值转换为 LLM 更易理解的文本标签"""
     mood = _MOOD_LABEL_MAP.get(item.get("mood")) if item.get("mood") else None
-    importance = _IMPORTANCE_LABEL_MAP.get(item.get("importance")) if item.get("importance") else None
+    importance = (
+        _IMPORTANCE_LABEL_MAP.get(item.get("importance")) if item.get("importance") else None
+    )
     custom_tags = _parse_custom_tags(item.get("custom_tags"))
     return mood, importance, custom_tags
 
 
-def _extract_summary_content(result: Any) -> Optional[str]:
+def _extract_summary_content(result: Any) -> str | None:
     """从 LLM 返回值中提取 summary 正文"""
     if isinstance(result, str):
         return result
@@ -149,42 +154,43 @@ def _compute_diary_source_hash(content: str) -> str:
 
 # ==================== 日记 CRUD ====================
 
+
 def _convert_db_to_diary_item(item: dict, include_content: bool = False) -> DiaryItem:
     """将数据库记录转换为 DiaryItem"""
     content = ""
     if include_content:
-        content = _read_diary_content(item['date'])
+        content = _read_diary_content(item["date"])
 
     return DiaryItem(
-        date=item['date'],
-        mood=item.get('mood'),
-        importance=item.get('importance'),
-        custom_tags=_parse_custom_tags(item.get('custom_tags')),
-        word_count=item.get('word_count', 0),
-        ai_summary=item.get('ai_summary'),
-        diary_source_hash=item.get('diary_source_hash'),
+        date=item["date"],
+        mood=item.get("mood"),
+        importance=item.get("importance"),
+        custom_tags=_parse_custom_tags(item.get("custom_tags")),
+        word_count=item.get("word_count", 0),
+        ai_summary=item.get("ai_summary"),
+        diary_source_hash=item.get("diary_source_hash"),
         content=content,
-        created_at=item.get('created_at', ''),
-        updated_at=item.get('updated_at'),
+        created_at=item.get("created_at", ""),
+        updated_at=item.get("updated_at"),
     )
 
 
 def _convert_db_to_meta_item(item: dict) -> DiaryMetaItem:
     """将数据库记录转换为 DiaryMetaItem"""
     return DiaryMetaItem(
-        date=item['date'],
-        mood=item.get('mood'),
-        importance=item.get('importance'),
-        custom_tags=_parse_custom_tags(item.get('custom_tags')),
-        word_count=item.get('word_count', 0),
-        ai_summary=item.get('ai_summary'),
-        diary_source_hash=item.get('diary_source_hash'),
-        created_at=item.get('created_at', ''),
-        updated_at=item.get('updated_at'),
+        date=item["date"],
+        mood=item.get("mood"),
+        importance=item.get("importance"),
+        custom_tags=_parse_custom_tags(item.get("custom_tags")),
+        word_count=item.get("word_count", 0),
+        ai_summary=item.get("ai_summary"),
+        diary_source_hash=item.get("diary_source_hash"),
+        created_at=item.get("created_at", ""),
+        updated_at=item.get("updated_at"),
     )
 
 
-def get_diary(date: str) -> Optional[DiaryItem]:
+def get_diary(date: str) -> DiaryItem | None:
     """
     获取指定日期日记（meta + content），不存在则自动创建
 
@@ -208,7 +214,7 @@ def get_diary(date: str) -> Optional[DiaryItem]:
     return _convert_db_to_diary_item(item, include_content=True)
 
 
-def update_diary_meta(date: str, request: UpdateDiaryMetaRequest) -> Optional[DiaryItem]:
+def update_diary_meta(date: str, request: UpdateDiaryMetaRequest) -> DiaryItem | None:
     """
     更新日记 meta（部分更新）
 
@@ -226,12 +232,12 @@ def update_diary_meta(date: str, request: UpdateDiaryMetaRequest) -> Optional[Di
     explicitly_set = request.model_fields_set
     update_data = {}
 
-    if 'mood' in explicitly_set:
-        update_data['mood'] = request.mood
-    if 'importance' in explicitly_set:
-        update_data['importance'] = request.importance
-    if 'custom_tags' in explicitly_set:
-        update_data['custom_tags'] = json.dumps(request.custom_tags, ensure_ascii=False)
+    if "mood" in explicitly_set:
+        update_data["mood"] = request.mood
+    if "importance" in explicitly_set:
+        update_data["importance"] = request.importance
+    if "custom_tags" in explicitly_set:
+        update_data["custom_tags"] = json.dumps(request.custom_tags, ensure_ascii=False)
 
     if update_data:
         diary_repository.update_diary(date, update_data)
@@ -239,12 +245,11 @@ def update_diary_meta(date: str, request: UpdateDiaryMetaRequest) -> Optional[Di
     logger.info("更新日记元数据: date=%s, fields=%s", date, list(update_data.keys()))
 
     return _convert_db_to_diary_item(
-        diary_repository.get_diary_by_date(date) or existing,
-        include_content=True
+        diary_repository.get_diary_by_date(date) or existing, include_content=True
     )
 
 
-def save_diary_content(date: str, request: SaveDiaryContentRequest) -> Optional[DiaryItem]:
+def save_diary_content(date: str, request: SaveDiaryContentRequest) -> DiaryItem | None:
     """
     保存日记内容（写文件 + 更新 word_count）
 
@@ -261,13 +266,12 @@ def save_diary_content(date: str, request: SaveDiaryContentRequest) -> Optional[
 
     _write_diary_content(date, request.content)
     word_count = _calculate_word_count(request.content)
-    diary_repository.update_diary(date, {'word_count': word_count})
+    diary_repository.update_diary(date, {"word_count": word_count})
 
     logger.info("保存日记内容: date=%s, word_count=%s", date, word_count)
 
     return _convert_db_to_diary_item(
-        diary_repository.get_diary_by_date(date) or existing,
-        include_content=True
+        diary_repository.get_diary_by_date(date) or existing, include_content=True
     )
 
 
@@ -300,14 +304,18 @@ async def generate_diary_ai_summary(date: str) -> DiaryAISummaryResponse:
     mood, importance, custom_tags = _map_diary_meta_for_summary(item)
     outdate_summary = item.get("ai_summary")
     logger.info("开始 AI 日记总结: date=%s", date)
-    result = await ai_diary_summary(date, mood, importance, custom_tags, outdate_summary=outdate_summary)
+    result = await ai_diary_summary(
+        date, mood, importance, custom_tags, outdate_summary=outdate_summary
+    )
     summary_content = _extract_summary_content(result)
     if not summary_content:
         logger.error("AI 总结生成失败: date=%s", date)
         raise ValueError("AI 总结生成失败")
 
     source_hash = _compute_diary_source_hash(content)
-    success = diary_repository.update_diary(date, {"ai_summary": summary_content, "diary_source_hash": source_hash})
+    success = diary_repository.update_diary(
+        date, {"ai_summary": summary_content, "diary_source_hash": source_hash}
+    )
     if not success:
         logger.error("AI 总结保存失败: date=%s", date)
         raise ValueError("AI 总结保存失败")
@@ -315,7 +323,9 @@ async def generate_diary_ai_summary(date: str) -> DiaryAISummaryResponse:
     return DiaryAISummaryResponse(content=summary_content)
 
 
-async def generate_diary_ai_summary_range(request: GenerateDiaryAISummaryRangeRequest) -> GenerateDiaryAISummaryRangeResponse:
+async def generate_diary_ai_summary_range(
+    request: GenerateDiaryAISummaryRangeRequest,
+) -> GenerateDiaryAISummaryRangeResponse:
     """
     按日期范围生成日记 AI 总结，并根据 existing_summary_mode 应用不同策略
     """
@@ -390,6 +400,7 @@ def get_diary_list(start_date: str, end_date: str) -> DiaryListResponse:
 
 # ==================== 模板管理 ====================
 
+
 def get_templates() -> TemplateListResponse:
     """
     获取模板列表（扫描模板目录）
@@ -405,7 +416,7 @@ def get_templates() -> TemplateListResponse:
     return TemplateListResponse(items=names)
 
 
-def get_template(name: str) -> Optional[TemplateItem]:
+def get_template(name: str) -> TemplateItem | None:
     """
     获取模板内容
 
@@ -419,7 +430,7 @@ def get_template(name: str) -> Optional[TemplateItem]:
     if not file_path.exists():
         return None
     try:
-        content = file_path.read_text(encoding='utf-8')
+        content = file_path.read_text(encoding="utf-8")
         return TemplateItem(name=name, content=content)
     except Exception as e:
         logger.error("读取模板 %s 失败: %s", name, e)
@@ -444,12 +455,12 @@ def create_template(request: CreateTemplateRequest) -> TemplateItem:
         raise ValueError(f"模板已存在: {request.name}")
 
     _ensure_template_dir()
-    file_path.write_text(request.content, encoding='utf-8')
+    file_path.write_text(request.content, encoding="utf-8")
     logger.info("创建模板 %s 成功", request.name)
     return TemplateItem(name=request.name, content=request.content)
 
 
-def update_template(name: str, request: UpdateTemplateRequest) -> Optional[TemplateItem]:
+def update_template(name: str, request: UpdateTemplateRequest) -> TemplateItem | None:
     """
     更新模板内容
 
@@ -464,7 +475,7 @@ def update_template(name: str, request: UpdateTemplateRequest) -> Optional[Templ
     if not file_path.exists():
         return None
 
-    file_path.write_text(request.content, encoding='utf-8')
+    file_path.write_text(request.content, encoding="utf-8")
     logger.info("更新模板 %s 成功", name)
     return TemplateItem(name=name, content=request.content)
 

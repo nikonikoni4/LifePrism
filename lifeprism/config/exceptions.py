@@ -4,14 +4,15 @@ Config 模块异常继承自 ConfigError(LWBaseError)，因为配置错误
 不一定是数据库问题（可能是文件缺失、格式错误等），
 不归属于 DataAccessError。
 """
-from lifeprism.utils.exceptions import LWBaseError
-
 
 from typing import Any
+
+from lifeprism.utils.exceptions import LWBaseError
 
 
 class ConfigError(LWBaseError):
     """配置模块基础异常。"""
+
     pass
 
 

@@ -6,13 +6,15 @@ Config 迁移运行器
 - 迁移前自动备份原文件（.backup-vN 后缀）
 - 任一迁移失败则保留备份、使用默认配置兜底，不阻塞启动
 """
+
 import shutil
-from lifeprism.utils import  get_logger
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import yaml
+
+from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -39,7 +41,7 @@ def run_config_migrations(config_path: Path, migrations: list) -> dict:
         return {}
 
     current_version = data.get("config_version", 0)
-    pending = [m for m in migrations if m.VERSION > current_version]
+    pending = [m for m in migrations if current_version < m.VERSION]
 
     if not pending:
         logger.debug("%s 版本 v%s，无待执行迁移", config_path.name, current_version)
@@ -47,7 +49,9 @@ def run_config_migrations(config_path: Path, migrations: list) -> dict:
 
     logger.info(
         "%s 版本 v%s，待执行 %s 个迁移",
-        config_path.name, current_version, len(pending),
+        config_path.name,
+        current_version,
+        len(pending),
     )
 
     # 备份原文件
@@ -59,7 +63,8 @@ def run_config_migrations(config_path: Path, migrations: list) -> dict:
             if migration.check_if_applied(data):
                 logger.info(
                     "迁移 %s (v%s) 已生效，补录版本记录",
-                    migration.NAME, migration.VERSION,
+                    migration.NAME,
+                    migration.VERSION,
                 )
                 data["config_version"] = migration.VERSION
             else:
@@ -71,7 +76,9 @@ def run_config_migrations(config_path: Path, migrations: list) -> dict:
             # LEGITIMATE: 辅助操作兜底 — 迁移失败不阻塞启动
             logger.exception(
                 "迁移 %s (v%s) 失败，备份保留于 %s，本次使用迁移前数据",
-                migration.NAME, migration.VERSION, config_path.parent,
+                migration.NAME,
+                migration.VERSION,
+                config_path.parent,
             )
             # 失败不阻塞启动，返回迁移到此为止的数据
             return data
@@ -80,7 +87,8 @@ def run_config_migrations(config_path: Path, migrations: list) -> dict:
     _save_yaml(config_path, data)
     logger.info(
         "%s 迁移完成，当前版本 v%s",
-        config_path.name, pending[-1].VERSION,
+        config_path.name,
+        pending[-1].VERSION,
     )
     return data
 

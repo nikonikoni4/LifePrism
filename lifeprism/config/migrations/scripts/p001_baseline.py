@@ -6,6 +6,7 @@ p001_baseline - providers.yaml 基线迁移
 直接用 DEFAULT_PROVIDER_CONFIG 重置并标记 v1。
 用户数据不受影响：API key 存储在 keyring，不在 yaml 中。
 """
+
 VERSION = 1
 NAME = "p001_baseline"
 
@@ -21,9 +22,7 @@ def check_if_applied(data: dict) -> bool:
         return False
     if not isinstance(data.get("providers"), list):
         return False
-    if "allowed_providers" not in data:
-        return False
-    return True
+    return "allowed_providers" in data
 
 
 def upgrade(data: dict) -> dict:
@@ -32,6 +31,7 @@ def upgrade(data: dict) -> dict:
     API key 在 keyring 中，此处无需迁移。
     """
     from lifeprism.config.provider_manager import DEFAULT_PROVIDER_CONFIG
+
     new_data = DEFAULT_PROVIDER_CONFIG.copy()
     new_data["config_version"] = 1
     return new_data

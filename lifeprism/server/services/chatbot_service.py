@@ -1,20 +1,20 @@
-from typing import Optional, List, Dict, Any, AsyncGenerator
-from datetime import datetime
-import uuid
 import warnings
+from collections.abc import AsyncGenerator
+from datetime import datetime
+from typing import Any
 
 from lifeprism.server.schemas.chatbot_schemas import (
+    ChatHistoryResponse,
+    ChatMessage,
     ChatSession,
     ChatSessionListResponse,
-    UpdateSessionRequest,
-    ModelConfig,
-    ChatMessage,
-    ChatHistoryResponse,
-    ChatStreamStartResponse,
     ChatStreamEvent,
+    ChatStreamStartResponse,
+    ModelConfig,
     SSEEventType,
+    UpdateSessionRequest,
 )
-from lifeprism.utils import get_logger
+from lifeprism.utils import LazySingleton, get_logger
 from lifeprism.utils.exceptions import NotFoundError
 
 logger = get_logger(__name__)
@@ -24,11 +24,12 @@ class ChatbotServiceV1:
     """
     聊天机器人服务类 V1（已弃用）
     """
+
     def __init__(self):
         warnings.warn(
             "ChatbotServiceV1 已弃用，请使用 ChatbotService（V2版本）",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
 
     async def initialize(self):
@@ -50,8 +51,9 @@ class ChatbotService:
     def __init__(self):
         """初始化服务"""
         from lifeprism.llm.chat.chat_bot import ChatBot
+
         self._chatbot = ChatBot()  # 直接实例化，它现在是业务逻辑的入口
-        self._current_session_id: Optional[str] = None
+        self._current_session_id: str | None = None
         self._model_config = ModelConfig()
         self._is_initialized = True
 
@@ -78,13 +80,15 @@ class ChatbotService:
         for sid in session_ids:
             metadata = SessionManager.get_session_metadata(sid)
             if metadata:
-                all_items.append(ChatSession(
-                    id=sid,
-                    name=metadata.get('name', 'default_name'),
-                    created_at=metadata.get('created_at', datetime.now().isoformat()),
-                    updated_at=metadata.get('updated_at', datetime.now().isoformat()),
-                    message_count=metadata.get('message_len', 0)
-                ))
+                all_items.append(
+                    ChatSession(
+                        id=sid,
+                        name=metadata.get("name", "default_name"),
+                        created_at=metadata.get("created_at", datetime.now().isoformat()),
+                        updated_at=metadata.get("updated_at", datetime.now().isoformat()),
+                        message_count=metadata.get("message_len", 0),
+                    )
+                )
 
         # 简单的内存分页
         all_items.sort(key=lambda x: x.updated_at, reverse=True)
@@ -96,9 +100,7 @@ class ChatbotService:
         return ChatSessionListResponse(items=items, total=total)
 
     async def get_or_create_session(
-        self,
-        session_id: Optional[str],
-        first_message: str
+        self, session_id: str | None, first_message: str
     ) -> ChatStreamStartResponse:
         """获取或创建会话"""
         # 如果传入了 ID，尝试获取现有会话
@@ -107,9 +109,7 @@ class ChatbotService:
             if session:
                 self._current_session_id = session_id
                 return ChatStreamStartResponse(
-                    session_id=session_id,
-                    session_name=session.name,
-                    is_new_session=False
+                    session_id=session_id, session_name=session.name, is_new_session=False
                 )
 
         # 创建新会话
@@ -117,7 +117,8 @@ class ChatbotService:
         # 如果是新会话（消息列表为空），更新名称
         if not session.messages:
             name = first_message.strip()[:20]
-            if len(first_message) > 20: name += "..."
+            if len(first_message) > 20:
+                name += "..."
             session.name = name or f"新会话 {datetime.now().strftime('%m-%d %H:%M')}"
             self._chatbot.save_session(session)
             is_new = True
@@ -126,16 +127,10 @@ class ChatbotService:
 
         self._current_session_id = session.id
         return ChatStreamStartResponse(
-            session_id=session.id,
-            session_name=session.name,
-            is_new_session=is_new
+            session_id=session.id, session_name=session.name, is_new_session=is_new
         )
 
-    async def update_session(
-        self,
-        session_id: str,
-        request: UpdateSessionRequest
-    ) -> ChatSession:
+    async def update_session(self, session_id: str, request: UpdateSessionRequest) -> ChatSession:
         """更新会话名称"""
         self._chatbot.update_session_name(session_id, request.name)
         logger.info("更新会话名称: session_id=%s, name=%s", session_id, request.name)
@@ -144,9 +139,13 @@ class ChatbotService:
             return ChatSession(
                 id=session.id,
                 name=session.name,
-                created_at=session.created_at.isoformat() if session.created_at else datetime.now().isoformat(),
-                updated_at=session.updated_at.isoformat() if session.updated_at else datetime.now().isoformat(),
-                message_count=len(session.messages)
+                created_at=session.created_at.isoformat()
+                if session.created_at
+                else datetime.now().isoformat(),
+                updated_at=session.updated_at.isoformat()
+                if session.updated_at
+                else datetime.now().isoformat(),
+                message_count=len(session.messages),
             )
         raise NotFoundError(message=f"会话 {session_id} 不存在", code="SESSION_NOT_FOUND")
 
@@ -163,17 +162,11 @@ class ChatbotService:
             return ChatHistoryResponse(session_id=session_id, session_name="未知", messages=[])
 
         messages = [
-            ChatMessage(
-                role=msg['role'],
-                content=msg['content'],
-                timestamp=msg.get('timestamp')
-            )
+            ChatMessage(role=msg["role"], content=msg["content"], timestamp=msg.get("timestamp"))
             for msg in session.messages
         ]
         return ChatHistoryResponse(
-            session_id=session.id,
-            session_name=session.name,
-            messages=messages
+            session_id=session.id, session_name=session.name, messages=messages
         )
 
     # ========== 模型配置 ==========
@@ -185,21 +178,21 @@ class ChatbotService:
     async def update_model_config(self, request: Any) -> ModelConfig:
         """更新模型配置"""
         if isinstance(request, dict):
-            if 'enable_search' in request: self._model_config.enable_search = request['enable_search']
-            if 'enable_thinking' in request: self._model_config.enable_thinking = request['enable_thinking']
+            if "enable_search" in request:
+                self._model_config.enable_search = request["enable_search"]
+            if "enable_thinking" in request:
+                self._model_config.enable_thinking = request["enable_thinking"]
         else:
-            if hasattr(request, 'enable_search') and request.enable_search is not None:
+            if hasattr(request, "enable_search") and request.enable_search is not None:
                 self._model_config.enable_search = request.enable_search
-            if hasattr(request, 'enable_thinking') and request.enable_thinking is not None:
+            if hasattr(request, "enable_thinking") and request.enable_thinking is not None:
                 self._model_config.enable_thinking = request.enable_thinking
         return self._model_config
 
     # ========== 对话功能 ==========
 
     async def send_message(
-        self,
-        content: str,
-        session_id: Optional[str] = None
+        self, content: str, session_id: str | None = None
     ) -> AsyncGenerator[ChatStreamEvent, None]:
         """发送消息并生成流式响应事件 (重构为调用 ChatBot.chat)"""
         # 1. 确保会话存在
@@ -211,7 +204,7 @@ class ChatbotService:
             type=SSEEventType.SESSION,
             session_id=sid,
             session_name=start_info.session_name,
-            is_new_session=start_info.is_new_session
+            is_new_session=start_info.is_new_session,
         )
 
         # 3. 调用 ChatBot 发送消息
@@ -220,41 +213,29 @@ class ChatbotService:
             response = await self._chatbot.chat(content, sid)
 
             # 发送 content 事件
-            yield ChatStreamEvent(
-                type=SSEEventType.CONTENT,
-                message=response.content
-            )
+            yield ChatStreamEvent(type=SSEEventType.CONTENT, message=response.content)
 
             # 发送 done 事件
-            yield ChatStreamEvent(
-                type=SSEEventType.DONE,
-                message=response.content
-            )
+            yield ChatStreamEvent(type=SSEEventType.DONE, message=response.content)
 
         except Exception as e:
             logger.error("对话失败: error=%s", e)
-            yield ChatStreamEvent(
-                type=SSEEventType.ERROR,
-                error=str(e)
-            )
+            yield ChatStreamEvent(type=SSEEventType.ERROR, error=str(e))
 
-    async def get_tokens_usage(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_tokens_usage(self, session_id: str | None = None) -> dict[str, Any]:
         """获取 Token 使用情况统计 (已简化)"""
         default_usage = {
-            'input_tokens': 0,
-            'output_tokens': 0,
-            'total_tokens': 0,
-            'search_count': 0
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "search_count": 0,
         }
-        return {
-            'turn_usage': default_usage.copy(),
-            'session_usage': default_usage.copy()
-        }
+        return {"turn_usage": default_usage.copy(), "session_usage": default_usage.copy()}
 
 
 # 创建单例
-from lifeprism.utils import LazySingleton
 chatbot_service = LazySingleton(ChatbotService)
+
 
 def get_chatbot_service_v1():
     return ChatbotServiceV1()

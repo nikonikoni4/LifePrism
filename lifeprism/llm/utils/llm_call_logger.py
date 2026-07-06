@@ -26,23 +26,24 @@
     )
 """
 
-import json
-import uuid
 import base64
+import inspect
+import json
 import re
 import shutil
-import inspect
-from pathlib import Path
+import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any, List, Tuple
+from pathlib import Path
+from typing import Any
 
 from lifeprism.config import settings
 from lifeprism.llm.bus.events import MessageContent
-from lifeprism.utils.logger import get_logger,DEBUG
 from lifeprism.utils.lazy_singleton import LazySingleton
+from lifeprism.utils.logger import DEBUG, get_logger
 
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
+
 
 class LLMCallLogger:
     """LLM 调用记录器
@@ -51,14 +52,13 @@ class LLMCallLogger:
     支持按 prompt 或 workflow 导出数据集。
     """
 
-    def __init__(self, log_dir: Optional[Path] = None):
+    def __init__(self, log_dir: Path | None = None):
         """初始化 LLM 调用记录器
 
         Args:
             log_dir: 日志目录，默认为 lifeprism_data_path/debug_log/llm_logs
         """
         if log_dir is None:
-
             log_dir = settings.lifeprism_data_path / "debug_logs" / "llm_logs"
             logger.info("llm_call_输出目录：%s", log_dir)
 
@@ -70,9 +70,11 @@ class LLMCallLogger:
         self.image_dir.mkdir(parents=True, exist_ok=True)
 
         # 从配置读取记录标志位
-        self._enabled = settings.get('llm_call_logger_enabled', False)
+        self._enabled = settings.get("llm_call_logger_enabled", False)
 
-        logger.debug("LLM 调用记录器初始化完成，日志目录: %s, 启用状态: %s", self.log_dir, self._enabled)
+        logger.debug(
+            "LLM 调用记录器初始化完成，日志目录: %s, 启用状态: %s", self.log_dir, self._enabled
+        )
 
     @property
     def enabled(self) -> bool:
@@ -89,14 +91,14 @@ class LLMCallLogger:
         self,
         inbound_msg: Any,
         outbound_msg: Any,
-        prompt_module: Optional[str] = None,
-        prompt_name: Optional[str] = None,
-        prompt_version: Optional[str] = None,
-        model: Optional[str] = None,
-        workflow_id: Optional[str] = None,
-        score: Optional[float] = None,
-        system_prompt: Optional[str] = None,
-    ) -> Optional[str]:
+        prompt_module: str | None = None,
+        prompt_name: str | None = None,
+        prompt_version: str | None = None,
+        model: str | None = None,
+        workflow_id: str | None = None,
+        score: float | None = None,
+        system_prompt: str | None = None,
+    ) -> str | None:
         """记录一次 LLM 调用
 
         Args:
@@ -120,8 +122,7 @@ class LLMCallLogger:
         try:
             # 1. 提取文本和图片
             text_content, image_filenames = self._process_content(
-                inbound_msg.content,
-                inbound_msg.extra
+                inbound_msg.content, inbound_msg.extra
             )
 
             # 2. 获取调用位置
@@ -149,7 +150,7 @@ class LLMCallLogger:
 
             # 6. model 自动兜底：未传时从 settings 获取默认模型
             if model is None:
-                model = settings.get('model', None) or getattr(settings, 'model', None)
+                model = settings.get("model", None) or getattr(settings, "model", None)
 
             # 7. 构建记录
             record = {
@@ -164,16 +165,14 @@ class LLMCallLogger:
                     "module": prompt_module,
                     "name": prompt_name,
                     "version": prompt_version,
-                    "content": system_prompt_content
+                    "content": system_prompt_content,
                 },
                 "input": {
                     "content_type": "multimodal" if image_filenames else "text",
                     "text": text_content,
-                    "images": image_filenames
+                    "images": image_filenames,
                 },
-                "output": {
-                    "content": output_content
-                },
+                "output": {"content": output_content},
                 "tool_call_chain": tool_call_chain,
                 "model": model,
                 "tokens": tokens,
@@ -192,10 +191,8 @@ class LLMCallLogger:
             return None
 
     def _process_content(
-        self,
-        content: MessageContent,
-        extra: Optional[Dict[str, Any]]
-    ) -> Tuple[str, List[str]]:
+        self, content: MessageContent, extra: dict[str, Any] | None
+    ) -> tuple[str, list[str]]:
         """处理 content 和 extra，提取文本和图片
 
         Args:
@@ -248,7 +245,7 @@ class LLMCallLogger:
             保存的文件名（不含路径）
         """
         # 解析 MIME 类型和数据
-        match = re.match(r'data:image/(\w+);base64,(.+)', base64_url)
+        match = re.match(r"data:image/(\w+);base64,(.+)", base64_url)
         if not match:
             raise ValueError("Invalid base64 image URL")
 
@@ -327,7 +324,7 @@ class LLMCallLogger:
 
         return "unknown"
 
-    def _write_record(self, record: Dict[str, Any]):
+    def _write_record(self, record: dict[str, Any]):
         """写入记录到日志文件
 
         Args:
@@ -340,21 +337,13 @@ class LLMCallLogger:
         # 读取现有数据
         if log_file.exists():
             try:
-                with open(log_file, "r", encoding="utf-8") as f:
+                with open(log_file, encoding="utf-8") as f:
                     data = json.load(f)
             except Exception as e:
                 logger.warning("读取日志文件失败 %s: %s", log_file, e)
-                data = {
-                    "version": "1.0",
-                    "date": date_str,
-                    "calls": []
-                }
+                data = {"version": "1.0", "date": date_str, "calls": []}
         else:
-            data = {
-                "version": "1.0",
-                "date": date_str,
-                "calls": []
-            }
+            data = {"version": "1.0", "date": date_str, "calls": []}
 
         # 添加新记录
         data["calls"].append(record)
@@ -371,10 +360,10 @@ class LLMCallLogger:
         self,
         prompt_module: str,
         prompt_name: str,
-        prompt_version: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        prompt_version: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[dict[str, Any]]:
         """按 prompt 导出数据集
 
         Args:
@@ -394,30 +383,30 @@ class LLMCallLogger:
 
         for log_file in log_files:
             try:
-                with open(log_file, "r", encoding="utf-8") as f:
+                with open(log_file, encoding="utf-8") as f:
                     data = json.load(f)
 
                 for call in data.get("calls", []):
                     prompt = call.get("prompt", {})
 
                     # 匹配 prompt
-                    if (prompt.get("module") == prompt_module and
-                        prompt.get("name") == prompt_name):
-
+                    if prompt.get("module") == prompt_module and prompt.get("name") == prompt_name:
                         # 如果指定了版本，检查版本
                         if prompt_version is not None and prompt.get("version") != prompt_version:
                             continue
 
                         # 提取数据
-                        dataset.append({
-                            "id": call.get("id"),
-                            "timestamp": call.get("timestamp"),
-                            "model": call.get("model"),
-                            "input": call.get("input"),
-                            "output": call.get("output"),
-                            "tokens": call.get("tokens"),
-                            "score": call.get("score"),
-                        })
+                        dataset.append(
+                            {
+                                "id": call.get("id"),
+                                "timestamp": call.get("timestamp"),
+                                "model": call.get("model"),
+                                "input": call.get("input"),
+                                "output": call.get("output"),
+                                "tokens": call.get("tokens"),
+                                "score": call.get("score"),
+                            }
+                        )
             except Exception as e:
                 logger.warning("读取日志文件失败 %s: %s", log_file, e)
 
@@ -427,7 +416,7 @@ class LLMCallLogger:
     def export_by_workflow(
         self,
         workflow_id: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """按 workflow_id 导出完整 workflow 数据
 
         Args:
@@ -443,7 +432,7 @@ class LLMCallLogger:
 
         for log_file in log_files:
             try:
-                with open(log_file, "r", encoding="utf-8") as f:
+                with open(log_file, encoding="utf-8") as f:
                     data = json.load(f)
 
                 for call in data.get("calls", []):
@@ -460,9 +449,9 @@ class LLMCallLogger:
 
     def _get_log_files(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-    ) -> List[Path]:
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[Path]:
         """获取日期范围内的所有日志文件
 
         Args:
@@ -481,7 +470,7 @@ class LLMCallLogger:
         filtered_files = []
         for file in all_files:
             # 从文件名提取日期：llm_calls_YYYY-MM-DD.json
-            match = re.match(r'llm_calls_(\d{4}-\d{2}-\d{2})\.json', file.name)
+            match = re.match(r"llm_calls_(\d{4}-\d{2}-\d{2})\.json", file.name)
             if match:
                 file_date = match.group(1)
 

@@ -15,10 +15,12 @@ repository Layer - 数据访问层统一入口
 
 参考文档：docs/temp/Investigation/2026-04-24-provider-aggregator-architecture-research.md
 """
-from .database_manager import DatabaseManager
-from lifeprism.config.settings_manager import settings
+
 # ==================== 全局单例实例 ====================
-import os
+
+from lifeprism.config.settings_manager import settings
+
+from .database_manager import DatabaseManager
 
 # 检查并创建数据库文件（如果不存在）
 # 防止 readonly 模式下因文件不存在导致连接失败
@@ -30,48 +32,45 @@ for db_path in [settings.lw_db_path, settings.chat_db_path]:
         db_path.touch()
 
 # LifeWatch 数据库（读写，使用连接池）
-lw_db_manager = DatabaseManager(
-    DB_PATH=str(settings.lw_db_path),
-    use_pool=True,
-    pool_size=5
-)
+lw_db_manager = DatabaseManager(DB_PATH=str(settings.lw_db_path), use_pool=True, pool_size=5)
 
 # ActivityWatch 数据库（只读，使用连接池）
 aw_db_manager = DatabaseManager(
-    DB_PATH=str(settings.aw_db_path),
-    use_pool=True,
-    pool_size=1,
-    readonly=True
+    DB_PATH=str(settings.aw_db_path), use_pool=True, pool_size=1, readonly=True
 )
 
 chat_history_db_manager = DatabaseManager(
-    DB_PATH=str(settings.chat_db_path),
-    use_pool=True,
-    pool_size=2,
-    readonly=True
+    DB_PATH=str(settings.chat_db_path), use_pool=True, pool_size=2, readonly=True
 )
 
 # ==================== 基础数据提供者 ====================
-from .base_providers import LWBaseDataProvider, AWBaseDataProvider
-from lifeprism.repository.providers import QueryOptions 
-# ==================== 单表 repository（内部是 Provider）====================
-from lifeprism.repository.providers import diary_provider as diary_repository
-from lifeprism.repository.providers import custom_block_provider as custom_block_repository
-from lifeprism.repository.providers import tokens_usage_provider as tokens_usage_repository
-from lifeprism.repository.providers import raw_behavior_analysis_provider as raw_behavior_analysis_repository
-from lifeprism.repository.providers import behavior_analysis_provider as behavior_analysis_repository
-from lifeprism.repository.providers import screen_capture_provider as screen_capture_repository
+from lifeprism.repository.aggregators import category_aggregator as category_repository
+from lifeprism.repository.aggregators import computer_usage_aggregator as computer_usage_repository
+from lifeprism.repository.aggregators import goal_aggregator as goal_repository
 
 # ==================== 多表 repository（内部是 Aggregator）====================
 from lifeprism.repository.aggregators import habit_aggregator as habit_repository
-from lifeprism.repository.aggregators import mood_aggregator as mood_repository
-from lifeprism.repository.aggregators import goal_aggregator as goal_repository
 from lifeprism.repository.aggregators import habit_chain_aggregator as habit_chain_repository
-from lifeprism.repository.aggregators import category_aggregator as category_repository
 from lifeprism.repository.aggregators import map_cache_aggregator as map_cache_repository
-from lifeprism.repository.aggregators import todo_aggregator as todo_repository
+from lifeprism.repository.aggregators import mood_aggregator as mood_repository
 from lifeprism.repository.aggregators import plan_doc_aggregator as plan_doc_repository
-from lifeprism.repository.aggregators import computer_usage_aggregator as computer_usage_repository
+from lifeprism.repository.aggregators import todo_aggregator as todo_repository
+from lifeprism.repository.providers import QueryOptions
+from lifeprism.repository.providers import (
+    behavior_analysis_provider as behavior_analysis_repository,
+)
+from lifeprism.repository.providers import custom_block_provider as custom_block_repository
+
+# ==================== 单表 repository（内部是 Provider）====================
+from lifeprism.repository.providers import diary_provider as diary_repository
+from lifeprism.repository.providers import (
+    raw_behavior_analysis_provider as raw_behavior_analysis_repository,
+)
+from lifeprism.repository.providers import screen_capture_provider as screen_capture_repository
+from lifeprism.repository.providers import tokens_usage_provider as tokens_usage_repository
+
+from .base_providers import AWBaseDataProvider, LWBaseDataProvider
+
 __all__ = [
     "QueryOptions",
     "DatabaseManager",
@@ -80,19 +79,20 @@ __all__ = [
     "LWBaseDataProvider",
     "AWBaseDataProvider",
     # 单表 repository
-    'diary_repository',
-    'todo_repository',
-    'custom_block_repository',
-    'plan_doc_repository',
-    'tokens_usage_repository',
-    'raw_behavior_analysis_repository',
-    'behavior_analysis_repository',
-    'screen_capture_repository',
+    "diary_repository",
+    "todo_repository",
+    "custom_block_repository",
+    "plan_doc_repository",
+    "tokens_usage_repository",
+    "raw_behavior_analysis_repository",
+    "behavior_analysis_repository",
+    "screen_capture_repository",
     # 多表 repository
-    'habit_repository',
-    'mood_repository',
-    'goal_repository',
-    'habit_chain_repository',
-    'category_repository',
-    'map_cache_repository',
+    "habit_repository",
+    "mood_repository",
+    "goal_repository",
+    "habit_chain_repository",
+    "computer_usage_repository",
+    "category_repository",
+    "map_cache_repository",
 ]

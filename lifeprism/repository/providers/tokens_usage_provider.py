@@ -3,13 +3,13 @@ Tokens Usage Provider - Token 使用统计数据访问层
 
 职责：提供 tokens_usage_log 表的所有数据访问接口
 """
-import sqlite3
-from typing import Optional, List, Dict, Any, Tuple, Set
+
+from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
-from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
+from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
 
@@ -30,19 +30,25 @@ class TokensUsageProvider(LWBaseDataProvider):
     _ON_CONFLICT = "replace"  # token 使用统计按 session_id 更新，冲突时替换
 
     # 白名单字段集合（用于防止 SQL 注入）
-    _FILTER_FIELDS: Set[str] = {
-        'session_id', 'mode', 'created_at'
+    _FILTER_FIELDS: set[str] = {"session_id", "mode", "created_at"}
+    _ORDER_FIELDS: set[str] = {"session_id", "created_at", "mode"}
+    _SELECT_FIELDS: set[str] = {
+        "session_id",
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "search_count",
+        "result_items_count",
+        "mode",
+        "created_at",
     }
-    _ORDER_FIELDS: Set[str] = {
-        'session_id', 'created_at', 'mode'
-    }
-    _SELECT_FIELDS: Set[str] = {
-        'session_id', 'input_tokens', 'output_tokens', 'total_tokens',
-        'search_count', 'result_items_count', 'mode', 'created_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'input_tokens', 'output_tokens', 'total_tokens',
-        'search_count', 'result_items_count', 'mode'
+    _UPDATE_FIELDS: set[str] = {
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "search_count",
+        "result_items_count",
+        "mode",
     }
 
     def __init__(self, db_manager=None):
@@ -51,9 +57,8 @@ class TokensUsageProvider(LWBaseDataProvider):
     # ==================== 核心方法（使用通用方法） ====================
 
     def query_tokens_usage(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -80,7 +85,7 @@ class TokensUsageProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_tokens_usage_by_session_id(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_tokens_usage_by_session_id(self, session_id: str) -> dict[str, Any] | None:
         """
         按会话 ID 获取单条记录
 
@@ -90,14 +95,11 @@ class TokensUsageProvider(LWBaseDataProvider):
         Returns:
             记录，不存在返回 None
         """
-        options = QueryOptions(
-            filters={'session_id': session_id},
-            order_by='session_id'
-        )
+        options = QueryOptions(filters={"session_id": session_id}, order_by="session_id")
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_tokens_usage(self, data: Dict[str, Any]) -> bool:
+    def create_tokens_usage(self, data: dict[str, Any]) -> bool:
         """
         创建 token 使用记录
 
@@ -118,33 +120,33 @@ class TokensUsageProvider(LWBaseDataProvider):
                 raise ValueError(f"Invalid insert fields: {invalid_fields}")
 
             # 必填字段检查
-            required_fields = {'session_id'}
+            required_fields = {"session_id"}
             missing_fields = required_fields - set(data.keys())
             if missing_fields:
                 raise ValueError(f"Missing required fields: {missing_fields}")
 
             # 设置默认值
-            if 'mode' not in data:
-                data['mode'] = 'classification'
-            if 'search_count' not in data:
-                data['search_count'] = 0
-            if 'input_tokens' not in data:
-                data['input_tokens'] = 0
-            if 'output_tokens' not in data:
-                data['output_tokens'] = 0
-            if 'total_tokens' not in data:
-                data['total_tokens'] = 0
-            if 'result_items_count' not in data:
-                data['result_items_count'] = 0
+            if "mode" not in data:
+                data["mode"] = "classification"
+            if "search_count" not in data:
+                data["search_count"] = 0
+            if "input_tokens" not in data:
+                data["input_tokens"] = 0
+            if "output_tokens" not in data:
+                data["output_tokens"] = 0
+            if "total_tokens" not in data:
+                data["total_tokens"] = 0
+            if "result_items_count" not in data:
+                data["result_items_count"] = 0
 
             self._generic_insert(data)
-            logger.info("创建 token 使用记录成功: %s", data.get('session_id'))
+            logger.info("创建 token 使用记录成功: %s", data.get("session_id"))
             return True
         except Exception as e:
             logger.error("创建 token 使用记录失败: %s", e)
             raise DataAccessError(f"创建 token 使用记录失败: {e}") from e
 
-    def update_tokens_usage(self, session_id: str, data: Dict[str, Any]) -> bool:
+    def update_tokens_usage(self, session_id: str, data: dict[str, Any]) -> bool:
         """
         更新 token 使用记录
 
@@ -194,7 +196,7 @@ class TokensUsageProvider(LWBaseDataProvider):
             logger.error("删除 token 使用记录 %s 失败: %s", session_id, e)
             raise DataAccessError(f"删除 token 使用记录 {session_id} 失败: {e}") from e
 
-    def upsert_tokens_usage(self, session_id: str, data: Dict[str, Any]) -> bool:
+    def upsert_tokens_usage(self, session_id: str, data: dict[str, Any]) -> bool:
         """
         更新或插入 token 使用记录（基于 session_id）
 
@@ -219,13 +221,13 @@ class TokensUsageProvider(LWBaseDataProvider):
                 return self.update_tokens_usage(session_id, data)
             else:
                 # 记录不存在，执行插入
-                data['session_id'] = session_id
+                data["session_id"] = session_id
                 return self.create_tokens_usage(data)
         except Exception as e:
             logger.error("Upsert token 使用记录 %s 失败: %s", session_id, e)
             raise DataAccessError(f"Upsert token 使用记录 {session_id} 失败: {e}") from e
 
-    def batch_insert_tokens_usage(self, data_list: List[Dict[str, Any]]) -> int:
+    def batch_insert_tokens_usage(self, data_list: list[dict[str, Any]]) -> int:
         """
         批量插入 token 使用记录
 
@@ -241,18 +243,18 @@ class TokensUsageProvider(LWBaseDataProvider):
         try:
             # 为每条记录设置默认值
             for data in data_list:
-                if 'mode' not in data:
-                    data['mode'] = 'classification'
-                if 'search_count' not in data:
-                    data['search_count'] = 0
-                if 'input_tokens' not in data:
-                    data['input_tokens'] = 0
-                if 'output_tokens' not in data:
-                    data['output_tokens'] = 0
-                if 'total_tokens' not in data:
-                    data['total_tokens'] = 0
-                if 'result_items_count' not in data:
-                    data['result_items_count'] = 0
+                if "mode" not in data:
+                    data["mode"] = "classification"
+                if "search_count" not in data:
+                    data["search_count"] = 0
+                if "input_tokens" not in data:
+                    data["input_tokens"] = 0
+                if "output_tokens" not in data:
+                    data["output_tokens"] = 0
+                if "total_tokens" not in data:
+                    data["total_tokens"] = 0
+                if "result_items_count" not in data:
+                    data["result_items_count"] = 0
 
             affected = self.db.insert_many(self._TABLE_NAME, data_list)
             logger.info("批量插入 %s 条 token 使用记录成功", affected)

@@ -7,16 +7,16 @@ LLM 统一工厂函数
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
-from lifeprism.config.settings_manager import settings
 from lifeprism.config.provider_manager import provider_manager
+from lifeprism.config.settings_manager import settings
 from lifeprism.llm.providers import find_by_name
 
 logger = logging.getLogger(__name__)
 
 
-def get_provider_id(provider_name: Optional[str] = None) -> str:
+def get_provider_id(provider_name: str | None = None) -> str:
     """
     获取 Provider ID (区分于display name 显示名称)
 
@@ -34,14 +34,14 @@ def get_provider_id(provider_name: Optional[str] = None) -> str:
 
 
 def create_llm(
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-    api_key: Optional[str] = None,
+    provider: str | None = None,
+    model: str | None = None,
+    api_key: str | None = None,
     temperature: float = 0.2,
     enable_search: bool = False,
     enable_thinking: bool = False,
     enable_streaming: bool = False,
-    **kwargs
+    **kwargs,
 ):
     """
     统一 LLM 创建入口
@@ -89,9 +89,7 @@ def create_llm(
     provider_name = provider_id
 
     if not actual_api_key:
-        raise ValueError(
-            f"未配置 API Key。请在设置中配置 {provider_id} 的 API Key。"
-        )
+        raise ValueError(f"未配置 API Key。请在设置中配置 {provider_id} 的 API Key。")
 
     logger.debug(
         f"创建 LLM: provider={provider_id}, model={actual_model}, "
@@ -107,7 +105,7 @@ def create_llm(
     return llm_provider
 
 
-def get_provider_capabilities(provider: Optional[str] = None) -> Dict[str, Any]:
+def get_provider_capabilities(provider: str | None = None) -> dict[str, Any]:
     """
     获取服务商信息（来自 provider_manager）。
 
@@ -148,11 +146,12 @@ def list_providers() -> list:
 
 # ===================== 向后兼容别名 =====================
 
+
 def create_ChatTongyiModel(
     temperature: float = 0.2,
     enable_search: bool = True,
     enable_thinking: bool = False,
-    enable_streaming: bool = False
+    enable_streaming: bool = False,
 ):
     """
     向后兼容的别名函数
@@ -172,7 +171,7 @@ def create_ChatTongyiModel(
         temperature=temperature,
         enable_search=enable_search,
         enable_thinking=enable_thinking,
-        enable_streaming=enable_streaming
+        enable_streaming=enable_streaming,
     )
 
 
@@ -203,7 +202,7 @@ if __name__ == "__main__":
     provider_id = get_provider_id()
     api_key = settings.get_api_key(provider_id)
 
-    print(f"\n配置信息:")
+    print("\n配置信息:")
     print(f"  Provider: {settings.provider}")
     print(f"  Provider ID: {provider_id}")
     print(f"  Model: {settings.model}")
@@ -221,7 +220,9 @@ if __name__ == "__main__":
             print(f"  LLM 实例创建成功: {type(llm).__name__}")
 
             async def test():
-                response = await llm.chat([{"role": "user", "content": "请回复'连接成功'这四个字。"}])
+                response = await llm.chat(
+                    [{"role": "user", "content": "请回复'连接成功'这四个字。"}]
+                )
                 return response.content or ""
 
             result = asyncio.run(test())

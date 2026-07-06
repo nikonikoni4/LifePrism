@@ -72,12 +72,10 @@ def build_todo_execution_context(
         "overdue": len(overdue_list),
         "completion_rate": completion_rate,
         "completed_items": [
-            {"todo_id": t["id"], "title": t["title"]}
-            for t in completed_list[:max_items]
+            {"todo_id": t["id"], "title": t["title"]} for t in completed_list[:max_items]
         ],
         "overdue_items": [
-            {"todo_id": t["id"], "title": t["title"]}
-            for t in overdue_list[:max_items]
+            {"todo_id": t["id"], "title": t["title"]} for t in overdue_list[:max_items]
         ],
     }
 

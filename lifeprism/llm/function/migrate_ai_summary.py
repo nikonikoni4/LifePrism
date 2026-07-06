@@ -5,12 +5,12 @@
     python -m lifeprism.llm.function.migrate_ai_summary
     python -m lifeprism.llm.function.migrate_ai_summary --dry-run
 """
+
 import sys
-from pathlib import Path
 
 from lifeprism.config.settings_manager import settings
-from lifeprism.repository import diary_repository
 from lifeprism.llm.utils.md_os import write_date_md
+from lifeprism.repository import diary_repository
 
 BEHAVIOR_PATH = settings.lifeprism_data_path / "user" / "daily_data" / "behavior.md"
 

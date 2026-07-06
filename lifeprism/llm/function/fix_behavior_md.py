@@ -9,19 +9,20 @@ r"""
     python -m lifeprism.llm.function.fix_behavior_md --dry-run
     python -m lifeprism.llm.function.fix_behavior_md --path "<自定义路径>"
 """
+
 import re
 import sys
 from pathlib import Path
 
 REPLACEMENTS = [
     # 纯 markdown 标题：### 今日概览 -> 1. 今日概览
-    (r'^(#{1,3}\s+)今日概览\s*$', r'1. 今日概览'),
-    (r'^(#{1,3}\s+)电脑使用总览\s*$', r'2. 电脑使用总览'),
-    (r'^(#{1,3}\s+)高频使用时段\s*$', r'3. 高频使用时段'),
+    (r"^(#{1,3}\s+)今日概览\s*$", r"1. 今日概览"),
+    (r"^(#{1,3}\s+)电脑使用总览\s*$", r"2. 电脑使用总览"),
+    (r"^(#{1,3}\s+)高频使用时段\s*$", r"3. 高频使用时段"),
     # 混合格式：### 1. 今日概览（附注）-> 1. 今日概览
-    (r'^#{1,3}\s+1\.\s*今日概览.*$', r'1. 今日概览'),
-    (r'^#{1,3}\s+2\.\s*电脑使用总览.*$', r'2. 电脑使用总览'),
-    (r'^#{1,3}\s+3\.\s*高频使用时段.*$', r'3. 高频使用时段'),
+    (r"^#{1,3}\s+1\.\s*今日概览.*$", r"1. 今日概览"),
+    (r"^#{1,3}\s+2\.\s*电脑使用总览.*$", r"2. 电脑使用总览"),
+    (r"^#{1,3}\s+3\.\s*高频使用时段.*$", r"3. 高频使用时段"),
 ]
 
 
@@ -43,7 +44,7 @@ def fix_behavior_md(path: Path, dry_run: bool = False) -> int:
                 if new_line != line:
                     fixed_count += 1
                     if dry_run:
-                        print(f"  L{i+1}: {line.rstrip()} -> {new_line.rstrip()}")
+                        print(f"  L{i + 1}: {line.rstrip()} -> {new_line.rstrip()}")
                 break
         new_lines.append(new_line)
 
@@ -73,6 +74,7 @@ if __name__ == "__main__":
         target = Path(path_arg)
     else:
         from lifeprism.config.settings_manager import settings
+
         target = settings.lifeprism_data_path / "user" / "daily_data" / "behavior.md"
 
     print(f"目标文件: {target}")

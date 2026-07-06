@@ -6,34 +6,33 @@ Category API v2 - 分类数据接口
 - /state: 获取分类统计数据
 """
 
-from fastapi import APIRouter, Query, HTTPException, Path
-from typing import Optional, List
 from datetime import datetime
 
+from fastapi import APIRouter, HTTPException, Path, Query
+
 from lifeprism.server.schemas.category_schemas import (
-    CategoryTreeResponse,
-    CategoryTreeItem,
-    SubCategoryTreeItem,
-    CategoryStatsResponse,
-    CategoryStatsIncludeOptions,
-    CreateCategoryRequest,
-    UpdateCategoryRequest,
-    DeleteCategoryRequest,
-    CreateSubCategoryRequest,
-    UpdateSubCategoryRequest,
-    ToggleCategoryStateRequest,
-    # CategoryMapCache 相关
-    CategoryMapCacheItem,
-    CategoryMapCacheResponse,
-    UpdateCategoryMapCacheRequest,
+    BatchDeleteCategoryMapCacheRequest,
     BatchUpdateCategoryMapCacheRequest,
-    DeleteCategoryMapCacheRequest,
-    BatchDeleteCategoryMapCacheRequest
+    # CategoryMapCache 相关
+    CategoryMapCacheResponse,
+    CategoryStatsIncludeOptions,
+    CategoryStatsResponse,
+    CategoryTreeItem,
+    CategoryTreeResponse,
+    CreateCategoryRequest,
+    CreateSubCategoryRequest,
+    DeleteCategoryRequest,
+    SubCategoryTreeItem,
+    ToggleCategoryStateRequest,
+    UpdateCategoryMapCacheRequest,
+    UpdateCategoryRequest,
+    UpdateSubCategoryRequest,
 )
 from lifeprism.server.schemas.common_schemas import StandardResponse
 from lifeprism.server.services import category_service
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import LWBaseError
+
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/category", tags=["Category V2"])
@@ -43,15 +42,13 @@ router = APIRouter(prefix="/category", tags=["Category V2"])
 # /tree - 分类结构接口
 # ============================================================================
 
+
 @router.get("/tree", summary="获取分类树形结构")
 async def get_category_tree(
     depth: int = Query(
-        default=2,
-        ge=1,
-        le=2,
-        description="返回层级深度。1=仅主分类，2=主分类+子分类"
-    )
-)->CategoryTreeResponse:
+        default=2, ge=1, le=2, description="返回层级深度。1=仅主分类，2=主分类+子分类"
+    ),
+) -> CategoryTreeResponse:
     try:
         return category_service.get_category_tree(depth)
     except LWBaseError:
@@ -59,50 +56,36 @@ async def get_category_tree(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("获取分类结构失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 # ============================================================================
 # /stats - 分类统计接口
 # ============================================================================
 
+
 @router.get("/stats", summary="获取分类统计数据")
 async def get_category_stats(
     # 包含的数据类型（可多选，逗号分隔）
     include: str = Query(
         default="app,duration,title",
-        description="包含的数据类型，可多选逗号分隔。可选值：app, duration, title"
+        description="包含的数据类型，可多选逗号分隔。可选值：app, duration, title",
     ),
     # 时间范围
-    start_time: datetime = Query(
-        description="开始时间，ISO 8601 格式，如 2024-12-18T00:00:00"
-    ),
-    end_time: datetime = Query(
-        description="结束时间，ISO 8601 格式"
-    ),
+    start_time: datetime = Query(description="开始时间，ISO 8601 格式，如 2024-12-18T00:00:00"),
+    end_time: datetime = Query(description="结束时间，ISO 8601 格式"),
     # 数量限制
-    top_title: int = Query(
-        default=3,
-        ge=1,
-        le=20,
-        description="返回的 Top 标题数量"
-    ),
+    top_title: int = Query(default=3, ge=1, le=20, description="返回的 Top 标题数量"),
     # 筛选条件
-    category: Optional[str] = Query(
-        default=None,
-        description="按主分类ID筛选"
-    ),
-    sub_category: Optional[str] = Query(
-        default=None,
-        description="按子分类ID筛选"
-    )
-)->CategoryStatsResponse:
+    category: str | None = Query(default=None, description="按主分类ID筛选"),
+    sub_category: str | None = Query(default=None, description="按子分类ID筛选"),
+) -> CategoryStatsResponse:
     """
     获取分类相关的统计数据
-    
+
     **参数：**
     - `include`: 包含的数据类型
         - `duration`: 时长统计
@@ -112,7 +95,7 @@ async def get_category_stats(
     - `start_time`, `end_time`: 统计的时间范围
     - `top_title`: 返回的 Top 标题数量
     - `category`, `sub_category`: 按分类筛选
-    
+
     **响应示例：**
     ```json
     {
@@ -137,46 +120,44 @@ async def get_category_stats(
     try:
         # API 层职责：解析 include 字符串为结构化选项
         include_options = CategoryStatsIncludeOptions.from_include_string(include)
-        
+
         return category_service.get_category_stats(
             start_time=start_time,
             end_time=end_time,
             include_options=include_options,
             top_title=top_title,
             category=category,
-            sub_category=sub_category
+            sub_category=sub_category,
         )
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("获取分类统计失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 # ============================================================================
 # /manage - 分类管理接口（CRUD）
 # ============================================================================
 
+
 @router.post("/manage", response_model=CategoryTreeItem, summary="创建主分类")
 async def create_category(request: CreateCategoryRequest):
     """
     创建新的主分类
-    
+
     请求体:
     - name: 分类名称
     - color: 分类颜色（十六进制格式，如 #5B8FF9）
-    
+
     返回创建的分类对象
     """
     try:
-        category = category_service.create_category(
-            name=request.name,
-            color=request.color
-        )
+        category = category_service.create_category(name=request.name, color=request.color)
         logger.info("创建主分类: name=%s, color=%s", request.name, request.color)
         return category
     except LWBaseError:
@@ -184,32 +165,29 @@ async def create_category(request: CreateCategoryRequest):
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("创建分类失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 @router.put("/manage/{category_id}", response_model=CategoryTreeItem, summary="更新主分类")
 async def update_category(
-    category_id: str = Path(..., description="分类ID"),
-    request: UpdateCategoryRequest = ...
+    category_id: str = Path(..., description="分类ID"), request: UpdateCategoryRequest = ...
 ):
     """
     更新主分类的名称或颜色
-    
+
     路径参数:
     - category_id: 分类ID
-    
+
     请求体:
     - name: 新的分类名称（可选）
     - color: 新的分类颜色（可选）
     """
     try:
         category = category_service.update_category(
-            category_id=category_id,
-            name=request.name or "",
-            color=request.color or ""
+            category_id=category_id, name=request.name or "", color=request.color or ""
         )
         logger.info("更新主分类: category_id=%s", category_id)
         return category
@@ -218,64 +196,59 @@ async def update_category(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error("更新分类失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 @router.delete("/manage/{category_id}", response_model=StandardResponse, summary="删除主分类")
 async def delete_category(
     category_id: str = Path(..., description="分类ID"),
-    request: DeleteCategoryRequest = DeleteCategoryRequest()
+    request: DeleteCategoryRequest = DeleteCategoryRequest(),
 ):
     """
     删除主分类
-    
+
     注意：
     - 会自动删除该分类下的所有子分类（CASCADE）
     - 关联的活动记录会被重新分配到指定分类（默认 'other'）
     """
     try:
         success = category_service.delete_category(
-            category_id=category_id,
-            reassign_to=request.reassign_to
+            category_id=category_id, reassign_to=request.reassign_to
         )
         logger.info("删除主分类: category_id=%s, reassign_to=%s", category_id, request.reassign_to)
         return StandardResponse(
-            success=True,
-            data={"deleted": success},
-            message=f"分类 '{category_id}' 删除成功"
+            success=True, data={"deleted": success}, message=f"分类 '{category_id}' 删除成功"
         )
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error("删除分类失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 @router.post("/manage/{parent_id}/sub", response_model=SubCategoryTreeItem, summary="添加子分类")
 async def create_sub_category(
-    parent_id: str = Path(..., description="主分类ID"),
-    request: CreateSubCategoryRequest = ...
+    parent_id: str = Path(..., description="主分类ID"), request: CreateSubCategoryRequest = ...
 ):
     """
     为指定主分类添加子分类
-    
+
     路径参数:
     - parent_id: 主分类ID
-    
+
     请求体:
     - name: 子分类名称
     """
     try:
         sub_category = category_service.create_sub_category(
-            category_id=parent_id,
-            name=request.name
+            category_id=parent_id, name=request.name
         )
         logger.info("创建子分类: parent_id=%s, name=%s", parent_id, request.name)
         return sub_category
@@ -284,33 +257,33 @@ async def create_sub_category(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error("创建子分类失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
-@router.put("/manage/{parent_id}/sub/{sub_id}", response_model=SubCategoryTreeItem, summary="更新子分类")
+@router.put(
+    "/manage/{parent_id}/sub/{sub_id}", response_model=SubCategoryTreeItem, summary="更新子分类"
+)
 async def update_sub_category(
     parent_id: str = Path(..., description="主分类ID"),
     sub_id: str = Path(..., description="子分类ID"),
-    request: UpdateSubCategoryRequest = ...
+    request: UpdateSubCategoryRequest = ...,
 ):
     """
     更新子分类名称
-    
+
     路径参数:
     - parent_id: 主分类ID
     - sub_id: 子分类ID
-    
+
     请求体:
     - name: 新的子分类名称
     """
     try:
         sub_category = category_service.update_sub_category(
-            category_id=parent_id,
-            sub_id=sub_id,
-            name=request.name
+            category_id=parent_id, sub_id=sub_id, name=request.name
         )
         logger.info("更新子分类: parent_id=%s, sub_id=%s", parent_id, sub_id)
         return sub_category
@@ -319,63 +292,61 @@ async def update_sub_category(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error("更新子分类失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
-@router.delete("/manage/{parent_id}/sub/{sub_id}", response_model=StandardResponse, summary="删除子分类")
+@router.delete(
+    "/manage/{parent_id}/sub/{sub_id}", response_model=StandardResponse, summary="删除子分类"
+)
 async def delete_sub_category(
     parent_id: str = Path(..., description="主分类ID"),
-    sub_id: str = Path(..., description="子分类ID")
+    sub_id: str = Path(..., description="子分类ID"),
 ):
     """
     删除子分类
-    
+
     注意：关联的活动记录会被重新分配到 'untracked' 子分类
     """
     try:
-        success = category_service.delete_sub_category(
-            category_id=parent_id,
-            sub_id=sub_id
-        )
+        success = category_service.delete_sub_category(category_id=parent_id, sub_id=sub_id)
         logger.info("删除子分类: parent_id=%s, sub_id=%s", parent_id, sub_id)
         return StandardResponse(
-            success=True,
-            data={"deleted": success},
-            message=f"子分类 '{sub_id}' 删除成功"
+            success=True, data={"deleted": success}, message=f"子分类 '{sub_id}' 删除成功"
         )
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error("删除子分类失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 # ============================================================================
 # /state - 分类状态切换接口
 # ============================================================================
 
-@router.patch("/manage/{category_id}/state", response_model=CategoryTreeItem, summary="切换主分类状态")
+
+@router.patch(
+    "/manage/{category_id}/state", response_model=CategoryTreeItem, summary="切换主分类状态"
+)
 async def toggle_category_state(
-    category_id: str = Path(..., description="分类ID"),
-    request: ToggleCategoryStateRequest = ...
+    category_id: str = Path(..., description="分类ID"), request: ToggleCategoryStateRequest = ...
 ):
     """
     切换主分类的启用/禁用状态
-    
+
     - state=1: 启用
     - state=0: 禁用（该分类将不再参与自动分类，已分类数据不受影响）
     """
     try:
         category = category_service.toggle_category_state(
-            category_id=category_id,
-            state=request.state
+            category_id=category_id, state=request.state
         )
         logger.info("切换主分类状态: category_id=%s, state=%s", category_id, request.state)
         return category
@@ -384,58 +355,65 @@ async def toggle_category_state(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error("切换分类状态失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
-@router.patch("/manage/{parent_id}/sub/{sub_id}/state", response_model=SubCategoryTreeItem, summary="切换子分类状态")
+@router.patch(
+    "/manage/{parent_id}/sub/{sub_id}/state",
+    response_model=SubCategoryTreeItem,
+    summary="切换子分类状态",
+)
 async def toggle_sub_category_state(
     parent_id: str = Path(..., description="主分类ID"),
     sub_id: str = Path(..., description="子分类ID"),
-    request: ToggleCategoryStateRequest = ...
+    request: ToggleCategoryStateRequest = ...,
 ):
     """
     切换子分类的启用/禁用状态
-    
+
     - state=1: 启用
     - state=0: 禁用（该子分类将不再参与自动分类，已分类数据不受影响）
     """
     try:
         sub_category = category_service.toggle_sub_category_state(
-            category_id=parent_id,
-            sub_id=sub_id,
-            state=request.state
+            category_id=parent_id, sub_id=sub_id, state=request.state
         )
-        logger.info("切换子分类状态: parent_id=%s, sub_id=%s, state=%s", parent_id, sub_id, request.state)
+        logger.info(
+            "切换子分类状态: parent_id=%s, sub_id=%s, state=%s", parent_id, sub_id, request.state
+        )
         return sub_category
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error("切换子分类状态失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 # ============================================================================
 # /category_map_cache - 分类缓存表接口
 # ============================================================================
 
+
 @router.get("/category_map", response_model=CategoryMapCacheResponse, summary="获取分类缓存列表")
 async def get_category_map_cache_list(
     page: int = Query(default=1, ge=1, description="页码"),
     page_size: int = Query(default=50, ge=1, le=200, description="每页数量"),
-    search: Optional[str] = Query(default=None, description="搜索关键词（匹配 app 或 title）"),
-    state: Optional[int] = Query(default=None, ge=0, le=1, description="按状态筛选"),
-    is_multipurpose_app: Optional[bool] = Query(default=None, description="按应用类型筛选（true=多用途, false=单用途）"),
+    search: str | None = Query(default=None, description="搜索关键词（匹配 app 或 title）"),
+    state: int | None = Query(default=None, ge=0, le=1, description="按状态筛选"),
+    is_multipurpose_app: bool | None = Query(
+        default=None, description="按应用类型筛选（true=多用途, false=单用途）"
+    ),
 ):
     """
     获取 category_map_cache 分类缓存列表
-    
+
     支持分页、搜索、状态筛选和应用类型筛选
     """
     try:
@@ -445,7 +423,7 @@ async def get_category_map_cache_list(
             page_size=page_size,
             search=search,
             state=state,
-            is_multipurpose_app=is_multipurpose_app
+            is_multipurpose_app=is_multipurpose_app,
         )
         return result
     except LWBaseError:
@@ -453,68 +431,65 @@ async def get_category_map_cache_list(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("获取分类缓存列表失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 # 注意：静态路径路由必须放在动态路径路由之前，否则 "batch" 会被错误解析为 record_id
 @router.put("/category_map/batch", response_model=StandardResponse, summary="批量更新分类缓存记录")
-async def batch_update_category_map_cache(
-    request: BatchUpdateCategoryMapCacheRequest
-):
+async def batch_update_category_map_cache(request: BatchUpdateCategoryMapCacheRequest):
     """
     批量更新 category_map_cache 记录的分类
-    
+
     - 更新时会自动同步目标分类的 state 状态
     - 使用 exclude_unset 区分"未传递字段"和"传递了 null 想清空"
     """
     # 使用 exclude_unset=True 获取前端实际传递的字段
     update_fields = request.model_dump(exclude_unset=True)
-    
+
     # 提取 ids 并移除（不属于更新字段）
-    record_ids = update_fields.pop('ids', [])
-    
+    record_ids = update_fields.pop("ids", [])
+
     logger.info("批量更新记录 %s，传递的字段: %s", record_ids, update_fields)
-    
+
     # 参数校验：至少需要一个可更新的字段
-    updatable_fields = {'category_id', 'sub_category_id', 'app_description', 'link_to_goal_id'}
+    updatable_fields = {"category_id", "sub_category_id", "app_description", "link_to_goal_id"}
     if not any(field in update_fields for field in updatable_fields):
         raise HTTPException(
-            status_code=400, 
-            detail="参数错误：至少需要提供一个更新字段（category_id、sub_category_id、app_description、link_to_goal_id）"
+            status_code=400,
+            detail="参数错误：至少需要提供一个更新字段（category_id、sub_category_id、app_description、link_to_goal_id）",
         )
-    
+
     try:
         count = category_service.batch_update_category_map_cache(
-            record_ids=record_ids,
-            update_fields=update_fields
+            record_ids=record_ids, update_fields=update_fields
         )
         return StandardResponse(
-            success=True,
-            data={"updated_count": count},
-            message=f"成功更新 {count} 条记录"
+            success=True, data={"updated_count": count}, message=f"成功更新 {count} 条记录"
         )
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("批量更新分类缓存记录失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
-@router.put("/category_map/{record_id}", response_model=StandardResponse, summary="更新分类缓存记录")
+@router.put(
+    "/category_map/{record_id}", response_model=StandardResponse, summary="更新分类缓存记录"
+)
 async def update_category_map_cache(
     record_id: str = Path(..., description="记录ID（格式：m-xxx 或 s-xxx）"),
-    request: UpdateCategoryMapCacheRequest = ...
+    request: UpdateCategoryMapCacheRequest = ...,
 ):
     """
     更新单条 category_map_cache 记录的分类
-    
+
     - 更新时会自动同步目标分类的 state 状态
     - 使用 exclude_unset 区分"未传递字段"和"传递了 null 想清空"
     - 例如：传 {"link_to_goal_id": null} 会将 link_to_goal_id 设为 NULL
@@ -522,48 +497,51 @@ async def update_category_map_cache(
     # 使用 exclude_unset=True 获取前端实际传递的字段
     # 这样可以区分 "没传这个字段" 和 "传了 null 想清空"
     update_fields = request.model_dump(exclude_unset=True)
-    
+
     # 移除 id 字段（路径参数已提供）
-    update_fields.pop('id', None)
-    
+    update_fields.pop("id", None)
+
     logger.info("更新记录 %s，传递的字段: %s", record_id, update_fields)
-    
+
     # 参数校验：至少需要一个可更新的字段
-    updatable_fields = {'category_id', 'sub_category_id', 'app_description', 'title_analysis', 'link_to_goal_id'}
+    updatable_fields = {
+        "category_id",
+        "sub_category_id",
+        "app_description",
+        "title_analysis",
+        "link_to_goal_id",
+    }
     if not any(field in update_fields for field in updatable_fields):
         raise HTTPException(
-            status_code=400, 
-            detail="参数错误：至少需要提供一个更新字段（category_id、sub_category_id、app_description、title_analysis、link_to_goal_id）"
+            status_code=400,
+            detail="参数错误：至少需要提供一个更新字段（category_id、sub_category_id、app_description、title_analysis、link_to_goal_id）",
         )
-    
+
     try:
         success = category_service.update_category_map_cache(
-            record_id=record_id,
-            update_fields=update_fields
+            record_id=record_id, update_fields=update_fields
         )
         if not success:
             raise HTTPException(status_code=404, detail=f"记录 ID={record_id} 不存在")
         return StandardResponse(
-            success=True,
-            data={"updated": True},
-            message=f"记录 ID={record_id} 更新成功"
+            success=True, data={"updated": True}, message=f"记录 ID={record_id} 更新成功"
         )
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("更新分类缓存记录失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 # 同样，DELETE 的 batch 路由也需要放在动态路径之前
-@router.delete("/category_map/batch", response_model=StandardResponse, summary="批量删除分类缓存记录")
-async def batch_delete_category_map_cache(
-    request: BatchDeleteCategoryMapCacheRequest
-):
+@router.delete(
+    "/category_map/batch", response_model=StandardResponse, summary="批量删除分类缓存记录"
+)
+async def batch_delete_category_map_cache(request: BatchDeleteCategoryMapCacheRequest):
     """
     批量删除 category_map_cache 记录
     """
@@ -571,24 +549,24 @@ async def batch_delete_category_map_cache(
         count = category_service.batch_delete_category_map_cache(record_ids=request.ids)
         logger.info("批量删除分类缓存: deleted_count=%s", count)
         return StandardResponse(
-            success=True,
-            data={"deleted_count": count},
-            message=f"成功删除 {count} 条记录"
+            success=True, data={"deleted_count": count}, message=f"成功删除 {count} 条记录"
         )
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("批量删除分类缓存记录失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
-@router.delete("/category_map/{record_id}", response_model=StandardResponse, summary="删除分类缓存记录")
+@router.delete(
+    "/category_map/{record_id}", response_model=StandardResponse, summary="删除分类缓存记录"
+)
 async def delete_category_map_cache(
-    record_id: str = Path(..., description="记录ID（格式：m-xxx 或 s-xxx）")
+    record_id: str = Path(..., description="记录ID（格式：m-xxx 或 s-xxx）"),
 ):
     """
     删除单条 category_map_cache 记录
@@ -599,16 +577,14 @@ async def delete_category_map_cache(
             raise HTTPException(status_code=404, detail=f"记录 ID={record_id} 不存在")
         logger.info("删除分类缓存记录: record_id=%s", record_id)
         return StandardResponse(
-            success=True,
-            data={"deleted": True},
-            message=f"记录 ID={record_id} 删除成功"
+            success=True, data={"deleted": True}, message=f"记录 ID={record_id} 删除成功"
         )
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("删除分类缓存记录失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e

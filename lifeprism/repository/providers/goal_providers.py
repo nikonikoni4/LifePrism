@@ -5,20 +5,22 @@ Goal Providers - 目标相关数据提供者
 - GoalProvider: goal 表的数据访问
 - GoalStatsProvider: goal_stats 表的数据访问
 """
-from typing import Optional, List, Dict, Any, Tuple, Set
-from datetime import datetime, timedelta
-import uuid
+
 import sqlite3
+import uuid
+from datetime import datetime, timedelta
+from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
-from lifeprism.utils import get_logger, LazySingleton
-from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
+from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import ConflictError, DataAccessError, ValidationError
 
 logger = get_logger(__name__)
 
 
 # ==================== GoalProvider ====================
+
 
 class GoalProvider(LWBaseDataProvider):
     """
@@ -35,32 +37,61 @@ class GoalProvider(LWBaseDataProvider):
     _TIME_FIELD = None
 
     # 白名单字段集合
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'name', 'status', 'link_to_category_id', 'link_to_sub_category_id',
-        'start_date', 'expected_finished_at', 'track_time_automatically', 'order_index'
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "name",
+        "status",
+        "link_to_category_id",
+        "link_to_sub_category_id",
+        "start_date",
+        "expected_finished_at",
+        "track_time_automatically",
+        "order_index",
     }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'name', 'order_index', 'created_at', 'start_date'
+    _ORDER_FIELDS: set[str] = {"id", "name", "order_index", "created_at", "start_date"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "name",
+        "content",
+        "color",
+        "link_to_category_id",
+        "link_to_sub_category_id",
+        "start_date",
+        "expected_finished_at",
+        "value",
+        "commitment",
+        "time_unit",
+        "time_invested",
+        "track_time_automatically",
+        "milestones",
+        "status",
+        "order_index",
+        "time_invested_updated_at",
+        "created_at",
+        "updated_at",
     }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'name', 'content', 'color', 'link_to_category_id', 'link_to_sub_category_id',
-        'start_date', 'expected_finished_at', 'value', 'commitment', 'time_unit',
-        'time_invested', 'track_time_automatically', 'milestones', 'status', 'order_index',
-        'time_invested_updated_at', 'created_at', 'updated_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'name', 'content', 'color', 'link_to_category_id', 'link_to_sub_category_id',
-        'start_date', 'expected_finished_at', 'value', 'commitment', 'time_unit',
-        'time_invested', 'track_time_automatically', 'milestones', 'status', 'order_index',
-        'time_invested_updated_at'
+    _UPDATE_FIELDS: set[str] = {
+        "name",
+        "content",
+        "color",
+        "link_to_category_id",
+        "link_to_sub_category_id",
+        "start_date",
+        "expected_finished_at",
+        "value",
+        "commitment",
+        "time_unit",
+        "time_invested",
+        "track_time_automatically",
+        "milestones",
+        "status",
+        "order_index",
+        "time_invested_updated_at",
     }
 
     # ==================== 核心方法（使用通用方法） ====================
 
-    def query_goals(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    def query_goals(self, options: QueryOptions | None = None) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -86,11 +117,11 @@ class GoalProvider(LWBaseDataProvider):
 
     def get_goals(
         self,
-        status: Optional[str] = None,
-        category_id: Optional[str] = None,
+        status: str | None = None,
+        category_id: str | None = None,
         page: int = 1,
-        page_size: int = 20
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        page_size: int = 20,
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         获取目标列表
 
@@ -105,20 +136,20 @@ class GoalProvider(LWBaseDataProvider):
         """
         filters = {}
         if status:
-            filters['status'] = status
+            filters["status"] = status
         if category_id:
-            filters['link_to_category_id'] = category_id
+            filters["link_to_category_id"] = category_id
 
         options = QueryOptions(
             filters=filters if filters else None,
-            order_by='order_index',
+            order_by="order_index",
             order_desc=False,
             page=page,
-            page_size=page_size
+            page_size=page_size,
         )
         return self._generic_query(options)
 
-    def get_goal_by_id(self, goal_id: str) -> Optional[Dict[str, Any]]:
+    def get_goal_by_id(self, goal_id: str) -> dict[str, Any] | None:
         """
         按 ID 获取单个目标
 
@@ -128,15 +159,11 @@ class GoalProvider(LWBaseDataProvider):
         Returns:
             Optional[Dict]: 目标数据，不存在返回 None
         """
-        options = QueryOptions(
-            filters={'id': goal_id},
-            order_by='id',
-            order_desc=False
-        )
+        options = QueryOptions(filters={"id": goal_id}, order_by="id", order_desc=False)
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_goal(self, data: Dict[str, Any]) -> Optional[str]:
+    def create_goal(self, data: dict[str, Any]) -> str | None:
         """
         创建新目标
 
@@ -154,23 +181,23 @@ class GoalProvider(LWBaseDataProvider):
         try:
             # 生成唯一 ID
             goal_id = f"goal-{str(uuid.uuid4())[:8]}"
-            data['id'] = goal_id
+            data["id"] = goal_id
 
             # 获取当前最大 order_index
-            if 'order_index' not in data:
+            if "order_index" not in data:
                 with self.db.get_connection() as conn:
                     cursor = conn.cursor()
                     cursor.execute("SELECT COALESCE(MAX(order_index), -1) + 1 FROM goal")
-                    data['order_index'] = cursor.fetchone()[0]
+                    data["order_index"] = cursor.fetchone()[0]
 
             # 设置默认值
-            data.setdefault('content', '')
-            data.setdefault('color', '#5B8FF9')
-            data.setdefault('time_unit', 'HRS')
-            data.setdefault('time_invested', 0)
-            data.setdefault('track_time_automatically', 1)
-            data.setdefault('milestones', '[]')
-            data.setdefault('status', 'active')
+            data.setdefault("content", "")
+            data.setdefault("color", "#5B8FF9")
+            data.setdefault("time_unit", "HRS")
+            data.setdefault("time_invested", 0)
+            data.setdefault("track_time_automatically", 1)
+            data.setdefault("milestones", "[]")
+            data.setdefault("status", "active")
 
             # 白名单验证
             allowed_fields = self._UPDATE_FIELDS | {self._PRIMARY_KEY}
@@ -186,16 +213,15 @@ class GoalProvider(LWBaseDataProvider):
             raise
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"目标记录已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
+                raise ConflictError("目标记录已存在") from e
+            raise DataAccessError("数据完整性错误") from e
         except Exception as e:
             logger.error("创建目标失败: %s", e)
             raise DataAccessError(
-                message=f"创建目标失败",
-                details={"goal_id": goal_id, "error": str(e)}
+                message="创建目标失败", details={"goal_id": goal_id, "error": str(e)}
             ) from e
 
-    def update_goal(self, goal_id: str, data: Dict[str, Any]) -> bool:
+    def update_goal(self, goal_id: str, data: dict[str, Any]) -> bool:
         """
         更新目标
 
@@ -222,7 +248,7 @@ class GoalProvider(LWBaseDataProvider):
             # goal 表不自动更新 updated_at，只更新传入的字段
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                set_clauses = [f"{key} = ?" for key in data.keys()]
+                set_clauses = [f"{key} = ?" for key in data]
                 values = list(data.values()) + [goal_id]
                 sql = f"UPDATE {self._TABLE_NAME} SET {', '.join(set_clauses)} WHERE {self._PRIMARY_KEY} = ?"
                 cursor.execute(sql, values)
@@ -237,8 +263,7 @@ class GoalProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("更新目标 %s 失败: %s", goal_id, e)
             raise DataAccessError(
-                message=f"更新目标失败",
-                details={"goal_id": goal_id, "error": str(e)}
+                message="更新目标失败", details={"goal_id": goal_id, "error": str(e)}
             ) from e
 
     def delete_goal(self, goal_id: str) -> bool:
@@ -260,7 +285,7 @@ class GoalProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
                 cursor.execute(
                     "UPDATE todo_list SET link_to_goal_id = NULL WHERE link_to_goal_id = ?",
-                    (goal_id,)
+                    (goal_id,),
                 )
                 cleared_count = cursor.rowcount
                 if cleared_count > 0:
@@ -275,13 +300,12 @@ class GoalProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("删除目标 %s 失败: %s", goal_id, e)
             raise DataAccessError(
-                message=f"删除目标失败",
-                details={"goal_id": goal_id, "error": str(e)}
+                message="删除目标失败", details={"goal_id": goal_id, "error": str(e)}
             ) from e
 
     # ==================== 业务方法 ====================
 
-    def reorder_goals(self, goal_ids: List[str]) -> bool:
+    def reorder_goals(self, goal_ids: list[str]) -> bool:
         """
         批量更新目标排序
 
@@ -299,10 +323,7 @@ class GoalProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
 
                 for index, goal_id in enumerate(goal_ids):
-                    cursor.execute(
-                        "UPDATE goal SET order_index = ? WHERE id = ?",
-                        (index, goal_id)
-                    )
+                    cursor.execute("UPDATE goal SET order_index = ? WHERE id = ?", (index, goal_id))
 
                 logger.info("重排序 %s 个目标成功", len(goal_ids))
                 return True
@@ -310,11 +331,10 @@ class GoalProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("重排序目标失败: %s", e)
             raise DataAccessError(
-                message=f"重排序目标失败",
-                details={"goal_count": len(goal_ids), "error": str(e)}
+                message="重排序目标失败", details={"goal_count": len(goal_ids), "error": str(e)}
             ) from e
 
-    def get_active_goals(self) -> List[Dict[str, Any]]:
+    def get_active_goals(self) -> list[dict[str, Any]]:
         """
         获取所有进行中的目标（用于前端选择绑定）
 
@@ -322,15 +342,15 @@ class GoalProvider(LWBaseDataProvider):
             List[Dict]: 目标列表，包含 id 和 name
         """
         options = QueryOptions(
-            filters={'status': 'active'},
-            fields=['id', 'name'],
-            order_by='order_index',
-            order_desc=False
+            filters={"status": "active"},
+            fields=["id", "name"],
+            order_by="order_index",
+            order_desc=False,
         )
         results, _ = self._generic_query(options)
         return results
 
-    def get_active_goals_with_category(self) -> List[Dict[str, Any]]:
+    def get_active_goals_with_category(self) -> list[dict[str, Any]]:
         """
         获取所有绑定了分类的进行中目标（用于 Map Cache 编辑界面）
 
@@ -355,16 +375,15 @@ class GoalProvider(LWBaseDataProvider):
                 columns = [description[0] for description in cursor.description]
                 rows = cursor.fetchall()
 
-                return [dict(zip(columns, row)) for row in rows]
+                return [dict(zip(columns, row, strict=False)) for row in rows]
 
         except Exception as e:
             logger.error("获取绑定分类的活跃目标列表失败: %s", e)
             raise DataAccessError(
-                message=f"获取绑定分类的活跃目标列表失败",
-                details={"error": str(e)}
+                message="获取绑定分类的活跃目标列表失败", details={"error": str(e)}
             ) from e
 
-    def get_goals_linked_to_category(self, category_id: str) -> List[Dict[str, Any]]:
+    def get_goals_linked_to_category(self, category_id: str) -> list[dict[str, Any]]:
         """
         获取关联到特定分类的所有目标
 
@@ -375,14 +394,12 @@ class GoalProvider(LWBaseDataProvider):
             List[Dict]: 目标列表
         """
         options = QueryOptions(
-            filters={'link_to_category_id': category_id},
-            order_by='order_index',
-            order_desc=False
+            filters={"link_to_category_id": category_id}, order_by="order_index", order_desc=False
         )
         results, _ = self._generic_query(options)
         return results
 
-    def get_active_goals_for_classify(self) -> List[Dict[str, Any]]:
+    def get_active_goals_for_classify(self) -> list[dict[str, Any]]:
         """
         获取所有活跃目标（用于 LLM 分类时的名称-ID映射）
 
@@ -418,13 +435,12 @@ class GoalProvider(LWBaseDataProvider):
                 columns = [description[0] for description in cursor.description]
                 rows = cursor.fetchall()
 
-                return [dict(zip(columns, row)) for row in rows]
+                return [dict(zip(columns, row, strict=False)) for row in rows]
 
         except Exception as e:
             logger.error("获取活跃目标列表（用于分类）失败: %s", e)
             raise DataAccessError(
-                message=f"获取活跃目标列表（用于分类）失败",
-                details={"error": str(e)}
+                message="获取活跃目标列表（用于分类）失败", details={"error": str(e)}
             ) from e
 
     def calculate_time_invested(self, goal_id: str) -> int:
@@ -443,11 +459,14 @@ class GoalProvider(LWBaseDataProvider):
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT COALESCE(SUM(duration), 0) as total_seconds
                     FROM user_app_behavior_log
                     WHERE link_to_goal_id = ?
-                """, (goal_id,))
+                """,
+                    (goal_id,),
+                )
 
                 result = cursor.fetchone()
                 total_seconds = int(result[0]) if result and result[0] else 0
@@ -456,8 +475,7 @@ class GoalProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("计算目标 %s 投入时间失败: %s", goal_id, e)
             raise DataAccessError(
-                message=f"计算目标投入时间失败",
-                details={"goal_id": goal_id, "error": str(e)}
+                message="计算目标投入时间失败", details={"goal_id": goal_id, "error": str(e)}
             ) from e
 
     def update_time_invested(self, goal_id: str, time_invested: int) -> bool:
@@ -476,10 +494,7 @@ class GoalProvider(LWBaseDataProvider):
         """
         try:
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            data = {
-                'time_invested': time_invested,
-                'time_invested_updated_at': now
-            }
+            data = {"time_invested": time_invested, "time_invested_updated_at": now}
             success = self._generic_update(goal_id, data)
             if success:
                 logger.info("更新目标 %s 投入时间: %s 秒", goal_id, time_invested)
@@ -488,12 +503,13 @@ class GoalProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("更新目标 %s 投入时间失败: %s", goal_id, e)
             raise DataAccessError(
-                message=f"更新目标投入时间失败",
-                details={"goal_id": goal_id, "time_invested": time_invested, "error": str(e)}
+                message="更新目标投入时间失败",
+                details={"goal_id": goal_id, "time_invested": time_invested, "error": str(e)},
             ) from e
 
 
 # ==================== GoalStatsProvider ====================
+
 
 class GoalStatsProvider(LWBaseDataProvider):
     """
@@ -511,25 +527,16 @@ class GoalStatsProvider(LWBaseDataProvider):
     _TIME_FIELD = None
 
     # 白名单字段集合
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'goal_id', 'date'
-    }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'goal_id'
-    }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'goal_id', 'date', 'time_spent', 'completed_todo_count'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'goal_id', 'date', 'time_spent', 'completed_todo_count'
-    }
+    _FILTER_FIELDS: set[str] = {"id", "goal_id", "date"}
+    _ORDER_FIELDS: set[str] = {"id", "goal_id"}
+    _SELECT_FIELDS: set[str] = {"id", "goal_id", "date", "time_spent", "completed_todo_count"}
+    _UPDATE_FIELDS: set[str] = {"goal_id", "date", "time_spent", "completed_todo_count"}
 
     # ==================== 核心方法（使用通用方法） ====================
 
     def query_goal_stats(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -554,7 +561,7 @@ class GoalStatsProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_stats_by_goal(self, goal_id: str, limit: int = 30) -> List[Dict[str, Any]]:
+    def get_stats_by_goal(self, goal_id: str, limit: int = 30) -> list[dict[str, Any]]:
         """
         获取目标的统计历史数据
 
@@ -566,17 +573,14 @@ class GoalStatsProvider(LWBaseDataProvider):
             List[Dict]: 统计数据列表，按日期升序排列
         """
         options = QueryOptions(
-            filters={'goal_id': goal_id},
-            order_by='date',
-            order_desc=True,
-            limit=limit
+            filters={"goal_id": goal_id}, order_by="date", order_desc=True, limit=limit
         )
         results, _ = self._generic_query(options)
         # 返回时按日期升序
         results.reverse()
         return results
 
-    def get_latest_stat_date(self, goal_id: str) -> Optional[str]:
+    def get_latest_stat_date(self, goal_id: str) -> str | None:
         """
         获取目标统计的最后更新日期
 
@@ -592,9 +596,12 @@ class GoalStatsProvider(LWBaseDataProvider):
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT MAX(date) FROM goal_stats WHERE goal_id = ?
-                """, (goal_id,))
+                """,
+                    (goal_id,),
+                )
 
                 result = cursor.fetchone()
                 return result[0] if result and result[0] else None
@@ -602,11 +609,10 @@ class GoalStatsProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("获取目标 %s 最新统计日期失败: %s", goal_id, e)
             raise DataAccessError(
-                message=f"获取目标最新统计日期失败",
-                details={"goal_id": goal_id, "error": str(e)}
+                message="获取目标最新统计日期失败", details={"goal_id": goal_id, "error": str(e)}
             ) from e
 
-    def get_stat_by_date(self, goal_id: str, date: str) -> Optional[Dict[str, Any]]:
+    def get_stat_by_date(self, goal_id: str, date: str) -> dict[str, Any] | None:
         """
         获取指定日期的统计数据
 
@@ -618,9 +624,7 @@ class GoalStatsProvider(LWBaseDataProvider):
             Optional[Dict]: 统计数据
         """
         options = QueryOptions(
-            filters={'goal_id': goal_id, 'date': date},
-            order_by='id',
-            order_desc=False
+            filters={"goal_id": goal_id, "date": date}, order_by="id", order_desc=False
         )
         results, _ = self._generic_query(options)
         return results[0] if results else None
@@ -648,26 +652,35 @@ class GoalStatsProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
 
                 # 检查是否已存在
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT id FROM goal_stats WHERE goal_id = ? AND date = ?
-                """, (goal_id, date))
+                """,
+                    (goal_id, date),
+                )
 
                 existing = cursor.fetchone()
 
                 if existing:
                     # 更新
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         UPDATE goal_stats
                         SET time_spent = ?, completed_todo_count = ?
                         WHERE goal_id = ? AND date = ?
-                    """, (time_spent, todo_count, goal_id, date))
+                    """,
+                        (time_spent, todo_count, goal_id, date),
+                    )
 
                 else:
                     # 插入
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO goal_stats (goal_id, date, time_spent, completed_todo_count)
                         VALUES (?, ?, ?, ?)
-                    """, (goal_id, date, time_spent, todo_count))
+                    """,
+                        (goal_id, date, time_spent, todo_count),
+                    )
 
                 logger.info("目标 %s 在 %s 的统计数据已更新", goal_id, date)
                 return True
@@ -675,8 +688,8 @@ class GoalStatsProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("更新目标 %s 在 %s 的统计数据失败: %s", goal_id, date, e)
             raise DataAccessError(
-                message=f"更新目标统计数据失败",
-                details={"goal_id": goal_id, "date": date, "error": str(e)}
+                message="更新目标统计数据失败",
+                details={"goal_id": goal_id, "date": date, "error": str(e)},
             ) from e
 
     # ==================== 聚合操作 ====================
@@ -702,23 +715,28 @@ class GoalStatsProvider(LWBaseDataProvider):
                 # 使用日期前缀匹配，避免时区问题
                 date_prefix = f"{date}%"
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT COALESCE(SUM(duration), 0) as total_duration
                     FROM user_app_behavior_log
                     WHERE link_to_goal_id = ?
                       AND start_time LIKE ?
-                """, (goal_id, date_prefix))
+                """,
+                    (goal_id, date_prefix),
+                )
 
                 result = cursor.fetchone()
                 total = int(result[0]) if result and result[0] else 0
-                logger.debug("aggregate_time_spent: goal_id=%s, date=%s, total=%s", goal_id, date, total)
+                logger.debug(
+                    "aggregate_time_spent: goal_id=%s, date=%s, total=%s", goal_id, date, total
+                )
                 return total
 
         except Exception as e:
             logger.error("聚合目标 %s 在 %s 的时间花费失败: %s", goal_id, date, e)
             raise DataAccessError(
-                message=f"聚合目标时间花费失败",
-                details={"goal_id": goal_id, "date": date, "error": str(e)}
+                message="聚合目标时间花费失败",
+                details={"goal_id": goal_id, "date": date, "error": str(e)},
             ) from e
 
     def aggregate_completed_todos(self, goal_id: str, date: str) -> int:
@@ -739,13 +757,16 @@ class GoalStatsProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT COUNT(*) as count
                     FROM todo_list
                     WHERE link_to_goal_id = ?
                       AND state = 'completed'
                       AND actual_finished_at = ?
-                """, (goal_id, date))
+                """,
+                    (goal_id, date),
+                )
 
                 result = cursor.fetchone()
                 return int(result[0]) if result and result[0] else 0
@@ -753,8 +774,8 @@ class GoalStatsProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("统计目标 %s 在 %s 完成的待办数量失败: %s", goal_id, date, e)
             raise DataAccessError(
-                message=f"统计目标完成的待办数量失败",
-                details={"goal_id": goal_id, "date": date, "error": str(e)}
+                message="统计目标完成的待办数量失败",
+                details={"goal_id": goal_id, "date": date, "error": str(e)},
             ) from e
 
     def sync_stats_to_date(self, goal_id: str, target_date: str, start_date: str = None) -> bool:
@@ -776,7 +797,13 @@ class GoalStatsProvider(LWBaseDataProvider):
         """
         try:
             last_date = self.get_latest_stat_date(goal_id)
-            logger.debug("sync_stats_to_date: goal_id=%s, target_date=%s, start_date=%s, last_date=%s", goal_id, target_date, start_date, last_date)
+            logger.debug(
+                "sync_stats_to_date: goal_id=%s, target_date=%s, start_date=%s, last_date=%s",
+                goal_id,
+                target_date,
+                start_date,
+                last_date,
+            )
 
             target_dt = datetime.strptime(target_date, "%Y-%m-%d")
 
@@ -801,7 +828,9 @@ class GoalStatsProvider(LWBaseDataProvider):
                 if start_date:
                     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
                     earliest_date = self._get_earliest_stat_date(goal_id)
-                    earliest_dt = datetime.strptime(earliest_date, "%Y-%m-%d") if earliest_date else last_dt
+                    earliest_dt = (
+                        datetime.strptime(earliest_date, "%Y-%m-%d") if earliest_date else last_dt
+                    )
 
                     if start_dt < earliest_dt:
                         # start_date 比现有最早的记录还早，需要向前补全
@@ -853,11 +882,11 @@ class GoalStatsProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("同步目标 %s 统计数据失败: %s", goal_id, e)
             raise DataAccessError(
-                message=f"同步目标统计数据失败",
-                details={"goal_id": goal_id, "target_date": target_date, "error": str(e)}
+                message="同步目标统计数据失败",
+                details={"goal_id": goal_id, "target_date": target_date, "error": str(e)},
             ) from e
 
-    def _get_earliest_stat_date(self, goal_id: str) -> Optional[str]:
+    def _get_earliest_stat_date(self, goal_id: str) -> str | None:
         """
         获取目标统计的最早日期
 
@@ -873,9 +902,12 @@ class GoalStatsProvider(LWBaseDataProvider):
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT MIN(date) FROM goal_stats WHERE goal_id = ?
-                """, (goal_id,))
+                """,
+                    (goal_id,),
+                )
 
                 result = cursor.fetchone()
                 return result[0] if result and result[0] else None
@@ -883,11 +915,10 @@ class GoalStatsProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("获取目标 %s 最早统计日期失败: %s", goal_id, e)
             raise DataAccessError(
-                message=f"获取目标最早统计日期失败",
-                details={"goal_id": goal_id, "error": str(e)}
+                message="获取目标最早统计日期失败", details={"goal_id": goal_id, "error": str(e)}
             ) from e
 
-    def get_cumulative_stats(self, goal_id: str, limit: int = 30) -> List[Dict[str, Any]]:
+    def get_cumulative_stats(self, goal_id: str, limit: int = 30) -> list[dict[str, Any]]:
         """
         获取累积统计数据（用于图表展示）
 
@@ -905,14 +936,14 @@ class GoalStatsProvider(LWBaseDataProvider):
         result = []
 
         for stat in stats:
-            cumulative_time += stat.get('time_spent', 0)
-            cumulative_todos += stat.get('completed_todo_count', 0)
-            result.append({
-                'date': stat['date'],
-                'cumulative_time_spent': cumulative_time,
-                'cumulative_todo_count': cumulative_todos
-            })
+            cumulative_time += stat.get("time_spent", 0)
+            cumulative_todos += stat.get("completed_todo_count", 0)
+            result.append(
+                {
+                    "date": stat["date"],
+                    "cumulative_time_spent": cumulative_time,
+                    "cumulative_todo_count": cumulative_todos,
+                }
+            )
 
         return result
-
-

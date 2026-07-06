@@ -3,6 +3,7 @@ m005_behavior_log_id_to_autoincrement - user_app_behavior_log.id 从 TEXT 迁移
 
 复用现有 migrate_behavior_log_id_to_autoincrement.py 的内部函数。
 """
+
 VERSION = 5
 NAME = "m005_behavior_log_id_to_autoincrement"
 
@@ -11,7 +12,7 @@ def check_if_applied(cursor) -> bool:
     """检查 user_app_behavior_log.id 是否已经是 INTEGER 类型"""
     cursor.execute("PRAGMA table_info(user_app_behavior_log)")
     columns = {row[1]: row[2] for row in cursor.fetchall()}
-    return columns.get('id') == 'INTEGER'
+    return columns.get("id") == "INTEGER"
 
 
 def upgrade(cursor) -> None:
@@ -53,7 +54,6 @@ def upgrade(cursor) -> None:
         FROM user_app_behavior_log
         ORDER BY start_time ASC
     """)
-    copied_count = cursor.rowcount
 
     # 3. 删除旧表
     cursor.execute("DROP TABLE IF EXISTS user_app_behavior_log")
@@ -62,14 +62,20 @@ def upgrade(cursor) -> None:
     cursor.execute("ALTER TABLE user_app_behavior_log_new RENAME TO user_app_behavior_log")
 
     # 5. 重建索引
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_app_start_time ON user_app_behavior_log(app, start_time)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_app_start_time ON user_app_behavior_log(app, start_time)"
+    )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_start_time ON user_app_behavior_log(start_time)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_end_time ON user_app_behavior_log(end_time)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_time_range ON user_app_behavior_log(start_time, end_time)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_time_range ON user_app_behavior_log(start_time, end_time)"
+    )
 
     # 验证迁移结果
     cursor.execute("SELECT COUNT(*) FROM user_app_behavior_log")
     count_after = cursor.fetchone()[0]
 
     if count_after != count_before:
-        raise RuntimeError(f"迁移验证失败: 行数不一致 (迁移前: {count_before}, 迁移后: {count_after})")
+        raise RuntimeError(
+            f"迁移验证失败: 行数不一致 (迁移前: {count_before}, 迁移后: {count_after})"
+        )

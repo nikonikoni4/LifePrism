@@ -22,26 +22,29 @@ class TruncatingFormatter(logging.Formatter):
     def format(self, record):
         msg = super().format(record)
         if len(msg) > self.max_length:
-            msg = msg[:self.max_length] + f"... [截断, 原始长度 {len(msg)}]"
+            msg = msg[: self.max_length] + f"... [截断, 原始长度 {len(msg)}]"
         return msg
 
-_LOG_FORMAT = "%(asctime)s %(levelname)s %(filename)s func:%(funcName)s line %(lineno)d : %(message)s"
+
+_LOG_FORMAT = (
+    "%(asctime)s %(levelname)s %(filename)s func:%(funcName)s line %(lineno)d : %(message)s"
+)
 
 # 模块级只配置 StreamHandler（控制台输出）
 # FileHandler 由 setup_file_logging() 延迟添加（等 settings_manager 初始化后调用）
 # 打包环境（PyInstaller --noconsole）下 sys.stdout 可能为 None 或无 fileno()，需防护
 try:
-    _stream = open(sys.stdout.fileno(), mode='w', encoding='utf-8', closefd=False)
+    _stream = open(sys.stdout.fileno(), mode="w", encoding="utf-8", closefd=False)  # noqa: SIM115
 except Exception:
     # LEGITIMATE: 辅助操作兜底 — 日志配置失败不影响主流程
-    _stream = open(os.devnull, mode='w', encoding='utf-8')
+    _stream = open(os.devnull, mode="w", encoding="utf-8")  # noqa: SIM115
 
 logging.basicConfig(
     level=logging.INFO,
     format=_LOG_FORMAT,
     handlers=[
         logging.StreamHandler(stream=_stream),
-    ]
+    ],
 )
 # 替换 basicConfig 默认 Formatter 为 TruncatingFormatter
 for _h in logging.getLogger().handlers:
@@ -68,11 +71,11 @@ def setup_file_logging(log_dir: Path) -> None:
 
     try:
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / 'lifeprism.log'
+        log_file = log_dir / "lifeprism.log"
         # 每次启动时清空旧日志
         if log_file.exists():
-            log_file.write_text('', encoding='utf-8')
-        file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+            log_file.write_text("", encoding="utf-8")
+        file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
         file_handler.setFormatter(TruncatingFormatter(_LOG_FORMAT))
         logging.getLogger().addHandler(file_handler)
         _file_handler = file_handler

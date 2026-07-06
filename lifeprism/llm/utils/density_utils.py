@@ -2,6 +2,7 @@
 
 提供活动密度计算、高密度时间段识别等功能，用于分析用户活动模式。
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta

@@ -1,18 +1,17 @@
-from dataclasses import field
 import json
 from typing import Any
 
-from lifeprism.llm.agent.tools.base import Tool,ERROR,SUCCESS
-from lifeprism.repository import (
-    todo_repository,
-    goal_repository,
-    behavior_analysis_repository,
-    custom_block_repository,
-    computer_usage_repository,
-    QueryOptions,
-    mood_repository
-)
+from lifeprism.llm.agent.tools.base import ERROR, SUCCESS, Tool
 from lifeprism.llm.utils import build_time_segments
+from lifeprism.repository import (
+    QueryOptions,
+    behavior_analysis_repository,
+    computer_usage_repository,
+    custom_block_repository,
+    mood_repository,
+    todo_repository,
+)
+
 # 数据
 ## 类型1：用户行为数据
 # 1. 电脑使用分类数据 -> user_app_behavior_log  通常不直接使用这个，只是作为小范围的数据精细补充查询
@@ -34,18 +33,20 @@ from lifeprism.llm.utils import build_time_segments
 # 按照参数类似性进行分类
 # 1. 输入是时间范围的查询数据 ： 电脑使用分类数据 ；电脑使用分类统计数据 ；用户行为备注 ；AI行为分析
 
-# 问题： 需不需要增加除时间范围以外的筛选条件？ ： 
+# 问题： 需不需要增加除时间范围以外的筛选条件？ ：
 # 1. 需要 ： 可以精细化筛选，比如心情，只看心情糟糕的（但是心情还没有实际投入使用）。这个目前看来按照筛选条件来用，频率似乎不是很多
 # 电脑使用分类数据 按照类别来查询？ 没有必要，这个单独的查询作用都不是很大
 # 按照时长？ 这个有一点作用 但是统计数据里面已经有这个了，统计数据给出高密度时间段，以及这个时间段的分类和每个分类最高的app title使用时间
 # 决定暂时不使用除时间范围以外的筛选条件，应该就给这个然后看看其效果如果，不行之后在增加其他的
 # 先全部写在一个
 
+
 # 习惯养成暂时先不查询
 class UserActivitySummaryTool(Tool):
     """数据查询工具"""
+
     def __init__(self):
-        pass 
+        pass
 
     @property
     def name(self) -> str:
@@ -55,7 +56,7 @@ class UserActivitySummaryTool(Tool):
     @property
     def description(self) -> str:
         """工具功能说明。"""
-        
+
         return """查询lifeprism系统中用户的行为活动数据，包括
         1. high_usage_segments ： 电脑高频使用时段数据分析，按高密度时间段分组展示分类占比。
         2. computer_overview ： 电脑总体统计数据，展示整个时间段内各分类的总时间和占比。
@@ -63,7 +64,6 @@ class UserActivitySummaryTool(Tool):
         4. ai_behavior_notes ： AI对于某段时间的截图分析，由AI经过截图分析，不一定准确，仅供参考。
         5. todolist ： 用户在这段时间内的任务列表。
         """
-        
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -76,20 +76,26 @@ class UserActivitySummaryTool(Tool):
                     "description": "查询选项列表",
                     "items": {
                         "type": "string",
-                        "enum": ["high_usage_segments", "computer_overview", "user_behavior_notes", "ai_behavior_notes",  "todolist"]# "goals",
+                        "enum": [
+                            "high_usage_segments",
+                            "computer_overview",
+                            "user_behavior_notes",
+                            "ai_behavior_notes",
+                            "todolist",
+                        ],  # "goals",
                     },
-                    "minItems": 1
+                    "minItems": 1,
                 },
                 "start_time": {
                     "type": "string",
-                    "description": "查询开始时间，格式：YYYY-MM-DD HH:MM:SS"
+                    "description": "查询开始时间，格式：YYYY-MM-DD HH:MM:SS",
                 },
                 "end_time": {
                     "type": "string",
-                    "description": "查询结束时间，格式：YYYY-MM-DD HH:MM:SS"
-                }
+                    "description": "查询结束时间，格式：YYYY-MM-DD HH:MM:SS",
+                },
             },
-            "required": ["query_option", "start_time", "end_time"]
+            "required": ["query_option", "start_time", "end_time"],
         }
 
     async def execute(self, **kwargs: Any) -> Any:
@@ -103,15 +109,17 @@ class UserActivitySummaryTool(Tool):
             工具执行结果（字符串或内容块列表）
         """
         try:
-            query_option = set(kwargs.get('query_option', []))
-            start_time = kwargs.get('start_time', '')
-            end_time = kwargs.get('end_time', '')
+            query_option = set(kwargs.get("query_option", []))
+            start_time = kwargs.get("start_time", "")
+            end_time = kwargs.get("end_time", "")
 
             return query_user_activity_summary(query_option, start_time, end_time)
         except ValueError as e:
             return f"{ERROR}参数错误: {str(e)}"
         except Exception as e:
             return f"{ERROR}查询失败: {str(e)}"
+
+
 def _category_stats(logs: list[dict], segment_start_time: str, segment_end_time: str) -> dict:
     """
     计算某段时间内的分类占比（如果某个log的区间在边界，会依据边界截断）
@@ -126,15 +134,15 @@ def _category_stats(logs: list[dict], segment_start_time: str, segment_end_time:
     """
     from datetime import datetime
 
-    segment_start = datetime.fromisoformat(segment_start_time.replace(' ', 'T'))
-    segment_end = datetime.fromisoformat(segment_end_time.replace(' ', 'T'))
+    segment_start = datetime.fromisoformat(segment_start_time.replace(" ", "T"))
+    segment_end = datetime.fromisoformat(segment_end_time.replace(" ", "T"))
 
     category_durations = {}
     total_duration = 0
 
     for log in logs:
-        log_start = datetime.fromisoformat(log['start_time'].replace(' ', 'T'))
-        log_end = datetime.fromisoformat(log['end_time'].replace(' ', 'T'))
+        log_start = datetime.fromisoformat(log["start_time"].replace(" ", "T"))
+        log_end = datetime.fromisoformat(log["end_time"].replace(" ", "T"))
 
         # 截断到边界
         actual_start = max(log_start, segment_start)
@@ -144,7 +152,7 @@ def _category_stats(logs: list[dict], segment_start_time: str, segment_end_time:
             continue
 
         duration = (actual_end - actual_start).total_seconds()
-        category = log.get('category_name', '未分类')
+        category = log.get("category_name", "未分类")
 
         category_durations[category] = category_durations.get(category, 0) + duration
         total_duration += duration
@@ -154,7 +162,8 @@ def _category_stats(logs: list[dict], segment_start_time: str, segment_end_time:
 
     return {cat: (dur / total_duration * 100) for cat, dur in category_durations.items()}
 
-def query_user_activity_summary(query_option: set[str],start_time: str,end_time: str) -> str:
+
+def query_user_activity_summary(query_option: set[str], start_time: str, end_time: str) -> str:
     """查询 LifePrism 系统中的数据
     args :
         query_option: list
@@ -174,7 +183,13 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
     # 参数校验
     from datetime import datetime
 
-    allowed_options = {"high_usage_segments", "computer_overview", "user_behavior_notes", "ai_behavior_notes", "todolist"} # , "goals"
+    allowed_options = {
+        "high_usage_segments",
+        "computer_overview",
+        "user_behavior_notes",
+        "ai_behavior_notes",
+        "todolist",
+    }  # , "goals"
     invalid_options = set(query_option) - allowed_options
     if invalid_options:
         raise ValueError(f"{ERROR} Invalid query options: {invalid_options}")
@@ -183,54 +198,78 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
         start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     except ValueError as e:
-        raise ValueError(f"{ERROR} Invalid time format. Expected 'YYYY-MM-DD HH:MM:SS': {e}")
+        raise ValueError(f"{ERROR} Invalid time format. Expected 'YYYY-MM-DD HH:MM:SS': {e}") from e
 
     if start_dt >= end_dt:
         raise ValueError(f"{ERROR} start_time must be before end_time")
 
     parts = []
 
-    
-    if 'high_usage_segments' in query_option:
+    if "high_usage_segments" in query_option:
         app_log, _ = computer_usage_repository.query_computer_usage_with_names(
-            QueryOptions(fields=['start_time', 'end_time', 'app', 'title', 'duration', 'category_id', 'sub_category_id']).with_time_range(start_time, end_time)
+            QueryOptions(
+                fields=[
+                    "start_time",
+                    "end_time",
+                    "app",
+                    "title",
+                    "duration",
+                    "category_id",
+                    "sub_category_id",
+                ]
+            ).with_time_range(start_time, end_time)
         )
         if not app_log:
             parts.append("## 电脑高频使用时段分析 \n 该时间段没有电脑使用记录")
         else:
             # 计算高密度时间段
-            usage_time_segments: list[dict] = build_time_segments(app_log, start_time, end_time, 0.6, 6)
+            usage_time_segments: list[dict] = build_time_segments(
+                app_log, start_time, end_time, 0.6, 6
+            )
 
             content = "## 电脑高频使用时段分析\n"
             for idx, segment in enumerate(usage_time_segments, 1):
                 # 计算每个时间段内的分类占比
-                category_stats = _category_stats(app_log, segment['start'], segment['end'])
+                category_stats = _category_stats(app_log, segment["start"], segment["end"])
 
                 content += f"### 时间段 {idx}: {segment['start']} ~ {segment['end']}\n"
                 content += f"持续时长: {segment['duration_seconds'] // 60} 分钟\n"
                 content += "分类占比:\n"
-                for category, percentage in sorted(category_stats.items(), key=lambda x: x[1], reverse=True):
+                for category, percentage in sorted(
+                    category_stats.items(), key=lambda x: x[1], reverse=True
+                ):
                     content += f"  - {category}: {percentage:.1f}%\n"
 
             parts.append(content)
-    
-    if 'computer_overview' in query_option:
+
+    if "computer_overview" in query_option:
         app_log, _ = computer_usage_repository.query_computer_usage_with_names(
-            QueryOptions(fields=['start_time', 'end_time', 'app', 'title', 'duration', 'category_id', 'sub_category_id']).with_time_range(start_time, end_time)
+            QueryOptions(
+                fields=[
+                    "start_time",
+                    "end_time",
+                    "app",
+                    "title",
+                    "duration",
+                    "category_id",
+                    "sub_category_id",
+                ]
+            ).with_time_range(start_time, end_time)
         )
         if not app_log:
             parts.append("## 电脑总体使用统计 \n 该时间段没有电脑使用记录")
         else:
             from datetime import datetime as dt
-            segment_start = dt.fromisoformat(start_time.replace(' ', 'T'))
-            segment_end = dt.fromisoformat(end_time.replace(' ', 'T'))
-            
+
+            segment_start = dt.fromisoformat(start_time.replace(" ", "T"))
+            segment_end = dt.fromisoformat(end_time.replace(" ", "T"))
+
             category_durations = {}
             total_duration = 0
 
             for log in app_log:
-                log_start = dt.fromisoformat(log['start_time'].replace(' ', 'T'))
-                log_end = dt.fromisoformat(log['end_time'].replace(' ', 'T'))
+                log_start = dt.fromisoformat(log["start_time"].replace(" ", "T"))
+                log_end = dt.fromisoformat(log["end_time"].replace(" ", "T"))
 
                 actual_start = max(log_start, segment_start)
                 actual_end = min(log_end, segment_end)
@@ -239,7 +278,7 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
                     continue
 
                 duration = (actual_end - actual_start).total_seconds()
-                category = log.get('category_name', '未分类')
+                category = log.get("category_name", "未分类")
 
                 category_durations[category] = category_durations.get(category, 0) + duration
                 total_duration += duration
@@ -247,13 +286,19 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
             content = "## 电脑总体使用统计\n"
             content += f"总使用时长: {total_duration // 60} 分钟\n"
             content += "分类统计:\n"
-            for category, duration in sorted(category_durations.items(), key=lambda x: x[1], reverse=True):
+            for category, duration in sorted(
+                category_durations.items(), key=lambda x: x[1], reverse=True
+            ):
                 percentage = (duration / total_duration * 100) if total_duration > 0 else 0
                 content += f"  - {category}: {duration // 60} 分钟 ({percentage:.1f}%)\n"
 
             parts.append(content)
-    if 'user_behavior_notes' in query_option:
-        custom_blocks, _ = custom_block_repository.query_custom_blocks(QueryOptions(fields=['id','start_time', 'end_time', 'content']).with_time_range(start_time, end_time))
+    if "user_behavior_notes" in query_option:
+        custom_blocks, _ = custom_block_repository.query_custom_blocks(
+            QueryOptions(fields=["id", "start_time", "end_time", "content"]).with_time_range(
+                start_time, end_time
+            )
+        )
         if not custom_blocks:
             parts.append("## 用户自定义行为备注 \n 用户自定义行为备注为空")
         else:
@@ -261,8 +306,12 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
             for i in range(len(custom_blocks)):
                 content += f"{i}. 'block_id': {custom_blocks[i]['id']}, {custom_blocks[i]['start_time']}~{custom_blocks[i]['end_time']} : {custom_blocks[i]['content']}\n"
             parts.append(content)
-    if 'ai_behavior_notes' in query_option:
-        behaviors, _ = behavior_analysis_repository.query_behaviors(QueryOptions(fields=['start_time', 'end_time', 'behavior_summary']).with_time_range(start_time, end_time))
+    if "ai_behavior_notes" in query_option:
+        behaviors, _ = behavior_analysis_repository.query_behaviors(
+            QueryOptions(fields=["start_time", "end_time", "behavior_summary"]).with_time_range(
+                start_time, end_time
+            )
+        )
         if not behaviors:
             parts.append("## AI分析行为备注 \n AI分析行为备注为空")
         else:
@@ -276,32 +325,34 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
     #         parts.append("## 用户目标 \n 用户目标为空")
     #     else:
     #         content = "## 用户目标\n"
-            
+
     #         for i in range(len(goals)):
     #             description = ""
     #             if goals[i]['content']:
     #                 description = f"描述：{goals[i]['content']}"
     #             content += f"{i}. {goals[i]['name']},{description}\n"
     #         parts.append(content)
-    if 'todolist' in query_option:
-        todolists, _ = todo_repository.query_todos(QueryOptions(fields=['content', 'date','state']).with_date_range(start_time[:10], end_time[:10]))
+    if "todolist" in query_option:
+        todolists, _ = todo_repository.query_todos(
+            QueryOptions(fields=["content", "date", "state"]).with_date_range(
+                start_time[:10], end_time[:10]
+            )
+        )
 
         def _format_state(state: str) -> str:
             """状态转换函数：数据库状态 -> 中文描述"""
-            state_map = {
-                'scheduled': '未完成',
-                'completed': '已完成'
-            }
+            state_map = {"scheduled": "未完成", "completed": "已完成"}
             return state_map.get(state, state)
 
-        filtered_todos = [t for t in todolists if t.get('state') in ('scheduled', 'completed')]
+        filtered_todos = [t for t in todolists if t.get("state") in ("scheduled", "completed")]
         if not filtered_todos:
             parts.append("## 用户待办事项 \n 用户待办事项为空")
         else:
             from collections import defaultdict
+
             by_date = defaultdict(list)
             for todo in filtered_todos:
-                by_date[todo['date']].append((todo['content'], todo['state']))
+                by_date[todo["date"]].append((todo["content"], todo["state"]))
             content = "## 用户待办事项\n"
             for date in sorted(by_date.keys()):
                 content += f"### {date}\n"
@@ -310,8 +361,10 @@ def query_user_activity_summary(query_option: set[str],start_time: str,end_time:
             parts.append(content)
     return "\n".join(parts)
 
+
 class UserComputerLogTool(Tool):
     """用户电脑使用日志工具"""
+
     def __init__(self):
         pass
 
@@ -335,19 +388,19 @@ class UserComputerLogTool(Tool):
             "properties": {
                 "start_time": {
                     "type": "string",
-                    "description": "查询开始时间，格式：YYYY-MM-DD HH:MM:SS"
+                    "description": "查询开始时间，格式：YYYY-MM-DD HH:MM:SS",
                 },
                 "end_time": {
                     "type": "string",
-                    "description": "查询结束时间，格式：YYYY-MM-DD HH:MM:SS"
+                    "description": "查询结束时间，格式：YYYY-MM-DD HH:MM:SS",
                 },
                 "duration_min": {
                     "type": "integer",
                     "description": "最小持续时长（秒），只返回持续时长大于等于此值的记录，默认45秒",
-                    "default": 45
-                }
+                    "default": 45,
+                },
             },
-            "required": ["start_time", "end_time"]
+            "required": ["start_time", "end_time"],
         }
 
     async def execute(self, **kwargs: Any) -> Any:
@@ -361,9 +414,9 @@ class UserComputerLogTool(Tool):
             工具执行结果（字符串或内容块列表）
         """
         try:
-            start_time = kwargs.get('start_time', '')
-            end_time = kwargs.get('end_time', '')
-            duration_min = kwargs.get('duration_min', 45)
+            start_time = kwargs.get("start_time", "")
+            end_time = kwargs.get("end_time", "")
+            duration_min = kwargs.get("duration_min", 45)
             if not start_time or not end_time:
                 return f"{ERROR}参数错误: start_time 和 end_time 是必填参数"
             if not duration_min:
@@ -373,7 +426,6 @@ class UserComputerLogTool(Tool):
             return f"{ERROR}参数错误: {str(e)}"
         except Exception as e:
             return f"{ERROR}查询失败: {str(e)}"
-
 
 
 def _format_duration(seconds: int) -> str:
@@ -423,11 +475,13 @@ def query_user_activity_log(start_time: str, end_time: str, duration_min: int = 
     result = f"[日志查询说明] 查询结果屏蔽了持续时间小于{duration_min}秒的记录。\n\n"
 
     app_log, _ = computer_usage_repository.query_computer_usage_with_names(
-        QueryOptions(fields=['start_time', 'end_time', 'app', 'title', 'duration', 'category_id']).with_time_range(start_time, end_time)
+        QueryOptions(
+            fields=["start_time", "end_time", "app", "title", "duration", "category_id"]
+        ).with_time_range(start_time, end_time)
     )
 
     # 时长过滤
-    app_log = [log for log in app_log if log.get('duration', 0) >= duration_min]
+    app_log = [log for log in app_log if log.get("duration", 0) >= duration_min]
 
     if not app_log:
         return f"该时间段内没有持续时长大于等于{duration_min}秒的电脑使用记录。"
@@ -440,12 +494,12 @@ def query_user_activity_log(start_time: str, end_time: str, duration_min: int = 
     result += "查询结果：\n"
     # 解析输出
     for log in app_log:
-        start = log.get('start_time', '')
-        end = log.get('end_time', '')
-        app = log.get('app', '未知应用')
-        title = log.get('title', '无标题')
-        duration_sec = log.get('duration', 0)
-        category = log.get('category_name', '未分类')
+        start = log.get("start_time", "")
+        end = log.get("end_time", "")
+        app = log.get("app", "未知应用")
+        title = log.get("title", "无标题")
+        duration_sec = log.get("duration", 0)
+        category = log.get("category_name", "未分类")
 
         # 格式化持续时长
         duration_str = _format_duration(duration_sec)
@@ -456,10 +510,7 @@ def query_user_activity_log(start_time: str, end_time: str, duration_min: int = 
 
 
 def create_or_update_user_behavior_note(
-    start_time: str,
-    end_time: str,
-    content: str,
-    block_id: int | None = None
+    start_time: str, end_time: str, content: str, block_id: int | None = None
 ) -> str:
     """创建或更新用户行为备注
 
@@ -482,7 +533,7 @@ def create_or_update_user_behavior_note(
         start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     except ValueError as e:
-        raise ValueError(f"{ERROR} 时间格式错误，期望格式为 'YYYY-MM-DD HH:MM:SS': {e}")
+        raise ValueError(f"{ERROR} 时间格式错误，期望格式为 'YYYY-MM-DD HH:MM:SS': {e}") from e
 
     if start_dt >= end_dt:
         raise ValueError(f"{ERROR} 开始时间必须早于结束时间")
@@ -499,7 +550,7 @@ def create_or_update_user_behavior_note(
         "end_time": end_time,
         "content": content,
         "duration": duration,
-        "color": color
+        "color": color,
     }
 
     try:
@@ -514,16 +565,17 @@ def create_or_update_user_behavior_note(
             # 创建模式
             result = custom_block_repository.create_custom_block(data)
             if result:
-                new_id = result.get('id', '未知')
+                new_id = result.get("id", "未知")
                 return f"{SUCCESS}创建行为备注成功 (ID: {new_id})\n时间段: {start_time} ~ {end_time}\n内容: {content}\n时长: {duration} 分钟"
             else:
                 return f"{ERROR}创建失败: 未知错误"
     except Exception as e:
-        raise Exception(f"数据库操作失败: {str(e)}")
+        raise Exception(f"数据库操作失败: {str(e)}") from e
 
 
 class UpdateUserBehaviorNoteTool(Tool):
     """创建或更新用户行为备注工具"""
+
     def __init__(self):
         pass
 
@@ -548,22 +600,19 @@ class UpdateUserBehaviorNoteTool(Tool):
             "properties": {
                 "start_time": {
                     "type": "string",
-                    "description": "开始时间，格式：YYYY-MM-DD HH:MM:SS"
+                    "description": "开始时间，格式：YYYY-MM-DD HH:MM:SS",
                 },
                 "end_time": {
                     "type": "string",
-                    "description": "结束时间，格式：YYYY-MM-DD HH:MM:SS"
+                    "description": "结束时间，格式：YYYY-MM-DD HH:MM:SS",
                 },
-                "content": {
-                    "type": "string",
-                    "description": "行为备注内容"
-                },
+                "content": {"type": "string", "description": "行为备注内容"},
                 "block_id": {
                     "type": "integer",
-                    "description": "可选，时间块 ID。如果提供则更新现有记录，否则创建新记录。 可以通过query_user_activity_summary工具获取。"
-                }
+                    "description": "可选，时间块 ID。如果提供则更新现有记录，否则创建新记录。 可以通过query_user_activity_summary工具获取。",
+                },
             },
-            "required": ["start_time", "end_time", "content"]
+            "required": ["start_time", "end_time", "content"],
         }
 
     async def execute(self, **kwargs: Any) -> Any:
@@ -581,19 +630,16 @@ class UpdateUserBehaviorNoteTool(Tool):
             工具执行结果（字符串）
         """
         try:
-            start_time = kwargs.get('start_time', '')
-            end_time = kwargs.get('end_time', '')
-            content = kwargs.get('content', '')
-            block_id = kwargs.get('block_id')
+            start_time = kwargs.get("start_time", "")
+            end_time = kwargs.get("end_time", "")
+            content = kwargs.get("content", "")
+            block_id = kwargs.get("block_id")
 
             if not start_time or not end_time or not content:
                 return f"{ERROR} 参数错误: start_time、end_time 和 content 是必填参数"
 
             return create_or_update_user_behavior_note(
-                start_time=start_time,
-                end_time=end_time,
-                content=content,
-                block_id=block_id
+                start_time=start_time, end_time=end_time, content=content, block_id=block_id
             )
         except ValueError as e:
             return f"{ERROR} 参数错误: {str(e)}"
@@ -601,18 +647,21 @@ class UpdateUserBehaviorNoteTool(Tool):
             return f"{ERROR} 操作失败: {str(e)}"
 
 
-def _get_mood_type_ids()->list[str]:
+def _get_mood_type_ids() -> list[str]:
     """获取所有可用的心情类型ID"""
     mood_types = mood_repository.get_mood_types()
-    return [m['id'] for m in mood_types]
+    return [m["id"] for m in mood_types]
 
-def _get_mood_types()->str:
+
+def _get_mood_types() -> str:
     """获取所有可用的心情类型,输出id:name对"""
     mood_types = mood_repository.get_mood_types()
-    return '\n '.join([f"{m['id']}: {m['name']}" for m in mood_types])
+    return "\n ".join([f"{m['id']}: {m['name']}" for m in mood_types])
+
 
 class UserMoodQuryTool(Tool):
     """查询用户心情记录工具"""
+
     def __init__(self):
         pass
 
@@ -635,21 +684,20 @@ class UserMoodQuryTool(Tool):
             "properties": {
                 "start_time": {
                     "type": "string",
-                    "description": "查询开始时间，格式：YYYY-MM-DD HH:MM:SS"
+                    "description": "查询开始时间，格式：YYYY-MM-DD HH:MM:SS",
                 },
                 "end_time": {
                     "type": "string",
-                    "description": "查询结束时间，格式：YYYY-MM-DD HH:MM:SS"
+                    "description": "查询结束时间，格式：YYYY-MM-DD HH:MM:SS",
                 },
                 "by_mood_type_id": {
                     "type": ["string", "null"],
                     "description": f"可选，按心情类型ID过滤，可使用的心情ID类型以及心情名称对(id:name): \n {_get_mood_types()}",
-                    "enum": _get_mood_type_ids()
-                }
+                    "enum": _get_mood_type_ids(),
+                },
             },
-            "required": ["start_time", "end_time"]
+            "required": ["start_time", "end_time"],
         }
-
 
     async def execute(self, **kwargs: Any) -> Any:
         """
@@ -662,9 +710,9 @@ class UserMoodQuryTool(Tool):
             格式化的心情记录字符串
         """
         try:
-            start_time = kwargs.get('start_time', '')
-            end_time = kwargs.get('end_time', '')
-            by_mood_type_id = kwargs.get('by_mood_type_id', None)
+            start_time = kwargs.get("start_time", "")
+            end_time = kwargs.get("end_time", "")
+            by_mood_type_id = kwargs.get("by_mood_type_id")
 
             return query_user_mood(start_time, end_time, by_mood_type_id)
         except ValueError as e:
@@ -672,7 +720,10 @@ class UserMoodQuryTool(Tool):
         except Exception as e:
             return f"{ERROR}查询失败: {str(e)}"
 
-def query_user_mood(start_time:str,end_time:str,by_mood_type_id:str|None=None)->list[dict[str,Any]]:
+
+def query_user_mood(
+    start_time: str, end_time: str, by_mood_type_id: str | None = None
+) -> list[dict[str, Any]]:
     """
     查询用户在指定时间范围内的心情记录。
     args:
@@ -682,37 +733,48 @@ def query_user_mood(start_time:str,end_time:str,by_mood_type_id:str|None=None)->
     return:
         心情记录列表
     """
-    mood_entries:list[dict]= mood_repository.get_mood_entries(start_time=start_time,end_time=end_time)
+    mood_entries: list[dict] = mood_repository.get_mood_entries(
+        start_time=start_time, end_time=end_time
+    )
     result = []
     if by_mood_type_id:
         for mood_entry in mood_entries:
-            if mood_entry['mood_type_id'] == by_mood_type_id:
+            if mood_entry["mood_type_id"] == by_mood_type_id:
                 result.append(mood_entry)
     else:
         result = mood_entries
     if not result:
-        return f"{start_time}~{end_time}  无{by_mood_type_id}对应心情记录" if by_mood_type_id else f"{start_time}~{end_time}  无心情记录"
+        return (
+            f"{start_time}~{end_time}  无{by_mood_type_id}对应心情记录"
+            if by_mood_type_id
+            else f"{start_time}~{end_time}  无心情记录"
+        )
     formatted_result = []
     for idx, entry in enumerate(result, 1):
-        factors_raw = entry.get('factors', '')
+        factors_raw = entry.get("factors", "")
         if factors_raw:
             try:
-                factors_list = json.loads(factors_raw) if isinstance(factors_raw, str) else factors_raw
-                factors_str = ', '.join(factors_list) if isinstance(factors_list, list) else str(factors_list)
+                factors_list = (
+                    json.loads(factors_raw) if isinstance(factors_raw, str) else factors_raw
+                )
+                factors_str = (
+                    ", ".join(factors_list) if isinstance(factors_list, list) else str(factors_list)
+                )
             except (json.JSONDecodeError, TypeError):
                 factors_str = str(factors_raw)
         else:
-            factors_str = ''
+            factors_str = ""
         formatted_result.append(
             f"{idx}. {entry.get('created_at', 'N/A')} 心情: {entry.get('score', 'N/A')}分\n"
             f"   内容：{entry.get('content', '无') or '无'}\n"
             f"   影响因素: {factors_str if factors_str else '无'}"
         )
-    return '\n\n'.join(formatted_result)
+    return "\n\n".join(formatted_result)
 
 
 class UserMoodCreateTool(Tool):
     """创建用户心情记录工具"""
+
     def __init__(self):
         pass
 
@@ -733,32 +795,26 @@ class UserMoodCreateTool(Tool):
         return {
             "type": "object",
             "properties": {
-                "content": {
-                    "type": "string",
-                    "description": "心情记录内容，描述当前的心情感受"
-                },
+                "content": {"type": "string", "description": "心情记录内容，描述当前的心情感受"},
                 "mood_type_id": {
                     "type": "string",
                     "description": f"可选，按心情类型ID过滤，可使用的心情ID类型以及心情名称对(id:name): \n {_get_mood_types()}",
-                    "enum": _get_mood_type_ids()
+                    "enum": _get_mood_type_ids(),
                 },
                 "factors": {
                     "type": "array",
                     "description": "可选，可多选，影响心情的因素列表",
-                    "items": {
-                        "type": "string",
-                        "enum": self._get_factors()
-                        }
-                }
+                    "items": {"type": "string", "enum": self._get_factors()},
+                },
             },
-            "required": ["content", "mood_type_id"]
+            "required": ["content", "mood_type_id"],
         }
 
     @staticmethod
-    def _get_factors()->list[str]:
+    def _get_factors() -> list[str]:
         """获取所有可用的影响因素，返回逗号分隔的字符串"""
         impacts = mood_repository.get_mood_impacts()
-        return [imp['name'] for imp in impacts]
+        return [imp["name"] for imp in impacts]
 
     async def execute(self, **kwargs: Any) -> Any:
         """
@@ -771,9 +827,9 @@ class UserMoodCreateTool(Tool):
             创建结果消息
         """
         try:
-            content = kwargs.get('content', '')
-            mood_type_id = kwargs.get('mood_type_id', '')
-            factors = kwargs.get('factors', None)
+            content = kwargs.get("content", "")
+            mood_type_id = kwargs.get("mood_type_id", "")
+            factors = kwargs.get("factors")
             if not mood_type_id:
                 return f"{ERROR}请输入心情类型ID"
 
@@ -781,7 +837,7 @@ class UserMoodCreateTool(Tool):
             mood_type = mood_repository.get_mood_type_by_id(mood_type_id)
             if not mood_type:
                 return f"{ERROR}心情类型ID {mood_type_id} 不存在"
-            score = mood_type.get('score', 50)
+            score = mood_type.get("score", 50)
 
             return create_user_mood(content, score, mood_type_id, factors)
         except ValueError as e:
@@ -790,7 +846,9 @@ class UserMoodCreateTool(Tool):
             return f"{ERROR}创建失败: {str(e)}"
 
 
-def create_user_mood(content:str,score:int,mood_type_id:str,factors_raw:list[str]|None=None)->str:
+def create_user_mood(
+    content: str, score: int, mood_type_id: str, factors_raw: list[str] | None = None
+) -> str:
     """
     创建用户心情记录。
     args:
@@ -802,18 +860,23 @@ def create_user_mood(content:str,score:int,mood_type_id:str,factors_raw:list[str
         新创建的 ID
     """
     data = {
-        'content': content,
-        'score': score,
-        'mood_type_id': mood_type_id,
-        'factors': factors_raw
+        "content": content,
+        "score": score,
+        "mood_type_id": mood_type_id,
+        "factors": factors_raw,
     }
     if factors_raw:
-        data['factors'] = json.dumps(factors_raw)
+        data["factors"] = json.dumps(factors_raw)
     mood_id = mood_repository.create_mood_entry(data)
     return f"{SUCCESS}创建心情记录成功，ID: {mood_id}"
 
+
 if __name__ == "__main__":
-    print(query_user_activity_summary(['computer_overview'],"2026-04-28 00:00:00","2026-04-29 00:00:00"))
+    print(
+        query_user_activity_summary(
+            ["computer_overview"], "2026-04-28 00:00:00", "2026-04-29 00:00:00"
+        )
+    )
     # print(query_user_activity_log("2026-04-28 00:00:00","2026-04-29 00:00:00"))
     # print(create_or_update_user_behavior_note("2026-04-28 00:00:00","2026-04-29 00:00:00","用户在电脑上工作111",129))
     # print(query_user_mood("2026-05-03","2026-05-04"))

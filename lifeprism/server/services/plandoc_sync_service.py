@@ -13,16 +13,18 @@ MD 解析规则：
 - 锚点格式：<!-- lp:t-xxx -->
 - 缩进规则：Tab 缩进判断父子关系（仅在同一 block 内有效）
 """
+
 import re
 import uuid
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
+from lifeprism.repository import plan_doc_repository, todo_repository
 from lifeprism.server.schemas.plan_doc_schemas import (
-    SyncPlanDocResponse, TodoDeletePreview,
+    SyncPlanDocResponse,
+    TodoDeletePreview,
 )
-from lifeprism.repository import todo_repository, plan_doc_repository
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -32,9 +34,11 @@ logger = get_logger(__name__)
 # 文件 I/O
 # ============================================================================
 
+
 def _get_plan_doc_dir() -> Path:
     """获取计划书目录路径"""
     from lifeprism.config.settings_manager import settings
+
     return settings.lifeprism_data_path / "plan"
 
 
@@ -43,12 +47,12 @@ def _get_plan_doc_path(doc_id: str) -> Path:
     return _get_plan_doc_dir() / f"{doc_id}.md"
 
 
-def _read_plan_doc_content(doc_id: str) -> Optional[str]:
+def _read_plan_doc_content(doc_id: str) -> str | None:
     """读取计划书 MD 内容"""
     file_path = _get_plan_doc_path(doc_id)
     try:
         if file_path.exists():
-            return file_path.read_text(encoding='utf-8')
+            return file_path.read_text(encoding="utf-8")
         return None
     except OSError as e:
         logger.error("读取计划书文件失败 %s: %s", doc_id, e)
@@ -60,7 +64,7 @@ def _write_plan_doc_content(doc_id: str, content: str) -> bool:
     file_path = _get_plan_doc_path(doc_id)
     try:
         _get_plan_doc_dir().mkdir(parents=True, exist_ok=True)
-        file_path.write_text(content, encoding='utf-8')
+        file_path.write_text(content, encoding="utf-8")
         return True
     except OSError as e:
         logger.error("写入计划书文件失败 %s: %s", doc_id, e)
@@ -77,19 +81,19 @@ def _generate_anchor_id() -> str:
 # ============================================================================
 
 TODOBLOCK_PATTERN = re.compile(
-    r'<!--\s*lp:todoblock\s*-->(.*?)<!--\s*/lp:todoblock\s*-->',
-    re.DOTALL
+    r"<!--\s*lp:todoblock\s*-->(.*?)<!--\s*/lp:todoblock\s*-->", re.DOTALL
 )
 TASK_LINE_PATTERN = re.compile(
-    r'^(\t*)-\s*\[([ xX])\]\s*(.+?)(?:\s*<!--\s*lp:(t-[a-f0-9]+)\s*-->)?$'
+    r"^(\t*)-\s*\[([ xX])\]\s*(.+?)(?:\s*<!--\s*lp:(t-[a-f0-9]+)\s*-->)?$"
 )
-ANCHOR_PATTERN = re.compile(r'<!--\s*lp:(t-[a-f0-9]+)\s*-->')
-SYSTEM_SECTION_START = '<!-- lp:system-section -->'
+ANCHOR_PATTERN = re.compile(r"<!--\s*lp:(t-[a-f0-9]+)\s*-->")
+SYSTEM_SECTION_START = "<!-- lp:system-section -->"
 
 
 # ============================================================================
 # MD 解析
 # ============================================================================
+
 
 def _ensure_todoblock_exists(content: str) -> str:
     """
@@ -104,7 +108,7 @@ def _ensure_todoblock_exists(content: str) -> str:
 
     system_start = content.find(SYSTEM_SECTION_START)
     if system_start != -1:
-        separator_pos = content.rfind('---', 0, system_start)
+        separator_pos = content.rfind("---", 0, system_start)
         if separator_pos != -1:
             content = content[:separator_pos].rstrip() + todoblock + content[separator_pos:]
         else:
@@ -115,7 +119,7 @@ def _ensure_todoblock_exists(content: str) -> str:
     return content
 
 
-def _get_all_todoblocks(content: str) -> List[Dict[str, Any]]:
+def _get_all_todoblocks(content: str) -> list[dict[str, Any]]:
     """
     获取所有 todoblock 的信息
 
@@ -128,16 +132,18 @@ def _get_all_todoblocks(content: str) -> List[Dict[str, Any]]:
     """
     blocks = []
     for i, match in enumerate(TODOBLOCK_PATTERN.finditer(content)):
-        blocks.append({
-            'block_content': match.group(1),
-            'start': match.start(1),
-            'end': match.end(1),
-            'block_index': i,
-        })
+        blocks.append(
+            {
+                "block_content": match.group(1),
+                "start": match.start(1),
+                "end": match.end(1),
+                "block_index": i,
+            }
+        )
     return blocks
 
 
-def _find_anchor_in_blocks(content: str, anchor_id: str) -> Optional[int]:
+def _find_anchor_in_blocks(content: str, anchor_id: str) -> int | None:
     """
     查找锚点所在的 todoblock 索引
 
@@ -146,12 +152,12 @@ def _find_anchor_in_blocks(content: str, anchor_id: str) -> Optional[int]:
     """
     blocks = _get_all_todoblocks(content)
     for block in blocks:
-        if f"lp:{anchor_id}" in block['block_content']:
-            return block['block_index']
+        if f"lp:{anchor_id}" in block["block_content"]:
+            return block["block_index"]
     return None
 
 
-def _parse_task_line(line: str) -> Optional[Dict[str, Any]]:
+def _parse_task_line(line: str) -> dict[str, Any] | None:
     """
     解析单行任务
 
@@ -166,20 +172,20 @@ def _parse_task_line(line: str) -> Optional[Dict[str, Any]]:
     tabs, checkbox, content, anchor_id = match.groups()
 
     # 清理 content 中可能残留的锚点注释
-    content = ANCHOR_PATTERN.sub('', content).strip()
+    content = ANCHOR_PATTERN.sub("", content).strip()
 
     if not content:
         return None
 
     return {
-        'indent_level': len(tabs),
-        'is_checked': checkbox.lower() == 'x',
-        'content': content,
-        'anchor_id': anchor_id,
+        "indent_level": len(tabs),
+        "is_checked": checkbox.lower() == "x",
+        "content": content,
+        "anchor_id": anchor_id,
     }
 
 
-def _parse_todoblock(block_content: str) -> List[Dict[str, Any]]:
+def _parse_todoblock(block_content: str) -> list[dict[str, Any]]:
     """
     解析 todoblock 中的所有任务
 
@@ -188,19 +194,19 @@ def _parse_todoblock(block_content: str) -> List[Dict[str, Any]]:
         - indent_level, is_checked, content, anchor_id, line_index, original_line
     """
     tasks = []
-    lines = block_content.split('\n')
+    lines = block_content.split("\n")
 
     for line_index, line in enumerate(lines):
         parsed = _parse_task_line(line)
         if parsed:
-            parsed['line_index'] = line_index
-            parsed['original_line'] = line
+            parsed["line_index"] = line_index
+            parsed["original_line"] = line
             tasks.append(parsed)
 
     return tasks
 
 
-def _build_parent_map(tasks: List[Dict[str, Any]]) -> Dict[int, Optional[str]]:
+def _build_parent_map(tasks: list[dict[str, Any]]) -> dict[int, str | None]:
     """
     根据缩进级别构建父任务映射
 
@@ -211,9 +217,9 @@ def _build_parent_map(tasks: List[Dict[str, Any]]) -> Dict[int, Optional[str]]:
     level_stack = []  # 栈：(level, anchor_id)
 
     for task in tasks:
-        level = task['indent_level']
-        anchor_id = task['anchor_id']
-        line_index = task['line_index']
+        level = task["indent_level"]
+        anchor_id = task["anchor_id"]
+        line_index = task["line_index"]
 
         # 弹出栈中所有 level >= 当前 level 的项
         while level_stack and level_stack[-1][0] >= level:
@@ -240,11 +246,10 @@ def _build_parent_map(tasks: List[Dict[str, Any]]) -> Dict[int, Optional[str]]:
 # MD 回写操作
 # ============================================================================
 
+
 def insert_todo_to_md(
-    plan_doc_id: str,
-    content: str,
-    parent_anchor_id: Optional[str] = None
-) -> Optional[str]:
+    plan_doc_id: str, content: str, parent_anchor_id: str | None = None
+) -> str | None:
     """
     插入新任务到 MD 文件（支持多个 todoblock）
 
@@ -288,9 +293,9 @@ def insert_todo_to_md(
             target_block_index = found_index
 
     target_block = blocks[target_block_index]
-    block_content = target_block['block_content']
-    block_start = target_block['start']
-    block_end = target_block['end']
+    block_content = target_block["block_content"]
+    block_start = target_block["start"]
+    block_end = target_block["end"]
 
     new_anchor = _generate_anchor_id()
 
@@ -299,16 +304,16 @@ def insert_todo_to_md(
     insert_position = len(block_content)
 
     if parent_anchor_id:
-        lines = block_content.split('\n')
+        lines = block_content.split("\n")
         for i, line in enumerate(lines):
             if f"lp:{parent_anchor_id}" in line:
-                parent_indent = len(line) - len(line.lstrip('\t'))
+                parent_indent = len(line) - len(line.lstrip("\t"))
                 indent_level = parent_indent + 1
 
                 insert_line_index = i + 1
                 while insert_line_index < len(lines):
                     next_line = lines[insert_line_index]
-                    if next_line.strip() and next_line.startswith('\t' * (parent_indent + 1)):
+                    if next_line.strip() and next_line.startswith("\t" * (parent_indent + 1)):
                         insert_line_index += 1
                     else:
                         break
@@ -316,7 +321,7 @@ def insert_todo_to_md(
                 insert_position = sum(len(lines[j]) + 1 for j in range(insert_line_index))
                 break
 
-    tabs = '\t' * indent_level
+    tabs = "\t" * indent_level
     new_line = f"{tabs}- [ ] {content} <!-- lp:{new_anchor} -->\n"
 
     new_block_content = block_content[:insert_position] + new_line + block_content[insert_position:]
@@ -324,7 +329,9 @@ def insert_todo_to_md(
 
     new_md_content = _update_system_section(new_md_content, plan_doc_id)
     if _write_plan_doc_content(plan_doc_id, new_md_content):
-        logger.debug("插入任务到 MD 成功: %s/%s (block %s)", plan_doc_id, new_anchor, target_block_index)
+        logger.debug(
+            "插入任务到 MD 成功: %s/%s (block %s)", plan_doc_id, new_anchor, target_block_index
+        )
         return new_anchor
 
     return None
@@ -343,8 +350,7 @@ def update_todo_in_md(plan_doc_id: str, anchor_id: str, new_content: str) -> boo
         return False
 
     pattern = re.compile(
-        rf'^(\t*)-\s*\[([ xX])\]\s*.+?\s*<!--\s*lp:{re.escape(anchor_id)}\s*-->',
-        re.MULTILINE
+        rf"^(\t*)-\s*\[([ xX])\]\s*.+?\s*<!--\s*lp:{re.escape(anchor_id)}\s*-->", re.MULTILINE
     )
 
     match = pattern.search(md_content)
@@ -390,23 +396,23 @@ def delete_todo_from_md(plan_doc_id: str, anchor_id: str) -> bool:
         return False
 
     target_block = blocks[target_block_index]
-    block_content = target_block['block_content']
-    block_start = target_block['start']
-    block_end = target_block['end']
+    block_content = target_block["block_content"]
+    block_start = target_block["start"]
+    block_end = target_block["end"]
 
-    lines = block_content.split('\n')
+    lines = block_content.split("\n")
     new_lines = []
     skip_until_indent = -1
 
     for line in lines:
         if f"lp:{anchor_id}" in line:
-            current_indent = len(line) - len(line.lstrip('\t'))
+            current_indent = len(line) - len(line.lstrip("\t"))
             skip_until_indent = current_indent
             continue
 
         if skip_until_indent >= 0:
             if line.strip():
-                current_indent = len(line) - len(line.lstrip('\t'))
+                current_indent = len(line) - len(line.lstrip("\t"))
                 if current_indent > skip_until_indent:
                     continue
                 else:
@@ -426,12 +432,14 @@ def delete_todo_from_md(plan_doc_id: str, anchor_id: str) -> bool:
         cleaned_lines.append(line)
         prev_empty = is_empty
 
-    new_block_content = '\n'.join(cleaned_lines)
+    new_block_content = "\n".join(cleaned_lines)
     new_md_content = md_content[:block_start] + new_block_content + md_content[block_end:]
 
     new_md_content = _update_system_section(new_md_content, plan_doc_id)
     if _write_plan_doc_content(plan_doc_id, new_md_content):
-        logger.debug("从 MD 删除任务成功: %s/%s (block %s)", plan_doc_id, anchor_id, target_block_index)
+        logger.debug(
+            "从 MD 删除任务成功: %s/%s (block %s)", plan_doc_id, anchor_id, target_block_index
+        )
         return True
 
     return False
@@ -441,10 +449,9 @@ def delete_todo_from_md(plan_doc_id: str, anchor_id: str) -> bool:
 # 同步核心
 # ============================================================================
 
+
 def sync_plan_doc(
-    plan_doc_id: str,
-    dry_run: bool = False,
-    confirm_delete: bool = False
+    plan_doc_id: str, dry_run: bool = False, confirm_delete: bool = False
 ) -> SyncPlanDocResponse:
     """
     同步计划书任务（支持多个 todoblock）
@@ -465,7 +472,7 @@ def sync_plan_doc(
         logger.warning("计划书不存在: %s", plan_doc_id)
         return result
 
-    goal_id = plan_doc.get('goal_id')
+    goal_id = plan_doc.get("goal_id")
 
     # 2. 读取 MD 内容
     content = _read_plan_doc_content(plan_doc_id)
@@ -489,23 +496,23 @@ def sync_plan_doc(
     block_modifications = {}
 
     for block in blocks:
-        block_content = block['block_content']
-        block_index = block['block_index']
+        block_content = block["block_content"]
+        block_index = block["block_index"]
 
         parsed_tasks = _parse_todoblock(block_content)
 
         modifications = {}
         for task in parsed_tasks:
-            task['block_index'] = block_index
+            task["block_index"] = block_index
 
-            if not task['anchor_id']:
+            if not task["anchor_id"]:
                 new_anchor = _generate_anchor_id()
-                task['anchor_id'] = new_anchor
+                task["anchor_id"] = new_anchor
 
-                tabs = '\t' * task['indent_level']
-                checkbox = '[x]' if task['is_checked'] else '[ ]'
+                tabs = "\t" * task["indent_level"]
+                checkbox = "[x]" if task["is_checked"] else "[ ]"
                 new_line = f"{tabs}- {checkbox} {task['content']} <!-- lp:{new_anchor} -->"
-                modifications[task['line_index']] = new_line
+                modifications[task["line_index"]] = new_line
 
         if modifications:
             block_modifications[block_index] = modifications
@@ -516,14 +523,14 @@ def sync_plan_doc(
     if block_modifications:
         for block_index in sorted(block_modifications.keys(), reverse=True):
             block = blocks[block_index]
-            block_content = block['block_content']
-            block_start = block['start']
-            block_end = block['end']
+            block_content = block["block_content"]
+            block_start = block["start"]
+            block_end = block["end"]
 
-            lines = block_content.split('\n')
+            lines = block_content.split("\n")
             for line_index, new_line in block_modifications[block_index].items():
                 lines[line_index] = new_line
-            new_block_content = '\n'.join(lines)
+            new_block_content = "\n".join(lines)
 
             content = content[:block_start] + new_block_content + content[block_end:]
 
@@ -532,21 +539,21 @@ def sync_plan_doc(
     # 6. 构建父任务映射（每个 block 独立构建）
     parent_map = {}
     for block in blocks:
-        block_tasks = [t for t in all_parsed_tasks if t.get('block_index') == block['block_index']]
+        block_tasks = [t for t in all_parsed_tasks if t.get("block_index") == block["block_index"]]
         block_parent_map = _build_parent_map(block_tasks)
         for line_index, parent_anchor in block_parent_map.items():
-            parent_map[(block['block_index'], line_index)] = parent_anchor
+            parent_map[(block["block_index"], line_index)] = parent_anchor
 
     # 7. 获取现有任务（id 就是锚点）
     existing_todos = todo_repository.get_todos_by_plan_doc(plan_doc_id)
-    existing_by_anchor = {t['id']: t for t in existing_todos}
+    existing_by_anchor = {t["id"]: t for t in existing_todos}
 
-    md_anchor_ids = {task['anchor_id'] for task in all_parsed_tasks if task['anchor_id']}
+    md_anchor_ids = {task["anchor_id"] for task in all_parsed_tasks if task["anchor_id"]}
 
     # 8. 检测待删除的任务（id 就是锚点）
     todos_to_delete = []
     for todo in existing_todos:
-        if todo['id'] not in md_anchor_ids:
+        if todo["id"] not in md_anchor_ids:
             todos_to_delete.append(todo)
 
     # 9. 处理每个解析出的任务
@@ -555,67 +562,77 @@ def sync_plan_doc(
     existing_parent_info = []
 
     for order_index, task in enumerate(all_parsed_tasks):
-        anchor_id = task['anchor_id']
+        anchor_id = task["anchor_id"]
         existing = existing_by_anchor.get(anchor_id)
-        parent_key = (task.get('block_index'), task['line_index'])
+        parent_key = (task.get("block_index"), task["line_index"])
 
         if existing:
             update_data = {
-                'id': existing['id'],
-                'content': task['content'],
-                'pool_order_index': order_index,
+                "id": existing["id"],
+                "content": task["content"],
+                "pool_order_index": order_index,
             }
 
-            if task['is_checked'] and existing.get('state') != 'completed':
-                update_data['state'] = 'completed'
-                update_data['actual_finished_at'] = datetime.now().strftime('%Y-%m-%d')
-            elif not task['is_checked'] and existing.get('state') == 'completed':
-                update_data['state'] = 'pool'
-                update_data['actual_finished_at'] = None
+            if task["is_checked"] and existing.get("state") != "completed":
+                update_data["state"] = "completed"
+                update_data["actual_finished_at"] = datetime.now().strftime("%Y-%m-%d")
+            elif not task["is_checked"] and existing.get("state") == "completed":
+                update_data["state"] = "pool"
+                update_data["actual_finished_at"] = None
 
             todos_to_update.append(update_data)
 
-            existing_parent_info.append({
-                'id': existing['id'],
-                'parent_anchor': parent_map.get(parent_key),
-                'old_parent_id': existing.get('parent_id'),
-            })
+            existing_parent_info.append(
+                {
+                    "id": existing["id"],
+                    "parent_anchor": parent_map.get(parent_key),
+                    "old_parent_id": existing.get("parent_id"),
+                }
+            )
 
             result.updated += 1
         else:
             create_data = {
-                'id': anchor_id,
-                'content': task['content'],
-                'state': 'completed' if task['is_checked'] else 'pool',
-                'plan_doc_id': plan_doc_id,
-                'link_to_goal_id': goal_id,
-                'pool_order_index': order_index,
-                'order_index': 0,
-                'color': '#FFFFFF',
+                "id": anchor_id,
+                "content": task["content"],
+                "state": "completed" if task["is_checked"] else "pool",
+                "plan_doc_id": plan_doc_id,
+                "link_to_goal_id": goal_id,
+                "pool_order_index": order_index,
+                "order_index": 0,
+                "color": "#FFFFFF",
             }
 
-            if task['is_checked']:
-                create_data['actual_finished_at'] = datetime.now().strftime('%Y-%m-%d')
+            if task["is_checked"]:
+                create_data["actual_finished_at"] = datetime.now().strftime("%Y-%m-%d")
 
-            todos_to_create.append({
-                'data': create_data,
-                'anchor_id': anchor_id,
-                'parent_anchor': parent_map.get(parent_key),
-            })
+            todos_to_create.append(
+                {
+                    "data": create_data,
+                    "anchor_id": anchor_id,
+                    "parent_anchor": parent_map.get(parent_key),
+                }
+            )
             result.created += 1
 
     # 10. dry_run 模式
     if dry_run:
         result.to_delete = [
             TodoDeletePreview(
-                id=todo['id'],
-                content=todo['content'],
-                state=todo.get('state', 'pool'),
+                id=todo["id"],
+                content=todo["content"],
+                state=todo.get("state", "pool"),
             )
             for todo in todos_to_delete
         ]
         result.total = len(existing_todos)
-        logger.info("同步预检 %s: to_create=%s, to_update=%s, to_delete=%s", plan_doc_id, result.created, result.updated, len(todos_to_delete))
+        logger.info(
+            "同步预检 %s: to_create=%s, to_update=%s, to_delete=%s",
+            plan_doc_id,
+            result.created,
+            result.updated,
+            len(todos_to_delete),
+        )
         return result
 
     # 11. 执行数据库操作
@@ -623,17 +640,19 @@ def sync_plan_doc(
         todo_repository.batch_update_todos(todos_to_update)
 
     if todos_to_create:
-        create_data_list = [item['data'] for item in todos_to_create]
-        new_ids = todo_repository.batch_create_todos(create_data_list)
+        create_data_list = [item["data"] for item in todos_to_create]
+        todo_repository.batch_create_todos(create_data_list)
 
         # parent_id 直接用 parent_anchor（id 就是锚点）
         parent_updates = []
         for item in todos_to_create:
-            if item['parent_anchor']:
-                parent_updates.append({
-                    'id': item['data']['id'],
-                    'parent_id': item['parent_anchor'],
-                })
+            if item["parent_anchor"]:
+                parent_updates.append(
+                    {
+                        "id": item["data"]["id"],
+                        "parent_id": item["parent_anchor"],
+                    }
+                )
 
         if parent_updates:
             todo_repository.batch_update_todos(parent_updates)
@@ -642,19 +661,21 @@ def sync_plan_doc(
     if existing_parent_info:
         parent_updates_existing = []
         for info in existing_parent_info:
-            new_parent_id = info['parent_anchor']
-            if new_parent_id != info['old_parent_id']:
-                parent_updates_existing.append({
-                    'id': info['id'],
-                    'parent_id': new_parent_id,
-                })
+            new_parent_id = info["parent_anchor"]
+            if new_parent_id != info["old_parent_id"]:
+                parent_updates_existing.append(
+                    {
+                        "id": info["id"],
+                        "parent_id": new_parent_id,
+                    }
+                )
         if parent_updates_existing:
             todo_repository.batch_update_todos(parent_updates_existing)
             logger.info("更新 %s 个任务的 parent_id", len(parent_updates_existing))
 
     # 12. 处理删除
     if confirm_delete and todos_to_delete:
-        delete_ids = [todo['id'] for todo in todos_to_delete]
+        delete_ids = [todo["id"] for todo in todos_to_delete]
         for todo_id in delete_ids:
             deleted_count = todo_repository.delete_todo_cascade(todo_id)
             result.deleted += deleted_count if deleted_count > 0 else 1
@@ -667,13 +688,20 @@ def sync_plan_doc(
     # 14. 统计总数
     result.total = len(todo_repository.get_todos_by_plan_doc(plan_doc_id))
 
-    logger.info("同步计划书 %s 完成: created=%s, updated=%s, deleted=%s", plan_doc_id, result.created, result.updated, result.deleted)
+    logger.info(
+        "同步计划书 %s 完成: created=%s, updated=%s, deleted=%s",
+        plan_doc_id,
+        result.created,
+        result.updated,
+        result.deleted,
+    )
     return result
 
 
 # ============================================================================
 # 状态回写
 # ============================================================================
+
 
 def writeback_completion_to_md(plan_doc_id: str, anchor_id: str) -> bool:
     """
@@ -687,8 +715,7 @@ def writeback_completion_to_md(plan_doc_id: str, anchor_id: str) -> bool:
         return False
 
     anchor_pattern = re.compile(
-        rf'^(\t*)-\s*\[\s*\]\s*(.+?)\s*<!--\s*lp:{re.escape(anchor_id)}\s*-->',
-        re.MULTILINE
+        rf"^(\t*)-\s*\[\s*\]\s*(.+?)\s*<!--\s*lp:{re.escape(anchor_id)}\s*-->", re.MULTILINE
     )
 
     match = anchor_pattern.search(content)
@@ -723,8 +750,8 @@ def writeback_uncomplete_to_md(plan_doc_id: str, anchor_id: str) -> bool:
         return False
 
     anchor_pattern = re.compile(
-        rf'^(\t*)-\s*\[x\]\s*(.+?)\s*<!--\s*lp:{re.escape(anchor_id)}\s*-->',
-        re.MULTILINE | re.IGNORECASE
+        rf"^(\t*)-\s*\[x\]\s*(.+?)\s*<!--\s*lp:{re.escape(anchor_id)}\s*-->",
+        re.MULTILINE | re.IGNORECASE,
     )
 
     match = anchor_pattern.search(content)
@@ -751,6 +778,7 @@ def writeback_uncomplete_to_md(plan_doc_id: str, anchor_id: str) -> bool:
 # 系统展示区
 # ============================================================================
 
+
 def _update_system_section(content: str, plan_doc_id: str) -> str:
     """
     更新或添加系统展示区
@@ -760,44 +788,44 @@ def _update_system_section(content: str, plan_doc_id: str) -> str:
     return content
 
 
-def _build_task_tree_for_summary(todos: List[Dict]) -> List[Dict]:
+def _build_task_tree_for_summary(todos: list[dict]) -> list[dict]:
     """构建任务树用于系统展示区"""
-    todo_map = {t['id']: {**t, 'children': []} for t in todos}
+    todo_map = {t["id"]: {**t, "children": []} for t in todos}
     roots = []
 
     for todo in todos:
-        todo_with_children = todo_map[todo['id']]
-        parent_id = todo.get('parent_id')
+        todo_with_children = todo_map[todo["id"]]
+        parent_id = todo.get("parent_id")
 
         if parent_id and parent_id in todo_map:
-            todo_map[parent_id]['children'].append(todo_with_children)
+            todo_map[parent_id]["children"].append(todo_with_children)
         else:
             roots.append(todo_with_children)
 
     def sort_key(t):
-        return t.get('pool_order_index') or 0
+        return t.get("pool_order_index") or 0
 
     roots.sort(key=sort_key)
     for todo in todo_map.values():
-        todo['children'].sort(key=sort_key)
+        todo["children"].sort(key=sort_key)
 
     return roots
 
 
-def _render_task_tree(tasks: List[Dict], indent: int) -> List[str]:
+def _render_task_tree(tasks: list[dict], indent: int) -> list[str]:
     """渲染任务树为 MD 格式（不含锚点）
 
     使用 4 个空格作为缩进，确保 Markdown 渲染器正确显示层级
     """
     lines = []
-    spaces = '    ' * indent
+    spaces = "    " * indent
 
     for task in tasks:
-        checkbox = '[x]' if task.get('state') == 'completed' else '[ ]'
+        checkbox = "[x]" if task.get("state") == "completed" else "[ ]"
         lines.append(f"{spaces}- {checkbox} {task['content']}")
 
-        if task.get('children'):
-            lines.extend(_render_task_tree(task['children'], indent + 1))
+        if task.get("children"):
+            lines.extend(_render_task_tree(task["children"], indent + 1))
 
     return lines
 

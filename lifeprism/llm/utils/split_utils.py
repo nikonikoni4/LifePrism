@@ -1,16 +1,18 @@
-from lifeprism.llm.schemas import classifyState
 import logging
+
 from lifeprism.config.settings_manager import settings
+from lifeprism.llm.schemas import classifyState
+
 logger = logging.getLogger(__name__)
 
 
 def split_by_purpose(state: classifyState) -> classifyState:
     """
     将 classifyState 按单用途和多用途分开，填充到对应字段
-    
+
     Args:
         state: 原始的 classifyState 对象
-        
+
     Returns:
         classifyState: 更新后的 state，包含:
             - log_items_for_single: 单用途数据
@@ -19,16 +21,20 @@ def split_by_purpose(state: classifyState) -> classifyState:
     # 分离 log_items
     single_purpose_items = []
     multi_purpose_items = []
-    
+
     for item in state.log_items:
         app_info = state.app_registry.get(item.app)
         if app_info and not app_info.is_multipurpose:
             single_purpose_items.append(item)
         else:
             multi_purpose_items.append(item)
-    
-    logger.debug("按用途分离完成: 单用途 %s 条, 多用途 %s 条", len(single_purpose_items), len(multi_purpose_items))
-    
+
+    logger.debug(
+        "按用途分离完成: 单用途 %s 条, 多用途 %s 条",
+        len(single_purpose_items),
+        len(multi_purpose_items),
+    )
+
     return {
         "log_items_for_single": single_purpose_items,
         "log_items_for_multi": multi_purpose_items,
@@ -43,18 +49,24 @@ def split_by_duration(multi_purpose_items: list) -> dict:
         dict: {log_items_for_multi_short, log_items_for_multi_long}
     """
     # multi_purpose_items 直接传入
-    
+
     # 按时长分离
     short_duration_items = []
     long_duration_items = []
-    
+
     for item in multi_purpose_items:
         if item.duration < settings.long_log_threshold:
             short_duration_items.append(item)
         else:
             long_duration_items.append(item)
 
-    logger.debug("按时长分离完成: 短时长(<%ss) %s 条, 长时长(>=%ss) %s 条", settings.long_log_threshold, len(short_duration_items), settings.long_log_threshold, len(long_duration_items))
+    logger.debug(
+        "按时长分离完成: 短时长(<%ss) %s 条, 长时长(>=%ss) %s 条",
+        settings.long_log_threshold,
+        len(short_duration_items),
+        settings.long_log_threshold,
+        len(long_duration_items),
+    )
 
     return {
         "log_items_for_multi_short": short_duration_items or None,

@@ -2,8 +2,9 @@
 Window 数据提供者
 提供窗口事件相关的数据库操作
 """
+
 import sqlite3
-from typing import Optional, Dict, Any
+
 from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
@@ -44,16 +45,11 @@ class MonitorDataProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            data = {
-                'timestamp': timestamp,
-                'duration': duration,
-                'app': app,
-                'title': title
-            }
+            data = {"timestamp": timestamp, "duration": duration, "app": app, "title": title}
 
             # 使用 DatabaseManager 的 insert 方法执行插入操作
             # LWBaseDataProvider 通过 self.db 持有 DatabaseManager 的引用
-            result = self.db.insert('window_events', data)
+            result = self.db.insert("window_events", data)
 
             logger.debug("窗口事件保存: app=%s, duration=%.1fs", app, duration)
 

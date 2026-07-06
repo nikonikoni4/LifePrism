@@ -4,8 +4,8 @@
 提供习惯 CRUD、打卡、统计、链式习惯等 RESTful 接口。
 router 不带前缀，由 main.py 注册时指定 /api/v2/habit。
 """
+
 from datetime import date
-from typing import Optional
 
 from fastapi import APIRouter, Query
 
@@ -70,8 +70,9 @@ def _raise_app_error(
 # 习惯 CRUD
 # ============================================================================
 
+
 @router.get("/habits")
-async def list_habits(status: Optional[str] = Query(default=None)):
+async def list_habits(status: str | None = Query(default=None)):
     """获取习惯列表，可按 status 筛选"""
     return habit_service.get_habits(status)
 
@@ -110,7 +111,7 @@ async def delete_habit(habitId: str):
 
 
 @router.post("/habits/{habitId}/pause")
-async def pause_habit(habitId: str, req: Optional[SettlementActionRequest] = None):
+async def pause_habit(habitId: str, req: SettlementActionRequest | None = None):
     """暂停习惯"""
     try:
         return habit_service.pause_habit(habitId, req)
@@ -123,7 +124,7 @@ async def pause_habit(habitId: str, req: Optional[SettlementActionRequest] = Non
 
 
 @router.post("/habits/{habitId}/resume")
-async def resume_habit(habitId: str, req: Optional[SettlementActionRequest] = None):
+async def resume_habit(habitId: str, req: SettlementActionRequest | None = None):
     """恢复习惯"""
     try:
         return habit_service.resume_habit(habitId, req)
@@ -138,6 +139,7 @@ async def resume_habit(habitId: str, req: Optional[SettlementActionRequest] = No
 # ============================================================================
 # 打卡操作
 # ============================================================================
+
 
 @router.post("/habits/{habitId}/checkins")
 async def checkin_today(habitId: str):
@@ -193,8 +195,9 @@ async def get_backfill_availability(req: BackfillAvailabilityRequest):
 # 挑战历史 & 结算
 # ============================================================================
 
+
 @router.get("/habits/{habitId}/challenges", response_model=ChallengeHistoryResponse)
-async def get_challenge_history(habitId: str, status: Optional[str] = Query(default=None)):
+async def get_challenge_history(habitId: str, status: str | None = Query(default=None)):
     """获取习惯的挑战历史"""
     try:
         raw_challenges = habit_service.get_challenge_history(habitId, status)
@@ -216,6 +219,7 @@ async def check_settlements():
 # ============================================================================
 # 统计
 # ============================================================================
+
 
 @router.get("/stats/today")
 async def get_today_stats():
@@ -242,8 +246,9 @@ async def get_heatmap(days: int = Query(default=365, ge=7, le=730)):
 # 链式习惯
 # ============================================================================
 
+
 @router.get("/chains")
-async def list_chains(showInTimeline: Optional[bool] = Query(default=None)):
+async def list_chains(showInTimeline: bool | None = Query(default=None)):
     """获取链列表"""
     return habit_chain_service.get_chains(showInTimeline)
 

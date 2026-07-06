@@ -11,12 +11,12 @@ NAME = "s005_add_screen_analysis_ignore"
 
 def check_if_applied(data: dict) -> bool:
     """检查迁移是否已应用"""
-    return 'screen_analysis_ignore' in data
+    return "screen_analysis_ignore" in data
 
 
 def upgrade(data: dict) -> dict:
     """执行迁移"""
-    if 'screen_analysis_ignore' not in data:
-        data['screen_analysis_ignore'] = []
+    if "screen_analysis_ignore" not in data:
+        data["screen_analysis_ignore"] = []
 
     return data

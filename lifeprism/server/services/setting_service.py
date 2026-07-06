@@ -3,24 +3,24 @@ Settings 服务层 - 配置管理业务逻辑
 
 纯函数模块，封装 SettingsManager 的操作，提供给 API 层使用
 """
-import os
-import sys
-import shutil
+
 import json
-from typing import Dict, Any, Optional, List
+import os
+import shutil
+import sys
 from pathlib import Path
 
-from lifeprism.config.settings_manager import settings
 from lifeprism.config.provider_manager import provider_manager
-from lifeprism.utils.common_utils import is_dev_environment
+from lifeprism.config.settings_manager import settings
+from lifeprism.llm.channel.wechat.client import WechatClient
 from lifeprism.server.schemas.setting_schemas import (
+    MigrateDataPathResponse,
     SettingItems,
     UpdateSettingsRequest,
     ValidatePathResponse,
-    MigrateDataPathResponse,
 )
 from lifeprism.utils import get_logger
-from lifeprism.llm.channel.wechat.client import WechatClient
+from lifeprism.utils.common_utils import is_dev_environment
 
 logger = get_logger(__name__)
 
@@ -34,12 +34,12 @@ def get_settings() -> SettingItems:
     """
     config = settings.get_for_display()
     # 添加 provider_list (来自 provider_manager)
-    config['provider_list'] = provider_manager.provider_list
+    config["provider_list"] = provider_manager.provider_list
     # 添加 provider_id_map (名称到 ID 的映射)
-    config['provider_id_map'] = provider_manager.name_to_id_map
+    config["provider_id_map"] = provider_manager.name_to_id_map
     # 添加 model_history
-    config['model_history'] = settings.model_history
-    config['config_base_path'] = str(settings.config_base_path)
+    config["model_history"] = settings.model_history
+    config["config_base_path"] = str(settings.config_base_path)
     return SettingItems(**config)
 
 
@@ -63,13 +63,13 @@ def update_settings(request: UpdateSettingsRequest) -> SettingItems:
         logger.info("更新配置: %s", list(updates.keys()))
 
         # 检查 screenshot_monitor 开启时的 is_vlm 校验
-        if updates.get('screenshot_monitor') is True:
-            provider_name = updates.get('provider') or settings.provider
+        if updates.get("screenshot_monitor") is True:
+            provider_name = updates.get("provider") or settings.provider
             provider_id = provider_manager.get_provider_id(provider_name) if provider_name else ""
-            model = updates.get('model') or settings.model
+            model = updates.get("model") or settings.model
             if provider_id and model:
                 key = f"{provider_id}/{model}"
-                is_vlm_cache = settings.get('is_vlm', {})
+                is_vlm_cache = settings.get("is_vlm", {})
                 vlm_status = is_vlm_cache.get(key)
                 if vlm_status is not True:
                     # is_vlm 不存在或为 false，拒绝开启截图监控
@@ -78,10 +78,10 @@ def update_settings(request: UpdateSettingsRequest) -> SettingItems:
                         f"请先调用 POST /settings/test-vlm 进行验证。current_vlm_status={vlm_status}"
                     )
 
-        provider_name = updates.get('provider') or settings.provider
+        provider_name = updates.get("provider") or settings.provider
         provider_id = provider_manager.get_provider_id(provider_name) if provider_name else ""
-        api_base = updates.get('api_base')
-        model = updates.get('model')
+        api_base = updates.get("api_base")
+        model = updates.get("model")
 
         if provider_id and api_base is not None:
             settings.set_provider_api_base(provider_id, api_base)
@@ -95,7 +95,7 @@ def update_settings(request: UpdateSettingsRequest) -> SettingItems:
     return get_settings()
 
 
-def update_api_key(api_key: str, provider_id: Optional[str] = None) -> bool:
+def update_api_key(api_key: str, provider_id: str | None = None) -> bool:
     """
     更新 API Key (安全存储到 keyring)
 
@@ -115,12 +115,12 @@ def update_api_key(api_key: str, provider_id: Optional[str] = None) -> bool:
         logger.info("%s 的 API Key 已安全保存到系统密钥管理器", actual_provider_id)
     else:
         logger.info("正在更新 API Key...")
-        settings.set('api_key', api_key)
+        settings.set("api_key", api_key)
         logger.info("API Key 已安全保存到系统密钥管理器")
     return True
 
 
-def validate_api_key(provider_id: Optional[str] = None) -> bool:
+def validate_api_key(provider_id: str | None = None) -> bool:
     """
     检查 API Key 是否已配置
 
@@ -135,7 +135,7 @@ def validate_api_key(provider_id: Optional[str] = None) -> bool:
     return settings.api_key is not None
 
 
-def get_model_history(provider_id: str) -> List[str]:
+def get_model_history(provider_id: str) -> list[str]:
     """
     获取指定服务商的模型历史
 
@@ -181,22 +181,16 @@ def validate_data_path(path: str, path_type: str) -> ValidatePathResponse:
 
     target = Path(path)
 
-    if path_type == 'lifeprism_data':
+    if path_type == "lifeprism_data":
         # 检测数据路径不能和安装路径相同
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, "frozen", False):
             install_dir = Path(sys.executable).parent.parent.parent
             try:
                 if target.resolve() == install_dir.resolve():
-                    return ValidatePathResponse(
-                        valid=False,
-                        message="数据路径不能与安装路径相同"
-                    )
+                    return ValidatePathResponse(valid=False, message="数据路径不能与安装路径相同")
                 # 检查是否是安装路径的子目录
                 target.resolve().relative_to(install_dir.resolve())
-                return ValidatePathResponse(
-                    valid=False,
-                    message="数据路径不能位于安装目录内"
-                )
+                return ValidatePathResponse(valid=False, message="数据路径不能位于安装目录内")
             except ValueError:
                 pass  # 不是子目录，正常
 
@@ -206,14 +200,14 @@ def validate_data_path(path: str, path_type: str) -> ValidatePathResponse:
 
         return ValidatePathResponse(valid=True, message="路径有效")
 
-    elif path_type == 'aw_db':
+    elif path_type == "aw_db":
         # AW 数据库路径验证
         expanded = Path(os.path.expanduser(path))
         if not expanded.exists():
             return ValidatePathResponse(valid=False, message="文件不存在")
         if not expanded.is_file():
             return ValidatePathResponse(valid=False, message="路径不是文件")
-        if not expanded.suffix == '.db':
+        if expanded.suffix != ".db":
             return ValidatePathResponse(valid=False, message="文件不是 .db 数据库文件")
         return ValidatePathResponse(valid=True, message="路径有效")
 
@@ -231,8 +225,7 @@ def _get_subdirs_to_migrate(current_path: Path) -> list[str]:
     if not current_path.exists():
         return []
     return [
-        d.name for d in current_path.iterdir()
-        if d.is_dir() and d.name not in _EXCLUDED_SUBDIRS
+        d.name for d in current_path.iterdir() if d.is_dir() and d.name not in _EXCLUDED_SUBDIRS
     ]
 
 
@@ -254,50 +247,35 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
     """
     # 1. 开发模式禁用
     if is_dev_environment():
-        return MigrateDataPathResponse(
-            success=False,
-            message="开发模式下不支持数据路径迁移"
-        )
+        return MigrateDataPathResponse(success=False, message="开发模式下不支持数据路径迁移")
 
     # 2. 计算新路径（末尾已是 lifeprismData 则不再追加）
     if not target_base_path or not target_base_path.strip():
         return MigrateDataPathResponse(success=False, message="目标路径不能为空")
 
     target = Path(target_base_path)
-    if target.name == "lifeprismData":
-        new_path = target
-    else:
-        new_path = target / "lifeprismData"
+    new_path = target if target.name == "lifeprismData" else target / "lifeprismData"
     current_path = settings.lifeprism_data_path
 
     # 3. 验证
     try:
         if new_path.resolve() == current_path.resolve():
-            return MigrateDataPathResponse(
-                success=False,
-                message="新路径与当前路径相同"
-            )
+            return MigrateDataPathResponse(success=False, message="新路径与当前路径相同")
     except Exception:
         pass
 
     # 检查不能在安装路径内
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         install_dir = Path(sys.executable).parent.parent.parent
         try:
             new_path.resolve().relative_to(install_dir.resolve())
-            return MigrateDataPathResponse(
-                success=False,
-                message="数据路径不能位于安装目录内"
-            )
+            return MigrateDataPathResponse(success=False, message="数据路径不能位于安装目录内")
         except ValueError:
             pass
 
     # 检查目标父目录是否存在
     if not Path(target_base_path).exists():
-        return MigrateDataPathResponse(
-            success=False,
-            message=f"目标目录不存在: {target_base_path}"
-        )
+        return MigrateDataPathResponse(success=False, message=f"目标目录不存在: {target_base_path}")
 
     if migrate_data:
         # 4. 关闭数据库连接池
@@ -309,10 +287,7 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
             lw_db_manager._close_connection_pool()
         except Exception as e:
             logger.error("关闭连接池失败: %s", e)
-            return MigrateDataPathResponse(
-                success=False,
-                message=f"关闭数据库连接失败: {e}"
-            )
+            return MigrateDataPathResponse(success=False, message=f"关闭数据库连接失败: {e}")
 
         # 5. 复制数据
         try:
@@ -328,10 +303,7 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
                     logger.debug("源目录不存在，已创建空目录: %s", dst)
         except Exception as e:
             logger.error("复制数据失败: %s", e)
-            return MigrateDataPathResponse(
-                success=False,
-                message=f"复制数据失败: {e}"
-            )
+            return MigrateDataPathResponse(success=False, message=f"复制数据失败: {e}")
     else:
         # 仅切换路径：创建目录结构，不复制数据
         try:
@@ -341,10 +313,7 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
             logger.info("仅切换路径，已创建空目录结构: %s", new_path)
         except Exception as e:
             logger.error("创建目录结构失败: %s", e)
-            return MigrateDataPathResponse(
-                success=False,
-                message=f"创建目录结构失败: {e}"
-            )
+            return MigrateDataPathResponse(success=False, message=f"创建目录结构失败: {e}")
 
     # 6. 更新配置（写入旧路径的 config.yaml，重启后后端会从中读取新路径）
     try:
@@ -352,15 +321,10 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
         logger.info("数据迁移完成: %s -> %s", current_path, new_path)
     except Exception as e:
         logger.error("更新配置失败: %s", e)
-        return MigrateDataPathResponse(
-            success=False,
-            message=f"数据已复制但更新配置失败: {e}"
-        )
+        return MigrateDataPathResponse(success=False, message=f"数据已复制但更新配置失败: {e}")
 
     return MigrateDataPathResponse(
-        success=True,
-        message="数据迁移成功，请重启程序",
-        new_path=str(new_path)
+        success=True, message="数据迁移成功，请重启程序", new_path=str(new_path)
     )
 
 
@@ -382,12 +346,12 @@ async def test_vlm_capability() -> dict:
 
     # 1. 先测试连接
     connect_result = await test_connect()
-    if not connect_result.get('success', False):
+    if not connect_result.get("success", False):
         return {
-            'success': False,
-            'message': f"连接失败: {connect_result.get('message', '未知错误')}",
-            'is_vlm': False,
-            'model_response': None
+            "success": False,
+            "message": f"连接失败: {connect_result.get('message', '未知错误')}",
+            "is_vlm": False,
+            "model_response": None,
         }
 
     # 2. 连接成功，测试 VLM
@@ -400,20 +364,20 @@ async def test_vlm_capability() -> dict:
     cache_updated = False
     if provider_id and model:
         key = f"{provider_id}/{model}"
-        is_vlm = vlm_result.get('success', False)
+        is_vlm = vlm_result.get("success", False)
         # 更新 is_vlm 缓存
-        is_vlm_cache = settings.get('is_vlm', {})
+        is_vlm_cache = settings.get("is_vlm", {})
         is_vlm_cache[key] = is_vlm
-        settings.set('is_vlm', is_vlm_cache)
+        settings.set("is_vlm", is_vlm_cache)
         logger.info("VLM 能力测试完成: %s = %s", key, is_vlm)
         cache_updated = True
 
     return {
-        'success': vlm_result.get('success', False),
-        'message': vlm_result.get('message', '测试完成'),
-        'is_vlm': vlm_result.get('success', False),
-        'model_response': vlm_result.get('model_response'),
-        'cache_updated': cache_updated
+        "success": vlm_result.get("success", False),
+        "message": vlm_result.get("message", "测试完成"),
+        "is_vlm": vlm_result.get("success", False),
+        "model_response": vlm_result.get("model_response"),
+        "cache_updated": cache_updated,
     }
 
 
@@ -440,10 +404,12 @@ async def get_qrcode(channel: str) -> dict:
     logger.info("正在获取 %s 通道的 QR 码", channel)
     async with WechatClient(base_url) as client:
         try:
-            data = await client.api_get("ilink/bot/get_bot_qrcode", params={"bot_type": "3"}, auth=False)
+            data = await client.api_get(
+                "ilink/bot/get_bot_qrcode", params={"bot_type": "3"}, auth=False
+            )
         except Exception as e:
             logger.error("获取 QR 码失败: %s", e, exc_info=True)
-            raise ValueError(f"获取 QR 码失败: {str(e)}")
+            raise ValueError(f"获取 QR 码失败: {str(e)}") from e
 
         qrcode_id = data.get("qrcode", "")
         qrcode_img = data.get("qrcode_img_content", qrcode_id)
@@ -453,10 +419,7 @@ async def get_qrcode(channel: str) -> dict:
             raise ValueError("获取 QR 码失败")
 
         logger.info("成功获取 QR 码，ID: %s...", qrcode_id[:20])
-        return {
-            "qr_string": qrcode_img,
-            "qrcode_id": qrcode_id
-        }
+        return {"qr_string": qrcode_img, "qrcode_id": qrcode_id}
 
 
 async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
@@ -480,10 +443,12 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
     logger.info("正在查询 QR 码状态: %s...", qrcode_id[:20])
     async with WechatClient(base_url) as client:
         try:
-            data = await client.api_get("ilink/bot/get_qrcode_status", params={"qrcode": qrcode_id}, auth=False)
+            data = await client.api_get(
+                "ilink/bot/get_qrcode_status", params={"qrcode": qrcode_id}, auth=False
+            )
         except Exception as e:
             logger.error("查询 QR 码状态失败: %s", e, exc_info=True)
-            raise ValueError(f"查询 QR 码状态失败: {str(e)}")
+            raise ValueError(f"查询 QR 码状态失败: {str(e)}") from e
 
         raw_status = data.get("status", "")
 
@@ -493,7 +458,7 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
             "waiting": "waiting",
             "scanning": "scanning",
             "confirmed": "confirmed",
-            "expired": "expired"
+            "expired": "expired",
         }
         mapped_status = status_map.get(raw_status, "waiting")
 
@@ -517,7 +482,7 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
                     with open(account_file, "w", encoding="utf-8") as f:
                         json.dump(account_data, f, ensure_ascii=False, indent=2)
                     logger.info("已保存 bot_token 到 keyring 和 context_tokens 到 %s", account_file)
-                    
+
                 else:
                     # keyring 不可用，fallback 到文件存储
                     logger.warning("Keyring 不可用，使用文件存储 token")
@@ -526,13 +491,13 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
                         json.dump(account_data, f, ensure_ascii=False, indent=2)
 
                     logger.info("已保存 bot_token 到 %s（文件模式）", account_file)
-                    
 
                 # 启动微信channel
                 from lifeprism.llm.channel import wechat_channel
-                await wechat_channel.start() # 有_runing确认启动保护，避免重复启动
+
+                await wechat_channel.start()  # 有_runing确认启动保护，避免重复启动
                 return {"status": mapped_status, "message": "登录成功，token 已保存"}
-                
+
             else:
                 logger.warning("状态为 confirmed 但未获取到 bot_token")
                 return {"status": mapped_status, "message": "登录成功但未获取到 token"}
@@ -541,6 +506,6 @@ async def get_qrcode_status(channel: str, qrcode_id: str) -> dict:
         message_map = {
             "waiting": "等待扫码",
             "scanning": "已扫码，等待确认",
-            "expired": "二维码已过期"
+            "expired": "二维码已过期",
         }
         return {"status": mapped_status, "message": message_map.get(mapped_status, "未知状态")}

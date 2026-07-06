@@ -4,13 +4,15 @@ Map Cache Aggregator - 映射缓存数据聚合层
 聚合 MultiPurposeMapCacheProvider, SinglePurposeMapCacheProvider
 提供映射缓存相关的统一数据视图
 """
-from typing import Optional, List, Dict, Any
+
+from typing import Any
+
 from lifeprism.repository.providers.map_cache_providers import (
     MultiPurposeMapCacheProvider,
     SinglePurposeMapCacheProvider,
 )
+from lifeprism.utils import LazySingleton, get_logger
 from lifeprism.utils.exceptions import DataAccessError
-from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -30,7 +32,7 @@ class MapCacheAggregator:
 
     # ==================== 聚合方法（核心价值）====================
 
-    def get_all_caches(self) -> Dict[str, List[Dict[str, Any]]]:
+    def get_all_caches(self) -> dict[str, list[dict[str, Any]]]:
         """
         获取所有缓存数据（包含多用途和单用途）
 
@@ -47,10 +49,7 @@ class MapCacheAggregator:
             # 获取单用途缓存
             single_purpose_caches, _ = self.single_purpose_provider.query_single_purpose_map_cache()
 
-            return {
-                'multi_purpose': multi_purpose_caches,
-                'single_purpose': single_purpose_caches
-            }
+            return {"multi_purpose": multi_purpose_caches, "single_purpose": single_purpose_caches}
         except DataAccessError:
             raise
         except Exception as e:
@@ -62,10 +61,8 @@ class MapCacheAggregator:
             ) from e
 
     def get_cache_by_purpose(
-        self,
-        purpose: str,
-        is_multi_purpose: bool = True
-    ) -> Optional[Dict[str, Any]]:
+        self, purpose: str, is_multi_purpose: bool = True
+    ) -> dict[str, Any] | None:
         """
         按用途查找缓存
 
@@ -80,13 +77,15 @@ class MapCacheAggregator:
             if is_multi_purpose:
                 # 查询多用途缓存
                 from lifeprism.repository.providers.common_query_options import QueryOptions
-                options = QueryOptions(filters={'app': purpose}, order_by='id')
+
+                options = QueryOptions(filters={"app": purpose}, order_by="id")
                 results, _ = self.multi_purpose_provider.query_multi_purpose_map_cache(options)
                 return results[0] if results else None
             else:
                 # 查询单用途缓存
                 from lifeprism.repository.providers.common_query_options import QueryOptions
-                options = QueryOptions(filters={'app': purpose}, order_by='id')
+
+                options = QueryOptions(filters={"app": purpose}, order_by="id")
                 results, _ = self.single_purpose_provider.query_single_purpose_map_cache(options)
                 return results[0] if results else None
         except DataAccessError:
@@ -94,7 +93,10 @@ class MapCacheAggregator:
         except Exception as e:
             logger.error(
                 "按用途查找缓存失败: purpose=%s, is_multi_purpose=%s, error=%s",
-                purpose, is_multi_purpose, e, exc_info=True
+                purpose,
+                is_multi_purpose,
+                e,
+                exc_info=True,
             )
             raise DataAccessError(
                 message="按用途查找缓存失败",
@@ -104,11 +106,11 @@ class MapCacheAggregator:
 
     # ==================== MultiPurposeMapCache 核心 CRUD 透传 ====================
 
-    def create_multi_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
+    def create_multi_purpose_map_cache(self, data: dict[str, Any]) -> bool:
         """透传：创建多用途映射缓存"""
         return self.multi_purpose_provider.create_multi_purpose_map_cache(data)
 
-    def update_multi_purpose_map_cache(self, cache_id: str, data: Dict[str, Any]) -> bool:
+    def update_multi_purpose_map_cache(self, cache_id: str, data: dict[str, Any]) -> bool:
         """透传：更新多用途映射缓存"""
         return self.multi_purpose_provider.update_multi_purpose_map_cache(cache_id, data)
 
@@ -116,25 +118,27 @@ class MapCacheAggregator:
         """透传：删除多用途映射缓存"""
         return self.multi_purpose_provider.delete_multi_purpose_map_cache(cache_id)
 
-    def query_multi_purpose_map_cache(self, options=None)->List[Dict[str, Any]]:
+    def query_multi_purpose_map_cache(self, options=None) -> list[dict[str, Any]]:
         """透传：查询多用途映射缓存"""
         return self.multi_purpose_provider.query_multi_purpose_map_cache(options)
 
-    def batch_delete_multi_purpose_map_cache(self, cache_ids: List[str]) -> int:
+    def batch_delete_multi_purpose_map_cache(self, cache_ids: list[str]) -> int:
         """透传：批量删除多用途映射缓存"""
         return self.multi_purpose_provider.batch_delete_multi_purpose_map_cache(cache_ids)
 
-    def batch_update_multi_purpose_map_cache(self, cache_ids: List[str], data: Dict[str, Any]) -> int:
+    def batch_update_multi_purpose_map_cache(
+        self, cache_ids: list[str], data: dict[str, Any]
+    ) -> int:
         """透传：批量更新多用途映射缓存"""
         return self.multi_purpose_provider.batch_update_multi_purpose_map_cache(cache_ids, data)
 
     # ==================== SinglePurposeMapCache 核心 CRUD 透传 ====================
 
-    def create_single_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
+    def create_single_purpose_map_cache(self, data: dict[str, Any]) -> bool:
         """透传：创建单用途映射缓存"""
         return self.single_purpose_provider.create_single_purpose_map_cache(data)
 
-    def update_single_purpose_map_cache(self, cache_id: str, data: Dict[str, Any]) -> bool:
+    def update_single_purpose_map_cache(self, cache_id: str, data: dict[str, Any]) -> bool:
         """透传：更新单用途映射缓存"""
         return self.single_purpose_provider.update_single_purpose_map_cache(cache_id, data)
 
@@ -146,17 +150,19 @@ class MapCacheAggregator:
         """透传：查询单用途映射缓存"""
         return self.single_purpose_provider.query_single_purpose_map_cache(options)
 
-    def batch_delete_single_purpose_map_cache(self, cache_ids: List[str]) -> int:
+    def batch_delete_single_purpose_map_cache(self, cache_ids: list[str]) -> int:
         """透传：批量删除单用途映射缓存"""
         return self.single_purpose_provider.batch_delete_single_purpose_map_cache(cache_ids)
 
-    def batch_update_single_purpose_map_cache(self, cache_ids: List[str], data: Dict[str, Any]) -> int:
+    def batch_update_single_purpose_map_cache(
+        self, cache_ids: list[str], data: dict[str, Any]
+    ) -> int:
         """透传：批量更新单用途映射缓存"""
         return self.single_purpose_provider.batch_update_single_purpose_map_cache(cache_ids, data)
 
     # ==================== 批量操作透传 ====================
 
-    def clear_all_caches(self) -> Dict[str, int]:
+    def clear_all_caches(self) -> dict[str, int]:
         """
         清理所有缓存
 
@@ -172,27 +178,36 @@ class MapCacheAggregator:
             multi_purpose_caches, _ = self.multi_purpose_provider.query_multi_purpose_map_cache()
             single_purpose_caches, _ = self.single_purpose_provider.query_single_purpose_map_cache()
 
-            multi_purpose_ids = [cache['id'] for cache in multi_purpose_caches]
-            single_purpose_ids = [cache['id'] for cache in single_purpose_caches]
+            multi_purpose_ids = [cache["id"] for cache in multi_purpose_caches]
+            single_purpose_ids = [cache["id"] for cache in single_purpose_caches]
 
             # 批量删除
             multi_deleted = 0
             single_deleted = 0
 
             if multi_purpose_ids:
-                multi_deleted = self.multi_purpose_provider.batch_delete_multi_purpose_map_cache(multi_purpose_ids)
+                multi_deleted = self.multi_purpose_provider.batch_delete_multi_purpose_map_cache(
+                    multi_purpose_ids
+                )
 
             if single_purpose_ids:
-                single_deleted = self.single_purpose_provider.batch_delete_single_purpose_map_cache(single_purpose_ids)
+                single_deleted = self.single_purpose_provider.batch_delete_single_purpose_map_cache(
+                    single_purpose_ids
+                )
 
             total_deleted = multi_deleted + single_deleted
 
-            logger.info("清理缓存完成: 多用途=%s, 单用途=%s, 总计=%s", multi_deleted, single_deleted, total_deleted)
+            logger.info(
+                "清理缓存完成: 多用途=%s, 单用途=%s, 总计=%s",
+                multi_deleted,
+                single_deleted,
+                total_deleted,
+            )
 
             return {
-                'multi_purpose_deleted': multi_deleted,
-                'single_purpose_deleted': single_deleted,
-                'total_deleted': total_deleted
+                "multi_purpose_deleted": multi_deleted,
+                "single_purpose_deleted": single_deleted,
+                "total_deleted": total_deleted,
             }
         except DataAccessError:
             raise
@@ -206,7 +221,5 @@ class MapCacheAggregator:
 
 
 # ==================== 导出单例 ====================
-
-from lifeprism.utils import LazySingleton
 
 map_cache_aggregator = LazySingleton(MapCacheAggregator)

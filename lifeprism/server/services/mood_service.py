@@ -3,23 +3,23 @@ Mood 服务层 - 心情模块业务逻辑
 
 架构：纯函数模块（无内存缓存，不需要单例）
 """
-import json
-from typing import Optional, List
 
+import json
+
+from lifeprism.repository import mood_repository
 from lifeprism.server.schemas.mood_schemas import (
-    MoodTypeItem,
-    MoodTypeListResponse,
+    CreateMoodEntryRequest,
+    CreateMoodImpactRequest,
+    CreateMoodTypeRequest,
     MoodEntryItem,
     MoodEntryListResponse,
     MoodImpactItem,
     MoodImpactListResponse,
-    CreateMoodTypeRequest,
-    UpdateMoodTypeRequest,
-    CreateMoodEntryRequest,
+    MoodTypeItem,
+    MoodTypeListResponse,
     UpdateMoodEntryRequest,
-    CreateMoodImpactRequest,
+    UpdateMoodTypeRequest,
 )
-from lifeprism.repository import mood_repository
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -27,7 +27,8 @@ logger = get_logger(__name__)
 
 # ==================== 工具函数 ====================
 
-def _parse_factors(json_str: Optional[str]) -> List[str]:
+
+def _parse_factors(json_str: str | None) -> list[str]:
     """JSON 字符串 → List[str]"""
     if not json_str:
         return []
@@ -41,50 +42,49 @@ def _parse_factors(json_str: Optional[str]) -> List[str]:
 def _convert_to_mood_type_item(item: dict) -> MoodTypeItem:
     """将数据库记录转换为 MoodTypeItem"""
     return MoodTypeItem(
-        id=item['id'],
-        name=item['name'],
-        icon=item['icon'],
-        color=item['color'],
-        score=item['score'],
-        is_dark=item.get('is_dark', 0),
-        sort_order=item.get('sort_order', 0),
-        created_at=item.get('created_at', ''),
+        id=item["id"],
+        name=item["name"],
+        icon=item["icon"],
+        color=item["color"],
+        score=item["score"],
+        is_dark=item.get("is_dark", 0),
+        sort_order=item.get("sort_order", 0),
+        created_at=item.get("created_at", ""),
     )
 
 
 def _convert_to_mood_entry_item(item: dict) -> MoodEntryItem:
     """将数据库记录转换为 MoodEntryItem"""
     return MoodEntryItem(
-        id=item['id'],
-        mood_type_id=item['mood_type_id'],
-        score=item['score'],
-        content=item.get('content'),
-        factors=_parse_factors(item.get('factors')),
-        created_at=item.get('created_at', ''),
+        id=item["id"],
+        mood_type_id=item["mood_type_id"],
+        score=item["score"],
+        content=item.get("content"),
+        factors=_parse_factors(item.get("factors")),
+        created_at=item.get("created_at", ""),
     )
 
 
 def _convert_to_mood_impact_item(item: dict) -> MoodImpactItem:
     """将数据库记录转换为 MoodImpactItem"""
     return MoodImpactItem(
-        id=item['id'],
-        name=item['name'],
-        sort_order=item.get('sort_order', 0),
-        created_at=item.get('created_at', ''),
+        id=item["id"],
+        name=item["name"],
+        sort_order=item.get("sort_order", 0),
+        created_at=item.get("created_at", ""),
     )
 
 
 # ==================== 心情类型 ====================
 
+
 def get_mood_types() -> MoodTypeListResponse:
     """获取所有心情类型"""
     items = mood_repository.get_mood_types()
-    return MoodTypeListResponse(
-        items=[_convert_to_mood_type_item(item) for item in items]
-    )
+    return MoodTypeListResponse(items=[_convert_to_mood_type_item(item) for item in items])
 
 
-def create_mood_type(request: CreateMoodTypeRequest) -> Optional[MoodTypeItem]:
+def create_mood_type(request: CreateMoodTypeRequest) -> MoodTypeItem | None:
     """
     创建心情类型
 
@@ -104,7 +104,7 @@ def create_mood_type(request: CreateMoodTypeRequest) -> Optional[MoodTypeItem]:
     return _convert_to_mood_type_item(item)
 
 
-def update_mood_type(mood_type_id: str, request: UpdateMoodTypeRequest) -> Optional[MoodTypeItem]:
+def update_mood_type(mood_type_id: str, request: UpdateMoodTypeRequest) -> MoodTypeItem | None:
     """
     更新心情类型（部分更新）
 
@@ -121,7 +121,7 @@ def update_mood_type(mood_type_id: str, request: UpdateMoodTypeRequest) -> Optio
 
     explicitly_set = request.model_fields_set
     update_data = {}
-    for field in ['name', 'icon', 'color', 'score', 'is_dark', 'sort_order']:
+    for field in ["name", "icon", "color", "score", "is_dark", "sort_order"]:
         if field in explicitly_set:
             update_data[field] = getattr(request, field)
 
@@ -160,7 +160,10 @@ def delete_mood_type(mood_type_id: str) -> bool:
 
 # ==================== 心情记录 ====================
 
-def get_mood_entries(start_date: Optional[str] = None, end_date: Optional[str] = None) -> MoodEntryListResponse:
+
+def get_mood_entries(
+    start_date: str | None = None, end_date: str | None = None
+) -> MoodEntryListResponse:
     """
     获取心情记录列表
 
@@ -172,12 +175,10 @@ def get_mood_entries(start_date: Optional[str] = None, end_date: Optional[str] =
         MoodEntryListResponse: 心情记录列表
     """
     items = mood_repository.get_mood_entries(start_date, end_date)
-    return MoodEntryListResponse(
-        items=[_convert_to_mood_entry_item(item) for item in items]
-    )
+    return MoodEntryListResponse(items=[_convert_to_mood_entry_item(item) for item in items])
 
 
-def get_mood_entry(entry_id: str) -> Optional[MoodEntryItem]:
+def get_mood_entry(entry_id: str) -> MoodEntryItem | None:
     """
     获取单条心情记录
 
@@ -193,7 +194,7 @@ def get_mood_entry(entry_id: str) -> Optional[MoodEntryItem]:
     return _convert_to_mood_entry_item(item)
 
 
-def create_mood_entry(request: CreateMoodEntryRequest) -> Optional[MoodEntryItem]:
+def create_mood_entry(request: CreateMoodEntryRequest) -> MoodEntryItem | None:
     """
     创建心情记录（自动从 mood_type 获取 score）
 
@@ -208,10 +209,10 @@ def create_mood_entry(request: CreateMoodEntryRequest) -> Optional[MoodEntryItem
         raise ValueError(f"无效的心情类型 ID: {request.mood_type_id}")
 
     data = {
-        'mood_type_id': request.mood_type_id,
-        'score': mood_type['score'],
-        'content': request.content,
-        'factors': json.dumps(request.factors, ensure_ascii=False) if request.factors else None,
+        "mood_type_id": request.mood_type_id,
+        "score": mood_type["score"],
+        "content": request.content,
+        "factors": json.dumps(request.factors, ensure_ascii=False) if request.factors else None,
     }
     new_id = mood_repository.create_mood_entry(data)
     if not new_id:
@@ -220,7 +221,7 @@ def create_mood_entry(request: CreateMoodEntryRequest) -> Optional[MoodEntryItem
     return _convert_to_mood_entry_item(item) if item else None
 
 
-def update_mood_entry(entry_id: str, request: UpdateMoodEntryRequest) -> Optional[MoodEntryItem]:
+def update_mood_entry(entry_id: str, request: UpdateMoodEntryRequest) -> MoodEntryItem | None:
     """
     更新心情记录（部分更新，如果更新了 mood_type_id 则重新获取 score）
 
@@ -238,18 +239,20 @@ def update_mood_entry(entry_id: str, request: UpdateMoodEntryRequest) -> Optiona
     explicitly_set = request.model_fields_set
     update_data = {}
 
-    if 'mood_type_id' in explicitly_set and request.mood_type_id is not None:
+    if "mood_type_id" in explicitly_set and request.mood_type_id is not None:
         mood_type = mood_repository.get_mood_type_by_id(request.mood_type_id)
         if not mood_type:
             raise ValueError(f"无效的心情类型 ID: {request.mood_type_id}")
-        update_data['mood_type_id'] = request.mood_type_id
-        update_data['score'] = mood_type['score']
+        update_data["mood_type_id"] = request.mood_type_id
+        update_data["score"] = mood_type["score"]
 
-    if 'content' in explicitly_set:
-        update_data['content'] = request.content
+    if "content" in explicitly_set:
+        update_data["content"] = request.content
 
-    if 'factors' in explicitly_set:
-        update_data['factors'] = json.dumps(request.factors, ensure_ascii=False) if request.factors else None
+    if "factors" in explicitly_set:
+        update_data["factors"] = (
+            json.dumps(request.factors, ensure_ascii=False) if request.factors else None
+        )
 
     if update_data:
         mood_repository.update_mood_entry(entry_id, update_data)
@@ -273,15 +276,14 @@ def delete_mood_entry(entry_id: str) -> bool:
 
 # ==================== 影响因素 ====================
 
+
 def get_mood_impacts() -> MoodImpactListResponse:
     """获取所有影响因素"""
     items = mood_repository.get_mood_impacts()
-    return MoodImpactListResponse(
-        items=[_convert_to_mood_impact_item(item) for item in items]
-    )
+    return MoodImpactListResponse(items=[_convert_to_mood_impact_item(item) for item in items])
 
 
-def create_mood_impact(request: CreateMoodImpactRequest) -> Optional[MoodImpactItem]:
+def create_mood_impact(request: CreateMoodImpactRequest) -> MoodImpactItem | None:
     """
     创建影响因素
 
@@ -295,7 +297,7 @@ def create_mood_impact(request: CreateMoodImpactRequest) -> Optional[MoodImpactI
         ValueError: 名称已存在
     """
     existing = mood_repository.get_mood_impacts()
-    if any(item['name'] == request.name for item in existing):
+    if any(item["name"] == request.name for item in existing):
         raise ValueError(f"影响因素名称已存在: {request.name}")
 
     data = request.model_dump()
@@ -305,7 +307,7 @@ def create_mood_impact(request: CreateMoodImpactRequest) -> Optional[MoodImpactI
     # 查询刚创建的记录
     items = mood_repository.get_mood_impacts()
     for item in items:
-        if item['id'] == new_id:
+        if item["id"] == new_id:
             return _convert_to_mood_impact_item(item)
     return None
 

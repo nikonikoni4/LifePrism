@@ -2,14 +2,15 @@
 Todo 数据提供者（重构版）
 提供 todo_list 表的数据库操作（支持多层级 parent_id 关系）
 """
-from typing import Optional, List, Dict, Any, Tuple, Set
-import uuid
+
 import sqlite3
+import uuid
+from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
-from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
+from lifeprism.utils.exceptions import ConflictError, DataAccessError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -35,27 +36,68 @@ class TodoProvider(LWBaseDataProvider):
     _ON_CONFLICT = "abort"  # todo 不应该有重复 ID，冲突时应该报错
 
     # 白名单字段集合（用于防止 SQL 注入）
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'content', 'state', 'link_to_goal_id', 'date',
-        'expected_finished_at', 'actual_finished_at', 'cross_day',
-        'folder_id', 'parent_id', 'plan_doc_id', 'waid_order',
-        'created_at', 'updated_at'
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "content",
+        "state",
+        "link_to_goal_id",
+        "date",
+        "expected_finished_at",
+        "actual_finished_at",
+        "cross_day",
+        "folder_id",
+        "parent_id",
+        "plan_doc_id",
+        "waid_order",
+        "created_at",
+        "updated_at",
     }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'order_index', 'pool_order_index', 'created_at', 'waid_order','date'
+    _ORDER_FIELDS: set[str] = {
+        "id",
+        "order_index",
+        "pool_order_index",
+        "created_at",
+        "waid_order",
+        "date",
     }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'order_index', 'pool_order_index', 'content', 'color', 'state',
-        'link_to_goal_id', 'date', 'expected_finished_at', 'actual_finished_at',
-        'cross_day', 'folder_id', 'parent_id', 'plan_doc_id',
-        'delay_days', 'delay_reason', 'waid_order', 'created_at', 'updated_at'
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "order_index",
+        "pool_order_index",
+        "content",
+        "color",
+        "state",
+        "link_to_goal_id",
+        "date",
+        "expected_finished_at",
+        "actual_finished_at",
+        "cross_day",
+        "folder_id",
+        "parent_id",
+        "plan_doc_id",
+        "delay_days",
+        "delay_reason",
+        "waid_order",
+        "created_at",
+        "updated_at",
     }
-    _UPDATE_FIELDS: Set[str] = {
-        'content', 'color', 'state', 'link_to_goal_id',
-        'date', 'expected_finished_at', 'actual_finished_at',
-        'cross_day', 'pool_order_index', 'folder_id', 'order_index',
-        'parent_id', 'plan_doc_id',
-        'delay_days', 'delay_reason', 'waid_order'
+    _UPDATE_FIELDS: set[str] = {
+        "content",
+        "color",
+        "state",
+        "link_to_goal_id",
+        "date",
+        "expected_finished_at",
+        "actual_finished_at",
+        "cross_day",
+        "pool_order_index",
+        "folder_id",
+        "order_index",
+        "parent_id",
+        "plan_doc_id",
+        "delay_days",
+        "delay_reason",
+        "waid_order",
     }
 
     def __init__(self, db_manager=None):
@@ -63,10 +105,7 @@ class TodoProvider(LWBaseDataProvider):
 
     # ==================== 核心方法（使用通用方法） ====================
 
-    def query_todos(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    def query_todos(self, options: QueryOptions | None = None) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口（使用基类方法）
 
@@ -91,11 +130,7 @@ class TodoProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_todos_by_date(
-        self,
-        date: str,
-        include_cross_day: bool = True
-    ) -> List[Dict[str, Any]]:
+    def get_todos_by_date(self, date: str, include_cross_day: bool = True) -> list[dict[str, Any]]:
         """
         获取指定日期的任务列表
 
@@ -134,16 +169,15 @@ class TodoProvider(LWBaseDataProvider):
                 columns = [description[0] for description in cursor.description]
                 rows = cursor.fetchall()
 
-                return [dict(zip(columns, row)) for row in rows]
+                return [dict(zip(columns, row, strict=False)) for row in rows]
 
         except sqlite3.Error as e:
             logger.error("获取任务列表失败 (date=%s): %s", date, e)
             raise DataAccessError(
-                message=f"获取任务列表失败",
-                details={"date": date, "error": str(e)}
+                message="获取任务列表失败", details={"date": date, "error": str(e)}
             ) from e
 
-    def get_todo_by_id(self, todo_id: str) -> Optional[Dict[str, Any]]:
+    def get_todo_by_id(self, todo_id: str) -> dict[str, Any] | None:
         """
         按 ID 获取单个任务
 
@@ -153,14 +187,11 @@ class TodoProvider(LWBaseDataProvider):
         Returns:
             Optional[Dict]: 任务数据，不存在返回 None
         """
-        options = QueryOptions(
-            filters={self._PRIMARY_KEY: todo_id},
-            order_by='id'
-        )
+        options = QueryOptions(filters={self._PRIMARY_KEY: todo_id}, order_by="id")
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_todo(self, data: Dict[str, Any]) -> str:
+    def create_todo(self, data: dict[str, Any]) -> str:
         """
         创建新任务
 
@@ -179,19 +210,32 @@ class TodoProvider(LWBaseDataProvider):
         """
         try:
             # 验证必填字段
-            if 'order_index' not in data:
+            if "order_index" not in data:
                 raise ValidationError("order_index is required")
 
             # 生成 ID（如果未提供）
-            if 'id' not in data:
-                data['id'] = generate_todo_id()
+            if "id" not in data:
+                data["id"] = generate_todo_id()
 
             # 白名单验证
             allowed_fields = {
-                'id', 'order_index', 'pool_order_index', 'content', 'color', 'state',
-                'link_to_goal_id', 'date', 'expected_finished_at', 'actual_finished_at',
-                'cross_day', 'folder_id', 'parent_id', 'plan_doc_id',
-                'delay_days', 'delay_reason', 'waid_order'
+                "id",
+                "order_index",
+                "pool_order_index",
+                "content",
+                "color",
+                "state",
+                "link_to_goal_id",
+                "date",
+                "expected_finished_at",
+                "actual_finished_at",
+                "cross_day",
+                "folder_id",
+                "parent_id",
+                "plan_doc_id",
+                "delay_days",
+                "delay_reason",
+                "waid_order",
             }
             invalid_fields = set(data.keys()) - allowed_fields
             if invalid_fields:
@@ -206,12 +250,9 @@ class TodoProvider(LWBaseDataProvider):
             raise
         except sqlite3.Error as e:
             logger.error("创建任务失败: %s", e)
-            raise DataAccessError(
-                message=f"创建任务失败",
-                details={"error": str(e)}
-            ) from e
+            raise DataAccessError(message="创建任务失败", details={"error": str(e)}) from e
 
-    def update_todo(self, todo_id: str, data: Dict[str, Any]) -> bool:
+    def update_todo(self, todo_id: str, data: dict[str, Any]) -> bool:
         """
         更新任务
 
@@ -244,7 +285,7 @@ class TodoProvider(LWBaseDataProvider):
                 for key, value in data.items():
                     set_clauses.append(f"{key} = ?")
                     # 处理布尔值
-                    if key == 'cross_day':
+                    if key == "cross_day":
                         values.append(1 if value else 0)
                     else:
                         values.append(value)
@@ -267,8 +308,7 @@ class TodoProvider(LWBaseDataProvider):
         except sqlite3.Error as e:
             logger.error("更新任务 %s 失败: %s", todo_id, e)
             raise DataAccessError(
-                message=f"更新任务失败",
-                details={"todo_id": todo_id, "error": str(e)}
+                message="更新任务失败", details={"todo_id": todo_id, "error": str(e)}
             ) from e
 
     def delete_todo(self, todo_id: str) -> bool:
@@ -292,8 +332,7 @@ class TodoProvider(LWBaseDataProvider):
         except sqlite3.Error as e:
             logger.error("删除任务 %s 失败: %s", todo_id, e)
             raise DataAccessError(
-                message=f"删除任务失败",
-                details={"todo_id": todo_id, "error": str(e)}
+                message="删除任务失败", details={"todo_id": todo_id, "error": str(e)}
             ) from e
 
     def delete_todo_cascade(self, todo_id: str) -> int:
@@ -314,11 +353,8 @@ class TodoProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
 
                 # 递归获取所有子任务 ID
-                def get_all_descendant_ids(parent_id: str) -> List[str]:
-                    cursor.execute(
-                        "SELECT id FROM todo_list WHERE parent_id = ?",
-                        (parent_id,)
-                    )
+                def get_all_descendant_ids(parent_id: str) -> list[str]:
+                    cursor.execute("SELECT id FROM todo_list WHERE parent_id = ?", (parent_id,))
                     child_ids = [row[0] for row in cursor.fetchall()]
                     all_ids = list(child_ids)
                     for child_id in child_ids:
@@ -342,11 +378,10 @@ class TodoProvider(LWBaseDataProvider):
         except sqlite3.Error as e:
             logger.error("级联删除任务 %s 失败: %s", todo_id, e)
             raise DataAccessError(
-                message=f"级联删除任务失败",
-                details={"todo_id": todo_id, "error": str(e)}
+                message="级联删除任务失败", details={"todo_id": todo_id, "error": str(e)}
             ) from e
 
-    def get_child_todos(self, parent_id: str) -> List[Dict[str, Any]]:
+    def get_child_todos(self, parent_id: str) -> list[dict[str, Any]]:
         """
         获取直接子任务列表
 
@@ -361,20 +396,17 @@ class TodoProvider(LWBaseDataProvider):
         """
         try:
             options = QueryOptions(
-                filters={'parent_id': parent_id},
-                order_by='pool_order_index',
-                order_desc=False
+                filters={"parent_id": parent_id}, order_by="pool_order_index", order_desc=False
             )
             results, _ = self._generic_query(options)
             return results
         except sqlite3.Error as e:
             logger.error("获取子任务列表失败 (parent_id=%s): %s", parent_id, e)
             raise DataAccessError(
-                message=f"获取子任务列表失败",
-                details={"parent_id": parent_id, "error": str(e)}
+                message="获取子任务列表失败", details={"parent_id": parent_id, "error": str(e)}
             ) from e
 
-    def batch_delete_todos(self, todo_ids: List[str]) -> int:
+    def batch_delete_todos(self, todo_ids: list[str]) -> int:
         """
         批量删除任务（不级联删除子任务）
 
@@ -406,11 +438,10 @@ class TodoProvider(LWBaseDataProvider):
         except sqlite3.Error as e:
             logger.error("批量删除任务失败: %s", e)
             raise DataAccessError(
-                message=f"批量删除任务失败",
-                details={"count": len(todo_ids), "error": str(e)}
+                message="批量删除任务失败", details={"count": len(todo_ids), "error": str(e)}
             ) from e
 
-    def reorder_todos(self, todo_ids: List[str]) -> bool:
+    def reorder_todos(self, todo_ids: list[str]) -> bool:
         """
         批量更新任务排序
 
@@ -429,8 +460,7 @@ class TodoProvider(LWBaseDataProvider):
 
                 for index, todo_id in enumerate(todo_ids):
                     cursor.execute(
-                        "UPDATE todo_list SET order_index = ? WHERE id = ?",
-                        (index, todo_id)
+                        "UPDATE todo_list SET order_index = ? WHERE id = ?", (index, todo_id)
                     )
 
                 logger.info("重排序 %s 个任务成功", len(todo_ids))
@@ -439,13 +469,12 @@ class TodoProvider(LWBaseDataProvider):
         except sqlite3.Error as e:
             logger.error("重排序任务失败: %s", e)
             raise DataAccessError(
-                message=f"重排序任务失败",
-                details={"count": len(todo_ids), "error": str(e)}
+                message="重排序任务失败", details={"count": len(todo_ids), "error": str(e)}
             ) from e
 
     # ==================== Task Pool 操作 ====================
 
-    def get_todos_by_state(self, state: str) -> List[Dict[str, Any]]:
+    def get_todos_by_state(self, state: str) -> list[dict[str, Any]]:
         """
         根据状态获取任务列表
 
@@ -460,17 +489,13 @@ class TodoProvider(LWBaseDataProvider):
         """
         try:
             # 对于 inactive 状态（任务池），按 pool_order_index 排序
-            if state == 'inactive':
+            if state == "inactive":
                 options = QueryOptions(
-                    filters={'state': state},
-                    order_by='pool_order_index',
-                    order_desc=False
+                    filters={"state": state}, order_by="pool_order_index", order_desc=False
                 )
             else:
                 options = QueryOptions(
-                    filters={'state': state},
-                    order_by='order_index',
-                    order_desc=False
+                    filters={"state": state}, order_by="order_index", order_desc=False
                 )
 
             results, _ = self._generic_query(options)
@@ -479,11 +504,10 @@ class TodoProvider(LWBaseDataProvider):
         except sqlite3.Error as e:
             logger.error("获取任务列表失败 (state=%s): %s", state, e)
             raise DataAccessError(
-                message=f"获取任务列表失败",
-                details={"state": state, "error": str(e)}
+                message="获取任务列表失败", details={"state": state, "error": str(e)}
             ) from e
 
-    def reorder_pool_todos(self, todo_ids: List[str]) -> bool:
+    def reorder_pool_todos(self, todo_ids: list[str]) -> bool:
         """
         批量更新任务池排序 (pool_order_index)
 
@@ -502,8 +526,7 @@ class TodoProvider(LWBaseDataProvider):
 
                 for index, todo_id in enumerate(todo_ids):
                     cursor.execute(
-                        "UPDATE todo_list SET pool_order_index = ? WHERE id = ?",
-                        (index, todo_id)
+                        "UPDATE todo_list SET pool_order_index = ? WHERE id = ?", (index, todo_id)
                     )
 
                 logger.info("重排序任务池 %s 个任务成功", len(todo_ids))
@@ -512,11 +535,10 @@ class TodoProvider(LWBaseDataProvider):
         except sqlite3.Error as e:
             logger.error("重排序任务池失败: %s", e)
             raise DataAccessError(
-                message=f"重排序任务池失败",
-                details={"count": len(todo_ids), "error": str(e)}
+                message="重排序任务池失败", details={"count": len(todo_ids), "error": str(e)}
             ) from e
 
-    def move_todo_to_folder(self, todo_id: str, folder_id: Optional[int]) -> bool:
+    def move_todo_to_folder(self, todo_id: str, folder_id: int | None) -> bool:
         """
         移动任务到指定文件夹
 
@@ -531,23 +553,22 @@ class TodoProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            return self._generic_update(todo_id, {'folder_id': folder_id})
+            return self._generic_update(todo_id, {"folder_id": folder_id})
         except sqlite3.Error as e:
             logger.error("移动任务失败 (todo_id=%s): %s", todo_id, e)
             raise DataAccessError(
-                message=f"移动任务失败",
-                details={"todo_id": todo_id, "folder_id": folder_id, "error": str(e)}
+                message="移动任务失败",
+                details={"todo_id": todo_id, "folder_id": folder_id, "error": str(e)},
             ) from e
-
 
     # ==================== 任务池查询 ====================
 
     def get_todos_for_taskpool(
         self,
-        goal_id: Optional[str] = None,
-        plan_doc_id: Optional[str] = None,
-        state: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        goal_id: str | None = None,
+        plan_doc_id: str | None = None,
+        state: str | None = None,
+    ) -> list[dict[str, Any]]:
         """
         获取任务池任务（支持筛选）
 
@@ -565,19 +586,17 @@ class TodoProvider(LWBaseDataProvider):
         try:
             filters = {}
 
-            if state and state != 'all':
-                filters['state'] = state
+            if state and state != "all":
+                filters["state"] = state
 
             if goal_id:
-                filters['link_to_goal_id'] = goal_id
+                filters["link_to_goal_id"] = goal_id
 
             if plan_doc_id:
-                filters['plan_doc_id'] = plan_doc_id
+                filters["plan_doc_id"] = plan_doc_id
 
             options = QueryOptions(
-                filters=filters if filters else None,
-                order_by='pool_order_index',
-                order_desc=False
+                filters=filters if filters else None, order_by="pool_order_index", order_desc=False
             )
 
             results, _ = self._generic_query(options)
@@ -586,11 +605,16 @@ class TodoProvider(LWBaseDataProvider):
         except sqlite3.Error as e:
             logger.error("获取任务池任务失败: %s", e)
             raise DataAccessError(
-                message=f"获取任务池任务失败",
-                details={"goal_id": goal_id, "plan_doc_id": plan_doc_id, "state": state, "error": str(e)}
+                message="获取任务池任务失败",
+                details={
+                    "goal_id": goal_id,
+                    "plan_doc_id": plan_doc_id,
+                    "state": state,
+                    "error": str(e),
+                },
             ) from e
 
-    def get_todos_by_plan_doc(self, plan_doc_id: str) -> List[Dict[str, Any]]:
+    def get_todos_by_plan_doc(self, plan_doc_id: str) -> list[dict[str, Any]]:
         """
         获取指定计划书关联的所有任务
 
@@ -605,20 +629,17 @@ class TodoProvider(LWBaseDataProvider):
         """
         try:
             options = QueryOptions(
-                filters={'plan_doc_id': plan_doc_id},
-                order_by='pool_order_index',
-                order_desc=False
+                filters={"plan_doc_id": plan_doc_id}, order_by="pool_order_index", order_desc=False
             )
             results, _ = self._generic_query(options)
             return results
         except sqlite3.Error as e:
             logger.error("获取计划书任务失败 (plan_doc=%s): %s", plan_doc_id, e)
             raise DataAccessError(
-                message=f"获取计划书任务失败",
-                details={"plan_doc_id": plan_doc_id, "error": str(e)}
+                message="获取计划书任务失败", details={"plan_doc_id": plan_doc_id, "error": str(e)}
             ) from e
 
-    def batch_create_todos(self, todos: List[Dict[str, Any]]) -> List[str]:
+    def batch_create_todos(self, todos: list[dict[str, Any]]) -> list[str]:
         """
         批量创建任务
 
@@ -638,38 +659,47 @@ class TodoProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
 
                 for data in todos:
-                    todo_id = data.get('id') or generate_todo_id()
+                    todo_id = data.get("id") or generate_todo_id()
                     columns = [
-                        'id', 'order_index', 'pool_order_index', 'content', 'color', 'state',
-                        'link_to_goal_id', 'date', 'expected_finished_at',
-                        'actual_finished_at', 'cross_day',
-                        'parent_id', 'plan_doc_id',
-                        'delay_days', 'delay_reason'
+                        "id",
+                        "order_index",
+                        "pool_order_index",
+                        "content",
+                        "color",
+                        "state",
+                        "link_to_goal_id",
+                        "date",
+                        "expected_finished_at",
+                        "actual_finished_at",
+                        "cross_day",
+                        "parent_id",
+                        "plan_doc_id",
+                        "delay_days",
+                        "delay_reason",
                     ]
                     values = [
                         todo_id,
-                        data.get('order_index', 0),
-                        data.get('pool_order_index', 0),
-                        data.get('content'),
-                        data.get('color', '#FFFFFF'),
-                        data.get('state', 'pool'),
-                        data.get('link_to_goal_id'),
-                        data.get('date'),
-                        data.get('expected_finished_at'),
-                        data.get('actual_finished_at'),
-                        1 if data.get('cross_day') else 0,
-                        data.get('parent_id'),
-                        data.get('plan_doc_id'),
-                        data.get('delay_days'),
-                        data.get('delay_reason')
+                        data.get("order_index", 0),
+                        data.get("pool_order_index", 0),
+                        data.get("content"),
+                        data.get("color", "#FFFFFF"),
+                        data.get("state", "pool"),
+                        data.get("link_to_goal_id"),
+                        data.get("date"),
+                        data.get("expected_finished_at"),
+                        data.get("actual_finished_at"),
+                        1 if data.get("cross_day") else 0,
+                        data.get("parent_id"),
+                        data.get("plan_doc_id"),
+                        data.get("delay_days"),
+                        data.get("delay_reason"),
                     ]
 
-                    placeholders = ', '.join(['?' for _ in columns])
-                    columns_str = ', '.join(columns)
+                    placeholders = ", ".join(["?" for _ in columns])
+                    columns_str = ", ".join(columns)
 
                     cursor.execute(
-                        f"INSERT INTO todo_list ({columns_str}) VALUES ({placeholders})",
-                        values
+                        f"INSERT INTO todo_list ({columns_str}) VALUES ({placeholders})", values
                     )
                     new_ids.append(todo_id)
 
@@ -678,16 +708,16 @@ class TodoProvider(LWBaseDataProvider):
 
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"任务已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
+                raise ConflictError("任务已存在") from e
+            raise DataAccessError("数据完整性错误") from e
         except sqlite3.Error as e:
             logger.error("批量创建任务失败: %s", e)
             raise DataAccessError(
-                message=f"批量创建任务失败",
-                details={"count": len(todos), "created": len(new_ids), "error": str(e)}
+                message="批量创建任务失败",
+                details={"count": len(todos), "created": len(new_ids), "error": str(e)},
             ) from e
 
-    def batch_update_todos(self, updates: List[Dict[str, Any]]) -> int:
+    def batch_update_todos(self, updates: list[dict[str, Any]]) -> int:
         """
         批量更新任务
 
@@ -707,7 +737,7 @@ class TodoProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
 
                 for data in updates:
-                    todo_id = data.get('id')
+                    todo_id = data.get("id")
                     if not todo_id:
                         continue
 
@@ -716,7 +746,7 @@ class TodoProvider(LWBaseDataProvider):
                     for key, value in data.items():
                         if key in self._UPDATE_FIELDS:
                             set_clauses.append(f"{key} = ?")
-                            if key == 'cross_day':
+                            if key == "cross_day":
                                 values.append(1 if value else 0)
                             else:
                                 values.append(value)
@@ -737,13 +767,13 @@ class TodoProvider(LWBaseDataProvider):
         except sqlite3.Error as e:
             logger.error("批量更新任务失败: %s", e)
             raise DataAccessError(
-                message=f"批量更新任务失败",
-                details={"count": len(updates), "updated": updated_count, "error": str(e)}
+                message="批量更新任务失败",
+                details={"count": len(updates), "updated": updated_count, "error": str(e)},
             ) from e
 
     # ==================== WAID 浮窗操作 ====================
 
-    def get_waid_todos(self) -> List[Dict[str, Any]]:
+    def get_waid_todos(self) -> list[dict[str, Any]]:
         """
         获取所有 waid_order IS NOT NULL 的 todo，按 waid_order ASC 排序
 
@@ -763,15 +793,14 @@ class TodoProvider(LWBaseDataProvider):
                 if not rows:
                     return []
                 columns = [desc[0] for desc in cursor.description]
-                return [dict(zip(columns, row)) for row in rows]
+                return [dict(zip(columns, row, strict=False)) for row in rows]
         except sqlite3.Error as e:
             logger.error("获取 WAID todo 列表失败: %s", e)
             raise DataAccessError(
-                message=f"获取 WAID todo 列表失败",
-                details={"error": str(e)}
+                message="获取 WAID todo 列表失败", details={"error": str(e)}
             ) from e
 
-    def batch_update_waid_order(self, todo_ids: List[str]) -> bool:
+    def batch_update_waid_order(self, todo_ids: list[str]) -> bool:
         """
         批量设置 waid_order，按数组索引顺序赋值 0,1,2...
 
@@ -788,17 +817,13 @@ class TodoProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 for idx, tid in enumerate(todo_ids):
-                    cursor.execute(
-                        "UPDATE todo_list SET waid_order = ? WHERE id = ?",
-                        (idx, tid)
-                    )
+                    cursor.execute("UPDATE todo_list SET waid_order = ? WHERE id = ?", (idx, tid))
                 logger.info("批量更新 WAID 排序成功，共 %s 个", len(todo_ids))
                 return True
         except sqlite3.Error as e:
             logger.error("批量更新 WAID 排序失败: %s", e)
             raise DataAccessError(
-                message=f"批量更新 WAID 排序失败",
-                details={"count": len(todo_ids), "error": str(e)}
+                message="批量更新 WAID 排序失败", details={"count": len(todo_ids), "error": str(e)}
             ) from e
 
     def clear_waid_order(self, todo_id: str) -> bool:
@@ -815,10 +840,9 @@ class TodoProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            return self._generic_update(todo_id, {'waid_order': None})
+            return self._generic_update(todo_id, {"waid_order": None})
         except sqlite3.Error as e:
             logger.error("清除 WAID 排序失败 (todo_id=%s): %s", todo_id, e)
             raise DataAccessError(
-                message=f"清除 WAID 排序失败",
-                details={"todo_id": todo_id, "error": str(e)}
+                message="清除 WAID 排序失败", details={"todo_id": todo_id, "error": str(e)}
             ) from e

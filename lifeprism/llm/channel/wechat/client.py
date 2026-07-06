@@ -4,8 +4,9 @@
 
 import base64
 import os
+
 import httpx
-from typing import Any
+
 from lifeprism.utils.logger import get_logger
 
 logger = get_logger(__name__)

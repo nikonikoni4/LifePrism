@@ -6,6 +6,7 @@ v2 → v3：在 settings.yaml 中追加 is_vlm 和 screenshot_monitor 字段。
 - screenshot_monitor: bool，截图监控开关，默认为 False
 已存在该字段的文件视为已应用，跳过修改。
 """
+
 VERSION = 3
 NAME = "s003_add_vlm_fields"
 

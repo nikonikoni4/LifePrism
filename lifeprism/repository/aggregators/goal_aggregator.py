@@ -4,15 +4,16 @@ Goal Aggregator - 目标数据聚合层
 聚合 GoalProvider, GoalStatsProvider
 提供目标相关的统一数据视图
 """
-from typing import Optional, List, Dict, Any
-from datetime import datetime
+
+from typing import Any
+
 from lifeprism.repository import QueryOptions
+from lifeprism.repository.exceptions import EntityNotFoundError
 from lifeprism.repository.providers.goal_providers import (
     GoalProvider,
     GoalStatsProvider,
 )
-from lifeprism.utils import get_logger
-from lifeprism.repository.exceptions import EntityNotFoundError
+from lifeprism.utils import LazySingleton, get_logger
 
 logger = get_logger(__name__)
 
@@ -32,9 +33,7 @@ class GoalAggregator:
 
     # ==================== 聚合方法（核心价值）====================
 
-    def get_goal_with_stats(
-        self, goal_id: str, stats_limit: int = 30
-    ) -> Optional[Dict[str, Any]]:
+    def get_goal_with_stats(self, goal_id: str, stats_limit: int = 30) -> dict[str, Any] | None:
         """
         获取目标详情（包含统计数据）
 
@@ -51,13 +50,11 @@ class GoalAggregator:
 
         # 获取统计数据
         stats = self.stats_provider.get_stats_by_goal(goal_id, limit=stats_limit)
-        goal['stats'] = stats
+        goal["stats"] = stats
 
         return goal
 
-    def get_goals_with_latest_stats(
-        self, status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def get_goals_with_latest_stats(self, status: str | None = None) -> list[dict[str, Any]]:
         """
         获取目标列表（每个包含最新统计）
 
@@ -72,18 +69,18 @@ class GoalAggregator:
 
         # 为每个目标获取最新的统计数据
         for goal in goals:
-            stats = self.stats_provider.get_stats_by_goal(goal['id'], limit=1)
-            goal['latest_stat'] = stats[0] if stats else None
+            stats = self.stats_provider.get_stats_by_goal(goal["id"], limit=1)
+            goal["latest_stat"] = stats[0] if stats else None
 
         return goals
 
     # ==================== Goal 核心 CRUD 透传 ====================
 
-    def create_goal(self, data: Dict[str, Any]) -> Optional[str]:
+    def create_goal(self, data: dict[str, Any]) -> str | None:
         """透传：创建目标"""
         return self.goal_provider.create_goal(data)
 
-    def update_goal(self, goal_id: str, data: Dict[str, Any]) -> bool:
+    def update_goal(self, goal_id: str, data: dict[str, Any]) -> bool:
         """透传：更新目标"""
         return self.goal_provider.update_goal(goal_id, data)
 
@@ -91,31 +88,39 @@ class GoalAggregator:
         """透传：删除目标"""
         return self.goal_provider.delete_goal(goal_id)
 
-    def get_goals(self, status: Optional[str] = None, category_id: Optional[str] = None, page: int = 1, page_size: int = 20):
+    def get_goals(
+        self,
+        status: str | None = None,
+        category_id: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ):
         """透传：获取目标列表"""
-        return self.goal_provider.get_goals(status=status, category_id=category_id, page=page, page_size=page_size)
+        return self.goal_provider.get_goals(
+            status=status, category_id=category_id, page=page, page_size=page_size
+        )
 
-    def query_goals(self, options : QueryOptions):
+    def query_goals(self, options: QueryOptions):
         """透传：通用目标查询"""
         return self.goal_provider.query_goals(options)
 
-    def get_goal_by_id(self, goal_id: str) -> Optional[Dict[str, Any]]:
+    def get_goal_by_id(self, goal_id: str) -> dict[str, Any] | None:
         """透传：根据ID获取目标"""
         return self.goal_provider.get_goal_by_id(goal_id)
 
-    def reorder_goals(self, goal_ids: List[str]) -> bool:
+    def reorder_goals(self, goal_ids: list[str]) -> bool:
         """透传：重排序目标"""
         return self.goal_provider.reorder_goals(goal_ids)
 
-    def get_active_goals(self) -> List[Dict[str, Any]]:
+    def get_active_goals(self) -> list[dict[str, Any]]:
         """透传：获取所有活跃目标"""
         return self.goal_provider.get_active_goals()
 
-    def get_active_goals_with_category(self) -> List[Dict[str, Any]]:
+    def get_active_goals_with_category(self) -> list[dict[str, Any]]:
         """透传：获取绑定了分类的活跃目标"""
         return self.goal_provider.get_active_goals_with_category()
 
-    def get_active_goals_for_classify(self) -> List[Dict[str, Any]]:
+    def get_active_goals_for_classify(self) -> list[dict[str, Any]]:
         """透传：获取用于分类的活跃目标"""
         return self.goal_provider.get_active_goals_for_classify()
 
@@ -127,17 +132,17 @@ class GoalAggregator:
         """透传：更新目标的投入时间"""
         return self.goal_provider.update_time_invested(goal_id, time_invested)
 
-    def get_goals_linked_to_category(self, category_id: str) -> List[Dict[str, Any]]:
+    def get_goals_linked_to_category(self, category_id: str) -> list[dict[str, Any]]:
         """透传：获取关联到指定分类的目标"""
         return self.goal_provider.get_goals_linked_to_category(category_id)
 
     # ==================== GoalStats 核心 CRUD 透传 ====================
 
-    def create_goal_stat(self, data: Dict[str, Any]) -> bool:
+    def create_goal_stat(self, data: dict[str, Any]) -> bool:
         """透传：创建目标统计"""
         return self.stats_provider.create_goal_stat(data)
 
-    def update_goal_stat(self, stat_id: str, data: Dict[str, Any]) -> bool:
+    def update_goal_stat(self, stat_id: str, data: dict[str, Any]) -> bool:
         """透传：更新目标统计"""
         return self.stats_provider.update_goal_stat(stat_id, data)
 
@@ -145,30 +150,36 @@ class GoalAggregator:
         """透传：删除目标统计"""
         return self.stats_provider.delete_goal_stat(stat_id)
 
-    def get_stats_by_goal(self, goal_id: str, limit: int = 30) -> List[Dict[str, Any]]:
+    def get_stats_by_goal(self, goal_id: str, limit: int = 30) -> list[dict[str, Any]]:
         """透传：获取目标的统计数据"""
         return self.stats_provider.get_stats_by_goal(goal_id, limit=limit)
 
-    def get_cumulative_stats(self, goal_id: str, date: str) -> Optional[Dict[str, Any]]:
+    def get_cumulative_stats(self, goal_id: str, date: str) -> dict[str, Any] | None:
         """透传：获取累计统计"""
         return self.stats_provider.get_cumulative_stats(goal_id, date)
 
-    def sync_stats_to_date(self, goal_id: str, target_date: str, start_date: Optional[str] = None) -> bool:
+    def sync_stats_to_date(
+        self, goal_id: str, target_date: str, start_date: str | None = None
+    ) -> bool:
         """透传：同步统计数据到指定日期"""
-        return self.stats_provider.sync_stats_to_date(goal_id=goal_id, target_date=target_date, start_date=start_date)
+        return self.stats_provider.sync_stats_to_date(
+            goal_id=goal_id, target_date=target_date, start_date=start_date
+        )
 
-    def get_stat_by_date(self, goal_id: str, date: str) -> Optional[Dict[str, Any]]:
+    def get_stat_by_date(self, goal_id: str, date: str) -> dict[str, Any] | None:
         """透传：获取指定日期的目标统计"""
         return self.stats_provider.get_stat_by_date(goal_id, date)
 
-    def upsert_stat(self, goal_id: str, date: str, time_spent: int, todo_count: int) -> Dict[str, Any]:
+    def upsert_stat(
+        self, goal_id: str, date: str, time_spent: int, todo_count: int
+    ) -> dict[str, Any]:
         """透传：更新或插入目标统计"""
         return self.stats_provider.upsert_stat(goal_id, date, time_spent, todo_count)
 
     # ==================== 事务性聚合方法 ====================
 
     def sync_goal_stats(
-        self, goal_id: str, target_date: str, start_date: Optional[str] = None
+        self, goal_id: str, target_date: str, start_date: str | None = None
     ) -> bool:
         """
         同步目标统计数据到指定日期
@@ -189,8 +200,7 @@ class GoalAggregator:
         goal = self.goal_provider.get_goal_by_id(goal_id)
         if not goal:
             logger.error(
-                "同步目标统计数据失败: goal_id=%s, target_date=%s, 目标不存在",
-                goal_id, target_date
+                "同步目标统计数据失败: goal_id=%s, target_date=%s, 目标不存在", goal_id, target_date
             )
             raise EntityNotFoundError(
                 entity_type="Goal",
@@ -200,9 +210,7 @@ class GoalAggregator:
         # 调用 stats_provider 的同步方法
         # stats_provider.sync_stats_to_date 内部已处理 sqlite3.Error 并抛出 DataAccessError
         success = self.stats_provider.sync_stats_to_date(
-            goal_id=goal_id,
-            target_date=target_date,
-            start_date=start_date
+            goal_id=goal_id, target_date=target_date, start_date=start_date
         )
 
         if success:
@@ -211,7 +219,5 @@ class GoalAggregator:
 
 
 # ==================== 导出单例 ====================
-
-from lifeprism.utils import LazySingleton
 
 goal_aggregator = LazySingleton(GoalAggregator)

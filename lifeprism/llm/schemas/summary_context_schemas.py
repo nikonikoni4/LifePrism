@@ -1,7 +1,6 @@
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 SummaryType = Literal["daily", "weekly", "monthly"]
 DayWindowMode = Literal["4_to_4"]
@@ -116,20 +115,20 @@ class CustomBlockItem(StrictBaseModel):
 
 class DiaryContext(StrictBaseModel):
     exists: bool
-    title: Optional[str] = None
-    content_excerpt: Optional[str] = None
+    title: str | None = None
+    content_excerpt: str | None = None
 
 
 class DiaryAISummaryContext(StrictBaseModel):
     exists: bool
-    summary: Optional[str] = None
+    summary: str | None = None
 
 
 class MoodEntryItem(StrictBaseModel):
     entry_id: str
     mood_type_id: str
     score: int
-    content: Optional[str] = None
+    content: str | None = None
     created_at: str
 
 

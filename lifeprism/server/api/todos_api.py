@@ -9,17 +9,21 @@ Todos API - 统一任务接口
 - PUT /todos/{id} - 更新任务
 - DELETE /todos/{id} - 删除任务
 """
-from fastapi import APIRouter, Query, HTTPException, Path
-from typing import Optional
 
+from fastapi import APIRouter, HTTPException, Path, Query
+
+from lifeprism.repository import todo_repository
 from lifeprism.server.schemas.todo_schemas import (
-    TodoItem, TodoListResponse,
-    CreateTodoRequest, CreateTodoResponse,
-    UpdateTodoRequest, UpdateTodoResponse,
-    WaidReorderRequest, WaidAddRequest,
+    CreateTodoRequest,
+    CreateTodoResponse,
+    TodoItem,
+    TodoListResponse,
+    UpdateTodoRequest,
+    UpdateTodoResponse,
+    WaidAddRequest,
+    WaidReorderRequest,
 )
 from lifeprism.server.services import taskpool_service
-from lifeprism.repository import todo_repository
 
 router = APIRouter(prefix="/todos", tags=["Todos"])
 
@@ -28,12 +32,15 @@ router = APIRouter(prefix="/todos", tags=["Todos"])
 # 任务查询接口
 # ============================================================================
 
+
 @router.get("", response_model=TodoListResponse)
 async def get_todos(
-    date: Optional[str] = Query(default=None, description="日期（YYYY-MM-DD 格式）"),
-    goal_id: Optional[str] = Query(default=None, description="按目标筛选"),
-    plan_doc_id: Optional[str] = Query(default=None, description="按计划书筛选"),
-    state: Optional[str] = Query(default=None, description="按状态筛选（pool/scheduled/completed/shelved/all）")
+    date: str | None = Query(default=None, description="日期（YYYY-MM-DD 格式）"),
+    goal_id: str | None = Query(default=None, description="按目标筛选"),
+    plan_doc_id: str | None = Query(default=None, description="按计划书筛选"),
+    state: str | None = Query(
+        default=None, description="按状态筛选（pool/scheduled/completed/shelved/all）"
+    ),
 ):
     """
     获取任务列表
@@ -58,15 +65,14 @@ async def get_todos(
     else:
         # 任务池查询
         return taskpool_service.get_taskpool(
-            goal_id=goal_id,
-            plan_doc_id=plan_doc_id,
-            state=state or "all"
+            goal_id=goal_id, plan_doc_id=plan_doc_id, state=state or "all"
         )
 
 
 # ============================================================================
 # 任务创建接口
 # ============================================================================
+
 
 @router.post("", response_model=CreateTodoResponse)
 async def create_todo(request: CreateTodoRequest):
@@ -97,6 +103,7 @@ async def create_todo(request: CreateTodoRequest):
 # WAID 浮窗接口
 # ============================================================================
 
+
 @router.get("/waid", response_model=TodoListResponse, summary="获取 WAID 浮窗 todo 列表")
 async def get_waid_todos():
     """获取浮窗中的 todo 列表（waid_order IS NOT NULL，ASC 排序）"""
@@ -116,8 +123,7 @@ async def reorder_waid(request: WaidReorderRequest):
 
 @router.put("/{todo_id}/waid", summary="添加 todo 到 WAID 浮窗")
 async def add_to_waid(
-    todo_id: str = Path(..., description="任务 ID"),
-    request: WaidAddRequest = WaidAddRequest()
+    todo_id: str = Path(..., description="任务 ID"), request: WaidAddRequest = WaidAddRequest()
 ):
     """添加 todo 到浮窗。如果未指定 waid_order，自动追加到末尾（MAX+1）"""
     todo = taskpool_service.get_todo_by_id(todo_id)
@@ -128,21 +134,19 @@ async def add_to_waid(
     if order is None:
         waid_todos = todo_repository.get_waid_todos()
         if waid_todos:
-            max_order = max(t.get('waid_order', 0) for t in waid_todos)
+            max_order = max(t.get("waid_order", 0) for t in waid_todos)
             order = max_order + 1
         else:
             order = 0
 
-    success = todo_repository.update_todo(todo_id, {'waid_order': order})
+    success = todo_repository.update_todo(todo_id, {"waid_order": order})
     if not success:
         raise HTTPException(status_code=500, detail="添加到浮窗失败")
     return {"success": True, "waid_order": order}
 
 
 @router.delete("/{todo_id}/waid", summary="从 WAID 浮窗移除")
-async def remove_from_waid(
-    todo_id: str = Path(..., description="任务 ID")
-):
+async def remove_from_waid(todo_id: str = Path(..., description="任务 ID")):
     """从浮窗移除（设 waid_order = NULL），不删除 todo 本身"""
     success = todo_repository.clear_waid_order(todo_id)
     if not success:
@@ -154,10 +158,9 @@ async def remove_from_waid(
 # 单个任务操作接口
 # ============================================================================
 
+
 @router.get("/{todo_id}", response_model=TodoItem)
-async def get_todo(
-    todo_id: str = Path(..., description="任务 ID")
-):
+async def get_todo(todo_id: str = Path(..., description="任务 ID")):
     """
     获取单个任务详情
     """
@@ -169,8 +172,7 @@ async def get_todo(
 
 @router.put("/{todo_id}", response_model=UpdateTodoResponse)
 async def update_todo(
-    todo_id: str = Path(..., description="任务 ID"),
-    request: UpdateTodoRequest = ...
+    todo_id: str = Path(..., description="任务 ID"), request: UpdateTodoRequest = ...
 ):
     """
     更新任务
@@ -195,19 +197,20 @@ async def update_todo(
     updates = request.model_dump(exclude_unset=True)
 
     # 验证：scheduled 状态必须提供 date
-    if updates.get('state') == 'scheduled':
-        # 检查是否提供了 date，或者现有任务是否已有 date
-        if not updates.get('date'):
-            existing = taskpool_service.get_todo_by_id(todo_id)
-            if not existing or not existing.date:
-                raise HTTPException(
-                    status_code=400,
-                    detail="scheduled_date is required when state is scheduled"
-                )
+    if updates.get("state") == "scheduled" and not updates.get("date"):
+        existing = taskpool_service.get_todo_by_id(todo_id)
+        if not existing or not existing.date:
+            raise HTTPException(
+                status_code=400, detail="scheduled_date is required when state is scheduled"
+            )
 
     # 如果设置了 date，自动将状态改为 scheduled
-    if 'date' in updates and updates['date'] and updates.get('state') not in ('completed', 'shelved'):
-        updates['state'] = 'scheduled'
+    if (
+        "date" in updates
+        and updates["date"]
+        and updates.get("state") not in ("completed", "shelved")
+    ):
+        updates["state"] = "scheduled"
 
     result = taskpool_service.update_todo_with_writeback(todo_id, updates)
 
@@ -218,9 +221,7 @@ async def update_todo(
 
 
 @router.delete("/{todo_id}")
-async def delete_todo(
-    todo_id: str = Path(..., description="任务 ID")
-):
+async def delete_todo(todo_id: str = Path(..., description="任务 ID")):
     """
     删除任务（会级联删除子任务）
     """

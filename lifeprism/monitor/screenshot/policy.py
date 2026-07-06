@@ -44,6 +44,4 @@ def get_frequency_policy(level: int) -> FrequencyPolicy:
     try:
         return _POLICIES[level]
     except KeyError as exc:
-        raise ValueError(
-            f"invalid active_screenshot_frequency_level: {level}"
-        ) from exc
+        raise ValueError(f"invalid active_screenshot_frequency_level: {level}") from exc

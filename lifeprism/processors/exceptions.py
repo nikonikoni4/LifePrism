@@ -3,11 +3,13 @@
 Processors 模块所有异常继承自 ProcessorError(DataAccessError)，
 由 API 层的全局异常处理器统一转换为 HTTP 500。
 """
+
 from lifeprism.utils.exceptions import DataAccessError
 
 
 class ProcessorError(DataAccessError):
     """Processors 模块基础异常。"""
+
     pass
 
 

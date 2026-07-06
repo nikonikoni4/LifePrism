@@ -1,5 +1,4 @@
 from pydantic import BaseModel, Field
-from typing import List
 
 
 class SystemWarning(BaseModel):
@@ -8,4 +7,4 @@ class SystemWarning(BaseModel):
 
 
 class SystemWarningsResponse(BaseModel):
-    warnings: List[SystemWarning] = Field(description="系统警告列表")
+    warnings: list[SystemWarning] = Field(description="系统警告列表")

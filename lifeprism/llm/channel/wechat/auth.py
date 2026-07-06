@@ -3,16 +3,18 @@
 提供二维码登录和状态持久化功能，支持 token 管理。
 """
 
-import json
 import asyncio
-import httpx
-import qrcode
-import keyring
+import json
 from pathlib import Path
 from typing import Any
-from lifeprism.utils.logger import get_logger
+
+import httpx
+import keyring
+import qrcode
+
 from lifeprism.llm.channel.wechat.client import WechatClient
 from lifeprism.llm.channel.wechat.exceptions import WechatAuthError
+from lifeprism.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -203,7 +205,7 @@ class WechatAuth:
                 logger.error("状态文件格式错误: %s", e, exc_info=True)
                 # 尝试备份损坏的文件
                 try:
-                    backup_path = self.state_file.with_suffix('.json.backup')
+                    backup_path = self.state_file.with_suffix(".json.backup")
                     self.state_file.rename(backup_path)
                     logger.info("已备份损坏的状态文件到: %s", backup_path)
                 except OSError:
@@ -230,17 +232,14 @@ class WechatAuth:
         """
         # 1. 保存 token 到 keyring
         token = state.get("token", "")
-        if token and token.strip():  # 确保非空且非空白
-            if not self._save_token_to_keyring(token):
-                logger.warning("Keyring 保存失败，fallback 到文件存储")
-                # Fallback: 保存到文件
-                self._save_state_to_file(state)
-                return
+        if token and token.strip() and not self._save_token_to_keyring(token):
+            logger.warning("Keyring 保存失败，fallback 到文件存储")
+            # Fallback: 保存到文件
+            self._save_state_to_file(state)
+            return
 
         # 2. 保存 user_data 到文件（不包含 token）
-        file_state = {
-            "user_data": state.get("user_data", {})
-        }
+        file_state = {"user_data": state.get("user_data", {})}
         self._save_state_to_file(file_state)
         logger.info("状态已保存到文件: %s", self.state_file)
 
@@ -255,7 +254,9 @@ class WechatAuth:
         """
         try:
             # 获取 QR 码
-            data = await self.client.api_get("ilink/bot/get_bot_qrcode", params={"bot_type": "3"}, auth=False)
+            data = await self.client.api_get(
+                "ilink/bot/get_bot_qrcode", params={"bot_type": "3"}, auth=False
+            )
             qrcode_id = data.get("qrcode", "")
             qrcode_img = data.get("qrcode_img_content", qrcode_id)
             if not qrcode_id:
@@ -272,9 +273,7 @@ class WechatAuth:
                     return False
 
                 status_data = await self.client.api_get(
-                    "ilink/bot/get_qrcode_status",
-                    params={"qrcode": qrcode_id},
-                    auth=False
+                    "ilink/bot/get_qrcode_status", params={"qrcode": qrcode_id}, auth=False
                 )
                 status = status_data.get("status", "")
 

@@ -1,10 +1,11 @@
 """习惯系统核心业务逻辑"""
+
 import json
 import math
-from datetime import datetime, date, timedelta
-from typing import Optional, List, Dict, Any
+from datetime import date, datetime, timedelta
+from typing import Any
 
-from lifeprism.repository import habit_repository, habit_chain_repository
+from lifeprism.repository import habit_chain_repository, habit_repository
 from lifeprism.server.errors.error_codes import (
     BACKFILL_DATE_OUT_OF_WINDOW,
     CANNOT_CANCEL_PAST_CHECKIN,
@@ -17,18 +18,28 @@ from lifeprism.server.errors.error_codes import (
     VALIDATION_FAILED,
 )
 from lifeprism.server.schemas.habit_schemas import (
-    CreateHabitRequest, UpdateHabitRequest, FrequencyObject,
-    HabitListItem, HabitListResponse, HabitDetailResponse,
-    ChallengeObject, AnchorInfoObject, SettlementActionRequest,
+    AnchorInfoObject,
     BackfillAvailabilityRequest,
-    CheckInResponse, CancelCheckInResponse, BackfillCheckInRequest,
-    BackfillCheckInBatchResponse, BackfillAvailabilityResponse,
+    BackfillAvailabilityResponse,
+    BackfillCheckInBatchResponse,
+    BackfillCheckInRequest,
+    CancelCheckInResponse,
+    ChallengeObject,
+    CheckInResponse,
+    CheckSettlementsResponse,
+    CreateHabitRequest,
+    FrequencyObject,
+    HabitDetailResponse,
+    HabitListItem,
+    HabitListResponse,
+    SettlementActionRequest,
+    SettlementItem,
+    UpdateHabitRequest,
 )
 from lifeprism.server.services.habit_stats_service import get_habit_streak
-from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils import LazySingleton, get_logger
 from lifeprism.utils.exceptions import ConflictError, NotFoundError, ValidationError
-from lifeprism.server.schemas.habit_schemas import SettlementItem
-from lifeprism.server.schemas.habit_schemas import CheckSettlementsResponse
+
 logger = get_logger(__name__)
 
 # 等级 → 挑战周数映射
@@ -62,7 +73,7 @@ class HabitService:
     """习惯系统核心 Service（有状态单例，维护 habit_name_map）"""
 
     def __init__(self):
-        self._habit_name_map: Dict[str, str] = {}
+        self._habit_name_map: dict[str, str] = {}
         self._refresh_cache()
 
     def _refresh_cache(self):
@@ -70,7 +81,7 @@ class HabitService:
         habits = habit_repository.get_habits()
         self._habit_name_map = {h["id"]: h["name"] for h in habits}
 
-    def _parse_frequency(self, row: Dict) -> FrequencyObject:
+    def _parse_frequency(self, row: dict) -> FrequencyObject:
         """从数据库行解析 FrequencyObject"""
         config = None
         if row.get("frequency_config"):
@@ -81,37 +92,45 @@ class HabitService:
         specific_days = config.get("specificDays") if config else None
         return FrequencyObject(type=row["frequency_type"], specific_days=specific_days)
 
-    def _calculate_remaining_rest_days(self, habit_id: str, challenge: Dict) -> int:
+    def _calculate_remaining_rest_days(self, habit_id: str, challenge: dict) -> int:
         """计算挑战剩余可休息天数。"""
         if challenge["status"] != "in_progress":
             return 0
 
         remaining_checkin_days = self._get_remaining_checkin_days(
-            habit_id, challenge, date.today(),
+            habit_id,
+            challenge,
+            date.today(),
         )
         return max(
             0,
-            challenge["completed_count"] + remaining_checkin_days - challenge["required_completions"],
+            challenge["completed_count"]
+            + remaining_checkin_days
+            - challenge["required_completions"],
         )
 
-    def _build_challenge_object(self, c: Optional[Dict], habit_id: str) -> Optional[ChallengeObject]:
+    def _build_challenge_object(self, c: dict | None, habit_id: str) -> ChallengeObject | None:
         """将 challenge 行转为 ChallengeObject"""
         if not c:
             return None
         remaining_rest_days = self._calculate_remaining_rest_days(habit_id, c)
         return ChallengeObject(
-            id=c["id"], habit_id=c["habit_id"],
-            from_level=c["from_level"], to_level=c["to_level"],
+            id=c["id"],
+            habit_id=c["habit_id"],
+            from_level=c["from_level"],
+            to_level=c["to_level"],
             challenge_weeks=c["challenge_weeks"],
             required_completions=c["required_completions"],
             completed_count=c["completed_count"],
             remaining_rest_days=remaining_rest_days,
-            start_date=c["start_date"], end_date=c["end_date"],
-            streak_base=c["streak_base"], status=c["status"],
+            start_date=c["start_date"],
+            end_date=c["end_date"],
+            streak_base=c["streak_base"],
+            status=c["status"],
             finished_at=c.get("finished_at"),
         )
 
-    def _build_habit_response(self, row: Dict) -> HabitListItem:
+    def _build_habit_response(self, row: dict) -> HabitListItem:
         """将 habit 行 + 关联数据组装为 HabitListItem"""
         freq = self._parse_frequency(row)
         challenge_row = habit_repository.get_current_challenge(row["id"])
@@ -126,7 +145,8 @@ class HabitService:
         if row["id"] in anchor_map:
             a = anchor_map[row["id"]]
             anchor_info = AnchorInfoObject(
-                chain_name=a["chainName"], node_name=a["nodeName"],
+                chain_name=a["chainName"],
+                node_name=a["nodeName"],
                 trigger_time=a.get("triggerTime"),
             )
 
@@ -135,23 +155,30 @@ class HabitService:
         today_checkin = habit_repository.get_checkin_by_date(row["id"], today_str)
 
         return HabitListItem(
-            id=row["id"], name=row["name"],
+            id=row["id"],
+            name=row["name"],
             description=row.get("description"),
-            frequency=freq, current_level=row["current_level"],
+            frequency=freq,
+            current_level=row["current_level"],
             status=row["status"],
             current_challenge=challenge_obj,
             value_id=row.get("value_id"),
             commitment_id=row.get("commitment_id"),
             created_at=row["created_at"],
             paused_at=row.get("paused_at"),
-            streak=streak, anchor_info=anchor_info,
+            streak=streak,
+            anchor_info=anchor_info,
             today_completed=bool(today_checkin),
         )
 
     def _create_challenge_for_habit(
-        self, habit_id: str, level: int, freq: FrequencyObject, streak_base: int,
-        previous_challenge: Optional[Dict] = None
-    ) -> Dict:
+        self,
+        habit_id: str,
+        level: int,
+        freq: FrequencyObject,
+        streak_base: int,
+        previous_challenge: dict | None = None,
+    ) -> dict:
         """为习惯创建新挑战，返回 challenge 行
 
         新挑战开始日期规则：
@@ -176,9 +203,12 @@ class HabitService:
             "habit_id": habit_id,
             "challenge_weeks": params["challengeWeeks"],
             "required_completions": params["requiredCompletions"],
-            "from_level": level, "to_level": to_level,
-            "start_date": start, "end_date": end,
-            "completed_count": 0, "streak_base": streak_base,
+            "from_level": level,
+            "to_level": to_level,
+            "start_date": start,
+            "end_date": end,
+            "completed_count": 0,
+            "streak_base": streak_base,
             "status": "in_progress",
         }
         cid = habit_repository.create_challenge(data)
@@ -188,12 +218,15 @@ class HabitService:
         """将当前 in_progress 挑战标记为 cancelled"""
         current = habit_repository.get_current_challenge(habit_id)
         if current:
-            habit_repository.update_challenge(current["id"], {
-                "status": "cancelled",
-                "finished_at": datetime.now().isoformat(),
-            })
+            habit_repository.update_challenge(
+                current["id"],
+                {
+                    "status": "cancelled",
+                    "finished_at": datetime.now().isoformat(),
+                },
+            )
 
-    def get_habits(self, status: Optional[str]) -> HabitListResponse:
+    def get_habits(self, status: str | None) -> HabitListResponse:
         """获取习惯列表"""
         rows = habit_repository.get_habits(status=status)
         items = [self._build_habit_response(r) for r in rows]
@@ -214,12 +247,14 @@ class HabitService:
             freq_config = json.dumps({"specificDays": req.frequency.specific_days})
 
         data = {
-            "name": req.name, "description": req.description,
+            "name": req.name,
+            "description": req.description,
             "frequency_type": req.frequency.type,
             "frequency_config": freq_config,
             "current_level": req.initial_level,
             "status": "active",
-            "value_id": req.value_id, "commitment_id": req.commitment_id,
+            "value_id": req.value_id,
+            "commitment_id": req.commitment_id,
         }
         habit_id = habit_repository.insert_habit(data)
         self._create_challenge_for_habit(habit_id, req.initial_level, req.frequency, 0)
@@ -267,7 +302,9 @@ class HabitService:
             current_challenge = habit_repository.get_current_challenge(habit_id)
             inherit_streak_base = 0
             if row["status"] == "active" and current_challenge:
-                inherit_streak_base = get_habit_streak(habit_id, self._parse_frequency(row), current_challenge)
+                inherit_streak_base = get_habit_streak(
+                    habit_id, self._parse_frequency(row), current_challenge
+                )
             self._cancel_current_challenge(habit_id)
             updated_row = habit_repository.get_habit_by_id(habit_id)
             freq_obj = self._parse_frequency(updated_row)
@@ -293,7 +330,7 @@ class HabitService:
     def pause_habit(
         self,
         habit_id: str,
-        settlement_action: Optional[SettlementActionRequest] = None,
+        settlement_action: SettlementActionRequest | None = None,
     ) -> HabitDetailResponse:
         """暂停习惯：当前挑战 cancelled，状态 paused"""
         row = habit_repository.get_habit_by_id(habit_id)
@@ -305,7 +342,8 @@ class HabitService:
             if settlement_action.source != "settlement":
                 raise ValidationError("invalid settlement source", code=INVALID_STATUS_TRANSITION)
             updated = habit_repository.mark_in_progress_challenge_failed(
-                habit_id, settlement_action.challenge_id,
+                habit_id,
+                settlement_action.challenge_id,
             )
             if not updated:
                 raise ValidationError(
@@ -314,15 +352,19 @@ class HabitService:
                 )
         else:
             self._cancel_current_challenge(habit_id)
-        habit_repository.update_habit(habit_id, {
-            "status": "paused", "paused_at": datetime.now().isoformat(),
-        })
+        habit_repository.update_habit(
+            habit_id,
+            {
+                "status": "paused",
+                "paused_at": datetime.now().isoformat(),
+            },
+        )
         return self.get_habit_detail(habit_id)
 
     def resume_habit(
         self,
         habit_id: str,
-        settlement_action: Optional[SettlementActionRequest] = None,
+        settlement_action: SettlementActionRequest | None = None,
     ) -> HabitDetailResponse:
         """恢复/重启习惯：创建同等级新挑战，状态 active"""
         row = habit_repository.get_habit_by_id(habit_id)
@@ -333,7 +375,8 @@ class HabitService:
             if settlement_action.source != "settlement":
                 raise ValidationError("invalid settlement source", code=INVALID_STATUS_TRANSITION)
             updated = habit_repository.mark_in_progress_challenge_failed(
-                habit_id, settlement_action.challenge_id,
+                habit_id,
+                settlement_action.challenge_id,
             )
             if not updated:
                 raise ValidationError(
@@ -363,7 +406,7 @@ class HabitService:
         challenge_id: str,
         persist_succeeded: bool,
         persist_failed: bool,
-    ) -> Optional[SettlementItem]:
+    ) -> SettlementItem | None:
         """判定挑战结果，返回 SettlementItem 或 None。"""
         challenge = habit_repository.get_challenge_by_id(challenge_id)
         if not challenge or challenge["status"] != "in_progress":
@@ -382,18 +425,23 @@ class HabitService:
         if reached_end_date and completed >= required:
             new_level = min(challenge["to_level"], MAX_LEVEL)
             if persist_succeeded:
-                habit_repository.update_challenge(challenge["id"], {
-                    "status": "succeeded",
-                    "finished_at": datetime.now().isoformat(),
-                })
+                habit_repository.update_challenge(
+                    challenge["id"],
+                    {
+                        "status": "succeeded",
+                        "finished_at": datetime.now().isoformat(),
+                    },
+                )
                 habit_repository.update_habit(habit_id, {"current_level": new_level})
                 freq = self._parse_frequency(habit_row)
                 self._create_challenge_for_habit(habit_id, new_level, freq, completed, challenge)
             return SettlementItem(
                 challenge_id=challenge["id"],
-                habit_id=habit_id, habit_name=habit_name,
+                habit_id=habit_id,
+                habit_name=habit_name,
                 result="succeeded",
-                from_level=challenge["from_level"], to_level=new_level,
+                from_level=challenge["from_level"],
+                to_level=new_level,
                 completed_count=completed,
                 required_completions=required,
                 can_save_by_backfill=False,
@@ -401,16 +449,23 @@ class HabitService:
 
         if required > (completed + remaining_checkin_days):
             can_save = self._can_save_by_backfill(
-                habit_id, challenge, completed, required,
+                habit_id,
+                challenge,
+                completed,
+                required,
             )
             if persist_failed:
-                habit_repository.update_challenge(challenge["id"], {
-                    "status": "failed",
-                    "finished_at": datetime.now().isoformat(),
-                })
+                habit_repository.update_challenge(
+                    challenge["id"],
+                    {
+                        "status": "failed",
+                        "finished_at": datetime.now().isoformat(),
+                    },
+                )
             return SettlementItem(
                 challenge_id=challenge["id"],
-                habit_id=habit_id, habit_name=habit_name,
+                habit_id=habit_id,
+                habit_name=habit_name,
                 result="failed",
                 from_level=challenge["from_level"],
                 to_level=challenge["from_level"],  # 失败等级不变
@@ -421,7 +476,7 @@ class HabitService:
 
         return None
 
-    def _get_remaining_checkin_days(self, habit_id: str, challenge: Dict, today: date) -> int:
+    def _get_remaining_checkin_days(self, habit_id: str, challenge: dict, today: date) -> int:
         """计算从 today 到 end_date 仍可打卡的最大天数（含今日未打卡场景）。"""
         end_date = date.fromisoformat(challenge["end_date"])
         if end_date < today:
@@ -429,12 +484,17 @@ class HabitService:
 
         remaining_future_days = (end_date - today).days
         today_checkin = habit_repository.get_checkin_by_date(
-            habit_id, today.isoformat(),
+            habit_id,
+            today.isoformat(),
         )
         return remaining_future_days + (0 if today_checkin else 1)
 
     def _can_save_by_backfill(
-        self, habit_id: str, challenge: Dict, completed: int, required: int,
+        self,
+        habit_id: str,
+        challenge: dict,
+        completed: int,
+        required: int,
     ) -> bool:
         """判断补签近7天能否挽救失败挑战"""
         today = date.today()
@@ -473,37 +533,51 @@ class HabitService:
         if today_str < challenge_start:
             raise ValidationError(
                 f"当前挑战从 {challenge_start} 开始，无法为 {today_str} 打卡",
-                code=VALIDATION_FAILED
+                code=VALIDATION_FAILED,
             )
 
         now_str = datetime.now().isoformat()
 
-        checkin_id = habit_repository.create_checkin({
-            "habit_id": habit_id,
-            "challenge_id": challenge["id"],
-            "date": today_str,
-        })
+        checkin_id = habit_repository.create_checkin(
+            {
+                "habit_id": habit_id,
+                "challenge_id": challenge["id"],
+                "date": today_str,
+            }
+        )
         if not checkin_id:
             raise ConflictError("今日已打卡，不可重复打卡", code=CHECKIN_ALREADY_EXISTS)
 
         new_count = challenge["completed_count"] + 1
-        habit_repository.update_challenge(challenge["id"], {
-            "completed_count": new_count,
-        })
+        habit_repository.update_challenge(
+            challenge["id"],
+            {
+                "completed_count": new_count,
+            },
+        )
 
         # 判定挑战结果
         settlement = self._judge_challenge_result(
-            habit_id, challenge["id"], True, False,
+            habit_id,
+            challenge["id"],
+            True,
+            False,
         )
 
         checkin_obj = CheckInObject(
-            id=checkin_id, habit_id=habit_id,
-            challenge_id=challenge["id"], date=today_str,
-            completed=True, completed_at=now_str, created_at=now_str,
+            id=checkin_id,
+            habit_id=habit_id,
+            challenge_id=challenge["id"],
+            date=today_str,
+            completed=True,
+            completed_at=now_str,
+            created_at=now_str,
         )
         habit_item = self._build_habit_response(habit_repository.get_habit_by_id(habit_id))
         return CheckInResponse(
-            checkin=checkin_obj, habit=habit_item, settlement=settlement,
+            checkin=checkin_obj,
+            habit=habit_item,
+            settlement=settlement,
         )
 
     def cancel_checkin(self, habit_id: str, date_str: str) -> CancelCheckInResponse:
@@ -527,19 +601,29 @@ class HabitService:
 
         habit_repository.delete_checkin(habit_id, date_str)
         new_count = max(challenge["completed_count"] - 1, 0)
-        habit_repository.update_challenge(challenge["id"], {
-            "completed_count": new_count,
-        })
+        habit_repository.update_challenge(
+            challenge["id"],
+            {
+                "completed_count": new_count,
+            },
+        )
 
         settlement = self._judge_challenge_result(
-            habit_id, challenge["id"], True, False,
+            habit_id,
+            challenge["id"],
+            True,
+            False,
         )
         habit_item = self._build_habit_response(habit_repository.get_habit_by_id(habit_id))
         return CancelCheckInResponse(habit=habit_item, settlement=settlement)
 
     def _validate_backfill_target_date(
-        self, target_date: date, today: date, start_date: date, end_date: date,
-    ) -> Optional[str]:
+        self,
+        target_date: date,
+        today: date,
+        start_date: date,
+        end_date: date,
+    ) -> str | None:
         """补录日期校验（本地窗口 + 挑战周期）。"""
         if target_date >= today:
             return "今日打卡请使用打卡接口"
@@ -549,7 +633,9 @@ class HabitService:
             return "补签日期不在当前挑战周期内"
         return None
 
-    def backfill_checkin(self, habit_id: str, req: BackfillCheckInRequest) -> BackfillCheckInBatchResponse:
+    def backfill_checkin(
+        self, habit_id: str, req: BackfillCheckInRequest
+    ) -> BackfillCheckInBatchResponse:
         """批量补签（过去 6 天内，按请求顺序逐项处理，部分成功继续）。"""
         from lifeprism.server.schemas.habit_schemas import (
             BackfillCheckInBatchSummary,
@@ -569,17 +655,19 @@ class HabitService:
 
         today = date.today()
         seen_dates: set[str] = set()
-        results: List[BackfillCheckInResultItem] = []
+        results: list[BackfillCheckInResultItem] = []
 
         def _append_failed(date_str: str, message: str, error_code: str):
-            results.append(BackfillCheckInResultItem(
-                date=date_str,
-                status="failed",
-                checkin=None,
-                settlement=None,
-                error_code=error_code,
-                message=message,
-            ))
+            results.append(
+                BackfillCheckInResultItem(
+                    date=date_str,
+                    status="failed",
+                    checkin=None,
+                    settlement=None,
+                    error_code=error_code,
+                    message=message,
+                )
+            )
 
         for item in req.items:
             date_str = item.date
@@ -604,29 +692,40 @@ class HabitService:
             start_date = date.fromisoformat(latest_challenge["start_date"])
             end_date = date.fromisoformat(latest_challenge["end_date"])
             date_error = self._validate_backfill_target_date(
-                target_date, today, start_date, end_date,
+                target_date,
+                today,
+                start_date,
+                end_date,
             )
             if date_error:
                 _append_failed(date_str, date_error, BACKFILL_DATE_OUT_OF_WINDOW)
                 continue
 
             now_str = datetime.now().isoformat()
-            checkin_id = habit_repository.create_checkin({
-                "habit_id": habit_id,
-                "challenge_id": latest_challenge["id"],
-                "date": date_str,
-            })
+            checkin_id = habit_repository.create_checkin(
+                {
+                    "habit_id": habit_id,
+                    "challenge_id": latest_challenge["id"],
+                    "date": date_str,
+                }
+            )
             if not checkin_id:
                 _append_failed(date_str, "该日期已有打卡记录", CHECKIN_ALREADY_EXISTS)
                 continue
 
             new_count = latest_challenge["completed_count"] + 1
-            habit_repository.update_challenge(latest_challenge["id"], {
-                "completed_count": new_count,
-            })
+            habit_repository.update_challenge(
+                latest_challenge["id"],
+                {
+                    "completed_count": new_count,
+                },
+            )
 
             settlement = self._judge_challenge_result(
-                habit_id, latest_challenge["id"], True, False,
+                habit_id,
+                latest_challenge["id"],
+                True,
+                False,
             )
             checkin_obj = CheckInObject(
                 id=checkin_id,
@@ -637,14 +736,16 @@ class HabitService:
                 completed_at=now_str,
                 created_at=now_str,
             )
-            results.append(BackfillCheckInResultItem(
-                date=date_str,
-                status="succeeded",
-                checkin=checkin_obj,
-                settlement=settlement,
-                error_code=None,
-                message=None,
-            ))
+            results.append(
+                BackfillCheckInResultItem(
+                    date=date_str,
+                    status="succeeded",
+                    checkin=checkin_obj,
+                    settlement=settlement,
+                    error_code=None,
+                    message=None,
+                )
+            )
 
         habit_item = self._build_habit_response(habit_repository.get_habit_by_id(habit_id))
         succeeded_count = sum(1 for item in results if item.status == "succeeded")
@@ -660,9 +761,7 @@ class HabitService:
             summary=summary,
         )
 
-    def get_challenge_history(
-        self, habit_id: str, status: Optional[str]
-    ) -> List[Dict[str, Any]]:
+    def get_challenge_history(self, habit_id: str, status: str | None) -> list[dict[str, Any]]:
         """获取习惯的挑战历史记录"""
         row = habit_repository.get_habit_by_id(habit_id)
         if not row:
@@ -670,11 +769,13 @@ class HabitService:
         return habit_repository.get_challenge_history(habit_id, status)
 
     def get_backfill_availability(
-        self, req: BackfillAvailabilityRequest,
+        self,
+        req: BackfillAvailabilityRequest,
     ) -> BackfillAvailabilityResponse:
         """获取补录可选日期（today-6 ~ today-1）。"""
         from lifeprism.server.schemas.habit_schemas import (
-            BackfillAvailabilityResponse, BackfillDateAvailabilityItem,
+            BackfillAvailabilityResponse,
+            BackfillDateAvailabilityItem,
         )
 
         habit = habit_repository.get_habit_by_id(req.habit_id)
@@ -688,36 +789,54 @@ class HabitService:
         start_date = date.fromisoformat(challenge["start_date"])
         end_date = date.fromisoformat(challenge["end_date"])
         today = date.today()
-        days: List[BackfillDateAvailabilityItem] = []
+        days: list[BackfillDateAvailabilityItem] = []
 
         for i in range(6, 0, -1):
             d = today - timedelta(days=i)
             date_str = d.isoformat()
 
             if d < start_date:
-                days.append(BackfillDateAvailabilityItem(
-                    date=date_str, selectable=False, reason="before_challenge_start",
-                ))
+                days.append(
+                    BackfillDateAvailabilityItem(
+                        date=date_str,
+                        selectable=False,
+                        reason="before_challenge_start",
+                    )
+                )
                 continue
 
             if d > end_date:
-                days.append(BackfillDateAvailabilityItem(
-                    date=date_str, selectable=False, reason="after_challenge_end",
-                ))
+                days.append(
+                    BackfillDateAvailabilityItem(
+                        date=date_str,
+                        selectable=False,
+                        reason="after_challenge_end",
+                    )
+                )
                 continue
 
             existing = habit_repository.get_checkin_by_date(req.habit_id, date_str)
             if existing:
-                days.append(BackfillDateAvailabilityItem(
-                    date=date_str, selectable=False, reason="already_checked_in",
-                ))
+                days.append(
+                    BackfillDateAvailabilityItem(
+                        date=date_str,
+                        selectable=False,
+                        reason="already_checked_in",
+                    )
+                )
             else:
-                days.append(BackfillDateAvailabilityItem(
-                    date=date_str, selectable=True, reason=None,
-                ))
+                days.append(
+                    BackfillDateAvailabilityItem(
+                        date=date_str,
+                        selectable=True,
+                        reason=None,
+                    )
+                )
 
         return BackfillAvailabilityResponse(
-            habit_id=req.habit_id, challenge_id=req.challenge_id, days=days,
+            habit_id=req.habit_id,
+            challenge_id=req.challenge_id,
+            days=days,
         )
 
     def check_settlements(self) -> CheckSettlementsResponse:
@@ -728,7 +847,10 @@ class HabitService:
         settlements = []
         for challenge in expired:
             item = self._judge_challenge_result(
-                challenge["habit_id"], challenge["id"], True, False,
+                challenge["habit_id"],
+                challenge["id"],
+                True,
+                False,
             )
             if item:
                 settlements.append(item)

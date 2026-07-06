@@ -1,6 +1,7 @@
-
 from dataclasses import dataclass, replace
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Any
+
+
 @dataclass(frozen=True)
 class QueryOptions:
     """
@@ -33,51 +34,50 @@ class QueryOptions:
     - fields: 返回字段列表，如 ["id", "title", "created_at"]。None 表示返回所有字段
     """
 
-    date_range: Optional[Tuple[str, str]] = None
-    time_range: Optional[Tuple[str, str]] = None
-    filters: Optional[Dict[str, Any]] = None
-    order_by: Optional[str] = None
+    date_range: tuple[str, str] | None = None
+    time_range: tuple[str, str] | None = None
+    filters: dict[str, Any] | None = None
+    order_by: str | None = None
     order_desc: bool = True
-    page: Optional[int] = None
-    page_size: Optional[int] = None
-    limit: Optional[int] = None
-    fields: Optional[List[str]] = None
+    page: int | None = None
+    page_size: int | None = None
+    limit: int | None = None
+    fields: list[str] | None = None
 
     def __post_init__(self):
         """参数验证"""
         if self.page is not None and self.page < 1:
             raise ValueError("page must be >= 1")
-        if self.page_size is not None:
-            if self.page_size < 1 or self.page_size > 1000:
-                raise ValueError("page_size must be between 1 and 1000")
+        if self.page_size is not None and (self.page_size < 1 or self.page_size > 1000):
+            raise ValueError("page_size must be between 1 and 1000")
         if self.limit is not None and self.limit < 1:
             raise ValueError("limit must be >= 1")
 
-    def with_date_range(self, start: str, end: str) -> 'QueryOptions':
+    def with_date_range(self, start: str, end: str) -> "QueryOptions":
         """返回新对象，修改日期范围,闭区间[]"""
         return replace(self, date_range=(start, end))
 
-    def with_time_range(self, start: str, end: str) -> 'QueryOptions':
+    def with_time_range(self, start: str, end: str) -> "QueryOptions":
         """返回新对象，修改时间范围"""
         return replace(self, time_range=(start, end))
 
-    def with_filters(self, **filters) -> 'QueryOptions':
+    def with_filters(self, **filters) -> "QueryOptions":
         """返回新对象，合并筛选条件"""
         new_filters = {**(self.filters or {}), **filters}
         return replace(self, filters=new_filters)
 
-    def with_order(self, field: str, desc: bool = True) -> 'QueryOptions':
+    def with_order(self, field: str, desc: bool = True) -> "QueryOptions":
         """返回新对象，修改排序"""
         return replace(self, order_by=field, order_desc=desc)
 
-    def with_page(self, page: int, page_size: int = 20) -> 'QueryOptions':
+    def with_page(self, page: int, page_size: int = 20) -> "QueryOptions":
         """返回新对象，设置分页"""
         return replace(self, page=page, page_size=page_size)
 
-    def with_limit(self, limit: int) -> 'QueryOptions':
+    def with_limit(self, limit: int) -> "QueryOptions":
         """返回新对象，设置结果数量限制"""
         return replace(self, limit=limit)
 
-    def with_fields(self, *fields: str) -> 'QueryOptions':
+    def with_fields(self, *fields: str) -> "QueryOptions":
         """返回新对象，设置返回字段"""
         return replace(self, fields=list(fields))

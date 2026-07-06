@@ -1,22 +1,23 @@
-import time
 import re
 import threading
+import time
 from datetime import datetime
-from typing import Optional, List
-from lifeprism.utils.logger import get_logger
+
+from lifeprism.config.settings_manager import settings
+from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
+from lifeprism.monitor.screenshot.models import WindowContext
 from lifeprism.monitor.windows_monitor.windows_api import (
     get_active_window_handle,
-    get_window_title,
     get_app_name,
     get_last_input_time,
     get_tick_count,
-    is_any_video_playing
+    get_window_title,
+    is_any_video_playing,
 )
-from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
-from lifeprism.monitor.screenshot.models import WindowContext
-from lifeprism.config.settings_manager import settings
+from lifeprism.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
 
 class WindowMonitor:
     def __init__(self, provider: MonitorDataProvider):
@@ -25,9 +26,9 @@ class WindowMonitor:
         self.exclude_titles = settings.get("exclude_titles", [])
         self.afk_timeout = settings.get("afk_timeout", 180.0)
 
-        self.current_app: Optional[str] = None
-        self.current_title: Optional[str] = None
-        self.start_time: Optional[datetime] = None
+        self.current_app: str | None = None
+        self.current_title: str | None = None
+        self.start_time: datetime | None = None
         self.is_afk = False
         self._state_lock = threading.Lock()
 
@@ -38,10 +39,7 @@ class WindowMonitor:
         self._exclude_patterns = [re.compile(p) for p in self.exclude_titles]
 
     def _should_exclude(self, title: str) -> bool:
-        for pattern in self._exclude_patterns:
-            if pattern.search(title):
-                return True
-        return False
+        return any(pattern.search(title) for pattern in self._exclude_patterns)
 
     def _flush(self):
         """将当前在内存中的事件保存到存储中"""
@@ -53,7 +51,7 @@ class WindowMonitor:
                     timestamp=self.start_time.strftime("%Y-%m-%d %H:%M:%S"),
                     duration=duration,
                     app=self.current_app,
-                    title=self.current_title
+                    title=self.current_title,
                 )
             self.start_time = now
 
@@ -67,7 +65,11 @@ class WindowMonitor:
 
     def run(self):
         self._running = True
-        logger.info("WindowMonitor started (poll_time: %ss, afk_timeout: %ss)", self.poll_time, self.afk_timeout)
+        logger.info(
+            "WindowMonitor started (poll_time: %ss, afk_timeout: %ss)",
+            self.poll_time,
+            self.afk_timeout,
+        )
 
         try:
             while self._running:

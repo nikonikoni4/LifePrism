@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class CaptureReason(str, Enum):
@@ -19,8 +18,8 @@ class FrequencyPolicy:
 
 @dataclass(frozen=True)
 class WindowContext:
-    app: Optional[str]
-    title: Optional[str]
+    app: str | None
+    title: str | None
     is_afk: bool
 
 
@@ -28,8 +27,8 @@ class WindowContext:
 class CaptureRequest:
     reason: CaptureReason
     captured_at: str
-    window_app: Optional[str]
-    window_title: Optional[str]
-    frequency_level: Optional[int]
-    engaged_segment_id: Optional[str]
+    window_app: str | None
+    window_title: str | None
+    frequency_level: int | None
+    engaged_segment_id: str | None
     is_afk: bool

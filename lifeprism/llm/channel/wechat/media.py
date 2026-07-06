@@ -3,14 +3,16 @@
 """
 
 import base64
-import httpx
 import uuid
 from pathlib import Path
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+import httpx
 from cryptography.hazmat.backends import default_backend
-from lifeprism.utils.logger import get_logger
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
 from lifeprism.llm.channel.wechat.client import WechatClient
 from lifeprism.llm.channel.wechat.exceptions import WechatMediaError
+from lifeprism.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -81,7 +83,10 @@ class WechatMedia:
                 return None
 
             # 下载
-            url = full_url or f"{self.client.base_url.replace('ilinkai', 'novac2c.cdn')}/c2c/download?encrypted_query_param={encrypt_param}"
+            url = (
+                full_url
+                or f"{self.client.base_url.replace('ilinkai', 'novac2c.cdn')}/c2c/download?encrypted_query_param={encrypt_param}"
+            )
             resp = await self.client._client.get(url)
             resp.raise_for_status()
             data = resp.content
@@ -101,7 +106,9 @@ class WechatMedia:
             file_path = self.media_dir / filename
             file_path.write_bytes(data)
 
-            logger.info("媒体文件已保存: %s, 类型: %s, 大小: %s bytes", file_path, media_type, len(data))
+            logger.info(
+                "媒体文件已保存: %s, 类型: %s, 大小: %s bytes", file_path, media_type, len(data)
+            )
             return str(file_path)
         except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
             logger.error("下载媒体网络错误: %s, 类型: %s", e, media_type, exc_info=True)

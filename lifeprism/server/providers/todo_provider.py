@@ -22,36 +22,36 @@
 
 #     继承 LWBaseDataProvider，提供 TodoList 的 CRUD 操作（支持多层级 parent_id 关系）
 #     """
-    
+
 #     def __init__(self, db_manager=None):
 #         super().__init__(db_manager)
-    
+
 #     # ==================== TodoList 操作 ====================
-    
+
 #     def get_todos_by_date(
-#         self, 
-#         date: str, 
+#         self,
+#         date: str,
 #         include_cross_day: bool = True
 #     ) -> List[Dict[str, Any]]:
 #         """
 #         获取指定日期的任务列表
-        
+
 #         Args:
 #             date: 日期（YYYY-MM-DD 格式）
 #             include_cross_day: 是否包含跨天未完成任务
-        
+
 #         Returns:
 #             List[Dict]: 任务列表
 #         """
 #         try:
 #             with self.db.get_connection() as conn:
 #                 cursor = conn.cursor()
-                
+
 #                 if include_cross_day:
 #                     # 获取当天任务 + 跨天未完成任务
 #                     sql = """
-#                     SELECT * FROM todo_list 
-#                     WHERE date = ? 
+#                     SELECT * FROM todo_list
+#                     WHERE date = ?
 #                        OR (cross_day = 1 AND state = 'active' AND date < ?)
 #                     ORDER BY order_index ASC
 #                     """
@@ -59,28 +59,28 @@
 #                 else:
 #                     # 仅获取当天任务
 #                     sql = """
-#                     SELECT * FROM todo_list 
+#                     SELECT * FROM todo_list
 #                     WHERE date = ?
 #                     ORDER BY order_index ASC
 #                     """
 #                     cursor.execute(sql, (date,))
-                
+
 #                 columns = [description[0] for description in cursor.description]
 #                 rows = cursor.fetchall()
-                
+
 #                 return [dict(zip(columns, row)) for row in rows]
-                
+
 #         except Exception as e:
 #             logger.error(f"获取任务列表失败: {e}")
 #             return []
-    
+
 #     def get_todo_by_id(self, todo_id: str) -> Optional[Dict[str, Any]]:
 #         """
 #         按 ID 获取单个任务
-        
+
 #         Args:
 #             todo_id: 任务 ID
-        
+
 #         Returns:
 #             Optional[Dict]: 任务数据，不存在返回 None
 #         """
@@ -88,17 +88,17 @@
 #             with self.db.get_connection() as conn:
 #                 cursor = conn.cursor()
 #                 cursor.execute("SELECT * FROM todo_list WHERE id = ?", (todo_id,))
-                
+
 #                 row = cursor.fetchone()
 #                 if row:
 #                     columns = [description[0] for description in cursor.description]
 #                     return dict(zip(columns, row))
 #                 return None
-                
+
 #         except Exception as e:
 #             logger.error(f"获取任务 {todo_id} 失败: {e}")
 #             return None
-    
+
 #     def create_todo(self, data: Dict[str, Any]) -> Optional[str]:
 #         """
 #         创建新任务
@@ -157,29 +157,29 @@
 
 #                 logger.info(f"创建任务成功，ID: {todo_id}")
 #                 return todo_id
-                
+
 #         except Exception as e:
 #             logger.error(f"创建任务失败: {e}")
 #             return None
-    
+
 #     def update_todo(self, todo_id: str, data: Dict[str, Any]) -> bool:
 #         """
 #         更新任务
-        
+
 #         Args:
 #             todo_id: 任务 ID
 #             data: 要更新的字段
-        
+
 #         Returns:
 #             bool: 是否成功
 #         """
 #         try:
 #             if not data:
 #                 return True
-            
+
 #             with self.db.get_connection() as conn:
 #                 cursor = conn.cursor()
-                
+
 #                 # 构建 SET 子句
 #                 set_clauses = []
 #                 values = []
@@ -211,11 +211,11 @@
 #                 if success:
 #                     logger.info(f"更新任务 {todo_id} 成功")
 #                 return success
-                
+
 #         except Exception as e:
 #             logger.error(f"更新任务 {todo_id} 失败: {e}")
 #             return False
-    
+
 #     def delete_todo(self, todo_id: str) -> bool:
 #         """
 #         删除任务
@@ -340,110 +340,110 @@
 #         except Exception as e:
 #             logger.error(f"批量删除任务失败: {e}")
 #             return 0
-    
+
 #     def reorder_todos(self, todo_ids: List[str]) -> bool:
 #         """
 #         批量更新任务排序
-        
+
 #         Args:
 #             todo_ids: 任务 ID 列表（按新顺序排列）
-        
+
 #         Returns:
 #             bool: 是否成功
 #         """
 #         try:
 #             with self.db.get_connection() as conn:
 #                 cursor = conn.cursor()
-                
+
 #                 for index, todo_id in enumerate(todo_ids):
 #                     cursor.execute(
 #                         "UPDATE todo_list SET order_index = ? WHERE id = ?",
 #                         (index, todo_id)
 #                     )
-                
+
 #                 logger.info(f"重排序 {len(todo_ids)} 个任务成功")
 #                 return True
-                
+
 #         except Exception as e:
 #             logger.error(f"重排序任务失败: {e}")
 #             return False
-    
+
 #     # ==================== Task Pool 操作 ====================
-    
+
 #     def get_todos_by_state(self, state: str) -> List[Dict[str, Any]]:
 #         """
 #         根据状态获取任务列表
-        
+
 #         Args:
 #             state: 任务状态 ('active', 'completed', 'inactive')
-        
+
 #         Returns:
 #             List[Dict]: 任务列表
 #         """
 #         try:
 #             with self.db.get_connection() as conn:
 #                 cursor = conn.cursor()
-                
+
 #                 # 对于 inactive 状态（任务池），按 pool_order_index 排序
 #                 if state == 'inactive':
 #                     sql = """
-#                     SELECT * FROM todo_list 
+#                     SELECT * FROM todo_list
 #                     WHERE state = ?
 #                     ORDER BY pool_order_index ASC, id ASC
 #                     """
 #                 else:
 #                     sql = """
-#                     SELECT * FROM todo_list 
+#                     SELECT * FROM todo_list
 #                     WHERE state = ?
 #                     ORDER BY order_index ASC
 #                     """
-                
+
 #                 cursor.execute(sql, (state,))
-                
+
 #                 columns = [description[0] for description in cursor.description]
 #                 rows = cursor.fetchall()
-                
+
 #                 return [dict(zip(columns, row)) for row in rows]
-                
+
 #         except Exception as e:
 #             logger.error(f"获取任务列表失败 (state={state}): {e}")
 #             return []
-    
+
 #     def reorder_pool_todos(self, todo_ids: List[str]) -> bool:
 #         """
 #         批量更新任务池排序 (pool_order_index)
-        
+
 #         Args:
 #             todo_ids: 任务 ID 列表（按新顺序排列）
-        
+
 #         Returns:
 #             bool: 是否成功
 #         """
 #         try:
 #             with self.db.get_connection() as conn:
 #                 cursor = conn.cursor()
-                
+
 #                 for index, todo_id in enumerate(todo_ids):
 #                     cursor.execute(
 #                         "UPDATE todo_list SET pool_order_index = ? WHERE id = ?",
 #                         (index, todo_id)
 #                     )
-                
+
 #                 logger.info(f"重排序任务池 {len(todo_ids)} 个任务成功")
 #                 return True
-                
+
 #         except Exception as e:
 #             logger.error(f"重排序任务池失败: {e}")
 #             return False
-    
+
 #     def move_todo_to_folder(self, todo_id: str, folder_id: Optional[int]) -> bool:
 #         """
 #         移动任务到指定文件夹
-        
+
 #         Args:
 #             todo_id: 任务 ID
 #             folder_id: 目标文件夹 ID（None 表示移到根级别）
-        
+
 #         Returns:
 #             bool: 是否成功
 #         """
@@ -464,7 +464,7 @@
 
 
 #     # ==================== 任务池查询 ====================
-    
+
 #     def get_todos_for_taskpool(
 #         self,
 #         goal_id: Optional[str] = None,
@@ -473,61 +473,61 @@
 #     ) -> List[Dict[str, Any]]:
 #         """
 #         获取任务池任务（支持筛选）
-        
+
 #         Args:
 #             goal_id: 按目标筛选
 #             plan_doc_id: 按计划书筛选
 #             state: 按状态筛选（pool/scheduled/completed/all）
-        
+
 #         Returns:
 #             List[Dict]: 任务列表（扁平结构，前端通过 parent_id 构建树）
 #         """
 #         try:
 #             with self.db.get_connection() as conn:
 #                 cursor = conn.cursor()
-                
+
 #                 # 构建查询条件
 #                 conditions = []
 #                 params = []
-                
+
 #                 if state and state != 'all':
 #                     conditions.append("state = ?")
 #                     params.append(state)
-                
+
 #                 if goal_id:
 #                     conditions.append("link_to_goal_id = ?")
 #                     params.append(goal_id)
-                
+
 #                 if plan_doc_id:
 #                     conditions.append("plan_doc_id = ?")
 #                     params.append(plan_doc_id)
-                
+
 #                 where_clause = " AND ".join(conditions) if conditions else "1=1"
-                
+
 #                 sql = f"""
-#                 SELECT * FROM todo_list 
+#                 SELECT * FROM todo_list
 #                 WHERE {where_clause}
 #                 ORDER BY pool_order_index ASC, id ASC
 #                 """
-                
+
 #                 cursor.execute(sql, params)
-                
+
 #                 columns = [description[0] for description in cursor.description]
 #                 rows = cursor.fetchall()
-                
+
 #                 return [dict(zip(columns, row)) for row in rows]
-                
+
 #         except Exception as e:
 #             logger.error(f"获取任务池任务失败: {e}")
 #             return []
-    
+
 #     def get_todos_by_plan_doc(self, plan_doc_id: str) -> List[Dict[str, Any]]:
 #         """
 #         获取指定计划书关联的所有任务
-        
+
 #         Args:
 #             plan_doc_id: 计划书 ID
-        
+
 #         Returns:
 #             List[Dict]: 任务列表
 #         """
@@ -538,16 +538,16 @@
 #                     "SELECT * FROM todo_list WHERE plan_doc_id = ? ORDER BY pool_order_index ASC",
 #                     (plan_doc_id,)
 #                 )
-                
+
 #                 columns = [description[0] for description in cursor.description]
 #                 rows = cursor.fetchall()
-                
+
 #                 return [dict(zip(columns, row)) for row in rows]
-                
+
 #         except Exception as e:
 #             logger.error(f"获取计划书任务失败 (plan_doc={plan_doc_id}): {e}")
 #             return []
-    
+
 #     def batch_create_todos(self, todos: List[Dict[str, Any]]) -> List[str]:
 #         """
 #         批量创建任务
@@ -598,21 +598,21 @@
 #                         values
 #                     )
 #                     new_ids.append(todo_id)
-                
+
 #                 logger.info(f"批量创建 {len(new_ids)} 个任务成功")
 #                 return new_ids
-                
+
 #         except Exception as e:
 #             logger.error(f"批量创建任务失败: {e}")
 #             return new_ids
-    
+
 #     def batch_update_todos(self, updates: List[Dict[str, Any]]) -> int:
 #         """
 #         批量更新任务
-        
+
 #         Args:
 #             updates: 更新数据列表，每项必须包含 'id' 字段
-        
+
 #         Returns:
 #             int: 成功更新的数量
 #         """
@@ -620,7 +620,7 @@
 #         try:
 #             with self.db.get_connection() as conn:
 #                 cursor = conn.cursor()
-                
+
 #                 allowed_fields = [
 #                     'content', 'color', 'state', 'link_to_goal_id',
 #                     'date', 'expected_finished_at', 'actual_finished_at',
@@ -628,12 +628,12 @@
 #                     'parent_id', 'plan_doc_id',
 #                     'delay_days', 'delay_reason', 'waid_order'
 #                 ]
-                
+
 #                 for data in updates:
 #                     todo_id = data.get('id')
 #                     if not todo_id:
 #                         continue
-                    
+
 #                     set_clauses = []
 #                     values = []
 #                     for key, value in data.items():
@@ -643,17 +643,17 @@
 #                                 values.append(1 if value else 0)
 #                             else:
 #                                 values.append(value)
-                    
+
 #                     if not set_clauses:
 #                         continue
-                    
+
 #                     values.append(todo_id)
 #                     sql = f"UPDATE todo_list SET {', '.join(set_clauses)} WHERE id = ?"
-                    
+
 #                     cursor.execute(sql, values)
 #                     if cursor.rowcount > 0:
 #                         updated_count += 1
-                
+
 #                 logger.info(f"批量更新 {updated_count} 个任务成功")
 #                 return updated_count
 

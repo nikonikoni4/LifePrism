@@ -11,20 +11,25 @@
 2. 前端需要增加手动更新按钮
 """
 
-from lifeprism.llm.bus import OutboundMessage, bus, MessageType, InboundMessage
-from lifeprism.llm.exceptions import LLMResponseError
-from lifeprism.llm.providers import LLMResponse
 from lifeprism.config import settings
-from pathlib import Path
-from lifeprism.llm.utils.md_os import read_md,write_date_md,extract_date_logs_from_file
-from lifeprism.repository import diary_repository
-from lifeprism.llm.prompts import prompt_loader, Prompts
+from lifeprism.llm.bus import InboundMessage, MessageType, OutboundMessage, bus
+from lifeprism.llm.exceptions import LLMResponseError
+from lifeprism.llm.prompts import Prompts, prompt_loader
+from lifeprism.llm.providers import LLMResponse
 from lifeprism.llm.utils import llm_call_logger
+from lifeprism.llm.utils.md_os import read_md, write_date_md
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
-async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:list[str], outdate_summary: str | None = None)->LLMResponse:
+
+async def ai_diary_summary(
+    date: str,
+    mood: str,
+    importence: str,
+    custom_label: list[str],
+    outdate_summary: str | None = None,
+) -> LLMResponse:
     """
     对某一天的日记进行总结
     args:
@@ -55,9 +60,7 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
         # 计算字数上限：日记长度的 30%，最小 100，最大 500
         upper_limit = int(min(max(len(diary_context) * 0.3, 100), 500))
         task_prompt = prompt_loader.load_prompt(
-            Prompts.Schedule.CREATE_DIARY_SUMMARY,
-            upper_limit=str(upper_limit),
-            user_md=user_md
+            Prompts.Schedule.CREATE_DIARY_SUMMARY, upper_limit=str(upper_limit), user_md=user_md
         )
         system_prompt = task_prompt
 
@@ -73,7 +76,7 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
             """
         )
 
-    diary= f"""
+    diary = f"""
     ## 日记内容：需要总结的部分
     <diary>
     ## {date}
@@ -81,12 +84,9 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
     </diary>
     """
 
-
-
     user_parts.append(diary)
     label_to_save = None
     if mood or importence or custom_label:
-        
         label = "\n\n## 标签"
         label_to_save = "用户输入标签："
         if mood:
@@ -105,53 +105,47 @@ async def ai_diary_summary(date:str, mood:str, importence : str ,custom_label:li
         content=content,
         type=MessageType.GENERAL_TASK,
         token_type=MessageType.DREAM_TASK,
-        extra={'system_prompt':system_prompt}
+        extra={"system_prompt": system_prompt},
     )
     try:
-        llm_result :OutboundMessage = await bus.send(msg)
+        llm_result: OutboundMessage = await bus.send(msg)
         result_content = llm_result.response.content
         llm_call_logger.log_call(msg, llm_result)
         if result_content:
             # 将ai summary写入lifeprismData\user\daily_data\behavior.md
             if label_to_save:
                 result_content = f"{label_to_save}\n" + result_content
-            write_date_md(behavior_md_path, date, result_content, subheading="日记总结", mode='overwrite' if outdate_summary else 'append')
+            write_date_md(
+                behavior_md_path,
+                date,
+                result_content,
+                subheading="日记总结",
+                mode="overwrite" if outdate_summary else "append",
+            )
             return result_content
         else:
-            logger.error(
-                "日记总结 LLM 返回空内容: date=%s, model=%s",
-                date, settings.model
-            )
-            raise LLMResponseError(
-                model=settings.model,
-                raw_response="(empty response)"
-            )
+            logger.error("日记总结 LLM 返回空内容: date=%s, model=%s", date, settings.model)
+            raise LLMResponseError(model=settings.model, raw_response="(empty response)")
     except LLMResponseError:
         raise
     except Exception as e:
-        logger.error(
-            "日记总结 LLM 调用失败: date=%s, model=%s, error=%s",
-            date, settings.model, e
-        )
-        raise LLMResponseError(
-            model=settings.model,
-            raw_response=str(e)[:500],
-            cause=e
-        ) from e
+        logger.error("日记总结 LLM 调用失败: date=%s, model=%s, error=%s", date, settings.model, e)
+        raise LLMResponseError(model=settings.model, raw_response=str(e)[:500], cause=e) from e
 
 
 if __name__ == "__main__":
     data = "2026-04-12"
     diary_context = None
     mood = "不太好"
-    from lifeprism.llm.agent.loop import agent_loop
     import asyncio
-    
+
+    from lifeprism.llm.agent.loop import agent_loop
+
     async def main():
         loop_task = asyncio.create_task(agent_loop.loop())
         # logger.info("[STARTUP] AgentLoop started") # logger is not imported in this file
         response = await ai_diary_summary(data, mood, None, None)
         print(response)
-        loop_task.cancel() # Cancel the loop task when done to exit cleanly
-        
+        loop_task.cancel()  # Cancel the loop task when done to exit cleanly
+
     asyncio.run(main())

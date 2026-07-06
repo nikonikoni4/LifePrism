@@ -1,10 +1,12 @@
-import sys
 import signal
-from lifeprism.utils.logger import get_logger
+import sys
+
 from lifeprism.monitor.windows_monitor.runtime import build_monitor_runtime
+from lifeprism.utils.logger import get_logger
 
 # 配置日志
 logger = get_logger("windows_monitor_main")
+
 
 def main():
     runtime = build_monitor_runtime()
@@ -26,11 +28,13 @@ def main():
         runtime.stop()
         sys.exit(1)
 
+
 def start_monitor_process():
     """
     创建并返回一个监控进程实例
     """
     import multiprocessing
+
     # 使用 multiprocessing.Process 包装 main 函数
     # 注意：在 Windows 上，必须确保 target 函数所在的模块可以被安全导入
     process = multiprocessing.Process(target=main, name="LifePrism-Monitor")

@@ -1,12 +1,16 @@
 """文件系统工具"""
-from typing import Optional, Dict, Any, Tuple
-from pathlib import Path
-import re
-from lifeprism.llm.agent.tools.base import Tool,ERROR,SUCCESS
-from lifeprism.utils import get_logger,DEBUG
-from lifeprism.config import settings
+
 import asyncio
+import re
+from pathlib import Path
+from typing import Any
+
+from lifeprism.config import ALLOWED_DIRS, settings
+from lifeprism.llm.agent.tools.base import ERROR, SUCCESS, Tool
+from lifeprism.utils import get_logger
+
 logger = get_logger(__name__)
+
 
 class _FileTool(Tool):
     """文件系统工具基类，提供路径权限验证功能"""
@@ -14,15 +18,13 @@ class _FileTool(Tool):
     def __init__(self):
         self.allowed_dir_path: list[Path] = settings.allowed_dir_path
         logger.debug("允许的工作目录: %s", self.allowed_dir_path)
-        
-    
-    
-    def _check_workspace_permission(self, file_path: str) -> Tuple[bool, str]:
+
+    def _check_workspace_permission(self, file_path: str) -> tuple[bool, str]:
         """检查文件路径是否在允许的工作目录内
-        
+
         Args:
             file_path: 要检查的文件路径
-            
+
         Returns:
             Tuple[bool, str]: (是否允许, 错误信息)
                               如果允许，返回 (True, "")
@@ -30,27 +32,30 @@ class _FileTool(Tool):
         """
         if not self.allowed_dir_path:
             return True, ""
-        
+
         file_path_obj = Path(file_path).resolve()
-        
+
         for allowed_dir in self.allowed_dir_path:
             try:
                 file_path_obj.relative_to(allowed_dir)
                 return True, ""
             except ValueError:
                 continue
-        
-        return False, f"没有权限访问该文件: {file_path}，允许的工作目录为: {[str(p) for p in self.allowed_dir_path]}"
+
+        return (
+            False,
+            f"没有权限访问该文件: {file_path}，允许的工作目录为: {[str(p) for p in self.allowed_dir_path]}",
+        )
+
 
 # ==========================================
 # 读取文件工具
 # ==========================================
 
-class ReadFileTool(_FileTool):
 
+class ReadFileTool(_FileTool):
     def __init__(self):
         super().__init__()
-            
 
     @property
     def name(self) -> str:
@@ -58,11 +63,13 @@ class ReadFileTool(_FileTool):
 
     @property
     def description(self) -> str:
-        return ("读取文件内容，支持按行号范围读取正文或读取 frontmatter。"
-                "使用 limit 控制读取行数。返回：content(内容), read_ratio(已读内容占全文字符数比例，1.0=已读完), last_line(最后行号)")
+        return (
+            "读取文件内容，支持按行号范围读取正文或读取 frontmatter。"
+            "使用 limit 控制读取行数。返回：content(内容), read_ratio(已读内容占全文字符数比例，1.0=已读完), last_line(最后行号)"
+        )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -106,7 +113,7 @@ class ReadFileTool(_FileTool):
         # 提取参数（使用默认值）
         file_path = kwargs.get("file_path")
         offset = kwargs.get("offset", 1)
-        limit = kwargs.get("limit", None)
+        limit = kwargs.get("limit")
         only_frontmatter = kwargs.get("only_frontmatter", False)
 
         if not file_path:
@@ -119,10 +126,7 @@ class ReadFileTool(_FileTool):
 
         # 将 offset/limit 转换为 start_line/end_line（内部使用从0开始的索引）
         start_line = offset - 1  # offset 从1开始，start_line 从0开始
-        if limit is not None:
-            end_line = start_line + limit - 1  # 转换为闭区间的结束行号
-        else:
-            end_line = None  # None 表示读到文件末尾
+        end_line = start_line + limit - 1 if limit is not None else None
 
         # 调用底层实现
         result = _read_file(
@@ -134,7 +138,6 @@ class ReadFileTool(_FileTool):
 
         # 检查是否有错误
         if "error" in result:
-
             return f"{ERROR}{result['error']}"
 
         # 返回成功结果
@@ -144,9 +147,9 @@ class ReadFileTool(_FileTool):
 def _read_file(
     file_path: str,
     start_line: int = 0,
-    end_line: Optional[int] = None,
+    end_line: int | None = None,
     only_frontmatter: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """读取文件内容
 
     Args:
@@ -170,10 +173,10 @@ def _read_file(
                 "content": "",
                 "read_ratio": 0.0,
                 "last_line": -1,
-                "error": f"文件 {file_path} 不存在"
+                "error": f"文件 {file_path} 不存在",
             }
 
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             all_lines = f.readlines()
 
         # 分离 frontmatter 和正文
@@ -204,14 +207,13 @@ def _read_file(
 
             logger.debug(
                 "读取文件 %s frontmatter: 字符数 %s/%s, 比例 %.2f%%",
-                file_path, len(content), total_chars, read_ratio * 100
+                file_path,
+                len(content),
+                total_chars,
+                read_ratio * 100,
             )
 
-            return {
-                "content": content,
-                "read_ratio": read_ratio,
-                "last_line": last_line
-            }
+            return {"content": content, "read_ratio": read_ratio, "last_line": last_line}
 
         # 读取正文内容
         total_body_chars = sum(len(line) for line in body_lines)
@@ -220,11 +222,7 @@ def _read_file(
         # 处理行号范围
         if start_line >= total_body_lines:
             logger.debug("start_line (%s) 超出文件行数 (%s)", start_line, total_body_lines)
-            return {
-                "content": "",
-                "read_ratio": 0.0,
-                "last_line": -1
-            }
+            return {"content": "", "read_ratio": 0.0, "last_line": -1}
 
         # 确定实际的结束行号
         actual_end_line = end_line if end_line is not None else total_body_lines - 1
@@ -233,14 +231,10 @@ def _read_file(
         # 检查行号范围有效性
         if start_line > actual_end_line:
             logger.debug("start_line (%s) > end_line (%s)", start_line, actual_end_line)
-            return {
-                "content": "",
-                "read_ratio": 0.0,
-                "last_line": -1
-            }
+            return {"content": "", "read_ratio": 0.0, "last_line": -1}
 
         # 截取行范围
-        selected_lines = body_lines[start_line:actual_end_line + 1]
+        selected_lines = body_lines[start_line : actual_end_line + 1]
         content = "".join(selected_lines)
 
         # 计算读取比例
@@ -248,14 +242,15 @@ def _read_file(
 
         logger.debug(
             "读取文件 %s: 行范围 [%s, %s], 字符数 %s/%s, 比例 %.2f%%",
-            file_path, start_line, actual_end_line, len(content), total_body_chars, read_ratio * 100
+            file_path,
+            start_line,
+            actual_end_line,
+            len(content),
+            total_body_chars,
+            read_ratio * 100,
         )
 
-        return {
-            "content": content,
-            "read_ratio": read_ratio,
-            "last_line": actual_end_line
-        }
+        return {"content": content, "read_ratio": read_ratio, "last_line": actual_end_line}
 
     except UnicodeDecodeError as e:
         logger.error("文件编码错误 %s: %s", file_path, e)
@@ -263,7 +258,7 @@ def _read_file(
             "content": "",
             "read_ratio": 0.0,
             "last_line": -1,
-            "error": f"文件编码错误: {str(e)}"
+            "error": f"文件编码错误: {str(e)}",
         }
     except Exception as e:
         logger.error("读取文件 %s 时出错: %s", file_path, e)
@@ -271,15 +266,13 @@ def _read_file(
             "content": "",
             "read_ratio": 0.0,
             "last_line": -1,
-            "error": f"读取文件时出错: {str(e)}"
+            "error": f"读取文件时出错: {str(e)}",
         }
-
 
 
 # ==========================================
 # 写入文件工具
 # ==========================================
-
 
 
 class WriteFileTool(_FileTool):
@@ -289,6 +282,7 @@ class WriteFileTool(_FileTool):
     @property
     def name(self) -> str:
         return "write_file"
+
     @property
     def description(self) -> str:
         return "编写一个全新的文件"
@@ -296,18 +290,12 @@ class WriteFileTool(_FileTool):
     @property
     def parameters(self) -> dict[str, Any]:
         return {
-            'type':'object',
-            'properties':{
-                'file_path':{
-                    'type':'string',
-                    'description':'文件路径'
-                },
-                'content':{
-                    'type':'string',
-                    'description':'文件内容'
-                }
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "文件路径"},
+                "content": {"type": "string", "description": "文件内容"},
             },
-            'required':['file_path','content']
+            "required": ["file_path", "content"],
         }
 
     async def execute(self, **kwargs: Any) -> Any:
@@ -317,7 +305,7 @@ class WriteFileTool(_FileTool):
             return f"{ERROR}: 缺少参数 file_path 或 content"
         try:
             # 确保文件路径在允许的目录中
-            permission,error_msg = self._check_workspace_permission(file_path)
+            permission, error_msg = self._check_workspace_permission(file_path)
             if not permission:
                 return f"{ERROR}: {error_msg}"
             # 写入文件内容
@@ -330,18 +318,16 @@ class WriteFileTool(_FileTool):
             return f"{SUCCESS}: 文件 {file_path} 已成功写入"
         except Exception as e:
             return f"{ERROR}: 写入文件 {file_path} 时出错: {str(e)}"
-        
+
 
 # ==========================================
 # 编辑文件内容工具
 # ==========================================
 
+
 def _replace_content(
-    file_path: str,
-    old_content: str,
-    new_content: str,
-    replace_all: bool = False
-) -> Dict[str, Any]:
+    file_path: str, old_content: str, new_content: str, replace_all: bool = False
+) -> dict[str, Any]:
     """替换文件内容的辅助函数
 
     Args:
@@ -365,7 +351,7 @@ def _replace_content(
             return {"error": f"文件 {file_path} 不存在"}
 
         # 读取文件全部内容
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             original_content = f.read()
 
         # 检查 old_content 是否存在
@@ -391,16 +377,15 @@ def _replace_content(
 
         # 构建成功消息
         if match_count > 1 and not replace_all:
-            message = f"文件 {file_path} 更新成功，替换了第 1 个匹配项（共找到 {match_count} 个匹配项）"
+            message = (
+                f"文件 {file_path} 更新成功，替换了第 1 个匹配项（共找到 {match_count} 个匹配项）"
+            )
             logger.debug(message)
         else:
             message = f"文件 {file_path} 更新成功，替换了 {replaced_count} 个匹配项"
             logger.debug(message)
 
-        return {
-            "message": message,
-            "replaced_count": replaced_count
-        }
+        return {"message": message, "replaced_count": replaced_count}
 
     except UnicodeDecodeError as e:
         logger.error("文件编码错误 %s: %s", file_path, e)
@@ -411,6 +396,7 @@ def _replace_content(
     except Exception as e:
         logger.error("更新文件 %s 时出错: %s", file_path, e)
         return {"error": f"更新文件时出错: {str(e)}"}
+
 
 class EditFileTool(_FileTool):
     """编辑文件工具，通过内容替换的方式修改文件"""
@@ -424,11 +410,13 @@ class EditFileTool(_FileTool):
 
     @property
     def description(self) -> str:
-        return ("通过替换内容的方式编辑文件。"
-                "使用场景：1. 直接替换旧内容为新内容 2. 在某处插入新内容（将原文替换为原文+新增内容）")
+        return (
+            "通过替换内容的方式编辑文件。"
+            "使用场景：1. 直接替换旧内容为新内容 2. 在某处插入新内容（将原文替换为原文+新增内容）"
+        )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -499,10 +487,10 @@ class EditFileTool(_FileTool):
         return f"{SUCCESS}{result['message']}"
 
 
-
 # ==========================================
 # 文件树工具（纯 Python 实现）
 # ==========================================
+
 
 class FileTreeTool(_FileTool):
     """文件树工具 - 纯 Python 实现
@@ -519,11 +507,10 @@ class FileTreeTool(_FileTool):
 
     @property
     def description(self) -> str:
-        return ("获取文件树结构。"
-                "使用场景：1. 查看目录结构 2. 分析文件组织")
+        return "获取文件树结构。使用场景：1. 查看目录结构 2. 分析文件组织"
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -589,7 +576,7 @@ class FileTreeTool(_FileTool):
                 recursive=recursive,
                 max_depth=max_depth,
                 show_hidden=show_hidden,
-                current_depth=0
+                current_depth=0,
             )
 
             if not result:
@@ -612,7 +599,7 @@ def _build_file_tree(
     max_depth: int,
     show_hidden: bool,
     current_depth: int,
-    prefix: str = ""
+    prefix: str = "",
 ) -> str:
     """构建文件树字符串
 
@@ -641,13 +628,13 @@ def _build_file_tree(
 
         # 过滤隐藏文件
         if not show_hidden:
-            items = [item for item in items if not item.name.startswith('.')]
+            items = [item for item in items if not item.name.startswith(".")]
 
         # 排序：目录在前，文件在后，同类按名称排序
         items.sort(key=lambda x: (not x.is_dir(), x.name.lower()))
 
         for i, item in enumerate(items):
-            is_last = (i == len(items) - 1)
+            is_last = i == len(items) - 1
             connector = "└── " if is_last else "├── "
             extension = "    " if is_last else "│   "
 
@@ -667,12 +654,12 @@ def _build_file_tree(
                             max_depth=max_depth,
                             show_hidden=show_hidden,
                             current_depth=current_depth + 1,
-                            prefix=prefix + extension
+                            prefix=prefix + extension,
                         )
                         if subtree:
                             lines.append(subtree)
                 else:
-                    size_str = _format_size(size)
+                    _format_size(size)
                     # lines.append(f"{prefix}{connector}{item.name} ({size_str})")
                     lines.append(f"{prefix}{connector}{item.name} ")
 
@@ -697,15 +684,17 @@ def _format_size(size: int) -> str:
     Returns:
         str: 格式化后的大小字符串
     """
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size < 1024.0:
             return f"{size:.1f}{unit}"
         size /= 1024.0
     return f"{size:.1f}PB"
 
+
 # ==========================================
 # 搜索文件工具（纯 Python 实现）
 # ==========================================
+
 
 class SearchFileTool(_FileTool):
     """搜索文件工具 - 纯 Python 实现
@@ -724,11 +713,10 @@ class SearchFileTool(_FileTool):
 
     @property
     def description(self) -> str:
-        return ("依据文件名称，搜索文件位置，支持模糊匹配。"
-                "注意：大型目录搜索可能需要较长时间")
+        return "依据文件名称，搜索文件位置，支持模糊匹配。注意：大型目录搜索可能需要较长时间"
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -799,7 +787,7 @@ class SearchFileTool(_FileTool):
                     search_dir=search_dir,
                     file_name=file_name,
                     max_results=max_results,
-                    max_depth=max_depth
+                    max_depth=max_depth,
                 )
         except asyncio.TimeoutError:
             return f"{ERROR}搜索超时（{timeout}秒），请尝试缩小搜索范围或增加超时时间"
@@ -811,11 +799,8 @@ class SearchFileTool(_FileTool):
 
 
 def _search_files_py(
-    search_dir: str,
-    file_name: str,
-    max_results: int = 20,
-    max_depth: int | None = None
-) -> Dict[str, Any]:
+    search_dir: str, file_name: str, max_results: int = 20, max_depth: int | None = None
+) -> dict[str, Any]:
     """搜索文件（纯 Python 实现）
 
     Args:
@@ -862,12 +847,11 @@ def _search_files_py(
         except Exception as e:
             return {"error": f"搜索目录 {search_dir} 时出错: {e}"}
 
-        logger.debug("搜索文件 '%s' in '%s': 找到 %s 个匹配项", file_name, search_dir, len(matched_files))
+        logger.debug(
+            "搜索文件 '%s' in '%s': 找到 %s 个匹配项", file_name, search_dir, len(matched_files)
+        )
 
-        return {
-            "files": matched_files,
-            "count": len(matched_files)
-        }
+        return {"files": matched_files, "count": len(matched_files)}
 
     except Exception as e:
         logger.error("搜索文件 '%s' 时出错: %s", file_name, e)
@@ -877,6 +861,7 @@ def _search_files_py(
 # ==========================================
 # 文件内容搜索工具（纯 Python 实现）
 # ==========================================
+
 
 class SearchStringTool(_FileTool):
     """搜索字符串工具 - 纯 Python 实现
@@ -898,7 +883,7 @@ class SearchStringTool(_FileTool):
         return "在文件或文件夹中搜索匹配指定模式的字符串，支持正则表达式"
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -983,7 +968,7 @@ class SearchStringTool(_FileTool):
                     context_lines=context_lines,
                     case_sensitive=case_sensitive,
                     max_results=max_results,
-                    max_depth=max_depth
+                    max_depth=max_depth,
                 )
         except asyncio.TimeoutError:
             return f"{ERROR}搜索超时（{timeout}秒），请尝试缩小搜索范围或增加超时时间"
@@ -995,9 +980,8 @@ class SearchStringTool(_FileTool):
 
 
 # 允许搜索的文本文件后缀（硬约束）
-ALLOWED_SEARCH_EXTENSIONS = {
-    '.txt', '.md', '.json', '.log', '.csv'
-}
+ALLOWED_SEARCH_EXTENSIONS = {".txt", ".md", ".json", ".log", ".csv"}
+
 
 def _search_string_py(
     path: str,
@@ -1005,8 +989,8 @@ def _search_string_py(
     context_lines: int = 0,
     case_sensitive: bool = False,
     max_results: int = 100,
-    max_depth: int | None = None
-) -> Dict[str, Any]:
+    max_depth: int | None = None,
+) -> dict[str, Any]:
     """使用 Python re 模块搜索文件内容
 
     Args:
@@ -1037,7 +1021,9 @@ def _search_string_py(
         if path_obj.is_file():
             # 硬约束：直接指定的文件也必须是允许的文本文件后缀
             if path_obj.suffix.lower() not in ALLOWED_SEARCH_EXTENSIONS:
-                return {"error": f"文件 {path} 不是可搜索的文本文件类型，允许的后缀: {', '.join(sorted(ALLOWED_SEARCH_EXTENSIONS))}"}
+                return {
+                    "error": f"文件 {path} 不是可搜索的文本文件类型，允许的后缀: {', '.join(sorted(ALLOWED_SEARCH_EXTENSIONS))}"
+                }
             files_to_search = [path_obj]
         else:
             base_depth = len(path_obj.absolute().parts)
@@ -1060,7 +1046,7 @@ def _search_string_py(
                 continue
 
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding="utf-8") as f:
                     lines = f.readlines()
 
                 for line_num, line in enumerate(lines, start=1):
@@ -1072,7 +1058,7 @@ def _search_string_py(
                         match_info = {
                             "file": str(file_path),
                             "line": line_num,
-                            "content": line.rstrip('\n')
+                            "content": line.rstrip("\n"),
                         }
 
                         # 添加上下文
@@ -1132,40 +1118,39 @@ def _search_string_py(
 
 
 if __name__ == "__main__":
-    def _check_workspace_permission(file_path: str) -> Tuple[bool, str]:
+
+    def _check_workspace_permission(file_path: str) -> tuple[bool, str]:
         """检查文件路径是否在允许的工作目录内
-        
+
         Args:
             file_path: 要检查的文件路径
-            
+
         Returns:
             Tuple[bool, str]: (是否允许, 错误信息)
                               如果允许，返回 (True, "")
                               如果不允许，返回 (False, 错误信息)
         """
         workspace = settings.lifeprism_data_path
-        allowed_dirs =  ALLOWED_DIRS
+        allowed_dirs = ALLOWED_DIRS
         allowed_dir_path: list[Path] = []
         for dir in allowed_dirs:
             allowed_dir_path.append(Path(workspace / dir).resolve())
         print(f"允许的工作目录: {[allowed_dir_path]}")
         if not allowed_dir_path:
             return True, ""
-        
+
         file_path_obj = Path(file_path).resolve()
-        
+
         for allowed_dir in allowed_dir_path:
             try:
                 file_path_obj.relative_to(allowed_dir)
                 return True, ""
             except ValueError:
                 continue
-        
-        return False, f"没有权限访问该文件: {file_path}，允许的工作目录为: {[str(p) for p in allowed_dir_path]}"
 
-    
+        return (
+            False,
+            f"没有权限访问该文件: {file_path}，允许的工作目录为: {[str(p) for p in allowed_dir_path]}",
+        )
+
     print(_check_workspace_permission("user/user.md"))
-
-
-
-    

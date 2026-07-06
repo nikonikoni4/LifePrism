@@ -1,4 +1,4 @@
-""" 工具调用基类
+"""工具调用基类
 本文件部分代码源自 https://github.com/HKUDS/nanobot.git
 Copyright (c) [2026.3.30] [HKUDS]
 Licensed under the MIT License.
@@ -11,6 +11,7 @@ from typing import Any
 # 错误和成功标识（遵循 nanobot 规范）
 ERROR = "Error: "
 SUCCESS = "Success: "
+
 
 class Tool(ABC):
     """
@@ -140,7 +141,7 @@ class Tool(ABC):
             # required 列出必填参数名，未列出的为可选
             "required": ["title", "count"],
         }
-        
+
         """
         pass
 
@@ -189,7 +190,12 @@ class Tool(ABC):
             return val
         if target_type == "integer" and isinstance(val, int) and not isinstance(val, bool):
             return val
-        if target_type in self._TYPE_MAP and target_type not in ("boolean", "integer", "array", "object"):
+        if target_type in self._TYPE_MAP and target_type not in (
+            "boolean",
+            "integer",
+            "array",
+            "object",
+        ):
             expected = self._TYPE_MAP[target_type]
             if isinstance(val, expected):
                 return val
@@ -245,11 +251,13 @@ class Tool(ABC):
             return []
         if t == "integer" and (not isinstance(val, int) or isinstance(val, bool)):
             return [f"{label} 应为 integer"]
-        if t == "number" and (
-            not isinstance(val, self._TYPE_MAP[t]) or isinstance(val, bool)
-        ):
+        if t == "number" and (not isinstance(val, self._TYPE_MAP[t]) or isinstance(val, bool)):
             return [f"{label} 应为 number"]
-        if t in self._TYPE_MAP and t not in ("integer", "number") and not isinstance(val, self._TYPE_MAP[t]):
+        if (
+            t in self._TYPE_MAP
+            and t not in ("integer", "number")
+            and not isinstance(val, self._TYPE_MAP[t])
+        ):
             return [f"{label} 应为 {t}"]
 
         errors = []

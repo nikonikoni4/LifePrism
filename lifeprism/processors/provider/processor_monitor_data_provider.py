@@ -1,13 +1,15 @@
 """
 内置监控数据提供者 (Processor 专用)
 """
+
 import logging
 from datetime import datetime
-from typing import List, Dict, Optional
+
 from lifeprism.config import settings
 from lifeprism.repository import LWBaseDataProvider
 
 logger = logging.getLogger(__name__)
+
 
 class ProcessorMonitorDataProvider(LWBaseDataProvider):
     """
@@ -19,11 +21,8 @@ class ProcessorMonitorDataProvider(LWBaseDataProvider):
         super().__init__(db_manager)
 
     def get_window_events(
-        self,
-        start_time: datetime,
-        end_time: datetime,
-        limit: int = 500000
-    ) -> List[Dict]:
+        self, start_time: datetime, end_time: datetime, limit: int = 500000
+    ) -> list[dict]:
         """
         获取内置监控的窗口事件
 
@@ -42,14 +41,30 @@ class ProcessorMonitorDataProvider(LWBaseDataProvider):
             ORDER BY timestamp ASC
             LIMIT ?
         """
-        if settings.monitor_type != 'lifeprism':
+        if settings.monitor_type != "lifeprism":
             # activitywatch的格式
-            start_str = start_time.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(start_time, datetime) else start_time
-            end_str = end_time.strftime("%Y-%m-%dT%H:%M:%S") if isinstance(end_time, datetime) else end_time
+            start_str = (
+                start_time.strftime("%Y-%m-%dT%H:%M:%S")
+                if isinstance(start_time, datetime)
+                else start_time
+            )
+            end_str = (
+                end_time.strftime("%Y-%m-%dT%H:%M:%S")
+                if isinstance(end_time, datetime)
+                else end_time
+            )
         else:
             # lifeprism的时间戳已经改为了YYYY-MM-DD HH:MM:SS
-            start_str = start_time.strftime("%Y-%m-%d %H:%M:%S") if isinstance(start_time, datetime) else start_time
-            end_str = end_time.strftime("%Y-%m-%d %H:%M:%S") if isinstance(end_time, datetime) else end_time
+            start_str = (
+                start_time.strftime("%Y-%m-%d %H:%M:%S")
+                if isinstance(start_time, datetime)
+                else start_time
+            )
+            end_str = (
+                end_time.strftime("%Y-%m-%d %H:%M:%S")
+                if isinstance(end_time, datetime)
+                else end_time
+            )
         params = [start_str, end_str, limit]
 
         try:
@@ -62,13 +77,10 @@ class ProcessorMonitorDataProvider(LWBaseDataProvider):
                 for row in rows:
                     # 转换为 EventTransformer 预期的 AW 格式
                     event = {
-                        'id': row['id'],
-                        'timestamp': row['timestamp'],
-                        'duration': row['duration'],
-                        'data': {
-                            'app': row['app'],
-                            'title': row['title']
-                        }
+                        "id": row["id"],
+                        "timestamp": row["timestamp"],
+                        "duration": row["duration"],
+                        "data": {"app": row["app"], "title": row["title"]},
                     }
                     events.append(event)
 
@@ -79,4 +91,10 @@ class ProcessorMonitorDataProvider(LWBaseDataProvider):
 
 
 if __name__ == "__main__":
-    print(len(ProcessorMonitorDataProvider().get_window_events(start_time="2026-04-29 12:08:46" ,end_time="2026-04-30 01:01:00")))
+    print(
+        len(
+            ProcessorMonitorDataProvider().get_window_events(
+                start_time="2026-04-29 12:08:46", end_time="2026-04-30 01:01:00"
+            )
+        )
+    )

@@ -1,7 +1,3 @@
-from .manager import session_manager, Session, ChatHistoryManager
+from .manager import ChatHistoryManager, Session, session_manager
 
-__all__ = [
-    "session_manager",
-    "Session",
-    "ChatHistoryManager"
-]
+__all__ = ["session_manager", "Session", "ChatHistoryManager"]

@@ -10,7 +10,7 @@ LLM 服务商配置管理器（纯数据层）
 不导入任何 llm/ 模块，依赖方向：config → llm
 """
 
-import sys
+import contextlib
 from pathlib import Path
 from typing import Any
 
@@ -569,14 +569,13 @@ class ProviderManager:
         self._raw_specs: list[dict[str, Any]] = []
         self._allowed_providers: list[str] = []
         from lifeprism.config.settings_manager import settings
+
         # 打包环境和开发环境都使用_config_base_path
         self._config_path = settings.config_base_path / "config" / "providers.yaml"
         if not self._config_path.exists():
             self._config_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self._config_path, "w", encoding="utf-8") as f:
-                yaml.dump(
-                    DEFAULT_PROVIDER_CONFIG, f, allow_unicode=True, sort_keys=False
-                )
+                yaml.dump(DEFAULT_PROVIDER_CONFIG, f, allow_unicode=True, sort_keys=False)
             logger.info(
                 f"providers.yaml not found, created from DEFAULT_PROVIDER_CONFIG: {self._config_path}"
             )
@@ -595,16 +594,12 @@ class ProviderManager:
                 data = DEFAULT_PROVIDER_CONFIG
             self._raw_specs = data.get("providers", [])
             self._allowed_providers = data.get("allowed_providers", [])
-            logger.debug(
-                f"Loaded {len(self._raw_specs)} providers from {self._config_path}"
-            )
+            logger.debug(f"Loaded {len(self._raw_specs)} providers from {self._config_path}")
         except Exception:
             # LEGITIMATE: 辅助操作兜底 — 回退到默认 provider 配置
             logger.exception(f"Failed to load providers.yaml from {self._config_path}")
             self._raw_specs = DEFAULT_PROVIDER_CONFIG.get("providers", [])
-            self._allowed_providers = DEFAULT_PROVIDER_CONFIG.get(
-                "allowed_providers", []
-            )
+            self._allowed_providers = DEFAULT_PROVIDER_CONFIG.get("allowed_providers", [])
 
     # ------------------------------------------------------------------
     # 供 registry.py 使用
@@ -636,9 +631,7 @@ class ProviderManager:
         """将 API key 写入 keyring。"""
         env_key = self._get_env_key(provider_name)
         if not env_key:
-            logger.warning(
-                f"Provider '{provider_name}' has no env_key, skipping keyring write"
-            )
+            logger.warning(f"Provider '{provider_name}' has no env_key, skipping keyring write")
             return
         keyring.set_password(_KEYRING_SERVICE, env_key, api_key)
 
@@ -647,10 +640,8 @@ class ProviderManager:
         env_key = self._get_env_key(provider_name)
         if not env_key:
             return
-        try:
+        with contextlib.suppress(keyring.errors.PasswordDeleteError):
             keyring.delete_password(_KEYRING_SERVICE, env_key)
-        except keyring.errors.PasswordDeleteError:
-            pass
 
     def _get_env_key(self, provider_name: str) -> str:
         """从 raw_specs 中查找 provider 的 env_key。"""

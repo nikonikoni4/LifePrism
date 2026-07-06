@@ -6,7 +6,6 @@ LLM 结果解析工具
 - parse_utils: 解析 LLM 的输出结果
 """
 
-
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,16 +14,16 @@ logger = logging.getLogger(__name__)
 def extract_json_from_response(content: str) -> str:
     """
     从 LLM 响应中提取 JSON 内容，处理可能的 Markdown 代码块标记
-    
+
     LLM 有时会返回带有 ```json 或 ``` 标记的响应，这个函数会清理这些标记，
     返回纯 JSON 字符串以便 json.loads() 正确解析。
-    
+
     Args:
         content: LLM 返回的原始响应内容
-        
+
     Returns:
         清理后的 JSON 字符串
-        
+
     Example:
         >>> content = '''```json
         ... {"id": 1}
@@ -33,7 +32,7 @@ def extract_json_from_response(content: str) -> str:
         '{"id": 1}'
     """
     content = content.strip()
-    
+
     # 如果包含代码块标记，提取其中的内容
     if content.startswith("```"):
         lines = content.split("\n")
@@ -44,30 +43,28 @@ def extract_json_from_response(content: str) -> str:
                 break
             json_lines.append(line)
         content = "\n".join(json_lines)
-    
+
     content = content.strip()
     # 非 JSON 内容（如错误信息）直接返回空，让调用方的 `if not clean` 拦截
-    if not content or content[0] not in ('{', '['):
+    if not content or content[0] not in ("{", "["):
         return ""
     return content
 
 
 def parse_classification_result(
-    log_items: list, 
-    classification_result: dict, 
-    node_name: str
+    log_items: list, classification_result: dict, node_name: str
 ) -> list:
     """
     通用的分类结果解析函数
-    
+
     Args:
         log_items: LogItem 列表
         classification_result: LLM 返回的分类结果，格式为 {id: [category, sub_category, link_to_goal]}
         node_name: 节点名称，用于日志输出
-        
+
     Returns:
         更新后的 LogItem 列表
-        
+
     Example:
         >>> classification_result = {
         ...     "1": ["工作/学习", "编程", "完成项目"],
@@ -77,7 +74,7 @@ def parse_classification_result(
     """
     # 创建 id 到 log_item 的映射
     id_to_item = {item.id: item for item in log_items}
-    
+
     # 遍历分类结果，更新对应的 log_item
     for item_id_str, classification in classification_result.items():
         try:
@@ -86,37 +83,48 @@ def parse_classification_result(
                 # classification 格式: [category, sub_category, link_to_goal]
                 if isinstance(classification, list) and len(classification) == 3:
                     category, sub_category, link_to_goal = classification
-                    
+
                     # 将字符串 "null" 或 None 转换为 Python 的 None
                     category = None if (category == "null" or category is None) else category
-                    sub_category = None if (sub_category == "null" or sub_category is None) else sub_category
-                    link_to_goal = None if (link_to_goal == "null" or link_to_goal is None) else link_to_goal
-                    
+                    sub_category = (
+                        None if (sub_category == "null" or sub_category is None) else sub_category
+                    )
+                    link_to_goal = (
+                        None if (link_to_goal == "null" or link_to_goal is None) else link_to_goal
+                    )
+
                     # 更新 log_item
                     id_to_item[item_id].category = category
                     id_to_item[item_id].sub_category = sub_category
                     id_to_item[item_id].link_to_goal = link_to_goal
-                    
+
                     logger.debug(
-                        "[%s] 已更新 log_item %s: "
-                        "category=%s, sub_category=%s, link_to_goal=%s",
-                        node_name, item_id, category, sub_category, link_to_goal
+                        "[%s] 已更新 log_item %s: category=%s, sub_category=%s, link_to_goal=%s",
+                        node_name,
+                        item_id,
+                        category,
+                        sub_category,
+                        link_to_goal,
                     )
                 else:
                     logger.warning(
                         "[%s] 分类结果格式错误: item_id=%s, "
                         "classification=%s, 期望列表格式 [category, sub_category, link_to_goal]",
-                        node_name, item_id, classification
+                        node_name,
+                        item_id,
+                        classification,
                     )
             else:
                 logger.warning("[%s] 分类结果中的 id %s 在 log_items 中不存在", node_name, item_id)
         except (ValueError, TypeError) as e:
             logger.warning(
-                "[%s] 解析分类结果时出错: "
-                "item_id=%s, classification=%s, error=%s",
-                node_name, item_id_str, classification, e
+                "[%s] 解析分类结果时出错: item_id=%s, classification=%s, error=%s",
+                node_name,
+                item_id_str,
+                classification,
+                e,
             )
-    
+
     return log_items
 
 
@@ -147,30 +155,25 @@ def parse_token_usage(result) -> dict:
         >>> print(usage)
         {'input_tokens': 100, 'output_tokens': 50, 'total_tokens': 150, 'search_count': 0}
     """
-    default_usage = {
-        'input_tokens': 0,
-        'output_tokens': 0,
-        'total_tokens': 0,
-        'search_count': 0
-    }
+    default_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "search_count": 0}
 
     if result is None:
         return default_usage
 
     # 尝试从 response_metadata 获取
     raw_usage = {}
-    if hasattr(result, 'response_metadata') and result.response_metadata:
+    if hasattr(result, "response_metadata") and result.response_metadata:
         response_meta = result.response_metadata
 
         # 方式1: token_usage 字段（阿里云、MiniMax、火山引擎）
-        if 'token_usage' in response_meta:
-            raw_usage = response_meta['token_usage']
+        if "token_usage" in response_meta:
+            raw_usage = response_meta["token_usage"]
         # 方式2: usage 字段（某些 OpenAI 兼容接口）
-        elif 'usage' in response_meta:
-            raw_usage = response_meta['usage']
+        elif "usage" in response_meta:
+            raw_usage = response_meta["usage"]
 
     # 尝试从 usage_metadata 获取（流式模式下的最后一个 chunk）
-    if not raw_usage and hasattr(result, 'usage_metadata') and result.usage_metadata:
+    if not raw_usage and hasattr(result, "usage_metadata") and result.usage_metadata:
         raw_usage = result.usage_metadata
 
     if not raw_usage:
@@ -179,9 +182,9 @@ def parse_token_usage(result) -> dict:
     # 解析 token 数量（兼容不同字段名）
     # 阿里云: input_tokens, output_tokens
     # 火山引擎/OpenAI: prompt_tokens, completion_tokens
-    input_tokens = raw_usage.get('input_tokens') or raw_usage.get('prompt_tokens') or 0
-    output_tokens = raw_usage.get('output_tokens') or raw_usage.get('completion_tokens') or 0
-    total_tokens = raw_usage.get('total_tokens') or 0
+    input_tokens = raw_usage.get("input_tokens") or raw_usage.get("prompt_tokens") or 0
+    output_tokens = raw_usage.get("output_tokens") or raw_usage.get("completion_tokens") or 0
+    total_tokens = raw_usage.get("total_tokens") or 0
 
     # 如果没有 total_tokens，尝试计算
     if total_tokens == 0 and (input_tokens > 0 or output_tokens > 0):
@@ -192,17 +195,17 @@ def parse_token_usage(result) -> dict:
     # 解析搜索插件调用次数（阿里云特有）
     search_count = 0
     if isinstance(raw_usage, dict):
-        plugins = raw_usage.get('plugins', {})
+        plugins = raw_usage.get("plugins", {})
         if isinstance(plugins, dict):
-            search_info = plugins.get('search', {})
+            search_info = plugins.get("search", {})
             if isinstance(search_info, dict):
-                search_count = search_info.get('count', 0)
+                search_count = search_info.get("count", 0)
 
     return {
-        'input_tokens': input_tokens,
-        'output_tokens': output_tokens,
-        'total_tokens': total_tokens,
-        'search_count': search_count
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+        "search_count": search_count,
     }
 
 
@@ -214,9 +217,10 @@ if __name__ == "__main__":
             "end":2
         }
     ```
-    
+
     """
     import json
+
     content = extract_json_from_response(content)
     print(content)
     print(json.loads(content))

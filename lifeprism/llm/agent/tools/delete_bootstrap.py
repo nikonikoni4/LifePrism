@@ -2,9 +2,10 @@
 
 由于暂时不想提供删除文件以及bash工具，所以暂时添加bootstrap.md删除工具
 """
-from pathlib import Path
-from .base import Tool, ERROR, SUCCESS
+
 from lifeprism.config import settings
+
+from .base import ERROR, SUCCESS, Tool
 
 
 class DeleteBootstrapTool(Tool):

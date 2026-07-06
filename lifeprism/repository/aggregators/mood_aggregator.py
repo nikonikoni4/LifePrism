@@ -4,14 +4,16 @@ Mood Aggregator - 心情数据聚合层
 聚合 MoodTypeProvider, MoodEntryProvider, MoodImpactProvider
 提供心情相关的统一数据视图
 """
-from typing import Optional, List, Dict, Any,Tuple
+
+from typing import Any
+
 from lifeprism.repository.providers.mood_providers import (
-    MoodTypeProvider,
     MoodEntryProvider,
     MoodImpactProvider,
-    QueryOptions
+    MoodTypeProvider,
+    QueryOptions,
 )
-from lifeprism.utils import get_logger
+from lifeprism.utils import LazySingleton, get_logger
 from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
@@ -33,7 +35,7 @@ class MoodAggregator:
 
     # ==================== 聚合方法（核心价值）====================
 
-    def get_mood_entry_with_type(self, entry_id: str) -> Optional[Dict[str, Any]]:
+    def get_mood_entry_with_type(self, entry_id: str) -> dict[str, Any] | None:
         """
         获取心情条目详情（包含类型信息）
 
@@ -50,9 +52,9 @@ class MoodAggregator:
                 return None
 
             # 获取心情类型
-            mood_type = self.type_provider.get_mood_type_by_id(entry['mood_type_id'])
+            mood_type = self.type_provider.get_mood_type_by_id(entry["mood_type_id"])
             if mood_type:
-                entry['mood_type'] = mood_type
+                entry["mood_type"] = mood_type
 
             return entry
         except Exception as e:
@@ -64,10 +66,8 @@ class MoodAggregator:
             ) from e
 
     def get_mood_entries_with_types(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, start_date: str | None = None, end_date: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         获取心情条目列表（每个包含类型信息）
 
@@ -86,24 +86,26 @@ class MoodAggregator:
 
             # 获取所有心情类型（一次性查询）
             mood_types = self.type_provider.get_mood_types()
-            type_map = {t['id']: t for t in mood_types}
+            type_map = {t["id"]: t for t in mood_types}
 
             # 为每个条目附加类型信息
             for entry in entries:
-                mood_type_id = entry.get('mood_type_id')
+                mood_type_id = entry.get("mood_type_id")
                 if mood_type_id and mood_type_id in type_map:
-                    entry['mood_type'] = type_map[mood_type_id]
+                    entry["mood_type"] = type_map[mood_type_id]
 
             return entries
         except Exception as e:
-            logger.error("获取心情条目列表失败: start=%s, end=%s, error=%s", start_date, end_date, e)
+            logger.error(
+                "获取心情条目列表失败: start=%s, end=%s, error=%s", start_date, end_date, e
+            )
             raise DataAccessError(
                 message="获取心情条目列表失败",
                 details={"start_date": start_date, "end_date": end_date, "error": str(e)},
                 cause=e,
             ) from e
 
-    def get_mood_type_with_stats(self, mood_type_id: str) -> Optional[Dict[str, Any]]:
+    def get_mood_type_with_stats(self, mood_type_id: str) -> dict[str, Any] | None:
         """
         获取心情类型详情（包含使用统计）
 
@@ -121,7 +123,7 @@ class MoodAggregator:
 
             # 获取使用统计
             entry_count = self.type_provider.count_entries_by_type(mood_type_id)
-            mood_type['entry_count'] = entry_count if entry_count >= 0 else 0
+            mood_type["entry_count"] = entry_count if entry_count >= 0 else 0
 
             return mood_type
         except Exception as e:
@@ -133,10 +135,8 @@ class MoodAggregator:
             ) from e
 
     def get_mood_analysis_with_impacts(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, start_date: str | None = None, end_date: str | None = None
+    ) -> dict[str, Any]:
         """
         获取心情分析（包含影响因素）
 
@@ -156,16 +156,13 @@ class MoodAggregator:
 
             # 构建分析结果
             analysis = {
-                'entries': entries,
-                'impacts': impacts,
-                'summary': {
-                    'total_entries': len(entries),
-                    'total_impacts': len(impacts),
-                    'date_range': {
-                        'start': start_date,
-                        'end': end_date
-                    }
-                }
+                "entries": entries,
+                "impacts": impacts,
+                "summary": {
+                    "total_entries": len(entries),
+                    "total_impacts": len(impacts),
+                    "date_range": {"start": start_date, "end": end_date},
+                },
             }
 
             return analysis
@@ -179,15 +176,15 @@ class MoodAggregator:
 
     # ==================== MoodType 核心 CRUD 透传 ====================
 
-    def query_mood_type(self,query_options:QueryOptions)->Tuple[List[Dict[str,Any]],int]:
+    def query_mood_type(self, query_options: QueryOptions) -> tuple[list[dict[str, Any]], int]:
         """透传：查询心情类型"""
         return self.type_provider.query_mood_types(query_options)
 
-    def create_mood_type(self, data: Dict[str, Any]) -> Optional[str]:
+    def create_mood_type(self, data: dict[str, Any]) -> str | None:
         """透传：创建心情类型"""
         return self.type_provider.create_mood_type(data)
 
-    def update_mood_type(self, mood_type_id: str, data: Dict[str, Any]) -> bool:
+    def update_mood_type(self, mood_type_id: str, data: dict[str, Any]) -> bool:
         """透传：更新心情类型"""
         return self.type_provider.update_mood_type(mood_type_id, data)
 
@@ -195,11 +192,11 @@ class MoodAggregator:
         """透传：删除心情类型"""
         return self.type_provider.delete_mood_type(mood_type_id)
 
-    def get_mood_types(self) -> List[Dict[str, Any]]:
+    def get_mood_types(self) -> list[dict[str, Any]]:
         """透传：获取所有心情类型"""
         return self.type_provider.get_mood_types()
 
-    def get_mood_type_by_id(self, mood_type_id: str) -> Optional[Dict[str, Any]]:
+    def get_mood_type_by_id(self, mood_type_id: str) -> dict[str, Any] | None:
         """透传：根据ID获取心情类型"""
         return self.type_provider.get_mood_type_by_id(mood_type_id)
 
@@ -208,16 +205,15 @@ class MoodAggregator:
         return self.type_provider.count_entries_by_type(mood_type_id)
 
     # ==================== MoodEntry 核心 CRUD 透传 ====================
-    def query_mood_entry(self,query_options:QueryOptions)->Tuple[List[Dict[str,Any]],int]:
+    def query_mood_entry(self, query_options: QueryOptions) -> tuple[list[dict[str, Any]], int]:
         """透传：查询心情记录"""
         return self.entry_provider.query_mood_entries(query_options)
 
-
-    def create_mood_entry(self, data: Dict[str, Any]) -> Optional[str]:
+    def create_mood_entry(self, data: dict[str, Any]) -> str | None:
         """透传：创建心情记录"""
         return self.entry_provider.create_mood_entry(data)
 
-    def update_mood_entry(self, entry_id: str, data: Dict[str, Any]) -> bool:
+    def update_mood_entry(self, entry_id: str, data: dict[str, Any]) -> bool:
         """透传：更新心情记录"""
         return self.entry_provider.update_mood_entry(entry_id, data)
 
@@ -225,17 +221,19 @@ class MoodAggregator:
         """透传：删除心情记录"""
         return self.entry_provider.delete_mood_entry(entry_id)
 
-    def get_mood_entries(self, start_time: Optional[str] = None, end_time: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_mood_entries(
+        self, start_time: str | None = None, end_time: str | None = None
+    ) -> list[dict[str, Any]]:
         """透传：获取心情记录列表"""
         return self.entry_provider.get_mood_entries(start_time, end_time)
 
-    def get_mood_entry_by_id(self, entry_id: str) -> Optional[Dict[str, Any]]:
+    def get_mood_entry_by_id(self, entry_id: str) -> dict[str, Any] | None:
         """透传：根据ID获取心情记录"""
         return self.entry_provider.get_mood_entry_by_id(entry_id)
 
     # ==================== MoodImpact 核心 CRUD 透传 ====================
 
-    def create_mood_impact(self, data: Dict[str, Any]) -> Optional[int]:
+    def create_mood_impact(self, data: dict[str, Any]) -> int | None:
         """透传：创建影响因素"""
         return self.impact_provider.create_mood_impact(data)
 
@@ -243,13 +241,11 @@ class MoodAggregator:
         """透传：删除影响因素"""
         return self.impact_provider.delete_mood_impact(impact_id)
 
-    def get_mood_impacts(self) -> List[Dict[str, Any]]:
+    def get_mood_impacts(self) -> list[dict[str, Any]]:
         """透传：获取所有影响因素"""
         return self.impact_provider.get_mood_impacts()
 
 
 # ==================== 导出单例 ====================
-
-from lifeprism.utils import LazySingleton
 
 mood_aggregator = LazySingleton(MoodAggregator)

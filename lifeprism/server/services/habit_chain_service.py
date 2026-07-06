@@ -2,9 +2,10 @@
 habit_chain_service.py
 Chain business logic.
 """
-from datetime import datetime
-from typing import Optional, List
 
+from datetime import datetime
+
+from lifeprism.repository import habit_chain_repository, habit_repository
 from lifeprism.server.errors.error_codes import (
     CHAIN_NODE_VALIDATION_FAILED,
     CHAIN_NOT_FOUND,
@@ -12,29 +13,27 @@ from lifeprism.server.errors.error_codes import (
     NODE_NOT_FOUND,
     REORDER_VALIDATION_FAILED,
 )
-from lifeprism.repository import habit_repository, habit_chain_repository
 from lifeprism.server.schemas.habit_schemas import (
-    CreateChainRequest,
-    UpdateChainRequest,
-    CreateNodeRequest,
-    UpdateNodeRequest,
-    ReorderNodesRequest,
-    ChainNodeObject,
-    ChainListItem,
     ChainDetailResponse,
+    ChainListItem,
     ChainListResponse,
-    TimelineResponse,
+    ChainNodeObject,
+    CreateChainRequest,
+    CreateNodeRequest,
+    ReorderNodesRequest,
     TimelineChainItem,
     TimelineNodeItem,
+    TimelineResponse,
+    UpdateChainRequest,
+    UpdateNodeRequest,
 )
-from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils import LazySingleton, get_logger
 from lifeprism.utils.exceptions import NotFoundError, ValidationError
 
 logger = get_logger(__name__)
 
 
 class HabitChainService:
-
     _MSG_NO_NODES = "链中没有节点，无法加入 Timeline"
     _MSG_FIRST_NODE_NEEDS_TIME = "第一个节点必须设置触发时间才能加入 Timeline"
     _MSG_INVALID_TIME = "节点触发时间格式非法"
@@ -46,7 +45,7 @@ class HabitChainService:
 
     # --- Chain CRUD ---
 
-    def get_chains(self, show_in_timeline: Optional[bool]) -> ChainListResponse:
+    def get_chains(self, show_in_timeline: bool | None) -> ChainListResponse:
         chains = habit_chain_repository.get_chains(show_in_timeline)
         items = []
         for chain in chains:
@@ -58,7 +57,9 @@ class HabitChainService:
         chain = self._get_chain_or_404(chain_id)
         nodes = habit_chain_repository.get_nodes_with_habit_names(chain_id)
         nodes_with_calculated = self._calculate_node_times(nodes)
-        return ChainDetailResponse(**self._build_chain_item(chain, nodes_with_calculated).model_dump())
+        return ChainDetailResponse(
+            **self._build_chain_item(chain, nodes_with_calculated).model_dump()
+        )
 
     def create_chain(self, req: CreateChainRequest) -> ChainDetailResponse:
         data = req.model_dump(exclude_unset=True)
@@ -78,7 +79,9 @@ class HabitChainService:
                 if node["id"] in trigger_time_map:
                     node["trigger_time"] = trigger_time_map[node["id"]]
 
-        is_showing_in_timeline = update_data.get("show_in_timeline", bool(chain.get("show_in_timeline", False)))
+        is_showing_in_timeline = update_data.get(
+            "show_in_timeline", bool(chain.get("show_in_timeline", False))
+        )
         self._validate_chain_timeline_rules(nodes, is_showing_in_timeline, CHAIN_VALIDATION_FAILED)
 
         if update_data:
@@ -86,7 +89,9 @@ class HabitChainService:
 
         if trigger_times is not None:
             for item in trigger_times:
-                habit_chain_repository.update_node(item["node_id"], {"trigger_time": item["trigger_time"]})
+                habit_chain_repository.update_node(
+                    item["node_id"], {"trigger_time": item["trigger_time"]}
+                )
 
         return self.get_chain_detail(chain_id)
 
@@ -140,7 +145,9 @@ class HabitChainService:
         update_data = req.model_dump(exclude_unset=True)
 
         if bool(chain and chain.get("show_in_timeline", False)):
-            simulated_nodes = [dict(item) for item in habit_chain_repository.get_nodes_by_chain(chain_id)]
+            simulated_nodes = [
+                dict(item) for item in habit_chain_repository.get_nodes_by_chain(chain_id)
+            ]
             for item in simulated_nodes:
                 if item["id"] == node_id and "trigger_time" in update_data:
                     item["trigger_time"] = update_data["trigger_time"]
@@ -155,10 +162,7 @@ class HabitChainService:
         habit_chain_repository.delete_node(node_id)
         remaining = habit_chain_repository.get_nodes_by_chain(chain_id)
         sorted_nodes = sorted(remaining, key=lambda n: n["sort_order"])
-        updates = [
-            {"node_id": n["id"], "sort_order": i + 1}
-            for i, n in enumerate(sorted_nodes)
-        ]
+        updates = [{"node_id": n["id"], "sort_order": i + 1} for i, n in enumerate(sorted_nodes)]
         if updates:
             habit_chain_repository.batch_update_sort_order(updates)
 
@@ -203,19 +207,21 @@ class HabitChainService:
                     name=n["name"],
                     habit_id=n.get("habit_id"),
                     habit_name=n.get("habit_name"),
-                    trigger_time=n.get("trigger_time"),           # 原始值
-                    calculated_time=n.get("calculated_time"),     # 计算值
+                    trigger_time=n.get("trigger_time"),  # 原始值
+                    calculated_time=n.get("calculated_time"),  # 计算值
                     sort_order=n["sort_order"],
                     today_checked_in=today_map.get(n.get("habit_id"), False),
                 )
                 for n in sorted(nodes_with_calculated, key=lambda x: x["sort_order"])
             ]
-            chain_items.append(TimelineChainItem(id=chain["id"], name=chain["name"], nodes=node_items))
+            chain_items.append(
+                TimelineChainItem(id=chain["id"], name=chain["name"], nodes=node_items)
+            )
         return TimelineResponse(chains=chain_items)
 
     # --- helpers ---
 
-    def _parse_time_to_minutes(self, time_value: Optional[str], error_code: str) -> Optional[int]:
+    def _parse_time_to_minutes(self, time_value: str | None, error_code: str) -> int | None:
         if time_value is None:
             return None
 
@@ -236,9 +242,11 @@ class HabitChainService:
             dt = datetime.fromisoformat(normalized)
             return dt.hour * 60 + dt.minute
         except ValueError as exc:
-            raise ValidationError(f"{self._MSG_INVALID_TIME}: {time_value}", code=error_code) from exc
+            raise ValidationError(
+                f"{self._MSG_INVALID_TIME}: {time_value}", code=error_code
+            ) from exc
 
-    def _calculate_node_times(self, nodes: List[dict]) -> List[dict]:
+    def _calculate_node_times(self, nodes: list[dict]) -> list[dict]:
         """
         计算每个节点的 calculated_time（不存库，仅返回计算结果）
 
@@ -260,7 +268,9 @@ class HabitChainService:
         for i, node in enumerate(sorted_nodes):
             if node.get("trigger_time"):
                 minutes = self._parse_time_to_minutes(node["trigger_time"], "INTERNAL_ERROR")
-                anchors.append({"index": i, "minutes": minutes, "original_time": node["trigger_time"]})
+                anchors.append(
+                    {"index": i, "minutes": minutes, "original_time": node["trigger_time"]}
+                )
 
         # 情况A：没有锚点，所有节点按默认30min递推
         if not anchors:
@@ -273,7 +283,9 @@ class HabitChainService:
         # 情况B：有锚点，处理第一段（第一个锚点之前的节点）
         first_anchor = anchors[0]
         if first_anchor["index"] > 0:
-            current_minutes = first_anchor["minutes"] - (first_anchor["index"] * self._DEFAULT_INTERVAL_MINUTES)
+            current_minutes = first_anchor["minutes"] - (
+                first_anchor["index"] * self._DEFAULT_INTERVAL_MINUTES
+            )
             for i in range(first_anchor["index"]):
                 sorted_nodes[i]["calculated_time"] = self._format_minutes_to_time(current_minutes)
                 current_minutes += self._DEFAULT_INTERVAL_MINUTES
@@ -318,7 +330,10 @@ class HabitChainService:
         return f"{hours:02d}:{mins:02d}"
 
     def _validate_chain_timeline_rules(
-        self, nodes: List[dict], is_showing_in_timeline: bool, error_code: str,
+        self,
+        nodes: list[dict],
+        is_showing_in_timeline: bool,
+        error_code: str,
     ) -> None:
         if not is_showing_in_timeline:
             return
@@ -345,7 +360,7 @@ class HabitChainService:
                 curr_time = self._format_minutes_to_time(current_minutes)
                 raise ValidationError(
                     f"节点触发时间间距不足：{prev_time} → {curr_time} 间距{gap}min，要求>={self._MIN_GAP_MINUTES}min",
-                    code=error_code
+                    code=error_code,
                 )
             last_minutes = current_minutes
 

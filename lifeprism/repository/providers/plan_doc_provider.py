@@ -3,12 +3,14 @@ Plan Doc 数据提供者（重构版）
 
 职责：提供 plan_doc 表的所有数据访问接口
 """
+
 import sqlite3
-from typing import Dict, Any, Optional, List, Tuple, Set
+from typing import Any
+
 from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
-from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
+from lifeprism.utils.exceptions import ConflictError, DataAccessError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -29,27 +31,31 @@ class PlanDocProvider(LWBaseDataProvider):
     _ON_CONFLICT = "abort"  # 计划书不应该有重复 ID，冲突时应该报错
 
     # 白名单字段集合（用于防止 SQL 注入）
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'goal_id', 'status', 'order_index',
-        'created_at', 'updated_at'
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "goal_id",
+        "status",
+        "order_index",
+        "created_at",
+        "updated_at",
     }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'order_index', 'created_at', 'updated_at'
+    _ORDER_FIELDS: set[str] = {"id", "order_index", "created_at", "updated_at"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "goal_id",
+        "content",
+        "status",
+        "order_index",
+        "created_at",
+        "updated_at",
     }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'goal_id', 'content', 'status', 'order_index',
-        'created_at', 'updated_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'status', 'order_index'
-    }
+    _UPDATE_FIELDS: set[str] = {"status", "order_index"}
 
     # ==================== 核心 CRUD 方法 ====================
 
     def query_plan_docs(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -73,7 +79,7 @@ class PlanDocProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_all_plan_docs(self) -> List[Dict[str, Any]]:
+    def get_all_plan_docs(self) -> list[dict[str, Any]]:
         """
         获取所有计划书
 
@@ -97,13 +103,13 @@ class PlanDocProvider(LWBaseDataProvider):
                 columns = [description[0] for description in cursor.description]
                 rows = cursor.fetchall()
 
-                return [dict(zip(columns, row)) for row in rows]
+                return [dict(zip(columns, row, strict=False)) for row in rows]
 
         except Exception as e:
             logger.error("获取所有计划书失败: %s", e)
             raise DataAccessError(f"获取所有计划书失败: {e}") from e
 
-    def get_plan_docs_by_goal(self, goal_id: str) -> List[Dict[str, Any]]:
+    def get_plan_docs_by_goal(self, goal_id: str) -> list[dict[str, Any]]:
         """
         获取指定目标的所有计划书
 
@@ -126,19 +132,19 @@ class PlanDocProvider(LWBaseDataProvider):
                     WHERE goal_id = ?
                     ORDER BY order_index ASC, created_at DESC
                     """,
-                    (goal_id,)
+                    (goal_id,),
                 )
 
                 columns = [description[0] for description in cursor.description]
                 rows = cursor.fetchall()
 
-                return [dict(zip(columns, row)) for row in rows]
+                return [dict(zip(columns, row, strict=False)) for row in rows]
 
         except Exception as e:
             logger.error("获取目标 %s 的计划书失败: %s", goal_id, e)
             raise DataAccessError(f"获取目标 {goal_id} 的计划书失败: {e}") from e
 
-    def get_plan_doc_by_id(self, doc_id: str) -> Optional[Dict[str, Any]]:
+    def get_plan_doc_by_id(self, doc_id: str) -> dict[str, Any] | None:
         """
         按 ID 获取单个计划书
 
@@ -148,14 +154,11 @@ class PlanDocProvider(LWBaseDataProvider):
         Returns:
             Optional[Dict]: 计划书数据，不存在返回 None
         """
-        options = QueryOptions(
-            filters={self._PRIMARY_KEY: doc_id},
-            order_by='id'
-        )
+        options = QueryOptions(filters={self._PRIMARY_KEY: doc_id}, order_by="id")
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_plan_doc(self, data: Dict[str, Any]) -> Optional[str]:
+    def create_plan_doc(self, data: dict[str, Any]) -> str | None:
         """
         创建新计划书
 
@@ -174,21 +177,21 @@ class PlanDocProvider(LWBaseDataProvider):
         """
         try:
             # 验证必填字段
-            doc_id = data.get('id', '')
+            doc_id = data.get("id", "")
             if not doc_id:
                 raise ValidationError("创建计划书失败: id 不能为空")
 
-            if 'order_index' not in data:
+            if "order_index" not in data:
                 raise ValidationError("创建计划书失败: order_index 不能为空")
 
             # 白名单验证
-            allowed_fields = {'id', 'goal_id', 'status', 'order_index'}
+            allowed_fields = {"id", "goal_id", "status", "order_index"}
             invalid_fields = set(data.keys()) - allowed_fields
             if invalid_fields:
                 raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
             # 使用 _generic_insert
-            result_id = self._generic_insert(data, on_conflict=self._ON_CONFLICT)
+            self._generic_insert(data, on_conflict=self._ON_CONFLICT)
             logger.info("创建计划书成功，ID: %s", doc_id)
             return doc_id
 
@@ -198,7 +201,7 @@ class PlanDocProvider(LWBaseDataProvider):
             logger.error("创建计划书失败: %s", e)
             raise DataAccessError(f"创建计划书失败: {e}") from e
 
-    def update_plan_doc(self, doc_id: str, data: Dict[str, Any]) -> bool:
+    def update_plan_doc(self, doc_id: str, data: dict[str, Any]) -> bool:
         """
         更新计划书
 
@@ -303,7 +306,7 @@ class PlanDocProvider(LWBaseDataProvider):
                 # 1. 更新 plan_doc 表的主键 ID
                 cursor.execute(
                     "UPDATE plan_doc SET id = ?, updated_at = datetime('now') WHERE id = ?",
-                    (new_id, old_id)
+                    (new_id, old_id),
                 )
 
                 if cursor.rowcount == 0:
@@ -312,11 +315,15 @@ class PlanDocProvider(LWBaseDataProvider):
 
                 # 2. 级联更新 todo_list 表 (Task Pool) 中的引用
                 cursor.execute(
-                    "UPDATE todo_list SET plan_doc_id = ? WHERE plan_doc_id = ?",
-                    (new_id, old_id)
+                    "UPDATE todo_list SET plan_doc_id = ? WHERE plan_doc_id = ?", (new_id, old_id)
                 )
 
-                logger.info("重命名计划书成功: %s -> %s, 关联任务更新数: %s", old_id, new_id, cursor.rowcount)
+                logger.info(
+                    "重命名计划书成功: %s -> %s, 关联任务更新数: %s",
+                    old_id,
+                    new_id,
+                    cursor.rowcount,
+                )
                 return True
 
         except sqlite3.IntegrityError as e:

@@ -3,12 +3,13 @@
 
 职责：提供 raw_behavior_analysis 表的所有数据访问接口
 """
-import sqlite3
-from typing import Dict, Any, Optional, List, Set, Tuple
+
+from typing import Any
+
 from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
-from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
+from lifeprism.utils.exceptions import DataAccessError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -30,25 +31,16 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
     _ON_CONFLICT = "replace"  # 原始行为分析数据可能重新分析，冲突时替换
 
     # 白名单字段集合（用于防止 SQL 注入）
-    _FILTER_FIELDS: Set[str] = {
-        'start_time', 'end_time', 'behavior', 'screen_count', 'created_at'
-    }
-    _ORDER_FIELDS: Set[str] = {
-        'start_time', 'end_time', 'created_at'
-    }
-    _SELECT_FIELDS: Set[str] = {
-        'start_time', 'end_time', 'behavior', 'screen_count', 'created_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'end_time', 'behavior', 'screen_count'
-    }
+    _FILTER_FIELDS: set[str] = {"start_time", "end_time", "behavior", "screen_count", "created_at"}
+    _ORDER_FIELDS: set[str] = {"start_time", "end_time", "created_at"}
+    _SELECT_FIELDS: set[str] = {"start_time", "end_time", "behavior", "screen_count", "created_at"}
+    _UPDATE_FIELDS: set[str] = {"end_time", "behavior", "screen_count"}
 
     # ==================== 核心 CRUD 方法 ====================
 
     def query_raw_behaviors(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -73,7 +65,7 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_raw_behavior_by_start_time(self, start_time: str) -> Optional[Dict[str, Any]]:
+    def get_raw_behavior_by_start_time(self, start_time: str) -> dict[str, Any] | None:
         """
         根据开始时间获取单条原始行为分析记录
 
@@ -83,18 +75,13 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
         Returns:
             dict | None: 记录或 None
         """
-        options = QueryOptions(
-            filters={self._PRIMARY_KEY: start_time},
-            order_by='start_time'
-        )
+        options = QueryOptions(filters={self._PRIMARY_KEY: start_time}, order_by="start_time")
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
     def get_raw_behaviors_by_date_range(
-        self,
-        start_date: str,
-        end_date: str
-    ) -> List[Dict[str, Any]]:
+        self, start_date: str, end_date: str
+    ) -> list[dict[str, Any]]:
         """
         获取指定日期范围内的原始行为分析记录
 
@@ -121,9 +108,9 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
             if not rows:
                 return []
             columns = [desc[0] for desc in cursor.description]
-            return [dict(zip(columns, row)) for row in rows]
+            return [dict(zip(columns, row, strict=False)) for row in rows]
 
-    def create_raw_behavior(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_raw_behavior(self, data: dict[str, Any]) -> dict[str, Any]:
         """
         创建单条原始行为分析记录
 
@@ -139,7 +126,7 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
         """
         try:
             # 白名单验证
-            required_fields = {'start_time', 'end_time', 'behavior', 'screen_count'}
+            required_fields = {"start_time", "end_time", "behavior", "screen_count"}
             if not required_fields.issubset(data.keys()):
                 missing = required_fields - set(data.keys())
                 raise ValueError(f"Missing required fields: {missing}")
@@ -150,18 +137,18 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
                 raise ValueError(f"Invalid insert fields: {invalid_fields}")
 
             # 使用 _generic_insert（_ON_CONFLICT = "replace"）
-            self._generic_insert(data,on_conflict=self._ON_CONFLICT)
-            logger.info("创建原始行为分析记录: %s", data['start_time'])
+            self._generic_insert(data, on_conflict=self._ON_CONFLICT)
+            logger.info("创建原始行为分析记录: %s", data["start_time"])
 
             # 返回刚插入的记录
-            return self.get_raw_behavior_by_start_time(data['start_time']) or {}
+            return self.get_raw_behavior_by_start_time(data["start_time"]) or {}
         except ValueError:
             raise
         except Exception as e:
             logger.error("创建原始行为分析记录失败: %s", e)
             raise DataAccessError(f"创建原始行为分析记录失败: {e}") from e
 
-    def batch_create_raw_behaviors(self, data_list: List[Dict[str, Any]]) -> int:
+    def batch_create_raw_behaviors(self, data_list: list[dict[str, Any]]) -> int:
         """
         批量创建原始行为分析记录
 
@@ -177,7 +164,7 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
         if not data_list:
             return 0
 
-        required_fields = {'start_time', 'end_time', 'behavior', 'screen_count'}
+        required_fields = {"start_time", "end_time", "behavior", "screen_count"}
 
         # 验证所有记录
         for idx, data in enumerate(data_list):
@@ -199,17 +186,22 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
                         f"""INSERT INTO {self._TABLE_NAME}
                            (start_time, end_time, behavior, screen_count, created_at)
                            VALUES (?, ?, ?, ?, datetime('now', 'localtime'))""",
-                        (data['start_time'], data['end_time'], data['behavior'], data['screen_count'])
+                        (
+                            data["start_time"],
+                            data["end_time"],
+                            data["behavior"],
+                            data["screen_count"],
+                        ),
                     )
                     success_count += 1
                 except Exception as e:
-                    logger.warning("插入记录失败 %s: %s", data['start_time'], e)
+                    logger.warning("插入记录失败 %s: %s", data["start_time"], e)
                     continue
 
         logger.info("批量创建原始行为分析记录: %s/%s", success_count, len(data_list))
         return success_count
 
-    def update_raw_behavior(self, start_time: str, data: Dict[str, Any]) -> bool:
+    def update_raw_behavior(self, start_time: str, data: dict[str, Any]) -> bool:
         """
         更新原始行为分析记录
 
@@ -236,11 +228,7 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
             logger.error("更新原始行为分析记录 %s 失败: %s", start_time, e)
             raise DataAccessError(f"更新原始行为分析记录失败: {e}") from e
 
-    def delete_raw_behaviors_by_date_range(
-        self,
-        start_date: str,
-        end_date: str
-    ) -> int:
+    def delete_raw_behaviors_by_date_range(self, start_date: str, end_date: str) -> int:
         """
         删除指定日期范围内的原始行为分析记录（用于重新生成）
 
@@ -263,14 +251,13 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
                 cursor.execute(
                     f"""DELETE FROM {self._TABLE_NAME}
                        WHERE start_time >= ? AND start_time <= ?""",
-                    (start_datetime, end_datetime)
+                    (start_datetime, end_datetime),
                 )
                 affected_rows = cursor.rowcount
-                logger.info("删除原始行为分析记录: %s 至 %s，共 %s 条", start_date, end_date, affected_rows)
+                logger.info(
+                    "删除原始行为分析记录: %s 至 %s，共 %s 条", start_date, end_date, affected_rows
+                )
                 return affected_rows
         except Exception as e:
             logger.error("删除原始行为分析记录失败: %s", e)
             raise DataAccessError(f"删除原始行为分析记录失败: {e}") from e
-
-
-

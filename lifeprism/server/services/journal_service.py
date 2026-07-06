@@ -3,16 +3,16 @@ Journal 服务层 - Goal Journal 日志业务逻辑
 
 纯函数模块，无状态缓存
 """
-from typing import Optional, List
+
 import json
 
+from lifeprism.server.providers.journal_provider import journal_provider
 from lifeprism.server.schemas.goal_schemas import (
+    CreateJournalRequest,
     JournalEntry,
     JournalListResponse,
-    CreateJournalRequest,
     UpdateJournalRequest,
 )
-from lifeprism.server.providers.journal_provider import journal_provider
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -22,7 +22,7 @@ def _convert_db_item_to_journal_entry(item: dict) -> JournalEntry:
     """
     将数据库记录转换为 JournalEntry
     """
-    tags = item.get('tags', '[]')
+    tags = item.get("tags", "[]")
     if isinstance(tags, str):
         try:
             tags = json.loads(tags)
@@ -30,13 +30,13 @@ def _convert_db_item_to_journal_entry(item: dict) -> JournalEntry:
             tags = []
 
     return JournalEntry(
-        id=item['id'],
-        date=item['date'],
-        time=item.get('time'),
-        content=item['content'],
-        mood=item.get('mood', 'neutral'),
-        duration=item.get('duration', 0),
-        tags=tags
+        id=item["id"],
+        date=item["date"],
+        time=item.get("time"),
+        content=item["content"],
+        mood=item.get("mood", "neutral"),
+        duration=item.get("duration", 0),
+        tags=tags,
     )
 
 
@@ -56,11 +56,11 @@ def get_journals_by_goal(goal_id: str) -> JournalListResponse:
 
 
 def get_journals(
-    goal_id: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    goal_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     page: int = 1,
-    page_size: int = 20
+    page_size: int = 20,
 ) -> JournalListResponse:
     """
     获取日志列表（支持筛选）
@@ -75,16 +75,13 @@ def get_journals(
     Returns:
         JournalListResponse: 日志列表响应
     """
-    if goal_id:
-        items = journal_provider.get_journals_by_goal(goal_id)
-    else:
-        items = []
+    items = journal_provider.get_journals_by_goal(goal_id) if goal_id else []
 
     # 日期筛选
     if start_date or end_date:
         filtered_items = []
         for item in items:
-            item_date = item.get('date', '')
+            item_date = item.get("date", "")
             if start_date and item_date < start_date:
                 continue
             if end_date and item_date > end_date:
@@ -101,7 +98,7 @@ def get_journals(
     return JournalListResponse(items=journal_entries)
 
 
-def get_journal_detail(journal_id: str) -> Optional[JournalEntry]:
+def get_journal_detail(journal_id: str) -> JournalEntry | None:
     """
     获取日志详情
 
@@ -117,7 +114,7 @@ def get_journal_detail(journal_id: str) -> Optional[JournalEntry]:
     return _convert_db_item_to_journal_entry(item)
 
 
-def create_journal(request: CreateJournalRequest) -> Optional[JournalEntry]:
+def create_journal(request: CreateJournalRequest) -> JournalEntry | None:
     """
     创建日志
 
@@ -128,13 +125,13 @@ def create_journal(request: CreateJournalRequest) -> Optional[JournalEntry]:
         Optional[JournalEntry]: 新创建的日志，失败返回 None
     """
     data = {
-        'goal_id': request.goal_id,
-        'date': request.date,
-        'time': request.time,
-        'content': request.content,
-        'mood': request.mood,
-        'duration': request.duration,
-        'tags': request.tags if request.tags else '[]',
+        "goal_id": request.goal_id,
+        "date": request.date,
+        "time": request.time,
+        "content": request.content,
+        "mood": request.mood,
+        "duration": request.duration,
+        "tags": request.tags if request.tags else "[]",
     }
 
     new_id = journal_provider.create_journal(data)
@@ -149,7 +146,7 @@ def create_journal(request: CreateJournalRequest) -> Optional[JournalEntry]:
     return _convert_db_item_to_journal_entry(item)
 
 
-def update_journal(journal_id: str, request: UpdateJournalRequest) -> Optional[JournalEntry]:
+def update_journal(journal_id: str, request: UpdateJournalRequest) -> JournalEntry | None:
     """
     更新日志
 
@@ -163,18 +160,18 @@ def update_journal(journal_id: str, request: UpdateJournalRequest) -> Optional[J
     update_data = {}
     explicitly_set_fields = request.model_fields_set
 
-    if 'date' in explicitly_set_fields:
-        update_data['date'] = request.date
-    if 'time' in explicitly_set_fields:
-        update_data['time'] = request.time
-    if 'content' in explicitly_set_fields:
-        update_data['content'] = request.content
-    if 'mood' in explicitly_set_fields:
-        update_data['mood'] = request.mood
-    if 'duration' in explicitly_set_fields:
-        update_data['duration'] = request.duration
-    if 'tags' in explicitly_set_fields:
-        update_data['tags'] = request.tags
+    if "date" in explicitly_set_fields:
+        update_data["date"] = request.date
+    if "time" in explicitly_set_fields:
+        update_data["time"] = request.time
+    if "content" in explicitly_set_fields:
+        update_data["content"] = request.content
+    if "mood" in explicitly_set_fields:
+        update_data["mood"] = request.mood
+    if "duration" in explicitly_set_fields:
+        update_data["duration"] = request.duration
+    if "tags" in explicitly_set_fields:
+        update_data["tags"] = request.tags
 
     success = journal_provider.update_journal(journal_id, update_data)
     if not success:

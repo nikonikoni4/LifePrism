@@ -1,18 +1,19 @@
 """
 Value API - 价值模块路由
 """
-from fastapi import APIRouter, Query, HTTPException, Path
+
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from lifeprism.server.schemas.value_schemas import (
-    ValueItem,
-    ValueDetailItem,
-    ValueListResponse,
     CreateValueRequest,
     UpdateValueRequest,
+    ValueDetailItem,
+    ValueItem,
+    ValueListResponse,
 )
 from lifeprism.server.services import value_service
-from lifeprism.utils.exceptions import LWBaseError, ConflictError
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import ConflictError, LWBaseError
 
 logger = get_logger(__name__)
 
@@ -49,10 +50,10 @@ async def create_value(request: CreateValueRequest):
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("创建价值失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 @value_router.patch("/{value_id}", response_model=ValueItem, summary="更新价值")

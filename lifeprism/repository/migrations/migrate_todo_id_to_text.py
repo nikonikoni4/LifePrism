@@ -14,16 +14,18 @@ Todo ID 重构迁移脚本：INTEGER 自增 → TEXT t-{uuid[:8]}
     python -m lifeprism.repository.migrations.migrate_todo_id_to_text
     python -m lifeprism.repository.migrations.migrate_todo_id_to_text --check
 """
-import sqlite3
+
 import logging
+import sqlite3
 from pathlib import Path
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 def get_db_path() -> Path:
     from lifeprism.config.settings_manager import settings
+
     return settings.lw_db_path
 
 
@@ -42,7 +44,7 @@ def run_migration():
         # 先检查是否已经迁移过（id 列是否已经是 TEXT）
         cursor.execute("PRAGMA table_info(todo_list)")
         columns = {row[1]: row[2] for row in cursor.fetchall()}
-        if columns.get('id') == 'TEXT':
+        if columns.get("id") == "TEXT":
             logger.debug("todo_list.id 已经是 TEXT 类型，跳过迁移")
             return True
 
@@ -51,7 +53,11 @@ def run_migration():
         todo_count_before = cursor.fetchone()[0]
         cursor.execute("SELECT COUNT(*) FROM timeline_custom_block")
         timeline_count_before = cursor.fetchone()[0]
-        logger.debug("迁移前: todo_list=%s 行, timeline_custom_block=%s 行", todo_count_before, timeline_count_before)
+        logger.debug(
+            "迁移前: todo_list=%s 行, timeline_custom_block=%s 行",
+            todo_count_before,
+            timeline_count_before,
+        )
 
         # 步骤 1: 创建临时映射表
         logger.debug("步骤 1: 创建 ID 映射表...")
@@ -115,7 +121,9 @@ def _create_id_map(cursor: sqlite3.Cursor):
 def _rebuild_timeline_custom_block(cursor: sqlite3.Cursor):
     """重建 timeline_custom_block，将 todo_id INTEGER → TEXT（通过映射表转换）"""
     # 检查 timeline_custom_block 是否存在
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='timeline_custom_block'")
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='timeline_custom_block'"
+    )
     if not cursor.fetchone():
         logger.debug("  timeline_custom_block 表不存在，跳过")
         return
@@ -206,16 +214,16 @@ def _rebuild_todo_list(cursor: sqlite3.Cursor):
 def _rebuild_indexes(cursor: sqlite3.Cursor):
     """重建索引（不再包含 source_anchor_id 索引）"""
     indexes = [
-        ('idx_todo_list_date', 'todo_list', 'date'),
-        ('idx_todo_list_cross_day_state', 'todo_list', 'cross_day, state'),
-        ('idx_todo_list_link_to_goal_id', 'todo_list', 'link_to_goal_id'),
-        ('idx_todo_list_state', 'todo_list', 'state'),
-        ('idx_todo_list_parent_id', 'todo_list', 'parent_id'),
-        ('idx_todo_list_plan_doc_id', 'todo_list', 'plan_doc_id'),
-        ('idx_timeline_custom_block_start_time', 'timeline_custom_block', 'start_time'),
-        ('idx_timeline_custom_block_end_time', 'timeline_custom_block', 'end_time'),
-        ('idx_timeline_custom_block_time_range', 'timeline_custom_block', 'start_time, end_time'),
-        ('idx_timeline_custom_block_todo_id', 'timeline_custom_block', 'todo_id'),
+        ("idx_todo_list_date", "todo_list", "date"),
+        ("idx_todo_list_cross_day_state", "todo_list", "cross_day, state"),
+        ("idx_todo_list_link_to_goal_id", "todo_list", "link_to_goal_id"),
+        ("idx_todo_list_state", "todo_list", "state"),
+        ("idx_todo_list_parent_id", "todo_list", "parent_id"),
+        ("idx_todo_list_plan_doc_id", "todo_list", "plan_doc_id"),
+        ("idx_timeline_custom_block_start_time", "timeline_custom_block", "start_time"),
+        ("idx_timeline_custom_block_end_time", "timeline_custom_block", "end_time"),
+        ("idx_timeline_custom_block_time_range", "timeline_custom_block", "start_time, end_time"),
+        ("idx_timeline_custom_block_todo_id", "timeline_custom_block", "todo_id"),
     ]
     for name, table, cols in indexes:
         cursor.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {table}({cols})")
@@ -235,16 +243,18 @@ def _verify_migration(cursor: sqlite3.Cursor, todo_expected: int, timeline_expec
     cursor.execute("SELECT COUNT(*) FROM timeline_custom_block")
     timeline_actual = cursor.fetchone()[0]
     if timeline_actual != timeline_expected:
-        errors.append(f"timeline_custom_block 行数不一致: 期望 {timeline_expected}, 实际 {timeline_actual}")
+        errors.append(
+            f"timeline_custom_block 行数不一致: 期望 {timeline_expected}, 实际 {timeline_actual}"
+        )
 
     # id 列类型
     cursor.execute("PRAGMA table_info(todo_list)")
     col_types = {row[1]: row[2] for row in cursor.fetchall()}
-    if col_types.get('id') != 'TEXT':
+    if col_types.get("id") != "TEXT":
         errors.append(f"todo_list.id 类型错误: {col_types.get('id')}")
-    if col_types.get('parent_id') != 'TEXT':
+    if col_types.get("parent_id") != "TEXT":
         errors.append(f"todo_list.parent_id 类型错误: {col_types.get('parent_id')}")
-    if 'source_anchor_id' in col_types:
+    if "source_anchor_id" in col_types:
         errors.append("todo_list 仍包含 source_anchor_id 列")
 
     # parent_id 引用完整性
@@ -297,7 +307,7 @@ def check_migration_status():
         cursor.execute("SELECT COUNT(*) FROM todo_list")
         print(f"todo 总数: {cursor.fetchone()[0]}")
 
-        if col_types.get('id') == 'TEXT' and 'source_anchor_id' not in col_types:
+        if col_types.get("id") == "TEXT" and "source_anchor_id" not in col_types:
             print("✓ 迁移已完成")
         else:
             print("✗ 需要执行迁移")
@@ -305,9 +315,10 @@ def check_migration_status():
         conn.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
-    if len(sys.argv) > 1 and sys.argv[1] == '--check':
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--check":
         check_migration_status()
     else:
         run_migration()

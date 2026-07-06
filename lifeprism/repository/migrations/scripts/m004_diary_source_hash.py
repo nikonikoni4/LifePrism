@@ -3,6 +3,7 @@ m004_diary_source_hash - diary 表新增 diary_source_hash 字段
 
 用于追踪 AI 总结时使用的正文 hash，判断总结是否需要刷新。
 """
+
 VERSION = 4
 NAME = "m004_diary_source_hash"
 

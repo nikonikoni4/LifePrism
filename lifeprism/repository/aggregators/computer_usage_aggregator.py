@@ -4,10 +4,12 @@ Computer Usage Aggregator - 计算机使用数据聚合层
 聚合 ComputerUsageProvider, CategoryProvider, SubCategoryProvider
 提供带分类名称的数据视图
 """
-from typing import Optional, List, Dict, Any, Tuple
-from lifeprism.repository.providers.computer_usage_provider import ComputerUsageProvider
+
+from typing import Any
+
 from lifeprism.repository.providers.category_provider import CategoryProvider, SubCategoryProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
+from lifeprism.repository.providers.computer_usage_provider import ComputerUsageProvider
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -26,35 +28,34 @@ class ComputerUsageAggregator:
         self.computer_usage_provider = ComputerUsageProvider()
         self.category_provider = CategoryProvider()
         self.sub_category_provider = SubCategoryProvider()
-        self._category_map: Dict[str, str] = {}
-        self._sub_category_map: Dict[str, str] = {}
+        self._category_map: dict[str, str] = {}
+        self._sub_category_map: dict[str, str] = {}
         self._refresh_cache()
 
     def _refresh_cache(self):
         """刷新分类名称缓存"""
         try:
             categories, _ = self.category_provider.query_categories(QueryOptions())
-            self._category_map = {c['id']: c['name'] for c in categories}
+            self._category_map = {c["id"]: c["name"] for c in categories}
 
             sub_categories, _ = self.sub_category_provider.query_sub_categories(QueryOptions())
-            self._sub_category_map = {s['id']: s['name'] for s in sub_categories}
+            self._sub_category_map = {s["id"]: s["name"] for s in sub_categories}
         except Exception as e:
             logger.error("刷新分类缓存失败: %s", e)
 
-    def _enrich_with_names(self, record: Dict[str, Any]) -> Dict[str, Any]:
+    def _enrich_with_names(self, record: dict[str, Any]) -> dict[str, Any]:
         """为记录添加分类名称"""
-        if record.get('category_id'):
-            record['category_name'] = self._category_map.get(record['category_id'], '')
-        if record.get('sub_category_id'):
-            record['sub_category_name'] = self._sub_category_map.get(record['sub_category_id'], '')
+        if record.get("category_id"):
+            record["category_name"] = self._category_map.get(record["category_id"], "")
+        if record.get("sub_category_id"):
+            record["sub_category_name"] = self._sub_category_map.get(record["sub_category_id"], "")
         return record
 
     # ==================== 聚合方法（核心价值）====================
 
     def query_computer_usage_with_names(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         查询记录并附加分类名称
 
@@ -83,7 +84,7 @@ class ComputerUsageAggregator:
         records, total = self.computer_usage_provider.query_computer_usage(options)
         return [self._enrich_with_names(r) for r in records], total
 
-    def get_computer_usage_by_id_with_names(self, record_id: str) -> Optional[Dict[str, Any]]:
+    def get_computer_usage_by_id_with_names(self, record_id: str) -> dict[str, Any] | None:
         """
         根据 ID 获取记录并附加分类名称
 
@@ -109,21 +110,20 @@ class ComputerUsageAggregator:
     # ==================== 透传 Provider 方法 ====================
 
     def query_computer_usage(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """透传：通用查询接口"""
         return self.computer_usage_provider.query_computer_usage(options)
 
-    def get_computer_usage_by_id(self, record_id: str) -> Optional[Dict[str, Any]]:
+    def get_computer_usage_by_id(self, record_id: str) -> dict[str, Any] | None:
         """透传：根据 ID 获取记录"""
         return self.computer_usage_provider.get_computer_usage_by_id(record_id)
 
-    def create_computer_usage(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_computer_usage(self, data: dict[str, Any]) -> dict[str, Any]:
         """透传：创建记录"""
         return self.computer_usage_provider.create_computer_usage(data)
 
-    def update_computer_usage(self, record_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_computer_usage(self, record_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         """透传：更新记录"""
         return self.computer_usage_provider.update_computer_usage(record_id, data)
 

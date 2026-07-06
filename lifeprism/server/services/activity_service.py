@@ -5,21 +5,18 @@ Activity V2 Service 层 - 纯函数模块
 无状态缓存，每次调用直接访问 provider
 """
 
-from datetime import datetime, timedelta
-from typing import Optional, List
-
+from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.schemas.activity_schemas import (
+    ActivityLogItem,
+    ActivityLogsResponse,
     ActivityStatsIncludeOptions,
     ActivityStatsResponse,
-    ActivityLogsResponse,
-    ActivityLogItem,
 )
-from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.services.activity_stats_builder import (
     build_activity_summary,
     build_time_overview,
-    get_top_title,
     get_top_app,
+    get_top_title,
 )
 from lifeprism.utils import get_logger
 
@@ -31,12 +28,12 @@ def get_activity_stats(
     include_options: ActivityStatsIncludeOptions,
     history_number: int,
     future_number: int,
-    category_id: Optional[str],
-    sub_category_id: Optional[str]
+    category_id: str | None,
+    sub_category_id: str | None,
 ) -> ActivityStatsResponse:
     """
     获取活动统计数据
-    
+
     Args:
         date: 中心日期 (YYYY-MM-DD 格式)
         include_options: 包含选项（由 API 层解析后传入）
@@ -44,7 +41,7 @@ def get_activity_stats(
         future_number: 未来数据天数
         category_id: 主分类ID筛选（可选）
         sub_category_id: 子分类ID筛选（可选）
-        
+
     Returns:
         ActivityStatsResponse: 活动统计响应
     """
@@ -55,22 +52,22 @@ def get_activity_stats(
             "history_number": history_number,
             "future_number": future_number,
             "category_id": category_id,
-            "sub_category_id": sub_category_id
+            "sub_category_id": sub_category_id,
         }
     )
-    
+
     # 根据 include 选项按需获取数据（调用纯函数模块）
     if include_options.include_activity_summary:
         result.activity_summary = build_activity_summary(
             date, history_number, future_number, category_id, sub_category_id
         )
-    
+
     if include_options.include_time_overview:
         result.time_overview = build_time_overview(date)
-    
+
     if include_options.include_top_title:
         result.top_title = get_top_title(date, top_n=5)
-    
+
     if include_options.include_top_app:
         result.top_app = get_top_app(date, top_n=5)
 
@@ -81,23 +78,24 @@ def get_activity_stats(
 # 日志相关函数
 # ============================================================================
 
+
 def get_activity_logs(
-    date: Optional[str],
-    start_time: Optional[str],
-    end_time: Optional[str],
+    date: str | None,
+    start_time: str | None,
+    end_time: str | None,
     device_filter: str,
-    category_id: Optional[str],
-    sub_category_id: Optional[str],
-    sort_by: Optional[str],
-    sort_order: Optional[str],
+    category_id: str | None,
+    sub_category_id: str | None,
+    sort_by: str | None,
+    sort_order: str | None,
     page: int,
-    page_size: int
+    page_size: int,
 ) -> ActivityLogsResponse:
     """
     获取活动日志列表
-    
+
     支持按日期或时间范围查询，使用 provider 的统一查询方法
-    
+
     Args:
         date: 查询日期 (YYYY-MM-DD 格式)，提供时查询整天数据
         start_time: 开始时间 (YYYY-MM-DD HH:MM:SS 格式)
@@ -109,10 +107,10 @@ def get_activity_logs(
         sort_order: 排序方向 (asc/desc)
         page: 页码
         page_size: 每页数量
-        
+
     Returns:
         ActivityLogsResponse: 日志列表响应
-        
+
     Note:
         必须提供 date 或 (start_time 和 end_time) 之一
     """
@@ -126,9 +124,9 @@ def get_activity_logs(
         order_by=sort_by,
         order_desc=(sort_order == "desc"),
         page=page,
-        page_size=page_size
+        page_size=page_size,
     )
-    
+
     # 转换为 ActivityLogItem 列表
     log_items = [
         ActivityLogItem(
@@ -141,34 +139,29 @@ def get_activity_logs(
             category_id=log.get("category_id"),
             sub_category_id=log.get("sub_category_id"),
             category=log.get("category_name"),
-            sub_category=log.get("sub_category_name")
+            sub_category=log.get("sub_category_name"),
         )
         for log in logs
     ]
-    
-    return ActivityLogsResponse(
-        data=log_items,
-        total=total,
-        page=page,
-        page_size=page_size
-    )
+
+    return ActivityLogsResponse(data=log_items, total=total, page=page, page_size=page_size)
 
 
-def get_activity_log_detail(log_id: str) -> Optional[ActivityLogItem]:
+def get_activity_log_detail(log_id: str) -> ActivityLogItem | None:
     """
     获取单条日志详情
-    
+
     Args:
         log_id: 日志ID
-        
+
     Returns:
         ActivityLogItem: 日志详情，如果不存在返回 None
     """
     log = server_lw_data_provider.get_activity_log_by_id(log_id)
-    
+
     if not log:
         return None
-    
+
     return ActivityLogItem(
         id=log["id"],
         start_time=log["start_time"],
@@ -179,26 +172,20 @@ def get_activity_log_detail(log_id: str) -> Optional[ActivityLogItem]:
         category_id=log.get("category_id"),
         sub_category_id=log.get("sub_category_id"),
         category=log.get("category_name"),
-        sub_category=log.get("sub_category_name")
+        sub_category=log.get("sub_category_name"),
     )
 
 
-def update_log_category(
-    log_id: str,
-    category_id: str,
-    sub_category_id: Optional[str]
-) -> bool:
+def update_log_category(log_id: str, category_id: str, sub_category_id: str | None) -> bool:
     """更新日志分类"""
     return server_lw_data_provider.update_event_category(log_id, category_id, sub_category_id)
 
 
-def batch_update_log_category(
-    log_ids: list,
-    category_id: str,
-    sub_category_id: Optional[str]
-) -> int:
+def batch_update_log_category(log_ids: list, category_id: str, sub_category_id: str | None) -> int:
     """批量更新日志分类，返回更新数量"""
-    return server_lw_data_provider.batch_update_event_category(log_ids, category_id, sub_category_id)
+    return server_lw_data_provider.batch_update_event_category(
+        log_ids, category_id, sub_category_id
+    )
 
 
 def delete_log(log_id: str) -> bool:
@@ -220,15 +207,15 @@ def update_logs_by_app_title(
     sub_category_id: str | None = None,
     goal_id: str | None = None,
     start_date: str | None = None,
-    end_date: str | None = None
+    end_date: str | None = None,
 ) -> int:
     """
     根据 app 和可选的 title 批量更新日志分类
-    
+
     匹配逻辑：
     - 单用途应用 (is_multipurpose_app=False): 仅按 app 匹配
     - 多用途应用 (is_multipurpose_app=True): 按 app + title 匹配
-    
+
     Args:
         app: 应用名称
         title: 窗口标题（多用途应用时必须提供）
@@ -238,7 +225,7 @@ def update_logs_by_app_title(
         goal_id: 目标ID（None=不修改, ''=清除, 'goal-xxx'=设置）
         start_date: 开始日期 YYYY-MM-DD（可选）
         end_date: 结束日期 YYYY-MM-DD（可选）
-    
+
     Returns:
         int: 成功更新的数量
     """
@@ -250,5 +237,5 @@ def update_logs_by_app_title(
         sub_category_id=sub_category_id,
         goal_id=goal_id,
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
     )

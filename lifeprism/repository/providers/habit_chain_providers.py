@@ -5,19 +5,21 @@ Habit Chain 模块数据提供者
 - HabitChainProvider: habit_chains 表
 - HabitChainNodeProvider: habit_chain_nodes 表
 """
+
 import sqlite3
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Set, Tuple
+from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
-from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
 
 
 # ==================== HabitChainProvider ====================
+
 
 class HabitChainProvider(LWBaseDataProvider):
     """
@@ -33,23 +35,23 @@ class HabitChainProvider(LWBaseDataProvider):
     _DATE_FIELD = None
     _TIME_FIELD = None
 
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'name', 'show_in_timeline', 'created_at', 'updated_at'
+    _FILTER_FIELDS: set[str] = {"id", "name", "show_in_timeline", "created_at", "updated_at"}
+    _ORDER_FIELDS: set[str] = {"id", "name", "created_at"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "name",
+        "description",
+        "show_in_timeline",
+        "created_at",
+        "updated_at",
     }
-    _ORDER_FIELDS: Set[str] = {'id', 'name', 'created_at'}
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'name', 'description', 'show_in_timeline', 'created_at', 'updated_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'name', 'description', 'show_in_timeline'
-    }
+    _UPDATE_FIELDS: set[str] = {"name", "description", "show_in_timeline"}
 
     # ==================== 核心方法 ====================
 
     def query_habit_chains(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -73,7 +75,7 @@ class HabitChainProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def create_chain(self, data: Dict[str, Any]) -> int:
+    def create_chain(self, data: dict[str, Any]) -> int:
         """
         创建习惯链条，返回新记录的自增 ID
 
@@ -84,9 +86,9 @@ class HabitChainProvider(LWBaseDataProvider):
             新插入记录的 INTEGER 主键
         """
         insert_data = {
-            'name': data['name'],
-            'description': data.get('description'),
-            'show_in_timeline': data.get('show_in_timeline', 0),
+            "name": data["name"],
+            "description": data.get("description"),
+            "show_in_timeline": data.get("show_in_timeline", 0),
         }
 
         try:
@@ -95,9 +97,9 @@ class HabitChainProvider(LWBaseDataProvider):
                     """INSERT INTO habit_chains (name, description, show_in_timeline)
                        VALUES (?, ?, ?)""",
                     (
-                        insert_data['name'],
-                        insert_data['description'],
-                        insert_data['show_in_timeline'],
+                        insert_data["name"],
+                        insert_data["description"],
+                        insert_data["show_in_timeline"],
                     ),
                 )
                 chain_id = cursor.lastrowid
@@ -107,7 +109,7 @@ class HabitChainProvider(LWBaseDataProvider):
             logger.error("创建习惯链失败: error=%s", e)
             raise DataAccessError(f"创建习惯链失败: {e}") from e
 
-    def get_chain_by_id(self, chain_id: int) -> Optional[Dict[str, Any]]:
+    def get_chain_by_id(self, chain_id: int) -> dict[str, Any] | None:
         """
         按 ID 查询单个链条
 
@@ -117,15 +119,11 @@ class HabitChainProvider(LWBaseDataProvider):
         Returns:
             链条数据字典，或 None
         """
-        options = QueryOptions(
-            filters={'id': chain_id},
-            order_by='id',
-            order_desc=False
-        )
+        options = QueryOptions(filters={"id": chain_id}, order_by="id", order_desc=False)
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def get_chains(self, show_in_timeline: Optional[bool] = None) -> List[Dict[str, Any]]:
+    def get_chains(self, show_in_timeline: bool | None = None) -> list[dict[str, Any]]:
         """
         获取链条列表，可按 show_in_timeline 过滤
 
@@ -136,14 +134,14 @@ class HabitChainProvider(LWBaseDataProvider):
             链条数据字典列表，按 created_at 升序
         """
         options = QueryOptions(
-            filters={'show_in_timeline': 1} if show_in_timeline is True else None,
-            order_by='created_at',
-            order_desc=False
+            filters={"show_in_timeline": 1} if show_in_timeline is True else None,
+            order_by="created_at",
+            order_desc=False,
         )
         results, _ = self._generic_query(options)
         return results
 
-    def update_chain(self, chain_id: int, update_data: Dict[str, Any]) -> bool:
+    def update_chain(self, chain_id: int, update_data: dict[str, Any]) -> bool:
         """
         更新链条（PATCH 语义）
 
@@ -183,12 +181,8 @@ class HabitChainProvider(LWBaseDataProvider):
         """
         try:
             with self.db.get_connection() as conn:
-                conn.execute(
-                    "DELETE FROM habit_chain_nodes WHERE chain_id = ?", (chain_id,)
-                )
-                conn.execute(
-                    "DELETE FROM habit_chains WHERE id = ?", (chain_id,)
-                )
+                conn.execute("DELETE FROM habit_chain_nodes WHERE chain_id = ?", (chain_id,))
+                conn.execute("DELETE FROM habit_chains WHERE id = ?", (chain_id,))
             logger.info("删除链条 %s 及其节点成功", chain_id)
             return True
         except sqlite3.Error as e:
@@ -197,6 +191,7 @@ class HabitChainProvider(LWBaseDataProvider):
 
 
 # ==================== HabitChainNodeProvider ====================
+
 
 class HabitChainNodeProvider(LWBaseDataProvider):
     """
@@ -212,24 +207,32 @@ class HabitChainNodeProvider(LWBaseDataProvider):
     _DATE_FIELD = None
     _TIME_FIELD = None  # trigger_time 不用于范围查询
 
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'chain_id', 'habit_id', 'sort_order', 'created_at', 'updated_at'
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "chain_id",
+        "habit_id",
+        "sort_order",
+        "created_at",
+        "updated_at",
     }
-    _ORDER_FIELDS: Set[str] = {'id', 'sort_order', 'created_at'}
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'chain_id', 'sort_order', 'name', 'habit_id', 'trigger_time',
-        'created_at', 'updated_at'
+    _ORDER_FIELDS: set[str] = {"id", "sort_order", "created_at"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "chain_id",
+        "sort_order",
+        "name",
+        "habit_id",
+        "trigger_time",
+        "created_at",
+        "updated_at",
     }
-    _UPDATE_FIELDS: Set[str] = {
-        'name', 'habit_id', 'trigger_time', 'sort_order'
-    }
+    _UPDATE_FIELDS: set[str] = {"name", "habit_id", "trigger_time", "sort_order"}
 
     # ==================== 核心方法 ====================
 
     def query_habit_chain_nodes(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -253,7 +256,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def create_node(self, data: Dict[str, Any]) -> int:
+    def create_node(self, data: dict[str, Any]) -> int:
         """
         创建链条节点，返回新记录的自增 ID
 
@@ -271,11 +274,11 @@ class HabitChainNodeProvider(LWBaseDataProvider):
                        (chain_id, sort_order, name, habit_id, trigger_time)
                        VALUES (?, ?, ?, ?, ?)""",
                     (
-                        data['chain_id'],
-                        data['sort_order'],
-                        data['name'],
-                        data.get('habit_id'),
-                        data.get('trigger_time'),
+                        data["chain_id"],
+                        data["sort_order"],
+                        data["name"],
+                        data.get("habit_id"),
+                        data.get("trigger_time"),
                     ),
                 )
                 node_id = cursor.lastrowid
@@ -285,7 +288,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
             logger.error("创建习惯链节点失败: error=%s", e)
             raise DataAccessError(f"创建习惯链节点失败: {e}") from e
 
-    def get_nodes_by_chain(self, chain_id: int) -> List[Dict[str, Any]]:
+    def get_nodes_by_chain(self, chain_id: int) -> list[dict[str, Any]]:
         """
         获取指定链条的所有节点，按 sort_order 升序排列
 
@@ -296,14 +299,12 @@ class HabitChainNodeProvider(LWBaseDataProvider):
             节点数据字典列表
         """
         options = QueryOptions(
-            filters={'chain_id': chain_id},
-            order_by='sort_order',
-            order_desc=False
+            filters={"chain_id": chain_id}, order_by="sort_order", order_desc=False
         )
         results, _ = self._generic_query(options)
         return results
 
-    def get_node_by_id(self, node_id: int) -> Optional[Dict[str, Any]]:
+    def get_node_by_id(self, node_id: int) -> dict[str, Any] | None:
         """
         按 ID 查询单个节点
 
@@ -313,15 +314,11 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         Returns:
             节点数据字典，或 None
         """
-        options = QueryOptions(
-            filters={'id': node_id},
-            order_by='id',
-            order_desc=False
-        )
+        options = QueryOptions(filters={"id": node_id}, order_by="id", order_desc=False)
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def update_node(self, node_id: int, update_data: Dict[str, Any]) -> bool:
+    def update_node(self, node_id: int, update_data: dict[str, Any]) -> bool:
         """
         更新节点（PATCH 语义）
 
@@ -365,7 +362,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
             logger.error("删除习惯链节点失败: error=%s", e)
             raise DataAccessError(f"删除习惯链节点失败: {e}") from e
 
-    def batch_update_sort_order(self, updates: List[Dict[str, Any]]) -> bool:
+    def batch_update_sort_order(self, updates: list[dict[str, Any]]) -> bool:
         """
         批量更新节点排序（逐条 UPDATE）
 
@@ -439,9 +436,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
 
     # ==================== 跨表查询 ====================
 
-    def get_anchor_info_by_habit_ids(
-        self, habit_ids: List[str]
-    ) -> Dict[str, Dict[str, Any]]:
+    def get_anchor_info_by_habit_ids(self, habit_ids: list[str]) -> dict[str, dict[str, Any]]:
         """
         批量查询习惯对应的锚点节点信息
 
@@ -468,7 +463,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
             cursor = conn.execute(sql, habit_ids)
             rows = cursor.fetchall()
 
-        result: Dict[str, Dict[str, Any]] = {}
+        result: dict[str, dict[str, Any]] = {}
         for row in rows:
             habit_id, node_name, trigger_time, chain_name = row
             if habit_id not in result:
@@ -479,7 +474,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
                 }
         return result
 
-    def get_nodes_with_habit_names(self, chain_id: int) -> List[Dict[str, Any]]:
+    def get_nodes_with_habit_names(self, chain_id: int) -> list[dict[str, Any]]:
         """
         获取链条节点列表，同时附带关联习惯的名称
 
@@ -499,6 +494,4 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         with self.db.get_connection() as conn:
             cursor = conn.execute(sql, (chain_id,))
             columns = [desc[0] for desc in cursor.description]
-            return [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-
+            return [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]

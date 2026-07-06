@@ -3,17 +3,20 @@ Map Cache Providers
 
 提供 multi_purpose_map_cache 和 single_purpose_map_cache 表的数据访问接口。
 """
+
 import sqlite3
-from typing import Dict, Any, List, Optional, Tuple, Set
+from typing import Any
+
 from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
-from lifeprism.utils import get_logger,LazySingleton
-from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
+from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import ConflictError, DataAccessError, ValidationError
 
 logger = get_logger(__name__)
 
 
 # ==================== MultiPurposeMapCacheProvider ====================
+
 
 class MultiPurposeMapCacheProvider(LWBaseDataProvider):
     """
@@ -30,29 +33,47 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
     _TIME_FIELD = None
 
     # 白名单字段集合（用于防止 SQL 注入）
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'app', 'title', 'category_id', 'sub_category_id',
-        'state', 'link_to_goal_id', 'created_at', 'updated_at'
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "app",
+        "title",
+        "category_id",
+        "sub_category_id",
+        "state",
+        "link_to_goal_id",
+        "created_at",
+        "updated_at",
     }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'app', 'title', 'created_at', 'updated_at'
+    _ORDER_FIELDS: set[str] = {"id", "app", "title", "created_at", "updated_at"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "app",
+        "title",
+        "app_description",
+        "title_analysis",
+        "category_id",
+        "sub_category_id",
+        "state",
+        "link_to_goal_id",
+        "created_at",
+        "updated_at",
     }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'app', 'title', 'app_description', 'title_analysis',
-        'category_id', 'sub_category_id', 'state', 'link_to_goal_id',
-        'created_at', 'updated_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'app', 'title', 'app_description', 'title_analysis',
-        'category_id', 'sub_category_id', 'state', 'link_to_goal_id'
+    _UPDATE_FIELDS: set[str] = {
+        "app",
+        "title",
+        "app_description",
+        "title_analysis",
+        "category_id",
+        "sub_category_id",
+        "state",
+        "link_to_goal_id",
     }
 
     # ==================== 核心方法（使用通用方法） ====================
 
     def query_multi_purpose_map_cache(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -67,22 +88,22 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
         """
         # 如果没有提供 options，使用默认的 order_by
         if options is None:
-            options = QueryOptions(order_by='id')
-        elif options.order_by == 'date':
+            options = QueryOptions(order_by="id")
+        elif options.order_by == "date":
             # 如果是默认的 'date'，改为 'id'
             options = QueryOptions(
                 date_range=options.date_range,
                 time_range=options.time_range,
                 filters=options.filters,
-                order_by='id',
+                order_by="id",
                 order_desc=options.order_desc,
                 page=options.page,
                 page_size=options.page_size,
-                fields=options.fields
+                fields=options.fields,
             )
         return self._generic_query(options)
 
-    def get_multi_purpose_map_cache_by_id(self, cache_id: str) -> Optional[Dict[str, Any]]:
+    def get_multi_purpose_map_cache_by_id(self, cache_id: str) -> dict[str, Any] | None:
         """
         按主键获取单条记录
 
@@ -92,11 +113,11 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
         Returns:
             记录，不存在返回 None
         """
-        options = QueryOptions(filters={'id': cache_id}, order_by='id')
+        options = QueryOptions(filters={"id": cache_id}, order_by="id")
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_multi_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
+    def create_multi_purpose_map_cache(self, data: dict[str, Any]) -> bool:
         """
         创建记录
 
@@ -117,26 +138,26 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                 raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
             # 验证必需字段
-            if 'id' not in data or 'app' not in data or 'title' not in data:
+            if "id" not in data or "app" not in data or "title" not in data:
                 raise ValidationError("Missing required fields: id, app, title")
 
             self._generic_insert(data)
-            logger.info("创建 multi_purpose_map_cache 记录成功: %s", data.get('id'))
+            logger.info("创建 multi_purpose_map_cache 记录成功: %s", data.get("id"))
             return True
         except ValidationError:
             raise
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint" in str(e):
                 raise ConflictError(f"记录已存在: {data.get('id')}") from e
-            raise DataAccessError(f"数据完整性错误") from e
+            raise DataAccessError("数据完整性错误") from e
         except Exception as e:
             logger.error("创建 multi_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
-                message=f"创建 multi_purpose_map_cache 记录失败",
-                details={"id": data.get('id'), "error": str(e)}
+                message="创建 multi_purpose_map_cache 记录失败",
+                details={"id": data.get("id"), "error": str(e)},
             ) from e
 
-    def update_multi_purpose_map_cache(self, cache_id: str, data: Dict[str, Any]) -> bool:
+    def update_multi_purpose_map_cache(self, cache_id: str, data: dict[str, Any]) -> bool:
         """
         更新记录
 
@@ -164,13 +185,13 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
             raise
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"记录已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
+                raise ConflictError("记录已存在") from e
+            raise DataAccessError("数据完整性错误") from e
         except Exception as e:
             logger.error("更新 multi_purpose_map_cache 记录 %s 失败: %s", cache_id, e)
             raise DataAccessError(
-                message=f"更新 multi_purpose_map_cache 记录失败",
-                details={"cache_id": cache_id, "error": str(e)}
+                message="更新 multi_purpose_map_cache 记录失败",
+                details={"cache_id": cache_id, "error": str(e)},
             ) from e
 
     def delete_multi_purpose_map_cache(self, cache_id: str) -> bool:
@@ -194,11 +215,11 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("删除 multi_purpose_map_cache 记录 %s 失败: %s", cache_id, e)
             raise DataAccessError(
-                message=f"删除 multi_purpose_map_cache 记录失败",
-                details={"cache_id": cache_id, "error": str(e)}
+                message="删除 multi_purpose_map_cache 记录失败",
+                details={"cache_id": cache_id, "error": str(e)},
             ) from e
 
-    def batch_insert_multi_purpose_map_cache(self, data_list: List[Dict[str, Any]]) -> int:
+    def batch_insert_multi_purpose_map_cache(self, data_list: list[dict[str, Any]]) -> int:
         """
         批量插入记录
 
@@ -223,7 +244,7 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                     raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
                 # 验证必需字段
-                if 'id' not in data or 'app' not in data or 'title' not in data:
+                if "id" not in data or "app" not in data or "title" not in data:
                     raise ValidationError("Missing required fields: id, app, title")
 
             # 手动实现批量插入
@@ -233,8 +254,8 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                 for data in data_list:
                     # 构建字段列表和占位符
                     fields = list(data.keys())
-                    placeholders = ','.join('?' * len(fields))
-                    fields_str = ','.join(fields)
+                    placeholders = ",".join("?" * len(fields))
+                    fields_str = ",".join(fields)
                     values = [data[f] for f in fields]
 
                     sql = f"INSERT INTO {self._TABLE_NAME} ({fields_str}) VALUES ({placeholders})"
@@ -249,19 +270,17 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
             raise
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"记录已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
+                raise ConflictError("记录已存在") from e
+            raise DataAccessError("数据完整性错误") from e
         except Exception as e:
             logger.error("批量插入 multi_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
-                message=f"批量插入 multi_purpose_map_cache 记录失败",
-                details={"count": len(data_list), "error": str(e)}
+                message="批量插入 multi_purpose_map_cache 记录失败",
+                details={"count": len(data_list), "error": str(e)},
             ) from e
 
     def batch_update_multi_purpose_map_cache(
-        self,
-        cache_ids: List[str],
-        data: Dict[str, Any]
+        self, cache_ids: list[str], data: dict[str, Any]
     ) -> int:
         """
         批量更新记录
@@ -287,11 +306,12 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
             # 手动实现批量更新
             from datetime import datetime
-            if 'updated_at' not in data:
-                data['updated_at'] = datetime.now().isoformat()
 
-            set_clause = ', '.join([f"{key} = ?" for key in data.keys()])
-            placeholders = ','.join('?' * len(cache_ids))
+            if "updated_at" not in data:
+                data["updated_at"] = datetime.now().isoformat()
+
+            set_clause = ", ".join([f"{key} = ?" for key in data])
+            placeholders = ",".join("?" * len(cache_ids))
             values = list(data.values()) + cache_ids
 
             sql = f"""
@@ -312,16 +332,16 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
             raise
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"记录已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
+                raise ConflictError("记录已存在") from e
+            raise DataAccessError("数据完整性错误") from e
         except Exception as e:
             logger.error("批量更新 multi_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
-                message=f"批量更新 multi_purpose_map_cache 记录失败",
-                details={"count": len(cache_ids), "error": str(e)}
+                message="批量更新 multi_purpose_map_cache 记录失败",
+                details={"count": len(cache_ids), "error": str(e)},
             ) from e
 
-    def batch_delete_multi_purpose_map_cache(self, cache_ids: List[str]) -> int:
+    def batch_delete_multi_purpose_map_cache(self, cache_ids: list[str]) -> int:
         """
         批量删除记录
 
@@ -339,7 +359,7 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
         try:
             # 手动实现批量删除
-            placeholders = ','.join('?' * len(cache_ids))
+            placeholders = ",".join("?" * len(cache_ids))
             sql = f"DELETE FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} IN ({placeholders})"
 
             with self.db.get_connection() as conn:
@@ -353,12 +373,13 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("批量删除 multi_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
-                message=f"批量删除 multi_purpose_map_cache 记录失败",
-                details={"count": len(cache_ids), "error": str(e)}
+                message="批量删除 multi_purpose_map_cache 记录失败",
+                details={"count": len(cache_ids), "error": str(e)},
             ) from e
 
 
 # ==================== SinglePurposeMapCacheProvider ====================
+
 
 class SinglePurposeMapCacheProvider(LWBaseDataProvider):
     """
@@ -375,29 +396,45 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
     _TIME_FIELD = None
 
     # 白名单字段集合（用于防止 SQL 注入）
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'app', 'title', 'category_id', 'sub_category_id',
-        'state', 'link_to_goal_id', 'created_at', 'updated_at'
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "app",
+        "title",
+        "category_id",
+        "sub_category_id",
+        "state",
+        "link_to_goal_id",
+        "created_at",
+        "updated_at",
     }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'app', 'title', 'created_at', 'updated_at'
+    _ORDER_FIELDS: set[str] = {"id", "app", "title", "created_at", "updated_at"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "app",
+        "title",
+        "app_description",
+        "category_id",
+        "sub_category_id",
+        "state",
+        "link_to_goal_id",
+        "created_at",
+        "updated_at",
     }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'app', 'title', 'app_description',
-        'category_id', 'sub_category_id', 'state', 'link_to_goal_id',
-        'created_at', 'updated_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'app', 'title', 'app_description',
-        'category_id', 'sub_category_id', 'state', 'link_to_goal_id'
+    _UPDATE_FIELDS: set[str] = {
+        "app",
+        "title",
+        "app_description",
+        "category_id",
+        "sub_category_id",
+        "state",
+        "link_to_goal_id",
     }
 
     # ==================== 核心方法（使用通用方法） ====================
 
     def query_single_purpose_map_cache(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -412,22 +449,22 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
         """
         # 如果没有提供 options，使用默认的 order_by
         if options is None:
-            options = QueryOptions(order_by='id')
-        elif options.order_by == 'date':
+            options = QueryOptions(order_by="id")
+        elif options.order_by == "date":
             # 如果是默认的 'date'，改为 'id'
             options = QueryOptions(
                 date_range=options.date_range,
                 time_range=options.time_range,
                 filters=options.filters,
-                order_by='id',
+                order_by="id",
                 order_desc=options.order_desc,
                 page=options.page,
                 page_size=options.page_size,
-                fields=options.fields
+                fields=options.fields,
             )
         return self._generic_query(options)
 
-    def get_single_purpose_map_cache_by_id(self, cache_id: str) -> Optional[Dict[str, Any]]:
+    def get_single_purpose_map_cache_by_id(self, cache_id: str) -> dict[str, Any] | None:
         """
         按主键获取单条记录
 
@@ -437,11 +474,11 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
         Returns:
             记录，不存在返回 None
         """
-        options = QueryOptions(filters={'id': cache_id}, order_by='id')
+        options = QueryOptions(filters={"id": cache_id}, order_by="id")
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_single_purpose_map_cache(self, data: Dict[str, Any]) -> bool:
+    def create_single_purpose_map_cache(self, data: dict[str, Any]) -> bool:
         """
         创建记录
 
@@ -462,26 +499,26 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                 raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
             # 验证必需字段
-            if 'id' not in data or 'app' not in data or 'title' not in data:
+            if "id" not in data or "app" not in data or "title" not in data:
                 raise ValidationError("Missing required fields: id, app, title")
 
             self._generic_insert(data)
-            logger.info("创建 single_purpose_map_cache 记录成功: %s", data.get('id'))
+            logger.info("创建 single_purpose_map_cache 记录成功: %s", data.get("id"))
             return True
         except ValidationError:
             raise
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint" in str(e):
                 raise ConflictError(f"记录已存在: {data.get('id')}") from e
-            raise DataAccessError(f"数据完整性错误") from e
+            raise DataAccessError("数据完整性错误") from e
         except Exception as e:
             logger.error("创建 single_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
-                message=f"创建 single_purpose_map_cache 记录失败",
-                details={"id": data.get('id'), "error": str(e)}
+                message="创建 single_purpose_map_cache 记录失败",
+                details={"id": data.get("id"), "error": str(e)},
             ) from e
 
-    def update_single_purpose_map_cache(self, cache_id: str, data: Dict[str, Any]) -> bool:
+    def update_single_purpose_map_cache(self, cache_id: str, data: dict[str, Any]) -> bool:
         """
         更新记录
 
@@ -509,13 +546,13 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
             raise
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"记录已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
+                raise ConflictError("记录已存在") from e
+            raise DataAccessError("数据完整性错误") from e
         except Exception as e:
             logger.error("更新 single_purpose_map_cache 记录 %s 失败: %s", cache_id, e)
             raise DataAccessError(
-                message=f"更新 single_purpose_map_cache 记录失败",
-                details={"cache_id": cache_id, "error": str(e)}
+                message="更新 single_purpose_map_cache 记录失败",
+                details={"cache_id": cache_id, "error": str(e)},
             ) from e
 
     def delete_single_purpose_map_cache(self, cache_id: str) -> bool:
@@ -539,11 +576,11 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("删除 single_purpose_map_cache 记录 %s 失败: %s", cache_id, e)
             raise DataAccessError(
-                message=f"删除 single_purpose_map_cache 记录失败",
-                details={"cache_id": cache_id, "error": str(e)}
+                message="删除 single_purpose_map_cache 记录失败",
+                details={"cache_id": cache_id, "error": str(e)},
             ) from e
 
-    def batch_insert_single_purpose_map_cache(self, data_list: List[Dict[str, Any]]) -> int:
+    def batch_insert_single_purpose_map_cache(self, data_list: list[dict[str, Any]]) -> int:
         """
         批量插入记录
 
@@ -568,7 +605,7 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                     raise ValidationError(f"Invalid insert fields: {invalid_fields}")
 
                 # 验证必需字段
-                if 'id' not in data or 'app' not in data or 'title' not in data:
+                if "id" not in data or "app" not in data or "title" not in data:
                     raise ValidationError("Missing required fields: id, app, title")
 
             # 手动实现批量插入
@@ -578,8 +615,8 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                 for data in data_list:
                     # 构建字段列表和占位符
                     fields = list(data.keys())
-                    placeholders = ','.join('?' * len(fields))
-                    fields_str = ','.join(fields)
+                    placeholders = ",".join("?" * len(fields))
+                    fields_str = ",".join(fields)
                     values = [data[f] for f in fields]
 
                     sql = f"INSERT INTO {self._TABLE_NAME} ({fields_str}) VALUES ({placeholders})"
@@ -594,19 +631,17 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
             raise
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"记录已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
+                raise ConflictError("记录已存在") from e
+            raise DataAccessError("数据完整性错误") from e
         except Exception as e:
             logger.error("批量插入 single_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
-                message=f"批量插入 single_purpose_map_cache 记录失败",
-                details={"count": len(data_list), "error": str(e)}
+                message="批量插入 single_purpose_map_cache 记录失败",
+                details={"count": len(data_list), "error": str(e)},
             ) from e
 
     def batch_update_single_purpose_map_cache(
-        self,
-        cache_ids: List[str],
-        data: Dict[str, Any]
+        self, cache_ids: list[str], data: dict[str, Any]
     ) -> int:
         """
         批量更新记录
@@ -632,11 +667,12 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
             # 手动实现批量更新
             from datetime import datetime
-            if 'updated_at' not in data:
-                data['updated_at'] = datetime.now().isoformat()
 
-            set_clause = ', '.join([f"{key} = ?" for key in data.keys()])
-            placeholders = ','.join('?' * len(cache_ids))
+            if "updated_at" not in data:
+                data["updated_at"] = datetime.now().isoformat()
+
+            set_clause = ", ".join([f"{key} = ?" for key in data])
+            placeholders = ",".join("?" * len(cache_ids))
             values = list(data.values()) + cache_ids
 
             sql = f"""
@@ -657,16 +693,16 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
             raise
         except sqlite3.IntegrityError as e:
             if "UNIQUE constraint" in str(e):
-                raise ConflictError(f"记录已存在") from e
-            raise DataAccessError(f"数据完整性错误") from e
+                raise ConflictError("记录已存在") from e
+            raise DataAccessError("数据完整性错误") from e
         except Exception as e:
             logger.error("批量更新 single_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
-                message=f"批量更新 single_purpose_map_cache 记录失败",
-                details={"count": len(cache_ids), "error": str(e)}
+                message="批量更新 single_purpose_map_cache 记录失败",
+                details={"count": len(cache_ids), "error": str(e)},
             ) from e
 
-    def batch_delete_single_purpose_map_cache(self, cache_ids: List[str]) -> int:
+    def batch_delete_single_purpose_map_cache(self, cache_ids: list[str]) -> int:
         """
         批量删除记录
 
@@ -684,7 +720,7 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
         try:
             # 手动实现批量删除
-            placeholders = ','.join('?' * len(cache_ids))
+            placeholders = ",".join("?" * len(cache_ids))
             sql = f"DELETE FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} IN ({placeholders})"
 
             with self.db.get_connection() as conn:
@@ -698,7 +734,6 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("批量删除 single_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
-                message=f"批量删除 single_purpose_map_cache 记录失败",
-                details={"count": len(cache_ids), "error": str(e)}
+                message="批量删除 single_purpose_map_cache 记录失败",
+                details={"count": len(cache_ids), "error": str(e)},
             ) from e
-

@@ -3,23 +3,31 @@
 """
 
 import asyncio
-import httpx
+import contextlib
 from typing import Any
-from pathlib import Path
-from lifeprism.llm.channel.base import BaseChannel
-from lifeprism.llm.channel.wechat.config import WechatConfig
-from lifeprism.llm.channel.wechat.client import WechatClient
-from lifeprism.llm.channel.wechat.auth import WechatAuth
-from lifeprism.llm.channel.wechat.media import WechatMedia
-from lifeprism.llm.channel.wechat.exceptions import WechatAPIError, WechatMessageError
-from lifeprism.utils.exceptions import LWBaseError
-from lifeprism.llm.bus import MessageQueue,OutboundMessage,MessageType,ChannelType,InboundMessage
-from lifeprism.llm.providers import LLMResponse
+
+import httpx
+
 from lifeprism.config.settings_manager import settings
-from lifeprism.utils.logger import get_logger
-from lifeprism.llm.session import session_manager
 from lifeprism.llm.agent.context import Context
+from lifeprism.llm.bus import (
+    ChannelType,
+    InboundMessage,
+    MessageQueue,
+    MessageType,
+    OutboundMessage,
+)
+from lifeprism.llm.channel.base import BaseChannel
+from lifeprism.llm.channel.wechat.auth import WechatAuth
+from lifeprism.llm.channel.wechat.client import WechatClient
+from lifeprism.llm.channel.wechat.config import WechatConfig
+from lifeprism.llm.channel.wechat.exceptions import WechatAPIError, WechatMessageError
+from lifeprism.llm.channel.wechat.media import WechatMedia
+from lifeprism.llm.providers import LLMResponse
 from lifeprism.llm.utils.llm_call_logger import llm_call_logger
+from lifeprism.utils.exceptions import LWBaseError
+from lifeprism.utils.logger import get_logger
+
 logger = get_logger(__name__)
 
 
@@ -102,7 +110,7 @@ class WechatChannel(BaseChannel):
                 }
             logger.info("已迁移 %s 个用户的数据", len(old_context_tokens))
 
-        logger.info("加载的 token: %s...", token[:20] if token else 'None')
+        logger.info("加载的 token: %s...", token[:20] if token else "None")
         logger.info("加载的用户数据: %s 个用户", len(self._user_data))
 
         if token:
@@ -118,7 +126,7 @@ class WechatChannel(BaseChannel):
             # 不存在token放弃启动
             logger.info("微信 channel 不存在 token，放弃启动")
             self._running = False
-            return 
+            return
         # 测试 token 是否有效
         try:
             test_body = {"get_updates_buf": ""}
@@ -144,10 +152,7 @@ class WechatChannel(BaseChannel):
         # 保存最新的用户数据（兜底保障）
         if self.auth and self.client and self._user_data:
             try:
-                state = {
-                    "token": self.client.token,
-                    "user_data": self._user_data
-                }
+                state = {"token": self.client.token, "user_data": self._user_data}
                 self.auth.save_state(state)
                 logger.info("停止时保存用户数据: %s 个用户", len(self._user_data))
             except Exception as e:
@@ -155,10 +160,8 @@ class WechatChannel(BaseChannel):
 
         if self._poll_task:
             self._poll_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._poll_task
-            except asyncio.CancelledError:
-                pass
         if self.client:
             await self.client.__aexit__(None, None, None)
         logger.info("微信 channel 已停止")
@@ -195,6 +198,7 @@ class WechatChannel(BaseChannel):
         # 构造并发送消息
         try:
             from lifeprism.llm.channel.wechat.message import WechatMessage
+
             message_body = WechatMessage.build_text_message(wechat_user_id, content, context_token)
             logger.info("开始发送消息到微信: content_len=%s", len(content))
             await self.client.api_post("ilink/bot/sendmessage", message_body)
@@ -216,7 +220,9 @@ class WechatChannel(BaseChannel):
         while self._running:
             try:
                 poll_count += 1
-                logger.debug("第 %s 次轮询, get_updates_buf=%s...", poll_count, get_updates_buf[:50])
+                logger.debug(
+                    "第 %s 次轮询, get_updates_buf=%s...", poll_count, get_updates_buf[:50]
+                )
                 body = {"get_updates_buf": get_updates_buf}
                 data = await self.client.api_post("ilink/bot/getupdates", body)
 
@@ -226,12 +232,16 @@ class WechatChannel(BaseChannel):
                 get_updates_buf = data.get("get_updates_buf", "")
                 messages = data.get("msgs", [])
 
-                logger.debug("轮询返回: get_updates_buf=%s..., 消息数=%s", get_updates_buf[:50], len(messages))
+                logger.debug(
+                    "轮询返回: get_updates_buf=%s..., 消息数=%s",
+                    get_updates_buf[:50],
+                    len(messages),
+                )
 
                 if messages:
                     logger.debug("*** 收到 %s 条消息 ***", len(messages))
                     for idx, msg in enumerate(messages):
-                        logger.debug("消息 %s: %s", idx+1, msg)
+                        logger.debug("消息 %s: %s", idx + 1, msg)
                         await self._handle_wechat_message(msg)
 
             except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
@@ -255,7 +265,11 @@ class WechatChannel(BaseChannel):
             from lifeprism.llm.channel.wechat.message import WechatMessage
 
             parsed = WechatMessage.parse_message(msg)
-            logger.debug("解析后的消息: content_len=%s, media_count=%s", len(parsed["content"]), len(parsed["media"]))
+            logger.debug(
+                "解析后的消息: content_len=%s, media_count=%s",
+                len(parsed["content"]),
+                len(parsed["media"]),
+            )
 
             wechat_user_id = parsed["from_user_id"]
             content = parsed["content"]
@@ -301,7 +315,7 @@ class WechatChannel(BaseChannel):
                 extra={
                     "media": media_paths,
                     "wechat_user_id": wechat_user_id,  # 传递用户ID，供 send() 使用
-                }
+                },
             )
 
             logger.info("准备发布到 bus: id=%s, content=%s", inbound_msg.id, content)
@@ -310,7 +324,7 @@ class WechatChannel(BaseChannel):
                 response: OutboundMessage = await self.bus.send(inbound_msg)
 
                 # 记录 LLM 调用（命令消息如 /new /continue 不记录）
-                if not content.startswith('/'):
+                if not content.startswith("/"):
                     try:
                         system_prompt = Context.build_system_prompt(inbound_msg)
                         llm_call_logger.log_call(
@@ -338,11 +352,11 @@ class WechatChannel(BaseChannel):
                     try:
                         state = {
                             "token": self.client.token if self.client else "",
-                            "user_data": self._user_data
+                            "user_data": self._user_data,
                         }
                         self.auth.save_state(state)
                         logger.info("已保存用户数据")
-                    except (OSError, IOError) as save_error:
+                    except OSError as save_error:
                         logger.error("保存用户数据失败: error=%s", save_error, exc_info=True)
 
                 # 将用户ID传递到响应中
@@ -357,15 +371,15 @@ class WechatChannel(BaseChannel):
                 error_response = OutboundMessage(
                     id=inbound_msg.id,
                     response=LLMResponse(content=f"[ERROR] 处理消息时出错: {e.message or str(e)}"),
-                    extra={"wechat_user_id": wechat_user_id}  # 传递用户ID
+                    extra={"wechat_user_id": wechat_user_id},  # 传递用户ID
                 )
-                
+
                 try:
                     await self.send(error_response)
                 except Exception as send_error:
                     # ✅ 发送错误消息失败时，允许 except Exception（未知的第三方 API 错误）
                     logger.error("发送错误消息也失败: error=%s", send_error, exc_info=True)
-            
+
         except (KeyError, ValueError, TypeError) as e:
             logger.error("消息解析错误: error=%s", e, exc_info=True)
             raise WechatMessageError(f"消息解析失败: {e}") from e

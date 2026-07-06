@@ -2,27 +2,28 @@
 分类管理服务层
 实现分类的业务逻辑和数据库操作
 """
-from lifeprism.server.providers import server_lw_data_provider
+
+import uuid
+from datetime import datetime
+
 from lifeprism.repository import (
     category_repository,
     map_cache_repository,
 )
-from lifeprism.server.schemas.category_schemas import (
-    CategoryTreeResponse,
-    CategoryTreeItem,
-    SubCategoryTreeItem,
-    CategoryStatsResponse,
-    CategoryStatsIncludeOptions,
-    CategoryDef,
-    SubCategoryDef,
-    AppUseInfo,
-    TitleDuration
-)
+from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager
-from lifeprism.utils import get_logger
-from datetime import datetime
-import uuid
-import pandas as pd
+from lifeprism.server.schemas.category_schemas import (
+    AppUseInfo,
+    CategoryDef,
+    CategoryStatsIncludeOptions,
+    CategoryStatsResponse,
+    CategoryTreeItem,
+    CategoryTreeResponse,
+    SubCategoryDef,
+    SubCategoryTreeItem,
+    TitleDuration,
+)
+from lifeprism.utils import LazySingleton, get_logger
 
 logger = get_logger(__name__)
 
@@ -42,42 +43,46 @@ class CategoryService:
         # 缓存 DataFrame
         self._categories_df = self.server_lw_data_provider.load_categories()
         self._sub_categories_df = self.server_lw_data_provider.load_sub_categories()
-        
+
         # 初始化分类名称映射（禁用的分类添加 (banned) 后缀）
         self.category_name_map = {}
         if self._categories_df is not None and not self._categories_df.empty:
             for _, row in self._categories_df.iterrows():
-                cat_id = str(row['id'])
-                name = row['name']
-                state = row.get('state', 1) if 'state' in self._categories_df.columns else 1
+                cat_id = str(row["id"])
+                name = row["name"]
+                state = row.get("state", 1) if "state" in self._categories_df.columns else 1
                 if state == 0:
                     name = f"{name} (banned)"
                 self.category_name_map[cat_id] = name
-        
+
         # 初始化子分类名称映射（禁用的子分类添加 (banned) 后缀）
         self.sub_category_name_map = {}
         if self._sub_categories_df is not None and not self._sub_categories_df.empty:
             for _, row in self._sub_categories_df.iterrows():
-                sub_id = str(row['id'])
-                name = row['name']
-                state = row.get('state', 1) if 'state' in self._sub_categories_df.columns else 1
+                sub_id = str(row["id"])
+                name = row["name"]
+                state = row.get("state", 1) if "state" in self._sub_categories_df.columns else 1
                 if state == 0:
                     name = f"{name} (banned)"
                 self.sub_category_name_map[sub_id] = name
-        
+
         # 子分类 -> 父分类ID映射
-        self.sub_to_parent_map = {
-            str(row['id']): str(row['category_id'])
-            for _, row in self._sub_categories_df.iterrows()
-        } if self._sub_categories_df is not None and not self._sub_categories_df.empty else {}
-    
+        self.sub_to_parent_map = (
+            {
+                str(row["id"]): str(row["category_id"])
+                for _, row in self._sub_categories_df.iterrows()
+            }
+            if self._sub_categories_df is not None and not self._sub_categories_df.empty
+            else {}
+        )
+
     def get_category_tree(self, depth) -> CategoryTreeResponse:
         """
         获取分类树
-        
+
         Args:
             depth: 树的深度，1=仅主分类，2=主分类+子分类
-            
+
         Returns:
             CategoryTreeResponse: 分类树响应
         """
@@ -85,54 +90,68 @@ class CategoryService:
             # 使用缓存的 DataFrame
             if self._categories_df is None or self._categories_df.empty:
                 return CategoryTreeResponse(data=[])
-            
+
             # 构建分类树
             category_tree = []
             for _, cat_row in self._categories_df.iterrows():
-                category_id = str(cat_row['id'])
-                
+                category_id = str(cat_row["id"])
+
                 # 构建子分类列表
                 subcategories = None
-                if depth >= 2 and self._sub_categories_df is not None and not self._sub_categories_df.empty:
+                if (
+                    depth >= 2
+                    and self._sub_categories_df is not None
+                    and not self._sub_categories_df.empty
+                ):
                     # 筛选属于当前主分类的子分类
-                    sub_df = self._sub_categories_df[self._sub_categories_df['category_id'] == cat_row['id']]
+                    sub_df = self._sub_categories_df[
+                        self._sub_categories_df["category_id"] == cat_row["id"]
+                    ]
                     subcategories = [
                         SubCategoryTreeItem(
-                            id=str(sub_row['id']),
-                            name=self.sub_category_name_map.get(str(sub_row['id']), sub_row['name']),
-                            color=color_manager.get_sub_category_color(str(sub_row['id'])),
-                            state=int(sub_row.get('state', 1)) if 'state' in sub_df.columns else 1
+                            id=str(sub_row["id"]),
+                            name=self.sub_category_name_map.get(
+                                str(sub_row["id"]), sub_row["name"]
+                            ),
+                            color=color_manager.get_sub_category_color(str(sub_row["id"])),
+                            state=int(sub_row.get("state", 1)) if "state" in sub_df.columns else 1,
                         )
                         for _, sub_row in sub_df.iterrows()
                     ]
-                
+
                 # 获取主分类的 state
-                cat_state = int(cat_row.get('state', 1)) if 'state' in self._categories_df.columns else 1
-                
-                category_tree.append(CategoryTreeItem(
-                    id=category_id,
-                    name=self.category_name_map.get(category_id, cat_row['name']),
-                    color=color_manager.get_main_category_color(category_id),
-                    state=cat_state,
-                    subcategories=subcategories
-                ))
-            
+                cat_state = (
+                    int(cat_row.get("state", 1)) if "state" in self._categories_df.columns else 1
+                )
+
+                category_tree.append(
+                    CategoryTreeItem(
+                        id=category_id,
+                        name=self.category_name_map.get(category_id, cat_row["name"]),
+                        color=color_manager.get_main_category_color(category_id),
+                        state=cat_state,
+                        subcategories=subcategories,
+                    )
+                )
+
             return CategoryTreeResponse(data=category_tree)
-            
+
         except Exception as e:
             logger.error("获取分类树失败: %s", e)
             raise
 
-    def get_category_stats(self,
-                            start_time: datetime,
-                            end_time: datetime,
-                            include_options: CategoryStatsIncludeOptions,
-                            top_title: int,
-                            category: str,
-                            sub_category: str) -> CategoryStatsResponse:
+    def get_category_stats(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        include_options: CategoryStatsIncludeOptions,
+        top_title: int,
+        category: str,
+        sub_category: str,
+    ) -> CategoryStatsResponse:
         """
         获取分类统计数据
-        
+
         Args:
             start_time: 开始时间
             end_time: 结束时间
@@ -140,101 +159,99 @@ class CategoryService:
             top_title: 返回的 Top 标题数量
             category: 按主分类ID筛选（可选）
             sub_category: 按子分类ID筛选（可选）
-            
+
         Returns:
             CategoryStatsResponse: 分类统计响应
         """
-        
+
         # 验证时间参数（在 try 之外，让验证错误直接抛出）
         now = datetime.now()
         if start_time >= end_time:
             raise ValueError(f"start_time ({start_time}) 必须小于 end_time ({end_time})")
         if end_time > now:
             raise ValueError(f"end_time ({end_time}) 不能大于当前时间 ({now})")
-        
+
         try:
             # 直接使用结构化的 include 选项（由 API 层解析）
             include_duration = include_options.include_duration
             include_app = include_options.include_app
             include_title = include_options.include_title
-            
+
             # 转换时间为字符串格式
-            start_time_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
-            end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
-            
+            start_time_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
+            end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
+
             # 加载行为日志数据
             behavior_df = self.server_lw_data_provider.load_user_app_behavior_log(
-                start_time=start_time_str,
-                end_time=end_time_str
+                start_time=start_time_str, end_time=end_time_str
             )
-            
+
             # 使用缓存的分类元数据
             if self._categories_df is None or self._categories_df.empty:
-                return CategoryStatsResponse(data=[], query={"start_time": start_time_str, "end_time": end_time_str})
-            
+                return CategoryStatsResponse(
+                    data=[], query={"start_time": start_time_str, "end_time": end_time_str}
+                )
+
             # 如果没有行为数据，返回空结构
             if behavior_df is None or behavior_df.empty:
                 return self._build_empty_category_state(
-                    category, 
-                    sub_category,
-                    start_time_str, 
-                    end_time_str,
-                    include_options
+                    category, sub_category, start_time_str, end_time_str, include_options
                 )
-            
+
             # 应用筛选条件
             if category:
-                behavior_df = behavior_df[behavior_df['category_id'] == category]
+                behavior_df = behavior_df[behavior_df["category_id"] == category]
             if sub_category:
-                behavior_df = behavior_df[behavior_df['sub_category_id'] == sub_category]
-            
+                behavior_df = behavior_df[behavior_df["sub_category_id"] == sub_category]
+
             if behavior_df.empty:
                 return self._build_empty_category_state(
-                    category, sub_category,
-                    start_time_str, end_time_str,
-                    include_options
+                    category, sub_category, start_time_str, end_time_str, include_options
                 )
-            
+
             # 计算总时长（用于百分比计算）
-            total_duration = int(behavior_df['duration'].sum())
-            
+            total_duration = int(behavior_df["duration"].sum())
+
             # 按主分类聚合
-            category_stats = behavior_df.groupby('category_id').agg({
-                'duration': 'sum'
-            }).reset_index()
-            
+            category_stats = (
+                behavior_df.groupby("category_id").agg({"duration": "sum"}).reset_index()
+            )
+
             # 构建结果
             category_state = []
-            
+
             for _, cat_stat in category_stats.iterrows():
-                cat_id = str(cat_stat['category_id']) if cat_stat['category_id'] else None
-                if not cat_id or cat_id == 'None':
+                cat_id = str(cat_stat["category_id"]) if cat_stat["category_id"] else None
+                if not cat_id or cat_id == "None":
                     continue
-                    
-                cat_duration = int(cat_stat['duration'])
-                cat_percent = round(cat_duration * 100 / total_duration) if total_duration > 0 else 0
-                
+
+                cat_duration = int(cat_stat["duration"])
+                cat_percent = (
+                    round(cat_duration * 100 / total_duration) if total_duration > 0 else 0
+                )
+
                 # 过滤属于当前主分类的数据
-                cat_behavior_df = behavior_df[behavior_df['category_id'] == cat_id]
-                
+                cat_behavior_df = behavior_df[behavior_df["category_id"] == cat_id]
+
                 # 构建子分类列表
                 subcategories = self._build_subcategory_stats(
-                    cat_behavior_df, cat_duration,
-                    include_app, include_title, top_title
+                    cat_behavior_df, cat_duration, include_app, include_title, top_title
                 )
-                
-                category_state.append(CategoryDef(
-                    id=cat_id,
-                    name=self.category_name_map.get(cat_id, '未知'),
-                    color=color_manager.get_main_category_color(cat_id),
-                    duration=cat_duration if include_duration else None,
-                    duration_percent=cat_percent if include_duration else None,
-                    subcategories=subcategories
-                ))
-            
+
+                category_state.append(
+                    CategoryDef(
+                        id=cat_id,
+                        name=self.category_name_map.get(cat_id, "未知"),
+                        color=color_manager.get_main_category_color(cat_id),
+                        duration=cat_duration if include_duration else None,
+                        duration_percent=cat_percent if include_duration else None,
+                        subcategories=subcategories,
+                    )
+                )
+
             # 按时长降序排序
             category_state.sort(key=lambda x: x.duration or 0, reverse=True)
-            
+
             return CategoryStatsResponse(
                 data=category_state,
                 query={
@@ -242,141 +259,151 @@ class CategoryService:
                     "end_time": end_time_str,
                     "include_options": include_options.model_dump(),
                     "category": category,
-                    "sub_category": sub_category
-                }
+                    "sub_category": sub_category,
+                },
             )
-            
+
         except Exception as e:
             logger.error("获取分类状态失败: %s", e)
             raise
-    
-    def _build_subcategory_stats(self,
-                                  cat_behavior_df,
-                                  parent_duration: int,
-                                  include_app: bool,
-                                  include_title: bool,
-                                  top_title: int) -> list[SubCategoryDef]:
+
+    def _build_subcategory_stats(
+        self,
+        cat_behavior_df,
+        parent_duration: int,
+        include_app: bool,
+        include_title: bool,
+        top_title: int,
+    ) -> list[SubCategoryDef]:
         """构建子分类统计数据"""
         # 按子分类聚合
-        sub_stats = cat_behavior_df.groupby('sub_category_id').agg({
-            'duration': 'sum'
-        }).reset_index()
-        
+        sub_stats = (
+            cat_behavior_df.groupby("sub_category_id").agg({"duration": "sum"}).reset_index()
+        )
+
         subcategories = []
         for _, sub_stat in sub_stats.iterrows():
-            sub_id = str(sub_stat['sub_category_id']) if sub_stat['sub_category_id'] else None
-            if not sub_id or sub_id == 'None':
+            sub_id = str(sub_stat["sub_category_id"]) if sub_stat["sub_category_id"] else None
+            if not sub_id or sub_id == "None":
                 continue
-                
-            sub_duration = int(sub_stat['duration'])
+
+            sub_duration = int(sub_stat["duration"])
             sub_percent = round(sub_duration * 100 / parent_duration) if parent_duration > 0 else 0
-            
+
             # 过滤属于当前子分类的数据
-            sub_behavior_df = cat_behavior_df[cat_behavior_df['sub_category_id'] == sub_id]
-            
+            sub_behavior_df = cat_behavior_df[cat_behavior_df["sub_category_id"] == sub_id]
+
             # 构建应用列表
             app_use_info = None
             if include_app:
                 app_use_info = self._build_app_stats(sub_behavior_df, include_title, top_title)
-            
-            subcategories.append(SubCategoryDef(
-                id=sub_id,
-                name=self.sub_category_name_map.get(sub_id, '未知'),
-                color=color_manager.get_sub_category_color(sub_id),
-                duration=sub_duration,
-                duration_percent=sub_percent,
-                app_use_info=app_use_info
-            ))
-        
+
+            subcategories.append(
+                SubCategoryDef(
+                    id=sub_id,
+                    name=self.sub_category_name_map.get(sub_id, "未知"),
+                    color=color_manager.get_sub_category_color(sub_id),
+                    duration=sub_duration,
+                    duration_percent=sub_percent,
+                    app_use_info=app_use_info,
+                )
+            )
+
         # 按时长降序排序
         subcategories.sort(key=lambda x: x.duration or 0, reverse=True)
         return subcategories
-    
-    def _build_app_stats(self,
-                         sub_behavior_df,
-                         include_title: bool,
-                         top_title: int) -> list:
+
+    def _build_app_stats(self, sub_behavior_df, include_title: bool, top_title: int) -> list:
         """构建应用统计数据"""
         # 按应用聚合
-        app_stats = sub_behavior_df.groupby('app').agg({
-            'duration': 'sum'
-        }).reset_index().sort_values('duration', ascending=False)
-        
+        app_stats = (
+            sub_behavior_df.groupby("app")
+            .agg({"duration": "sum"})
+            .reset_index()
+            .sort_values("duration", ascending=False)
+        )
+
         apps = []
         for _, app_stat in app_stats.iterrows():
-            app_name = app_stat['app']
-            app_duration = int(app_stat['duration'])
-            
+            app_name = app_stat["app"]
+            app_duration = int(app_stat["duration"])
+
             # 构建标题列表
             top_titles = None
             if include_title:
-                app_behavior_df = sub_behavior_df[sub_behavior_df['app'] == app_name]
-                title_stats = app_behavior_df.groupby('title').agg({
-                    'duration': 'sum'
-                }).reset_index().sort_values('duration', ascending=False).head(top_title)
-                
+                app_behavior_df = sub_behavior_df[sub_behavior_df["app"] == app_name]
+                title_stats = (
+                    app_behavior_df.groupby("title")
+                    .agg({"duration": "sum"})
+                    .reset_index()
+                    .sort_values("duration", ascending=False)
+                    .head(top_title)
+                )
+
                 top_titles = [
                     TitleDuration(
-                        title=str(row['title']) if row['title'] else '(无标题)',
-                        duration=int(row['duration'])
+                        title=str(row["title"]) if row["title"] else "(无标题)",
+                        duration=int(row["duration"]),
                     )
                     for _, row in title_stats.iterrows()
                 ]
-            
-            apps.append(AppUseInfo(
-                name=app_name,
-                duration=app_duration,
-                top_titles=top_titles
-            ))
-        
+
+            apps.append(AppUseInfo(name=app_name, duration=app_duration, top_titles=top_titles))
+
         return apps
-    
-    def _build_empty_category_state(self,
-                                     category_filter: str,
-                                     sub_category_filter: str,
-                                     start_time_str: str,
-                                     end_time_str: str,
-                                     include_options: CategoryStatsIncludeOptions) -> CategoryStatsResponse:
+
+    def _build_empty_category_state(
+        self,
+        category_filter: str,
+        sub_category_filter: str,
+        start_time_str: str,
+        end_time_str: str,
+        include_options: CategoryStatsIncludeOptions,
+    ) -> CategoryStatsResponse:
         """构建空数据状态响应"""
-        
+
         # 如果有筛选条件，只返回筛选的分类
         if category_filter:
-            filtered_cats = self._categories_df[self._categories_df['id'] == category_filter]
+            filtered_cats = self._categories_df[self._categories_df["id"] == category_filter]
         else:
             filtered_cats = self._categories_df
-            
+
         category_state = []
         for _, cat_row in filtered_cats.iterrows():
-            cat_id = str(cat_row['id'])
-            
+            cat_id = str(cat_row["id"])
+
             # 构建子分类（空数据）
             subcategories = None
             if self._sub_categories_df is not None and not self._sub_categories_df.empty:
-                sub_df = self._sub_categories_df[self._sub_categories_df['category_id'] == cat_row['id']]
+                sub_df = self._sub_categories_df[
+                    self._sub_categories_df["category_id"] == cat_row["id"]
+                ]
                 if sub_category_filter:
-                    sub_df = sub_df[sub_df['id'] == sub_category_filter]
-                    
+                    sub_df = sub_df[sub_df["id"] == sub_category_filter]
+
                 subcategories = [
                     SubCategoryDef(
-                        id=str(sub_row['id']),
-                        name=self.sub_category_name_map.get(str(sub_row['id']), sub_row['name']),
-                        color=color_manager.get_sub_category_color(str(sub_row['id'])),
+                        id=str(sub_row["id"]),
+                        name=self.sub_category_name_map.get(str(sub_row["id"]), sub_row["name"]),
+                        color=color_manager.get_sub_category_color(str(sub_row["id"])),
                         duration=0,
                         duration_percent=0,
-                        app_use_info=[]
+                        app_use_info=[],
                     )
                     for _, sub_row in sub_df.iterrows()
                 ]
-            
-            category_state.append(CategoryDef(
-                id=cat_id,
-                name=self.category_name_map.get(cat_id, cat_row['name']),
-                color=color_manager.get_main_category_color(cat_id),
-                duration=0,
-                duration_percent=0,
-                subcategories=subcategories
-            ))
-        
+
+            category_state.append(
+                CategoryDef(
+                    id=cat_id,
+                    name=self.category_name_map.get(cat_id, cat_row["name"]),
+                    color=color_manager.get_main_category_color(cat_id),
+                    duration=0,
+                    duration_percent=0,
+                    subcategories=subcategories,
+                )
+            )
+
         return CategoryStatsResponse(
             data=category_state,
             query={
@@ -384,44 +411,48 @@ class CategoryService:
                 "end_time": end_time_str,
                 "include_options": include_options.model_dump(),
                 "category": category_filter,
-                "sub_category": sub_category_filter
-            }
+                "sub_category": sub_category_filter,
+            },
         )
-    
+
     def _refresh_cache(self):
         """刷新分类缓存"""
         self._categories_df = self.server_lw_data_provider.load_categories()
         self._sub_categories_df = self.server_lw_data_provider.load_sub_categories()
-        
+
         # 更新名称映射（禁用的分类添加 (banned) 后缀）
         self.category_name_map = {}
         if self._categories_df is not None and not self._categories_df.empty:
             for _, row in self._categories_df.iterrows():
-                cat_id = str(row['id'])
-                name = row['name']
-                state = row.get('state', 1) if 'state' in self._categories_df.columns else 1
+                cat_id = str(row["id"])
+                name = row["name"]
+                state = row.get("state", 1) if "state" in self._categories_df.columns else 1
                 if state == 0:
                     name = f"{name} (banned)"
                 self.category_name_map[cat_id] = name
-        
+
         self.sub_category_name_map = {}
         if self._sub_categories_df is not None and not self._sub_categories_df.empty:
             for _, row in self._sub_categories_df.iterrows():
-                sub_id = str(row['id'])
-                name = row['name']
-                state = row.get('state', 1) if 'state' in self._sub_categories_df.columns else 1
+                sub_id = str(row["id"])
+                name = row["name"]
+                state = row.get("state", 1) if "state" in self._sub_categories_df.columns else 1
                 if state == 0:
                     name = f"{name} (banned)"
                 self.sub_category_name_map[sub_id] = name
-        
-        self.sub_to_parent_map = {
-            str(row['id']): str(row['category_id'])
-            for _, row in self._sub_categories_df.iterrows()
-        } if self._sub_categories_df is not None and not self._sub_categories_df.empty else {}
-        
+
+        self.sub_to_parent_map = (
+            {
+                str(row["id"]): str(row["category_id"])
+                for _, row in self._sub_categories_df.iterrows()
+            }
+            if self._sub_categories_df is not None and not self._sub_categories_df.empty
+            else {}
+        )
+
         # 刷新颜色管理器缓存
         color_manager.refresh_colors()
-    
+
     def create_category(self, name: str, color: str) -> CategoryTreeItem:
         """
         创建新的主分类
@@ -440,11 +471,7 @@ class CategoryService:
             category_id = f"cat-{str(uuid.uuid4())[:8]}"
 
             # 插入数据（使用新的 provider）
-            data = {
-                'id': category_id,
-                'name': name,
-                'color': color
-            }
+            data = {"id": category_id, "name": name, "color": color}
 
             success = self.category_repository.create_category(data)
             if not success:
@@ -455,17 +482,12 @@ class CategoryService:
             # 刷新缓存
             self._refresh_cache()
 
-            return CategoryTreeItem(
-                id=category_id,
-                name=name,
-                color=color,
-                subcategories=[]
-            )
+            return CategoryTreeItem(id=category_id, name=name, color=color, subcategories=[])
 
         except Exception as e:
             logger.error("创建分类失败: %s", e)
             raise
-    
+
     def update_category(self, category_id: str, name: str, color: str) -> CategoryTreeItem:
         """
         更新主分类
@@ -490,9 +512,9 @@ class CategoryService:
             # 构建更新数据
             update_data = {}
             if name:
-                update_data['name'] = name
+                update_data["name"] = name
             if color:
-                update_data['color'] = color
+                update_data["color"] = color
 
             if not update_data:
                 logger.warning("没有提供任何更新字段")
@@ -516,7 +538,7 @@ class CategoryService:
         except Exception as e:
             logger.error("更新分类失败: %s", e)
             raise
-    
+
     def delete_category(self, category_id: str, reassign_to: str) -> bool:
         """
         删除主分类
@@ -539,16 +561,15 @@ class CategoryService:
 
             # 1. 重新分配关联的行为日志记录（这部分仍使用 db，因为涉及其他表）
             behavior_logs = self.db.query(
-                'user_app_behavior_log',
-                where={'category_id': category_id}
+                "user_app_behavior_log", where={"category_id": category_id}
             )
 
             if not behavior_logs.empty:
                 logger.info("找到 %s 条关联记录，重新分配到 '%s'", len(behavior_logs), reassign_to)
                 self.db.update(
-                    'user_app_behavior_log',
-                    {'category_id': reassign_to, 'sub_category_id': 'untracked'},
-                    {'category_id': category_id}
+                    "user_app_behavior_log",
+                    {"category_id": reassign_to, "sub_category_id": "untracked"},
+                    {"category_id": category_id},
                 )
 
             # 2. 删除主分类（子分类会通过 CASCADE 自动删除）（使用新的 provider）
@@ -568,7 +589,7 @@ class CategoryService:
         except Exception as e:
             logger.error("删除分类失败: %s", e)
             raise
-    
+
     def create_sub_category(self, category_id: str, name: str) -> SubCategoryTreeItem:
         """
         创建子分类
@@ -593,11 +614,7 @@ class CategoryService:
             sub_id = f"sub-{str(uuid.uuid4())[:8]}"
 
             # 插入数据（使用新的 provider）
-            data = {
-                'id': sub_id,
-                'category_id': category_id,
-                'name': name
-            }
+            data = {"id": sub_id, "category_id": category_id, "name": name}
 
             success = self.category_repository.create_sub_category(data)
             if not success:
@@ -609,9 +626,7 @@ class CategoryService:
             self._refresh_cache()
 
             return SubCategoryTreeItem(
-                id=sub_id,
-                name=name,
-                color=color_manager.get_sub_category_color(sub_id)
+                id=sub_id, name=name, color=color_manager.get_sub_category_color(sub_id)
             )
 
         except ValueError:
@@ -619,7 +634,7 @@ class CategoryService:
         except Exception as e:
             logger.error("创建子分类失败: %s", e)
             raise
-    
+
     def update_sub_category(self, category_id: str, sub_id: str, name: str) -> SubCategoryTreeItem:
         """
         更新子分类
@@ -646,11 +661,11 @@ class CategoryService:
             if not existing_sub:
                 raise ValueError(f"子分类 '{sub_id}' 不存在")
 
-            if existing_sub['category_id'] != category_id:
+            if existing_sub["category_id"] != category_id:
                 raise ValueError(f"子分类 '{sub_id}' 不属于分类 '{category_id}'")
 
             # 更新子分类（使用新的 provider）
-            success = self.category_repository.update_sub_category(sub_id, {'name': name})
+            success = self.category_repository.update_sub_category(sub_id, {"name": name})
             if not success:
                 raise Exception("更新数据库失败")
 
@@ -660,9 +675,7 @@ class CategoryService:
             self._refresh_cache()
 
             return SubCategoryTreeItem(
-                id=sub_id,
-                name=name,
-                color=color_manager.get_sub_category_color(sub_id)
+                id=sub_id, name=name, color=color_manager.get_sub_category_color(sub_id)
             )
 
         except ValueError:
@@ -696,21 +709,20 @@ class CategoryService:
             if not existing_sub:
                 raise ValueError(f"子分类 '{sub_id}' 不存在")
 
-            if existing_sub['category_id'] != category_id:
+            if existing_sub["category_id"] != category_id:
                 raise ValueError(f"子分类 '{sub_id}' 不属于分类 '{category_id}'")
 
             # 重新分配关联的行为日志记录（这部分仍使用 db，因为涉及其他表）
             behavior_logs = self.db.query(
-                'user_app_behavior_log',
-                where={'sub_category_id': sub_id}
+                "user_app_behavior_log", where={"sub_category_id": sub_id}
             )
 
             if not behavior_logs.empty:
                 logger.info("找到 %s 条关联记录，重新分配到 'untracked'", len(behavior_logs))
                 self.db.update(
-                    'user_app_behavior_log',
-                    {'sub_category_id': 'untracked'},
-                    {'sub_category_id': sub_id}
+                    "user_app_behavior_log",
+                    {"sub_category_id": "untracked"},
+                    {"sub_category_id": sub_id},
                 )
 
             # 删除子分类（使用新的 provider）
@@ -722,15 +734,15 @@ class CategoryService:
 
             # 刷新缓存
             self._refresh_cache()
-            
+
             return True
-            
+
         except ValueError:
             raise
         except Exception as e:
             logger.error("删除子分类失败: %s", e)
             raise
-    
+
     def _get_category_by_id(self, category_id: str) -> CategoryTreeItem:
         """
         根据ID获取完整的分类对象（含子分类）- 内部使用，不存在时抛出异常
@@ -747,27 +759,26 @@ class CategoryService:
             raise ValueError(f"分类 '{category_id}' 不存在")
 
         # 获取子分类（使用 db.query，因为需要 DataFrame）
-        sub_cats_df = self.db.query(
-            'sub_category',
-            where={'category_id': category_id}
-        )
+        sub_cats_df = self.db.query("sub_category", where={"category_id": category_id})
 
         subcategories = []
         if not sub_cats_df.empty:
             for _, sub_row in sub_cats_df.iterrows():
-                subcategories.append(SubCategoryTreeItem(
-                    id=str(sub_row['id']),
-                    name=sub_row['name'],
-                    color=color_manager.get_sub_category_color(str(sub_row['id'])),
-                    state=int(sub_row.get('state', 1))
-                ))
+                subcategories.append(
+                    SubCategoryTreeItem(
+                        id=str(sub_row["id"]),
+                        name=sub_row["name"],
+                        color=color_manager.get_sub_category_color(str(sub_row["id"])),
+                        state=int(sub_row.get("state", 1)),
+                    )
+                )
 
         return CategoryTreeItem(
-            id=category['id'],
-            name=category['name'],
-            color=color_manager.get_main_category_color(category['id']),
+            id=category["id"],
+            name=category["name"],
+            color=color_manager.get_main_category_color(category["id"]),
             subcategories=subcategories,
-            state=int(category.get('state', 1))
+            state=int(category.get("state", 1)),
         )
 
     def get_category_by_id(self, category_id: str) -> CategoryTreeItem:
@@ -786,9 +797,9 @@ class CategoryService:
             return None
 
         return CategoryTreeItem(
-            id=category['id'],
-            name=category['name'],
-            color=color_manager.get_main_category_color(category['id'])
+            id=category["id"],
+            name=category["name"],
+            color=color_manager.get_main_category_color(category["id"]),
         )
 
     def toggle_category_state(self, category_id: str, state: int) -> CategoryTreeItem:
@@ -811,10 +822,10 @@ class CategoryService:
             if not existing:
                 raise ValueError(f"分类 '{category_id}' 不存在")
 
-            old_state = existing.get('state', 1)
+            old_state = existing.get("state", 1)
 
             # 更新分类状态（使用新的 provider）
-            success = self.category_repository.update_category(category_id, {'state': state})
+            success = self.category_repository.update_category(category_id, {"state": state})
             if not success:
                 raise Exception("更新数据库失败")
 
@@ -827,20 +838,22 @@ class CategoryService:
             elif state == 1 and old_state == 0:
                 # 启用：恢复符合条件的记录（主分类和子分类都启用）
                 self._enable_category_map_records_by_category(category_id)
-            
+
             # 刷新缓存
             self._refresh_cache()
-            
+
             # 返回更新后的分类
             return self._get_category_by_id(category_id)
-            
+
         except ValueError:
             raise
         except Exception as e:
             logger.error("切换分类状态失败: %s", e)
             raise
-    
-    def toggle_sub_category_state(self, category_id: str, sub_id: str, state: int) -> SubCategoryTreeItem:
+
+    def toggle_sub_category_state(
+        self, category_id: str, sub_id: str, state: int
+    ) -> SubCategoryTreeItem:
         """
         切换子分类的启用/禁用状态
 
@@ -866,13 +879,13 @@ class CategoryService:
             if not existing_sub:
                 raise ValueError(f"子分类 '{sub_id}' 不存在")
 
-            if existing_sub['category_id'] != category_id:
+            if existing_sub["category_id"] != category_id:
                 raise ValueError(f"子分类 '{sub_id}' 不属于分类 '{category_id}'")
 
-            old_state = existing_sub.get('state', 1)
+            old_state = existing_sub.get("state", 1)
 
             # 更新子分类状态（使用新的 provider）
-            success = self.category_repository.update_sub_category(sub_id, {'state': state})
+            success = self.category_repository.update_sub_category(sub_id, {"state": state})
             if not success:
                 raise Exception("更新数据库失败")
 
@@ -885,26 +898,26 @@ class CategoryService:
             elif state == 1 and old_state == 0:
                 # 启用：恢复符合条件的记录（主分类和子分类都启用）
                 self._enable_category_map_records_by_sub_category(sub_id, category_id)
-            
+
             # 刷新缓存
             self._refresh_cache()
-            
+
             # 返回更新后的子分类
             return SubCategoryTreeItem(
                 id=sub_id,
-                name=self.sub_category_name_map.get(sub_id, existing_sub['name']),
+                name=self.sub_category_name_map.get(sub_id, existing_sub["name"]),
                 color=color_manager.get_sub_category_color(sub_id),
-                state=state
+                state=state,
             )
-            
+
         except ValueError:
             raise
         except Exception as e:
             logger.error("切换子分类状态失败: %s", e)
             raise
-    
+
     # ==================== category_map_cache 状态同步方法 ====================
-    
+
     def _disable_category_map_records_by_category(self, category_id: str):
         """
         禁用主分类时，将 multi_purpose_map_cache 和 single_purpose_map_cache 中该分类的所有记录 state 置为 0
@@ -913,29 +926,35 @@ class CategoryService:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 total_affected = 0
-                
+
                 # 更新 multi_purpose_map_cache 表
-                cursor.execute("""
-                    UPDATE multi_purpose_map_cache 
+                cursor.execute(
+                    """
+                    UPDATE multi_purpose_map_cache
                     SET state = 0, updated_at = CURRENT_TIMESTAMP
                     WHERE category_id = ?
-                """, (category_id,))
+                """,
+                    (category_id,),
+                )
                 total_affected += cursor.rowcount
-                
+
                 # 更新 single_purpose_map_cache 表
-                cursor.execute("""
-                    UPDATE single_purpose_map_cache 
+                cursor.execute(
+                    """
+                    UPDATE single_purpose_map_cache
                     SET state = 0, updated_at = CURRENT_TIMESTAMP
                     WHERE category_id = ?
-                """, (category_id,))
+                """,
+                    (category_id,),
+                )
                 total_affected += cursor.rowcount
-                
+
                 conn.commit()
                 logger.info("禁用分类 '%s' 时，置 %s 条记录为无效", category_id, total_affected)
         except Exception as e:
             logger.error("禁用分类记录失败: %s", e)
             raise
-    
+
     def _disable_category_map_records_by_sub_category(self, sub_category_id: str):
         """
         禁用子分类时，将 multi_purpose_map_cache 和 single_purpose_map_cache 中该子分类的所有记录 state 置为 0
@@ -944,225 +963,286 @@ class CategoryService:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 total_affected = 0
-                
+
                 # 更新 multi_purpose_map_cache 表
-                cursor.execute("""
-                    UPDATE multi_purpose_map_cache 
+                cursor.execute(
+                    """
+                    UPDATE multi_purpose_map_cache
                     SET state = 0, updated_at = CURRENT_TIMESTAMP
                     WHERE sub_category_id = ?
-                """, (sub_category_id,))
+                """,
+                    (sub_category_id,),
+                )
                 total_affected += cursor.rowcount
-                
+
                 # 更新 single_purpose_map_cache 表
-                cursor.execute("""
-                    UPDATE single_purpose_map_cache 
+                cursor.execute(
+                    """
+                    UPDATE single_purpose_map_cache
                     SET state = 0, updated_at = CURRENT_TIMESTAMP
                     WHERE sub_category_id = ?
-                """, (sub_category_id,))
+                """,
+                    (sub_category_id,),
+                )
                 total_affected += cursor.rowcount
-                
+
                 conn.commit()
-                logger.info("禁用子分类 '%s' 时，置 %s 条记录为无效", sub_category_id, total_affected)
+                logger.info(
+                    "禁用子分类 '%s' 时，置 %s 条记录为无效", sub_category_id, total_affected
+                )
         except Exception as e:
             logger.error("禁用子分类记录失败: %s", e)
             raise
-    
+
     def _enable_category_map_records_by_category(self, category_id: str):
         """
         启用主分类时，恢复 multi_purpose_map_cache 和 single_purpose_map_cache 中符合条件的记录
-        
+
         恢复条件：主分类启用 AND 子分类也启用
         恢复前：删除同 (app, title) 中 created_at 更晚的记录
         """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                
+
                 # 获取该分类下所有子分类的启用状态
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT id, state FROM sub_category WHERE category_id = ?
-                """, (category_id,))
+                """,
+                    (category_id,),
+                )
                 sub_categories = {row[0]: row[1] for row in cursor.fetchall()}
-                
+
                 total_enabled = 0
                 total_deleted = 0
-                
+
                 # 处理 multi_purpose_map_cache 表
-                cursor.execute("""
-                    SELECT id, app, title, sub_category_id, created_at 
-                    FROM multi_purpose_map_cache 
+                cursor.execute(
+                    """
+                    SELECT id, app, title, sub_category_id, created_at
+                    FROM multi_purpose_map_cache
                     WHERE category_id = ? AND state = 0
-                """, (category_id,))
+                """,
+                    (category_id,),
+                )
                 multi_records = cursor.fetchall()
-                
+
                 for record_id, app, title, sub_cat_id, created_at in multi_records:
                     sub_state = sub_categories.get(sub_cat_id, 1)
                     if sub_state == 0:
                         continue
-                    
+
                     if created_at:
                         # 多分类应用：删除同 (app, title) 中 created_at 更晚的记录
-                        cursor.execute("""
-                            DELETE FROM multi_purpose_map_cache 
+                        cursor.execute(
+                            """
+                            DELETE FROM multi_purpose_map_cache
                             WHERE app = ? AND title = ? AND created_at > ?
-                        """, (app, title, created_at))
+                        """,
+                            (app, title, created_at),
+                        )
                         total_deleted += cursor.rowcount
-                    
+
                     # 恢复该记录
-                    cursor.execute("""
-                        UPDATE multi_purpose_map_cache 
+                    cursor.execute(
+                        """
+                        UPDATE multi_purpose_map_cache
                         SET state = 1, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
-                    """, (record_id,))
+                    """,
+                        (record_id,),
+                    )
                     total_enabled += cursor.rowcount
-                
+
                 # 处理 single_purpose_map_cache 表
-                cursor.execute("""
-                    SELECT id, app, sub_category_id, created_at 
-                    FROM single_purpose_map_cache 
+                cursor.execute(
+                    """
+                    SELECT id, app, sub_category_id, created_at
+                    FROM single_purpose_map_cache
                     WHERE category_id = ? AND state = 0
-                """, (category_id,))
+                """,
+                    (category_id,),
+                )
                 single_records = cursor.fetchall()
-                
+
                 for record_id, app, sub_cat_id, created_at in single_records:
                     sub_state = sub_categories.get(sub_cat_id, 1)
-                    if sub_state == 0: 
+                    if sub_state == 0:
                         continue
-                    
+
                     if created_at:
                         # 单分类应用：删除同 app 中 created_at 更晚的记录
-                        cursor.execute("""
-                            DELETE FROM single_purpose_map_cache 
+                        cursor.execute(
+                            """
+                            DELETE FROM single_purpose_map_cache
                             WHERE app = ? AND created_at > ?
-                        """, (app, created_at))
+                        """,
+                            (app, created_at),
+                        )
                         total_deleted += cursor.rowcount
-                    
+
                     # 恢复该记录
-                    cursor.execute("""
-                        UPDATE single_purpose_map_cache 
+                    cursor.execute(
+                        """
+                        UPDATE single_purpose_map_cache
                         SET state = 1, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
-                    """, (record_id,))
+                    """,
+                        (record_id,),
+                    )
                     total_enabled += cursor.rowcount
-                
+
                 conn.commit()
-                logger.info("启用分类 '%s' 时，恢复 %s 条记录，删除 %s 条冲突记录", category_id, total_enabled, total_deleted)
-                
+                logger.info(
+                    "启用分类 '%s' 时，恢复 %s 条记录，删除 %s 条冲突记录",
+                    category_id,
+                    total_enabled,
+                    total_deleted,
+                )
+
         except Exception as e:
             logger.error("启用分类记录失败: %s", e)
             raise
-    
+
     def _enable_category_map_records_by_sub_category(self, sub_category_id: str, category_id: str):
         """
         启用子分类时，恢复 multi_purpose_map_cache 和 single_purpose_map_cache 中符合条件的记录
-        
+
         恢复条件：主分类启用 AND 子分类启用
         恢复前：删除同 (app, title) 中 created_at 更晚的记录
         """
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                
+
                 # 检查主分类是否启用
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT state FROM category WHERE id = ?
-                """, (category_id,))
+                """,
+                    (category_id,),
+                )
                 result = cursor.fetchone()
                 if not result or result[0] == 0:
                     # 主分类还是禁用状态，不恢复
                     logger.info("主分类 '%s' 仍处于禁用状态，跳过恢复子分类记录", category_id)
                     return
-                
+
                 total_enabled = 0
                 total_deleted = 0
-                
+
                 # 处理 multi_purpose_map_cache 表
-                cursor.execute("""
-                    SELECT id, app, title, created_at 
-                    FROM multi_purpose_map_cache 
+                cursor.execute(
+                    """
+                    SELECT id, app, title, created_at
+                    FROM multi_purpose_map_cache
                     WHERE sub_category_id = ? AND state = 0
-                """, (sub_category_id,))
+                """,
+                    (sub_category_id,),
+                )
                 multi_records = cursor.fetchall()
-                
+
                 for record_id, app, title, created_at in multi_records:
                     if created_at:
                         # 多分类应用：删除同 (app, title) 中 created_at 更晚的记录
-                        cursor.execute("""
-                            DELETE FROM multi_purpose_map_cache 
+                        cursor.execute(
+                            """
+                            DELETE FROM multi_purpose_map_cache
                             WHERE app = ? AND title = ? AND created_at > ?
-                        """, (app, title, created_at))
+                        """,
+                            (app, title, created_at),
+                        )
                         total_deleted += cursor.rowcount
-                    
+
                     # 恢复该记录
-                    cursor.execute("""
-                        UPDATE multi_purpose_map_cache 
+                    cursor.execute(
+                        """
+                        UPDATE multi_purpose_map_cache
                         SET state = 1, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
-                    """, (record_id,))
+                    """,
+                        (record_id,),
+                    )
                     total_enabled += cursor.rowcount
-                
+
                 # 处理 single_purpose_map_cache 表
-                cursor.execute("""
-                    SELECT id, app, created_at 
-                    FROM single_purpose_map_cache 
+                cursor.execute(
+                    """
+                    SELECT id, app, created_at
+                    FROM single_purpose_map_cache
                     WHERE sub_category_id = ? AND state = 0
-                """, (sub_category_id,))
+                """,
+                    (sub_category_id,),
+                )
                 single_records = cursor.fetchall()
-                
+
                 for record_id, app, created_at in single_records:
                     if created_at:
                         # 单分类应用：删除同 app 中 created_at 更晚的记录
-                        cursor.execute("""
-                            DELETE FROM single_purpose_map_cache 
+                        cursor.execute(
+                            """
+                            DELETE FROM single_purpose_map_cache
                             WHERE app = ? AND created_at > ?
-                        """, (app, created_at))
+                        """,
+                            (app, created_at),
+                        )
                         total_deleted += cursor.rowcount
-                    
+
                     # 恢复该记录
-                    cursor.execute("""
-                        UPDATE single_purpose_map_cache 
+                    cursor.execute(
+                        """
+                        UPDATE single_purpose_map_cache
                         SET state = 1, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
-                    """, (record_id,))
+                    """,
+                        (record_id,),
+                    )
                     total_enabled += cursor.rowcount
-                
+
                 conn.commit()
-                logger.info("启用子分类 '%s' 时，恢复 %s 条记录，删除 %s 条冲突记录", sub_category_id, total_enabled, total_deleted)
-                
+                logger.info(
+                    "启用子分类 '%s' 时，恢复 %s 条记录，删除 %s 条冲突记录",
+                    sub_category_id,
+                    total_enabled,
+                    total_deleted,
+                )
+
         except Exception as e:
             logger.error("启用子分类记录失败: %s", e)
             raise
 
     # ==================== category_map_cache 数据管理 ====================
-    
+
     def get_category_map_cache_list(
         self,
         page: int = 1,
         page_size: int = 50,
         search: str | None = None,
         state: int | None = None,
-        is_multipurpose_app: bool | None = None
+        is_multipurpose_app: bool | None = None,
     ):
         """
         获取 category_map_cache 列表
-        
+
         Args:
             page: 页码
             page_size: 每页数量
             search: 搜索关键词
             state: 状态筛选
             is_multipurpose_app: 应用类型筛选（True=多用途, False=单用途）
-        
+
         Returns:
             CategoryMapCacheResponse: 分页响应
         """
+        import math
+
         from lifeprism.server.schemas.category_schemas import (
             CategoryMapCacheItem,
-            CategoryMapCacheResponse
+            CategoryMapCacheResponse,
         )
         from lifeprism.server.services.goal_service import goal_service
-        import math
-        
+
         try:
             # 调用 base provider 的分页查询
             result = self.server_lw_data_provider.load_category_map_cache_V2(
@@ -1170,89 +1250,92 @@ class CategoryService:
                 page_size=page_size,
                 search=search,
                 state=state,
-                is_multipurpose_app=is_multipurpose_app
+                is_multipurpose_app=is_multipurpose_app,
             )
-            
+
             # 分页查询返回 (df, total) 元组
             df, total = result
-            
+
             # 构建响应数据
             items = []
             if df is not None and not df.empty:
                 for _, row in df.iterrows():
                     # 映射 category_id 和 sub_category_id 到名称
-                    category_id = row.get('category_id')
-                    sub_category_id = row.get('sub_category_id')
-                    goal_id = row.get('link_to_goal_id')
-                    
-                    category_name = self.category_name_map.get(str(category_id), None) if category_id else None
-                    sub_category_name = self.sub_category_name_map.get(str(sub_category_id), None) if sub_category_id else None
+                    category_id = row.get("category_id")
+                    sub_category_id = row.get("sub_category_id")
+                    goal_id = row.get("link_to_goal_id")
+
+                    category_name = (
+                        self.category_name_map.get(str(category_id), None) if category_id else None
+                    )
+                    sub_category_name = (
+                        self.sub_category_name_map.get(str(sub_category_id), None)
+                        if sub_category_id
+                        else None
+                    )
                     goal_name = goal_service.get_goal_name(str(goal_id)) if goal_id else None
 
                     # 处理 pandas NaN 值
                     import pandas as pd
-                    app_description = row.get('app_description')
+
+                    app_description = row.get("app_description")
                     if pd.isna(app_description):
                         app_description = None
-                    title_analysis = row.get('title_analysis')
+                    title_analysis = row.get("title_analysis")
                     if pd.isna(title_analysis):
                         title_analysis = None
 
-                    items.append(CategoryMapCacheItem(
-                        id=str(row['id']),
-                        app=row['app'],
-                        app_description=app_description,
-                        title=row['title'],
-                        title_analysis=title_analysis,
-                        category=category_name,
-                        sub_category=sub_category_name,
-                        category_id=str(category_id) if category_id else None,
-                        sub_category_id=str(sub_category_id) if sub_category_id else None,
-                        link_to_goal_id=str(goal_id) if goal_id else None,
-                        link_to_goal=goal_name,
-                        is_multipurpose_app=bool(row.get('is_multipurpose_app', 0)),
-                        state=int(row.get('state', 1)),
-                        created_at=str(row.get('created_at')) if row.get('created_at') else None
-                    ))
-            
+                    items.append(
+                        CategoryMapCacheItem(
+                            id=str(row["id"]),
+                            app=row["app"],
+                            app_description=app_description,
+                            title=row["title"],
+                            title_analysis=title_analysis,
+                            category=category_name,
+                            sub_category=sub_category_name,
+                            category_id=str(category_id) if category_id else None,
+                            sub_category_id=str(sub_category_id) if sub_category_id else None,
+                            link_to_goal_id=str(goal_id) if goal_id else None,
+                            link_to_goal=goal_name,
+                            is_multipurpose_app=bool(row.get("is_multipurpose_app", 0)),
+                            state=int(row.get("state", 1)),
+                            created_at=str(row.get("created_at"))
+                            if row.get("created_at")
+                            else None,
+                        )
+                    )
+
             total_pages = math.ceil(total / page_size) if total > 0 else 1
-            
+
             return CategoryMapCacheResponse(
-                data=items,
-                total=total,
-                page=page,
-                page_size=page_size,
-                total_pages=total_pages
+                data=items, total=total, page=page, page_size=page_size, total_pages=total_pages
             )
-            
+
         except Exception as e:
             logger.error("获取 category_map_cache 列表失败: %s", e)
             raise
-    
+
     def _get_category_state_from_cache(self, category_id: str) -> int:
         """
         从缓存获取分类的状态
-        
+
         Args:
             category_id: 主分类ID
-        
+
         Returns:
             int: 分类状态（1: 启用, 0: 禁用），默认返回 1
         """
         if self._categories_df is None or self._categories_df.empty:
             return 1
-        
-        cat_row = self._categories_df[self._categories_df['id'] == category_id]
+
+        cat_row = self._categories_df[self._categories_df["id"] == category_id]
         if cat_row.empty:
             return 1
-        
-        return int(cat_row.iloc[0].get('state', 1))
-    
-    def update_category_map_cache(
-        self,
-        record_id: str,
-        update_fields: dict
-    ) -> bool:
+
+        return int(cat_row.iloc[0].get("state", 1))
+
+    def update_category_map_cache(self, record_id: str, update_fields: dict) -> bool:
         """
         更新 category_map_cache 记录的分类
 
@@ -1268,20 +1351,18 @@ class CategoryService:
         """
         try:
             # 只有当 category_id 在 update_fields 中且不为空时才获取目标分类的状态
-            if 'category_id' in update_fields and update_fields['category_id'] is not None:
-                state = self._get_category_state_from_cache(update_fields['category_id'])
-                update_fields['state'] = state
+            if "category_id" in update_fields and update_fields["category_id"] is not None:
+                state = self._get_category_state_from_cache(update_fields["category_id"])
+                update_fields["state"] = state
 
             # 根据 ID 前缀判断使用哪个 provider
-            if record_id.startswith('m-'):
+            if record_id.startswith("m-"):
                 result = self.map_cache_repository.update_multi_purpose_map_cache(
-                    cache_id=record_id,
-                    data=update_fields
+                    cache_id=record_id, data=update_fields
                 )
-            elif record_id.startswith('s-'):
+            elif record_id.startswith("s-"):
                 result = self.map_cache_repository.update_single_purpose_map_cache(
-                    cache_id=record_id,
-                    data=update_fields
+                    cache_id=record_id, data=update_fields
                 )
             else:
                 logger.error("无效的 record_id 格式: %s", record_id)
@@ -1296,12 +1377,8 @@ class CategoryService:
         except Exception as e:
             logger.error("更新 category_map_cache 记录失败: %s", e)
             raise
-    
-    def batch_update_category_map_cache(
-        self,
-        record_ids: list[str],
-        update_fields: dict
-    ) -> int:
+
+    def batch_update_category_map_cache(self, record_ids: list[str], update_fields: dict) -> int:
         """
         批量更新 category_map_cache 记录的分类
 
@@ -1317,28 +1394,26 @@ class CategoryService:
         """
         try:
             # 只有当 category_id 在 update_fields 中且不为空时才获取目标分类的状态
-            if 'category_id' in update_fields and update_fields['category_id'] is not None:
-                state = self._get_category_state_from_cache(update_fields['category_id'])
-                update_fields['state'] = state
+            if "category_id" in update_fields and update_fields["category_id"] is not None:
+                state = self._get_category_state_from_cache(update_fields["category_id"])
+                update_fields["state"] = state
 
             # 根据 ID 前缀分组
-            multi_ids = [rid for rid in record_ids if rid.startswith('m-')]
-            single_ids = [rid for rid in record_ids if rid.startswith('s-')]
+            multi_ids = [rid for rid in record_ids if rid.startswith("m-")]
+            single_ids = [rid for rid in record_ids if rid.startswith("s-")]
 
             count = 0
 
             # 批量更新 multi_purpose_map_cache
             if multi_ids:
                 count += self.map_cache_repository.batch_update_multi_purpose_map_cache(
-                    cache_ids=multi_ids,
-                    data=update_fields
+                    cache_ids=multi_ids, data=update_fields
                 )
 
             # 批量更新 single_purpose_map_cache
             if single_ids:
                 count += self.map_cache_repository.batch_update_single_purpose_map_cache(
-                    cache_ids=single_ids,
-                    data=update_fields
+                    cache_ids=single_ids, data=update_fields
                 )
 
             logger.info("批量更新 %s 条 category_map_cache 记录的分类", count)
@@ -1347,7 +1422,7 @@ class CategoryService:
         except Exception as e:
             logger.error("批量更新 category_map_cache 记录失败: %s", e)
             raise
-    
+
     def delete_category_map_cache(self, record_id: str) -> bool:
         """
         删除 category_map_cache 记录
@@ -1360,9 +1435,9 @@ class CategoryService:
         """
         try:
             # 根据 ID 前缀判断使用哪个 provider
-            if record_id.startswith('m-'):
+            if record_id.startswith("m-"):
                 result = self.map_cache_repository.delete_multi_purpose_map_cache(record_id)
-            elif record_id.startswith('s-'):
+            elif record_id.startswith("s-"):
                 result = self.map_cache_repository.delete_single_purpose_map_cache(record_id)
             else:
                 logger.error("无效的 record_id 格式: %s", record_id)
@@ -1377,7 +1452,7 @@ class CategoryService:
         except Exception as e:
             logger.error("删除 category_map_cache 记录失败: %s", e)
             raise
-    
+
     def batch_delete_category_map_cache(self, record_ids: list[str]) -> int:
         """
         批量删除 category_map_cache 记录
@@ -1390,8 +1465,8 @@ class CategoryService:
         """
         try:
             # 根据 ID 前缀分组
-            multi_ids = [rid for rid in record_ids if rid.startswith('m-')]
-            single_ids = [rid for rid in record_ids if rid.startswith('s-')]
+            multi_ids = [rid for rid in record_ids if rid.startswith("m-")]
+            single_ids = [rid for rid in record_ids if rid.startswith("s-")]
 
             count = 0
 
@@ -1411,34 +1486,36 @@ class CategoryService:
             raise
 
 
-from lifeprism.utils import LazySingleton
 category_service = LazySingleton(CategoryService)
 
 if __name__ == "__main__":
     from datetime import datetime, timedelta
+
     from lifeprism.server.schemas.category_schemas import CategoryStatsIncludeOptions
-    
+
     test_service = CategoryService()
-    
+
     # 测试 get_category_stats
     end_time = datetime.now()
     start_time = end_time - timedelta(days=1)
-    
+
     include_options = CategoryStatsIncludeOptions.from_include_string("duration,app,title")
-    
+
     category_state = test_service.get_category_stats(
         start_time=start_time,
         end_time=end_time,
         include_options=include_options,
         top_title=5,
         category="",
-        sub_category=""
+        sub_category="",
     )
     import json
+
     print(json.dumps(category_state.model_dump(), indent=4, ensure_ascii=False))
 if __name__ == "__main__":
     test_service = CategoryService()
     data = test_service.get_category_map_cache_list()
     import json
+
     print("=========")
     print(json.dumps(data.model_dump(), indent=4, ensure_ascii=False))

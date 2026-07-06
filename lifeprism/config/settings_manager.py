@@ -7,20 +7,21 @@ API Key 读取优先级:
 3. settings.yaml 配置文件 (不推荐，仅作为后备)
 """
 
+import json
 import os
 import sys
-import json
-import yaml
-import keyring
 from pathlib import Path
-from typing import Any, Optional, List, Dict
+from typing import Any, Optional
+
+import keyring
+import yaml
 
 from lifeprism.config.exceptions import InvalidConfigError
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
-ALLOWED_DIRS = ['user','diary','agent']
+ALLOWED_DIRS = ["user", "diary", "agent"]
 
 # Keyring 服务名称
 KEYRING_SERVICE_NAME = "lifeprism"
@@ -29,83 +30,84 @@ KEYRING_API_KEY_USERNAME = "api_key"  # 保留向后兼容
 
 class SettingsManager:
     """配置管理器单例"""
-    
-    _instance: Optional['SettingsManager'] = None
+
+    _instance: Optional["SettingsManager"] = None
 
     # 环境变量映射 (yaml_key -> env_var_name)
     ENV_VAR_MAPPING = {
-        'api_key': 'LIFEWATCH_API_KEY',
+        "api_key": "LIFEWATCH_API_KEY",
     }
-    
+
     # 默认配置值
     DEFAULTS = {
-        'user_name': '默认用户',
-        'api_key': None,
-        'provider': '',
-        'model': '',
-        'api_base': '',  # 空=由 settings 界面按 provider 历史/默认值回填
-        'input_tokens_cost': 0.0,
-        'output_tokens_cost': 0.0,
-        'classification_mode': 'classify_graph',
-        'long_log_threshold': 600,
-        'multi_purpose_app_names': ['chrome', 'msedge', 'firefox'],
-        'aw_db_path': '~/AppData/Local/activitywatch/activitywatch/aw-server/peewee-sqlite.v2.db',
-        'lifeprism_data_path': '',  # 空=使用默认路径
-        'data_cleaning_threshold': 10,
-        'poll_time': 1.0,
-        'afk_timeout': 180.0,
-        'exclude_titles': [],
-        'model_history': {},  # 按服务商存储的模型历史 {provider_id: {api_base: '', models: [model1, model2, ...]}}
-        'monitor_type': 'lifeprism',
-        'scheduled_screenshot_interval_seconds': 60,
-        'active_screenshot_frequency_level': 2,
-        'keyboard_keepalive_seconds': 12,
-        'mouse_keepalive_seconds': 6,
-        'enter_screenshot_delay_ms': 700,
-        'screenshot_retention_days': 3,
-        'cleanup_check_interval_seconds': 86400,
-        'is_vlm': {},  # Dict[str, bool], key = "provider_id/model_name"
-        'screenshot_monitor': False,
-        'screen_analysis_ignore': [],  # 截图分析忽略的分类 ID 列表
-        'auto_diary_summary': True,  # 每日自动总结日记
-        'llm_call_logger_enabled': True,  # LLM 调用记录器开关
-        'auto_summary_session': True,  # 自动总结会话
-        'auto_update_memory': True,  # 自动更新记忆
+        "user_name": "默认用户",
+        "api_key": None,
+        "provider": "",
+        "model": "",
+        "api_base": "",  # 空=由 settings 界面按 provider 历史/默认值回填
+        "input_tokens_cost": 0.0,
+        "output_tokens_cost": 0.0,
+        "classification_mode": "classify_graph",
+        "long_log_threshold": 600,
+        "multi_purpose_app_names": ["chrome", "msedge", "firefox"],
+        "aw_db_path": "~/AppData/Local/activitywatch/activitywatch/aw-server/peewee-sqlite.v2.db",
+        "lifeprism_data_path": "",  # 空=使用默认路径
+        "data_cleaning_threshold": 10,
+        "poll_time": 1.0,
+        "afk_timeout": 180.0,
+        "exclude_titles": [],
+        "model_history": {},  # 按服务商存储的模型历史 {provider_id: {api_base: '', models: [model1, model2, ...]}}
+        "monitor_type": "lifeprism",
+        "scheduled_screenshot_interval_seconds": 60,
+        "active_screenshot_frequency_level": 2,
+        "keyboard_keepalive_seconds": 12,
+        "mouse_keepalive_seconds": 6,
+        "enter_screenshot_delay_ms": 700,
+        "screenshot_retention_days": 3,
+        "cleanup_check_interval_seconds": 86400,
+        "is_vlm": {},  # Dict[str, bool], key = "provider_id/model_name"
+        "screenshot_monitor": False,
+        "screen_analysis_ignore": [],  # 截图分析忽略的分类 ID 列表
+        "auto_diary_summary": True,  # 每日自动总结日记
+        "llm_call_logger_enabled": True,  # LLM 调用记录器开关
+        "auto_summary_session": True,  # 自动总结会话
+        "auto_update_memory": True,  # 自动更新记忆
     }
-    
-    def __new__(cls) -> 'SettingsManager':
+
+    def __new__(cls) -> "SettingsManager":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialize()
         return cls._instance
 
-    def get_config_path(self)->Path:
+    def get_config_path(self) -> Path:
         return self._config_path
 
-        
     def _initialize(self) -> None:
         """初始化配置管理器"""
-        self._config: Dict[str, Any] = {}
-        self._warnings: List[Dict[str, str]] = []
+        self._config: dict[str, Any] = {}
+        self._warnings: list[dict[str, str]] = []
         # 判断是否是开发环境
-        self._is_dev = not getattr(sys, 'frozen', False)
+        self._is_dev = not getattr(sys, "frozen", False)
 
         # 1. 解析配置文件基础路径（固定，不随数据迁移）
         self._config_base_path = self._resolve_config_base_path()
-        
-        self._config_path = self._config_base_path / 'config' / 'config.yaml' # 打包环境和开发环境都使用_config_base_path，命名都改为config.yaml
+
+        self._config_path = (
+            self._config_base_path / "config" / "config.yaml"
+        )  # 打包环境和开发环境都使用_config_base_path，命名都改为config.yaml
         # 2. 加载 yaml 配置
         self._load_config()
 
         # 3. 解析数据路径（优先级：yaml 配置 > 环境变量 > 默认路径）
-        configured_path = self._config.get('lifeprism_data_path', '')
+        configured_path = self._config.get("lifeprism_data_path", "")
         if configured_path:
             self._lifeprism_data_path = Path(configured_path)
         else:
             self._lifeprism_data_path = self._resolve_default_data_path()
 
         # 4. 设置环境变量（供 Electron 等外部进程使用）
-        os.environ['LIFEPRISM_DATA_PATH'] = str(self._lifeprism_data_path)
+        os.environ["LIFEPRISM_DATA_PATH"] = str(self._lifeprism_data_path)
 
         # 5. 配置日志文件输出（logger 此前只有控制台输出）
         self._setup_logging()
@@ -123,15 +125,15 @@ class SettingsManager:
         打包环境：%LOCALAPPDATA%/LifePrism/lifeprismData
         开发环境：localData
         """
-        if getattr(sys, 'frozen', False):
-            localappdata = os.environ.get('LOCALAPPDATA', '')
+        if getattr(sys, "frozen", False):
+            localappdata = os.environ.get("LOCALAPPDATA", "")
             if localappdata:
-                return Path(localappdata) / 'LifePrism' / 'lifeprismData'
+                return Path(localappdata) / "LifePrism" / "lifeprismData"
             # 后备：基于 exe 路径推算
             backend_dir = Path(sys.executable).parent
             app_dir = backend_dir.parent.parent
             root_dir = app_dir.parent
-            return root_dir.parent / 'lifeprismData'
+            return root_dir.parent / "lifeprismData"
         return Path("localData")
 
     def _resolve_default_data_path(self) -> Path:
@@ -146,14 +148,14 @@ class SettingsManager:
             Path: lifeprismData 目录路径
         """
         # 1. 环境变量（Electron 启动后端时传入）
-        data_env = os.environ.get('LIFEPRISM_DATA_PATH')
+        data_env = os.environ.get("LIFEPRISM_DATA_PATH")
         if data_env:
             return Path(data_env)
 
         # 2. 默认与配置基础路径相同
         return self._config_base_path
 
-    def _resolve_allowed_dir_paths(self) -> List[Path]:
+    def _resolve_allowed_dir_paths(self) -> list[Path]:
         """
         解析允许的工作目录路径列表
 
@@ -165,35 +167,34 @@ class SettingsManager:
         Returns:
             List[Path]: 允许的目录路径列表
         """
-        allowed_paths: List[Path] = []
+        allowed_paths: list[Path] = []
         # 1. 处理固定的白名单目录
         for dir_name in ALLOWED_DIRS:
             allowed_paths.append((self._lifeprism_data_path / dir_name).resolve())
-        
+
         # 2. 读取 expand_meta_data.json 中的扩展目录
-        expand_meta_path = self._lifeprism_data_path / 'expand_dir' / 'expand_meta_data.json'
+        expand_meta_path = self._lifeprism_data_path / "expand_dir" / "expand_meta_data.json"
         if expand_meta_path.exists():
             try:
-                with open(expand_meta_path, 'r', encoding='utf-8') as f:
+                with open(expand_meta_path, encoding="utf-8") as f:
                     meta_data = json.load(f)
-                expand_dirs = meta_data.get('expand_dirs', [])
+                expand_dirs = meta_data.get("expand_dirs", [])
                 for dir_info in expand_dirs:
-                    dir_path = dir_info.get('path')
+                    dir_path = dir_info.get("path")
                     if dir_path:
                         allowed_paths.append(Path(dir_path).resolve())
             except Exception:
                 # 读取失败不影响启动，静默处理
                 pass
-        
+
         return allowed_paths
 
     def _setup_logging(self) -> None:
         """配置日志文件输出"""
         from lifeprism.utils.logger import setup_file_logging
 
-        # 日志写入 {_lifeprism_data_path}/debug_logs/ 
-        setup_file_logging(self._lifeprism_data_path / 'debug_logs')
- 
+        # 日志写入 {_lifeprism_data_path}/debug_logs/
+        setup_file_logging(self._lifeprism_data_path / "debug_logs")
 
     def _check_data_path_safety(self) -> None:
         """检查数据路径是否位于安装目录内（仅打包环境）"""
@@ -207,51 +208,49 @@ class SettingsManager:
             resolved_install = install_dir.resolve()
             resolved_data.relative_to(resolved_install)
             # 没抛异常 = 数据路径在安装目录内
-            self._warnings.append({
-                "type": "data_path",
-                "message": "数据路径位于安装目录内，更新版本时安装目录下的内容可能被删除，建议在设置中迁移数据路径"
-            })
+            self._warnings.append(
+                {
+                    "type": "data_path",
+                    "message": "数据路径位于安装目录内，更新版本时安装目录下的内容可能被删除，建议在设置中迁移数据路径",
+                }
+            )
         except (ValueError, OSError):
             pass  # ValueError=不是子目录（安全），OSError=resolve失败（不阻塞启动）
 
     @property
-    def warnings(self) -> List[str]:
+    def warnings(self) -> list[str]:
         """获取系统警告列表"""
         return list(self._warnings)  # List[Dict[str, str]]
-            
-    
+
     def _load_config(self) -> None:
         """从 YAML 文件加载配置"""
         if self._config_path.exists():
             from lifeprism.config.migrations.config_migrator import run_config_migrations
             from lifeprism.config.migrations.scripts import SETTINGS_MIGRATIONS
+
             self._config = run_config_migrations(self._config_path, SETTINGS_MIGRATIONS) or {}
         else:
             self._config = self.DEFAULTS.copy()
             # 如果配置文件不存在，创建默认配置
             self._save_config()
 
-        self._config['model_history'] = self._normalize_model_history(
-            self._config.get('model_history')
+        self._config["model_history"] = self._normalize_model_history(
+            self._config.get("model_history")
         )
-    
+
     def _save_config(self) -> None:
         """保存配置到 YAML 文件"""
         # 确保目录存在
         self._config_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(self._config_path, 'w', encoding='utf-8') as f:
+
+        with open(self._config_path, "w", encoding="utf-8") as f:
             yaml.dump(
-                self._config, 
-                f, 
-                allow_unicode=True, 
-                default_flow_style=False,
-                sort_keys=False
+                self._config, f, allow_unicode=True, default_flow_style=False, sort_keys=False
             )
 
     def _normalize_model_history(
-        self, raw_history: Optional[Dict[str, Any]]
-    ) -> Dict[str, Dict[str, Any]]:
+        self, raw_history: dict[str, Any] | None
+    ) -> dict[str, dict[str, Any]]:
         """
         统一模型历史结构。
 
@@ -261,7 +260,7 @@ class SettingsManager:
         新结构:
         {provider_id: {"api_base": "", "models": [model1, model2]}}
         """
-        normalized: Dict[str, Dict[str, Any]] = {}
+        normalized: dict[str, dict[str, Any]] = {}
         if not isinstance(raw_history, dict):
             return normalized
 
@@ -288,17 +287,17 @@ class SettingsManager:
                 }
 
         return normalized
-    
+
     def get(self, key: str, default: Any = None) -> Any:
         """
         获取配置值
-        
+
         优先级: 环境变量 > keyring(仅api_key) > yaml配置 > 默认值
-        
+
         Args:
             key: 配置键名
             default: 默认值 (如果未提供，使用 DEFAULTS 中的值)
-            
+
         Returns:
             配置值
         """
@@ -307,34 +306,35 @@ class SettingsManager:
             env_value = os.getenv(self.ENV_VAR_MAPPING[key])
             if env_value:
                 return env_value
-        
+
         # 2. 对于 api_key，优先从 keyring 获取
-        if key == 'api_key':
+        if key == "api_key":
             keyring_value = self._get_api_key_from_keyring()
             if keyring_value:
                 return keyring_value
-        
+
         # 3. 检查 yaml 配置
         if key in self._config and self._config[key] is not None:
             return self._config[key]
-        
+
         # 4. 返回默认值
         if default is not None:
             return default
         return self.DEFAULTS.get(key)
-    
-    def _get_api_key_from_keyring(self) -> Optional[str]:
+
+    def _get_api_key_from_keyring(self) -> str | None:
         """从系统密钥管理器获取 API Key（向后兼容）"""
         try:
             return keyring.get_password(KEYRING_SERVICE_NAME, KEYRING_API_KEY_USERNAME)
         except Exception:
             return None
 
-    def _get_api_key_from_keyring_by_provider(self, provider_id: str) -> Optional[str]:
+    def _get_api_key_from_keyring_by_provider(self, provider_id: str) -> str | None:
         """从系统密钥管理器获取指定服务商的 API Key"""
         try:
             # 延迟导入避免循环依赖
             from lifeprism.config.provider_manager import provider_manager
+
             username = provider_manager.get_keyring_username(provider_id)
             if username:
                 return keyring.get_password(KEYRING_SERVICE_NAME, username)
@@ -356,6 +356,7 @@ class SettingsManager:
         try:
             # 延迟导入避免循环依赖
             from lifeprism.config.provider_manager import provider_manager
+
             username = provider_manager.get_keyring_username(provider_id)
             if username:
                 keyring.set_password(KEYRING_SERVICE_NAME, username, api_key)
@@ -380,6 +381,7 @@ class SettingsManager:
         try:
             # 延迟导入避免循环依赖
             from lifeprism.config.provider_manager import provider_manager
+
             username = provider_manager.get_keyring_username(provider_id)
             if username:
                 keyring.delete_password(KEYRING_SERVICE_NAME, username)
@@ -390,7 +392,7 @@ class SettingsManager:
         except Exception:
             return False
 
-    def get_api_key(self, provider_id: Optional[str] = None) -> Optional[str]:
+    def get_api_key(self, provider_id: str | None = None) -> str | None:
         """
         获取 API Key
 
@@ -406,7 +408,7 @@ class SettingsManager:
             API Key 或 None
         """
         # 1. 检查环境变量
-        env_value = os.getenv('LIFEWATCH_API_KEY')
+        env_value = os.getenv("LIFEWATCH_API_KEY")
         if env_value:
             return env_value
 
@@ -419,7 +421,7 @@ class SettingsManager:
         # 3. 向后兼容：获取通用 key
         return self._get_api_key_from_keyring()
 
-    def set_api_key(self, api_key: str, provider_id: Optional[str] = None) -> bool:
+    def set_api_key(self, api_key: str, provider_id: str | None = None) -> bool:
         """
         设置 API Key
 
@@ -433,32 +435,32 @@ class SettingsManager:
         if provider_id:
             return self._set_api_key_to_keyring_by_provider(provider_id, api_key)
         return self._set_api_key_to_keyring(api_key)
-    
+
     def set(self, key: str, value: Any, save: bool = True) -> None:
         """
         设置配置值
-        
+
         对于 api_key，会保存到系统密钥管理器而非 yaml 文件
-        
+
         Args:
             key: 配置键名
             value: 配置值
             save: 是否立即保存到文件 (api_key 忽略此参数，始终保存到 keyring)
         """
         # api_key 特殊处理：保存到 keyring
-        if key == 'api_key':
+        if key == "api_key":
             if value:
                 self._set_api_key_to_keyring(value)
             else:
                 self._delete_api_key_from_keyring()
             # 不保存到 yaml 文件
             return
-        
+
         self._config[key] = value
         if save:
             self._save_config()
-    
-    def update(self, updates: Dict[str, Any], save: bool = True) -> None:
+
+    def update(self, updates: dict[str, Any], save: bool = True) -> None:
         """
         批量更新配置
 
@@ -467,12 +469,13 @@ class SettingsManager:
             save: 是否立即保存到文件
         """
         # 验证 screenshot_retention_days
-        if 'screenshot_retention_days' in updates:
-            days = updates['screenshot_retention_days']
+        if "screenshot_retention_days" in updates:
+            days = updates["screenshot_retention_days"]
             if days < 3:
                 logger.error(
                     "配置验证失败: screenshot_retention_days=%s, 期望 >=3, 当前配置项总数=%d",
-                    days, len(updates)
+                    days,
+                    len(updates),
                 )
                 raise InvalidConfigError(
                     key="screenshot_retention_days",
@@ -481,12 +484,13 @@ class SettingsManager:
                 )
 
         # 验证 active_screenshot_frequency_level
-        if 'active_screenshot_frequency_level' in updates:
-            level = updates['active_screenshot_frequency_level']
+        if "active_screenshot_frequency_level" in updates:
+            level = updates["active_screenshot_frequency_level"]
             if level not in [1, 2, 3]:
                 logger.error(
                     "配置验证失败: active_screenshot_frequency_level=%s, 期望 1/2/3, 当前配置项总数=%d",
-                    level, len(updates)
+                    level,
+                    len(updates),
                 )
                 raise InvalidConfigError(
                     key="active_screenshot_frequency_level",
@@ -495,8 +499,8 @@ class SettingsManager:
                 )
 
         # 分离出 api_key
-        if 'api_key' in updates:
-            api_key = updates.pop('api_key')
+        if "api_key" in updates:
+            api_key = updates.pop("api_key")
             if api_key:
                 self._set_api_key_to_keyring(api_key)
             else:
@@ -509,19 +513,19 @@ class SettingsManager:
                 self._save_config()
 
             # 如果更新了 lifeprism_data_path，同步更新环境变量和内部路径
-            if 'lifeprism_data_path' in updates:
-                new_path = updates['lifeprism_data_path']
+            if "lifeprism_data_path" in updates:
+                new_path = updates["lifeprism_data_path"]
                 if new_path:
                     self._lifeprism_data_path = Path(new_path)
                 else:
                     self._lifeprism_data_path = self._resolve_default_data_path()
-                os.environ['LIFEPRISM_DATA_PATH'] = str(self._lifeprism_data_path)
-    
+                os.environ["LIFEPRISM_DATA_PATH"] = str(self._lifeprism_data_path)
+
     def reload(self) -> None:
         """重新加载配置文件"""
         self._load_config()
-    
-    def get_all(self) -> Dict[str, Any]:
+
+    def get_all(self) -> dict[str, Any]:
         """
         获取所有配置 (合并默认值)
 
@@ -540,18 +544,18 @@ class SettingsManager:
         # 从 keyring 获取 api_key
         keyring_api_key = self._get_api_key_from_keyring()
         if keyring_api_key:
-            result['api_key'] = keyring_api_key
+            result["api_key"] = keyring_api_key
 
         # 添加计算属性（转为字符串供前端使用）
-        result['lifeprism_data_path'] = str(self.lifeprism_data_path)
+        result["lifeprism_data_path"] = str(self.lifeprism_data_path)
 
         # 移除已废弃的独立路径字段
-        result.pop('lw_db_path', None)
-        result.pop('chat_db_path', None)
+        result.pop("lw_db_path", None)
+        result.pop("chat_db_path", None)
 
         return result
-    
-    def get_for_display(self) -> Dict[str, Any]:
+
+    def get_for_display(self) -> dict[str, Any]:
         """
         获取用于显示的配置 (隐藏敏感信息)
 
@@ -561,7 +565,7 @@ class SettingsManager:
         config = self.get_all()
 
         # 根据当前 provider 获取对应的 API key
-        current_provider = config.get('provider', '')
+        current_provider = config.get("provider", "")
         provider_id = self._get_provider_id_from_name(current_provider)
 
         # 优先获取当前 provider 的 API key
@@ -574,15 +578,15 @@ class SettingsManager:
         # 隐藏 api_key
         if api_key:
             if len(api_key) > 8:
-                config['api_key'] = f"{api_key[:4]}...{api_key[-4:]}"
+                config["api_key"] = f"{api_key[:4]}...{api_key[-4:]}"
             else:
-                config['api_key'] = "***"
+                config["api_key"] = "***"
         else:
-            config['api_key'] = None
+            config["api_key"] = None
 
         return config
 
-    def _get_provider_id_from_name(self, provider_name: str) -> Optional[str]:
+    def _get_provider_id_from_name(self, provider_name: str) -> str | None:
         """
         从 provider 显示名称获取 provider_id
 
@@ -594,49 +598,50 @@ class SettingsManager:
         """
         # 延迟导入避免循环依赖
         from lifeprism.config.provider_manager import provider_manager
+
         return provider_manager.name_to_id_map.get(provider_name)
-    
+
     # ===================== 便捷属性访问 =====================
-    
+
     @property
     def user_name(self) -> str:
-        return self.get('user_name')
-    
+        return self.get("user_name")
+
     @property
-    def api_key(self) -> Optional[str]:
-        return self.get('api_key')
-    
+    def api_key(self) -> str | None:
+        return self.get("api_key")
+
     @property
     def provider(self) -> str:
-        return self.get('provider')
-    
+        return self.get("provider")
+
     @property
     def model(self) -> str:
-        return self.get('model')
+        return self.get("model")
 
     @property
     def api_base(self) -> str:
-        return self.get('api_base')
-    
+        return self.get("api_base")
+
     @property
     def input_tokens_cost(self) -> float:
-        return self.get('input_tokens_cost')
-    
+        return self.get("input_tokens_cost")
+
     @property
     def output_tokens_cost(self) -> float:
-        return self.get('output_tokens_cost')
-    
+        return self.get("output_tokens_cost")
+
     @property
     def classification_mode(self) -> str:
-        return self.get('classification_mode')
-    
+        return self.get("classification_mode")
+
     @property
     def long_log_threshold(self) -> int:
-        return self.get('long_log_threshold')
-    
+        return self.get("long_log_threshold")
+
     @property
-    def multi_purpose_app_names(self) -> List[str]:
-        return self.get('multi_purpose_app_names')
+    def multi_purpose_app_names(self) -> list[str]:
+        return self.get("multi_purpose_app_names")
 
     def is_multi_purpose_app(self, app_name: str) -> bool:
         if not app_name:
@@ -649,26 +654,26 @@ class SettingsManager:
 
     @property
     def monitor_type(self) -> str:
-        return self.get('monitor_type')
-    
+        return self.get("monitor_type")
+
     @property
     def aw_db_path(self) -> Path:
-        aw_path = os.path.expanduser(self.get('aw_db_path')) if self.get('aw_db_path') else ''
+        aw_path = os.path.expanduser(self.get("aw_db_path")) if self.get("aw_db_path") else ""
         return Path(aw_path) if aw_path else Path()
 
     @property
     def lw_db_path(self) -> Path:
         """获取 LifeWatch 数据库路径（自动推算，位于 lifeprismData/dataset/）"""
-        return self._lifeprism_data_path / 'dataset' / 'lifewatch_ai.db'
+        return self._lifeprism_data_path / "dataset" / "lifewatch_ai.db"
 
     @property
     def chat_db_path(self) -> Path:
         """获取聊天历史数据库路径（自动推算，位于 lifeprismData/dataset/）"""
-        return self._lifeprism_data_path / 'dataset' / 'chat_history.db'
+        return self._lifeprism_data_path / "dataset" / "chat_history.db"
 
     @property
     def data_cleaning_threshold(self) -> int:
-        return self.get('data_cleaning_threshold')
+        return self.get("data_cleaning_threshold")
 
     @property
     def lifeprism_data_path(self) -> Path:
@@ -686,45 +691,46 @@ class SettingsManager:
         return self._lifeprism_data_path
 
     @property
-    def allowed_dir_path(self) -> List[Path]:
+    def allowed_dir_path(self) -> list[Path]:
         """获取允许的工作目录路径列表"""
         return self._allowed_dir_path
 
     @property
-    def model_history(self) -> Dict[str, Dict[str, Any]]:
+    def model_history(self) -> dict[str, dict[str, Any]]:
         """获取模型历史记录"""
-        return self._normalize_model_history(self.get('model_history') or {})
+        return self._normalize_model_history(self.get("model_history") or {})
+
     @property
     def channel_path(self) -> Path:
         """获取通道路径配置"""
-        return self._lifeprism_data_path / 'channel'
+        return self._lifeprism_data_path / "channel"
 
     @property
-    def session_path(self)->Path:
-        return self._lifeprism_data_path / 'session'
+    def session_path(self) -> Path:
+        return self._lifeprism_data_path / "session"
 
     @property
-    def auto_diary_summary(self)->bool:
-        return self._config.get("auto_diary_summary",False)
+    def auto_diary_summary(self) -> bool:
+        return self._config.get("auto_diary_summary", False)
 
     @property
-    def auto_summary_session(self)->bool:
-        return self._config.get("auto_summary_session",False)
+    def auto_summary_session(self) -> bool:
+        return self._config.get("auto_summary_session", False)
 
     @property
-    def auto_update_memory(self)->bool:
-        return self._config.get("auto_update_memory",False)
+    def auto_update_memory(self) -> bool:
+        return self._config.get("auto_update_memory", False)
 
     @property
-    def token_limit(self)->int:
-        return  50000 # 暂定50k
+    def token_limit(self) -> int:
+        return 50000  # 暂定50k
 
-    def get_provider_history(self, provider_id: str) -> Dict[str, Any]:
+    def get_provider_history(self, provider_id: str) -> dict[str, Any]:
         """获取指定服务商的历史快照。"""
         history = self.model_history
         return history.get(provider_id, {"api_base": "", "models": []})
 
-    def get_model_history_for_provider(self, provider_id: str) -> List[str]:
+    def get_model_history_for_provider(self, provider_id: str) -> list[str]:
         """
         获取指定服务商的模型历史
 
@@ -752,10 +758,10 @@ class SettingsManager:
         snapshot = history.get(provider_id, {"api_base": "", "models": []})
         snapshot["api_base"] = api_base or ""
         history[provider_id] = snapshot
-        self.set('model_history', history)
+        self.set("model_history", history)
 
     def add_model_to_history(
-        self, provider_id: str, model: str, api_base: Optional[str] = None
+        self, provider_id: str, model: str, api_base: str | None = None
     ) -> None:
         """
         将模型添加到历史记录
@@ -783,7 +789,7 @@ class SettingsManager:
             snapshot["api_base"] = api_base or ""
         history[provider_id] = snapshot
 
-        self.set('model_history', history)
+        self.set("model_history", history)
 
     def remove_model_from_history(self, provider_id: str, model: str) -> bool:
         """
@@ -806,7 +812,7 @@ class SettingsManager:
             models.remove(model)
             snapshot["models"] = models
             history[provider_id] = snapshot
-            self.set('model_history', history)
+            self.set("model_history", history)
             return True
         return False
 
@@ -821,7 +827,7 @@ class SettingsManager:
         if not provider_id or not self.model:
             return False
         key = f"{provider_id}/{self.model}"
-        return self._config.get('is_vlm', {}).get(key, False)
+        return self._config.get("is_vlm", {}).get(key, False)
 
 
 # 全局单例实例
@@ -829,6 +835,7 @@ settings = SettingsManager()
 
 
 # ===================== 便捷函数 =====================
+
 
 def get_setting(key: str, default: Any = None) -> Any:
     """获取配置值的便捷函数"""
@@ -840,15 +847,15 @@ def set_setting(key: str, value: Any) -> None:
     settings.set(key, value)
 
 
-def get_api_key() -> Optional[str]:
+def get_api_key() -> str | None:
     """获取 API Key 的便捷函数"""
     return settings.api_key
 
 
-def get_all_settings() -> Dict[str, Any]:
+def get_all_settings() -> dict[str, Any]:
     """获取所有配置的便捷函数"""
     return settings.get_all()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(settings.model)

@@ -11,16 +11,18 @@ user_values 表字段迁移脚本：keyword → keywords, content → content_po
     python -m lifeprism.repository.migrations.migrate_value_keyword_to_keywords
     python -m lifeprism.repository.migrations.migrate_value_keyword_to_keywords --check
 """
-import sqlite3
+
 import logging
+import sqlite3
 from pathlib import Path
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 def get_db_path() -> Path:
     from lifeprism.config.settings_manager import settings
+
     return settings.lw_db_path
 
 
@@ -40,11 +42,13 @@ def run_migration():
         cursor.execute("PRAGMA table_info(user_values)")
         columns = {row[1]: row[2] for row in cursor.fetchall()}
 
-        if 'keywords' in columns and 'content_positive' in columns:
-            logger.debug("user_values 已完成迁移（keywords 和 content_positive 字段已存在），跳过迁移")
+        if "keywords" in columns and "content_positive" in columns:
+            logger.debug(
+                "user_values 已完成迁移（keywords 和 content_positive 字段已存在），跳过迁移"
+            )
             return True
 
-        if 'keyword' not in columns:
+        if "keyword" not in columns:
             logger.error("user_values.keyword 字段不存在，无法迁移")
             return False
 
@@ -114,25 +118,27 @@ def _verify_migration(cursor: sqlite3.Cursor, expected_count: int):
 
     # 字段检查
     cursor.execute("PRAGMA table_info(user_values)")
-    col_info = {row[1]: {'type': row[2], 'notnull': row[3], 'pk': row[5]} for row in cursor.fetchall()}
+    col_info = {
+        row[1]: {"type": row[2], "notnull": row[3], "pk": row[5]} for row in cursor.fetchall()
+    }
 
-    if 'keywords' not in col_info:
+    if "keywords" not in col_info:
         errors.append("user_values.keywords 字段不存在")
-    elif col_info['keywords']['type'] != 'TEXT':
+    elif col_info["keywords"]["type"] != "TEXT":
         errors.append(f"user_values.keywords 类型错误: {col_info['keywords']['type']}")
-    elif col_info['keywords']['notnull'] != 1:
+    elif col_info["keywords"]["notnull"] != 1:
         errors.append("user_values.keywords 缺少 NOT NULL 约束")
 
-    if 'keyword' in col_info:
+    if "keyword" in col_info:
         errors.append("user_values 仍包含旧的 keyword 字段")
 
-    if 'content' in col_info:
+    if "content" in col_info:
         errors.append("user_values 仍包含旧的 content 字段")
 
     # UNIQUE 约束检查
     cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='user_values'")
     table_sql = cursor.fetchone()[0]
-    if 'UNIQUE' not in table_sql.upper() or 'keywords' not in table_sql:
+    if "UNIQUE" not in table_sql.upper() or "keywords" not in table_sql:
         errors.append("user_values.keywords 缺少 UNIQUE 约束")
 
     # 数据完整性检查
@@ -146,7 +152,9 @@ def _verify_migration(cursor: sqlite3.Cursor, expected_count: int):
             logger.error("  验证失败: %s", e)
         raise RuntimeError("迁移验证失败: " + "; ".join(errors))
 
-    logger.debug("  验证通过: 记录数=%s, keywords/content_positive 字段正常, UNIQUE 约束存在", actual_count)
+    logger.debug(
+        "  验证通过: 记录数=%s, keywords/content_positive 字段正常, UNIQUE 约束存在", actual_count
+    )
 
 
 def check_migration_status():
@@ -162,7 +170,9 @@ def check_migration_status():
         cursor.execute("PRAGMA table_info(user_values)")
         columns = {row[1]: row[2] for row in cursor.fetchall()}
 
-        print("=== user_values keyword → keywords, content → content_positive + content_negative 迁移状态检查 ===")
+        print(
+            "=== user_values keyword → keywords, content → content_positive + content_negative 迁移状态检查 ==="
+        )
         print(f"数据库路径: {db_path}")
         print(f"keyword 字段存在: {'keyword' in columns}")
         print(f"keywords 字段存在: {'keywords' in columns}")
@@ -170,17 +180,22 @@ def check_migration_status():
         print(f"content_positive 字段存在: {'content_positive' in columns}")
         print(f"content_negative 字段存在: {'content_negative' in columns}")
 
-        if 'keywords' in columns:
+        if "keywords" in columns:
             print(f"keywords 类型: {columns['keywords']}")
-        if 'content_positive' in columns:
+        if "content_positive" in columns:
             print(f"content_positive 类型: {columns['content_positive']}")
 
         cursor.execute("SELECT COUNT(*) FROM user_values")
         print(f"记录总数: {cursor.fetchone()[0]}")
 
-        if 'keywords' in columns and 'content_positive' in columns and 'keyword' not in columns and 'content' not in columns:
+        if (
+            "keywords" in columns
+            and "content_positive" in columns
+            and "keyword" not in columns
+            and "content" not in columns
+        ):
             print("✓ 迁移已完成")
-        elif 'keyword' in columns and 'content' in columns:
+        elif "keyword" in columns and "content" in columns:
             print("✗ 需要执行迁移")
         else:
             print("⚠ 状态异常（部分字段已迁移）")
@@ -188,9 +203,10 @@ def check_migration_status():
         conn.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
-    if len(sys.argv) > 1 and sys.argv[1] == '--check':
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--check":
         check_migration_status()
     else:
         run_migration()

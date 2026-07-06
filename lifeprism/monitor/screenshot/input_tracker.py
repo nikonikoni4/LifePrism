@@ -1,14 +1,14 @@
-from dataclasses import dataclass
 import threading
-from typing import Callable, List, Optional
+from collections.abc import Callable
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class InputSnapshot:
     engaged: bool
-    engaged_segment_id: Optional[str]
-    last_keyboard_at: Optional[float]
-    last_mouse_at: Optional[float]
+    engaged_segment_id: str | None
+    last_keyboard_at: float | None
+    last_mouse_at: float | None
 
 
 class InputActivityTracker:
@@ -25,10 +25,10 @@ class InputActivityTracker:
         self.mouse_keepalive_seconds = mouse_keepalive_seconds
         self.time_source = time_source
         self.segment_id_factory = segment_id_factory
-        self._last_keyboard_at: Optional[float] = None
-        self._last_mouse_at: Optional[float] = None
-        self._engaged_segment_id: Optional[str] = None
-        self._pending_enter_events: List[float] = []
+        self._last_keyboard_at: float | None = None
+        self._last_mouse_at: float | None = None
+        self._engaged_segment_id: str | None = None
+        self._pending_enter_events: list[float] = []
         self._lock = threading.Lock()
 
     def record_keyboard_event(self, key_name: str) -> None:
@@ -79,7 +79,7 @@ class InputActivityTracker:
                 last_mouse_at=self._last_mouse_at,
             )
 
-    def consume_enter_events(self) -> List[float]:
+    def consume_enter_events(self) -> list[float]:
         """消费并清空缓冲的 Enter 键事件。
 
         Returns:

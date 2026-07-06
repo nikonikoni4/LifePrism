@@ -7,15 +7,14 @@ Add-on 扩展功能业务逻辑层
 import json
 import os
 import tempfile
-from pathlib import Path
-from typing import List, Optional
 from datetime import datetime
+from pathlib import Path
 
 from lifeprism.config.settings_manager import settings
 from lifeprism.server.schemas.add_on_schemas import (
     CreateExpandDirRequest,
-    UpdateExpandDirRequest,
     ExpandDirItem,
+    UpdateExpandDirRequest,
 )
 from lifeprism.utils import get_logger
 
@@ -37,14 +36,14 @@ def _read_data() -> dict:
         return {"expand_dirs": []}
 
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError as e:
         logger.error("JSON 文件损坏: error=%s", e)
-        raise ValueError(f"配置文件格式错误: {e}")
-    except (OSError, json.JSONDecodeError) as e:
+        raise ValueError(f"配置文件格式错误: {e}") from e
+    except OSError as e:
         logger.error("读取配置文件失败: error=%s", e)
-        raise IOError(f"无法读取配置文件: {e}")
+        raise OSError(f"无法读取配置文件: {e}") from e
 
 
 def _save_data(data: dict) -> None:
@@ -52,12 +51,9 @@ def _save_data(data: dict) -> None:
     file_path = _get_data_file_path()
 
     # 写入临时文件
-    temp_fd, temp_path = tempfile.mkstemp(
-        dir=file_path.parent,
-        suffix='.tmp'
-    )
+    temp_fd, temp_path = tempfile.mkstemp(dir=file_path.parent, suffix=".tmp")
     try:
-        with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
+        with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         # 原子性重命名
         os.replace(temp_path, file_path)
@@ -72,7 +68,7 @@ def _save_data(data: dict) -> None:
         raise RuntimeError("保存配置失败") from e
 
 
-def _generate_next_id(existing_dirs: List[dict]) -> str:
+def _generate_next_id(existing_dirs: list[dict]) -> str:
     """生成下一个 ID（数字字符串，从 1 开始自增）"""
     if not existing_dirs:
         return "1"
@@ -96,9 +92,9 @@ def _validate_path(path: str) -> bool:
         # 禁止系统关键目录
         forbidden_dirs = [
             Path.home() / "AppData",
-            Path("C:/Windows") if os.name == 'nt' else Path("/etc"),
-            Path("C:/Program Files") if os.name == 'nt' else Path("/sys"),
-            Path("/proc") if os.name != 'nt' else None,
+            Path("C:/Windows") if os.name == "nt" else Path("/etc"),
+            Path("C:/Program Files") if os.name == "nt" else Path("/sys"),
+            Path("/proc") if os.name != "nt" else None,
         ]
         forbidden_dirs = [d for d in forbidden_dirs if d is not None]
 
@@ -116,7 +112,7 @@ def _validate_path(path: str) -> bool:
         return False
 
 
-def get_all_expand_dirs() -> List[ExpandDirItem]:
+def get_all_expand_dirs() -> list[ExpandDirItem]:
     """
     获取所有扩展文件夹配置
 
@@ -181,7 +177,7 @@ def create_expand_dir(data: CreateExpandDirRequest) -> ExpandDirItem:
         "path": data.path,
         "description": data.description,
         "ai_index": data.ai_index,
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
     }
 
     expand_dirs.append(new_item)
@@ -240,7 +236,7 @@ def update_expand_dir(id: str, data: UpdateExpandDirRequest) -> ExpandDirItem:
         "path": data.path,
         "description": data.description,
         "ai_index": data.ai_index,
-        "created_at": expand_dirs[target_index].get("created_at", datetime.now().isoformat())
+        "created_at": expand_dirs[target_index].get("created_at", datetime.now().isoformat()),
     }
 
     expand_dirs[target_index] = updated_item

@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Protocol
-from lifeprism.llm.bus.queue import MessageQueue
+
 from lifeprism.llm.bus.events import OutboundMessage
+from lifeprism.llm.bus.queue import MessageQueue
 from lifeprism.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -13,6 +14,7 @@ class ChannelConfig(Protocol):
     Attributes:
         allow_from: 允许的发送者列表，支持 "*" 通配符
     """
+
     allow_from: list[str]
 
 

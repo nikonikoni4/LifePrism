@@ -5,6 +5,7 @@ p002_add_xiaomi_mimo - 添加小米 Mimo provider（Token Plan 和普通版本�
 1. xiaomi_mimo_token_plan - Token Plan 版本
 2. xiaomi_mimo - 普通版本
 """
+
 VERSION = 2
 NAME = "p002_add_xiaomi_mimo"
 

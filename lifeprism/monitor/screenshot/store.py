@@ -1,6 +1,7 @@
-from pathlib import Path
-from typing import Any, Callable, Dict
+from collections.abc import Callable
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 from lifeprism.monitor.screenshot.models import CaptureRequest
 
@@ -20,7 +21,7 @@ class ScreenshotStore:
         self.data_root = Path(data_root)
         self.id_factory = id_factory
 
-    def capture(self, request: CaptureRequest) -> Dict[str, Any]:
+    def capture(self, request: CaptureRequest) -> dict[str, Any]:
         capture_id = self.id_factory()
         date_dir = request.captured_at[:10]
         target_dir = self.data_root / "screenshots" / date_dir
@@ -36,14 +37,16 @@ class ScreenshotStore:
         # 对 app 和 title 进行标准化处理，与 data_clean.py 保持一致
         window_app = request.window_app
         if window_app:
-            window_app = window_app.lower().strip().split('.exe')[0]
+            window_app = window_app.lower().strip().split(".exe")[0]
 
         window_title = request.window_title
         if window_title:
-            window_title = window_title.split('和另外')[0].strip().lower()
+            window_title = window_title.split("和另外")[0].strip().lower()
 
         # 转换时间戳格式为 YYYY-MM-DD HH:MM:SS
-        captured_at_formatted = datetime.fromisoformat(request.captured_at).strftime("%Y-%m-%d %H:%M:%S")
+        captured_at_formatted = datetime.fromisoformat(request.captured_at).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
 
         payload = {
             "id": capture_id,

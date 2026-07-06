@@ -4,18 +4,19 @@ Prompt 加载器模块
 提供统一的 prompt 加载、版本管理和使用统计功能。
 """
 
-from pathlib import Path
-from typing import Optional, Dict, Any
-from datetime import datetime
-from dataclasses import dataclass
 import shutil
 import sys
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
 import yaml
 
 from lifeprism.config import settings
-from lifeprism.utils import get_logger
 from lifeprism.llm.exceptions import PromptNotFoundError
 from lifeprism.llm.utils.md_os import prompts_md_load
+from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -29,6 +30,7 @@ class PromptRef:
         module: 模块名称（对应 {module}_prompts.md 文件）
         name: prompt 名称
     """
+
     module: str
     name: str
 
@@ -43,6 +45,7 @@ class Prompts:
 
     class Schedule:
         """定时任务相关 prompts (schedule_prompts.md)"""
+
         ACTIVITY_SUMMARY = PromptRef("schedule", "activity_summary")
         MOOD_SUMMARY = PromptRef("schedule", "mood_summary")
         UPDATE_MEMORY = PromptRef("schedule", "update_memory")
@@ -51,6 +54,8 @@ class Prompts:
         UPDATE_DIARY_SUMMARY = PromptRef("schedule", "update_diary_summary")
         SCREENSHOT_ANALYSIS = PromptRef("schedule", "screenshot_analysis")
         SCREEN_BEHAVIOR_SUMMARY = PromptRef("schedule", "screen_behavior_summary")
+
+
 class PromptLoader:
     """
     Prompt 加载器类
@@ -64,7 +69,11 @@ class PromptLoader:
         _usage_stats: 使用统计数据
     """
 
-    def __init__(self, prompts_dir: Path | str = settings.lifeprism_data_path / "prompts", usage_stats_file: Optional[Path | str] = None):
+    def __init__(
+        self,
+        prompts_dir: Path | str = settings.lifeprism_data_path / "prompts",
+        usage_stats_file: Path | str | None = None,
+    ):
         """
         初始化 PromptLoader
 
@@ -84,17 +93,17 @@ class PromptLoader:
             self.usage_stats_file = usage_stats_file
 
         # 开发环境：用 templates/prompts 覆盖 localData/prompts
-        if not getattr(sys, 'frozen', False):
+        if not getattr(sys, "frozen", False):
             self._sync_dev_prompts(prompts_dir)
 
         # 缓存已加载的 prompt 文件
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
 
         # 使用统计数据
-        self._usage_stats: Dict[str, Dict[str, Any]] = {}
+        self._usage_stats: dict[str, dict[str, Any]] = {}
         self._load_usage_stats()
 
-    def _sync_dev_prompts(self,target_dir: Path) -> None:
+    def _sync_dev_prompts(self, target_dir: Path) -> None:
         """开发环境：将 templates/prompts 同步到目标目录"""
         # 项目根目录 = lifeprism 包的上两级
         project_root = Path(__file__).resolve().parent.parent.parent.parent
@@ -115,14 +124,14 @@ class PromptLoader:
             target_file = target_dir / relative_path
             target_file.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(md_file, target_file)
-        
+
         logger.debug("开发环境已同步 .md prompts: %s -> %s", source_dir, target_dir)
 
     def _load_usage_stats(self) -> None:
         """加载使用统计数据"""
         if self.usage_stats_file.exists():
             try:
-                with open(self.usage_stats_file, 'r', encoding='utf-8') as f:
+                with open(self.usage_stats_file, encoding="utf-8") as f:
                     self._usage_stats = yaml.safe_load(f) or {}
             except Exception as e:
                 logger.warning("加载使用统计文件失败: %s", e)
@@ -136,7 +145,7 @@ class PromptLoader:
             # 确保目录存在
             self.usage_stats_file.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(self.usage_stats_file, 'w', encoding='utf-8') as f:
+            with open(self.usage_stats_file, "w", encoding="utf-8") as f:
                 yaml.dump(self._usage_stats, f, allow_unicode=True, default_flow_style=False)
         except Exception as e:
             logger.warning("保存使用统计文件失败: %s", e)
@@ -153,7 +162,7 @@ class PromptLoader:
             self._usage_stats[prompt_name] = {
                 "total_count": 0,
                 "version_stats": {},
-                "last_used": None
+                "last_used": None,
             }
 
         # 更新总计数
@@ -171,7 +180,7 @@ class PromptLoader:
         # 保存统计数据
         self._save_usage_stats()
 
-    def _load_prompt_file(self, module: str) -> Dict[str, Any]:
+    def _load_prompt_file(self, module: str) -> dict[str, Any]:
         """
         加载 prompt 文件
 
@@ -195,12 +204,11 @@ class PromptLoader:
         if not file_path.exists():
             logger.error(
                 "Prompt 文件缺失: module=%s, prompt_name=%s_prompts.md, file_path=%s",
-                module, module, str(file_path)
+                module,
+                module,
+                str(file_path),
             )
-            raise PromptNotFoundError(
-                prompt_name=f"{module}_prompts.md",
-                module=module
-            )
+            raise PromptNotFoundError(prompt_name=f"{module}_prompts.md", module=module)
 
         # 加载文件
         try:
@@ -216,8 +224,8 @@ class PromptLoader:
         self,
         prompt_name: str,
         version: str,
-        version_history: Dict[str, Any],
-        params: Dict[str, Any]
+        version_history: dict[str, Any],
+        params: dict[str, Any],
     ) -> None:
         """
         验证参数是否符合声明
@@ -261,9 +269,9 @@ class PromptLoader:
     def load_prompt(
         self,
         prompt: PromptRef | str,
-        module: Optional[str] = None,
-        version: Optional[str] = None,
-        **params
+        module: str | None = None,
+        version: str | None = None,
+        **params,
     ) -> str:
         """
         加载指定的 prompt
@@ -315,8 +323,7 @@ class PromptLoader:
         if version not in prompt_data["versions"]:
             available_versions = list(prompt_data["versions"].keys())
             raise ValueError(
-                f"版本 '{version}' 不存在于 prompt '{prompt_name}'，"
-                f"可用版本: {available_versions}"
+                f"版本 '{version}' 不存在于 prompt '{prompt_name}'，可用版本: {available_versions}"
             )
 
         # 获取 prompt 内容
@@ -330,10 +337,7 @@ class PromptLoader:
         # 如果版本声明了参数，则进行校验
         if declared_params is not None:
             self._validate_params(
-                prompt_name,
-                version,
-                prompt_data["metadata"]["version_history"],
-                params
+                prompt_name, version, prompt_data["metadata"]["version_history"], params
             )
 
         # 参数注入（如果有参数）
@@ -350,7 +354,7 @@ class PromptLoader:
 
         return prompt_content
 
-    def get_prompt_metadata(self, module: str, prompt_name: str) -> Dict[str, Any]:
+    def get_prompt_metadata(self, module: str, prompt_name: str) -> dict[str, Any]:
         """
         获取 prompt 的元数据
 
@@ -394,7 +398,7 @@ class PromptLoader:
 
         return list(data["prompts"][prompt_name]["versions"].keys())
 
-    def get_usage_stats(self, prompt_name: Optional[str] = None) -> Dict[str, Any]:
+    def get_usage_stats(self, prompt_name: str | None = None) -> dict[str, Any]:
         """
         获取使用统计数据
 
@@ -407,11 +411,9 @@ class PromptLoader:
         if prompt_name is None:
             return self._usage_stats.copy()
         else:
-            return self._usage_stats.get(prompt_name, {
-                "total_count": 0,
-                "version_stats": {},
-                "last_used": None
-            })
+            return self._usage_stats.get(
+                prompt_name, {"total_count": 0, "version_stats": {}, "last_used": None}
+            )
 
     def clear_cache(self) -> None:
         """清空缓存，强制重新加载文件"""

@@ -3,7 +3,7 @@
 """
 
 import uuid
-from typing import Any, Dict
+from typing import Any
 
 ITEM_TEXT: int = 1
 ITEM_IMAGE: int = 2
@@ -20,22 +20,22 @@ CLIENT_ID_LENGTH: int = 12
 class WechatMessage:
     """微信消息处理"""
 
-    _MEDIA_KEY_MAP: Dict[int, str] = {
+    _MEDIA_KEY_MAP: dict[int, str] = {
         ITEM_IMAGE: "image_item",
         ITEM_VOICE: "voice_item",
         ITEM_FILE: "file_item",
-        ITEM_VIDEO: "video_item"
+        ITEM_VIDEO: "video_item",
     }
 
-    _MEDIA_TYPE_MAP: Dict[int, str] = {
+    _MEDIA_TYPE_MAP: dict[int, str] = {
         ITEM_IMAGE: "image",
         ITEM_VOICE: "voice",
         ITEM_FILE: "file",
-        ITEM_VIDEO: "video"
+        ITEM_VIDEO: "video",
     }
 
     @staticmethod
-    def parse_message(msg: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_message(msg: dict[str, Any]) -> dict[str, Any]:
         """
         解析接收到的消息
 
@@ -49,7 +49,7 @@ class WechatMessage:
             "from_user_id": msg.get("from_user_id", ""),
             "content": "",
             "media": [],
-            "context_token": msg.get("context_token", "")
+            "context_token": msg.get("context_token", ""),
         }
 
         item_list = msg.get("item_list", [])
@@ -61,15 +61,14 @@ class WechatMessage:
             elif item_type in [ITEM_IMAGE, ITEM_VOICE, ITEM_FILE, ITEM_VIDEO]:
                 media_key = WechatMessage._MEDIA_KEY_MAP[item_type]
                 media_item = item.get(media_key, {})
-                result["media"].append({
-                    "type": WechatMessage._MEDIA_TYPE_MAP[item_type],
-                    "info": media_item
-                })
+                result["media"].append(
+                    {"type": WechatMessage._MEDIA_TYPE_MAP[item_type], "info": media_item}
+                )
 
         return result
 
     @staticmethod
-    def build_text_message(to_user_id: str, text: str, context_token: str = "") -> Dict[str, Any]:
+    def build_text_message(to_user_id: str, text: str, context_token: str = "") -> dict[str, Any]:
         """
         构造文本消息
 
@@ -89,7 +88,7 @@ class WechatMessage:
             "client_id": client_id,
             "message_type": MESSAGE_TYPE_BOT,
             "message_state": MESSAGE_STATE_FINISH,
-            "item_list": [{"type": ITEM_TEXT, "text_item": {"text": text}}]
+            "item_list": [{"type": ITEM_TEXT, "text_item": {"text": text}}],
         }
 
         if context_token:

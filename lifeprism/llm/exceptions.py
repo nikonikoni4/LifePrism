@@ -6,11 +6,13 @@ LLM 模块所有异常继承自 LLMError(ExternalServiceError)，
 注意：PromptNotFoundError 继承自 NotFoundError，因为 Prompt 文件缺失
 是配置/部署问题（持久性错误），不是外部服务故障（临时性错误）。
 """
+
 from lifeprism.utils.exceptions import ExternalServiceError, NotFoundError
 
 
 class LLMError(ExternalServiceError):
     """LLM 模块基础异常。"""
+
     pass
 
 

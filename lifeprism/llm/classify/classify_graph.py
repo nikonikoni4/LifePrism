@@ -2,22 +2,24 @@
 功能描述: 多步分类器，替代原 LangGraph 实现
 date: 2025.12.17
 """
+
 import asyncio
 import json
 import logging
+
 from lifeprism.config import settings
-from lifeprism.llm.exceptions import LLMResponseError, LLMError
-from lifeprism.llm.schemas.classify_shemas import classifyState, LogItem
+from lifeprism.llm.bus import InboundMessage, MessageType, OutboundMessage, bus
+from lifeprism.llm.exceptions import LLMError, LLMResponseError
+from lifeprism.llm.schemas.classify_shemas import LogItem, classifyState
 from lifeprism.llm.utils import (
-    format_goals_for_prompt,
-    format_category_tree_for_prompt,
-    format_log_items_table,
     extract_json_from_response,
+    format_category_tree_for_prompt,
+    format_goals_for_prompt,
+    format_log_items_table,
     parse_classification_result,
-    split_by_purpose,
     split_by_duration,
+    split_by_purpose,
 )
-from lifeprism.llm.bus import OutboundMessage, bus, InboundMessage,MessageType
 
 MAX_LOG_ITEMS = 10
 MAX_TITLE_ITEMS = 5
@@ -31,7 +33,9 @@ class ClassifyGraph:
         self.goal = goal
         self.category_tree = category_tree
 
-    async def _titles_then_long_classify(self, state: classifyState, long_items: list[LogItem]) -> list[LogItem]:
+    async def _titles_then_long_classify(
+        self, state: classifyState, long_items: list[LogItem]
+    ) -> list[LogItem]:
         """get_titles -> multi_classify_long 串行链，整体可与其他分支并发"""
         long_items = await self.get_titles(long_items)
         return await self.multi_classify_long(state, long_items)
@@ -83,7 +87,7 @@ class ClassifyGraph:
                     type=MessageType.CLASSIFY,
                     extra={"system_prompt": system_prompt},
                 )
-                result :OutboundMessage = await bus.send(msg)
+                result: OutboundMessage = await bus.send(msg)
                 result = result.response.content
                 if result and result.strip() and result.strip().lower() != "none":
                     app_info.description = result.strip()
@@ -109,37 +113,47 @@ class ClassifyGraph:
             if not app_info.description
         ]
         logger.info("开始获取 app 描述: 共 %s 个 app", len(apps_without_desc))
-        await asyncio.gather(*[
-            self._fetch_one_description(app, app_info, system_prompt)
-            for app, app_info in apps_without_desc
-        ])
+        await asyncio.gather(
+            *[
+                self._fetch_one_description(app, app_info, system_prompt)
+                for app, app_info in apps_without_desc
+            ]
+        )
         return state
 
-    async def _single_classify_batch(self, batch: list, batch_num: int, system_prompt: str,
-                                       app_registry: dict, result_items: list):
+    async def _single_classify_batch(
+        self,
+        batch: list,
+        batch_num: int,
+        system_prompt: str,
+        app_registry: dict,
+        result_items: list,
+    ):
         """单用途分类单批次"""
         content = format_log_items_table(
-            batch, fields=["id", "app", "title"],
-            app_registry=app_registry, group_by_app=True, show_app_description=True
+            batch,
+            fields=["id", "app", "title"],
+            app_registry=app_registry,
+            group_by_app=True,
+            show_app_description=True,
         )
         msg = InboundMessage(
             content=content,
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
         )
-        result :OutboundMessage = await bus.send(msg)
+        result: OutboundMessage = await bus.send(msg)
         raw_content = result.response.content
         clean = extract_json_from_response(raw_content)
         if not clean:
             model = settings.model
             logger.error(
                 "single_classify 批次 %d LLM 返回空内容: model=%s, raw=%s",
-                batch_num, model, (raw_content or "")[:200]
+                batch_num,
+                model,
+                (raw_content or "")[:200],
             )
-            raise LLMResponseError(
-                model=model,
-                raw_response=(raw_content or "")[:500]
-            )
+            raise LLMResponseError(model=model, raw_response=(raw_content or "")[:500])
         parse_classification_result(result_items, json.loads(clean), "single_classify")
 
     async def single_classify(self, state: classifyState, items: list[LogItem]) -> list[LogItem]:
@@ -161,15 +175,21 @@ class ClassifyGraph:
 注意：value 必须是列表，包含三个元素；无值时使用 null；key 必须是 id。\
 """
         result_items = list(items)
-        batches = [items[i:i + MAX_LOG_ITEMS] for i in range(0, len(items), MAX_LOG_ITEMS)]
+        batches = [items[i : i + MAX_LOG_ITEMS] for i in range(0, len(items), MAX_LOG_ITEMS)]
         logger.info("single_classify 共 %s 条，分 %s 批并发", len(items), len(batches))
-        await asyncio.gather(*[
-            self._single_classify_batch(batch, i + 1, system_prompt, state.app_registry, result_items)
-            for i, batch in enumerate(batches)
-        ])
+        await asyncio.gather(
+            *[
+                self._single_classify_batch(
+                    batch, i + 1, system_prompt, state.app_registry, result_items
+                )
+                for i, batch in enumerate(batches)
+            ]
+        )
         return result_items
 
-    async def _multi_classify_short_batch(self, batch: list, batch_num: int, system_prompt: str, result_items: list):
+    async def _multi_classify_short_batch(
+        self, batch: list, batch_num: int, system_prompt: str, result_items: list
+    ):
         """短时长多用途分类单批次"""
         content = format_log_items_table(batch, fields=["id", "app", "title"])
         msg = InboundMessage(
@@ -177,22 +197,23 @@ class ClassifyGraph:
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
         )
-        result :OutboundMessage = await bus.send(msg)
+        result: OutboundMessage = await bus.send(msg)
         raw_content = result.response.content
         clean = extract_json_from_response(raw_content)
         if not clean:
             model = settings.model
             logger.error(
                 "multi_classify_short 批次 %d LLM 返回空内容: model=%s, raw=%s",
-                batch_num, model, (raw_content or "")[:200]
+                batch_num,
+                model,
+                (raw_content or "")[:200],
             )
-            raise LLMResponseError(
-                model=model,
-                raw_response=(raw_content or "")[:500]
-            )
+            raise LLMResponseError(model=model, raw_response=(raw_content or "")[:500])
         parse_classification_result(result_items, json.loads(clean), "multi_classify_short")
 
-    async def multi_classify_short(self, state: classifyState, items: list[LogItem]) -> list[LogItem]:
+    async def multi_classify_short(
+        self, state: classifyState, items: list[LogItem]
+    ) -> list[LogItem]:
         """node 2b-short: 短时长多用途并发分类"""
         goal_str = format_goals_for_prompt(self.goal)
         category_str = format_category_tree_for_prompt(self.category_tree)
@@ -210,12 +231,14 @@ class ClassifyGraph:
 # 输出格式为 JSON，key 为 id，value 为 [category, sub_category, link_to_goal]\
 """
         result_items = list(items)
-        batches = [items[i:i + MAX_LOG_ITEMS] for i in range(0, len(items), MAX_LOG_ITEMS)]
+        batches = [items[i : i + MAX_LOG_ITEMS] for i in range(0, len(items), MAX_LOG_ITEMS)]
         logger.info("multi_classify_short 共 %s 条，分 %s 批并发", len(items), len(batches))
-        await asyncio.gather(*[
-            self._multi_classify_short_batch(batch, i + 1, system_prompt, result_items)
-            for i, batch in enumerate(batches)
-        ])
+        await asyncio.gather(
+            *[
+                self._multi_classify_short_batch(batch, i + 1, system_prompt, result_items)
+                for i, batch in enumerate(batches)
+            ]
+        )
         return result_items
 
     async def _fetch_one_title(self, item: LogItem, system_prompt: str):
@@ -223,11 +246,13 @@ class ClassifyGraph:
         if not item.title:
             return
         try:
-            result :OutboundMessage = await bus.send(InboundMessage(
-                content=f"搜索并分析 {item.title}",
-                type=MessageType.CLASSIFY,
-                extra={"system_prompt": system_prompt},
-            ))
+            result: OutboundMessage = await bus.send(
+                InboundMessage(
+                    content=f"搜索并分析 {item.title}",
+                    type=MessageType.CLASSIFY,
+                    extra={"system_prompt": system_prompt},
+                )
+            )
             item.title_analysis = result.response.content
         except Exception as e:
             logger.warning("get_titles 分析 title=%r 失败: %s", item.title, e)
@@ -239,13 +264,12 @@ class ClassifyGraph:
             "要求结果在30字以内。只输出描述文字（用户活动），不要输出其他内容。"
         )
         logger.info("开始获取 title 分析: 共 %s 条", len(items))
-        await asyncio.gather(*[
-            self._fetch_one_title(item, system_prompt)
-            for item in items
-        ])
+        await asyncio.gather(*[self._fetch_one_title(item, system_prompt) for item in items])
         return items
 
-    async def _multi_classify_long_batch(self, batch: list, batch_num: int, system_prompt: str, result_items: list):
+    async def _multi_classify_long_batch(
+        self, batch: list, batch_num: int, system_prompt: str, result_items: list
+    ):
         """长时长多用途分类单批次"""
         content = format_log_items_table(batch, fields=["id", "app", "title", "title_analysis"])
         msg = InboundMessage(
@@ -253,22 +277,23 @@ class ClassifyGraph:
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
         )
-        result :OutboundMessage = await bus.send(msg)
+        result: OutboundMessage = await bus.send(msg)
         raw_content = result.response.content
         clean = extract_json_from_response(raw_content)
         if not clean:
             model = settings.model
             logger.error(
                 "multi_classify_long 批次 %d LLM 返回空内容: model=%s, raw=%s",
-                batch_num, model, (raw_content or "")[:200]
+                batch_num,
+                model,
+                (raw_content or "")[:200],
             )
-            raise LLMResponseError(
-                model=model,
-                raw_response=(raw_content or "")[:500]
-            )
+            raise LLMResponseError(model=model, raw_response=(raw_content or "")[:500])
         parse_classification_result(result_items, json.loads(clean), "multi_classify_long")
 
-    async def multi_classify_long(self, state: classifyState, items: list[LogItem]) -> list[LogItem]:
+    async def multi_classify_long(
+        self, state: classifyState, items: list[LogItem]
+    ) -> list[LogItem]:
         """node 4: 长时长多用途并发分类"""
         goal_str = format_goals_for_prompt(self.goal)
         category_str = format_category_tree_for_prompt(self.category_tree)
@@ -287,10 +312,12 @@ class ClassifyGraph:
 # 输出格式为 JSON，key 为 id，value 为 [category, sub_category, link_to_goal]\
 """
         result_items = list(items)
-        batches = [items[i:i + MAX_LOG_ITEMS] for i in range(0, len(items), MAX_LOG_ITEMS)]
+        batches = [items[i : i + MAX_LOG_ITEMS] for i in range(0, len(items), MAX_LOG_ITEMS)]
         logger.info("multi_classify_long 共 %s 条，分 %s 批并发", len(items), len(batches))
-        await asyncio.gather(*[
-            self._multi_classify_long_batch(batch, i + 1, system_prompt, result_items)
-            for i, batch in enumerate(batches)
-        ])
+        await asyncio.gather(
+            *[
+                self._multi_classify_long_batch(batch, i + 1, system_prompt, result_items)
+                for i, batch in enumerate(batches)
+            ]
+        )
         return result_items

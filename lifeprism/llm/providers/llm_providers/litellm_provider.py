@@ -13,16 +13,20 @@ from typing import Any
 import json_repair
 import litellm
 from litellm import acompletion
-from lifeprism.utils import get_logger
 
 from lifeprism.llm.providers.llm_providers.base import LLMProvider, LLMResponse, ToolCallRequest
 from lifeprism.llm.providers.llm_providers.registry import find_by_model, find_gateway
+from lifeprism.utils import get_logger
+
 logger = get_logger(__name__)
 
 # Standard chat-completion message keys.
-_ALLOWED_MSG_KEYS = frozenset({"role", "content", "tool_calls", "tool_call_id", "name", "reasoning_content"})
+_ALLOWED_MSG_KEYS = frozenset(
+    {"role", "content", "tool_calls", "tool_call_id", "name", "reasoning_content"}
+)
 _ANTHROPIC_EXTRA_KEYS = frozenset({"thinking_blocks"})
 _ALNUM = string.ascii_letters + string.digits
+
 
 def _short_tool_id() -> str:
     """Generate a 9-char alphanumeric ID compatible with all providers (incl. Mistral)."""
@@ -32,7 +36,7 @@ def _short_tool_id() -> str:
 class LiteLLMProvider(LLMProvider):
     """
     LLM provider using LiteLLM for multi-provider support.
-    
+
     Supports OpenRouter, Anthropic, OpenAI, Gemini, MiniMax, and many other providers through
     a unified interface.  Provider-specific logic is driven by the registry
     (see providers/registry.py) — no if-elif chains needed here.
@@ -40,12 +44,11 @@ class LiteLLMProvider(LLMProvider):
 
     def __init__(
         self,
-        api_key: str ,
-        api_base: str ,
-        default_model: str ,
-        provider_name: str ,
+        api_key: str,
+        api_base: str,
+        default_model: str,
+        provider_name: str,
         extra_headers: dict[str, str] | None = None,
-        
     ):
         """
         args:
@@ -59,7 +62,7 @@ class LiteLLMProvider(LLMProvider):
                 覆盖策略 → 是否覆盖已有环境变量
                 模型前缀 → 给 litellm 发什么模型名
                 前缀剥离 → 是否先清理原有前缀
-                Prompt Caching → 是否注入 
+                Prompt Caching → 是否注入
 
                 cache_control
                 额外请求参数 → 网关特有的 litellm_kwargs
@@ -71,7 +74,7 @@ class LiteLLMProvider(LLMProvider):
                 1. 继承nanobot的能力：
                     模型前缀 → 给 litellm 发什么模型名
                     前缀剥离 → 是否先清理原有前缀
-                    Prompt Caching → 是否注入 
+                    Prompt Caching → 是否注入
 
                     cache_control
                     额外请求参数 → 网关特有的 litellm_kwargs
@@ -80,7 +83,7 @@ class LiteLLMProvider(LLMProvider):
 
         """
         super().__init__(api_key, api_base)
-        
+
         self.extra_headers = extra_headers or {}
 
         # Detect gateway / local deployment.
@@ -88,7 +91,7 @@ class LiteLLMProvider(LLMProvider):
         # api_key / api_base are fallback for auto-detection.
         self._gateway = find_gateway(provider_name, api_key, api_base)
 
-        self.default_model =  default_model
+        self.default_model = default_model
         if api_base:
             litellm.api_base = api_base
 
@@ -146,7 +149,9 @@ class LiteLLMProvider(LLMProvider):
             if msg.get("role") == "system":
                 content = msg["content"]
                 if isinstance(content, str):
-                    new_content = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
+                    new_content = [
+                        {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}
+                    ]
                 else:
                     new_content = list(content)
                     new_content[-1] = {**new_content[-1], "cache_control": {"type": "ephemeral"}}
@@ -175,7 +180,11 @@ class LiteLLMProvider(LLMProvider):
     def _extra_msg_keys(original_model: str, resolved_model: str) -> frozenset[str]:
         """Return provider-specific extra keys to preserve in request messages."""
         spec = find_by_model(original_model) or find_by_model(resolved_model)
-        if (spec and spec.name == "anthropic") or "claude" in original_model.lower() or resolved_model.startswith("anthropic/"):
+        if (
+            (spec and spec.name == "anthropic")
+            or "claude" in original_model.lower()
+            or resolved_model.startswith("anthropic/")
+        ):
             return _ANTHROPIC_EXTRA_KEYS
         return frozenset()
 
@@ -189,7 +198,9 @@ class LiteLLMProvider(LLMProvider):
         return hashlib.sha1(tool_call_id.encode()).hexdigest()[:9]
 
     @staticmethod
-    def _sanitize_messages(messages: list[dict[str, Any]], extra_keys: frozenset[str] = frozenset()) -> list[dict[str, Any]]:
+    def _sanitize_messages(
+        messages: list[dict[str, Any]], extra_keys: frozenset[str] = frozenset()
+    ) -> list[dict[str, Any]]:
         """Strip non-standard keys and ensure assistant messages have a content key."""
         allowed = _ALLOWED_MSG_KEYS | extra_keys
         sanitized = LLMProvider._sanitize_request_messages(messages, allowed)
@@ -222,7 +233,7 @@ class LiteLLMProvider(LLMProvider):
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
-        model: str | None = None, 
+        model: str | None = None,
         max_tokens: int = 4096,
         temperature: float = 0.7,
         reasoning_effort: str | None = None,
@@ -255,7 +266,9 @@ class LiteLLMProvider(LLMProvider):
 
         kwargs: dict[str, Any] = {
             "model": model,
-            "messages": self._sanitize_messages(self._sanitize_empty_content(messages), extra_keys=extra_msg_keys),
+            "messages": self._sanitize_messages(
+                self._sanitize_empty_content(messages), extra_keys=extra_msg_keys
+            ),
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
@@ -280,11 +293,11 @@ class LiteLLMProvider(LLMProvider):
         # Pass extra headers (e.g. APP-Code for AiHubMix)
         if self.extra_headers:
             kwargs["extra_headers"] = self.extra_headers
-        
+
         if reasoning_effort:
             kwargs["reasoning_effort"] = reasoning_effort
             kwargs["drop_params"] = True
-        
+
         if tools:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = tool_choice or "auto"
@@ -315,19 +328,19 @@ class LiteLLMProvider(LLMProvider):
 
         tool_calls = []
         # Match <tool_call>...</tool_call> blocks
-        tool_call_pattern = r'<tool_call>(.*?)</tool_call>'
+        tool_call_pattern = r"<tool_call>(.*?)</tool_call>"
         matches = re.findall(tool_call_pattern, content, re.DOTALL)
 
         for match in matches:
             # Extract function name from <function=name>
-            func_match = re.search(r'<function=([^>]+)>', match)
+            func_match = re.search(r"<function=([^>]+)>", match)
             if not func_match:
                 continue
 
             function_name = func_match.group(1)
 
             # Extract all parameters
-            param_pattern = r'<parameter=([^>]+)>([^<]*)</parameter>'
+            param_pattern = r"<parameter=([^>]+)>([^<]*)</parameter>"
             params = re.findall(param_pattern, match)
 
             # Build arguments dict
@@ -335,8 +348,8 @@ class LiteLLMProvider(LLMProvider):
             for param_name, param_value in params:
                 # Try to parse as JSON if it looks like a number or boolean
                 param_value = param_value.strip()
-                if param_value.lower() in ('true', 'false'):
-                    arguments[param_name] = param_value.lower() == 'true'
+                if param_value.lower() in ("true", "false"):
+                    arguments[param_name] = param_value.lower() == "true"
                 elif param_value.isdigit():
                     arguments[param_name] = int(param_value)
                 else:
@@ -345,11 +358,13 @@ class LiteLLMProvider(LLMProvider):
                     except ValueError:
                         arguments[param_name] = param_value
 
-            tool_calls.append(ToolCallRequest(
-                id=_short_tool_id(),
-                name=function_name,
-                arguments=arguments,
-            ))
+            tool_calls.append(
+                ToolCallRequest(
+                    id=_short_tool_id(),
+                    name=function_name,
+                    arguments=arguments,
+                )
+            )
 
         return tool_calls
 
@@ -373,8 +388,11 @@ class LiteLLMProvider(LLMProvider):
                 content = msg.content
 
         if len(response.choices) > 1:
-            logger.debug("LiteLLM response has {} choices, merged {} tool_calls",
-                         len(response.choices), len(raw_tool_calls))
+            logger.debug(
+                "LiteLLM response has {} choices, merged {} tool_calls",
+                len(response.choices),
+                len(raw_tool_calls),
+            )
 
         tool_calls = []
         for tc in raw_tool_calls:
@@ -388,17 +406,24 @@ class LiteLLMProvider(LLMProvider):
                 getattr(tc.function, "provider_specific_fields", None) or None
             )
 
-            tool_calls.append(ToolCallRequest(
-                id=_short_tool_id(),
-                name=tc.function.name,
-                arguments=args,
-                provider_specific_fields=provider_specific_fields,
-                function_provider_specific_fields=function_provider_specific_fields,
-            ))
+            tool_calls.append(
+                ToolCallRequest(
+                    id=_short_tool_id(),
+                    name=tc.function.name,
+                    arguments=args,
+                    provider_specific_fields=provider_specific_fields,
+                    function_provider_specific_fields=function_provider_specific_fields,
+                )
+            )
 
         # Handle XML-format tool calls (MIMO, MiniMax, etc.)
         # If finish_reason is 'tool_calls' but tool_calls is empty, and content contains XML tool calls
-        if finish_reason == "tool_calls" and not tool_calls and content and "<tool_call>" in content:
+        if (
+            finish_reason == "tool_calls"
+            and not tool_calls
+            and content
+            and "<tool_call>" in content
+        ):
             logger.debug("Detected XML-format tool calls in content, parsing...")
             xml_tool_calls = self._parse_xml_tool_calls(content)
             if xml_tool_calls:

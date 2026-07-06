@@ -1,12 +1,12 @@
-from typing import List, Optional
-from lifeprism.llm.bus import MessageType, OutboundMessage, bus, InboundMessage
-from lifeprism.llm.providers.llm_providers.base import LLMResponse
-from lifeprism.llm.session.manager import session_manager, Session
 from lifeprism.llm.agent.context import Context
+from lifeprism.llm.bus import InboundMessage, MessageType, OutboundMessage, bus
+from lifeprism.llm.providers.llm_providers.base import LLMResponse
+from lifeprism.llm.session.manager import Session, session_manager
 from lifeprism.llm.utils.llm_call_logger import llm_call_logger
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
+
 
 class ChatBot:
     def __init__(self):
@@ -22,12 +22,11 @@ class ChatBot:
 
             # 2. 发送消息
             # 注意：不再此处手动添加消息，因为 AgentLoop 会处理消息的接收、存储和回复存储
-            logger.info("ChatBot.chat 开始: session_id=%s, content_len=%s", session_id, len(content))
+            logger.info(
+                "ChatBot.chat 开始: session_id=%s, content_len=%s", session_id, len(content)
+            )
             msg = InboundMessage(
-                content=content,
-                session_id=session.id,
-                type=MessageType.CHAT,
-                extra=extra
+                content=content, session_id=session.id, type=MessageType.CHAT, extra=extra
             )
             response_data = await self._bus.send(msg)
 
@@ -36,7 +35,9 @@ class ChatBot:
                 system_prompt = Context.build_system_prompt(msg)
                 llm_call_logger.log_call(
                     inbound_msg=msg,
-                    outbound_msg=response_data if isinstance(response_data, OutboundMessage) else None,
+                    outbound_msg=response_data
+                    if isinstance(response_data, OutboundMessage)
+                    else None,
                     prompt_module="chat",
                     prompt_name="chat",
                     system_prompt=system_prompt,
@@ -46,7 +47,7 @@ class ChatBot:
 
             # 3. 包装响应
             result = None
-            if isinstance(response_data,OutboundMessage):
+            if isinstance(response_data, OutboundMessage):
                 result = response_data.response
             elif isinstance(response_data, LLMResponse):
                 result = response_data
@@ -74,11 +75,11 @@ class ChatBot:
         """删除会话"""
         self._session_manager.delete_session(session_id)
 
-    def list_sessions(self) -> List[str]:
+    def list_sessions(self) -> list[str]:
         """获取所有会话 ID 列表"""
         return self._session_manager.show_session_list()
 
-    def get_session(self, session_id: str) -> Optional[Session]:
+    def get_session(self, session_id: str) -> Session | None:
         """获取现有会话，不存在则返回 None"""
         try:
             return self._session_manager.get_or_create_session(session_id)

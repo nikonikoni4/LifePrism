@@ -2,11 +2,12 @@
 Goal Journal 数据提供者
 提供 Goal Journal 日志的数据库操作
 """
-from typing import Optional, List, Dict, Any
+
 import uuid
+from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
-from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils import LazySingleton, get_logger
 
 logger = get_logger(__name__)
 
@@ -21,7 +22,7 @@ class JournalProvider(LWBaseDataProvider):
     def __init__(self, db_manager=None):
         super().__init__(db_manager)
 
-    def get_journals_by_goal(self, goal_id: str) -> List[Dict[str, Any]]:
+    def get_journals_by_goal(self, goal_id: str) -> list[dict[str, Any]]:
         """
         获取指定目标的所有日志
 
@@ -40,19 +41,19 @@ class JournalProvider(LWBaseDataProvider):
                     WHERE goal_id = ?
                     ORDER BY date DESC, time DESC
                     """,
-                    (goal_id,)
+                    (goal_id,),
                 )
 
                 columns = [description[0] for description in cursor.description]
                 rows = cursor.fetchall()
 
-                return [dict(zip(columns, row)) for row in rows]
+                return [dict(zip(columns, row, strict=False)) for row in rows]
 
         except Exception as e:
             logger.error("获取目标 %s 的日志失败: error=%s", goal_id, e)
             return []
 
-    def get_journal_by_id(self, journal_id: str) -> Optional[Dict[str, Any]]:
+    def get_journal_by_id(self, journal_id: str) -> dict[str, Any] | None:
         """
         按 ID 获取单个日志
 
@@ -70,14 +71,14 @@ class JournalProvider(LWBaseDataProvider):
                 row = cursor.fetchone()
                 if row:
                     columns = [description[0] for description in cursor.description]
-                    return dict(zip(columns, row))
+                    return dict(zip(columns, row, strict=False))
                 return None
 
         except Exception as e:
             logger.error("获取日志 %s 失败: error=%s", journal_id, e)
             return None
 
-    def create_journal(self, data: Dict[str, Any]) -> Optional[str]:
+    def create_journal(self, data: dict[str, Any]) -> str | None:
         """
         创建新日志
 
@@ -95,27 +96,23 @@ class JournalProvider(LWBaseDataProvider):
                 journal_id = f"journal-{str(uuid.uuid4())[:8]}"
 
                 # 构建插入数据
-                columns = [
-                    'id', 'goal_id', 'date', 'time', 'content',
-                    'mood', 'duration', 'tags'
-                ]
+                columns = ["id", "goal_id", "date", "time", "content", "mood", "duration", "tags"]
                 values = [
                     journal_id,
-                    data.get('goal_id'),
-                    data.get('date'),
-                    data.get('time'),
-                    data.get('content'),
-                    data.get('mood', 'neutral'),
-                    data.get('duration', 0),
-                    data.get('tags', '[]')
+                    data.get("goal_id"),
+                    data.get("date"),
+                    data.get("time"),
+                    data.get("content"),
+                    data.get("mood", "neutral"),
+                    data.get("duration", 0),
+                    data.get("tags", "[]"),
                 ]
 
-                placeholders = ', '.join(['?' for _ in columns])
-                columns_str = ', '.join(columns)
+                placeholders = ", ".join(["?" for _ in columns])
+                columns_str = ", ".join(columns)
 
                 cursor.execute(
-                    f"INSERT INTO goal_journal ({columns_str}) VALUES ({placeholders})",
-                    values
+                    f"INSERT INTO goal_journal ({columns_str}) VALUES ({placeholders})", values
                 )
 
                 logger.info("创建日志成功，ID: %s", journal_id)
@@ -125,7 +122,7 @@ class JournalProvider(LWBaseDataProvider):
             logger.error("创建日志失败: error=%s", e)
             return None
 
-    def update_journal(self, journal_id: str, data: Dict[str, Any]) -> bool:
+    def update_journal(self, journal_id: str, data: dict[str, Any]) -> bool:
         """
         更新日志
 
@@ -144,9 +141,7 @@ class JournalProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
 
                 # 允许更新的字段
-                allowed_fields = [
-                    'date', 'time', 'content', 'mood', 'duration', 'tags'
-                ]
+                allowed_fields = ["date", "time", "content", "mood", "duration", "tags"]
 
                 set_clauses = []
                 values = []

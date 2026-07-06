@@ -6,16 +6,16 @@ PlanDoc 服务层 - Plan Doc 计划书业务逻辑
 
 架构：纯函数模块（无内存缓存，不需要单例）
 """
-from typing import Optional
+
 from pathlib import Path
 
+from lifeprism.repository import plan_doc_repository
 from lifeprism.server.schemas.goal_schemas import (
+    CreatePlanDocRequest,
     PlanDocItem,
     PlanDocListResponse,
-    CreatePlanDocRequest,
     UpdatePlanDocRequest,
 )
-from lifeprism.repository import plan_doc_repository
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -24,7 +24,9 @@ logger = get_logger(__name__)
 def _get_plan_doc_dir() -> Path:
     """获取计划书目录路径"""
     from lifeprism.config.settings_manager import settings
+
     return settings.lifeprism_data_path / "plan"
+
 
 def _ensure_plan_doc_dir():
     """确保计划书目录存在"""
@@ -44,7 +46,7 @@ def _read_content_from_file(doc_id: str) -> str:
     file_path = _get_plan_doc_path(doc_id)
     try:
         if file_path.exists():
-            return file_path.read_text(encoding='utf-8')
+            return file_path.read_text(encoding="utf-8")
         return ""
     except Exception as e:
         logger.error("读取计划书文件 %s 失败: %s", doc_id, e)
@@ -56,7 +58,7 @@ def _write_content_to_file(doc_id: str, content: str):
     file_path = _get_plan_doc_path(doc_id)
     try:
         _ensure_plan_doc_dir()
-        file_path.write_text(content, encoding='utf-8')
+        file_path.write_text(content, encoding="utf-8")
         logger.debug("写入计划书文件 %s 成功", doc_id)
     except Exception as e:
         logger.error("写入计划书文件 %s 失败: %s", doc_id, e)
@@ -83,24 +85,24 @@ def _convert_db_item_to_plan_doc_item(item: dict, include_content: bool = False)
     """
     content = ""
     if include_content:
-        content = _read_content_from_file(item['id'])
+        content = _read_content_from_file(item["id"])
 
     return PlanDocItem(
-        id=item['id'],
-        goal_id=item['goal_id'],
+        id=item["id"],
+        goal_id=item["goal_id"],
         content=content,
-        status=item.get('status', 'active'),
-        order_index=item.get('order_index', 0),
-        created_at=item.get('created_at', ''),
-        updated_at=item.get('updated_at')
+        status=item.get("status", "active"),
+        order_index=item.get("order_index", 0),
+        created_at=item.get("created_at", ""),
+        updated_at=item.get("updated_at"),
     )
 
 
 def get_plan_docs(
-    goal_id: Optional[str] = None,
-    doc_type: Optional[str] = None,
+    goal_id: str | None = None,
+    doc_type: str | None = None,
     page: int = 1,
-    page_size: int = 20
+    page_size: int = 20,
 ) -> PlanDocListResponse:
     """
     获取计划书列表（只返回 meta 信息，不含 content）
@@ -119,7 +121,9 @@ def get_plan_docs(
     else:
         items = plan_doc_repository.get_all_plan_docs()
 
-    plan_doc_items = [_convert_db_item_to_plan_doc_item(item, include_content=False) for item in items]
+    plan_doc_items = [
+        _convert_db_item_to_plan_doc_item(item, include_content=False) for item in items
+    ]
     return PlanDocListResponse(items=plan_doc_items)
 
 
@@ -134,11 +138,13 @@ def get_plan_docs_by_goal(goal_id: str) -> PlanDocListResponse:
         PlanDocListResponse: 计划书列表响应
     """
     items = plan_doc_repository.get_plan_docs_by_goal(goal_id)
-    plan_doc_items = [_convert_db_item_to_plan_doc_item(item, include_content=False) for item in items]
+    plan_doc_items = [
+        _convert_db_item_to_plan_doc_item(item, include_content=False) for item in items
+    ]
     return PlanDocListResponse(items=plan_doc_items)
 
 
-def get_plan_doc_detail(doc_id: str) -> Optional[PlanDocItem]:
+def get_plan_doc_detail(doc_id: str) -> PlanDocItem | None:
     """
     获取计划书详情（meta + 文件内容）
 
@@ -176,7 +182,7 @@ def _check_plan_doc_id_exists(doc_id: str) -> tuple[bool, str]:
     return False, ""
 
 
-def create_plan_doc(request: CreatePlanDocRequest) -> Optional[PlanDocItem]:
+def create_plan_doc(request: CreatePlanDocRequest) -> PlanDocItem | None:
     """
     创建计划书（数据库 + 文件）
 
@@ -196,8 +202,8 @@ def create_plan_doc(request: CreatePlanDocRequest) -> Optional[PlanDocItem]:
         raise ValueError(f"{conflict_source}: {request.id}")
 
     data = {
-        'id': request.id,
-        'goal_id': request.goal_id,
+        "id": request.id,
+        "goal_id": request.goal_id,
     }
 
     new_id = plan_doc_repository.create_plan_doc(data)
@@ -212,7 +218,7 @@ def create_plan_doc(request: CreatePlanDocRequest) -> Optional[PlanDocItem]:
     return get_plan_doc_detail(new_id)
 
 
-def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[PlanDocItem]:
+def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> PlanDocItem | None:
     """
     更新计划书（meta + 文件内容）
 
@@ -235,7 +241,7 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
     explicitly_set_fields = request.model_fields_set
 
     # 处理重命名逻辑 (当 new_id 存在时)
-    if 'new_id' in explicitly_set_fields and request.new_id and request.new_id != doc_id:
+    if "new_id" in explicitly_set_fields and request.new_id and request.new_id != doc_id:
         new_id = request.new_id
         logger.info("检测到重命名操作: %s -> %s", doc_id, new_id)
 
@@ -247,7 +253,7 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
 
         # 2. 文件层操作：另存为新文件 (保留旧文件做备份)
         content_to_write = ""
-        if 'content' in explicitly_set_fields:
+        if "content" in explicitly_set_fields:
             content_to_write = request.content
         else:
             content_to_write = _read_content_from_file(doc_id)
@@ -261,25 +267,25 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
             logger.error("数据库重命名失败，回滚文件操作 (删除 %s.md)", new_id)
             _delete_content_file(new_id)
             return None
-            
+
         # 4. 如果还有其他字段需要更新 (status)，则再更新一次新记录
-        if 'status' in explicitly_set_fields:
-             plan_doc_repository.update_plan_doc(new_id, {'status': request.status})
-             
+        if "status" in explicitly_set_fields:
+            plan_doc_repository.update_plan_doc(new_id, {"status": request.status})
+
         return get_plan_doc_detail(new_id)
 
     # 常规更新逻辑 (非重命名)
     update_data = {}
 
-    if 'status' in explicitly_set_fields:
-        update_data['status'] = request.status
+    if "status" in explicitly_set_fields:
+        update_data["status"] = request.status
 
     # 更新数据库 meta
     if update_data:
         plan_doc_repository.update_plan_doc(doc_id, update_data)
 
     # 更新文件内容
-    if 'content' in explicitly_set_fields:
+    if "content" in explicitly_set_fields:
         _write_content_to_file(doc_id, request.content)
 
     logger.info("更新计划书: doc_id=%s", doc_id)

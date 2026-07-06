@@ -7,18 +7,20 @@ skill 分为 2个类型：
 
 """
 
-from lifeprism.config import settings
-from pathlib import Path
-from lifeprism.utils import get_logger
 import re
-import yaml
 from typing import Any
+
+import yaml
+
+from lifeprism.config import settings
+from lifeprism.utils import get_logger
+
 logger = get_logger(__name__)
 
+
 class SkillLoad:
-    _ALWAYS_LOAD = [
-        "user-data-guide"
-    ]
+    _ALWAYS_LOAD = ["user-data-guide"]
+
     def __init__(self):
         self.skill_path = settings.lifeprism_data_path / "agent" / "skills"
 
@@ -28,29 +30,34 @@ class SkillLoad:
             return ""
         if not isinstance(s, str):
             s = str(s)
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&apos;")
+        return (
+            s.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&apos;")
+        )
 
     def _strip_frontmatter(self, content: str) -> str:
         """Remove YAML frontmatter from markdown content."""
         if content.startswith("---"):
             match = re.match(r"^---\n.*?\n---\n", content, re.DOTALL)
             if match:
-                return content[match.end():].strip()
+                return content[match.end() :].strip()
         return content
 
-    def load_skill_content(self,skill_name) -> str | None:
-        """ 加载去除frontmatter的skill正文 """
+    def load_skill_content(self, skill_name) -> str | None:
+        """加载去除frontmatter的skill正文"""
         path = self.skill_path / f"{skill_name}/skill.md"
         if path.exists():
             # 读取文件
             content = path.read_text(encoding="utf-8")
-            # 
+            #
             return self._strip_frontmatter(content)
 
         else:
             logger.warning("%s不存在，无法加载%s skill,", str(path), skill_name)
         return None
-
 
     def load_skill_frontmatter(self, skill_name: str) -> dict | None:
         """加载 skill.md 顶部的 YAML frontmatter，解析为 dict。无文件、无 frontmatter 或解析失败时返回 None。"""
@@ -96,18 +103,18 @@ class SkillLoad:
                 lines.append(f'  <skill name="{self._escape_xml(skill_name)}">')
                 # if description:
                 #     lines.append(f'    <description>{self._escape_xml(description)}</description>')
-                lines.append('    <content>')
+                lines.append("    <content>")
                 lines.append(self._escape_xml(content))
-                lines.append('    </content>')
-                lines.append('  </skill>')
+                lines.append("    </content>")
+                lines.append("  </skill>")
 
-        lines.append('</skills>')
+        lines.append("</skills>")
         return "\n".join(lines) if len(lines) > 2 else ""
 
     def load_frontmatters(self, loaded_skills_name: list[str] | None = None) -> str:
         """加载除已经加载的 skill 以外的所有 skill 的 frontmatters (可用技能列表)
-            args:
-                loaded_skills_name : 本轮要加载的 skills，在加载 frontmatters 时应该排除这些内容
+        args:
+            loaded_skills_name : 本轮要加载的 skills，在加载 frontmatters 时应该排除这些内容
         """
         if loaded_skills_name is None:
             loaded_skills_name = []
@@ -127,8 +134,8 @@ class SkillLoad:
                     path_str = self._escape_xml(str(self.skill_path / f"{skill}/skill.md"))
 
                     lines.append(f'  <skill name="{name}">')
-                    lines.append(f'    <description>{desc}</description>')
-                    lines.append(f'    <location>{path_str}</location>')
+                    lines.append(f"    <description>{desc}</description>")
+                    lines.append(f"    <location>{path_str}</location>")
 
                     # 兼容展示除name和description以外的所有扩展字段
                     for k, v in fm.items():
@@ -141,9 +148,8 @@ class SkillLoad:
 
         lines.append("</skills>")
         return "\n".join(lines) if len(lines) > 2 else ""
-        
 
-    def get_skills_list(self) ->list[str]:
+    def get_skills_list(self) -> list[str]:
         """
         获取所有skills list ,返回skill名称列表
 
@@ -154,7 +160,8 @@ class SkillLoad:
             logger.warning("skills目录不存在: %s, 已创建", self.skill_path)
             self.skill_path.mkdir(parents=True, exist_ok=True)
             return []
-        return  [f.name for f in self.skill_path.iterdir() if f.is_dir()]
+        return [f.name for f in self.skill_path.iterdir() if f.is_dir()]
+
 
 if __name__ == "__main__":
     skill_load = SkillLoad()

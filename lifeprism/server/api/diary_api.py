@@ -4,20 +4,21 @@ Diary API - 日记模块路由
 路由顺序关键：/list 和 /templates/* 必须在 /{date} 之前，
 否则 FastAPI 会把 "list"/"templates" 当作 date 参数。
 """
-from fastapi import APIRouter, Query, HTTPException, Path
+
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from lifeprism.server.schemas.diary_schemas import (
+    CreateTemplateRequest,
+    DiaryAISummaryResponse,
     DiaryItem,
     DiaryListResponse,
-    DiaryAISummaryResponse,
-    UpdateDiaryMetaRequest,
+    GenerateDiaryAISummaryRangeRequest,
+    GenerateDiaryAISummaryRangeResponse,
     SaveDiaryContentRequest,
     TemplateItem,
     TemplateListResponse,
-    CreateTemplateRequest,
+    UpdateDiaryMetaRequest,
     UpdateTemplateRequest,
-    GenerateDiaryAISummaryRangeRequest,
-    GenerateDiaryAISummaryRangeResponse,
 )
 from lifeprism.server.services import diary_service
 
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/diary", tags=["Diary"])
 
 
 # ==================== 日记列表（必须在 /{date} 之前） ====================
+
 
 @router.get("/list", response_model=DiaryListResponse, summary="获取日记列表")
 async def get_diary_list(
@@ -36,6 +38,7 @@ async def get_diary_list(
 
 
 # ==================== 模板管理（必须在 /{date} 之前） ====================
+
 
 @router.get("/templates", response_model=TemplateListResponse, summary="获取模板列表")
 async def get_templates():
@@ -58,7 +61,7 @@ async def create_template(request: CreateTemplateRequest):
     try:
         return diary_service.create_template(request)
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
 
 @router.put("/templates/{name}", response_model=TemplateItem, summary="更新模板")
@@ -84,7 +87,12 @@ async def delete_template(
 
 # ==================== 日记 CRUD ====================
 
-@router.post("/ai_summary/range", response_model=GenerateDiaryAISummaryRangeResponse, summary="按日期范围更新日记 AI 总结")
+
+@router.post(
+    "/ai_summary/range",
+    response_model=GenerateDiaryAISummaryRangeResponse,
+    summary="按日期范围更新日记 AI 总结",
+)
 async def generate_diary_ai_summary_range(request: GenerateDiaryAISummaryRangeRequest):
     """按日期范围批量更新日记 AI 总结，支持三种现有总结模式"""
     return await diary_service.generate_diary_ai_summary_range(request)
@@ -125,7 +133,9 @@ async def save_diary_content(
     return result
 
 
-@router.post("/{date}/ai_summary", response_model=DiaryAISummaryResponse, summary="生成日记 AI 总结")
+@router.post(
+    "/{date}/ai_summary", response_model=DiaryAISummaryResponse, summary="生成日记 AI 总结"
+)
 async def generate_diary_ai_summary(
     date: str = Path(..., description="日期 YYYY-MM-DD"),
 ):
@@ -133,4 +143,4 @@ async def generate_diary_ai_summary(
     try:
         return await diary_service.generate_diary_ai_summary(date)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e

@@ -4,6 +4,7 @@ s002_add_monitor_type - 新增 monitor_type 字段
 v1 → v2：在 settings.yaml 中追加 monitor_type 字段，默认值为 'lifeprism'。
 已存在该字段的文件视为已应用，跳过修改。
 """
+
 VERSION = 2
 NAME = "s002_add_monitor_type"
 

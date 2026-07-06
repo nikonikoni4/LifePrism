@@ -3,13 +3,15 @@ Category Provider - 分类数据访问层
 
 职责：提供 category 和 sub_category 表的所有数据访问接口
 """
+
 import sqlite3
-from typing import Optional, List, Dict, Any, Tuple, Set
-from .common_query_options import QueryOptions
+from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
-from lifeprism.utils import get_logger,LazySingleton
-from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
+from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError, ValidationError
+
+from .common_query_options import QueryOptions
 
 logger = get_logger(__name__)
 
@@ -31,20 +33,10 @@ class CategoryProvider(LWBaseDataProvider):
     _ON_CONFLICT = "ignore"  # 分类数据可能重复导入，忽略冲突
 
     # 白名单字段集合（用于防止 SQL 注入）
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'name', 'color', 'state',
-        'created_at', 'updated_at'
-    }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'name', 'created_at', 'updated_at'
-    }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'name', 'color', 'state',
-        'created_at', 'updated_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'name', 'color', 'state'
-    }
+    _FILTER_FIELDS: set[str] = {"id", "name", "color", "state", "created_at", "updated_at"}
+    _ORDER_FIELDS: set[str] = {"id", "name", "created_at", "updated_at"}
+    _SELECT_FIELDS: set[str] = {"id", "name", "color", "state", "created_at", "updated_at"}
+    _UPDATE_FIELDS: set[str] = {"name", "color", "state"}
 
     def __init__(self, db_manager=None):
         super().__init__(db_manager)
@@ -52,9 +44,8 @@ class CategoryProvider(LWBaseDataProvider):
     # ==================== 核心方法（使用通用方法） ====================
 
     def query_categories(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -78,7 +69,7 @@ class CategoryProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_category_by_id(self, category_id: str) -> Optional[Dict[str, Any]]:
+    def get_category_by_id(self, category_id: str) -> dict[str, Any] | None:
         """
         按主键获取单条分类记录
 
@@ -88,11 +79,11 @@ class CategoryProvider(LWBaseDataProvider):
         Returns:
             分类记录，不存在返回 None
         """
-        options = QueryOptions(filters={'id': category_id}, order_by='id')
+        options = QueryOptions(filters={"id": category_id}, order_by="id")
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_category(self, data: Dict[str, Any]) -> bool:
+    def create_category(self, data: dict[str, Any]) -> bool:
         """
         创建分类记录
 
@@ -111,37 +102,44 @@ class CategoryProvider(LWBaseDataProvider):
         if invalid_fields:
             logger.warning(
                 "创建分类失败: 无效字段=%s, 允许字段=%s, 输入data=%s",
-                invalid_fields, allowed_fields, data
+                invalid_fields,
+                allowed_fields,
+                data,
             )
             raise ValidationError(
                 message=f"无效的插入字段: {invalid_fields}",
                 code="VALIDATION_FAILED",
-                details={"invalid_fields": list(invalid_fields), "allowed_fields": list(allowed_fields)}
+                details={
+                    "invalid_fields": list(invalid_fields),
+                    "allowed_fields": list(allowed_fields),
+                },
             )
 
         # 必填字段检查
-        required_fields = {'id', 'name', 'color'}
+        required_fields = {"id", "name", "color"}
         missing_fields = required_fields - set(data.keys())
         if missing_fields:
             logger.warning(
-                "创建分类失败: 缺少必填字段=%s, 已提供字段=%s",
-                missing_fields, list(data.keys())
+                "创建分类失败: 缺少必填字段=%s, 已提供字段=%s", missing_fields, list(data.keys())
             )
             raise ValidationError(
                 message=f"缺少必填字段: {missing_fields}",
                 code="VALIDATION_FAILED",
-                details={"missing_fields": list(missing_fields), "provided_fields": list(data.keys())}
+                details={
+                    "missing_fields": list(missing_fields),
+                    "provided_fields": list(data.keys()),
+                },
             )
 
         try:
             self._generic_insert(data)
-            logger.info("创建分类成功: %s", data.get('id'))
+            logger.info("创建分类成功: %s", data.get("id"))
             return True
         except sqlite3.Error as e:
             logger.error("创建分类失败: %s", e)
             raise DataAccessError(f"创建分类失败: {e}") from e
 
-    def update_category(self, category_id: str, data: Dict[str, Any]) -> bool:
+    def update_category(self, category_id: str, data: dict[str, Any]) -> bool:
         """
         更新分类记录
 
@@ -163,12 +161,18 @@ class CategoryProvider(LWBaseDataProvider):
         if invalid_fields:
             logger.warning(
                 "更新分类失败: category_id=%s, 无效字段=%s, 允许字段=%s",
-                category_id, invalid_fields, self._UPDATE_FIELDS
+                category_id,
+                invalid_fields,
+                self._UPDATE_FIELDS,
             )
             raise ValidationError(
                 message=f"无效的更新字段: {invalid_fields}",
                 code="VALIDATION_FAILED",
-                details={"category_id": category_id, "invalid_fields": list(invalid_fields), "allowed_fields": list(self._UPDATE_FIELDS)}
+                details={
+                    "category_id": category_id,
+                    "invalid_fields": list(invalid_fields),
+                    "allowed_fields": list(self._UPDATE_FIELDS),
+                },
             )
 
         try:
@@ -217,20 +221,10 @@ class SubCategoryProvider(LWBaseDataProvider):
     _ON_CONFLICT = "ignore"  # 子分类数据可能重复导入，忽略冲突
 
     # 白名单字段集合（用于防止 SQL 注入）
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'category_id', 'name', 'state',
-        'created_at', 'updated_at'
-    }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'name', 'category_id', 'created_at', 'updated_at'
-    }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'category_id', 'name', 'state',
-        'created_at', 'updated_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'category_id', 'name', 'state'
-    }
+    _FILTER_FIELDS: set[str] = {"id", "category_id", "name", "state", "created_at", "updated_at"}
+    _ORDER_FIELDS: set[str] = {"id", "name", "category_id", "created_at", "updated_at"}
+    _SELECT_FIELDS: set[str] = {"id", "category_id", "name", "state", "created_at", "updated_at"}
+    _UPDATE_FIELDS: set[str] = {"category_id", "name", "state"}
 
     def __init__(self, db_manager=None):
         super().__init__(db_manager)
@@ -238,9 +232,8 @@ class SubCategoryProvider(LWBaseDataProvider):
     # ==================== 核心方法（使用通用方法） ====================
 
     def query_sub_categories(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -264,7 +257,7 @@ class SubCategoryProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_sub_category_by_id(self, sub_category_id: str) -> Optional[Dict[str, Any]]:
+    def get_sub_category_by_id(self, sub_category_id: str) -> dict[str, Any] | None:
         """
         按主键获取单条子分类记录
 
@@ -274,11 +267,11 @@ class SubCategoryProvider(LWBaseDataProvider):
         Returns:
             子分类记录，不存在返回 None
         """
-        options = QueryOptions(filters={'id': sub_category_id}, order_by='id')
+        options = QueryOptions(filters={"id": sub_category_id}, order_by="id")
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_sub_category(self, data: Dict[str, Any]) -> bool:
+    def create_sub_category(self, data: dict[str, Any]) -> bool:
         """
         创建子分类记录
 
@@ -297,37 +290,44 @@ class SubCategoryProvider(LWBaseDataProvider):
         if invalid_fields:
             logger.warning(
                 "创建子分类失败: 无效字段=%s, 允许字段=%s, 输入data=%s",
-                invalid_fields, allowed_fields, data
+                invalid_fields,
+                allowed_fields,
+                data,
             )
             raise ValidationError(
                 message=f"无效的插入字段: {invalid_fields}",
                 code="VALIDATION_FAILED",
-                details={"invalid_fields": list(invalid_fields), "allowed_fields": list(allowed_fields)}
+                details={
+                    "invalid_fields": list(invalid_fields),
+                    "allowed_fields": list(allowed_fields),
+                },
             )
 
         # 必填字段检查
-        required_fields = {'id', 'category_id', 'name'}
+        required_fields = {"id", "category_id", "name"}
         missing_fields = required_fields - set(data.keys())
         if missing_fields:
             logger.warning(
-                "创建子分类失败: 缺少必填字段=%s, 已提供字段=%s",
-                missing_fields, list(data.keys())
+                "创建子分类失败: 缺少必填字段=%s, 已提供字段=%s", missing_fields, list(data.keys())
             )
             raise ValidationError(
                 message=f"缺少必填字段: {missing_fields}",
                 code="VALIDATION_FAILED",
-                details={"missing_fields": list(missing_fields), "provided_fields": list(data.keys())}
+                details={
+                    "missing_fields": list(missing_fields),
+                    "provided_fields": list(data.keys()),
+                },
             )
 
         try:
             self._generic_insert(data)
-            logger.info("创建子分类成功: %s", data.get('id'))
+            logger.info("创建子分类成功: %s", data.get("id"))
             return True
         except sqlite3.Error as e:
             logger.error("创建子分类失败: %s", e)
             raise DataAccessError(f"创建子分类失败: {e}") from e
 
-    def update_sub_category(self, sub_category_id: str, data: Dict[str, Any]) -> bool:
+    def update_sub_category(self, sub_category_id: str, data: dict[str, Any]) -> bool:
         """
         更新子分类记录
 
@@ -349,12 +349,18 @@ class SubCategoryProvider(LWBaseDataProvider):
         if invalid_fields:
             logger.warning(
                 "更新子分类失败: sub_category_id=%s, 无效字段=%s, 允许字段=%s",
-                sub_category_id, invalid_fields, self._UPDATE_FIELDS
+                sub_category_id,
+                invalid_fields,
+                self._UPDATE_FIELDS,
             )
             raise ValidationError(
                 message=f"无效的更新字段: {invalid_fields}",
                 code="VALIDATION_FAILED",
-                details={"sub_category_id": sub_category_id, "invalid_fields": list(invalid_fields), "allowed_fields": list(self._UPDATE_FIELDS)}
+                details={
+                    "sub_category_id": sub_category_id,
+                    "invalid_fields": list(invalid_fields),
+                    "allowed_fields": list(self._UPDATE_FIELDS),
+                },
             )
 
         try:

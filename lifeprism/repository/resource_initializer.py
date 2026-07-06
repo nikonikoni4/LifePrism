@@ -9,9 +9,10 @@
   templates/config/...  -> config_base_path/config/...
   templates/<其他>/...  -> lifeprism_data_path/<其他>/...
 """
-import sys
-import shutil
+
 import logging
+import shutil
+import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,9 @@ logger = logging.getLogger(__name__)
 _CONFIG_SUBDIR = "config"
 
 # 需要强制覆盖的目录列表，无论目标文件是否存在都会覆盖
-OVERWRITE_DIR_LIST = ["prompts","tool","agent"]
+OVERWRITE_DIR_LIST = ["prompts", "tool", "agent"]
+
+
 def initialize_resources() -> None:
     """
     初始化资源文件
@@ -53,10 +56,7 @@ def initialize_resources() -> None:
         rel = source.relative_to(templates_dir)
 
         # 第一级子目录决定目标基础路径
-        if rel.parts[0] == _CONFIG_SUBDIR:
-            target = config_path / rel
-        else:
-            target = data_path / rel
+        target = config_path / rel if rel.parts[0] == _CONFIG_SUBDIR else data_path / rel
 
         # 如果文件所在目录在强制覆盖列表中，则无论是否存在都覆盖
         if rel.parts[0] in OVERWRITE_DIR_LIST:

@@ -4,6 +4,7 @@ m001_baseline - 基线迁移
 对已有数据库标记基线版本。新数据库由 init_database() 创建表结构，
 此迁移仅用于版本追踪。
 """
+
 VERSION = 1
 NAME = "m001_baseline"
 

@@ -6,7 +6,7 @@ Licensed under the MIT License.
 
 from typing import Any
 
-from lifeprism.llm.agent.tools.base import Tool,ERROR
+from lifeprism.llm.agent.tools.base import ERROR, Tool
 
 
 class ToolRegistry:
@@ -54,11 +54,13 @@ class ToolRegistry:
         try:
             # Attempt to cast parameters to match schema types
             params = tool.cast_params(params)
-            
+
             # Validate parameters
             errors = tool.validate_params(params)
             if errors:
-                return f"{ERROR}: Invalid parameters for tool '{name}': " + "; ".join(errors) + _HINT
+                return (
+                    f"{ERROR}: Invalid parameters for tool '{name}': " + "; ".join(errors) + _HINT
+                )
             result = await tool.execute(**params)
             if isinstance(result, str) and result.startswith("{ERROR}"):
                 return result + _HINT

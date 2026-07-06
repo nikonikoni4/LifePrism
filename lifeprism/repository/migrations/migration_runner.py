@@ -7,11 +7,12 @@
 - 迁移前自动备份数据库
 - 支持幂等检查（check_if_applied）
 """
-import sqlite3
-import shutil
+
 import logging
-from pathlib import Path
+import shutil
+import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 from lifeprism.repository.migrations.scripts import MIGRATIONS
 
@@ -37,7 +38,7 @@ def run_migrations(db_path: str) -> None:
     try:
         cursor = conn.cursor()
         current_version = _get_current_version(cursor)
-        pending = [m for m in MIGRATIONS if m.VERSION > current_version]
+        pending = [m for m in MIGRATIONS if current_version < m.VERSION]
 
         if not pending:
             logger.debug("数据库版本 v%s，无待执行迁移", current_version)
@@ -129,6 +130,4 @@ def _execute_migration(conn: sqlite3.Connection, migration) -> None:
         conn.commit()
     except Exception as e:
         conn.rollback()
-        raise RuntimeError(
-            f"迁移 v{migration.VERSION} ({migration.NAME}) 失败: {e}"
-        ) from e
+        raise RuntimeError(f"迁移 v{migration.VERSION} ({migration.NAME}) 失败: {e}") from e

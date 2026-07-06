@@ -3,17 +3,16 @@ Diary Provider - 日记数据访问层
 
 职责：提供 diary 表的所有数据访问接口
 """
-import sqlite3
-from typing import Optional, List, Dict, Any, Tuple, Set
-from .common_query_options import QueryOptions
+
+from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger
-from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
+from lifeprism.utils.exceptions import DataAccessError
+
+from .common_query_options import QueryOptions
 
 logger = get_logger(__name__)
-
-
 
 
 class DiaryProvider(LWBaseDataProvider):
@@ -27,27 +26,41 @@ class DiaryProvider(LWBaseDataProvider):
     # ==================== 表元数据定义 ====================
 
     _TABLE_NAME = "diary"
-    _PRIMARY_KEY = "date"          # ✅ diary 表使用 date 作为主键
-    _DATE_FIELD = "date"           # ✅ diary 表有 date 字段
-    _TIME_FIELD = None             # ❌ diary 表没有 time 字段
-    _ON_CONFLICT = "replace"       # 日记按日期更新，冲突时替换
+    _PRIMARY_KEY = "date"  # ✅ diary 表使用 date 作为主键
+    _DATE_FIELD = "date"  # ✅ diary 表有 date 字段
+    _TIME_FIELD = None  # ❌ diary 表没有 time 字段
+    _ON_CONFLICT = "replace"  # 日记按日期更新，冲突时替换
 
-    _FILTER_FIELDS: Set[str] = {
-        'date', 'mood', 'importance', 'custom_tags',
-        'word_count', 'ai_summary', 'diary_source_hash',
-        'created_at', 'updated_at'
+    _FILTER_FIELDS: set[str] = {
+        "date",
+        "mood",
+        "importance",
+        "custom_tags",
+        "word_count",
+        "ai_summary",
+        "diary_source_hash",
+        "created_at",
+        "updated_at",
     }
-    _ORDER_FIELDS: Set[str] = {
-        'date', 'created_at', 'updated_at', 'word_count'
+    _ORDER_FIELDS: set[str] = {"date", "created_at", "updated_at", "word_count"}
+    _SELECT_FIELDS: set[str] = {
+        "date",
+        "mood",
+        "importance",
+        "custom_tags",
+        "word_count",
+        "ai_summary",
+        "diary_source_hash",
+        "created_at",
+        "updated_at",
     }
-    _SELECT_FIELDS: Set[str] = {
-        'date', 'mood', 'importance', 'custom_tags',
-        'word_count', 'ai_summary', 'diary_source_hash',
-        'created_at', 'updated_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'mood', 'importance', 'custom_tags',
-        'word_count', 'ai_summary', 'diary_source_hash'
+    _UPDATE_FIELDS: set[str] = {
+        "mood",
+        "importance",
+        "custom_tags",
+        "word_count",
+        "ai_summary",
+        "diary_source_hash",
     }
 
     def __init__(self, db_manager=None):
@@ -56,9 +69,8 @@ class DiaryProvider(LWBaseDataProvider):
     # ==================== 核心方法（使用通用方法） ====================
 
     def query_diaries(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口（使用基类方法）
 
@@ -83,7 +95,7 @@ class DiaryProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)  # ✅ 直接调用基类方法
 
-    def get_diary_by_id(self, date: str) -> Optional[Dict[str, Any]]:
+    def get_diary_by_id(self, date: str) -> dict[str, Any] | None:
         """
         按主键（date）获取单条日记（使用基类方法）
 
@@ -93,11 +105,11 @@ class DiaryProvider(LWBaseDataProvider):
         Returns:
             日记记录，不存在返回 None
         """
-        options = QueryOptions(filters={'date': date}, order_by='date')
+        options = QueryOptions(filters={"date": date}, order_by="date")
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_diary(self, date: str, data: Optional[Dict[str, Any]] = None) -> bool:
+    def create_diary(self, date: str, data: dict[str, Any] | None = None) -> bool:
         """
         创建日记记录（使用基类方法）
 
@@ -112,7 +124,7 @@ class DiaryProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            insert_data = {'date': date}
+            insert_data = {"date": date}
             if data:
                 # 白名单验证
                 invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
@@ -127,7 +139,7 @@ class DiaryProvider(LWBaseDataProvider):
             logger.error("创建日记 %s 失败: %s", date, e)
             raise DataAccessError(f"创建日记 {date} 失败") from e
 
-    def update_diary(self, date: str, data: Dict[str, Any]) -> bool:
+    def update_diary(self, date: str, data: dict[str, Any]) -> bool:
         """
         更新日记记录
 
@@ -149,7 +161,7 @@ class DiaryProvider(LWBaseDataProvider):
 
         try:
             # 使用自定义 SQL 以支持 SQLite 的 datetime('now','localtime')
-            if 'updated_at' not in data:
+            if "updated_at" not in data:
                 # 使用 SQLite 特定的时间戳更新
                 with self.db.get_connection() as conn:
                     cursor = conn.cursor()
@@ -159,7 +171,7 @@ class DiaryProvider(LWBaseDataProvider):
                     if invalid_fields:
                         raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-                    set_clauses = [f"{key} = ?" for key in data.keys()]
+                    set_clauses = [f"{key} = ?" for key in data]
                     set_clauses.append("updated_at = datetime('now','localtime')")
                     values = list(data.values()) + [date]
 
@@ -204,7 +216,7 @@ class DiaryProvider(LWBaseDataProvider):
     # 注意：以下方法是对通用方法的简单封装，提供更清晰的业务语义
     # 新 provider 不应创建此类便捷方法，应直接使用通用方法
 
-    def get_diary_by_date(self, date: str) -> Optional[Dict[str, Any]]:
+    def get_diary_by_date(self, date: str) -> dict[str, Any] | None:
         """
         按日期获取日记（兼容旧接口）
 
@@ -215,7 +227,7 @@ class DiaryProvider(LWBaseDataProvider):
         """
         return self.get_diary_by_id(date)
 
-    def get_diaries_by_date_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    def get_diaries_by_date_range(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
         """
         获取日期范围内的日记列表（兼容旧接口）
 
@@ -229,11 +241,7 @@ class DiaryProvider(LWBaseDataProvider):
         Returns:
             日记列表，按日期降序排列
         """
-        options = QueryOptions(
-            date_range=(start_date, end_date),
-            order_by='date',
-            order_desc=True
-        )
+        options = QueryOptions(date_range=(start_date, end_date), order_by="date", order_desc=True)
         results, _ = self.query_diaries(options)
         return results
 

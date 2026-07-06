@@ -116,7 +116,7 @@
 #             with self.db.get_connection() as conn:
 #                 cursor = conn.cursor()
 
-#                 # 使用 id 
+#                 # 使用 id
 #                 doc_id = data.get('id', '')
 #                 if not doc_id:
 #                     logger.error("创建计划书失败: id 不能为空")
@@ -243,26 +243,26 @@
 #         try:
 #             with self.db.get_connection() as conn:
 #                 cursor = conn.cursor()
-                
+
 #                 #开启事务 (SQLite context manager does this, but being explicit helps readability)
-                
-#                 # 1. 更新 plan_doc 表的主键 ID 
+
+#                 # 1. 更新 plan_doc 表的主键 ID
 #                 cursor.execute(
 #                     "UPDATE plan_doc SET id = ?, updated_at = datetime('now') WHERE id = ?",
 #                     (new_id, old_id)
 #                 )
-                
+
 #                 if cursor.rowcount == 0:
 #                     logger.warning("重命名失败: 计划书 %s 不存在", old_id)
 #                     return False
-                
+
 #                 # 2. 级联更新 todo_list 表 (Task Pool) 中的引用
 #                 # todo_list 表中有 plan_doc_id 字段
 #                 cursor.execute(
 #                     "UPDATE todo_list SET plan_doc_id = ? WHERE plan_doc_id = ?",
 #                     (new_id, old_id)
 #                 )
-                
+
 #                 logger.info("重命名计划书成功: %s -> %s, 关联任务更新数: %s", old_id, new_id, cursor.rowcount)
 #                 return True
 

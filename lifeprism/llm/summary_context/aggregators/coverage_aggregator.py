@@ -68,14 +68,12 @@ def build_coverage_context(
 
     execution_item_count = len(todos) + len(habit_checkins)
     execution_coverage_level = _determine_coverage_level(
-        has_todo_data or has_habit_data,
-        execution_item_count
+        has_todo_data or has_habit_data, execution_item_count
     )
 
     authored_item_count = len(custom_blocks) + len(diaries) + len(mood_entries)
     authored_coverage_level = _determine_coverage_level(
-        has_custom_blocks or has_diary or has_mood,
-        authored_item_count
+        has_custom_blocks or has_diary or has_mood, authored_item_count
     )
 
     # 计算总体覆盖等级
@@ -87,9 +85,9 @@ def build_coverage_context(
     }
 
     avg_score = (
-        coverage_scores[activity_coverage_level] * 0.5 +
-        coverage_scores[execution_coverage_level] * 0.3 +
-        coverage_scores[authored_coverage_level] * 0.2
+        coverage_scores[activity_coverage_level] * 0.5
+        + coverage_scores[execution_coverage_level] * 0.3
+        + coverage_scores[authored_coverage_level] * 0.2
     )
 
     if avg_score >= 2.5:
@@ -105,34 +103,35 @@ def build_coverage_context(
     limitations: list[dict[str, str]] = []
 
     if not has_custom_blocks:
-        limitations.append({
-            "code": "missing_custom_blocks",
-            "message": "缺少 timeline custom block，无法准确确认部分时间段的具体任务内容"
-        })
+        limitations.append(
+            {
+                "code": "missing_custom_blocks",
+                "message": "缺少 timeline custom block，无法准确确认部分时间段的具体任务内容",
+            }
+        )
 
     if not has_diary:
-        limitations.append({
-            "code": "missing_diary",
-            "message": "缺少日记记录，无法获取用户主观记录的重点事项"
-        })
+        limitations.append(
+            {"code": "missing_diary", "message": "缺少日记记录，无法获取用户主观记录的重点事项"}
+        )
 
     if not has_mood:
-        limitations.append({
-            "code": "missing_mood",
-            "message": "缺少心情记录，无法结合主观状态解释行为变化"
-        })
+        limitations.append(
+            {"code": "missing_mood", "message": "缺少心情记录，无法结合主观状态解释行为变化"}
+        )
 
     if not has_activity_data:
-        limitations.append({
-            "code": "missing_activity_data",
-            "message": "缺少活动数据，无法分析电脑使用模式"
-        })
+        limitations.append(
+            {"code": "missing_activity_data", "message": "缺少活动数据，无法分析电脑使用模式"}
+        )
 
     if not has_todo_data and not has_habit_data:
-        limitations.append({
-            "code": "missing_execution_data",
-            "message": "缺少 todo 和 habit 数据，无法分析执行情况"
-        })
+        limitations.append(
+            {
+                "code": "missing_execution_data",
+                "message": "缺少 todo 和 habit 数据，无法分析执行情况",
+            }
+        )
 
     return {
         "has_activity_data": has_activity_data,

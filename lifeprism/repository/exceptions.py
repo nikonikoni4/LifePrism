@@ -3,14 +3,13 @@
 Repository 模块所有异常继承自 RepositoryError(DataAccessError)，
 由 API 层的全局异常处理器统一转换为 HTTP 500。
 """
-from lifeprism.utils.exceptions import DataAccessError
 
-
-from lifeprism.utils.exceptions import ConflictError, NotFoundError
+from lifeprism.utils.exceptions import ConflictError, DataAccessError, NotFoundError
 
 
 class RepositoryError(DataAccessError):
     """Repository 模块基础异常。"""
+
     pass
 
 

@@ -6,18 +6,19 @@ Task Pool API - 任务池接口
 - POST /taskpool/sync - 同步计划书任务
 - POST /taskpool/regenerate-summary - 重新生成系统展示区
 """
-from fastapi import APIRouter, Query
-from typing import Optional
 
+from fastapi import APIRouter, Query
+
+from lifeprism.server.schemas.plan_doc_schemas import (
+    RegenerateSummaryRequest,
+    RegenerateSummaryResponse,
+    SyncPlanDocRequest,
+    SyncPlanDocResponse,
+)
 from lifeprism.server.schemas.todo_schemas import (
     TodoListResponse,
 )
-from lifeprism.server.schemas.plan_doc_schemas import (
-    SyncPlanDocRequest, SyncPlanDocResponse,
-    RegenerateSummaryRequest, RegenerateSummaryResponse,
-)
-from lifeprism.server.services import taskpool_service
-from lifeprism.server.services import plandoc_sync_service
+from lifeprism.server.services import plandoc_sync_service, taskpool_service
 
 router = APIRouter(prefix="/taskpool", tags=["Task Pool"])
 
@@ -26,17 +27,20 @@ router = APIRouter(prefix="/taskpool", tags=["Task Pool"])
 # 任务池接口
 # ============================================================================
 
+
 @router.get("", response_model=TodoListResponse)
 async def get_taskpool(
-    goal_id: Optional[str] = Query(default=None, description="按目标筛选"),
-    plan_doc_id: Optional[str] = Query(default=None, description="按计划书筛选"),
-    state: Optional[str] = Query(default="all", description="按状态筛选（pool/scheduled/completed/all）")
+    goal_id: str | None = Query(default=None, description="按目标筛选"),
+    plan_doc_id: str | None = Query(default=None, description="按计划书筛选"),
+    state: str | None = Query(
+        default="all", description="按状态筛选（pool/scheduled/completed/all）"
+    ),
 ):
     """
     获取任务池任务列表
-    
+
     返回扁平结构的任务列表，前端通过 parent_id 构建树形结构。
-    
+
     - **goal_id**: 按目标筛选
     - **plan_doc_id**: 按计划书筛选
     - **state**: 按状态筛选
@@ -45,11 +49,7 @@ async def get_taskpool(
         - completed: 已完成
         - all: 所有状态（默认）
     """
-    return taskpool_service.get_taskpool(
-        goal_id=goal_id,
-        plan_doc_id=plan_doc_id,
-        state=state
-    )
+    return taskpool_service.get_taskpool(goal_id=goal_id, plan_doc_id=plan_doc_id, state=state)
 
 
 @router.post("/sync", response_model=SyncPlanDocResponse)
@@ -81,9 +81,7 @@ async def sync_plan_doc(request: SyncPlanDocRequest):
     - **to_delete**: 待删除任务列表（dry_run 模式返回）
     """
     return plandoc_sync_service.sync_plan_doc(
-        request.plan_doc_id,
-        dry_run=request.dry_run,
-        confirm_delete=request.confirm_delete
+        request.plan_doc_id, dry_run=request.dry_run, confirm_delete=request.confirm_delete
     )
 
 
@@ -91,21 +89,15 @@ async def sync_plan_doc(request: SyncPlanDocRequest):
 async def regenerate_summary(request: RegenerateSummaryRequest):
     """
     重新生成系统展示区
-    
+
     根据数据库中的任务数据，重新生成计划书 MD 文件中的系统展示区。
-    
+
     系统展示区位于 MD 文件末尾，以 `<!-- lp:system-section -->` 标记。
     用户对此区域的手动修改会在下次同步时被覆盖。
     """
     success = plandoc_sync_service.regenerate_summary(request.plan_doc_id)
-    
+
     if success:
-        return RegenerateSummaryResponse(
-            success=True,
-            message="系统展示区已更新"
-        )
+        return RegenerateSummaryResponse(success=True, message="系统展示区已更新")
     else:
-        return RegenerateSummaryResponse(
-            success=False,
-            message="更新失败，请检查计划书是否存在"
-        )
+        return RegenerateSummaryResponse(success=False, message="更新失败，请检查计划书是否存在")

@@ -1,6 +1,9 @@
-from typing import Dict, List
-
-from lifeprism.monitor.screenshot.models import CaptureReason, CaptureRequest, FrequencyPolicy, WindowContext
+from lifeprism.monitor.screenshot.models import (
+    CaptureReason,
+    CaptureRequest,
+    FrequencyPolicy,
+    WindowContext,
+)
 
 
 class ScreenshotScheduler:
@@ -16,9 +19,9 @@ class ScreenshotScheduler:
         self.scheduled_interval_seconds = scheduled_interval_seconds
         self.enter_delay_ms = enter_delay_ms
         self._next_scheduled_at: float | None = None
-        self._segment_started_at: Dict[str, float] = {}
+        self._segment_started_at: dict[str, float] = {}
         self._segment_first_active_done: set[str] = set()
-        self._next_active_at: Dict[str, float] = {}
+        self._next_active_at: dict[str, float] = {}
         self._enter_cooldown_until = 0.0
 
     def evaluate(
@@ -28,8 +31,8 @@ class ScreenshotScheduler:
         window: WindowContext,
         engaged: bool,
         engaged_segment_id: str | None,
-        enter_events: List[float],
-    ) -> List[CaptureRequest]:
+        enter_events: list[float],
+    ) -> list[CaptureRequest]:
         """根据当前状态评估并生成截图请求。
 
         Args:
@@ -49,7 +52,7 @@ class ScreenshotScheduler:
         if window.is_afk:
             return []
 
-        requests: List[CaptureRequest] = []
+        requests: list[CaptureRequest] = []
 
         # 暂时关停 SCHEDULED 截图
         # if self._next_scheduled_at is None:

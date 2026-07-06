@@ -1,9 +1,11 @@
 import asyncio
+import contextlib
 import time
 from collections import deque
-from lifeprism.llm.bus.events import InboundMessage, OutboundMessage, MessageContent
+
+from lifeprism.llm.bus.events import InboundMessage, MessageContent, OutboundMessage
 from lifeprism.utils.lazy_singleton import LazySingleton
-from lifeprism.utils.logger import get_logger, INFO,DEBUG
+from lifeprism.utils.logger import DEBUG, get_logger
 
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
@@ -13,8 +15,9 @@ RATE_LIMIT = 60
 RATE_WINDOW = 60.0
 RATE_SAFETY_FACTOR = 0.7
 
+
 # ─────────────────────────────────────────
-#MessageQueue：双向队列，纯数据通道
+# MessageQueue：双向队列，纯数据通道
 # ─────────────────────────────────────────
 class MessageQueue:
     def __init__(self):
@@ -69,10 +72,8 @@ class MessageQueue:
             return
         self.stop_receive = True  # 设置停止标志
         self._receive_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await self._receive_task
-        except asyncio.CancelledError:
-            pass
         self._receive_task = None
 
     async def _wait_for_rate_limit(self):
@@ -101,7 +102,7 @@ class MessageQueue:
                 logger.debug("[MessageQueue] 限速等待 %.2fs", wait)
                 await asyncio.sleep(wait)
 
-    async def send(self, msg:InboundMessage) -> OutboundMessage:
+    async def send(self, msg: InboundMessage) -> OutboundMessage:
         """发送消息并等待结果
         args:
             msg : InboundMessage
@@ -141,17 +142,17 @@ class MessageQueue:
 
                 # 适配 usage 数据格式
                 usage_data = {
-                    'input_tokens': result.response.usage.get('prompt_tokens', 0),
-                    'output_tokens': result.response.usage.get('completion_tokens', 0),
-                    'total_tokens': result.response.usage.get('total_tokens', 0),
-                    'mode': msg.token_type or msg.type
+                    "input_tokens": result.response.usage.get("prompt_tokens", 0),
+                    "output_tokens": result.response.usage.get("completion_tokens", 0),
+                    "total_tokens": result.response.usage.get("total_tokens", 0),
+                    "mode": msg.token_type or msg.type,
                 }
 
-                asyncio.create_task(asyncio.to_thread(
-                    provider.upsert_session_tokens_usage,
-                    result.session_id,
-                    usage_data
-                ))
+                asyncio.create_task(
+                    asyncio.to_thread(
+                        provider.upsert_session_tokens_usage, result.session_id, usage_data
+                    )
+                )
             except Exception as e:
                 logger.error("[MessageQueue] 保存 token 使用情况失败: %s", e)
 
@@ -175,4 +176,5 @@ class MessageQueue:
             logger.error("[MessageQueue] 接收循环异常: %s", e)
             raise
 
-bus:MessageQueue = LazySingleton(MessageQueue) # 单一实例代理
+
+bus: MessageQueue = LazySingleton(MessageQueue)  # 单一实例代理

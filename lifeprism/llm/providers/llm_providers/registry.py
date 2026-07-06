@@ -17,7 +17,8 @@ Licensed under the MIT License.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields as dataclass_fields
+from dataclasses import dataclass, field
+from dataclasses import fields as dataclass_fields
 from typing import Any
 
 from lifeprism.config.provider_manager import provider_manager
@@ -97,15 +98,13 @@ def _build_providers() -> tuple[ProviderSpec, ...]:
             if "tuple" in type_str and isinstance(val, list):
                 # Handle tuple[tuple[str,str],...] (env_extras, model_overrides)
                 filtered[f.name] = tuple(
-                    tuple(item) if isinstance(item, list) else item
-                    for item in val
+                    tuple(item) if isinstance(item, list) else item for item in val
                 )
         result.append(ProviderSpec(**filtered))
     return tuple(result)
 
 
 PROVIDERS: tuple[ProviderSpec, ...] = _build_providers()
-
 
 
 # ---------------------------------------------------------------------------

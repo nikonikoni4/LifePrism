@@ -18,6 +18,7 @@ class WechatConfig:
         poll_timeout: 长轮询超时时间（秒）
         allow_from: 允许接收消息的用户列表（微信 ID）
     """
+
     enabled: bool = False
     base_url: str = "https://ilinkai.weixin.qq.com"
     cdn_base_url: str = "https://novac2c.cdn.weixin.qq.com/c2c"

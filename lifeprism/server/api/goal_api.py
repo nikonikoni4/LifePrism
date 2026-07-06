@@ -3,32 +3,31 @@ Goal API - 目标管理接口
 
 提供 Goal、Journal、PlanDoc 的 RESTful API
 """
-from fastapi import APIRouter, Query, HTTPException, Path
-from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Path, Query
 
 from lifeprism.server.schemas.goal_schemas import (
+    ActiveGoalNamesResponse,
+    CreateGoalRequest,
+    CreateJournalRequest,
+    CreatePlanDocRequest,
     # Goal Schemas
     GoalItem,
     GoalListResponse,
-    CreateGoalRequest,
-    UpdateGoalRequest,
-    ReorderGoalRequest,
-    ActiveGoalNamesResponse,
     GoalsWithCategoryResponse,
-    UpdateMilestoneStateRequest,
     # Journal Schemas
     JournalEntry,
     JournalListResponse,
-    CreateJournalRequest,
-    UpdateJournalRequest,
     # PlanDoc Schemas
     PlanDocItem,
     PlanDocListResponse,
-    CreatePlanDocRequest,
+    ReorderGoalRequest,
+    UpdateGoalRequest,
+    UpdateJournalRequest,
+    UpdateMilestoneStateRequest,
     UpdatePlanDocRequest,
 )
-from lifeprism.server.services import journal_service
-from lifeprism.server.services import plan_doc_service
+from lifeprism.server.services import journal_service, plan_doc_service
 from lifeprism.server.services.goal_service import goal_service
 
 router = APIRouter(prefix="/goal", tags=["Goal"])
@@ -38,12 +37,15 @@ router = APIRouter(prefix="/goal", tags=["Goal"])
 # Goal 接口
 # ============================================================================
 
+
 @router.get("/goals", response_model=GoalListResponse)
 async def get_goals(
-    status: Optional[str] = Query(default=None, description="按状态筛选 (active, completed, archived)"),
-    category_id: Optional[str] = Query(default=None, description="按分类筛选"),
+    status: str | None = Query(
+        default=None, description="按状态筛选 (active, completed, archived)"
+    ),
+    category_id: str | None = Query(default=None, description="按分类筛选"),
     page: int = Query(default=1, ge=1, description="页码"),
-    page_size: int = Query(default=20, ge=1, le=100, description="每页数量")
+    page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
 ):
     """
     获取目标列表
@@ -114,11 +116,8 @@ async def get_goals_with_category():
     return goal_service.get_goals_with_category()
 
 
-
 @router.get("/goals/{goal_id}", response_model=GoalItem)
-async def get_goal_detail(
-    goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)")
-):
+async def get_goal_detail(goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)")):
     """
     获取目标详情
     """
@@ -131,7 +130,7 @@ async def get_goal_detail(
 @router.patch("/goals/{goal_id}", response_model=GoalItem)
 async def update_goal(
     goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)"),
-    request: UpdateGoalRequest = ...
+    request: UpdateGoalRequest = ...,
 ):
     """
     更新目标（部分更新）
@@ -157,9 +156,7 @@ async def update_goal(
 
 
 @router.delete("/goals/{goal_id}")
-async def delete_goal(
-    goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)")
-):
+async def delete_goal(goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)")):
     """
     删除目标
     """
@@ -173,11 +170,12 @@ async def delete_goal(
 # Milestone 接口
 # ============================================================================
 
+
 @router.patch("/goals/{goal_id}/milestones/{milestone_id}")
 async def update_milestone_state(
     goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)"),
     milestone_id: str = Path(..., description="里程碑 ID"),
-    request: UpdateMilestoneStateRequest = ...
+    request: UpdateMilestoneStateRequest = ...,
 ):
     """
     更新里程碑状态
@@ -193,7 +191,7 @@ async def update_milestone_state(
 
 @router.post("/goals/{goal_id}/refresh-time", summary="刷新目标投入时间")
 async def refresh_goal_time_invested(
-    goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)")
+    goal_id: str = Path(..., description="目标 ID (格式: goal-xxx)"),
 ):
     """
     手动刷新目标的投入时间
@@ -210,13 +208,14 @@ async def refresh_goal_time_invested(
 # Journal 接口
 # ============================================================================
 
+
 @router.get("/journals", response_model=JournalListResponse)
 async def get_journals(
-    goal_id: Optional[str] = Query(default=None, description="按目标筛选"),
-    start_date: Optional[str] = Query(default=None, description="开始日期 (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(default=None, description="结束日期 (YYYY-MM-DD)"),
+    goal_id: str | None = Query(default=None, description="按目标筛选"),
+    start_date: str | None = Query(default=None, description="开始日期 (YYYY-MM-DD)"),
+    end_date: str | None = Query(default=None, description="结束日期 (YYYY-MM-DD)"),
     page: int = Query(default=1, ge=1, description="页码"),
-    page_size: int = Query(default=20, ge=1, le=100, description="每页数量")
+    page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
 ):
     """
     获取日志列表
@@ -251,7 +250,7 @@ async def create_journal(request: CreateJournalRequest):
 
 @router.get("/journals/{journal_id}", response_model=JournalEntry)
 async def get_journal_detail(
-    journal_id: str = Path(..., description="日志 ID (格式: journal-xxx)")
+    journal_id: str = Path(..., description="日志 ID (格式: journal-xxx)"),
 ):
     """
     获取日志详情
@@ -265,7 +264,7 @@ async def get_journal_detail(
 @router.patch("/journals/{journal_id}", response_model=JournalEntry)
 async def update_journal(
     journal_id: str = Path(..., description="日志 ID (格式: journal-xxx)"),
-    request: UpdateJournalRequest = ...
+    request: UpdateJournalRequest = ...,
 ):
     """
     更新日志（部分更新）
@@ -284,9 +283,7 @@ async def update_journal(
 
 
 @router.delete("/journals/{journal_id}")
-async def delete_journal(
-    journal_id: str = Path(..., description="日志 ID (格式: journal-xxx)")
-):
+async def delete_journal(journal_id: str = Path(..., description="日志 ID (格式: journal-xxx)")):
     """
     删除日志
     """
@@ -300,12 +297,15 @@ async def delete_journal(
 # PlanDoc 接口
 # ============================================================================
 
+
 @router.get("/plan-docs", response_model=PlanDocListResponse)
 async def get_plan_docs(
-    goal_id: Optional[str] = Query(default=None, description="按目标筛选"),
-    doc_type: Optional[str] = Query(default=None, description="按类型筛选 (weekly, monthly, quarterly, yearly, custom)"),
+    goal_id: str | None = Query(default=None, description="按目标筛选"),
+    doc_type: str | None = Query(
+        default=None, description="按类型筛选 (weekly, monthly, quarterly, yearly, custom)"
+    ),
     page: int = Query(default=1, ge=1, description="页码"),
-    page_size: int = Query(default=20, ge=1, le=100, description="每页数量")
+    page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
 ):
     """
     获取计划文档列表
@@ -337,12 +337,12 @@ async def create_plan_doc(request: CreatePlanDocRequest):
             raise HTTPException(status_code=500, detail="创建计划文档失败")
         return result
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
 
 @router.get("/plan-docs/{doc_id}", response_model=PlanDocItem)
 async def get_plan_doc_detail(
-    doc_id: str = Path(..., description="计划文档 ID (格式: plandoc-xxx)")
+    doc_id: str = Path(..., description="计划文档 ID (格式: plandoc-xxx)"),
 ):
     """
     获取计划文档详情
@@ -356,7 +356,7 @@ async def get_plan_doc_detail(
 @router.patch("/plan-docs/{doc_id}", response_model=PlanDocItem)
 async def update_plan_doc(
     doc_id: str = Path(..., description="计划文档 ID (格式: plandoc-xxx)"),
-    request: UpdatePlanDocRequest = ...
+    request: UpdatePlanDocRequest = ...,
 ):
     """
     更新计划文档（部分更新）
@@ -374,13 +374,11 @@ async def update_plan_doc(
             raise HTTPException(status_code=404, detail="计划文档不存在或更新失败")
         return result
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
 
 @router.delete("/plan-docs/{doc_id}")
-async def delete_plan_doc(
-    doc_id: str = Path(..., description="计划文档 ID (格式: plandoc-xxx)")
-):
+async def delete_plan_doc(doc_id: str = Path(..., description="计划文档 ID (格式: plandoc-xxx)")):
     """
     删除计划文档
     """

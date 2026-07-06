@@ -4,19 +4,20 @@ Mood Providers - 心情模块数据访问层
 提供 mood_types / mood_entries / mood_impacts 三张表的数据访问接口。
 按照架构原则：一个 Provider 对应一张表，多个 Provider 写在同一个文件内。
 """
-import sqlite3
+
 import uuid
-from typing import Optional, List, Dict, Any, Tuple, Set
+from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
-from lifeprism.utils import get_logger, LazySingleton
-from lifeprism.utils.exceptions import DataAccessError, ConflictError, ValidationError
+from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
 
 
 # ==================== MoodTypeProvider ====================
+
 
 class MoodTypeProvider(LWBaseDataProvider):
     """
@@ -32,18 +33,28 @@ class MoodTypeProvider(LWBaseDataProvider):
     _DATE_FIELD = None
     _TIME_FIELD = None
 
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'name', 'icon', 'color', 'score', 'is_dark', 'sort_order', 'created_at'
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "name",
+        "icon",
+        "color",
+        "score",
+        "is_dark",
+        "sort_order",
+        "created_at",
     }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'name', 'score', 'sort_order', 'created_at'
+    _ORDER_FIELDS: set[str] = {"id", "name", "score", "sort_order", "created_at"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "name",
+        "icon",
+        "color",
+        "score",
+        "is_dark",
+        "sort_order",
+        "created_at",
     }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'name', 'icon', 'color', 'score', 'is_dark', 'sort_order', 'created_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'name', 'icon', 'color', 'score', 'is_dark', 'sort_order'
-    }
+    _UPDATE_FIELDS: set[str] = {"name", "icon", "color", "score", "is_dark", "sort_order"}
 
     def __init__(self, db_manager=None):
         super().__init__(db_manager)
@@ -51,9 +62,8 @@ class MoodTypeProvider(LWBaseDataProvider):
     # ==================== 核心方法（使用通用方法） ====================
 
     def query_mood_types(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -77,21 +87,18 @@ class MoodTypeProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_mood_types(self) -> List[Dict[str, Any]]:
+    def get_mood_types(self) -> list[dict[str, Any]]:
         """
         获取所有心情类型（按 sort_order DESC 排序）
 
         Returns:
             List[Dict]: 心情类型列表
         """
-        options = QueryOptions(
-            order_by='sort_order',
-            order_desc=True
-        )
+        options = QueryOptions(order_by="sort_order", order_desc=True)
         results, _ = self._generic_query(options)
         return results
 
-    def get_mood_type_by_id(self, mood_type_id: str) -> Optional[Dict[str, Any]]:
+    def get_mood_type_by_id(self, mood_type_id: str) -> dict[str, Any] | None:
         """
         按 ID 获取心情类型
 
@@ -101,11 +108,11 @@ class MoodTypeProvider(LWBaseDataProvider):
         Returns:
             Optional[Dict]: 心情类型，不存在返回 None
         """
-        options = QueryOptions(filters={'id': mood_type_id}, order_by='id', order_desc=False)
+        options = QueryOptions(filters={"id": mood_type_id}, order_by="id", order_desc=False)
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_mood_type(self, data: Dict[str, Any]) -> str:
+    def create_mood_type(self, data: dict[str, Any]) -> str:
         """
         创建心情类型
 
@@ -121,7 +128,7 @@ class MoodTypeProvider(LWBaseDataProvider):
         try:
             # 自动生成 ID
             new_id = f"mood-type-{str(uuid.uuid4())[:8]}"
-            insert_data = {'id': new_id}
+            insert_data = {"id": new_id}
 
             # 白名单验证
             invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
@@ -136,7 +143,7 @@ class MoodTypeProvider(LWBaseDataProvider):
             logger.error("创建心情类型失败: %s", e)
             raise DataAccessError(f"创建心情类型失败: {e}") from e
 
-    def update_mood_type(self, mood_type_id: str, data: Dict[str, Any]) -> bool:
+    def update_mood_type(self, mood_type_id: str, data: dict[str, Any]) -> bool:
         """
         更新心情类型
 
@@ -202,7 +209,9 @@ class MoodTypeProvider(LWBaseDataProvider):
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM mood_entries WHERE mood_type_id = ?", (mood_type_id,))
+                cursor.execute(
+                    "SELECT COUNT(*) FROM mood_entries WHERE mood_type_id = ?", (mood_type_id,)
+                )
                 return cursor.fetchone()[0]
         except Exception as e:
             logger.error("统计心情类型 %s 关联记录数失败: %s", mood_type_id, e)
@@ -210,6 +219,7 @@ class MoodTypeProvider(LWBaseDataProvider):
 
 
 # ==================== MoodEntryProvider ====================
+
 
 class MoodEntryProvider(LWBaseDataProvider):
     """
@@ -225,18 +235,10 @@ class MoodEntryProvider(LWBaseDataProvider):
     _DATE_FIELD = None  # 没有独立的 date 字段，使用 created_at
     _TIME_FIELD = None
 
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'mood_type_id', 'score', 'content', 'factors', 'created_at'
-    }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'score', 'created_at'
-    }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'mood_type_id', 'score', 'content', 'factors', 'created_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'mood_type_id', 'score', 'content', 'factors'
-    }
+    _FILTER_FIELDS: set[str] = {"id", "mood_type_id", "score", "content", "factors", "created_at"}
+    _ORDER_FIELDS: set[str] = {"id", "score", "created_at"}
+    _SELECT_FIELDS: set[str] = {"id", "mood_type_id", "score", "content", "factors", "created_at"}
+    _UPDATE_FIELDS: set[str] = {"mood_type_id", "score", "content", "factors"}
 
     def __init__(self, db_manager=None):
         super().__init__(db_manager)
@@ -244,9 +246,8 @@ class MoodEntryProvider(LWBaseDataProvider):
     # ==================== 核心方法（使用通用方法） ====================
 
     def query_mood_entries(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -270,7 +271,9 @@ class MoodEntryProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_mood_entries(self, start_time: Optional[str] = None, end_time: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_mood_entries(
+        self, start_time: str | None = None, end_time: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         获取心情记录列表（按 created_at ASC 排序）
 
@@ -299,12 +302,12 @@ class MoodEntryProvider(LWBaseDataProvider):
                 where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
                 cursor.execute(f"SELECT * FROM mood_entries{where} ORDER BY created_at ASC", params)
                 columns = [desc[0] for desc in cursor.description]
-                return [dict(zip(columns, row)) for row in cursor.fetchall()]
+                return [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
         except Exception as e:
             logger.error("获取心情记录列表失败: %s", e)
             raise DataAccessError(f"获取心情记录列表失败: {e}") from e
 
-    def get_mood_entry_by_id(self, entry_id: str) -> Optional[Dict[str, Any]]:
+    def get_mood_entry_by_id(self, entry_id: str) -> dict[str, Any] | None:
         """
         按 ID 获取心情记录
 
@@ -314,11 +317,11 @@ class MoodEntryProvider(LWBaseDataProvider):
         Returns:
             Optional[Dict]: 心情记录，不存在返回 None
         """
-        options = QueryOptions(filters={'id': entry_id}, order_by='id', order_desc=False)
+        options = QueryOptions(filters={"id": entry_id}, order_by="id", order_desc=False)
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_mood_entry(self, data: Dict[str, Any]) -> str:
+    def create_mood_entry(self, data: dict[str, Any]) -> str:
         """
         创建心情记录
 
@@ -334,7 +337,7 @@ class MoodEntryProvider(LWBaseDataProvider):
         try:
             # 自动生成 ID
             new_id = f"mood-{str(uuid.uuid4())[:8]}"
-            insert_data = {'id': new_id}
+            insert_data = {"id": new_id}
 
             # 白名单验证
             invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
@@ -349,7 +352,7 @@ class MoodEntryProvider(LWBaseDataProvider):
             logger.error("创建心情记录失败: %s", e)
             raise DataAccessError(f"创建心情记录失败: {e}") from e
 
-    def update_mood_entry(self, entry_id: str, data: Dict[str, Any]) -> bool:
+    def update_mood_entry(self, entry_id: str, data: dict[str, Any]) -> bool:
         """
         更新心情记录
 
@@ -402,6 +405,7 @@ class MoodEntryProvider(LWBaseDataProvider):
 
 # ==================== MoodImpactProvider ====================
 
+
 class MoodImpactProvider(LWBaseDataProvider):
     """
     影响因素数据提供者（对应 mood_impacts 表）
@@ -417,18 +421,10 @@ class MoodImpactProvider(LWBaseDataProvider):
     _DATE_FIELD = None
     _TIME_FIELD = None
 
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'name', 'sort_order', 'created_at'
-    }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'name', 'sort_order', 'created_at'
-    }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'name', 'sort_order', 'created_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'name', 'sort_order'
-    }
+    _FILTER_FIELDS: set[str] = {"id", "name", "sort_order", "created_at"}
+    _ORDER_FIELDS: set[str] = {"id", "name", "sort_order", "created_at"}
+    _SELECT_FIELDS: set[str] = {"id", "name", "sort_order", "created_at"}
+    _UPDATE_FIELDS: set[str] = {"name", "sort_order"}
 
     def __init__(self, db_manager=None):
         super().__init__(db_manager)
@@ -436,9 +432,8 @@ class MoodImpactProvider(LWBaseDataProvider):
     # ==================== 核心方法（使用通用方法） ====================
 
     def query_mood_impacts(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -462,21 +457,18 @@ class MoodImpactProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_mood_impacts(self) -> List[Dict[str, Any]]:
+    def get_mood_impacts(self) -> list[dict[str, Any]]:
         """
         获取所有影响因素（按 sort_order DESC 排序）
 
         Returns:
             List[Dict]: 影响因素列表
         """
-        options = QueryOptions(
-            order_by='sort_order',
-            order_desc=True
-        )
+        options = QueryOptions(order_by="sort_order", order_desc=True)
         results, _ = self._generic_query(options)
         return results
 
-    def create_mood_impact(self, data: Dict[str, Any]) -> int:
+    def create_mood_impact(self, data: dict[str, Any]) -> int:
         """
         创建影响因素
 
@@ -498,12 +490,15 @@ class MoodImpactProvider(LWBaseDataProvider):
             # 使用自定义 SQL 获取 AUTOINCREMENT ID
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO mood_impacts (name, sort_order)
                     VALUES (?, ?)
-                """, (data['name'], data.get('sort_order', 0)))
+                """,
+                    (data["name"], data.get("sort_order", 0)),
+                )
                 new_id = cursor.lastrowid
-                logger.info("创建影响因素成功: %s", data['name'])
+                logger.info("创建影响因素成功: %s", data["name"])
                 return new_id
         except Exception as e:
             logger.error("创建影响因素失败: %s", e)
@@ -530,5 +525,3 @@ class MoodImpactProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("删除影响因素 %s 失败: %s", impact_id, e)
             raise DataAccessError(f"删除影响因素 {impact_id} 失败: {e}") from e
-
-

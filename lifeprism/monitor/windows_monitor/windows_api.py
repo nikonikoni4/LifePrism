@@ -1,14 +1,14 @@
+import psutil
+import win32api
 import win32gui
 import win32process
-import win32api
-import win32con
-import psutil
-from typing import Optional
+
 # from lifeprism.utils.logger import get_logger
 from lifeprism.utils.logger import get_logger
-from lifeprism.monitor.windows_monitor.exceptions import MonitorError
 
 logger = get_logger(__name__)
+
+
 def get_last_input_time() -> float:
     """
     获取自系统启动以来的最后一次输入时间（秒）。
@@ -16,11 +16,13 @@ def get_last_input_time() -> float:
     # GetLastInputInfo 返回毫秒
     return win32api.GetLastInputInfo() / 1000.0
 
+
 def get_tick_count() -> float:
     """
     获取系统启动以来的毫秒数（秒）。
     """
     return win32api.GetTickCount() / 1000.0
+
 
 def is_any_video_playing() -> bool:
     """
@@ -28,11 +30,14 @@ def is_any_video_playing() -> bool:
     实现逻辑参考 aw-watcher-afk: 通过 powercfg /requests 判定。
     """
     import subprocess
+
     try:
         # 执行 powercfg /requests 并检查是否包含 DISPLAY 或 EXECUTION 请求
         # 注意：这在某些系统上可能需要权限，或者输出格式不同
         # AW 原版在 Windows 上使用 PowerGetActiveScheme 等 API，这里先用简单的 shell 命令实现核心逻辑
-        result = subprocess.check_output(["powercfg", "/requests"], stderr=subprocess.STDOUT, text=True)
+        result = subprocess.check_output(
+            ["powercfg", "/requests"], stderr=subprocess.STDOUT, text=True
+        )
         # 如果 [DISPLAY] 或 [EXECUTION] 下面不是 "None"，则认为有媒体在运行
         # 这是一个简化的匹配逻辑
         lines = result.splitlines()
@@ -40,10 +45,7 @@ def is_any_video_playing() -> bool:
         for line in lines:
             line = line.strip()
             if line.startswith("["):
-                if "DISPLAY" in line or "EXECUTION" in line:
-                    capture = True
-                else:
-                    capture = False
+                capture = bool("DISPLAY" in line or "EXECUTION" in line)
                 continue
             if capture and line and "None" not in line:
                 return True
@@ -53,11 +55,13 @@ def is_any_video_playing() -> bool:
         logger.debug("Failed to check power requests: %s", e)
         return False
 
+
 def get_active_window_handle() -> int:
     """
     获取当前前台窗口的句柄 (HWND)。
     """
     return win32gui.GetForegroundWindow()
+
 
 def get_window_title(hwnd: int) -> str:
     """
@@ -69,6 +73,7 @@ def get_window_title(hwnd: int) -> str:
         # LEGITIMATE: 第三方未知错误 — Windows API 可能抛非预期异常
         logger.warning("获取窗口标题失败 (HWND: %s): %s", hwnd, e)
         return ""
+
 
 def get_app_name(hwnd: int) -> str:
     """
@@ -91,6 +96,7 @@ def get_app_name(hwnd: int) -> str:
         logger.debug("获取应用名称失败 (HWND: %s): %s", hwnd, e)
         return "unknown"
 
+
 def get_app_path(hwnd: int) -> str:
     """
     获取窗口所属的应用程序可执行文件路径。
@@ -109,6 +115,7 @@ def get_app_path(hwnd: int) -> str:
         logger.debug("获取应用路径失败 (HWND: %s): %s", hwnd, e)
         return ""
 
+
 def _get_app_name_fallback(hwnd: int) -> str:
     """
     当 psutil 无法访问进程时（如管理员权限进程），尝试通过 WMI 或其他方式获取名称。
@@ -117,6 +124,7 @@ def _get_app_name_fallback(hwnd: int) -> str:
     try:
         # 尝试通过 WMI 获取（如果安装了 wmi 库）
         import wmi
+
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
         c = wmi.WMI()
         for process in c.Win32_Process(ProcessId=pid):
@@ -129,12 +137,14 @@ def _get_app_name_fallback(hwnd: int) -> str:
 
     return "unknown"
 
+
 def _get_app_path_fallback(hwnd: int) -> str:
     """
     管理员权限进程的可执行文件路径 fallback。
     """
     try:
         import wmi
+
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
         c = wmi.WMI()
         for process in c.Win32_Process(ProcessId=pid):

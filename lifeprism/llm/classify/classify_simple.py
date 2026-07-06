@@ -2,17 +2,19 @@
 功能描述: 简化版分类器，一步分类
 date: 2025.12.17
 """
+
 import asyncio
 import json
 import logging
+
+from lifeprism.llm.bus import InboundMessage, MessageType, OutboundMessage, bus
 from lifeprism.llm.schemas.classify_shemas import classifyState
 from lifeprism.llm.utils import (
     extract_json_from_response,
-    parse_classification_result,
-    format_goals_for_prompt,
     format_category_tree_for_prompt,
+    format_goals_for_prompt,
+    parse_classification_result,
 )
-from lifeprism.llm.bus import OutboundMessage, bus, InboundMessage,MessageType
 
 MAX_LOG_ITEMS = 15
 
@@ -24,8 +26,14 @@ class ClassifySimple:
         self.goal = goal
         self.category_tree = category_tree
 
-    async def _classify_batch(self, batch: list, batch_num: int, system_prompt: str,
-                               app_registry: dict, result_items: list):
+    async def _classify_batch(
+        self,
+        batch: list,
+        batch_num: int,
+        system_prompt: str,
+        app_registry: dict,
+        result_items: list,
+    ):
         """单批次分类"""
         compact_data = [
             [
@@ -43,7 +51,7 @@ class ClassifySimple:
             type=MessageType.CLASSIFY,
             extra={"system_prompt": system_prompt},
         )
-        raw :OutboundMessage = await bus.send(msg)
+        raw: OutboundMessage = await bus.send(msg)
         raw = raw.response.content
         clean = extract_json_from_response(raw)
         if not clean:
@@ -78,10 +86,17 @@ class ClassifySimple:
 注意：value 必须是列表，包含三个元素；无值时使用 null；key 必须是 id。\
 """
         all_result_items = list(state.log_items)
-        batches = [state.log_items[i:i + MAX_LOG_ITEMS] for i in range(0, len(state.log_items), MAX_LOG_ITEMS)]
+        batches = [
+            state.log_items[i : i + MAX_LOG_ITEMS]
+            for i in range(0, len(state.log_items), MAX_LOG_ITEMS)
+        ]
         logger.info("classify_simple 共 %s 条，分 %s 批并发", len(state.log_items), len(batches))
-        await asyncio.gather(*[
-            self._classify_batch(batch, i + 1, system_prompt, state.app_registry, all_result_items)
-            for i, batch in enumerate(batches)
-        ])
+        await asyncio.gather(
+            *[
+                self._classify_batch(
+                    batch, i + 1, system_prompt, state.app_registry, all_result_items
+                )
+                for i, batch in enumerate(batches)
+            ]
+        )
         return {"result_items": all_result_items}

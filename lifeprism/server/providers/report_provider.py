@@ -4,8 +4,9 @@ Report 数据提供者
 
 重构版本：使用 DatabaseManager 内置的 CRUD 方法
 """
+
 import json
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger
@@ -16,31 +17,31 @@ logger = get_logger(__name__)
 class DailyReportProvider(LWBaseDataProvider):
     """
     报告数据提供者
-    
+
     继承 LWBaseDataProvider，提供 Daily Report 的 CRUD 操作
     使用 DatabaseManager 内置方法进行数据库操作
     """
-    
-    TABLE_NAME = 'daily_report'
-    ID_COLUMN = 'date'
-    
+
+    TABLE_NAME = "daily_report"
+    ID_COLUMN = "date"
+
     # JSON 字段列表
-    JSON_FIELDS = ['sunburst_data', 'todo_data', 'goal_data', 'daily_trend_data']
-    
+    JSON_FIELDS = ["sunburst_data", "todo_data", "goal_data", "daily_trend_data"]
+
     def __init__(self, db_manager=None):
         super().__init__(db_manager)
-    
+
     # ==================== 辅助方法 ====================
-    
-    def _serialize_json_fields(self, data: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _serialize_json_fields(self, data: dict[str, Any]) -> dict[str, Any]:
         """将 JSON 字段序列化为字符串"""
         result = data.copy()
         for field in self.JSON_FIELDS:
             if field in result and result[field] is not None:
                 result[field] = json.dumps(result[field], ensure_ascii=False)
         return result
-    
-    def _deserialize_json_fields(self, row: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _deserialize_json_fields(self, row: dict[str, Any]) -> dict[str, Any]:
         """将 JSON 字符串字段反序列化为对象"""
         if not row:
             return row
@@ -52,27 +53,27 @@ class DailyReportProvider(LWBaseDataProvider):
                 except (json.JSONDecodeError, TypeError):
                     result[field] = None
         return result
-    
-    def _df_to_dict_list(self, df) -> List[Dict[str, Any]]:
+
+    def _df_to_dict_list(self, df) -> list[dict[str, Any]]:
         """将 DataFrame 转换为带 JSON 反序列化的字典列表"""
         if df.empty:
             return []
-        
+
         results = []
         for _, row in df.iterrows():
             item = row.to_dict()
             results.append(self._deserialize_json_fields(item))
         return results
-    
+
     # ==================== CRUD 操作 ====================
-    
-    def get_daily_report(self, date: str) -> Optional[Dict[str, Any]]:
+
+    def get_daily_report(self, date: str) -> dict[str, Any] | None:
         """
         按日期获取日报告
-        
+
         Args:
             date: 日期 YYYY-MM-DD
-        
+
         Returns:
             Optional[Dict]: 报告数据，不存在返回 None
         """
@@ -84,38 +85,35 @@ class DailyReportProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("获取日报告 %s 失败: error=%s", date, e)
             return None
-    
-    def upsert_daily_report(self, date: str, data: Dict[str, Any]) -> bool:
+
+    def upsert_daily_report(self, date: str, data: dict[str, Any]) -> bool:
         """
         创建或更新日报告 (UPSERT)
-        
+
         Args:
             date: 日期 YYYY-MM-DD
             data: 报告数据（只更新非 None 字段）
-        
+
         Returns:
             bool: 是否成功
         """
         try:
             # 检查是否已存在
             exists = self.db.get_by_id(self.TABLE_NAME, self.ID_COLUMN, date) is not None
-            
+
             if exists:
                 # UPDATE - 只更新传入的非 None 字段
                 update_data = {k: v for k, v in data.items() if v is not None}
                 if not update_data:
                     return True
-                
+
                 # 序列化 JSON 字段
                 update_data = self._serialize_json_fields(update_data)
-                
+
                 rows_affected = self.db.update_by_id(
-                    self.TABLE_NAME, 
-                    self.ID_COLUMN, 
-                    date, 
-                    update_data
+                    self.TABLE_NAME, self.ID_COLUMN, date, update_data
                 )
-                
+
                 if rows_affected > 0:
                     logger.info("更新日报告 %s 成功", date)
                 return True
@@ -123,115 +121,97 @@ class DailyReportProvider(LWBaseDataProvider):
                 # INSERT
                 insert_data = {self.ID_COLUMN: date}
                 insert_data.update({k: v for k, v in data.items() if v is not None})
-                
+
                 # 序列化 JSON 字段
                 insert_data = self._serialize_json_fields(insert_data)
-                
+
                 self.db.insert(self.TABLE_NAME, insert_data)
                 logger.info("创建日报告 %s 成功", date)
                 return True
-                
+
         except Exception as e:
             logger.error("保存日报告 %s 失败: error=%s", date, e)
             return False
-    
+
     def update_report_state(self, date: str, state: str) -> bool:
         """
         更新报告状态
-        
+
         Args:
             date: 日期 YYYY-MM-DD
             state: 状态 ("0": 未完成, "1": 已完成)
-        
+
         Returns:
             bool: 是否成功
         """
         try:
             rows_affected = self.db.update_by_id(
-                self.TABLE_NAME,
-                self.ID_COLUMN,
-                date,
-                {'state': state}
+                self.TABLE_NAME, self.ID_COLUMN, date, {"state": state}
             )
-            
+
             success = rows_affected > 0
             if success:
                 logger.info("更新日报告 %s 状态为 %s", date, state)
             return success
-            
+
         except Exception as e:
             logger.error("更新日报告 %s 状态失败: error=%s", date, e)
             return False
-    
+
     def delete_daily_report(self, date: str) -> bool:
         """
         删除日报告
-        
+
         Args:
             date: 日期 YYYY-MM-DD
-        
+
         Returns:
             bool: 是否成功
         """
         try:
-            rows_affected = self.db.delete_by_id(
-                self.TABLE_NAME,
-                self.ID_COLUMN,
-                date
-            )
-            
+            rows_affected = self.db.delete_by_id(self.TABLE_NAME, self.ID_COLUMN, date)
+
             success = rows_affected > 0
             if success:
                 logger.info("删除日报告 %s 成功", date)
             return success
-            
+
         except Exception as e:
             logger.error("删除日报告 %s 失败: error=%s", date, e)
             return False
-    
-    def get_reports_in_range(
-        self,
-        start_date: str,
-        end_date: str
-    ) -> List[Dict[str, Any]]:
+
+    def get_reports_in_range(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
         """
         获取日期范围内的报告列表
-        
+
         Args:
             start_date: 开始日期 YYYY-MM-DD
             end_date: 结束日期 YYYY-MM-DD
-        
+
         Returns:
             List[Dict]: 报告列表
         """
         try:
             df = self.db.query_advanced(
                 self.TABLE_NAME,
-                conditions=[
-                    (self.ID_COLUMN, '>=', start_date),
-                    (self.ID_COLUMN, '<=', end_date)
-                ],
-                order_by=f'{self.ID_COLUMN} ASC'
+                conditions=[(self.ID_COLUMN, ">=", start_date), (self.ID_COLUMN, "<=", end_date)],
+                order_by=f"{self.ID_COLUMN} ASC",
             )
-            
+
             return self._df_to_dict_list(df)
-            
+
         except Exception as e:
             logger.error("获取日期范围 %s 至 %s 报告失败: error=%s", start_date, end_date, e)
             return []
-    
-    def get_completed_report_dates(
-        self,
-        start_date: str,
-        end_date: str
-    ) -> List[str]:
+
+    def get_completed_report_dates(self, start_date: str, end_date: str) -> list[str]:
         """
         获取日期范围内已完成的报告日期列表
-        
+
         Args:
             start_date: 开始日期 YYYY-MM-DD
             end_date: 结束日期 YYYY-MM-DD
-        
+
         Returns:
             List[str]: 日期列表
         """
@@ -240,17 +220,17 @@ class DailyReportProvider(LWBaseDataProvider):
                 self.TABLE_NAME,
                 columns=[self.ID_COLUMN],
                 conditions=[
-                    (self.ID_COLUMN, '>=', start_date),
-                    (self.ID_COLUMN, '<=', end_date),
-                    ('state', '=', '1')
+                    (self.ID_COLUMN, ">=", start_date),
+                    (self.ID_COLUMN, "<=", end_date),
+                    ("state", "=", "1"),
                 ],
-                order_by=f'{self.ID_COLUMN} ASC'
+                order_by=f"{self.ID_COLUMN} ASC",
             )
-            
+
             if df.empty:
                 return []
             return df[self.ID_COLUMN].tolist()
-            
+
         except Exception as e:
             logger.error("获取已完成报告日期失败: error=%s", e)
             return []
@@ -263,31 +243,31 @@ daily_report_provider = DailyReportProvider()
 class WeeklyReportProvider(LWBaseDataProvider):
     """
     周报告数据提供者
-    
+
     继承 LWBaseDataProvider，提供 Weekly Report 的 CRUD 操作
     使用 DatabaseManager 内置方法进行数据库操作
     """
-    
-    TABLE_NAME = 'weekly_report'
-    ID_COLUMN = 'date'  # 使用周开始日期作为主键
-    
+
+    TABLE_NAME = "weekly_report"
+    ID_COLUMN = "date"  # 使用周开始日期作为主键
+
     # JSON 字段列表
-    JSON_FIELDS = ['sunburst_data', 'todo_data', 'goal_data', 'daily_trend_data']
-    
+    JSON_FIELDS = ["sunburst_data", "todo_data", "goal_data", "daily_trend_data"]
+
     def __init__(self, db_manager=None):
         super().__init__(db_manager)
-    
+
     # ==================== 辅助方法 ====================
-    
-    def _serialize_json_fields(self, data: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _serialize_json_fields(self, data: dict[str, Any]) -> dict[str, Any]:
         """将 JSON 字段序列化为字符串"""
         result = data.copy()
         for field in self.JSON_FIELDS:
             if field in result and result[field] is not None:
                 result[field] = json.dumps(result[field], ensure_ascii=False)
         return result
-    
-    def _deserialize_json_fields(self, row: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _deserialize_json_fields(self, row: dict[str, Any]) -> dict[str, Any]:
         """将 JSON 字符串字段反序列化为对象"""
         if not row:
             return row
@@ -299,27 +279,27 @@ class WeeklyReportProvider(LWBaseDataProvider):
                 except (json.JSONDecodeError, TypeError):
                     result[field] = None
         return result
-    
-    def _df_to_dict_list(self, df) -> List[Dict[str, Any]]:
+
+    def _df_to_dict_list(self, df) -> list[dict[str, Any]]:
         """将 DataFrame 转换为带 JSON 反序列化的字典列表"""
         if df.empty:
             return []
-        
+
         results = []
         for _, row in df.iterrows():
             item = row.to_dict()
             results.append(self._deserialize_json_fields(item))
         return results
-    
+
     # ==================== CRUD 操作 ====================
-    
-    def get_weekly_report(self, week_start_date: str) -> Optional[Dict[str, Any]]:
+
+    def get_weekly_report(self, week_start_date: str) -> dict[str, Any] | None:
         """
         按周开始日期获取周报告
-        
+
         Args:
             week_start_date: 周开始日期 YYYY-MM-DD（周一）
-        
+
         Returns:
             Optional[Dict]: 报告数据，不存在返回 None
         """
@@ -331,38 +311,35 @@ class WeeklyReportProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("获取周报告 %s 失败: error=%s", week_start_date, e)
             return None
-    
-    def upsert_weekly_report(self, week_start_date: str, data: Dict[str, Any]) -> bool:
+
+    def upsert_weekly_report(self, week_start_date: str, data: dict[str, Any]) -> bool:
         """
         创建或更新周报告 (UPSERT)
-        
+
         Args:
             week_start_date: 周开始日期 YYYY-MM-DD（周一）
             data: 报告数据（只更新非 None 字段）
-        
+
         Returns:
             bool: 是否成功
         """
         try:
             # 检查是否已存在
             exists = self.db.get_by_id(self.TABLE_NAME, self.ID_COLUMN, week_start_date) is not None
-            
+
             if exists:
                 # UPDATE - 只更新传入的非 None 字段
                 update_data = {k: v for k, v in data.items() if v is not None}
                 if not update_data:
                     return True
-                
+
                 # 序列化 JSON 字段
                 update_data = self._serialize_json_fields(update_data)
-                
+
                 rows_affected = self.db.update_by_id(
-                    self.TABLE_NAME, 
-                    self.ID_COLUMN, 
-                    week_start_date, 
-                    update_data
+                    self.TABLE_NAME, self.ID_COLUMN, week_start_date, update_data
                 )
-                
+
                 if rows_affected > 0:
                     logger.info("更新周报告 %s 成功", week_start_date)
                 return True
@@ -370,99 +347,85 @@ class WeeklyReportProvider(LWBaseDataProvider):
                 # INSERT
                 insert_data = {self.ID_COLUMN: week_start_date}
                 insert_data.update({k: v for k, v in data.items() if v is not None})
-                
+
                 # 序列化 JSON 字段
                 insert_data = self._serialize_json_fields(insert_data)
-                
+
                 self.db.insert(self.TABLE_NAME, insert_data)
                 logger.info("创建周报告 %s 成功", week_start_date)
                 return True
-                
+
         except Exception as e:
             logger.error("保存周报告 %s 失败: error=%s", week_start_date, e)
             return False
-    
+
     def update_report_state(self, week_start_date: str, state: str) -> bool:
         """
         更新报告状态
-        
+
         Args:
             week_start_date: 周开始日期 YYYY-MM-DD
             state: 状态 ("0": 未完成, "1": 已完成)
-        
+
         Returns:
             bool: 是否成功
         """
         try:
             rows_affected = self.db.update_by_id(
-                self.TABLE_NAME,
-                self.ID_COLUMN,
-                week_start_date,
-                {'state': state}
+                self.TABLE_NAME, self.ID_COLUMN, week_start_date, {"state": state}
             )
-            
+
             success = rows_affected > 0
             if success:
                 logger.info("更新周报告 %s 状态为 %s", week_start_date, state)
             return success
-            
+
         except Exception as e:
             logger.error("更新周报告 %s 状态失败: error=%s", week_start_date, e)
             return False
-    
+
     def delete_weekly_report(self, week_start_date: str) -> bool:
         """
         删除周报告
-        
+
         Args:
             week_start_date: 周开始日期 YYYY-MM-DD
-        
+
         Returns:
             bool: 是否成功
         """
         try:
-            rows_affected = self.db.delete_by_id(
-                self.TABLE_NAME,
-                self.ID_COLUMN,
-                week_start_date
-            )
-            
+            rows_affected = self.db.delete_by_id(self.TABLE_NAME, self.ID_COLUMN, week_start_date)
+
             success = rows_affected > 0
             if success:
                 logger.info("删除周报告 %s 成功", week_start_date)
             return success
-            
+
         except Exception as e:
             logger.error("删除周报告 %s 失败: error=%s", week_start_date, e)
             return False
-    
-    def get_reports_in_range(
-        self,
-        start_date: str,
-        end_date: str
-    ) -> List[Dict[str, Any]]:
+
+    def get_reports_in_range(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
         """
         获取日期范围内的周报告列表
-        
+
         Args:
             start_date: 开始日期 YYYY-MM-DD
             end_date: 结束日期 YYYY-MM-DD
-        
+
         Returns:
             List[Dict]: 报告列表
         """
         try:
             df = self.db.query_advanced(
                 self.TABLE_NAME,
-                conditions=[
-                    (self.ID_COLUMN, '>=', start_date),
-                    (self.ID_COLUMN, '<=', end_date)
-                ],
-                order_by=f'{self.ID_COLUMN} ASC'
+                conditions=[(self.ID_COLUMN, ">=", start_date), (self.ID_COLUMN, "<=", end_date)],
+                order_by=f"{self.ID_COLUMN} ASC",
             )
-            
+
             return self._df_to_dict_list(df)
-            
+
         except Exception as e:
             logger.error("获取日期范围 %s 至 %s 周报告失败: error=%s", start_date, end_date, e)
             return []
@@ -475,31 +438,31 @@ weekly_report_provider = WeeklyReportProvider()
 class MonthlyReportProvider(LWBaseDataProvider):
     """
     月报告数据提供者
-    
+
     继承 LWBaseDataProvider，提供 Monthly Report 的 CRUD 操作
     使用 DatabaseManager 内置方法进行数据库操作
     """
-    
-    TABLE_NAME = 'monthly_report'
-    ID_COLUMN = 'date'  # 使用月开始日期 YYYY-MM-01 作为主键
-    
+
+    TABLE_NAME = "monthly_report"
+    ID_COLUMN = "date"  # 使用月开始日期 YYYY-MM-01 作为主键
+
     # JSON 字段列表
-    JSON_FIELDS = ['sunburst_data', 'todo_data', 'goal_data', 'daily_trend_data', 'heatmap_data']
-    
+    JSON_FIELDS = ["sunburst_data", "todo_data", "goal_data", "daily_trend_data", "heatmap_data"]
+
     def __init__(self, db_manager=None):
         super().__init__(db_manager)
-    
+
     # ==================== 辅助方法 ====================
-    
-    def _serialize_json_fields(self, data: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _serialize_json_fields(self, data: dict[str, Any]) -> dict[str, Any]:
         """将 JSON 字段序列化为字符串"""
         result = data.copy()
         for field in self.JSON_FIELDS:
             if field in result and result[field] is not None:
                 result[field] = json.dumps(result[field], ensure_ascii=False)
         return result
-    
-    def _deserialize_json_fields(self, row: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _deserialize_json_fields(self, row: dict[str, Any]) -> dict[str, Any]:
         """将 JSON 字符串字段反序列化为对象"""
         if not row:
             return row
@@ -511,27 +474,27 @@ class MonthlyReportProvider(LWBaseDataProvider):
                 except (json.JSONDecodeError, TypeError):
                     result[field] = None
         return result
-    
-    def _df_to_dict_list(self, df) -> List[Dict[str, Any]]:
+
+    def _df_to_dict_list(self, df) -> list[dict[str, Any]]:
         """将 DataFrame 转换为带 JSON 反序列化的字典列表"""
         if df.empty:
             return []
-        
+
         results = []
         for _, row in df.iterrows():
             item = row.to_dict()
             results.append(self._deserialize_json_fields(item))
         return results
-    
+
     # ==================== CRUD 操作 ====================
-    
-    def get_monthly_report(self, month_start_date: str) -> Optional[Dict[str, Any]]:
+
+    def get_monthly_report(self, month_start_date: str) -> dict[str, Any] | None:
         """
         按月开始日期获取月报告
-        
+
         Args:
             month_start_date: 月开始日期 YYYY-MM-01
-        
+
         Returns:
             Optional[Dict]: 报告数据，不存在返回 None
         """
@@ -543,38 +506,37 @@ class MonthlyReportProvider(LWBaseDataProvider):
         except Exception as e:
             logger.error("获取月报告 %s 失败: error=%s", month_start_date, e)
             return None
-    
-    def upsert_monthly_report(self, month_start_date: str, data: Dict[str, Any]) -> bool:
+
+    def upsert_monthly_report(self, month_start_date: str, data: dict[str, Any]) -> bool:
         """
         创建或更新月报告 (UPSERT)
-        
+
         Args:
             month_start_date: 月开始日期 YYYY-MM-01
             data: 报告数据（只更新非 None 字段）
-        
+
         Returns:
             bool: 是否成功
         """
         try:
             # 检查是否已存在
-            exists = self.db.get_by_id(self.TABLE_NAME, self.ID_COLUMN, month_start_date) is not None
-            
+            exists = (
+                self.db.get_by_id(self.TABLE_NAME, self.ID_COLUMN, month_start_date) is not None
+            )
+
             if exists:
                 # UPDATE - 只更新传入的非 None 字段
                 update_data = {k: v for k, v in data.items() if v is not None}
                 if not update_data:
                     return True
-                
+
                 # 序列化 JSON 字段
                 update_data = self._serialize_json_fields(update_data)
-                
+
                 rows_affected = self.db.update_by_id(
-                    self.TABLE_NAME, 
-                    self.ID_COLUMN, 
-                    month_start_date, 
-                    update_data
+                    self.TABLE_NAME, self.ID_COLUMN, month_start_date, update_data
                 )
-                
+
                 if rows_affected > 0:
                     logger.info("更新月报告 %s 成功", month_start_date)
                 return True
@@ -582,99 +544,85 @@ class MonthlyReportProvider(LWBaseDataProvider):
                 # INSERT
                 insert_data = {self.ID_COLUMN: month_start_date}
                 insert_data.update({k: v for k, v in data.items() if v is not None})
-                
+
                 # 序列化 JSON 字段
                 insert_data = self._serialize_json_fields(insert_data)
-                
+
                 self.db.insert(self.TABLE_NAME, insert_data)
                 logger.info("创建月报告 %s 成功", month_start_date)
                 return True
-                
+
         except Exception as e:
             logger.error("保存月报告 %s 失败: error=%s", month_start_date, e)
             return False
-    
+
     def update_report_state(self, month_start_date: str, state: str) -> bool:
         """
         更新报告状态
-        
+
         Args:
             month_start_date: 月开始日期 YYYY-MM-01
             state: 状态 ("0": 未完成, "1": 已完成)
-        
+
         Returns:
             bool: 是否成功
         """
         try:
             rows_affected = self.db.update_by_id(
-                self.TABLE_NAME,
-                self.ID_COLUMN,
-                month_start_date,
-                {'state': state}
+                self.TABLE_NAME, self.ID_COLUMN, month_start_date, {"state": state}
             )
-            
+
             success = rows_affected > 0
             if success:
                 logger.info("更新月报告 %s 状态为 %s", month_start_date, state)
             return success
-            
+
         except Exception as e:
             logger.error("更新月报告 %s 状态失败: error=%s", month_start_date, e)
             return False
-    
+
     def delete_monthly_report(self, month_start_date: str) -> bool:
         """
         删除月报告
-        
+
         Args:
             month_start_date: 月开始日期 YYYY-MM-01
-        
+
         Returns:
             bool: 是否成功
         """
         try:
-            rows_affected = self.db.delete_by_id(
-                self.TABLE_NAME,
-                self.ID_COLUMN,
-                month_start_date
-            )
-            
+            rows_affected = self.db.delete_by_id(self.TABLE_NAME, self.ID_COLUMN, month_start_date)
+
             success = rows_affected > 0
             if success:
                 logger.info("删除月报告 %s 成功", month_start_date)
             return success
-            
+
         except Exception as e:
             logger.error(f"删除月报告 {month_start_date} 失败: {e}")
             return False
-    
-    def get_reports_in_range(
-        self,
-        start_date: str,
-        end_date: str
-    ) -> List[Dict[str, Any]]:
+
+    def get_reports_in_range(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
         """
         获取日期范围内的月报告列表
-        
+
         Args:
             start_date: 开始日期 YYYY-MM-DD
             end_date: 结束日期 YYYY-MM-DD
-        
+
         Returns:
             List[Dict]: 报告列表
         """
         try:
             df = self.db.query_advanced(
                 self.TABLE_NAME,
-                conditions=[
-                    (self.ID_COLUMN, '>=', start_date),
-                    (self.ID_COLUMN, '<=', end_date)
-                ],
-                order_by=f'{self.ID_COLUMN} ASC'
+                conditions=[(self.ID_COLUMN, ">=", start_date), (self.ID_COLUMN, "<=", end_date)],
+                order_by=f"{self.ID_COLUMN} ASC",
             )
-            
+
             return self._df_to_dict_list(df)
-            
+
         except Exception as e:
             logger.error(f"获取日期范围 {start_date} 至 {end_date} 月报告失败: {e}")
             return []
@@ -695,12 +643,8 @@ class ComparisonDataProvider(LWBaseDataProvider):
         super().__init__(db_manager)
 
     def get_period_comparison(
-        self,
-        current_start: str,
-        current_end: str,
-        previous_start: str,
-        previous_end: str
-    ) -> Dict[str, Any]:
+        self, current_start: str, current_end: str, previous_start: str, previous_end: str
+    ) -> dict[str, Any]:
         """
         获取两个时间段的环比对比数据
 
@@ -721,45 +665,41 @@ class ComparisonDataProvider(LWBaseDataProvider):
                 current_start, current_end, previous_start, previous_end
             )
 
-            return {
-                'category_comparison': category_comparison,
-                'goal_comparison': goal_comparison
-            }
+            return {"category_comparison": category_comparison, "goal_comparison": goal_comparison}
         except Exception as e:
             logger.error(f"计算环比数据失败: {e}")
-            return {
-                'category_comparison': [],
-                'goal_comparison': []
-            }
+            return {"category_comparison": [], "goal_comparison": []}
 
     def _calc_category_comparison(
-        self,
-        current_start: str,
-        current_end: str,
-        previous_start: str,
-        previous_end: str
-    ) -> List[Dict[str, Any]]:
+        self, current_start: str, current_end: str, previous_start: str, previous_end: str
+    ) -> list[dict[str, Any]]:
         """计算分类环比数据"""
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
                 # 查询当前周期分类时长
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT category_id, SUM(duration) as total_duration
                     FROM user_app_behavior_log
                     WHERE start_time >= ? AND start_time <= ? AND category_id IS NOT NULL
                     GROUP BY category_id
-                """, (current_start, current_end))
+                """,
+                    (current_start, current_end),
+                )
                 current_data = {str(row[0]): int(row[1]) for row in cursor.fetchall()}
 
                 # 查询上一周期分类时长
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT category_id, SUM(duration) as total_duration
                     FROM user_app_behavior_log
                     WHERE start_time >= ? AND start_time <= ? AND category_id IS NOT NULL
                     GROUP BY category_id
-                """, (previous_start, previous_end))
+                """,
+                    (previous_start, previous_end),
+                )
                 previous_data = {str(row[0]): int(row[1]) for row in cursor.fetchall()}
 
                 # 查询分类名称
@@ -777,23 +717,27 @@ class ComparisonDataProvider(LWBaseDataProvider):
 
                 # 计算变化百分比
                 if previous_duration > 0:
-                    change_percentage = round((current_duration - previous_duration) / previous_duration * 100, 1)
+                    change_percentage = round(
+                        (current_duration - previous_duration) / previous_duration * 100, 1
+                    )
                 elif current_duration > 0:
                     change_percentage = None  # 新增时为 null
                 else:
                     change_percentage = None
 
-                result.append({
-                    'category_id': cat_id,
-                    'category_name': category_names.get(cat_id, '未知分类'),
-                    'current_duration': current_duration,
-                    'previous_duration': previous_duration,
-                    'change_seconds': change_seconds,
-                    'change_percentage': change_percentage
-                })
+                result.append(
+                    {
+                        "category_id": cat_id,
+                        "category_name": category_names.get(cat_id, "未知分类"),
+                        "current_duration": current_duration,
+                        "previous_duration": previous_duration,
+                        "change_seconds": change_seconds,
+                        "change_percentage": change_percentage,
+                    }
+                )
 
             # 按当前时长降序排序
-            result.sort(key=lambda x: x['current_duration'], reverse=True)
+            result.sort(key=lambda x: x["current_duration"], reverse=True)
             return result
 
         except Exception as e:
@@ -801,33 +745,35 @@ class ComparisonDataProvider(LWBaseDataProvider):
             return []
 
     def _calc_goal_comparison(
-        self,
-        current_start: str,
-        current_end: str,
-        previous_start: str,
-        previous_end: str
-    ) -> List[Dict[str, Any]]:
+        self, current_start: str, current_end: str, previous_start: str, previous_end: str
+    ) -> list[dict[str, Any]]:
         """计算目标环比数据"""
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
                 # 查询当前周期目标时长
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT link_to_goal_id, SUM(duration) as total_duration
                     FROM user_app_behavior_log
                     WHERE start_time >= ? AND start_time <= ? AND link_to_goal_id IS NOT NULL
                     GROUP BY link_to_goal_id
-                """, (current_start, current_end))
+                """,
+                    (current_start, current_end),
+                )
                 current_data = {str(row[0]): int(row[1]) for row in cursor.fetchall()}
 
                 # 查询上一周期目标时长
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT link_to_goal_id, SUM(duration) as total_duration
                     FROM user_app_behavior_log
                     WHERE start_time >= ? AND start_time <= ? AND link_to_goal_id IS NOT NULL
                     GROUP BY link_to_goal_id
-                """, (previous_start, previous_end))
+                """,
+                    (previous_start, previous_end),
+                )
                 previous_data = {str(row[0]): int(row[1]) for row in cursor.fetchall()}
 
                 # 查询目标名称
@@ -845,23 +791,27 @@ class ComparisonDataProvider(LWBaseDataProvider):
 
                 # 计算变化百分比
                 if previous_duration > 0:
-                    change_percentage = round((current_duration - previous_duration) / previous_duration * 100, 1)
+                    change_percentage = round(
+                        (current_duration - previous_duration) / previous_duration * 100, 1
+                    )
                 elif current_duration > 0:
                     change_percentage = None  # 新增时为 null
                 else:
                     change_percentage = None
 
-                result.append({
-                    'goal_id': goal_id,
-                    'goal_name': goal_names.get(goal_id, '未知目标'),
-                    'current_duration': current_duration,
-                    'previous_duration': previous_duration,
-                    'change_seconds': change_seconds,
-                    'change_percentage': change_percentage
-                })
+                result.append(
+                    {
+                        "goal_id": goal_id,
+                        "goal_name": goal_names.get(goal_id, "未知目标"),
+                        "current_duration": current_duration,
+                        "previous_duration": previous_duration,
+                        "change_seconds": change_seconds,
+                        "change_percentage": change_percentage,
+                    }
+                )
 
             # 按当前时长降序排序
-            result.sort(key=lambda x: x['current_duration'], reverse=True)
+            result.sort(key=lambda x: x["current_duration"], reverse=True)
             return result
 
         except Exception as e:

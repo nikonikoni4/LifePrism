@@ -69,6 +69,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "test/**" = ["B", "SIM"]
+"lifeprism/server/main.py" = ["E402"]
+"lifeprism/repository/__init__.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.10"

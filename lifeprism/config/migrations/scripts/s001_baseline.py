@@ -4,6 +4,7 @@ s001_baseline - settings.yaml 基线迁移
 将无版本字段的旧 settings.yaml 标记为 v1。
 所有已知字段保留，新增 config_version: 1。
 """
+
 VERSION = 1
 NAME = "s001_baseline"
 

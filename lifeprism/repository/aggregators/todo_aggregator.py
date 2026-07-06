@@ -3,9 +3,11 @@ Todo Aggregator - 任务数据聚合层
 
 聚合 TodoProvider，提供任务相关的统一数据视图和业务逻辑
 """
-from typing import Optional, List, Dict, Any, Tuple
-from lifeprism.repository.providers.todo_provider import TodoProvider
+
+from typing import Any
+
 from lifeprism.repository.providers.common_query_options import QueryOptions
+from lifeprism.repository.providers.todo_provider import TodoProvider
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
 
@@ -44,17 +46,16 @@ class TodoAggregator:
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT COALESCE(MAX(order_index), -1) + 1 FROM todo_list WHERE date = ?",
-                    (date,)
+                    (date,),
                 )
                 return cursor.fetchone()[0]
         except Exception as e:
             logger.error("获取下一个 order_index 失败: date=%s, error=%s", date, e)
             raise DataAccessError(
-                message=f"获取下一个 order_index 失败",
-                details={"date": date, "error": str(e)}
+                message="获取下一个 order_index 失败", details={"date": date, "error": str(e)}
             ) from e
 
-    def create_todo(self, data: Dict[str, Any]) -> str:
+    def create_todo(self, data: dict[str, Any]) -> str:
         """
         创建新任务（包含 order_index 计算）
 
@@ -72,34 +73,27 @@ class TodoAggregator:
             DataAccessError: 数据库操作失败
         """
         # 如果未提供 order_index，自动计算
-        if 'order_index' not in data:
-            data['order_index'] = self.get_next_order_index(data.get('date'))
+        if "order_index" not in data:
+            data["order_index"] = self.get_next_order_index(data.get("date"))
 
         # 调用 provider 创建
         return self.provider.create_todo(data)
 
     # ==================== 透传 Provider 方法 ====================
 
-    def query_todos(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    def query_todos(self, options: QueryOptions | None = None) -> tuple[list[dict[str, Any]], int]:
         """透传：通用查询接口"""
         return self.provider.query_todos(options)
 
-    def get_todos_by_date(
-        self,
-        date: str,
-        include_cross_day: bool = True
-    ) -> List[Dict[str, Any]]:
+    def get_todos_by_date(self, date: str, include_cross_day: bool = True) -> list[dict[str, Any]]:
         """透传：获取指定日期的任务列表"""
         return self.provider.get_todos_by_date(date, include_cross_day)
 
-    def get_todo_by_id(self, todo_id: str) -> Optional[Dict[str, Any]]:
+    def get_todo_by_id(self, todo_id: str) -> dict[str, Any] | None:
         """透传：按 ID 获取单个任务"""
         return self.provider.get_todo_by_id(todo_id)
 
-    def update_todo(self, todo_id: str, data: Dict[str, Any]) -> bool:
+    def update_todo(self, todo_id: str, data: dict[str, Any]) -> bool:
         """透传：更新任务"""
         return self.provider.update_todo(todo_id, data)
 
@@ -108,23 +102,20 @@ class TodoAggregator:
         return self.provider.delete_todo(todo_id)
 
     def get_todos_for_taskpool(
-        self,
-        goal_id: Optional[str] = None,
-        plan_doc_id: Optional[str] = None,
-        state: str = "all"
-    ) -> List[Dict[str, Any]]:
+        self, goal_id: str | None = None, plan_doc_id: str | None = None, state: str = "all"
+    ) -> list[dict[str, Any]]:
         """透传：获取任务池任务"""
         return self.provider.get_todos_for_taskpool(goal_id, plan_doc_id, state)
 
-    def reorder_todos(self, todo_ids: List[str]) -> bool:
+    def reorder_todos(self, todo_ids: list[str]) -> bool:
         """透传：重排序任务"""
         return self.provider.reorder_todos(todo_ids)
 
-    def batch_update_todos(self, updates: List[Dict[str, Any]]) -> int:
+    def batch_update_todos(self, updates: list[dict[str, Any]]) -> int:
         """透传：批量更新任务"""
         return self.provider.batch_update_todos(updates)
 
-    def get_waid_todos(self) -> List[Dict[str, Any]]:
+    def get_waid_todos(self) -> list[dict[str, Any]]:
         """透传：获取待办任务"""
         return self.provider.get_waid_todos()
 
@@ -132,15 +123,15 @@ class TodoAggregator:
         """透传：级联删除任务及其所有子任务"""
         return self.provider.delete_todo_cascade(todo_id)
 
-    def get_todos_by_plan_doc(self, plan_doc_id: str) -> List[Dict[str, Any]]:
+    def get_todos_by_plan_doc(self, plan_doc_id: str) -> list[dict[str, Any]]:
         """透传：获取指定计划书关联的所有任务"""
         return self.provider.get_todos_by_plan_doc(plan_doc_id)
 
-    def batch_create_todos(self, todos: List[Dict[str, Any]]) -> List[str]:
+    def batch_create_todos(self, todos: list[dict[str, Any]]) -> list[str]:
         """透传：批量创建任务"""
         return self.provider.batch_create_todos(todos)
 
-    def batch_update_waid_order(self, todo_ids: List[str]) -> bool:
+    def batch_update_waid_order(self, todo_ids: list[str]) -> bool:
         """透传：批量设置 WAID 浮窗排序"""
         return self.provider.batch_update_waid_order(todo_ids)
 

@@ -1,5 +1,6 @@
 """业务异常定义。"""
-from typing import Any, Dict, Optional
+
+from typing import Any
 
 
 class LWBaseError(Exception):
@@ -15,10 +16,10 @@ class LWBaseError(Exception):
 
     def __init__(
         self,
-        message: Optional[str] = None,
-        code: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
-        cause: Optional[Exception] = None,
+        message: str | None = None,
+        code: str | None = None,
+        details: dict[str, Any] | None = None,
+        cause: Exception | None = None,
     ):
         final_message = message or self.__class__.__name__
         self.code = code
@@ -29,13 +30,13 @@ class LWBaseError(Exception):
         if cause is not None:
             self.__cause__ = cause
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """将异常序列化为字典（用于调试和日志记录）。
 
         注意：此方法不用于生成 API 响应。API 响应格式由
         api_error_mapping.map_app_error() 统一生成。
         """
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "error_type": self.__class__.__name__,
             "message": self.message,
             "code": self.code,

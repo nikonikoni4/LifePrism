@@ -63,7 +63,11 @@ def get_summary_context(
             # 默认取本月
             today = date.today()
             start_of_month = today.replace(day=1)
-            next_month = start_of_month.replace(month=start_of_month.month + 1) if start_of_month.month < 12 else start_of_month.replace(year=start_of_month.year + 1, month=1)
+            next_month = (
+                start_of_month.replace(month=start_of_month.month + 1)
+                if start_of_month.month < 12
+                else start_of_month.replace(year=start_of_month.year + 1, month=1)
+            )
             end_of_month = next_month - timedelta(days=1)
             start_date = start_of_month.isoformat()
             end_date = end_of_month.isoformat()

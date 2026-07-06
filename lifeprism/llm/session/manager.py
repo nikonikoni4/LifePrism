@@ -1,30 +1,34 @@
 """
 管理会话
 """
-from dataclasses import dataclass,field
+
+import json
+import os
+import uuid
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-import json
-import uuid
+
 from lifeprism.config import settings
-from lifeprism.utils import get_logger,NotFoundError
+from lifeprism.utils import NotFoundError, get_logger
 from lifeprism.utils.lazy_singleton import LazySingleton
-import os 
+
 logger = get_logger(__name__)
-allow_role = ['user','assistant','tool','system']
+allow_role = ["user", "assistant", "tool", "system"]
+
 
 @dataclass
 class Session:
-    id : str = field(default_factory=lambda: str(uuid.uuid4()))
-    name : str = field(default_factory=lambda: f"session_{datetime.now().strftime('%Y%m%d%H%M')}")
-    messages : list[dict[str,Any]] = field(default_factory=list)
-    created_at : datetime = field(default_factory=datetime.now)
-    updated_at : datetime = field(default_factory=datetime.now)
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = field(default_factory=lambda: f"session_{datetime.now().strftime('%Y%m%d%H%M')}")
+    messages: list[dict[str, Any]] = field(default_factory=list)
+    created_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
     # metadata : dict = field(default_factory=dict) # 扩展位，预留，暂时无任何作用
-    last_compacted_loc : int = 0 # 上一次compact的位置 
-    auto_compact : bool = True # 默认不自动进行压缩 这个是因为lifeprism 里目前没有长对话，
-    last_processed_loc : int = 0 # 上次整理session信息的位置，区别与last_compacted_loc, last_compacted_loc仅仅作为对话压缩不涉及记忆提取
+    last_compacted_loc: int = 0  # 上一次compact的位置
+    auto_compact: bool = True  # 默认不自动进行压缩 这个是因为lifeprism 里目前没有长对话，
+    last_processed_loc: int = 0  # 上次整理session信息的位置，区别与last_compacted_loc, last_compacted_loc仅仅作为对话压缩不涉及记忆提取
 
     # def retract_last_user_message(self) -> dict[str, Any]:
     #     """撤销最后一条 user 消息及其之后的所有消息，返回被撤销的 user 消息"""
@@ -40,20 +44,17 @@ class Session:
     #     self.updated_at = datetime.now()
     #     return retracted
 
-    def add_message(self,role:str,content:str | list | None,**kw:Any) -> None:
+    def add_message(self, role: str, content: str | list | None, **kw: Any) -> None:
         if role not in allow_role:
             raise ValueError(f"message role can't be {role}")
-        self.messages.append({
-            'role': role,
-            'content':content,
-            'timestamp':datetime.now().isoformat(),
-            **kw
-        })
+        self.messages.append(
+            {"role": role, "content": content, "timestamp": datetime.now().isoformat(), **kw}
+        )
         self.updated_at = datetime.now()
-        
-    def get_history_message(self) ->list[dict[str,Any]]:
+
+    def get_history_message(self) -> list[dict[str, Any]]:
         """加载未压缩的message"""
-        load_loc = self.last_compacted_loc if self.auto_compact else 0 
+        load_loc = self.last_compacted_loc if self.auto_compact else 0
         return self.messages[load_loc:]
 
 
@@ -61,15 +62,17 @@ class SessionManager:
     """
     维护session的生命周期: 创建，加载，保存，删除
     """
-    ALLOW_SAVE_MESSAGE_TYPE = ['user','assistant','tool']
+
+    ALLOW_SAVE_MESSAGE_TYPE = ["user", "assistant", "tool"]
+
     def __init__(self):
-        self._cache : dict[str,Session] = {} # 存放已经加载过的内容 {id : session}
+        self._cache: dict[str, Session] = {}  # 存放已经加载过的内容 {id : session}
 
     @staticmethod
-    def get_session_path_by_id(session_id)->Path:
-        return  settings.session_path / f"{session_id}.jsonl" 
+    def get_session_path_by_id(session_id) -> Path:
+        return settings.session_path / f"{session_id}.jsonl"
 
-    def _load_session(self,session_id:str) -> Session :
+    def _load_session(self, session_id: str) -> Session:
         path = self.get_session_path_by_id(session_id)
         messages = []
         id = session_id
@@ -82,44 +85,53 @@ class SessionManager:
         if path.exists():
             with open(path, encoding="utf-8") as f:
                 for line in f:
-                    line  = line.strip()
-                    if not line :
+                    line = line.strip()
+                    if not line:
                         continue
-                    data:dict = json.loads(line)
+                    data: dict = json.loads(line)
                     if data.get("_type") == "metadata":
                         # metadata:dict = data.get("metadata",{})
-                        created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None
-                        updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
-                        last_compacted_loc = data.get('last_compacted_loc')
-                        last_processed_loc = data.get('last_processed_loc')
-                        name = data.get('name')
+                        created_at = (
+                            datetime.fromisoformat(data["created_at"])
+                            if data.get("created_at")
+                            else None
+                        )
+                        updated_at = (
+                            datetime.fromisoformat(data["updated_at"])
+                            if data.get("updated_at")
+                            else None
+                        )
+                        last_compacted_loc = data.get("last_compacted_loc")
+                        last_processed_loc = data.get("last_processed_loc")
+                        name = data.get("name")
                     else:
                         messages.append(data)
             return Session(
-                id = id,
-                name = name if name else 'default_name',
-                last_compacted_loc = last_compacted_loc if last_compacted_loc else 0,
-                last_processed_loc = last_processed_loc if last_processed_loc else 0,
+                id=id,
+                name=name if name else "default_name",
+                last_compacted_loc=last_compacted_loc if last_compacted_loc else 0,
+                last_processed_loc=last_processed_loc if last_processed_loc else 0,
                 # metadata=metadata,
-                messages = messages,
-                created_at = created_at,
-                updated_at = updated_at
+                messages=messages,
+                created_at=created_at,
+                updated_at=updated_at,
             )
         else:
             logger.error("在%s中，找不到%s.jsonl文件", path, session_id)
-            raise NotFoundError(f'在{path}中，找不到{session_id}.jsonl文件') # 需要在上层捕获这个错误
-            
+            raise NotFoundError(
+                f"在{path}中，找不到{session_id}.jsonl文件"
+            )  # 需要在上层捕获这个错误
 
-    def get_or_create_session(self,session_id :str | None = None) -> Session:
+    def get_or_create_session(self, session_id: str | None = None) -> Session:
         """
-            加载或创建一个新的session
-            args:
-                session_id : str | None 当没有传入session_id时自动创建一个新的session
-            return:
-                Session
+        加载或创建一个新的session
+        args:
+            session_id : str | None 当没有传入session_id时自动创建一个新的session
+        return:
+            Session
         """
 
-        if session_id and session_id in self._cache: 
+        if session_id and session_id in self._cache:
             # 已经缓存，直接返回
             return self._cache[session_id]
         elif session_id:
@@ -132,13 +144,11 @@ class SessionManager:
         # 缓存Session
         self._cache[session.id] = session
         return session
-                
 
-    def delete_session(self,session_id:str) :
+    def delete_session(self, session_id: str):
         path = self.get_session_path_by_id(session_id)
         if path.exists():
-            
-            os.remove(path) # 暂时不写错误处理
+            os.remove(path)  # 暂时不写错误处理
             if session_id in self._cache:
                 del self._cache[session_id]
 
@@ -153,51 +163,53 @@ class SessionManager:
         Returns:
             处理后的消息字典（深拷贝）
         """
-        if msg.get('role') != 'user':
+        if msg.get("role") != "user":
             return msg
 
-        content = msg.get('content')
+        content = msg.get("content")
         if not isinstance(content, list):
             return msg
 
         # 深拷贝消息，避免修改原始数据
         import copy
+
         msg_copy = copy.deepcopy(msg)
 
         # 过滤掉图片类型的 content block
         filtered_content = []
         for block in content:
             if isinstance(block, dict):
-                block_type = block.get('type', '')
+                block_type = block.get("type", "")
                 # 跳过图片类型的 block
-                if block_type not in ('image', 'image_url'):
+                if block_type not in ("image", "image_url"):
                     filtered_content.append(block)
             else:
                 filtered_content.append(block)
 
-        msg_copy['content'] = filtered_content
+        msg_copy["content"] = filtered_content
         return msg_copy
 
-    def save_session(self,session:Session):
+    def save_session(self, session: Session):
         if session:
             path = self.get_session_path_by_id(session.id)
             settings.session_path.mkdir(parents=True, exist_ok=True)
-            with open(path,'w', encoding='utf-8') as f:
+            with open(path, "w", encoding="utf-8") as f:
                 metadata_line = {
-                    "_type":"metadata",
-                    "name" : session.name,
-                    "created_at" : session.created_at.isoformat(),
-                    "updated_at" : session.updated_at.isoformat(),
-                    "last_compacted_loc" : session.last_compacted_loc,
-                    "last_processed_loc" : session.last_processed_loc,
-                    "message_len":len(session.messages)
+                    "_type": "metadata",
+                    "name": session.name,
+                    "created_at": session.created_at.isoformat(),
+                    "updated_at": session.updated_at.isoformat(),
+                    "last_compacted_loc": session.last_compacted_loc,
+                    "last_processed_loc": session.last_processed_loc,
+                    "message_len": len(session.messages),
                 }
                 f.write(json.dumps(metadata_line, ensure_ascii=False) + "\n")
                 for msg in session.messages:
-                    if msg.get('role','') in self.ALLOW_SAVE_MESSAGE_TYPE:
+                    if msg.get("role", "") in self.ALLOW_SAVE_MESSAGE_TYPE:
                         # 移除 user 消息中的图片内容
                         processed_msg = self._remove_image_content(msg)
                         f.write(json.dumps(processed_msg, ensure_ascii=False) + "\n")
+
     @staticmethod
     def get_session_metadata(session_id: str) -> dict | None:
         """
@@ -246,14 +258,16 @@ class SessionManager:
             return False
 
     @staticmethod
-    def show_session_list(path:Path= settings.session_path)-> list[str]:
+    def show_session_list(path: Path = settings.session_path) -> list[str]:
         """搜索存储地址内的jsonl, 返回session_id list（不带.jsonl后缀）"""
         if not path.exists():
             return []
-        return [f.stem for f in path.glob('*.jsonl')]
+        return [f.stem for f in path.glob("*.jsonl")]
 
     @staticmethod
-    def show_session_content_list(date_filter: str | None = None, path: Path = settings.session_path) -> list[dict]:
+    def show_session_content_list(
+        date_filter: str | None = None, path: Path = settings.session_path
+    ) -> list[dict]:
         """
         返回 session 列表及其最新 user 消息预览
 
@@ -268,63 +282,62 @@ class SessionManager:
             return []
 
         result = []
-        for file in path.glob('*.jsonl'):
+        for file in path.glob("*.jsonl"):
             session_id = file.stem
             last_user_msg = None
             updated_at = None
 
             try:
-                with open(file, encoding='utf-8') as f:
+                with open(file, encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
                         if not line:
                             continue
                         data = json.loads(line)
-                        if data.get('_type') == 'metadata':
-                            updated_at = data.get('updated_at', '')
-                        elif data.get('role') == 'user':
-                            last_user_msg = data.get('content', '')
+                        if data.get("_type") == "metadata":
+                            updated_at = data.get("updated_at", "")
+                        elif data.get("role") == "user":
+                            last_user_msg = data.get("content", "")
             except Exception as e:
                 logger.warning("读取 session %s 失败: %s", session_id, e)
                 continue
 
             # 日期筛选
-            if date_filter and updated_at:
-                if not updated_at.startswith(date_filter):
-                    continue
+            if date_filter and updated_at and not updated_at.startswith(date_filter):
+                continue
 
             # 提取前20个字符
-            msg_preview = ''
+            msg_preview = ""
             if last_user_msg:
                 if isinstance(last_user_msg, str):
                     msg_preview = last_user_msg[:20]
                 elif isinstance(last_user_msg, list):
                     msg_preview = str(last_user_msg)[:20]
 
-            result.append({
-                'session_id': session_id,
-                'session_current_msg': msg_preview
-            })
+            result.append({"session_id": session_id, "session_current_msg": msg_preview})
 
         return result
 
-session_manager:SessionManager  = LazySingleton(SessionManager)
+
+session_manager: SessionManager = LazySingleton(SessionManager)
 
 
 class ChatHistoryManager:
     """管理chat_history.json, 不作为单例，每次直接创建"""
+
     MAX_ITEMS = 1000
-    def __init__(self,path:Path|None = None):
+
+    def __init__(self, path: Path | None = None):
         if path:
             self.path = path
         else:
             self.path = settings.lifeprism_data_path / "user/daily_data/chat_history.json"
         self.path.parent.parent.mkdir(parents=True, exist_ok=True)
-        self.histories :list[dict]= [] # timestamp,content,is_processed
+        self.histories: list[dict] = []  # timestamp,content,is_processed
         self.last_processed_time = datetime.now()
         self.load_histories()
 
-    def load_histories(self)->list[dict]:
+    def load_histories(self) -> list[dict]:
         """加载jsonl文件和meta_date
 
         兼容两种格式：
@@ -332,9 +345,9 @@ class ChatHistoryManager:
         - 旧格式（bug）：第二行为整个 JSON 数组 [{...}, {...}]
         """
         if self.path.exists():
-            with self.path.open('r',encoding='utf-8') as f:
+            with self.path.open("r", encoding="utf-8") as f:
                 for line in f:
-                    line  = line.strip()
+                    line = line.strip()
                     if not line:
                         continue
                     data = json.loads(line)
@@ -344,23 +357,30 @@ class ChatHistoryManager:
                             if isinstance(entry, dict):
                                 self.histories.append(entry)
                         continue
-                    if data.get("_type",None):
-                        self.last_processed_time = datetime.fromisoformat(data.get("last_processed_time",None)) if data.get("last_processed_time",None) else datetime.now()
+                    if data.get("_type", None):
+                        self.last_processed_time = (
+                            datetime.fromisoformat(data.get("last_processed_time", None))
+                            if data.get("last_processed_time", None)
+                            else datetime.now()
+                        )
                     else:
                         self.histories.append(data)
         if self.histories:
             # 只保存前1000条数据
-            self.histories = self.histories[-self.MAX_ITEMS:]
+            self.histories = self.histories[-self.MAX_ITEMS :]
         return self.histories
-    
-    def get_histories_to_dream(self)->list[dict]|None:
+
+    def get_histories_to_dream(self) -> list[dict] | None:
         """获取所有未被处理的聊天历史总结"""
         result = []
         for history in self.histories:
-            if history.get("timestamp",None):
-                if datetime.fromisoformat(history["timestamp"]) > self.last_processed_time:
-                    result.append(history)
+            if (
+                history.get("timestamp", None)
+                and datetime.fromisoformat(history["timestamp"]) > self.last_processed_time
+            ):
+                result.append(history)
         return result
+
     def add_content(self, content: str, session_id: str | None = None) -> None:
         """添加聊天历史记录
 
@@ -377,10 +397,7 @@ class ChatHistoryManager:
         self.path.parent.parent.mkdir(parents=True, exist_ok=True)
 
         # 构建历史记录项
-        history_item = {
-            "timestamp": datetime.now().isoformat(),
-            "content": content
-        }
+        history_item = {"timestamp": datetime.now().isoformat(), "content": content}
 
         # 只有当 session_id 不为 None 时才添加该字段
         if session_id is not None:
@@ -390,9 +407,8 @@ class ChatHistoryManager:
             logger.debug("添加聊天历史: 未关联session")
 
         self.histories.append(history_item)
-        
 
-    def save_history(self,last_processed_time:datetime|None = None):
+    def save_history(self, last_processed_time: datetime | None = None):
         """
         在添加完内容或处理完history之后需要调用这个函数
         args:
@@ -401,17 +417,15 @@ class ChatHistoryManager:
         """
         if last_processed_time:
             self.last_processed_time = last_processed_time
-        with self.path.open("w",encoding="utf-8") as f:
+        with self.path.open("w", encoding="utf-8") as f:
             metadata_line = {
-                    "_type":"metadata",
-                    "last_processed_time":self.last_processed_time.isoformat()
-                }
-            f.write(json.dumps(metadata_line, ensure_ascii=False)+"\n")
+                "_type": "metadata",
+                "last_processed_time": self.last_processed_time.isoformat(),
+            }
+            f.write(json.dumps(metadata_line, ensure_ascii=False) + "\n")
             if self.histories:
                 for entry in self.histories:
-                    f.write(json.dumps(entry, ensure_ascii=False)+"\n")
-
-    
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":
@@ -423,10 +437,10 @@ if __name__ == "__main__":
     assert isinstance(session.id, str)
 
     # 2. 添加消息
-    session.add_message(role='user', content='你好')
-    session.add_message(role='assistant', content='你好，我是你的专属助手')
+    session.add_message(role="user", content="你好")
+    session.add_message(role="assistant", content="你好，我是你的专属助手")
     assert len(session.messages) == 2
-    assert session.messages[0]['role'] == 'user'
+    assert session.messages[0]["role"] == "user"
     print(f"[消息] 共 {len(session.messages)} 条")
 
     # 3. 保存 session
@@ -439,7 +453,7 @@ if __name__ == "__main__":
     assert loaded.id == session.id
     assert loaded.name == session.name
     assert len(loaded.messages) == 2
-    assert loaded.messages[1]['content'] == '你好，我是你的专属助手'
+    assert loaded.messages[1]["content"] == "你好，我是你的专属助手"
     print(f"[加载] id={loaded.id}, 消息数={len(loaded.messages)}")
 
     # 5. show_session_list

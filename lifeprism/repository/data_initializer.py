@@ -2,6 +2,7 @@
 数据库初始数据初始化模块
 在新安装环境中，当数据库表为空时，添加默认的分类、示例目标和示例计划书
 """
+
 import logging
 from pathlib import Path
 
@@ -10,97 +11,168 @@ logger = logging.getLogger(__name__)
 
 # 默认分类配置
 DEFAULT_CATEGORIES = [
-    {'id': 'cat-work', 'name': '工作', 'color': '#5B8FF9'},
-    {'id': 'cat-study', 'name': '学习', 'color': '#5AD8A6'},
-    {'id': 'cat-entertainment', 'name': '娱乐', 'color': '#F6BD16'},
-    {'id': 'cat-other', 'name': '其他', 'color': '#E8684A'},
+    {"id": "cat-work", "name": "工作", "color": "#5B8FF9"},
+    {"id": "cat-study", "name": "学习", "color": "#5AD8A6"},
+    {"id": "cat-entertainment", "name": "娱乐", "color": "#F6BD16"},
+    {"id": "cat-other", "name": "其他", "color": "#E8684A"},
 ]
 
 # 每个主分类的默认子分类
 DEFAULT_SUB_CATEGORIES = [
-    {'id': 'subcat-work-other', 'category_id': 'cat-work', 'name': '其他'},
-    {'id': 'subcat-study-other', 'category_id': 'cat-study', 'name': '其他'},
-    {'id': 'subcat-entertainment-other', 'category_id': 'cat-entertainment', 'name': '其他'},
-    {'id': 'subcat-other-other', 'category_id': 'cat-other', 'name': '其他'},
+    {"id": "subcat-work-other", "category_id": "cat-work", "name": "其他"},
+    {"id": "subcat-study-other", "category_id": "cat-study", "name": "其他"},
+    {"id": "subcat-entertainment-other", "category_id": "cat-entertainment", "name": "其他"},
+    {"id": "subcat-other-other", "category_id": "cat-other", "name": "其他"},
 ]
 
 # 示例目标 ID（固定，用于关联 plan_doc）
-EXAMPLE_GOAL_ID = 'goal-example'
+EXAMPLE_GOAL_ID = "goal-example"
 
 # 示例目标配置
 EXAMPLE_GOAL = {
-    'id': EXAMPLE_GOAL_ID,
-    'name': '示例',
-    'content': '''这是一个例子：
+    "id": EXAMPLE_GOAL_ID,
+    "name": "示例",
+    "content": """这是一个例子：
 
 1. 目标界面中可编辑，卡片颜色，目标分类，开始和结束时间等基础属性。
 2. 编写目标的价值和承诺，解释为什么需要做这个目标，这很重要！
 3. 在配置中可选择自动跟踪，当为目标设置了分类类别和自动跟踪时，会依据电脑使用数据自动跟踪目标投入时间
 4. 为你的目标添加里程碑吧！查看当前目标进度
-5. 可在最下方为你的目标添加log，记录目标过程！''',
-    'color': '#5B8FF9',
-    'status': 'active',
-    'track_time_automatically': 0,  # 示例目标不开启自动追踪
-    'milestones': '[]',
-    'time_unit': 'HRS',
-    'time_invested': 0,
-    'order_index': 0,
+5. 可在最下方为你的目标添加log，记录目标过程！""",
+    "color": "#5B8FF9",
+    "status": "active",
+    "track_time_automatically": 0,  # 示例目标不开启自动追踪
+    "milestones": "[]",
+    "time_unit": "HRS",
+    "time_invested": 0,
+    "order_index": 0,
 }
 
 # 示例计划书配置
 EXAMPLE_PLAN_DOC = {
-    'id': '示例-planDoc',
-    'goal_id': EXAMPLE_GOAL_ID,
-    'content': '示例计划书',
-    'status': 'active',
-    'order_index': 0,
+    "id": "示例-planDoc",
+    "goal_id": EXAMPLE_GOAL_ID,
+    "content": "示例计划书",
+    "status": "active",
+    "order_index": 0,
 }
 
 # 示例计划书 MD 文件名
 EXAMPLE_PLAN_DOC_MD_FILENAME = "示例-planDoc.md"
 
 # 每日目标 ID（固定，用于关联 plan_doc）
-DAILY_GOAL_ID = 'goal-daily'
+DAILY_GOAL_ID = "goal-daily"
 
 # 每日目标配置
 DAILY_GOAL = {
-    'id': DAILY_GOAL_ID,
-    'name': '每日目标',
-    'content': '记录每日的目标和计划',
-    'color': '#5AD8A6',
-    'status': 'active',
-    'track_time_automatically': 0,
-    'milestones': '[]',
-    'time_unit': 'HRS',
-    'time_invested': 0,
-    'order_index': 1,
+    "id": DAILY_GOAL_ID,
+    "name": "每日目标",
+    "content": "记录每日的目标和计划",
+    "color": "#5AD8A6",
+    "status": "active",
+    "track_time_automatically": 0,
+    "milestones": "[]",
+    "time_unit": "HRS",
+    "time_invested": 0,
+    "order_index": 1,
 }
 
 # 每日目标计划书配置
 DAILY_PLAN_DOC = {
-    'id': '每日目标-docs',
-    'goal_id': DAILY_GOAL_ID,
-    'content': '每日目标计划书',
-    'status': 'active',
-    'order_index': 1,
+    "id": "每日目标-docs",
+    "goal_id": DAILY_GOAL_ID,
+    "content": "每日目标计划书",
+    "status": "active",
+    "order_index": 1,
 }
 
 # 默认心情类型（sort_order 从 7 递减到 1，越大越靠前）
 DEFAULT_MOOD_TYPES = [
-    {'id': 'joy',        'name': '喜悦', 'icon': 'Sun',         'color': '#fed7aa', 'score': 90, 'is_dark': 0, 'sort_order': 7},
-    {'id': 'calm',       'name': '宁静', 'icon': 'Wind',        'color': '#d1fae5', 'score': 70, 'is_dark': 0, 'sort_order': 6},
-    {'id': 'pensive',    'name': '沉思', 'icon': 'Cloud',       'color': '#cbd5e1', 'score': 50, 'is_dark': 0, 'sort_order': 5},
-    {'id': 'anger',      'name': '愤怒', 'icon': 'Flame',       'color': '#fb7185', 'score': 40, 'is_dark': 1, 'sort_order': 4},
-    {'id': 'guilt',      'name': '内疚', 'icon': 'ShieldAlert',  'color': '#8589c9', 'score': 35, 'is_dark': 1, 'sort_order': 3},
-    {'id': 'melancholy', 'name': '忧郁', 'icon': 'Moon',        'color': '#a5b4fc', 'score': 30, 'is_dark': 0, 'sort_order': 2},
-    {'id': 'sorrow',     'name': '悲伤', 'icon': 'Heart',       'color': '#52525b', 'score': 10, 'is_dark': 1, 'sort_order': 1},
+    {
+        "id": "joy",
+        "name": "喜悦",
+        "icon": "Sun",
+        "color": "#fed7aa",
+        "score": 90,
+        "is_dark": 0,
+        "sort_order": 7,
+    },
+    {
+        "id": "calm",
+        "name": "宁静",
+        "icon": "Wind",
+        "color": "#d1fae5",
+        "score": 70,
+        "is_dark": 0,
+        "sort_order": 6,
+    },
+    {
+        "id": "pensive",
+        "name": "沉思",
+        "icon": "Cloud",
+        "color": "#cbd5e1",
+        "score": 50,
+        "is_dark": 0,
+        "sort_order": 5,
+    },
+    {
+        "id": "anger",
+        "name": "愤怒",
+        "icon": "Flame",
+        "color": "#fb7185",
+        "score": 40,
+        "is_dark": 1,
+        "sort_order": 4,
+    },
+    {
+        "id": "guilt",
+        "name": "内疚",
+        "icon": "ShieldAlert",
+        "color": "#8589c9",
+        "score": 35,
+        "is_dark": 1,
+        "sort_order": 3,
+    },
+    {
+        "id": "melancholy",
+        "name": "忧郁",
+        "icon": "Moon",
+        "color": "#a5b4fc",
+        "score": 30,
+        "is_dark": 0,
+        "sort_order": 2,
+    },
+    {
+        "id": "sorrow",
+        "name": "悲伤",
+        "icon": "Heart",
+        "color": "#52525b",
+        "score": 10,
+        "is_dark": 1,
+        "sort_order": 1,
+    },
 ]
 
 # 默认影响因素
 DEFAULT_MOOD_IMPACTS = [
-    '健康', '健身', '自我照顾', '爱好', '身份', '心灵',
-    '社群', '家人', '朋友', '伴侣', '约会', '家务',
-    '工作', '教育', '旅行', '天气', '时事', '金钱',
+    "健康",
+    "健身",
+    "自我照顾",
+    "爱好",
+    "身份",
+    "心灵",
+    "社群",
+    "家人",
+    "朋友",
+    "伴侣",
+    "约会",
+    "家务",
+    "工作",
+    "教育",
+    "旅行",
+    "天气",
+    "时事",
+    "金钱",
 ]
 
 
@@ -120,6 +192,7 @@ class DataInitializer:
         """
         if db_manager is None:
             from lifeprism.repository import lw_db_manager
+
             self.db = lw_db_manager
         else:
             self.db = db_manager
@@ -169,7 +242,7 @@ class DataInitializer:
 
         只有当 category 表为空时才添加默认分类
         """
-        if not self._is_table_empty('category'):
+        if not self._is_table_empty("category"):
             logger.debug("category 表已有数据，跳过默认分类初始化")
             return
 
@@ -178,10 +251,13 @@ class DataInitializer:
                 cursor = conn.cursor()
 
                 for cat in DEFAULT_CATEGORIES:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO category (id, name, color, state)
                         VALUES (?, ?, ?, 1)
-                    """, (cat['id'], cat['name'], cat['color']))
+                    """,
+                        (cat["id"], cat["name"], cat["color"]),
+                    )
 
                 logger.info("成功初始化 %s 个默认分类", len(DEFAULT_CATEGORIES))
 
@@ -195,7 +271,7 @@ class DataInitializer:
 
         只有当 sub_category 表为空时才添加默认子分类
         """
-        if not self._is_table_empty('sub_category'):
+        if not self._is_table_empty("sub_category"):
             logger.debug("sub_category 表已有数据，跳过默认子分类初始化")
             return
 
@@ -204,10 +280,13 @@ class DataInitializer:
                 cursor = conn.cursor()
 
                 for sub in DEFAULT_SUB_CATEGORIES:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO sub_category (id, category_id, name, state)
                         VALUES (?, ?, ?, 1)
-                    """, (sub['id'], sub['category_id'], sub['name']))
+                    """,
+                        (sub["id"], sub["category_id"], sub["name"]),
+                    )
 
                 logger.info("成功初始化 %s 个默认子分类", len(DEFAULT_SUB_CATEGORIES))
 
@@ -221,7 +300,7 @@ class DataInitializer:
 
         只有当 goal 表为空时才添加示例目标
         """
-        if not self._is_table_empty('goal'):
+        if not self._is_table_empty("goal"):
             logger.debug("goal 表已有数据，跳过示例目标初始化")
             return
 
@@ -229,27 +308,30 @@ class DataInitializer:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO goal (
                         id, name, content, color, status,
                         track_time_automatically, milestones,
                         time_unit, time_invested, order_index
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    EXAMPLE_GOAL['id'],
-                    EXAMPLE_GOAL['name'],
-                    EXAMPLE_GOAL['content'],
-                    EXAMPLE_GOAL['color'],
-                    EXAMPLE_GOAL['status'],
-                    EXAMPLE_GOAL['track_time_automatically'],
-                    EXAMPLE_GOAL['milestones'],
-                    EXAMPLE_GOAL['time_unit'],
-                    EXAMPLE_GOAL['time_invested'],
-                    EXAMPLE_GOAL['order_index'],
-                ))
+                """,
+                    (
+                        EXAMPLE_GOAL["id"],
+                        EXAMPLE_GOAL["name"],
+                        EXAMPLE_GOAL["content"],
+                        EXAMPLE_GOAL["color"],
+                        EXAMPLE_GOAL["status"],
+                        EXAMPLE_GOAL["track_time_automatically"],
+                        EXAMPLE_GOAL["milestones"],
+                        EXAMPLE_GOAL["time_unit"],
+                        EXAMPLE_GOAL["time_invested"],
+                        EXAMPLE_GOAL["order_index"],
+                    ),
+                )
 
-                logger.info("成功初始化示例目标，ID: %s", EXAMPLE_GOAL['id'])
+                logger.info("成功初始化示例目标，ID: %s", EXAMPLE_GOAL["id"])
 
         except Exception as e:
             logger.error("初始化示例目标失败: error=%s", e)
@@ -261,7 +343,7 @@ class DataInitializer:
 
         只有当 plan_doc 表为空时才添加示例计划书，并生成对应的 MD 文件
         """
-        if not self._is_table_empty('plan_doc'):
+        if not self._is_table_empty("plan_doc"):
             logger.debug("plan_doc 表已有数据，跳过示例计划书初始化")
             return
 
@@ -269,20 +351,23 @@ class DataInitializer:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO plan_doc (
                         id, goal_id, content, status, order_index
                     )
                     VALUES (?, ?, ?, ?, ?)
-                """, (
-                    EXAMPLE_PLAN_DOC['id'],
-                    EXAMPLE_PLAN_DOC['goal_id'],
-                    EXAMPLE_PLAN_DOC['content'],
-                    EXAMPLE_PLAN_DOC['status'],
-                    EXAMPLE_PLAN_DOC['order_index'],
-                ))
+                """,
+                    (
+                        EXAMPLE_PLAN_DOC["id"],
+                        EXAMPLE_PLAN_DOC["goal_id"],
+                        EXAMPLE_PLAN_DOC["content"],
+                        EXAMPLE_PLAN_DOC["status"],
+                        EXAMPLE_PLAN_DOC["order_index"],
+                    ),
+                )
 
-                logger.info("成功初始化示例计划书，ID: %s", EXAMPLE_PLAN_DOC['id'])
+                logger.info("成功初始化示例计划书，ID: %s", EXAMPLE_PLAN_DOC["id"])
 
             # 生成示例 MD 文件
             # self._generate_example_plan_doc_md()
@@ -300,6 +385,7 @@ class DataInitializer:
         """
         try:
             from lifeprism.config.settings_manager import settings
+
             plan_dir = settings.lifeprism_data_path / "plan"
             plan_dir.mkdir(parents=True, exist_ok=True)
             md_path = plan_dir / EXAMPLE_PLAN_DOC_MD_FILENAME
@@ -309,7 +395,8 @@ class DataInitializer:
                 return
 
             import sys
-            if not getattr(sys, 'frozen', False):
+
+            if not getattr(sys, "frozen", False):
                 # 开发环境：source == target，无法复制，仅记录
                 logger.debug("开发环境，示例计划书不存在: %s", md_path)
                 return
@@ -317,8 +404,8 @@ class DataInitializer:
             # 打包环境：从 exe 内嵌资源读取（兜底，正常由 resource_initializer 处理）
             source = Path(sys._MEIPASS) / "templates" / "plan" / EXAMPLE_PLAN_DOC_MD_FILENAME
             if source.exists():
-                content = source.read_text(encoding='utf-8')
-                md_path.write_text(content, encoding='utf-8')
+                content = source.read_text(encoding="utf-8")
+                md_path.write_text(content, encoding="utf-8")
                 logger.info("生成示例计划书 MD 文件: %s", md_path)
             else:
                 logger.warning("示例计划书源文件不存在: %s", source)
@@ -331,7 +418,7 @@ class DataInitializer:
 
         只有当 mood_types 表为空时才添加默认数据
         """
-        if not self._is_table_empty('mood_types'):
+        if not self._is_table_empty("mood_types"):
             logger.debug("mood_types 表已有数据，跳过默认心情类型初始化")
             return
 
@@ -339,11 +426,21 @@ class DataInitializer:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 for mt in DEFAULT_MOOD_TYPES:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO mood_types (id, name, icon, color, score, is_dark, sort_order)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (mt['id'], mt['name'], mt['icon'], mt['color'],
-                          mt['score'], mt['is_dark'], mt['sort_order']))
+                    """,
+                        (
+                            mt["id"],
+                            mt["name"],
+                            mt["icon"],
+                            mt["color"],
+                            mt["score"],
+                            mt["is_dark"],
+                            mt["sort_order"],
+                        ),
+                    )
                 logger.info("成功初始化 %s 个默认心情类型", len(DEFAULT_MOOD_TYPES))
         except Exception as e:
             logger.error("初始化默认心情类型失败: error=%s", e)
@@ -355,7 +452,7 @@ class DataInitializer:
 
         只有当 mood_impacts 表为空时才添加默认数据
         """
-        if not self._is_table_empty('mood_impacts'):
+        if not self._is_table_empty("mood_impacts"):
             logger.debug("mood_impacts 表已有数据，跳过默认影响因素初始化")
             return
 
@@ -364,10 +461,13 @@ class DataInitializer:
                 cursor = conn.cursor()
                 total = len(DEFAULT_MOOD_IMPACTS)
                 for idx, name in enumerate(DEFAULT_MOOD_IMPACTS):
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO mood_impacts (name, sort_order)
                         VALUES (?, ?)
-                    """, (name, total - idx))
+                    """,
+                        (name, total - idx),
+                    )
                 logger.info("成功初始化 %s 个默认影响因素", total)
         except Exception as e:
             logger.error("初始化默认影响因素失败: error=%s", e)
@@ -395,38 +495,40 @@ class DataInitializer:
                 # 查询同名或同id的记录
                 cursor.execute(
                     "SELECT id, name FROM goal WHERE id = ? OR name = ?",
-                    (DAILY_GOAL_ID, DAILY_GOAL['name'])
+                    (DAILY_GOAL_ID, DAILY_GOAL["name"]),
                 )
                 conflicts = cursor.fetchall()
 
                 # 情况1：无冲突，直接创建
                 if not conflicts:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO goal (
                             id, name, content, color, status,
                             track_time_automatically, milestones,
                             time_unit, time_invested, order_index
                         )
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        DAILY_GOAL['id'],
-                        DAILY_GOAL['name'],
-                        DAILY_GOAL['content'],
-                        DAILY_GOAL['color'],
-                        DAILY_GOAL['status'],
-                        DAILY_GOAL['track_time_automatically'],
-                        DAILY_GOAL['milestones'],
-                        DAILY_GOAL['time_unit'],
-                        DAILY_GOAL['time_invested'],
-                        DAILY_GOAL['order_index'],
-                    ))
+                    """,
+                        (
+                            DAILY_GOAL["id"],
+                            DAILY_GOAL["name"],
+                            DAILY_GOAL["content"],
+                            DAILY_GOAL["color"],
+                            DAILY_GOAL["status"],
+                            DAILY_GOAL["track_time_automatically"],
+                            DAILY_GOAL["milestones"],
+                            DAILY_GOAL["time_unit"],
+                            DAILY_GOAL["time_invested"],
+                            DAILY_GOAL["order_index"],
+                        ),
+                    )
                     logger.info("成功初始化每日目标，ID: %s", DAILY_GOAL_ID)
 
                 # 情况6：极端情况（多条冲突记录），跳过
                 elif len(conflicts) > 1:
                     logger.warning(
-                        "检测到多条冲突记录，跳过每日目标初始化。冲突记录：%s",
-                        conflicts
+                        "检测到多条冲突记录，跳过每日目标初始化。冲突记录：%s", conflicts
                     )
 
                 # 单条冲突记录，进一步判断
@@ -434,47 +536,52 @@ class DataInitializer:
                     existing_id, existing_name = conflicts[0]
 
                     # 情况2：同名且同id，跳过
-                    if existing_id == DAILY_GOAL_ID and existing_name == DAILY_GOAL['name']:
+                    if existing_id == DAILY_GOAL_ID and existing_name == DAILY_GOAL["name"]:
                         logger.debug("每日目标已存在，跳过初始化，ID: %s", DAILY_GOAL_ID)
 
                     # 情况3：id相同但名不同，跳过
-                    elif existing_id == DAILY_GOAL_ID and existing_name != DAILY_GOAL['name']:
+                    elif existing_id == DAILY_GOAL_ID and existing_name != DAILY_GOAL["name"]:
                         logger.debug(
-                            "检测到固定id目标名称已被修改（'%s'），跳过初始化",
-                            existing_name
+                            "检测到固定id目标名称已被修改（'%s'），跳过初始化", existing_name
                         )
 
                     # 情况4：同名但不同id，修改id
-                    elif existing_id != DAILY_GOAL_ID and existing_name == DAILY_GOAL['name']:
+                    elif existing_id != DAILY_GOAL_ID and existing_name == DAILY_GOAL["name"]:
                         cursor.execute(
-                            "UPDATE goal SET id = ? WHERE id = ?",
-                            (DAILY_GOAL_ID, existing_id)
+                            "UPDATE goal SET id = ? WHERE id = ?", (DAILY_GOAL_ID, existing_id)
                         )
                         logger.info(
                             "检测到同名目标 '%s'（id=%s），已更新为固定id '%s'",
-                            existing_name, existing_id, DAILY_GOAL_ID
+                            existing_name,
+                            existing_id,
+                            DAILY_GOAL_ID,
                         )
 
                 # 检查每日目标计划书是否存在
-                cursor.execute("SELECT COUNT(*) FROM plan_doc WHERE id = ?", (DAILY_PLAN_DOC['id'],))
+                cursor.execute(
+                    "SELECT COUNT(*) FROM plan_doc WHERE id = ?", (DAILY_PLAN_DOC["id"],)
+                )
                 plan_doc_exists = cursor.fetchone()[0] > 0
 
                 if not plan_doc_exists:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO plan_doc (
                             id, goal_id, content, status, order_index
                         )
                         VALUES (?, ?, ?, ?, ?)
-                    """, (
-                        DAILY_PLAN_DOC['id'],
-                        DAILY_PLAN_DOC['goal_id'],
-                        DAILY_PLAN_DOC['content'],
-                        DAILY_PLAN_DOC['status'],
-                        DAILY_PLAN_DOC['order_index'],
-                    ))
-                    logger.info("成功初始化每日目标计划书，ID: %s", DAILY_PLAN_DOC['id'])
+                    """,
+                        (
+                            DAILY_PLAN_DOC["id"],
+                            DAILY_PLAN_DOC["goal_id"],
+                            DAILY_PLAN_DOC["content"],
+                            DAILY_PLAN_DOC["status"],
+                            DAILY_PLAN_DOC["order_index"],
+                        ),
+                    )
+                    logger.info("成功初始化每日目标计划书，ID: %s", DAILY_PLAN_DOC["id"])
                 else:
-                    logger.debug("每日目标计划书已存在，跳过初始化，ID: %s", DAILY_PLAN_DOC['id'])
+                    logger.debug("每日目标计划书已存在，跳过初始化，ID: %s", DAILY_PLAN_DOC["id"])
 
         except Exception as e:
             logger.error("初始化每日目标失败: error=%s", e)

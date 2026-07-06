@@ -2,6 +2,7 @@
 LLM 使用统计数据提供者
 继承 LWBaseDataProvider，专门负责 token 使用量的记录与查询
 """
+
 import logging
 from typing import Any
 
@@ -22,7 +23,7 @@ class LLMUsageDataProvider(LWBaseDataProvider):
         """
         super().__init__(db_manager)
 
-    def save_usage(self, session_id: str, usage: dict[str, Any], mode: str = 'chatbot') -> int:
+    def save_usage(self, session_id: str, usage: dict[str, Any], mode: str = "chatbot") -> int:
         """
         保存或更新单个会话的 token 使用情况
 
@@ -39,10 +40,10 @@ class LLMUsageDataProvider(LWBaseDataProvider):
 
         # 适配 LWBaseDataProvider.upsert_session_tokens_usage 的参数要求
         usage_data = {
-            'input_tokens': usage.get('prompt_tokens', 0),
-            'output_tokens': usage.get('completion_tokens', 0),
-            'total_tokens': usage.get('total_tokens', 0),
-            'mode': mode
+            "input_tokens": usage.get("prompt_tokens", 0),
+            "output_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+            "mode": mode,
         }
 
         try:

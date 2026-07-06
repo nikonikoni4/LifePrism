@@ -6,13 +6,13 @@ from fastapi import APIRouter, HTTPException
 
 from lifeprism.server.schemas.add_on_schemas import (
     CreateExpandDirRequest,
-    UpdateExpandDirRequest,
     ExpandDirItem,
     ExpandDirListResponse,
+    UpdateExpandDirRequest,
 )
 from lifeprism.server.services import add_on_service
-from lifeprism.utils.exceptions import LWBaseError
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import LWBaseError
 
 logger = get_logger(__name__)
 
@@ -30,13 +30,15 @@ async def get_expand_dirs():
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("获取扩展文件夹列表失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
-@router.post("/expand_dir", response_model=ExpandDirItem, status_code=201, summary="创建新的扩展数据文件夹")
+@router.post(
+    "/expand_dir", response_model=ExpandDirItem, status_code=201, summary="创建新的扩展数据文件夹"
+)
 async def create_expand_dir(data: CreateExpandDirRequest):
     """创建新的扩展数据文件夹"""
     try:
@@ -47,10 +49,10 @@ async def create_expand_dir(data: CreateExpandDirRequest):
         raise
     except ValueError as e:
         logger.warning("创建扩展文件夹失败（业务逻辑错误）: error=%s", e)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("创建扩展文件夹失败（服务器错误）: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 @router.patch("/expand_dir/{id}", response_model=ExpandDirItem, summary="更新扩展数据文件夹配置")
@@ -67,13 +69,13 @@ async def update_expand_dir(id: str, data: UpdateExpandDirRequest):
         # 判断是否为资源不存在错误
         if "不存在" in error_msg:
             logger.warning("更新扩展文件夹失败（资源不存在）: id=%s, error=%s", id, e)
-            raise HTTPException(status_code=404, detail=error_msg)
+            raise HTTPException(status_code=404, detail=error_msg) from e
         else:
             logger.warning("更新扩展文件夹失败（业务逻辑错误）: id=%s, error=%s", id, e)
-            raise HTTPException(status_code=400, detail=error_msg)
+            raise HTTPException(status_code=400, detail=error_msg) from e
     except Exception as e:
         logger.error("更新扩展文件夹失败（服务器错误）: id=%s, error=%s", id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 @router.delete("/expand_dir/{id}", status_code=204, summary="删除扩展数据文件夹配置")
@@ -87,7 +89,7 @@ async def delete_expand_dir(id: str):
         raise
     except ValueError as e:
         logger.warning("删除扩展文件夹失败（资源不存在）: id=%s, error=%s", id, e)
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error("删除扩展文件夹失败（服务器错误）: id=%s, error=%s", id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e

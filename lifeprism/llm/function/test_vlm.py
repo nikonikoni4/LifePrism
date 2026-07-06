@@ -1,10 +1,10 @@
 import asyncio
 import base64
+import logging
 from pathlib import Path
 
-from lifeprism.llm.providers import create_llm_client
 from lifeprism.config.settings_manager import settings
-import logging
+from lifeprism.llm.providers import create_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -57,21 +57,18 @@ async def test_vlm() -> dict:
         image_data_url = _load_image_as_base64(image_path)
 
         # 构建多模态消息：文字提问 + 图片
-        messages = [{
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": "请描述这张图片的内容，用一句话即可。如果没有收到任何图片，请直接回复：未收到图片"
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": image_data_url
-                    }
-                }
-            ]
-        }]
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "请描述这张图片的内容，用一句话即可。如果没有收到任何图片，请直接回复：未收到图片",
+                    },
+                    {"type": "image_url", "image_url": {"url": image_data_url}},
+                ],
+            }
+        ]
 
         # 使用用户配置的 LLM 创建 client
         llm = create_llm_client()
@@ -80,40 +77,50 @@ async def test_vlm() -> dict:
         output = await llm.chat(messages=messages)
         print(output.usage)
         # 获取回复内容
-        response_content = output.content if hasattr(output, 'content') else str(output)
+        response_content = output.content if hasattr(output, "content") else str(output)
 
         # 严格成功判定：3个失败条件 + 1个成功条件，默认失败
 
         # 失败条件1: 包含错误信息
         if "error" in response_content.lower():
-            logger.error("VLM 测试失败: 模型返回错误 (provider=%s, model=%s): %s", settings.provider, settings.model, response_content[:200])
+            logger.error(
+                "VLM 测试失败: 模型返回错误 (provider=%s, model=%s): %s",
+                settings.provider,
+                settings.model,
+                response_content[:200],
+            )
             return {
                 "success": False,
-                "message": f"VLM 测试失败: 模型返回错误",
+                "message": "VLM 测试失败: 模型返回错误",
                 "model_response": response_content,
                 "provider": settings.provider,
                 "model": settings.model,
-                "image_path": image_path
+                "image_path": image_path,
             }
 
         # 失败条件2: 未收到图片
         if "未收到图片" in response_content:
-            logger.error("VLM 测试失败: 模型未收到图片 (provider=%s, model=%s)", settings.provider, settings.model)
+            logger.error(
+                "VLM 测试失败: 模型未收到图片 (provider=%s, model=%s)",
+                settings.provider,
+                settings.model,
+            )
             return {
                 "success": False,
                 "message": "VLM 测试失败: 模型未收到图片",
                 "model_response": response_content,
                 "provider": settings.provider,
                 "model": settings.model,
-                "image_path": image_path
+                "image_path": image_path,
             }
 
         # 成功条件: 识别出猫
         if "猫" in response_content or "cat" in response_content.lower():
             logger.info(
                 "VLM 测试成功 (provider=%s, model=%s): %s...",
-                settings.provider, settings.model,
-                response_content[:100] if response_content else 'None'
+                settings.provider,
+                settings.model,
+                response_content[:100] if response_content else "None",
             )
             return {
                 "success": True,
@@ -121,18 +128,23 @@ async def test_vlm() -> dict:
                 "model_response": response_content,
                 "provider": settings.provider,
                 "model": settings.model,
-                "image_path": image_path
+                "image_path": image_path,
             }
 
         # 失败条件3 (默认): 未识别出猫
-        logger.error("VLM 测试失败: 模型未识别出猫 (provider=%s, model=%s): %s...", settings.provider, settings.model, response_content[:100])
+        logger.error(
+            "VLM 测试失败: 模型未识别出猫 (provider=%s, model=%s): %s...",
+            settings.provider,
+            settings.model,
+            response_content[:100],
+        )
         return {
             "success": False,
             "message": "VLM 测试失败",
             "model_response": response_content,
             "provider": settings.provider,
             "model": settings.model,
-            "image_path": image_path
+            "image_path": image_path,
         }
 
     except FileNotFoundError as e:
@@ -144,14 +156,13 @@ async def test_vlm() -> dict:
             "model_response": None,
             "provider": settings.provider,
             "model": settings.model,
-            "image_path": image_path
+            "image_path": image_path,
         }
 
     except Exception as e:
         error_msg = str(e)
         logger.error(
-            "VLM 测试失败 (provider=%s, model=%s): %s",
-            settings.provider, settings.model, error_msg
+            "VLM 测试失败 (provider=%s, model=%s): %s", settings.provider, settings.model, error_msg
         )
 
         return {
@@ -160,7 +171,7 @@ async def test_vlm() -> dict:
             "model_response": None,
             "provider": settings.provider,
             "model": settings.model,
-            "image_path": image_path
+            "image_path": image_path,
         }
 
 

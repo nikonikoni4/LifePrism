@@ -1,37 +1,38 @@
 """
 爬虫配置模块
 """
+
 # 百度百科首页URL
-BAIDU_BAIKE_URL = 'https://baike.baidu.com/'
+BAIDU_BAIKE_URL = "https://baike.baidu.com/"
 
 # 百度百科首页搜索框选择器
-BAIDU_BAIKE_BOX_SELECTOR = 'searchInput'
+BAIDU_BAIKE_BOX_SELECTOR = "searchInput"
 
 # 有词条内容页面的词条描述文本选择器
-LEMMA_DESCRIPTION_SELECTOR = 'lemmaDescText_gU5Fz'
+LEMMA_DESCRIPTION_SELECTOR = "lemmaDescText_gU5Fz"
 
 # 无词条内容页面的第一个推荐词条容器选择器
-FIRST_RECOMMEND_CONTAINER_SELECTOR = 'listWrap_Yn22D'
+FIRST_RECOMMEND_CONTAINER_SELECTOR = "listWrap_Yn22D"
 
 # 无词条内容页面的推荐词条条目选择器
-RECOMMEND_ITEM_SELECTOR = 'container_OT5ZI'
+RECOMMEND_ITEM_SELECTOR = "container_OT5ZI"
 
 # 无词条内容页面的推荐词条标题链接选择器
-RECOMMEND_TITLE_LINK_SELECTOR = 'title_aWWAv'
+RECOMMEND_TITLE_LINK_SELECTOR = "title_aWWAv"
 
 # 百度搜素主页URL
-BAIDU_SEARCH_URL = 'https://www.baidu.com/'
+BAIDU_SEARCH_URL = "https://www.baidu.com/"
 # 百度搜索主页搜索框选择器
-BAIDU_SEARCH_BOX_SELECTOR = 'chat-input-container'
+BAIDU_SEARCH_BOX_SELECTOR = "chat-input-container"
 # 选择器重复次数
-SELECTOR_TIME_OUT= 2
+SELECTOR_TIME_OUT = 2
 
 # 百度搜索引擎的AI总结
 BAIDU_SEARCH_AI_CONCLUTION_SELECTOR = "marklang-paragraph"
 
 # 百度搜索引擎结果总结
 BAIDU_SEARCH_SUMMARY_SELECTOR = "summary-text_560AW"
-                                        
+
 # 百度搜索引擎结果标题选择器
 BAIDU_SEARCH_RESULT_TITLE_SELECTOR = "_no-spacing_10ku5_31"
 

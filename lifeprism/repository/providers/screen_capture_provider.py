@@ -3,12 +3,14 @@ Screen Capture Provider - 截屏记录数据访问层
 
 职责：提供 screen_captures 表的所有数据访问接口
 """
-from typing import Optional, List, Dict, Any, Tuple, Set
-from .common_query_options import QueryOptions
+
+from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
+
+from .common_query_options import QueryOptions
 
 logger = get_logger(__name__)
 
@@ -24,28 +26,45 @@ class ScreenCaptureProvider(LWBaseDataProvider):
     # ==================== 表元数据定义 ====================
 
     _TABLE_NAME = "screen_captures"
-    _PRIMARY_KEY = "id"                # ✅ screen_captures 表使用 id 作为主键
-    _DATE_FIELD = None                 # ❌ screen_captures 表没有 date 字段
-    _TIME_FIELD = "captured_at"        # ✅ screen_captures 表有 captured_at 时间字段
-    _ON_CONFLICT = "replace"           # 冲突时替换
+    _PRIMARY_KEY = "id"  # ✅ screen_captures 表使用 id 作为主键
+    _DATE_FIELD = None  # ❌ screen_captures 表没有 date 字段
+    _TIME_FIELD = "captured_at"  # ✅ screen_captures 表有 captured_at 时间字段
+    _ON_CONFLICT = "replace"  # 冲突时替换
 
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'captured_at', 'capture_reason', 'file_path',
-        'window_app', 'window_title', 'frequency_level',
-        'engaged_segment_id', 'is_afk', 'created_at'
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "captured_at",
+        "capture_reason",
+        "file_path",
+        "window_app",
+        "window_title",
+        "frequency_level",
+        "engaged_segment_id",
+        "is_afk",
+        "created_at",
     }
-    _ORDER_FIELDS: Set[str] = {
-        'id', 'captured_at', 'created_at', 'frequency_level'
+    _ORDER_FIELDS: set[str] = {"id", "captured_at", "created_at", "frequency_level"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "captured_at",
+        "capture_reason",
+        "file_path",
+        "window_app",
+        "window_title",
+        "frequency_level",
+        "engaged_segment_id",
+        "is_afk",
+        "created_at",
     }
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'captured_at', 'capture_reason', 'file_path',
-        'window_app', 'window_title', 'frequency_level',
-        'engaged_segment_id', 'is_afk', 'created_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'captured_at', 'capture_reason', 'file_path',
-        'window_app', 'window_title', 'frequency_level',
-        'engaged_segment_id', 'is_afk'
+    _UPDATE_FIELDS: set[str] = {
+        "captured_at",
+        "capture_reason",
+        "file_path",
+        "window_app",
+        "window_title",
+        "frequency_level",
+        "engaged_segment_id",
+        "is_afk",
     }
 
     def __init__(self, db_manager=None):
@@ -54,9 +73,8 @@ class ScreenCaptureProvider(LWBaseDataProvider):
     # ==================== 核心方法（使用通用方法） ====================
 
     def query_screen_captures(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口（使用基类方法）
 
@@ -85,7 +103,7 @@ class ScreenCaptureProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)  # ✅ 直接调用基类方法
 
-    def get_screen_capture_by_id(self, capture_id: str) -> Optional[Dict[str, Any]]:
+    def get_screen_capture_by_id(self, capture_id: str) -> dict[str, Any] | None:
         """
         按主键（id）获取单条截屏记录（使用基类方法）
 
@@ -95,11 +113,11 @@ class ScreenCaptureProvider(LWBaseDataProvider):
         Returns:
             截屏记录，不存在返回 None
         """
-        options = QueryOptions(filters={'id': capture_id})
+        options = QueryOptions(filters={"id": capture_id})
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_screen_capture(self, capture_id: str, data: Optional[Dict[str, Any]] = None) -> bool:
+    def create_screen_capture(self, capture_id: str, data: dict[str, Any] | None = None) -> bool:
         """
         创建截屏记录（使用基类方法）
 
@@ -114,7 +132,7 @@ class ScreenCaptureProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            insert_data = {'id': capture_id}
+            insert_data = {"id": capture_id}
             if data:
                 # 白名单验证
                 invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
@@ -129,7 +147,7 @@ class ScreenCaptureProvider(LWBaseDataProvider):
             logger.error("创建截屏记录 %s 失败: %s", capture_id, e)
             raise DataAccessError(f"创建截屏记录 {capture_id} 失败") from e
 
-    def update_screen_capture(self, capture_id: str, data: Dict[str, Any]) -> bool:
+    def update_screen_capture(self, capture_id: str, data: dict[str, Any]) -> bool:
         """
         更新截屏记录（使用基类方法）
 
@@ -185,8 +203,8 @@ class ScreenCaptureProvider(LWBaseDataProvider):
         self,
         start_time: str,
         end_time: str,
-        capture_reason: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        capture_reason: str | None = None,
+    ) -> list[dict[str, Any]]:
         """
         查询截图记录（便捷方法）
 
@@ -209,18 +227,18 @@ class ScreenCaptureProvider(LWBaseDataProvider):
             ... )
         """
         # 将 ISO 格式（带 T）转换为数据库格式（空格分隔）
-        start_time_db = start_time.replace('T', ' ') if 'T' in start_time else start_time
-        end_time_db = end_time.replace('T', ' ') if 'T' in end_time else end_time
+        start_time_db = start_time.replace("T", " ") if "T" in start_time else start_time
+        end_time_db = end_time.replace("T", " ") if "T" in end_time else end_time
 
         filters = {}
         if capture_reason is not None:
-            filters['capture_reason'] = capture_reason
+            filters["capture_reason"] = capture_reason
 
         options = QueryOptions(
             time_range=(start_time_db, end_time_db),
             filters=filters,
-            order_by='captured_at',
-            order_desc=False  # 升序排序
+            order_by="captured_at",
+            order_desc=False,  # 升序排序
         )
 
         results, _ = self.query_screen_captures(options)

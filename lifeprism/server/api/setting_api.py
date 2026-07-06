@@ -3,28 +3,28 @@ Settings API - 配置管理接口
 
 提供配置的读取和修改功能
 """
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
 
+from fastapi import APIRouter, HTTPException, Query
+
+from lifeprism.config.provider_manager import provider_manager
 from lifeprism.server.schemas.setting_schemas import (
-    SettingsResponse,
-    UpdateSettingsRequest,
-    UpdateApiKeyRequest,
-    UpdateApiKeyResponse,
-    ProviderListResponse,
-    ProviderInfo,
-    ValidatePathRequest,
-    ValidatePathResponse,
     MigrateDataPathRequest,
     MigrateDataPathResponse,
-    TestVlmResponse,
+    ProviderInfo,
+    ProviderListResponse,
     QRCodeResponse,
     QRCodeStatusResponse,
+    SettingsResponse,
+    TestVlmResponse,
+    UpdateApiKeyRequest,
+    UpdateApiKeyResponse,
+    UpdateSettingsRequest,
+    ValidatePathRequest,
+    ValidatePathResponse,
 )
 from lifeprism.server.services import setting_service
-from lifeprism.config.provider_manager import provider_manager
-from lifeprism.utils.exceptions import LWBaseError
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import LWBaseError
 
 logger = get_logger(__name__)
 
@@ -35,7 +35,7 @@ router = APIRouter(prefix="/settings", tags=["Settings - 配置管理"])
 async def get_settings():
     """
     获取当前配置
-    
+
     API Key 会以脱敏形式返回 (如: sk-ab...xy)
     """
     settings_data = setting_service.get_settings()
@@ -61,11 +61,7 @@ async def update_settings(request: UpdateSettingsRequest):
     except ValueError as e:
         # is_vlm 校验失败，需要前端先调用 test-vlm
         settings_data = setting_service.get_settings()
-        return SettingsResponse(
-            settings=settings_data,
-            message=str(e),
-            require_vlm_test=True
-        )
+        return SettingsResponse(settings=settings_data, message=str(e), require_vlm_test=True)
 
 
 @router.put("/api-key", response_model=UpdateApiKeyResponse)
@@ -88,23 +84,25 @@ async def update_api_key(request: UpdateApiKeyRequest):
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error("保存 API Key 失败: provider_id=%s, error=%s", request.provider_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        logger.error(
+            "保存 API Key 失败: provider_id=%s, error=%s", request.provider_id, e, exc_info=True
+        )
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 @router.get("/api-key/status")
 async def check_api_key_status():
     """
     检查 API Key 配置状态
-    
+
     返回 API Key 是否已配置，不返回实际的 Key 值。
     """
     is_configured = setting_service.validate_api_key()
     return {
         "configured": is_configured,
-        "message": "API Key 已配置" if is_configured else "API Key 未配置"
+        "message": "API Key 已配置" if is_configured else "API Key 未配置",
     }
 
 
@@ -130,10 +128,10 @@ async def test_llm_connection():
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("LLM 连接测试失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 @router.post("/test-vlm", response_model=TestVlmResponse, summary="测试 VLM 图像理解能力")
@@ -158,10 +156,10 @@ async def test_vlm_capability():
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("VLM 测试失败: error=%s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 @router.get("/providers", response_model=ProviderListResponse, summary="获取所有支持的服务商列表")
@@ -179,7 +177,7 @@ async def get_providers():
 @router.delete("/model-history", summary="删除模型历史记录")
 async def delete_model_history(
     provider_id: str = Query(..., description="服务商 ID，如 aliyun, volcengine 等"),
-    model: str = Query(..., description="要删除的模型名称/ID")
+    model: str = Query(..., description="要删除的模型名称/ID"),
 ):
     """
     从指定服务商的历史记录中删除模型
@@ -248,16 +246,16 @@ async def get_qrcode(channel: str = Query(..., description="通道类型，如 w
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error("获取 QR 码失败: channel=%s, error=%s", channel, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e
 
 
 @router.get("/qrcode/status", response_model=QRCodeStatusResponse, summary="查询 QR 码状态")
 async def get_qrcode_status(
     channel: str = Query(..., description="通道类型"),
-    qrcode_id: str = Query(..., description="QR 码 ID")
+    qrcode_id: str = Query(..., description="QR 码 ID"),
 ):
     """
     查询 QR 码扫描状态
@@ -277,7 +275,13 @@ async def get_qrcode_status(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error("查询 QR 码状态失败: channel=%s, qrcode_id=%s, error=%s", channel, qrcode_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
+        logger.error(
+            "查询 QR 码状态失败: channel=%s, qrcode_id=%s, error=%s",
+            channel,
+            qrcode_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="服务器内部错误") from e

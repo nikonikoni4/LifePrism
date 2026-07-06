@@ -5,7 +5,6 @@ import json
 import re
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import tiktoken
@@ -24,7 +23,9 @@ def detect_image_mime(data: bytes) -> str | None:
     return None
 
 
-def build_image_content_blocks(raw: bytes, mime: str, path: str, label: str) -> list[dict[str, Any]]:
+def build_image_content_blocks(
+    raw: bytes, mime: str, path: str, label: str
+) -> list[dict[str, Any]]:
     """Build native image blocks plus a short text label."""
     b64 = base64.b64encode(raw).decode()
     return [
@@ -35,8 +36,6 @@ def build_image_content_blocks(raw: bytes, mime: str, path: str, label: str) -> 
         },
         {"type": "text", "text": label},
     ]
-
-
 
 
 def timestamp() -> str:
@@ -52,6 +51,7 @@ def current_time_str() -> str:
 
 
 _UNSAFE_CHARS = re.compile(r'[<>:"/\\|?*]')
+
 
 def safe_filename(name: str) -> str:
     """Replace unsafe path characters with underscores."""
@@ -80,9 +80,9 @@ def split_message(content: str, max_len: int = 2000) -> list[str]:
             break
         cut = content[:max_len]
         # Try to break at newline first, then space, then hard break
-        pos = cut.rfind('\n')
+        pos = cut.rfind("\n")
         if pos <= 0:
-            pos = cut.rfind(' ')
+            pos = cut.rfind(" ")
         if pos <= 0:
             pos = max_len
         chunks.append(content[:pos])

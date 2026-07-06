@@ -1,7 +1,7 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable
 
 
 @dataclass(frozen=True)
@@ -35,9 +35,7 @@ class ScreenshotCleanupWorker:
         Returns:
             CleanupResult: 清理结果统计（已删除文件数、已删除记录数、失败数）
         """
-        cutoff = (
-            datetime.fromisoformat(now_iso) - timedelta(days=self.retention_days)
-        ).isoformat()
+        cutoff = (datetime.fromisoformat(now_iso) - timedelta(days=self.retention_days)).isoformat()
         expired = self.provider.list_expired_captures(cutoff)
 
         deleted_files = 0

@@ -1,8 +1,10 @@
 """业务异常到 HTTP 错误响应的统一映射。"""
-from typing import Any, Dict, Tuple
+
+from typing import Any
 
 from fastapi import HTTPException
 
+from lifeprism.config.exceptions import ConfigError
 from lifeprism.server.errors.error_codes import (
     BACKFILL_DATE_OUT_OF_WINDOW,
     CACHE_UPDATE_ERROR,
@@ -33,12 +35,15 @@ from lifeprism.server.errors.error_codes import (
     VALIDATION_FAILED,
 )
 from lifeprism.utils.exceptions import (
-    ConflictError, DataAccessError, ExternalServiceError,
-    LWBaseError, NotFoundError, ValidationError,
+    ConflictError,
+    DataAccessError,
+    ExternalServiceError,
+    LWBaseError,
+    NotFoundError,
+    ValidationError,
 )
-from lifeprism.config.exceptions import ConfigError
 
-ERROR_CODE_TO_STATUS: Dict[str, int] = {
+ERROR_CODE_TO_STATUS: dict[str, int] = {
     HABIT_NOT_FOUND: 404,
     CHALLENGE_NOT_FOUND: 404,
     CHECKIN_NOT_FOUND: 404,
@@ -90,7 +95,7 @@ def _fallback_code(error: LWBaseError) -> str:
     return INTERNAL_ERROR
 
 
-def map_app_error(error: LWBaseError, default_code: str = None) -> Tuple[int, Dict[str, Any]]:
+def map_app_error(error: LWBaseError, default_code: str = None) -> tuple[int, dict[str, Any]]:
     """将 LWBaseError 映射为 HTTP status + detail payload。"""
     code = error.code or default_code or _fallback_code(error)
     status_code = ERROR_CODE_TO_STATUS.get(code)

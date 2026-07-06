@@ -1,9 +1,9 @@
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional
 
 from lifeprism.config.settings_manager import settings
 from lifeprism.monitor.provider.screenshot_data_provider import ScreenshotDataProvider
@@ -45,7 +45,7 @@ class MonitorRuntime:
         cleanup_worker: ScreenshotCleanupWorker,
         input_listener,
         db_manager: DatabaseManager,
-        monitor: Optional[WindowMonitor] = None,
+        monitor: WindowMonitor | None = None,
         time_source: Callable[[], float] | None = None,
         iso_time_source: Callable[[], str] | None = None,
         scheduler_sleep_seconds: float = 1.0,
@@ -62,23 +62,25 @@ class MonitorRuntime:
         self.db_manager = db_manager
         self.monitor = monitor
         self.time_source = time_source or time.time
-        self.iso_time_source = iso_time_source or (lambda: datetime.now().replace(microsecond=0).isoformat())
+        self.iso_time_source = iso_time_source or (
+            lambda: datetime.now().replace(microsecond=0).isoformat()
+        )
         self.scheduler_sleep_seconds = scheduler_sleep_seconds
         self.cleanup_interval_seconds = cleanup_interval_seconds
         self.sleep_func = sleep_func
         self._running = False
-        self._pending_enter_events: List[float] = []
-        self._monitor_thread: Optional[threading.Thread] = None
-        self._cleanup_thread: Optional[threading.Thread] = None
+        self._pending_enter_events: list[float] = []
+        self._monitor_thread: threading.Thread | None = None
+        self._cleanup_thread: threading.Thread | None = None
 
     @classmethod
     def for_test(
         cls,
         *,
         data_root: Path,
-        time_points: List[float],
-        window_snapshots: List[Dict[str, object]],
-        input_script: List[tuple[float, str, str]],
+        time_points: list[float],
+        window_snapshots: list[dict[str, object]],
+        input_script: list[tuple[float, str, str]],
     ) -> "MonitorRuntime":
         data_root = Path(data_root)
         data_root.mkdir(parents=True, exist_ok=True)
@@ -183,8 +185,8 @@ class MonitorRuntime:
     def _run_scheduler_tick(self) -> None:
         now_epoch = self.time_source()
         self._pending_enter_events.extend(self.input_tracker.consume_enter_events())
-        due_enter_events: List[float] = []
-        remaining_enter_events: List[float] = []
+        due_enter_events: list[float] = []
+        remaining_enter_events: list[float] = []
         enter_delay_seconds = self.scheduler.enter_delay_ms / 1000.0
         for event_time in self._pending_enter_events:
             if event_time + enter_delay_seconds <= now_epoch:

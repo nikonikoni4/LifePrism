@@ -6,14 +6,15 @@ Habit 模块数据提供者
 - HabitChallengeProvider: habit_challenges 表
 - HabitCheckinProvider: habit_checkins 表
 """
-import uuid
+
 import sqlite3
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any, Tuple, Set
+import uuid
+from datetime import date, datetime
+from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
-from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
@@ -25,6 +26,7 @@ def generate_id(prefix: str) -> str:
 
 
 # ==================== HabitProvider ====================
+
 
 class HabitProvider(LWBaseDataProvider):
     """
@@ -40,27 +42,47 @@ class HabitProvider(LWBaseDataProvider):
     _DATE_FIELD = None
     _TIME_FIELD = None
 
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'name', 'status', 'frequency_type', 'current_level',
-        'value_id', 'commitment_id', 'created_at', 'updated_at'
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "name",
+        "status",
+        "frequency_type",
+        "current_level",
+        "value_id",
+        "commitment_id",
+        "created_at",
+        "updated_at",
     }
-    _ORDER_FIELDS: Set[str] = {'id', 'name', 'current_level', 'created_at'}
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'name', 'description', 'frequency_type', 'frequency_config',
-        'current_level', 'status', 'value_id', 'commitment_id', 'paused_at',
-        'created_at', 'updated_at'
+    _ORDER_FIELDS: set[str] = {"id", "name", "current_level", "created_at"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "name",
+        "description",
+        "frequency_type",
+        "frequency_config",
+        "current_level",
+        "status",
+        "value_id",
+        "commitment_id",
+        "paused_at",
+        "created_at",
+        "updated_at",
     }
-    _UPDATE_FIELDS: Set[str] = {
-        'name', 'description', 'frequency_type', 'frequency_config',
-        'current_level', 'status', 'value_id', 'commitment_id', 'paused_at'
+    _UPDATE_FIELDS: set[str] = {
+        "name",
+        "description",
+        "frequency_type",
+        "frequency_config",
+        "current_level",
+        "status",
+        "value_id",
+        "commitment_id",
+        "paused_at",
     }
 
     # ==================== 核心方法 ====================
 
-    def query_habits(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    def query_habits(self, options: QueryOptions | None = None) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -84,7 +106,7 @@ class HabitProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def get_habits(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_habits(self, status: str | None = None) -> list[dict[str, Any]]:
         """
         获取习惯列表，可按 status 过滤
 
@@ -95,14 +117,12 @@ class HabitProvider(LWBaseDataProvider):
             习惯列表，按 created_at 升序
         """
         options = QueryOptions(
-            filters={'status': status} if status else None,
-            order_by='created_at',
-            order_desc=False
+            filters={"status": status} if status else None, order_by="created_at", order_desc=False
         )
         results, _ = self._generic_query(options)
         return results
 
-    def get_habit_by_id(self, habit_id: str) -> Optional[Dict[str, Any]]:
+    def get_habit_by_id(self, habit_id: str) -> dict[str, Any] | None:
         """
         按 ID 查询单个习惯
 
@@ -112,15 +132,11 @@ class HabitProvider(LWBaseDataProvider):
         Returns:
             习惯数据，不存在返回 None
         """
-        options = QueryOptions(
-            filters={'id': habit_id},
-            order_by='id',
-            order_desc=False
-        )
+        options = QueryOptions(filters={"id": habit_id}, order_by="id", order_desc=False)
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def create_habit(self, data: Dict[str, Any]) -> str:
+    def create_habit(self, data: dict[str, Any]) -> str:
         """
         创建习惯，返回新生成的 habit_id
 
@@ -132,22 +148,22 @@ class HabitProvider(LWBaseDataProvider):
         """
         habit_id = generate_id("habit")
         insert_data = {
-            'id': habit_id,
-            'name': data['name'],
-            'description': data.get('description'),
-            'frequency_type': data.get('frequency_type', 'daily'),
-            'frequency_config': data.get('frequency_config'),
-            'current_level': data.get('current_level', 0),
-            'status': data.get('status', 'active'),
-            'value_id': data.get('value_id'),
-            'commitment_id': data.get('commitment_id'),
-            'paused_at': None,
+            "id": habit_id,
+            "name": data["name"],
+            "description": data.get("description"),
+            "frequency_type": data.get("frequency_type", "daily"),
+            "frequency_config": data.get("frequency_config"),
+            "current_level": data.get("current_level", 0),
+            "status": data.get("status", "active"),
+            "value_id": data.get("value_id"),
+            "commitment_id": data.get("commitment_id"),
+            "paused_at": None,
         }
         self._generic_insert(insert_data)
         logger.info("创建习惯成功: %s", habit_id)
         return habit_id
 
-    def update_habit(self, habit_id: str, update_data: Dict[str, Any]) -> bool:
+    def update_habit(self, habit_id: str, update_data: dict[str, Any]) -> bool:
         """
         更新习惯（PATCH 语义）
 
@@ -190,6 +206,7 @@ class HabitProvider(LWBaseDataProvider):
 
 # ==================== HabitChallengeProvider ====================
 
+
 class HabitChallengeProvider(LWBaseDataProvider):
     """
     习惯挑战数据提供者（对应 habit_challenges 表）
@@ -204,27 +221,41 @@ class HabitChallengeProvider(LWBaseDataProvider):
     _DATE_FIELD = "start_date"  # 用于日期范围查询
     _TIME_FIELD = None
 
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'habit_id', 'status', 'from_level', 'to_level',
-        'start_date', 'end_date', 'created_at', 'updated_at'
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "habit_id",
+        "status",
+        "from_level",
+        "to_level",
+        "start_date",
+        "end_date",
+        "created_at",
+        "updated_at",
     }
-    _ORDER_FIELDS: Set[str] = {'id', 'start_date', 'end_date', 'created_at'}
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'habit_id', 'challenge_weeks', 'required_completions',
-        'from_level', 'to_level', 'start_date', 'end_date',
-        'completed_count', 'streak_base', 'status', 'finished_at',
-        'created_at', 'updated_at'
+    _ORDER_FIELDS: set[str] = {"id", "start_date", "end_date", "created_at"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "habit_id",
+        "challenge_weeks",
+        "required_completions",
+        "from_level",
+        "to_level",
+        "start_date",
+        "end_date",
+        "completed_count",
+        "streak_base",
+        "status",
+        "finished_at",
+        "created_at",
+        "updated_at",
     }
-    _UPDATE_FIELDS: Set[str] = {
-        'completed_count', 'streak_base', 'status', 'finished_at'
-    }
+    _UPDATE_FIELDS: set[str] = {"completed_count", "streak_base", "status", "finished_at"}
 
     # ==================== 核心方法 ====================
 
     def query_habit_challenges(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -249,7 +280,7 @@ class HabitChallengeProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def create_challenge(self, data: Dict[str, Any]) -> str:
+    def create_challenge(self, data: dict[str, Any]) -> str:
         """
         创建挑战记录，返回新 challenge_id
 
@@ -261,24 +292,24 @@ class HabitChallengeProvider(LWBaseDataProvider):
         """
         challenge_id = generate_id("challenge")
         insert_data = {
-            'id': challenge_id,
-            'habit_id': data['habit_id'],
-            'challenge_weeks': data['challenge_weeks'],
-            'required_completions': data['required_completions'],
-            'from_level': data['from_level'],
-            'to_level': data['to_level'],
-            'start_date': data['start_date'],
-            'end_date': data['end_date'],
-            'completed_count': data.get('completed_count', 0),
-            'streak_base': data.get('streak_base', 0),
-            'status': data.get('status', 'in_progress'),
-            'finished_at': data.get('finished_at'),
+            "id": challenge_id,
+            "habit_id": data["habit_id"],
+            "challenge_weeks": data["challenge_weeks"],
+            "required_completions": data["required_completions"],
+            "from_level": data["from_level"],
+            "to_level": data["to_level"],
+            "start_date": data["start_date"],
+            "end_date": data["end_date"],
+            "completed_count": data.get("completed_count", 0),
+            "streak_base": data.get("streak_base", 0),
+            "status": data.get("status", "in_progress"),
+            "finished_at": data.get("finished_at"),
         }
         self._generic_insert(insert_data)
-        logger.info("创建挑战成功: %s (habit_id=%s)", challenge_id, data['habit_id'])
+        logger.info("创建挑战成功: %s (habit_id=%s)", challenge_id, data["habit_id"])
         return challenge_id
 
-    def get_challenge_by_id(self, challenge_id: str) -> Optional[Dict[str, Any]]:
+    def get_challenge_by_id(self, challenge_id: str) -> dict[str, Any] | None:
         """
         按 ID 查询单个挑战
 
@@ -288,15 +319,11 @@ class HabitChallengeProvider(LWBaseDataProvider):
         Returns:
             挑战字典，或 None
         """
-        options = QueryOptions(
-            filters={'id': challenge_id},
-            order_by='id',
-            order_desc=False
-        )
+        options = QueryOptions(filters={"id": challenge_id}, order_by="id", order_desc=False)
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def get_challenges_by_habit(self, habit_id: str) -> List[Dict[str, Any]]:
+    def get_challenges_by_habit(self, habit_id: str) -> list[dict[str, Any]]:
         """
         获取某习惯的所有挑战记录，按创建时间升序
 
@@ -307,14 +334,12 @@ class HabitChallengeProvider(LWBaseDataProvider):
             挑战列表
         """
         options = QueryOptions(
-            filters={'habit_id': habit_id},
-            order_by='created_at',
-            order_desc=False
+            filters={"habit_id": habit_id}, order_by="created_at", order_desc=False
         )
         results, _ = self._generic_query(options)
         return results
 
-    def get_current_challenge(self, habit_id: str) -> Optional[Dict[str, Any]]:
+    def get_current_challenge(self, habit_id: str) -> dict[str, Any] | None:
         """
         获取习惯当前进行中的挑战（status = 'in_progress'）
 
@@ -325,16 +350,16 @@ class HabitChallengeProvider(LWBaseDataProvider):
             进行中的挑战字典，或 None
         """
         options = QueryOptions(
-            filters={'habit_id': habit_id, 'status': 'in_progress'},
-            order_by='id',
+            filters={"habit_id": habit_id, "status": "in_progress"},
+            order_by="id",
             order_desc=False,
             page=1,
-            page_size=1
+            page_size=1,
         )
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def update_challenge(self, challenge_id: str, update_data: Dict[str, Any]) -> bool:
+    def update_challenge(self, challenge_id: str, update_data: dict[str, Any]) -> bool:
         """
         更新挑战字段（PATCH 语义）
 
@@ -389,7 +414,7 @@ class HabitChallengeProvider(LWBaseDataProvider):
             )
             return cursor.rowcount == 1
 
-    def get_expired_in_progress_challenges(self, today: str) -> List[Dict[str, Any]]:
+    def get_expired_in_progress_challenges(self, today: str) -> list[dict[str, Any]]:
         """
         获取所有 status = 'in_progress' 的挑战（用于到期检查）
 
@@ -399,17 +424,13 @@ class HabitChallengeProvider(LWBaseDataProvider):
         Returns:
             进行中的挑战列表
         """
-        options = QueryOptions(
-            filters={'status': 'in_progress'},
-            order_by='id',
-            order_desc=False
-        )
+        options = QueryOptions(filters={"status": "in_progress"}, order_by="id", order_desc=False)
         results, _ = self._generic_query(options)
         return results
 
     def get_challenge_history(
-        self, habit_id: str, status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, habit_id: str, status: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         获取习惯的挑战历史（succeeded 和 failed），按 finished_at 倒序
 
@@ -438,7 +459,7 @@ class HabitChallengeProvider(LWBaseDataProvider):
                         (habit_id,),
                     )
                 columns = [desc[0] for desc in cursor.description]
-                return [dict(zip(columns, row)) for row in cursor.fetchall()]
+                return [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
         except sqlite3.Error as e:
             logger.error("获取挑战历史失败: error=%s", e)
             raise DataAccessError(f"获取挑战历史失败: {e}") from e
@@ -455,9 +476,7 @@ class HabitChallengeProvider(LWBaseDataProvider):
         """
         try:
             with self.db.get_connection() as conn:
-                conn.execute(
-                    "DELETE FROM habit_challenges WHERE habit_id = ?", (habit_id,)
-                )
+                conn.execute("DELETE FROM habit_challenges WHERE habit_id = ?", (habit_id,))
             return True
         except sqlite3.Error as e:
             logger.error("按习惯ID删除挑战失败: error=%s", e)
@@ -465,6 +484,7 @@ class HabitChallengeProvider(LWBaseDataProvider):
 
 
 # ==================== HabitCheckinProvider ====================
+
 
 class HabitCheckinProvider(LWBaseDataProvider):
     """
@@ -480,23 +500,25 @@ class HabitCheckinProvider(LWBaseDataProvider):
     _DATE_FIELD = "date"  # 用于日期范围查询
     _TIME_FIELD = None
 
-    _FILTER_FIELDS: Set[str] = {
-        'id', 'habit_id', 'challenge_id', 'date', 'created_at'
+    _FILTER_FIELDS: set[str] = {"id", "habit_id", "challenge_id", "date", "created_at"}
+    _ORDER_FIELDS: set[str] = {"id", "date", "created_at"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "habit_id",
+        "challenge_id",
+        "date",
+        "completed_at",
+        "created_at",
     }
-    _ORDER_FIELDS: Set[str] = {'id', 'date', 'created_at'}
-    _SELECT_FIELDS: Set[str] = {
-        'id', 'habit_id', 'challenge_id', 'date', 'completed_at', 'created_at'
-    }
-    _UPDATE_FIELDS: Set[str] = {
-        'completed_at'  # 通常不更新打卡记录，但保留字段
+    _UPDATE_FIELDS: set[str] = {
+        "completed_at"  # 通常不更新打卡记录，但保留字段
     }
 
     # ==================== 核心方法 ====================
 
     def query_habit_checkins(
-        self,
-        options: Optional[QueryOptions] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self, options: QueryOptions | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         通用查询接口
 
@@ -521,7 +543,7 @@ class HabitCheckinProvider(LWBaseDataProvider):
         """
         return self._generic_query(options)
 
-    def create_checkin(self, data: Dict[str, Any]) -> Optional[str]:
+    def create_checkin(self, data: dict[str, Any]) -> str | None:
         """
         创建打卡记录，返回新 checkin_id
         若 UNIQUE(habit_id, date) 冲突（重复打卡），返回 None
@@ -536,11 +558,11 @@ class HabitCheckinProvider(LWBaseDataProvider):
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         insert_data = {
-            'id': checkin_id,
-            'habit_id': data['habit_id'],
-            'challenge_id': data['challenge_id'],
-            'date': data['date'],
-            'completed_at': data.get('completed_at', now_str),
+            "id": checkin_id,
+            "habit_id": data["habit_id"],
+            "challenge_id": data["challenge_id"],
+            "date": data["date"],
+            "completed_at": data.get("completed_at", now_str),
         }
 
         try:
@@ -548,10 +570,10 @@ class HabitCheckinProvider(LWBaseDataProvider):
             logger.info("创建打卡记录成功: %s", checkin_id)
             return checkin_id
         except sqlite3.IntegrityError:
-            logger.warning("打卡记录已存在: habit_id=%s, date=%s", data['habit_id'], data['date'])
+            logger.warning("打卡记录已存在: habit_id=%s, date=%s", data["habit_id"], data["date"])
             return None  # 重复打卡
 
-    def get_checkin_by_date(self, habit_id: str, checkin_date: str) -> Optional[Dict[str, Any]]:
+    def get_checkin_by_date(self, habit_id: str, checkin_date: str) -> dict[str, Any] | None:
         """
         按习惯 ID 和日期查询打卡记录
 
@@ -563,9 +585,7 @@ class HabitCheckinProvider(LWBaseDataProvider):
             打卡记录，或 None
         """
         options = QueryOptions(
-            filters={'habit_id': habit_id, 'date': checkin_date},
-            order_by='id',
-            order_desc=False
+            filters={"habit_id": habit_id, "date": checkin_date}, order_by="id", order_desc=False
         )
         results, _ = self._generic_query(options)
         return results[0] if results else None
@@ -604,17 +624,13 @@ class HabitCheckinProvider(LWBaseDataProvider):
         """
         try:
             with self.db.get_connection() as conn:
-                conn.execute(
-                    "DELETE FROM habit_checkins WHERE habit_id = ?", (habit_id,)
-                )
+                conn.execute("DELETE FROM habit_checkins WHERE habit_id = ?", (habit_id,))
             return True
         except sqlite3.Error as e:
             logger.error("按习惯ID删除打卡失败: error=%s", e)
             raise DataAccessError(f"按习惯ID删除打卡失败: {e}") from e
 
-    def get_checkin_dates_by_challenge(
-        self, habit_id: str, challenge_id: str
-    ) -> List[str]:
+    def get_checkin_dates_by_challenge(self, habit_id: str, challenge_id: str) -> list[str]:
         """
         获取某挑战期内所有打卡日期列表
 
@@ -626,13 +642,13 @@ class HabitCheckinProvider(LWBaseDataProvider):
             日期列表，按日期升序
         """
         options = QueryOptions(
-            filters={'habit_id': habit_id, 'challenge_id': challenge_id},
-            order_by='date',
+            filters={"habit_id": habit_id, "challenge_id": challenge_id},
+            order_by="date",
             order_desc=False,
-            fields=['date']
+            fields=["date"],
         )
         results, _ = self._generic_query(options)
-        return [row['date'] for row in results]
+        return [row["date"] for row in results]
 
     def count_checkins_by_challenge(self, challenge_id: str) -> int:
         """
@@ -655,7 +671,7 @@ class HabitCheckinProvider(LWBaseDataProvider):
             logger.error("统计打卡失败: error=%s", e)
             raise DataAccessError(f"统计打卡失败: {e}") from e
 
-    def get_today_checkins(self, habit_ids: List[str]) -> Dict[str, bool]:
+    def get_today_checkins(self, habit_ids: list[str]) -> dict[str, bool]:
         """
         批量查询今日打卡状态
 
@@ -686,8 +702,8 @@ class HabitCheckinProvider(LWBaseDataProvider):
         self,
         start_date: str,
         end_date: str,
-        habit_ids: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        habit_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         查询日期范围内的打卡记录（热力图用）
 
@@ -710,16 +726,11 @@ class HabitCheckinProvider(LWBaseDataProvider):
                     [start_date, end_date] + list(habit_ids),
                 )
                 columns = [desc[0] for desc in cursor.description]
-                return [dict(zip(columns, row)) for row in cursor.fetchall()]
+                return [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
         else:
             # 使用通用方法
             options = QueryOptions(
-                date_range=(start_date, end_date),
-                order_by='date',
-                order_desc=False
+                date_range=(start_date, end_date), order_by="date", order_desc=False
             )
             results, _ = self._generic_query(options)
             return results
-
-
-
