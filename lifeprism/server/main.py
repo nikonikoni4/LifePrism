@@ -552,7 +552,7 @@ if __name__ == "__main__":
             "lifeprism.server.main:app",
             host="0.0.0.0",
             port=port,
-            reload=True,
+            reload=False,
             reload_dirs=["lifeprism"],  # 只监控 Python 代码目录
             reload_excludes=["__pycache__", "*.pyc", ".git","*.db","lifeprism.egg-info"],
             log_level="info",

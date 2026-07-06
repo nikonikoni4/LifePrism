@@ -66,7 +66,7 @@ def initialize_resources() -> None:
             continue
 
         # 特殊处理：如果 agent/chat 目录在初始化前已存在，跳过复制 bootstrap.md
-        if str(rel) == "agent/chat/bootstrap.md" and agent_chat_existed_before:
+        if rel.as_posix() == "agent/chat/bootstrap.md" and agent_chat_existed_before:
             logger.debug("agent/chat 目录已存在，跳过复制 bootstrap.md: %s", target)
             continue
 
