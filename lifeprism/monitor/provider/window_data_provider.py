@@ -55,7 +55,7 @@ class MonitorDataProvider(LWBaseDataProvider):
             # LWBaseDataProvider 通过 self.db 持有 DatabaseManager 的引用
             result = self.db.insert('window_events', data)
 
-            logger.info("窗口事件保存: app=%s, duration=%.1fs", app, duration)
+            logger.debug("窗口事件保存: app=%s, duration=%.1fs", app, duration)
 
             return result > 0
 

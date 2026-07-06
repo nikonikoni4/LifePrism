@@ -29,7 +29,7 @@ class ScreenshotDataProvider(LWBaseDataProvider):
         """
         try:
             result = self.db.insert("screen_captures", data) > 0
-            logger.info("截图元数据保存: id=%s", data.get('id'))
+            logger.debug("截图元数据保存: id=%s", data.get('id'))
             return result
         except sqlite3.Error as exc:
             logger.error("保存截图元数据失败: %s", exc)
@@ -83,7 +83,7 @@ class ScreenshotDataProvider(LWBaseDataProvider):
         """
         try:
             result = self.db.delete("screen_captures", {"id": capture_id}) > 0
-            logger.info("截图元数据删除: id=%s", capture_id)
+            logger.debug("截图元数据删除: id=%s", capture_id)
             return result
         except sqlite3.Error as exc:
             logger.error("删除截图元数据失败: %s", exc)

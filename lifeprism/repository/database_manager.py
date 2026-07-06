@@ -279,7 +279,7 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(sql, list(data.values()))
-                logger.info("插入成功: %s", table_name)
+                logger.debug("插入成功: %s", table_name)
                 return cursor.rowcount
                 
         except sqlite3.Error as e:
@@ -323,7 +323,7 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.executemany(sql, values_list)
-                logger.info("批量插入成功: %s, %s 行", table_name, cursor.rowcount)
+                logger.debug("批量插入成功: %s, %s 行", table_name, cursor.rowcount)
                 return cursor.rowcount
                 
         except sqlite3.Error as e:
@@ -385,7 +385,7 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(sql, list(data.values()))
-                logger.info("UPSERT成功: %s", table_name)
+                logger.debug("UPSERT成功: %s", table_name)
                 return cursor.rowcount
                 
         except sqlite3.Error as e:
@@ -459,7 +459,7 @@ class DatabaseManager:
                 cursor = conn.cursor()
                 cursor.executemany(sql, values_list)
                 total_affected = cursor.rowcount
-                logger.info("批量UPSERT成功: %s, %s 行", table_name, total_affected)
+                logger.debug("批量UPSERT成功: %s, %s 行", table_name, total_affected)
                 return total_affected
                 
         except sqlite3.Error as e:
@@ -505,7 +505,7 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(sql, params)
-                logger.info("更新成功: %s, %s 行", table_name, cursor.rowcount)
+                logger.debug("更新成功: %s, %s 行", table_name, cursor.rowcount)
                 return cursor.rowcount
                 
         except sqlite3.Error as e:
@@ -561,7 +561,7 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(sql, params)
-                logger.info("删除成功: %s, %s 行", table_name, cursor.rowcount)
+                logger.debug("删除成功: %s, %s 行", table_name, cursor.rowcount)
                 return cursor.rowcount
                 
         except sqlite3.Error as e:
@@ -730,7 +730,7 @@ class DatabaseManager:
                 else:
                     cursor = conn.cursor()
                     cursor.execute(sql, params or ())
-                    logger.info("原始 SQL 执行成功，影响 %s 行", cursor.rowcount)
+                    logger.debug("原始 SQL 执行成功，影响 %s 行", cursor.rowcount)
                     return None
                     
         except sqlite3.Error as e:
