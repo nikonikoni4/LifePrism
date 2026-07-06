@@ -139,6 +139,7 @@ class MonitorRuntime:
             self._run_scheduler_tick()
 
     def start(self) -> None:
+        logger.info("MonitorRuntime 启动")
         self._running = True
         self.input_listener.start()
 
@@ -165,6 +166,7 @@ class MonitorRuntime:
             self.stop()
 
     def stop(self) -> None:
+        logger.info("MonitorRuntime 停止")
         self._running = False
         self.input_listener.stop()
         if self.monitor is not None:
@@ -175,7 +177,7 @@ class MonitorRuntime:
             try:
                 self.cleanup_worker.run_once(self.iso_time_source())
             except Exception as exc:
-                logger.error("截图清理任务执行失败: %s", exc)
+                logger.warning("截图清理任务执行失败: %s", exc)
             self.sleep_func(self.cleanup_interval_seconds)
 
     def _run_scheduler_tick(self) -> None:
@@ -208,7 +210,7 @@ class MonitorRuntime:
             try:
                 self.screenshot_store.capture(request)
             except Exception as exc:
-                logger.error("截图请求执行失败: %s", exc)
+                logger.warning("截图请求执行失败: %s", exc)
 
     def _set_test_tick(self, index: int, now_epoch: float) -> None:
         self._test_state["now"] = now_epoch

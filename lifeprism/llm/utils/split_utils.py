@@ -27,7 +27,7 @@ def split_by_purpose(state: classifyState) -> classifyState:
         else:
             multi_purpose_items.append(item)
     
-    logger.info("按用途分离完成: 单用途 %s 条, 多用途 %s 条", len(single_purpose_items), len(multi_purpose_items))
+    logger.debug("按用途分离完成: 单用途 %s 条, 多用途 %s 条", len(single_purpose_items), len(multi_purpose_items))
     
     return {
         "log_items_for_single": single_purpose_items,
@@ -54,7 +54,7 @@ def split_by_duration(multi_purpose_items: list) -> dict:
         else:
             long_duration_items.append(item)
 
-    logger.info("按时长分离完成: 短时长(<%ss) %s 条, 长时长(>=%ss) %s 条", settings.long_log_threshold, len(short_duration_items), settings.long_log_threshold, len(long_duration_items))
+    logger.debug("按时长分离完成: 短时长(<%ss) %s 条, 长时长(>=%ss) %s 条", settings.long_log_threshold, len(short_duration_items), settings.long_log_threshold, len(long_duration_items))
 
     return {
         "log_items_for_multi_short": short_duration_items or None,

@@ -125,7 +125,7 @@ class PromptLoader:
                 with open(self.usage_stats_file, 'r', encoding='utf-8') as f:
                     self._usage_stats = yaml.safe_load(f) or {}
             except Exception as e:
-                logger.error("加载使用统计文件失败: %s", e)
+                logger.warning("加载使用统计文件失败: %s", e)
                 self._usage_stats = {}
         else:
             self._usage_stats = {}
@@ -139,7 +139,7 @@ class PromptLoader:
             with open(self.usage_stats_file, 'w', encoding='utf-8') as f:
                 yaml.dump(self._usage_stats, f, allow_unicode=True, default_flow_style=False)
         except Exception as e:
-            logger.error("保存使用统计文件失败: %s", e)
+            logger.warning("保存使用统计文件失败: %s", e)
 
     def _update_usage_stats(self, prompt_name: str, version: str) -> None:
         """

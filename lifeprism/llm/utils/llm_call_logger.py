@@ -188,7 +188,7 @@ class LLMCallLogger:
             return record["id"]
 
         except Exception as e:
-            logger.error("记录 LLM 调用失败: %s", e, exc_info=True)
+            logger.warning("记录 LLM 调用失败: %s", e, exc_info=True)
             return None
 
     def _process_content(
@@ -343,7 +343,7 @@ class LLMCallLogger:
                 with open(log_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
             except Exception as e:
-                logger.error("读取日志文件失败 %s: %s", log_file, e)
+                logger.warning("读取日志文件失败 %s: %s", log_file, e)
                 data = {
                     "version": "1.0",
                     "date": date_str,
@@ -419,7 +419,7 @@ class LLMCallLogger:
                             "score": call.get("score"),
                         })
             except Exception as e:
-                logger.error("读取日志文件失败 %s: %s", log_file, e)
+                logger.warning("读取日志文件失败 %s: %s", log_file, e)
 
         logger.info("导出 %s.%s 数据集，共 %s 条记录", prompt_module, prompt_name, len(dataset))
         return dataset
@@ -450,7 +450,7 @@ class LLMCallLogger:
                     if call.get("workflow_id") == workflow_id:
                         records.append(call)
             except Exception as e:
-                logger.error("读取日志文件失败 %s: %s", log_file, e)
+                logger.warning("读取日志文件失败 %s: %s", log_file, e)
 
         # 按时间戳排序
         records.sort(key=lambda x: x.get("timestamp", ""))

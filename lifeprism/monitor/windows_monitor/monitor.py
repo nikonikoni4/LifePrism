@@ -82,7 +82,7 @@ class WindowMonitor:
                 if currently_afk:
                     if not self.is_afk:
                         # 刚进入 AFK 状态，保存当前窗口并清空状态（不追踪 AFK 时间段）
-                        logger.info("User is AFK (idle for %.1fs)", idle_time)
+                        logger.debug("User is AFK (idle for %.1fs)", idle_time)
                         self._flush()
                         with self._state_lock:
                             self.is_afk = True
@@ -92,7 +92,7 @@ class WindowMonitor:
                 else:
                     if self.is_afk:
                         # 从 AFK 状态恢复
-                        logger.info("User is back from AFK")
+                        logger.debug("User is back from AFK")
                         self._flush()
                         with self._state_lock:
                             self.is_afk = False

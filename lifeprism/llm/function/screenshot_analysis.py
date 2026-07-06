@@ -496,7 +496,7 @@ async def screenshot_analysis(
         screenshots = get_active_screenshots(chunk_start, chunk_end)
         screen_count = len(screenshots)
 
-        logger.info(
+        logger.debug(
             "[%s/%s] %s -> %s, 截图数量: %s",
             i, len(all_chunks), chunk_start, chunk_end, screen_count
         )
@@ -508,6 +508,7 @@ async def screenshot_analysis(
             "chunk": chunk,
             "screen_count": screen_count,
         })
+        logger.info("开始截图分析: chunk=%s/%s, 截图数=%s", i, len(all_chunks), screen_count)
         analysis_tasks.append(
             analyze_chunk_screenshots(chunk, screenshots, todolist)
         )
@@ -566,6 +567,7 @@ async def _behavior_summary(start_time:str,end_time:str,screen_count:int,behavio
             type=MessageType.GENERAL_TASK,
             extra={"system_prompt": summary_prompt},
         )
+        logger.info("开始行为总结: start_time=%s", start_time)
         llm_result :OutboundMessage = await bus.send(msg)
         response_content = llm_result.response.content
         if response_content:

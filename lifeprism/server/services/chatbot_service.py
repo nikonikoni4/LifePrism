@@ -138,6 +138,7 @@ class ChatbotService:
     ) -> ChatSession:
         """更新会话名称"""
         self._chatbot.update_session_name(session_id, request.name)
+        logger.info("更新会话名称: session_id=%s, name=%s", session_id, request.name)
         session = self._chatbot.get_session(session_id)
         if session:
             return ChatSession(
@@ -152,6 +153,7 @@ class ChatbotService:
     async def delete_session(self, session_id: str) -> bool:
         """删除会话"""
         self._chatbot.delete_session(session_id)
+        logger.info("删除会话: session_id=%s", session_id)
         return True
 
     async def get_history(self, session_id: str) -> ChatHistoryResponse:
@@ -214,6 +216,7 @@ class ChatbotService:
 
         # 3. 调用 ChatBot 发送消息
         try:
+            logger.info("LLM 对话开始: session_id=%s, content_len=%s", sid, len(content))
             response = await self._chatbot.chat(content, sid)
 
             # 发送 content 事件

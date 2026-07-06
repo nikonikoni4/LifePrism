@@ -72,7 +72,7 @@ async def summary_activities(activities: str, start_time: str, end_time: str) ->
     Returns:
         str: 活动总结内容
     """
-    logger.debug("[summary_activities] 开始活动总结, 时间范围: %s ~ %s", start_time, end_time)
+    logger.info("[summary_activities] 开始活动总结, 时间范围: %s ~ %s", start_time, end_time)
     logger.debug("[summary_activities] 输入数据长度: %s 字符", len(activities) if activities else 0)
 
     # 加载 prompt，注入时间参数
@@ -84,7 +84,7 @@ async def summary_activities(activities: str, start_time: str, end_time: str) ->
     logger.debug("[summary_activities] 已加载 prompt, 长度: %s 字符", len(activity_summary_prompt) if activity_summary_prompt else 0)
 
     if activities:
-        logger.debug("[summary_activities] 发送 LLM 请求进行活动总结")
+        logger.info("[summary_activities] 发送 LLM 请求进行活动总结")
         msg = InboundMessage(
             type=MessageType.GENERAL_TASK,
             token_type=TokenType.DREAM_TASK,
@@ -95,7 +95,7 @@ async def summary_activities(activities: str, start_time: str, end_time: str) ->
         llm_call_logger.log_call(msg, result, prompt_module=Prompts.Schedule.ACTIVITY_SUMMARY.module, prompt_name=Prompts.Schedule.ACTIVITY_SUMMARY.name)
         
         if result.response and result.response.content:
-            logger.debug("[summary_activities] LLM 返回成功, 结果长度: %s 字符", len(result.response.content))
+            logger.info("[summary_activities] LLM 返回成功, 结果长度: %s 字符", len(result.response.content))
             normalized = _normalize_activity_summary_format(result.response.content)
             return normalized
         else:
@@ -138,7 +138,7 @@ async def summary_moods(mood_data: str) -> str:
     Returns:
         str: 心情总结内容
     """
-    logger.debug("[summary_moods] 开始心情总结")
+    logger.info("[summary_moods] 开始心情总结")
     logger.debug("[summary_moods] 输入数据长度: %s 字符", len(mood_data) if mood_data else 0)
     
     # 加载 prompt
@@ -151,7 +151,7 @@ async def summary_moods(mood_data: str) -> str:
         return "无心情记录"
 
     # 调用 LLM 进行总结
-    logger.debug("[summary_moods] 发送 LLM 请求进行心情总结")
+    logger.info("[summary_moods] 发送 LLM 请求进行心情总结")
     msg = InboundMessage(
         type = MessageType.GENERAL_TASK,
         token_type = TokenType.DREAM_TASK,
@@ -163,7 +163,7 @@ async def summary_moods(mood_data: str) -> str:
 
     # 处理返回结果
     if result.response and result.response.content:
-        logger.debug("[summary_moods] LLM 返回成功, 结果长度: %s 字符", len(result.response.content))
+        logger.info("[summary_moods] LLM 返回成功, 结果长度: %s 字符", len(result.response.content))
         return result.response.content
     else:
         logger.error(
@@ -182,7 +182,7 @@ async def update_memory(date: str, date_offset: int = DEFAULT_DATE_OFFSET) -> No
         date: 结束时间 YYYY-MM-DD, 包括这一天
         date_offset: 时间偏移量，用于计算开始时间 date - date_offset
     """
-    logger.debug("[update_memory] 开始更新记忆文档, 日期: %s, 偏移量: %s", date, date_offset)
+    logger.info("[update_memory] 开始更新记忆文档, 日期: %s, 偏移量: %s", date, date_offset)
     
     if date_offset < 0:
         date_offset = 0
@@ -234,7 +234,7 @@ async def update_memory(date: str, date_offset: int = DEFAULT_DATE_OFFSET) -> No
     """
     logger.debug("[update_memory] 构建的 LLM 请求内容长度: %s 字符", len(content))
     
-    logger.debug("[update_memory] 发送 LLM 请求更新记忆文档")
+    logger.info("[update_memory] 发送 LLM 请求更新记忆文档")
     msg = InboundMessage(
         type = MessageType.DREAM_TASK, # 这里需要工具，因为他需要变更user和state，其他的四个子任务不需要工具调用
         token_type = TokenType.DREAM_TASK,
@@ -243,7 +243,7 @@ async def update_memory(date: str, date_offset: int = DEFAULT_DATE_OFFSET) -> No
     )
     result = await bus.send(msg)
     llm_call_logger.log_call(msg, result, prompt_module=Prompts.Schedule.UPDATE_MEMORY.module, prompt_name=Prompts.Schedule.UPDATE_MEMORY.name)
-    logger.debug("[update_memory] 记忆文档更新完成")
+    logger.info("[update_memory] 记忆文档更新完成")
     
 
 
@@ -340,6 +340,7 @@ async def extract_from_chat_messages(session: Session) -> str | None:
             content=f"## 需要总结的内容 \n {summary_raw_content}",
             extra={"system_prompt": extract_chat_prompt}
         )
+        logger.info("[process_session_message] 发送 LLM 请求提取聊天消息")
         result: OutboundMessage = await bus.send(msg)
         llm_call_logger.log_call(msg, result, prompt_module=Prompts.Schedule.EXTRACT_CHAT.module, prompt_name=Prompts.Schedule.EXTRACT_CHAT.name)
         
@@ -382,7 +383,7 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
     Args:
         days_offset: 处理日期限制，旧session不在处理
     """
-    logger.debug("[process_session_message] 开始处理会话消息, days_offset=%s", days_offset)
+    logger.info("[process_session_message] 开始处理会话消息, days_offset=%s", days_offset)
     
     # 1. 加载session meta,获取需要处理的消息
     _session_to_process = []
@@ -449,7 +450,7 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
             logger.debug("[process_session_message] session 缓存清理完成")
 
         # 创建history
-        logger.debug("[process_session_message] 开始保存历史记录, 共 %s 条结果", len(all_results))
+        logger.info("[process_session_message] 开始保存历史记录, 共 %s 条结果", len(all_results))
         for session_id, content in all_results:
             history_manager.add_content(content, session_id=session_id)
         history_manager.save_history()
@@ -458,7 +459,7 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
         logger.debug("[process_session_message] 没有需要处理的 session")
 
     # 将chat_history 更新到behavior
-    logger.debug("[process_session_message] 开始更新 behavior")
+    logger.info("[process_session_message] 开始更新 behavior")
     history = history_manager.get_histories_to_dream()
     if history:
         logger.debug("[process_session_message] 获取到 %s 条历史记录用于更新 behavior", len(history))
@@ -473,13 +474,13 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
             )
             # 更新 last_processed_time
             history_manager.save_history(datetime.now())
-            logger.debug("[process_session_message] behavior 更新完成")
+            logger.info("[process_session_message] behavior 更新完成")
         else:
             logger.debug("[process_session_message] history_content 为空, 跳过更新")
     else:
         logger.debug("[process_session_message] 没有历史记录需要更新 behavior")
     
-    logger.debug("[process_session_message] 会话消息处理完成")
+    logger.info("[process_session_message] 会话消息处理完成")
 
 if __name__ == "__main__":
     from datetime import timedelta

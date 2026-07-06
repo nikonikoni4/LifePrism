@@ -41,7 +41,7 @@ def run_migration():
         columns = {row[1]: row[2] for row in cursor.fetchall()}
 
         if 'keywords' in columns and 'content_positive' in columns:
-            logger.info("user_values 已完成迁移（keywords 和 content_positive 字段已存在），跳过迁移")
+            logger.debug("user_values 已完成迁移（keywords 和 content_positive 字段已存在），跳过迁移")
             return True
 
         if 'keyword' not in columns:
@@ -51,14 +51,14 @@ def run_migration():
         # 记录迁移前行数
         cursor.execute("SELECT COUNT(*) FROM user_values")
         count_before = cursor.fetchone()[0]
-        logger.info("迁移前: user_values=%s 行", count_before)
+        logger.debug("迁移前: user_values=%s 行", count_before)
 
         # 步骤 1: 重建表（keyword → keywords, content → content_positive + content_negative）
-        logger.info("步骤 1: 重建 user_values 表...")
+        logger.debug("步骤 1: 重建 user_values 表...")
         _rebuild_user_values(cursor)
 
         # 步骤 2: 验证
-        logger.info("步骤 2: 验证迁移结果...")
+        logger.debug("步骤 2: 验证迁移结果...")
         _verify_migration(cursor, count_before)
 
         conn.commit()
@@ -99,7 +99,7 @@ def _rebuild_user_values(cursor: sqlite3.Cursor):
 
     cursor.execute("DROP TABLE user_values")
     cursor.execute("ALTER TABLE user_values_new RENAME TO user_values")
-    logger.info("  迁移 %s 条记录", migrated)
+    logger.debug("  迁移 %s 条记录", migrated)
 
 
 def _verify_migration(cursor: sqlite3.Cursor, expected_count: int):
@@ -146,7 +146,7 @@ def _verify_migration(cursor: sqlite3.Cursor, expected_count: int):
             logger.error("  验证失败: %s", e)
         raise RuntimeError("迁移验证失败: " + "; ".join(errors))
 
-    logger.info("  验证通过: 记录数=%s, keywords/content_positive 字段正常, UNIQUE 约束存在", actual_count)
+    logger.debug("  验证通过: 记录数=%s, keywords/content_positive 字段正常, UNIQUE 约束存在", actual_count)
 
 
 def check_migration_status():

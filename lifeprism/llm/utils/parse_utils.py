@@ -103,7 +103,7 @@ def parse_classification_result(
                         node_name, item_id, category, sub_category, link_to_goal
                     )
                 else:
-                    logger.error(
+                    logger.warning(
                         "[%s] 分类结果格式错误: item_id=%s, "
                         "classification=%s, 期望列表格式 [category, sub_category, link_to_goal]",
                         node_name, item_id, classification
@@ -111,7 +111,7 @@ def parse_classification_result(
             else:
                 logger.warning("[%s] 分类结果中的 id %s 在 log_items 中不存在", node_name, item_id)
         except (ValueError, TypeError) as e:
-            logger.error(
+            logger.warning(
                 "[%s] 解析分类结果时出错: "
                 "item_id=%s, classification=%s, error=%s",
                 node_name, item_id_str, classification, e

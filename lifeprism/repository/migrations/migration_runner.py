@@ -30,7 +30,7 @@ def run_migrations(db_path: str) -> None:
     """
     db_file = Path(db_path)
     if not db_file.exists():
-        logger.info("数据库文件不存在，跳过迁移（将由 init_database 创建）")
+        logger.debug("数据库文件不存在，跳过迁移（将由 init_database 创建）")
         return
 
     conn = sqlite3.connect(db_path)
@@ -40,7 +40,7 @@ def run_migrations(db_path: str) -> None:
         pending = [m for m in MIGRATIONS if m.VERSION > current_version]
 
         if not pending:
-            logger.info("数据库版本 v%s，无待执行迁移", current_version)
+            logger.debug("数据库版本 v%s，无待执行迁移", current_version)
             return
 
         logger.info("数据库版本 v%s，待执行 %s 个迁移", current_version, len(pending))
@@ -101,7 +101,7 @@ def _cleanup_old_backups(db_file: Path, keep: int = 3) -> None:
     backups = sorted(db_file.parent.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
     for old_backup in backups[keep:]:
         old_backup.unlink()
-        logger.info("清理旧备份: %s", old_backup.name)
+        logger.debug("清理旧备份: %s", old_backup.name)
 
 
 def _execute_migration(conn: sqlite3.Connection, migration) -> None:
@@ -116,7 +116,7 @@ def _execute_migration(conn: sqlite3.Connection, migration) -> None:
     try:
         already_applied = migration.check_if_applied(cursor)
         if already_applied:
-            logger.info("迁移 v%s (%s) 已生效，补录版本记录", migration.VERSION, migration.NAME)
+            logger.debug("迁移 v%s (%s) 已生效，补录版本记录", migration.VERSION, migration.NAME)
         else:
             logger.info("执行迁移 v%s (%s)...", migration.VERSION, migration.NAME)
             migration.upgrade(cursor)

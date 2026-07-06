@@ -79,7 +79,7 @@ class DataProcessingService:
             apps_to_classify = len(classify_state.log_items) if classify_state.log_items else 0
             logger.info("  [OK] 获取并过滤后保留 %s 条事件", filtered_events)
             if not filtered_data.empty:
-                logger.info("  %s", filtered_data[['app','duration','start_time','end_time']])
+                logger.debug("  %s", filtered_data[['app','duration','start_time','end_time']])
             logger.info("  [OK] 发现 %s 条待分类日志项", apps_to_classify)
             
             classified_apps = 0
@@ -333,7 +333,7 @@ class DataProcessingService:
         for _, cat in category.iterrows():
             # 过滤被禁用的主分类
             if cat.get('state', 1) == 0:
-                logger.info("  跳过禁用的主分类: %s", cat['name'])
+                logger.debug("  跳过禁用的主分类: %s", cat['name'])
                 continue
             
             cat_id = cat['id']
@@ -444,7 +444,7 @@ class DataProcessingService:
                     'sub_category': item.sub_category,  # 保留用于调试
                 })
                 if len(items) > 1:
-                    logger.info("    单用途应用 '%s' 有 %s 条记录，只保存第一条", app, len(items))
+                    logger.debug("    单用途应用 '%s' 有 %s 条记录，只保存第一条", app, len(items))
             else:
                 # 多用途应用：保存所有不同 title 的记录
                 for item in items:

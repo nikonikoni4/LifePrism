@@ -242,6 +242,7 @@ class WechatAuth:
             "user_data": state.get("user_data", {})
         }
         self._save_state_to_file(file_state)
+        logger.info("状态已保存到文件: %s", self.state_file)
 
     async def qr_login(self, timeout: int = 300) -> bool:
         """QR 码登录流程
@@ -258,7 +259,7 @@ class WechatAuth:
             qrcode_id = data.get("qrcode", "")
             qrcode_img = data.get("qrcode_img_content", qrcode_id)
             if not qrcode_id:
-                logger.error("获取 QR 码失败")
+                logger.error("获取 QR 码失败: qrcode_id 为空, raw_data=%s", data)
                 return False
 
             self._print_qr_code(qrcode_img)
@@ -294,7 +295,7 @@ class WechatAuth:
                     logger.error("QR 码已过期")
                     return False
                 elif status == "scanning":
-                    logger.info("用户正在扫描二维码")
+                    logger.debug("用户正在扫描二维码")
 
                 await asyncio.sleep(1)
         except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:

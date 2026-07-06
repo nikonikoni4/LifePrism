@@ -40,10 +40,18 @@ def get_latest_test(
     - **mode**: 测试模式 (past/present/future)
     - **user_id**: 用户 ID，默认为 1
     """
-    result = being_service.get_test_result(user_id, mode)
-    if not result:
-        raise HTTPException(status_code=404, detail=f"未找到 {mode} 模式的测试记录")
-    return result
+    try:
+        result = being_service.get_test_result(user_id, mode)
+        if not result:
+            raise HTTPException(status_code=404, detail=f"未找到 {mode} 模式的测试记录")
+        return result
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("获取最新测试结果失败: error=%s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.get(
@@ -60,8 +68,16 @@ def get_versions(
     
     返回简要信息，不包含完整测试内容
     """
-    versions = being_service.get_version_list(user_id, mode)
-    return VersionListResponse(mode=mode, versions=versions)
+    try:
+        versions = being_service.get_version_list(user_id, mode)
+        return VersionListResponse(mode=mode, versions=versions)
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("获取版本列表失败: error=%s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 @router.get(
@@ -77,13 +93,21 @@ def get_test_by_version(
     """
     获取用户指定模式和版本的测试结果
     """
-    result = being_service.get_test_result(user_id, mode, version)
-    if not result:
-        raise HTTPException(
-            status_code=404, 
-            detail=f"未找到 {mode} 模式版本 {version} 的测试记录"
-        )
-    return result
+    try:
+        result = being_service.get_test_result(user_id, mode, version)
+        if not result:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"未找到 {mode} 模式版本 {version} 的测试记录"
+            )
+        return result
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("获取指定版本测试结果失败: error=%s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
 # ==================== 创建/更新接口 ====================
@@ -107,6 +131,7 @@ def create_test(
         result = being_service.save_test_result(user_id, mode, body.content)
         if not result:
             raise HTTPException(status_code=500, detail="创建测试记录失败")
+        logger.info("创建测试记录: user_id=%s, mode=%s, version=%s", user_id, mode, result.version)
         return result
     except LWBaseError:
         raise
@@ -140,6 +165,7 @@ def update_test(
                 status_code=404,
                 detail=f"更新失败，未找到 {mode} 模式版本 {version} 的记录"
             )
+        logger.info("更新测试记录: user_id=%s, mode=%s, version=%s", user_id, mode, version)
         return SuccessResponse(success=True, message="更新成功")
     except LWBaseError:
         raise
@@ -174,6 +200,7 @@ def delete_test(
                 status_code=404,
                 detail=f"删除失败，未找到 {mode} 模式版本 {version} 的记录"
             )
+        logger.info("删除测试记录: user_id=%s, mode=%s, version=%s", user_id, mode, version)
         return SuccessResponse(success=True, message="删除成功")
     except LWBaseError:
         raise
@@ -203,7 +230,15 @@ def generate_ai_abstract(
     
     注意：此功能待接入 LLM 后实现
     """
-    result = being_service.generate_ai_abstract(user_id, mode, version)
-    if result is None:
-        raise HTTPException(status_code=501, detail="AI 总结功能待实现")
-    return SuccessResponse(success=True, message="AI 总结生成成功")
+    try:
+        result = being_service.generate_ai_abstract(user_id, mode, version)
+        if result is None:
+            raise HTTPException(status_code=501, detail="AI 总结功能待实现")
+        return SuccessResponse(success=True, message="AI 总结生成成功")
+    except LWBaseError:
+        raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("生成AI总结失败: error=%s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="服务器内部错误")

@@ -14,6 +14,7 @@ from typing import Optional, List, Dict, Any, Tuple, Set
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
 
@@ -420,23 +421,27 @@ class HabitChallengeProvider(LWBaseDataProvider):
             挑战历史列表，按 finished_at 倒序
         """
         # 这个方法需要自定义 SQL，因为需要 IN 查询和特殊排序
-        with self.db.get_connection() as conn:
-            if status:
-                cursor = conn.execute(
-                    """SELECT * FROM habit_challenges
-                    WHERE habit_id = ? AND status = ?
-                    ORDER BY finished_at DESC""",
-                    (habit_id, status),
-                )
-            else:
-                cursor = conn.execute(
-                    """SELECT * FROM habit_challenges
-                    WHERE habit_id = ? AND status IN ('succeeded', 'failed')
-                    ORDER BY finished_at DESC""",
-                    (habit_id,),
-                )
-            columns = [desc[0] for desc in cursor.description]
-            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        try:
+            with self.db.get_connection() as conn:
+                if status:
+                    cursor = conn.execute(
+                        """SELECT * FROM habit_challenges
+                        WHERE habit_id = ? AND status = ?
+                        ORDER BY finished_at DESC""",
+                        (habit_id, status),
+                    )
+                else:
+                    cursor = conn.execute(
+                        """SELECT * FROM habit_challenges
+                        WHERE habit_id = ? AND status IN ('succeeded', 'failed')
+                        ORDER BY finished_at DESC""",
+                        (habit_id,),
+                    )
+                columns = [desc[0] for desc in cursor.description]
+                return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        except sqlite3.Error as e:
+            logger.error("获取挑战历史失败: error=%s", e)
+            raise DataAccessError(f"获取挑战历史失败: {e}") from e
 
     def delete_by_habit_id(self, habit_id: str) -> bool:
         """
@@ -448,11 +453,15 @@ class HabitChallengeProvider(LWBaseDataProvider):
         Returns:
             True
         """
-        with self.db.get_connection() as conn:
-            conn.execute(
-                "DELETE FROM habit_challenges WHERE habit_id = ?", (habit_id,)
-            )
-        return True
+        try:
+            with self.db.get_connection() as conn:
+                conn.execute(
+                    "DELETE FROM habit_challenges WHERE habit_id = ?", (habit_id,)
+                )
+            return True
+        except sqlite3.Error as e:
+            logger.error("按习惯ID删除挑战失败: error=%s", e)
+            raise DataAccessError(f"按习惯ID删除挑战失败: {e}") from e
 
 
 # ==================== HabitCheckinProvider ====================
@@ -572,12 +581,16 @@ class HabitCheckinProvider(LWBaseDataProvider):
         Returns:
             True
         """
-        with self.db.get_connection() as conn:
-            conn.execute(
-                "DELETE FROM habit_checkins WHERE habit_id = ? AND date = ?",
-                (habit_id, checkin_date),
-            )
-        return True
+        try:
+            with self.db.get_connection() as conn:
+                conn.execute(
+                    "DELETE FROM habit_checkins WHERE habit_id = ? AND date = ?",
+                    (habit_id, checkin_date),
+                )
+            return True
+        except sqlite3.Error as e:
+            logger.error("删除打卡记录失败: error=%s", e)
+            raise DataAccessError(f"删除打卡记录失败: {e}") from e
 
     def delete_by_habit_id(self, habit_id: str) -> bool:
         """
@@ -589,11 +602,15 @@ class HabitCheckinProvider(LWBaseDataProvider):
         Returns:
             True
         """
-        with self.db.get_connection() as conn:
-            conn.execute(
-                "DELETE FROM habit_checkins WHERE habit_id = ?", (habit_id,)
-            )
-        return True
+        try:
+            with self.db.get_connection() as conn:
+                conn.execute(
+                    "DELETE FROM habit_checkins WHERE habit_id = ?", (habit_id,)
+                )
+            return True
+        except sqlite3.Error as e:
+            logger.error("按习惯ID删除打卡失败: error=%s", e)
+            raise DataAccessError(f"按习惯ID删除打卡失败: {e}") from e
 
     def get_checkin_dates_by_challenge(
         self, habit_id: str, challenge_id: str
@@ -627,12 +644,16 @@ class HabitCheckinProvider(LWBaseDataProvider):
         Returns:
             打卡次数
         """
-        with self.db.get_connection() as conn:
-            cursor = conn.execute(
-                "SELECT COUNT(*) FROM habit_checkins WHERE challenge_id = ?",
-                (challenge_id,),
-            )
-            return cursor.fetchone()[0]
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM habit_checkins WHERE challenge_id = ?",
+                    (challenge_id,),
+                )
+                return cursor.fetchone()[0]
+        except sqlite3.Error as e:
+            logger.error("统计打卡失败: error=%s", e)
+            raise DataAccessError(f"统计打卡失败: {e}") from e
 
     def get_today_checkins(self, habit_ids: List[str]) -> Dict[str, bool]:
         """
@@ -650,12 +671,16 @@ class HabitCheckinProvider(LWBaseDataProvider):
         today = date.today().isoformat()
         placeholders = ",".join("?" * len(habit_ids))
 
-        with self.db.get_connection() as conn:
-            cursor = conn.execute(
-                f"SELECT habit_id FROM habit_checkins WHERE date = ? AND habit_id IN ({placeholders})",
-                [today] + list(habit_ids),
-            )
-            return {row[0]: True for row in cursor.fetchall()}
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.execute(
+                    f"SELECT habit_id FROM habit_checkins WHERE date = ? AND habit_id IN ({placeholders})",
+                    [today] + list(habit_ids),
+                )
+                return {row[0]: True for row in cursor.fetchall()}
+        except sqlite3.Error as e:
+            logger.error("获取今日打卡失败: error=%s", e)
+            raise DataAccessError(f"获取今日打卡失败: {e}") from e
 
     def get_checkins_in_date_range(
         self,

@@ -37,6 +37,7 @@ class ClassifyGraph:
         return await self.multi_classify_long(state, long_items)
 
     async def classify(self, state: classifyState) -> dict:
+        logger.info("classify 开始: 共 %s 条记录", len(state.log_items))
         if not state.log_items:
             logger.info("log_items 为空，跳过分类")
             return {"result_items": None}
@@ -86,7 +87,7 @@ class ClassifyGraph:
                 result = result.response.content
                 if result and result.strip() and result.strip().lower() != "none":
                     app_info.description = result.strip()
-                    logger.info("获取 %s 描述成功: %s", app, result[:50])
+                    logger.debug("获取 %s 描述成功: %s", app, result[:50])
                     return
                 logger.warning("获取 %s 描述为空（第 %s/%s 次）", app, attempt, MAX_RETRIES)
             except (asyncio.TimeoutError, LLMError, ConnectionError, OSError) as e:
@@ -107,6 +108,7 @@ class ClassifyGraph:
             for app, app_info in state.app_registry.items()
             if not app_info.description
         ]
+        logger.info("开始获取 app 描述: 共 %s 个 app", len(apps_without_desc))
         await asyncio.gather(*[
             self._fetch_one_description(app, app_info, system_prompt)
             for app, app_info in apps_without_desc
@@ -236,6 +238,7 @@ class ClassifyGraph:
             "你是一个通过网络搜索分析的助手，依据网络搜索结果和 title 分析用户的活动，"
             "要求结果在30字以内。只输出描述文字（用户活动），不要输出其他内容。"
         )
+        logger.info("开始获取 title 分析: 共 %s 条", len(items))
         await asyncio.gather(*[
             self._fetch_one_title(item, system_prompt)
             for item in items

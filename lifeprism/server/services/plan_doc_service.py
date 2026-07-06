@@ -57,7 +57,7 @@ def _write_content_to_file(doc_id: str, content: str):
     try:
         _ensure_plan_doc_dir()
         file_path.write_text(content, encoding='utf-8')
-        logger.info("写入计划书文件 %s 成功", doc_id)
+        logger.debug("写入计划书文件 %s 成功", doc_id)
     except Exception as e:
         logger.error("写入计划书文件 %s 失败: %s", doc_id, e)
 
@@ -68,7 +68,7 @@ def _delete_content_file(doc_id: str):
     try:
         if file_path.exists():
             file_path.unlink()
-            logger.info("删除计划书文件 %s 成功", doc_id)
+            logger.debug("删除计划书文件 %s 成功", doc_id)
     except Exception as e:
         logger.error("删除计划书文件 %s 失败: %s", doc_id, e)
 
@@ -204,6 +204,8 @@ def create_plan_doc(request: CreatePlanDocRequest) -> Optional[PlanDocItem]:
     if new_id is None:
         return None
 
+    logger.info("创建计划书: doc_id=%s", new_id)
+
     # 创建 md 文件
     _write_content_to_file(new_id, request.content)
 
@@ -280,6 +282,8 @@ def update_plan_doc(doc_id: str, request: UpdatePlanDocRequest) -> Optional[Plan
     if 'content' in explicitly_set_fields:
         _write_content_to_file(doc_id, request.content)
 
+    logger.info("更新计划书: doc_id=%s", doc_id)
+
     return get_plan_doc_detail(doc_id)
 
 
@@ -296,4 +300,7 @@ def delete_plan_doc(doc_id: str) -> bool:
     # 先删除文件
     _delete_content_file(doc_id)
     # 再删除数据库记录
-    return plan_doc_repository.delete_plan_doc(doc_id)
+    success = plan_doc_repository.delete_plan_doc(doc_id)
+    if success:
+        logger.info("删除计划书: doc_id=%s", doc_id)
+    return success

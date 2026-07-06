@@ -401,6 +401,8 @@ class GoalService:
         if new_id is None:
             return None
 
+        logger.info("创建目标: goal_id=%s, name=%s", new_id, data.get('name'))
+
         # 刷新缓存
         self._refresh_cache()
 
@@ -465,6 +467,8 @@ class GoalService:
         success = self.goal_repository.update_goal(goal_id, update_data)
         if not success:
             return None
+
+        logger.info("更新目标: goal_id=%s", goal_id)
 
         # 如果更新了 name 或 status，刷新缓存
         if 'name' in update_data or 'status' in update_data:
@@ -534,6 +538,7 @@ class GoalService:
         """
         success = self.goal_repository.delete_goal(goal_id)
         if success:
+            logger.info("删除目标: goal_id=%s", goal_id)
             # 刷新缓存
             self._refresh_cache()
         return success

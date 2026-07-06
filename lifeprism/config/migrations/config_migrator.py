@@ -113,7 +113,7 @@ def _backup_config(config_path: Path, current_version: int) -> None:
     )
     try:
         shutil.copy2(config_path, backup_path)
-        logger.info("已备份 %s → %s", config_path.name, backup_path.name)
+        logger.debug("已备份 %s → %s", config_path.name, backup_path.name)
         _cleanup_old_backups(config_path)
     except Exception:
         # LEGITIMATE: 辅助操作兜底 — 迁移失败不阻塞启动
@@ -130,4 +130,4 @@ def _cleanup_old_backups(config_path: Path, keep: int = 3) -> None:
     )
     for old in backups[keep:]:
         old.unlink()
-        logger.info("清理旧备份: %s", old.name)
+        logger.debug("清理旧备份: %s", old.name)

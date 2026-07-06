@@ -123,7 +123,8 @@ class WechatChannel(BaseChannel):
         try:
             test_body = {"get_updates_buf": ""}
             test_data = await self.client.api_post("ilink/bot/getupdates", test_body)
-            logger.info("Token 测试成功，返回数据: %s", test_data)
+            logger.info("Token 测试成功")
+            logger.debug("返回数据: %s", test_data)
         except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
             logger.error("Token 测试失败: error=%s", e, exc_info=True)
 
@@ -195,6 +196,7 @@ class WechatChannel(BaseChannel):
         try:
             from lifeprism.llm.channel.wechat.message import WechatMessage
             message_body = WechatMessage.build_text_message(wechat_user_id, content, context_token)
+            logger.info("开始发送消息到微信: user_id=%s, content_len=%s", wechat_user_id, len(content))
             await self.client.api_post("ilink/bot/sendmessage", message_body)
             logger.info("发送消息到微信: 用户id :%s", wechat_user_id)
         except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
@@ -227,9 +229,9 @@ class WechatChannel(BaseChannel):
                 logger.debug("轮询返回: get_updates_buf=%s..., 消息数=%s", get_updates_buf[:50], len(messages))
 
                 if messages:
-                    logger.info("*** 收到 %s 条消息 ***", len(messages))
+                    logger.debug("*** 收到 %s 条消息 ***", len(messages))
                     for idx, msg in enumerate(messages):
-                        logger.info("消息 %s: %s", idx+1, msg)
+                        logger.debug("消息 %s: %s", idx+1, msg)
                         await self._handle_wechat_message(msg)
 
             except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
@@ -304,7 +306,6 @@ class WechatChannel(BaseChannel):
 
             logger.info("准备发布到 bus: id=%s, content=%s", inbound_msg.id, content)
             # 发送到 bus
-            logger.info("发送消息")
             try:
                 response: OutboundMessage = await self.bus.send(inbound_msg)
 
@@ -340,7 +341,7 @@ class WechatChannel(BaseChannel):
                             "user_data": self._user_data
                         }
                         self.auth.save_state(state)
-                        logger.debug("已保存用户 %s 的数据", wechat_user_id)
+                        logger.info("已保存用户 %s 的数据", wechat_user_id)
                     except (OSError, IOError) as save_error:
                         logger.error("保存用户数据失败: error=%s", save_error, exc_info=True)
 
@@ -349,7 +350,6 @@ class WechatChannel(BaseChannel):
                     response.extra = {}
                 response.extra["wechat_user_id"] = wechat_user_id
 
-                logger.info("发送响应消息->wechat")
                 await self.send(response)
             except LWBaseError as e:
                 logger.error("处理消息失败: error=%s", e, exc_info=True)

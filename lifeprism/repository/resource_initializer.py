@@ -62,12 +62,12 @@ def initialize_resources() -> None:
         if rel.parts[0] in OVERWRITE_DIR_LIST:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
-            logger.info("已强制覆盖资源文件: %s", target)
+            logger.debug("已强制覆盖资源文件: %s", target)
             continue
 
         # 特殊处理：如果 agent/chat 目录在初始化前已存在，跳过复制 bootstrap.md
         if str(rel) == "agent/chat/bootstrap.md" and agent_chat_existed_before:
-            logger.info("agent/chat 目录已存在，跳过复制 bootstrap.md: %s", target)
+            logger.debug("agent/chat 目录已存在，跳过复制 bootstrap.md: %s", target)
             continue
 
         if target.exists():
@@ -75,4 +75,4 @@ def initialize_resources() -> None:
 
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
-        logger.info("已初始化资源文件: %s", target)
+        logger.debug("已初始化资源文件: %s", target)

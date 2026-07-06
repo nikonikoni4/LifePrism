@@ -322,10 +322,10 @@ def migrate_data_path(target_base_path: str, migrate_data: bool = True) -> Migra
                 dst = new_path / subdir
                 if src.exists() and src.is_dir():
                     shutil.copytree(str(src), str(dst), dirs_exist_ok=True)
-                    logger.info("已复制: %s -> %s", src, dst)
+                    logger.debug("已复制: %s -> %s", src, dst)
                 else:
                     dst.mkdir(parents=True, exist_ok=True)
-                    logger.info("源目录不存在，已创建空目录: %s", dst)
+                    logger.debug("源目录不存在，已创建空目录: %s", dst)
         except Exception as e:
             logger.error("复制数据失败: %s", e)
             return MigrateDataPathResponse(

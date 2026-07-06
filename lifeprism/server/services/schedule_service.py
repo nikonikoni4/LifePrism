@@ -173,7 +173,7 @@ class ScheduleService:
         last_execution = state.get(job_id)
 
         if last_execution == today:
-            logger.info("任务 %s 今天已执行过（%s），跳过", job_id, today)
+            logger.debug("任务 %s 今天已执行过（%s），跳过", job_id, today)
             return False
 
         return True
@@ -216,7 +216,7 @@ class ScheduleService:
                             logger.info("已过今日 %s:%02d，异步执行一次 %s", target_hour, target_minute, job_id)
                             asyncio.get_event_loop().create_task(self._execute_cron_with_state(job_config["func"], job_id))
                         else:
-                            logger.info("任务 %s 今天已执行过，跳过补偿执行", job_id)
+                            logger.debug("任务 %s 今天已执行过，跳过补偿执行", job_id)
             except Exception as e:
                 logger.error("添加系统任务 %s 失败: error=%s", job_config['job_id'], e)
 

@@ -172,7 +172,7 @@ class QuerySessionListTool(Tool):
                     "last_user_message": data["last_user_message"]
                 }
 
-            logger.info("查询会话列表: date_filter=%s, 结果数=%s", date_filter, len(result))
+            logger.debug("查询会话列表: date_filter=%s, 结果数=%s", date_filter, len(result))
             return result
 
         except Exception as e:
@@ -274,7 +274,7 @@ class QuerySessionHistoryTool(Tool):
             messages.reverse()
             result = messages[:min(limit, 50)]
 
-            logger.info("查询会话历史: session_id=%s, limit=%s, 结果数=%s", session_id, limit, len(result))
+            logger.debug("查询会话历史: session_id=%s, limit=%s, 结果数=%s", session_id, limit, len(result))
             return result
 
         except Exception as e:

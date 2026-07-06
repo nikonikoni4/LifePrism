@@ -257,7 +257,7 @@ def insert_todo_to_md(
     """
     md_content = _read_plan_doc_content(plan_doc_id)
     if md_content is None:
-        logger.info("MD 文件不存在，创建新文件: %s", plan_doc_id)
+        logger.debug("MD 文件不存在，创建新文件: %s", plan_doc_id)
         file_path = _get_plan_doc_path(plan_doc_id)
 
         # 确保目录存在
@@ -273,7 +273,7 @@ def insert_todo_to_md(
 
     blocks = _get_all_todoblocks(md_content)
     if not blocks:
-        logger.info("无 todoblock，自动创建: %s", plan_doc_id)
+        logger.debug("无 todoblock，自动创建: %s", plan_doc_id)
         md_content = _ensure_todoblock_exists(md_content)
         if not _write_plan_doc_content(plan_doc_id, md_content):
             logger.error("写入 todoblock 失败: %s", plan_doc_id)
@@ -324,7 +324,7 @@ def insert_todo_to_md(
 
     new_md_content = _update_system_section(new_md_content, plan_doc_id)
     if _write_plan_doc_content(plan_doc_id, new_md_content):
-        logger.info("插入任务到 MD 成功: %s/%s (block %s)", plan_doc_id, new_anchor, target_block_index)
+        logger.debug("插入任务到 MD 成功: %s/%s (block %s)", plan_doc_id, new_anchor, target_block_index)
         return new_anchor
 
     return None
@@ -361,7 +361,7 @@ def update_todo_in_md(plan_doc_id: str, anchor_id: str, new_content: str) -> boo
 
     new_md_content = _update_system_section(new_md_content, plan_doc_id)
     if _write_plan_doc_content(plan_doc_id, new_md_content):
-        logger.info("更新任务内容成功: %s/%s", plan_doc_id, anchor_id)
+        logger.debug("更新任务内容成功: %s/%s", plan_doc_id, anchor_id)
         return True
 
     return False
@@ -431,7 +431,7 @@ def delete_todo_from_md(plan_doc_id: str, anchor_id: str) -> bool:
 
     new_md_content = _update_system_section(new_md_content, plan_doc_id)
     if _write_plan_doc_content(plan_doc_id, new_md_content):
-        logger.info("从 MD 删除任务成功: %s/%s (block %s)", plan_doc_id, anchor_id, target_block_index)
+        logger.debug("从 MD 删除任务成功: %s/%s (block %s)", plan_doc_id, anchor_id, target_block_index)
         return True
 
     return False
@@ -705,7 +705,7 @@ def writeback_completion_to_md(plan_doc_id: str, anchor_id: str) -> bool:
     content = _update_system_section(content, plan_doc_id)
 
     if _write_plan_doc_content(plan_doc_id, content):
-        logger.info("回写完成状态成功: %s/%s", plan_doc_id, anchor_id)
+        logger.debug("回写完成状态成功: %s/%s", plan_doc_id, anchor_id)
         return True
 
     return False
@@ -741,7 +741,7 @@ def writeback_uncomplete_to_md(plan_doc_id: str, anchor_id: str) -> bool:
     content = _update_system_section(content, plan_doc_id)
 
     if _write_plan_doc_content(plan_doc_id, content):
-        logger.info("回写取消完成状态成功: %s/%s", plan_doc_id, anchor_id)
+        logger.debug("回写取消完成状态成功: %s/%s", plan_doc_id, anchor_id)
         return True
 
     return False

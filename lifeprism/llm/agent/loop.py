@@ -76,6 +76,7 @@ class AgentLoop:
         """
         llm = create_llm_client()
         messages = Context.build_prompt(system_prompt, session.get_history_message())
+        logger.info("LLM 调用开始, session=%s", session.id)
         response: LLMResponse = await llm.chat(
             messages=messages,
             tools=tools
@@ -225,6 +226,7 @@ class AgentLoop:
                 new_session = session_manager.get_or_create_session()
                 # 立即保存 session 到文件，避免重启后丢失
                 session_manager.save_session(new_session)
+                logger.info("保存新会话: session_id=%s", new_session.id)
 
                 # 构造响应文本
                 response_text = f"[SUCCESS] 新建会话 {new_session.id} --- 可以开始新的聊天了！"
@@ -252,8 +254,8 @@ class AgentLoop:
 
                 # 3. 检查session_id是否存在
                 if session_id not in session_manager.show_session_list():
-                    logger.info("session_id ： %s", session_id)
-                    logger.info("session_list ： %s", session_manager.show_session_list())
+                    logger.debug("session_id ： %s", session_id)
+                    logger.debug("session_list ： %s", session_manager.show_session_list())
                     return OutboundMessage(
                         id=msg.id,
                         response=LLMResponse(content=f"[ERROR] 会话 {session_id} 不存在")
@@ -404,6 +406,7 @@ class AgentLoop:
             session.add_message("user", content=Context._build_user_message(msg))
             if msg.type == MessageType.CHAT: 
                 session_manager.save_session(session)
+                logger.info("保存会话: session_id=%s", session.id)
 
             # 4. 调用 LLM
             result, tool_call_chain = await self._run_agent_loop(session, system_prompt, tools)
@@ -421,7 +424,9 @@ class AgentLoop:
             # 6. 保存session
             if msg.type == MessageType.CHAT: # 只有聊天数据才保存
                 session_manager.save_session(session)
+                logger.info("保存会话: session_id=%s", session.id)
         except ValueError as e:
+            logger.error("处理消息失败: msg_id=%s, error=%s", msg.id, e)
             raise 
         except Exception as e:
             logger.error("[AgentLoop] 处理消息 id=%s 时出错: %s", msg.id, e, exc_info=True)
@@ -498,6 +503,7 @@ class AgentLoop:
             }
         ]
         try : 
+            logger.info("auto_compact LLM 调用开始, session=%s", session.id)
             response:LLMResponse= await llm.chat(messages)
         except Exception as e:
             logger.error("auto compact llm 处理出错, %s", e)
@@ -509,6 +515,7 @@ class AgentLoop:
         session.add_message("user",f"# 消息压缩总结 \n\n{response.content}",**{'is_compact_summary':True})
         # 5. 保存session
         session_manager.save_session(session)
+        logger.info("保存会话: session_id=%s", session.id)
         return session
         
 agent_loop = LazySingleton(AgentLoop, bus=bus)

@@ -190,6 +190,8 @@ def create_expand_dir(data: CreateExpandDirRequest) -> ExpandDirItem:
     # 保存
     _save_data(file_data)
 
+    logger.info("创建扩展文件夹: folder_id=%s", new_id)
+
     return ExpandDirItem(**new_item)
 
 
@@ -247,6 +249,8 @@ def update_expand_dir(id: str, data: UpdateExpandDirRequest) -> ExpandDirItem:
     # 保存
     _save_data(file_data)
 
+    logger.info("更新扩展文件夹: folder_id=%s", id)
+
     return ExpandDirItem(**updated_item)
 
 
@@ -280,3 +284,5 @@ def delete_expand_dir(id: str) -> None:
 
     # 保存
     _save_data(file_data)
+
+    logger.info("删除扩展文件夹: folder_id=%s", id)

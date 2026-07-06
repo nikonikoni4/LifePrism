@@ -46,6 +46,7 @@ class AWBaseDataProvider:
     def _validate_database(self):
         """验证数据库文件是否存在"""
         if not os.path.exists(self.db.DB_PATH):
+            logger.error("数据库文件不存在: %s", self.db.DB_PATH)
             raise FileNotFoundError(
                 f"ActivityWatch 数据库文件不存在: {self.db.DB_PATH}\n"
                 f"请检查配置文件中的 ACTIVITYWATCH_DATABASE_PATH 是否正确"

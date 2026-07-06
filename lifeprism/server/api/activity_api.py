@@ -189,7 +189,7 @@ async def get_activity_logs(
     except HTTPException:
         raise
     except ValueError as e:
-        logger.error("获取活动日志失败: %s", str(e))
+        logger.warning("获取活动日志失败: %s", str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error("获取活动日志失败: error=%s", e, exc_info=True)
@@ -255,6 +255,7 @@ async def update_log_category(
             category_id=category_id,
             sub_category_id=sub_category_id
         )
+        logger.info("更新日志分类: log_id=%s, category_id=%s, sub_category_id=%s", log_id, category_id, sub_category_id)
         return StandardResponse(
             success=success,
             message=f"日志 '{log_id}' 分类更新{'成功' if success else '失败'}"
@@ -301,6 +302,7 @@ async def batch_update_log_category(
             category_id=category_id,
             sub_category_id=sub_category_id
         )
+        logger.info("批量更新日志分类: count=%s, category_id=%s", len(log_ids), category_id)
         return StandardResponse(
             success=True,
             data={"updated_count": updated_count},
@@ -336,6 +338,7 @@ async def batch_delete_logs(
     """
     try:
         deleted_count = activity_service.batch_delete_logs(log_ids)
+        logger.info("批量删除日志: deleted_count=%s", len(log_ids))
         return StandardResponse(
             success=True,
             data={"deleted_count": deleted_count},
@@ -366,6 +369,7 @@ async def delete_log(log_id: str) -> StandardResponse:
     """
     try:
         success = activity_service.delete_log(log_id)
+        logger.info("删除日志: log_id=%s", log_id)
         return StandardResponse(
             success=success,
             message=f"日志 '{log_id}' 删除{'成功' if success else '失败'}"
@@ -431,7 +435,7 @@ async def update_logs_by_cache(
             start_date=start_date,
             end_date=end_date
         )
-        
+        logger.info("根据缓存更新日志: app=%s, title=%s, updated_count=%s", app, title, updated_count)
         return StandardResponse(
             success=True,
             data={"updated_count": updated_count},

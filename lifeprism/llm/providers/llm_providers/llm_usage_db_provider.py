@@ -48,7 +48,7 @@ class LLMUsageDataProvider(LWBaseDataProvider):
         try:
             return self.upsert_session_tokens_usage(session_id, usage_data)
         except Exception as e:
-            logger.error("[LLMUsageDataProvider] 保存 token 使用情况失败: %s", e)
+            logger.warning("[LLMUsageDataProvider] 保存 token 使用情况失败: %s", e)
             return 0
 
     def batch_save_usage(self, usage_list: list[dict[str, Any]]) -> int:
@@ -67,7 +67,7 @@ class LLMUsageDataProvider(LWBaseDataProvider):
         try:
             return self.save_tokens_usage(usage_list)
         except Exception as e:
-            logger.error("[LLMUsageDataProvider] 批量保存 token 使用情况失败: %s", e)
+            logger.warning("[LLMUsageDataProvider] 批量保存 token 使用情况失败: %s", e)
             return 0
 
 

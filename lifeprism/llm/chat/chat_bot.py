@@ -22,6 +22,7 @@ class ChatBot:
 
             # 2. 发送消息
             # 注意：不再此处手动添加消息，因为 AgentLoop 会处理消息的接收、存储和回复存储
+            logger.info("ChatBot.chat 开始: session_id=%s, content_len=%s", session_id, len(content))
             msg = InboundMessage(
                 content=content,
                 session_id=session.id,
@@ -44,14 +45,17 @@ class ChatBot:
                 logger.warning("记录 LLM 调用日志失败: %s", log_e)
 
             # 3. 包装响应
+            result = None
             if isinstance(response_data,OutboundMessage):
-                return response_data.response
-            if isinstance(response_data, LLMResponse):
-                return response_data
-            if isinstance(response_data, str):
-                return LLMResponse(content=response_data)
-
-            return response_data
+                result = response_data.response
+            elif isinstance(response_data, LLMResponse):
+                result = response_data
+            elif isinstance(response_data, str):
+                result = LLMResponse(content=response_data)
+            else:
+                result = response_data
+            logger.info("ChatBot.chat 完成: session_id=%s", session_id)
+            return result
         except Exception as e:
             logger.error("[ChatBot] Chat error: %s", e, exc_info=True)
             raise

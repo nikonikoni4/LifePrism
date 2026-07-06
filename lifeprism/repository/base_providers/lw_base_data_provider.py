@@ -664,9 +664,9 @@ class LWBaseDataProvider:
                 latest_time = result[0] if result and result[0] else None
                 
                 if latest_time:
-                    logger.info("数据库中最新的 end_time: %s", latest_time)
+                    logger.debug("数据库中最新的 end_time: %s", latest_time)
                 else:
-                    logger.info("数据库为空，没有历史数据")
+                    logger.debug("数据库为空，没有历史数据")
                 
                 return latest_time
         except sqlite3.Error as e:
@@ -908,12 +908,12 @@ class LWBaseDataProvider:
             if existing:
                 # 存在则 UPDATE
                 affected = self.db.update('tokens_usage_log', data, where={'session_id': session_id})
-                logger.debug("更新会话 %s 的 token 使用记录", session_id)
+                logger.info("更新会话 %s 的 token 使用记录", session_id)
             else:
                 # 不存在则 INSERT
                 data['session_id'] = session_id
                 affected = self.db.insert('tokens_usage_log', data)
-                logger.debug("插入会话 %s 的 token 使用记录", session_id)
+                logger.info("插入会话 %s 的 token 使用记录", session_id)
             
             return affected
             

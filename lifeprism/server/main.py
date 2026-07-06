@@ -189,7 +189,7 @@ async def lifespan(app: FastAPI):
                 app.state.monitor_process = start_monitor_process()
                 logger.info("内置监控进程启动成功")
             except Exception as e:
-                logger.error("启动内置监控进程失败: error=%s", e)
+                logger.warning("启动内置监控进程失败: error=%s", e)
                 app.state.monitor_process = None
         else:
             app.state.monitor_process = None
@@ -200,7 +200,7 @@ async def lifespan(app: FastAPI):
             await wechat_channel.start()
             logger.info("微信渠道启动成功")
         except Exception as e:
-            logger.error("启动微信渠道失败: error=%s", e)
+            logger.warning("启动微信渠道失败: error=%s", e)
 
         _total_lifespan = (time.perf_counter() - _startup_timer) * 1000
         print(f"\n{'='*60}")
@@ -222,7 +222,7 @@ async def lifespan(app: FastAPI):
         schedule_service.start()
         logger.info("[STARTUP] ScheduleService started")
     except Exception as e:
-        logger.error("启动定时任务服务失败: error=%s", e)
+        logger.warning("启动定时任务服务失败: error=%s", e)
 
     # 初始化 ChatBot 服务和 AgentLoop
     from lifeprism.llm.agent.loop import agent_loop
@@ -495,7 +495,7 @@ def find_available_port(config_path: str = None) -> int:
     # 按顺序尝试端口
     for port in fallback_list:
         if is_port_available(port):
-            logger.info("[STARTUP] 端口 %s 可用", port)
+            logger.debug("[STARTUP] 端口 %s 可用", port)
             return port
         else:
             logger.warning("[STARTUP] 端口 %s 被占用，尝试下一个...", port)
@@ -513,7 +513,7 @@ if __name__ == "__main__":
 
     # Windows 下 multiprocessing 必须调用 freeze_support()
     multiprocessing.freeze_support()
-    logger.warning(multiprocessing.current_process().name) # 之前重复运行的问题在打包环境下还存在？
+    logger.debug(multiprocessing.current_process().name) # 之前重复运行的问题在打包环境下还存在？
     # 防止子进程重复启动服务器（只需 2 行代码）
     if multiprocessing.current_process().name != 'MainProcess':
         print("===============================")

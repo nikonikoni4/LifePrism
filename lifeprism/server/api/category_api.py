@@ -177,6 +177,7 @@ async def create_category(request: CreateCategoryRequest):
             name=request.name,
             color=request.color
         )
+        logger.info("创建主分类: name=%s, color=%s", request.name, request.color)
         return category
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
@@ -210,6 +211,7 @@ async def update_category(
             name=request.name or "",
             color=request.color or ""
         )
+        logger.info("更新主分类: category_id=%s", category_id)
         return category
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
@@ -239,6 +241,7 @@ async def delete_category(
             category_id=category_id,
             reassign_to=request.reassign_to
         )
+        logger.info("删除主分类: category_id=%s, reassign_to=%s", category_id, request.reassign_to)
         return StandardResponse(
             success=True,
             data={"deleted": success},
@@ -274,6 +277,7 @@ async def create_sub_category(
             category_id=parent_id,
             name=request.name
         )
+        logger.info("创建子分类: parent_id=%s, name=%s", parent_id, request.name)
         return sub_category
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
@@ -308,6 +312,7 @@ async def update_sub_category(
             sub_id=sub_id,
             name=request.name
         )
+        logger.info("更新子分类: parent_id=%s, sub_id=%s", parent_id, sub_id)
         return sub_category
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
@@ -335,6 +340,7 @@ async def delete_sub_category(
             category_id=parent_id,
             sub_id=sub_id
         )
+        logger.info("删除子分类: parent_id=%s, sub_id=%s", parent_id, sub_id)
         return StandardResponse(
             success=True,
             data={"deleted": success},
@@ -371,6 +377,7 @@ async def toggle_category_state(
             category_id=category_id,
             state=request.state
         )
+        logger.info("切换主分类状态: category_id=%s, state=%s", category_id, request.state)
         return category
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
@@ -401,6 +408,7 @@ async def toggle_sub_category_state(
             sub_id=sub_id,
             state=request.state
         )
+        logger.info("切换子分类状态: parent_id=%s, sub_id=%s, state=%s", parent_id, sub_id, request.state)
         return sub_category
     except LWBaseError:
         raise  # 让全局 handler 映射为正确 HTTP 状态码
@@ -561,6 +569,7 @@ async def batch_delete_category_map_cache(
     """
     try:
         count = category_service.batch_delete_category_map_cache(record_ids=request.ids)
+        logger.info("批量删除分类缓存: deleted_count=%s", count)
         return StandardResponse(
             success=True,
             data={"deleted_count": count},
@@ -588,6 +597,7 @@ async def delete_category_map_cache(
         success = category_service.delete_category_map_cache(record_id=record_id)
         if not success:
             raise HTTPException(status_code=404, detail=f"记录 ID={record_id} 不存在")
+        logger.info("删除分类缓存记录: record_id=%s", record_id)
         return StandardResponse(
             success=True,
             data={"deleted": True},

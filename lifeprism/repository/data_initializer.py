@@ -323,7 +323,7 @@ class DataInitializer:
             else:
                 logger.warning("示例计划书源文件不存在: %s", source)
         except Exception as e:
-            logger.error("生成示例计划书 MD 文件失败: error=%s", e)
+            logger.warning("生成示例计划书 MD 文件失败: error=%s", e)
 
     def _initialize_default_mood_types(self):
         """

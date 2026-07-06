@@ -67,7 +67,7 @@ def get_window_title(hwnd: int) -> str:
         return win32gui.GetWindowText(hwnd)
     except Exception as e:
         # LEGITIMATE: 第三方未知错误 — Windows API 可能抛非预期异常
-        logger.error("获取窗口标题失败 (HWND: %s): %s", hwnd, e)
+        logger.warning("获取窗口标题失败 (HWND: %s): %s", hwnd, e)
         return ""
 
 def get_app_name(hwnd: int) -> str:

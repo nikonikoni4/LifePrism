@@ -74,7 +74,7 @@ class ProcessorMonitorDataProvider(LWBaseDataProvider):
 
                 return events
         except Exception as e:
-            logger.error("获取内置监控事件失败: %s", e)
+            logger.warning("获取内置监控事件失败: %s", e)
             return []
 
 

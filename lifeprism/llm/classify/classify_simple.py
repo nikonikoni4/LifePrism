@@ -47,11 +47,12 @@ class ClassifySimple:
         raw = raw.response.content
         clean = extract_json_from_response(raw)
         if not clean:
-            logger.error("classify_simple 批次 %s 返回空内容，跳过", batch_num)
+            logger.warning("classify_simple 批次 %s 返回空内容，跳过", batch_num)
             return
         parse_classification_result(result_items, json.loads(clean), "classify_simple")
 
     async def classify(self, state: classifyState) -> dict:
+        logger.info("classify_simple 开始: 共 %s 条记录", len(state.log_items))
         if not state.log_items:
             logger.info("log_items 为空，跳过分类")
             return {"result_items": None, "tokens_usage": {}}

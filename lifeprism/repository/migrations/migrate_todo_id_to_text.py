@@ -43,7 +43,7 @@ def run_migration():
         cursor.execute("PRAGMA table_info(todo_list)")
         columns = {row[1]: row[2] for row in cursor.fetchall()}
         if columns.get('id') == 'TEXT':
-            logger.info("todo_list.id 已经是 TEXT 类型，跳过迁移")
+            logger.debug("todo_list.id 已经是 TEXT 类型，跳过迁移")
             return True
 
         # 记录迁移前行数
@@ -51,30 +51,30 @@ def run_migration():
         todo_count_before = cursor.fetchone()[0]
         cursor.execute("SELECT COUNT(*) FROM timeline_custom_block")
         timeline_count_before = cursor.fetchone()[0]
-        logger.info("迁移前: todo_list=%s 行, timeline_custom_block=%s 行", todo_count_before, timeline_count_before)
+        logger.debug("迁移前: todo_list=%s 行, timeline_custom_block=%s 行", todo_count_before, timeline_count_before)
 
         # 步骤 1: 创建临时映射表
-        logger.info("步骤 1: 创建 ID 映射表...")
+        logger.debug("步骤 1: 创建 ID 映射表...")
         _create_id_map(cursor)
 
         # 步骤 2: 重建 timeline_custom_block（先于 todo_list）
-        logger.info("步骤 2: 重建 timeline_custom_block...")
+        logger.debug("步骤 2: 重建 timeline_custom_block...")
         _rebuild_timeline_custom_block(cursor)
 
         # 步骤 3: 重建 todo_list
-        logger.info("步骤 3: 重建 todo_list...")
+        logger.debug("步骤 3: 重建 todo_list...")
         _rebuild_todo_list(cursor)
 
         # 步骤 4: 重建索引
-        logger.info("步骤 4: 重建索引...")
+        logger.debug("步骤 4: 重建索引...")
         _rebuild_indexes(cursor)
 
         # 步骤 5: 删除临时映射表
-        logger.info("步骤 5: 清理临时表...")
+        logger.debug("步骤 5: 清理临时表...")
         cursor.execute("DROP TABLE IF EXISTS _todo_id_map")
 
         # 步骤 6: 验证
-        logger.info("步骤 6: 验证迁移结果...")
+        logger.debug("步骤 6: 验证迁移结果...")
         _verify_migration(cursor, todo_count_before, timeline_count_before)
 
         conn.commit()
@@ -109,7 +109,7 @@ def _create_id_map(cursor: sqlite3.Cursor):
         FROM todo_list
     """)
     mapped = cursor.rowcount
-    logger.info("  映射 %s 条记录", mapped)
+    logger.debug("  映射 %s 条记录", mapped)
 
 
 def _rebuild_timeline_custom_block(cursor: sqlite3.Cursor):
@@ -117,7 +117,7 @@ def _rebuild_timeline_custom_block(cursor: sqlite3.Cursor):
     # 检查 timeline_custom_block 是否存在
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='timeline_custom_block'")
     if not cursor.fetchone():
-        logger.info("  timeline_custom_block 表不存在，跳过")
+        logger.debug("  timeline_custom_block 表不存在，跳过")
         return
 
     cursor.execute("""
@@ -152,7 +152,7 @@ def _rebuild_timeline_custom_block(cursor: sqlite3.Cursor):
     migrated = cursor.rowcount
     cursor.execute("DROP TABLE timeline_custom_block")
     cursor.execute("ALTER TABLE timeline_custom_block_new RENAME TO timeline_custom_block")
-    logger.info("  迁移 %s 条 timeline 记录", migrated)
+    logger.debug("  迁移 %s 条 timeline 记录", migrated)
 
 
 def _rebuild_todo_list(cursor: sqlite3.Cursor):
@@ -200,7 +200,7 @@ def _rebuild_todo_list(cursor: sqlite3.Cursor):
     migrated = cursor.rowcount
     cursor.execute("DROP TABLE todo_list")
     cursor.execute("ALTER TABLE todo_list_new RENAME TO todo_list")
-    logger.info("  迁移 %s 条 todo 记录", migrated)
+    logger.debug("  迁移 %s 条 todo 记录", migrated)
 
 
 def _rebuild_indexes(cursor: sqlite3.Cursor):
@@ -219,7 +219,7 @@ def _rebuild_indexes(cursor: sqlite3.Cursor):
     ]
     for name, table, cols in indexes:
         cursor.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {table}({cols})")
-        logger.info("  创建索引: %s", name)
+        logger.debug("  创建索引: %s", name)
 
 
 def _verify_migration(cursor: sqlite3.Cursor, todo_expected: int, timeline_expected: int):
@@ -272,7 +272,7 @@ def _verify_migration(cursor: sqlite3.Cursor, todo_expected: int, timeline_expec
             logger.error("  验证失败: %s", e)
         raise RuntimeError("迁移验证失败: " + "; ".join(errors))
 
-    logger.info("  验证通过: todo=%s, timeline=%s, 无孤儿引用", todo_actual, timeline_actual)
+    logger.debug("  验证通过: todo=%s, timeline=%s, 无孤儿引用", todo_actual, timeline_actual)
 
 
 def check_migration_status():

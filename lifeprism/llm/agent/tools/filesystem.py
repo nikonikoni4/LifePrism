@@ -7,7 +7,6 @@ from lifeprism.utils import get_logger,DEBUG
 from lifeprism.config import settings
 import asyncio
 logger = get_logger(__name__)
-logger.debug(DEBUG)
 
 class _FileTool(Tool):
     """文件系统工具基类，提供路径权限验证功能"""
@@ -327,6 +326,7 @@ class WriteFileTool(_FileTool):
             file_path.parent.mkdir(parents=True, exist_ok=True)
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
+            logger.info("文件写入成功: %s", file_path)
             return f"{SUCCESS}: 文件 {file_path} 已成功写入"
         except Exception as e:
             return f"{ERROR}: 写入文件 {file_path} 时出错: {str(e)}"
@@ -392,10 +392,10 @@ def _replace_content(
         # 构建成功消息
         if match_count > 1 and not replace_all:
             message = f"文件 {file_path} 更新成功，替换了第 1 个匹配项（共找到 {match_count} 个匹配项）"
-            logger.info(message)
+            logger.debug(message)
         else:
             message = f"文件 {file_path} 更新成功，替换了 {replaced_count} 个匹配项"
-            logger.info(message)
+            logger.debug(message)
 
         return {
             "message": message,

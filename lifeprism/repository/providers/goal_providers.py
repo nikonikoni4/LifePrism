@@ -482,7 +482,7 @@ class GoalProvider(LWBaseDataProvider):
             }
             success = self._generic_update(goal_id, data)
             if success:
-                logger.debug("更新目标 %s 投入时间: %s 秒", goal_id, time_invested)
+                logger.info("更新目标 %s 投入时间: %s 秒", goal_id, time_invested)
             return success
 
         except Exception as e:
@@ -669,7 +669,7 @@ class GoalStatsProvider(LWBaseDataProvider):
                         VALUES (?, ?, ?, ?)
                     """, (goal_id, date, time_spent, todo_count))
 
-                logger.debug("目标 %s 在 %s 的统计数据已更新", goal_id, date)
+                logger.info("目标 %s 在 %s 的统计数据已更新", goal_id, date)
                 return True
 
         except Exception as e:

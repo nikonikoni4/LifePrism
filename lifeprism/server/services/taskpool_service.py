@@ -140,6 +140,8 @@ def create_todo_v2(data: Dict[str, Any]) -> Optional[TodoItem]:
     if not new_id:
         return None
 
+    logger.info("创建任务: todo_id=%s", new_id)
+
     db_item = todo_repository.get_todo_by_id(new_id)
     if not db_item:
         return None
@@ -186,6 +188,8 @@ def update_todo_with_writeback(
     success = todo_repository.update_todo(todo_id, updates)
     if not success:
         return None
+
+    logger.info("更新任务: todo_id=%s", todo_id)
 
     # 4. 检查是否需要回写 MD（id 就是锚点）
     md_synced = False
@@ -235,4 +239,6 @@ def delete_todo(todo_id: str) -> bool:
         delete_todo_from_md(plan_doc_id, anchor_id)
 
     deleted_count = todo_repository.delete_todo_cascade(todo_id)
+    if deleted_count > 0:
+        logger.info("删除任务: todo_id=%s", todo_id)
     return deleted_count > 0

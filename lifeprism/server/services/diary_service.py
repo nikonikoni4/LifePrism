@@ -204,6 +204,7 @@ def get_diary(date: str) -> Optional[DiaryItem]:
         item = diary_repository.get_diary_by_date(date)
         if not item:
             return None
+    logger.info("创建日记: date=%s", date)
     return _convert_db_to_diary_item(item, include_content=True)
 
 
@@ -235,6 +236,8 @@ def update_diary_meta(date: str, request: UpdateDiaryMetaRequest) -> Optional[Di
     if update_data:
         diary_repository.update_diary(date, update_data)
 
+    logger.info("更新日记元数据: date=%s, fields=%s", date, list(update_data.keys()))
+
     return _convert_db_to_diary_item(
         diary_repository.get_diary_by_date(date) or existing,
         include_content=True
@@ -259,6 +262,8 @@ def save_diary_content(date: str, request: SaveDiaryContentRequest) -> Optional[
     _write_diary_content(date, request.content)
     word_count = _calculate_word_count(request.content)
     diary_repository.update_diary(date, {'word_count': word_count})
+
+    logger.info("保存日记内容: date=%s, word_count=%s", date, word_count)
 
     return _convert_db_to_diary_item(
         diary_repository.get_diary_by_date(date) or existing,
@@ -294,14 +299,17 @@ async def generate_diary_ai_summary(date: str) -> DiaryAISummaryResponse:
 
     mood, importance, custom_tags = _map_diary_meta_for_summary(item)
     outdate_summary = item.get("ai_summary")
+    logger.info("开始 AI 日记总结: date=%s", date)
     result = await ai_diary_summary(date, mood, importance, custom_tags, outdate_summary=outdate_summary)
     summary_content = _extract_summary_content(result)
     if not summary_content:
+        logger.error("AI 总结生成失败: date=%s", date)
         raise ValueError("AI 总结生成失败")
 
     source_hash = _compute_diary_source_hash(content)
     success = diary_repository.update_diary(date, {"ai_summary": summary_content, "diary_source_hash": source_hash})
     if not success:
+        logger.error("AI 总结保存失败: date=%s", date)
         raise ValueError("AI 总结保存失败")
 
     return DiaryAISummaryResponse(content=summary_content)

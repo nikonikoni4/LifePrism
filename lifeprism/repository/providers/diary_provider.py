@@ -167,6 +167,8 @@ class DiaryProvider(LWBaseDataProvider):
                     cursor.execute(sql, values)
                     conn.commit()
 
+                    if cursor.rowcount > 0:
+                        logger.info("更新日记: date=%s", date)
                     return cursor.rowcount > 0
             else:
                 # 如果已经提供了 updated_at，使用通用方法

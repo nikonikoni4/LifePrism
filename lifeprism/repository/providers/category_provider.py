@@ -109,7 +109,7 @@ class CategoryProvider(LWBaseDataProvider):
         allowed_fields = self._UPDATE_FIELDS | {self._PRIMARY_KEY}
         invalid_fields = set(data.keys()) - allowed_fields
         if invalid_fields:
-            logger.error(
+            logger.warning(
                 "创建分类失败: 无效字段=%s, 允许字段=%s, 输入data=%s",
                 invalid_fields, allowed_fields, data
             )
@@ -123,7 +123,7 @@ class CategoryProvider(LWBaseDataProvider):
         required_fields = {'id', 'name', 'color'}
         missing_fields = required_fields - set(data.keys())
         if missing_fields:
-            logger.error(
+            logger.warning(
                 "创建分类失败: 缺少必填字段=%s, 已提供字段=%s",
                 missing_fields, list(data.keys())
             )
@@ -161,7 +161,7 @@ class CategoryProvider(LWBaseDataProvider):
         # 白名单验证
         invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
         if invalid_fields:
-            logger.error(
+            logger.warning(
                 "更新分类失败: category_id=%s, 无效字段=%s, 允许字段=%s",
                 category_id, invalid_fields, self._UPDATE_FIELDS
             )
@@ -295,7 +295,7 @@ class SubCategoryProvider(LWBaseDataProvider):
         allowed_fields = self._UPDATE_FIELDS | {self._PRIMARY_KEY}
         invalid_fields = set(data.keys()) - allowed_fields
         if invalid_fields:
-            logger.error(
+            logger.warning(
                 "创建子分类失败: 无效字段=%s, 允许字段=%s, 输入data=%s",
                 invalid_fields, allowed_fields, data
             )
@@ -309,7 +309,7 @@ class SubCategoryProvider(LWBaseDataProvider):
         required_fields = {'id', 'category_id', 'name'}
         missing_fields = required_fields - set(data.keys())
         if missing_fields:
-            logger.error(
+            logger.warning(
                 "创建子分类失败: 缺少必填字段=%s, 已提供字段=%s",
                 missing_fields, list(data.keys())
             )
@@ -347,7 +347,7 @@ class SubCategoryProvider(LWBaseDataProvider):
         # 白名单验证
         invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
         if invalid_fields:
-            logger.error(
+            logger.warning(
                 "更新子分类失败: sub_category_id=%s, 无效字段=%s, 允许字段=%s",
                 sub_category_id, invalid_fields, self._UPDATE_FIELDS
             )

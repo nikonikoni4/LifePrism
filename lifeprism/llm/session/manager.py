@@ -106,7 +106,7 @@ class SessionManager:
                 updated_at = updated_at
             )
         else:
-            logger.warning("在%s中，找不到%s.jsonl文件", path, session_id)
+            logger.error("在%s中，找不到%s.jsonl文件", path, session_id)
             raise NotFoundError(f'在{path}中，找不到{session_id}.jsonl文件') # 需要在上层捕获这个错误
             
 
@@ -128,6 +128,7 @@ class SessionManager:
         else:
             # 不存在，创建新的Session
             session = Session()
+            logger.info("创建新会话: session_id=%s", session.id)
         # 缓存Session
         self._cache[session.id] = session
         return session
@@ -384,9 +385,9 @@ class ChatHistoryManager:
         # 只有当 session_id 不为 None 时才添加该字段
         if session_id is not None:
             history_item["session_id"] = session_id
-            logger.info("添加聊天历史: session_id=%s", session_id)
+            logger.debug("添加聊天历史: session_id=%s", session_id)
         else:
-            logger.info("添加聊天历史: 未关联session")
+            logger.debug("添加聊天历史: 未关联session")
 
         self.histories.append(history_item)
         

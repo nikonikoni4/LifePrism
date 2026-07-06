@@ -5,12 +5,14 @@ Habit Chain 模块数据提供者
 - HabitChainProvider: habit_chains 表
 - HabitChainNodeProvider: habit_chain_nodes 表
 """
+import sqlite3
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Set, Tuple
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger, LazySingleton
+from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
 
@@ -87,19 +89,23 @@ class HabitChainProvider(LWBaseDataProvider):
             'show_in_timeline': data.get('show_in_timeline', 0),
         }
 
-        with self.db.get_connection() as conn:
-            cursor = conn.execute(
-                """INSERT INTO habit_chains (name, description, show_in_timeline)
-                   VALUES (?, ?, ?)""",
-                (
-                    insert_data['name'],
-                    insert_data['description'],
-                    insert_data['show_in_timeline'],
-                ),
-            )
-            chain_id = cursor.lastrowid
-            logger.info("创建链条成功: %s", chain_id)
-            return chain_id
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.execute(
+                    """INSERT INTO habit_chains (name, description, show_in_timeline)
+                       VALUES (?, ?, ?)""",
+                    (
+                        insert_data['name'],
+                        insert_data['description'],
+                        insert_data['show_in_timeline'],
+                    ),
+                )
+                chain_id = cursor.lastrowid
+                logger.info("创建链条成功: %s", chain_id)
+                return chain_id
+        except sqlite3.Error as e:
+            logger.error("创建习惯链失败: error=%s", e)
+            raise DataAccessError(f"创建习惯链失败: {e}") from e
 
     def get_chain_by_id(self, chain_id: int) -> Optional[Dict[str, Any]]:
         """
@@ -175,15 +181,19 @@ class HabitChainProvider(LWBaseDataProvider):
         Returns:
             True
         """
-        with self.db.get_connection() as conn:
-            conn.execute(
-                "DELETE FROM habit_chain_nodes WHERE chain_id = ?", (chain_id,)
-            )
-            conn.execute(
-                "DELETE FROM habit_chains WHERE id = ?", (chain_id,)
-            )
-        logger.info("删除链条 %s 及其节点成功", chain_id)
-        return True
+        try:
+            with self.db.get_connection() as conn:
+                conn.execute(
+                    "DELETE FROM habit_chain_nodes WHERE chain_id = ?", (chain_id,)
+                )
+                conn.execute(
+                    "DELETE FROM habit_chains WHERE id = ?", (chain_id,)
+                )
+            logger.info("删除链条 %s 及其节点成功", chain_id)
+            return True
+        except sqlite3.Error as e:
+            logger.error("删除习惯链失败: error=%s", e)
+            raise DataAccessError(f"删除习惯链失败: {e}") from e
 
 
 # ==================== HabitChainNodeProvider ====================
@@ -254,22 +264,26 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         Returns:
             新插入记录的 INTEGER 主键
         """
-        with self.db.get_connection() as conn:
-            cursor = conn.execute(
-                """INSERT INTO habit_chain_nodes
-                   (chain_id, sort_order, name, habit_id, trigger_time)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (
-                    data['chain_id'],
-                    data['sort_order'],
-                    data['name'],
-                    data.get('habit_id'),
-                    data.get('trigger_time'),
-                ),
-            )
-            node_id = cursor.lastrowid
-            logger.info("创建节点成功: %s", node_id)
-            return node_id
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.execute(
+                    """INSERT INTO habit_chain_nodes
+                       (chain_id, sort_order, name, habit_id, trigger_time)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (
+                        data['chain_id'],
+                        data['sort_order'],
+                        data['name'],
+                        data.get('habit_id'),
+                        data.get('trigger_time'),
+                    ),
+                )
+                node_id = cursor.lastrowid
+                logger.info("创建节点成功: %s", node_id)
+                return node_id
+        except sqlite3.Error as e:
+            logger.error("创建习惯链节点失败: error=%s", e)
+            raise DataAccessError(f"创建习惯链节点失败: {e}") from e
 
     def get_nodes_by_chain(self, chain_id: int) -> List[Dict[str, Any]]:
         """
@@ -342,10 +356,14 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         Returns:
             True
         """
-        success = self._generic_delete(node_id)
-        if success:
-            logger.info("删除节点 %s 成功", node_id)
-        return success
+        try:
+            success = self._generic_delete(node_id)
+            if success:
+                logger.info("删除节点 %s 成功", node_id)
+            return success
+        except sqlite3.Error as e:
+            logger.error("删除习惯链节点失败: error=%s", e)
+            raise DataAccessError(f"删除习惯链节点失败: {e}") from e
 
     def batch_update_sort_order(self, updates: List[Dict[str, Any]]) -> bool:
         """
@@ -357,15 +375,19 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         Returns:
             True
         """
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with self.db.get_connection() as conn:
-            for item in updates:
-                conn.execute(
-                    "UPDATE habit_chain_nodes SET sort_order = ?, updated_at = ? WHERE id = ?",
-                    (item["sort_order"], now, item["node_id"]),
-                )
-        logger.info("批量更新 %s 个节点排序成功", len(updates))
-        return True
+        try:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with self.db.get_connection() as conn:
+                for item in updates:
+                    conn.execute(
+                        "UPDATE habit_chain_nodes SET sort_order = ?, updated_at = ? WHERE id = ?",
+                        (item["sort_order"], now, item["node_id"]),
+                    )
+            logger.info("批量更新 %s 个节点排序成功", len(updates))
+            return True
+        except sqlite3.Error as e:
+            logger.error("批量更新排序失败: error=%s", e)
+            raise DataAccessError(f"批量更新排序失败: {e}") from e
 
     def increment_sort_order_after(self, chain_id: int, after_order: int) -> bool:
         """
@@ -380,14 +402,18 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         Returns:
             True
         """
-        with self.db.get_connection() as conn:
-            conn.execute(
-                """UPDATE habit_chain_nodes
-                   SET sort_order = sort_order + 1
-                   WHERE chain_id = ? AND sort_order >= ?""",
-                (chain_id, after_order),
-            )
-        return True
+        try:
+            with self.db.get_connection() as conn:
+                conn.execute(
+                    """UPDATE habit_chain_nodes
+                       SET sort_order = sort_order + 1
+                       WHERE chain_id = ? AND sort_order >= ?""",
+                    (chain_id, after_order),
+                )
+            return True
+        except sqlite3.Error as e:
+            logger.error("递增排序失败: error=%s", e)
+            raise DataAccessError(f"递增排序失败: {e}") from e
 
     def unlink_habit_from_nodes(self, habit_id: str) -> bool:
         """
@@ -399,13 +425,17 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         Returns:
             True
         """
-        with self.db.get_connection() as conn:
-            conn.execute(
-                "UPDATE habit_chain_nodes SET habit_id = NULL WHERE habit_id = ?",
-                (habit_id,),
-            )
-        logger.info("解除习惯 %s 与节点的关联", habit_id)
-        return True
+        try:
+            with self.db.get_connection() as conn:
+                conn.execute(
+                    "UPDATE habit_chain_nodes SET habit_id = NULL WHERE habit_id = ?",
+                    (habit_id,),
+                )
+            logger.info("解除习惯 %s 与节点的关联", habit_id)
+            return True
+        except sqlite3.Error as e:
+            logger.error("取消关联失败: error=%s", e)
+            raise DataAccessError(f"取消关联失败: {e}") from e
 
     # ==================== 跨表查询 ====================
 

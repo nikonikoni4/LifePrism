@@ -215,6 +215,7 @@ class CustomBlockProvider(LWBaseDataProvider):
             where={"id": block_id}
         )
         if affected_rows > 0:
+            logger.info("更新自定义时间块: block_id=%s", block_id)
             return self.get_custom_block_by_id(block_id)
         return None
 
