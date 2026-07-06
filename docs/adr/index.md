@@ -2,9 +2,15 @@
 version: 1.4
 created_at: 2026-04-10
 updated_at: 2026-06-30
-last_updated: 新增工具调用链完整记录功能决策文档索引
+last_updated: 新增自定义记录模块存储方案决策索引
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## custom-records-storage
+- updated_at: 2026-07-06
+- path: `docs/adr/2026-07-06-custom-records-storage.md`
+- 触发规则：当需要理解自定义记录模块的存储设计、动态建表机制、meta 表元数据驱动方案、或扩展该模块功能时读取
+- 内容摘要：决定自定义记录模块采用 SQLite 动态建表 + meta 表元数据驱动方案，否决 JSON 文件方案。核心决策：AI 负责 schema 生成与持续录入，P1 仅支持文本字段且字段定义后不可变，记录类型硬删且 slug 可复用，AI 无删除工具。记录了两个误区纠正：JSON 无法部分读取（无索引）、xxx-01 编号命名是反模式（meta 表已提供类型发现）。
 
 ## tool-call-chain-logging
 - updated_at: 2026-06-30
