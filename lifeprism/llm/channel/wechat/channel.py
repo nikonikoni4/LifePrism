@@ -189,18 +189,18 @@ class WechatChannel(BaseChannel):
             content = msg.response.content
 
         if not content:
-            logger.debug("消息内容为空，跳过发送: %s", wechat_user_id)
+            logger.debug("消息内容为空，跳过发送")
             return
 
         # 构造并发送消息
         try:
             from lifeprism.llm.channel.wechat.message import WechatMessage
             message_body = WechatMessage.build_text_message(wechat_user_id, content, context_token)
-            logger.info("开始发送消息到微信: user_id=%s, content_len=%s", wechat_user_id, len(content))
+            logger.info("开始发送消息到微信: content_len=%s", len(content))
             await self.client.api_post("ilink/bot/sendmessage", message_body)
-            logger.info("发送消息到微信: 用户id :%s", wechat_user_id)
+            logger.info("发送消息到微信成功")
         except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
-            logger.error("发送消息失败，目标用户: %s, 错误: %s", wechat_user_id, e, exc_info=True)
+            logger.error("发送消息失败: 错误=%s", e, exc_info=True)
             raise WechatAPIError(f"发送消息失败: {e}") from e
 
     async def _poll_loop(self) -> None:
@@ -251,11 +251,11 @@ class WechatChannel(BaseChannel):
             msg: 原始微信消息字典
         """
         try:
-            logger.info("开始处理微信消息: %s", msg)
+            logger.info("开始处理微信消息")
             from lifeprism.llm.channel.wechat.message import WechatMessage
 
             parsed = WechatMessage.parse_message(msg)
-            logger.debug("解析后的消息: %s", parsed)
+            logger.debug("解析后的消息: content_len=%s, media_count=%s", len(parsed["content"]), len(parsed["media"]))
 
             wechat_user_id = parsed["from_user_id"]
             content = parsed["content"]
@@ -263,10 +263,10 @@ class WechatChannel(BaseChannel):
 
             # 检查权限
             if not self.is_allowed(wechat_user_id):
-                logger.warning("拒绝未授权用户: %s", wechat_user_id)
+                logger.warning("拒绝未授权用户")
                 return
 
-            logger.info("用户 %s 已授权", wechat_user_id)
+            logger.info("用户已授权")
 
             # 标记是否需要持久化
             need_save = False
@@ -276,7 +276,7 @@ class WechatChannel(BaseChannel):
                 if wechat_user_id not in self._user_data:
                     self._user_data[wechat_user_id] = {}
                 self._user_data[wechat_user_id]["context_token"] = context_token
-                logger.debug("context_token ： %s", context_token)
+                logger.debug("context_token已更新")
                 need_save = True
 
             # 下载媒体
@@ -341,7 +341,7 @@ class WechatChannel(BaseChannel):
                             "user_data": self._user_data
                         }
                         self.auth.save_state(state)
-                        logger.info("已保存用户 %s 的数据", wechat_user_id)
+                        logger.info("已保存用户数据")
                     except (OSError, IOError) as save_error:
                         logger.error("保存用户数据失败: error=%s", save_error, exc_info=True)
 
