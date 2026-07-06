@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 _CONFIG_SUBDIR = "config"
 
 # 需要强制覆盖的目录列表，无论目标文件是否存在都会覆盖
-OVERWRITE_DIR_LIST = ["prompts"]
+OVERWRITE_DIR_LIST = ["prompts","tool","agent"]
 def initialize_resources() -> None:
     """
     初始化资源文件
