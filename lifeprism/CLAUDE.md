@@ -1,6 +1,6 @@
 # 后端通用规则
 
-错误处理详见 `docs/coding-rules/backend-core-rules.md`
+错误处理详见 `docs/coding-rules/backend-error-handling.md`
 
 ## 错误处理
 
@@ -10,7 +10,30 @@
 |------|------|
 | 底层（Provider/Repository） | 抛出领域异常（如 NotFoundError、DataAccessError），不 catch，让错误冒泡 |
 | 中间层（Service） | 捕获外部服务错误（LLM/IO/网络/数据库），转换为领域异常后抛出；不做兜底 |
-| 顶层（API） | 已有全局异常处理器，通过 `to_http_exception()` 统一映射 |
+| 顶层（API） | **禁止 try/except**，让异常自然冒泡到全局异常处理器统一映射 |
+
+**⚠️ 技术债警告**：当前 `lifeprism/server/api/*.py` 中存在大量冗余的 try/except 代码（约 74 处），违反了上述规则。**新代码禁止使用这种模式**，现有代码将逐步清理。详见 `docs/technical-debt/api-redundant-exception-handling.md`
+
+**API 层正确做法**：
+
+```python
+# ✅ 正确：API 层不需要 try/except，让异常自然冒泡
+@router.get("/goals/{goal_id}")
+async def get_goal(goal_id: str):
+    return goal_service.get_goal(goal_id)  # 直接调用，不捕获
+    # NotFoundError → 全局处理器 → HTTP 404
+    # DataAccessError → 全局处理器 → HTTP 500
+
+# ❌ 错误：API 层手动捕获并转换（冗余）
+@router.get("/goals/{goal_id}")
+async def get_goal(goal_id: str):
+    try:
+        return goal_service.get_goal(goal_id)
+    except LWBaseError:  # ← 冗余，全局处理器会处理
+        raise
+    except Exception as e:  # ← 冗余，全局兜底处理器会处理
+        raise HTTPException(status_code=500, detail="...")
+```
 
 **外部接口层必须捕获并转换**：
 

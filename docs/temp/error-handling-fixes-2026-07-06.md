@@ -102,7 +102,9 @@
 
 ### 规则文档
 1. `docs/coding-rules/backend-error-handling.md` - 新增 `except Exception` 合法场景详细说明（版本 1.0 → 1.1）
-2. `lifeprism/CLAUDE.md` - 新增 `except Exception` 合法场景简要说明
+2. `lifeprism/CLAUDE.md` - 新增 `except Exception` 合法场景简要说明 + API 层正确做法 + 技术债警告
+3. `lifeprism/utils/exceptions.py` - 在 `LWBaseError` 和 `to_dict()` 文档中明确 `to_dict()` 用途
+4. `docs/technical-debt/api-redundant-exception-handling.md` - 新增技术债文档，记录 API 层冗余异常处理问题
 
 ---
 
@@ -116,11 +118,30 @@
 
 **说明**: 这些是体系引入的第一步，后续 PR 会逐步迁移旧代码使用这些异常类。
 
-### 2. LWBaseError.to_dict() 与 API 响应不一致
-- `to_dict()` 包含 `error_type` 和 `cause` 字段
-- 实际 API 响应只包含 `error_code`、`message`、`details`
+### 2. API 层存在大量冗余的 try/except（技术债）
+- **位置**: `lifeprism/server/api/*.py`（约 19 个文件，74 处 try 语句）
+- **问题**: API 路由手动捕获 `LWBaseError` 和 `Exception` 后 re-raise，与全局异常处理器重复
+- **影响**: 代码冗余、维护成本高、不一致风险
+- **记录**: 已在 `docs/technical-debt/api-redundant-exception-handling.md` 中记录
+- **规范**: 已在 `lifeprism/CLAUDE.md` 中明确禁止新代码使用这种模式
 
-**建议**: 在文档中明确说明 `to_dict()` 用于调试/日志，不用于 API 响应。
+---
+
+## ✅ 已通过文档明确的问题
+
+### 2. LWBaseError.to_dict() 与 API 响应格式不一致
+
+**问题**: 
+- `to_dict()` 返回：`error_type` + `code` + `message` + `details` + `cause`（可选）
+- API 响应返回：`error_code` + `message` + `details`
+
+**原因**: 这是设计决策，不是 bug
+- `to_dict()` 用于调试和日志记录（给开发者看），需要完整的异常信息
+- API 响应用于前端展示（给用户看），只需要错误码和消息
+
+**修复**: 
+- 在 `LWBaseError` 类文档中明确说明两者的用途区别
+- 在 `to_dict()` 方法文档中说明不用于生成 API 响应
 
 ---
 

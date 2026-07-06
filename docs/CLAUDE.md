@@ -1,0 +1,1 @@
+1. 修改或新增docs的相关文档时阅读docs\docs-rules\docs-write-rules.md

@@ -7,7 +7,7 @@ import time
 _startup_timer = time.perf_counter()
 
 def _log_startup_time(step_name: str, start_time: float) -> float:
-    """记录启动步骤耗时并返回当前时间"""
+    """记录启动步骤耗时并返回当前时间，调试用"""
     current = time.perf_counter()
     elapsed = (current - start_time) * 1000  # 转换为毫秒
     total = (current - _startup_timer) * 1000

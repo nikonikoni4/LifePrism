@@ -5,8 +5,12 @@ from typing import Any, Dict, Optional
 class LWBaseError(Exception):
     """项目异常基类。
 
-    所有业务异常必须继承此类。通过 code / details / cause 携带结构化上下文，
-    to_dict() 提供统一的 JSON 序列化接口。
+    所有业务异常必须继承此类。通过 code / details / cause 携带结构化上下文。
+
+    注意：
+    - to_dict() 用于调试和日志记录，包含完整的异常信息（error_type + cause）
+    - API 响应由 api_error_mapping.map_app_error() 生成，只包含 error_code + message + details
+    - 两者格式不同是设计决策：to_dict() 给开发者看，API 响应给前端看
     """
 
     def __init__(
@@ -26,7 +30,11 @@ class LWBaseError(Exception):
             self.__cause__ = cause
 
     def to_dict(self) -> Dict[str, Any]:
-        """将异常序列化为 API 响应格式。"""
+        """将异常序列化为字典（用于调试和日志记录）。
+
+        注意：此方法不用于生成 API 响应。API 响应格式由
+        api_error_mapping.map_app_error() 统一生成。
+        """
         result: Dict[str, Any] = {
             "error_type": self.__class__.__name__,
             "message": self.message,
