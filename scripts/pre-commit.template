@@ -1,0 +1,32 @@
+#!/bin/sh
+# Local CI: auto-fix then verify before commit.
+# Skip with: git commit --no-verify
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# ==================== Backend ====================
+if git diff --cached --name-only | grep -qE '\.py$'; then
+  echo "📦 Backend: Verifying lint + type check..."
+  make lint type
+fi
+
+# ==================== Frontend ====================
+if git diff --cached --name-only | grep -qE '^frontend/'; then
+  echo "🎨 Frontend: Type checking..."
+  make frontend-type
+
+  echo "🎨 Frontend: Linting..."
+  make frontend-lint
+
+  echo "🎨 Frontend: Format checking..."
+  make frontend-check
+fi
+
+# ==================== Docs ====================
+if git diff --cached --name-only | grep -qE '^agents_hub/.*\.py$|^frontend/src/.*\.(ts|tsx)$'; then
+  echo "📚 Docs: Checking flow/spec documents..."
+  python scripts/docs_update/pre-commit-check-flow.py || true
+fi
+
+echo "✅ All checks passed!"
