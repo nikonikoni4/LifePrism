@@ -14,7 +14,8 @@
 | **编码规则** | `docs/coding-rules/` | 编写代码时必须遵守的规范、约束、触发场景 |
 | **文档规则** | `docs/docs-rules/` | 编写 docs 时必须遵守的规范、约束、触发场景 |
 | **权威参考** | `docs/authority/` | 系统中特定且关键的实现知识,用于承接不适合放在 `rules` 里的重要实现事实 |
-| **产品规格** | `docs/specs/` | 对于正式 `spec`,承载业务意图、业务规则、领域概念,以及规范性技术契约 |
+| **产品规格（Spec）** | `docs/specs/` | 技术契约文档，定义模块的业务意图、对外接口、功能完整性清单、设计决策 |
+| **数据状态流（Flow）** | `docs/flows/` | 数据流转与状态变化文档，提供完整的调用链路和函数位置导航 |
 | **架构决策** | `docs/adr/` | 记录对于长期具有重要的作用的修改决定 |
 | **技术债** | `docs/technical-debt/` | 记录已知的技术债务、问题原因、清理计划 |
 | **自动生成** | `docs/generated/` | 代码镜像,不手工维护正文,用于快速了解当前实现事实及 CI 结果 |
@@ -29,9 +30,15 @@
 1. **按需加载**：在你决定阅读某个具体文件夹内容之前**必须阅读导航文件index.md**按需加载具体文件
 2. **任务涉及代码修改时**：必须阅读`docs/coding-rules/index.md`，按需加载当前任务所涉及到的规则
 3. **需要编写文档进入docs时**：必须阅读`docs/docs-rules/index.md`和`docs/docs-rules/docs-write-rules.md`
-4. **编写功能前**：需要阅读`docs/specs/index.md`，查看当前是否已经存在spec，按需加载具体的spec来了解该功能情况
-5. **如果你是minimax模型**：必须阅读`docs/coding-rules/other-model-rules`
-6. **修复bug时**: 可以阅读`docs\history-bugs\index.md`来获取历史bug解决方法
+4. **修改或为某个模块增加功能前**：
+   - 先读 `docs/specs/index.md`，查看当前是否已经存在该模块的 spec
+   - 读取对应的 spec，了解模块的业务意图、技术契约、功能完整性清单
+   - 如果需要了解具体实现路径，再读 `docs/flows/index.md`，查看是否有相关的 flow 文档
+5. **修改bug时**：
+   - 先读 `docs/flows/index.md`，查找与之相关的数据流文档
+   - flow 文档提供完整的调用链路和函数位置，帮助快速定位问题
+6. **如果你是minimax模型**：必须阅读`docs/coding-rules/other-model-rules`
+7. **修复bug时**: 可以阅读`docs\history-bugs\index.md`来获取历史bug解决方法
 
 </<docs-read-rules>>
 

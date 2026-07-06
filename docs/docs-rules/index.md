@@ -33,3 +33,10 @@
 - path: `docs\docs-rules\formal-bugs-write-rules.md`
 - 触发规则：编写入正式的`docs\history-bugs`才阅读，编写入`docs/temp/bugs`不需要阅读
 - 内容摘要：history-bugs文档的写入规则
+
+## flow-write-guide
+
+- updated_at: 2026-07-06
+- path: `docs/docs-rules/flow-write-guide.md`
+- 触发规则：编写或修改 `docs/flows/` 目录下的数据流文档时阅读
+- 内容摘要：Flow 文档编写规则，定义 Flow 对象数据结构、耦合关系、反常设计说明的写法，以及 5 类必须记录的节点判断标准

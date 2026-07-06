@@ -113,7 +113,8 @@ abstract: docs 总写作规则，先定义文档类型，再按类型约束正�
 
 1. 写正式 `spec` 前，读取 `docs/docs-rules/spec-write-rules.md`
 2. 写正式 `plan` 前，读取 `docs/docs-rules/plan-write-rules.md`
-3. 修改或编写 `docs/ARCHITECTURE.md` 时，读取 `docs/docs-rules/architecture-write-rules.md`
+3. 写正式 `flow` 前，读取 `docs/docs-rules/flow-write-guide.md`
+4. 修改或编写 `docs/ARCHITECTURE.md` 时，读取 `docs/docs-rules/architecture-write-rules.md`
 
 </rules>
 

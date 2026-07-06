@@ -65,6 +65,42 @@
 - 触发规则：开发、修改或查询心情模块相关功能时阅读（心情类型管理、心情记录 CRUD、影响因素管理）
 - 内容摘要：心情模块规格文档，定义 Mind Space 心情追踪系统，包含心情类型（mood_types）的 CRUD 与删除约束、心情记录（mood_entries）的创建与评分自动获取规则、影响因素（mood_impacts）的唯一性约束与管理、按日期范围查询能力
 
+## config-path-spec
+- updated_at: 2026-07-06
+- path: `docs/specs/2026-07-06-config-path-spec.md`
+- 触发规则：开发、修改或查询路径解析体系相关功能时阅读（config_base_path 固定路径 vs lifeprism_data_path 可迁移路径、打包/开发环境路径差异、数据迁移流程）
+- 内容摘要：Config 路径体系规格，定义 config_base_path（固定不变，配置文件根目录）和 lifeprism_data_path（可迁移，数据根目录）的解析规则、三级优先级（yaml > env var > default）、6 种环境组合、派生路径自动推算、安全检查机制
+
+## config-settings-spec
+- updated_at: 2026-07-06
+- path: `docs/specs/2026-07-06-config-settings-spec.md`
+- 触发规则：开发、修改或查询配置管理相关功能时阅读（SettingsManager 初始化流程、配置读写、API Key 安全存储、ProviderManager、配置优先级状态机）
+- 内容摘要：Config 配置管理规格，定义 SettingsManager 7 步初始化流程、config.yaml/providers.yaml schema、ProviderManager 3 步并行初始化、配置优先级状态机（env > keyring > yaml > default）、API Key 安全存储（keyring）
+
+## llm-agent-spec
+- updated_at: 2026-07-06
+- path: `docs/specs/2026-07-06-llm-agent-spec.md`
+- 触发规则：开发、修改或查询 Agent 执行引擎相关功能时阅读（AgentLoop 主循环、Context 构建、Skill 系统、Tool 注册与安全沙箱、Event Bus、Session 自动压缩）
+- 内容摘要：Agent 执行引擎核心规格，定义 AgentLoop 生命周期（消息处理→上下文构建→LLM 调用→工具执行循环）、30 项功能检查点、7 类 17 个工具实现、文件系统安全沙箱（allowed_dir_path 白名单 + 命令黑名单）、Event Bus 消息队列（asyncio.Queue）、Skill 可插拔加载系统
+
+## llm-communication-spec
+- updated_at: 2026-07-06
+- path: `docs/specs/2026-07-06-llm-communication-spec.md`
+- 触发规则：开发、修改或查询 LLM 通信与会话模块相关功能时阅读（Channel 消息平台接入、ChatBot 对话入口、Session 生命周期管理、内容分类管线、LLM Functions 功能集）
+- 内容摘要：LLM 通信与会话模块核心规格，定义 Channel 体系（BaseChannel 抽象 + WeChatChannel 完整实现）、ChatBot 无状态对话 API、Session 管理（JSONL 持久化 + 内存缓存双层架构）、内容分类（ClassifyGraph 多步推理 vs ClassifySimple 一步直出）、定时任务（dreaming/process_session_message）、LLM Functions（日记总结/截图分析/连接测试/数据修复工具）
+
+## llm-infrastructure-spec
+- updated_at: 2026-07-06
+- path: `docs/specs/2026-07-06-llm-infrastructure-spec.md`
+- 触发规则：开发、修改或查询 LLM 基础设施相关功能时阅读（Provider 体系、LLM Client 工厂、Token 用量追踪、Prompt 模板加载、Schema 定义、工具函数集）
+- 内容摘要：LLM 基础设施核心规格，定义 Provider 抽象与多服务商适配（LiteLLM/Custom）、create_llm_client 工厂、ProviderSpec 注册表（18+ 服务商）、68 项功能检查点、LLMResponse/ToolCallRequest 数据结构、PromptLoader Markdown 模板管理、异常体系（LLMError→503/PromptNotFoundError→404）
+
+## repository-core-spec
+- updated_at: 2026-07-06
+- path: `docs/specs/2026-07-06-repository-core-spec.md`
+- 触发规则：开发、修改或查询数据访问层相关功能时阅读（DatabaseManager、LWTableManager、BaseDataProvider、迁移系统、QueryOptions）
+- 内容摘要：Repository 数据访问层核心规格，定义 DatabaseManager 15 个对外接口、LWBaseDataProvider 元数据驱动 CRUD（_TABLE_NAME/_PRIMARY_KEY 白名单防注入）、AWBaseDataProvider 只读查询、3 个数据库实例（lw/aw/chat_history）连接池契约、迁移系统（版本检测→备份→执行）、QueryOptions 不可变查询对象
+
 ## waid-window-spec
 - updated_at: 2026-05-20
 - path: `docs/specs/2026-05-20-waid-window-spec.md`

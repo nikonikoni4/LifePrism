@@ -1,344 +1,227 @@
 ---
-version: 1.4
+version: 2.1
 created_at: 2026-04-09
-updated_at: 2026-04-26
-last_updated: 增强正文内容筛选原则，明确 Technical Contract 边界，调整规则优先级
-abstract: 正式 spec 写入规则，定义 spec 的筛选原则、状态、固定结构、frontmatter 和 CI 抓手。
+updated_at: 2026-07-06
+last_updated: 去除 key_function 时间戳；新增 Functional Checklist 章节（功能完整性清单）
+abstract: 正式 spec 写入规则，定义 spec 的职责、结构、函数位置标注、功能完整性清单和模块拆分判断
 ---
 
 # spec-write-rules.md
 
-## 1. 目的
+## 1. Spec 的定位
 
-这份文档只负责正式 `spec` 的写入规则。
+### Spec = 业务意图 + 技术契约 + 设计决策
 
-作用：
+**Spec 应该回答的问题**：
+1. **这个模块要解决什么业务问题？**（业务意图）
+2. **这个模块对外承诺什么？**（技术契约：API、Schema、状态机规则）
+3. **为什么这样设计？**（设计决策：权衡、约束、演进史）
 
-1. 定义什么情况下应该写正式 `spec`
-2. 定义 `sourc_spec -> spec draft` 的过滤方式
-3. 定义正式 `spec` 的固定结构
-4. 定义 `spec` 为后续 CI 提供的最小检查抓手
+**Spec 不应该写的**：
+1. **怎么实现的？**（这是 Flow 的职责）
+2. **完整的调用链路？**（这是 Flow 的职责）
+3. **详细的执行步骤？**（这是 Flow 的职责）
 
-说明：
+### Spec 与 Flow 的分工
 
-- docs 总入口见 `docs/docs-rules/docs-write-rules.md`
-- docs 的更细治理讨论见 `docs/plans/active/2026-04-08-docs-maintenance.md`
-- 本文件只聚焦“正式 `spec` 应该怎么写”
+| 维度 | Spec | Flow |
+|------|------|------|
+| **业务意图** | ✅ 核心职责 | ❌ 不写 |
+| **功能完整性清单** | ✅ 核心职责 | ❌ 不写 |
+| **技术契约** | ✅ 完整定义 | 📝 引用（不重复定义） |
+| **对外接口** | ✅ 函数签名 + 位置 | 📝 引用 + 完整调用链 |
+| **状态机规则** | ✅ 抽象定义 | ✅ 具体实现路径 |
+| **设计决策** | 📝 简要说明 | ❌ 不写 |
+| **数据流路径** | ❌ 不写 | ✅ 核心职责 |
+| **内部实现函数** | ❌ 不写 | ✅ 核心职责 |
+| **反常设计** | ❌ 不写 | ✅ 核心职责 |
 
-## 2. spec 写入流程说明
+## 2. 核心规则
 
-`brainstorming` 产生的 `sourc_spec` 通常包含大量实现细节、执行细节和对话上下文。若直接把 `sourc_spec` 当成正式 `spec`，文档会快速腐化，长期无法维护。
+### 2.1 对外接口的函数位置标注（⭐ 核心）
 
-因此，正式 `spec` 必须通过过滤生成，而不是直接复制：
+#### "对外接口"的定义
 
-1. 先确认是否真的需要创建正式 `spec`
-2. 指定一个高细节输入源，通常是 `sourc_spec`
-3. 根据本规则筛选长期有价值的内容
-4. 写成结构稳定、可维护的正式 `spec draft`
-5. 在实现完成后补全或修正 `code_scope` 与 `contract_refs`
+1. **模块的公共接口**（被其他模块调用的关键函数）
+2. **架构关键节点**（核心编排入口，如 `GroupChat.send_message_to_agent`）
+3. **导出的工具函数**（如果有专门的工具模块）
 
-## 3. spec 的状态流转
+#### 不同类型模块的特殊处理
 
-当前正式 `spec` 使用以下状态：
+**基础数据模型层**（如 foundation）：
+- 标注工具函数（renderer、paths、token 工具等）
+- **不标注**：数据类、枚举类、常量、异常类
 
-- `draft`
-- `accepted_unimplemented`
-- `unstable`
-- `stable`
-- `deprecated`
+**API 路由层**（如 FastAPI、Flask）：
+- 标注**路由处理函数**，而非 Service 层函数
+- **只标注核心端点**（用户最常用的 3-8 个端点），而非全部端点
+- 在端点总览表格中添加"路由处理函数"列，建立 HTTP 端点与函数的映射
 
-状态含义：
+**前端模块**（TypeScript/JavaScript）：
+- 标注导出的类的公共方法（如 `WebSocketManager.connect`）
+- 标注关键工具函数（如 `mockableRequest`）
+- **不标注**：简单的 API 封装函数（函数体只有一行 `return apiClient.get/post(...)`）
+- **不标注**：类的私有方法（以 `_` 开头）、类型定义（interface、type）
 
-1. `draft`
-   - 初稿
-   - 已开始进入正式 `spec` 体系，但内容仍可能不完整或待采纳
+#### 必须使用 key_function 标签
 
-2. `accepted_unimplemented`
-   - 已被采纳
-   - 但尚未落地实现
+**格式**（严格遵守，自动同步工具依赖此格式）：
+```markdown
+<key_function>
+- lifeprism/core/communication/message_router.py
+  - message_router.MessageRouter.register:45
+  - message_router.MessageRouter.unregister:67
+  - message_router.MessageRouter.send_message:89
+</key_function>
+```
 
-3. `unstable`
-   - 已实现
-   - 但仍可能变动，或 CI / AI / 人工仍可能发现问题
+**格式规则**（必须严格遵守）：
+- 标签格式：`<key_function>` 和 `</key_function>`
+- 文件路径：从仓库根目录开始，使用 `-` 开头
+- 函数列表：使用 `  -` 开头（2个空格 + `-`）
+- 函数签名格式（重要）：[file_name].[class_name(如果有)].[func_name]
+  - Python 类方法：`FileName.ClassName.method_name`
+  - Python 模块函数：`FileName.function_name`
+  - TypeScript/JavaScript 类方法：`FileName.ClassName.method_name`
+  - TypeScript/JavaScript 模块函数：`FileName.function_name`
+- 行号：`:行号`（编辑器可点击）
 
-4. `stable`
-   - 长期稳定
-   - 可作为后续任务的正式约束
+**自动同步机制**：
+- 读取 `docs/specs/*.md` 时 hook 自动调用 `sync_docs.py`
+- 脚本解析此标签格式，从 `ast_scan_result.json` 查找函数行号
+- 自动更新行号（不更新时间戳，避免频繁无意义提交）
 
-5. `deprecated`
-   - 对应需求已弃用，或被新 `spec` 取代
+#### spec 与 flow 的 key_function 区别
 
-## 4. 核心规则
+| 维度 | spec 的 key_function | flow 的 key_function |
+|------|---------------------|---------------------|
+| **范围** | 只写对外接口（契约入口） | 写完整调用链路（包括内部函数） |
+| **目的** | 提供契约验证入口 | 提供导航索引 |
+| **数量** | 少（3-10 个） | 多（10-50 个） |
+| **选择标准** | 被其他模块调用 or 架构关键节点 | 影响 Flow 对象的所有关键节点 |
 
-<rules>
+#### 判断标准：哪些函数应该写进 spec？
 
-### 1. 先判断是否应该写正式 `spec`
+**写进 spec**：
+- ✅ 模块的公共 API（被其他模块调用）
+- ✅ 架构关键节点（核心编排入口）
+- ✅ 导出的工具函数
 
-并不是所有 `brainstorming` 或设计讨论都需要进入 `docs/specs/`。
+**不写进 spec**：
+- ❌ 内部实现函数（只被模块内部调用）
+- ❌ 辅助函数（格式化、校验）
+- ❌ 回调函数
 
-适合写正式 `spec` 的情况：
+### 2.2 内容边界
 
-1. 当前计划涉及具体功能模块
-2. 属于新增功能
-3. 属于现有功能模块的嵌入式改动，且会改变长期行为、接口、状态机或关键数据约束
-4. 会形成长期复用的 API、schema、命名约束或交互规则
-5. 3 个月后人或 AI 仍可能需要查阅
-
-通常不写正式 `spec` 的情况：
-
-1. 纯流程讨论、纯文档讨论、纯工具讨论
-2. 与具体功能模块无关的泛化讨论
-3. 一次性迁移、一次性试验或短期临时方案
-4. 不形成长期约束，且长期复用价值低
-5. 只服务于本次执行拆解，实现完成后主要剩历史价值
-
-### 2. 正文内容筛选原则（⭐ 核心）
-
-#### 什么应该写入 spec
-
-**稳定的跨模块契约**（必须写）：
+**必须写入**：
 1. 数据库表结构（字段、约束、索引）
-2. 核心 API 接口（路径、Query/Path 参数、Response 格式）
-3. API Request/Response Schemas（核心接口）
-4. 关键配置项（config.yaml 中的字段）
-5. 核心数据流转规则（状态机、优先级、计算规则）
+2. 核心 API 接口（路径、参数、Response 格式）
+3. API Request/Response Schemas（**完整定义所有字段**）
+   - 原因：Schema 是技术契约的核心，相对稳定，对调用方至关重要
+   - API 层：所有请求和响应的 Schema
+   - Service 层：对外返回的数据结构 Schema
+4. 核心数据流转规则（状态机、优先级、计算规则）
+5. 对外接口的函数位置（使用 key_function 标签）
 
-**抽象的行为描述**（应该写）：
-1. 功能的核心逻辑流程（用流程图或步骤描述）
-2. 关键算法的抽象说明（不写具体实现）
-3. 前端功能需求（做什么，不是怎么做）
-4. 交互规则（点击/展开/筛选等行为）
-
-#### 什么不应该写入 spec
-
-**易变的实现细节**（禁止写）：
-1. 函数签名（函数名、参数列表、返回值类型、docstring）
-2. 具体的代码实现（查询语句、循环逻辑）
-3. 变量名、类名、文件路径（除非是跨模块约定）
-4. 前端组件的具体实现（TypeScript 类型、状态管理）
-
-**弱关系的内容**（禁止写）：
-1. 依赖模块的内部实现细节
-2. 非核心的辅助功能（如日志记录、错误处理）
-3. 临时的过渡方案或兼容逻辑
-
-**过度具体的细节**（禁止写）：
-1. UI 的像素级布局（颜色代码、间距、字体大小）
-2. 完整的 TypeScript 接口定义（除非是 API 契约）
-3. 详细的交互动画或过渡效果
-
-#### 判断标准
-
-问自己三个问题：
-1. **会频繁变动吗？** → 是 → 不写
-2. **与当前模块强相关吗？** → 否 → 不写
-3. **需要跨模块对齐吗？** → 否 → 不写
-
-只有同时满足"不易变动 + 强相关 + 需要对齐"的内容才应该写入 spec。
-
-### 3. Technical Contract 边界（⭐ 核心）
-
-#### API 契约的分层原则
-
-**核心 API**（完整契约）：
-- 当前模块直接提供的 API
-- 需要写明：路径、参数、Request Body、Response、Schema
-
-**依附型 API**（简化说明）：
-- 当前功能依附于其他模块的 API
-- 只需说明：触发条件、参数来源、时间范围计算
-- 不需要写：完整的 Request/Response schemas
-
-**判断方法**：
-- 如果当前模块是 API 的提供者 → 写完整契约
-- 如果当前模块只是 API 的触发者或使用者 → 只说明参数来源
-
-#### 前端契约的抽象层次
-
-**功能需求**（应该写）：
-- 需要展示什么数据
-- 需要提供什么操作
-- 数据如何获取（API 调用）
-
-**实现细节**（不应该写）：
-- 具体的组件结构
-- TypeScript 类型定义（除非是 API 契约）
-- 状态管理方案
-- 样式和布局细节
-
-### 4. 正文内容边界（强制约束）
-
-以下内容**禁止**进入正式 `spec`：
-
-1. **函数级实现细节**
-   - 函数签名（函数名、参数列表、返回值类型、docstring）
-   - 具体的代码逻辑（循环、条件判断、查询语句）
-   - 变量名、类名（除非是跨模块约定的命名）
-
-2. **弱关系模块的内容**
-   - 依赖模块的内部实现细节
-   - 非核心的辅助功能（日志、错误处理、性能优化）
-   - 临时的过渡方案或兼容逻辑
-
-3. **过度具体的前端细节**
-   - 完整的 TypeScript 接口定义（除非是 API 契约）
-   - 组件的内部状态管理
-   - 样式代码（颜色、间距、字体）
-   - 交互动画或过渡效果
-
-4. **临时的执行细节**
-   - 组件树、文件路径、目录拆分
-   - 具体实现优先级和阶段拆解
-   - 迁移步骤、回填步骤、发布步骤
-   - 大段代码片段、具体库用法、实现技巧
+**禁止写入**：
+1. 内部实现的函数签名（只能写对外接口）
+2. 具体的代码逻辑（循环、条件判断、查询语句）
+3. 完整的调用链路（这是 Flow 的职责）
+4. 临时的执行细节（迁移步骤、阶段拆解）
+5. 过度具体的前端细节（TypeScript 类型、组件状态、样式代码）
 
 **判断原则**：
 - 如果内容在 3 个月后可能已经变化 → 不写
-- 如果内容只服务于本次执行 → 不写
-- 如果内容与当前模块关系较浅 → 不写
+- 如果内容是"怎么实现"而非"是什么" → 不写
 
-### 5. 正式 `spec` 的固定结构
+### 2.3 功能完整性清单（⭐ Functional Checklist）
+
+#### 目的
+
+**防止 AI agent 修改代码时破坏已实现的功能。**
+
+Functional Checklist 是该模块**已验证可正常工作**的功能点列表。它的核心作用是：
+1. **回归验证** — 修改代码后，逐项检查清单确保已有功能未被破坏
+2. **功能边界** — 明确告诉 AI "这些功能已经实现且必须保持正常"
+3. **可检查性** — 每一项都是可验证的具体行为，而非抽象描述
+
+#### 写法要求
+
+**每项功能点必须是可逐项打勾的**：
+- ✅ 好的写法：`用户点击"开始监控"按钮后，系统在 3 秒内开始截图`
+- ❌ 坏的写法：`监控功能正常工作`
+
+**按功能分组**，每组对应一个用户可感知的功能模块：
+```markdown
+### 核心监控
+- [ ] 定时截图：按配置间隔自动触发截图
+- [ ] 手动截图：用户点击按钮立即截图
+- [ ] 截图存储：截图保存到 lifeprismData/dataset/ 目录
+
+### AI 分析
+- [ ] 文本分析：截图文字提取并发送到 LLM 分析
+- [ ] 行为总结：每小时生成行为摘要
+```
+
+**不写进 Functional Checklist 的**：
+- 内部实现细节（如"数据库连接池大小=5"）
+- 性能指标（除非是用户可感知的功能承诺）
+- 已在 Technical Contract 中详细定义的内容（避免重复）
+
+#### 与 Technical Contract 的关系
+
+| Functional Checklist | Technical Contract |
+|---------------------|-------------------|
+| 用户视角的功能行为 | 技术视角的接口契约 |
+| "做什么"（面向验收） | "怎么对接"（面向调用方） |
+| 修改代码时的回归检查清单 | 修改接口时的兼容性检查依据 |
+
+两者互补，不重复。Checklist 关注功能完整性，Contract 关注接口稳定性。
+
+### 2.4 文档结构
 
 每个正式 `spec` 默认按以下结构编写：
 
-1. `Overview`
-2. `Scope`
-3. `Core Behavior`
-4. `Technical Contract`
-5. `Interaction / UX Notes`
-6. `Acceptance Notes`
-7. `Out of Spec`
+1. `Overview` - 业务问题和核心职责
+2. `Scope` - 范围内和范围外
+3. `Functional Checklist` - 功能完整性清单（可逐项验证的功能点）
+4. `Technical Contract` - 技术契约（对外接口、数据模型、状态机规则）
+5. `Design Rationale` - 设计理由、约束、已知限制
+6. `Interaction / UX Notes`（可选）- 前端交互规则
+7. `Out of Scope` - 链接到其他相关 spec
 
-其中：
+### 2.5 模块拆分判断（⭐ 重要）
 
-1. `Overview`、`Scope`、`Core Behavior`、`Technical Contract`
-   - 默认必需
+#### 应该拆分成多个 spec
 
-2. `Interaction / UX Notes`
-   - 仅在前端功能或交互功能需要时保留
+- 每个子模块有明确的单一职责
+- 子模块之间通过明确的接口交互
+- 依赖方向单向（A 依赖 B，B 不依赖 A）
+- 单个 spec > 500 行
 
-3. `Acceptance Notes`
-   - 保留轻量关键验收点
-   - 当前不要求展开为完整测试设计
+#### 应该合并成一个 spec
 
-4. `Out of Spec`
-   - 用于明确哪些内容不在本 `spec` 中长期维护
+- 必须一起理解才能明白完整逻辑
+- 子模块之间没有清晰的接口边界
+- 即使拆分，每个 spec < 100 行
 
-### 6. 正式 `spec` 的 frontmatter
+#### 拆分后需要总览文档
 
-正式 `spec` 默认包含以下 frontmatter 字段：
+拆分后添加模块总览文档（如 `core-module-overview.md`），包含：
+1. 模块整体职责
+2. 子模块分层架构图
+3. 依赖规则说明
+4. 子模块 spec 索引
+5. 跨层交互的典型场景
 
-```yaml
-version:
-created_at:
-updated_at:
-last_updated:
-abstract:
-id:
-title:
-status:
-module:
-sourc_spec:
-related_plan:
-code_scope:
-contract_refs:
-```
+#### 保持 spec 之间的链接
 
-字段说明：
+每个 spec 都应该：
+- 在 **Scope** 章节明确范围外的内容
+- 在 **Out of Scope** 章节链接到相关的其他 spec
 
-1. `version`、`created_at`、`updated_at`、`last_updated`、`abstract`
-   - 继承通用 md 文档规则
-
-2. `id`
-   - `spec` 的稳定标识
-
-3. `title`
-   - `spec` 标题
-
-4. `status`
-   - 当前状态
-
-5. `module`
-   - 关联功能模块
-
-6. `sourc_spec`
-   - 该 `spec draft` 来源于哪份高细节设计稿
-
-7. `related_plan`
-   - 当前主要执行计划
-
-8. `code_scope`
-   - 抽象内容的语义检查范围
-
-9. `contract_refs`
-   - `Technical Contract` 对应的定义文件
-
-### 7. `code_scope` 与 `contract_refs` 的写法
-
-`code_scope` 写法：
-
-1. 允许文件路径与目录路径混用
-2. 当相关实现只涉及少量离散文件时，直接写文件路径
-3. 当同一功能目录下有较多相关文件，且边界稳定时，可直接写目录路径
-4. 目录路径应尽量指向功能边界明确的目录，避免直接给过大的根目录
-
-`contract_refs` 写法：
-
-1. 默认写文件路径
-2. 只有当某个目录本身就是稳定的契约定义目录，且其中大部分文件都属于该契约时，才允许写目录路径
-3. 不建议仅因文件数量多就把 `contract_refs` 退化为目录路径
-
-当前建议阈值：
-
-1. 对 `code_scope`
-   - 当相关文件 `<= 4` 个时，优先直接写文件
-   - 当相关文件 `>= 5` 个且集中在同一功能目录时，可直接写目录
-
-2. 对 `contract_refs`
-   - 默认不按数量阈值切换
-   - 仍以是否为稳定定义目录为主判断是否可写目录
-
-### 8. `code_scope` 与 `contract_refs` 的时间线
-
-1. `code_scope` 与 `contract_refs` 可以在 `plan` 执行完成后补全或修正
-2. 当 `spec` 进入 `unstable` 时，二者应成为正式 CI 检查依据
-3. 对 `draft` / `accepted_unimplemented` 状态，可以只做弱检查：
-   - 字段是否存在
-   - 是否缺少明显必要的范围或引用
-
-### 9. 正式 `spec` 与 `plan` 的关系
-
-1. `writing-plan` 可以主要依据 `sourc_spec` 编写
-2. 不要求 `plan` 只能依赖过滤后的正式 `spec`
-3. 正式 `spec` 更偏长期规格资产
-4. `plan` 更偏本次执行资产
-
-### 10. 正式 `spec` 的最小质量要求
-
-1. 不允许只有抽象描述而没有 `Technical Contract`
-2. 不允许只有技术细节而没有功能与行为说明
-3. 不允许把本次执行步骤直接写成长期 `spec`
-4. 不允许缺少 `sourc_spec`、`related_plan`、`code_scope`、`contract_refs`
-
-</rules>
-
-<never_do>
-
-你禁止做以下事情：
-
-1. 直接将 `brainstorming` 或其他技能产出的高细节 `sourc_spec` 原样写入 `docs/specs`
-2. 把执行步骤、迁移步骤、阶段拆解直接写成正式 `spec`
-3. 把组件树、目录结构、局部实现技巧当作正式 `spec` 的主体内容
-4. 在缺少 `Technical Contract` 的情况下，将文档标记为正式 `spec`
-5. 在未确认其长期价值前，把泛化讨论或低价值内容写入 `docs/specs`
-6. **写明函数签名**（函数名、参数列表、返回值、docstring）
-7. **写入弱关系模块的实现细节**
-8. **为依附型 API 编写完整的 Request/Response schemas**
-9. **写入过度具体的前端实现细节**（TypeScript 类型、组件状态、样式代码）
-
-</never_do>
-
-## 5. 写入模板
+## 3. 写入模板
 
 ```md
 ---
@@ -347,14 +230,6 @@ created_at: YYYY-MM-DD
 updated_at: YYYY-MM-DD
 last_updated:
 abstract:
-id:
-title:
-status: draft
-module:
-sourc_spec:
-related_plan:
-code_scope:
-contract_refs:
 ---
 
 # {title}
@@ -367,15 +242,91 @@ contract_refs:
 
 ## Overview
 
+**业务问题**：[这个模块要解决什么问题？]
+
+**核心职责**：[这个模块做什么、不做什么？]
+
 ## Scope
 
-## Core Behavior
+### 范围内
+
+- [列出本模块的核心职责]
+
+### 范围外
+
+- [列出不属于本模块的内容，并链接到相关 spec]
+
+## Functional Checklist
+
+> 本模块已实现的功能完整性清单。修改代码后，对照此清单做回归验证，确保已有功能未被破坏。
+
+### [功能分组 1]
+
+- [ ] [可验证的功能点描述]
+- [ ] [可验证的功能点描述]
+
+### [功能分组 2]
+
+- [ ] [可验证的功能点描述]
 
 ## Technical Contract
 
+### [子系统名称]
+
+<key_function>
+- path/to/file.py
+  - file.ClassName.method_name:行号
+  - file.function_name:行号
+</key_function>
+
+**对外接口**：
+
+| 接口 | 说明 | 约束 |
+|------|------|------|
+| method_name(params) | 接口说明 | 约束条件 |
+
+### 数据模型
+
+[核心数据结构定义]
+
+### 状态机规则（如果有）
+
+[状态转换规则的抽象定义]
+
+### API 端点（如果有）
+
+[HTTP API 的完整契约]
+
+## Design Rationale
+
+**为什么这样设计？**
+- [设计理由]
+
+**有哪些约束？**
+- [技术约束、业务约束]
+
+**有哪些已知限制？**
+- [当前无法支持的场景]
+
+**相关 ADR**：
+- [链接到相关的架构决策记录]
+
 ## Interaction / UX Notes
 
-## Acceptance Notes
+[仅在前端功能或交互功能需要时保留]
 
-## Out of Spec
+## Out of Scope
+
+本 spec 不覆盖以下内容，请参考相应文档：
+
+- **[模块名]**：[链接] - [说明]
 ```
+
+## 4. 禁止事项
+
+1. 直接将 `brainstorming` 产出的高细节内容原样写入 `docs/specs`
+2. 把执行步骤、迁移步骤、阶段拆解直接写成正式 `spec`
+3. 在缺少 `Technical Contract` 的情况下，将文档标记为正式 `spec`
+4. **写明内部实现的函数签名**（只能写对外接口的函数签名，使用 key_function 标签）
+5. **写入完整的调用链路**（这是 Flow 文档的职责）
+6. **对外接口不使用 key_function 标签标注函数位置**
