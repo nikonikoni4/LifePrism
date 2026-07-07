@@ -6,6 +6,7 @@ repository Aggregators - 数据聚合层
 
 from lifeprism.repository.aggregators.category_aggregator import CategoryAggregator
 from lifeprism.repository.aggregators.computer_usage_aggregator import ComputerUsageAggregator
+from lifeprism.repository.aggregators.custom_record_aggregator import CustomRecordRepository
 from lifeprism.repository.aggregators.goal_aggregator import GoalAggregator
 from lifeprism.repository.aggregators.habit_aggregator import HabitAggregator
 from lifeprism.repository.aggregators.habit_chain_aggregator import HabitChainAggregator
@@ -25,6 +26,7 @@ map_cache_aggregator: MapCacheAggregator = LazySingleton(MapCacheAggregator)
 todo_aggregator: TodoAggregator = LazySingleton(TodoAggregator)
 plan_doc_aggregator: PlanDocAggregator = LazySingleton(PlanDocAggregator)
 computer_usage_aggregator: ComputerUsageAggregator = LazySingleton(ComputerUsageAggregator)
+custom_record_repository: CustomRecordRepository = LazySingleton(CustomRecordRepository)
 
 __all__ = [
     # 类
@@ -37,6 +39,7 @@ __all__ = [
     "TodoAggregator",
     "PlanDocAggregator",
     "ComputerUsageAggregator",
+    "CustomRecordRepository",
     # 单例
     "habit_aggregator",
     "mood_aggregator",
@@ -47,4 +50,5 @@ __all__ = [
     "todo_aggregator",
     "plan_doc_aggregator",
     "computer_usage_aggregator",
+    "custom_record_repository",
 ]

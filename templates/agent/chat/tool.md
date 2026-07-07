@@ -116,3 +116,84 @@ session_id: xyz789ghi012
 | `/new` | 新建一个会话，开始新的聊天 | 用户发送 `/new` |
 | `/continue <session_id>` | 继续指定的会话 | 用户发送 `/continue abc123` |
 | `/session-list [YYYY-MM-DD]` | 列出所有会话，或指定日期的会话 | 用户发送 `/session-list` 或 `/session-list 2026-05-06` |
+
+## 自定义记录模块
+
+### 功能说明
+
+用户可以通过自然语言让 AI 创建"自定义记录类型"并录入数据。每个类型对应一张数据表，字段由用户描述后 AI 生成。
+
+### 可用工具
+
+| 工具名 | 用途 | 适用场景 |
+|--------|------|----------|
+| `list_custom_record_types` | 列出所有已创建的记录类型（含字段定义） | 录入数据前查看类型和字段；用户问"有哪些记录类型" |
+| `create_custom_record_type` | 创建新的记录类型 | 用户表达「想记录某类内容」（如「想记录体育活动」） |
+| `create_custom_record_entry` | 向已存在的类型录入一条数据 | 用户表达「记录某事」（如「今天跑了5公里」） |
+| `query_custom_record_entries` | 查询某类型的记录列表（按创建时间倒序） | 用户问「这周记录了哪些运动」「查一下最近的饮食」 |
+
+### 创建类型流程
+
+当用户表达「想记录某类内容」时，按以下流程操作：
+
+1. **解析用户意图**：从自然语言中提取类型名、字段定义
+2. **生成 slug 和 field_key**：将中文名转为英文小写+下划线格式的标识符（如「体育活动」→slug=`sport`，「锻炼内容」→field_key=`exercise_content`）
+3. **展示给用户确认**：列出类型名、slug、字段列表，等待用户确认
+4. **用户确认后调用 `create_custom_record_type`**
+
+### 录入数据流程
+
+当用户表达「记录某事」时，按以下流程操作：
+
+1. **调用 `list_custom_record_types`**：获取类型列表，匹配用户描述的类型（如「体育活动」），拿到 `type_id` 和字段定义
+2. **解析字段值**：从用户自然语言中提取各字段的值，按 field_key 组织成 data 字典
+3. **展示给用户确认**：列出类型名、各字段值，等待用户确认
+4. **用户确认后调用 `create_custom_record_entry`**：传入 `type_id` 和 `data`
+
+#### 录入示例
+
+用户：「今天跑了5公里」
+
+AI 操作：
+1. 调用 `list_custom_record_types`，找到类型「体育活动」（type_id=`crt-xxxx`），字段为 `exercise_date`、`exercise_content`
+2. 解析字段值：`exercise_date="2026-07-07"`、`exercise_content="跑了5公里"`
+3. 展示给用户确认：
+   - 类型：体育活动
+   - 日期：2026-07-07
+   - 锻炼内容：跑了5公里
+4. 用户确认后调用 `create_custom_record_entry`：`{type_id: "crt-xxxx", data: {exercise_date: "2026-07-07", exercise_content: "跑了5公里"}}`
+
+### 查询数据流程
+
+当用户问「这周记录了哪些运动」「查一下最近的饮食」时：
+
+1. **调用 `list_custom_record_types`**：匹配类型，拿到 `type_id`
+2. **调用 `query_custom_record_entries`**：传入 `type_id` 和 `date_range`（可选）
+3. **整理结果回复用户**：将记录列表格式化为易读的文本
+
+### field_key 错误处理
+
+录入数据时，如果 `data` 中的 key 不匹配类型的 field_key，工具会返回 `INVALID_FIELD_KEY` 错误，包含 `valid_fields` 列表：
+
+```json
+{
+  "error": "INVALID_FIELD_KEY",
+  "message": "字段不存在: wrong_field",
+  "valid_fields": [
+    {"field_key": "exercise_date", "field_name": "日期"},
+    {"field_key": "exercise_content", "field_name": "锻炼内容"}
+  ]
+}
+```
+
+收到此错误时，**根据 `valid_fields` 重新解析用户输入**，匹配正确的 field_key 后重试 `create_custom_record_entry`。
+
+### 注意事项
+
+- **slug 和 field_key 格式**：必须匹配 `^[a-z][a-z0-9_]*$`（英文小写字母开头，只能含小写字母、数字、下划线）
+- **fields 至少 1 个**：不能创建没有字段的类型
+- **slug 全局唯一**：如果冲突，需要换个 slug
+- **缺失字段允许**：录入时 data 中缺少某些字段不会报错，缺失字段存为 NULL
+- **空字典允许**：录入时 data 可以是空字典 `{}`
+- **date_range 格式**：`[start, end]`，格式 `YYYY-MM-DD`，任一侧可为 null
+- **AI 无删除工具**：删除类型/记录走前端，用户需要在前端操作

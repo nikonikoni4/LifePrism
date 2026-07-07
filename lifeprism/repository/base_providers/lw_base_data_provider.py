@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
-from lifeprism.repository.providers.common_query_options import QueryOptions
+from lifeprism.repository.providers import QueryOptions
 from lifeprism.utils.exceptions import DataAccessError
 
 logger = logging.getLogger(__name__)

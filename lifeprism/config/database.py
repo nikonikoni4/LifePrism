@@ -1428,6 +1428,79 @@ BEHAVIOR_ANALYSIS_CONFIG = {
 }
 
 
+# ==================== 自定义记录模块 Meta 表 ====================
+
+CUSTOM_RECORD_TYPES_CONFIG = {
+    "table_name": "custom_record_types",
+    "columns": {
+        "id": {
+            "type": "TEXT",
+            "constraints": ["PRIMARY KEY", "NOT NULL"],
+            "comment": "类型 ID（格式：crt-{uuid[:8]}）",
+        },
+        "name": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL"],
+            "comment": "类型显示名",
+        },
+        "slug": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "UNIQUE"],
+            "comment": "语义化标识，用作数据表名后缀",
+        },
+        "description": {
+            "type": "TEXT",
+            "constraints": [],
+            "comment": "类型描述",
+        },
+    },
+    "table_constraints": [],
+    "indexes": [],
+    "timestamps": True,
+    "update_at": True,
+}
+
+CUSTOM_RECORD_FIELDS_CONFIG = {
+    "table_name": "custom_record_fields",
+    "columns": {
+        "id": {
+            "type": "TEXT",
+            "constraints": ["PRIMARY KEY", "NOT NULL"],
+            "comment": "字段定义 ID（格式：crf-{uuid[:8]}）",
+        },
+        "type_id": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL"],
+            "comment": "关联 custom_record_types.id",
+        },
+        "field_name": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL"],
+            "comment": "字段显示名",
+        },
+        "field_key": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL"],
+            "comment": "数据库列名，正则 ^[a-z][a-z0-9_]*$",
+        },
+        "field_type": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL"],
+            "comment": "字段类型（P1 仅 text）",
+        },
+        "sort_order": {
+            "type": "INTEGER",
+            "constraints": ["NOT NULL", "DEFAULT 0"],
+            "comment": "列顺序",
+        },
+    },
+    "table_constraints": ["UNIQUE (type_id, field_key)"],
+    "indexes": [],
+    "timestamps": True,
+    "update_at": False,
+}
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     "category_map_cache": category_map_cache_CONFIG,
@@ -1466,6 +1539,8 @@ TABLE_CONFIGS = {
     "window_events": WINDOW_EVENTS_CONFIG,
     "raw_behavior_analysis": RAW_BEHAVIOR_ANALYSIS_CONFIG,
     "behavior_analysis": BEHAVIOR_ANALYSIS_CONFIG,
+    "custom_record_types": CUSTOM_RECORD_TYPES_CONFIG,
+    "custom_record_fields": CUSTOM_RECORD_FIELDS_CONFIG,
 }
 
 

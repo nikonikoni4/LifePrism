@@ -130,6 +130,11 @@ from lifeprism.server.api import habit_router
 _log_startup_time("  - habit_router", _import_start)
 
 _import_start = time.perf_counter()
+from lifeprism.server.api import custom_records_router
+
+_log_startup_time("  - custom_records_router", _import_start)
+
+_import_start = time.perf_counter()
 from lifeprism.server.api.add_on_api import router as add_on_router
 
 _log_startup_time("  - add_on_router", _import_start)
@@ -443,6 +448,7 @@ app.include_router(mood_router, prefix="/api/v2")  # Mood 心情
 app.include_router(value_router, prefix="/api/v2")  # Value 价值
 app.include_router(commitment_router, prefix="/api/v2")  # Commitment 承诺
 app.include_router(habit_router, prefix="/api/v2/habit", tags=["habit"])  # Habit 习惯
+app.include_router(custom_records_router, prefix="/api/v2")  # Custom Records 自定义记录
 app.include_router(add_on_router)
 
 _log_startup_time("[OK] API routers registered (20 routers)", _router_start)

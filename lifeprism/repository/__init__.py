@@ -46,6 +46,9 @@ chat_history_db_manager = DatabaseManager(
 # ==================== 基础数据提供者 ====================
 from lifeprism.repository.aggregators import category_aggregator as category_repository
 from lifeprism.repository.aggregators import computer_usage_aggregator as computer_usage_repository
+from lifeprism.repository.aggregators import (
+    custom_record_repository as custom_record_repository,
+)
 from lifeprism.repository.aggregators import goal_aggregator as goal_repository
 
 # ==================== 多表 repository（内部是 Aggregator）====================
@@ -60,8 +63,6 @@ from lifeprism.repository.providers import (
     behavior_analysis_provider as behavior_analysis_repository,
 )
 from lifeprism.repository.providers import custom_block_provider as custom_block_repository
-
-# ==================== 单表 repository（内部是 Provider）====================
 from lifeprism.repository.providers import diary_provider as diary_repository
 from lifeprism.repository.providers import (
     raw_behavior_analysis_provider as raw_behavior_analysis_repository,
@@ -95,4 +96,5 @@ __all__ = [
     "computer_usage_repository",
     "category_repository",
     "map_cache_repository",
+    "custom_record_repository",
 ]

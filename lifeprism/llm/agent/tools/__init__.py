@@ -1,4 +1,10 @@
 from .base import ERROR
+from .custom_records_tool import (
+    CreateCustomRecordEntryTool,
+    CreateCustomRecordTypeTool,
+    ListCustomRecordTypesTool,
+    QueryCustomRecordEntriesTool,
+)
 from .delete_bootstrap import DeleteBootstrapTool
 from .filesystem import (
     EditFileTool,
@@ -34,5 +40,9 @@ __all__ = [
     "SearchStringTool",
     "QuerySessionListTool",
     "QuerySessionHistoryTool",
+    "ListCustomRecordTypesTool",
+    "CreateCustomRecordTypeTool",
+    "CreateCustomRecordEntryTool",
+    "QueryCustomRecordEntriesTool",
     "ERROR",
 ]

@@ -8,9 +8,13 @@ from lifeprism.config import settings
 from lifeprism.llm.agent.context import Context
 from lifeprism.llm.agent.tools import (
     ERROR,
+    CreateCustomRecordEntryTool,
+    CreateCustomRecordTypeTool,
     DeleteBootstrapTool,
     EditFileTool,
     FileTreeTool,
+    ListCustomRecordTypesTool,
+    QueryCustomRecordEntriesTool,
     QuerySessionHistoryTool,
     QuerySessionListTool,
     ReadFileTool,
@@ -428,6 +432,10 @@ class AgentLoop:
                 self._tool_registry.register(UpdateUserBehaviorNoteTool())
                 self._tool_registry.register(UserMoodQuryTool())
                 self._tool_registry.register(UserMoodCreateTool())
+                self._tool_registry.register(ListCustomRecordTypesTool())
+                self._tool_registry.register(CreateCustomRecordTypeTool())
+                self._tool_registry.register(CreateCustomRecordEntryTool())
+                self._tool_registry.register(QueryCustomRecordEntriesTool())
                 self._tool_registry.register(ReadFileTool())
                 self._tool_registry.register(WriteFileTool())
                 self._tool_registry.register(EditFileTool())

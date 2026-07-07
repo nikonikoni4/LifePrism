@@ -7,6 +7,7 @@ from .being_api import router as being_router
 from .category_api import router as category_v2_router
 from .chatbot_api import router as chatbot_router
 from .commitment_api import commitment_router
+from .custom_records_api import router as custom_records_router
 from .diary_api import router as diary_router
 from .goal_api import router as goal_router
 from .habit_api import router as habit_router
@@ -40,4 +41,5 @@ __all__ = [
     "value_router",
     "commitment_router",
     "habit_router",
+    "custom_records_router",
 ]

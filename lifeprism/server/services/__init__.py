@@ -12,6 +12,7 @@ from . import (
     activity_service,  # 已改为纯函数
     add_on_service,  # Add-on 扩展功能
     commitment_service,  # Mind Space 承诺
+    custom_records_service,  # 自定义记录模块
     diary_service,  # Mind Space 日记
     journal_service,  # 已改为纯函数
     mood_service,  # Mind Space 心情
@@ -46,4 +47,5 @@ __all__ = [
     "value_service",
     "commitment_service",
     "add_on_service",
+    "custom_records_service",
 ]
