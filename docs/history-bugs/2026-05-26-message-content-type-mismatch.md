@@ -1,8 +1,9 @@
 # Bug: InboundMessage.content 类型不统一导致图片丢失和上下文爆炸
 
 - **date**: 2026-05-26
+- **updated_at**: 2026-07-07
 - **status**: fixed
-- **scope**: lifeprism/llm
+- **scope**: lifeprism/llm, lifeprism/server
 
 ## 问题描述
 
@@ -98,6 +99,42 @@ def _validate_last_user_content_is_multimodal(messages: list[dict[str, Any]]) ->
 2. **不要用 f-string 拼接复杂对象**：list/dict 被 f-string 转为字符串后会丢失语义，应使用结构化数据传递
 3. **防御性校验应在入口处**：MessageContent 在 InboundMessage 构造时就归一化，而不是在每个下游使用点检查
 
+## 补充修复（2026-07-07）
+
+### 问题
+
+修复 `InboundMessage` 写入侧（user 消息统一用 list 存储）后，**读取侧没有同步更新**。`chatbot_service.py::get_history()` 直接从 `session.messages` 取 `msg["content"]` 传给 `ChatMessage`（Pydantic 要求 `content: str`），当 user 消息 content 为 list 时触发 `ValidationError`，导致 `GET /chatbot/sessions/{id}/history` 返回 500。
+
+```
+pydantic_core._pydantic_core.ValidationError: 1 validation error for ChatMessage
+content
+  Input should be a valid string [type=string_type, input_value=[{'type': 'text', 'text':...}], input_type=list]
+```
+
+### 修复
+
+在 `ChatbotService` 新增 `_normalize_content()` 静态方法，将 `str | list | None` 统一转为 `str`：
+
+```python
+@staticmethod
+def _normalize_content(content: str | list | None) -> str:
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        text_parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text_parts.append(block.get("text", ""))
+        return "".join(text_parts)
+    return str(content)
+```
+
+### 硬约束
+
+已在 `lifeprism/CLAUDE.md` 新增「消息内容格式」规则：任何从 `session.messages` 读取 content 并对外输出的地方，必须先归一化为字符串。
+
 ## 触发规则
 
 在排查以下问题时阅读：
@@ -105,3 +142,5 @@ def _validate_last_user_content_is_multimodal(messages: list[dict[str, Any]]) ->
 - 上下文长度异常膨胀或 token 爆炸
 - InboundMessage.content 相关的类型错误
 - MessageContent 类的使用和扩展
+- `GET /chatbot/sessions/{id}/history` 返回 500 / Pydantic ValidationError / content type string_type
+- 会话历史消息加载失败
