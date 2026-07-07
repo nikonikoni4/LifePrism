@@ -7,8 +7,8 @@ Goal Aggregator - 目标数据聚合层
 
 from typing import Any
 
-from lifeprism.repository import QueryOptions
 from lifeprism.repository.exceptions import EntityNotFoundError
+from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.repository.providers.goal_providers import (
     GoalProvider,
     GoalStatsProvider,

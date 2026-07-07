@@ -6,7 +6,7 @@ Tokens Usage Provider - Token 使用统计数据访问层
 
 from typing import Any
 
-from lifeprism.repository import LWBaseDataProvider
+from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError

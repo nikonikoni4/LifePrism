@@ -8,7 +8,7 @@ Mood Providers - 心情模块数据访问层
 import uuid
 from typing import Any
 
-from lifeprism.repository import LWBaseDataProvider
+from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError

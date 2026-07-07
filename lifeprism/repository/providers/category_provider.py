@@ -7,7 +7,7 @@ Category Provider - 分类数据访问层
 import sqlite3
 from typing import Any
 
-from lifeprism.repository import LWBaseDataProvider
+from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError, ValidationError
 
