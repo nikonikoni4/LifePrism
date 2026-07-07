@@ -2,7 +2,7 @@
  * ModuleDock 类型定义
  */
 
-export type ModuleId = 'lifewatch' | 'mindspace' | 'addons' | 'goals' | 'habits' | 'settings';
+export type ModuleId = 'lifewatch' | 'mindspace' | 'addons' | 'goals' | 'habits' | 'settings' | 'custom-records';
 
 export interface ModuleConfig {
     id: ModuleId;

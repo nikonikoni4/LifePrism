@@ -11,10 +11,20 @@ import { HabitsApp } from '../apps/habits/HabitsApp';
 import { SettingsApp } from '../apps/settings/SettingsApp';
 import { MindSpaceApp } from '../apps/mindspace/MindSpaceApp';
 import { AddonsApp } from '../apps/addons/AddonsApp';
+import { CustomRecordsApp } from '../apps/custom-records/CustomRecordsApp';
 
 export const AppShell: React.FC = () => {
-    // 模块切换状态
-    const [currentModule, setCurrentModule] = useState<ModuleId>('lifewatch');
+    // 模块切换状态 — 初始值从 URL 路径推断，避免 LifeWatchApp catch-all 路由重定向
+    const [currentModule, setCurrentModule] = useState<ModuleId>(() => {
+        const path = window.location.hash.replace(/^#/, '') || '/';
+        if (path.startsWith('/goals')) return 'goals';
+        if (path.startsWith('/habits')) return 'habits';
+        if (path.startsWith('/settings')) return 'settings';
+        if (path.startsWith('/mindspace')) return 'mindspace';
+        if (path.startsWith('/addons')) return 'addons';
+        if (path.startsWith('/custom-records')) return 'custom-records';
+        return 'lifewatch';
+    });
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -26,6 +36,7 @@ export const AppShell: React.FC = () => {
         else if (path.startsWith('/settings')) setCurrentModule('settings');
         else if (path.startsWith('/mindspace')) setCurrentModule('mindspace');
         else if (path.startsWith('/addons')) setCurrentModule('addons');
+        else if (path.startsWith('/custom-records')) setCurrentModule('custom-records');
         else setCurrentModule('lifewatch'); // Default to lifewatch for /, /home, /timeline, etc.
     }, [location.pathname]);
 
@@ -39,6 +50,7 @@ export const AppShell: React.FC = () => {
             case 'settings': navigate('/settings'); break;
             case 'mindspace': navigate('/mindspace'); break;
             case 'addons': navigate('/addons'); break;
+            case 'custom-records': navigate('/custom-records'); break;
         }
     };
 
@@ -78,8 +90,11 @@ export const AppShell: React.FC = () => {
                 <HabitsApp />
             )}
             {currentModule === 'settings' && (
-                <SettingsApp />
-            )}
+                  <SettingsApp />
+              )}
+              {currentModule === 'custom-records' && (
+                  <CustomRecordsApp />
+              )}
 
             {/* Toast 消息容器 (Global) */}
             <ToastContainer />

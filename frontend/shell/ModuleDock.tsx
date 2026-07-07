@@ -56,6 +56,13 @@ const MODULES: ModuleConfig[] = [
         description: '扩展插件',
         color: '#10B981', // emerald
     },
+    {
+        id: 'custom-records',
+        name: 'Custom Records',
+        icon: 'database',
+        description: '自定义记录',
+        color: '#06B6D4', // cyan
+    },
 ];
 
 // 触发区域高度

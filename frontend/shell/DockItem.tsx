@@ -7,7 +7,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { motion, useSpring } from 'framer-motion';
 import { DockItemProps } from './types';
 
-import { Target, Zap, Settings as SettingsIcon } from 'lucide-react';
+import { Target, Zap, Settings as SettingsIcon, Database } from 'lucide-react';
 
 // 图标映射
 const iconMap: Record<string, React.ReactNode> = {
@@ -43,6 +43,7 @@ const iconMap: Record<string, React.ReactNode> = {
     goals: <Target strokeWidth={1.5} className="w-full h-full" />,
     habits: <Zap strokeWidth={1.5} className="w-full h-full" />,
     settings: <SettingsIcon strokeWidth={1.5} className="w-full h-full" />,
+    'custom-records': <Database strokeWidth={1.5} className="w-full h-full" />,
 };
 
 export const DockItem: React.FC<DockItemProps> = ({
