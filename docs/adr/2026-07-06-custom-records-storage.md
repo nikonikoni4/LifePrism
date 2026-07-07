@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-06
-updated_at: 2026-07-06
-last_updated: 创建自定义记录模块存储方案决策初稿
+updated_at: 2026-07-07
+last_updated: 同步实现偏差：CustomRecordRepository 独立实现（非继承 LWBaseDataProvider）；Meta 表新增展示配置列（card_template/icon/accent_color/display_role）
 abstract: 决定自定义记录模块采用 SQLite 动态建表 + meta 表元数据驱动方案，否决 JSON 文件方案。AI 负责schema 生成与持续录入，P1 仅支持文本字段，字段定义后不可变。
 status: decided
 ---
@@ -14,6 +14,7 @@ status: decided
 | 版本 | 更新内容 |
 | ---- | -------- |
 | 1.0  | 创建文档初稿 |
+| 1.1  | 同步实现偏差：CustomRecordRepository 独立实现说明；Meta 表新增展示配置列（card_template/icon/accent_color/display_role） |
 
 ## 问题界定
 
@@ -104,7 +105,7 @@ status: decided
 
 **优点**：
 - ✅ 索引能力：SQLite 天然支持，按日期查询毫秒级
-- ✅ 与现有架构一致：复用 [LWBaseDataProvider](../../lifeprism/repository/base_providers/lw_base_data_provider.py) 模式，`_TABLE_NAME` 运行时由 meta 表驱动设置
+- ✅ 架构适配合理：动态表名运行时才确定，无法套用 [LWBaseDataProvider](../../lifeprism/repository/base_providers/lw_base_data_provider.py) 的静态元数据模式（`_TABLE_NAME` 类属性），因此独立实现 CustomRecordRepository，内部直接使用 `lw_db_manager` 执行参数化 SQL
 - ✅ LLM tool 契约统一：tool 直接调 repository，与 [llm-agent-spec](../specs/2026-07-06-llm-agent-spec.md) 一致
 - ✅ 写入并发：WAL 模式 + 连接池天然支持
 - ✅ Schema 可发现：meta 表提供类型列表与字段定义，前端不接触 `sqlite_master`
@@ -180,6 +181,9 @@ JSON 唯一真实优势是"本地可编辑"，但 AI 是录入入口，用户手
 | name | TEXT | NOT NULL | 显示名（如"体育活动"） |
 | slug | TEXT | NOT NULL, UNIQUE | 表名后缀（如 `sport`），实际表名 `custom_sport` |
 | description | TEXT | - | 描述，给 AI 看 |
+| card_template | TEXT | NOT NULL, DEFAULT 'clean' | 卡片模板（clean/paper/minimal/bold/metric） |
+| icon | TEXT | NOT NULL, DEFAULT 'fileText' | 图标名 |
+| accent_color | TEXT | NOT NULL, DEFAULT 'blue' | 强调色 |
 | created_at | TEXT | 自动 | 创建时间 |
 | updated_at | TEXT | 自动 | 更新时间 |
 
@@ -193,9 +197,12 @@ JSON 唯一真实优势是"本地可编辑"，但 AI 是录入入口，用户手
 | field_key | TEXT | NOT NULL | 列名（如 `exercise_content`），AI 生成 |
 | field_type | TEXT | NOT NULL | P1 只有 `text`，保留 `number`/`date` 枚举位 |
 | sort_order | INTEGER | NOT NULL, DEFAULT 0 | 列顺序 |
+| display_role | TEXT | NOT NULL, DEFAULT 'auto' | 展示角色（auto/title/main/chip/hidden），属展示配置可变 |
 | created_at | TEXT | 自动 | 创建时间 |
 
 **约束**：`(type_id, field_key)` 联合唯一，防止同类型内列名重复。
+
+> **display_role 不违反"字段定义后不可变"约束**：`field_key`/`field_type`/`field_name` 等结构定义一旦创建不可修改，而 `display_role` 属于展示层配置（决定字段在卡片中的渲染角色），与数据结构无关，用户可随时通过 PATCH 端点调整，不影响已存储数据的完整性。
 
 ### 数据表结构
 
@@ -268,7 +275,7 @@ LLM tool 调用 create_custom_record_type
 
 ### 正面影响
 
-1. **架构一致性**：复用现有 [LWBaseDataProvider](../../lifeprism/repository/base_providers/lw_base_data_provider.py) 模式，无新存储范式
+1. **架构适配合理**：动态表名运行时才确定，无法套用 [LWBaseDataProvider](../../lifeprism/repository/base_providers/lw_base_data_provider.py) 的静态元数据模式，因此独立实现 CustomRecordRepository，无新存储范式（仍走 `lw_db_manager` 连接池）
 2. **LLM tool 契约统一**：与 [llm-agent-spec](../specs/2026-07-06-llm-agent-spec.md) 一致，tool 调 repository
 3. **查询性能**：SQLite 索引支持按日期高效查询
 4. **schema 可发现**：meta 表提供类型列表，前端不接触系统表
@@ -285,6 +292,28 @@ LLM tool 调用 create_custom_record_type
 - 动态建表逻辑封装在 `CustomRecordRepository` 中，不污染现有 `LWTableManager`
 - slug 生成失败时 AI 在对话内重新生成，不自动加后缀
 - schema 演进留作未来 ADR 单独决策
+
+## 实现偏差说明
+
+### CustomRecordRepository 独立实现，不继承 LWBaseDataProvider
+
+**初稿描述**：方案 B 优点中最初写"复用 LWBaseDataProvider 模式，`_TABLE_NAME` 运行时由 meta 表驱动设置"。
+
+**实际实现偏差**：`CustomRecordRepository` 并未继承 `LWBaseDataProvider`，而是独立实现，内部直接使用 `lw_db_manager` 执行参数化 SQL。
+
+**偏差原因**：
+
+[LWBaseDataProvider](../../lifeprism/repository/base_providers/lw_base_data_provider.py) 采用**静态元数据驱动**模式——子类在类定义时通过 `_TABLE_NAME`、`_PRIMARY_KEY` 等类属性声明表结构，基类据此生成参数化 SQL。这一模式的前提是：表名在类加载时即可确定。
+
+自定义记录模块的核心特征是**表名运行时才确定**：
+
+1. 数据表名 `custom_<slug>` 中的 `slug` 由 AI 在运行时生成（如 `sport`、`diet`），无法在类定义时写死
+2. 同一个 Repository 实例需要操作**多张不同的动态表**（用户可创建任意数量的记录类型），每次操作前需先查 meta 表获取 `slug` 再拼接表名
+3. DDL（CREATE TABLE / DROP TABLE）是动态操作，`LWBaseDataProvider` 的 CRUD 模板不覆盖 DDL 场景
+
+因此，`LWBaseDataProvider` 的静态元数据模式无法适配动态表名场景。强行套用需要覆写几乎所有方法，反而增加复杂度。独立实现更直接、更清晰，且仍复用底层 `lw_db_manager` 连接池，不引入新存储范式。
+
+**实际代码位置**：`lifeprism/repository/aggregators/custom_record_aggregator.py` 中的 `CustomRecordRepository` 类。
 
 ## 经验教训
 

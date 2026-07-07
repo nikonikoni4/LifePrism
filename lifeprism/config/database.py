@@ -1453,6 +1453,21 @@ CUSTOM_RECORD_TYPES_CONFIG = {
             "constraints": [],
             "comment": "类型描述",
         },
+        "card_template": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "DEFAULT 'clean'"],
+            "comment": "卡片模板（clean|paper|minimal|bold|metric）",
+        },
+        "icon": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "DEFAULT 'fileText'"],
+            "comment": "类型图标名",
+        },
+        "accent_color": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "DEFAULT 'blue'"],
+            "comment": "强调色",
+        },
     },
     "table_constraints": [],
     "indexes": [],
@@ -1492,6 +1507,11 @@ CUSTOM_RECORD_FIELDS_CONFIG = {
             "type": "INTEGER",
             "constraints": ["NOT NULL", "DEFAULT 0"],
             "comment": "列顺序",
+        },
+        "display_role": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "DEFAULT 'auto'"],
+            "comment": "字段展示角色（auto|title|main|chip|hidden）",
         },
     },
     "table_constraints": ["UNIQUE (type_id, field_key)"],

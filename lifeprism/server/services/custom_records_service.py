@@ -6,6 +6,7 @@
 """
 
 from lifeprism.repository import custom_record_repository
+from lifeprism.repository.exceptions import EntityNotFoundError
 from lifeprism.server.schemas.custom_records_schemas import (
     CreateCustomRecordEntryRequest,
     CreateCustomRecordTypeRequest,
@@ -14,6 +15,8 @@ from lifeprism.server.schemas.custom_records_schemas import (
     CustomRecordTypeItem,
     CustomRecordTypeListResponse,
     FieldDefinition,
+    UpdateFieldRoleRequest,
+    UpdateTypeConfigRequest,
 )
 from lifeprism.utils import get_logger
 
@@ -26,20 +29,25 @@ logger = get_logger(__name__)
 def _convert_to_field_definition(item: dict) -> FieldDefinition:
     """将数据库字段记录转换为 FieldDefinition"""
     return FieldDefinition(
+        id=item.get("id", ""),
         field_name=item["field_name"],
         field_key=item["field_key"],
         field_type=item.get("field_type", "text"),
+        display_role=item.get("display_role", "auto"),
     )
 
 
-def _convert_to_type_item(item: dict, fields: list[dict]) -> CustomRecordTypeItem:
-    """将数据库类型记录 + 字段列表转换为 CustomRecordTypeItem"""
+def _convert_to_type_item(item: dict) -> CustomRecordTypeItem:
+    """将数据库类型记录（含 fields）转换为 CustomRecordTypeItem"""
     return CustomRecordTypeItem(
         id=item["id"],
         name=item["name"],
         slug=item["slug"],
         description=item.get("description", "") or "",
-        fields=[_convert_to_field_definition(f) for f in fields],
+        fields=[_convert_to_field_definition(f) for f in item.get("fields", [])],
+        card_template=item.get("card_template", "clean"),
+        icon=item.get("icon", "fileText"),
+        accent_color=item.get("accent_color", "blue"),
         created_at=item.get("created_at", ""),
         updated_at=item.get("updated_at", ""),
     )
@@ -56,7 +64,7 @@ def _convert_to_entry_item(item: dict) -> CustomRecordEntryItem:
 def get_types() -> CustomRecordTypeListResponse:
     """获取所有自定义记录类型（含字段定义）"""
     types = custom_record_repository.list_types()
-    items = [_convert_to_type_item(t, t.get("fields", [])) for t in types]
+    items = [_convert_to_type_item(t) for t in types]
     return CustomRecordTypeListResponse(items=items)
 
 
@@ -67,8 +75,9 @@ def get_type(type_id: str) -> CustomRecordTypeItem:
         EntityNotFoundError: 类型不存在
     """
     type_dict = custom_record_repository.get_type_by_id(type_id)
-    fields = custom_record_repository.get_type_fields(type_id)
-    return _convert_to_type_item(type_dict, fields)
+    if type_dict is None:
+        raise EntityNotFoundError(entity_type="CustomRecordType", entity_id=type_id)
+    return _convert_to_type_item(type_dict)
 
 
 def create_type(request: CreateCustomRecordTypeRequest) -> CustomRecordTypeItem:
@@ -85,9 +94,8 @@ def create_type(request: CreateCustomRecordTypeRequest) -> CustomRecordTypeItem:
         description=request.description,
     )
     type_dict = custom_record_repository.get_type_by_id(type_id)
-    fields = custom_record_repository.get_type_fields(type_id)
     logger.info("创建自定义记录类型成功: type_id=%s, slug=%s", type_id, request.slug)
-    return _convert_to_type_item(type_dict, fields)
+    return _convert_to_type_item(type_dict)
 
 
 def delete_type(type_id: str) -> bool:
@@ -118,14 +126,14 @@ def get_entries(
     if start_date or end_date:
         date_range = (start_date, end_date)
 
-    entries = custom_record_repository.query_entries(
+    entries, total_count = custom_record_repository.query_entries(
         type_id=type_id,
         date_range=date_range,
         page=page,
         page_size=page_size,
     )
     items = [_convert_to_entry_item(e) for e in entries]
-    return CustomRecordEntryListResponse(items=items, total=len(items))
+    return CustomRecordEntryListResponse(items=items, total=total_count)
 
 
 def create_entry(type_id: str, request: CreateCustomRecordEntryRequest) -> CustomRecordEntryItem:
@@ -148,3 +156,39 @@ def delete_entry(type_id: str, entry_id: str) -> bool:
         EntityNotFoundError: 类型不存在
     """
     return custom_record_repository.delete_entry(type_id=type_id, entry_id=entry_id)
+
+
+# ==================== 配置更新 ====================
+
+
+def update_type_config(type_id: str, request: UpdateTypeConfigRequest) -> CustomRecordTypeItem:
+    """更新类型展示配置
+
+    Raises:
+        EntityNotFoundError: 类型不存在
+    """
+    custom_record_repository.update_type_config(
+        type_id=type_id,
+        card_template=request.card_template,
+        icon=request.icon,
+        accent_color=request.accent_color,
+    )
+    type_dict = custom_record_repository.get_type_by_id(type_id)
+    logger.info("更新类型配置成功: type_id=%s", type_id)
+    return _convert_to_type_item(type_dict)
+
+
+def update_field_role(type_id: str, field_id: str, request: UpdateFieldRoleRequest) -> CustomRecordTypeItem:
+    """更新字段展示角色
+
+    Raises:
+        EntityNotFoundError: 类型不存在 / 字段不存在
+    """
+    custom_record_repository.update_field_role(
+        type_id=type_id,
+        field_id=field_id,
+        display_role=request.display_role,
+    )
+    type_dict = custom_record_repository.get_type_by_id(type_id)
+    logger.info("更新字段角色成功: type_id=%s, field_id=%s", type_id, field_id)
+    return _convert_to_type_item(type_dict)

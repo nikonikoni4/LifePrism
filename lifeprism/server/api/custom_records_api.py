@@ -15,6 +15,8 @@ from lifeprism.server.schemas.custom_records_schemas import (
     CustomRecordEntryListResponse,
     CustomRecordTypeItem,
     CustomRecordTypeListResponse,
+    UpdateFieldRoleRequest,
+    UpdateTypeConfigRequest,
 )
 from lifeprism.server.services import custom_records_service
 
@@ -59,6 +61,31 @@ async def delete_custom_record_type(
     """硬删类型（DROP 数据表 + 删除 meta 记录）。类型不存在返回 404"""
     custom_records_service.delete_type(type_id)
     return {"message": f"类型 {type_id} 已删除"}
+
+
+@router.patch("/types/{type_id}", response_model=CustomRecordTypeItem, summary="更新类型展示配置")
+async def update_custom_record_type_config(
+    request: UpdateTypeConfigRequest,
+    type_id: str = Path(..., description="类型 ID"),
+):
+    """更新类型展示配置（card_template/icon/accent_color）。类型不存在返回 404"""
+    return custom_records_service.update_type_config(type_id=type_id, request=request)
+
+
+@router.patch(
+    "/types/{type_id}/fields/{field_id}",
+    response_model=CustomRecordTypeItem,
+    summary="更新字段展示角色",
+)
+async def update_custom_record_field_role(
+    request: UpdateFieldRoleRequest,
+    type_id: str = Path(..., description="类型 ID"),
+    field_id: str = Path(..., description="字段 ID"),
+):
+    """更新字段展示角色（display_role）。字段不存在返回 404"""
+    return custom_records_service.update_field_role(
+        type_id=type_id, field_id=field_id, request=request
+    )
 
 
 # ==================== 记录管理 ====================

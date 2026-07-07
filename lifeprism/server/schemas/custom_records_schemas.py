@@ -5,6 +5,7 @@
 """
 
 from pydantic import BaseModel, Field
+from typing import Literal
 
 # ==================== 字段定义 ====================
 
@@ -12,9 +13,13 @@ from pydantic import BaseModel, Field
 class FieldDefinition(BaseModel):
     """字段定义"""
 
+    id: str = Field(default="", description="字段 ID（crf-{uuid[:8]}）")
     field_name: str = Field(..., description="字段显示名")
     field_key: str = Field(..., description="字段标识，英文小写+下划线")
     field_type: str = Field(default="text", description="字段类型，P1 仅 text")
+    display_role: Literal["auto", "title", "main", "chip", "hidden"] = Field(
+        default="auto", description="字段展示角色"
+    )
 
 
 # ==================== 类型管理 ====================
@@ -28,6 +33,11 @@ class CustomRecordTypeItem(BaseModel):
     slug: str = Field(..., description="语义化标识")
     description: str = Field(default="", description="类型描述")
     fields: list[FieldDefinition] = Field(default=[], description="字段定义列表")
+    card_template: Literal["clean", "paper", "minimal", "bold", "metric"] = Field(
+        default="clean", description="卡片模板"
+    )
+    icon: str = Field(default="fileText", description="类型图标名")
+    accent_color: str = Field(default="blue", description="强调色")
     created_at: str = Field(default="", description="创建时间")
     updated_at: str = Field(default="", description="更新时间")
 
@@ -65,10 +75,31 @@ class CustomRecordEntryListResponse(BaseModel):
     """记录列表响应"""
 
     items: list[CustomRecordEntryItem] = Field(default=[], description="记录列表")
-    total: int = Field(default=0, description="总条数（当前页条数）")
+    total: int = Field(default=0, description="满足筛选条件的总记录数")
 
 
 class CreateCustomRecordEntryRequest(BaseModel):
     """录入自定义记录"""
 
     data: dict[str, str] = Field(default={}, description="字段值字典 {field_key: value}")
+
+
+# ==================== 配置更新 ====================
+
+
+class UpdateTypeConfigRequest(BaseModel):
+    """更新类型展示配置"""
+
+    card_template: Literal["clean", "paper", "minimal", "bold", "metric"] | None = Field(
+        default=None, description="卡片模板"
+    )
+    icon: str | None = Field(default=None, description="类型图标名")
+    accent_color: str | None = Field(default=None, description="强调色")
+
+
+class UpdateFieldRoleRequest(BaseModel):
+    """更新字段展示角色"""
+
+    display_role: Literal["auto", "title", "main", "chip", "hidden"] = Field(
+        ..., description="展示角色"
+    )

@@ -17,6 +17,7 @@ import type {
   CreateCustomRecordTypeRequest,
   CustomRecordEntryItem,
   CreateCustomRecordEntryRequest,
+  UpdateTypeConfigRequest,
 } from './types';
 
 describe('CustomRecordsAPI', () => {
@@ -355,6 +356,107 @@ describe('CustomRecordsAPI', () => {
       } as Response);
 
       await expect(CustomRecordsAPI.deleteEntry('crt-abc12345', 'nonexistent')).rejects.toThrow('删除记录失败');
+    });
+  });
+
+  // ==================== Cycle 6: updateTypeConfig + updateFieldRole (Slice 6) ====================
+
+  describe('updateTypeConfig', () => {
+    it('should call PATCH /custom-records/types/{id} with correct body', async () => {
+      const mockUpdated: CustomRecordTypeItem = {
+        id: 'crt-abc12345',
+        name: '阅读记录',
+        slug: 'reading',
+        description: '',
+        fields: [],
+        card_template: 'paper',
+        icon: 'book',
+        accent_color: 'amber',
+        created_at: '2026-07-07T10:00:00',
+        updated_at: '2026-07-07T11:00:00',
+      };
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => mockUpdated,
+      } as Response);
+
+      const result = await CustomRecordsAPI.updateTypeConfig('crt-abc12345', {
+        card_template: 'paper',
+        icon: 'book',
+        accent_color: 'amber',
+      });
+
+      expect(fetch).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v2/custom-records/types/crt-abc12345',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ card_template: 'paper', icon: 'book', accent_color: 'amber' }),
+        },
+      );
+      expect(result.card_template).toBe('paper');
+    });
+
+    it('should work with partial update (only card_template)', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ id: 'crt-abc12345', name: 'test', slug: 't', description: '', fields: [], card_template: 'bold', created_at: '', updated_at: '' }),
+      } as Response);
+
+      await CustomRecordsAPI.updateTypeConfig('crt-abc12345', { card_template: 'bold' });
+
+      expect(fetch).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v2/custom-records/types/crt-abc12345',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ card_template: 'bold' }),
+        },
+      );
+    });
+
+    it('should throw error on 404 type not found', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      } as Response);
+
+      await expect(
+        CustomRecordsAPI.updateTypeConfig('nonexistent', { card_template: 'paper' }),
+      ).rejects.toThrow('更新类型配置失败');
+    });
+  });
+
+  describe('updateFieldRole', () => {
+    it('should call PATCH /custom-records/types/{id}/fields/{field_id} with display_role', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ id: 'crt-abc12345', name: 'test', slug: 't', description: '', fields: [], created_at: '', updated_at: '' }),
+      } as Response);
+
+      await CustomRecordsAPI.updateFieldRole('crt-abc12345', 'crf-001', { display_role: 'main' });
+
+      expect(fetch).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v2/custom-records/types/crt-abc12345/fields/crf-001',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ display_role: 'main' }),
+        },
+      );
+    });
+
+    it('should throw error on 404 field not found', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      } as Response);
+
+      await expect(
+        CustomRecordsAPI.updateFieldRole('crt-abc12345', 'nonexistent', { display_role: 'hidden' }),
+      ).rejects.toThrow('更新字段角色失败');
     });
   });
 });

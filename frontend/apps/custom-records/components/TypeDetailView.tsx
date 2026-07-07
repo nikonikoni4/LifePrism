@@ -1,19 +1,22 @@
 /**
- * 类型详情视图 — 卡片视图（默认） + 表格视图 Tab 切换
- * 卡片按日期分组，日期头部显示"今天/昨天/具体日期"
+ * 类型详情视图 — 卡片视图（默认） + 表格视图 + 模板对比 Tab
+ * 卡片按日期分组，支持模板切换和字段角色配置
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, Database, FileText, Clock, Trash2, AlertTriangle, ChevronLeft, ChevronRight, LayoutGrid, Table } from 'lucide-react';
+import { ArrowLeft, Database, FileText, Clock, Trash2, AlertTriangle, ChevronLeft, ChevronRight, LayoutGrid, Table, Columns3, Settings2 } from 'lucide-react';
 import { CustomRecordsAPI } from '../api';
 import { EntryCard } from './EntryCard';
-import type { CustomRecordTypeItem, CustomRecordEntryItem } from '../types';
+import { TemplatePicker } from './TemplatePicker';
+import { FieldRoleModal } from './FieldRoleModal';
+import { TEMPLATE_PRESETS, getTemplatePreset } from '../utils/templatePresets';
+import type { CustomRecordTypeItem, CustomRecordEntryItem, FieldDefinition } from '../types';
 
 interface TypeDetailViewProps {
   typeId: string;
   onBack: () => void;
 }
 
-type ViewTab = 'card' | 'table';
+type ViewTab = 'card' | 'table' | 'compare';
 
 // ==================== 日期分组工具 ====================
 
@@ -45,6 +48,11 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<ViewTab>('card');
 
+  // 模板和字段配置
+  const [currentTemplate, setCurrentTemplate] = useState('clean');
+  const [showFieldModal, setShowFieldModal] = useState(false);
+  const [localFields, setLocalFields] = useState<FieldDefinition[]>([]);
+
   // 筛选与分页
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -65,6 +73,8 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
         }),
       ]);
       setType(typeData);
+      setLocalFields(typeData.fields);
+      setCurrentTemplate(typeData.card_template || 'clean');
       setEntries(entryData.items);
       setTotal(entryData.total);
     } catch (e) {
@@ -86,8 +96,65 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
   };
 
   const handleFilter = () => {
-    setPage(1);
-    loadData();
+    if (page === 1) {
+      // 已经在第 1 页，useEffect 不会因 page 变化而触发，需要手动加载
+      loadData();
+    } else {
+      // page 变化会触发 useEffect 自动加载
+      setPage(1);
+    }
+  };
+
+  // 模板切换 — debounce 自动保存
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedStatusTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 组件卸载时清理所有定时器
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
+    };
+  }, []);
+
+  const handleTemplateChange = (templateId: string) => {
+    setCurrentTemplate(templateId);
+    setSaveStatus('saving');
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        await CustomRecordsAPI.updateTypeConfig(typeId, { card_template: templateId });
+        setSaveStatus('saved');
+        if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
+        savedStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 1500);
+      } catch {
+        setSaveStatus('idle');
+      }
+    }, 600);
+  };
+
+  // 字段角色切换 — 持久化到后端
+  const handleFieldRoleChange = async (fieldKey: string, displayRole: string) => {
+    // 找到对应字段的 id
+    const field = localFields.find(f => f.field_key === fieldKey);
+    if (!field || !field.id) return;
+
+    // 本地立即更新
+    setLocalFields(prev => prev.map(f =>
+      f.field_key === fieldKey ? { ...f, display_role: displayRole } : f
+    ));
+
+    // 持久化到后端
+    try {
+      await CustomRecordsAPI.updateFieldRole(typeId, field.id, { display_role: displayRole });
+    } catch (e) {
+      // 持久化失败时回滚本地状态
+      setLocalFields(prev => prev.map(f =>
+        f.field_key === fieldKey ? { ...f, display_role: field.display_role } : f
+      ));
+      setError(e instanceof Error ? e.message : '更新字段角色失败');
+    }
   };
 
   // 日期分组
@@ -151,17 +218,28 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
         </div>
       </div>
 
-      {/* 字段 chips */}
+      {/* 字段 chips + 配置按钮 */}
       <div className="mb-5 flex items-center gap-2 flex-wrap">
-        {type.fields.map(f => (
+        {localFields.map(f => (
           <span key={f.field_key} className="text-xs px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 border border-slate-100 flex items-center gap-1.5">
             <FileText size={11} className="opacity-40" />
             {f.field_name}
+            {f.display_role && f.display_role !== 'auto' && (
+              <span className="text-[9px] px-1 rounded bg-cyan-100 text-cyan-600 font-medium">
+                {f.display_role}
+              </span>
+            )}
           </span>
         ))}
+        <button
+          onClick={() => setShowFieldModal(true)}
+          className="text-xs px-2.5 py-1 rounded-lg text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 border border-dashed border-slate-200 flex items-center gap-1"
+        >
+          <Settings2 size={11} />配置角色
+        </button>
       </div>
 
-      {/* Tab 栏 + 筛选栏 */}
+      {/* Tab 栏 + 模板选择器 + 筛选栏 */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
           <button
@@ -180,37 +258,63 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
           >
             <Table size={14} />表格
           </button>
+          <button
+            onClick={() => setActiveTab('compare')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'compare' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Columns3 size={14} />模板对比
+          </button>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Clock size={14} className="text-slate-400" />
-            <input
-              type="date"
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-            />
-            <span className="text-slate-400 text-sm">~</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-            />
-          </div>
-          <button onClick={handleFilter} className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-slate-700 hover:bg-slate-800">
-            筛选
-          </button>
-          {(startDate || endDate) && (
-            <button
-              onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
-              className="text-xs text-slate-400 hover:text-slate-600"
-            >
-              清除
+        {activeTab !== 'compare' && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* 模板选择器（卡片视图时显示） */}
+            {activeTab === 'card' && (
+              <div className="flex items-center gap-2">
+                {saveStatus !== 'idle' && (
+                  <span className="text-[10px] text-slate-400">
+                    {saveStatus === 'saving' ? '保存中...' : '已保存'}
+                  </span>
+                )}
+                <TemplatePicker
+                  currentTemplate={currentTemplate}
+                  onTemplateChange={handleTemplateChange}
+                />
+              </div>
+            )}
+
+            {/* 日期筛选 */}
+            <div className="flex items-center gap-2">
+              <Clock size={14} className="text-slate-400" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+              />
+              <span className="text-slate-400 text-sm">~</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+              />
+            </div>
+            <button onClick={handleFilter} className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-slate-700 hover:bg-slate-800">
+              筛选
             </button>
-          )}
-        </div>
+            {(startDate || endDate) && (
+              <button
+                onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
+                className="text-xs text-slate-400 hover:text-slate-600"
+              >
+                清除
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -219,8 +323,51 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
         </div>
       )}
 
-      {/* 内容区 — 卡片视图 / 表格视图 */}
-      {entries.length === 0 ? (
+      {/* 内容区 */}
+      {activeTab === 'compare' ? (
+        /* 模板对比 Tab — 5 套模板并排展示同一条数据 */
+        <div className="space-y-6">
+          <p className="text-sm text-slate-500">选择一个模板应用到当前类型的所有卡片：</p>
+          {entries.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-16 flex flex-col items-center text-slate-400">
+              <Database size={36} strokeWidth={1} className="mb-3 opacity-40" />
+              <p className="text-sm">暂无记录可供对比</p>
+            </div>
+          ) : (
+            TEMPLATE_PRESETS.map(tpl => (
+              <div key={tpl.id} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-slate-700">{tpl.name}</h3>
+                    <span className="text-xs text-slate-400">{tpl.description}</span>
+                  </div>
+                  {currentTemplate === tpl.id ? (
+                    <span className="text-xs px-2 py-0.5 rounded bg-cyan-100 text-cyan-600 font-medium">当前</span>
+                  ) : (
+                    <button
+                      onClick={() => handleTemplateChange(tpl.id)}
+                      className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    >
+                      应用
+                    </button>
+                  )}
+                </div>
+                {/* 用第一条记录预览模板效果 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {entries.slice(0, 2).map(entry => (
+                    <EntryCard
+                      key={entry.id}
+                      fields={localFields}
+                      entry={entry}
+                      templateId={tpl.id}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : entries.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-16 flex flex-col items-center text-slate-400">
           <Database size={36} strokeWidth={1} className="mb-3 opacity-40" />
           <p className="text-sm font-medium">暂无记录</p>
@@ -231,7 +378,6 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
         <div className="space-y-6">
           {groupedEntries.map(group => (
             <div key={group.dateKey}>
-              {/* 日期头部 */}
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center">
                   <Clock size={13} className="text-slate-500" />
@@ -241,14 +387,13 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
                 <span className="text-xs text-slate-300">·</span>
                 <span className="text-xs text-slate-400">{group.items.length} 条</span>
               </div>
-              {/* 卡片网格 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {group.items.map(entry => (
                   <EntryCard
                     key={entry.id}
-                    fields={type.fields}
+                    fields={localFields}
                     entry={entry}
-                    accentColor="cyan"
+                    templateId={currentTemplate}
                     onDelete={handleDeleteEntry}
                   />
                 ))}
@@ -263,7 +408,7 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100">
-                  {type.fields.map(f => (
+                  {localFields.map(f => (
                     <th key={f.field_key} className="px-5 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                       {f.field_name}
                     </th>
@@ -275,7 +420,7 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
               <tbody>
                 {entries.map(entry => (
                   <tr key={entry.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 group">
-                    {type.fields.map(f => (
+                    {localFields.map(f => (
                       <td key={f.field_key} className="px-5 py-3.5 text-slate-700 max-w-xs truncate">
                         {entry[f.field_key] || <span className="text-slate-300">—</span>}
                       </td>
@@ -300,7 +445,7 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
       )}
 
       {/* 分页 */}
-      {totalPages > 1 && (
+      {totalPages > 1 && activeTab !== 'compare' && (
         <div className="flex items-center justify-center gap-1 mt-5">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -320,6 +465,15 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
             <ChevronRight size={16} />
           </button>
         </div>
+      )}
+
+      {/* 字段角色配置弹窗 */}
+      {showFieldModal && (
+        <FieldRoleModal
+          fields={localFields}
+          onClose={() => setShowFieldModal(false)}
+          onFieldRoleChange={handleFieldRoleChange}
+        />
       )}
     </div>
   );

@@ -1,8 +1,8 @@
 # 前端配置持久化与三层自适应模板系统
 
-**Triage labels**: `ready-for-agent`
+**Triage labels**: `completed`
 **Parent**: `.scratch/custom-records-module/PRD.md`
-**Status**: `ready-for-agent`
+**Status**: `completed`（TDD 完成，后端 7 + 前端 19 个新测试通过，UI 人工验证通过）
 **UI 原型**: `.scratch/custom-records-module/prototype.html`（打开后进入任意类型详情页，点击顶部"模板选择器"切换模板，点击"字段展示设置"打开弹窗配置字段角色）
 
 ## What to build
@@ -59,17 +59,17 @@
 
 ## Acceptance criteria
 
-- [ ] 后端：`custom_record_types` 表增加 `card_template`、`icon`、`accent_color` 三个字段
-- [ ] 后端：`custom_record_fields` 表增加 `display_role` 字段
-- [ ] 后端：新增 `PATCH /custom-records/types/{type_id}` 更新类型配置
-- [ ] 后端：新增 `PATCH /custom-records/types/{type_id}/fields/{field_id}` 更新字段角色
-- [ ] 前端：类型详情页顶部显示模板选择器，切换后卡片实时刷新
-- [ ] 前端：5 套模板 CSS 实现完整的视觉差异（背景、字体、chips 样式、accent 位置）
-- [ ] 前端："字段展示设置"弹窗实现，每个字段 5 选 1
-- [ ] 前端：字段角色覆盖后，L1 引擎以用户配置优先
-- [ ] 前端：配置修改后自动保存（debounce），有保存成功提示
-- [ ] 前端："模板对比"Tab 可并排查看同数据在 5 种模板下的效果
-- [ ] 旧数据兼容：已有类型的配置字段使用 DEFAULT 值，无需迁移
+- [x] 后端：`custom_record_types` 表增加 `card_template`、`icon`、`accent_color` 三个字段
+- [x] 后端：`custom_record_fields` 表增加 `display_role` 字段
+- [x] 后端：新增 `PATCH /custom-records/types/{type_id}` 更新类型配置
+- [x] 后端：新增 `PATCH /custom-records/types/{type_id}/fields/{field_id}` 更新字段角色
+- [x] 前端：类型详情页顶部显示模板选择器，切换后卡片实时刷新
+- [x] 前端：5 套模板 CSS 实现完整的视觉差异（背景、字体、chips 样式、accent 位置）
+- [x] 前端："字段展示设置"弹窗实现，每个字段 5 选 1
+- [x] 前端：字段角色覆盖后，L1 引擎以用户配置优先
+- [x] 前端：配置修改后自动保存（debounce），有保存成功提示
+- [x] 前端："模板对比"Tab 可并排查看同数据在 5 种模板下的效果
+- [x] 旧数据兼容：已有类型的配置字段使用 DEFAULT 值，无需迁移
 
 ## Blocked by
 

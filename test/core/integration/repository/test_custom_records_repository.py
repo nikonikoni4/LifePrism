@@ -1,5 +1,5 @@
 """
-CustomRecordRepository 单元测试
+CustomRecordRepository 集成测试
 
 测试 seam: Repository 层
 参考: test/core/unit/storage/test_base_provider_generic_methods.py
@@ -8,6 +8,8 @@ import pytest
 
 from lifeprism.repository.exceptions import DuplicateEntityError, EntityNotFoundError
 from lifeprism.utils.exceptions import ValidationError
+
+pytestmark = pytest.mark.core
 
 
 # ==================== Fixtures ====================
@@ -37,6 +39,9 @@ def repository(test_data_path):
                 name TEXT NOT NULL,
                 slug TEXT NOT NULL UNIQUE,
                 description TEXT,
+                card_template TEXT NOT NULL DEFAULT 'clean',
+                icon TEXT NOT NULL DEFAULT 'fileText',
+                accent_color TEXT NOT NULL DEFAULT 'blue',
                 created_at TEXT DEFAULT (datetime('now','localtime')),
                 updated_at TEXT DEFAULT (datetime('now','localtime'))
             )
@@ -51,6 +56,7 @@ def repository(test_data_path):
                 field_key TEXT NOT NULL,
                 field_type TEXT NOT NULL,
                 sort_order INTEGER DEFAULT 0,
+                display_role TEXT NOT NULL DEFAULT 'auto',
                 created_at TEXT DEFAULT (datetime('now','localtime')),
                 UNIQUE (type_id, field_key)
             )
@@ -479,7 +485,7 @@ class TestQueryEntries:
         _set_created_at(repository.db, "custom_sport", eid3, "2026-07-10 10:00:00")
 
         # Act: 查询 7月3日~7月8日 的记录
-        entries = repository.query_entries(
+        entries, total_count = repository.query_entries(
             type_id=type_id,
             date_range=("2026-07-03", "2026-07-08"),
         )
@@ -487,6 +493,7 @@ class TestQueryEntries:
         # Assert: 只返回 7月5日 的记录
         assert len(entries) == 1
         assert entries[0]["content"] == "7月5日"
+        assert total_count == 1
 
     def test_query_entries_with_only_start_date(self, repository):
         """date_range 单侧缺失（只有 start）：查询正常，start 侧加约束"""
@@ -504,7 +511,7 @@ class TestQueryEntries:
         _set_created_at(repository.db, "custom_sport", eid3, "2026-07-20 10:00:00")
 
         # Act: 只传 start
-        entries = repository.query_entries(
+        entries, total_count = repository.query_entries(
             type_id=type_id,
             date_range=("2026-07-05", None),
         )
@@ -513,6 +520,7 @@ class TestQueryEntries:
         assert len(entries) == 2
         dates = {e["content"] for e in entries}
         assert dates == {"7月10日", "7月20日"}
+        assert total_count == 2
 
     def test_query_entries_with_only_end_date(self, repository):
         """date_range 单侧缺失（只有 end）：查询正常，end 侧加约束"""
@@ -530,7 +538,7 @@ class TestQueryEntries:
         _set_created_at(repository.db, "custom_sport", eid3, "2026-07-20 10:00:00")
 
         # Act: 只传 end
-        entries = repository.query_entries(
+        entries, total_count = repository.query_entries(
             type_id=type_id,
             date_range=(None, "2026-07-15"),
         )
@@ -539,6 +547,7 @@ class TestQueryEntries:
         assert len(entries) == 2
         dates = {e["content"] for e in entries}
         assert dates == {"7月1日", "7月10日"}
+        assert total_count == 2
 
     def test_query_entries_pagination(self, repository):
         """查询分页：page/page_size 生效"""
@@ -555,16 +564,18 @@ class TestQueryEntries:
             _set_created_at(repository.db, "custom_sport", eid, f"{day} 10:00:00")
 
         # Act: 第 1 页，每页 2 条
-        page1 = repository.query_entries(
+        page1, total1 = repository.query_entries(
             type_id=type_id, date_range=None, page=1, page_size=2
         )
-        page2 = repository.query_entries(
+        page2, total2 = repository.query_entries(
             type_id=type_id, date_range=None, page=2, page_size=2
         )
 
         # Assert: 每页 2 条，且按 created_at DESC 排序（7月5日、7月4日在 page1）
         assert len(page1) == 2
         assert len(page2) == 2
+        assert total1 == 5  # 总记录数始终为 5
+        assert total2 == 5
         dates_page1 = {e["content"] for e in page1}
         assert dates_page1 == {"2026-07-05", "2026-07-04"}
         dates_page2 = {e["content"] for e in page2}
@@ -582,13 +593,14 @@ class TestQueryEntries:
         _set_created_at(repository.db, "custom_sport", eid, "2026-07-01 10:00:00")
 
         # Act: 查询一个没有记录的日期范围
-        entries = repository.query_entries(
+        entries, total_count = repository.query_entries(
             type_id=type_id,
             date_range=("2026-08-01", "2026-08-31"),
         )
 
         # Assert
         assert entries == []
+        assert total_count == 0
 
 
 # ==================== 获取单条记录测试 ====================
@@ -672,3 +684,144 @@ class TestDeleteEntry:
         # Act + Assert: 删除不存在的 entry 应抛 EntityNotFoundError
         with pytest.raises(EntityNotFoundError):
             repository.delete_entry(type_id=type_id, entry_id="cre-nonexist")
+
+
+# ==================== 更新类型配置测试 (Slice 6) ====================
+
+
+class TestUpdateTypeConfig:
+    """测试 update_type_config() 方法（Slice 6 新增）"""
+
+    def test_update_type_config_persists_card_template_icon_accent(self, repository):
+        """更新类型配置：card_template/icon/accent_color 持久化到数据库"""
+        type_id = repository.create_type(
+            name="阅读",
+            slug="reading_cfg_test",
+            fields=[{"field_name": "书名", "field_key": "title", "field_type": "text"}],
+        )
+
+        repository.update_type_config(
+            type_id=type_id,
+            card_template="paper",
+            icon="book",
+            accent_color="amber",
+        )
+
+        # Assert: 数据库中有新值
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT card_template, icon, accent_color FROM custom_record_types WHERE id = ?",
+                (type_id,),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "paper"
+            assert row[1] == "book"
+            assert row[2] == "amber"
+
+    def test_update_type_config_with_partial_fields_only_updates_provided(self, repository):
+        """部分更新：只传 card_template，icon 和 accent_color 不变"""
+        type_id = repository.create_type(
+            name="阅读",
+            slug="reading_s6",
+            fields=[{"field_name": "书名", "field_key": "title", "field_type": "text"}],
+        )
+
+        # 先设全部
+        repository.update_type_config(
+            type_id=type_id, card_template="bold", icon="zap", accent_color="rose"
+        )
+        # 再只更新 card_template
+        repository.update_type_config(
+            type_id=type_id, card_template="minimal", icon=None, accent_color=None
+        )
+
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT card_template, icon, accent_color FROM custom_record_types WHERE id = ?",
+                (type_id,),
+            )
+            row = cursor.fetchone()
+            assert row[0] == "minimal"  # 更新了
+            assert row[1] == "zap"  # 未变
+            assert row[2] == "rose"  # 未变
+
+    def test_update_type_config_raises_entity_not_found_for_nonexistent(self, repository):
+        """更新不存在的类型：抛 EntityNotFoundError"""
+        with pytest.raises(EntityNotFoundError):
+            repository.update_type_config(
+                type_id="crt-nonexist", card_template="paper", icon=None, accent_color=None
+            )
+
+    def test_list_types_returns_config_fields_with_defaults(self, repository):
+        """list_types 返回的配置字段有 DEFAULT 值"""
+        repository.create_type(
+            name="阅读",
+            slug="reading_s6",
+            fields=[{"field_name": "书名", "field_key": "title", "field_type": "text"}],
+        )
+
+        types = repository.list_types()
+        t = types[0]
+        assert t["card_template"] == "clean"  # DEFAULT
+        assert t["icon"] == "fileText"  # DEFAULT
+        assert t["accent_color"] == "blue"  # DEFAULT
+
+
+class TestUpdateFieldRole:
+    """测试 update_field_role() 方法（Slice 6 新增）"""
+
+    def test_update_field_role_persists_display_role(self, repository):
+        """更新字段角色：display_role 持久化"""
+        type_id = repository.create_type(
+            name="阅读",
+            slug="reading_s6",
+            fields=[
+                {"field_name": "书名", "field_key": "title", "field_type": "text"},
+                {"field_name": "笔记", "field_key": "notes", "field_type": "text"},
+            ],
+        )
+
+        # 获取 field_id
+        fields = repository.get_type_fields(type_id)
+        field_id = None
+        for f in fields:
+            if f["field_key"] == "notes":
+                field_id = f["id"]
+                break
+        assert field_id is not None
+
+        repository.update_field_role(
+            type_id=type_id, field_id=field_id, display_role="main"
+        )
+
+        # Assert
+        fields_after = repository.get_type_fields(type_id)
+        notes_field = next(f for f in fields_after if f["field_key"] == "notes")
+        assert notes_field["display_role"] == "main"
+
+    def test_update_field_role_defaults_to_auto(self, repository):
+        """新建字段默认 display_role = 'auto'"""
+        type_id = repository.create_type(
+            name="阅读",
+            slug="reading_s6",
+            fields=[{"field_name": "书名", "field_key": "title", "field_type": "text"}],
+        )
+
+        fields = repository.get_type_fields(type_id)
+        assert fields[0]["display_role"] == "auto"
+
+    def test_update_field_role_raises_entity_not_found_for_nonexistent_field(self, repository):
+        """更新不存在的字段：抛 EntityNotFoundError"""
+        type_id = repository.create_type(
+            name="阅读",
+            slug="reading_s6",
+            fields=[{"field_name": "书名", "field_key": "title", "field_type": "text"}],
+        )
+
+        with pytest.raises(EntityNotFoundError):
+            repository.update_field_role(
+                type_id=type_id, field_id="crf-nonexist", display_role="hidden"
+            )

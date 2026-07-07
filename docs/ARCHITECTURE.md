@@ -1,8 +1,8 @@
 ---
-version: 2.0
+version: 2.1
 created_at: 2026-04-09
 updated_at: 2026-07-07
-last_updated: 全面重写，参照 agents-hub 格式重构，更新至当前实际代码结构，新增 LLM Agent/Channel/Repository 等核心模块，补充技术栈、分层图、数据流和文档导航
+last_updated: 新增自定义记录模块（Custom Records）章节，前端架构图和目录结构同步更新
 abstract: 项目架构地图，概述仓库物理结构、抽象分层、前后端架构、主干数据流和关键依赖方向。
 ---
 
@@ -17,6 +17,7 @@ abstract: 项目架构地图，概述仓库物理结构、抽象分层、前后�
 | 1.0 | 创建架构地图初稿 |
 | 1.1 | 补充 abstract 字段 |
 | 2.0 | 全面重写：参照 agents-hub 格式重构，新增 LLM Agent/Channel/Repository 等核心模块，补充技术栈表、分层架构图、4 条主干数据流和文档导航 |
+| 2.1 | 新增自定义记录模块（Custom Records）：前端架构图和目录结构同步更新 |
 
 ## 项目概述
 
@@ -50,6 +51,10 @@ LifePrism 是一个围绕**个人成长**构建的桌面应用项目，核心目
 │  │ LifeWatch│ │GoalMaster│ │Mind Space│ │  Settings    │   │
 │  │ (时间追踪)│ │(目标管理) │ │(内心探索) │ │  (配置)      │   │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────────┘   │
+│  ┌──────────────┐                                          │
+│  │Custom Records│                                          │
+│  │ (自定义记录)  │                                          │
+│  └──────────────┘                                          │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │  Core Layer (API Client / WebSocket / Shared Utils)  │   │
 │  └──────────────────────────────────────────────────────┘   │
@@ -156,7 +161,7 @@ lifeprism/
 │   ├── __init__.py                 # 3 个 DB 实例 + 连接池
 │   ├── base_providers/             # LWBaseDataProvider / AWBaseDataProvider
 │   ├── providers/                  # 业务 DataProvider
-│   ├── aggregators/                # 多表聚合查询（GoalAggregator 等）
+│   ├── aggregators/                # 多表聚合查询（GoalAggregator / CustomRecordRepository 等）
 │   └── migrations/                 # 数据库迁移（版本检测→备份→执行）
 │
 └── utils/                          # 基础设施
@@ -218,6 +223,20 @@ utils → config → repository → monitor → processors → server
 | repository/ | DB 连接池、元数据驱动 CRUD、迁移系统 | SQLite | [repository-core](specs/2026-07-06-repository-core-spec.md) |
 | utils/ | 日志、异常、单例、通用工具，**零依赖** | - | - |
 
+### 业务模块
+
+业务模块横跨前后端多层，每个模块有独立的前端 app 和后端 API/Repository/Tool 实现：
+
+| 业务模块 | 前端 app | 后端入口 | Spec |
+|---------|---------|---------|------|
+| 时间追踪（LifeWatch） | `apps/lifewatch/` | server/services + repository/providers | - |
+| 目标管理（GoalMaster） | `apps/goals/` | server/services + repository/aggregators | - |
+| 习惯养成（Habits） | `apps/habits/` | server/services + repository/providers | [habit-system](specs/2026-04-15-habit-system.md) |
+| 内心探索（Mind Space） | `apps/mindspace/` | server/services + repository/providers | [mood-module](specs/2026-05-20-mood-module-spec.md) |
+| 自定义记录（Custom Records） | `apps/custom-records/` | server/api + repository/aggregators + llm/agent/tools | [custom-records-module](specs/custom-records-module.md) |
+
+**自定义记录模块特殊性**：该模块是唯一采用**动态建表 + meta 表元数据驱动**的业务模块。`CustomRecordRepository` 独立实现（不继承 `LWBaseDataProvider`），因为动态表名 `custom_<slug>` 运行时才确定，无法套用静态元数据模式。AI 通过 4 个 LLM Tool（列出/创建类型、录入/查询记录）参与类型创建和数据录入。前端采用 L1/L2/L3 三层布局引擎实现卡片自适应展示。
+
 ## 前端架构
 
 ### 技术栈
@@ -247,6 +266,7 @@ frontend/
 │   ├── goals/                      # 目标管理（components / hooks / context / apis / types）
 │   ├── habits/                     # 习惯养成（components / hooks / apis / types / data）
 │   ├── mindspace/                  # 内心探索（components / services / utils / data）
+│   ├── custom-records/             # 自定义记录（components / utils / api / types）
 │   ├── settings/                   # 设置页
 │   └── addons/                     # 拓展功能
 ├── core/                           # 跨应用核心层
@@ -335,6 +355,38 @@ settings_manager（单例初始化）
 - 消息通过 `asyncio.Queue` 解耦收发
 - 工具调用含安全沙箱（`allowed_dir_path` 白名单 + 命令黑名单）
 - Session 采用 JSONL 文件持久化 + 内存缓存双层架构
+
+### 5. 自定义记录 AI 录入流
+
+自定义记录模块的独特链路：AI 通过 tool 创建类型和录入数据，前端通过 meta 表发现类型并展示。
+
+```
+用户自然语言（"我想记录体育活动"）
+  → AgentLoop → LLM 解析意图
+    → create_custom_record_type tool
+      → CustomRecordRepository.create_type()
+        → meta 表写入（custom_record_types + custom_record_fields）
+        → 动态 DDL（CREATE TABLE custom_<slug>）
+          → 返回 type_id
+
+用户后续自然语言（"今天跑了5公里"）
+  → AgentLoop → LLM 解析字段值
+    → list_custom_record_types tool（获取字段定义）
+    → create_custom_record_entry tool
+      → CustomRecordRepository.create_entry()
+        → INSERT INTO custom_<slug>
+          → 返回 entry_id
+
+前端展示
+  → GET /custom-records/types → 查 meta 表
+    → GET /custom-records/{type_id}/entries → 查 custom_<slug>
+      → L1/L2/L3 布局引擎 → 卡片渲染
+```
+
+**关键点**：
+- 动态表名 `custom_<slug>` 运行时由 meta 表的 slug 字段拼接确定
+- `CustomRecordRepository` 独立实现，不继承 `LWBaseDataProvider`（静态元数据模式不适用）
+- AI 仅拥有创建/列出/录入/查询四类 tool，无删除 tool（删除走前端手动操作）
 
 ## 关键依赖方向
 

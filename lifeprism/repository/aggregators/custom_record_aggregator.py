@@ -217,7 +217,7 @@ class CustomRecordRepository:
     def _get_fields_by_type_id(self, type_id: str) -> list[dict[str, Any]]:
         """按 type_id 获取字段定义列表（按 sort_order 排序）"""
         return self._query_all(
-            "SELECT field_name, field_key, field_type, sort_order "
+            "SELECT id, field_name, field_key, field_type, sort_order, display_role "
             "FROM custom_record_fields WHERE type_id = ? ORDER BY sort_order ASC",
             (type_id,),
         )
@@ -233,7 +233,7 @@ class CustomRecordRepository:
         """
         try:
             types = self._query_all(
-                "SELECT id, name, slug, description, created_at, updated_at "
+                "SELECT id, name, slug, description, card_template, icon, accent_color, created_at, updated_at "
                 "FROM custom_record_types ORDER BY created_at ASC"
             )
             for t in types:
@@ -259,7 +259,7 @@ class CustomRecordRepository:
         """
         try:
             t = self._query_one(
-                "SELECT id, name, slug, description, created_at, updated_at "
+                "SELECT id, name, slug, description, card_template, icon, accent_color, created_at, updated_at "
                 "FROM custom_record_types WHERE id = ?",
                 (type_id,),
             )
@@ -416,7 +416,7 @@ class CustomRecordRepository:
         date_range: tuple[str | None, str | None] | None = None,
         page: int = 1,
         page_size: int = 50,
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         按日期范围分页查询记录（date_range 过滤 created_at，按 created_at DESC 排序）
 
@@ -427,7 +427,7 @@ class CustomRecordRepository:
             page_size: 每页条数
 
         Returns:
-            List[Dict]: 记录列表，每项含 id/created_at/updated_at + 用户字段
+            tuple: (记录列表, 总记录数)
 
         Raises:
             EntityNotFoundError: 类型不存在
@@ -448,11 +448,21 @@ class CustomRecordRepository:
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         offset = (page - 1) * page_size
-        sql = f"SELECT * FROM {data_table} {where_sql} ORDER BY created_at DESC LIMIT ? OFFSET ?"
-        params.extend([page_size, offset])
+
+        # COUNT 查询获取总记录数
+        count_sql = f"SELECT COUNT(*) FROM {data_table} {where_sql}"
+        # 数据查询
+        data_sql = f"SELECT * FROM {data_table} {where_sql} ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        data_params = list(params) + [page_size, offset]
 
         try:
-            return self._query_all(sql, tuple(params))
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(count_sql, tuple(params))
+                total_count = cursor.fetchone()[0]
+                cursor.execute(data_sql, tuple(data_params))
+                rows = [dict(row) for row in cursor.fetchall()]
+            return rows, total_count
         except sqlite3.Error as e:
             logger.error("查询自定义记录失败: type_id=%s, error=%s", type_id, e)
             raise DataAccessError(
@@ -540,5 +550,126 @@ class CustomRecordRepository:
             "删除自定义记录成功: type_id=%s, entry_id=%s",
             type_id,
             entry_id,
+        )
+        return True
+
+    # ==================== 配置更新 (Slice 6) ====================
+
+    def update_type_config(
+        self,
+        type_id: str,
+        card_template: str | None = None,
+        icon: str | None = None,
+        accent_color: str | None = None,
+    ) -> bool:
+        """
+        更新类型展示配置（card_template/icon/accent_color）
+
+        Args:
+            type_id: 类型 ID
+            card_template: 卡片模板（clean|paper|minimal|bold|metric），None 表示不更新
+            icon: 图标名，None 表示不更新
+            accent_color: 强调色，None 表示不更新
+
+        Returns:
+            bool: 是否成功
+
+        Raises:
+            EntityNotFoundError: 类型不存在
+            DataAccessError: 数据库操作失败
+        """
+        set_clauses: list[str] = []
+        params: list[Any] = []
+        if card_template is not None:
+            set_clauses.append("card_template = ?")
+            params.append(card_template)
+        if icon is not None:
+            set_clauses.append("icon = ?")
+            params.append(icon)
+        if accent_color is not None:
+            set_clauses.append("accent_color = ?")
+            params.append(accent_color)
+
+        if not set_clauses:
+            # 没有需要更新的字段
+            return True
+
+        # 始终更新 updated_at
+        set_clauses.append("updated_at = ?")
+        from datetime import datetime
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        params.append(now)
+
+        params.append(type_id)
+        sql = f"UPDATE custom_record_types SET {', '.join(set_clauses)} WHERE id = ?"
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql, tuple(params))
+                updated = cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error("更新类型配置失败: type_id=%s, error=%s", type_id, e)
+            raise DataAccessError(
+                message="更新类型配置失败",
+                details={"type_id": type_id, "error": str(e)},
+                cause=e,
+            ) from e
+
+        if not updated:
+            raise EntityNotFoundError(entity_type="CustomRecordType", entity_id=type_id)
+        logger.info("更新类型配置成功: type_id=%s", type_id)
+        return True
+
+    def update_field_role(
+        self,
+        type_id: str,
+        field_id: str,
+        display_role: str,
+    ) -> bool:
+        """
+        更新字段展示角色（display_role）
+
+        Args:
+            type_id: 类型 ID
+            field_id: 字段 ID
+            display_role: 展示角色（auto|title|main|chip|hidden）
+
+        Returns:
+            bool: 是否成功
+
+        Raises:
+            EntityNotFoundError: 字段不存在
+            DataAccessError: 数据库操作失败
+        """
+        sql = (
+            "UPDATE custom_record_fields SET display_role = ? "
+            "WHERE id = ? AND type_id = ?"
+        )
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql, (display_role, field_id, type_id))
+                updated = cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(
+                "更新字段角色失败: type_id=%s, field_id=%s, error=%s",
+                type_id,
+                field_id,
+                e,
+            )
+            raise DataAccessError(
+                message="更新字段角色失败",
+                details={"type_id": type_id, "field_id": field_id, "error": str(e)},
+                cause=e,
+            ) from e
+
+        if not updated:
+            raise EntityNotFoundError(entity_type="CustomRecordField", entity_id=field_id)
+        logger.info(
+            "更新字段角色成功: type_id=%s, field_id=%s, display_role=%s",
+            type_id,
+            field_id,
+            display_role,
         )
         return True
