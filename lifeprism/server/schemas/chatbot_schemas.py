@@ -9,7 +9,7 @@ Chatbot 模块的 schemas 定义
 
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 # ============================================================================
 # 会话 Schemas
@@ -160,20 +160,6 @@ class ChatMessage(BaseModel):
     role: MessageRole = Field(..., description="消息角色")
     content: str = Field(..., description="消息内容")
     timestamp: str | None = Field(default=None, description="消息时间戳")
-
-    @field_validator("role", mode="before")
-    @classmethod
-    def filter_tool_role(cls, v):
-        """
-        过滤工具调用消息（仅用于前端展示）
-
-        当数据库中存在 role='tool' 的消息时，Pydantic 会抛出验证错误。
-        该验证器在数据注入前将 'tool' 角色转换为 'assistant'，
-        避免前端接收到工具调用的技术细节。
-        """
-        if v == "tool":
-            return "assistant"  # 将工具消息转换为 assistant 角色
-        return v
 
 
 class ChatHistoryResponse(BaseModel):

@@ -182,6 +182,8 @@ class ChatbotService:
         if not session:
             return ChatHistoryResponse(session_id=session_id, session_name="未知", messages=[])
 
+        # 只返回 user 和 assistant 消息，过滤掉 tool 调用结果等内部消息
+        display_roles = {"user", "assistant"}
         messages = [
             ChatMessage(
                 role=msg["role"],
@@ -189,6 +191,7 @@ class ChatbotService:
                 timestamp=msg.get("timestamp"),
             )
             for msg in session.messages
+            if msg.get("role") in display_roles
         ]
         return ChatHistoryResponse(
             session_id=session.id, session_name=session.name, messages=messages
