@@ -155,6 +155,27 @@ class ChatbotService:
         logger.info("删除会话: session_id=%s", session_id)
         return True
 
+    @staticmethod
+    def _normalize_content(content: str | list | None) -> str:
+        """将消息 content 统一转为字符串格式
+
+        LLM API 返回的 content 可能是:
+        - 纯文本字符串: "你好"
+        - 结构化列表: [{"type": "text", "text": "你好"}, {"type": "image", ...}]
+        这里提取其中的文本部分拼接返回。
+        """
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            text_parts = []
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text_parts.append(block.get("text", ""))
+            return "".join(text_parts)
+        return str(content)
+
     async def get_history(self, session_id: str) -> ChatHistoryResponse:
         """获取会话历史记录"""
         session = self._chatbot.get_session(session_id)
@@ -162,7 +183,11 @@ class ChatbotService:
             return ChatHistoryResponse(session_id=session_id, session_name="未知", messages=[])
 
         messages = [
-            ChatMessage(role=msg["role"], content=msg["content"], timestamp=msg.get("timestamp"))
+            ChatMessage(
+                role=msg["role"],
+                content=self._normalize_content(msg.get("content")),
+                timestamp=msg.get("timestamp"),
+            )
             for msg in session.messages
         ]
         return ChatHistoryResponse(

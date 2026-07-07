@@ -199,6 +199,42 @@ async def dreaming_task(self, date: str):
 - **WARN**：批量操作部分失败、降级方案、可疑状态但不影响当前操作
 - **DEBUG**：幂等性检查、辅助函数、详细参数、内部状态
 
+## 消息内容格式
+
+**硬约束：Session 消息 content 是 `str | list | None`，读取时必须归一化**
+
+`Session.add_message()` 接受 `content: str | list | None`，存到 JSONL 的消息 content 可能是三种格式之一：
+
+- `str`: 纯文本（如 assistant 回复）
+- `list[dict]`: 多模态结构（如 user 消息，`[{"type":"text","text":"..."}]`）
+- `None`: 空内容
+
+**规则**：任何从 `session.messages` 读取 content 并传给 Pydantic 模型或前端的地方，**必须先归一化为字符串**。
+
+```python
+# ❌ 错误：直接传 msg["content"]，list 类型会触发 Pydantic ValidationError
+ChatMessage(role=msg["role"], content=msg["content"], ...)
+
+# ✅ 正确：先归一化再传
+ChatMessage(role=msg["role"], content=_normalize_content(msg.get("content")), ...)
+
+def _normalize_content(content: str | list | None) -> str:
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            block.get("text", "") for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
+    return str(content)
+```
+
+**为什么 user 消息是 list**：`InboundMessage.__post_init__` 将 content 统一归一化为 `MessageContent`（list 子类），`context.py::_build_user_message()` 构建多模态列表返回。历史 bug 见 `docs/history-bugs/2026-05-26-message-content-type-mismatch.md`。
+
+**必须检查的位置**：任何读取 `session.messages[n]["content"]` 并对外输出的地方（API、UI、日志预览等）。
+
 ## 禁止事项
 
 - ❌ 关键流程（数据持久化、LLM 调用、状态变化、跨边界）使用 DEBUG
