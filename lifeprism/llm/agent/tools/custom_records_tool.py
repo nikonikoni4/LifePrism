@@ -41,7 +41,7 @@ class ListCustomRecordTypesTool(Tool):
     async def execute(self, **kwargs: Any) -> str:
         try:
             types = custom_record_repository.list_types()
-            return json.dumps(types, ensure_ascii=False)
+            return f"{SUCCESS}{json.dumps(types, ensure_ascii=False)}"
         except Exception as e:
             return f"{ERROR}查询自定义记录类型失败: {e}"
 
@@ -263,6 +263,6 @@ class QueryCustomRecordEntriesTool(Tool):
                 page=1,
                 page_size=int(limit),
             )
-            return json.dumps(entries, ensure_ascii=False)
+            return f"{SUCCESS}{json.dumps(entries, ensure_ascii=False)}"
         except Exception as e:
             return f"{ERROR}查询自定义记录失败: {e}"

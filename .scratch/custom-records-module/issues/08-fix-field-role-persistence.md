@@ -2,7 +2,7 @@
 
 **Triage labels**: `ready-for-agent`
 **Parent**: `.scratch/custom-records-module/PRD.md`
-**Code Review**: `docs/generated/002/code-review-2026-07-07-2145.md` Issue 2（置信度 100）
+**Code Review**: `docs/generated/003/code-review-2026-07-07-2145.md` Issue 2（置信度 100）
 
 ## What to build
 
