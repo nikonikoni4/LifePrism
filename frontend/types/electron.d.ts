@@ -29,6 +29,9 @@ interface ElectronAPI {
     // 在文件管理器中打开文件夹
     openFolder: (folderPath: string) => Promise<{ success: boolean }>;
 
+    // 在文件管理器中打开文件夹并选中指定文件
+    openFolderAndSelect: (filePath: string) => Promise<{ success: boolean }>;
+
     // 自动更新
     checkForUpdates: () => Promise<{ status: string; version?: string; message?: string }>;
     downloadUpdate: () => Promise<{ status: string; message?: string }>;

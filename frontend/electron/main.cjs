@@ -377,6 +377,19 @@ ipcMain.handle('open-folder', async (_event, folderPath) => {
     }
 });
 
+// IPC: 在文件管理器中打开文件夹并选中指定文件
+// Windows: shell.showItemInFolder(filePath)
+ipcMain.handle('open-folder-and-select', (_event, filePath) => {
+    if (!filePath) return { success: false };
+    try {
+        shell.showItemInFolder(filePath);
+        return { success: true };
+    } catch (e) {
+        console.log('[Electron] 打开文件夹并选中文件失败:', e);
+        return { success: false };
+    }
+});
+
 // IPC: 退出应用（数据迁移后调用）
 ipcMain.handle('app-quit', () => {
     app.isQuitting = true;

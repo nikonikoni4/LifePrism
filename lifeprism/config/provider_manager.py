@@ -621,11 +621,21 @@ class ProviderManager:
         """
         从 keyring 读取 provider 的 API key。
         env_key 为空（如 custom）时返回 None。
+
+        keyring 读取失败时，fallback 到 providers.yaml 的 api_key 字段（云端 Linux）。
         """
         env_key = self._get_env_key(provider_name)
         if not env_key:
             return None
-        return keyring.get_password(_KEYRING_SERVICE, env_key)
+        # 优先从 keyring 读取
+        api_key = keyring.get_password(_KEYRING_SERVICE, env_key)
+        if api_key:
+            return api_key
+        # Fallback: 从 providers.yaml 的 api_key 字段读取（云端 Linux 部署）
+        for spec in self._raw_specs:
+            if spec.get("name") == provider_name:
+                return spec.get("api_key") or None
+        return None
 
     def set_api_key(self, provider_name: str, api_key: str) -> None:
         """将 API key 写入 keyring。"""

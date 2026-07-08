@@ -1,10 +1,46 @@
 ---
-version: 1.4
+version: 1.7
 created_at: 2026-04-10
-updated_at: 2026-06-30
-last_updated: 新增自定义记录模块存储方案决策索引
+updated_at: 2026-07-09
+last_updated: 新增 4 个 P2 数据同步相关决策（密钥存储/冲突解决/通信架构/初始化策略）
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## key-fallback-strategy
+- updated_at: 2026-07-09
+- path: `docs/ADR/2026-07-09-key-fallback-strategy.md`
+- 触发规则：当需要理解密钥存储方式、考虑改用 .env 环境变量、或新增密钥类型时读取
+- 内容摘要：密钥存储采用 keyring 优先 + config.yaml fallback，否决 .env 和 systemd 环境变量方案。核心原因：.env 本质也是文件，而 config.yaml 已被 settings_manager 加载，无需引入 python-dotenv 依赖。.env 扁平格式不适合多 Provider 的嵌套 Key 结构。
+
+## lww-conflict-resolution
+- updated_at: 2026-07-09
+- path: `docs/ADR/2026-07-09-lww-conflict-resolution.md`
+- 触发规则：当需要理解同步冲突解决策略、三类表写入分类、或考虑引入 CRDT/版本号时读取
+- 内容摘要：冲突解决采用 LWW + 三类表写入分类，否决 CRDT 和版本号方案。核心原因：主备模式下同步频率低、时间差大，冲突概率 < 0.1%。版本号方案需改 30+ 张表 schema，CRDT 过度设计。三类表分类：TEXT 主键（INSERT OR REPLACE）/ AUTOINCREMENT+UNIQUE（剥离远程 id）/ 补充 UNIQUE 约束。
+
+## rest-polling-communication
+- updated_at: 2026-07-09
+- path: `docs/ADR/2026-07-09-rest-polling-communication.md`
+- 触发规则：当需要理解同步通信架构、考虑改用 WebSocket、或调整同步频率时读取
+- 内容摘要：通信采用 HTTP REST + 本地主动轮询（10 分钟），否决 WebSocket 和云端推送。核心原因：使用模式为电脑开机用本地、出门用手机，同步频率低无需实时性。本地在 NAT 后面，本地主动发起避免 NAT 穿透问题。REST 最简单可靠，调试方便。
+
+## cloud-init-atomic-strategy
+- updated_at: 2026-07-09
+- path: `docs/ADR/2026-07-09-cloud-init-atomic-strategy.md`
+- 触发规则：当需要理解 cloud_init.yaml 初始化流程、验证失败处理、或 monitor_type 强制覆盖逻辑时读取
+- 内容摘要：cloud_init.yaml 初始化采用验证失败不删除策略。核心原因：密钥由本地 keyring 生成，删除文件后如果本地程序已关闭则密钥不可恢复。只有 config.yaml 和 providers.yaml 都写入成功才删除 cloud_init.yaml。monitor_type 强制覆盖为 none（云端禁用 Monitor）。
+
+## sync-atomicity-strategy
+- updated_at: 2026-07-09
+- path: `docs/ADR/2026-07-09-sync-atomicity-strategy.md`
+- 触发规则：当需要理解同步系统的错误处理粒度、last_sync_time 更新策略、或考虑改为 row-level best-effort 时读取
+- 内容摘要：同步系统采用全局 last_sync_time 整体原子性策略（Pull+Push 全部成功才更新时间戳），否决 row-level best-effort 方案。核心原因：row-level 方案推进时间戳后，失败行 updated_at <= last_sync_time，下次 query_incremental 查询不到，数据永久丢失。整体原子性下成功表重复同步是幂等操作，代价可接受。
+
+## linux-deployment-multiple-entrypoints
+- updated_at: 2026-07-08
+- path: `docs/adr/2026-07-08-linux-deployment-multiple-entrypoints.md`
+- 触发规则：当需要理解为什么采用多入口架构（三个独立启动文件）而非单文件配置控制、或新增运行模式时读取
+- 内容摘要：Linux 跨平台部署采用多入口架构（main.py、main_web_demo.py、main_agent_only.py），而非单文件配置控制。核心原因：避免 Python import 机制导致的平台依赖问题（顶部 import 无论如何都会执行），三种运行形态是不同的产品形态而非模式切换。优势：职责单一、依赖按需加载、易于测试和维护。劣势：代码分散、新增模式需创建新文件。
 
 ## custom-records-storage
 - updated_at: 2026-07-06

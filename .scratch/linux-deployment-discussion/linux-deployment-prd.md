@@ -258,24 +258,401 @@ dependencies = [
 
 ---
 
+## P2 Implementation: 数据同步方案
+
+> **注意**：以下为 P2 阶段的实现方案，P1 不包含数据同步功能。
+
+### 问题定义
+
+P1 完成后，Windows 本地和 Linux 云端各自独立运行，但用户需要：
+1. 在 Windows 本地查看通过微信（Linux Agent）记录的数据
+2. 在 Linux 云端使用 Windows 本地采集的 Monitor 数据
+3. 两端数据保持一致，支持离线后同步
+
+### 解决方案
+
+实现 Windows ↔ Linux 双向数据同步，采用主备模式（平时用 Windows，出门时用 Linux Agent）。
+
+### P2 User Stories
+
+15. 作为用户，我想在出门前启动 Windows 本地，自动将最新数据同步到云端，以便微信查询时能看到最新的电脑使用数据
+16. 作为用户，我想在外通过微信记录心情后，回家打开 Windows 能自动拉取云端的新记录
+17. 作为用户，我想在前端设置页面点击"生成云端配置"，自动生成配置文件并提示我复制到云端
+18. 作为用户，我想在云端 API Key 过期时，通过 CLI 命令重新加载配置，而不需要重新部署服务
+19. 作为用户，我想查看同步状态（上次同步时间、同步记录数），以便确认数据已同步
+20. 作为开发者，我想通过云端 CLI 测试 LLM 连接，以便快速验证配置是否正确
+
+### P2 Implementation Decisions
+
+#### 1. 同步范围与数据量
+
+**需要同步的表**（除 `window_events` 外的所有表）：
+- 用户输入：`mood_entries`、`diary`、`todo_list`、`goal`、`habits`、`timeline_custom_block`
+- Monitor 聚合数据：`user_app_behavior_log`、`behavior_analysis`
+- 元数据：`category`、`sub_category`
+- 缓存表：`category_map_cache`、`multi_purpose_map_cache`、`single_purpose_map_cache`
+
+**不同步的表**：
+- `window_events`（原始窗口事件，数据量太大 ~50MB，云端用不上）
+
+**数据量估算**（3 个月使用）：
+- 总数据量：~16MB（不含 `window_events`）
+- 增量同步（10 分钟）：~27KB
+- 第一次同步：16MB，分批传输 + 压缩，约 1-2 分钟
+
+**理由**：
+- 排除 `window_events` 可减少 10 倍传输量
+- `behavior_analysis` 是聚合数据，云端不需要原始事件
+- 缓存表数据量小（< 1MB），同步比重新计算更高效（避免触发 LLM）
+
+#### 2. 增量同步机制
+
+**依赖字段**：`updated_at`（需为 9 个表添加）
+- `behavior_analysis`
+- `category`
+- `category_map_cache`
+- `goal`
+- `mood_entries`
+- `sub_category`
+- `timeline_custom_block`
+- `todo_list`
+- `user_app_behavior_log`
+
+**查询方式**：
+```python
+# 利用索引快速查询增量数据
+SELECT * FROM {table} WHERE updated_at > ? ORDER BY updated_at ASC
+```
+
+**索引创建**：
+```sql
+CREATE INDEX IF NOT EXISTS idx_{table}_updated_at ON {table}(updated_at);
+```
+
+**性能**：
+- 有索引：10 个表 × 5ms = ~50ms
+- 无索引：10 个表 × 500ms = ~5 秒
+
+**理由**：
+- 不需要扫描全表
+- 避免版本号方案的改动成本（30+ 张表改 schema）
+- 主备模式下冲突概率极低，无需复杂的 CRDT
+
+#### 3. 冲突解决策略
+
+**策略**：Last-Write-Wins（最后写入获胜）
+- 比较 `updated_at` 时间戳，谁更晚谁保留
+- 无需版本号或 `device_id`
+
+**同步原子性**：Best-effort（尽力而为）
+- 单条记录失败不阻塞其他记录
+- 只有全部成功才更新 `last_sync_time`（避免丢数据）
+
+**冲突判断逻辑**：
+```python
+if local_row.updated_at <= last_sync_time:
+    # 本地未修改 → 直接覆盖
+    local_db.replace(remote_row)
+elif remote_row.updated_at > local_row.updated_at:
+    # 云端更晚 → 覆盖本地
+    local_db.replace(remote_row)
+else:
+    # 本地更晚 → 保留本地（稍后推送）
+    pass
+```
+
+**理由**：
+- NTP 时间同步保证时钟误差 < 1 秒
+- 主备模式不会同时修改同一条记录，冲突概率 < 0.1%
+- 避免版本号方案的 30+ 张表改动
+
+**明确否决的方案**：
+- ❌ 版本号 + `device_id`（改动量太大）
+- ❌ cr-sqlite / CRDT（过度设计，适用于多端并发）
+
+#### 4. 通信架构
+
+**方案**：HTTP REST API + 本地主动轮询
+- Windows 本地主动发起（避免 NAT 穿透问题）
+- Linux 云端被动响应（不需要知道本地 IP）
+
+**同步时机**：
+- 启动时立即同步 1 次
+- 定时同步（每 10 分钟）
+
+**API 设计**：
+```
+POST /api/sync/pull
+  Request: {last_sync_time, tables, api_key}
+  Response: {changes: {table: [rows]}, sync_time}
+
+POST /api/sync/push
+  Request: {changes: {table: [rows]}, api_key}
+  Response: {status: 'ok', sync_time}
+```
+
+**大数据处理**：
+- 分批同步（1000 条/批）
+- 压缩传输（gzip，压缩率 60-70%）
+
+**理由**：
+- 简单可靠，不需要 WebSocket 长连接
+- 10 分钟间隔已足够（不需要实时同步）
+- 云端无需访问本地（避免家庭网络 NAT 问题）
+
+#### 5. 安全机制
+
+**多层防护**：
+1. **API Key 认证**（必须）：32 字节随机字符串
+2. **HTTPS 加密传输**（必须）：Let's Encrypt 免费证书
+3. **IP 白名单**（可选）：家庭 IP 可能变化
+4. **请求签名**（可选）：HMAC-SHA256
+
+**API Key 存储**：
+- **本地 Windows**：keyring（Windows 凭据管理器）
+- **云端 Linux**：config.yaml（文件权限 600）
+
+**理由**：
+- 云端无桌面环境，keyring 不可用
+- 同步 API Key 是云端生成的，不是用户敏感信息
+- 文件权限 600 + HTTPS 已足够安全
+
+#### 6. 配置管理（Key 统一存储）
+
+**Key 类型**（3 种）：
+1. **LLM Provider API Keys**（多个，按 Provider 分组）
+   - keyring 命名：`api_key_{provider_name}`
+   - 例如：`api_key_anthropic`、`api_key_openai`
+2. **微信通道 Token**（1 个）
+   - keyring 命名：`wechat_bot_token`
+3. **数据同步 API Key**（1 个）
+   - keyring 命名：`sync_api_key`
+
+**Key 读取逻辑（统一 fallback 机制）**：
+
+所有 Key 读取时，优先从 keyring 读取（本地场景），fallback 到 config.yaml（云端场景）。
+
+代码修改点（集中在数据返回层，其他代码零感知）：
+- `provider_manager.py::get_api_key()` - 增加 config fallback（+10 行）
+- `wechat/auth.py::_load_token_from_keyring()` - 增加 config fallback（+8 行）
+- `sync/sync_config.py`（新增）- 同步 API Key 读取（+20 行）
+
+**本地配置文件**（不含 Key）：
+```yaml
+llm:
+  provider: anthropic
+  model: claude-opus-4
+  # API Key 在 keyring: api_key_anthropic
+```
+
+**云端配置文件**（包含 Key）：
+```yaml
+llm:
+  provider: anthropic
+  model: claude-opus-4
+
+# 云端需要的 Key（从本地 keyring 读取后写入）
+wechat_token: "wx_token_..."
+sync_api_key: "lifeprism_sync_..."
+```
+
+**providers.yaml**（云端）：
+```yaml
+providers:
+  - name: anthropic
+    env_key: api_key_anthropic
+    api_key: "sk-ant-..."  # 新增字段，仅云端需要
+```
+
+**理由**：
+- 统一逻辑，所有 Key 都用 keyring（本地）
+- 云端无 keyring，fallback 到配置文件
+- 代码修改最小，只在读取层截断
+- 无耦合，其他代码不需要判断"云端 vs 本地"
+
+#### 7. 配置生成与初始化
+
+**本地生成配置**：
+
+前端设置页面增加"生成云端配置"按钮：
+1. 后端从 keyring 读取所有 Key（LLM/微信/同步）
+2. 生成完整的 `cloud_init.yaml`（包含所有配置和 Key）
+3. 保存到 `{lifeprism_data_path}/cloud_init.yaml`
+4. 打开文件夹并选中该文件（Windows: `explorer /select`）
+5. 提示用户复制到云端的 `{lifeprism_data_path}/cloud_init.yaml`
+
+**生成的配置文件**（完整，包含 Key）：
+```yaml
+llm:
+  provider: anthropic
+  model: claude-opus-4
+
+sync:
+  enabled: true
+  api_key: "lifeprism_sync_..."
+
+wechat_token: "wx_token_..."
+monitor_type: none  # 强制覆盖
+```
+
+**云端初始化流程**：
+
+`main_agent_only.py` 启动时：
+1. 检测 `{lifeprism_data_path}/cloud_init.yaml` 是否存在
+2. 如果存在：
+   - 读取配置
+   - 写入 `config.yaml` 和 `providers.yaml`
+   - 删除 `cloud_init.yaml`（不留痕迹）
+3. 继续正常启动
+
+**文件路径约定**：
+- 文件名固定：`cloud_init.yaml`
+- 本地路径：`{lifeprism_data_path}/cloud_init.yaml`
+- 云端路径：`{lifeprism_data_path}/cloud_init.yaml`（临时，写入后删除）
+
+**理由**：
+- 用户只需复制一个文件
+- 配置包含完整信息（含 Key），云端直接使用
+- 临时文件立即删除，不留痕迹
+- 不需要加密（SSH 已加密，文件立即删除）
+
+#### 8. 云端 CLI 管理
+
+`main_agent_only.py` 支持命令行参数：
+
+**命令列表**：
+```bash
+# 正常启动（默认）
+python -m lifeprism.server.main_agent_only
+
+# 重新初始化配置（API Key 过期时）
+python -m lifeprism.server.main_agent_only reinit-config
+
+# 查看当前配置（脱敏显示）
+python -m lifeprism.server.main_agent_only show-config
+
+# 测试 LLM 连接（验证 API Key）
+python -m lifeprism.server.main_agent_only test-llm
+```
+
+**`reinit-config` 行为**：
+- 读取 `cloud_init.yaml`
+- 写入 `config.yaml` 和 `providers.yaml`
+- 删除 `cloud_init.yaml`
+- **不自动重启服务**（用户手动 `systemctl restart`）
+
+**理由**：
+- 云端没有前端界面，需要 CLI 管理
+- API Key 过期后方便重新配置
+- 不自动重启，用户有控制权
+
+#### 9. 云端启动校验
+
+`main_agent_only.py` 启动时强制校验：
+```python
+if config.get("monitor_type") != "none":
+    logger.warning("云端 monitor_type 必须为 none，自动修正")
+    settings.set("monitor_type", "none")
+```
+
+**理由**：
+- 防止配置错误（本地配置复制过来时可能包含 `monitor_type: lifeprism`）
+- 云端强制禁用 Monitor
+
+### P2 Testing Decisions
+
+#### 1. 同步逻辑测试
+**测试文件**：`test/integration/test_data_sync.py`
+
+**测试用例**：
+- `test_pull_inserts_new_records`：拉取时插入本地不存在的记录
+- `test_pull_updates_unmodified_records`：拉取时覆盖本地未修改的记录
+- `test_pull_respects_local_changes`：拉取时保留本地更新的记录
+- `test_push_sends_local_changes`：推送本地变更到云端
+- `test_sync_updates_last_sync_time_only_on_success`：只有全部成功才更新同步时间
+- `test_sync_handles_network_failure`：网络失败时的重试逻辑
+
+**Mock 策略**：
+- Mock HTTP 请求（`httpx.AsyncClient`）
+- 使用临时数据库文件
+- Mock 时间戳（避免测试依赖实际时间）
+
+#### 2. 配置生成测试
+**测试文件**：`test/integration/test_cloud_config_generator.py`
+
+**测试用例**：
+- `test_generate_includes_all_keys`：生成的配置包含所有 Key
+- `test_generate_reads_from_keyring`：从 keyring 读取 Key
+- `test_generate_saves_to_correct_path`：保存到正确路径
+- `test_cloud_init_contains_monitor_override`：强制覆盖 `monitor_type: none`
+
+#### 3. 云端初始化测试
+**测试文件**：`test/integration/test_cloud_initializer.py`
+
+**测试用例**：
+- `test_initializer_detects_cloud_init`：检测 `cloud_init.yaml`
+- `test_initializer_writes_config`：写入 `config.yaml`
+- `test_initializer_deletes_temp_file`：删除临时文件
+- `test_reinit_config_command`：CLI `reinit-config` 命令
+
+#### 4. Key 读取 fallback 测试
+**测试文件**：`test/unit/config/test_key_fallback.py`
+
+**测试用例**：
+- `test_get_api_key_prefers_keyring`：优先从 keyring 读取
+- `test_get_api_key_falls_back_to_config`：keyring 失败时 fallback
+- `test_wechat_token_fallback`：微信 Token fallback
+- `test_sync_api_key_fallback`：同步 API Key fallback
+
+### P2 Out of Scope
+
+以下内容不在 P2 实现范围内：
+
+- 冲突仲裁 UI（记录冲突表，用户手动选择）
+- 同步进度条（前端实时显示同步状态）
+- 增量同步优化（Delta encoding）
+- 数据库静态加密（SQLCipher）
+- Web Demo 演示数据生成（AI 生成假数据）
+- Docker 容器部署（P3 考虑）
+
+### P2 验收标准
+
+#### 功能验收
+- ✅ Windows 启动时自动同步到云端
+- ✅ 云端记录的数据能同步回 Windows
+- ✅ 前端能生成云端配置文件并打开文件夹
+- ✅ 云端 CLI 命令正常工作（`reinit-config`、`show-config`、`test-llm`）
+- ✅ API Key 过期后能通过 CLI 重新配置
+
+#### 技术验收
+- ✅ 同步测试全部通过
+- ✅ 增量查询使用索引，耗时 < 100ms
+- ✅ Key 读取 fallback 逻辑正常工作
+- ✅ 代码修改集中在读取层，无耦合
+
+#### 安全验收
+- ✅ HTTPS 证书配置正确
+- ✅ API Key 认证生效
+- ✅ 云端配置文件权限 600
+
+---
+
 ## Out of Scope
 
-以下内容**不在本期实现范围内**，作为后续迭代（P2/P3）：
+以下内容**不在 P1/P2 实现范围内**：
 
-### P2 - 数据方案
-- Windows ↔ Linux 数据双向同步
-- 冲突检测与解决
-- 增量同步机制
-- 数据加密传输
-- Web Demo 演示数据生成（AI 生成假数据库，每天复制相同内容）
-- Agent Only 数据获取方式
-- 微信多端口冲突（本地优先级 > Linux）
-
+### P3 - 未来优化
+- Docker 容器部署
+- Web Demo 演示数据生成（AI 生成假数据库）
+- 同步进度条（前端实时显示）
+- 冲突仲裁 UI
+- 数据库静态加密（SQLCipher）
 
 ### 不考虑
 - Linux 上实现 Monitor 模块（明确不做）
 - 分布式部署（多实例负载均衡）
 - 数据库水平扩展
+- 实时同步（10 分钟已足够）
 
 ---
 

@@ -27,6 +27,7 @@ from lifeprism.server.errors.error_codes import (
     INTERNAL_ERROR,
     INVALID_CONFIG,
     INVALID_STATUS_TRANSITION,
+    INVALID_SYNC_API_KEY,
     LLM_OUTPUT_PARSE_ERROR,
     LLM_RESPONSE_ERROR,
     NODE_NOT_FOUND,
@@ -79,6 +80,8 @@ ERROR_CODE_TO_STATUS: dict[str, int] = {
     INVALID_CONFIG: 500,
     # 部署模式
     DEMO_MODE_NOT_SUPPORTED: 422,
+    # 同步模块
+    INVALID_SYNC_API_KEY: 422,
 }
 
 

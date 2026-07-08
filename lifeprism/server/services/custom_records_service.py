@@ -178,7 +178,9 @@ def update_type_config(type_id: str, request: UpdateTypeConfigRequest) -> Custom
     return _convert_to_type_item(type_dict)
 
 
-def update_field_role(type_id: str, field_id: str, request: UpdateFieldRoleRequest) -> CustomRecordTypeItem:
+def update_field_role(
+    type_id: str, field_id: str, request: UpdateFieldRoleRequest
+) -> CustomRecordTypeItem:
     """更新字段展示角色
 
     Raises:

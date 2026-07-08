@@ -24,23 +24,74 @@ LifePrism 支持三种运行形态，对应三个独立启动入口：
    - 通过微信渠道提供对话服务
    - 服务器后台运行，本地关机也可用
 
-### 数据同步（Data Sync）— P2 计划，本期未实现
+### 数据同步（Data Sync）— P2 计划
 
-> 以下为 P2 规划的设计方向，当前代码库中尚未实现。P1 部署不包含数据同步功能。
+**使用模式**：主备模式（平时用 Windows 桌面版，出门时用 Linux Agent Only）
 
-**使用模式**：主备模式（不同时使用多端）
+**同步单位**：记录级别（Row-level），尽力而为（Best-effort）
+- 单条记录失败不阻塞其他记录
+- 只有全部成功才更新 `last_sync_time`（避免丢数据）
 
-**同步策略**：按需同步（启动时拉取 + 可选定时拉取）
+**通信方式**：HTTP REST API + 本地主动轮询
+- Windows 本地主动发起（避免 NAT 问题）
+- 云端被动响应（不需要知道本地 IP）
+- 同步时机：启动时立即同步 + 定时同步（每 10 分钟）
 
-- **同步方向**：双向（Windows ↔ Linux）
-- **同步时机**：启动时 + 可选的定时拉取（如每 10 分钟）
-- **冲突解决**：最后写入胜出（Last-Write-Wins），因主备模式冲突概率极低
-- **ID 生成**：`{prefix}-{uuid.uuid4().hex[:8]}`，全局唯一，冲突概率 ~1/42亿
-- **同步范围**：
-  - Windows → Linux：Monitor 采集数据 + 桌面版手动输入
-  - Linux → Windows：微信对话输入的数据（心情/备注/自定义记录）
+**同步范围**：
+- **需要同步的表**：除 `window_events`（原始窗口事件）外的所有表
+  - 用户输入：`mood_entries`、`diary`、`todo_list`、`goal`、`habits`、`timeline_custom_block`
+  - Monitor 聚合数据：`user_app_behavior_log`、`behavior_analysis`
+  - 元数据：`category`、`sub_category`
+  - 缓存表：`category_map_cache`、`*_cache`（数据量小，避免云端重新计算触发 LLM）
+- **不同步的表**：`window_events`（数据量太大 ~50MB，云端用不上）
 
-**不存在的概念**：实时同步、冲突仲裁机制（主备模式不需要）
+**增量同步机制**：
+- 依赖 `updated_at` 字段（需为 9 个表添加此字段）
+- 查询：`WHERE updated_at > last_sync_time`
+- 使用索引：`CREATE INDEX idx_{table}_updated_at ON {table}(updated_at)`
+- 不需要扫描全表，查询耗时 ~50ms（10 个表）
+
+**冲突解决**：Last-Write-Wins（最后写入获胜）
+- 比较 `updated_at` 时间戳，谁更晚谁保留
+- 无需版本号或 device_id（主备模式冲突概率 < 0.1%）
+- NTP 时间同步保证时钟误差 < 1 秒
+
+**数据量估算**：
+- 总数据量（3 个月）：~16MB（不含 window_events）
+- 增量同步（10 分钟）：~27KB
+- 第一次同步：16MB，分批传输（1000 条/批）+ 压缩（gzip），约 1-2 分钟
+
+**安全机制**：
+- API Key 认证（32 字节随机字符串）
+- HTTPS 加密传输（Let's Encrypt 免费证书）
+- 可选：IP 白名单、请求签名（HMAC-SHA256）
+
+**配置管理**：
+- **Key 存储**：本地用 keyring（Windows 凭据管理器），云端用 config.yaml
+- **配置生成**：本地生成 `cloud_init.yaml`（包含完整配置和所有 Key）
+- **配置初始化**：云端启动时读取 `cloud_init.yaml` → 写入 `config.yaml` → 删除临时文件
+- **配置文件路径**：
+  - 本地：`{lifeprism_data_path}/cloud_init.yaml`
+  - 云端：`{lifeprism_data_path}/cloud_init.yaml`（临时），写入后删除
+- **前端交互**：点击生成 → 保存到本地 → 打开文件夹并选中 → 提示用户复制到云端
+
+**云端 CLI 管理**（`main_agent_only.py` 命令行）：
+- `reinit-config`：重新初始化配置（从 `cloud_init.yaml` 读取并覆盖 `config.yaml`）
+- `show-config`：查看当前配置（脱敏显示）
+- `test-llm`：测试 LLM 连接
+
+**Key 读取逻辑**（统一的 fallback 机制）：
+- LLM API Key：`provider_manager.get_api_key()` → keyring 优先 → fallback 到 `providers.yaml::api_key`
+- 微信 Token：`WechatAuth._load_token_from_keyring()` → keyring 优先 → fallback 到 `config.yaml::wechat_token`
+- 同步 API Key：`sync_config.get_sync_api_key()` → keyring 优先 → fallback 到 `config.yaml::sync_api_key`
+- 代码修改点集中在数据返回层，其他代码零感知云端/本地差异
+
+**不存在的概念**：
+- 实时同步（10 分钟已足够）
+- 版本号冲突检测（主备模式不需要）
+- cr-sqlite / CRDT（过度设计）
+- 配置文件加密（SSH 已加密 + 文件立即删除）
+- secrets.yaml（统一用 config.yaml）
 
 ## 自定义记录模块（Custom Records Module）
 

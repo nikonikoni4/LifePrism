@@ -276,32 +276,16 @@ class TodoProvider(LWBaseDataProvider):
             if invalid_fields:
                 raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
+            # 预处理 cross_day 布尔值为整数
+            if "cross_day" in data:
+                data["cross_day"] = 1 if data["cross_day"] else 0
 
-                # 构建 SET 子句
-                set_clauses = []
-                values = []
-                for key, value in data.items():
-                    set_clauses.append(f"{key} = ?")
-                    # 处理布尔值
-                    if key == "cross_day":
-                        values.append(1 if value else 0)
-                    else:
-                        values.append(value)
+            # 使用 _generic_update 自动处理 updated_at
+            success = self._generic_update(todo_id, data)
 
-                if not set_clauses:
-                    return True
-
-                values.append(todo_id)
-                sql = f"UPDATE todo_list SET {', '.join(set_clauses)} WHERE id = ?"
-
-                cursor.execute(sql, values)
-                success = cursor.rowcount > 0
-
-                if success:
-                    logger.info("更新任务 %s 成功", todo_id)
-                return success
+            if success:
+                logger.info("更新任务 %s 成功", todo_id)
+            return success
 
         except ValidationError:
             raise

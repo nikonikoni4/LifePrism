@@ -4,6 +4,7 @@
 职责：提供 behavior_analysis 表的所有数据访问接口
 """
 
+import sqlite3
 from typing import Any
 
 from lifeprism.repository.base_providers import LWBaseDataProvider
@@ -219,13 +220,18 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
         if invalid_fields:
             raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-        affected_rows = self.db.update(
-            self._TABLE_NAME, data=update_data, where={"start_time": start_time}
-        )
-        if affected_rows > 0:
-            logger.info("更新行为分析记录: %s", start_time)
-            return self.get_behavior_by_start_time(start_time)
-        return None
+        try:
+            # 使用 _generic_update 自动处理 updated_at
+            success = self._generic_update(start_time, update_data)
+            if success:
+                logger.info("更新行为分析记录: %s", start_time)
+                return self.get_behavior_by_start_time(start_time)
+            return None
+        except sqlite3.Error as e:
+            logger.error("更新行为分析记录失败: %s, %s", start_time, e)
+            raise DataAccessError(
+                message="更新行为分析记录失败", details={"start_time": start_time, "error": str(e)}
+            ) from e
 
     def delete_behaviors_by_date_range(self, start_date: str, end_date: str) -> int:
         """

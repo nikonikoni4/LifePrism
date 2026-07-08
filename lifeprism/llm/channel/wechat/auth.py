@@ -54,13 +54,26 @@ class WechatAuth:
 
         Returns:
             token 字符串，失败返回空字符串
+
+        keyring 读取失败时，fallback 到 config.yaml 的 wechat_token 字段（云端 Linux）。
         """
         try:
             token = keyring.get_password(KEYRING_SERVICE_NAME, KEYRING_WECHAT_TOKEN_USERNAME)
-            return token if token else ""
+            if token:
+                return token
         except (keyring.errors.KeyringError, OSError) as e:
             logger.debug("从 keyring 加载 token 失败: %s", e)
-            return ""
+        # Fallback: 从 config.yaml 读取 wechat_token 字段（云端 Linux 部署）
+        try:
+            from lifeprism.config.settings_manager import get_setting
+
+            config_token = get_setting("wechat_token")
+            if config_token:
+                logger.debug("keyring 未找到微信 token，已从 config fallback")
+                return str(config_token)
+        except Exception as e:
+            logger.debug("从 config 读取 wechat_token 失败: %s", e)
+        return ""
 
     @staticmethod
     def _save_token_to_keyring(token: str) -> bool:

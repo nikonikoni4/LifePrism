@@ -452,7 +452,9 @@ class CustomRecordRepository:
         # COUNT 查询获取总记录数
         count_sql = f"SELECT COUNT(*) FROM {data_table} {where_sql}"
         # 数据查询
-        data_sql = f"SELECT * FROM {data_table} {where_sql} ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        data_sql = (
+            f"SELECT * FROM {data_table} {where_sql} ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        )
         data_params = list(params) + [page_size, offset]
 
         try:
@@ -597,6 +599,7 @@ class CustomRecordRepository:
         # 始终更新 updated_at
         set_clauses.append("updated_at = ?")
         from datetime import datetime
+
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         params.append(now)
 
@@ -642,10 +645,7 @@ class CustomRecordRepository:
             EntityNotFoundError: 字段不存在
             DataAccessError: 数据库操作失败
         """
-        sql = (
-            "UPDATE custom_record_fields SET display_role = ? "
-            "WHERE id = ? AND type_id = ?"
-        )
+        sql = "UPDATE custom_record_fields SET display_role = ? WHERE id = ? AND type_id = ?"
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()

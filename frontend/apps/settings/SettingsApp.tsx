@@ -29,6 +29,8 @@ import { toast } from '../../core/components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CategoryAPI } from '../lifewatch/pages/category/api';
 import type { CategoryTreeItem } from '../lifewatch/pages/category/types';
+import { SyncConfigSection } from './components/SyncConfigSection';
+import { SyncStatusSection } from './components/SyncStatusSection';
 
 const SettingsApp: React.FC = () => {
     // Loading & Saving States
@@ -1465,6 +1467,12 @@ const SettingsApp: React.FC = () => {
                     )}
                 </div>
             </section>
+
+            {/* 9. 数据同步配置 */}
+            <SyncConfigSection />
+
+            {/* 10. 同步状态展示 */}
+            <SyncStatusSection />
 
             {/* TODO: 暂时禁用火山引擎说明弹窗
             {showVolcEngineModal && (

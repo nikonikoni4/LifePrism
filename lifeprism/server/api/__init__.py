@@ -6,6 +6,7 @@ from .activity_api import router as activity_v2_router
 from .being_api import router as being_router
 from .category_api import router as category_v2_router
 from .chatbot_api import router as chatbot_router
+from .cloud_config_api import router as cloud_config_router
 from .commitment_api import commitment_router
 from .custom_records_api import router as custom_records_router
 from .diary_api import router as diary_router
@@ -15,6 +16,8 @@ from .mood_api import router as mood_router
 from .report_api import router as report_router
 from .setting_api import router as setting_router
 from .sync import router as sync_router
+from .sync_cloud_api import router as sync_cloud_router
+from .sync_status_api import router as sync_status_router
 from .system_api import router as system_router
 from .taskpool_api import router as taskpool_router
 from .timeline_api import router as timeline_v2_router
@@ -42,4 +45,7 @@ __all__ = [
     "commitment_router",
     "habit_router",
     "custom_records_router",
+    "sync_cloud_router",
+    "sync_status_router",
+    "cloud_config_router",
 ]

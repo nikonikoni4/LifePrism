@@ -4,6 +4,7 @@ Timeline 数据提供者（重构版）
 职责：提供 timeline_custom_block 表的所有数据访问接口
 """
 
+import sqlite3
 from typing import Any
 
 from lifeprism.repository.base_providers import LWBaseDataProvider
@@ -226,11 +227,18 @@ class CustomBlockProvider(LWBaseDataProvider):
         if invalid_fields:
             raise ValueError(f"Invalid update fields: {invalid_fields}")
 
-        affected_rows = self.db.update(self._TABLE_NAME, data=update_data, where={"id": block_id})
-        if affected_rows > 0:
-            logger.info("更新自定义时间块: block_id=%s", block_id)
-            return self.get_custom_block_by_id(block_id)
-        return None
+        try:
+            # 使用 _generic_update 自动处理 updated_at
+            success = self._generic_update(block_id, update_data)
+            if success:
+                logger.info("更新自定义时间块: block_id=%s", block_id)
+                return self.get_custom_block_by_id(block_id)
+            return None
+        except sqlite3.Error as e:
+            logger.error("更新自定义时间块失败: block_id=%s, %s", block_id, e)
+            raise DataAccessError(
+                message="更新自定义时间块失败", details={"block_id": block_id, "error": str(e)}
+            ) from e
 
     def delete_custom_block(self, block_id: int) -> bool:
         """

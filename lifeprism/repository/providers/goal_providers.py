@@ -245,14 +245,8 @@ class GoalProvider(LWBaseDataProvider):
             if invalid_fields:
                 raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
-            # goal 表不自动更新 updated_at，只更新传入的字段
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                set_clauses = [f"{key} = ?" for key in data]
-                values = list(data.values()) + [goal_id]
-                sql = f"UPDATE {self._TABLE_NAME} SET {', '.join(set_clauses)} WHERE {self._PRIMARY_KEY} = ?"
-                cursor.execute(sql, values)
-                success = cursor.rowcount > 0
+            # 使用 _generic_update 自动处理 updated_at
+            success = self._generic_update(goal_id, data)
 
             if success:
                 logger.info("更新目标 %s 成功", goal_id)
@@ -260,7 +254,7 @@ class GoalProvider(LWBaseDataProvider):
 
         except ValidationError:
             raise
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error("更新目标 %s 失败: %s", goal_id, e)
             raise DataAccessError(
                 message="更新目标失败", details={"goal_id": goal_id, "error": str(e)}

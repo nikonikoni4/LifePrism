@@ -164,8 +164,11 @@ category_map_cache_CONFIG = {
         },
     },
     "table_constraints": ["UNIQUE (app, title, state)"],  # 唯一约束：保证数据不重复
-    "indexes": [],
+    "indexes": [
+        {"name": "idx_category_map_cache_updated_at", "columns": ["updated_at"]},
+    ],
     "timestamps": True,  # 自动添加 created_at, updated_at
+    "update_at": True,
 }
 
 
@@ -217,8 +220,10 @@ USER_APP_BEHAVIOR_LOG_CONFIG = {
         {"name": "idx_start_time", "columns": ["start_time"]},
         {"name": "idx_end_time", "columns": ["end_time"]},
         {"name": "idx_time_range", "columns": ["start_time", "end_time"]},  # 时间范围查询优化
+        {"name": "idx_user_app_behavior_log_updated_at", "columns": ["updated_at"]},
     ],
     "timestamps": True,  # 自动添加 created_at
+    "update_at": True,
 }
 
 # 分类定义表配置（主分类）
@@ -247,8 +252,12 @@ CATEGORY_CONFIG = {
         },
     },
     "table_constraints": [],
-    "indexes": [{"name": "idx_category_id", "columns": ["id"]}],
+    "indexes": [
+        {"name": "idx_category_id", "columns": ["id"]},
+        {"name": "idx_category_updated_at", "columns": ["updated_at"]},
+    ],
     "timestamps": True,  # 自动添加 created_at, updated_at
+    "update_at": True,
 }
 
 # 子分类定义表配置
@@ -280,8 +289,10 @@ SUB_CATEGORY_CONFIG = {
     "indexes": [
         {"name": "idx_sub_category_id", "columns": ["id"]},
         {"name": "idx_sub_category_parent", "columns": ["category_id"]},
+        {"name": "idx_sub_category_updated_at", "columns": ["updated_at"]},
     ],
     "timestamps": True,  # 自动添加 created_at, updated_at
+    "update_at": True,
 }
 
 # Token 使用统计表配置
@@ -423,8 +434,10 @@ TODO_LIST_CONFIG = {
         {"name": "idx_todo_list_state", "columns": ["state"]},
         {"name": "idx_todo_list_parent_id", "columns": ["parent_id"]},
         {"name": "idx_todo_list_plan_doc_id", "columns": ["plan_doc_id"]},
+        {"name": "idx_todo_list_updated_at", "columns": ["updated_at"]},
     ],
     "timestamps": True,  # 自动添加 created_at
+    "update_at": True,
 }
 
 
@@ -545,8 +558,10 @@ GOAL_CONFIG = {
         {"name": "idx_goal_status", "columns": ["status"]},
         {"name": "idx_goal_category", "columns": ["link_to_category_id"]},
         {"name": "idx_goal_order", "columns": ["order_index"]},
+        {"name": "idx_goal_updated_at", "columns": ["updated_at"]},
     ],
     "timestamps": True,
+    "update_at": True,
 }
 
 # Goal Journal 目标日志表配置
@@ -672,14 +687,20 @@ TIMELINE_CUSTOM_BLOCK_CONFIG = {
         "category_id": {"type": "TEXT", "constraints": [], "comment": "分类ID"},
         "sub_category_id": {"type": "TEXT", "constraints": [], "comment": "子分类ID"},
     },
-    "table_constraints": ["CHECK(end_time > start_time)", "CHECK(duration > 0)"],
+    "table_constraints": [
+        "CHECK(end_time > start_time)",
+        "CHECK(duration > 0)",
+        "UNIQUE(start_time)",
+    ],
     "indexes": [
         {"name": "idx_timeline_custom_block_start_time", "columns": ["start_time"]},
         {"name": "idx_timeline_custom_block_end_time", "columns": ["end_time"]},
         {"name": "idx_timeline_custom_block_time_range", "columns": ["start_time", "end_time"]},
         {"name": "idx_timeline_custom_block_todo_id", "columns": ["todo_id"]},
+        {"name": "idx_timeline_custom_block_updated_at", "columns": ["updated_at"]},
     ],
     "timestamps": True,  # 自动添加 created_at, updated_at
+    "update_at": True,
 }
 
 GOAL_STATS_CONFIG = {
@@ -1022,9 +1043,10 @@ MOOD_ENTRIES_CONFIG = {
     "indexes": [
         {"name": "idx_mood_entries_mood_type_id", "columns": ["mood_type_id"]},
         {"name": "idx_mood_entries_created_at", "columns": ["created_at"]},
+        {"name": "idx_mood_entries_updated_at", "columns": ["updated_at"]},
     ],
     "timestamps": True,
-    "update_at": False,
+    "update_at": True,
 }
 
 # 影响因素配置表（Mind Space 心情模块）
@@ -1422,9 +1444,10 @@ BEHAVIOR_ANALYSIS_CONFIG = {
     "indexes": [
         {"name": "idx_behavior_start_time", "columns": ["start_time"]},
         {"name": "idx_behavior_time_range", "columns": ["start_time", "end_time"]},
+        {"name": "idx_behavior_analysis_updated_at", "columns": ["updated_at"]},
     ],
     "timestamps": True,
-    "update_at": False,
+    "update_at": True,
 }
 
 

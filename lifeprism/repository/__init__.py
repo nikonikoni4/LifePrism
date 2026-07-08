@@ -67,6 +67,7 @@ from lifeprism.repository.providers import screen_capture_provider as screen_cap
 from lifeprism.repository.providers import tokens_usage_provider as tokens_usage_repository
 
 from .base_providers import AWBaseDataProvider, LWBaseDataProvider
+from .sync_repository import SyncRepository
 
 __all__ = [
     "QueryOptions",
@@ -93,4 +94,6 @@ __all__ = [
     "category_repository",
     "map_cache_repository",
     "custom_record_repository",
+    # 同步 repository
+    "SyncRepository",
 ]

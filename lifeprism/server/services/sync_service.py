@@ -94,7 +94,9 @@ class SyncService:
         """
         # 演示模式守卫：非 full 模式下禁用数据同步
         if settings.run_mode != "full":
-            logger.warning("[incremental_sync] 当前运行模式为 %s，不支持数据同步", settings.run_mode)
+            logger.warning(
+                "[incremental_sync] 当前运行模式为 %s，不支持数据同步", settings.run_mode
+            )
             raise ValidationError(
                 message="演示模式不支持数据同步",
                 code=DEMO_MODE_NOT_SUPPORTED,
@@ -179,7 +181,9 @@ class SyncService:
         """
         # 演示模式守卫：非 full 模式下禁用数据同步
         if settings.run_mode != "full":
-            logger.warning("[sync_by_time_range] 当前运行模式为 %s，不支持数据同步", settings.run_mode)
+            logger.warning(
+                "[sync_by_time_range] 当前运行模式为 %s，不支持数据同步", settings.run_mode
+            )
             raise ValidationError(
                 message="演示模式不支持数据同步",
                 code=DEMO_MODE_NOT_SUPPORTED,

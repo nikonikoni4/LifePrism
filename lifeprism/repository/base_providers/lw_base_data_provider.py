@@ -5,11 +5,14 @@ LifeWatch 基础数据提供者
 
 import logging
 import sqlite3
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import pandas as pd
 
 from lifeprism.utils.exceptions import DataAccessError
+
+if TYPE_CHECKING:
+    from lifeprism.repository.providers.common_query_options import QueryOptions
 
 logger = logging.getLogger(__name__)
 

@@ -136,6 +136,21 @@ from lifeprism.server.api import custom_records_router
 _log_startup_time("  - custom_records_router", _import_start)
 
 _import_start = time.perf_counter()
+from lifeprism.server.api import sync_cloud_router
+
+_log_startup_time("  - sync_cloud_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import sync_status_router
+
+_log_startup_time("  - sync_status_router", _import_start)
+
+_import_start = time.perf_counter()
+from lifeprism.server.api import cloud_config_router
+
+_log_startup_time("  - cloud_config_router", _import_start)
+
+_import_start = time.perf_counter()
 from lifeprism.server.api.add_on_api import router as add_on_router
 
 _log_startup_time("  - add_on_router", _import_start)
@@ -271,6 +286,19 @@ async def lifespan(app: FastAPI):
         logger.info("[STARTUP] ScheduleService started")
     except Exception as e:
         logger.warning("启动定时任务服务失败: error=%s", e)
+
+    # 创建 SyncClient 实例（用于同步状态查询和手动触发同步）
+    try:
+        from lifeprism.repository import lw_db_manager
+        from lifeprism.repository.sync_repository import SyncRepository
+        from lifeprism.sync.sync_client import SyncClient
+
+        sync_repo = SyncRepository()
+        app.state.sync_client = SyncClient(db_manager=lw_db_manager, sync_repository=sync_repo)
+        logger.info("[STARTUP] SyncClient created")
+    except Exception as e:
+        logger.warning("创建 SyncClient 失败: error=%s", e)
+        app.state.sync_client = None
 
     # 初始化 ChatBot 服务和 AgentLoop
     import asyncio
@@ -461,9 +489,12 @@ app.include_router(value_router, prefix="/api/v2")  # Value 价值
 app.include_router(commitment_router, prefix="/api/v2")  # Commitment 承诺
 app.include_router(habit_router, prefix="/api/v2/habit", tags=["habit"])  # Habit 习惯
 app.include_router(custom_records_router, prefix="/api/v2")  # Custom Records 自定义记录
+app.include_router(sync_cloud_router)  # 云端数据同步 Pull + Push
+app.include_router(sync_status_router)  # 同步状态查询和手动触发
+app.include_router(cloud_config_router)  # 云端配置生成
 app.include_router(add_on_router)
 
-_log_startup_time("[OK] API routers registered (20 routers)", _router_start)
+_log_startup_time("[OK] API routers registered (21 routers)", _router_start)
 
 # 模块加载阶段总结
 _module_load_total = (time.perf_counter() - _startup_timer) * 1000

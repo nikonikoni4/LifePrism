@@ -34,20 +34,20 @@ class LWTableManager:
             self.db = db_manager
 
     def init_database(self):
-        """初始化数据库，根据配置创建所有表"""
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
+        """初始化数据库，根据配置创建所有表
 
-                # 遍历所有表配置并创建表
-                for _table_name, config in TABLE_CONFIGS.items():
-                    self._create_table_from_config(cursor, config)
+        CREATE TABLE IF NOT EXISTS 对已存在的表是空操作（不会添加新列）。
+        新列的添加由 migrations 迁移脚本负责，本方法仅负责建表和建索引。
+        如果索引引用的列尚不存在（旧表未迁移），跳过该索引并记录 warning，
+        待迁移脚本补列后，下次启动时自然会创建索引。
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
 
-                logger.info("数据库初始化成功，共创建 %s 个表", len(TABLE_CONFIGS))
+            for _table_name, config in TABLE_CONFIGS.items():
+                self._create_table_from_config(cursor, config)
 
-        except Exception as e:
-            logger.error("数据库初始化失败: error=%s", e)
-            raise
+            logger.info("数据库初始化成功，共创建 %s 个表", len(TABLE_CONFIGS))
 
     def _create_table_from_config(self, cursor: sqlite3.Cursor, config: dict):
         """
@@ -97,16 +97,34 @@ class LWTableManager:
         cursor.execute(create_table_sql)
         # logger.info(f"表 '{table_name}' 创建成功")
 
-        # 5. 创建索引
+        # 5. 创建索引（跳过引用不存在列的索引，待迁移补列后下次启动创建）
+        existing_columns = self._get_table_columns(cursor, table_name)
         for index in indexes:
             index_name = index["name"]
-            index_columns = ", ".join(index["columns"])
+            index_columns = index["columns"]
+            # 检查索引引用的列是否都存在（旧表可能尚未迁移）
+            missing_cols = [c for c in index_columns if c not in existing_columns]
+            if missing_cols:
+                logger.warning(
+                    "跳过索引 '%s' on %s：列 %s 不存在（待迁移脚本补列）",
+                    index_name,
+                    table_name,
+                    missing_cols,
+                )
+                continue
+            index_columns_str = ", ".join(index_columns)
             create_index_sql = f"""
             CREATE INDEX IF NOT EXISTS {index_name}
-            ON {table_name}({index_columns});
+            ON {table_name}({index_columns_str});
             """
             cursor.execute(create_index_sql)
             logger.debug("索引 '%s' 创建成功", index_name)
+
+    @staticmethod
+    def _get_table_columns(cursor: sqlite3.Cursor, table_name: str) -> set[str]:
+        """获取表已存在的列名集合"""
+        cursor.execute(f'PRAGMA table_info("{table_name}")')
+        return {row[1] for row in cursor.fetchall()}
 
 
 # ==================== 便捷函数 ====================

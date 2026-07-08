@@ -4,8 +4,9 @@
 类型管理 + 记录 CRUD 的请求/响应模型
 """
 
-from pydantic import BaseModel, Field
 from typing import Literal
+
+from pydantic import BaseModel, Field
 
 # ==================== 字段定义 ====================
 

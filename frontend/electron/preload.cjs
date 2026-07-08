@@ -63,6 +63,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return ipcRenderer.invoke('open-folder', folderPath);
     },
 
+    // 在文件管理器中打开文件夹并选中指定文件
+    openFolderAndSelect: (filePath) => {
+        preloadLog('INFO', 'invoke:open-folder-and-select', filePath);
+        return ipcRenderer.invoke('open-folder-and-select', filePath);
+    },
+
     // 自动更新
     checkForUpdates: () => {
         preloadLog('INFO', 'invoke:updater:check');

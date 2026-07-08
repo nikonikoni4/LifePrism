@@ -11,6 +11,7 @@ from . import (
     m003_value_keyword_to_keywords,
     m004_diary_source_hash,
     m005_behavior_log_id_to_autoincrement,
+    m006_add_updated_at,
 )
 
 MIGRATIONS = [
@@ -19,4 +20,5 @@ MIGRATIONS = [
     m003_value_keyword_to_keywords,
     m004_diary_source_hash,
     m005_behavior_log_id_to_autoincrement,
+    m006_add_updated_at,
 ]

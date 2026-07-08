@@ -57,9 +57,7 @@ class DatabaseManager:
                 # readonly 模式懒加载：不在 __init__ 中创建连接池，
                 # 避免外部数据库（如 ActivityWatch）文件不存在时导致应用启动崩溃。
                 # 连接池将在首次 get_connection() 时延迟初始化。
-                logger.debug(
-                    "readonly 模式，连接池将延迟到首次使用时初始化: %s", self.DB_PATH
-                )
+                logger.debug("readonly 模式，连接池将延迟到首次使用时初始化: %s", self.DB_PATH)
             else:
                 self._init_connection_pool()
             # 注册程序退出时关闭连接池
@@ -165,10 +163,15 @@ class DatabaseManager:
                 conn.commit()
             except sqlite3.Error as e:
                 conn.rollback()
-                logger.error("数据库操作失败，已回滚: db_path=%s, error=%s", self.DB_PATH, e)
+                logger.error(
+                    "数据库操作失败，已回滚: db_path=%s, error=%s",
+                    self.DB_PATH,
+                    e,
+                    exc_info=True,
+                )
                 raise DataAccessError(
-                    message="数据库操作失败，已回滚",
-                    details={"db_path": str(self.DB_PATH), "error": str(e)},
+                    message=f"数据库操作失败: {e}",
+                    details={"db_path": str(self.DB_PATH)},
                     cause=e,
                 ) from e
             finally:
@@ -182,10 +185,15 @@ class DatabaseManager:
                 conn.commit()
             except sqlite3.Error as e:
                 conn.rollback()
-                logger.error("数据库操作失败，已回滚: db_path=%s, error=%s", self.DB_PATH, e)
+                logger.error(
+                    "数据库操作失败，已回滚: db_path=%s, error=%s",
+                    self.DB_PATH,
+                    e,
+                    exc_info=True,
+                )
                 raise DataAccessError(
-                    message="数据库操作失败，已回滚",
-                    details={"db_path": str(self.DB_PATH), "error": str(e)},
+                    message=f"数据库操作失败: {e}",
+                    details={"db_path": str(self.DB_PATH)},
                     cause=e,
                 ) from e
             finally:
