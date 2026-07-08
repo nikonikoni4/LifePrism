@@ -24,7 +24,7 @@ from .database_manager import DatabaseManager
 
 # 检查并创建数据库文件（如果不存在）
 # 防止 readonly 模式下因文件不存在导致连接失败
-for db_path in [settings.lw_db_path, settings.chat_db_path]:
+for db_path in [settings.lw_db_path]:
     if db_path and not db_path.exists():
         print(f"Creating database file: {db_path}")
         # 确保目录存在
@@ -37,10 +37,6 @@ lw_db_manager = DatabaseManager(DB_PATH=str(settings.lw_db_path), use_pool=True,
 # ActivityWatch 数据库（只读，使用连接池）
 aw_db_manager = DatabaseManager(
     DB_PATH=str(settings.aw_db_path), use_pool=True, pool_size=1, readonly=True
-)
-
-chat_history_db_manager = DatabaseManager(
-    DB_PATH=str(settings.chat_db_path), use_pool=True, pool_size=2, readonly=True
 )
 
 # ==================== 基础数据提供者 ====================

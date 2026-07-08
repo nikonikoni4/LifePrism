@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-06
-updated_at: 2026-07-06
-last_updated:
+updated_at: 2026-07-08
+last_updated: 移除已弃用的 chat_history_db_manager 和 chat_db_path 引用
 abstract: Repository 数据访问层核心契约 — DatabaseManager 连接管理、LWTableManager 建表、BaseProvider 通用 CRUD、迁移系统、异常体系
 status: draft
 module: repository
@@ -15,6 +15,7 @@ module: repository
 | 版本 | 更新内容 |
 | ---- | -------- |
 | 1.0 | 创建 spec 初稿 |
+| 1.1 | 移除已弃用的 chat_history_db_manager 和 chat_db_path 引用 |
 
 ## Overview
 
@@ -57,8 +58,6 @@ module: repository
 - [ ] lw_db 数据库文件不存在时，`__init__.py` 自动创建空文件和父目录
 - [ ] lw_db_manager 以读写模式创建，连接池大小为 5，程序退出时自动关闭所有连接
 - [ ] aw_db_manager 以只读模式（`mode=ro` URI）创建，连接池大小为 1
-- [ ] chat_history_db_manager 以只读模式创建，连接池大小为 2
-- [ ] chat_db 数据库文件不存在时，`__init__.py` 自动创建空文件（防止只读模式连接失败）
 
 ### 连接池
 
@@ -263,9 +262,8 @@ module: repository
 |--------|---------|----------|--------|------|
 | `lw_db_manager` | `settings.lw_db_path` | 读写 | 池大小 5 | LifeWatch 主数据库 |
 | `aw_db_manager` | `settings.aw_db_path` | 只读 (`mode=ro`) | 池大小 1 | ActivityWatch 外部数据 |
-| `chat_history_db_manager` | `settings.chat_db_path` | 只读 (`mode=ro`) | 池大小 2 | 聊天历史数据 |
 
-**数据库文件自动创建**：对于 lw_db_path 和 chat_db_path，若文件不存在则在模块加载时自动创建空文件和父目录，防止只读模式下因文件不存在导致连接失败。
+**数据库文件自动创建**：对于 lw_db_path，若文件不存在则在模块加载时自动创建空文件和父目录，防止只读模式下因文件不存在导致连接失败。
 
 ### 异常体系
 
@@ -363,7 +361,6 @@ LWBaseError (lifeprism.utils.exceptions)
 | `DatabaseManager` | 类 | 数据库管理器 |
 | `lw_db_manager` | DatabaseManager 实例 | LW 主库（读写，池5） |
 | `aw_db_manager` | DatabaseManager 实例 | AW 外部库（只读，池1） |
-| `chat_history_db_manager` | DatabaseManager 实例 | 聊天历史（只读，池2） |
 | `LWBaseDataProvider` | 类 | LW 通用 CRUD 基类 |
 | `AWBaseDataProvider` | 类 | AW 只读基类 |
 | `*_repository` (15 个) | Provider/Aggregator 实例 | 单表和多表数据访问入口 |
@@ -378,12 +375,11 @@ LWBaseError (lifeprism.utils.exceptions)
 
 **为什么连接池模式是可选的？**
 - `use_pool=False` 保持向后兼容，每次操作创建新连接
-- 只读数据库（AW、chat_history）仅需少量连接，池大小 1-2 即可满足
+- 只读数据库（AW）仅需少量连接，池大小 1 即可满足
 - 读写数据库（LW）需要池大小 5 支持多线程并发写入
 
-**为什么 aw_db 和 chat_db 是只读的？**
+**为什么 aw_db 是只读的？**
 - ActivityWatch 是外部应用生成的数据库，修改它可能导致 AW 数据损坏或 AW 自身行为异常
-- Chat 历史由前端直接写入（通过 Electron IPC 或其他机制），后端仅需读取
 - 只读模式通过 SQLite URI `mode=ro` 在数据库层面强制执行，防止误写
 
 **为什么迁移系统使用独立 sqlite3 连接？**
@@ -396,9 +392,8 @@ LWBaseError (lifeprism.utils.exceptions)
 - 白名单机制（`_FILTER_FIELDS`、`_ORDER_FIELDS` 等）在提供灵活性的同时防止 SQL 注入和非法字段访问
 - 子类只需定义表名和字段约束即可使用，新增 Provider 成本极低
 
-**为什么 lw_db 和 chat_db 文件要自动创建？**
+**为什么 lw_db 文件要自动创建？**
 - 数据库文件在首次启动时可能不存在（新用户或数据迁移后的干净状态）
-- 特别是 chat_db 为只读模式，如果文件不存在会导致 `mode=ro` 打开失败
 - 模块加载时在连接池创建前检查文件存在性，创建空文件后连接池才能正常初始化
 
 **有哪些约束？**

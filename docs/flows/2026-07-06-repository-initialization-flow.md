@@ -1,9 +1,9 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-06
-updated_at: 2026-07-06
-last_updated: 初始版本
-abstract: Repository 层初始化数据流，串联模块导入时的 DB 实例创建、数据库表结构初始化、迁移执行、默认数据填充、资源文件初始化 5 条链路，覆盖 3 个 DatabaseManager 单例的创建与连接池初始化、LWTableManager.init_database 的配置驱动建表、migration_runner 的版本检测-备份-执行流程、data_initializer 的空表检测与默认数据插入、resource_initializer 的打包/开发环境分支资源复制
+updated_at: 2026-07-08
+last_updated: 移除已弃用的 chat_history_db_manager 和 chat_db_path 引用
+abstract: Repository 层初始化数据流，串联模块导入时的 DB 实例创建、数据库表结构初始化、迁移执行、默认数据填充、资源文件初始化 5 条链路，覆盖 2 个 DatabaseManager 单例的创建与连接池初始化、LWTableManager.init_database 的配置驱动建表、migration_runner 的版本检测-备份-执行流程、data_initializer 的空表检测与默认数据插入、resource_initializer 的打包/开发环境分支资源复制
 ---
 
 ## 版本
@@ -11,6 +11,7 @@ abstract: Repository 层初始化数据流，串联模块导入时的 DB 实例�
 | 版本 | 更新内容 |
 | ---- | -------- |
 | 1.0 | 初始版本 |
+| 1.1 | 移除已弃用的 chat_history_db_manager 和 chat_db_path 引用 |
 
 # 数据流：RepoInitState
 
@@ -27,13 +28,11 @@ class RepoInitState:
     # === DB 实例（全局单例） ===
     lw_db_manager: DatabaseManager     # LifeWatch 读写 DB，连接池=5，use_pool=True
     aw_db_manager: DatabaseManager     # ActivityWatch 只读 DB，连接池=1，readonly=True
-    chat_history_db_manager: DatabaseManager  # 聊天历史只读 DB，连接池=2，readonly=True
 
     # === DB 文件状态 ===
     lw_db_path: Path                   # LifeWatch DB 文件完整路径（从 settings 读取）
-    chat_db_path: Path                 # 聊天历史 DB 文件完整路径（从 settings 读取）
     aw_db_path: Path                   # ActivityWatch DB 文件完整路径（从 settings 读取）
-    db_files_exist: bool               # 3 个 DB 文件是否都已存在（True=跳过创建）
+    db_files_exist: bool               # 2 个 DB 文件是否都已存在（True=跳过创建）
 
     # === 表结构状态 ===
     tables_created: dict[str, bool]    # 各表是否创建成功（table_name → bool）
@@ -61,7 +60,7 @@ class RepoInitState:
 
 **关键字段说明**：
 - `lw_db_manager`：整个 Repository 层的主数据库入口，所有 LifeWatch 表的读写操作都经过此实例。连接池=5 意味着同时最多 5 个并发数据库操作
-- `aw_db_manager` 和 `chat_history_db_manager`：只读模式，用于外部数据源（ActivityWatch）和聊天历史查询，连接池较小因为并发需求低
+- `aw_db_manager`：只读模式，用于外部数据源（ActivityWatch），连接池较小因为并发需求低
 - `schema_version`：迁移状态的核心指标，决定了哪些迁移需要执行。初始值为 0，每次迁移执行后递增
 - `tables_created`：表结构初始化的结果快照，由 TABLE_CONFIGS 配置驱动，任何表创建失败都会中断整个 init_database 流程
 - `resources_overwritten`：仅在 OVERWRITE_DIR_LIST 中的目录（prompts/tool/agent）会强制覆盖，其他资源文件仅在目标不存在时复制
@@ -70,18 +69,18 @@ class RepoInitState:
 
 ### RepoInitState <-> ConfigInitState
 
-**ConfigInitState 状态字段**：`config_base_path`（源）、`lifeprism_data_path`（源）、`lw_db_path`（派生）、`chat_db_path`（派生）、`aw_db_path`（派生）
+**ConfigInitState 状态字段**：`config_base_path`（源）、`lifeprism_data_path`（源）、`lw_db_path`（派生）、`aw_db_path`（派生）
 
 **耦合关系**：
 
 | RepoInitState 状态变化 | ConfigInitState 影响 | 触发位置 |
 |-----------------------|---------------------|---------|
-| `lw_db_path` / `chat_db_path` / `aw_db_path` 确定 | 依赖 settings 的属性访问器从 `_lifeprism_data_path` 自动推算 | `__init__.py` 模块级读取 `settings.lw_db_path` 等 |
+| `lw_db_path` / `aw_db_path` 确定 | 依赖 settings 的属性访问器从 `_lifeprism_data_path` 自动推算 | `__init__.py` 模块级读取 `settings.lw_db_path` 等 |
 | DB 文件创建（mkdir + touch）完成 | 后续 DatabaseManager.__init__ 可以正常连接 | `__init__.py` 模块级 for 循环 |
 | resource_initializer 读取 settings | 依赖 `settings.config_base_path` 和 `settings.lifeprism_data_path` 确定目标路径 | `resource_initializer.initialize_resources():33-42` |
 | migration_runner 读取 settings | `run_migrations(str(settings.lw_db_path))` 需要 ConfigInitState 已就绪 | `main.py` lifespan:205 |
 
-**说明**：RepoInitState 是 ConfigInitState 的下游依赖。`__init__.py` 模块级代码在 import 时就会读取 `settings.lw_db_path`、`settings.chat_db_path`、`settings.aw_db_path`，因此 Repository 层初始化必须在 SettingsManager 单例完成初始化之后。`main.py` 通过显式的 import 顺序（line 38-39 先导入 settings，line 142-164 再导入 repository 模块）保证这一依赖关系。
+**说明**：RepoInitState 是 ConfigInitState 的下游依赖。`__init__.py` 模块级代码在 import 时就会读取 `settings.lw_db_path`、`settings.aw_db_path`，因此 Repository 层初始化必须在 SettingsManager 单例完成初始化之后。`main.py` 通过显式的 import 顺序（line 38-39 先导入 settings，line 142-164 再导入 repository 模块）保证这一依赖关系。
 
 <key_function>
 - lifeprism/repository/__init__.py
@@ -126,8 +125,8 @@ stateDiagram-v2
 
     state __init__py {
         [*] --> ImportSettings : import settings
-        ImportSettings --> CheckDBFiles : 检查 lw_db_path / chat_db_path 是否存在
-        CheckDBFiles --> CreateIfMissing : 任一不存在 → mkdir + touch
+        ImportSettings --> CheckDBFiles : 检查 lw_db_path 是否存在
+        CheckDBFiles --> CreateIfMissing : 不存在 → mkdir + touch
         CheckDBFiles --> SkipCreate : 都存在 → 跳过
 
         state CreateIfMissing {
@@ -153,15 +152,7 @@ stateDiagram-v2
             AW_Queue --> AW_Atexit : 注册 atexit 清理
         }
 
-        CreateAW --> CreateChat : 创建 chat_history_db_manager (use_pool=True, pool_size=2, readonly=True)
-
-        state CreateChat {
-            [*] --> Chat_InitPool : use_pool=True → _init_connection_pool()
-            Chat_InitPool --> Chat_Queue : 创建 2 个只读连接放入 Queue
-            Chat_Queue --> Chat_Atexit : 注册 atexit 清理
-        }
-
-        CreateChat --> [*] : 3 个 DB 实例创建完成
+        CreateAW --> [*] : 2 个 DB 实例创建完成
     }
 
     __init__py --> InitDatabase : lifespan 阶段调用
@@ -308,7 +299,7 @@ stateDiagram-v2
 ```
 
 **关键分支说明**：
-- **__init__.py DB 文件检查**：即使 aw_db_manager 和 chat_history_db_manager 是只读模式，`__init__.py` 在创建 DatabaseManager 实例之前也会对这两个路径执行 touch 创建。这是为了防止只读模式（`mode=ro` + uri）在文件不存在时连接失败
+- **__init__.py DB 文件检查**：`__init__.py` 在创建 DatabaseManager 实例之前会对 lw_db_path 执行 touch 创建。这是为了确保数据库文件在连接池初始化前一定存在
 - **迁移版本检测**：`_get_current_version()` 通过查询 `schema_version` 表的最大 version 号获取当前版本。表不存在时返回 0，所有迁移都会被标记为 pending
 - **迁移幂等检查**：每个迁移的 `check_if_applied()` 支持跳过已生效的迁移（如通过其他方式已经应用了表结构变更），仅补录版本记录
 - **data_initializer 空表检测**：每个 `_initialize_*` 方法先通过 `_is_table_empty()` 检查表是否为空，非空则跳过。这保证了默认数据仅在首次安装时填充，后续启动不会重复插入
@@ -316,20 +307,19 @@ stateDiagram-v2
 
 ## 数据流节点
 
-**业务场景说明**：Repository 层初始化分为两个阶段：(1) 模块导入阶段，`__init__.py` 的模块级代码在 `from lifeprism.repository import ...` 首次执行时创建 3 个 DatabaseManager 单例；(2) `main.py` 的 lifespan 阶段，依次执行表结构初始化、数据库迁移、默认数据填充、资源文件初始化。
+**业务场景说明**：Repository 层初始化分为两个阶段：(1) 模块导入阶段，`__init__.py` 的模块级代码在 `from lifeprism.repository import ...` 首次执行时创建 2 个 DatabaseManager 单例；(2) `main.py` 的 lifespan 阶段，依次执行表结构初始化、数据库迁移、默认数据填充、资源文件初始化。
 
 ### 链路 1：模块导入时的 DB 实例创建（__init__.py）
 
 **1. 模块级代码执行（__init__.py 第 21-44 行）**
-   `from lifeprism.config.settings_manager import settings` → 读取 `settings.lw_db_path`、`settings.chat_db_path` → 遍历两个路径检查是否存在 → 不存在则 `mkdir + touch` 创建空 DB 文件 → 创建 3 个 DatabaseManager 实例（含连接池初始化）
-   状态: 3 个 DB 文件确保存在 + 3 个 DatabaseManager 单例创建完成 | 持久化: ✅ (空 DB 文件) | 跨模块: ✅ (settings→repository)
+   `from lifeprism.config.settings_manager import settings` → 读取 `settings.lw_db_path` → 检查是否存在 → 不存在则 `mkdir + touch` 创建空 DB 文件 → 创建 2 个 DatabaseManager 实例（含连接池初始化）
+   状态: 1 个 DB 文件确保存在 + 2 个 DatabaseManager 单例创建完成 | 持久化: ✅ (空 DB 文件) | 跨模块: ✅ (settings→repository)
    步骤:
-   - 导入 settings 获取 lw_db_path、chat_db_path（注意：aw_db_path 不在 touch 循环中，但同理需要路径存在）
+   - 导入 settings 获取 lw_db_path（注意：aw_db_path 不在 touch 循环中，但同理需要路径存在）
    - 分支A (db_path 不存在): `parent.mkdir(parents=True, exist_ok=True)` → `touch()` 创建空文件
    - 分支B (db_path 已存在): 跳过 touch
    - lw_db_manager: `DatabaseManager(DB_PATH, use_pool=True, pool_size=5)` — 读写模式，大连接池
    - aw_db_manager: `DatabaseManager(DB_PATH, use_pool=True, pool_size=1, readonly=True)` — 只读，小连接池
-   - chat_history_db_manager: `DatabaseManager(DB_PATH, use_pool=True, pool_size=2, readonly=True)` — 只读，中连接池
 
 **2. DatabaseManager.__init__() — 连接池模式分支**
    根据 use_pool 参数决定是否初始化连接池，readonly 参数决定连接打开模式
@@ -455,7 +445,7 @@ stateDiagram-v2
 
 **设计意图**：Python 模块的 `__init__.py` 通常只做导入和单例声明，不执行有副作用的文件 I/O 操作。
 
-**当前实现**：`lifeprism/repository/__init__.py` 第 27-32 行在模块级别直接执行 `for db_path in [settings.lw_db_path, settings.chat_db_path]: if db_path and not db_path.exists(): db_path.parent.mkdir(parents=True, exist_ok=True); db_path.touch()`。这意味着任何 `from lifeprism.repository import ...` 的首次执行都会触发文件系统写操作。
+**当前实现**：`lifeprism/repository/__init__.py` 第 27-32 行在模块级别直接执行 `for db_path in [settings.lw_db_path]: if db_path and not db_path.exists(): db_path.parent.mkdir(parents=True, exist_ok=True); db_path.touch()`。这意味着任何 `from lifeprism.repository import ...` 的首次执行都会触发文件系统写操作。
 
 **为什么是反常的**：模块导入是隐式触发，调用方（如测试代码、脚本）可能并不期望 import 操作会产生文件系统副作用。这不是延迟初始化模式——DB 文件在 import 阶段就已经创建，而不是在显式调用初始化方法时。
 
@@ -464,15 +454,15 @@ stateDiagram-v2
 **相关位置**：
 - `lifeprism/repository/__init__.py:27-32`
 
-### 2. aw_db_manager 和 chat_history_db_manager 是只读的，但 __init__.py 仍然 touch 创建
+### 2. aw_db_manager 是只读的，但 __init__.py 不为其 touch 创建
 
-**设计意图**：只读数据库（ActivityWatch、聊天历史）的数据由外部进程写入，LifePrism 只需读取。如果文件不存在，说明外部数据源尚未产生数据，正常情况下连接失败是可以接受的。
+**设计意图**：只读数据库（ActivityWatch）的数据由外部进程写入，LifePrism 只需读取。如果文件不存在，说明外部数据源尚未产生数据，正常情况下连接失败是可以接受的。
 
-**当前实现**：`__init__.py` 第 27 行的 touch 循环遍历的是 `[settings.lw_db_path, settings.chat_db_path]`（注意：没有 aw_db_path），但 `chat_db_path` 也指向一个 `readonly=True` 的 DatabaseManager。touch 创建空文件是为了防止 `sqlite3.connect("file:...?mode=ro", uri=True)` 在文件不存在时抛出 `sqlite3.OperationalError`。
+**当前实现**：`__init__.py` 第 27 行的 touch 循环仅遍历 `[settings.lw_db_path]`（注意：没有 aw_db_path）。aw_db_path 不在 touch 循环中——如果 ActivityWatch 尚未产生数据文件，aw_db_manager 的连接池创建会失败。
 
-**为什么是反常的**：只读数据库的空文件创建不是业务需求——它纯粹是为了满足 SQLite URI 只读模式的连接要求（文件必须存在才能以 `mode=ro` 打开）。这是技术约束驱动的设计，而非业务逻辑驱动的设计。
+**为什么是反常的**：与 lw_db_path 的预防性 touch 创建不同，aw_db_path 没有相同的保护机制。这是有意为之——ActivityWatch 数据库文件应由 AW 自身创建，LifePrism 不应干预外部数据源。
 
-**影响范围**：如果外部数据源（如 ActivityWatch）尚未运行，LifePrism 会连接到空的 chat_history DB 文件（表结构由外部进程创建）。aw_db_path 不在 touch 循环中——如果 ActivityWatch 尚未产生数据文件，aw_db_manager 的连接池创建会失败。
+**影响范围**：如果 ActivityWatch 尚未运行，aw_db_manager 的连接池创建会因 `sqlite3.OperationalError` 失败，应用启动将中断。
 
 **相关位置**：
 - `lifeprism/repository/__init__.py:27-32`（touch 循环）

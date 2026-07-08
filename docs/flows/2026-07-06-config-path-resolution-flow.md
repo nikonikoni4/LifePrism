@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-06
-updated_at: 2026-07-06
-last_updated: 初始版本
+updated_at: 2026-07-08
+last_updated: 移除已弃用的 chat_db_path 节点
 abstract: config_base_path 和 lifeprism_data_path 的完整解析流程，覆盖打包/开发环境下的 6 种路径组合、三级优先级决策、数据迁移触发、派生路径生成及安全检查
 ---
 
@@ -11,6 +11,7 @@ abstract: config_base_path 和 lifeprism_data_path 的完整解析流程，覆�
 | 版本 | 更新内容 |
 | ---- | -------- |
 | 1.0 | 初始版本 |
+| 1.1 | 移除已弃用的 chat_db_path 节点 |
 
 # 数据流：ResolvedPaths
 
@@ -31,7 +32,6 @@ class ResolvedPaths:
 
     # === 派生路径（从 lifeprism_data_path 自动推算） ===
     lw_db_path: Path                # = lifeprism_data_path/dataset/lifewatch_ai.db
-    chat_db_path: Path              # = lifeprism_data_path/dataset/chat_history.db
     channel_path: Path              # = lifeprism_data_path/channel
     session_path: Path              # = lifeprism_data_path/session
     allowed_dir_path: list[Path]    # = lifeprism_data_path/{user,diary,agent} + expand_meta_data 扩展目录
@@ -228,22 +228,17 @@ lifeprism_data_path 是**可迁移的**数据根目录。优先级：yaml 配置
    状态: 无（只读计算属性） | 持久化: ❌ | 跨模块: ❌
    步骤: `_lifeprism_data_path / "dataset" / "lifewatch_ai.db"`
 
-8. settings_manager.SettingsManager.chat_db_path
-   计算聊天历史数据库路径
-   状态: 无（只读计算属性） | 持久化: ❌ | 跨模块: ❌
-   步骤: `_lifeprism_data_path / "dataset" / "chat_history.db"`
-
-9. settings_manager.SettingsManager.channel_path
+8. settings_manager.SettingsManager.channel_path
    计算通道路径
    状态: 无（只读计算属性） | 持久化: ❌ | 跨模块: ❌
    步骤: `_lifeprism_data_path / "channel"`
 
-10. settings_manager.SettingsManager.session_path
+9. settings_manager.SettingsManager.session_path
     计算会话数据路径
     状态: 无（只读计算属性） | 持久化: ❌ | 跨模块: ❌
     步骤: `_lifeprism_data_path / "session"`
 
-11. settings_manager.SettingsManager._resolve_allowed_dir_paths()
+10. settings_manager.SettingsManager._resolve_allowed_dir_paths()
     计算允许访问的目录白名单，用于文件系统工具的安全沙箱
     状态: self._allowed_dir_path 赋值 | 持久化: ❌ | 跨模块: ✅ config → llm/agent/tools（文件系统工具读取 allowed_dir_path 进行路径校验）
     步骤:
@@ -253,7 +248,7 @@ lifeprism_data_path 是**可迁移的**数据根目录。优先级：yaml 配置
     - 所有路径做 `resolve()` 规范化
     - expand_meta_data.json 读取失败时静默跳过
 
-12. settings_manager.SettingsManager.custom_data_path
+11. settings_manager.SettingsManager.custom_data_path
     已废弃属性，别名指向 `_lifeprism_data_path`
     状态: 无（只读计算属性） | 持久化: ❌ | 跨模块: ❌
     步骤: 直接返回 `self._lifeprism_data_path`

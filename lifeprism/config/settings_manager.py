@@ -551,7 +551,6 @@ class SettingsManager:
 
         # 移除已废弃的独立路径字段
         result.pop("lw_db_path", None)
-        result.pop("chat_db_path", None)
 
         return result
 
@@ -665,11 +664,6 @@ class SettingsManager:
     def lw_db_path(self) -> Path:
         """获取 LifeWatch 数据库路径（自动推算，位于 lifeprismData/dataset/）"""
         return self._lifeprism_data_path / "dataset" / "lifewatch_ai.db"
-
-    @property
-    def chat_db_path(self) -> Path:
-        """获取聊天历史数据库路径（自动推算，位于 lifeprismData/dataset/）"""
-        return self._lifeprism_data_path / "dataset" / "chat_history.db"
 
     @property
     def data_cleaning_threshold(self) -> int:

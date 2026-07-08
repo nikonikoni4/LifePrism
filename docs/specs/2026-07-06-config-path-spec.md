@@ -1,8 +1,8 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-06
-updated_at: 2026-07-06
-last_updated:
+updated_at: 2026-07-08
+last_updated: 移除已弃用的 chat_db_path 派生路径
 abstract: config 模块路径体系 spec — 定义 config_base_path（配置文件固定路径）和 lifeprism_data_path（数据路径，可迁移）的解析规则、优先级、派生路径体系，以及环境差异和安全检查契约
 module: config
 status: draft
@@ -15,6 +15,7 @@ status: draft
 | 版本 | 更新内容 |
 | ---- | -------- |
 | 1.0 | 创建 spec 初稿 |
+| 1.1 | 移除已弃用的 chat_db_path 派生路径 |
 
 ## Overview
 
@@ -33,7 +34,7 @@ status: draft
 - `config_base_path` 的定义和解析规则（打包/开发环境差异，不可迁移）
 - `lifeprism_data_path` 的定义和解析优先级（yaml 配置 > 环境变量 > 默认值）
 - 数据路径迁移时的环境变量同步行为
-- 基于 `lifeprism_data_path` 的派生路径规则（lw_db_path、chat_db_path、channel_path、session_path）
+- 基于 `lifeprism_data_path` 的派生路径规则（lw_db_path、channel_path、session_path）
 - `allowed_dir_path` 的白名单目录和扩展目录规则
 - 打包环境数据路径安全检查（安装目录内警告）
 - 开发环境使用 `localData` 的行为
@@ -70,7 +71,6 @@ status: draft
 ### 派生路径
 
 - [ ] `lw_db_path` = `{lifeprism_data_path}/dataset/lifewatch_ai.db`
-- [ ] `chat_db_path` = `{lifeprism_data_path}/dataset/chat_history.db`
 - [ ] `channel_path` = `{lifeprism_data_path}/channel`
 - [ ] `session_path` = `{lifeprism_data_path}/session`
 - [ ] 以上所有派生路径自动跟随 `lifeprism_data_path` 变化，无需手动更新
@@ -144,7 +144,6 @@ status: draft
 | Property | 基于路径 | 最终路径 |
 |----------|---------|---------|
 | `lw_db_path` | `lifeprism_data_path` | `{lifeprism_data_path}/dataset/lifewatch_ai.db` |
-| `chat_db_path` | `lifeprism_data_path` | `{lifeprism_data_path}/dataset/chat_history.db` |
 | `channel_path` | `lifeprism_data_path` | `{lifeprism_data_path}/channel` |
 | `session_path` | `lifeprism_data_path` | `{lifeprism_data_path}/session` |
 | `allowed_dir_path` | `lifeprism_data_path` | 见下方 allowed_dir_path 规则 |
@@ -153,7 +152,6 @@ status: draft
 <key_function>
 - lifeprism/config/settings_manager.py
   - settings_manager.SettingsManager.lw_db_path:665
-  - settings_manager.SettingsManager.chat_db_path:670
   - settings_manager.SettingsManager.channel_path:704
   - settings_manager.SettingsManager.session_path:709
   - settings_manager.SettingsManager.allowed_dir_path:694

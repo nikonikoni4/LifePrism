@@ -59,7 +59,7 @@ class ConfigInitState:
 
 ### ConfigInitState <-> ResolvedPaths
 
-**ResolvedPaths 状态字段**：`config_base_path`（源）、`lifeprism_data_path`（源）、`lw_db_path`（派生）、`chat_db_path`（派生）、`session_path`（派生）、`channel_path`（派生）
+**ResolvedPaths 状态字段**：`config_base_path`（源）、`lifeprism_data_path`（源）、`lw_db_path`（派生）、`session_path`（派生）、`channel_path`（派生）
 
 **耦合关系**：
 
@@ -70,7 +70,7 @@ class ConfigInitState:
 | `os.environ["LIFEPRISM_DATA_PATH"]` 同步 | Electron 等外部进程可读取数据路径 | SettingsManager._initialize:110 |
 | `_config` 加载完成 | `lifeprism_data_path` 字段可能含迁移后的值，下次启动生效 | SettingsManager._load_config |
 
-**说明**：ConfigInitState 是 ResolvedPaths 的上游依赖。ConfigInitState 完成初始化后，`settings.lifeprism_data_path` 和 `settings.config_base_path` 成为全系统路径解析的唯一数据源。ResolvedPaths flow 中的 `lw_db_path`、`chat_db_path`、`session_path` 等均通过 `settings` 的属性访问器从 `_lifeprism_data_path` 自动推算，不独立存储。
+**说明**：ConfigInitState 是 ResolvedPaths 的上游依赖。ConfigInitState 完成初始化后，`settings.lifeprism_data_path` 和 `settings.config_base_path` 成为全系统路径解析的唯一数据源。ResolvedPaths flow 中的 `lw_db_path`、`session_path` 等均通过 `settings` 的属性访问器从 `_lifeprism_data_path` 自动推算，不独立存储。
 
 <key_function>
 - lifeprism/config/settings_manager.py

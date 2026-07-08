@@ -1,8 +1,8 @@
 ---
-version: 2.3
+version: 2.4
 created_at: 2026-04-15
-updated_at: 2026-04-20
-last_updated: 重构前端路径配置章节，新增完整的前后端路径解析流程图和对比表
+updated_at: 2026-07-08
+last_updated: 移除已弃用的 chat_db_path 引用
 abstract: 路径配置体系权威参考，定义 config_base_path（固定）、lifeprism_data_path（可迁移）、数据库路径（自动推算）的解析规则和优先级，以及配置文件固定路径设计和数据迁移机制，包含前后端完整的路径配置流程图
 ---
 
@@ -15,6 +15,7 @@ abstract: 路径配置体系权威参考，定义 config_base_path（固定）�
 | 2.1 | 2026-04-18 | 数据迁移和资源初始化内容移至 resource-init.md |
 | 2.2 | 2026-04-20 | 新增前端打包路径配置章节 |
 | 2.3 | 2026-04-20 | 重构前端路径配置章节，新增完整的前后端路径解析流程图和对比表，明确前端必须读取 yaml 配置 |
+| 2.4 | 2026-07-08 | 移除已弃用的 chat_db_path 引用 |
 
 ---
 
@@ -27,12 +28,11 @@ abstract: 路径配置体系权威参考，定义 config_base_path（固定）�
 | `config_base_path` | `settings.config_base_path` | 固定推算 | 配置文件根目录，不随数据迁移 |
 | `lifeprism_data_path` | `settings.lifeprism_data_path` | yaml 配置 / 环境变量 / 默认推算 | 数据根目录，可迁移 |
 | `lw_db_path` | `settings.lw_db_path` | 自动推算 | `{data_path}/dataset/lifewatch_ai.db` |
-| `chat_db_path` | `settings.chat_db_path` | 自动推算 | `{data_path}/dataset/chat_history.db` |
 | `aw_db_path` | `settings.aw_db_path` | yaml 配置 | ActivityWatch 数据库，独立配置 |
 | 日志目录 | `_setup_logging()` 内部 | 自动推算 | 打包：`{data_path}/debug_logs/`，开发：项目根目录 |
 | `session_path` | `settings.session_path` | 自动推算 | `{data_path}/session/` |
 
-**关键规则**：`lw_db_path` / `chat_db_path` 不在 yaml 中配置，是从 `lifeprism_data_path` 计算得出的只读属性。
+**关键规则**：`lw_db_path` 不在 yaml 中配置，是从 `lifeprism_data_path` 计算得出的只读属性。
 
 ---
 
@@ -95,7 +95,7 @@ abstract: 路径配置体系权威参考，定义 config_base_path（固定）�
     └── config.json        # 端口配置（前后端共用）
 
 {lifeprism_data_path}/                 ← 数据路径（可迁移）
-├── dataset/          # 数据库文件 (lifewatch_ai.db, chat_history.db)
+├── dataset/          # 数据库文件 (lifewatch_ai.db)
 ├── plan/             # PlanDoc Markdown 文件
 ├── debug_logs/       # 日志文件（打包环境）
 ├── workflow/         # 工作流数据
@@ -360,7 +360,7 @@ function initFrontendLog() {
 ## 约束规则
 
 1. **禁止**在 `settings_manager` 以外的模块自行解析路径或读取路径相关环境变量
-2. **禁止**在 yaml 中单独配置 `lw_db_path` / `chat_db_path`，它们是计算属性
+2. **禁止**在 yaml 中单独配置 `lw_db_path`，它是计算属性
 3. 新增数据子目录时，会自动被迁移（黑名单机制，仅排除 `config/`）
 4. 路径相关的前端设置变更通过 `PATCH /settings` 提交，后端 `settings.update()` 会同步更新内部 `_lifeprism_data_path` 和环境变量
 5. **配置文件路径**使用 `settings.config_base_path`，**数据路径**使用 `settings.lifeprism_data_path`，两者在迁移后不同
