@@ -24,6 +24,7 @@ print("[STARTUP] 开始追踪服务器启动时间...")
 print(f"{'=' * 60}")
 
 # ==================== 核心库导入 ====================
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -218,19 +219,30 @@ async def lifespan(app: FastAPI):
         initialize_category_colors()
         _log_startup_time("[OK] Category colors init (initialize_category_colors)", _color_start)
 
-        # 集成内置监控进程
+        # 集成内置监控进程（仅当 monitor_type='lifeprism' 且 Windows 平台时启动）
+        app.state.monitor_process = None
         if settings._config.get("monitor_type") == "lifeprism":
-            logger.info("检测到 monitor_type 为 'lifeprism'，正在启动内置监控进程...")
-            try:
-                from lifeprism.monitor.windows_monitor.main import start_monitor_process
+            if sys.platform != "win32":
+                logger.warning(
+                    "monitor_type 为 'lifeprism'，但当前平台非 Windows (platform=%s)，"
+                    "跳过 Monitor 启动",
+                    sys.platform,
+                )
+            else:
+                logger.info("检测到 monitor_type 为 'lifeprism'，正在启动内置监控进程...")
+                try:
+                    from lifeprism.monitor.windows_monitor.main import start_monitor_process
 
-                app.state.monitor_process = start_monitor_process()
-                logger.info("内置监控进程启动成功")
-            except Exception as e:
-                logger.warning("启动内置监控进程失败: error=%s", e)
-                app.state.monitor_process = None
-        else:
-            app.state.monitor_process = None
+                    app.state.monitor_process = start_monitor_process()
+                    logger.info("内置监控进程启动成功")
+                except ImportError as e:
+                    logger.warning(
+                        "Monitor 依赖缺失，跳过启动 (error=%s)。"
+                        "请确认 pywin32 等 Windows 依赖已安装",
+                        e,
+                    )
+                except Exception as e:
+                    logger.warning("启动内置监控进程失败: error=%s", e)
 
         # 启动channel
         from lifeprism.llm.channel import wechat_channel

@@ -3,6 +3,45 @@
 > 项目核心域语言与概念定义。当 issue、提案、测试名、spec 引用这些概念时，使用此处定义的术语，避免漂移到同义词。
 > 由 `/grill-with-docs` 在术语实际被解决时懒创建。
 
+## 跨平台部署（Cross-Platform Deployment）
+
+LifePrism 支持三种运行形态，对应三个独立启动入口：
+
+### 运行形态（Runtime Variants）
+
+1. **Windows 桌面完整版**（`main.py`）
+   - FastAPI 服务 + Electron 前端 + Agent + Monitor
+   - 本地数据采集与完整功能
+   - 主要使用场景
+
+2. **Linux Web Demo**（`main_web_demo.py`）
+   - FastAPI 服务 + 静态前端 + Agent（无 Monitor）
+   - 通过 Nginx 反向代理对外暴露
+   - 用于演示与远程访问
+
+3. **Linux Agent Only**（`main_agent_only.py`）
+   - 仅 Agent Loop + Channel（无 FastAPI，无前端，无 Monitor）
+   - 通过微信渠道提供对话服务
+   - 服务器后台运行，本地关机也可用
+
+### 数据同步（Data Sync）— P2 计划，本期未实现
+
+> 以下为 P2 规划的设计方向，当前代码库中尚未实现。P1 部署不包含数据同步功能。
+
+**使用模式**：主备模式（不同时使用多端）
+
+**同步策略**：按需同步（启动时拉取 + 可选定时拉取）
+
+- **同步方向**：双向（Windows ↔ Linux）
+- **同步时机**：启动时 + 可选的定时拉取（如每 10 分钟）
+- **冲突解决**：最后写入胜出（Last-Write-Wins），因主备模式冲突概率极低
+- **ID 生成**：`{prefix}-{uuid.uuid4().hex[:8]}`，全局唯一，冲突概率 ~1/42亿
+- **同步范围**：
+  - Windows → Linux：Monitor 采集数据 + 桌面版手动输入
+  - Linux → Windows：微信对话输入的数据（心情/备注/自定义记录）
+
+**不存在的概念**：实时同步、冲突仲裁机制（主备模式不需要）
+
 ## 自定义记录模块（Custom Records Module）
 
 让用户通过自然语言告诉 AI 想记录什么，AI 生成数据结构定义并持续把后续自然语言解析成结构化记录写入的系统。P1 仅支持文本字段 + 文本列表展示，P2 图表（柱形/折线/饼）暂不做。
