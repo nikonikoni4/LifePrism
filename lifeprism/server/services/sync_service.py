@@ -10,9 +10,11 @@ from datetime import datetime, timedelta
 from lifeprism.config import settings
 from lifeprism.llm.function import screenshot_analysis, screenshot_behavior_summary
 from lifeprism.repository import QueryOptions, todo_repository
+from lifeprism.server.errors.error_codes import DEMO_MODE_NOT_SUPPORTED
 from lifeprism.server.schemas.timeline_schemas import BehaviorAnalysisItem
 from lifeprism.server.services.data_processing_service import DataProcessingService
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import ValidationError
 
 logger = get_logger(__name__)
 
@@ -90,6 +92,14 @@ class SyncService:
         Returns:
             Dict: 同步结果
         """
+        # 演示模式守卫：非 full 模式下禁用数据同步
+        if settings.run_mode != "full":
+            logger.warning("[incremental_sync] 当前运行模式为 %s，不支持数据同步", settings.run_mode)
+            raise ValidationError(
+                message="演示模式不支持数据同步",
+                code=DEMO_MODE_NOT_SUPPORTED,
+            )
+
         # 尝试获取锁，如果已被占用则立即返回
         if self._sync_lock.locked():
             logger.warning("[incremental_sync] 同步正在进行中，跳过本次请求")
@@ -167,6 +177,14 @@ class SyncService:
         Returns:
             Dict: 同步结果
         """
+        # 演示模式守卫：非 full 模式下禁用数据同步
+        if settings.run_mode != "full":
+            logger.warning("[sync_by_time_range] 当前运行模式为 %s，不支持数据同步", settings.run_mode)
+            raise ValidationError(
+                message="演示模式不支持数据同步",
+                code=DEMO_MODE_NOT_SUPPORTED,
+            )
+
         # 尝试获取锁，如果已被占用则立即返回
         if self._sync_lock.locked():
             logger.warning("[sync_by_time_range] 同步正在进行中，跳过本次请求")

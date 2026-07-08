@@ -68,6 +68,9 @@ cmd_start() {
 
     cd "$PROJECT_ROOT"
 
+    # 设置部署模式为 Agent Only
+    export LIFEPRISM_RUN_MODE=agent_only
+
     # 使用 nohup 后台启动
     nohup python -m lifeprism.server.main_agent_only \
         > "$LOG_FILE" 2>&1 &

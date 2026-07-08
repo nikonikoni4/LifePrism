@@ -314,10 +314,11 @@ const ActivitySummaryHeader: React.FC<ActivitySummaryHeaderProps> = ({ selectedD
             }
         } catch (error) {
             console.error('Sync failed:', error);
+            const errorMsg = error instanceof Error ? error.message : '数据同步失败，请查看控制台或lifeprismData/Debug_logs/lifeprism.log了解详情';
             if (window.electronAPI?.showAlert) {
-                window.electronAPI.showAlert({ message: '数据同步失败，请查看控制台或lifeprismData/Debug_logs/lifeprism.log了解详情，请查看控制台了解详情' });
+                window.electronAPI.showAlert({ message: errorMsg });
             } else {
-                alert('数据同步失败，请查看控制台或lifeprismData/Debug_logs/lifeprism.log了解详情，请查看控制台了解详情');
+                toast.error(errorMsg);
             }
         } finally {
             setIsSyncing(false);

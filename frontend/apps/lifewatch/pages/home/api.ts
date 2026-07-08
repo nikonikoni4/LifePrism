@@ -136,7 +136,7 @@ export const SyncAPI = {
         });
 
         if (!response.ok) {
-            throw new Error(`Sync failed: ${response.statusText}`);
+            throw new Error(await parseSyncErrorMessage(response));
         }
 
         const data = await response.json();
@@ -163,7 +163,7 @@ export const SyncAPI = {
         });
 
         if (!response.ok) {
-            throw new Error(`Sync failed: ${response.statusText}`);
+            throw new Error(await parseSyncErrorMessage(response));
         }
 
         const data = await response.json();
@@ -173,3 +173,21 @@ export const SyncAPI = {
         return data;
     },
 };
+
+/**
+ * 从错误响应中解析用户友好的错误消息
+ */
+async function parseSyncErrorMessage(response: Response): Promise<string> {
+    try {
+        const body = await response.json();
+        if (body.message) {
+            return body.message;
+        }
+        if (body.error_code === 'DEMO_MODE_NOT_SUPPORTED') {
+            return '演示模式不支持数据同步';
+        }
+        return `同步失败: ${response.statusText}`;
+    } catch {
+        return `同步失败: ${response.statusText}`;
+    }
+}

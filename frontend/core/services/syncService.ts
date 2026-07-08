@@ -51,7 +51,8 @@ export async function incrementalSync(autoClassify: boolean = true): Promise<Syn
         });
 
         if (!response.ok) {
-            throw new Error(`同步失败: ${response.statusText}`);
+            const errorMessage = await parseSyncErrorMessage(response);
+            throw new Error(errorMessage);
         }
 
         const data: SyncResponse = await response.json();
@@ -87,7 +88,8 @@ export async function syncActivityWatchDataByTimeRange(
         });
 
         if (!response.ok) {
-            throw new Error(`同步失败: ${response.statusText}`);
+            const errorMessage = await parseSyncErrorMessage(response);
+            throw new Error(errorMessage);
         }
 
         const data: SyncResponse = await response.json();
@@ -98,6 +100,25 @@ export async function syncActivityWatchDataByTimeRange(
     } catch (error) {
         console.error('时间范围数据同步错误:', error);
         throw error;
+    }
+}
+
+/**
+ * 从错误响应中解析用户友好的错误消息
+ * 支持后端返回的 { error_code, message, details } 格式
+ */
+async function parseSyncErrorMessage(response: Response): Promise<string> {
+    try {
+        const body = await response.json();
+        if (body.message) {
+            return body.message;
+        }
+        if (body.error_code === 'DEMO_MODE_NOT_SUPPORTED') {
+            return '演示模式不支持数据同步';
+        }
+        return `同步失败: ${response.statusText}`;
+    } catch {
+        return `同步失败: ${response.statusText}`;
     }
 }
 

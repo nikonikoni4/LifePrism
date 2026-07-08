@@ -18,6 +18,7 @@ from lifeprism.server.errors.error_codes import (
     CLASSIFICATION_ERROR,
     CONFIG_FILE_NOT_FOUND,
     CONFLICT,
+    DEMO_MODE_NOT_SUPPORTED,
     ENTITY_ALREADY_EXISTS,
     ENTITY_NOT_FOUND,
     EXTERNAL_SERVICE_ERROR,
@@ -76,6 +77,8 @@ ERROR_CODE_TO_STATUS: dict[str, int] = {
     # Config 模块
     CONFIG_FILE_NOT_FOUND: 500,
     INVALID_CONFIG: 500,
+    # 部署模式
+    DEMO_MODE_NOT_SUPPORTED: 422,
 }
 
 

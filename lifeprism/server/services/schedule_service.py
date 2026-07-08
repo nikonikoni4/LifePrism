@@ -195,9 +195,19 @@ class ScheduleService:
         """启动调度器
 
         应在应用启动时调用（如 FastAPI 的 lifespan 事件）
+
+        当 run_mode != "full" 时，跳过系统任务注册（防御性守卫）。
+        这些任务依赖 Monitor 采集的数据，在 web_demo / agent_only 模式下无意义。
         """
         if self._scheduler is not None:
             logger.warning("调度器已经启动，跳过重复启动")
+            return
+
+        if settings.run_mode != "full":
+            logger.info(
+                "run_mode=%s，跳过定时任务注册（仅 full 模式启用）",
+                settings.run_mode,
+            )
             return
 
         self._scheduler = AsyncIOScheduler()

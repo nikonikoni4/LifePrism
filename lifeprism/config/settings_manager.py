@@ -72,6 +72,7 @@ class SettingsManager:
         "llm_call_logger_enabled": True,  # LLM 调用记录器开关
         "auto_summary_session": True,  # 自动总结会话
         "auto_update_memory": True,  # 自动更新记忆
+        "run_mode": "full",  # 部署模式：full / web_demo / agent_only
     }
 
     def __new__(cls) -> "SettingsManager":
@@ -654,6 +655,14 @@ class SettingsManager:
     @property
     def monitor_type(self) -> str:
         return self.get("monitor_type")
+
+    @property
+    def run_mode(self) -> str:
+        """部署模式：full / web_demo / agent_only
+
+        优先级：环境变量 LIFEPRISM_RUN_MODE > config 中的值 > 默认值 "full"
+        """
+        return os.environ.get("LIFEPRISM_RUN_MODE", None) or self.get("run_mode")
 
     @property
     def aw_db_path(self) -> Path:

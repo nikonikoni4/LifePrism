@@ -53,7 +53,15 @@ class DatabaseManager:
         self._pool_lock = threading.Lock()
 
         if self.use_pool:
-            self._init_connection_pool()
+            if self.readonly:
+                # readonly 模式懒加载：不在 __init__ 中创建连接池，
+                # 避免外部数据库（如 ActivityWatch）文件不存在时导致应用启动崩溃。
+                # 连接池将在首次 get_connection() 时延迟初始化。
+                logger.debug(
+                    "readonly 模式，连接池将延迟到首次使用时初始化: %s", self.DB_PATH
+                )
+            else:
+                self._init_connection_pool()
             # 注册程序退出时关闭连接池
             atexit.register(self._close_connection_pool)
 
@@ -86,6 +94,12 @@ class DatabaseManager:
         Returns:
             sqlite3.Connection: 数据库连接对象
         """
+        # readonly 懒加载：首次使用时初始化连接池（线程安全，双重检查锁定）
+        if self._connection_pool is None:
+            with self._pool_lock:
+                if self._connection_pool is None:
+                    self._init_connection_pool()
+
         try:
             # 尝试从池中获取连接（超时1秒）
             conn = self._connection_pool.get(timeout=1.0)
