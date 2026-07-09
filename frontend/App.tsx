@@ -10,12 +10,15 @@ import { toast } from './core/components';
 import DataPathWarningDialog from './core/components/DataPathWarningDialog';
 import UpdateNotification from './core/components/UpdateNotification';
 import { UserInfoProvider } from './core/context/UserInfoContext';
+import { DemoDialog } from './src/components/DemoDialog';
+import { isDemoMode } from './src/config/env';
 
 function MainApp() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isApiReady, setIsApiReady] = useState(false);
   const [pathWarnings, setPathWarnings] = useState<string[]>([]);
+  const [showDemoDialog, setShowDemoDialog] = useState(false);
 
   // 初始化 API 配置（探测后端端口）
   useEffect(() => {
@@ -59,6 +62,13 @@ function MainApp() {
         }
       });
   }, [isApiReady]);
+
+  // Demo 模式：首次访问显示引导弹窗
+  useEffect(() => {
+    if (isDemoMode && !sessionStorage.getItem('demo-dialog-shown')) {
+      setShowDemoDialog(true);
+    }
+  }, []);
 
   // 页面加载时自动同步数据（等待 API 配置初始化完成）
   useEffect(() => {
@@ -120,6 +130,11 @@ function MainApp() {
           warnings={pathWarnings}
           onClose={() => setPathWarnings([])}
         />
+      )}
+
+      {/* Demo 模式引导弹窗 */}
+      {showDemoDialog && (
+        <DemoDialog onClose={() => setShowDemoDialog(false)} />
       )}
 
       <UpdateNotification />

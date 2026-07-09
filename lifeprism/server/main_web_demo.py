@@ -19,6 +19,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 
 # ==================== 配置初始化（必须在所有 lifeprism 模块之前） ====================
 from lifeprism.config.settings_manager import settings  # noqa: F401
@@ -56,6 +57,8 @@ from lifeprism.server.bootstrap import (
 from lifeprism.server.errors import to_http_exception
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import LWBaseError
+
+settings.set_runtime_config("run_mode", "web_demo")
 
 logger = get_logger(__name__)
 
@@ -105,6 +108,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ==================== Demo 只读中间件 ====================
+# Web Demo 天然是只读模式，拦截所有写操作（POST/PUT/PATCH/DELETE）
+
+
+@app.middleware("http")
+async def demo_readonly_middleware(request: Request, call_next) -> Response:
+    """Web Demo 只读拦截：阻止所有写操作"""
+    if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
+        # 排除允许的只读操作（如健康检查、系统警告查询）
+        allowed_paths = ["/health", "/api/v2/system/warnings"]
+        if request.url.path not in allowed_paths:
+            logger.info(
+                "Demo 只读拦截: method=%s, path=%s, client=%s",
+                request.method,
+                request.url.path,
+                request.client.host if request.client else "unknown",
+            )
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "error_code": "DEMO_MODE_READ_ONLY",
+                    "message": "Demo 演示网站无法写入数据，请到本地部署或下载安装包",
+                    "details": {
+                        "github_url": "https://github.com/nikonikoni4/LifePrism",
+                        "vote_url": "https://forum.trae.cn/t/topic/70390",
+                        "hint": "您可以在 GitHub 下载安装包本地安装,或参与创造力大赛投票",
+                    },
+                },
+            )
+    return await call_next(request)
 
 
 # ==================== 全局异常处理器 ====================

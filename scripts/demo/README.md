@@ -2,12 +2,13 @@
 
 ## 概述
 
-`scripts/demo/` 提供两套脚本，用于为 LifePrism Web-Demo 模式生成和管理模拟用户数据，解决 Linux 服务器上无 Monitor 采集数据导致前端空白的问题。
+`scripts/demo/` 提供三套脚本，用于为 LifePrism Web-Demo 模式生成、管理和重置模拟用户数据，解决 Linux 服务器上无 Monitor 采集数据导致前端空白的问题。
 
 | 脚本 | 用途 | 运行频率 |
 |---|---|---|
 | `generate_demo_data.py` | 一次性生成过去 7 天完整演示数据 | 仅一次 |
 | `refresh_daily_data.py` | 刷新"今天"的数据，使演示环境持续有新数据 | 每天 12:00 |
+| `reset_demo_data.sh` | 停止服务 → 删除旧数据 → 重新生成 → 重启服务 | 每天 04:00（推荐） |
 | `setup_demo_crontab.sh` | 安装 crontab 定时任务 | 仅一次 |
 
 ---
@@ -132,6 +133,112 @@ python scripts/demo/refresh_daily_data.py
 ```
 [INFO] 今天的数据已存在，跳过刷新（使用 --force 强制刷新）
 ```
+
+---
+
+## 四、每日数据重置（推荐）
+
+### 为什么需要重置？
+
+Demo 环境的两个主要问题：
+1. **恶意数据污染**：用户可能写入不当内容，影响后续访客体验
+2. **多人并发冲突**：无隔离机制，多人同时操作可能导致数据混乱
+
+**解决方案**：每天凌晨自动重置数据，保持演示环境干净。
+
+### 手动重置
+
+```bash
+bash scripts/demo/reset_demo_data.sh
+```
+
+### 脚本流程
+
+1. ✅ 停止 LifePrism 后端服务
+2. ✅ 删除 `localData` 目录（清除所有旧数据）
+3. ✅ 重新生成演示数据（过去 7 天）
+4. ✅ 重启 LifePrism 后端服务
+
+### 配置自动重置（Crontab）
+
+每天凌晨 4 点自动重置：
+
+```bash
+# 编辑 crontab
+crontab -e
+
+# 添加以下行（替换 /path/to/LifeWatch-AI 为实际路径）
+0 4 * * * cd /path/to/LifeWatch-AI && bash scripts/demo/reset_demo_data.sh >> /var/log/lifeprism-demo-reset.log 2>&1
+```
+
+### 验证
+
+```bash
+# 查看重置日志
+tail -f /var/log/lifeprism-demo-reset.log
+
+# 查看后端服务状态
+ps aux | grep lifeprism.server.main
+```
+
+### 注意事项
+
+- ⚠️ **数据不可恢复**：重置后所有数据将被删除，无法恢复
+- ⚠️ **服务中断**：重置期间服务不可用（约 30 秒）
+- ✅ **生产环境勿用**：仅适用于 Demo 演示环境
+
+---
+
+## 五、Demo 只读模式配置
+
+### 后端配置
+
+在启动 Demo 服务时，设置环境变量启用只读模式：
+
+```bash
+export LIFEPRISM_DEMO_MODE=true
+uvicorn lifeprism.server.main:app --host 0.0.0.0 --port 8088
+```
+
+或在 `config.yaml` 中配置：
+
+```yaml
+demo_mode: true
+```
+
+**效果**：所有 `POST/PUT/PATCH/DELETE` 请求将被拦截，返回 403 错误：
+
+```json
+{
+  "error_code": "DEMO_MODE_READ_ONLY",
+  "message": "Demo 演示网站无法写入数据，请到本地部署或下载安装包",
+  "details": {
+    "github_url": "https://github.com/nikonikoni4/LifePrism",
+    "vote_url": "https://forum.trae.cn/t/topic/70390"
+  }
+}
+```
+
+### 前端配置
+
+在构建时设置环境变量：
+
+```bash
+# .env.demo 文件
+VITE_DEMO_MODE=true
+VITE_API_BASE_URL=https://your-demo-server.com
+```
+
+构建：
+
+```bash
+npm run build -- --mode demo
+```
+
+**效果**：
+- ✅ 首次访问自动弹出引导弹窗
+- ✅ 展示项目信息、投票链接、只读限制说明
+- ✅ 支持"不再提示本次会话"选项
 
 ---
 
