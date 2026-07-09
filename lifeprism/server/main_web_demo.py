@@ -79,6 +79,11 @@ async def lifespan(app: FastAPI):
     # 数据库初始化
     init_database_full()
 
+    # 生成 Web-Demo 演示数据（每次启动全量重建）
+    from scripts.demo import generate_demo_data
+
+    generate_demo_data()
+
     # 启动 Agent Loop + WeChat Channel
     loop_task, wechat_channel = await start_agent_and_channel()
 
