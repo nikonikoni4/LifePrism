@@ -838,7 +838,10 @@ def get_changed_files(directory: Path, last_sync_time: datetime) -> list[dict]:
 
 **解决方案**：明确区分云端提供的 API 和本地提供的 API。
 
-**云端 API**（`main_agent_only.py` 提供，端口 8101）：
+**云端 API**（`main_agent_only.py` 提供，端口 8102）：
+
+> 使用独立端口 8102（而非 web-demo 的 8101），便于在同一台服务器上同时启动
+> web-demo 和 agent-only 进行测试。
 
 云端启动轻量 FastAPI 服务，仅同步 API：
 
@@ -853,7 +856,7 @@ async def _run_agent_and_api():
     app.include_router(sync_cloud_router)  # 仅云端同步 API
     
     # 2. 启动 FastAPI（后台任务）
-    config = uvicorn.Config(app, host="0.0.0.0", port=8101, log_level="info")
+    config = uvicorn.Config(app, host="0.0.0.0", port=8102, log_level="info")
     server = uvicorn.Server(config)
     api_task = asyncio.create_task(server.serve())
     
@@ -1026,7 +1029,7 @@ httpx.post(f"{remote_url}/api/sync/push", ...)
 - ✅ Key 读取 fallback 逻辑正常工作
 - ✅ 代码修改集中在读取层，无耦合
 - ✅ 心跳机制线程安全
-- ✅ 云端 agent-only 启动 FastAPI 服务（端口 8101）
+- ✅ 云端 agent-only 启动 FastAPI 服务（端口 8102）
 - ✅ 本地 main.py 移除 sync_cloud_router 注册
 - ✅ 同步测试全部通过
 

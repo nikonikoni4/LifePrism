@@ -1,3 +1,10 @@
+## 2026-07-09-monitor-type-none-aw-db-crash
+
+- updated_at: 2026-07-09
+- path: `docs/history-bugs/2026-07-09-monitor-type-none-aw-db-crash.md`
+- 触发规则：在云端部署（agent_only / web_demo）遇到数据清洗任务报错、AW 数据库文件不存在的 FileNotFoundError、`monitor_type: none` 却走了 ActivityWatch 分支时阅读
+- 内容摘要：记录了云端 `monitor_type: none` 导致 `data_clean.py` 数据源选择逻辑落入 `else` 分支，触发 `ProcessorAWDataProvider` → `AWBaseDataProvider._validate_database()` → `FileNotFoundError`。虽然 issue #11 已将 `aw_db_manager` 改为懒加载避免 import 崩溃，但首次数据清洗触发 `get_connection()` 时仍会因 AW 数据库文件不存在而失败。修复方案是在 `data_clean.py` 增加 `elif monitor_type == "none"` 分支直接返回空数据。
+
 ## 2026-06-30-read-file-max-chars-causes-excessive-tool-calls
 
 - updated_at: 2026-06-30

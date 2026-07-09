@@ -5,10 +5,11 @@ LifePrism Linux Agent Only 启动入口 + 云端 CLI 管理
 
 适用场景：仅需 AI 助手对话能力 + 云端数据同步，不需要完整 Web 界面。
 Agent 通过微信渠道接收/回复消息，直接读写数据库。
-FastAPI 仅提供同步 API（端口 8101），供本地客户端拉取/推送数据。
+FastAPI 仅提供同步 API（端口 8102），供本地客户端拉取/推送数据。
 
-与 Web Demo 模式的区别：
-- 仅启动轻量 FastAPI（仅同步 API，端口 8101，不含业务 API）
+与 Web Demo 模式（端口 8101）的区别：
+- 使用独立端口 8102（便于同时启动 web-demo 和 agent-only 进行测试）
+- 仅启动轻量 FastAPI（仅同步 API，不含业务 API）
 - 不启动 Monitor 模块
 - 不启动 ScheduleService
 - 资源占用更低

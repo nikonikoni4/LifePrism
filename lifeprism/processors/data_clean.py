@@ -484,12 +484,15 @@ def clean_activitywatch_data(
     # 1. 获取原始数据
     # 根据监控类型选择 Provider
     if settings.monitor_type == "lifeprism":
-        logger.debug("使用内置监控数据源 (lifeprism)")
+        logger.info("使用内置监控数据源 (lifeprism)")
         raw_events = processor_monitor_data_provider.get_window_events(
             start_time=start_time, end_time=end_time
         )
+    elif settings.monitor_type == "none":
+        logger.info("监控已禁用 (monitor_type=none)，跳过数据获取")
+        raw_events = []
     else:
-        logger.debug("使用 ActivityWatch 数据源")
+        logger.info("使用 ActivityWatch 数据源")
         raw_events = processor_aw_data_provider.get_window_events(
             start_time=start_time, end_time=end_time
         )

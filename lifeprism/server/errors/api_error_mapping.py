@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from lifeprism.config.exceptions import ConfigError
 from lifeprism.server.errors.error_codes import (
+    AW_DATABASE_NOT_FOUND,
     BACKFILL_DATE_OUT_OF_WINDOW,
     CACHE_UPDATE_ERROR,
     CANNOT_CANCEL_PAST_CHECKIN,
@@ -84,6 +85,8 @@ ERROR_CODE_TO_STATUS: dict[str, int] = {
     # 同步模块
     INVALID_SYNC_API_KEY: 422,
     INVALID_HEARTBEAT_EVENT: 422,
+    # 数据源模块
+    AW_DATABASE_NOT_FOUND: 422,
 }
 
 
