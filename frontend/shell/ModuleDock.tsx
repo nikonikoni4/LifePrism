@@ -36,13 +36,6 @@ const MODULES: ModuleConfig[] = [
         color: '#10B981', // emerald
     },
     {
-        id: 'settings',
-        name: 'Settings',
-        icon: 'settings',
-        description: '系统设置',
-        color: '#64748B', // slate
-    },
-    {
         id: 'mindspace',
         name: 'MindSpace',
         icon: 'brain',
@@ -50,18 +43,25 @@ const MODULES: ModuleConfig[] = [
         color: '#EC4899', // pink
     },
     {
+        id: 'custom-records',
+        name: 'Custom Records',
+        icon: 'file-pen-line',
+        description: '自定义记录',
+        color: '#06B6D4', // cyan
+    },
+    {
+        id: 'settings',
+        name: 'Settings',
+        icon: 'settings',
+        description: '系统设置',
+        color: '#64748B', // slate
+    },
+    {
         id: 'addons',
         name: 'Add-ons',
         icon: 'puzzle',
         description: '扩展插件',
         color: '#10B981', // emerald
-    },
-    {
-        id: 'custom-records',
-        name: 'Custom Records',
-        icon: 'database',
-        description: '自定义记录',
-        color: '#06B6D4', // cyan
     },
 ];
 
