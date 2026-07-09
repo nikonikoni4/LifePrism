@@ -213,7 +213,7 @@ const MindSpaceHome: React.FC<MindSpaceHomeProps> = ({ onNavigate }) => {
         onNavigate('commitment');
         break;
       case 'VALUE':
-        onNavigate('value');
+        console.log("Value content - coming soon");
         break;
       // "Being" content is not connected yet as per instructions
       case 'BARRIER':

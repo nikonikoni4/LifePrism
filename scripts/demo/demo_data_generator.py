@@ -26,6 +26,7 @@ from scripts.demo.demo_data_config import (
     DAILY_FOCUS_TEMPLATES,
     DEMO_APPS,
     DEMO_COMMITMENTS,
+    DEMO_CUSTOM_RECORDS,
     DEMO_HABITS,
     DEMO_VALUES,
     DIARY_TEMPLATES,
@@ -223,6 +224,13 @@ class DemoDataGenerator:
         for table in no_marker_tables:
             conn.execute(f"DELETE FROM {table}")
 
+        # 自定义记录：清理 demo 数据表
+        for record_def in DEMO_CUSTOM_RECORDS:
+            slug = record_def["slug"]
+            conn.execute(f"DROP TABLE IF EXISTS custom_{slug}")
+        conn.execute("DELETE FROM custom_record_fields WHERE id LIKE 'crf-demo-%'")
+        conn.execute("DELETE FROM custom_record_types WHERE id LIKE 'crt-demo-%'")
+
         conn.commit()
         conn.close()
         LOGGER.info("已清理旧演示数据")
@@ -252,6 +260,7 @@ class DemoDataGenerator:
         self._gen_timeline_custom_blocks(conn)
         self._gen_goal_stats(conn)
         self._gen_tokens_usage(conn)
+        self._gen_custom_records(conn)
 
         conn.commit()
         conn.close()
@@ -777,6 +786,73 @@ class DemoDataGenerator:
             )
             total += 1
         LOGGER.info("  [ok] tokens_usage_log: %d 条", total)
+
+    def _gen_custom_records(self, conn: sqlite3.Connection) -> None:
+        """生成自定义记录数据（读书、锻炼等）"""
+        total_types = 0
+        total_entries = 0
+        now = _now_str()
+
+        for record_def in DEMO_CUSTOM_RECORDS:
+            type_id = record_def["type_id"]
+            slug = record_def["slug"]
+            data_table = f"custom_{slug}"
+
+            # 1. 写入类型元数据
+            conn.execute(
+                """INSERT INTO custom_record_types
+                   (id, name, slug, description, card_template, icon, accent_color, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (type_id, record_def["name"], slug, record_def["description"],
+                 "clean", record_def["icon"], record_def["accent_color"], now, now),
+            )
+            total_types += 1
+
+            # 2. 写入字段定义
+            for f in record_def["fields"]:
+                conn.execute(
+                    """INSERT INTO custom_record_fields
+                       (id, type_id, field_name, field_key, field_type, sort_order, display_role, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (f["id"], type_id, f["field_name"], f["field_key"],
+                     f["field_type"], f["sort_order"], f["display_role"], now),
+                )
+
+            # 3. 创建数据表
+            column_defs = ["id TEXT PRIMARY KEY"]
+            for f in record_def["fields"]:
+                column_defs.append(f"{f['field_key']} TEXT")
+            column_defs.append("created_at TEXT")
+            column_defs.append("updated_at TEXT")
+            ddl = f"CREATE TABLE IF NOT EXISTS {data_table} ({', '.join(column_defs)})"
+            conn.execute(ddl)
+
+            # 4. 插入过去 N 天的记录（每天随机 0~2 条）
+            entry_templates = record_def["entries"]
+            for day in self._date_range():
+                num_entries = random.randint(1, 2)
+                for _ in range(num_entries):
+                    tmpl = random.choice(entry_templates)
+                    entry_id = f"cre-demo-{uuid.uuid4().hex[:8]}"
+                    entry_time = _format_time(
+                        day.replace(hour=random.randint(8, 22), minute=random.randint(0, 59))
+                    )
+
+                    field_keys = [f["field_key"] for f in record_def["fields"]]
+                    values = [tmpl[k] for k in field_keys]
+
+                    columns = ["id"] + field_keys + ["created_at", "updated_at"]
+                    placeholders = ["?"] * len(columns)
+                    params = [entry_id] + values + [entry_time, now]
+
+                    conn.execute(
+                        f"INSERT INTO {data_table} ({', '.join(columns)}) "
+                        f"VALUES ({', '.join(placeholders)})",
+                        params,
+                    )
+                    total_entries += 1
+
+        LOGGER.info("  [ok] custom_records: %d 类型, %d 条记录", total_types, total_entries)
 
     # ==================== 文件数据生成 ====================
 

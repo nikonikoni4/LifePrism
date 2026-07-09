@@ -266,3 +266,72 @@ WORK_BLOCKS = [
     (13, 18, 0.65),  # 下午：65% 工作类
     (19, 23, 0.3),   # 晚上：30% 工作类
 ]
+
+# ==================== 自定义记录模板 ====================
+
+DEMO_CUSTOM_RECORDS = [
+    {
+        "type_id": "crt-demo-reading",
+        "name": "读书记录",
+        "slug": "reading",
+        "description": "记录每日阅读情况，包括书名、时长和笔记",
+        "icon": "bookOpen",
+        "accent_color": "blue",
+        "fields": [
+            {"id": "crf-demo-r1", "field_name": "书名", "field_key": "book_name",
+             "field_type": "text", "sort_order": 0, "display_role": "title"},
+            {"id": "crf-demo-r2", "field_name": "阅读时长", "field_key": "reading_time",
+             "field_type": "text", "sort_order": 1, "display_role": "chip"},
+            {"id": "crf-demo-r3", "field_name": "读书笔记", "field_key": "note",
+             "field_type": "text", "sort_order": 2, "display_role": "main"},
+        ],
+        "entries": [
+            {"book_name": "《深入浅出设计模式》", "reading_time": "45分钟",
+             "note": "学习了策略模式和观察者模式，对解耦有了更深的理解。策略模式适合算法族的切换场景，观察者模式适合一对多的事件通知。"},
+            {"book_name": "《代码整洁之道》", "reading_time": "30分钟",
+             "note": "重新审视了函数命名的重要性，好的命名可以让代码自解释。决定从明天开始重构一些旧代码的命名。"},
+            {"book_name": "《原子习惯》", "reading_time": "25分钟",
+             "note": "习惯的形成需要四个步骤：提示、渴求、回应、奖励。小习惯比大目标更容易坚持。"},
+            {"book_name": "《程序员修炼之道》", "reading_time": "40分钟",
+             "note": "破窗理论很有启发——不要容忍任何一处糟糕的代码或设计，它们会像破窗一样引发更多的问题。"},
+            {"book_name": "《思考，快与慢》", "reading_time": "35分钟",
+             "note": "系统1和系统2的区分很精妙。很多直觉判断实际上来自系统1的快速模式匹配，需要警惕认知偏差。"},
+            {"book_name": "《重构：改善既有代码的设计》", "reading_time": "50分钟",
+             "note": "学习了提炼函数、内联变量等重构手法。小步快跑、频繁测试是安全重构的关键。"},
+            {"book_name": "《软技能：代码之外的生存指南》", "reading_time": "30分钟",
+             "note": "除了技术能力，职业规划、个人品牌、健康管理同样重要。打算开始写技术博客。"},
+        ],
+    },
+    {
+        "type_id": "crt-demo-exercise",
+        "name": "锻炼记录",
+        "slug": "exercise",
+        "description": "记录每日运动锻炼情况，包括类型、时长和感受",
+        "icon": "heart",
+        "accent_color": "green",
+        "fields": [
+            {"id": "crf-demo-e1", "field_name": "锻炼类型", "field_key": "exercise_type",
+             "field_type": "text", "sort_order": 0, "display_role": "title"},
+            {"id": "crf-demo-e2", "field_name": "时长", "field_key": "duration",
+             "field_type": "text", "sort_order": 1, "display_role": "chip"},
+            {"id": "crf-demo-e3", "field_name": "感受", "field_key": "feeling",
+             "field_type": "text", "sort_order": 2, "display_role": "main"},
+        ],
+        "entries": [
+            {"exercise_type": "跑步", "duration": "30分钟",
+             "feeling": "傍晚沿着河边跑了3公里，配速6分左右。天气凉爽，跑完浑身舒畅，感觉一天的疲劳都消散了。"},
+            {"exercise_type": "力量训练", "duration": "40分钟",
+             "feeling": "做了俯卧撑、深蹲和哑铃推举。上肢力量有明显进步，俯卧撑能连做25个了。"},
+            {"exercise_type": "瑜伽", "duration": "25分钟",
+             "feeling": "跟视频做了一套肩颈放松的瑜伽。拉伸后肩膀和背部舒服多了，适合久坐后的恢复。"},
+            {"exercise_type": "游泳", "duration": "45分钟",
+             "feeling": "蛙泳800米，自由泳400米。水中的感觉很好，全身肌肉都得到了锻炼，游完特别饿。"},
+            {"exercise_type": "骑行", "duration": "60分钟",
+             "feeling": "周末骑行去了郊外，往返约15公里。沿途风景不错，呼吸新鲜空气心情也变好了。"},
+            {"exercise_type": "HIIT", "duration": "20分钟",
+             "feeling": "高强度间歇训练，做完大汗淋漓。虽然时间短但消耗很大，心率一度飙到170，心肺功能在提升。"},
+            {"exercise_type": "散步", "duration": "40分钟",
+             "feeling": "晚饭后在公园散步，步伐不快。边走路边听了会播客，放松身心的好方式。"},
+        ],
+    },
+]

@@ -104,8 +104,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onChatToggle, isCollapsed = false, on
         </div>
       </nav>
 
-      {/* User Profile */}
-      <div className={`mt-auto ${isCollapsed ? 'px-2' : 'px-4 lg:px-6'}`}>
+      {/* User Profile - 暂时禁用 */}
+      {/* <div className={`mt-auto ${isCollapsed ? 'px-2' : 'px-4 lg:px-6'}`}>
         <div className={`flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 p-3'} rounded-2xl border border-transparent hover:border-gray-100 hover:bg-gray-50 cursor-pointer transition-all duration-200`}>
           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border-2 border-white shadow-md shrink-0">
             <img src="https://picsum.photos/seed/alex/100/100" alt="User" className="w-full h-full object-cover" />
@@ -115,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onChatToggle, isCollapsed = false, on
             <p className="text-xs text-slate-400 font-medium">Pro Account</p>
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };
