@@ -12,15 +12,9 @@
  * - 所有写操作会被后端拦截
  *
  * 设置方式：
- * 1. 开发环境：在 .env 文件中设置 VITE_DEMO_MODE=true
- * 2. 打包环境：构建时通过 --mode demo 参数
+ * 打包时通过 --mode demo 参数：npm run build -- --mode demo
  */
 export const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
-
-/**
- * API 基础路径
- */
-export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8088';
 
 /**
  * 应用版本
