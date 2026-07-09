@@ -12,6 +12,7 @@ from . import (
     m004_diary_source_hash,
     m005_behavior_log_id_to_autoincrement,
     m006_add_updated_at,
+    m007_add_updated_at_supplement,
 )
 
 MIGRATIONS = [
@@ -21,4 +22,5 @@ MIGRATIONS = [
     m004_diary_source_hash,
     m005_behavior_log_id_to_autoincrement,
     m006_add_updated_at,
+    m007_add_updated_at_supplement,
 ]
