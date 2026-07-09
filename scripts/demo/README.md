@@ -1,31 +1,60 @@
 # Web-Demo 演示数据说明
 
-## 当前机制（2026-07-10 重构后）
+## 运行流程
 
-**演示数据在 web-demo 每次启动时自动全量重建**，无需外部脚本或 crontab。
+### 1. 启动后端（带断线自动重启）
 
-启动 web-demo 时，`lifespan` 生命周期自动执行：
+使用 `scripts/start.sh` 启动 web-demo 后端，Linux 上推荐用 `systemd` 或 `nohup` + 循环实现进程守护：
+
+```bash
+bash scripts/start.sh
+```
+
+启动后服务监听 `0.0.0.0:8101`，进程崩溃或断开后自动重启。
+
+### 2. 定时刷新数据（每天 04:00）
+
+后端启动时自动生成一次演示数据（lifespan）。但长期运行中数据会"过时"——日期范围不会自动推进。因此配置 cron 每天凌晨 4 点重新生成一次，保持数据以当天为终点：
+
+```bash
+# 编辑 crontab
+crontab -e
+
+# 添加以下行
+0 4 * * * cd /path/to/LifeWatch-AI && /path/to/venv/bin/python scripts/demo/generate_demo_data.py >> /path/to/LifeWatch-AI/localData/debug_logs/demo_cron.log 2>&1
+```
+
+> **注意**：脚本直接操作 SQLite 数据库和文件，不需要停止或重启后端服务。
+
+---
+
+## 数据生成机制
+
+### 启动时自动生成
+
+web-demo 启动时，`lifespan` 生命周期自动执行：
 
 ```
 init_database_full()          # 建表 + 默认数据
     ↓
-generate_demo_data()          # 删除旧数据 → 生成过去 7 天新数据
+generate_demo_data()          # 删除旧 demo 数据 → 生成过去 7 天新数据
     ↓
 start_agent_and_channel()     # 启动 Agent + Channel
 ```
 
-核心代码位于 `lifeprism/server/demo/` 包：
-- `demo_data_config.py` — 模板常量
-- `demo_data_generator.py` — 生成器（含 3 个 bug 修复：时间格式、行为日志重叠、行为分析重叠）
-
-## 手动触发（可选）
+### 手动触发
 
 ```bash
 cd /path/to/LifeWatch-AI
 python scripts/demo/generate_demo_data.py [--data-path PATH] [--days 7]
 ```
 
-本脚本保留作为独立测试/调试入口，实际逻辑委托到 `lifeprism.server.demo.DemoDataGenerator`。
+核心代码位于 `scripts/demo/` 包：
+- `demo_data_config.py` — 模板常量
+- `demo_data_generator.py` — 生成器（含 3 个 bug 修复）
+- `generate_demo_data.py` — CLI 入口
+
+---
 
 ## 生成内容
 
@@ -44,6 +73,8 @@ python scripts/demo/generate_demo_data.py [--data-path PATH] [--days 7]
 | 其他 | `time_paradoxes`, `tokens_usage_log`, 缓存表 | ~30 条 |
 | 文件 | `behavior.md`, `recent_state.md` | 2 个 |
 
+---
+
 ## 已修复的 Bug（2026-07-10）
 
 | Bug | 修复 |
@@ -52,10 +83,12 @@ python scripts/demo/generate_demo_data.py [--data-path PATH] [--days 7]
 | `user_app_behavior_log` 时间范围严重重叠 | 时间槽分区算法，确保不重叠 |
 | `behavior_analysis` 时间范围可能重叠 | 同上 |
 
+---
+
 ## 废弃的脚本
 
 | 脚本 | 状态 |
 |------|------|
-| `refresh_daily_data.py` | ⚠️ 废弃 — 不再需要增量刷新 |
-| `reset_demo_data.sh` | ⚠️ 废弃 — 重启服务即自动重置 |
-| `setup_demo_crontab.sh` | ⚠️ 废弃 — 不再需要 crontab |
+| `refresh_daily_data.py` | ⚠️ 废弃 — 由 cron + `generate_demo_data.py` 替代 |
+| `reset_demo_data.sh` | ⚠️ 废弃 — 不再需要停服重置 |
+| `setup_demo_crontab.sh` | ⚠️ 废弃 — 手动配置 cron（见上方说明） |
