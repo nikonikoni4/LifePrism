@@ -283,6 +283,10 @@ class DemoDataGenerator:
             print("[WARN] 检测到已有演示数据，跳过生成（使用 --force 强制覆盖）")
             return
 
+        if self.force:
+            print("\n[0/3] 清理已有演示数据...")
+            self._cleanup_demo_data()
+
         print("\n[1/3] 生成数据库演示数据...")
         self._generate_db_data()
 
@@ -305,6 +309,71 @@ class DemoDataGenerator:
             return count > 0
         except Exception:
             return False
+
+    def _cleanup_demo_data(self):
+        """清理已有演示数据（force 模式下先删除再生成）"""
+        conn = sqlite3.connect(str(self.db_path))
+
+        date_start = self.start_date.strftime("%Y-%m-%d")
+        date_end = self.today.strftime("%Y-%m-%d")
+
+        # 日期范围表：删除时间范围内的数据
+        date_range_tables = [
+            ("user_app_behavior_log", "start_time"),
+            ("behavior_analysis", "start_time"),
+            ("raw_behavior_analysis", "start_time"),
+            ("diary", "date"),
+            ("daily_focus", "date"),
+            ("goal_stats", "date"),
+            ("goal_journal", "date"),
+            ("timeline_custom_block", "start_time"),
+            ("habit_checkins", "date"),
+            ("mood_entries", "created_at"),
+        ]
+        for table, col in date_range_tables:
+            conn.execute(
+                f"DELETE FROM {table} WHERE {col} >= ? AND {col} <= ? || ' 23:59:59'",
+                (date_start, date_end)
+            )
+
+        # todo_list：删除 demo ID 前缀的
+        conn.execute("DELETE FROM todo_list WHERE id LIKE 't-demo-%'")
+
+        # ID 前缀表
+        prefix_tables = {
+            "habits": "hab-demo-%",
+            "habit_challenges": "chall-demo-%",
+            "user_values": "val-demo-%",
+            "commitments": "cmt-demo-%",
+        }
+        for table, prefix in prefix_tables.items():
+            conn.execute(f"DELETE FROM {table} WHERE id LIKE '{prefix}'")
+
+        # tokens_usage_log 主键是 session_id，非 id
+        conn.execute("DELETE FROM tokens_usage_log WHERE session_id LIKE 'session-demo-%'")
+
+        # 整表清理（无 demo 标记，全删）
+        conn.execute("DELETE FROM habit_chains")
+        conn.execute("DELETE FROM habit_chain_nodes")
+        conn.execute("DELETE FROM time_paradoxes")
+        conn.execute("DELETE FROM weekly_focus")
+        conn.execute("DELETE FROM category_map_cache")
+        conn.execute("DELETE FROM multi_purpose_map_cache")
+        conn.execute("DELETE FROM single_purpose_map_cache")
+
+        conn.commit()
+        conn.close()
+
+        deleted_count = sum(1 for _ in [
+            "user_app_behavior_log", "behavior_analysis", "raw_behavior_analysis",
+            "diary", "daily_focus", "goal_stats", "goal_journal",
+            "timeline_custom_block", "habit_checkins", "mood_entries",
+            "todo_list", "habits", "habit_challenges", "user_values",
+            "commitments", "tokens_usage_log", "habit_chains",
+            "habit_chain_nodes", "time_paradoxes", "weekly_focus",
+            "category_map_cache", "multi_purpose_map_cache", "single_purpose_map_cache",
+        ])
+        print(f"  已清理 {deleted_count} 张表的已有数据")
 
     # ==================== 数据库数据生成 ====================
 
@@ -848,7 +917,7 @@ class DemoDataGenerator:
                                 timedelta(minutes=random.randint(20, 90))).strftime("%Y-%m-%dT%H:%M:%S")
 
                 conn.execute(
-                    """INSERT INTO timeline_custom_block
+                    """INSERT OR IGNORE INTO timeline_custom_block
                        (start_time, end_time, duration, content, color,
                         category_id, sub_category_id, created_at, updated_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -868,11 +937,11 @@ class DemoDataGenerator:
             for goal_id in ["goal-daily", "goal-example"]:
                 conn.execute(
                     """INSERT INTO goal_stats
-                       (goal_id, date, time_spent, completed_todo_count, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
+                       (goal_id, date, time_spent, completed_todo_count, created_at)
+                       VALUES (?, ?, ?, ?, ?)""",
                     (goal_id, day.strftime("%Y-%m-%d"),
                      random.randint(30, 300), random.randint(0, 3),
-                     iso_now(), iso_now())
+                     iso_now())
                 )
         print(f"  [ok] goal_stats: {self.days * 2} 条")
 

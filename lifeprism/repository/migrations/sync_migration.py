@@ -24,6 +24,10 @@ SYNC_TABLES = [
     "timeline_custom_block",
     "todo_list",
     "user_app_behavior_log",
+    # P2 补充：原本遗漏的同步表
+    "goal_journal",
+    "daily_focus",
+    "weekly_focus",
 ]
 
 

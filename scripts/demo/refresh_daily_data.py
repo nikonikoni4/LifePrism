@@ -130,6 +130,9 @@ class DailyDataRefresher:
     def _refresh_db(self):
         conn = sqlite3.connect(str(self.db_path))
 
+        if self.force:
+            self._cleanup_today(conn)
+
         self._refresh_behavior_logs(conn)
         self._refresh_behavior_analysis(conn)
         self._refresh_raw_behavior(conn)
@@ -143,6 +146,25 @@ class DailyDataRefresher:
         conn.commit()
         conn.close()
         print("  数据库刷新完成")
+
+    def _cleanup_today(self, conn: sqlite3.Connection):
+        """force 模式下清理今天已有的数据"""
+        today_tables = [
+            ("user_app_behavior_log", "start_time"),
+            ("behavior_analysis", "start_time"),
+            ("raw_behavior_analysis", "start_time"),
+            ("mood_entries", "created_at"),
+            ("daily_focus", "date"),
+            ("timeline_custom_block", "start_time"),
+            ("goal_stats", "date"),
+            ("habit_checkins", "date"),
+        ]
+        for table, col in today_tables:
+            conn.execute(
+                f"DELETE FROM {table} WHERE {col} >= ? AND {col} <= ? || ' 23:59:59'",
+                (self.today_str, self.today_str)
+            )
+        print("  [cleanup] 已清理今天已有数据")
 
     def _today_exists(self, conn: sqlite3.Connection, table: str, date_column: str = "start_time") -> bool:
         """检查表中是否已有今天的数据"""
@@ -185,7 +207,7 @@ class DailyDataRefresher:
                 end_time_str = end_dt.strftime("%Y-%m-%d %H:%M:%S")
 
                 conn.execute(
-                    """INSERT INTO user_app_behavior_log
+                    """INSERT OR IGNORE INTO user_app_behavior_log
                        (start_time, end_time, duration, app, title, is_multipurpose_app,
                         category_id, sub_category_id, created_at, updated_at)
                        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)""",
@@ -316,7 +338,7 @@ class DailyDataRefresher:
                             timedelta(minutes=duration_min)).strftime("%Y-%m-%dT%H:%M:%S")
 
             conn.execute(
-                """INSERT INTO timeline_custom_block
+                """INSERT OR IGNORE INTO timeline_custom_block
                    (start_time, end_time, duration, content, color,
                     category_id, sub_category_id, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -335,11 +357,11 @@ class DailyDataRefresher:
         for goal_id in ["goal-daily", "goal-example"]:
             conn.execute(
                 """INSERT INTO goal_stats
-                   (goal_id, date, time_spent, completed_todo_count, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
+                   (goal_id, date, time_spent, completed_todo_count, created_at)
+                   VALUES (?, ?, ?, ?, ?)""",
                 (goal_id, self.today_str,
                  random.randint(20, 180), random.randint(0, 2),
-                 iso_now(), iso_now())
+                 iso_now())
             )
         print("  [ok] goal_stats: 2 条")
 

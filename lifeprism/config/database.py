@@ -458,8 +458,12 @@ DAILY_FOCUS_CONFIG = {
         "content": {"type": "TEXT", "constraints": [], "comment": "日焦点内容"},
     },
     "table_constraints": [],
-    "indexes": [{"name": "idx_daily_focus_date", "columns": ["date"]}],
+    "indexes": [
+        {"name": "idx_daily_focus_date", "columns": ["date"]},
+        {"name": "idx_daily_focus_updated_at", "columns": ["updated_at"]},
+    ],
     "timestamps": True,
+    "update_at": True,
 }
 
 
@@ -478,8 +482,12 @@ WEEKLY_FOCUS_CONFIG = {
         "content": {"type": "TEXT", "constraints": [], "comment": "周焦点内容"},
     },
     "table_constraints": ["UNIQUE(year, month, week_num)"],
-    "indexes": [{"name": "idx_weekly_focus_year_month", "columns": ["year", "month"]}],
+    "indexes": [
+        {"name": "idx_weekly_focus_year_month", "columns": ["year", "month"]},
+        {"name": "idx_weekly_focus_updated_at", "columns": ["updated_at"]},
+    ],
     "timestamps": True,
+    "update_at": True,
 }
 
 
@@ -593,8 +601,10 @@ GOAL_JOURNAL_CONFIG = {
     "indexes": [
         {"name": "idx_goal_journal_goal_id", "columns": ["goal_id"]},
         {"name": "idx_goal_journal_date", "columns": ["date"]},
+        {"name": "idx_goal_journal_updated_at", "columns": ["updated_at"]},
     ],
     "timestamps": True,
+    "update_at": True,
 }
 
 # Plan Doc 计划书表配置
