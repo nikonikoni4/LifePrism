@@ -72,7 +72,6 @@ class SettingsManager:
         "llm_call_logger_enabled": True,  # LLM 调用记录器开关
         "auto_summary_session": True,  # 自动总结会话
         "auto_update_memory": True,  # 自动更新记忆
-        "run_mode": "full",  # 部署模式：full / web_demo / agent_only
     }
 
     def __new__(cls) -> "SettingsManager":
@@ -87,6 +86,7 @@ class SettingsManager:
     def _initialize(self) -> None:
         """初始化配置管理器"""
         self._config: dict[str, Any] = {}
+        self._runtime_config: dict[str, Any] = {}
         self._warnings: list[dict[str, str]] = []
         # 判断是否是开发环境
         self._is_dev = not getattr(sys, "frozen", False)
@@ -526,6 +526,14 @@ class SettingsManager:
         """重新加载配置文件"""
         self._load_config()
 
+    def set_runtime_config(self, key: str, value: Any) -> None:
+        """设置运行时配置（仅内存，不持久化到 yaml）
+
+        用于运行时注入的配置，如 run_mode。与 _config 不同，
+        _runtime_config 不会被 _save_config() 写入 yaml 文件。
+        """
+        self._runtime_config[key] = value
+
     def get_all(self) -> dict[str, Any]:
         """
         获取所有配置 (合并默认值)
@@ -660,9 +668,10 @@ class SettingsManager:
     def run_mode(self) -> str:
         """部署模式：full / web_demo / agent_only
 
-        优先级：环境变量 LIFEPRISM_RUN_MODE > config 中的值 > 默认值 "full"
+        由入口文件通过 set_runtime_config() 注入，默认 "full"。
+        不从 yaml 读取，不持久化。
         """
-        return os.environ.get("LIFEPRISM_RUN_MODE", None) or self.get("run_mode")
+        return self._runtime_config.get("run_mode", "full")
 
     @property
     def aw_db_path(self) -> Path:

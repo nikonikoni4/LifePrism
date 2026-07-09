@@ -182,6 +182,8 @@ _step_start = _log_startup_time("[OK] Database modules imported", _step_start)
 
 from lifeprism.utils import get_logger
 
+settings.set_runtime_config("run_mode", "full")
+
 logger = get_logger(__name__)
 
 

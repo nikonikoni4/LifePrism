@@ -12,7 +12,6 @@
 #   LIFEPRISM_DATA_PATH  — 数据目录路径（可选，默认 localData/）
 #   LIFEPRISM_PORT       — 监听端口（可选，默认 8101）
 #   LIFEPRISM_HOST       — 监听地址（可选，默认 0.0.0.0）
-#   LIFEPRISM_RUN_MODE   — 部署模式（自动设置为 web_demo）
 #
 
 set -euo pipefail
@@ -76,9 +75,6 @@ cmd_start() {
     echo "[$APP_NAME]   Log:  $LOG_FILE"
 
     cd "$PROJECT_ROOT"
-
-    # 设置部署模式为 Web Demo
-    export LIFEPRISM_RUN_MODE=web_demo
 
     # 使用 nohup 后台启动 uvicorn
     nohup python -m uvicorn lifeprism.server.main_web_demo:app \

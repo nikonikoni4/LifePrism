@@ -5,9 +5,10 @@ ScheduleService run_mode 守卫单元测试
 1. web_demo 模式不注册任务，不创建调度器
 2. agent_only 模式不注册任务，不创建调度器
 3. full 模式正常注册任务（回归保护）
+
+注意：run_mode 通过 set_runtime_config() 注入，测试中 patch _runtime_config。
 """
 
-import os
 from unittest.mock import patch
 
 import pytest
@@ -26,7 +27,7 @@ class TestScheduleServiceRunModeGuard:
 
         service = ScheduleService()
 
-        with patch.dict(os.environ, {"LIFEPRISM_RUN_MODE": "web_demo"}):
+        with patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}):
             service.start()
 
         # 调度器未创建
@@ -38,7 +39,7 @@ class TestScheduleServiceRunModeGuard:
 
         service = ScheduleService()
 
-        with patch.dict(os.environ, {"LIFEPRISM_RUN_MODE": "agent_only"}):
+        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}):
             service.start()
 
         assert service._scheduler is None
@@ -50,7 +51,7 @@ class TestScheduleServiceRunModeGuard:
 
         service = ScheduleService()
 
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.object(settings, "_runtime_config", {"run_mode": "full"}):
             service.start()
 
         # 调度器应被创建

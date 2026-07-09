@@ -6,10 +6,9 @@ SyncService run_mode 守卫单元测试
 2. sync_by_time_range() 在非 full 模式下抛出 ValidationError
 3. full 模式下不抛出（不执行实际同步逻辑，仅验证守卫不触发）
 
-注意：run_mode 是 property，通过环境变量 LIFEPRISM_RUN_MODE 控制。
+注意：run_mode 通过 set_runtime_config() 注入，测试中 patch _runtime_config。
 """
 
-import os
 from unittest.mock import patch
 
 import pytest
@@ -29,7 +28,7 @@ class TestSyncServiceRunModeGuard:
         """incremental_sync() 在 web_demo 模式下抛出 ValidationError"""
         from lifeprism.server.services.sync_service import SyncService
 
-        with patch.dict(os.environ, {"LIFEPRISM_RUN_MODE": "web_demo"}):
+        with patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}):
             service = SyncService()
             with pytest.raises(ValidationError) as exc_info:
                 await service.incremental_sync()
@@ -41,7 +40,7 @@ class TestSyncServiceRunModeGuard:
         """incremental_sync() 在 agent_only 模式下抛出 ValidationError"""
         from lifeprism.server.services.sync_service import SyncService
 
-        with patch.dict(os.environ, {"LIFEPRISM_RUN_MODE": "agent_only"}):
+        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}):
             service = SyncService()
             with pytest.raises(ValidationError) as exc_info:
                 await service.incremental_sync()
@@ -53,7 +52,7 @@ class TestSyncServiceRunModeGuard:
         """sync_by_time_range() 在 web_demo 模式下抛出 ValidationError"""
         from lifeprism.server.services.sync_service import SyncService
 
-        with patch.dict(os.environ, {"LIFEPRISM_RUN_MODE": "web_demo"}):
+        with patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}):
             service = SyncService()
             with pytest.raises(ValidationError) as exc_info:
                 await service.sync_by_time_range(
@@ -68,7 +67,7 @@ class TestSyncServiceRunModeGuard:
         """sync_by_time_range() 在 agent_only 模式下抛出 ValidationError"""
         from lifeprism.server.services.sync_service import SyncService
 
-        with patch.dict(os.environ, {"LIFEPRISM_RUN_MODE": "agent_only"}):
+        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}):
             service = SyncService()
             with pytest.raises(ValidationError) as exc_info:
                 await service.sync_by_time_range(
@@ -87,7 +86,7 @@ class TestSyncServiceRunModeGuard:
         """
         from lifeprism.server.services.sync_service import SyncService
 
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.object(settings, "_runtime_config", {"run_mode": "full"}):
             service = SyncService()
             try:
                 await service.incremental_sync()
@@ -103,7 +102,7 @@ class TestSyncServiceRunModeGuard:
         """sync_by_time_range() 在 full 模式下不抛出 DEMO_MODE_NOT_SUPPORTED"""
         from lifeprism.server.services.sync_service import SyncService
 
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.object(settings, "_runtime_config", {"run_mode": "full"}):
             service = SyncService()
             try:
                 await service.sync_by_time_range(

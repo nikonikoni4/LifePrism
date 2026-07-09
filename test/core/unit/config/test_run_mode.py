@@ -2,13 +2,11 @@
 run_mode 配置单元测试
 
 验证 settings.run_mode 的读取逻辑：
-1. 默认值为 "full"
-2. 环境变量 LIFEPRISM_RUN_MODE 优先于配置文件值
-3. 环境变量未设置时回退到配置文件值
-4. 环境变量和配置文件都未设置时回退到默认值 "full"
+1. 默认值为 "full"（_runtime_config 未注入时）
+2. set_runtime_config 注入后返回注入值
+3. _runtime_config 被 patch 时返回 patch 值
 """
 
-import os
 from unittest.mock import patch
 
 import pytest
@@ -22,31 +20,27 @@ class TestRunModeConfig:
     """测试 run_mode 配置读取"""
 
     def test_run_mode_default_is_full(self):
-        """默认 run_mode 为 full"""
-        with patch.dict(os.environ, {}, clear=True):
-            with patch.object(settings, "_config", {}):
-                assert settings.run_mode == "full"
+        """_runtime_config 为空时默认返回 full"""
+        with patch.object(settings, "_runtime_config", {}):
+            assert settings.run_mode == "full"
 
-    def test_run_mode_from_env_var(self):
-        """环境变量 LIFEPRISM_RUN_MODE 优先于配置文件"""
-        with patch.dict(os.environ, {"LIFEPRISM_RUN_MODE": "web_demo"}):
-            with patch.object(settings, "_config", {"run_mode": "agent_only"}):
-                assert settings.run_mode == "web_demo"
+    def test_run_mode_from_runtime_config_web_demo(self):
+        """_runtime_config 注入 web_demo 时返回 web_demo"""
+        with patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}):
+            assert settings.run_mode == "web_demo"
 
-    def test_run_mode_from_config_when_env_not_set(self):
-        """环境变量未设置时，回退到配置文件值"""
-        with patch.dict(os.environ, {}, clear=True):
-            with patch.object(settings, "_config", {"run_mode": "agent_only"}):
-                assert settings.run_mode == "agent_only"
+    def test_run_mode_from_runtime_config_agent_only(self):
+        """_runtime_config 注入 agent_only 时返回 agent_only"""
+        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}):
+            assert settings.run_mode == "agent_only"
 
-    def test_run_mode_env_overrides_default(self):
-        """环境变量覆盖默认值"""
-        with patch.dict(os.environ, {"LIFEPRISM_RUN_MODE": "web_demo"}):
-            with patch.object(settings, "_config", {}):
-                assert settings.run_mode == "web_demo"
+    def test_run_mode_from_set_runtime_config(self):
+        """set_runtime_config() 方法注入后能正确读取"""
+        with patch.object(settings, "_runtime_config", {}):
+            settings.set_runtime_config("run_mode", "web_demo")
+            assert settings.run_mode == "web_demo"
 
-    def test_run_mode_agent_only_from_env(self):
-        """环境变量设置为 agent_only"""
-        with patch.dict(os.environ, {"LIFEPRISM_RUN_MODE": "agent_only"}):
-            with patch.object(settings, "_config", {}):
-                assert settings.run_mode == "agent_only"
+    def test_run_mode_full_explicit(self):
+        """_runtime_config 显式注入 full 时返回 full"""
+        with patch.object(settings, "_runtime_config", {"run_mode": "full"}):
+            assert settings.run_mode == "full"

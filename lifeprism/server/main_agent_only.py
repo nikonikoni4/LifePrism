@@ -51,6 +51,8 @@ from lifeprism.server.errors import to_http_exception
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import LWBaseError
 
+settings.set_runtime_config("run_mode", "agent_only")
+
 logger = get_logger(__name__)
 
 
