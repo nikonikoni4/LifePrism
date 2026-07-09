@@ -300,12 +300,12 @@ async def _run_agent_and_api() -> None:
     config = uvicorn.Config(
         app,
         host="0.0.0.0",
-        port=8101,
+        port=8102,
         log_level="info",
     )
     server = uvicorn.Server(config)
     api_task = asyncio.create_task(server.serve())
-    logger.info("[AGENT-ONLY] FastAPI 启动: host=0.0.0.0, port=8101")
+    logger.info("[AGENT-ONLY] FastAPI 启动: host=0.0.0.0, port=8102")
 
     # 3. 数据库初始化
     logger.info("正在初始化数据库...")
