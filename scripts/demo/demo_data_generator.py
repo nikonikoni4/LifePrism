@@ -518,7 +518,7 @@ class DemoDataGenerator:
                        (id, order_index, content, color, state, link_to_goal_id,
                         date, actual_finished_at, cross_day, created_at, updated_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)""",
-                    (todo_id, idx, content, random.choice(["#5B8FF9", "#5AD8A6", "#F6BD16"]),
+                    (todo_id, idx, content, random.choice(["#FFFFFF", "#E0F2FE", "#DCFCE7", "#FEF3C7", "#FAE8FF"]),
                      state, tmpl["link_to_goal_id"],
                      day.strftime("%Y-%m-%d"), actual_finished, _now_str(), _now_str()),
                 )
@@ -537,7 +537,7 @@ class DemoDataGenerator:
                    (id, pool_order_index, content, color, state, link_to_goal_id,
                     created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (f"t-demo-pool-{idx}", idx, content, "#E8684A",
+                (f"t-demo-pool-{idx}", idx, content, "#FFFFFF",
                  "pool", tmpl["link_to_goal_id"], _now_str(), _now_str()),
             )
             total += 1
@@ -549,7 +549,7 @@ class DemoDataGenerator:
                 """INSERT INTO todo_list
                    (id, order_index, content, color, state, created_at, updated_at)
                    VALUES (?, 0, ?, ?, 'shelved', ?, ?)""",
-                (f"t-demo-shelved-{idx}", tmpl["content"], "#cbd5e1", _now_str(), _now_str()),
+                (f"t-demo-shelved-{idx}", tmpl["content"], "#F3F4F6", _now_str(), _now_str()),
             )
             total += 1
 
