@@ -35,12 +35,12 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
 
     # 重置 update_at 缓存（确保测试使用最新配置）
     from lifeprism.repository.base_providers.lw_base_data_provider import (
         LWBaseDataProvider,
     )
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
@@ -111,9 +111,7 @@ async def _run_loop_until_cancelled(sync_client, interval_seconds=600, max_calls
     Returns:
         抛出 CancelledError 时的任务对象（已结束）
     """
-    task = asyncio.create_task(
-        sync_client._run_sync_loop(interval_seconds)
-    )
+    task = asyncio.create_task(sync_client._run_sync_loop(interval_seconds))
     with patch(
         "lifeprism.sync.sync_client.asyncio.sleep",
         new=_make_cancelling_sleep(max_calls),
@@ -204,9 +202,7 @@ class TestConcurrencyControl:
         await _run_loop_until_cancelled(sync_client, max_calls=1)
 
         # Assert
-        warning_messages = [
-            r.getMessage() for r in caplog.records if r.levelno == logging.WARNING
-        ]
+        warning_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
         assert any("跳过定时同步" in m and "上次同步未完成" in m for m in warning_messages), (
             f"未找到跳过同步的 WARNING 日志，实际: {warning_messages}"
         )
@@ -241,19 +237,20 @@ class TestIsSyncingReset:
         assert sync_client._is_syncing is False
 
     async def test_logs_error_on_sync_failure(self, sync_client, caplog):
-        """同步失败时记录 ERROR: 定时同步失败: {error}"""
+        """同步失败时记录 ERROR（含 exc_info 追踪）"""
         caplog.set_level(logging.ERROR, logger="lifeprism.sync.sync_client")
         mock_sync_once = MagicMock(side_effect=RuntimeError("连接超时"))
 
         with patch.object(sync_client, "sync_once", new=mock_sync_once):
             await _run_loop_until_cancelled(sync_client, max_calls=1)
 
-        error_messages = [
-            r.getMessage() for r in caplog.records if r.levelno == logging.ERROR
-        ]
-        assert any(
-            "定时同步失败" in m and "连接超时" in m for m in error_messages
-        ), f"未找到同步失败的 ERROR 日志，实际: {error_messages}"
+        error_records = [r for r in caplog.records if r.levelno == logging.ERROR]
+        assert any("定时同步失败" in r.getMessage() for r in error_records), (
+            f"未找到同步失败的 ERROR 日志，实际: {[r.getMessage() for r in error_records]}"
+        )
+        assert any(r.exc_info and r.exc_info[1] is not None for r in error_records), (
+            "ERROR 日志缺少 exc_info（异常追踪）"
+        )
 
     async def test_is_syncing_reset_to_false_on_success(self, sync_client, caplog):
         """同步成功后 _is_syncing 被重置为 False"""
@@ -291,9 +288,7 @@ class TestFailureRetry:
         """第一次失败、第二次成功：sync_once 被调用两次"""
         caplog.set_level(logging.INFO, logger="lifeprism.sync.sync_client")
         # 第一次抛异常，第二次成功
-        mock_sync_once = MagicMock(
-            side_effect=[RuntimeError("首次失败"), None]
-        )
+        mock_sync_once = MagicMock(side_effect=[RuntimeError("首次失败"), None])
 
         with patch.object(sync_client, "sync_once", new=mock_sync_once):
             await _run_loop_until_cancelled(sync_client, max_calls=2)
@@ -304,20 +299,19 @@ class TestFailureRetry:
     async def test_logs_error_then_success_after_retry(self, sync_client, caplog):
         """重试场景下日志：先 ERROR（失败）后 INFO（完成）"""
         caplog.set_level(logging.INFO, logger="lifeprism.sync.sync_client")
-        mock_sync_once = MagicMock(
-            side_effect=[RuntimeError("首次失败"), None]
-        )
+        mock_sync_once = MagicMock(side_effect=[RuntimeError("首次失败"), None])
 
         with patch.object(sync_client, "sync_once", new=mock_sync_once):
             await _run_loop_until_cancelled(sync_client, max_calls=2)
 
-        error_messages = [
-            r.getMessage() for r in caplog.records if r.levelno == logging.ERROR
-        ]
-        info_messages = [
-            r.getMessage() for r in caplog.records if r.levelno == logging.INFO
-        ]
-        assert any("定时同步失败" in m and "首次失败" in m for m in error_messages)
+        error_records = [r for r in caplog.records if r.levelno == logging.ERROR]
+        info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+        assert any("定时同步失败" in r.getMessage() for r in error_records), (
+            "未找到同步失败的 ERROR 日志"
+        )
+        assert any(r.exc_info and r.exc_info[1] is not None for r in error_records), (
+            "ERROR 日志缺少 exc_info（异常追踪）"
+        )
         assert any("定时同步完成" in m for m in info_messages)
 
     async def test_is_syncing_reset_between_attempts(self, sync_client, caplog):
@@ -359,9 +353,7 @@ class TestFailureRetry:
 
         assert mock_sync_once.call_count == 4
         # 三次 ERROR 日志
-        error_messages = [
-            r.getMessage() for r in caplog.records if r.levelno == logging.ERROR
-        ]
+        error_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
         assert len(error_messages) == 3
         # 最终 _is_syncing 为 False
         assert sync_client._is_syncing is False
@@ -381,9 +373,7 @@ class TestSuccessLogging:
         with patch.object(sync_client, "sync_once", new=mock_sync_once):
             await _run_loop_until_cancelled(sync_client, max_calls=1)
 
-        info_messages = [
-            r.getMessage() for r in caplog.records if r.levelno == logging.INFO
-        ]
+        info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
         assert any("定时同步开始" in m for m in info_messages), (
             f"未找到 '定时同步开始' INFO 日志，实际: {info_messages}"
         )
@@ -399,9 +389,7 @@ class TestSuccessLogging:
         with patch.object(sync_client, "sync_once", new=mock_sync_once):
             await _run_loop_until_cancelled(sync_client, max_calls=1)
 
-        info_messages = [
-            r.getMessage() for r in caplog.records if r.levelno == logging.INFO
-        ]
+        info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
         complete_msgs = [m for m in info_messages if "定时同步完成" in m]
         assert len(complete_msgs) == 1
         # 完成日志格式：定时同步完成，耗时 {duration}s

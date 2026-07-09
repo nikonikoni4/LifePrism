@@ -169,9 +169,9 @@ class SyncClient:
                 await asyncio.to_thread(self.sync_once)
                 duration = (datetime.now(timezone.utc) - start_time).total_seconds()
                 logger.info("定时同步完成，耗时 %ss", duration)
-            except Exception as e:
+            except Exception:
                 # 失败重试：记录 ERROR，不终止循环，下次定时触发自动重试
-                logger.error("定时同步失败: %s", e)
+                logger.error("定时同步失败", exc_info=True)
             finally:
                 self.finish_sync()
 
@@ -260,20 +260,30 @@ class SyncClient:
                 continue
 
             while True:
-                response = httpx.post(
-                    url=f"{remote_url}/api/sync/pull",
-                    json={
-                        "last_sync_time": last_sync_time,
-                        "tables": [table_name],
-                        "offset": offset,
-                        "limit": batch_size,
-                    },
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                    },
-                    timeout=60.0,
-                )
-                response.raise_for_status()
+                try:
+                    response = httpx.post(
+                        url=f"{remote_url}/api/sync/pull",
+                        json={
+                            "last_sync_time": last_sync_time,
+                            "tables": [table_name],
+                            "offset": offset,
+                            "limit": batch_size,
+                        },
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                        },
+                        timeout=60.0,
+                    )
+                    response.raise_for_status()
+                except (httpx.HTTPStatusError, httpx.RequestError) as e:
+                    logger.error(
+                        "pull_from_remote: 拉取表 %s 失败, offset=%d, remote_url=%s, error=%s",
+                        table_name,
+                        offset,
+                        remote_url,
+                        e,
+                    )
+                    raise
                 data = response.json()
 
                 rows = data.get("changes", {}).get(table_name, [])
@@ -373,17 +383,26 @@ class SyncClient:
             if rows:
                 tables_data[table_name] = rows
 
-        response = httpx.post(
-            url=f"{remote_url}/api/sync/push",
-            json={
-                "changes": tables_data,
-            },
-            headers={
-                "Authorization": f"Bearer {api_key}",
-            },
-            timeout=60.0,
-        )
-        response.raise_for_status()
+        try:
+            response = httpx.post(
+                url=f"{remote_url}/api/sync/push",
+                json={
+                    "changes": tables_data,
+                },
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                },
+                timeout=60.0,
+            )
+            response.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(
+                "push_to_remote: 推送失败, tables=%s, remote_url=%s, error=%s",
+                list(tables_data.keys()),
+                remote_url,
+                e,
+            )
+            raise
 
         logger.info("push_to_remote: 推送 %d 张表的数据", len(tables_data))
 
@@ -401,18 +420,27 @@ class SyncClient:
             last_sync_time: 上次同步时间（ISO 8601 字符串）
             directories: 文件同步目录列表
         """
-        response = httpx.post(
-            url=f"{remote_url}/api/sync/pull-files",
-            json={
-                "last_sync_time": last_sync_time,
-                "directories": directories,
-            },
-            headers={
-                "Authorization": f"Bearer {api_key}",
-            },
-            timeout=60.0,
-        )
-        response.raise_for_status()
+        try:
+            response = httpx.post(
+                url=f"{remote_url}/api/sync/pull-files",
+                json={
+                    "last_sync_time": last_sync_time,
+                    "directories": directories,
+                },
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                },
+                timeout=60.0,
+            )
+            response.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(
+                "pull_files_from_remote: 拉取文件失败, remote_url=%s, directories=%s, error=%s",
+                remote_url,
+                directories,
+                e,
+            )
+            raise
         data = response.json()
 
         files = data.get("files", [])
@@ -445,17 +473,26 @@ class SyncClient:
         """
         files = self._collect_changed_files(last_sync_time, directories)
 
-        response = httpx.post(
-            url=f"{remote_url}/api/sync/push-files",
-            json={
-                "files": files,
-            },
-            headers={
-                "Authorization": f"Bearer {api_key}",
-            },
-            timeout=60.0,
-        )
-        response.raise_for_status()
+        try:
+            response = httpx.post(
+                url=f"{remote_url}/api/sync/push-files",
+                json={
+                    "files": files,
+                },
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                },
+                timeout=60.0,
+            )
+            response.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(
+                "push_files_to_remote: 推送文件失败, remote_url=%s, files=%d, error=%s",
+                remote_url,
+                len(files),
+                e,
+            )
+            raise
 
         logger.info("push_files_to_remote: 推送 %d 个文件", len(files))
 

@@ -306,8 +306,8 @@ async def lifespan(app: FastAPI):
         print(f"{'=' * 60}\n")
 
         logger.info("[DONE] Database initialized successfully")
-    except Exception as e:
-        logger.error("[ERROR] Database init failed: error=%s", e)
+    except Exception:
+        logger.error("[ERROR] Database init failed", exc_info=True)
         raise
 
     # 启动定时任务调度器
