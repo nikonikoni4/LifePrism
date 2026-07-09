@@ -257,9 +257,36 @@ class WechatChannel(BaseChannel):
         解析微信消息，检查权限，下载媒体文件，构造 InboundMessage 并发送到消息总线。
         单个消息处理失败不会影响其他消息的处理。
 
+        消息路由：仅在云端模式（agent_only）下，在解析消息之前先判断本地在线状态，
+        本地在线时跳过云端处理，由本地负责回复，避免重复回复；本地离线时云端接管处理。
+        本地模式（full）下 heartbeat_manager 从不被更新，直接处理所有消息。
+
         Args:
             msg: 原始微信消息字典
         """
+        # 消息路由：仅在云端模式（agent_only）时检查心跳
+        # 本地模式（full）下 heartbeat_manager 从不被更新，is_local_online() 永远返回 False，
+        # 路由检查为死代码。此守卫确保只在云端执行路由判断，防止未来误更新 heartbeat_manager
+        # 导致本地消息被错误跳过。
+        from lifeprism.sync.heartbeat_manager import heartbeat_manager
+
+        if settings.run_mode == "agent_only":
+            # 云端模式：根据本地心跳状态决定是否跳过消息处理
+            if heartbeat_manager.is_local_online():
+                logger.info(
+                    "本地在线，跳过云端处理: from_user=%s, message=%s",
+                    msg.get("from_user_id"),
+                    str(msg.get("content", ""))[:50],
+                )
+                return  # 本地会处理
+
+            # 本地离线，云端接管处理
+            logger.info(
+                "本地离线，云端接管处理: from_user=%s, message=%s",
+                msg.get("from_user_id"),
+                str(msg.get("content", ""))[:50],
+            )
+
         try:
             logger.info("开始处理微信消息")
             from lifeprism.llm.channel.wechat.message import WechatMessage

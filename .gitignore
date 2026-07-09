@@ -48,3 +48,7 @@ test.py
 docs\temp\创造者挑战大赛要求.md
 docs\temp\初赛报名.md
 .diff
+explore
+.mypy_cache
+.ruff_cache
+.uploads

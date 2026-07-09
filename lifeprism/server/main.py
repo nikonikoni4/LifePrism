@@ -11,8 +11,6 @@ _startup_timer = time.perf_counter()
 def _log_startup_time(step_name: str, start_time: float) -> float:
     """记录启动步骤耗时并返回当前时间，调试用"""
     current = time.perf_counter()
-    (current - start_time) * 1000  # 转换为毫秒
-    (current - _startup_timer) * 1000
     # 关闭打印
     # print(f"[STARTUP] {step_name}: {elapsed:.2f}ms (累计: {total:.2f}ms)")
     return current
@@ -27,6 +25,7 @@ print(f"{'=' * 60}")
 import sys
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -136,11 +135,6 @@ from lifeprism.server.api import custom_records_router
 _log_startup_time("  - custom_records_router", _import_start)
 
 _import_start = time.perf_counter()
-from lifeprism.server.api import sync_cloud_router
-
-_log_startup_time("  - sync_cloud_router", _import_start)
-
-_import_start = time.perf_counter()
 from lifeprism.server.api import sync_status_router
 
 _log_startup_time("  - sync_status_router", _import_start)
@@ -191,6 +185,40 @@ from lifeprism.utils import get_logger
 logger = get_logger(__name__)
 
 
+async def send_heartbeat(event: str):
+    """发送心跳事件到云端
+
+    在本地生命周期启动/关闭时调用，让云端立即知道本地状态变化。
+    心跳发送失败不会影响启动/关闭流程（仅记录 WARNING）。
+
+    Args:
+        event: 心跳事件类型，'online' | 'offline'
+    """
+    from lifeprism.config.settings_manager import get_setting
+    from lifeprism.sync.sync_config import get_sync_api_key
+
+    remote_url = get_setting("sync.remote_url")
+    api_key = get_sync_api_key()
+
+    if not remote_url or not api_key:
+        logger.debug("未配置同步，跳过心跳发送")
+        return
+
+    try:
+        # 使用 AsyncClient 避免同步 httpx.post 阻塞事件循环（最长 10s）
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url=f"{remote_url}/api/sync/heartbeat",
+                json={"event": event},
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            logger.info("心跳事件已发送: event=%s", event)
+    except Exception as e:
+        logger.warning("心跳事件发送失败: event=%s, error=%s", event, e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -202,6 +230,10 @@ async def lifespan(app: FastAPI):
     print(f"\n{'=' * 60}")
     print("[STARTUP] 进入 lifespan - 应用初始化阶段")
     print(f"{'=' * 60}")
+
+    # 发送 online 心跳事件（让云端尽早知道本地上线）
+    await send_heartbeat("online")
+
     from lifeprism.utils.logger import enable_uvicorn_file_logging
 
     enable_uvicorn_file_logging()
@@ -349,6 +381,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("ChatBot 服务关闭时出现警告: error=%s", e)
 
+    # 发送 offline 心跳事件（确保所有资源已清理后通知云端）
+    await send_heartbeat("offline")
+
 
 # ==================== 创建 FastAPI 应用实例 ====================
 print("[STARTUP] 正在创建 FastAPI 应用实例...")
@@ -489,7 +524,6 @@ app.include_router(value_router, prefix="/api/v2")  # Value 价值
 app.include_router(commitment_router, prefix="/api/v2")  # Commitment 承诺
 app.include_router(habit_router, prefix="/api/v2/habit", tags=["habit"])  # Habit 习惯
 app.include_router(custom_records_router, prefix="/api/v2")  # Custom Records 自定义记录
-app.include_router(sync_cloud_router)  # 云端数据同步 Pull + Push
 app.include_router(sync_status_router)  # 同步状态查询和手动触发
 app.include_router(cloud_config_router)  # 云端配置生成
 app.include_router(add_on_router)

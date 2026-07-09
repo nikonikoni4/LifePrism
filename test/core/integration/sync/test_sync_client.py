@@ -169,7 +169,7 @@ class TestPullFromRemoteInsertNew:
     def test_pull_sends_correct_request_body(
         self, sync_client, initialized_db, clean_tables
     ):
-        """拉取：HTTP 请求体包含 last_sync_time 和 tables"""
+        """拉取：HTTP 请求体包含 last_sync_time、tables、offset 和 limit（分批格式）"""
         mock_response = _make_mock_response({"changes": {}})
 
         with patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post:
@@ -180,13 +180,19 @@ class TestPullFromRemoteInsertNew:
                 tables=["todo_list", "diary"],
             )
 
-        # Assert: 验证请求 URL 和 body
-        mock_post.assert_called_once()
-        call_args = mock_post.call_args
-        assert call_args.kwargs["url"] == "http://test:8000/api/sync/pull"
-        assert call_args.kwargs["json"]["last_sync_time"] == "2026-07-01 00:00:00"
-        assert call_args.kwargs["json"]["tables"] == ["todo_list", "diary"]
-        assert call_args.kwargs["headers"]["Authorization"] == "Bearer my-api-key"
+        # Assert: 分批拉取，每张表各发一次请求（空表只发一次）
+        assert mock_post.call_count == 2
+        # 验证每次请求的 URL、认证头和分批参数
+        requested_tables = []
+        for call in mock_post.call_args_list:
+            assert call.kwargs["url"] == "http://test:8000/api/sync/pull"
+            assert call.kwargs["json"]["last_sync_time"] == "2026-07-01 00:00:00"
+            assert call.kwargs["json"]["offset"] == 0
+            assert call.kwargs["json"]["limit"] == 1000
+            assert call.kwargs["headers"]["Authorization"] == "Bearer my-api-key"
+            requested_tables.extend(call.kwargs["json"]["tables"])
+        # 两张表都已被请求
+        assert set(requested_tables) == {"todo_list", "diary"}
 
     def test_pull_handles_empty_remote_data(self, sync_client, initialized_db, clean_tables):
         """拉取：远程无数据时不报错"""
@@ -480,11 +486,27 @@ def _mock_get_setting_factory(remote_url="http://test:8000", last_sync_time="202
 
 
 def _mock_post_factory(pull_data=None, push_success=True):
-    """构建 httpx.post 的 mock side_effect，区分 pull 和 push 请求"""
+    """构建 httpx.post 的 mock side_effect，区分 4 种同步请求
+
+    - /pull-files -> {"files": []}
+    - /push-files -> {"status": "ok"}
+    - /pull -> {"changes": pull_data}
+    - /push -> {"success": True} 或 500 错误
+    """
 
     def _mock_post(*args, **kwargs):
         url = kwargs.get("url", "")
-        if "/pull" in url:
+        if "/pull-files" in url:
+            return _make_mock_response({"files": []})
+        elif "/push-files" in url:
+            if push_success:
+                return _make_mock_response({"status": "ok", "written": 0, "skipped": 0})
+            else:
+                mock_resp = MagicMock()
+                mock_resp.status_code = 500
+                mock_resp.raise_for_status.side_effect = Exception("HTTP 500 Push Failed")
+                return mock_resp
+        elif "/pull" in url:
             resp = _make_mock_response({"changes": pull_data or {}})
             return resp
         elif "/push" in url:
@@ -511,7 +533,13 @@ class TestSyncOnce:
 
         def mock_post_side_effect(*args, **kwargs):
             url = kwargs.get("url", "")
-            if "/pull" in url:
+            if "/pull-files" in url:
+                call_order.append("pull-files")
+                return _make_mock_response({"files": []})
+            elif "/push-files" in url:
+                call_order.append("push-files")
+                return _make_mock_response({"status": "ok", "written": 0, "skipped": 0})
+            elif "/pull" in url:
                 call_order.append("pull")
                 return _make_mock_response({"changes": {}})
             elif "/push" in url:
@@ -530,8 +558,8 @@ class TestSyncOnce:
         ):
             sync_client.sync_once(tables=["todo_list"])
 
-        # Assert: 先 pull 再 push
-        assert call_order == ["pull", "push"]
+        # Assert: 数据库 pull -> push, 文件 pull -> push
+        assert call_order == ["pull", "push", "pull-files", "push-files"]
         # set_setting 被调用（更新 last_sync_time）
         mock_set_setting.assert_called_once()
 
@@ -643,13 +671,19 @@ class TestSyncOnce:
         ):
             sync_client.sync_once()
 
-        # Assert: pull 请求的 tables 不为空（使用了默认表列表）
-        pull_call = mock_post.call_args_list[0]
-        assert pull_call.kwargs["url"].endswith("/api/sync/pull")
-        tables_in_request = pull_call.kwargs["json"]["tables"]
-        assert len(tables_in_request) > 0
-        assert "todo_list" in tables_in_request
-        assert "diary" in tables_in_request
+        # Assert: 分批拉取使用了默认表列表（每张表单独请求）
+        pull_calls = [
+            c for c in mock_post.call_args_list
+            if c.kwargs["url"].endswith("/api/sync/pull")
+        ]
+        assert len(pull_calls) > 0
+        # 汇总所有 pull 请求中请求的表名
+        all_requested_tables = set()
+        for call in pull_calls:
+            all_requested_tables.update(call.kwargs["json"]["tables"])
+        assert len(all_requested_tables) > 0
+        assert "todo_list" in all_requested_tables
+        assert "diary" in all_requested_tables
 
 
 # ==================== Seam 4: 原子性保证 ====================
@@ -725,7 +759,11 @@ class TestSyncOnceAtomicity:
 
         def mock_post_side_effect(*args, **kwargs):
             url = kwargs.get("url", "")
-            if "/pull" in url:
+            if "/pull-files" in url:
+                return _make_mock_response({"files": []})
+            elif "/push-files" in url:
+                return _make_mock_response({"status": "ok", "written": 0, "skipped": 0})
+            elif "/pull" in url:
                 return _make_mock_response({"changes": {"todo_list": [remote_row]}})
             elif "/push" in url:
                 # 在 push 时验证本地已有 pull 写入的数据

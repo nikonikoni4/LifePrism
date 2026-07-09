@@ -38,33 +38,70 @@ LifePrism 支持三种运行形态，对应三个独立启动入口：
 - 同步时机：启动时立即同步 + 定时同步（每 10 分钟）
 
 **同步范围**：
-- **需要同步的表**：除 `window_events`（原始窗口事件）外的所有表
-  - 用户输入：`mood_entries`、`diary`、`todo_list`、`goal`、`habits`、`timeline_custom_block`
-  - Monitor 聚合数据：`user_app_behavior_log`、`behavior_analysis`
-  - 元数据：`category`、`sub_category`
-  - 缓存表：`category_map_cache`、`*_cache`（数据量小，避免云端重新计算触发 LLM）
-- **不同步的表**：`window_events`（数据量太大 ~50MB，云端用不上）
+
+**数据库同步**（31 张静态表 + 动态表）：
+- **用户输入数据**（15 张）：`mood_entries`、`diary`、`todo_list`、`goal`、`goal_journal`、`plan_doc`、`daily_focus`、`weekly_focus`、`habits`、`habit_challenges`、`habit_checkins`、`habit_chains`、`habit_chain_nodes`、`timeline_custom_block`、`time_paradoxes`
+- **元数据**（8 张）：`category`、`sub_category`、`mood_types`、`mood_impacts`、`user_values`、`commitments`、`custom_record_types`、`custom_record_fields`
+- **Monitor 数据**（3 张）：`user_app_behavior_log`、`behavior_analysis`、`raw_behavior_analysis`
+- **缓存表**（3 张）：`multi_purpose_map_cache`、`single_purpose_map_cache`、`category_map_cache`
+- **统计数据**（1 张）：`tokens_usage_log`（云端 token 使用需要统计）
+- **动态表**：`custom_records_{slug}`（根据 `custom_record_types.slug` 运行时获取）
+
+**不同步的表**（16 张）：
+- `chat_session`（元数据表，实体在 `session/*.jsonl`）
+- `goal_stats`、`daily_report`、`weekly_report`、`monthly_report`（统计缓存，可本地重新生成）
+- `schema_version`（迁移版本号，两端独立管理）
+- `screen_captures`、`window_events`（Monitor 原始数据，云端用不上）
+
+**文件同步**（11 个目录/文件）：
+- 需要同步：`agent/`、`assets/`、`channel/wechat/account.json`、`diary/`、`docs/`、`external_files/`、`plan/`、`prompts/`、`session/`、`user/`、`workflow/`
+- 不同步：`.schedule_state.json`、`config/`、`dataset/`、`debug_logs/`、`screenshots/`、`channel/wechat/media/`
+- **关键文件**：`channel/wechat/account.json` 必须同步（包含微信 session_id，保证对话历史连贯）
 
 **增量同步机制**：
-- 依赖 `updated_at` 字段（需为 9 个表添加此字段）
-- 查询：`WHERE updated_at > last_sync_time`
+- 依赖 `updated_at` 字段（需为 31 张表添加此字段）
+- 查询：`WHERE updated_at > last_sync_time ORDER BY updated_at ASC LIMIT ? OFFSET ?`（分批查询）
 - 使用索引：`CREATE INDEX idx_{table}_updated_at ON {table}(updated_at)`
-- 不需要扫描全表，查询耗时 ~50ms（10 个表）
+- 查询耗时：~155ms（31 个表 × 5ms）
+
+**分批同步机制**：
+- 客户端按表逐个拉取，每表分批 1000 条
+- 避免首次同步超时（httpx timeout=60s）
+- 首次同步 16MB（~10,000 条）：分 10 批，总耗时 ~30-50 秒
 
 **冲突解决**：Last-Write-Wins（最后写入获胜）
 - 比较 `updated_at` 时间戳，谁更晚谁保留
 - 无需版本号或 device_id（主备模式冲突概率 < 0.1%）
 - NTP 时间同步保证时钟误差 < 1 秒
 
+**消息路由与心跳机制**：
+- **问题**：微信消息群发到本地和云端，需要避免重复回复
+- **解决方案**：云端通过心跳机制判断本地是否在线
+- **心跳来源**：
+  1. 复用数据同步：本地每 10 分钟发起 `POST /api/sync/pull`，云端调用 `heartbeat_manager.update_heartbeat()`
+  2. 生命周期事件：本地 FastAPI 启动/关闭时发送 `POST /api/sync/heartbeat {"event": "online|offline"}`
+- **判断逻辑**：`now() - last_heartbeat < 15min` → 在线
+- **消息路由**：本地在线时云端跳过处理，本地离线时云端处理
+- **状态管理**：纯内存（`HeartbeatManager`），不使用数据库
+
+**API 区分**：
+- **云端 API**（`main_agent_only.py` 提供，端口 8101）：
+  - `POST /api/sync/pull`、`POST /api/sync/push`（数据库同步）
+  - `POST /api/sync/pull-files`、`POST /api/sync/push-files`（文件同步）
+  - `POST /api/sync/heartbeat`（心跳/生命周期事件）
+- **本地 API**（`main.py` 提供）：
+  - `GET /api/sync/status`（查询同步状态）
+  - `POST /api/sync/trigger`（手动触发同步）
+  - `POST /api/sync/generate-cloud-config`（生成云端配置）
+
 **数据量估算**：
 - 总数据量（3 个月）：~16MB（不含 window_events）
 - 增量同步（10 分钟）：~27KB
-- 第一次同步：16MB，分批传输（1000 条/批）+ 压缩（gzip），约 1-2 分钟
+- 首次同步：16MB，分批传输（1000 条/批）+ 压缩（gzip），约 30-50 秒
 
 **安全机制**：
-- API Key 认证（32 字节随机字符串）
+- API Key 认证（32 字节随机字符串，`secrets.compare_digest` 防时序攻击）
 - HTTPS 加密传输（Let's Encrypt 免费证书）
-- 可选：IP 白名单、请求签名（HMAC-SHA256）
 
 **配置管理**：
 - **Key 存储**：本地用 keyring（Windows 凭据管理器），云端用 config.yaml
@@ -92,6 +129,8 @@ LifePrism 支持三种运行形态，对应三个独立启动入口：
 - cr-sqlite / CRDT（过度设计）
 - 配置文件加密（SSH 已加密 + 文件立即删除）
 - secrets.yaml（统一用 config.yaml）
+- 本地在线状态持久化（纯内存管理，服务重启 15 分钟内自动恢复）
+- IP 白名单、请求签名（HTTPS + API Key 已足够）
 
 ## 自定义记录模块（Custom Records Module）
 

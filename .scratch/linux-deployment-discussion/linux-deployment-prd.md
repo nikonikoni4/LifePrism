@@ -268,10 +268,11 @@ P1 完成后，Windows 本地和 Linux 云端各自独立运行，但用户需�
 1. 在 Windows 本地查看通过微信（Linux Agent）记录的数据
 2. 在 Linux 云端使用 Windows 本地采集的 Monitor 数据
 3. 两端数据保持一致，支持离线后同步
+4. 避免微信消息群发导致的重复回复（本地和云端都收到消息）
 
 ### 解决方案
 
-实现 Windows ↔ Linux 双向数据同步，采用主备模式（平时用 Windows，出门时用 Linux Agent）。
+实现 Windows ↔ Linux 双向数据同步（数据库 + 文件），采用主备模式（平时用 Windows，出门时用 Linux Agent）。云端通过心跳机制判断本地是否在线，决定是否处理微信消息。
 
 ### P2 User Stories
 
@@ -281,47 +282,71 @@ P1 完成后，Windows 本地和 Linux 云端各自独立运行，但用户需�
 18. 作为用户，我想在云端 API Key 过期时，通过 CLI 命令重新加载配置，而不需要重新部署服务
 19. 作为用户，我想查看同步状态（上次同步时间、同步记录数），以便确认数据已同步
 20. 作为开发者，我想通过云端 CLI 测试 LLM 连接，以便快速验证配置是否正确
+21. 作为用户，我想在外通过微信发送消息时，只收到一个回复（本地在线时本地处理，本地离线时云端处理）
+22. 作为用户，我想在 Windows 本地关闭时，云端能立即知道并接管微信消息处理
+23. 作为用户，我想在 Windows 本地异常崩溃时，云端能在 15 分钟内自动接管微信消息处理
+24. 作为用户，我想在外通过微信对话时，云端能使用与本地相同的 session_id，以便对话历史连贯
 
 ### P2 Implementation Decisions
 
 #### 1. 同步范围与数据量
 
-**需要同步的表**（除 `window_events` 外的所有表）：
-- 用户输入：`mood_entries`、`diary`、`todo_list`、`goal`、`habits`、`timeline_custom_block`
-- Monitor 聚合数据：`user_app_behavior_log`、`behavior_analysis`
-- 元数据：`category`、`sub_category`
-- 缓存表：`category_map_cache`、`multi_purpose_map_cache`、`single_purpose_map_cache`
+**需要同步的表**（30 张静态表 + 动态表）：
 
-**不同步的表**：
-- `window_events`（原始窗口事件，数据量太大 ~50MB，云端用不上）
+**用户输入数据**（15 张）：
+- `mood_entries`、`diary`、`todo_list`、`goal`、`goal_journal`、`plan_doc`
+- `daily_focus`、`weekly_focus`、`habits`、`habit_challenges`、`habit_checkins`
+- `habit_chains`、`habit_chain_nodes`、`timeline_custom_block`、`time_paradoxes`
+
+**元数据**（8 张）：
+- `category`、`sub_category`、`mood_types`、`mood_impacts`
+- `user_values`、`commitments`、`custom_record_types`、`custom_record_fields`
+
+**Monitor 数据**（3 张）：
+- `user_app_behavior_log`、`behavior_analysis`、`raw_behavior_analysis`
+
+**缓存表**（3 张）：
+- `multi_purpose_map_cache`、`single_purpose_map_cache`、`category_map_cache`
+
+**统计数据**（1 张）：
+- `tokens_usage_log`（云端 token 使用需要统计）
+
+**动态表**（运行时获取）：
+- `custom_records_{slug}`（根据 `custom_record_types.slug` 动态同步）
+
+**不同步的表**（16 张）：
+- `chat_session`（元数据表，实体在 `session/*.jsonl`）
+- `goal_stats`、`daily_report`、`weekly_report`、`monthly_report`（统计缓存，可本地重新生成）
+- `schema_version`（迁移版本号，两端独立管理）
+- `screen_captures`、`window_events`（Monitor 原始数据，云端用不上）
 
 **数据量估算**（3 个月使用）：
 - 总数据量：~16MB（不含 `window_events`）
 - 增量同步（10 分钟）：~27KB
-- 第一次同步：16MB，分批传输 + 压缩，约 1-2 分钟
+- 首次同步：16MB，分批传输（1000 条/批）+ 压缩，约 30-50 秒
 
 **理由**：
 - 排除 `window_events` 可减少 10 倍传输量
-- `behavior_analysis` 是聚合数据，云端不需要原始事件
 - 缓存表数据量小（< 1MB），同步比重新计算更高效（避免触发 LLM）
+- `tokens_usage_log` 包含云端 token 使用，需要统计
+- `raw_behavior_analysis` 数据量小，保持完整性
 
 #### 2. 增量同步机制
 
-**依赖字段**：`updated_at`（需为 9 个表添加）
-- `behavior_analysis`
-- `category`
-- `category_map_cache`
-- `goal`
-- `mood_entries`
-- `sub_category`
-- `timeline_custom_block`
-- `todo_list`
-- `user_app_behavior_log`
+**依赖字段**：`updated_at`（需为以下表添加）
+- `behavior_analysis`、`category`、`category_map_cache`、`goal`、`mood_entries`
+- `sub_category`、`timeline_custom_block`、`todo_list`、`user_app_behavior_log`
+- `goal_journal`、`plan_doc`、`daily_focus`、`weekly_focus`、`habit_challenges`
+- `habit_checkins`、`habit_chains`、`habit_chain_nodes`、`time_paradoxes`
+- `mood_types`、`mood_impacts`、`user_values`、`commitments`
+- `custom_record_types`、`custom_record_fields`、`custom_records_{slug}`
+- `raw_behavior_analysis`
 
 **查询方式**：
 ```python
 # 利用索引快速查询增量数据
 SELECT * FROM {table} WHERE updated_at > ? ORDER BY updated_at ASC
+LIMIT ? OFFSET ?  # 分批查询，避免首次同步超时
 ```
 
 **索引创建**：
@@ -330,13 +355,29 @@ CREATE INDEX IF NOT EXISTS idx_{table}_updated_at ON {table}(updated_at);
 ```
 
 **性能**：
-- 有索引：10 个表 × 5ms = ~50ms
-- 无索引：10 个表 × 500ms = ~5 秒
+- 有索引：31 个表 × 5ms = ~155ms
+- 无索引：31 个表 × 500ms = ~15 秒
 
 **理由**：
 - 不需要扫描全表
 - 避免版本号方案的改动成本（30+ 张表改 schema）
 - 主备模式下冲突概率极低，无需复杂的 CRDT
+
+**动态表处理**：
+```python
+def get_all_sync_tables():
+    """获取所有需要同步的表（包括动态表）"""
+    static_tables = SYNC_TABLES.copy()
+    
+    # 查询 custom_record_types 获取 slug 列表
+    slugs = db.execute("SELECT slug FROM custom_record_types").fetchall()
+    
+    # 添加动态表
+    for (slug,) in slugs:
+        static_tables.append(f"custom_records_{slug}")
+    
+    return static_tables
+```
 
 #### 3. 冲突解决策略
 
@@ -381,9 +422,11 @@ else:
 - 定时同步（每 10 分钟）
 
 **API 设计**：
+
+**数据库同步 API**：
 ```
 POST /api/sync/pull
-  Request: {last_sync_time, tables, api_key}
+  Request: {last_sync_time, tables: [table_name], offset, limit, api_key}
   Response: {changes: {table: [rows]}, sync_time}
 
 POST /api/sync/push
@@ -391,14 +434,90 @@ POST /api/sync/push
   Response: {status: 'ok', sync_time}
 ```
 
-**大数据处理**：
-- 分批同步（1000 条/批）
-- 压缩传输（gzip，压缩率 60-70%）
+**文件同步 API**：
+```
+POST /api/sync/pull-files
+  Request: {last_sync_time, directories: ['session', 'channel/wechat'], api_key}
+  Response: {files: [{path, content_base64_gzip, mtime}], sync_time}
+
+POST /api/sync/push-files
+  Request: {files: [{path, content_base64_gzip, mtime}], api_key}
+  Response: {status: 'ok', sync_time}
+```
+
+**心跳 API**：
+```
+POST /api/sync/heartbeat
+  Request: {event: 'online'|'offline'|'ping', api_key}
+  Response: {status: 'ok', server_time}
+```
+
+**分批同步机制**：
+
+客户端按表逐个拉取，每表分批 1000 条：
+
+```python
+# 客户端 sync_client.py
+def pull_from_remote_batched(self, remote_url, api_key, last_sync_time, tables):
+    for table_name in tables:
+        offset = 0
+        batch_size = 1000
+        
+        while True:
+            response = httpx.post(
+                url=f"{remote_url}/api/sync/pull",
+                json={
+                    "last_sync_time": last_sync_time,
+                    "tables": [table_name],  # 一次只拉一个表
+                    "offset": offset,
+                    "limit": batch_size,
+                },
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=60.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            rows = data["changes"].get(table_name, [])
+            if not rows:
+                break
+            
+            # 应用 Last-Write-Wins 冲突解决
+            self._apply_rows(table_name, rows, last_sync_time)
+            
+            if len(rows) < batch_size:
+                break  # 最后一批
+            
+            offset += batch_size
+```
+
+**Repository 支持**：
+
+```python
+# sync_repository.py
+def query_incremental(self, table_name, last_sync_time, offset=0, limit=None):
+    sql = f"SELECT * FROM {table_name} WHERE updated_at > ? ORDER BY updated_at ASC"
+    params = [last_sync_time]
+    
+    if limit is not None:
+        sql += f" LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+    
+    cursor = self.db.execute(sql, params)
+    return [dict(row) for row in cursor.fetchall()]
+```
+
+**性能估算**：
+- 首次同步 16MB（~10,000 条记录）
+- 分 10 批，每批 1000 条（~1.6MB）
+- 单批耗时 ~3-5 秒（查询 + 网络传输 + 写入）
+- 总耗时 ~30-50 秒（可接受）
 
 **理由**：
 - 简单可靠，不需要 WebSocket 长连接
 - 10 分钟间隔已足够（不需要实时同步）
 - 云端无需访问本地（避免家庭网络 NAT 问题）
+- 分批避免首次同步超时（httpx timeout=60s）
 
 #### 5. 安全机制
 
@@ -559,6 +678,233 @@ if config.get("monitor_type") != "none":
 - 防止配置错误（本地配置复制过来时可能包含 `monitor_type: lifeprism`）
 - 云端强制禁用 Monitor
 
+#### 10. 消息路由与本地在线判断
+
+**问题**：微信消息群发到本地和云端，需要避免重复回复。
+
+**解决方案**：云端通过心跳机制判断本地是否在线，在线则跳过处理。
+
+**心跳状态管理（纯内存）**：
+
+```python
+# 云端 lifeprism/sync/heartbeat_manager.py（新增）
+class HeartbeatManager:
+    def __init__(self):
+        self._last_heartbeat: datetime | None = None
+        self._last_event: str | None = None  # 'online' | 'offline'
+        self._lock = Lock()
+    
+    def update_heartbeat(self):
+        """更新心跳时间（每次 sync/pull 时调用）"""
+        with self._lock:
+            self._last_heartbeat = datetime.now()
+    
+    def set_event(self, event: str):
+        """设置生命周期事件（'online' | 'offline'）"""
+        with self._lock:
+            self._last_event = event
+            self._last_heartbeat = datetime.now()
+    
+    def is_local_online(self) -> bool:
+        """判断本地是否在线"""
+        with self._lock:
+            if self._last_event == "offline":
+                return False  # 显式 offline
+            if self._last_heartbeat is None:
+                return False  # 从未连接
+            elapsed = (datetime.now() - self._last_heartbeat).total_seconds()
+            return elapsed < 900  # 15 分钟 = 900 秒
+```
+
+**心跳来源**：
+
+1. **复用数据同步**：本地每 10 分钟发起 `POST /api/sync/pull`，云端在处理请求开头调用 `heartbeat_manager.update_heartbeat()`
+2. **生命周期事件**：本地 FastAPI 启动/关闭时发送 `POST /api/sync/heartbeat {"event": "online|offline"}`
+
+**状态转换**：
+```
+初始状态（last_heartbeat=None）
+  ↓
+本地启动 → POST /api/sync/heartbeat {"event": "online"} 
+  → [last_event="online", last_heartbeat=T0]
+  ↓
+每 10 分钟同步 → POST /api/sync/pull 
+  → 云端调用 update_heartbeat() 
+  → [last_heartbeat=T1]
+  ↓
+判断：now() - last_heartbeat < 15min → 在线
+  ↓
+本地关闭 → POST /api/sync/heartbeat {"event": "offline"}
+  → [last_event="offline"]
+```
+
+**消息路由逻辑**：
+
+```python
+# 云端 WeChat Channel
+async def on_message_received(self, message):
+    if heartbeat_manager.is_local_online():
+        logger.info("本地在线，跳过云端处理")
+        return  # 本地会处理
+    # 本地离线，云端处理
+    await self.agent_loop.process(message)
+```
+
+**超时设置**：
+- 同步间隔：10 分钟
+- 超时判断：15 分钟（10 分钟间隔 + 5 分钟容错）
+- 异常退出延迟：最长 15 分钟（可接受）
+
+**场景覆盖**：
+- ✅ 本地正常运行：每 10 分钟心跳，云端跳过消息处理
+- ✅ 本地正常关闭：发送 offline 事件，云端立即接管
+- ✅ 本地异常退出：15 分钟后云端自动接管
+- ⚠️ 网络分区：极端情况下可能重复回复（概率 < 1%，可接受）
+
+**理由**：
+- 纯内存状态管理，零开销（云端服务长期运行，重启后 15 分钟内自动恢复）
+- 不需要数据库表（过度设计）
+- 复用同步请求作为心跳，节省网络开销
+
+#### 11. 文件同步
+
+**需要同步的目录/文件**：
+```python
+SYNC_FILES = [
+    "agent/",                         # Agent 配置
+    "assets/",                        # 资源文件
+    "channel/wechat/account.json",   # ← 必须（微信 session_id）
+    "diary/",                         # 日记 MD 文件
+    "docs/",                          # 用户文档
+    "external_files/",                # 外部文件
+    "plan/",                          # 计划文件
+    "prompts/",                       # 自定义 prompt
+    "session/",                       # chat_history JSONL
+    "user/",                          # 用户配置
+    "workflow/",                      # 工作流配置
+]
+```
+
+**不同步的目录/文件**：
+```python
+EXCLUDE_FROM_SYNC = [
+    ".schedule_state.json",           # 定时任务状态
+    "config/",                        # 配置文件（手动同步）
+    "dataset/",                       # 数据集（不走文件同步）
+    "debug_logs/",                    # 调试日志
+    "screenshots/",                   # 截图
+    "channel/wechat/media/",          # 微信媒体文件
+]
+```
+
+**增量同步**：
+
+```python
+def get_changed_files(directory: Path, last_sync_time: datetime) -> list[dict]:
+    """获取自上次同步后变更的文件"""
+    changed = []
+    for file_path in directory.rglob("*"):
+        if not file_path.is_file():
+            continue
+        mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+        if mtime > last_sync_time:
+            content_bytes = gzip.compress(file_path.read_bytes())
+            changed.append({
+                "path": str(file_path.relative_to(data_path)),
+                "content": base64.b64encode(content_bytes).decode(),
+                "mtime": mtime.isoformat()
+            })
+    return changed
+```
+
+**冲突解决**：Last-Write-Wins（比较 `mtime`）
+
+**为什么简单策略足够**：
+1. 云端 agent-only **不启动 dreaming**（已确认）
+2. 文件修改只来自会话（agent 处理消息）
+3. 同一时间只有一端的 agent 在工作（本地在线则云端跳过）
+4. **不会同时修改同一个文件**
+
+**性能估算**：
+- 单个 session JSONL：~10KB
+- 10 分钟增量：1-2 个文件，~20KB
+- gzip 压缩率：~70%，传输 ~6KB
+
+**关键文件**：`channel/wechat/account.json` 必须同步，包含微信 session_id，保证云端对话历史连贯。
+
+#### 12. 云端与本地 API 区分
+
+**问题**：当前 `sync_cloud_api.py` 同时被本地和云端注册，职责混乱。
+
+**解决方案**：明确区分云端提供的 API 和本地提供的 API。
+
+**云端 API**（`main_agent_only.py` 提供，端口 8101）：
+
+云端启动轻量 FastAPI 服务，仅同步 API：
+
+```python
+# main_agent_only.py
+async def _run_agent_and_api():
+    # 1. 创建 FastAPI 实例（仅同步 API）
+    from fastapi import FastAPI
+    from lifeprism.server.api import sync_cloud_router
+    
+    app = FastAPI(title="LifePrism Agent Only")
+    app.include_router(sync_cloud_router)  # 仅云端同步 API
+    
+    # 2. 启动 FastAPI（后台任务）
+    config = uvicorn.Config(app, host="0.0.0.0", port=8101, log_level="info")
+    server = uvicorn.Server(config)
+    api_task = asyncio.create_task(server.serve())
+    
+    # 3. 启动 Agent Loop + WeChat Channel
+    init_database_full()
+    loop_task, wechat_channel = await start_agent_and_channel()
+    
+    # 4. 等待终止信号
+    # ...
+```
+
+云端提供的端点：
+```
+POST /api/sync/pull          # 本地调用：从云端拉取数据
+POST /api/sync/push          # 本地调用：推送数据到云端
+POST /api/sync/pull-files    # 本地调用：拉取文件
+POST /api/sync/push-files    # 本地调用：推送文件
+POST /api/sync/heartbeat     # 本地调用：发送心跳/生命周期事件
+```
+
+**本地 API**（`main.py` 提供，端口默认）：
+
+本地提供同步状态查询和配置生成：
+
+```python
+# main.py
+app.include_router(sync_router, prefix="/api/v2")       # ActivityWatch 同步
+# app.include_router(sync_cloud_router)  # ← 删除，这是云端提供的
+app.include_router(sync_status_router)   # 本地同步状态查询
+app.include_router(cloud_config_router)  # 云端配置生成
+```
+
+本地提供的端点：
+```
+GET /api/sync/status                    # 查询同步状态
+POST /api/sync/trigger                  # 手动触发同步
+POST /api/sync/generate-cloud-config    # 生成云端配置
+```
+
+本地调用云端 API：
+```python
+# SyncClient 通过 httpx 调用云端
+httpx.post(f"{remote_url}/api/sync/pull", ...)
+httpx.post(f"{remote_url}/api/sync/push", ...)
+```
+
+**理由**：
+- 云端必须提供 HTTP API（否则本地无法调用 pull/push）
+- 本地不应提供云端 API（职责混乱）
+- 明确区分：云端提供数据，本地提供状态查询
+
 ### P2 Testing Decisions
 
 #### 1. 同步逻辑测试
@@ -571,6 +917,8 @@ if config.get("monitor_type") != "none":
 - `test_push_sends_local_changes`：推送本地变更到云端
 - `test_sync_updates_last_sync_time_only_on_success`：只有全部成功才更新同步时间
 - `test_sync_handles_network_failure`：网络失败时的重试逻辑
+- `test_pull_batched_large_dataset`：分批拉取大数据集
+- `test_dynamic_table_sync`：动态表（custom_records_{slug}）同步
 
 **Mock 策略**：
 - Mock HTTP 请求（`httpx.AsyncClient`）
@@ -604,6 +952,44 @@ if config.get("monitor_type") != "none":
 - `test_wechat_token_fallback`：微信 Token fallback
 - `test_sync_api_key_fallback`：同步 API Key fallback
 
+#### 5. 心跳状态管理测试
+**测试文件**：`test/unit/sync/test_heartbeat_manager.py`
+
+**测试用例**：
+- `test_is_local_online_initial_state`：初始状态为离线
+- `test_is_local_online_after_heartbeat`：心跳后在线
+- `test_is_local_online_timeout`：超时后离线
+- `test_explicit_offline_event`：显式 offline 事件立即生效
+- `test_thread_safety`：多线程安全
+
+#### 6. 文件同步测试
+**测试文件**：`test/integration/test_file_sync.py`
+
+**测试用例**：
+- `test_pull_files_incremental`：增量拉取文件
+- `test_push_files_changed_only`：只推送变更文件
+- `test_file_conflict_lww`：文件冲突 Last-Write-Wins
+- `test_sync_account_json`：同步 channel/wechat/account.json
+- `test_exclude_patterns`：排除指定目录/文件
+
+#### 7. 消息路由测试
+**测试文件**：`test/integration/test_message_routing.py`
+
+**测试用例**：
+- `test_cloud_skips_when_local_online`：本地在线时云端跳过
+- `test_cloud_processes_when_local_offline`：本地离线时云端处理
+- `test_cloud_takeover_after_timeout`：超时后云端接管
+- `test_explicit_offline_takeover`：显式 offline 后云端接管
+
+#### 8. 云端 API 启动测试
+**测试文件**：`test/integration/test_agent_only_api.py`
+
+**测试用例**：
+- `test_agent_only_starts_fastapi`：agent-only 启动 FastAPI
+- `test_sync_endpoints_available`：同步端点可访问
+- `test_heartbeat_endpoint_available`：心跳端点可访问
+- `test_agent_loop_starts`：Agent Loop 正常启动
+
 ### P2 Out of Scope
 
 以下内容不在 P2 实现范围内：
@@ -614,6 +1000,9 @@ if config.get("monitor_type") != "none":
 - 数据库静态加密（SQLCipher）
 - Web Demo 演示数据生成（AI 生成假数据）
 - Docker 容器部署（P3 考虑）
+- 文件同步的行级合并（JSONL 文件不做行级 diff）
+- 本地在线状态持久化（纯内存管理，服务重启 15 分钟内自动恢复）
+- IP 白名单、请求签名（HMAC-SHA256）等高级安全机制（HTTPS + API Key 已足够）
 
 ### P2 验收标准
 
@@ -623,12 +1012,23 @@ if config.get("monitor_type") != "none":
 - ✅ 前端能生成云端配置文件并打开文件夹
 - ✅ 云端 CLI 命令正常工作（`reinit-config`、`show-config`、`test-llm`）
 - ✅ API Key 过期后能通过 CLI 重新配置
+- ✅ 本地在线时微信消息由本地处理，本地离线时由云端处理
+- ✅ 本地正常关闭后云端立即接管微信消息
+- ✅ 本地异常退出后云端在 15 分钟内接管微信消息
+- ✅ 云端对话使用与本地相同的 session_id（通过同步 channel/wechat/account.json）
+- ✅ 动态表（custom_records_{slug}）能正确同步
 
 #### 技术验收
-- ✅ 同步测试全部通过
-- ✅ 增量查询使用索引，耗时 < 100ms
+- ✅ 所有 31 张静态表 + 动态表能正确同步
+- ✅ 文件同步覆盖所有必需目录（session/、channel/wechat/account.json 等）
+- ✅ 增量查询使用索引，耗时 < 200ms（31 个表）
+- ✅ 首次同步分批传输，总耗时 < 60 秒
 - ✅ Key 读取 fallback 逻辑正常工作
 - ✅ 代码修改集中在读取层，无耦合
+- ✅ 心跳机制线程安全
+- ✅ 云端 agent-only 启动 FastAPI 服务（端口 8101）
+- ✅ 本地 main.py 移除 sync_cloud_router 注册
+- ✅ 同步测试全部通过
 
 #### 安全验收
 - ✅ HTTPS 证书配置正确

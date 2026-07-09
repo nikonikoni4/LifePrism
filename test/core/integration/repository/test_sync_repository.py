@@ -585,6 +585,83 @@ class TestUpsertRowsWithLww:
             repository.upsert_rows_with_lww("nonexistent_table_xyz", rows)
 
 
+# ==================== Seam 4b: batch_get_existing_updated_at() ====================
+
+
+class TestBatchGetExistingUpdatedAt:
+    """测试 batch_get_existing_updated_at() 方法"""
+
+    def test_batch_get_existing_updated_at_returns_correct_mapping(
+        self, repository, initialized_db
+    ):
+        """批量查询：返回正确的 {pk_value: updated_at} 映射"""
+        # Arrange: 插入 3 条记录
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO mood_entries (id, mood_type_id, score, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                ("batch-001", "happy", 5, "2026-07-01 10:00:00", "2026-07-01 10:00:00"),
+            )
+            cursor.execute(
+                "INSERT INTO mood_entries (id, mood_type_id, score, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                ("batch-002", "calm", 7, "2026-07-01 11:00:00", "2026-07-01 11:00:00"),
+            )
+            cursor.execute(
+                "INSERT INTO mood_entries (id, mood_type_id, score, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                ("batch-003", "joy", 9, "2026-07-01 12:00:00", "2026-07-01 12:00:00"),
+            )
+            conn.commit()
+
+        # Act: 批量查询 3 个主键
+        pk_values = ["batch-001", "batch-002", "batch-003"]
+        result = repository.batch_get_existing_updated_at("mood_entries", "id", pk_values)
+
+        # Assert: 返回正确的映射
+        assert isinstance(result, dict)
+        assert len(result) == 3
+        assert result["batch-001"] == "2026-07-01 10:00:00"
+        assert result["batch-002"] == "2026-07-01 11:00:00"
+        assert result["batch-003"] == "2026-07-01 12:00:00"
+
+    def test_batch_get_existing_updated_at_returns_empty_for_empty_pk_values(
+        self, repository, initialized_db
+    ):
+        """批量查询：空 pk_values 列表返回空 dict"""
+        # Act
+        result = repository.batch_get_existing_updated_at("mood_entries", "id", [])
+
+        # Assert
+        assert result == {}
+
+    def test_batch_get_existing_updated_at_excludes_nonexistent_pk(
+        self, repository, initialized_db
+    ):
+        """批量查询：不存在的 pk 不在返回结果中"""
+        # Arrange: 只插入 1 条记录
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO mood_entries (id, mood_type_id, score, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                ("batch-exist", "happy", 5, "2026-07-01 10:00:00", "2026-07-01 10:00:00"),
+            )
+            conn.commit()
+
+        # Act: 查询 1 个存在 + 2 个不存在的 pk
+        pk_values = ["batch-exist", "nonexistent-001", "nonexistent-002"]
+        result = repository.batch_get_existing_updated_at("mood_entries", "id", pk_values)
+
+        # Assert: 只有存在的 pk 在结果中
+        assert len(result) == 1
+        assert "batch-exist" in result
+        assert "nonexistent-001" not in result
+        assert "nonexistent-002" not in result
+        assert result["batch-exist"] == "2026-07-01 10:00:00"
+
+
 # ==================== Seam 5: get_unique_fields() / _is_autoincrement_table() ====================
 
 

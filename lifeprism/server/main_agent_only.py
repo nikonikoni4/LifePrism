@@ -1,19 +1,20 @@
 """
 LifePrism Linux Agent Only 启动入口 + 云端 CLI 管理
 
-运行形态：Agent Loop + WeChat Channel（无 FastAPI，无 Monitor，无 ScheduleService）
+运行形态：Agent Loop + WeChat Channel + 轻量 FastAPI（仅同步 API，无 Monitor，无 ScheduleService）
 
-适用场景：仅需 AI 助手对话能力，不需要 Web 界面。
+适用场景：仅需 AI 助手对话能力 + 云端数据同步，不需要完整 Web 界面。
 Agent 通过微信渠道接收/回复消息，直接读写数据库。
+FastAPI 仅提供同步 API（端口 8101），供本地客户端拉取/推送数据。
 
 与 Web Demo 模式的区别：
-- 不启动 FastAPI 服务（无 HTTP API）
+- 仅启动轻量 FastAPI（仅同步 API，端口 8101，不含业务 API）
 - 不启动 Monitor 模块
 - 不启动 ScheduleService
 - 资源占用更低
 
 CLI 命令：
-    python -m lifeprism.server.main_agent_only [start]         # 启动 Agent Loop（默认）
+    python -m lifeprism.server.main_agent_only [start]         # 启动 Agent Loop + FastAPI 同步服务（默认）
     python -m lifeprism.server.main_agent_only reinit-config   # 重新初始化配置
     python -m lifeprism.server.main_agent_only show-config     # 查看当前配置（脱敏）
     python -m lifeprism.server.main_agent_only test-llm        # 测试 LLM 连接
@@ -28,7 +29,12 @@ CLI 命令：
 
 import argparse
 import asyncio
+import contextlib
 import signal
+
+import uvicorn
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 # 配置初始化（必须在所有 lifeprism 模块之前）
 from lifeprism.config.cloud_initializer import CloudInitializer
@@ -40,9 +46,67 @@ from lifeprism.server.bootstrap import (
     start_agent_and_channel,
     stop_agent_and_channel,
 )
+from lifeprism.server.errors import to_http_exception
 from lifeprism.utils import get_logger
+from lifeprism.utils.exceptions import LWBaseError
 
 logger = get_logger(__name__)
+
+
+# ==================== 全局异常处理器 ====================
+
+
+async def _lw_base_error_handler(request: Request, exc: LWBaseError):
+    """统一处理所有 LWBaseError 子类异常（与 main.py 保持一致）。
+
+    映射关系（由 _fallback_code + ERROR_CODE_TO_STATUS 决定）：
+    - NotFoundError       → 404
+    - ConflictError       → 409
+    - ValidationError     → 422
+    - DataAccessError     → 500
+    - ExternalServiceError → 503
+    """
+    http_exc = to_http_exception(exc)
+    if http_exc.status_code < 500:
+        logger.warning(
+            "%s: %s (code=%s, path=%s)",
+            type(exc).__name__,
+            exc.message,
+            exc.code,
+            request.url.path,
+        )
+    else:
+        logger.error(
+            "%s: %s (code=%s, path=%s)",
+            type(exc).__name__,
+            exc.message,
+            exc.code,
+            request.url.path,
+            exc_info=True,
+        )
+    return JSONResponse(
+        status_code=http_exc.status_code,
+        content=http_exc.detail,
+    )
+
+
+async def _global_exception_handler(request: Request, exc: Exception):
+    """全局兜底异常处理器 → 500（与 main.py 保持一致）。捕获所有非 LWBaseError 的未知异常。"""
+    logger.error(
+        "未处理的异常: type=%s, error=%s, path=%s",
+        type(exc).__name__,
+        str(exc),
+        request.url.path,
+        exc_info=True,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error_code": "INTERNAL_ERROR",
+            "message": "服务器内部错误",
+            "details": {},
+        },
+    )
 
 
 # test-llm 命令发送的测试消息
@@ -193,31 +257,66 @@ def cmd_test_llm(args: argparse.Namespace) -> None:
         print(f"LLM 回复: {response.content}")
 
 
-# ==================== Agent Loop 主循环（原有逻辑）====================
+# ==================== Agent Loop + FastAPI 主循环 ====================
 
 
-async def _run_agent_loop() -> None:
-    """
-    Agent Only 主循环。
+async def _run_agent_and_api() -> None:
+    """Agent Only 主循环 + FastAPI 同步服务。
 
     启动流程：
-        1. 数据库初始化（建表 + 迁移 + 默认数据 + 资源文件）
-        2. 启动 WeChat Channel（接收/发送消息）
-        3. 启动 Agent Loop（处理消息、调用工具）
-        4. 等待 Agent Loop 运行（直到收到终止信号）
-        5. 优雅关闭
+        1. 创建 FastAPI 实例（仅注册 sync_cloud_router）
+        2. 启动 uvicorn 服务（后台任务，端口 8101）
+        3. 数据库初始化（建表 + 迁移 + 默认数据 + 资源文件）
+        4. 启动 Agent Loop + WeChat Channel
+        5. 等待终止信号或 Agent Loop 异常退出
+        6. 优雅关闭 FastAPI 和 Agent Loop
     """
+    from fastapi import FastAPI
+
+    from lifeprism.server.api import sync_cloud_router
+
     logger.info("=== LifePrism Agent Only 模式启动 ===")
 
-    # 1. 数据库初始化
+    # 1. 创建 FastAPI 实例（仅同步 API）
+    app = FastAPI(
+        title="LifePrism Agent Only - Sync API",
+        description="云端同步 API 服务（仅数据同步，不包含业务 API）",
+        version="1.0.0",
+        openapi_url=None,
+        docs_url=None,
+        redoc_url=None,
+    )
+    app.include_router(sync_cloud_router)
+
+    # 注册全局异常处理器（与 main.py 保持一致）
+    # 确保 verify_sync_api_key 抛出的 ValidationError 等返回 422 而非默认 500
+    app.add_exception_handler(LWBaseError, _lw_base_error_handler)
+    app.add_exception_handler(Exception, _global_exception_handler)
+    logger.info("[AGENT-ONLY] 全局异常处理器已注册（LWBaseError + Exception）")
+
+    logger.info("[AGENT-ONLY] FastAPI 实例创建完成（仅同步 API）")
+
+    # 2. 启动 FastAPI（后台任务）
+    config = uvicorn.Config(
+        app,
+        host="0.0.0.0",
+        port=8101,
+        log_level="info",
+    )
+    server = uvicorn.Server(config)
+    api_task = asyncio.create_task(server.serve())
+    logger.info("[AGENT-ONLY] FastAPI 启动: host=0.0.0.0, port=8101")
+
+    # 3. 数据库初始化
     logger.info("正在初始化数据库...")
     init_database_full()
 
-    # 2. 启动 Agent + Channel
+    # 4. 启动 Agent + Channel
     logger.info("正在启动 Agent Loop 和 WeChat Channel...")
     loop_task, wechat_channel = await start_agent_and_channel()
+    logger.info("[AGENT-ONLY] Agent Loop + WeChat Channel 启动完成")
 
-    # 3. 注册信号处理（优雅关闭）
+    # 5. 注册信号处理（优雅关闭）
     stop_event = asyncio.Event()
 
     def _signal_handler(sig_name: str) -> None:
@@ -232,9 +331,10 @@ async def _run_agent_loop() -> None:
             # Windows 不支持 add_signal_handler，回退到 signal.signal
             signal.signal(sig, lambda *_, _sig=sig: _signal_handler(_sig.name))
 
-    # 4. 等待终止信号或 Agent Loop 异常退出
+    # 6. 等待终止信号或 Agent Loop 异常退出
+    stop_wait_task = asyncio.create_task(stop_event.wait())
     done, pending = await asyncio.wait(
-        {loop_task, asyncio.create_task(stop_event.wait())},
+        {loop_task, stop_wait_task},
         return_when=asyncio.FIRST_COMPLETED,
     )
 
@@ -246,10 +346,32 @@ async def _run_agent_loop() -> None:
         else:
             logger.info("Agent Loop 正常退出")
 
-    # 5. 优雅关闭
+    # 7. 停止 FastAPI 服务
+    logger.info("[AGENT-ONLY] 正在停止 FastAPI 服务...")
+    server.should_exit = True
+    try:
+        await api_task
+    except asyncio.CancelledError:
+        logger.info("[AGENT-ONLY] FastAPI 任务已取消")
+
+    # 取消未完成的 stop_wait_task
+    if not stop_wait_task.done():
+        stop_wait_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await stop_wait_task
+
+    # 8. 优雅关闭 Agent 和 Channel
     logger.info("正在关闭 Agent 和 Channel...")
     await stop_agent_and_channel(loop_task, wechat_channel)
     logger.info("=== LifePrism Agent Only 已关闭 ===")
+
+
+async def _run_agent_loop() -> None:
+    """Agent Only 主循环（委托给 _run_agent_and_api）。
+
+    保留此函数以兼容 test_cloud_cli.py 的 noop_agent_loop fixture。
+    """
+    await _run_agent_and_api()
 
 
 # ==================== CLI 入口 ====================

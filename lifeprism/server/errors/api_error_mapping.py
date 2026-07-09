@@ -26,6 +26,7 @@ from lifeprism.server.errors.error_codes import (
     HABIT_NOT_FOUND,
     INTERNAL_ERROR,
     INVALID_CONFIG,
+    INVALID_HEARTBEAT_EVENT,
     INVALID_STATUS_TRANSITION,
     INVALID_SYNC_API_KEY,
     LLM_OUTPUT_PARSE_ERROR,
@@ -82,6 +83,7 @@ ERROR_CODE_TO_STATUS: dict[str, int] = {
     DEMO_MODE_NOT_SUPPORTED: 422,
     # 同步模块
     INVALID_SYNC_API_KEY: 422,
+    INVALID_HEARTBEAT_EVENT: 422,
 }
 
 
