@@ -26,7 +26,7 @@ export const DemoDialog: React.FC<DemoDialogProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative w-full max-w-4xl mx-4 bg-white rounded-lg shadow-xl">
+      <div className="relative w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto bg-white rounded-lg shadow-xl">
         {/* 关闭按钮 */}
         <button
           onClick={handleClose}
