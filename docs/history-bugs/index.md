@@ -1,3 +1,10 @@
+## 2026-07-09-run-mode-persisted-to-yaml
+
+- updated_at: 2026-07-09
+- path: `docs/history-bugs/2026-07-09-run-mode-persisted-to-yaml.md`
+- 触发规则：在排查不同部署模式（full/web_demo/agent_only）行为不一致、sync_service 在 web_demo 下仍允许同步、schedule_service 在 web_demo 下仍注册定时任务、wechat channel 云端路由不生效时阅读
+- 内容摘要：记录了 `run_mode` 被定义在 `DEFAULTS` 中导致首次启动写入 yaml，之后切换入口不会更新。三个入口文件都没有显式设置当前运行模式，完全依赖 yaml 中始终为 `"full"` 的值，导致所有模式守卫失效。修复方案是引入 `_runtime_config` 字典分离运行时配置和持久化配置，三个入口文件显式注入对应 run_mode。
+
 ## 2026-07-09-monitor-type-none-aw-db-crash
 
 - updated_at: 2026-07-09
