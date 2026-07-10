@@ -213,7 +213,10 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
             setIsProcessing(true);
             await CategoryMapCacheAPI.update(editingRecord.id, {
                 app_description: editForm.app_description || null,
-                title_analysis: editForm.title_analysis || null,
+                // 只有多用途应用才传递 title_analysis
+                ...(editingRecord.is_multipurpose_app && {
+                    title_analysis: editForm.title_analysis || null
+                }),
                 category_id: editForm.category_id || null,
                 sub_category_id: editForm.sub_category_id || null,
                 link_to_goal_id: editForm.link_to_goal_id || null,
@@ -225,7 +228,10 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                     ? {
                         ...r,
                         app_description: editForm.app_description || null,
-                        title_analysis: editForm.title_analysis || null,
+                        // 只有多用途应用才更新 title_analysis
+                        ...(editingRecord.is_multipurpose_app && {
+                            title_analysis: editForm.title_analysis || null
+                        }),
                         category_id: editForm.category_id || null,
                         sub_category_id: editForm.sub_category_id || null,
                         link_to_goal_id: editForm.link_to_goal_id || null,
@@ -693,16 +699,19 @@ const CategoryMapCacheTab: React.FC<CategoryMapCacheTabProps> = ({ categories })
                                     placeholder="输入应用描述..."
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">标题分析</label>
-                                <textarea
-                                    value={editForm.title_analysis}
-                                    onChange={(e) => setEditForm(prev => ({ ...prev, title_analysis: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
-                                    rows={2}
-                                    placeholder="输入标题分析..."
-                                />
-                            </div>
+                            {/* 只有多用途应用才显示标题分析编辑框 */}
+                            {editingRecord.is_multipurpose_app && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">标题分析</label>
+                                    <textarea
+                                        value={editForm.title_analysis}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, title_analysis: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                                        rows={2}
+                                        placeholder="输入标题分析..."
+                                    />
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">主分类</label>
                                 <select
