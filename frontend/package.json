@@ -5,7 +5,7 @@
   "version": "0.1.3",
   "type": "module",
   "author": "LifePrism Team",
-  "description": "LifePrism - 数据驱动的自我成长平台",
+  "description": "LifePrism - 记录自己，读懂自己",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
