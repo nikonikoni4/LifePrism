@@ -51,7 +51,7 @@ export const EntryCard: React.FC<EntryCardProps> = ({
     }
   }
 
-  const { layout, title, main, chips } = analyzeCardLayout(fields, data, overrides);
+  const { layout, title, mains, chips } = analyzeCardLayout(fields, data, overrides);
   const tpl = getTemplatePreset(templateId);
   const layoutLabel = LAYOUT_LABELS[layout] || layout;
 
@@ -88,9 +88,10 @@ export const EntryCard: React.FC<EntryCardProps> = ({
             {title && (
               <h3 className={`${tpl.titleClass} leading-snug`}>{title}</h3>
             )}
-            {main && (
-              <p className={`${tpl.mainClass} whitespace-pre-wrap`}>{main}</p>
-            )}
+            {/* 多个正文段落叠加渲染 */}
+            {mains.map((m) => (
+              <p key={m.field_key} className={`${tpl.mainClass} whitespace-pre-wrap`}>{m.value}</p>
+            ))}
             {chips.length > 0 && (
               <div className="flex gap-1.5 flex-wrap pt-1">
                 {chips.map(chip => {
@@ -119,7 +120,7 @@ export const EntryCard: React.FC<EntryCardProps> = ({
               return (
                 <div key={chip.field_key} className="flex items-center gap-2 text-xs">
                   <span className="opacity-40 min-w-[60px]">{chip.field_name}</span>
-                  <span className={`font-medium ${color.text}`}>{chip.value || '—'}</span>
+                  <span className={`font-medium ${color.text}`}>{chip.value}</span>
                 </div>
               );
             })}
@@ -135,7 +136,7 @@ export const EntryCard: React.FC<EntryCardProps> = ({
                   key={chip.field_key}
                   className={`text-xs px-2.5 py-1 rounded-lg ${tpl.chipClass} ${color.bg} ${color.text} border ${color.border} font-medium`}
                 >
-                  {chip.value || '—'}
+                  {chip.value}
                 </span>
               );
             })}

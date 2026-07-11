@@ -2,7 +2,7 @@
  * L1 启发式布局引擎
  *
  * 输入: fields[] (字段定义) + data{} (单条记录数据) + overrides{} (用户覆盖)
- * 输出: { layout, title, main, chips, hidden }
+ * 输出: { layout, title, mains, chips, hidden }
  *
  * 字段角色识别优先级:
  *   1. 用户覆盖 (overrides[field_key] = 'title'/'main'/'chip'/'hidden')
@@ -10,9 +10,14 @@
  *   3. 内容长度启发
  *
  * 布局模式决策:
- *   - note: 有 main 字段 → 标题 + 大段正文 + chips
+ *   - note: 有 main 字段 → 标题 + 大段正文（支持多个叠加） + chips
  *   - tight: 无 main，chips 全短(<12字) → 纯标签云
  *   - compact: 无 main 但有中长字段 → 键值对列表
+ *
+ * 空字段处理:
+ *   - 无论字段配置为什么角色，若值为空（空字符串/null/undefined），则不渲染
+ *   - 标题（title）只能有一个：若配置的 title 为空，第一个非空的 title 候选成为标题
+ *   - 正文（main）支持多个叠加：所有配置为 main 且非空的字段按顺序渲染
  */
 
 import type { FieldDefinition } from '../types';
@@ -41,7 +46,7 @@ export type FieldRole = 'title' | 'main' | 'chip' | 'hidden' | 'auto';
 export interface CardLayoutResult {
   layout: LayoutMode;
   title: string | null;
-  main: string | null;
+  mains: { field_key: string; field_name: string; value: string }[];
   chips: { field_key: string; field_name: string; value: string }[];
   hidden: string[];
 }
@@ -75,11 +80,19 @@ const resolveRole = (
   if (matchKeywords(field.field_key, field.field_name, TITLE_KEYWORDS)) return 'title';
   if (matchKeywords(field.field_key, field.field_name, MAIN_KEYWORDS)) return 'main';
 
-  // 3. 内容长度启发
+  // 3. 内容长度启发（空值不参与启发，直接作为 chip 但会被过滤）
   if (value.length > 25) return 'main';
   if (value.length <= 20) return 'chip';
   // 20-25 且无主体 → main
   return 'main';
+};
+
+/**
+ * 判断值是否为空（空字符串、null、undefined、仅空白字符）
+ */
+const isEmpty = (val: string | null | undefined): boolean => {
+  if (val == null) return true;
+  return val.trim().length === 0;
 };
 
 // ==================== 主函数 ====================
@@ -90,23 +103,30 @@ export function analyzeCardLayout(
   overrides: Overrides = {},
 ): CardLayoutResult {
   let title: string | null = null;
-  let main: string | null = null;
+  const mains: { field_key: string; field_name: string; value: string }[] = [];
   const chips: { field_key: string; field_name: string; value: string }[] = [];
   const hidden: string[] = [];
 
+  // 收集所有角色为 title 的非空候选（用于 fallback）
+  const titleCandidates: { field_key: string; field_name: string; value: string }[] = [];
+
   for (const field of fields) {
-    const value = data[field.field_key] ?? '';
+    const rawValue = data[field.field_key];
+    const value = rawValue ?? '';
+
+    // 空值检查：无论什么角色，空值都不渲染（hidden 除外，它本来就不渲染）
+    if (isEmpty(value)) {
+      continue;
+    }
 
     const role = resolveRole(field, overrides, value);
 
     switch (role) {
       case 'title':
-        if (title === null) title = value;
-        else chips.push({ field_key: field.field_key, field_name: field.field_name, value });
+        titleCandidates.push({ field_key: field.field_key, field_name: field.field_name, value });
         break;
       case 'main':
-        if (main === null) main = value;
-        else chips.push({ field_key: field.field_key, field_name: field.field_name, value });
+        mains.push({ field_key: field.field_key, field_name: field.field_name, value });
         break;
       case 'hidden':
         hidden.push(field.field_key);
@@ -118,9 +138,18 @@ export function analyzeCardLayout(
     }
   }
 
+  // 标题选择：第一个非空 title 候选成为标题，其余降级为 chip
+  if (titleCandidates.length > 0) {
+    title = titleCandidates[0].value;
+    // 其余 title 候选降级为 chip
+    for (let i = 1; i < titleCandidates.length; i++) {
+      chips.push(titleCandidates[i]);
+    }
+  }
+
   // 布局模式决策
   let layout: LayoutMode;
-  if (main !== null) {
+  if (mains.length > 0) {
     layout = 'note';
   } else if (chips.length > 0 && chips.every(c => c.value.length < 12)) {
     layout = 'tight';
@@ -128,5 +157,5 @@ export function analyzeCardLayout(
     layout = 'compact';
   }
 
-  return { layout, title, main, chips, hidden };
+  return { layout, title, mains, chips, hidden };
 }
