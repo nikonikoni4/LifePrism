@@ -262,6 +262,55 @@ providers:  # list[dict] — 全部 provider 元数据
     # ...
 ```
 
+### Provider 双层命名体系（display_name ↔ name）
+
+Provider 系统使用两层命名来区分"用户可见名称"和"系统内部标识符"。**任何跨越这两层命名的代码边界（如 cloud_init 生成/消费、配置验证）都必须显式转换。**
+
+#### 两层命名的定义
+
+| 维度 | `name`（内部标识符） | `display_name`（显示名称） |
+|------|---------------------|--------------------------|
+| **格式** | 全小写 + 下划线，如 `"xiaomi_mimo"` | 含大小写、空格，如 `"Xiaomi MIMO"` |
+| **存储位置** | `providers.yaml` 的 `providers[].name` | `config.yaml` 的 `provider` 字段 |
+| **用途** | keyring username（env_key）、ProviderSpec 匹配、model_history key、is_vlm key | 前端下拉框选项、用户配置文件 |
+| **消费方** | `get_api_key(name)`、`find_by_name(name)`、`get_provider_id(display_name)` | `settings.get("provider")` |
+
+#### 转换方法
+
+| 方法 | 方向 | 行为 |
+|------|------|------|
+| `provider_manager.get_provider_id(provider_name)` | display_name → name | 遍历 raw_specs 按 display_name 匹配返回 name；已是 name 则原样返回 |
+| `provider_manager.name_to_id_map` | display_name → name | 返回 `{display_name: name}` 映射字典（仅含 display_name 非空的 provider） |
+
+#### config.yaml 的 provider 字段契约
+
+**`config.yaml` 的 `provider` 字段存储的是 display_name**（如 `"Xiaomi MIMO"`），原因：
+1. 该字段由前端下拉框 `provider_list`（返回 display_name 列表）写入
+2. 所有后端消费 `settings.provider` 的代码都先调用 `get_provider_id()` 转为内部 name
+
+**消费方期望（所有位置都必须先转换）**：
+
+| 消费位置 | 传入 | 转换方式 |
+|----------|------|----------|
+| `build_llm_client.py:create_llm_client()` | `settings.provider` | `provider_manager.get_provider_id(settings.provider)` |
+| `setting_service.py:save_api_key()` | 前端传来的 provider | `provider_manager.get_provider_id(provider)` |
+| `main_agent_only.py:cmd_show_config()` | `settings.provider` | `provider_manager.get_provider_id(provider)` |
+| `settings_manager.py:is_visual()` | `settings.provider` | `_get_provider_id_from_name()`（仅接受 display_name） |
+
+#### cloud_init.yaml 边界注意事项
+
+`cloud_init.yaml` 是 display_name 和 name 共存的典型边界：
+
+```yaml
+llm:
+  provider: "Xiaomi MIMO"    # ← display_name，来自 settings.get("provider")
+providers:
+  - name: xiaomi_mimo        # ← 内部 name，来自 provider spec
+```
+
+- `CloudInitializer._validate()` 匹配 provider 时，必须通过 `get_provider_id()` 将 display_name 转为内部 name 后再匹配 `providers[].name`
+- 历史 bug：验证时直接用 `p.get("name") == provider` 做精确字符串匹配，导致 `"Xiaomi MIMO" != "xiaomi_mimo"` 失败 → 见 `docs/history-bugs/2026-07-11-cloud-init-provider-display-name-mismatch.md`
+
 ### 配置优先级状态机
 
 ```

@@ -1,4 +1,10 @@
 
+## data-sync-spec
+- updated_at: 2026-07-11
+- path: `docs/specs/2026-07-11-data-sync-spec.md`
+- 触发规则：开发、修改或查询 Windows ↔ Linux 数据同步相关功能时阅读（数据库同步、文件同步、心跳管理、消息路由、云端配置初始化）
+- 内容摘要：数据同步模块规格，定义 30 张静态表 + 动态表的增量同步机制（updated_at + 分批拉取）、LWW 冲突解决策略、文件同步（gzip+base64）、心跳状态管理（纯内存 15 分钟超时）、消息路由（本地在线时云端跳过）、云端配置生成与初始化（CloudConfigGenerator → CloudInitializer）、API Key 认证安全
+
 ## category-spec
 - updated_at: 2026-04-16
 - path: `docs/specs/2026-04-16-category-spec.md`

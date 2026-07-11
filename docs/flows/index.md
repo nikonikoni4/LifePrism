@@ -1,3 +1,9 @@
+## 2026-07-11-data-sync-flow
+ - updated_at : 2026-07-11
+ - path: docs/flows/2026-07-11-data-sync-flow.md
+ - 触发规则：需要理解 Windows ↔ Linux 数据同步完整数据流、云端配置初始化链路（CloudConfigGenerator → CloudInitializer）、数据库 Pull/Push 路径、文件同步增量机制、心跳维护与消息路由决策时读取
+ - 内容摘要：SyncData 数据流，覆盖云端配置初始化（本地生成 cloud_init.yaml → 云端消费写入 config/providers.yaml）、数据库同步完整路径（Pull 分批拉取+LWW 过滤 → Push 增量推送）、文件同步（gzip+base64+mtime LWW）、心跳与消息路由（is_local_online 判断→消息处理分支）共 4 条链路，含 display_name/name 双层命名反常设计说明
+
 ## 2026-07-06-repository-initialization-flow
  - updated_at : 2026-07-06
  - path: docs/flows/2026-07-06-repository-initialization-flow.md

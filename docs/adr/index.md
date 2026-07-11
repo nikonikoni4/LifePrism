@@ -1,10 +1,17 @@
 ---
-version: 1.7
+version: 1.8
 created_at: 2026-04-10
-updated_at: 2026-07-09
-last_updated: 新增 4 个 P2 数据同步相关决策（密钥存储/冲突解决/通信架构/初始化策略）
+updated_at: 2026-07-12
+last_updated: 新增时区迁移决策（UTC + ISO 8601）
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## migrate-to-utc-timezone
+- updated_at: 2026-07-12
+- path: `docs/adr/2026-07-12-migrate-to-utc-timezone.md`
+- 触发规则：当需要理解时区策略、修改时间相关代码、处理时间格式问题、或考虑跨时区部署时读取
+- 内容摘要：时间处理从本地时区迁移到 UTC + ISO 8601 格式。核心原因：解决旧表 UTC 和新表本地时区不一致导致的数据同步失败（LWW 比较错误）、前后端时区不一致、格式混乱、未来云端部署风险。符合业界最佳实践（Laravel/ActivityWatch 等都强制 UTC）。即使是桌面应用也需要 UTC 以避免夏令时、服务器迁移、跨时区用户等问题。
+
 
 ## key-fallback-strategy
 - updated_at: 2026-07-09

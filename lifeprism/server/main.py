@@ -383,7 +383,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("ChatBot 服务关闭时出现警告: error=%s", e)
 
-    # 发送 offline 心跳事件（确保所有资源已清理后通知云端）
+    # 关闭时：推送最终数据到云端（sync → offline 顺序，先同步再告知离线）
+    if hasattr(app.state, "sync_client") and app.state.sync_client:
+        try:
+            await asyncio.to_thread(app.state.sync_client.sync_once)
+            logger.info("[SHUTDOWN] 关闭前同步完成")
+        except Exception as e:
+            logger.warning("[SHUTDOWN] 关闭前同步失败: error=%s", e)
+
+    # 发送 offline 心跳事件（同步完成后通知云端接管）
     await send_heartbeat("offline")
 
 
