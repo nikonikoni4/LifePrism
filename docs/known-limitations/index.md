@@ -4,7 +4,9 @@
 
 ## 索引
 
-- [时区和时间格式不一致](timezone-and-format-inconsistency.md) - 数据库时间字段的时区和格式混乱问题，影响数据同步和业务逻辑
+当前无已知限制。
+
+> 时区和时间格式不一致问题已于 2026-07-12 通过 UTC 时区迁移解决，相关规范见 `docs/coding-rules/time-handling-rules.md`，决策见 `docs/adr/2026-07-12-migrate-to-utc-timezone.md`。
 
 ## 说明
 

@@ -12,6 +12,13 @@
 - 触发规则：开发或修改 API 端点、路由时阅读
 - 内容摘要：API 设计规范，包括路由定义、HTTP 方法、参数验证、错误响应、增量更新（PATCH）三态语义等
 
+## time-handling-rules.md
+
+- updated_at: 2026-07-12
+- path: `docs/coding-rules/time-handling-rules.md`
+- 触发规则：编写涉及时间/时区/日期处理的代码时阅读
+- 内容摘要：全栈时间处理规范，UTC 存储 + ISO 8601 格式 + 展示层本地化，区分时间戳字段与日期字段，约束后端时间生成/序列化/解析/定时任务和前端日期格式化行为
+
 ## frontend-date-handling.md
 
 - updated_at: 2026-04-15
