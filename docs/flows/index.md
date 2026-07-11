@@ -52,3 +52,21 @@
  - path: docs/flows/2026-07-06-llm-session-lifecycle-flow.md
  - 触发规则：需要理解 Session 生命周期管理、JSONL 持久化格式、内存缓存机制、自动压缩（auto_compact）、ChatHistoryManager 聊天历史提取时读取
  - 内容摘要：SessionLifecycleTrace 数据流，覆盖 Session 创建（UUID 生成 + JSONL 初始化）、加载（缓存命中/文件读取两条子路径）、消息追加与自动压缩（token 超标检测 + LLM 压缩）、持久化（JSONL 格式契约 + 图片 base64 剥离）、删除与缓存管理共 5 条链路，含内存缓存 + JSONL 文件双层架构说明
+
+## 2026-07-11-custom-type-lifecycle-flow
+ - updated_at : 2026-07-11
+ - path: docs/flows/2026-07-11-custom-type-lifecycle-flow.md
+ - 触发规则：需要理解自定义记录类型从创建到删除的完整数据流、meta表+DDL事务、动态SET子句更新、字段角色更新时读取
+ - 内容摘要：CustomRecordType+CustomRecordField 数据流，覆盖创建类型（5层校验→事务INSERT types+INSERT fields+CREATE TABLE）、查询类型列表（SELECT types + N次SELECT fields组装）、查询单个类型详情、更新展示配置（动态SET子句+debounce自动保存）、更新字段展示角色（乐观更新+失败回滚+双条件WHERE防误更新）、删除类型（事务DROP TABLE+DELETE fields+DELETE types 逆序操作）共 6 条链路，含 LLM Tool 绕过 Service 层和 Repository 不继承 LWBaseDataProvider 等反常设计说明
+
+## 2026-07-11-custom-entry-crud-flow
+ - updated_at : 2026-07-11
+ - path: docs/flows/2026-07-11-custom-entry-crud-flow.md
+ - 触发规则：需要理解自定义记录条目的录入/查询/删除数据流、REST/AI双通道架构、动态SQL拼接、分页双查询、AI智能重试机制时读取
+ - 内容摘要：CustomRecordEntry 数据流，覆盖录入记录REST路径（动态列INSERT+field_key白名单校验）、录入记录AI Tool路径（绕过Service+SUCCESS/ERROR字符串返回+valid_fields引导重试）、分页查询（COUNT+SELECT双查询+日期范围动态WHERE）、AI查询（固定page=1+limit默认50不分页）、删除记录（with块外抛EntityNotFound防连接池异常）共 5 条链路，含双通道架构和动态SQL拼接安全说明
+
+## 2026-07-11-custom-card-rendering-flow
+ - updated_at : 2026-07-11
+ - path: docs/flows/2026-07-11-custom-card-rendering-flow.md
+ - 触发规则：需要理解前端卡片渲染管线、L1/L2/L3三层布局引擎、多正文叠加、空字段过滤、三布局分支渲染、确定性字段着色时读取
+ - 内容摘要：CardLayoutResult 数据流（纯前端），覆盖布局分析核心管线（空值过滤→resolveRole三级优先级→标题竞争分配→布局模式决策）、L2 overrides构建（从fields.display_role提取）、L3模板预设解析（getTemplatePreset返回CSS类名）、EntryCard三布局分支渲染（note多正文叠加/compact键值对/tight纯标签云）、字段颜色确定性分配、日期分组共 6 条链路，含数据驱动布局和模板-布局正交设计说明

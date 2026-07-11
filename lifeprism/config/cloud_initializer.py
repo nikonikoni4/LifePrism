@@ -186,7 +186,13 @@ class CloudInitializer:
         if not providers:
             errors.append("缺少必需字段: providers（不能为空）")
         elif provider:
-            provider_spec = next((p for p in providers if p.get("name") == provider), None)
+            # 将 display_name 转为内部 name（如 "Xiaomi MIMO" → "xiaomi_mimo"）
+            # cloud_init.yaml 的 llm.provider 来自本地 settings.get("provider")，
+            # 存储的是 display_name；而 providers[].name 是内部 name
+            from lifeprism.config.provider_manager import provider_manager
+
+            provider_id = provider_manager.get_provider_id(provider)
+            provider_spec = next((p for p in providers if p.get("name") == provider_id), None)
             if provider_spec is None:
                 errors.append(f"providers 列表中未找到 llm.provider 对应的 provider: {provider}")
             elif not provider_spec.get("api_key"):

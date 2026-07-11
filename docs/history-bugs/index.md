@@ -1,3 +1,10 @@
+## 2026-07-11-cloud-init-provider-display-name-mismatch
+
+- updated_at: 2026-07-11
+- path: `docs/history-bugs/2026-07-11-cloud-init-provider-display-name-mismatch.md`
+- 触发规则：在排查云端 `reinit-config` 失败、cloud_init.yaml 验证报 "未找到 llm.provider 对应的 provider"、provider 配置了 display_name 和内部 name 两套命名时阅读
+- 内容摘要：记录了 `CloudInitializer._validate()` 直接用 display_name 匹配 providers[].name（内部 name）导致精确匹配失败的问题。根源是项目 Provider 系统有两层命名，cloud_init.yaml 的 `llm.provider` 来自 `settings.get("provider")`（display_name），而 `providers[].name` 是内部 name，验证时缺少 `get_provider_id()` 转换。测试用例 mock 数据用的是内部 name 恰好绕过了此 bug。
+
 ## 2026-07-09-run-mode-persisted-to-yaml
 
 - updated_at: 2026-07-09

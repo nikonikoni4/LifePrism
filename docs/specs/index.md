@@ -108,7 +108,7 @@
 - 内容摘要：WAID 浮窗功能规格，定义浮窗的任务显示逻辑、计时功能规则、拖拽排序机制、状态同步机制，以及相关的 API 契约和 Electron IPC 通信规范。包含创建任务时的字段映射（关联每日目标 goal-daily 和计划文档 每日目标-docs）和计时结束时 CustomBlock 的完整字段结构
 
 ## custom-records-module
-- updated_at: 2026-07-07
+- updated_at: 2026-07-11
 - path: `docs/specs/custom-records-module.md`
-- 触发规则：开发、修改或查询自定义记录模块相关功能时阅读（类型管理、记录CRUD、展示配置、布局引擎、AI工具）
-- 内容摘要：自定义记录模块规格，定义顶级独立模块允许用户通过 AI 创建任意结构化数据类型。采用 SQLite 动态建表 + meta 表元数据驱动方案（custom_record_types + custom_record_fields + custom_<slug> 动态表），8 类 API 端点覆盖类型CRUD + 记录CRUD + PATCH配置 + PATCH字段角色，L1/L2/L3 三层布局引擎（启发式自动布局 + 用户角色覆盖 + 5套视觉模板预设），4 个 LLM Tool（列出/创建类型、录入/查询记录）
+- 触发规则：开发、修改或查询自定义记录模块相关功能时阅读（类型管理、记录CRUD、展示配置、布局引擎、AI工具、ChatPanel集成）
+- 内容摘要：自定义记录模块规格（v1.1），定义顶级独立模块允许用户通过 AI 或表单创建任意结构化数据类型。采用 SQLite 动态建表 + meta 表元数据驱动方案（custom_record_types + custom_record_fields + custom_<slug> 动态表），9 个 API 端点覆盖类型CRUD + 记录CRUD + PATCH配置 + PATCH字段角色，L1/L2/L3 三层布局引擎（启发式自动布局 + 用户角色覆盖 + 5套视觉模板预设），支持多正文叠加渲染和空字段自动过滤，4 个 LLM Tool（列出/创建类型、录入/查询记录），前端集成 ChatPanel AI 侧边栏（卡片/表格/模板对比三视图）
