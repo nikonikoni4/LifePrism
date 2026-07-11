@@ -67,10 +67,13 @@ class AgentLoop:
         self._active_tasks: dict[str, list[asyncio.Task]] = {}  # session_id -> tasks
         self._background_tasks: list[asyncio.Task] = []
         self._running = True
-        self._tool_registry = ToolRegistry()
 
     async def _run_agent_loop(
-        self, session: Session, system_prompt: str, tools: list[dict[str, Any]]
+        self,
+        session: Session,
+        system_prompt: str,
+        tools: list[dict[str, Any]],
+        tool_registry: ToolRegistry,
     ) -> tuple[LLMResponse, list[dict[str, Any]]]:
         """执行 Agent 循环
 
@@ -137,7 +140,7 @@ class AgentLoop:
             # 将模型回复（包含tool_calls）添加到messages中
             for tool_call in response.tool_calls:
                 logger.debug("工具调用 ： %s ，调用参数%s", tool_call.name, tool_call.arguments)
-                result = await self._tool_registry.execute(tool_call.name, tool_call.arguments)
+                result = await tool_registry.execute(tool_call.name, tool_call.arguments)
                 logger.debug("工具结果 ： %s - %s", tool_call.name, result)
 
                 # 先判断工具调用是否出错
@@ -425,38 +428,39 @@ class AgentLoop:
             system_prompt = Context.build_system_prompt(msg)
 
             # 2. 构建tool description
+            tool_registry = ToolRegistry()
             tools = []
             if msg.type == MessageType.CHAT:
-                self._tool_registry.register(UserActivitySummaryTool())
-                self._tool_registry.register(UserComputerLogTool())
-                self._tool_registry.register(UpdateUserBehaviorNoteTool())
-                self._tool_registry.register(UserMoodQuryTool())
-                self._tool_registry.register(UserMoodCreateTool())
-                self._tool_registry.register(ListCustomRecordTypesTool())
-                self._tool_registry.register(CreateCustomRecordTypeTool())
-                self._tool_registry.register(CreateCustomRecordEntryTool())
-                self._tool_registry.register(QueryCustomRecordEntriesTool())
-                self._tool_registry.register(ReadFileTool())
-                self._tool_registry.register(WriteFileTool())
-                self._tool_registry.register(EditFileTool())
-                self._tool_registry.register(FileTreeTool())
-                self._tool_registry.register(SearchFileTool())
-                self._tool_registry.register(SearchStringTool())
-                self._tool_registry.register(QuerySessionListTool())
-                self._tool_registry.register(QuerySessionHistoryTool())
+                tool_registry.register(UserActivitySummaryTool())
+                tool_registry.register(UserComputerLogTool())
+                tool_registry.register(UpdateUserBehaviorNoteTool())
+                tool_registry.register(UserMoodQuryTool())
+                tool_registry.register(UserMoodCreateTool())
+                tool_registry.register(ListCustomRecordTypesTool())
+                tool_registry.register(CreateCustomRecordTypeTool())
+                tool_registry.register(CreateCustomRecordEntryTool())
+                tool_registry.register(QueryCustomRecordEntriesTool())
+                tool_registry.register(ReadFileTool())
+                tool_registry.register(WriteFileTool())
+                tool_registry.register(EditFileTool())
+                tool_registry.register(FileTreeTool())
+                tool_registry.register(SearchFileTool())
+                tool_registry.register(SearchStringTool())
+                tool_registry.register(QuerySessionListTool())
+                tool_registry.register(QuerySessionHistoryTool())
                 if (settings.lifeprism_data_path / "agent/chat/bootstrap.md").exists():
-                    self._tool_registry.register(DeleteBootstrapTool())
-                tools: list[dict[str, Any]] = self._tool_registry.get_definitions()
+                    tool_registry.register(DeleteBootstrapTool())
+                tools: list[dict[str, Any]] = tool_registry.get_definitions()
             elif msg.type == MessageType.DREAM_TASK:
-                self._tool_registry.register(UserActivitySummaryTool())
-                self._tool_registry.register(UserComputerLogTool())
-                self._tool_registry.register(ReadFileTool())
-                self._tool_registry.register(WriteFileTool())
-                self._tool_registry.register(EditFileTool())
-                self._tool_registry.register(FileTreeTool())
-                self._tool_registry.register(SearchFileTool())
-                self._tool_registry.register(SearchStringTool())
-                tools: list[dict[str, Any]] = self._tool_registry.get_definitions()
+                tool_registry.register(UserActivitySummaryTool())
+                tool_registry.register(UserComputerLogTool())
+                tool_registry.register(ReadFileTool())
+                tool_registry.register(WriteFileTool())
+                tool_registry.register(EditFileTool())
+                tool_registry.register(FileTreeTool())
+                tool_registry.register(SearchFileTool())
+                tool_registry.register(SearchStringTool())
+                tools: list[dict[str, Any]] = tool_registry.get_definitions()
             elif msg.type == MessageType.CLASSIFY:
                 tools = []
 
@@ -470,7 +474,9 @@ class AgentLoop:
                 logger.info("保存会话: session_id=%s", session.id)
 
             # 4. 调用 LLM
-            result, tool_call_chain = await self._run_agent_loop(session, system_prompt, tools)
+            result, tool_call_chain = await self._run_agent_loop(
+                session, system_prompt, tools, tool_registry
+            )
 
             # 5. 保存 assistant 回复并发布结果
             await self._bus.publish_outbound(
@@ -495,8 +501,7 @@ class AgentLoop:
                 OutboundMessage(id=msg.id, response=LLMResponse(content=f"[ERROR] {e}"))
             )
         finally:
-            # 7. 清空工具注册表，避免工具累积和不同消息类型的工具混用
-            self._tool_registry.clear()
+            pass
 
     async def loop(self):
 

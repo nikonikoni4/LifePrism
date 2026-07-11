@@ -58,6 +58,16 @@ export const DemoDialog: React.FC<DemoDialogProps> = ({ onClose }) => {
                   顶部工具栏可切换不同功能模块：
                   <strong>LifeWatch</strong>（活动追踪）、目标管理、快捷操作等。
                 </p>
+                <div className="text-sm text-gray-600 space-y-2 mb-3">
+                  <p className="flex items-start gap-2">
+                    <span className="text-base mt-0.5">🖥️</span>
+                    <span><strong>电脑端：</strong>鼠标移动到屏幕<span className="text-blue-600 font-medium">顶部边缘</span>，导航栏会自动弹出</span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <span className="text-base mt-0.5">📱</span>
+                    <span><strong>手机端：</strong>点击屏幕<span className="text-blue-600 font-medium">顶部边缘</span>，导航栏即会显示</span>
+                  </p>
+                </div>
                 <img
                   src="/模块导航栏说明.png"
                   alt="模块导航栏位置说明"
