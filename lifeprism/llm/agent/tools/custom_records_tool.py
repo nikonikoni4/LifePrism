@@ -42,6 +42,11 @@ class ListCustomRecordTypesTool(Tool):
     async def execute(self, **kwargs: Any) -> str:
         try:
             types = custom_record_repository.list_types()
+            for t in types:
+                if "created_at" in t and t["created_at"]:
+                    t["created_at"] = utc_to_local_display(t["created_at"])
+                if "updated_at" in t and t["updated_at"]:
+                    t["updated_at"] = utc_to_local_display(t["updated_at"])
             return f"{SUCCESS}{json.dumps(types, ensure_ascii=False)}"
         except Exception as e:
             return f"{ERROR}查询自定义记录类型失败: {e}"
