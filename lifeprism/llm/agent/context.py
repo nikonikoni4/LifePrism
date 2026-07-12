@@ -1,7 +1,7 @@
 # context 模块负责加载各种外置文件，构建system prompt
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -182,7 +182,7 @@ class Context:
         else:
             channel_type = "未知"
 
-        return f"## runtime\n 当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n 当前对话方式：{channel_type}\n"
+        return f"## runtime\n 当前时间：{datetime.now(timezone.utc).astimezone().strftime('%Y-%m-%d %H:%M:%S')}\n 当前对话方式：{channel_type}\n"
 
     @staticmethod
     def _build_user_message(msg: InboundMessage) -> list[dict[str, Any]]:

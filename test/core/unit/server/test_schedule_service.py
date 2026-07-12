@@ -42,7 +42,7 @@ class TestScheduleService:
         # 模拟 AsyncIOScheduler
         with pytest.MonkeyPatch.context() as m:
             m.setattr("lifeprism.server.services.schedule_service.AsyncIOScheduler", 
-                      lambda: mock_scheduler)
+                      lambda *args, **kwargs: mock_scheduler)
             schedule_service.start()
             
             assert schedule_service._scheduler is not None
@@ -54,7 +54,7 @@ class TestScheduleService:
         
         with pytest.MonkeyPatch.context() as m:
             m.setattr("lifeprism.server.services.schedule_service.AsyncIOScheduler", 
-                      lambda: mock_scheduler)
+                      lambda *args, **kwargs: mock_scheduler)
             schedule_service.start()
             
             # 不应该再次调用 start
@@ -425,8 +425,9 @@ class TestScheduleServiceCronState:
 
     def test_should_execute_cron_today_same_date(self, schedule_service_with_temp_state):
         """测试同一天已执行时不应该再执行"""
-        from datetime import datetime
-        today = datetime.now().strftime("%Y-%m-%d")
+        from datetime import datetime, timezone
+        # 使用 UTC 日期匹配代码行为（_should_execute_cron_today 使用 UTC）
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         # 保存今天的执行记录
         schedule_service_with_temp_state._save_cron_state("update_memory", today)
@@ -471,7 +472,7 @@ class TestScheduleServiceCronState:
     @pytest.mark.asyncio
     async def test_execute_cron_with_state(self, schedule_service_with_temp_state):
         """测试执行 Cron 任务并记录状态"""
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         execution_count = 0
 
@@ -485,10 +486,10 @@ class TestScheduleServiceCronState:
         # 验证任务被执行
         assert execution_count == 1, "任务应该被执行一次"
 
-        # 验证状态被保存
+        # 验证状态被保存（_execute_cron_with_state 使用 UTC 日期记录）
         state = schedule_service_with_temp_state._load_cron_state()
-        today = datetime.now().strftime("%Y-%m-%d")
-        assert state.get("test_job") == today, "执行后应该保存今天的日期"
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        assert state.get("test_job") == today, "执行后应该保存今天的 UTC 日期"
 
     @pytest.mark.asyncio
     async def test_execute_cron_with_state_on_failure(self, schedule_service_with_temp_state):

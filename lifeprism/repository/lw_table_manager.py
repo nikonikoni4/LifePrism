@@ -76,13 +76,11 @@ class LWTableManager:
 
             column_definitions.append(col_def)
 
-        # 2. 添加时间戳列
+        # 2. 添加时间戳列（SQLite datetime('now') 返回 UTC 时间）
         if timestamps:
-            column_definitions.append("created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))")
+            column_definitions.append("created_at TIMESTAMP DEFAULT (datetime('now'))")
             if update_at:
-                column_definitions.append(
-                    "updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
-                )
+                column_definitions.append("updated_at TIMESTAMP DEFAULT (datetime('now'))")
 
         # 3. 添加表级约束
         all_constraints = column_definitions + table_constraints

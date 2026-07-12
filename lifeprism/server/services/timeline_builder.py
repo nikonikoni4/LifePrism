@@ -6,7 +6,7 @@ Timeline Builder - 纯函数模块
 """
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
 import pandas as pd
@@ -595,8 +595,10 @@ def _calculate_time_distribution(
             range_start = df["start_dt"].min().replace(hour=0, minute=0, second=0, microsecond=0)
             range_end = range_start + timedelta(days=1)
         else:
-            # 默认使用当天 00:00 - 24:00
-            range_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            # 默认使用当天 UTC 00:00 - 24:00
+            range_start = datetime.now(timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
             range_end = range_start + timedelta(days=1)
 
     # 计算时间范围（分钟）和每格的间隔

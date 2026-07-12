@@ -1161,8 +1161,8 @@ SCHEMA_VERSION_CONFIG = {
         "name": {"type": "TEXT", "constraints": ["NOT NULL"], "comment": "迁移脚本名称"},
         "applied_at": {
             "type": "TIMESTAMP",
-            "constraints": ["DEFAULT (datetime('now', 'localtime'))"],
-            "comment": "执行时间",
+            "constraints": ["DEFAULT (datetime('now'))"],
+            "comment": "执行时间（UTC）",
         },
     },
     "table_constraints": [],

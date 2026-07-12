@@ -5,7 +5,7 @@ Goal 服务层 - Goal 目标业务逻辑
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from lifeprism.repository import goal_repository
@@ -23,6 +23,7 @@ from lifeprism.server.schemas.goal_schemas import (
 )
 from lifeprism.server.services.category_service import category_service
 from lifeprism.utils import LazySingleton, get_logger
+from lifeprism.utils.time_utils import get_local_today, get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -110,8 +111,8 @@ class GoalService:
         if not start_date:
             return None
         try:
-            start = datetime.strptime(start_date, "%Y-%m-%d")
-            today = datetime.now()
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            today = get_local_today()
             delta = today - start
             return max(0, delta.days)
         except Exception:
@@ -206,8 +207,15 @@ class GoalService:
             return True
 
         try:
-            last_update = datetime.strptime(updated_at, "%Y-%m-%d %H:%M:%S")
-            threshold = datetime.now() - timedelta(hours=TIME_INVESTED_UPDATE_THRESHOLD_HOURS)
+            # 兼容旧格式（空格分隔）和新 ISO 格式（T 分隔）
+            normalized = updated_at.replace(" ", "T", 1) if " " in updated_at else updated_at
+            last_update = datetime.fromisoformat(normalized)
+            if last_update.tzinfo is None:
+                # 旧数据为 naive 本地时间，过渡期按 UTC 处理（24h 阈值容差可接受）
+                last_update = last_update.replace(tzinfo=timezone.utc)
+            threshold = datetime.now(timezone.utc) - timedelta(
+                hours=TIME_INVESTED_UPDATE_THRESHOLD_HOURS
+            )
             return last_update < threshold
         except Exception:
             return True
@@ -231,7 +239,7 @@ class GoalService:
 
         # 更新内存中的记录
         item["time_invested"] = time_invested
-        item["time_invested_updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        item["time_invested_updated_at"] = get_utc_now_iso()
         logger.debug("自动更新目标 %s 投入时间: %s 秒", goal_id, time_invested)
 
         return item
@@ -510,7 +518,7 @@ class GoalService:
             if m.get("id") == milestone_id:
                 m["state"] = state
                 if state == 1:
-                    m["finish_time"] = datetime.now().strftime("%Y-%m-%d")
+                    m["finish_time"] = get_local_today().isoformat()
                 else:
                     m["finish_time"] = None
                 updated = True

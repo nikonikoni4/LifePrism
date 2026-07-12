@@ -12,6 +12,7 @@ import { InputDialog } from '../../shared/components/InputDialog';
 import { RefreshConflictDialog } from '../../shared/components/RefreshConflictDialog';
 import { viewBackground } from '../../shared/backgroundStyles';
 import { toast } from '../../../../../core/components';
+import { toISOStringUTC } from '../../../../../core/utils/dateUtils';
 
 
 export const PlanDocListView: React.FC = () => {
@@ -134,7 +135,7 @@ export const PlanDocListView: React.FC = () => {
         try {
             await planDocApi.updatePlanDoc(selectedDoc.id, { content: prevContentRef.current });
             setHasUnsavedChanges(false);
-            updatePlanDoc({ ...selectedDoc, content: prevContentRef.current, updatedAt: new Date().toISOString() });
+            updatePlanDoc({ ...selectedDoc, content: prevContentRef.current, updatedAt: toISOStringUTC(new Date()) });
         } catch (error) {
             console.error('Silent save failed:', error);
             // 静默保存失败不显示 toast，避免干扰用户操作
@@ -182,7 +183,7 @@ export const PlanDocListView: React.FC = () => {
             await planDocApi.updatePlanDoc(selectedDoc.id, { content: localContent });
             setHasUnsavedChanges(false);
             // Update store after successful save
-            updatePlanDoc({ ...selectedDoc, content: localContent, updatedAt: new Date().toISOString() });
+            updatePlanDoc({ ...selectedDoc, content: localContent, updatedAt: toISOStringUTC(new Date()) });
             toast.success('文档已保存');
         } catch (error) {
             console.error('Save failed:', error);
@@ -222,8 +223,8 @@ export const PlanDocListView: React.FC = () => {
             id: docId,
             goalId: selectedGoalId,
             content: '# New Plan\n',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            createdAt: toISOStringUTC(new Date()),
+            updatedAt: toISOStringUTC(new Date()),
             status: 'active'
         };
 

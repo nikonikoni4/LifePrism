@@ -2,7 +2,7 @@
 
 import json
 import math
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
 from lifeprism.repository import habit_chain_repository, habit_repository
@@ -39,6 +39,7 @@ from lifeprism.server.schemas.habit_schemas import (
 from lifeprism.server.services.habit_stats_service import get_habit_streak
 from lifeprism.utils import LazySingleton, get_logger
 from lifeprism.utils.exceptions import ConflictError, NotFoundError, ValidationError
+from lifeprism.utils.time_utils import get_local_today, get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -100,7 +101,7 @@ class HabitService:
         remaining_checkin_days = self._get_remaining_checkin_days(
             habit_id,
             challenge,
-            date.today(),
+            get_local_today(),
         )
         return max(
             0,
@@ -151,7 +152,7 @@ class HabitService:
             )
 
         # 今日是否已打卡
-        today_str = date.today().isoformat()
+        today_str = get_local_today().isoformat()
         today_checkin = habit_repository.get_checkin_by_date(row["id"], today_str)
 
         return HabitListItem(
@@ -186,7 +187,7 @@ class HabitService:
         - 否则从今天开始
         """
         params = calculate_challenge_params(level, freq)
-        today = date.today()
+        today = get_local_today()
 
         if previous_challenge:
             # 从旧挑战结束日的第二天开始
@@ -222,7 +223,7 @@ class HabitService:
                 current["id"],
                 {
                     "status": "cancelled",
-                    "finished_at": datetime.now().isoformat(),
+                    "finished_at": get_utc_now_iso(),
                 },
             )
 
@@ -356,7 +357,7 @@ class HabitService:
             habit_id,
             {
                 "status": "paused",
-                "paused_at": datetime.now().isoformat(),
+                "paused_at": get_utc_now_iso(),
             },
         )
         return self.get_habit_detail(habit_id)
@@ -412,7 +413,7 @@ class HabitService:
         if not challenge or challenge["status"] != "in_progress":
             return None
 
-        today = date.today()
+        today = get_local_today()
         end_date = date.fromisoformat(challenge["end_date"])
 
         completed = challenge["completed_count"]
@@ -429,7 +430,7 @@ class HabitService:
                     challenge["id"],
                     {
                         "status": "succeeded",
-                        "finished_at": datetime.now().isoformat(),
+                        "finished_at": get_utc_now_iso(),
                     },
                 )
                 habit_repository.update_habit(habit_id, {"current_level": new_level})
@@ -459,7 +460,7 @@ class HabitService:
                     challenge["id"],
                     {
                         "status": "failed",
-                        "finished_at": datetime.now().isoformat(),
+                        "finished_at": get_utc_now_iso(),
                     },
                 )
             return SettlementItem(
@@ -497,7 +498,7 @@ class HabitService:
         required: int,
     ) -> bool:
         """判断补签近7天能否挽救失败挑战"""
-        today = date.today()
+        today = get_local_today()
         start_date = date.fromisoformat(challenge["start_date"])
         end_date = date.fromisoformat(challenge["end_date"])
         backfill_count = 0
@@ -526,7 +527,7 @@ class HabitService:
         if not challenge:
             raise NotFoundError("当前无进行中的挑战", code=CHALLENGE_NOT_FOUND)
 
-        today_str = date.today().isoformat()
+        today_str = get_local_today().isoformat()
         challenge_start = challenge["start_date"]
 
         # 校验打卡日期不能早于挑战开始日期
@@ -536,7 +537,7 @@ class HabitService:
                 code=VALIDATION_FAILED,
             )
 
-        now_str = datetime.now().isoformat()
+        now_str = get_utc_now_iso()
 
         checkin_id = habit_repository.create_checkin(
             {
@@ -587,7 +588,7 @@ class HabitService:
         if not row:
             raise NotFoundError("习惯不存在", code=HABIT_NOT_FOUND)
 
-        today_str = date.today().isoformat()
+        today_str = get_local_today().isoformat()
         if date_str != today_str:
             raise ValidationError("只能取消当天的打卡", code=CANNOT_CANCEL_PAST_CHECKIN)
 
@@ -653,7 +654,7 @@ class HabitService:
         if not challenge or challenge["habit_id"] != habit_id:
             raise NotFoundError("挑战不存在", code=CHALLENGE_NOT_FOUND)
 
-        today = date.today()
+        today = get_local_today()
         seen_dates: set[str] = set()
         results: list[BackfillCheckInResultItem] = []
 
@@ -701,7 +702,7 @@ class HabitService:
                 _append_failed(date_str, date_error, BACKFILL_DATE_OUT_OF_WINDOW)
                 continue
 
-            now_str = datetime.now().isoformat()
+            now_str = get_utc_now_iso()
             checkin_id = habit_repository.create_checkin(
                 {
                     "habit_id": habit_id,
@@ -788,7 +789,7 @@ class HabitService:
 
         start_date = date.fromisoformat(challenge["start_date"])
         end_date = date.fromisoformat(challenge["end_date"])
-        today = date.today()
+        today = get_local_today()
         days: list[BackfillDateAvailabilityItem] = []
 
         for i in range(6, 0, -1):
@@ -842,7 +843,7 @@ class HabitService:
     def check_settlements(self) -> CheckSettlementsResponse:
         """批量检查所有到期未结算挑战（成功落库，失败仅检测不落库）。"""
 
-        today = date.today().isoformat()
+        today = get_local_today().isoformat()
         expired = habit_repository.get_expired_in_progress_challenges(today)
         settlements = []
         for challenge in expired:

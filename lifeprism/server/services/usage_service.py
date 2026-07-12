@@ -4,8 +4,11 @@ Usage 服务层 - Token 使用统计
 提供 Token 使用统计的纯函数接口
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
+import pytz
+
+from lifeprism.config import LOCAL_TIMEZONE
 from lifeprism.config.settings_manager import settings
 from lifeprism.repository import tokens_usage_repository
 from lifeprism.repository.providers.common_query_options import QueryOptions
@@ -22,20 +25,74 @@ from lifeprism.server.schemas.usage_schemas import (
 MODE_CLASSIFICATION = "classification"
 
 
+def _normalize_created_at(created_at: str) -> str:
+    """将 created_at 规范化为 'YYYY-MM-DD HH:MM:SS' 格式（UTC）。
+
+    处理两种输入格式：
+    - 标准 'YYYY-MM-DD HH:MM:SS'（SQLite DEFAULT 输出）
+    - ISO 8601 'YYYY-MM-DDTHH:MM:SS.ffffff+00:00'（Python isoformat 输出）
+
+    Args:
+        created_at: 原始 created_at 字符串
+
+    Returns:
+        str: 规范化后的 'YYYY-MM-DD HH:MM:SS' 格式字符串
+    """
+    if not created_at:
+        return ""
+    value = str(created_at)
+    # ISO 格式（含 T 分隔符）转换为标准格式
+    if "T" in value:
+        # 取 T 后的时间部分前 19 个字符：'YYYY-MM-DDTHH:MM:SS'
+        value = value.replace("T", " ", 1)
+    return value[:19]
+
+
 def _to_time_range(
     date: str = None, start_time: str = None, end_time: str = None
 ) -> tuple[str | None, str | None]:
-    """将 date 或显式时间范围统一转换为时间范围字符串。"""
+    """将 date 或显式时间范围统一转换为 UTC 时间范围字符串。
+
+    当传入本地日期（YYYY-MM-DD）时，基于 LOCAL_TIMEZONE 转换为 UTC 时间范围。
+    例如本地 2026-07-12 (UTC+8) -> UTC 2026-07-11 16:00:00 ~ 2026-07-12 15:59:59
+
+    Args:
+        date: 本地日期 YYYY-MM-DD（用户本地时区）
+        start_time: 显式起始时间（已是 UTC）
+        end_time: 显式结束时间（已是 UTC）
+
+    Returns:
+        tuple[str | None, str | None]: (start, end) UTC 时间范围字符串
+    """
     if date:
-        return f"{date} 00:00:00", f"{date} 23:59:59"
+        local_tz = pytz.timezone(LOCAL_TIMEZONE)
+        local_start = local_tz.localize(datetime.strptime(date, "%Y-%m-%d"))
+        local_end = local_start + timedelta(days=1) - timedelta(seconds=1)
+        utc_start = local_start.astimezone(timezone.utc)
+        utc_end = local_end.astimezone(timezone.utc)
+        return utc_start.strftime("%Y-%m-%d %H:%M:%S"), utc_end.strftime("%Y-%m-%d %H:%M:%S")
     return start_time, end_time
 
 
 def _is_in_time_range(created_at: str, start_time: str = None, end_time: str = None) -> bool:
-    """判断记录 created_at 是否处于指定时间范围内（闭区间）。"""
+    """判断记录 created_at 是否处于指定时间范围内（闭区间）。
+
+    created_at 可能是 UTC 标准格式或 ISO 8601 格式，统一规范化后比较。
+    start_time/end_time 应为 UTC 'YYYY-MM-DD HH:MM:SS' 格式。
+
+    Args:
+        created_at: 记录创建时间（UTC，可能是标准或 ISO 格式）
+        start_time: 范围起始（UTC 'YYYY-MM-DD HH:MM:SS'）
+        end_time: 范围结束（UTC 'YYYY-MM-DD HH:MM:SS'）
+
+    Returns:
+        bool: 是否在范围内（闭区间）
+    """
     if not created_at:
         return False
-    time_value = str(created_at)[:19]
+    time_value = _normalize_created_at(created_at)
+    if not time_value:
+        return False
     if start_time and time_value < start_time:
         return False
     return not (end_time and time_value > end_time)
@@ -66,12 +123,41 @@ def _empty_usage_data() -> dict:
     return {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "result_items_count": 0}
 
 
+def _utc_created_at_to_local_date(created_at: str) -> str:
+    """将 UTC created_at 转换为用户本地时区日期（YYYY-MM-DD）。
+
+    用于按"天"分组统计，确保分组基于用户感知的日期，而非 UTC 日期。
+
+    Args:
+        created_at: UTC 时间戳（标准 'YYYY-MM-DD HH:MM:SS' 或 ISO 8601 格式）
+
+    Returns:
+        str: 用户本地时区日期 'YYYY-MM-DD'，空输入返回空字符串
+    """
+    if not created_at:
+        return ""
+    normalized = _normalize_created_at(created_at)
+    if not normalized:
+        return ""
+    try:
+        utc_dt = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        local_tz = pytz.timezone(LOCAL_TIMEZONE)
+        local_dt = utc_dt.astimezone(local_tz)
+        return local_dt.strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return ""
+
+
 def _aggregate_tokens_usage_by_date(records: list[dict]) -> dict[str, dict]:
-    """按日期聚合 token 使用记录。"""
+    """按用户本地日期聚合 token 使用记录。
+
+    created_at 是 UTC 时间戳，需先转换为用户本地时区日期再分组，
+    确保跨时区边界的数据分到正确的本地日期。
+    """
     usage_dict: dict[str, dict] = {}
     for record in records:
-        created_at = str(record.get("created_at", ""))
-        usage_date = created_at[:10]
+        created_at = record.get("created_at", "")
+        usage_date = _utc_created_at_to_local_date(created_at)
         if not usage_date:
             continue
         if usage_date not in usage_dict:
@@ -145,21 +231,21 @@ def get_usage_stats_7days(date: str) -> UsageStats7Days:
     获取最近7天的使用统计
 
     Args:
-        date: 结束日期（YYYY-MM-DD 格式）
+        date: 结束日期（YYYY-MM-DD 格式，用户本地时区）
 
     Returns:
         UsageStats7Days: 7天的使用统计列表
     """
-    # 计算7天的日期范围
+    # 计算7天的日期范围（本地日期）
     end_date = datetime.strptime(date, "%Y-%m-%d")
     start_date = end_date - timedelta(days=6)  # 包括今天共7天
 
-    # 获取7天的数据
-    start_time = start_date.strftime("%Y-%m-%d 00:00:00")
-    end_time = end_date.strftime("%Y-%m-%d 23:59:59")
+    # 将本地日期范围转为 UTC 时间范围进行查询
+    utc_start, _ = _to_time_range(date=start_date.strftime("%Y-%m-%d"))
+    _, utc_end = _to_time_range(date=end_date.strftime("%Y-%m-%d"))
 
     usage_data = _aggregate_tokens_usage_by_date(
-        _query_tokens_usage_records(start_time=start_time, end_time=end_time)
+        _query_tokens_usage_records(start_time=utc_start, end_time=utc_end)
     )
 
     # 构建7天的统计列表

@@ -1,6 +1,6 @@
 import warnings
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from lifeprism.server.schemas.chatbot_schemas import (
@@ -16,6 +16,7 @@ from lifeprism.server.schemas.chatbot_schemas import (
 )
 from lifeprism.utils import LazySingleton, get_logger
 from lifeprism.utils.exceptions import NotFoundError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -84,8 +85,8 @@ class ChatbotService:
                     ChatSession(
                         id=sid,
                         name=metadata.get("name", "default_name"),
-                        created_at=metadata.get("created_at", datetime.now().isoformat()),
-                        updated_at=metadata.get("updated_at", datetime.now().isoformat()),
+                        created_at=metadata.get("created_at", get_utc_now_iso()),
+                        updated_at=metadata.get("updated_at", get_utc_now_iso()),
                         message_count=metadata.get("message_len", 0),
                     )
                 )
@@ -119,7 +120,7 @@ class ChatbotService:
             name = first_message.strip()[:20]
             if len(first_message) > 20:
                 name += "..."
-            session.name = name or f"新会话 {datetime.now().strftime('%m-%d %H:%M')}"
+            session.name = name or f"新会话 {datetime.now(timezone.utc).strftime('%m-%d %H:%M')}"
             self._chatbot.save_session(session)
             is_new = True
         else:
@@ -141,10 +142,10 @@ class ChatbotService:
                 name=session.name,
                 created_at=session.created_at.isoformat()
                 if session.created_at
-                else datetime.now().isoformat(),
+                else get_utc_now_iso(),
                 updated_at=session.updated_at.isoformat()
                 if session.updated_at
-                else datetime.now().isoformat(),
+                else get_utc_now_iso(),
                 message_count=len(session.messages),
             )
         raise NotFoundError(message=f"会话 {session_id} 不存在", code="SESSION_NOT_FOUND")

@@ -7,7 +7,7 @@ Habit Chain 模块数据提供者
 """
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from lifeprism.repository.base_providers import LWBaseDataProvider
@@ -373,7 +373,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
             True
         """
         try:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now = datetime.now(timezone.utc).isoformat()
             with self.db.get_connection() as conn:
                 for item in updates:
                     conn.execute(

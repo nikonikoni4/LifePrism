@@ -32,7 +32,7 @@ class LWBaseDataProvider:
     本实现仅支持 SQLite 数据库，使用了以下 SQLite 特定功能：
 
     1. SQL 函数：
-       - datetime('now','localtime') - SQLite 日期时间函数
+       - datetime('now') - SQLite 日期时间函数（返回 UTC 时间）
        - 其他数据库需使用 NOW() 或 CURRENT_TIMESTAMP
 
     2. 自增 ID 获取：
@@ -1179,9 +1179,9 @@ class LWBaseDataProvider:
             self._init_update_at_cache()
 
         if self._TABLE_NAME in self._TABLES_WITH_UPDATE_AT and "updated_at" not in data:
-            from datetime import datetime
+            from datetime import datetime, timezone
 
-            data["updated_at"] = datetime.now().isoformat()
+            data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
         # 3. 构建 UPDATE 语句
         set_clause = ", ".join([f"{key} = ?" for key in data])

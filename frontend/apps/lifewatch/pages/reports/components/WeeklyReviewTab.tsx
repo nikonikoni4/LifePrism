@@ -14,6 +14,7 @@ import TrendComparisonCard from './TrendComparisonCard';
 import { ReportsAPI } from '../api';
 import { WeeklyReportData } from '../types';
 import { getMockWeeklyReport, getMockComparisonData } from '../mockData';
+import { toLocalDateString } from '../../../../../core/utils/dateUtils';
 
 interface WeeklyReviewTabProps {
     className?: string;
@@ -21,8 +22,8 @@ interface WeeklyReviewTabProps {
     onNavigateToDaily?: (date: string) => void;
 }
 
-/** 获取指定日期所在周的起止日期 */
-const getWeekRange = (date: Date): { start: string; end: string } => {
+/** 获取指定日期所在周的起止日期（周一至周日，使用本地时区日期） */
+export const getWeekRange = (date: Date): { start: string; end: string } => {
     const day = date.getDay();
     const diff = date.getDate() - day + (day === 0 ? -6 : 1); // 调整为周一开始
 
@@ -33,8 +34,8 @@ const getWeekRange = (date: Date): { start: string; end: string } => {
     sunday.setDate(monday.getDate() + 6);
 
     return {
-        start: monday.toISOString().split('T')[0],
-        end: sunday.toISOString().split('T')[0]
+        start: toLocalDateString(monday),
+        end: toLocalDateString(sunday)
     };
 };
 
@@ -115,11 +116,11 @@ const WeeklyReviewTab: React.FC<WeeklyReviewTabProps> = ({ className = '', onNav
         // 计算对比日期 (上周)
         const prevStartDate = new Date(startDate);
         prevStartDate.setDate(prevStartDate.getDate() - 7);
-        const prevStartStr = prevStartDate.toISOString().split('T')[0];
+        const prevStartStr = toLocalDateString(prevStartDate);
 
         const prevEndDate = new Date(endDate);
         prevEndDate.setDate(prevEndDate.getDate() - 7);
-        const prevEndStr = prevEndDate.toISOString().split('T')[0];
+        const prevEndStr = toLocalDateString(prevEndDate);
 
         return getMockComparisonData(startDate, endDate, prevStartStr, prevEndStr);
     })();

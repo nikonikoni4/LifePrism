@@ -305,10 +305,10 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
                 raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
             # 手动实现批量更新
-            from datetime import datetime
+            from datetime import datetime, timezone
 
             if "updated_at" not in data:
-                data["updated_at"] = datetime.now().isoformat()
+                data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
             set_clause = ", ".join([f"{key} = ?" for key in data])
             placeholders = ",".join("?" * len(cache_ids))
@@ -666,10 +666,10 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
                 raise ValidationError(f"Invalid update fields: {invalid_fields}")
 
             # 手动实现批量更新
-            from datetime import datetime
+            from datetime import datetime, timezone
 
             if "updated_at" not in data:
-                data["updated_at"] = datetime.now().isoformat()
+                data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
             set_clause = ", ".join([f"{key} = ?" for key in data])
             placeholders = ",".join("?" * len(cache_ids))

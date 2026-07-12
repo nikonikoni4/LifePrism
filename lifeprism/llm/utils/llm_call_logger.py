@@ -32,7 +32,7 @@ import json
 import re
 import shutil
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -155,7 +155,7 @@ class LLMCallLogger:
             # 7. 构建记录
             record = {
                 "id": str(uuid.uuid4()),
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "caller": caller,
                 "message_type": inbound_msg.type,
                 "session_id": inbound_msg.session_id,
@@ -256,7 +256,7 @@ class LLMCallLogger:
         image_data = base64.b64decode(b64_data)
 
         # 生成文件名：img_YYYYMMdd_HHMMSSfff.ext
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S%f")[:-3]
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S%f")[:-3]
         filename = f"img_{timestamp}.{ext}"
 
         # 保存
@@ -284,7 +284,7 @@ class LLMCallLogger:
 
         # 生成新文件名（保留原始扩展名）
         ext = source_path.suffix
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S%f")[:-3]
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S%f")[:-3]
         filename = f"media_{timestamp}{ext}"
 
         # 拷贝
@@ -331,7 +331,7 @@ class LLMCallLogger:
             record: 调用记录
         """
         # 按日期分文件
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         log_file = self.log_dir / f"llm_calls_{date_str}.json"
 
         # 读取现有数据

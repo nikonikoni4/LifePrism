@@ -11,7 +11,7 @@
 import asyncio
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from lifeprism.config import settings
 from lifeprism.llm.agent.tools.lifeprismsystem import query_user_activity_summary, query_user_mood
@@ -451,9 +451,13 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
         if meta_data.get("message_len", None):
             message_len = meta_data["message_len"]
             last_processed_loc = meta_data.get("last_processed_loc", 0)
+            # session 文件中的 update_at 已迁移为 UTC aware ISO 格式，
+            # 向后兼容：旧文件中的 naive 时间戳视为 UTC。
             update_at = datetime.fromisoformat(
-                meta_data.get("update_at", datetime.now().isoformat())
+                meta_data.get("update_at", datetime.now(timezone.utc).isoformat())
             )
+            if update_at.tzinfo is None:
+                update_at = update_at.replace(tzinfo=timezone.utc)
             logger.debug(
                 "[process_session_message] session %s: message_len=%s, last_processed_loc=%s, update_at=%s",
                 session_id,
@@ -463,9 +467,9 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
             )
 
             # 判断是否有未处理消息 且 update_at > 今天 - days_offset
-            if message_len > last_processed_loc and update_at > datetime.now() - timedelta(
-                days=days_offset
-            ):
+            if message_len > last_processed_loc and update_at > datetime.now(
+                timezone.utc
+            ) - timedelta(days=days_offset):
                 _session_to_process.append(session_id)
                 logger.debug(
                     "[process_session_message] session %s 需要处理 (有 %s 条新消息)",
@@ -566,12 +570,12 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
             )
             write_date_md(
                 settings.lifeprism_data_path / "user/daily_data/behavior.md",
-                datetime.now().strftime("%Y-%m-%d"),
+                datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 history_content,
                 "聊天记录总结",
             )
             # 更新 last_processed_time
-            history_manager.save_history(datetime.now())
+            history_manager.save_history(datetime.now(timezone.utc))
             logger.info("[process_session_message] behavior 更新完成")
         else:
             logger.debug("[process_session_message] history_content 为空, 跳过更新")

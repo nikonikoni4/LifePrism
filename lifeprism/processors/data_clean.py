@@ -6,12 +6,10 @@
 - clean_activitywatch_data_v2: 重构版本（组件化架构）
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
-import pytz
 
-from lifeprism.config import LOCAL_TIMEZONE
 from lifeprism.config.database import get_table_columns
 from lifeprism.config.settings_manager import settings
 from lifeprism.llm import AppInFo, LogItem, classifyState
@@ -51,38 +49,26 @@ def create_dict_from_table_columns(table_name: str, values: dict = None) -> dict
     return result
 
 
-def convert_utc_to_local(utc_timestamp_str: str, target_tz: str) -> str:
+def _normalize_utc_timestamp(utc_timestamp_str: str) -> str:
     """
-    将ActivityWatch API返回的UTC时间戳转换为用户本地时间
+    标准化 UTC 时间戳为 ISO 8601 格式
+
+    迁移到 UTC 后，ActivityWatch 返回的 UTC 时间戳直接保留，
+    不再转换为本地时间。
 
     Args:
-        utc_timestamp_str: API返回的UTC时间戳，格式如 "2025-11-19T08:14:52.000000+00:00"
-        target_tz: 目标时区，默认为用户设置时区
+        utc_timestamp_str: ISO 8601 格式的 UTC 时间戳
 
-    Rlifewatch.utils.py.utilss:
-        str: 格式化后的本地时间字符串，格式如 "2025-11-19 16:14:52"
-
-    Note:
-        - 输入：ISO 8601格式的UTC时间戳
-        - 输出：用户本地时区的格式化时间字符串
-        - 保持毫秒级时间精度
+    Returns:
+        UTC ISO 8601 格式的时间字符串（带时区标识）
     """
     try:
-        # 1. 解析ISO 8601格式的UTC时间戳
-        # 处理Z后缀（表示UTC）并替换为+00:00
         clean_timestamp = utc_timestamp_str.replace("Z", "+00:00")
-        dt_utc = datetime.fromisoformat(clean_timestamp)
-
-        # 2. 转换为用户指定的时区
-        target_timezone = pytz.timezone(target_tz)
-        dt_local = dt_utc.astimezone(target_timezone)
-
-        # 3. 格式化输出，保持毫秒精度
-        return dt_local.strftime("%Y-%m-%d %H:%M:%S")
-
+        dt = datetime.fromisoformat(clean_timestamp)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
     except Exception as e:
-        # 错误处理：如果解析失败，返回原始字符串并记录警告
-        # print(f"⚠️  时间戳转换失败: {utc_timestamp_str} -> {str(e)}")
         logger.warning("时间戳转换失败: %s -> %s", utc_timestamp_str, str(e))
         return utc_timestamp_str
 
@@ -201,12 +187,12 @@ def clean_activitywatch_data_old(
     for event in raw_events:
         duration = int(event.get("duration", 0))
         if duration >= lower_bound:
-            # 转换时间戳
-            local_start_time = convert_utc_to_local(event.get("timestamp", ""), LOCAL_TIMEZONE)
-            # 计算结束时间
-            start_dt = datetime.strptime(local_start_time, "%Y-%m-%d %H:%M:%S")
+            # 标准化 UTC 时间戳（保持 UTC ISO 8601 格式，不转本地时间）
+            utc_start_time = _normalize_utc_timestamp(event.get("timestamp", ""))
+            # 计算结束时间（UTC ISO 8601 格式）
+            start_dt = datetime.fromisoformat(utc_start_time)
             end_dt = start_dt + timedelta(seconds=duration)
-            local_end_time = end_dt.strftime("%Y-%m-%d %H:%M:%S")
+            utc_end_time = end_dt.isoformat()
             # 获得应用名称
             app_name = event.get("data", {}).get("app", None)
 
@@ -224,8 +210,8 @@ def clean_activitywatch_data_old(
                     "user_app_behavior_log",
                     {
                         "id": event.get("id", ""),
-                        "start_time": local_start_time,
-                        "end_time": local_end_time,
+                        "start_time": utc_start_time,
+                        "end_time": utc_end_time,
                         "duration": duration,
                         "app": app_name,
                         "title": title,

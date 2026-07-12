@@ -7,7 +7,7 @@ Prompt 加载器模块
 import shutil
 import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -175,7 +175,7 @@ class PromptLoader:
         version_stats[version] += 1
 
         # 更新最后使用时间
-        self._usage_stats[prompt_name]["last_used"] = datetime.now().isoformat()
+        self._usage_stats[prompt_name]["last_used"] = datetime.now(timezone.utc).isoformat()
 
         # 保存统计数据
         self._save_usage_stats()

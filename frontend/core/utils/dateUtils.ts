@@ -33,3 +33,36 @@ export function toLocalDateTimeString(date: Date): string {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
+
+/**
+ * 解析后端返回的 ISO 8601 字符串为 Date 对象
+ *
+ * 后端迁移到 UTC 后，所有时间戳字段使用 ISO 8601 格式（带时区标识），
+ * 例如 "2026-07-11T16:29:54.123456+00:00" 或 "2026-07-11T16:29:54.123Z"。
+ * 浏览器的 new Date(isoString) 能正确解析带时区的 ISO 字符串，
+ * 封装此函数作为单一入口，便于后续统一处理边界情况。
+ *
+ * @param isoString 后端返回的 ISO 8601 字符串
+ * @returns 对应的 Date 对象
+ */
+export function parseISOString(isoString: string): Date {
+    return new Date(isoString);
+}
+
+/**
+ * 将 Date 对象转为 UTC ISO 8601 字符串，用于发送时间给后端
+ *
+ * 后端迁移到 UTC 后，前端发送的时间戳字段（如 created_at、updated_at）
+ * 必须使用 UTC ISO 8601 格式。Date.prototype.toISOString() 原生生成
+ * UTC 格式（带 Z 后缀），封装此函数作为单一入口，明确表达"发送给后端"
+ * 的意图，与 toLocalDateString（本地日期）区分。
+ *
+ * 注意：此函数用于时间戳字段。YYYY-MM-DD 格式的业务日期字段
+ * （如 date、start_date）仍应使用 toLocalDateString。
+ *
+ * @param date 要转换的 Date 对象
+ * @returns UTC ISO 8601 字符串，如 "2026-07-11T16:29:54.123Z"
+ */
+export function toISOStringUTC(date: Date): string {
+    return date.toISOString();
+}

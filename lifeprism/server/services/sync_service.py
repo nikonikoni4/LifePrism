@@ -5,7 +5,7 @@
 
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from lifeprism.config import settings
 from lifeprism.llm.function import screenshot_analysis, screenshot_behavior_summary
@@ -38,7 +38,10 @@ async def screen_behavior_anlysis(start_time: str, end_time: str) -> list[Behavi
     # 1. 计算开始时间
     screenshot_retention_days = settings.get("screenshot_retention_days", 3)
     requested_start_time = datetime.fromisoformat(start_time)
-    earliest_available_time = datetime.now().replace(microsecond=0) - timedelta(
+    # 迁移后输入字符串视为 UTC 时间：若 naive 则补充 UTC tzinfo，避免与 aware 比较抛错
+    if requested_start_time.tzinfo is None:
+        requested_start_time = requested_start_time.replace(tzinfo=timezone.utc)
+    earliest_available_time = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(
         days=screenshot_retention_days
     )
     start_time = (
@@ -136,12 +139,12 @@ class SyncService:
                     analysis_start_time = last_records[0]["end_time"]
                 else:
                     # 如果表为空，使用当前时间往前推 1 天
-                    analysis_start_time = (datetime.now() - timedelta(days=1)).strftime(
+                    analysis_start_time = (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
                         "%Y-%m-%d %H:%M:%S"
                     )
 
                 # 使用当前时间作为结束时间
-                analysis_end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                analysis_end_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
                 # 后台执行截图分析，不阻塞 sync 响应
                 asyncio.create_task(screen_behavior_anlysis(analysis_start_time, analysis_end_time))

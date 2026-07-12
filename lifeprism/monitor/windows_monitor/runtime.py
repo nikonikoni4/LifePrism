@@ -2,7 +2,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lifeprism.config.settings_manager import settings
@@ -63,7 +63,7 @@ class MonitorRuntime:
         self.monitor = monitor
         self.time_source = time_source or time.time
         self.iso_time_source = iso_time_source or (
-            lambda: datetime.now().replace(microsecond=0).isoformat()
+            lambda: datetime.now(timezone.utc).replace(microsecond=0).isoformat()
         )
         self.scheduler_sleep_seconds = scheduler_sleep_seconds
         self.cleanup_interval_seconds = cleanup_interval_seconds

@@ -11,6 +11,16 @@ from lifeprism.llm.summary_context.aggregators.activity_aggregator import (
 )
 
 
+def _normalize_tz(value: str) -> str:
+    """去除时区后缀用于一致性比较
+
+    density_utils._to_dt 返回 aware datetime（isoformat() 带 +00:00 后缀），
+    activity_aggregator._to_dt 返回 naive datetime（无时区后缀）。
+    一致性测试只关心时间值本身，去除时区后缀后再比较。
+    """
+    return value.replace("+00:00", "")
+
+
 @pytest.mark.core
 class TestComputeBucketDensity:
     """测试时间桶密度计算"""
@@ -203,10 +213,12 @@ class TestConsistencyWithActivityAggregator:
             f"时间段数量不一致: new={len(new_segments)}, old={len(old_segments)}"
 
         # 验证每个时间段的关键字段一致
+        # 新函数返回 aware datetime（带 +00:00 后缀），旧函数返回 naive datetime，
+        # 用 _normalize_tz 去除时区后缀后再比较
         for i, (new_seg, old_seg) in enumerate(zip(new_segments, old_segments)):
-            assert new_seg["start"] == old_seg["start"], \
+            assert _normalize_tz(new_seg["start"]) == old_seg["start"], \
                 f"第{i}个时间段的start不一致: new={new_seg['start']}, old={old_seg['start']}"
-            assert new_seg["end"] == old_seg["end"], \
+            assert _normalize_tz(new_seg["end"]) == old_seg["end"], \
                 f"第{i}个时间段的end不一致: new={new_seg['end']}, old={old_seg['end']}"
             assert new_seg["duration_seconds"] == old_seg["duration_seconds"], \
                 f"第{i}个时间段的duration_seconds不一致: new={new_seg['duration_seconds']}, old={old_seg['duration_seconds']}"
@@ -256,10 +268,11 @@ class TestConsistencyWithActivityAggregator:
             )
 
             # 验证一致性
+            # 新函数返回 aware datetime（带 +00:00 后缀），用 _normalize_tz 去除后比较
             assert len(new_segments) == len(old_segments)
             for new_seg, old_seg in zip(new_segments, old_segments):
-                assert new_seg["start"] == old_seg["start"]
-                assert new_seg["end"] == old_seg["end"]
+                assert _normalize_tz(new_seg["start"]) == old_seg["start"]
+                assert _normalize_tz(new_seg["end"]) == old_seg["end"]
                 assert new_seg["duration_seconds"] == old_seg["duration_seconds"]
 
         finally:
@@ -321,10 +334,10 @@ class TestConsistencyWithActivityAggregator:
                 f"真实场景下时间段数量不一致: new={len(new_segments)}, old={len(old_segments)}"
 
             for i, (new_seg, old_seg) in enumerate(zip(new_segments, old_segments)):
-                assert new_seg["start"] == old_seg["start"], \
-                    f"真实场景第{i}个时间段的start不一致"
-                assert new_seg["end"] == old_seg["end"], \
-                    f"真实场景第{i}个时间段的end不一致"
+                assert _normalize_tz(new_seg["start"]) == old_seg["start"], \
+                    f"真实场景第{i}个时间段的start不一致: new={new_seg['start']}, old={old_seg['start']}"
+                assert _normalize_tz(new_seg["end"]) == old_seg["end"], \
+                    f"真实场景第{i}个时间段的end不一致: new={new_seg['end']}, old={old_seg['end']}"
                 assert new_seg["duration_seconds"] == old_seg["duration_seconds"], \
                     f"真实场景第{i}个时间段的duration_seconds不一致"
 

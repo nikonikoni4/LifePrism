@@ -1,7 +1,7 @@
 import re
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from lifeprism.config.settings_manager import settings
 from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
@@ -44,11 +44,11 @@ class WindowMonitor:
     def _flush(self):
         """将当前在内存中的事件保存到存储中"""
         if self.current_app is not None and self.start_time is not None:
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             duration = (now - self.start_time).total_seconds()
             if duration > 0:
                 self.provider.save_event(
-                    timestamp=self.start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    timestamp=self.start_time.isoformat(),
                     duration=duration,
                     app=self.current_app,
                     title=self.current_title,
@@ -118,7 +118,7 @@ class WindowMonitor:
                             with self._state_lock:
                                 self.current_app = app
                                 self.current_title = title
-                                self.start_time = datetime.now()
+                                self.start_time = datetime.now(timezone.utc)
                     else:
                         self._flush()
                         with self._state_lock:

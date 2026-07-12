@@ -7,6 +7,7 @@ import {
 import { Goal, ThemeKey } from '../../../../types';
 import { THEMES } from '../../../../hooks/useGoalStore';
 import CategoryFilter, { CategoryFilterValue } from '../../../../../../core/components/CategoryFilter';
+import { toLocalDateString } from '../../../../../../core/utils/dateUtils';
 
 interface AddGoalModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ interface AddGoalModalProps {
 // Get today's date in YYYY-MM-DD format
 const getTodayDate = () => {
   const today = new Date();
-  return today.toISOString().split('T')[0];
+  return toLocalDateString(today);
 };
 
 const AddGoalModal: React.FC<AddGoalModalProps> = ({ isOpen, onClose, onSave }) => {

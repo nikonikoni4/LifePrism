@@ -3,11 +3,14 @@ LWBaseDataProvider 通用方法单元测试
 
 测试基类的通用 CRUD 方法，确保边界情况和错误处理正确。
 """
+import re
 import pytest
 from typing import Set
 
 from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
+
+pytestmark = pytest.mark.core
 
 
 # ==================== 测试用 Mock Provider ====================
@@ -57,7 +60,7 @@ def mock_provider(test_data_path):
 
     provider = MockProvider()
 
-    # 创建测试表
+    # 创建测试表（使用 UTC DEFAULT，与迁移后的表定义一致）
     with provider.db.get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -68,8 +71,8 @@ def mock_provider(test_data_path):
                 date TEXT,
                 time TEXT,
                 order_index INTEGER,
-                created_at TEXT DEFAULT (datetime('now','localtime')),
-                updated_at TEXT DEFAULT (datetime('now','localtime'))
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
             )
         """)
         conn.commit()
@@ -243,6 +246,64 @@ class TestGenericUpdate:
         result = mock_provider._generic_update('test-id', {})
         assert result is True  # 空数据应该返回 True
 
+    def test_update_generates_utc_timestamp(self, mock_provider):
+        """测试 _generic_update 自动生成的 updated_at 带有 UTC 时区信息"""
+        # 先插入一条记录
+        mock_provider._generic_insert(
+            {'id': 'test-utc-1', 'name': 'test', 'status': 'active'}
+        )
+
+        # 将 test_table 加入 _TABLES_WITH_UPDATE_AT 缓存，模拟配置了 update_at=True 的表
+        LWBaseDataProvider._init_update_at_cache()
+        original_cache = LWBaseDataProvider._TABLES_WITH_UPDATE_AT
+        LWBaseDataProvider._TABLES_WITH_UPDATE_AT = original_cache | {'test_table'}
+
+        try:
+            # 执行更新（不显式传入 updated_at）
+            mock_provider._generic_update('test-utc-1', {'name': 'updated'})
+
+            # 查询验证 updated_at
+            with mock_provider.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT updated_at FROM test_table WHERE id = 'test-utc-1'")
+                row = cursor.fetchone()
+
+            assert row is not None
+            updated_at = row[0]
+
+            # 验证是 ISO 8601 格式且带时区后缀（+00:00）
+            # 格式：2026-07-12T12:34:56.789012+00:00
+            iso_8601_with_tz = re.compile(
+                r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?\+00:00$'
+            )
+            assert iso_8601_with_tz.match(updated_at) is not None, (
+                f"updated_at 应为带 UTC 时区的 ISO 8601 格式，实际值: {updated_at}"
+            )
+        finally:
+            # 恢复原始缓存
+            LWBaseDataProvider._TABLES_WITH_UPDATE_AT = original_cache
+
+    def test_update_does_not_override_explicit_updated_at(self, mock_provider):
+        """测试 _generic_update 不在白名单中的 updated_at 字段会被白名单拦截（设计如此）"""
+        mock_provider._generic_insert(
+            {'id': 'test-utc-2', 'name': 'test', 'status': 'active'}
+        )
+
+        LWBaseDataProvider._init_update_at_cache()
+        original_cache = LWBaseDataProvider._TABLES_WITH_UPDATE_AT
+        LWBaseDataProvider._TABLES_WITH_UPDATE_AT = original_cache | {'test_table'}
+
+        try:
+            # updated_at 不在 _UPDATE_FIELDS 白名单中，显式传入应被拦截
+            # 这是设计行为：updated_at 由系统自动管理，不应由调用方显式设置
+            with pytest.raises(ValueError, match="Invalid update fields"):
+                mock_provider._generic_update('test-utc-2', {
+                    'name': 'updated',
+                    'updated_at': "2026-01-01T00:00:00+00:00",
+                })
+        finally:
+            LWBaseDataProvider._TABLES_WITH_UPDATE_AT = original_cache
+
 
 # ==================== 删除方法测试 ====================
 
@@ -328,3 +389,198 @@ class TestQueryOptions:
 
         with pytest.raises(ValueError, match="page_size must be between 1 and 1000"):
             QueryOptions(page=1, page_size=1001)
+
+
+# ==================== UTC 时区迁移测试 ====================
+
+class TestUTCTimestampGeneration:
+    """测试 UTC 时间戳生成"""
+
+    def test_generated_timestamp_has_timezone_info(self, mock_provider):
+        """测试自动生成的 updated_at 包含时区信息（aware datetime）"""
+        from datetime import datetime
+
+        mock_provider._generic_insert(
+            {'id': 'test-tz-1', 'name': 'test', 'status': 'active'}
+        )
+
+        LWBaseDataProvider._init_update_at_cache()
+        original_cache = LWBaseDataProvider._TABLES_WITH_UPDATE_AT
+        LWBaseDataProvider._TABLES_WITH_UPDATE_AT = original_cache | {'test_table'}
+
+        try:
+            mock_provider._generic_update('test-tz-1', {'name': 'updated'})
+
+            with mock_provider.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT updated_at FROM test_table WHERE id = 'test-tz-1'")
+                row = cursor.fetchone()
+
+            assert row is not None
+            updated_at_str = row[0]
+
+            # 解析为 datetime 对象，验证 tzinfo 不为 None
+            parsed = datetime.fromisoformat(updated_at_str)
+            assert parsed.tzinfo is not None, (
+                f"自动生成的 updated_at 应为 aware datetime（tzinfo 不为 None），"
+                f"实际值: {updated_at_str}"
+            )
+
+            # 验证时区为 UTC（utcoffset 为 0）
+            assert parsed.utcoffset().total_seconds() == 0, (
+                f"自动生成的 updated_at 时区应为 UTC（offset=0），"
+                f"实际 offset: {parsed.utcoffset()}"
+            )
+        finally:
+            LWBaseDataProvider._TABLES_WITH_UPDATE_AT = original_cache
+
+    def test_generated_timestamp_is_iso_8601_format(self, mock_provider):
+        """测试自动生成的 updated_at 符合 ISO 8601 格式"""
+        mock_provider._generic_insert(
+            {'id': 'test-iso-1', 'name': 'test', 'status': 'active'}
+        )
+
+        LWBaseDataProvider._init_update_at_cache()
+        original_cache = LWBaseDataProvider._TABLES_WITH_UPDATE_AT
+        LWBaseDataProvider._TABLES_WITH_UPDATE_AT = original_cache | {'test_table'}
+
+        try:
+            mock_provider._generic_update('test-iso-1', {'name': 'updated'})
+
+            with mock_provider.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT updated_at FROM test_table WHERE id = 'test-iso-1'")
+                row = cursor.fetchone()
+
+            assert row is not None
+            updated_at_str = row[0]
+
+            # 验证 ISO 8601 格式：YYYY-MM-DDTHH:MM:SS.ffffff+00:00
+            # T 分隔符 + 微秒 + UTC 时区后缀
+            iso_pattern = re.compile(
+                r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+\+00:00$'
+            )
+            assert iso_pattern.match(updated_at_str) is not None, (
+                f"updated_at 应为 ISO 8601 格式（含 T 分隔符和 +00:00 后缀），"
+                f"实际值: {updated_at_str}"
+            )
+
+            # 验证不包含空格分隔符（旧格式特征）
+            assert ' ' not in updated_at_str, (
+                f"updated_at 不应包含空格分隔符（旧格式），实际值: {updated_at_str}"
+            )
+        finally:
+            LWBaseDataProvider._TABLES_WITH_UPDATE_AT = original_cache
+
+
+class TestM008MigrationScript:
+    """测试 m008 UTC 迁移脚本"""
+
+    def test_check_if_applied_returns_true_when_no_localtime(self, test_data_path):
+        """测试 check_if_applied 在没有 localtime 时返回 True"""
+        import sqlite3
+        from lifeprism.repository.migrations.scripts import m008_migrate_to_utc
+
+        conn = sqlite3.connect(":memory:")
+        cursor = conn.cursor()
+        # 创建一个使用 UTC DEFAULT 的表
+        cursor.execute(
+            "CREATE TABLE test_utc (id TEXT, created_at TIMESTAMP DEFAULT (datetime('now')))"
+        )
+        conn.commit()
+
+        assert m008_migrate_to_utc.check_if_applied(cursor) is True
+        conn.close()
+
+    def test_check_if_applied_returns_false_when_localtime_exists(self, test_data_path):
+        """测试 check_if_applied 在存在 localtime 时返回 False"""
+        import sqlite3
+        from lifeprism.repository.migrations.scripts import m008_migrate_to_utc
+
+        conn = sqlite3.connect(":memory:")
+        cursor = conn.cursor()
+        # 创建一个使用 localtime DEFAULT 的表
+        cursor.execute(
+            "CREATE TABLE test_local (id TEXT, created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')))"
+        )
+        conn.commit()
+
+        assert m008_migrate_to_utc.check_if_applied(cursor) is False
+        conn.close()
+
+    def test_upgrade_rebuilds_table_with_utc_default(self, test_data_path):
+        """测试 upgrade 将表的 DEFAULT 从 localtime 改为 UTC"""
+        import sqlite3
+        from lifeprism.repository.migrations.scripts import m008_migrate_to_utc
+
+        conn = sqlite3.connect(":memory:")
+        cursor = conn.cursor()
+
+        # 创建一个使用 localtime DEFAULT 的表
+        cursor.execute("""
+            CREATE TABLE test_rebuild (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+        cursor.execute("CREATE INDEX idx_test_rebuild_name ON test_rebuild(name)")
+        cursor.execute("INSERT INTO test_rebuild (id, name) VALUES ('1', 'test1')")
+        cursor.execute("INSERT INTO test_rebuild (id, name) VALUES ('2', 'test2')")
+        conn.commit()
+
+        # 执行迁移
+        m008_migrate_to_utc.upgrade(cursor)
+        conn.commit()
+
+        # 验证数据保留
+        cursor.execute("SELECT COUNT(*) FROM test_rebuild")
+        assert cursor.fetchone()[0] == 2
+
+        # 验证 DEFAULT 已改为 UTC
+        cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='test_rebuild'")
+        create_sql = cursor.fetchone()[0]
+        assert "datetime('now')" in create_sql
+        assert "localtime" not in create_sql
+
+        # 验证索引保留
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='test_rebuild' AND sql IS NOT NULL"
+        )
+        indexes = cursor.fetchall()
+        assert len(indexes) == 1
+        assert indexes[0][0] == "idx_test_rebuild_name"
+
+        conn.close()
+
+    def test_upgrade_idempotent_on_already_utc_tables(self, test_data_path):
+        """测试 upgrade 对已经是 UTC 的表是幂等的（不报错）"""
+        import sqlite3
+        from lifeprism.repository.migrations.scripts import m008_migrate_to_utc
+
+        conn = sqlite3.connect(":memory:")
+        cursor = conn.cursor()
+
+        # 创建一个已经使用 UTC DEFAULT 的表
+        cursor.execute("""
+            CREATE TABLE test_already_utc (
+                id TEXT PRIMARY KEY,
+                created_at TIMESTAMP DEFAULT (datetime('now'))
+            )
+        """)
+        cursor.execute("INSERT INTO test_already_utc (id) VALUES ('1')")
+        conn.commit()
+
+        # 执行迁移（不应该报错也不应该修改表）
+        m008_migrate_to_utc.upgrade(cursor)
+        conn.commit()
+
+        # 验证数据保留
+        cursor.execute("SELECT COUNT(*) FROM test_already_utc")
+        assert cursor.fetchone()[0] == 1
+
+        # 验证 check_if_applied 返回 True
+        assert m008_migrate_to_utc.check_if_applied(cursor) is True
+
+        conn.close()

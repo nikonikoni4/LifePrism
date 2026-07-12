@@ -4,7 +4,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import pytz
@@ -16,6 +16,7 @@ from lifeprism.processors.data_clean import clean_activitywatch_data
 from lifeprism.repository import goal_repository, tokens_usage_repository
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.utils import LWBaseError, get_logger
+from lifeprism.utils.time_utils import get_local_today
 
 # 配置日志
 logger = get_logger(__name__, logging.DEBUG)
@@ -62,7 +63,7 @@ class DataProcessingService:
             # 获取增量同步的时间范围
             sync_mode = "incremental"
             start_time, end_time = self._get_incremental_time_range()
-            time_range = f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            time_range = f"{start_time.isoformat()} ~ {end_time.isoformat()}"
 
             # 1-2. 获取 ActivityWatch 数据并清洗
             logger.info("步骤 1-2/6: 获取 ActivityWatch 数据并清洗...")
@@ -164,7 +165,7 @@ class DataProcessingService:
             Dict: 处理结果统计
         """
         try:
-            time_range = f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            time_range = f"{start_time.isoformat()} ~ {end_time.isoformat()}"
             logger.info("开始按时间范围同步数据: %s", time_range)
 
             # 1-2. 获取 ActivityWatch 数据并清洗
@@ -256,30 +257,66 @@ class DataProcessingService:
         如果数据库为空，则获取最近24小时的数据（首次同步）
 
         Returns:
-            start_time: 开始时间
-            end_time: 结束时间
+            start_time: 开始时间 (UTC aware datetime)
+            end_time: 结束时间 (UTC aware datetime)
         """
-        local_tz = pytz.timezone(LOCAL_TIMEZONE)
         latest_end_time = self.server_lw_data_provider.get_latest_end_time()
 
         if latest_end_time:
             # 增量同步：从数据库最新的 end_time 开始获取到现在
-            latest_dt = datetime.strptime(latest_end_time, "%Y-%m-%d %H:%M:%S")
-            start_time = local_tz.localize(latest_dt)
-            end_time = datetime.now(local_tz)
+            start_time = self._parse_latest_end_time(latest_end_time)
+            end_time = datetime.now(timezone.utc)
             time_diff = end_time - start_time
             hours_diff = time_diff.total_seconds() / 3600
             logger.info("开始增量同步 ActivityWatch 数据")
-            logger.info("  开始时间: %s", start_time.strftime("%Y-%m-%d %H:%M:%S"))
-            logger.info("  结束时间: %s", end_time.strftime("%Y-%m-%d %H:%M:%S"))
+            logger.info("  开始时间: %s", start_time.isoformat())
+            logger.info("  结束时间: %s", end_time.isoformat())
             logger.info("  时间跨度: %.2f 小时", hours_diff)
         else:
             # 数据库为空，首次同步：获取最近24小时
-            start_time = datetime.now(local_tz) - timedelta(hours=24)
-            end_time = datetime.now(local_tz)
+            start_time = datetime.now(timezone.utc) - timedelta(hours=24)
+            end_time = datetime.now(timezone.utc)
             logger.info("数据库为空，执行首次同步（24小时）")
 
         return start_time, end_time
+
+    def _parse_latest_end_time(self, latest_end_time: str) -> datetime:
+        """
+        解析数据库中最新的 end_time 字符串为 UTC aware datetime
+
+        处理两种格式：
+        - 新格式（UTC ISO 8601）：2026-07-12T10:00:00+00:00
+        - 旧格式（本地时间）：2026-07-12 10:00:00 或 2026-07-12T10:00:00
+
+        旧格式数据假设为本地时间，转换为 UTC。
+
+        Args:
+            latest_end_time: 数据库中的 end_time 字符串
+
+        Returns:
+            UTC aware datetime 对象
+        """
+        try:
+            # 尝试解析为新格式（ISO 8601，带时区）
+            dt = datetime.fromisoformat(latest_end_time)
+            if dt.tzinfo is None:
+                # 旧格式（无时区信息），假设为本地时间，转换为 UTC
+                local_tz = pytz.timezone(LOCAL_TIMEZONE)
+                dt = local_tz.localize(dt)
+                dt = dt.astimezone(timezone.utc)
+            return dt
+        except ValueError:
+            # 尝试解析为旧格式 "%Y-%m-%d %H:%M:%S"
+            try:
+                dt = datetime.strptime(latest_end_time, "%Y-%m-%d %H:%M:%S")
+                local_tz = pytz.timezone(LOCAL_TIMEZONE)
+                dt = local_tz.localize(dt)
+                dt = dt.astimezone(timezone.utc)
+                return dt
+            except ValueError as e:
+                logger.warning("无法解析 end_time: %s, 错误: %s", latest_end_time, e)
+                # 解析失败，回退到24小时前
+                return datetime.now(timezone.utc) - timedelta(hours=24)
 
     async def _classify_apps(
         self, classify_state: classifyState, filtered_events: int
@@ -782,8 +819,8 @@ class DataProcessingService:
             result_items_count: 分类结果项目数
         """
         try:
-            # 生成当天的 session_id（格式：c-YYYY-MM-DD）
-            today = datetime.now().strftime("%Y-%m-%d")
+            # 生成当天的 session_id（格式：c-YYYY-MM-DD），使用用户本地时区日期
+            today = get_local_today().isoformat()
             session_id = f"c-{today}"
 
             # 从 result 中提取 tokens_usage 字典
@@ -833,8 +870,8 @@ if __name__ == "__main__":
 
     async def _main():
         data_processing_service = DataProcessingService()
-        datetime.now() - timedelta(minutes=5)
-        datetime.now()
+        datetime.now(timezone.utc) - timedelta(minutes=5)
+        datetime.now(timezone.utc)
         await data_processing_service.process_activitywatch_data(auto_classify=True)
 
     asyncio.run(_main())

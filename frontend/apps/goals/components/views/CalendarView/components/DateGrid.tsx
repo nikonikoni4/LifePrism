@@ -4,6 +4,7 @@ import { DroppableDateCell, DraggableItem } from '@my-ui-kit/core';
 import { TodoItem } from '../../../../types/todo';
 import { useTaskPoolStore } from '../../../../hooks/useTaskPoolStore';
 import { useGoalPageContext } from '../../../../context/GoalPageContext';
+import { toLocalDateString } from '../../../../../../core/utils/dateUtils';
 
 interface DateGridProps {
     startDate: Date;
@@ -13,12 +14,12 @@ interface DateGridProps {
 /**
  * 生成日期范围数组
  */
-const generateDateRange = (start: Date, end: Date): string[] => {
+export const generateDateRange = (start: Date, end: Date): string[] => {
     const dates: string[] = [];
     const current = new Date(start);
 
     while (current <= end) {
-        dates.push(current.toISOString().split('T')[0]);
+        dates.push(toLocalDateString(current));
         current.setDate(current.getDate() + 1);
     }
 
@@ -63,7 +64,7 @@ export const DateGrid: React.FC<DateGridProps> = ({ startDate, endDate }) => {
     // 判断是否是今天
     const isToday = (dateStr: string) => {
         const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = toLocalDateString(today);
         return dateStr === todayStr;
     };
 
@@ -86,7 +87,7 @@ export const DateGrid: React.FC<DateGridProps> = ({ startDate, endDate }) => {
                         const monthDay = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
                         const today = isToday(date);
                         const weekend = isWeekend(dateObj);
-                        const isSelected = selectedDate.toISOString().split('T')[0] === date;
+                        const isSelected = toLocalDateString(selectedDate) === date;
 
                         const handleDateClick = () => {
                             setSelectedDate(dateObj);

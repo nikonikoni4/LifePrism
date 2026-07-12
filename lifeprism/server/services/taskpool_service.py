@@ -9,7 +9,6 @@
 PlanDoc MD 同步逻辑已拆分至 plandoc_sync_service.py
 """
 
-from datetime import datetime
 from typing import Any
 
 from lifeprism.repository import todo_repository
@@ -26,6 +25,7 @@ from lifeprism.server.services.plandoc_sync_service import (
     writeback_uncomplete_to_md,
 )
 from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import get_local_today
 
 logger = get_logger(__name__)
 
@@ -177,7 +177,7 @@ def update_todo_with_writeback(todo_id: str, updates: dict[str, Any]) -> UpdateT
 
     # 2. 处理状态变更副作用
     if updates.get("state") == "completed" and existing.get("state") != "completed":
-        updates["actual_finished_at"] = datetime.now().strftime("%Y-%m-%d")
+        updates["actual_finished_at"] = get_local_today().isoformat()
     elif updates.get("state") in ["pool", "scheduled"] and existing.get("state") == "completed":
         updates["actual_finished_at"] = None
 

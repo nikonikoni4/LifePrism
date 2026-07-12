@@ -17,6 +17,7 @@ import {
     CategoryComparisonItem,
     GoalComparisonItem
 } from './types';
+import { toLocalDateString } from '../../../../core/utils/dateUtils';
 
 // ============================================================================
 // Common Mock Data
@@ -63,7 +64,7 @@ const generateWeeklyTrend = (): TimeDistributionPoint[] => {
     return days.map((day, index) => {
         const date = new Date(start);
         date.setDate(start.getDate() + index);
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = toLocalDateString(date);
 
         return {
             label: day,

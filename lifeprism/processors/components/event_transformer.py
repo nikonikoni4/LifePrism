@@ -3,11 +3,8 @@
 负责将 ActivityWatch 原始事件转换为标准化的 ProcessedEvent
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
-import pytz
-
-from lifeprism.config import LOCAL_TIMEZONE
 from lifeprism.config.settings_manager import settings
 from lifeprism.processors.models.processed_event import ProcessedEvent
 from lifeprism.utils import get_logger, is_multipurpose_app
@@ -23,19 +20,20 @@ class EventTransformer:
     - 将原始 AW 事件转换为标准化的 ProcessedEvent
     - 过滤短时长事件
     - 标准化时间戳、应用名称、窗口标题
+
+    Note:
+        迁移到 UTC 后，时间戳保持 UTC ISO 8601 格式，
+        不再转换为本地时间。
     """
 
-    def __init__(self, min_duration: int = None, timezone: str = LOCAL_TIMEZONE):
+    def __init__(self, min_duration: int = None):
         """
         初始化转换器
 
         Args:
             min_duration: 最小事件时长（秒），低于此值的事件将被过滤
-            timezone: 目标时区
         """
         self.min_duration = min_duration or settings.data_cleaning_threshold
-        self.timezone = timezone
-        self._target_tz = pytz.timezone(timezone)
 
     def transform(self, raw_event: dict) -> ProcessedEvent | None:
         """
@@ -70,17 +68,17 @@ class EventTransformer:
             logger.debug("过滤脏数据: 多用途应用 %s 无 title", app_name)
             return None
 
-        # 6. 转换时间戳
+        # 6. 转换时间戳（保持 UTC ISO 8601 格式）
         timestamp_str = raw_event.get("timestamp", "")
         start_time = self._convert_timestamp(timestamp_str)
         if not start_time:
             logger.warning("时间戳转换失败: %s", timestamp_str)
             return None
 
-        # 7. 计算结束时间
-        start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        # 7. 计算结束时间（UTC ISO 8601 格式）
+        start_dt = datetime.fromisoformat(start_time)
         end_dt = start_dt + timedelta(seconds=duration)
-        end_time = end_dt.strftime("%Y-%m-%d %H:%M:%S")
+        end_time = end_dt.isoformat()
 
         return ProcessedEvent(
             id=str(raw_event.get("id", "")),
@@ -138,26 +136,30 @@ class EventTransformer:
 
     def _convert_timestamp(self, utc_timestamp_str: str) -> str | None:
         """
-        将 UTC 时间戳转换为本地时间
+        标准化 UTC 时间戳为 ISO 8601 格式
+
+        迁移到 UTC 后，ActivityWatch 返回的 UTC 时间戳直接保留，
+        不再转换为本地时间。
 
         Args:
             utc_timestamp_str: ISO 8601 格式的 UTC 时间戳
 
         Returns:
-            本地时间字符串 (YYYY-MM-DD HH:MM:SS) 或 None
+            UTC ISO 8601 格式的时间字符串（带时区标识），或 None
         """
         if not utc_timestamp_str:
             return None
 
         try:
-            # 处理 Z 后缀
+            # 处理 Z 后缀（表示 UTC）
             clean_timestamp = utc_timestamp_str.replace("Z", "+00:00")
-            dt_utc = datetime.fromisoformat(clean_timestamp)
+            dt = datetime.fromisoformat(clean_timestamp)
 
-            # 转换到本地时区
-            dt_local = dt_utc.astimezone(self._target_tz)
+            # 如果是 naive datetime，补充 UTC 时区
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
 
-            return dt_local.strftime("%Y-%m-%d %H:%M:%S")
+            return dt.isoformat()
         except Exception as e:
             logger.warning("时间戳转换失败: %s -> %s", utc_timestamp_str, str(e))
             return None

@@ -54,17 +54,9 @@ class ProcessorMonitorDataProvider(LWBaseDataProvider):
                 else end_time
             )
         else:
-            # lifeprism的时间戳已经改为了YYYY-MM-DD HH:MM:SS
-            start_str = (
-                start_time.strftime("%Y-%m-%d %H:%M:%S")
-                if isinstance(start_time, datetime)
-                else start_time
-            )
-            end_str = (
-                end_time.strftime("%Y-%m-%d %H:%M:%S")
-                if isinstance(end_time, datetime)
-                else end_time
-            )
+            # lifeprism 的 timestamp 使用 UTC ISO 8601 格式
+            start_str = start_time.isoformat() if isinstance(start_time, datetime) else start_time
+            end_str = end_time.isoformat() if isinstance(end_time, datetime) else end_time
         params = [start_str, end_str, limit]
 
         try:

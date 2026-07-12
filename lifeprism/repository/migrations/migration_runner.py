@@ -11,7 +11,7 @@
 import logging
 import shutil
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from lifeprism.repository.migrations.scripts import MIGRATIONS
@@ -75,7 +75,7 @@ def _backup_database(db_file: Path, current_version: int) -> None:
     Raises:
         RuntimeError: 备份失败时抛出
     """
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     backup_name = f"{db_file.stem}.backup-v{current_version}-{timestamp}{db_file.suffix}"
     backup_path = db_file.parent / backup_name
 

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Goal, ThemeKey, JournalEntry, MilestoneItem } from '../types';
 import { goalsV2Api } from '../apis/goal';
+import { toLocalDateString } from '../../../core/utils/dateUtils';
 
 // Constants
 export const THEMES: Record<string, { label: string; accentColor: string; gradient: string; title: string; progressBg: string; meta: string; container: string; button: string; timelineLine: string; tag: string }> = {
@@ -201,7 +202,7 @@ export const GoalProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     ...g,
                     milestones: (g.milestones || []).map(m =>
                         m.id === milestoneId
-                            ? { ...m, state, finishTime: state === 1 ? new Date().toISOString().split('T')[0] : null }
+                            ? { ...m, state, finishTime: state === 1 ? toLocalDateString(new Date()) : null }
                             : m
                     )
                 };

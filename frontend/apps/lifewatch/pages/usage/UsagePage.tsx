@@ -16,6 +16,7 @@ import {
 import { CreditCard, Info, DollarSign, Database, TrendingUp, Zap } from 'lucide-react';
 import { UsageAPI } from './api';
 import { UsageStatsResponse } from './types';
+import { toLocalDateString } from '../../../../core/utils/dateUtils';
 
 const UsagePage: React.FC = () => {
    // State
@@ -25,7 +26,7 @@ const UsagePage: React.FC = () => {
    const [selectedDate, setSelectedDate] = useState<string>(() => {
       // 默认使用今天的日期
       const today = new Date();
-      return today.toISOString().split('T')[0]; // YYYY-MM-DD
+      return toLocalDateString(today); // YYYY-MM-DD
    });
 
    // Fetch data

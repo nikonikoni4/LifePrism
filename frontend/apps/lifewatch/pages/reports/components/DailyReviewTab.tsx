@@ -15,6 +15,7 @@ import TrendComparisonCard from './TrendComparisonCard';
 import { ReportsAPI } from '../api';
 import { DailyReportData } from '../types';
 import { getMockDailyReport, getMockComparisonData } from '../mockData';
+import { toLocalDateString } from '../../../../../core/utils/dateUtils';
 
 interface DailyReviewTabProps {
     className?: string;
@@ -35,7 +36,7 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({
             return initialDate;
         }
         const today = new Date();
-        return today.toISOString().split('T')[0];
+        return toLocalDateString(today);
     });
 
     // 当 initialDate 变化时更新日期并通知父组件
@@ -116,7 +117,7 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({
         // 计算对比日期 (昨天)
         const prevDate = new Date(selectedDate);
         prevDate.setDate(prevDate.getDate() - 1);
-        const prevDateStr = prevDate.toISOString().split('T')[0];
+        const prevDateStr = toLocalDateString(prevDate);
         return getMockComparisonData(selectedDate, selectedDate, prevDateStr, prevDateStr);
     })();
 
@@ -165,7 +166,7 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({
                             onClick={() => {
                                 const date = new Date(selectedDate);
                                 date.setDate(date.getDate() - 1);
-                                setSelectedDate(date.toISOString().split('T')[0]);
+                                setSelectedDate(toLocalDateString(date));
                             }}
                             className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-500 hover:text-blue-500 transition-all focus:outline-none focus:ring-2 focus:ring-blue-100"
                             title="前一天"
@@ -184,7 +185,7 @@ const DailyReviewTab: React.FC<DailyReviewTabProps> = ({
                             onClick={() => {
                                 const date = new Date(selectedDate);
                                 date.setDate(date.getDate() + 1);
-                                setSelectedDate(date.toISOString().split('T')[0]);
+                                setSelectedDate(toLocalDateString(date));
                             }}
                             className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-500 hover:text-blue-500 transition-all focus:outline-none focus:ring-2 focus:ring-blue-100"
                             title="后一天"

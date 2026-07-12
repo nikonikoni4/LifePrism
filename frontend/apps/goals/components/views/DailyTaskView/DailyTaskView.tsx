@@ -10,6 +10,7 @@ import { usePlanDocStore } from '../../../hooks/usePlanDocStore';
 import { TodoItemTreeDetailed, TODO_COLORS, getRandomColor } from '@my-ui-kit/core';
 import { TodoItem } from '../../../types/todo';
 import { DailyTaskHeader, DailyTaskToolbar, TaskInputBox } from './components';
+import { toLocalDateString } from '../../../../../core/utils/dateUtils';
 
 /**
  * 构建树形结构
@@ -326,7 +327,7 @@ export const DailyTaskView: React.FC = () => {
 
     // 格式化日期为 YYYY-MM-DD
     const dateStr = useMemo(() => {
-        return selectedDate.toISOString().split('T')[0];
+        return toLocalDateString(selectedDate);
     }, [selectedDate]);
 
     // 过滤任务

@@ -31,6 +31,7 @@ from lifeprism.repository.sync_repository import SyncRepository
 from lifeprism.sync.sync_config import get_sync_api_key
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import ValidationError
+from lifeprism.utils.time_utils import parse_iso_to_aware
 
 logger = get_logger(__name__)
 
@@ -338,9 +339,7 @@ def sync_pull_files(
     start_time = time.perf_counter()
 
     data_path = settings.lifeprism_data_path.resolve()
-    last_sync_dt = (
-        datetime.fromisoformat(request.last_sync_time) if request.last_sync_time else None
-    )
+    last_sync_dt = parse_iso_to_aware(request.last_sync_time) if request.last_sync_time else None
 
     files: list[dict[str, str]] = []
     for dir_rel in request.directories:
@@ -427,7 +426,7 @@ def sync_push_files(
             skipped += 1
             continue
 
-        remote_mtime_dt = datetime.fromisoformat(item.mtime)
+        remote_mtime_dt = parse_iso_to_aware(item.mtime)
         remote_mtime_ts = remote_mtime_dt.timestamp()
 
         # LWW 冲突解决：本地文件 mtime 更新时跳过

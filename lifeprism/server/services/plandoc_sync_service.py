@@ -16,7 +16,6 @@ MD 解析规则：
 
 import re
 import uuid
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +25,7 @@ from lifeprism.server.schemas.plan_doc_schemas import (
     TodoDeletePreview,
 )
 from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import get_local_today
 
 logger = get_logger(__name__)
 
@@ -575,7 +575,7 @@ def sync_plan_doc(
 
             if task["is_checked"] and existing.get("state") != "completed":
                 update_data["state"] = "completed"
-                update_data["actual_finished_at"] = datetime.now().strftime("%Y-%m-%d")
+                update_data["actual_finished_at"] = get_local_today().isoformat()
             elif not task["is_checked"] and existing.get("state") == "completed":
                 update_data["state"] = "pool"
                 update_data["actual_finished_at"] = None
@@ -604,7 +604,7 @@ def sync_plan_doc(
             }
 
             if task["is_checked"]:
-                create_data["actual_finished_at"] = datetime.now().strftime("%Y-%m-%d")
+                create_data["actual_finished_at"] = get_local_today().isoformat()
 
             todos_to_create.append(
                 {

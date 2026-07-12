@@ -11,7 +11,7 @@ Meta 表驱动：custom_record_types + custom_record_fields 定义动态数据�
 import re
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from lifeprism.repository.exceptions import DuplicateEntityError, EntityNotFoundError
@@ -123,7 +123,7 @@ class CustomRecordRepository:
         data_table = f"{self._DATA_TABLE_PREFIX}{slug}"
 
         # 事务：meta 写入 + DDL
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now(timezone.utc).isoformat()
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
@@ -378,7 +378,7 @@ class CustomRecordRepository:
 
         # 生成 entry_id
         entry_id = f"{self._ENTRY_ID_PREFIX}{uuid.uuid4().hex[:8]}"
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now(timezone.utc).isoformat()
 
         # 构造 INSERT：只插入 data 中出现的字段 + id/created_at/updated_at
         columns = ["id", "created_at", "updated_at"]
@@ -598,9 +598,7 @@ class CustomRecordRepository:
 
         # 始终更新 updated_at
         set_clauses.append("updated_at = ?")
-        from datetime import datetime
-
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now(timezone.utc).isoformat()
         params.append(now)
 
         params.append(type_id)

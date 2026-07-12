@@ -8,7 +8,7 @@ Goal Providers - 目标相关数据提供者
 
 import sqlite3
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from lifeprism.repository.base_providers import LWBaseDataProvider
@@ -487,7 +487,7 @@ class GoalProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now = datetime.now(timezone.utc).isoformat()
             data = {"time_invested": time_invested, "time_invested_updated_at": now}
             success = self._generic_update(goal_id, data)
             if success:
@@ -809,7 +809,7 @@ class GoalStatsProvider(LWBaseDataProvider):
                     dates_to_sync = []
                     current = start_dt
                     while current <= target_dt:
-                        dates_to_sync.append(current.strftime("%Y-%m-%d"))
+                        dates_to_sync.append(current.date().isoformat())
                         current += timedelta(days=1)
                 else:
                     # 只计算今天
@@ -831,13 +831,13 @@ class GoalStatsProvider(LWBaseDataProvider):
                         dates_to_sync = []
                         current = start_dt
                         while current < earliest_dt:
-                            dates_to_sync.append(current.strftime("%Y-%m-%d"))
+                            dates_to_sync.append(current.date().isoformat())
                             current += timedelta(days=1)
                         # 再加上从 last_date 之后到 target_date 的日期
                         if last_dt < target_dt:
                             current = last_dt + timedelta(days=1)
                             while current <= target_dt:
-                                dates_to_sync.append(current.strftime("%Y-%m-%d"))
+                                dates_to_sync.append(current.date().isoformat())
                                 current += timedelta(days=1)
                         # 最后更新今天
                         if target_date not in dates_to_sync:
@@ -850,7 +850,7 @@ class GoalStatsProvider(LWBaseDataProvider):
                             dates_to_sync = []
                             current = last_dt + timedelta(days=1)
                             while current <= target_dt:
-                                dates_to_sync.append(current.strftime("%Y-%m-%d"))
+                                dates_to_sync.append(current.date().isoformat())
                                 current += timedelta(days=1)
 
                 else:
@@ -861,7 +861,7 @@ class GoalStatsProvider(LWBaseDataProvider):
                         dates_to_sync = []
                         current = last_dt + timedelta(days=1)
                         while current <= target_dt:
-                            dates_to_sync.append(current.strftime("%Y-%m-%d"))
+                            dates_to_sync.append(current.date().isoformat())
                             current += timedelta(days=1)
 
             # 同步每个日期的数据

@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -43,14 +42,10 @@ class ScreenshotStore:
         if window_title:
             window_title = window_title.split("和另外")[0].strip().lower()
 
-        # 转换时间戳格式为 YYYY-MM-DD HH:MM:SS
-        captured_at_formatted = datetime.fromisoformat(request.captured_at).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
-
+        # 保持 captured_at 的 ISO 8601 格式（UTC 时区）
         payload = {
             "id": capture_id,
-            "captured_at": captured_at_formatted,
+            "captured_at": request.captured_at,
             "capture_reason": request.reason.value,
             "file_path": relative_path,
             "window_app": window_app,

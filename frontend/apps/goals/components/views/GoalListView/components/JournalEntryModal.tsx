@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Sun, Moon, Coffee, Zap, Tag, FileText } from 'lucide-react';
 import { JournalEntry } from '../../../../types';
+import { toLocalDateString } from '../../../../../../core/utils/dateUtils';
 
 interface JournalEntryModalProps {
   goalId: string;
@@ -19,7 +20,7 @@ const MOOD_OPTIONS: { value: MoodType; label: string; icon: React.ReactNode; bgC
 ];
 
 const getTodayDate = () => {
-  return new Date().toISOString().split('T')[0];
+  return toLocalDateString(new Date());
 };
 
 const getCurrentTime = () => {

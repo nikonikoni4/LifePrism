@@ -13,6 +13,8 @@ from . import (
     m005_behavior_log_id_to_autoincrement,
     m006_add_updated_at,
     m007_add_updated_at_supplement,
+    m008_migrate_to_utc,
+    m009_migrate_history_to_utc,
 )
 
 MIGRATIONS = [
@@ -23,4 +25,6 @@ MIGRATIONS = [
     m005_behavior_log_id_to_autoincrement,
     m006_add_updated_at,
     m007_add_updated_at_supplement,
+    m008_migrate_to_utc,
+    m009_migrate_history_to_utc,
 ]

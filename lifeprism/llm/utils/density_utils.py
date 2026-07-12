@@ -5,19 +5,25 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 def _to_dt(value: str) -> datetime:
-    """将 ISO 格式字符串转换为 datetime 对象
+    """将 ISO 格式字符串转换为 aware datetime 对象
+
+    如果输入是 naive datetime（无时区信息），补充 UTC tzinfo，
+    避免 naive 与 aware datetime 比较时抛出 TypeError。
 
     Args:
-        value: ISO 格式时间字符串
+        value: ISO 格式时间字符串（可能带或不带时区标识）
 
     Returns:
-        datetime: datetime 对象
+        datetime: aware datetime 对象（tzinfo=UTC）
     """
-    return datetime.fromisoformat(value)
+    dt = datetime.fromisoformat(value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def compute_bucket_density(bucket_start: str, bucket_end: str, logs: list[dict]) -> float:

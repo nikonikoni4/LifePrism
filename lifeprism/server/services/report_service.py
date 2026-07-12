@@ -10,12 +10,13 @@ Report 服务层
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pandas as pd
+import pytz
 
-from lifeprism.config import settings
+from lifeprism.config import LOCAL_TIMEZONE, settings
 from lifeprism.repository import goal_repository, todo_repository
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
@@ -39,8 +40,119 @@ from lifeprism.server.schemas.report_schemas import (
 )
 from lifeprism.server.services.category_service import category_service
 from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import get_local_today
 
 logger = get_logger(__name__)
+
+
+# ==================== UTC 时区迁移辅助函数 ====================
+
+
+def _get_local_today_str() -> str:
+    """获取用户本地时区的今天日期字符串
+
+    用于报表状态判断（"今天"是否晚于报告日期），
+    确保用户在 UTC+ 时区午夜前后看到的日期与预期一致。
+
+    Returns:
+        str: 用户本地时区的今天日期 'YYYY-MM-DD'
+    """
+    return get_local_today().isoformat()
+
+
+def _normalize_timestamp(value: str) -> str:
+    """将时间戳规范化为 'YYYY-MM-DD HH:MM:SS' 格式（UTC）。
+
+    处理两种输入格式：
+    - 标准 'YYYY-MM-DD HH:MM:SS'（SQLite DEFAULT 输出）
+    - ISO 8601 'YYYY-MM-DDTHH:MM:SS.ffffff+00:00'（Python isoformat 输出）
+    """
+    if not value:
+        return ""
+    result = str(value)
+    if "T" in result:
+        result = result.replace("T", " ", 1)
+    return result[:19]
+
+
+def _utc_timestamp_to_local_date(timestamp: str) -> str:
+    """将 UTC 时间戳转换为用户本地时区日期（YYYY-MM-DD）。
+
+    用于 pandas 按天分组统计，确保分组基于用户感知的日期，而非 UTC 日期。
+
+    Args:
+        timestamp: UTC 时间戳（标准 'YYYY-MM-DD HH:MM:SS' 或 ISO 8601 格式）
+
+    Returns:
+        str: 用户本地时区日期 'YYYY-MM-DD'，空输入返回空字符串
+    """
+    if not timestamp:
+        return ""
+    normalized = _normalize_timestamp(timestamp)
+    if not normalized:
+        return ""
+    try:
+        utc_dt = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        local_tz = pytz.timezone(LOCAL_TIMEZONE)
+        local_dt = utc_dt.astimezone(local_tz)
+        return local_dt.strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return ""
+
+
+def _add_local_date_column(df: pd.DataFrame, time_col: str = "start_time") -> pd.DataFrame:
+    """为 DataFrame 添加 local_date 列（用户本地时区日期）。
+
+    用于 pandas 按天分组统计，将 UTC 时间戳转为用户本地时区日期。
+    确保跨时区边界的数据分到正确的本地日期。
+
+    Args:
+        df: 包含时间戳列的 DataFrame
+        time_col: 时间戳列名，默认 'start_time'
+
+    Returns:
+        pd.DataFrame: 添加了 'local_date' 列的 DataFrame
+    """
+    if time_col not in df.columns:
+        df["local_date"] = ""
+        return df
+
+    local_tz = pytz.timezone(LOCAL_TIMEZONE)
+    # 解析时间戳并标记为 UTC，然后转为本地时区，最后提取日期
+    df = df.copy()
+    utc_times = pd.to_datetime(df[time_col], utc=True, errors="coerce")
+    local_times = utc_times.dt.tz_convert(local_tz)
+    df["local_date"] = local_times.dt.strftime("%Y-%m-%d")
+    # NaT 转为空字符串
+    df["local_date"] = df["local_date"].where(df["local_date"].notna(), "")
+    return df
+
+
+def _build_utc_time_range(start_date: str, end_date: str = None) -> tuple[str, str]:
+    """将本地日期（范围）转换为 UTC 时间范围用于数据库查询。
+
+    例如本地 2026-07-12 (UTC+8) -> UTC 2026-07-11 16:00:00 ~ 2026-07-12 15:59:59
+
+    Args:
+        start_date: 本地开始日期 'YYYY-MM-DD'
+        end_date: 本地结束日期 'YYYY-MM-DD'，若为 None 则等于 start_date
+
+    Returns:
+        tuple[str, str]: (utc_start, utc_end) 'YYYY-MM-DD HH:MM:SS' 格式
+    """
+    if end_date is None:
+        end_date = start_date
+
+    local_tz = pytz.timezone(LOCAL_TIMEZONE)
+    local_start = local_tz.localize(datetime.strptime(start_date, "%Y-%m-%d"))
+    local_end = (
+        local_tz.localize(datetime.strptime(end_date, "%Y-%m-%d"))
+        + timedelta(days=1)
+        - timedelta(seconds=1)
+    )
+    utc_start = local_start.astimezone(timezone.utc)
+    utc_end = local_end.astimezone(timezone.utc)
+    return utc_start.strftime("%Y-%m-%d %H:%M:%S"), utc_end.strftime("%Y-%m-%d %H:%M:%S")
 
 
 # ==================== 辅助：从 behavior.md 读取 AI 总结 ====================
@@ -132,7 +244,7 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
 
     # 4. 保存到数据库
     # 判断状态：只有当今天的日期晚于报告日期时，才标记为已完成
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _get_local_today_str()
     state = "1" if today > date else "0"
 
     report_data = {
@@ -227,7 +339,7 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
 
     # 4. 保存到数据库
     # 判断状态：只有当今天的日期晚于周结束日期时，才标记为已完成
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _get_local_today_str()
     state = "1" if today > week_end_date else "0"
 
     report_data = {
@@ -330,7 +442,7 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
 
     # 4. 保存到数据库
     # 判断状态：只有当今天的日期晚于月结束日期时，才标记为已完成
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _get_local_today_str()
     state = "1" if today > month_end_date else "0"
 
     report_data = {

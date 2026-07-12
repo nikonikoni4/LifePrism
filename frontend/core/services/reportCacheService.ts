@@ -6,6 +6,7 @@
  */
 
 import { CacheManager, CacheOptions } from '../utils/cacheManager';
+import { toLocalDateString } from '../utils/dateUtils';
 import { DailyReportData, WeeklyReportData, MonthlyReportData } from '../../apps/lifewatch/pages/reports/types';
 
 export class ReportCacheService {
@@ -287,7 +288,7 @@ export class ReportCacheService {
             const adjacentDate = new Date(currentDate);
             adjacentDate.setDate(adjacentDate.getDate() + i);
 
-            const dateStr = adjacentDate.toISOString().split('T')[0];
+            const dateStr = toLocalDateString(adjacentDate);
             dates.push(dateStr);
         }
 

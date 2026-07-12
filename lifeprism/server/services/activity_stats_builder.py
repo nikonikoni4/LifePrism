@@ -6,10 +6,12 @@ Activity Stats Builder - 纯函数模块
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
+import pytz
 
+from lifeprism.config import LOCAL_TIMEZONE
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
 from lifeprism.server.schemas.activity_schemas import (
@@ -22,6 +24,104 @@ from lifeprism.server.schemas.activity_schemas import (
     TopTitleData,
 )
 from lifeprism.server.services.category_service import category_service
+
+# ============================================================================
+# UTC 时区迁移辅助函数
+# ============================================================================
+
+
+def _normalize_timestamp(value: str) -> str:
+    """将时间戳规范化为 'YYYY-MM-DD HH:MM:SS' 格式（UTC）。
+
+    处理两种输入格式：
+    - 标准 'YYYY-MM-DD HH:MM:SS'（SQLite DEFAULT 输出）
+    - ISO 8601 'YYYY-MM-DDTHH:MM:SS.ffffff+00:00'（Python isoformat 输出）
+    """
+    if not value:
+        return ""
+    result = str(value)
+    if "T" in result:
+        result = result.replace("T", " ", 1)
+    return result[:19]
+
+
+def _utc_timestamp_to_local_date(timestamp: str) -> str:
+    """将 UTC 时间戳转换为用户本地时区日期（YYYY-MM-DD）。
+
+    用于按天分组统计，确保分组基于用户感知的日期，而非 UTC 日期。
+
+    Args:
+        timestamp: UTC 时间戳（标准 'YYYY-MM-DD HH:MM:SS' 或 ISO 8601 格式）
+
+    Returns:
+        str: 用户本地时区日期 'YYYY-MM-DD'，空输入返回空字符串
+    """
+    if not timestamp:
+        return ""
+    normalized = _normalize_timestamp(timestamp)
+    if not normalized:
+        return ""
+    try:
+        utc_dt = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        local_tz = pytz.timezone(LOCAL_TIMEZONE)
+        local_dt = utc_dt.astimezone(local_tz)
+        return local_dt.strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return ""
+
+
+def _add_local_date_column(df: pd.DataFrame, time_col: str = "start_time") -> pd.DataFrame:
+    """为 DataFrame 添加 local_date 列（用户本地时区日期）。
+
+    用于 pandas 按天分组统计，将 UTC 时间戳转为用户本地时区日期。
+    确保跨时区边界的数据分到正确的本地日期。
+
+    Args:
+        df: 包含时间戳列的 DataFrame
+        time_col: 时间戳列名，默认 'start_time'
+
+    Returns:
+        pd.DataFrame: 添加了 'local_date' 列的 DataFrame
+    """
+    if time_col not in df.columns:
+        df["local_date"] = ""
+        return df
+
+    local_tz = pytz.timezone(LOCAL_TIMEZONE)
+    df = df.copy()
+    utc_times = pd.to_datetime(df[time_col], utc=True, errors="coerce")
+    local_times = utc_times.dt.tz_convert(local_tz)
+    df["local_date"] = local_times.dt.strftime("%Y-%m-%d")
+    df["local_date"] = df["local_date"].where(df["local_date"].notna(), "")
+    return df
+
+
+def _build_utc_time_range(start_date: str, end_date: str = None) -> tuple[str, str]:
+    """将本地日期（范围）转换为 UTC 时间范围用于数据库查询。
+
+    例如本地 2026-07-12 (UTC+8) -> UTC 2026-07-11 16:00:00 ~ 2026-07-12 15:59:59
+
+    Args:
+        start_date: 本地开始日期 'YYYY-MM-DD'
+        end_date: 本地结束日期 'YYYY-MM-DD'，若为 None 则等于 start_date
+
+    Returns:
+        tuple[str, str]: (utc_start, utc_end) 'YYYY-MM-DD HH:MM:SS' 格式
+    """
+    if end_date is None:
+        end_date = start_date
+
+    local_tz = pytz.timezone(LOCAL_TIMEZONE)
+    local_start = local_tz.localize(datetime.strptime(start_date, "%Y-%m-%d"))
+    local_end = (
+        local_tz.localize(datetime.strptime(end_date, "%Y-%m-%d"))
+        + timedelta(days=1)
+        - timedelta(seconds=1)
+    )
+    utc_start = local_start.astimezone(timezone.utc)
+    utc_end = local_end.astimezone(timezone.utc)
+    return utc_start.strftime("%Y-%m-%d %H:%M:%S"), utc_end.strftime("%Y-%m-%d %H:%M:%S")
+
 
 # ============================================================================
 # 分类名称查找辅助函数（使用 CategoryService 缓存）

@@ -7,7 +7,6 @@ Add-on 扩展功能业务逻辑层
 import json
 import os
 import tempfile
-from datetime import datetime
 from pathlib import Path
 
 from lifeprism.config.settings_manager import settings
@@ -17,6 +16,7 @@ from lifeprism.server.schemas.add_on_schemas import (
     UpdateExpandDirRequest,
 )
 from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -177,7 +177,7 @@ def create_expand_dir(data: CreateExpandDirRequest) -> ExpandDirItem:
         "path": data.path,
         "description": data.description,
         "ai_index": data.ai_index,
-        "created_at": datetime.now().isoformat(),
+        "created_at": get_utc_now_iso(),
     }
 
     expand_dirs.append(new_item)
@@ -236,7 +236,7 @@ def update_expand_dir(id: str, data: UpdateExpandDirRequest) -> ExpandDirItem:
         "path": data.path,
         "description": data.description,
         "ai_index": data.ai_index,
-        "created_at": expand_dirs[target_index].get("created_at", datetime.now().isoformat()),
+        "created_at": expand_dirs[target_index].get("created_at", get_utc_now_iso()),
     }
 
     expand_dirs[target_index] = updated_item
