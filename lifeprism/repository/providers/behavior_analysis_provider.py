@@ -313,8 +313,8 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
                 try:
                     cursor.execute(
                         f"""INSERT INTO {self._TABLE_NAME}
-                           (start_time, end_time, behavior, behavior_summary, title, screen_count, created_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                           (start_time, end_time, behavior, behavior_summary, title, screen_count, created_at, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             data["start_time"],
                             data["end_time"],
@@ -322,6 +322,7 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
                             data.get("behavior_summary"),
                             data.get("title"),
                             data["screen_count"],
+                            now_iso,
                             now_iso,
                         ),
                     )

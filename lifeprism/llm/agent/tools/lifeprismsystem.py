@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from typing import Any
 
 from lifeprism.llm.agent.tools.base import ERROR, SUCCESS, Tool
@@ -11,6 +12,25 @@ from lifeprism.repository import (
     mood_repository,
     todo_repository,
 )
+
+# ISO 8601 时间格式描述（与数据库 UTC 迁移后格式一致）
+_TIME_FORMAT_DESC = "YYYY-MM-DDTHH:MM:SS+00:00（ISO 8601 + UTC）"
+
+
+def _parse_iso_time(time_str: str) -> datetime:
+    """解析 ISO 8601 时间字符串，返回 UTC aware datetime。
+
+    兼容带时区和不带时区的输入，不带时区时默认为 UTC。
+    解析后统一输出 isoformat() 字符串，确保与数据库格式一致。
+    """
+    try:
+        dt = datetime.fromisoformat(time_str)
+    except ValueError as e:
+        raise ValueError(f"{ERROR} 时间格式错误，期望格式为 '{_TIME_FORMAT_DESC}': {e}") from e
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
 
 # 数据
 ## 类型1：用户行为数据
@@ -88,11 +108,11 @@ class UserActivitySummaryTool(Tool):
                 },
                 "start_time": {
                     "type": "string",
-                    "description": "查询开始时间，格式：YYYY-MM-DD HH:MM:SS",
+                    "description": f"查询开始时间，格式：{_TIME_FORMAT_DESC}",
                 },
                 "end_time": {
                     "type": "string",
-                    "description": "查询结束时间，格式：YYYY-MM-DD HH:MM:SS",
+                    "description": f"查询结束时间，格式：{_TIME_FORMAT_DESC}",
                 },
             },
             "required": ["query_option", "start_time", "end_time"],
@@ -126,23 +146,21 @@ def _category_stats(logs: list[dict], segment_start_time: str, segment_end_time:
 
     Args:
         logs: 电脑使用数据（包含start_time, end_time, duration, category_name）
-        segment_start_time: 分析开始时间 YYYY-MM-DD HH:MM:SS
-        segment_end_time: 分析结束时间 YYYY-MM-DD HH:MM:SS
+        segment_start_time: 分析开始时间 ISO 8601
+        segment_end_time: 分析结束时间 ISO 8601
 
     Returns:
         dict: {'category_name': percentage, ...}
     """
-    from datetime import datetime
-
-    segment_start = datetime.fromisoformat(segment_start_time.replace(" ", "T"))
-    segment_end = datetime.fromisoformat(segment_end_time.replace(" ", "T"))
+    segment_start = _parse_iso_time(segment_start_time)
+    segment_end = _parse_iso_time(segment_end_time)
 
     category_durations = {}
     total_duration = 0
 
     for log in logs:
-        log_start = datetime.fromisoformat(log["start_time"].replace(" ", "T"))
-        log_end = datetime.fromisoformat(log["end_time"].replace(" ", "T"))
+        log_start = _parse_iso_time(log["start_time"])
+        log_end = _parse_iso_time(log["end_time"])
 
         # 截断到边界
         actual_start = max(log_start, segment_start)
@@ -175,14 +193,12 @@ def query_user_activity_summary(query_option: set[str], start_time: str, end_tim
                 # goals,
                 todolist
 
-        start_time: 查询开始时间 YYYY-MM-DD HH:MM:SS
-        end_time: 查询结束时间 YYYY-MM-DD HH:MM:SS
+        start_time: 查询开始时间 ISO 8601 + UTC
+        end_time: 查询结束时间 ISO 8601 + UTC
     return
         str 返回格式化数据
     """
     # 参数校验
-    from datetime import datetime
-
     allowed_options = {
         "high_usage_segments",
         "computer_overview",
@@ -194,14 +210,15 @@ def query_user_activity_summary(query_option: set[str], start_time: str, end_tim
     if invalid_options:
         raise ValueError(f"{ERROR} Invalid query options: {invalid_options}")
 
-    try:
-        start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-        end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-    except ValueError as e:
-        raise ValueError(f"{ERROR} Invalid time format. Expected 'YYYY-MM-DD HH:MM:SS': {e}") from e
+    start_dt = _parse_iso_time(start_time)
+    end_dt = _parse_iso_time(end_time)
 
     if start_dt >= end_dt:
         raise ValueError(f"{ERROR} start_time must be before end_time")
+
+    # 统一格式化为 ISO 8601 + UTC 字符串，确保与数据库格式一致
+    start_time = start_dt.isoformat()
+    end_time = end_dt.isoformat()
 
     parts = []
 
@@ -259,17 +276,15 @@ def query_user_activity_summary(query_option: set[str], start_time: str, end_tim
         if not app_log:
             parts.append("## 电脑总体使用统计 \n 该时间段没有电脑使用记录")
         else:
-            from datetime import datetime as dt
-
-            segment_start = dt.fromisoformat(start_time.replace(" ", "T"))
-            segment_end = dt.fromisoformat(end_time.replace(" ", "T"))
+            segment_start = _parse_iso_time(start_time)
+            segment_end = _parse_iso_time(end_time)
 
             category_durations = {}
             total_duration = 0
 
             for log in app_log:
-                log_start = dt.fromisoformat(log["start_time"].replace(" ", "T"))
-                log_end = dt.fromisoformat(log["end_time"].replace(" ", "T"))
+                log_start = _parse_iso_time(log["start_time"])
+                log_end = _parse_iso_time(log["end_time"])
 
                 actual_start = max(log_start, segment_start)
                 actual_end = min(log_end, segment_end)
@@ -388,11 +403,11 @@ class UserComputerLogTool(Tool):
             "properties": {
                 "start_time": {
                     "type": "string",
-                    "description": "查询开始时间，格式：YYYY-MM-DD HH:MM:SS",
+                    "description": f"查询开始时间，格式：{_TIME_FORMAT_DESC}",
                 },
                 "end_time": {
                     "type": "string",
-                    "description": "查询结束时间，格式：YYYY-MM-DD HH:MM:SS",
+                    "description": f"查询结束时间，格式：{_TIME_FORMAT_DESC}",
                 },
                 "duration_min": {
                     "type": "integer",
@@ -464,13 +479,17 @@ def query_user_activity_log(start_time: str, end_time: str, duration_min: int = 
     """查询用户电脑使用的详细日志
 
     Args:
-        start_time: 查询开始时间 YYYY-MM-DD HH:MM:SS
-        end_time: 查询结束时间 YYYY-MM-DD HH:MM:SS
+        start_time: 查询开始时间 ISO 8601 + UTC
+        end_time: 查询结束时间 ISO 8601 + UTC
         duration_min: 最小持续时长（秒），只返回持续时长大于等于此值的记录，默认45秒
 
     Returns:
         str: 格式化的活动日志，每行格式为 "start_time ~ end_time app title duration category_name"
     """
+    # 解析并统一格式化时间，确保与数据库格式一致
+    start_time = _parse_iso_time(start_time).isoformat()
+    end_time = _parse_iso_time(end_time).isoformat()
+
     MAX_LEN = 40
     result = f"[日志查询说明] 查询结果屏蔽了持续时间小于{duration_min}秒的记录。\n\n"
 
@@ -515,8 +534,8 @@ def create_or_update_user_behavior_note(
     """创建或更新用户行为备注
 
     Args:
-        start_time: 开始时间 YYYY-MM-DD HH:MM:SS
-        end_time: 结束时间 YYYY-MM-DD HH:MM:SS
+        start_time: 开始时间 ISO 8601 + UTC
+        end_time: 结束时间 ISO 8601 + UTC
         content: 备注内容
         block_id: 可选，时间块 ID。如果提供则更新，否则创建
 
@@ -526,14 +545,11 @@ def create_or_update_user_behavior_note(
     Raises:
         ValueError: 时间格式错误或时间范围无效
     """
-    from datetime import datetime
-
-    # 参数校验
-    try:
-        start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-        end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-    except ValueError as e:
-        raise ValueError(f"{ERROR} 时间格式错误，期望格式为 'YYYY-MM-DD HH:MM:SS': {e}") from e
+    # 参数校验并统一格式化
+    start_dt = _parse_iso_time(start_time)
+    end_dt = _parse_iso_time(end_time)
+    start_time = start_dt.isoformat()
+    end_time = end_dt.isoformat()
 
     if start_dt >= end_dt:
         raise ValueError(f"{ERROR} 开始时间必须早于结束时间")
@@ -600,11 +616,11 @@ class UpdateUserBehaviorNoteTool(Tool):
             "properties": {
                 "start_time": {
                     "type": "string",
-                    "description": "开始时间，格式：YYYY-MM-DD HH:MM:SS",
+                    "description": f"开始时间，格式：{_TIME_FORMAT_DESC}",
                 },
                 "end_time": {
                     "type": "string",
-                    "description": "结束时间，格式：YYYY-MM-DD HH:MM:SS",
+                    "description": f"结束时间，格式：{_TIME_FORMAT_DESC}",
                 },
                 "content": {"type": "string", "description": "行为备注内容"},
                 "block_id": {
@@ -684,11 +700,11 @@ class UserMoodQuryTool(Tool):
             "properties": {
                 "start_time": {
                     "type": "string",
-                    "description": "查询开始时间，格式：YYYY-MM-DD HH:MM:SS",
+                    "description": f"查询开始时间，格式：{_TIME_FORMAT_DESC}",
                 },
                 "end_time": {
                     "type": "string",
-                    "description": "查询结束时间，格式：YYYY-MM-DD HH:MM:SS",
+                    "description": f"查询结束时间，格式：{_TIME_FORMAT_DESC}",
                 },
                 "by_mood_type_id": {
                     "type": ["string", "null"],
@@ -727,12 +743,16 @@ def query_user_mood(
     """
     查询用户在指定时间范围内的心情记录。
     args:
-        start_time: 开始时间，格式：YYYY-MM-DD HH:MM:SS
-        end_time: 结束时间，格式：YYYY-MM-DD HH:MM:SS
+        start_time: 开始时间 ISO 8601 + UTC
+        end_time: 结束时间 ISO 8601 + UTC
         by_mood_type_id: 可选，心情类型ID，按心情类型查询
     return:
         心情记录列表
     """
+    # 解析并统一格式化时间，确保与数据库格式一致
+    start_time = _parse_iso_time(start_time).isoformat()
+    end_time = _parse_iso_time(end_time).isoformat()
+
     mood_entries: list[dict] = mood_repository.get_mood_entries(
         start_time=start_time, end_time=end_time
     )
@@ -874,7 +894,7 @@ def create_user_mood(
 if __name__ == "__main__":
     print(
         query_user_activity_summary(
-            ["computer_overview"], "2026-04-28 00:00:00", "2026-04-29 00:00:00"
+            ["computer_overview"], "2026-04-28T00:00:00+00:00", "2026-04-29T00:00:00+00:00"
         )
     )
     # print(query_user_activity_log("2026-04-28 00:00:00","2026-04-29 00:00:00"))
