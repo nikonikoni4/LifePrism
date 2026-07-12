@@ -11,6 +11,7 @@ from typing import Any
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -180,6 +181,9 @@ class BeingProvider(LWBaseDataProvider):
         try:
             # 序列化 content 字段
             insert_data = self._serialize_content(data)
+            now_iso = get_utc_now_iso()
+            insert_data["created_at"] = now_iso
+            insert_data["updated_at"] = now_iso
 
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
@@ -248,6 +252,7 @@ class BeingProvider(LWBaseDataProvider):
         """
         try:
             update_data = self._serialize_content(data)
+            update_data["updated_at"] = get_utc_now_iso()
             rows_affected = self.db.update(self.TABLE_NAME, update_data, where={"id": record_id})
             if rows_affected > 0:
                 logger.info("更新 Being 记录 %s 成功", record_id)
@@ -276,6 +281,7 @@ class BeingProvider(LWBaseDataProvider):
         """
         try:
             update_data = self._serialize_content(data)
+            update_data["updated_at"] = get_utc_now_iso()
             rows_affected = self.db.update(
                 self.TABLE_NAME,
                 update_data,
@@ -318,6 +324,7 @@ class BeingProvider(LWBaseDataProvider):
             bool: 是否成功
         """
         try:
+            now_iso = get_utc_now_iso()
             data = {
                 "user_id": user_id,
                 "mode": mode,
@@ -326,6 +333,8 @@ class BeingProvider(LWBaseDataProvider):
                 if isinstance(content, dict)
                 else content,
                 "ai_abstract": ai_abstract,
+                "created_at": now_iso,
+                "updated_at": now_iso,
             }
 
             self.db.upsert(self.TABLE_NAME, data, conflict_columns=["user_id", "mode", "version"])

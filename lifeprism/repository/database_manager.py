@@ -19,6 +19,7 @@ from lifeprism.config.database import (
 )
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 # 配置日志
 logger = get_logger(__name__)
@@ -372,19 +373,27 @@ class DatabaseManager:
             placeholders = ", ".join(["?" for _ in columns])
 
             # 构建 UPDATE 子句（排除冲突列）
-            if conflict_columns:
-                update_columns = [col for col in columns if col not in conflict_columns]
-            else:
-                update_columns = columns
+            exclude_cols = set(conflict_columns) if conflict_columns else set()
 
+            # 对于有更新时间戳的表，自动更新 updated_at（参数化绑定 ISO 8601 + UTC）
+            config = get_table_config(table_name)
+            need_update_at = config.get("timestamps") and (
+                table_name == "single_purpose_map_cache" or table_name == "multi_purpose_map_cache"
+            )
+            if need_update_at:
+                # created_at 不应被更新；updated_at 由参数化绑定，避免 SET 重复
+                exclude_cols.update({"created_at", "updated_at"})
+
+            update_columns = [col for col in columns if col not in exclude_cols]
             update_str = ", ".join([f"{col} = excluded.{col}" for col in update_columns])
 
-            # 对于有更新时间戳的表，自动更新 updated_at
-            config = get_table_config(table_name)
-            if config.get("timestamps") and (
-                table_name == "single_purpose_map_cache" or table_name == "multi_purpose_map_cache"
-            ):
-                update_str += ", updated_at = CURRENT_TIMESTAMP"
+            now_iso = None
+            if need_update_at:
+                now_iso = get_utc_now_iso()
+                if update_str:
+                    update_str += ", updated_at = ?"
+                else:
+                    update_str = "updated_at = ?"
 
             # 构建 ON CONFLICT 子句
             conflict_str = f"({', '.join(conflict_columns)})" if conflict_columns else ""
@@ -397,7 +406,10 @@ class DatabaseManager:
 
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(sql, list(data.values()))
+                params = list(data.values())
+                if now_iso is not None:
+                    params.append(now_iso)
+                cursor.execute(sql, params)
                 logger.debug("UPSERT成功: %s", table_name)
                 return cursor.rowcount
 
@@ -434,19 +446,27 @@ class DatabaseManager:
             placeholders = ", ".join(["?" for _ in columns])
 
             # 构建 UPDATE 子句
-            if conflict_columns:
-                update_columns = [col for col in columns if col not in conflict_columns]
-            else:
-                update_columns = columns
+            exclude_cols = set(conflict_columns) if conflict_columns else set()
 
+            # 自动更新时间戳（参数化绑定 ISO 8601 + UTC）
+            config = get_table_config(table_name)
+            need_update_at = config.get("timestamps") and (
+                table_name == "single_purpose_map_cache" or table_name == "multi_purpose_map_cache"
+            )
+            if need_update_at:
+                # created_at 不应被更新；updated_at 由参数化绑定，避免 SET 重复
+                exclude_cols.update({"created_at", "updated_at"})
+
+            update_columns = [col for col in columns if col not in exclude_cols]
             update_str = ", ".join([f"{col} = excluded.{col}" for col in update_columns])
 
-            # 自动更新时间戳
-            config = get_table_config(table_name)
-            if config.get("timestamps") and (
-                table_name == "single_purpose_map_cache" or table_name == "multi_purpose_map_cache"
-            ):
-                update_str += ", updated_at = CURRENT_TIMESTAMP"
+            now_iso = None
+            if need_update_at:
+                now_iso = get_utc_now_iso()
+                if update_str:
+                    update_str += ", updated_at = ?"
+                else:
+                    update_str = "updated_at = ?"
 
             # 构建 ON CONFLICT 子句
             conflict_str = f"({', '.join(conflict_columns)})" if conflict_columns else ""
@@ -459,6 +479,8 @@ class DatabaseManager:
 
             # 准备数据
             values_list = [[row.get(col) for col in columns] for row in data_list]
+            if now_iso is not None:
+                values_list = [row + [now_iso] for row in values_list]
 
             with self.get_connection() as conn:
                 cursor = conn.cursor()

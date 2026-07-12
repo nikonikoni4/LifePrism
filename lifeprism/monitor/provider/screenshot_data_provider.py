@@ -8,6 +8,7 @@ from typing import Any
 from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -29,7 +30,8 @@ class ScreenshotDataProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            result = self.db.insert("screen_captures", data) > 0
+            insert_data = {**data, "created_at": get_utc_now_iso()}
+            result = self.db.insert("screen_captures", insert_data) > 0
             logger.debug("截图元数据保存: id=%s", data.get("id"))
             return result
         except sqlite3.Error as exc:

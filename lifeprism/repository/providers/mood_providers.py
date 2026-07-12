@@ -12,6 +12,7 @@ from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -488,14 +489,15 @@ class MoodImpactProvider(LWBaseDataProvider):
                 raise ValueError(f"Invalid insert fields: {invalid_fields}")
 
             # 使用自定义 SQL 获取 AUTOINCREMENT ID
+            now_iso = get_utc_now_iso()
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO mood_impacts (name, sort_order)
-                    VALUES (?, ?)
+                    INSERT INTO mood_impacts (name, sort_order, created_at)
+                    VALUES (?, ?, ?)
                 """,
-                    (data["name"], data.get("sort_order", 0)),
+                    (data["name"], data.get("sort_order", 0), now_iso),
                 )
                 new_id = cursor.lastrowid
                 logger.info("创建影响因素成功: %s", data["name"])

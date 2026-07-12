@@ -11,6 +11,7 @@ from typing import Any
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import LazySingleton, get_logger
 from lifeprism.utils.exceptions import DataAccessError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -81,12 +82,13 @@ class ValueProvider(LWBaseDataProvider):
         """
         try:
             new_id = f"val-{str(uuid.uuid4())[:8]}"
+            now_iso = get_utc_now_iso()
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO user_values (id, keywords, content_positive, content_negative, sort_order)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO user_values (id, keywords, content_positive, content_negative, sort_order, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
                         new_id,
@@ -94,6 +96,8 @@ class ValueProvider(LWBaseDataProvider):
                         data.get("content_positive"),
                         data.get("content_negative"),
                         data.get("sort_order", 0),
+                        now_iso,
+                        now_iso,
                     ),
                 )
             logger.info(f"创建价值成功: {new_id}")

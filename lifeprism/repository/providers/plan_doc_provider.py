@@ -11,6 +11,7 @@ from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import ConflictError, DataAccessError, ValidationError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -239,7 +240,9 @@ class PlanDocProvider(LWBaseDataProvider):
                     return True
 
                 # 添加 updated_at
-                set_clauses.append("updated_at = datetime('now')")
+                now_iso = get_utc_now_iso()
+                set_clauses.append("updated_at = ?")
+                values.append(now_iso)
 
                 values.append(doc_id)
                 sql = f"UPDATE plan_doc SET {', '.join(set_clauses)} WHERE id = ?"
@@ -304,9 +307,10 @@ class PlanDocProvider(LWBaseDataProvider):
                 cursor = conn.cursor()
 
                 # 1. 更新 plan_doc 表的主键 ID
+                now_iso = get_utc_now_iso()
                 cursor.execute(
-                    "UPDATE plan_doc SET id = ?, updated_at = datetime('now') WHERE id = ?",
-                    (new_id, old_id),
+                    "UPDATE plan_doc SET id = ?, updated_at = ? WHERE id = ?",
+                    (new_id, now_iso, old_id),
                 )
 
                 if cursor.rowcount == 0:

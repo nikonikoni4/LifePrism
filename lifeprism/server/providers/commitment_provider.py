@@ -11,6 +11,7 @@ from typing import Any
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import LazySingleton, get_logger
 from lifeprism.utils.exceptions import DataAccessError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -147,14 +148,15 @@ class CommitmentProvider(LWBaseDataProvider):
         """
         try:
             new_id = f"cmt-{str(uuid.uuid4())[:8]}"
+            now_iso = get_utc_now_iso()
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO commitments (id, content, value_id, status)
-                    VALUES (?, ?, ?, 'active')
+                    INSERT INTO commitments (id, content, value_id, status, created_at, updated_at)
+                    VALUES (?, ?, ?, 'active', ?, ?)
                 """,
-                    (new_id, data["content"], data.get("value_id")),
+                    (new_id, data["content"], data.get("value_id"), now_iso, now_iso),
                 )
             logger.info("创建承诺成功: id=%s", new_id)
             return new_id

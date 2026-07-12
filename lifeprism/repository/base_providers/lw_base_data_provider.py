@@ -605,6 +605,20 @@ class LWBaseDataProvider:
         multi_purpose_data = multi_df.to_dict("records") if not multi_df.empty else []
         single_purpose_data = single_df.to_dict("records") if not single_df.empty else []
 
+        # 注入 ISO 8601 + UTC 时间戳（两表均配置了 timestamps=True 和 update_at=True）
+        # 避免依赖数据库 DEFAULT datetime('now') 的非 ISO 格式
+        if self._TABLES_WITH_TIMESTAMPS is None:
+            self._init_update_at_cache()
+        from lifeprism.utils.time_utils import get_utc_now_iso
+
+        now_iso = get_utc_now_iso()
+        for record in single_purpose_data:
+            record.setdefault("created_at", now_iso)
+            record.setdefault("updated_at", now_iso)
+        for record in multi_purpose_data:
+            record.setdefault("created_at", now_iso)
+            record.setdefault("updated_at", now_iso)
+
         affected = 0
         try:
             if single_purpose_data:
@@ -775,6 +789,9 @@ class LWBaseDataProvider:
         """
         try:
             data_list = []
+            from lifeprism.utils.time_utils import get_utc_now_iso
+
+            now_iso = get_utc_now_iso()
             for _, row in cleaned_events_df.iterrows():
                 data_list.append(
                     {
@@ -787,6 +804,8 @@ class LWBaseDataProvider:
                         "category_id": row.get("category_id"),
                         "sub_category_id": row.get("sub_category_id"),
                         "link_to_goal_id": row.get("link_to_goal_id"),
+                        "created_at": now_iso,
+                        "updated_at": now_iso,
                     }
                 )
 
@@ -845,6 +864,14 @@ class LWBaseDataProvider:
                     data["mode"] = "classification"
                 if "search_count" not in data:
                     data["search_count"] = 0
+
+            # 注入 ISO 8601 + UTC 时间戳（tokens_usage_log 配置了 timestamps=True，无 update_at）
+            from lifeprism.utils.time_utils import get_utc_now_iso
+
+            now_iso = get_utc_now_iso()
+            for data in tokens_usage_data:
+                if "created_at" not in data:
+                    data["created_at"] = now_iso
 
             # 使用 insert_many 插入数据
             affected = self.db.insert_many("tokens_usage_log", tokens_usage_data)
@@ -937,14 +964,18 @@ class LWBaseDataProvider:
             # 先查询是否存在
             existing = self.get_session_tokens_usage(session_id)
             if existing:
-                # 存在则 UPDATE
+                # 存在则 UPDATE（tokens_usage_log 无 update_at，不需写 updated_at）
                 affected = self.db.update(
                     "tokens_usage_log", data, where={"session_id": session_id}
                 )
                 logger.info("更新会话 %s 的 token 使用记录", session_id)
             else:
-                # 不存在则 INSERT
+                # 不存在则 INSERT（注入 created_at，tokens_usage_log 无 update_at）
                 data["session_id"] = session_id
+                from lifeprism.utils.time_utils import get_utc_now_iso
+
+                if "created_at" not in data:
+                    data["created_at"] = get_utc_now_iso()
                 affected = self.db.insert("tokens_usage_log", data)
                 logger.info("插入会话 %s 的 token 使用记录", session_id)
 

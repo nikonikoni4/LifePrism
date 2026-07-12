@@ -8,6 +8,7 @@ from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import LazySingleton, get_logger
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -95,8 +96,21 @@ class JournalProvider(LWBaseDataProvider):
                 # 生成唯一 ID
                 journal_id = f"journal-{str(uuid.uuid4())[:8]}"
 
+                now_iso = get_utc_now_iso()
+
                 # 构建插入数据
-                columns = ["id", "goal_id", "date", "time", "content", "mood", "duration", "tags"]
+                columns = [
+                    "id",
+                    "goal_id",
+                    "date",
+                    "time",
+                    "content",
+                    "mood",
+                    "duration",
+                    "tags",
+                    "created_at",
+                    "updated_at",
+                ]
                 values = [
                     journal_id,
                     data.get("goal_id"),
@@ -106,6 +120,8 @@ class JournalProvider(LWBaseDataProvider):
                     data.get("mood", "neutral"),
                     data.get("duration", 0),
                     data.get("tags", "[]"),
+                    now_iso,
+                    now_iso,
                 ]
 
                 placeholders = ", ".join(["?" for _ in columns])

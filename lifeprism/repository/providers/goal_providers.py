@@ -15,6 +15,7 @@ from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import ConflictError, DataAccessError, ValidationError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -316,8 +317,12 @@ class GoalProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
+                now_iso = get_utc_now_iso()
                 for index, goal_id in enumerate(goal_ids):
-                    cursor.execute("UPDATE goal SET order_index = ? WHERE id = ?", (index, goal_id))
+                    cursor.execute(
+                        "UPDATE goal SET order_index = ?, updated_at = ? WHERE id = ?",
+                        (index, now_iso, goal_id),
+                    )
 
                 logger.info("重排序 %s 个目标成功", len(goal_ids))
                 return True
@@ -656,7 +661,7 @@ class GoalStatsProvider(LWBaseDataProvider):
                 existing = cursor.fetchone()
 
                 if existing:
-                    # 更新
+                    # 更新（goal_stats 无 update_at 配置，不需写 updated_at）
                     cursor.execute(
                         """
                         UPDATE goal_stats
@@ -667,13 +672,14 @@ class GoalStatsProvider(LWBaseDataProvider):
                     )
 
                 else:
-                    # 插入
+                    # 插入（注入 created_at，goal_stats 无 update_at）
+                    now_iso = get_utc_now_iso()
                     cursor.execute(
                         """
-                        INSERT INTO goal_stats (goal_id, date, time_spent, completed_todo_count)
-                        VALUES (?, ?, ?, ?)
+                        INSERT INTO goal_stats (goal_id, date, time_spent, completed_todo_count, created_at)
+                        VALUES (?, ?, ?, ?, ?)
                     """,
-                        (goal_id, date, time_spent, todo_count),
+                        (goal_id, date, time_spent, todo_count, now_iso),
                     )
 
                 logger.info("目标 %s 在 %s 的统计数据已更新", goal_id, date)

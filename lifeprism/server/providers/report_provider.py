@@ -10,6 +10,7 @@ from typing import Any
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -109,6 +110,7 @@ class DailyReportProvider(LWBaseDataProvider):
 
                 # 序列化 JSON 字段
                 update_data = self._serialize_json_fields(update_data)
+                update_data["updated_at"] = get_utc_now_iso()
 
                 rows_affected = self.db.update_by_id(
                     self.TABLE_NAME, self.ID_COLUMN, date, update_data
@@ -124,6 +126,9 @@ class DailyReportProvider(LWBaseDataProvider):
 
                 # 序列化 JSON 字段
                 insert_data = self._serialize_json_fields(insert_data)
+                now_iso = get_utc_now_iso()
+                insert_data["created_at"] = now_iso
+                insert_data["updated_at"] = now_iso
 
                 self.db.insert(self.TABLE_NAME, insert_data)
                 logger.info("创建日报告 %s 成功", date)
@@ -335,6 +340,7 @@ class WeeklyReportProvider(LWBaseDataProvider):
 
                 # 序列化 JSON 字段
                 update_data = self._serialize_json_fields(update_data)
+                update_data["updated_at"] = get_utc_now_iso()
 
                 rows_affected = self.db.update_by_id(
                     self.TABLE_NAME, self.ID_COLUMN, week_start_date, update_data
@@ -350,6 +356,9 @@ class WeeklyReportProvider(LWBaseDataProvider):
 
                 # 序列化 JSON 字段
                 insert_data = self._serialize_json_fields(insert_data)
+                now_iso = get_utc_now_iso()
+                insert_data["created_at"] = now_iso
+                insert_data["updated_at"] = now_iso
 
                 self.db.insert(self.TABLE_NAME, insert_data)
                 logger.info("创建周报告 %s 成功", week_start_date)
@@ -532,6 +541,7 @@ class MonthlyReportProvider(LWBaseDataProvider):
 
                 # 序列化 JSON 字段
                 update_data = self._serialize_json_fields(update_data)
+                update_data["updated_at"] = get_utc_now_iso()
 
                 rows_affected = self.db.update_by_id(
                     self.TABLE_NAME, self.ID_COLUMN, month_start_date, update_data
@@ -547,6 +557,9 @@ class MonthlyReportProvider(LWBaseDataProvider):
 
                 # 序列化 JSON 字段
                 insert_data = self._serialize_json_fields(insert_data)
+                now_iso = get_utc_now_iso()
+                insert_data["created_at"] = now_iso
+                insert_data["updated_at"] = now_iso
 
                 self.db.insert(self.TABLE_NAME, insert_data)
                 logger.info("创建月报告 %s 成功", month_start_date)

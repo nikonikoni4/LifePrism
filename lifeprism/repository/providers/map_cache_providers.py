@@ -11,6 +11,7 @@ from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import ConflictError, DataAccessError, ValidationError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -249,14 +250,15 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
 
             # 手动实现批量插入
             count = 0
+            now_iso = get_utc_now_iso()
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 for data in data_list:
-                    # 构建字段列表和占位符
-                    fields = list(data.keys())
+                    # 构建字段列表和占位符（补充时间戳字段）
+                    fields = list(data.keys()) + ["created_at", "updated_at"]
                     placeholders = ",".join("?" * len(fields))
                     fields_str = ",".join(fields)
-                    values = [data[f] for f in fields]
+                    values = list(data.values()) + [now_iso, now_iso]
 
                     sql = f"INSERT INTO {self._TABLE_NAME} ({fields_str}) VALUES ({placeholders})"
                     cursor.execute(sql, values)
@@ -610,14 +612,15 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
 
             # 手动实现批量插入
             count = 0
+            now_iso = get_utc_now_iso()
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 for data in data_list:
-                    # 构建字段列表和占位符
-                    fields = list(data.keys())
+                    # 构建字段列表和占位符（补充时间戳字段）
+                    fields = list(data.keys()) + ["created_at", "updated_at"]
                     placeholders = ",".join("?" * len(fields))
                     fields_str = ",".join(fields)
-                    values = [data[f] for f in fields]
+                    values = list(data.values()) + [now_iso, now_iso]
 
                     sql = f"INSERT INTO {self._TABLE_NAME} ({fields_str}) VALUES ({placeholders})"
                     cursor.execute(sql, values)

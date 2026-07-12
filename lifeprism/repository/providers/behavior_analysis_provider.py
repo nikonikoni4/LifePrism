@@ -11,6 +11,7 @@ from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -305,6 +306,7 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
 
         # 批量插入
         success_count = 0
+        now_iso = get_utc_now_iso()
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             for data in data_list:
@@ -312,7 +314,7 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
                     cursor.execute(
                         f"""INSERT INTO {self._TABLE_NAME}
                            (start_time, end_time, behavior, behavior_summary, title, screen_count, created_at)
-                           VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))""",
+                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
                         (
                             data["start_time"],
                             data["end_time"],
@@ -320,6 +322,7 @@ class BehaviorAnalysisProvider(LWBaseDataProvider):
                             data.get("behavior_summary"),
                             data.get("title"),
                             data["screen_count"],
+                            now_iso,
                         ),
                     )
                     success_count += 1

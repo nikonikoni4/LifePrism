@@ -11,6 +11,7 @@ from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import ConflictError, DataAccessError, ValidationError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -442,9 +443,11 @@ class TodoProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
+                now_iso = get_utc_now_iso()
                 for index, todo_id in enumerate(todo_ids):
                     cursor.execute(
-                        "UPDATE todo_list SET order_index = ? WHERE id = ?", (index, todo_id)
+                        "UPDATE todo_list SET order_index = ?, updated_at = ? WHERE id = ?",
+                        (index, now_iso, todo_id),
                     )
 
                 logger.info("重排序 %s 个任务成功", len(todo_ids))
@@ -508,9 +511,11 @@ class TodoProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
+                now_iso = get_utc_now_iso()
                 for index, todo_id in enumerate(todo_ids):
                     cursor.execute(
-                        "UPDATE todo_list SET pool_order_index = ? WHERE id = ?", (index, todo_id)
+                        "UPDATE todo_list SET pool_order_index = ?, updated_at = ? WHERE id = ?",
+                        (index, now_iso, todo_id),
                     )
 
                 logger.info("重排序任务池 %s 个任务成功", len(todo_ids))
@@ -642,6 +647,7 @@ class TodoProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
+                now_iso = get_utc_now_iso()
                 for data in todos:
                     todo_id = data.get("id") or generate_todo_id()
                     columns = [
@@ -660,6 +666,8 @@ class TodoProvider(LWBaseDataProvider):
                         "plan_doc_id",
                         "delay_days",
                         "delay_reason",
+                        "created_at",
+                        "updated_at",
                     ]
                     values = [
                         todo_id,
@@ -677,6 +685,8 @@ class TodoProvider(LWBaseDataProvider):
                         data.get("plan_doc_id"),
                         data.get("delay_days"),
                         data.get("delay_reason"),
+                        now_iso,
+                        now_iso,
                     ]
 
                     placeholders = ", ".join(["?" for _ in columns])
@@ -720,6 +730,7 @@ class TodoProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
+                now_iso = get_utc_now_iso()
                 for data in updates:
                     todo_id = data.get("id")
                     if not todo_id:
@@ -737,6 +748,10 @@ class TodoProvider(LWBaseDataProvider):
 
                     if not set_clauses:
                         continue
+
+                    # 自动写入 updated_at（ISO 8601 + UTC）
+                    set_clauses.append("updated_at = ?")
+                    values.append(now_iso)
 
                     values.append(todo_id)
                     sql = f"UPDATE todo_list SET {', '.join(set_clauses)} WHERE id = ?"
@@ -800,8 +815,12 @@ class TodoProvider(LWBaseDataProvider):
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
+                now_iso = get_utc_now_iso()
                 for idx, tid in enumerate(todo_ids):
-                    cursor.execute("UPDATE todo_list SET waid_order = ? WHERE id = ?", (idx, tid))
+                    cursor.execute(
+                        "UPDATE todo_list SET waid_order = ?, updated_at = ? WHERE id = ?",
+                        (idx, now_iso, tid),
+                    )
                 logger.info("批量更新 WAID 排序成功，共 %s 个", len(todo_ids))
                 return True
         except sqlite3.Error as e:

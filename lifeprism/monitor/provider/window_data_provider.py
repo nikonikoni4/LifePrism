@@ -8,6 +8,7 @@ import sqlite3
 from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -45,7 +46,13 @@ class MonitorDataProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            data = {"timestamp": timestamp, "duration": duration, "app": app, "title": title}
+            data = {
+                "timestamp": timestamp,
+                "duration": duration,
+                "app": app,
+                "title": title,
+                "created_at": get_utc_now_iso(),
+            }
 
             # 使用 DatabaseManager 的 insert 方法执行插入操作
             # LWBaseDataProvider 通过 self.db 持有 DatabaseManager 的引用
