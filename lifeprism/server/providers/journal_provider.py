@@ -169,6 +169,10 @@ class JournalProvider(LWBaseDataProvider):
                 if not set_clauses:
                     return True
 
+                # 追加 updated_at（ISO 8601 + UTC 格式）
+                set_clauses.append("updated_at = ?")
+                values.append(get_utc_now_iso())
+
                 values.append(journal_id)
                 sql = f"UPDATE goal_journal SET {', '.join(set_clauses)} WHERE id = ?"
 
