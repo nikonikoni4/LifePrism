@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytz
 
-from lifeprism.config import LOCAL_TIMEZONE
+from lifeprism.config import get_user_timezone
 from lifeprism.utils.exceptions import LWBaseError
 
 WINDOW_BUCKET_ID = "aw-watcher-window_"
@@ -41,7 +41,7 @@ class AWBaseDataProvider:
         else:
             self.db = db_manager
 
-        self.local_tz = pytz.timezone(LOCAL_TIMEZONE)
+        self.local_tz = pytz.timezone(get_user_timezone())
         self.utc_tz = timezone.utc
 
         # 验证数据库路径存在

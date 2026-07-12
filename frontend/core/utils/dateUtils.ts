@@ -66,3 +66,42 @@ export function parseISOString(isoString: string): Date {
 export function toISOStringUTC(date: Date): string {
     return date.toISOString();
 }
+
+// ==================== 用户时区配置 ====================
+// 用户时区缓存在 localStorage 中，由设置界面写入。
+// 后端 AI 工具使用此时区进行交互，前端时间显示目前仍使用浏览器本地时区，
+// 后续可引入 date-fns-tz 按配置时区显示。
+
+const TIMEZONE_STORAGE_KEY = 'lifeprism_timezone';
+
+/**
+ * 获取用户配置的时区（IANA 标识符）
+ *
+ * 优先从 localStorage 读取（由设置界面写入），fallback 到上海时区。
+ * 后端 AI 工具的本地时间显示使用此时区。
+ *
+ * @returns 时区标识符，如 "Asia/Shanghai"
+ */
+export function getUserTimezone(): string {
+    try {
+        const tz = localStorage.getItem(TIMEZONE_STORAGE_KEY);
+        return tz || 'Asia/Shanghai';
+    } catch {
+        return 'Asia/Shanghai';
+    }
+}
+
+/**
+ * 设置用户时区到 localStorage
+ *
+ * 由设置界面在加载/保存配置时调用，供前端其他模块读取。
+ *
+ * @param timezone IANA 时区标识符，如 "Asia/Shanghai"
+ */
+export function setUserTimezone(timezone: string): void {
+    try {
+        localStorage.setItem(TIMEZONE_STORAGE_KEY, timezone);
+    } catch {
+        // localStorage 不可用时静默失败
+    }
+}

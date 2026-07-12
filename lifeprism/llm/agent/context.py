@@ -5,7 +5,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from lifeprism.config import ALLOWED_DIRS, settings
+import pytz
+
+from lifeprism.config import ALLOWED_DIRS, get_user_timezone, settings
 from lifeprism.llm.agent.skill import SkillLoad
 from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType
 from lifeprism.utils import get_logger
@@ -182,7 +184,14 @@ class Context:
         else:
             channel_type = "未知"
 
-        return f"## runtime\n 当前时间（UTC ISO 8601）：{datetime.now(timezone.utc).isoformat()}\n 当前对话方式：{channel_type}\n"
+        tz_name = get_user_timezone()
+        tz = pytz.timezone(tz_name)
+        now_local = datetime.now(timezone.utc).astimezone(tz)
+        return (
+            f"## runtime\n"
+            f" 当前时间：{now_local.strftime('%Y-%m-%d %H:%M:%S')}（时区：{tz_name}）\n"
+            f" 当前对话方式：{channel_type}\n"
+        )
 
     @staticmethod
     def _build_user_message(msg: InboundMessage) -> list[dict[str, Any]]:

@@ -16,7 +16,7 @@ from typing import Any
 import pandas as pd
 import pytz
 
-from lifeprism.config import LOCAL_TIMEZONE, settings
+from lifeprism.config import get_user_timezone, settings
 from lifeprism.repository import goal_repository, todo_repository
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
@@ -93,7 +93,7 @@ def _utc_timestamp_to_local_date(timestamp: str) -> str:
         return ""
     try:
         utc_dt = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-        local_tz = pytz.timezone(LOCAL_TIMEZONE)
+        local_tz = pytz.timezone(get_user_timezone())
         local_dt = utc_dt.astimezone(local_tz)
         return local_dt.strftime("%Y-%m-%d")
     except (ValueError, TypeError):
@@ -117,7 +117,7 @@ def _add_local_date_column(df: pd.DataFrame, time_col: str = "start_time") -> pd
         df["local_date"] = ""
         return df
 
-    local_tz = pytz.timezone(LOCAL_TIMEZONE)
+    local_tz = pytz.timezone(get_user_timezone())
     # 解析时间戳并标记为 UTC，然后转为本地时区，最后提取日期
     df = df.copy()
     utc_times = pd.to_datetime(df[time_col], utc=True, errors="coerce")
@@ -143,7 +143,7 @@ def _build_utc_time_range(start_date: str, end_date: str = None) -> tuple[str, s
     if end_date is None:
         end_date = start_date
 
-    local_tz = pytz.timezone(LOCAL_TIMEZONE)
+    local_tz = pytz.timezone(get_user_timezone())
     local_start = local_tz.localize(datetime.strptime(start_date, "%Y-%m-%d"))
     local_end = (
         local_tz.localize(datetime.strptime(end_date, "%Y-%m-%d"))

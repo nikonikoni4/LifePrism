@@ -12,6 +12,7 @@
 - docs/guides/utc-migration-hidden-dependencies.md
 - .scratch/utc-timezone-migration/06-report-stats-service-migration.md
 """
+
 import importlib.util
 from pathlib import Path
 from unittest.mock import patch
@@ -49,16 +50,14 @@ class TestGetLocalTodayStr:
         """
         report_service = _load_report_service_module()
 
-        with patch.object(report_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(report_service, "get_user_timezone", return_value="Asia/Shanghai"):
             with patch.object(report_service, "get_local_today") as mock_get_local:
                 from datetime import date
 
                 mock_get_local.return_value = date(2026, 7, 13)
                 result = report_service._get_local_today_str()
 
-        assert result == "2026-07-13", (
-            f"应返回本地日期 '2026-07-13'，实际为 '{result}'"
-        )
+        assert result == "2026-07-13", f"应返回本地日期 '2026-07-13'，实际为 '{result}'"
 
     def test_returns_correct_date_at_utc_midnight(self):
         """UTC 午夜前后应返回正确的本地日期
@@ -70,7 +69,7 @@ class TestGetLocalTodayStr:
         """
         report_service = _load_report_service_module()
 
-        with patch.object(report_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(report_service, "get_user_timezone", return_value="Asia/Shanghai"):
             with patch.object(report_service, "get_local_today") as mock_get_local:
                 from datetime import date
 
@@ -94,7 +93,7 @@ class TestUtcTimestampToLocalDate:
         """
         report_service = _load_report_service_module()
 
-        with patch.object(report_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(report_service, "get_user_timezone", return_value="Asia/Shanghai"):
             result = report_service._utc_timestamp_to_local_date("2026-07-11 17:00:00")
 
         assert result == "2026-07-12", (
@@ -108,7 +107,7 @@ class TestUtcTimestampToLocalDate:
         """
         report_service = _load_report_service_module()
 
-        with patch.object(report_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(report_service, "get_user_timezone", return_value="Asia/Shanghai"):
             result = report_service._utc_timestamp_to_local_date("2026-07-12 02:00:00")
 
         assert result == "2026-07-12"
@@ -121,10 +120,8 @@ class TestUtcTimestampToLocalDate:
         """
         report_service = _load_report_service_module()
 
-        with patch.object(report_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
-            result = report_service._utc_timestamp_to_local_date(
-                "2026-07-11T17:00:00.123456+00:00"
-            )
+        with patch.object(report_service, "get_user_timezone", return_value="Asia/Shanghai"):
+            result = report_service._utc_timestamp_to_local_date("2026-07-11T17:00:00.123456+00:00")
 
         assert result == "2026-07-12", (
             f"ISO 格式 UTC 时间戳应转为本地日期 '2026-07-12'，实际为 '{result}'"
@@ -156,7 +153,7 @@ class TestUtcTimestampToLocalDate:
             }
         )
 
-        with patch.object(report_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(report_service, "get_user_timezone", return_value="Asia/Shanghai"):
             result = report_service._add_local_date_column(df.copy())
 
         assert result["local_date"].iloc[0] == "2026-07-12"
@@ -174,7 +171,7 @@ class TestBuildUtcTimeRange:
         """本地日期 2026-07-12 (UTC+8) 应转为 UTC 2026-07-11 16:00 ~ 2026-07-12 15:59"""
         report_service = _load_report_service_module()
 
-        with patch.object(report_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(report_service, "get_user_timezone", return_value="Asia/Shanghai"):
             start, end = report_service._build_utc_time_range("2026-07-12")
 
         assert start == "2026-07-11 16:00:00", (
@@ -188,7 +185,7 @@ class TestBuildUtcTimeRange:
         """本地日期范围 2026-07-09 ~ 2026-07-15 应转为 UTC 范围"""
         report_service = _load_report_service_module()
 
-        with patch.object(report_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(report_service, "get_user_timezone", return_value="Asia/Shanghai"):
             start, end = report_service._build_utc_time_range("2026-07-09", "2026-07-15")
 
         # 本地 2026-07-09 00:00 (UTC+8) = UTC 2026-07-08 16:00

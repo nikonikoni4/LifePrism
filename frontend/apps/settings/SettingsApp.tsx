@@ -32,6 +32,25 @@ import type { CategoryTreeItem } from '../lifewatch/pages/category/types';
 import { SyncConfigSection } from './components/SyncConfigSection';
 import { SyncStatusSection } from './components/SyncStatusSection';
 
+// 常用时区选项
+const TIMEZONE_OPTIONS = [
+    { value: 'Asia/Shanghai', label: '上海 (UTC+8)' },
+    { value: 'Asia/Tokyo', label: '东京 (UTC+9)' },
+    { value: 'Asia/Singapore', label: '新加坡 (UTC+8)' },
+    { value: 'Asia/Hong_Kong', label: '香港 (UTC+8)' },
+    { value: 'Asia/Taipei', label: '台北 (UTC+8)' },
+    { value: 'Asia/Bangkok', label: '曼谷 (UTC+7)' },
+    { value: 'Asia/Dubai', label: '迪拜 (UTC+4)' },
+    { value: 'Europe/London', label: '伦敦 (UTC+0)' },
+    { value: 'Europe/Paris', label: '巴黎 (UTC+1)' },
+    { value: 'Europe/Berlin', label: '柏林 (UTC+1)' },
+    { value: 'America/New_York', label: '纽约 (UTC-5)' },
+    { value: 'America/Los_Angeles', label: '洛杉矶 (UTC-8)' },
+    { value: 'America/Chicago', label: '芝加哥 (UTC-6)' },
+    { value: 'Australia/Sydney', label: '悉尼 (UTC+10)' },
+    { value: 'Pacific/Auckland', label: '奥克兰 (UTC+12)' },
+];
+
 const SettingsApp: React.FC = () => {
     // Loading & Saving States
     const [isLoading, setIsLoading] = useState(true);
@@ -39,6 +58,7 @@ const SettingsApp: React.FC = () => {
 
     // 1. User Settings
     const [nickname, setNickname] = useState('');
+    const [timezone, setTimezone] = useState('Asia/Shanghai');
 
     // 2. API Settings
     const [provider, setProvider] = useState('');
@@ -177,6 +197,7 @@ const SettingsApp: React.FC = () => {
 
                 // Populate state from API response
                 setNickname(settings.user_name);
+                setTimezone(settings.timezone || 'Asia/Shanghai');
                 setProvider(settings.provider);
                 setProviderList(settings.provider_list);
                 setProviderIdMap(settings.provider_id_map || {});
@@ -284,6 +305,7 @@ const SettingsApp: React.FC = () => {
     const triggerAutoSave = useCallback((overrides: Record<string, unknown> = {}) => {
         const currentSettings = {
             user_name: nickname,
+            timezone: timezone,
             provider: provider,
             model: modelName,
             api_base: apiBase,
@@ -302,7 +324,7 @@ const SettingsApp: React.FC = () => {
             ...overrides,
         };
         debouncedSave(currentSettings);
-    }, [nickname, provider, modelName, apiBase, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, screenshotFrequencyLevel, screenshotRetentionDays, monitorType, screenAnalysisIgnore, debouncedSave]);
+    }, [nickname, timezone, provider, modelName, apiBase, costInput, costOutput, classificationMode, longLogThreshold, browserApps, awPath, lifeprismDataPath, filterDuration, screenshotFrequencyLevel, screenshotRetentionDays, monitorType, screenAnalysisIgnore, debouncedSave]);
 
     // Handlers
     const handleTestConnection = async () => {
@@ -608,6 +630,22 @@ const SettingsApp: React.FC = () => {
                         onBlur={() => triggerAutoSave({ user_name: nickname })}
                         className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-50/50 rounded-xl px-4 py-3 text-slate-800 font-bold outline-none transition-all"
                     />
+                </div>
+                <div className="max-w-md mt-6">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">时区设置</label>
+                    <select
+                        value={timezone}
+                        onChange={(e) => {
+                            setTimezone(e.target.value);
+                            triggerAutoSave({ timezone: e.target.value });
+                        }}
+                        className="w-full bg-gray-50 border border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-50/50 rounded-xl px-4 py-3 text-slate-800 font-bold outline-none transition-all appearance-none cursor-pointer"
+                    >
+                        {TIMEZONE_OPTIONS.map(tz => (
+                            <option key={tz.value} value={tz.value}>{tz.label}</option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-slate-400 mt-2">AI 对话和时间显示将使用此时区，数据库存储仍为 UTC。</p>
                 </div>
             </section>
 

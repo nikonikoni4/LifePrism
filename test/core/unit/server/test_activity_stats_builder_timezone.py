@@ -12,6 +12,7 @@
 - docs/guides/utc-migration-hidden-dependencies.md
 - .scratch/utc-timezone-migration/06-report-stats-service-migration.md
 """
+
 import importlib.util
 from pathlib import Path
 from unittest.mock import patch
@@ -45,7 +46,7 @@ class TestBuildUtcTimeRange:
         """本地日期 2026-07-12 (UTC+8) 应转为 UTC 2026-07-11 16:00 ~ 2026-07-12 15:59"""
         builder = _load_activity_stats_builder_module()
 
-        with patch.object(builder, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(builder, "get_user_timezone", return_value="Asia/Shanghai"):
             start, end = builder._build_utc_time_range("2026-07-12")
 
         assert start == "2026-07-11 16:00:00", (
@@ -59,7 +60,7 @@ class TestBuildUtcTimeRange:
         """本地日期范围 2026-07-09 ~ 2026-07-15 应转为 UTC 范围"""
         builder = _load_activity_stats_builder_module()
 
-        with patch.object(builder, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(builder, "get_user_timezone", return_value="Asia/Shanghai"):
             start, end = builder._build_utc_time_range("2026-07-09", "2026-07-15")
 
         assert start == "2026-07-08 16:00:00"
@@ -79,7 +80,7 @@ class TestUtcTimestampToLocalDate:
         """
         builder = _load_activity_stats_builder_module()
 
-        with patch.object(builder, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(builder, "get_user_timezone", return_value="Asia/Shanghai"):
             result = builder._utc_timestamp_to_local_date("2026-07-11 17:00:00")
 
         assert result == "2026-07-12", (
@@ -90,7 +91,7 @@ class TestUtcTimestampToLocalDate:
         """UTC 早上时间应留在同一本地日期"""
         builder = _load_activity_stats_builder_module()
 
-        with patch.object(builder, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(builder, "get_user_timezone", return_value="Asia/Shanghai"):
             result = builder._utc_timestamp_to_local_date("2026-07-12 02:00:00")
 
         assert result == "2026-07-12"
@@ -99,10 +100,8 @@ class TestUtcTimestampToLocalDate:
         """ISO 格式 UTC 时间戳也应正确转换"""
         builder = _load_activity_stats_builder_module()
 
-        with patch.object(builder, "LOCAL_TIMEZONE", "Asia/Shanghai"):
-            result = builder._utc_timestamp_to_local_date(
-                "2026-07-11T17:00:00.123456+00:00"
-            )
+        with patch.object(builder, "get_user_timezone", return_value="Asia/Shanghai"):
+            result = builder._utc_timestamp_to_local_date("2026-07-11T17:00:00.123456+00:00")
 
         assert result == "2026-07-12"
 
@@ -133,7 +132,7 @@ class TestAddLocalDateColumn:
             }
         )
 
-        with patch.object(builder, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(builder, "get_user_timezone", return_value="Asia/Shanghai"):
             result = builder._add_local_date_column(df.copy())
 
         assert result["local_date"].iloc[0] == "2026-07-12"
@@ -146,21 +145,21 @@ class TestAddLocalDateColumn:
 
         df = pd.DataFrame({"other_col": [1, 2, 3]})
 
-        with patch.object(builder, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(builder, "get_user_timezone", return_value="Asia/Shanghai"):
             result = builder._add_local_date_column(df.copy(), time_col="start_time")
 
         assert "local_date" in result.columns
 
 
-# ==================== Seam 4: LOCAL_TIMEZONE 已导入 ====================
+# ==================== Seam 4: get_user_timezone 已导入 ====================
 
 
-class TestLocalTimezoneImported:
-    """验证 activity_stats_builder 已导入 LOCAL_TIMEZONE"""
+class TestGetUserTimezoneImported:
+    """验证 activity_stats_builder 已导入 get_user_timezone"""
 
-    def test_local_timezone_is_imported(self):
-        """activity_stats_builder 应导入 LOCAL_TIMEZONE"""
+    def test_get_user_timezone_is_imported(self):
+        """activity_stats_builder 应导入 get_user_timezone 函数"""
         builder = _load_activity_stats_builder_module()
-        assert hasattr(builder, "LOCAL_TIMEZONE"), (
-            "activity_stats_builder 应导入 LOCAL_TIMEZONE 常量"
+        assert hasattr(builder, "get_user_timezone"), (
+            "activity_stats_builder 应导入 get_user_timezone 函数"
         )

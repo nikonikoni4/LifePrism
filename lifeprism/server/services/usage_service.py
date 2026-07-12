@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytz
 
-from lifeprism.config import LOCAL_TIMEZONE
+from lifeprism.config import get_user_timezone
 from lifeprism.config.settings_manager import settings
 from lifeprism.repository import tokens_usage_repository
 from lifeprism.repository.providers.common_query_options import QueryOptions
@@ -53,7 +53,7 @@ def _to_time_range(
 ) -> tuple[str | None, str | None]:
     """将 date 或显式时间范围统一转换为 UTC 时间范围字符串。
 
-    当传入本地日期（YYYY-MM-DD）时，基于 LOCAL_TIMEZONE 转换为 UTC 时间范围。
+    当传入本地日期（YYYY-MM-DD）时，基于用户配置时区转换为 UTC 时间范围。
     例如本地 2026-07-12 (UTC+8) -> UTC 2026-07-11 16:00:00 ~ 2026-07-12 15:59:59
 
     Args:
@@ -65,7 +65,7 @@ def _to_time_range(
         tuple[str | None, str | None]: (start, end) UTC 时间范围字符串
     """
     if date:
-        local_tz = pytz.timezone(LOCAL_TIMEZONE)
+        local_tz = pytz.timezone(get_user_timezone())
         local_start = local_tz.localize(datetime.strptime(date, "%Y-%m-%d"))
         local_end = local_start + timedelta(days=1) - timedelta(seconds=1)
         utc_start = local_start.astimezone(timezone.utc)
@@ -141,7 +141,7 @@ def _utc_created_at_to_local_date(created_at: str) -> str:
         return ""
     try:
         utc_dt = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-        local_tz = pytz.timezone(LOCAL_TIMEZONE)
+        local_tz = pytz.timezone(get_user_timezone())
         local_dt = utc_dt.astimezone(local_tz)
         return local_dt.strftime("%Y-%m-%d")
     except (ValueError, TypeError):

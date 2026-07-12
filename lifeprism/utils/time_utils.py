@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 
 import pytz
 
-from lifeprism.config import LOCAL_TIMEZONE
+from lifeprism.config import get_user_timezone
 
 
 def get_local_today() -> date:
@@ -21,7 +21,7 @@ def get_local_today() -> date:
     Returns:
         date: 用户本地时区的今天日期对象
     """
-    local_tz = pytz.timezone(LOCAL_TIMEZONE)
+    local_tz = pytz.timezone(get_user_timezone())
     return datetime.now(local_tz).date()
 
 

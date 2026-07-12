@@ -48,6 +48,7 @@ export interface Settings {
     screenshot_retention_days?: number;
     is_vlm?: Record<string, boolean>;
     screen_analysis_ignore?: string[];
+    timezone?: string;
 }
 
 /** 获取配置响应 */
@@ -75,6 +76,7 @@ export interface UpdateSettingsRequest {
     screenshot_monitor?: boolean;
     is_vlm?: Record<string, boolean>;
     screen_analysis_ignore?: string[];
+    timezone?: string;
 }
 
 /** 更新 API Key 请求 */

@@ -13,8 +13,8 @@
 - docs/guides/utc-migration-hidden-dependencies.md
 - .scratch/utc-timezone-migration/06-report-stats-service-migration.md
 """
+
 import importlib.util
-from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -45,7 +45,7 @@ class TestToLocalTimeRange:
         """本地日期 2026-07-12 (UTC+8) 应转为 UTC 2026-07-11 16:00 ~ 2026-07-12 15:59"""
         usage_service = _load_usage_service_module()
 
-        with patch.object(usage_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(usage_service, "get_user_timezone", return_value="Asia/Shanghai"):
             start, end = usage_service._to_time_range(date="2026-07-12")
 
         # 本地 2026-07-12 00:00:00 (UTC+8) = UTC 2026-07-11 16:00:00
@@ -88,7 +88,7 @@ class TestIsInTimeRange:
         - 记录 UTC 2026-07-12 02:00:00 (本地 10:00) 应在范围内
         """
         usage_service = _load_usage_service_module()
-        with patch.object(usage_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(usage_service, "get_user_timezone", return_value="Asia/Shanghai"):
             result = usage_service._is_in_time_range(
                 "2026-07-12 02:00:00",
                 start_time="2026-07-11 16:00:00",
@@ -193,16 +193,14 @@ class TestAggregateByDate:
             }
         ]
 
-        with patch.object(usage_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(usage_service, "get_user_timezone", return_value="Asia/Shanghai"):
             result = usage_service._aggregate_tokens_usage_by_date(records)
 
         # 应按本地日期 2026-07-12 分组，而非 UTC 日期 2026-07-11
         assert "2026-07-12" in result, (
             f"UTC 2026-07-11 17:00 应分组到本地日期 '2026-07-12'，实际分组键为 {list(result.keys())}"
         )
-        assert "2026-07-11" not in result, (
-            "UTC 2026-07-11 17:00 不应分组到 UTC 日期 '2026-07-11'"
-        )
+        assert "2026-07-11" not in result, "UTC 2026-07-11 17:00 不应分组到 UTC 日期 '2026-07-11'"
         assert result["2026-07-12"]["total_tokens"] == 150
 
     def test_utc_created_at_noon_groups_same_local_date(self):
@@ -223,7 +221,7 @@ class TestAggregateByDate:
             }
         ]
 
-        with patch.object(usage_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(usage_service, "get_user_timezone", return_value="Asia/Shanghai"):
             result = usage_service._aggregate_tokens_usage_by_date(records)
 
         assert "2026-07-12" in result
@@ -244,7 +242,7 @@ class TestAggregateByDate:
             }
         ]
 
-        with patch.object(usage_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(usage_service, "get_user_timezone", return_value="Asia/Shanghai"):
             result = usage_service._aggregate_tokens_usage_by_date(records)
 
         assert "2026-07-12" in result, (
@@ -284,7 +282,7 @@ class TestAggregateByDate:
             },
         ]
 
-        with patch.object(usage_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(usage_service, "get_user_timezone", return_value="Asia/Shanghai"):
             result = usage_service._aggregate_tokens_usage_by_date(records)
 
         # 第一条记录应分到 2026-07-11
@@ -319,7 +317,7 @@ class TestGetUsageStats7DaysTimezone:
             raising=False,
         )
 
-        with patch.object(usage_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(usage_service, "get_user_timezone", return_value="Asia/Shanghai"):
             usage_service.get_usage_stats_7days("2026-07-15")
 
         # 应该有一次查询调用
@@ -363,7 +361,7 @@ class TestGetUsageStats7DaysTimezone:
             raising=False,
         )
 
-        with patch.object(usage_service, "LOCAL_TIMEZONE", "Asia/Shanghai"):
+        with patch.object(usage_service, "get_user_timezone", return_value="Asia/Shanghai"):
             result = usage_service.get_usage_stats_7days("2026-07-15")
 
         # 7天范围内 2026-07-15 应包含两条记录的 token 总和

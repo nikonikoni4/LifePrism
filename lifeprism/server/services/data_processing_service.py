@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import pytz
 
-from lifeprism.config import LOCAL_TIMEZONE, settings
+from lifeprism.config import get_user_timezone, settings
 from lifeprism.llm.classify.main_classify import LLMClassify
 from lifeprism.llm.schemas import classifyState
 from lifeprism.processors.data_clean import clean_activitywatch_data
@@ -301,7 +301,7 @@ class DataProcessingService:
             dt = datetime.fromisoformat(latest_end_time)
             if dt.tzinfo is None:
                 # 旧格式（无时区信息），假设为本地时间，转换为 UTC
-                local_tz = pytz.timezone(LOCAL_TIMEZONE)
+                local_tz = pytz.timezone(get_user_timezone())
                 dt = local_tz.localize(dt)
                 dt = dt.astimezone(timezone.utc)
             return dt
@@ -309,7 +309,7 @@ class DataProcessingService:
             # 尝试解析为旧格式 "%Y-%m-%d %H:%M:%S"
             try:
                 dt = datetime.strptime(latest_end_time, "%Y-%m-%d %H:%M:%S")
-                local_tz = pytz.timezone(LOCAL_TIMEZONE)
+                local_tz = pytz.timezone(get_user_timezone())
                 dt = local_tz.localize(dt)
                 dt = dt.astimezone(timezone.utc)
                 return dt

@@ -72,6 +72,7 @@ class SettingsManager:
         "llm_call_logger_enabled": True,  # LLM 调用记录器开关
         "auto_summary_session": True,  # 自动总结会话
         "auto_update_memory": True,  # 自动更新记忆
+        "timezone": "Asia/Shanghai",  # 用户时区（IANA 标识符）
     }
 
     def __new__(cls) -> "SettingsManager":
@@ -736,6 +737,12 @@ class SettingsManager:
     @property
     def token_limit(self) -> int:
         return 50000  # 暂定50k
+
+    @property
+    def timezone(self) -> str:
+        """获取用户配置的时区（IANA 标识符）"""
+        tz = self.get("timezone")
+        return tz if tz else "Asia/Shanghai"
 
     def get_provider_history(self, provider_id: str) -> dict[str, Any]:
         """获取指定服务商的历史快照。"""

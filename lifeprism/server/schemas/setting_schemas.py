@@ -60,6 +60,7 @@ class SettingItems(BaseModel):
     screen_analysis_ignore: list[str] = Field(
         default_factory=list, description="截图分析忽略的分类 ID 列表"
     )
+    timezone: str = Field(default="Asia/Shanghai", description="用户时区（IANA 标识符）")
 
 
 class SettingsResponse(BaseModel):
@@ -95,6 +96,7 @@ class UpdateSettingsRequest(BaseModel):
     screenshot_monitor: bool | None = None
     monitor_type: str | None = None
     screen_analysis_ignore: list[str] | None = None
+    timezone: str | None = None
 
 
 class UpdateApiKeyRequest(BaseModel):
