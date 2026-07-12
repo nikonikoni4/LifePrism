@@ -59,3 +59,75 @@ def parse_iso_to_aware(iso_string: str) -> datetime:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def local_to_utc_iso(local_str: str, format: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """将本地时间字符串转换为 UTC ISO 8601 格式字符串
+
+    偏移量由 get_user_timezone() 动态决定，用于定时任务构造本地时间后转 UTC 查库、
+    Repository 层修复等场景。
+
+    Args:
+        local_str: 本地时间字符串（如 "2026-07-12 04:00:00"）
+        format: 输入字符串的解析格式，默认 "%Y-%m-%d %H:%M:%S"
+
+    Returns:
+        str: UTC ISO 8601 格式字符串（如 "2026-07-11T20:00:00+00:00"）
+    """
+    tz = pytz.timezone(get_user_timezone())
+    dt = datetime.strptime(local_str, format)
+    dt = tz.localize(dt)
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def build_local_datetime(date_str: str, time_str: str = "00:00:00") -> str:
+    """根据日期和时间构造本地时间字符串
+
+    用于定时任务构造本地时间字符串（替代 f"{date} {time}" 硬拼接）。
+    输出为面向 AI/用户的格式，无时区标识。
+
+    Args:
+        date_str: 日期字符串，格式 YYYY-MM-DD
+        time_str: 时间字符串，格式 HH:MM:SS，默认 "00:00:00"
+
+    Returns:
+        str: 本地时间字符串 "YYYY-MM-DD HH:MM:SS"
+    """
+    combined = f"{date_str} {time_str}"
+    datetime.strptime(combined, "%Y-%m-%d %H:%M:%S")
+    return combined
+
+
+def utc_to_local_display(utc_iso: str) -> str:
+    """将 UTC ISO 8601 时间字符串转换为本地时区显示格式
+
+    用于后端将 UTC ISO 转为本地时间显示（AI 工具输出、日志等）。
+    复用 parse_iso_to_aware 处理 +00:00、Z 后缀、带偏移输入。
+
+    Args:
+        utc_iso: UTC ISO 8601 时间字符串（如 "2026-07-11T20:00:00+00:00"）
+
+    Returns:
+        str: 本地时间字符串 "YYYY-MM-DD HH:MM:SS"（面向 AI/用户格式）
+    """
+    dt = parse_iso_to_aware(utc_iso)
+    tz = pytz.timezone(get_user_timezone())
+    local_dt = dt.astimezone(tz)
+    return local_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def build_utc_time_range(local_date: str) -> tuple[str, str]:
+    """根据本地日期构造当天的 UTC 时间范围
+
+    用于 Repository 层按日期查询时间戳字段时，将本地日期转为 UTC 时间范围。
+    范围为当天 00:00:00 ~ 23:59:59 对应的 UTC 时间。
+
+    Args:
+        local_date: 本地日期字符串，格式 YYYY-MM-DD
+
+    Returns:
+        tuple[str, str]: (utc_start_iso, utc_end_iso)
+    """
+    start_utc = local_to_utc_iso(f"{local_date} 00:00:00")
+    end_utc = local_to_utc_iso(f"{local_date} 23:59:59")
+    return (start_utc, end_utc)

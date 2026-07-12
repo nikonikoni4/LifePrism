@@ -10,7 +10,7 @@ from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError, ValidationError
-from lifeprism.utils.time_utils import get_utc_now_iso
+from lifeprism.utils.time_utils import build_utc_time_range, get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -87,14 +87,14 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
         获取指定日期范围内的原始行为分析记录
 
         Args:
-            start_date: 开始日期（YYYY-MM-DD 格式）
-            end_date: 结束日期（YYYY-MM-DD 格式）
+            start_date: 开始日期（YYYY-MM-DD 格式，本地时区）
+            end_date: 结束日期（YYYY-MM-DD 格式，本地时区）
 
         Returns:
             list[dict]: 记录列表，按 start_time 升序排列
         """
-        start_datetime = f"{start_date} 00:00:00"
-        end_datetime = f"{end_date} 23:59:59"
+        start_datetime, _ = build_utc_time_range(start_date)
+        _, end_datetime = build_utc_time_range(end_date)
 
         sql = """
         SELECT * FROM raw_behavior_analysis
@@ -236,8 +236,8 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
         删除指定日期范围内的原始行为分析记录（用于重新生成）
 
         Args:
-            start_date: 开始日期（YYYY-MM-DD 格式）
-            end_date: 结束日期（YYYY-MM-DD 格式）
+            start_date: 开始日期（YYYY-MM-DD 格式，本地时区）
+            end_date: 结束日期（YYYY-MM-DD 格式，本地时区）
 
         Returns:
             int: 删除的记录数
@@ -245,8 +245,8 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
         Raises:
             DataAccessError: 数据库操作失败
         """
-        start_datetime = f"{start_date} 00:00:00"
-        end_datetime = f"{end_date} 23:59:59"
+        start_datetime, _ = build_utc_time_range(start_date)
+        _, end_datetime = build_utc_time_range(end_date)
 
         try:
             with self.db.get_connection() as conn:

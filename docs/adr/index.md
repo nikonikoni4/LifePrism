@@ -1,10 +1,16 @@
 ---
-version: 1.8
+version: 1.9
 created_at: 2026-04-10
 updated_at: 2026-07-12
-last_updated: 新增时区迁移决策（UTC + ISO 8601）
+last_updated: 新增时间转换职责分层架构决策
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## time-conversion-layering
+- updated_at: 2026-07-12
+- path: `docs/adr/2026-07-12-time-conversion-layering.md`
+- 触发规则：当需要理解时间转换在哪个层级进行、为什么不用装饰器自动转换、或新增 LLM 工具时参考转换模式时读取
+- 内容摘要：确立时间转换职责分层——数据层只返回 UTC ISO，LLM 工具 execute 层负责输入转换，工具函数内部显式转换输出。否决装饰器方案（字段用途差异、静默失败、返回类型多样）和 Repository 增加 return_local_time 参数方案（违反数据层职责单一）。决策经历 4 次迭代：v1 工具内部转换 → v2 考虑 Repository 参数（动摇）→ v3 考虑装饰器（审查后否决）→ v4 回到工具内部显式转换（职责更清晰）。
 
 ## migrate-to-utc-timezone
 - updated_at: 2026-07-12

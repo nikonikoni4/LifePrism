@@ -6,6 +6,7 @@ import pandas as pd
 
 from lifeprism.repository import LWBaseDataProvider
 from lifeprism.utils import LazySingleton, get_logger
+from lifeprism.utils.time_utils import build_utc_time_range, utc_to_local_display
 
 logger = get_logger(__name__)
 
@@ -515,9 +516,9 @@ class ServerLWDataProvider(LWBaseDataProvider):
         获取token使用汇总
 
         Args:
-            date: 日期（YYYY-MM-DD 格式）
-            start_time: 开始时间（可选，YYYY-MM-DD HH:MM:SS 格式）
-            end_time: 结束时间（可选，YYYY-MM-DD HH:MM:SS 格式）
+            date: 日期（YYYY-MM-DD 格式，本地时区）
+            start_time: 开始时间（可选，UTC ISO 格式）
+            end_time: 结束时间（可选，UTC ISO 格式）
 
         Returns:
             dict[str, dict]: 日期到使用统计的映射，例如
@@ -530,30 +531,25 @@ class ServerLWDataProvider(LWBaseDataProvider):
                     }
                 }
         """
-        # 1. 确定时间范围
+        # 1. 确定时间范围（转为 UTC 查询时间戳字段）
         if date:
-            # 使用 current_date setter 自动设置时间范围
-            self.current_date = date
-            query_start_time = self._start_time
-            query_end_time = self._end_time
+            query_start_time, query_end_time = build_utc_time_range(date)
         elif start_time and end_time:
             query_start_time = start_time
             query_end_time = end_time
         else:
             raise ValueError("必须提供 date 或 (start_time 和 end_time)")
 
-        # 2. 构建SQL查询
+        # 2. 查询原始数据（不在 SQL 层按 DATE 分组，避免 UTC 日期分组错位）
         sql = """
         SELECT
-            DATE(created_at) as usage_date,
-            SUM(input_tokens) as input_tokens,
-            SUM(output_tokens) as output_tokens,
-            SUM(total_tokens) as total_tokens,
-            SUM(result_items_count) as result_items_count
+            created_at,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            result_items_count
         FROM tokens_usage_log
         WHERE created_at >= ? AND created_at <= ?
-        GROUP BY DATE(created_at)
-        ORDER BY usage_date
         """
 
         with self.db.get_connection() as conn:
@@ -561,17 +557,27 @@ class ServerLWDataProvider(LWBaseDataProvider):
             cursor.execute(sql, (query_start_time, query_end_time))
             results = cursor.fetchall()
 
-        # 3. 转换为字典格式
-        usage_dict = {}
+        # 3. 按本地时区日期分组聚合（避免 DATE(created_at) 取 UTC 日期导致跨时区分组错位）
+        usage_dict: dict[str, dict] = {}
         for row in results:
-            usage_dict[row[0]] = {
-                "input_tokens": row[1] if row[1] is not None else 0,
-                "output_tokens": row[2] if row[2] is not None else 0,
-                "total_tokens": row[3] if row[3] is not None else 0,
-                "result_items_count": row[4] if row[4] is not None else 0,
-            }
+            created_at = row[0]
+            try:
+                local_date = utc_to_local_display(created_at)[:10]
+            except (ValueError, TypeError):
+                continue
+            if local_date not in usage_dict:
+                usage_dict[local_date] = {
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                    "result_items_count": 0,
+                }
+            usage_dict[local_date]["input_tokens"] += row[1] if row[1] is not None else 0
+            usage_dict[local_date]["output_tokens"] += row[2] if row[2] is not None else 0
+            usage_dict[local_date]["total_tokens"] += row[3] if row[3] is not None else 0
+            usage_dict[local_date]["result_items_count"] += row[4] if row[4] is not None else 0
 
-        return usage_dict
+        return dict(sorted(usage_dict.items()))
 
     def get_all_tokens_usage(self) -> dict:
         """

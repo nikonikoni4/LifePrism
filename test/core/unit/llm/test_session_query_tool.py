@@ -1,19 +1,21 @@
 """QuerySessionHistoryTool 和 QuerySessionListTool 单元测试"""
-import pytest
-import tempfile
+
 import json
-from pathlib import Path
-from datetime import datetime
-import sys
 import os
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 # 添加项目根目录到 sys.path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from lifeprism.llm.agent.tools.session_query import QuerySessionHistoryTool, QuerySessionListTool
 from lifeprism.llm.agent.tools.base import ERROR
+from lifeprism.llm.agent.tools.session_query import QuerySessionHistoryTool, QuerySessionListTool
 
 
 @pytest.mark.core
@@ -27,6 +29,7 @@ class TestQuerySessionHistoryTool:
         yield Path(temp_dir)
         # 清理
         import shutil
+
         shutil.rmtree(temp_dir, ignore_errors=True)
 
     @pytest.fixture
@@ -35,7 +38,7 @@ class TestQuerySessionHistoryTool:
         from lifeprism.config.settings_manager import settings
 
         # Mock settings.session_path property
-        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: temp_session_dir))
+        monkeypatch.setattr(type(settings), "session_path", property(lambda self: temp_session_dir))
 
         session_id = "test-session-001"
         session_path = temp_session_dir / f"{session_id}.jsonl"
@@ -47,53 +50,29 @@ class TestQuerySessionHistoryTool:
             "updated_at": "2026-07-01T12:00:00",
             "name": "测试会话",
             "last_compacted_loc": 0,
-            "last_processed_loc": 0
+            "last_processed_loc": 0,
         }
 
         # 写入多条消息（包括 user、assistant、tool）
         messages = [
-            {
-                "role": "user",
-                "content": "第一条用户消息",
-                "timestamp": "2026-07-01T10:01:00"
-            },
-            {
-                "role": "assistant",
-                "content": "第一条助手回复",
-                "timestamp": "2026-07-01T10:02:00"
-            },
+            {"role": "user", "content": "第一条用户消息", "timestamp": "2026-07-01T10:01:00"},
+            {"role": "assistant", "content": "第一条助手回复", "timestamp": "2026-07-01T10:02:00"},
             {
                 "role": "tool",
                 "content": "工具调用结果",
                 "timestamp": "2026-07-01T10:03:00",
-                "tool_call_id": "call_123"
+                "tool_call_id": "call_123",
             },
-            {
-                "role": "user",
-                "content": "第二条用户消息",
-                "timestamp": "2026-07-01T10:05:00"
-            },
-            {
-                "role": "assistant",
-                "content": "第二条助手回复",
-                "timestamp": "2026-07-01T10:06:00"
-            },
-            {
-                "role": "user",
-                "content": "第三条用户消息",
-                "timestamp": "2026-07-01T11:00:00"
-            },
-            {
-                "role": "assistant",
-                "content": "第三条助手回复",
-                "timestamp": "2026-07-01T11:01:00"
-            }
+            {"role": "user", "content": "第二条用户消息", "timestamp": "2026-07-01T10:05:00"},
+            {"role": "assistant", "content": "第二条助手回复", "timestamp": "2026-07-01T10:06:00"},
+            {"role": "user", "content": "第三条用户消息", "timestamp": "2026-07-01T11:00:00"},
+            {"role": "assistant", "content": "第三条助手回复", "timestamp": "2026-07-01T11:01:00"},
         ]
 
-        with open(session_path, 'w', encoding='utf-8') as f:
-            f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+        with open(session_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(metadata, ensure_ascii=False) + "\n")
             for msg in messages:
-                f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+                f.write(json.dumps(msg, ensure_ascii=False) + "\n")
 
         return session_id, session_path
 
@@ -169,7 +148,8 @@ class TestQuerySessionHistoryTool:
     async def test_session_not_exists(self, temp_session_dir, monkeypatch):
         """测试 session_id 不存在时返回错误消息"""
         from lifeprism.config.settings_manager import settings
-        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: temp_session_dir))
+
+        monkeypatch.setattr(type(settings), "session_path", property(lambda self: temp_session_dir))
 
         tool = QuerySessionHistoryTool()
         result = await tool.execute(session_id="non-existent-session")
@@ -189,7 +169,8 @@ class TestQuerySessionHistoryTool:
         assert "不能为空" in result
 
     @pytest.mark.asyncio
-    async def test_message_format(self, sample_session_file):
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="UTC")
+    async def test_message_format(self, _mock_tz, sample_session_file):
         """测试返回消息的格式：验证时间戳格式为 MM-DD HH:MM"""
         session_id, _ = sample_session_file
         tool = QuerySessionHistoryTool()
@@ -197,7 +178,7 @@ class TestQuerySessionHistoryTool:
         result = await tool.execute(session_id=session_id, limit=1)
 
         assert isinstance(result, str)
-        # 验证时间戳格式为 MM-DD HH:MM
+        # 验证时间戳格式为 MM-DD HH:MM（UTC 时区下转换前后一致）
         assert "07-01 11:01" in result  # 最新的一条消息时间
         # 验证包含角色标识
         assert "助手" in result
@@ -212,20 +193,21 @@ class TestQuerySessionHistoryTool:
         assert len(tool.description) > 0
 
         params = tool.parameters
-        assert params['type'] == 'object'
-        assert 'session_id' in params['properties']
-        assert 'limit' in params['properties']
-        assert 'session_id' in params['required']
+        assert params["type"] == "object"
+        assert "session_id" in params["properties"]
+        assert "limit" in params["properties"]
+        assert "session_id" in params["required"]
         # 验证 limit 的约束
-        assert params['properties']['limit']['minimum'] == 1
-        assert params['properties']['limit']['maximum'] == 50
-        assert params['properties']['limit']['default'] == 10
+        assert params["properties"]["limit"]["minimum"] == 1
+        assert params["properties"]["limit"]["maximum"] == 50
+        assert params["properties"]["limit"]["default"] == 10
 
     @pytest.mark.asyncio
     async def test_empty_message_handling(self, temp_session_dir, monkeypatch):
         """测试空消息处理：显示 (空消息)"""
         from lifeprism.config.settings_manager import settings
-        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: temp_session_dir))
+
+        monkeypatch.setattr(type(settings), "session_path", property(lambda self: temp_session_dir))
 
         session_id = "test-empty-msg"
         session_path = temp_session_dir / f"{session_id}.jsonl"
@@ -233,17 +215,17 @@ class TestQuerySessionHistoryTool:
         metadata = {
             "_type": "metadata",
             "created_at": "2026-07-01T10:00:00",
-            "updated_at": "2026-07-01T10:00:00"
+            "updated_at": "2026-07-01T10:00:00",
         }
         messages = [
             {"role": "user", "content": "", "timestamp": "2026-07-01T10:01:00"},
-            {"role": "assistant", "content": "   ", "timestamp": "2026-07-01T10:02:00"}
+            {"role": "assistant", "content": "   ", "timestamp": "2026-07-01T10:02:00"},
         ]
 
-        with open(session_path, 'w', encoding='utf-8') as f:
-            f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+        with open(session_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(metadata, ensure_ascii=False) + "\n")
             for msg in messages:
-                f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+                f.write(json.dumps(msg, ensure_ascii=False) + "\n")
 
         tool = QuerySessionHistoryTool()
         result = await tool.execute(session_id=session_id)
@@ -256,7 +238,8 @@ class TestQuerySessionHistoryTool:
     async def test_long_message_truncation(self, temp_session_dir, monkeypatch):
         """测试长消息截断：超过 100 字符截断为 80 字符 + 省略提示"""
         from lifeprism.config.settings_manager import settings
-        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: temp_session_dir))
+
+        monkeypatch.setattr(type(settings), "session_path", property(lambda self: temp_session_dir))
 
         session_id = "test-long-msg"
         session_path = temp_session_dir / f"{session_id}.jsonl"
@@ -266,16 +249,14 @@ class TestQuerySessionHistoryTool:
         metadata = {
             "_type": "metadata",
             "created_at": "2026-07-01T10:00:00",
-            "updated_at": "2026-07-01T10:00:00"
+            "updated_at": "2026-07-01T10:00:00",
         }
-        messages = [
-            {"role": "user", "content": long_content, "timestamp": "2026-07-01T10:01:00"}
-        ]
+        messages = [{"role": "user", "content": long_content, "timestamp": "2026-07-01T10:01:00"}]
 
-        with open(session_path, 'w', encoding='utf-8') as f:
-            f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+        with open(session_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(metadata, ensure_ascii=False) + "\n")
             for msg in messages:
-                f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+                f.write(json.dumps(msg, ensure_ascii=False) + "\n")
 
         tool = QuerySessionHistoryTool()
         result = await tool.execute(session_id=session_id)
@@ -285,10 +266,12 @@ class TestQuerySessionHistoryTool:
         assert len(result) < len(long_content)
 
     @pytest.mark.asyncio
-    async def test_cross_day_timestamp(self, temp_session_dir, monkeypatch):
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="UTC")
+    async def test_cross_day_timestamp(self, _mock_tz, temp_session_dir, monkeypatch):
         """测试跨天时间戳：验证日期部分正确显示"""
         from lifeprism.config.settings_manager import settings
-        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: temp_session_dir))
+
+        monkeypatch.setattr(type(settings), "session_path", property(lambda self: temp_session_dir))
 
         session_id = "test-cross-day"
         session_path = temp_session_dir / f"{session_id}.jsonl"
@@ -296,22 +279,22 @@ class TestQuerySessionHistoryTool:
         metadata = {
             "_type": "metadata",
             "created_at": "2026-07-05T10:00:00",
-            "updated_at": "2026-07-06T10:00:00"
+            "updated_at": "2026-07-06T10:00:00",
         }
         messages = [
             {"role": "user", "content": "第一天的消息", "timestamp": "2026-07-05T23:30:00"},
-            {"role": "assistant", "content": "第二天的回复", "timestamp": "2026-07-06T00:15:00"}
+            {"role": "assistant", "content": "第二天的回复", "timestamp": "2026-07-06T00:15:00"},
         ]
 
-        with open(session_path, 'w', encoding='utf-8') as f:
-            f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+        with open(session_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(metadata, ensure_ascii=False) + "\n")
             for msg in messages:
-                f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+                f.write(json.dumps(msg, ensure_ascii=False) + "\n")
 
         tool = QuerySessionHistoryTool()
         result = await tool.execute(session_id=session_id)
 
-        # 验证两个不同的日期都出现
+        # 验证两个不同的日期都出现（UTC 时区下转换前后一致）
         assert "07-05 23:30" in result
         assert "07-06 00:15" in result
 
@@ -319,7 +302,8 @@ class TestQuerySessionHistoryTool:
     async def test_multimodal_content_extraction(self, temp_session_dir, monkeypatch):
         """测试多模态消息内容提取：正确提取文本部分"""
         from lifeprism.config.settings_manager import settings
-        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: temp_session_dir))
+
+        monkeypatch.setattr(type(settings), "session_path", property(lambda self: temp_session_dir))
 
         session_id = "test-multimodal"
         session_path = temp_session_dir / f"{session_id}.jsonl"
@@ -327,23 +311,23 @@ class TestQuerySessionHistoryTool:
         metadata = {
             "_type": "metadata",
             "created_at": "2026-07-01T10:00:00",
-            "updated_at": "2026-07-01T10:00:00"
+            "updated_at": "2026-07-01T10:00:00",
         }
         messages = [
             {
                 "role": "user",
                 "content": [
                     {"type": "text", "text": "这是文本部分"},
-                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}},
                 ],
-                "timestamp": "2026-07-01T10:01:00"
+                "timestamp": "2026-07-01T10:01:00",
             }
         ]
 
-        with open(session_path, 'w', encoding='utf-8') as f:
-            f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+        with open(session_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(metadata, ensure_ascii=False) + "\n")
             for msg in messages:
-                f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+                f.write(json.dumps(msg, ensure_ascii=False) + "\n")
 
         tool = QuerySessionHistoryTool()
         result = await tool.execute(session_id=session_id)
@@ -365,6 +349,7 @@ class TestQuerySessionListTool:
         yield Path(temp_dir)
         # 清理
         import shutil
+
         shutil.rmtree(temp_dir, ignore_errors=True)
 
     @pytest.fixture
@@ -374,6 +359,7 @@ class TestQuerySessionListTool:
         yield Path(temp_dir)
         # 清理
         import shutil
+
         shutil.rmtree(temp_dir, ignore_errors=True)
 
     @pytest.fixture
@@ -382,8 +368,10 @@ class TestQuerySessionListTool:
         from lifeprism.config.settings_manager import settings
 
         # Mock settings.session_path 和 lifeprism_data_path properties
-        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: temp_session_dir))
-        monkeypatch.setattr(type(settings), 'lifeprism_data_path', property(lambda self: temp_data_dir))
+        monkeypatch.setattr(type(settings), "session_path", property(lambda self: temp_session_dir))
+        monkeypatch.setattr(
+            type(settings), "lifeprism_data_path", property(lambda self: temp_data_dir)
+        )
 
         # 创建三个 session 文件
         sessions = [
@@ -392,31 +380,37 @@ class TestQuerySessionListTool:
                 "updated_at": "2026-07-01T10:00:00",
                 "user_messages": [
                     {"content": "第一个会话的第一条消息", "timestamp": "2026-07-01T09:00:00"},
-                    {"content": "第一个会话的第二条消息", "timestamp": "2026-07-01T09:30:00"}
-                ]
+                    {"content": "第一个会话的第二条消息", "timestamp": "2026-07-01T09:30:00"},
+                ],
             },
             {
                 "id": "session-002",
                 "updated_at": "2026-07-02T14:00:00",
                 "user_messages": [
                     {"content": "第二个会话的唯一消息", "timestamp": "2026-07-02T14:00:00"}
-                ]
+                ],
             },
             {
                 "id": "session-003",
                 "updated_at": "2026-07-03T16:00:00",
                 "user_messages": [
-                    {"content": [
-                        {"type": "text", "text": "多模态消息"},
-                        {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
-                    ], "timestamp": "2026-07-03T16:00:00"}
-                ]
-            }
+                    {
+                        "content": [
+                            {"type": "text", "text": "多模态消息"},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": "data:image/png;base64,..."},
+                            },
+                        ],
+                        "timestamp": "2026-07-03T16:00:00",
+                    }
+                ],
+            },
         ]
 
         for session in sessions:
             session_path = temp_session_dir / f"{session['id']}.jsonl"
-            with open(session_path, 'w', encoding='utf-8') as f:
+            with open(session_path, "w", encoding="utf-8") as f:
                 # 写入 metadata
                 metadata = {
                     "_type": "metadata",
@@ -424,26 +418,26 @@ class TestQuerySessionListTool:
                     "updated_at": session["updated_at"],
                     "name": f"测试会话 {session['id']}",
                     "last_compacted_loc": 0,
-                    "last_processed_loc": 0
+                    "last_processed_loc": 0,
                 }
-                f.write(json.dumps(metadata, ensure_ascii=False) + '\n')
+                f.write(json.dumps(metadata, ensure_ascii=False) + "\n")
 
                 # 写入用户消息
-                for msg in session['user_messages']:
+                for msg in session["user_messages"]:
                     user_msg = {
                         "role": "user",
                         "content": msg["content"],
-                        "timestamp": msg["timestamp"]
+                        "timestamp": msg["timestamp"],
                     }
-                    f.write(json.dumps(user_msg, ensure_ascii=False) + '\n')
+                    f.write(json.dumps(user_msg, ensure_ascii=False) + "\n")
 
                 # 写入一条 assistant 消息
                 assistant_msg = {
                     "role": "assistant",
                     "content": "助手回复",
-                    "timestamp": session["updated_at"]
+                    "timestamp": session["updated_at"],
                 }
-                f.write(json.dumps(assistant_msg, ensure_ascii=False) + '\n')
+                f.write(json.dumps(assistant_msg, ensure_ascii=False) + "\n")
 
         # 创建 chat_history.json
         chat_history_dir = temp_data_dir / "user" / "daily_data"
@@ -455,30 +449,27 @@ class TestQuerySessionListTool:
             {
                 "timestamp": "2026-07-01T09:10:00",
                 "content": "session-001 的旧总结",
-                "session_id": "session-001"
+                "session_id": "session-001",
             },
             {
                 "timestamp": "2026-07-01T10:00:00",
                 "content": "session-001 的最新总结",
-                "session_id": "session-001"
+                "session_id": "session-001",
             },
             # session-002 的总结
             {
                 "timestamp": "2026-07-02T14:30:00",
                 "content": "session-002 的总结",
-                "session_id": "session-002"
+                "session_id": "session-002",
             },
             # session-003 没有总结
             # 旧数据（没有 session_id）
-            {
-                "timestamp": "2026-06-30T10:00:00",
-                "content": "旧数据没有 session_id"
-            }
+            {"timestamp": "2026-06-30T10:00:00", "content": "旧数据没有 session_id"},
         ]
 
-        with open(chat_history_path, 'w', encoding='utf-8') as f:
+        with open(chat_history_path, "w", encoding="utf-8") as f:
             for history in histories:
-                f.write(json.dumps(history, ensure_ascii=False) + '\n')
+                f.write(json.dumps(history, ensure_ascii=False) + "\n")
 
         return sessions
 
@@ -560,9 +551,14 @@ class TestQuerySessionListTool:
     async def test_empty_session_path(self, temp_session_dir, temp_data_dir, monkeypatch):
         """测试 session_path 不存在时返回空 JSON 对象"""
         from lifeprism.config.settings_manager import settings
+
         non_existent_path = temp_session_dir / "non_existent"
-        monkeypatch.setattr(type(settings), 'session_path', property(lambda self: non_existent_path))
-        monkeypatch.setattr(type(settings), 'lifeprism_data_path', property(lambda self: temp_data_dir))
+        monkeypatch.setattr(
+            type(settings), "session_path", property(lambda self: non_existent_path)
+        )
+        monkeypatch.setattr(
+            type(settings), "lifeprism_data_path", property(lambda self: temp_data_dir)
+        )
 
         tool = QuerySessionListTool()
         result = await tool.execute()
@@ -594,7 +590,6 @@ class TestQuerySessionListTool:
         assert len(tool.description) > 0
 
         params = tool.parameters
-        assert params['type'] == 'object'
-        assert 'date_filter' in params['properties']
-        assert params['required'] == []  # date_filter 是可选的
-
+        assert params["type"] == "object"
+        assert "date_filter" in params["properties"]
+        assert params["required"] == []  # date_filter 是可选的

@@ -1,10 +1,20 @@
 """time_utils 单元测试 - 验证 UTC 时区迁移后的时间工具函数行为"""
+
 import re
 from datetime import date, datetime, timezone
+from unittest.mock import patch
 
 import pytest
 
-from lifeprism.utils.time_utils import get_local_today, get_utc_now_iso, parse_iso_to_aware
+from lifeprism.utils.time_utils import (
+    build_local_datetime,
+    build_utc_time_range,
+    get_local_today,
+    get_utc_now_iso,
+    local_to_utc_iso,
+    parse_iso_to_aware,
+    utc_to_local_display,
+)
 
 
 @pytest.mark.core
@@ -125,3 +135,142 @@ class TestParseIsoToAware:
         result = parse_iso_to_aware("2026-07-01T10:00:00.123456")
         assert result.tzinfo is not None
         assert result.microsecond == 123456
+
+
+@pytest.mark.core
+class TestLocalToUtcIso:
+    """local_to_utc_iso 应将本地时间字符串转换为 UTC ISO 8601 格式
+
+    偏移量由 get_user_timezone() 动态决定。
+    """
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="Asia/Shanghai")
+    def test_shanghai_utc8_offset(self, _mock_tz):
+        """UTC+8 时区：本地时间减 8 小时为 UTC"""
+        result = local_to_utc_iso("2026-07-12 04:00:00")
+        assert result == "2026-07-11T20:00:00+00:00"
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="America/Los_Angeles")
+    def test_los_angeles_utc_minus_8_offset(self, _mock_tz):
+        """UTC-8 时区（PST 冬令时）：本地时间加 8 小时为 UTC"""
+        result = local_to_utc_iso("2026-01-15 04:00:00")
+        assert result == "2026-01-15T12:00:00+00:00"
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="UTC")
+    def test_utc_zero_offset(self, _mock_tz):
+        """UTC+0 时区：本地时间等于 UTC"""
+        result = local_to_utc_iso("2026-07-12 04:00:00")
+        assert result == "2026-07-12T04:00:00+00:00"
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="Asia/Shanghai")
+    def test_cross_date_boundary(self, _mock_tz):
+        """跨日期边界：本地 00:30 → UTC 前一天 16:30"""
+        result = local_to_utc_iso("2026-07-12 00:30:00")
+        assert result == "2026-07-11T16:30:00+00:00"
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="Asia/Shanghai")
+    def test_custom_format(self, _mock_tz):
+        """支持自定义解析格式"""
+        result = local_to_utc_iso("2026-07-12", "%Y-%m-%d")
+        assert result == "2026-07-11T16:00:00+00:00"
+
+    def test_invalid_input_raises_value_error(self):
+        """无效输入应抛出 ValueError"""
+        with pytest.raises(ValueError):
+            local_to_utc_iso("invalid time string")
+
+
+@pytest.mark.core
+class TestBuildLocalDatetime:
+    """build_local_datetime 应根据日期和时间构造本地时间字符串"""
+
+    def test_basic_construction(self):
+        """正常构造日期 + 时间"""
+        result = build_local_datetime("2026-07-12", "04:00:00")
+        assert result == "2026-07-12 04:00:00"
+
+    def test_default_time_is_zero(self):
+        """省略 time_str 时默认为 00:00:00"""
+        result = build_local_datetime("2026-07-12")
+        assert result == "2026-07-12 00:00:00"
+
+    def test_invalid_date_raises_value_error(self):
+        """无效日期应抛出 ValueError"""
+        with pytest.raises(ValueError):
+            build_local_datetime("invalid-date", "04:00:00")
+
+    def test_invalid_time_raises_value_error(self):
+        """无效时间应抛出 ValueError"""
+        with pytest.raises(ValueError):
+            build_local_datetime("2026-07-12", "invalid-time")
+
+
+@pytest.mark.core
+class TestUtcToLocalDisplay:
+    """utc_to_local_display 应将 UTC ISO 8601 转为本地时区显示格式"""
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="Asia/Shanghai")
+    def test_utc_plus8_with_offset_suffix(self, _mock_tz):
+        """UTC+8：处理 +00:00 后缀输入"""
+        result = utc_to_local_display("2026-07-11T20:00:00+00:00")
+        assert result == "2026-07-12 04:00:00"
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="Asia/Shanghai")
+    def test_utc_plus8_with_z_suffix(self, _mock_tz):
+        """UTC+8：处理 Z 后缀输入"""
+        result = utc_to_local_display("2026-07-11T20:00:00Z")
+        assert result == "2026-07-12 04:00:00"
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="Asia/Shanghai")
+    def test_utc_plus8_with_nonzero_offset(self, _mock_tz):
+        """UTC+8：处理带非零偏移的输入（-08:00 → UTC 20:00 → 本地 04:00 次日）"""
+        result = utc_to_local_display("2026-07-11T12:00:00-08:00")
+        assert result == "2026-07-12 04:00:00"
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="UTC")
+    def test_utc_zero_offset(self, _mock_tz):
+        """UTC+0：UTC 时间等于本地时间"""
+        result = utc_to_local_display("2026-07-12T04:00:00+00:00")
+        assert result == "2026-07-12 04:00:00"
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="America/Los_Angeles")
+    def test_utc_minus8_offset(self, _mock_tz):
+        """UTC-8（PST 冬令时）：UTC 时间减 8 小时为本地时间"""
+        result = utc_to_local_display("2026-01-15T20:00:00+00:00")
+        assert result == "2026-01-15 12:00:00"
+
+    def test_invalid_input_raises_value_error(self):
+        """无效输入应抛出 ValueError"""
+        with pytest.raises(ValueError):
+            utc_to_local_display("invalid time string")
+
+
+@pytest.mark.core
+class TestBuildUtcTimeRange:
+    """build_utc_time_range 应根据本地日期构造当天 UTC 时间范围"""
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="Asia/Shanghai")
+    def test_shanghai_range_crosses_date(self, _mock_tz):
+        """UTC+8：本地日期范围跨 UTC 日期（前一日 16:00 ~ 当日 15:59:59）"""
+        start, end = build_utc_time_range("2026-07-12")
+        assert start == "2026-07-11T16:00:00+00:00"
+        assert end == "2026-07-12T15:59:59+00:00"
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="UTC")
+    def test_utc_range_same_date(self, _mock_tz):
+        """UTC+0：本地日期范围等于 UTC 日期范围"""
+        start, end = build_utc_time_range("2026-07-12")
+        assert start == "2026-07-12T00:00:00+00:00"
+        assert end == "2026-07-12T23:59:59+00:00"
+
+    @patch("lifeprism.utils.time_utils.get_user_timezone", return_value="America/Los_Angeles")
+    def test_los_angeles_range_crosses_date(self, _mock_tz):
+        """UTC-8（PST 冬令时）：本地日期范围跨 UTC 日期（当日 08:00 ~ 次日 07:59:59）"""
+        start, end = build_utc_time_range("2026-01-15")
+        assert start == "2026-01-15T08:00:00+00:00"
+        assert end == "2026-01-16T07:59:59+00:00"
+
+    def test_invalid_date_raises_value_error(self):
+        """无效日期应抛出 ValueError"""
+        with pytest.raises(ValueError):
+            build_utc_time_range("invalid-date")

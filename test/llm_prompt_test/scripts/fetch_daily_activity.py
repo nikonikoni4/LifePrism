@@ -5,6 +5,7 @@
 
 输出格式：每个日期生成一个 YYYY-MM-DD.md 文件
 """
+
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -14,7 +15,7 @@ project_root = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from lifeprism.llm.agent.tools.lifeprismsystem import query_user_activity_summary
-
+from lifeprism.utils.time_utils import local_to_utc_iso
 
 # 常量定义
 DAILY_START_HOUR = "04:00:00"
@@ -65,7 +66,10 @@ def fetch_activity_for_date(date: str) -> str:
     print(f"获取数据: {start_time} ~ {end_time}")
 
     try:
-        result = query_user_activity_summary(QUERY_OPTIONS, start_time, end_time)
+        # 工具函数接收 UTC ISO，本地时间就地转换
+        result = query_user_activity_summary(
+            QUERY_OPTIONS, local_to_utc_iso(start_time), local_to_utc_iso(end_time)
+        )
         return result
     except Exception as e:
         return f"获取数据失败: {str(e)}"
@@ -82,7 +86,9 @@ def save_to_md(date: str, content: str) -> None:
 
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(f"# {date} 行为数据\n\n")
-        f.write(f"时间范围: {date} 04:00:00 ~ {(datetime.strptime(date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')} 04:00:00\n\n")
+        f.write(
+            f"时间范围: {date} 04:00:00 ~ {(datetime.strptime(date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')} 04:00:00\n\n"
+        )
         f.write(content)
 
     print(f"已保存: {file_path}")
@@ -90,7 +96,7 @@ def save_to_md(date: str, content: str) -> None:
 
 def main():
     """主函数"""
-    print(f"开始获取行为数据")
+    print("开始获取行为数据")
     print(f"日期范围: {START_DATE} ~ {END_DATE}")
     print(f"输出目录: {OUTPUT_DIR}")
     print("-" * 50)

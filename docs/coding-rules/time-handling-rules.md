@@ -1,45 +1,41 @@
 ---
-version: 1.0
+version: 3.0
 created_at: 2026-07-12
 updated_at: 2026-07-12
-last_updated: 创建文档初稿，基于 UTC 时区迁移（ADR 2026-07-12）落地后的统一时间处理规范
-abstract: 全栈时间处理规范，明确 UTC 存储 + ISO 8601 格式 + 展示层本地化的核心原则，区分时间戳字段与日期字段，约束后端时间生成/序列化/解析/定时任务和前端日期格式化行为
+last_updated: 重构为规则导向——移除具体函数名、文件路径等易腐坏内容，控制在 200 行以内
+abstract: 时间处理规则，明确"内部 UTC + ISO 8601，对外本地时区 + YYYY-MM-DD HH:MM:SS"的内外分离原则，所有转换在边界处就地完成
 ---
 
-# 时间处理规范
+# 时间处理规则
 
-## 1. 核心原则
+## 1. 核心原则：内外分离 + 就地转换
 
-系统统一遵循 **UTC 存储 + ISO 8601 格式 + 展示层本地化** 的业界最佳实践：
+| 分类 | 时区 | 格式 | 适用场景 |
+|------|------|------|---------|
+| **内部**（存储、模块间传输、后端计算） | UTC | ISO 8601（带时区标识） | 数据库、API 响应、后端逻辑 |
+| **对外**（面向用户、面向 AI） | 本地时区 | `YYYY-MM-DD HH:MM:SS` | 前端显示、大模型提示词、大模型工具参数 |
+| **日期字段**（例外） | 本地时区 | `YYYY-MM-DD` | 打卡日期、日报日期等"某一天"语义 |
 
-| 层级 | 时区 | 格式 | 说明 |
-|------|------|------|------|
-| **数据层**（数据库、API 传输） | UTC | ISO 8601（带时区标识） | `2026-07-11T16:29:54.123456+00:00` |
-| **逻辑层**（后端计算、前端计算） | aware datetime / Date 对象 | - | Python 用 `timezone.utc` aware datetime；JS 用 `Date` 对象 |
-| **展示层**（前端 UI） | 用户本地时区 | 本地化字符串 | 浏览器 `Date` 自动处理时区转换 |
+**就地转换规则**：
+- 组件/模块**内部**使用本地时区时，在**传出去的那一刻**就地转为 UTC ISO
+- 组件/模块**接收**外部本地时间时，在**入口处**就地转为 UTC ISO 再内部使用
+- **禁止**将本地时间字符串透传到内部层（数据库查询、API 传输、后端计算）
 
-**设计依据**：`docs/adr/2026-07-12-migrate-to-utc-timezone.md`
+**本地时区来源**：统一通过配置动态获取，禁止硬编码时区字符串用于业务逻辑。
+
+**设计依据**：`docs/adr/2026-07-12-migrate-to-utc-timezone.md`、`docs/adr/2026-07-12-time-conversion-layering.md`
 
 ---
 
-## 2. 字段分类（关键区分）
+## 2. 字段分类规则
 
 时间字段分为两类，**时区处理方式不同**，编写代码前必须先确认字段类型。
 
 ### 2.1 时间戳字段（UTC 存储）
 
-记录"某个时刻"，必须使用 UTC + ISO 8601 格式存储和传输。
+记录"某个时刻"，必须使用 UTC + ISO 8601 格式。
 
-| 字段名 | 说明 |
-|--------|------|
-| `created_at` | 记录创建时间 |
-| `updated_at` | 记录更新时间 |
-| `captured_at` | 截图捕获时间 |
-| `finished_at` | 任务/挑战完成时间 |
-| `paused_at` | 暂停时间 |
-| `start_time` / `end_time` | 行为事件起止时间（监控数据） |
-| `timestamp` | 通用时间戳（如消息、日志） |
-| `last_sync_time` | 最后同步时间 |
+**字段示例**：`created_at`、`updated_at`、`start_time`/`end_time`（监控数据）、`timestamp`、`last_sync_time` 等。
 
 **格式示例**：`2026-07-11T16:29:54.123456+00:00`
 
@@ -47,232 +43,202 @@ abstract: 全栈时间处理规范，明确 UTC 存储 + ISO 8601 格式 + 展�
 
 记录"用户语义的某一天"，保持用户本地时区日期，**不使用 UTC 日期**。
 
-| 字段名 | 说明 |
-|--------|------|
-| `date` | 习惯打卡日期、日报日期等 |
-| `start_date` | 目标开始日期 |
-| `expected_finished_at`（日期部分） | 目标预期完成日期 |
-| `actual_finished_at` | Todo 实际完成日期 |
-| `finish_time`（里程碑，日期部分） | 里程碑完成日期 |
+**字段示例**：`date`（打卡日期）、`start_date`、`actual_finished_at` 等。
 
 **格式示例**：`2026-07-12`
 
-**为什么日期字段不用 UTC**：用户在 UTC+8 的 00:30 打卡，UTC 日期是"昨天"，但用户认为是"今天"。如果存 UTC 日期，用户查看"今日打卡"时看不到刚打的卡。
+**理由**：用户在 UTC+8 的 00:30 打卡，UTC 日期是"昨天"，但用户认为是"今天"。存 UTC 日期会导致"今日打卡"看不到刚打的卡。
 
 ---
 
 ## 3. 后端规则
 
-### 3.1 时间生成（强制）
+### 3.1 时间生成
 
-```python
-# ✅ 正确：使用 timezone.utc 生成 aware datetime
-from datetime import datetime, timezone
+- 所有时间戳必须生成 UTC aware datetime（示例：`datetime.now(timezone.utc)` 或项目时间工具函数）
+- **禁止** `datetime.now()`（无时区参数）
+- **禁止** `datetime.today()`、`date.today()` 生成时间戳（仅日期字段可用）
 
-now = datetime.now(timezone.utc)
-timestamp = datetime.now(timezone.utc).isoformat()
+### 3.2 时间序列化
 
-# ❌ 禁止：datetime.now() 返回 naive datetime（无时区信息）
-now = datetime.now()
-timestamp = datetime.now().isoformat()
-
-# ❌ 禁止：strftime 生成无时区字符串
-timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-```
-
-**规则**：
-- 所有时间戳生成必须使用 `datetime.now(timezone.utc)`
-- 禁止使用 `datetime.now()`（无时区参数）
-- 禁止使用 `datetime.today()`、`date.today()` 生成时间戳（仅日期字段可用，见 3.5）
-
-### 3.2 时间序列化（强制）
-
-```python
-# ✅ 正确：统一使用 .isoformat()，返回带时区的 ISO 8601 字符串
-timestamp = datetime.now(timezone.utc).isoformat()
-# 结果: "2026-07-11T16:29:54.123456+00:00"
-
-# ❌ 禁止：strftime 生成无时区或不一致格式
-timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
-```
-
-**规则**：
 - 所有时间戳序列化必须使用 `.isoformat()`
-- 禁止使用 `.strftime()` 序列化时间戳字段
-- 统一格式为 `YYYY-MM-DDTHH:MM:SS.ffffff+00:00`（带 T 分隔符、微秒、时区标识）
+- **禁止** `.strftime()` 序列化时间戳字段
+- 统一格式为 `YYYY-MM-DDTHH:MM:SS.ffffff+00:00`
+
+```python
+# ✅
+datetime.now(timezone.utc).isoformat()
+
+# ❌
+datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+```
 
 ### 3.3 时间解析
 
-```python
-from datetime import datetime, timezone
+- 解析 ISO 字符串必须确保返回 aware datetime
+- **禁止** `datetime.fromisoformat()` 后不做 tzinfo 检查
 
-# ✅ 正确：解析后确认是 aware datetime，naive 字符串补充 UTC 时区
-dt = datetime.fromisoformat(iso_string)
-if dt.tzinfo is None:
-    dt = dt.replace(tzinfo=timezone.utc)  # 假设无时区字符串为 UTC
+### 3.4 数据库 DEFAULT
 
-# ⚠️ 注意：历史数据迁移后，所有新数据都应带时区标识
-# 仅在解析外部输入（API 参数、文件读取）时需要处理 naive 字符串
-```
+- 所有表 DEFAULT 使用 `datetime('now')`（SQLite 返回 UTC）
+- **禁止** `datetime('now', 'localtime')`
+- **禁止** `CURRENT_TIMESTAMP`
 
-### 3.4 数据库 DEFAULT（强制）
+### 3.5 日期字段生成
 
-```python
-# ✅ 正确：SQLite datetime('now') 返回 UTC
-"created_at TIMESTAMP DEFAULT (datetime('now'))"
+- 日期字段基于用户本地时区（示例：`get_local_today()` 或等效方法）
+- 时间戳字段基于 UTC
+- 编写代码前必须先确认字段属于哪一类
 
-# ❌ 禁止：datetime('now', 'localtime') 返回本地时间
-"created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
+### 3.6 定时任务
 
-# ❌ 禁止：CURRENT_TIMESTAMP 在部分 SQLite 版本行为不一致
-"created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-```
-
-**规则**：
-- 所有表 DEFAULT 使用 `datetime('now')`（SQLite 的 `datetime('now')` 返回 UTC）
-- 禁止使用 `datetime('now', 'localtime')`
-- 新建表遵循 `docs/coding-rules/create-table-rules.md`
-
-### 3.5 日期字段生成（本地时区）
-
-日期字段（YYYY-MM-DD）基于用户本地时区，不基于 UTC：
+**Cron 表达式**：写本地时间，`CronTrigger` 的 `timezone` 参数设为用户本地时区。
 
 ```python
-# ✅ 正确：基于用户本地时区获取"今天"
-from datetime import datetime
-import pytz
-from lifeprism.config import LOCAL_TIMEZONE
+# ✅ Cron 表达式写本地时间，timezone 设为本地时区
+trigger = CronTrigger.from_crontab("0 10 * * *", timezone=local_tz)
 
-def get_local_today() -> str:
-    """获取用户本地时区的今天日期 YYYY-MM-DD"""
-    return datetime.now(pytz.timezone(LOCAL_TIMEZONE)).strftime("%Y-%m-%d")
-
-today = get_local_today()
-
-# ❌ 错误：基于 UTC 的"今天"，UTC+8 午夜前后日期错误
-today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+# ❌ Cron 表达式写 UTC 时间，硬编码换算
+trigger = CronTrigger.from_crontab("0 2 * * *", timezone=pytz.UTC)
 ```
 
-**规则**：
-- `date`、`start_date` 等业务日期字段基于用户本地时区
-- 时间戳字段（`created_at`、`updated_at`）基于 UTC
-- 编写时间相关代码前，先确认字段属于哪一类（见第 2 节）
-
-### 3.6 定时任务时区
+**硬编码本地时间常量**：保留为纯时间字符串（如 `"04:00:00"`），**使用时立即就地转 UTC ISO**。
 
 ```python
-# ✅ 正确：APScheduler 显式设置 UTC 时区
-import pytz
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
+# ✅ 常量保留，使用时转 UTC ISO
+start_time = local_to_utc(build_local_datetime(date, DAILY_START_HOUR))
 
-scheduler = AsyncIOScheduler(timezone=pytz.UTC)
-trigger = CronTrigger.from_crontab(cron_expr, timezone=pytz.UTC)
-
-# ❌ 禁止：未设置 timezone，依赖系统本地时区
-scheduler = AsyncIOScheduler()
-trigger = CronTrigger.from_crontab(cron_expr)
+# ❌ 直接拼接无时区字符串
+start_time = f"{date} {DAILY_START_HOUR}"
 ```
 
-**Cron 表达式规则**：
-- Cron 表达式基于 **UTC 时间**
-- 若需保持用户感知的"本地时间触发"，需转换：本地 10:00（UTC+8）= UTC 02:00
-- 示例：`_SYSTEM_CRON_JOB_TIME = "0 2 * * *"`（UTC 02:00 = 北京时间 10:00）
-
-**"今天"/"昨天"语义**：
-- 定时任务中"今天"/"昨天"的语义基于**用户本地时区**（用户感知的日期）
-- 存储到数据库的时间戳仍使用 UTC
-- 示例：`_dreaming()` 处理"昨天的日记"，日期范围用本地时区计算，执行时间戳用 UTC
+**"今天"/"昨天"语义**：基于用户本地时区，**禁止**基于 UTC 计算业务日期。
 
 ---
 
-## 4. 前端规则
+## 4. 大模型交互规则
 
-### 4.1 时间戳字段（UTC）
+大模型交互涉及两个方向的时间，**默认本地时区，就地转换**。
 
-发送给后端的时间戳字段使用 UTC ISO 8601 格式：
+### 4.1 提示词输入（后端 → 大模型）：本地时间
 
-```typescript
-import { toISOStringUTC, parseISOString } from '@core/utils/dateUtils';
+- 提示词中的时间必须转换为本地时区 `YYYY-MM-DD HH:MM:SS` 格式
+- 同时标注时区名称（如"时区：Asia/Shanghai"），让 AI 知道本地时区
+- **禁止**把 UTC ISO 时间直接注入提示词
 
-// ✅ 正确：发送 UTC 时间给后端
-const timestamp = toISOStringUTC(new Date());
-// 结果: "2026-07-11T16:29:54.123Z"
+```python
+# ✅ 本地时间格式
+"当前时间：2026-07-12 10:30:00（时区：Asia/Shanghai）"
 
-// ✅ 正确：解析后端返回的 ISO 字符串
-const date = parseISOString('2026-07-11T16:29:54.123456+00:00');
+# ❌ UTC ISO 格式
+"当前时间：2026-07-12T02:30:00+00:00"
 ```
 
-### 4.2 日期字段（本地时区，YYYY-MM-DD）
+### 4.2 工具输入（大模型 → 后端）：本地时间，execute 层转 UTC
 
-日期字段必须使用本地时区方法，**禁止 `.toISOString().split('T')[0]`**：
+- 大模型工具参数中的时间默认本地时区 `YYYY-MM-DD HH:MM:SS`
+- **execute 方法层**负责输入转换：本地时间 → UTC ISO
+- 转换后工具函数内部一致使用 UTC ISO（包括数据库查询）
+- **禁止**把大模型输出的本地时间字符串直接用于数据库查询
 
-```typescript
-import { toLocalDateString } from '@core/utils/dateUtils';
+```python
+# ✅ execute 层转换
+async def execute(self, **kwargs):
+    start_utc = local_to_utc(kwargs["start_time"])
+    return tool_func(start_utc, ...)
 
-// ✅ 正确：本地日期字符串
-const today = toLocalDateString(new Date());
-// 结果: "2026-07-12"（基于浏览器本地时区）
-
-// ❌ 禁止：toISOString 返回 UTC，UTC+ 午夜会导致日期减一天
-const today = new Date().toISOString().split('T')[0];
-// UTC+8 的 00:30 → "2026-07-11"（错误，应是 07-12）
+# ❌ 工具函数内部用本地时间查库
+def tool_func(start_time):
+    db.query("WHERE created_at >= ?", (start_time,))  # 本地时间查 UTC 数据
 ```
 
-**详细规则见**：`docs/coding-rules/frontend-date-handling.md`
+### 4.3 工具输出（后端 → 大模型）：区分显示用与计算用
 
-### 4.3 后端返回的 YYYY-MM-DD 字符串
+工具函数返回结果中的时间字段，**必须区分用途**：
 
-后端返回的日期字符串（如 `2026-07-12`）直接使用，**不要转 `Date` 再格式化**：
+- **显示用字段**：转本地 `YYYY-MM-DD HH:MM:SS` 后返回给 AI
+- **计算用字段**：保持 UTC ISO，不转（如用于时间区间截断、时长计算的字段）
 
-```typescript
-// ✅ 直接用
-challenge.startDate;
+```python
+# ✅ 显示用字段转本地
+content += f"时间: {utc_to_local(log['start_time'])}"
 
-// ❌ 多余且引入时区风险
-toLocalDateString(new Date(challenge.startDate));
+# ✅ 计算用字段保持 UTC ISO
+segment_start = parse_iso(log['start_time'])  # 用于时间区间计算
 ```
 
-### 4.4 禁止事项
+**理由**：只有工具函数知道字段用途，所以转换必须在工具函数内部显式进行，不能用装饰器自动转换（装饰器无法区分显示用与计算用，会误转计算字段）。
 
-| 禁止项 | 说明 | 正确做法 |
-|--------|------|---------|
-| ❌ `new Date().toISOString().split('T')[0]` | UTC 日期，午夜错位 | `toLocalDateString(date)` |
-| ❌ 内联手写 `${y}-${m}-${d}` | 违反 SSOT | `toLocalDateString(date)` |
-| ❌ 对日期字段用 `toISOString()` | 返回 UTC | `toLocalDateString(date)` |
+### 4.4 工具函数内部一致性
 
-**例外**：时间戳字段发送给后端时，`toISOString()`（即 `toISOStringUTC`）是正确做法。
+- 工具函数接收 UTC ISO 参数（由 execute 层转换）
+- 工具函数返回的原始数据是 UTC ISO
+- 工具函数内部格式化输出时，显式转换显示用字段
 
 ---
 
-## 5. 数据同步规则
+## 5. 前端规则
 
-LWW（Last-Write-Wins）冲突解决依赖字符串比较，**格式和时区必须完全一致**：
+### 5.1 时间戳显示：UTC ISO → 本地
 
-- 所有 `updated_at` 统一为 UTC ISO 8601 格式
-- 字符串比较在相同时区、相同格式下与时间顺序一致
+- 组件接收 UTC ISO，**内部就地转换**为本地 `YYYY-MM-DD HH:MM:SS` 显示
+- 使用项目日期工具函数转换，禁止内联手写格式化逻辑
+
+```typescript
+// ✅
+const display = toLocalDateTimeString(parseISOString(isoString));
+
+// ❌ 直接显示 UTC ISO
+<p>{isoString}</p>
+```
+
+### 5.2 提交后端：本地时间 → UTC ISO
+
+- 用户选择/输入的时间，**提交时就地转为 UTC ISO** 再传给后端
+- **禁止**提交本地时间字符串给后端（无时区标识）
+
+### 5.3 日期字段：本地时区
+
+- 日期字段使用本地时区方法，**禁止** `.toISOString().split('T')[0]`
+- 后端返回的 `YYYY-MM-DD` 字符串直接使用，不要转 `Date` 再格式化
+
+### 5.4 禁止事项
+
+| 禁止项 | 正确做法 |
+|--------|---------|
+| `new Date().toISOString().split('T')[0]` | 用本地日期工具函数 |
+| 内联手写 `${y}-${m}-${d}` | 用本地日期工具函数 |
+| 直接显示后端 UTC ISO | 转本地 `YYYY-MM-DD HH:MM:SS` |
+| 提交本地时间字符串给后端 | 转 UTC ISO 后提交 |
+
+---
+
+## 6. 数据同步规则
+
+- LWW 冲突解决依赖字符串比较，**格式和时区必须完全一致**
+- 所有 `updated_at` 统一为 UTC ISO 8601
 - `last_sync_time` 使用 UTC ISO 格式存储
 - 迁移后 `last_sync_time` 需重置，触发全量同步
 
 ---
 
-## 6. 暂停机制
+## 7. 暂停规则
 
 遇到以下情况**必须暂停，与用户讨论后再编码**：
 
 - 不确定字段属于"时间戳字段"还是"日期字段"
 - 需要跨时区比较或传递给要求特定时区的外部 API
-- 需要新增日期格式化函数（应统一在 `dateUtils.ts` / 后端时间工具中）
+- 需要新增日期格式化函数（应统一在项目时间工具模块）
 - 历史数据迁移涉及时区假设不确定
-- 定时任务的 Cron 表达式需要调整时区转换
+- 大模型工具参数格式不确定是本地时间还是 UTC
+- 不确定时间字段是"显示用"还是"计算用"
 
 ---
 
-## 7. 相关文档
+## 8. 相关文档
 
 - `docs/adr/2026-07-12-migrate-to-utc-timezone.md` - UTC 迁移决策
+- `docs/adr/2026-07-12-time-conversion-layering.md` - 时间转换职责分层决策
 - `docs/coding-rules/frontend-date-handling.md` - 前端日期格式化详细规则
-- `docs/coding-rules/create-table-rules.md` - 建表规范（含 DEFAULT 时间戳）
-- `docs/guides/utc-migration-hidden-dependencies.md` - 迁移隐性依赖排查清单
-- `frontend/core/utils/dateUtils.ts` - 前端日期工具函数（单一真相源）
+- `docs/coding-rules/create-table-rules.md` - 建表规范
+- 项目时间工具模块（后端/前端各自单一真相源）

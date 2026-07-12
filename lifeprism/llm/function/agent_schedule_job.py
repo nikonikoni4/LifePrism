@@ -22,6 +22,7 @@ from lifeprism.llm.session import ChatHistoryManager, Session, session_manager
 from lifeprism.llm.utils import llm_call_logger
 from lifeprism.llm.utils.md_os import extract_date_logs_from_file, read_md, write_date_md
 from lifeprism.utils import DEBUG, get_logger
+from lifeprism.utils.time_utils import build_local_datetime, get_local_today, local_to_utc_iso
 
 logger = get_logger(__name__)
 logger.setLevel(DEBUG)
@@ -125,16 +126,16 @@ def get_mood_data(start_time: str, end_time: str) -> str:
     """获取心情数据
 
     Args:
-        start_time: 开始时间，格式为 'YYYY-MM-DD HH:MM:SS'
-        end_time: 结束时间，格式为 'YYYY-MM-DD HH:MM:SS'
+        start_time: 开始时间，格式为 'YYYY-MM-DD HH:MM:SS'（本地时区）
+        end_time: 结束时间，格式为 'YYYY-MM-DD HH:MM:SS'（本地时区）
 
     Returns:
         str: 格式化的心情数据字符串
     """
     logger.debug("[get_mood_data] 获取心情数据, 时间范围: %s ~ %s", start_time, end_time)
 
-    # 直接使用时间查询，不再转换为日期
-    mood_data = query_user_mood(start_time, end_time)
+    # 工具函数接收 UTC ISO，本地时间就地转换
+    mood_data = query_user_mood(local_to_utc_iso(start_time), local_to_utc_iso(end_time))
     logger.debug("[get_mood_data] 获取到心情数据长度: %s 字符", len(mood_data) if mood_data else 0)
 
     return mood_data
@@ -239,8 +240,11 @@ async def update_memory(date: str, date_offset: int = DEFAULT_DATE_OFFSET) -> No
         len(recent_state_md) if recent_state_md else 0,
     )
 
+    # 工具函数接收 UTC ISO，硬编码本地时间后就地转换
     computer_overview = query_user_activity_summary(
-        set(["computer_overview"]), f"{start_date} {DAILY_START_HOUR}", f"{date} {DAILY_START_HOUR}"
+        set(["computer_overview"]),
+        local_to_utc_iso(build_local_datetime(start_date, DAILY_START_HOUR)),
+        local_to_utc_iso(build_local_datetime(date, DAILY_START_HOUR)),
     )
     logger.debug(
         "[update_memory] 电脑使用总览数据长度: %s 字符",
@@ -293,8 +297,8 @@ async def dreaming(date: str) -> None:
 
     # 计算时间范围
     next_date = (datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-    start_time = f"{date} {DAILY_START_HOUR}"
-    end_time = f"{next_date} {DAILY_START_HOUR}"
+    start_time = build_local_datetime(date, DAILY_START_HOUR)
+    end_time = build_local_datetime(next_date, DAILY_START_HOUR)
     logger.debug("[dreaming] 时间范围: %s ~ %s", start_time, end_time)
 
     # 阶段1: 获取用户活动数据并总结
@@ -302,7 +306,12 @@ async def dreaming(date: str) -> None:
     activity_types = set(["high_usage_segments", "user_behavior_notes", "ai_behavior_notes"])
     logger.debug("[dreaming] 查询活动类型: %s", activity_types)
 
-    activities = query_user_activity_summary(activity_types, start_time, end_time)
+    # 工具函数接收 UTC ISO，本地时间就地转换（start_time/end_time 本身保持本地格式用于 prompt 注入）
+    activities = query_user_activity_summary(
+        activity_types,
+        local_to_utc_iso(start_time),
+        local_to_utc_iso(end_time),
+    )
     logger.debug("[dreaming] 获取到活动数据长度: %s 字符", len(activities) if activities else 0)
     if activities:
         logger.debug("[dreaming] 活动数据前200字符: %s", activities[:200])
@@ -570,7 +579,7 @@ async def process_session_message(days_offset: int = DEFAULT_DAYS_OFFSET) -> Non
             )
             write_date_md(
                 settings.lifeprism_data_path / "user/daily_data/behavior.md",
-                datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                get_local_today().isoformat(),
                 history_content,
                 "聊天记录总结",
             )

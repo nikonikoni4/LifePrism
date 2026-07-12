@@ -393,9 +393,9 @@ async def analyze_chunk_screenshots(
             # 清理 LLM 响应中的 Markdown 格式
             # cleaned_response = _clean_llm_response(response_content)
             cleaned_response = response_content
-            # 写入数据库前，将 ISO 格式（带 T）转换为数据库格式（空格分隔）
-            start_time_db = chunk["start"].replace("T", " ")
-            end_time_db = chunk["end"].replace("T", " ")
+            # 保持 ISO 8601 格式写入数据库（UTC 时间戳字段）
+            start_time_db = chunk["start"]
+            end_time_db = chunk["end"]
 
             data = {
                 "start_time": start_time_db,
@@ -606,9 +606,9 @@ async def _behavior_summary(
             extracted = extract_json_from_response(response_content)
             data: dict = json.loads(extracted)
             if "behavior_summary" in data and "title" in data:
-                # 写入数据库前，将 ISO 格式（带 T）转换为数据库格式（空格分隔）
-                start_time_db = start_time.replace("T", " ") if "T" in start_time else start_time
-                end_time_db = end_time.replace("T", " ") if "T" in end_time else end_time
+                # 保持 ISO 8601 格式写入数据库（UTC 时间戳字段）
+                start_time_db = start_time
+                end_time_db = end_time
 
                 # 存入数据库 start_time, end_time, behavior, behavior_summary, title, screen_count
                 data["screen_count"] = screen_count

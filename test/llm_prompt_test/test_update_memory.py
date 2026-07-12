@@ -1,16 +1,20 @@
 import sys
 from pathlib import Path
 from typing import Any
+
 sys.path.insert(0, str(Path(__file__).parent))
 
-from lifeprism.llm.prompts import prompt_loader, PromptRef, Prompts
-from lifeprism.llm.providers import create_llm_client, LLMResponse
-from lifeprism.llm.utils.md_os import read_md
-from lifeprism.llm.agent.tools.lifeprismsystem import query_user_activity_summary
-from llm_test_base import LLMTestBase, TestLog
 import asyncio
-import openpyxl
 from datetime import datetime, timedelta
+
+import openpyxl
+from llm_test_base import LLMTestBase, TestLog
+
+from lifeprism.llm.agent.tools.lifeprismsystem import query_user_activity_summary
+from lifeprism.llm.prompts import Prompts, prompt_loader
+from lifeprism.llm.providers import LLMResponse, create_llm_client
+from lifeprism.llm.utils.md_os import read_md
+from lifeprism.utils.time_utils import local_to_utc_iso
 
 # prompts 目录路径
 PROMPTS_DIR = Path(__file__).parent.parent.parent / "templates" / "prompts"
@@ -27,7 +31,7 @@ class UpdateMemoryTest(LLMTestBase):
         temperature: float = 0.7,
         start_date: str = "2026-05-13",
         end_date: str = "2026-05-19",
-        prompt_params: dict[str, str] | None = None
+        prompt_params: dict[str, str] | None = None,
     ):
         """
         Args:
@@ -44,7 +48,7 @@ class UpdateMemoryTest(LLMTestBase):
             prompt_version=prompt_version,
             input_path=input_path,
             output_path=output_path,
-            temperature=temperature
+            temperature=temperature,
         )
         self.llm_client = create_llm_client()
         self.prompt_params = prompt_params or {}
@@ -112,28 +116,27 @@ class UpdateMemoryTest(LLMTestBase):
         end_time = end_dt.strftime("%Y-%m-%d 23:59:59")
 
         try:
+            # 工具函数接收 UTC ISO，本地时间就地转换
             stats = query_user_activity_summary(
                 query_option={"computer_overview"},
-                start_time=start_time,
-                end_time=end_time
+                start_time=local_to_utc_iso(start_time),
+                end_time=local_to_utc_iso(end_time),
             )
             return stats
         except Exception as e:
             print(f"获取电脑使用统计失败: {e}")
             return "## 电脑总体使用统计\n获取数据失败"
 
-    def _build_messages(self, behavior_content: str, recent_state_content: str = "") -> list[dict[str, str]]:
+    def _build_messages(
+        self, behavior_content: str, recent_state_content: str = ""
+    ) -> list[dict[str, str]]:
         """构建 LLM 消息，使用 PromptLoader 加载 prompt"""
         # 合并静态参数和动态参数
         params = self.prompt_params.copy()
         params["recent_state_path"] = "test/output/recent_state.md"  # 测试用路径
 
         # 使用 PromptLoader 加载 prompt
-        task_prompt = prompt_loader.load_prompt(
-            self.prompt,
-            version=self.prompt_version,
-            **params
-        )
+        task_prompt = prompt_loader.load_prompt(self.prompt, version=self.prompt_version, **params)
 
         system_prompt = task_prompt
 
@@ -157,7 +160,7 @@ class UpdateMemoryTest(LLMTestBase):
 
         return [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user", "content": user_prompt},
         ]
 
     def _filter_behavior_by_date(self, content: str, start_date: str, end_date: str) -> str:
@@ -173,39 +176,39 @@ class UpdateMemoryTest(LLMTestBase):
             筛选后的 behavior 内容
         """
         import re
-        
+
         start = datetime.strptime(start_date, "%Y-%m-%d")
         end = datetime.strptime(end_date, "%Y-%m-%d")
-        
+
         # 按日期标题分割: ## YYYY-MM-DD
-        date_pattern = re.compile(r'^## (\d{4}-\d{2}-\d{2})', re.MULTILINE)
-        
+        date_pattern = re.compile(r"^## (\d{4}-\d{2}-\d{2})", re.MULTILINE)
+
         # 找到所有日期标题的位置
         matches = list(date_pattern.finditer(content))
-        
+
         if not matches:
             return content
-        
+
         filtered_parts = []
-        
+
         for i, match in enumerate(matches):
             date_str = match.group(1)
             date = datetime.strptime(date_str, "%Y-%m-%d")
-            
+
             # 检查日期是否在范围内
             if start <= date <= end:
                 # 获取当前日期段的起始位置
                 start_pos = match.start()
                 # 获取下一个日期段的起始位置（或文件末尾）
                 end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(content)
-                
+
                 # 提取该日期段内容
                 section = content[start_pos:end_pos].rstrip()
                 filtered_parts.append(section)
-        
+
         if not filtered_parts:
             raise ValueError(f"behavior.md 中未找到 {start_date} 到 {end_date} 范围内的数据")
-        
+
         return "\n\n".join(filtered_parts)
 
     def data_input(self, input_files: list[str] | None = None) -> list[dict[str, Any]]:
@@ -228,7 +231,9 @@ class UpdateMemoryTest(LLMTestBase):
             raise ValueError(f"behavior.md 内容为空: {behavior_path}")
 
         # 按日期范围筛选内容
-        behavior_content = self._filter_behavior_by_date(full_content, self.start_date, self.end_date)
+        behavior_content = self._filter_behavior_by_date(
+            full_content, self.start_date, self.end_date
+        )
 
         # 读取旧版本 recent_state.md（如果存在）
         recent_state_path = self.input_path / "update_memory" / "recent_state.md"
@@ -236,27 +241,25 @@ class UpdateMemoryTest(LLMTestBase):
         if recent_state_path.exists():
             recent_state_content = read_md(recent_state_path)
 
-        return [{
-            "date_range": f"{self.start_date} ~ {self.end_date}",
-            "behavior_content": behavior_content,
-            "recent_state_content": recent_state_content,
-            "file_count": 1
-        }]
+        return [
+            {
+                "date_range": f"{self.start_date} ~ {self.end_date}",
+                "behavior_content": behavior_content,
+                "recent_state_content": recent_state_content,
+                "file_count": 1,
+            }
+        ]
 
     async def _call_llm(self, messages: list[dict[str, str]]) -> str:
         """调用 LLM 获取响应"""
         response: LLMResponse = await self.llm_client.chat_with_retry(
-            messages=messages,
-            temperature=self.temperature
+            messages=messages, temperature=self.temperature
         )
         return response.content or ""
 
     async def _process_single(self, data: dict) -> tuple[dict, TestLog]:
         """处理单个数据项"""
-        messages = self._build_messages(
-            data["behavior_content"],
-            data["recent_state_content"]
-        )
+        messages = self._build_messages(data["behavior_content"], data["recent_state_content"])
 
         # llm_input 包含日期范围和文件数量
         llm_input = f"日期范围: {data['date_range']}\n文件数量: {data['file_count']}\n---\n行为数据长度: {len(data['behavior_content'])} 字符"
@@ -268,16 +271,18 @@ class UpdateMemoryTest(LLMTestBase):
             "result": llm_output,
             "version": self.prompt_version,
             "temperature": self.temperature,
-            "input_data_date": data["date_range"]
+            "input_data_date": data["date_range"],
         }
 
         return {
             "llm_input": llm_input,
             "llm_output": llm_output,
-            "date_range": data["date_range"]
+            "date_range": data["date_range"],
         }, test_log
 
-    async def _run_test_async(self, input_files: list[str] | None = None, round: int = 1) -> tuple[list[dict], list[TestLog]]:
+    async def _run_test_async(
+        self, input_files: list[str] | None = None, round: int = 1
+    ) -> tuple[list[dict], list[TestLog]]:
         """异步执行测试"""
         data_list = self.data_input(input_files)
         results = []
@@ -290,7 +295,9 @@ class UpdateMemoryTest(LLMTestBase):
 
         return results, test_logs
 
-    def run_test(self, input_files: list[str] | None = None, round: int = 1) -> tuple[list[dict], list[TestLog]]:
+    def run_test(
+        self, input_files: list[str] | None = None, round: int = 1
+    ) -> tuple[list[dict], list[TestLog]]:
         """
         执行测试
 
@@ -339,12 +346,12 @@ class UpdateMemoryTest(LLMTestBase):
             # pass, score, reason, other 留空供人工填写
 
         # 调整列宽
-        ws.column_dimensions['A'].width = 30
-        ws.column_dimensions['B'].width = 80
-        ws.column_dimensions['C'].width = 10
-        ws.column_dimensions['D'].width = 10
-        ws.column_dimensions['E'].width = 30
-        ws.column_dimensions['F'].width = 20
+        ws.column_dimensions["A"].width = 30
+        ws.column_dimensions["B"].width = 80
+        ws.column_dimensions["C"].width = 10
+        ws.column_dimensions["D"].width = 10
+        ws.column_dimensions["E"].width = 30
+        ws.column_dimensions["F"].width = 20
 
         wb.save(file_path)
         return file_path
@@ -412,9 +419,7 @@ class UpdateMemoryTest(LLMTestBase):
         # 2. 生成 Excel 评估表
         print("生成 Excel 评估表...")
         eval_sheet_path = self.generate_eval_sheet(
-            test_results=test_results,
-            round=round,
-            temperature=self.temperature
+            test_results=test_results, round=round, temperature=self.temperature
         )
         print(f"评估表已生成: {eval_sheet_path}")
         print("-" * 50)
@@ -422,7 +427,9 @@ class UpdateMemoryTest(LLMTestBase):
         # 3. 保存测试日志
         print("保存测试日志...")
         self.save_log(test_logs, round)
-        print(f"测试日志已保存: {self.output_path / self.prompt.name / self.prompt_version / f'r{round}-t{self.temperature}.json'}")
+        print(
+            f"测试日志已保存: {self.output_path / self.prompt.name / self.prompt_version / f'r{round}-t{self.temperature}.json'}"
+        )
         print("-" * 50)
 
         # 4. 获取输入文件信息
@@ -430,11 +437,7 @@ class UpdateMemoryTest(LLMTestBase):
 
         # 5. 更新 metadata（pass_ratio 初始为 0，等待人工评估）
         print("更新 metadata...")
-        self.update_metadata(
-            round=round,
-            pass_ratio=0.0,
-            input_files=input_file_info
-        )
+        self.update_metadata(round=round, pass_ratio=0.0, input_files=input_file_info)
         print(f"Metadata 已更新: {self.output_path / self.prompt.name / 'meta_data.json'}")
         print("-" * 50)
 
@@ -452,6 +455,6 @@ if __name__ == "__main__":
         temperature=0.7,
         start_date="2026-05-13",
         end_date="2026-05-19",
-        prompt_params = {"upper_limit" : 2000}
+        prompt_params={"upper_limit": 2000},
     )
     test.main()

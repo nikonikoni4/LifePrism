@@ -2,13 +2,13 @@
 
 import json
 import re
-from datetime import datetime
 from typing import Any
 
 from lifeprism.config import settings
 from lifeprism.llm.agent.tools.base import ERROR, Tool
 from lifeprism.llm.session.manager import ChatHistoryManager, SessionManager
 from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import utc_to_local_display
 
 logger = get_logger(__name__)
 
@@ -290,10 +290,10 @@ class QuerySessionHistoryTool(Tool):
                 timestamp = msg["timestamp"]
                 content = msg["content"]
 
-                # 解析时间戳为 MM-DD HH:MM 格式
+                # 解析时间戳为本地时间 MM-DD HH:MM 格式
                 try:
-                    dt = datetime.fromisoformat(timestamp)
-                    time_str = dt.strftime("%m-%d %H:%M")
+                    local_str = utc_to_local_display(timestamp)  # YYYY-MM-DD HH:MM:SS
+                    time_str = local_str[5:16]  # 提取 MM-DD HH:MM
                 except Exception:
                     time_str = timestamp[:16] if len(timestamp) >= 16 else timestamp
 

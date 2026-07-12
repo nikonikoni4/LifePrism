@@ -2,9 +2,6 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-import pytz
-
-from lifeprism.config import get_user_timezone
 from lifeprism.llm.agent.tools.base import ERROR, SUCCESS, Tool
 from lifeprism.llm.utils import build_time_segments
 from lifeprism.repository import (
@@ -15,42 +12,10 @@ from lifeprism.repository import (
     mood_repository,
     todo_repository,
 )
+from lifeprism.utils.time_utils import local_to_utc_iso, utc_to_local_display
 
 # 本地时区时间格式描述（AI 输入用）
 _TIME_FORMAT_DESC = "YYYY-MM-DD HH:MM:SS（本地时区）"
-
-
-def _parse_local_time(time_str: str) -> datetime:
-    """解析本地时区时间字符串，返回 UTC aware datetime。
-
-    支持格式：YYYY-MM-DD HH:MM:SS 或 YYYY-MM-DDTHH:MM:SS
-    如果输入已带时区信息（如 UTC ISO 8601），则直接解析并转换为 UTC。
-    如果输入是 naive（无时区），则附加用户配置时区后转换为 UTC。
-
-    Args:
-        time_str: 本地时区时间字符串
-
-    Returns:
-        datetime: UTC aware datetime 对象
-
-    Raises:
-        ValueError: 时间格式错误
-    """
-    try:
-        if "T" in time_str:
-            dt = datetime.fromisoformat(time_str)
-        else:
-            dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
-    except ValueError as e:
-        raise ValueError(f"{ERROR} 时间格式错误，期望格式为 '{_TIME_FORMAT_DESC}': {e}") from e
-
-    # 如果 naive，附加用户时区
-    if dt.tzinfo is None:
-        tz = pytz.timezone(get_user_timezone())
-        dt = tz.localize(dt)
-
-    # 转换为 UTC
-    return dt.astimezone(timezone.utc)
 
 
 def _parse_iso_time(time_str: str) -> datetime:
@@ -71,7 +36,7 @@ def _parse_iso_time(time_str: str) -> datetime:
 def _utc_to_local(utc_time_str: str) -> str:
     """将 UTC ISO 8601 时间字符串转换为本地时区显示格式。
 
-    用于将数据库查询结果中的时间字段转换为 AI 可读的本地时间。
+    薄包装：委托给公共函数 utc_to_local_display，额外处理空字符串和异常兜底。
 
     Args:
         utc_time_str: UTC ISO 8601 时间字符串或 'YYYY-MM-DD HH:MM:SS' 格式
@@ -82,18 +47,7 @@ def _utc_to_local(utc_time_str: str) -> str:
     if not utc_time_str:
         return ""
     try:
-        time_str = str(utc_time_str)
-        # 处理 'YYYY-MM-DD HH:MM:SS' 格式（SQLite DEFAULT 输出）
-        if "T" not in time_str:
-            dt = datetime.strptime(time_str[:19], "%Y-%m-%d %H:%M:%S")
-            dt = dt.replace(tzinfo=timezone.utc)
-        else:
-            dt = datetime.fromisoformat(time_str)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-        tz = pytz.timezone(get_user_timezone())
-        local_dt = dt.astimezone(tz)
-        return local_dt.strftime("%Y-%m-%d %H:%M:%S")
+        return utc_to_local_display(str(utc_time_str))
     except (ValueError, TypeError):
         return str(utc_time_str)
 
@@ -196,8 +150,9 @@ class UserActivitySummaryTool(Tool):
         """
         try:
             query_option = set(kwargs.get("query_option", []))
-            start_time = kwargs.get("start_time", "")
-            end_time = kwargs.get("end_time", "")
+            # 输入转换：本地时间 → UTC ISO（AI 输入本地时间，工具函数内部用 UTC ISO）
+            start_time = local_to_utc_iso(kwargs.get("start_time", ""))
+            end_time = local_to_utc_iso(kwargs.get("end_time", ""))
 
             return query_user_activity_summary(query_option, start_time, end_time)
         except ValueError as e:
@@ -259,8 +214,8 @@ def query_user_activity_summary(query_option: set[str], start_time: str, end_tim
                 # goals,
                 todolist
 
-        start_time: 查询开始时间（本地时区，格式：YYYY-MM-DD HH:MM:SS）
-        end_time: 查询结束时间（本地时区，格式：YYYY-MM-DD HH:MM:SS）
+        start_time: 查询开始时间（UTC ISO 8601 格式）
+        end_time: 查询结束时间（UTC ISO 8601 格式）
     return
         str 返回格式化数据
     """
@@ -276,15 +231,12 @@ def query_user_activity_summary(query_option: set[str], start_time: str, end_tim
     if invalid_options:
         raise ValueError(f"{ERROR} Invalid query options: {invalid_options}")
 
-    start_dt = _parse_local_time(start_time)
-    end_dt = _parse_local_time(end_time)
+    # 解析 UTC ISO 用于校验时间范围（计算用，保持 UTC ISO）
+    start_dt = _parse_iso_time(start_time)
+    end_dt = _parse_iso_time(end_time)
 
     if start_dt >= end_dt:
         raise ValueError(f"{ERROR} start_time must be before end_time")
-
-    # 统一格式化为 ISO 8601 + UTC 字符串，确保与数据库格式一致
-    start_time = start_dt.isoformat()
-    end_time = end_dt.isoformat()
 
     parts = []
 
@@ -495,8 +447,9 @@ class UserComputerLogTool(Tool):
             工具执行结果（字符串或内容块列表）
         """
         try:
-            start_time = kwargs.get("start_time", "")
-            end_time = kwargs.get("end_time", "")
+            # 输入转换：本地时间 → UTC ISO（AI 输入本地时间，工具函数内部用 UTC ISO）
+            start_time = local_to_utc_iso(kwargs.get("start_time", ""))
+            end_time = local_to_utc_iso(kwargs.get("end_time", ""))
             duration_min = kwargs.get("duration_min", 45)
             if not start_time or not end_time:
                 return f"{ERROR}参数错误: start_time 和 end_time 是必填参数"
@@ -545,17 +498,13 @@ def query_user_activity_log(start_time: str, end_time: str, duration_min: int = 
     """查询用户电脑使用的详细日志
 
     Args:
-        start_time: 查询开始时间（本地时区，格式：YYYY-MM-DD HH:MM:SS）
-        end_time: 查询结束时间（本地时区，格式：YYYY-MM-DD HH:MM:SS）
+        start_time: 查询开始时间（UTC ISO 8601 格式）
+        end_time: 查询结束时间（UTC ISO 8601 格式）
         duration_min: 最小持续时长（秒），只返回持续时长大于等于此值的记录，默认45秒
 
     Returns:
         str: 格式化的活动日志，每行格式为 "start_time ~ end_time app title duration category_name"
     """
-    # 解析本地时间并统一格式化为 UTC ISO 8601，确保与数据库格式一致
-    start_time = _parse_local_time(start_time).isoformat()
-    end_time = _parse_local_time(end_time).isoformat()
-
     MAX_LEN = 40
     result = f"[日志查询说明] 查询结果屏蔽了持续时间小于{duration_min}秒的记录。\n\n"
 
@@ -600,8 +549,8 @@ def create_or_update_user_behavior_note(
     """创建或更新用户行为备注
 
     Args:
-        start_time: 开始时间（本地时区，格式：YYYY-MM-DD HH:MM:SS）
-        end_time: 结束时间（本地时区，格式：YYYY-MM-DD HH:MM:SS）
+        start_time: 开始时间（UTC ISO 8601 格式）
+        end_time: 结束时间（UTC ISO 8601 格式）
         content: 备注内容
         block_id: 可选，时间块 ID。如果提供则更新，否则创建
 
@@ -611,11 +560,9 @@ def create_or_update_user_behavior_note(
     Raises:
         ValueError: 时间格式错误或时间范围无效
     """
-    # 参数校验并统一格式化（AI 输入为本地时间，转换为 UTC 存储）
-    start_dt = _parse_local_time(start_time)
-    end_dt = _parse_local_time(end_time)
-    start_time = start_dt.isoformat()
-    end_time = end_dt.isoformat()
+    # 解析 UTC ISO 用于校验和时长计算（计算用，保持 UTC ISO）
+    start_dt = _parse_iso_time(start_time)
+    end_dt = _parse_iso_time(end_time)
 
     if start_dt >= end_dt:
         raise ValueError(f"{ERROR} 开始时间必须早于结束时间")
@@ -626,7 +573,7 @@ def create_or_update_user_behavior_note(
     # 硬编码 color
     color = "#bfdbfe"
 
-    # 构建数据
+    # 构建数据（时间字段保持 UTC ISO 存入数据库）
     data = {
         "start_time": start_time,
         "end_time": end_time,
@@ -712,8 +659,9 @@ class UpdateUserBehaviorNoteTool(Tool):
             工具执行结果（字符串）
         """
         try:
-            start_time = kwargs.get("start_time", "")
-            end_time = kwargs.get("end_time", "")
+            # 输入转换：本地时间 → UTC ISO（AI 输入本地时间，工具函数内部用 UTC ISO）
+            start_time = local_to_utc_iso(kwargs.get("start_time", ""))
+            end_time = local_to_utc_iso(kwargs.get("end_time", ""))
             content = kwargs.get("content", "")
             block_id = kwargs.get("block_id")
 
@@ -792,8 +740,9 @@ class UserMoodQuryTool(Tool):
             格式化的心情记录字符串
         """
         try:
-            start_time = kwargs.get("start_time", "")
-            end_time = kwargs.get("end_time", "")
+            # 输入转换：本地时间 → UTC ISO（AI 输入本地时间，工具函数内部用 UTC ISO）
+            start_time = local_to_utc_iso(kwargs.get("start_time", ""))
+            end_time = local_to_utc_iso(kwargs.get("end_time", ""))
             by_mood_type_id = kwargs.get("by_mood_type_id")
 
             return query_user_mood(start_time, end_time, by_mood_type_id)
@@ -809,16 +758,12 @@ def query_user_mood(
     """
     查询用户在指定时间范围内的心情记录。
     args:
-        start_time: 开始时间（本地时区，格式：YYYY-MM-DD HH:MM:SS）
-        end_time: 结束时间（本地时区，格式：YYYY-MM-DD HH:MM:SS）
+        start_time: 开始时间（UTC ISO 8601 格式）
+        end_time: 结束时间（UTC ISO 8601 格式）
         by_mood_type_id: 可选，心情类型ID，按心情类型查询
     return:
         心情记录列表
     """
-    # 解析本地时间并统一格式化为 UTC ISO 8601，确保与数据库格式一致
-    start_time = _parse_local_time(start_time).isoformat()
-    end_time = _parse_local_time(end_time).isoformat()
-
     mood_entries: list[dict] = mood_repository.get_mood_entries(
         start_time=start_time, end_time=end_time
     )
@@ -958,12 +903,14 @@ def create_user_mood(
 
 
 if __name__ == "__main__":
-    print(
-        query_user_activity_summary(
-            ["computer_overview"], "2026-04-28 00:00:00", "2026-04-29 00:00:00"
-        )
-    )
-    # print(query_user_activity_log("2026-04-28 00:00:00","2026-04-29 00:00:00"))
-    # print(create_or_update_user_behavior_note("2026-04-28 00:00:00","2026-04-29 00:00:00","用户在电脑上工作111",129))
-    # print(query_user_mood("2026-05-03","2026-05-04"))
+    # 工具函数现在接收 UTC ISO，execute 方法负责本地时间 → UTC ISO 转换
+    # 直接调用工具函数时需传入 UTC ISO
+    from lifeprism.utils.time_utils import local_to_utc_iso
+
+    _start = local_to_utc_iso("2026-04-28 00:00:00")
+    _end = local_to_utc_iso("2026-04-29 00:00:00")
+    print(query_user_activity_summary(["computer_overview"], _start, _end))
+    # print(query_user_activity_log(local_to_utc_iso("2026-04-28 00:00:00"), local_to_utc_iso("2026-04-29 00:00:00")))
+    # print(create_or_update_user_behavior_note(local_to_utc_iso("2026-04-28 00:00:00"), local_to_utc_iso("2026-04-29 00:00:00"),"用户在电脑上工作111",129))
+    # print(query_user_mood(local_to_utc_iso("2026-05-03 00:00:00"), local_to_utc_iso("2026-05-04 00:00:00")))
     # print(UserMoodCreateTool().parameters)

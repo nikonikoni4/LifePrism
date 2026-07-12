@@ -11,6 +11,7 @@ from typing import Any
 from lifeprism.llm.agent.tools.base import ERROR, SUCCESS, Tool
 from lifeprism.repository import custom_record_repository
 from lifeprism.utils.exceptions import ValidationError
+from lifeprism.utils.time_utils import utc_to_local_display
 
 
 class ListCustomRecordTypesTool(Tool):
@@ -249,6 +250,7 @@ class QueryCustomRecordEntriesTool(Tool):
             return f"{ERROR}参数缺失：type_id 必填"
 
         # 转换 date_range：[start, end] -> (start, end)，None 或空串表示不限制
+        # date_range 是日期字段（YYYY-MM-DD），保持本地日期，不转 UTC
         date_range = None
         if date_range_raw and isinstance(date_range_raw, list) and len(date_range_raw) == 2:
             start = date_range_raw[0] or None
@@ -263,6 +265,14 @@ class QueryCustomRecordEntriesTool(Tool):
                 page=1,
                 page_size=int(limit),
             )
+
+            # 输出转换：UTC ISO → 本地 YYYY-MM-DD HH:MM:SS（显示用字段）
+            for entry in entries:
+                if "created_at" in entry and entry["created_at"]:
+                    entry["created_at"] = utc_to_local_display(entry["created_at"])
+                if "updated_at" in entry and entry["updated_at"]:
+                    entry["updated_at"] = utc_to_local_display(entry["updated_at"])
+
             return f"{SUCCESS}{json.dumps(entries, ensure_ascii=False)}"
         except Exception as e:
             return f"{ERROR}查询自定义记录失败: {e}"

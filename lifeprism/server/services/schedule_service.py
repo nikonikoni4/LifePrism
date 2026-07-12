@@ -15,11 +15,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from lifeprism.config import get_user_timezone
 from lifeprism.config.settings_manager import settings
 from lifeprism.llm.function.agent_schedule_job import dreaming, process_session_message
 from lifeprism.server.services.diary_service import generate_diary_ai_summary
 from lifeprism.server.services.sync_service import SyncService
 from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import get_local_today
 
 logger = get_logger(__name__)
 
@@ -31,10 +33,9 @@ TEST_CRON_AFTER_MINUTES = 1  # 定时任务测试参数（启动后N分钟触发
 
 
 async def _dreaming():
-    # 每天 UTC 02:00（本地 10:00）执行时，获取昨天的完整数据（昨天04:00 ~ 今天04:00）
-    # 使用 UTC 日期：任务在 UTC 02:00 触发，此时 UTC 日期与本地日期一致（UTC+8 10:00），
-    # 且数据库中时间戳已迁移为 UTC，按 UTC 日期查询保证数据范围正确。
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    # 每天本地 10:00 执行时，获取昨天的完整数据（昨天04:00 ~ 今天04:00）
+    # 基于本地时区计算"昨天"：用户在本地午夜前后看到的日期与预期一致。
+    yesterday = (get_local_today() - timedelta(days=1)).isoformat()
     logger.info("[dreaming] 开始执行, 目标日期: %s", yesterday)
 
     # 先执行增量同步，确保数据已分类和总结
@@ -75,7 +76,7 @@ class ScheduleService:
     - 任务生命周期管理
     """
 
-    _SYSTEM_CRON_JOB_TIME = "0 2 * * *"  # UTC 02:00 = 北京时间 10:00
+    _SYSTEM_CRON_JOB_TIME = "0 10 * * *"  # 本地 10:00
     _STATE_FILE_NAME = ".schedule_state.json"
 
     def __init__(self) -> None:
@@ -108,7 +109,7 @@ class ScheduleService:
                 )
                 cron_expr = f"{target_time.minute} {target_time.hour} * * *"
             else:
-                cron_expr = "0 2 * * *"  # UTC 02:00 = 北京时间 10:00
+                cron_expr = "0 10 * * *"  # 本地 10:00
             self._system_jobs.append(
                 {
                     "func": _dreaming,
@@ -187,7 +188,7 @@ class ScheduleService:
         Returns:
             bool: True 表示应该执行，False 表示今天已执行过
         """
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = get_local_today().isoformat()
         state = self._load_cron_state()
         last_execution = state.get(job_id)
 
@@ -216,7 +217,8 @@ class ScheduleService:
             )
             return
 
-        self._scheduler = AsyncIOScheduler(timezone=pytz.UTC)
+        local_tz = pytz.timezone(get_user_timezone())
+        self._scheduler = AsyncIOScheduler(timezone=local_tz)
         self._scheduler.start()
         logger.info("定时任务调度器已启动")
 
@@ -225,8 +227,9 @@ class ScheduleService:
 
     def _add_system_jobs(self) -> None:
         """添加系统预设任务，对于 Cron 任务，如果已过触发时间且今天未执行则异步执行一次"""
-        # 使用 UTC 时间判断是否过触发时间（Cron 表达式基于 UTC 时区）
-        now = datetime.now(timezone.utc)
+        # 使用本地时间判断是否过触发时间（Cron 表达式基于本地时区）
+        local_tz = pytz.timezone(get_user_timezone())
+        now = datetime.now(local_tz)
         for job_config in self._system_jobs:
             try:
                 if job_config["trigger"] == "interval":
@@ -271,7 +274,7 @@ class ScheduleService:
         """
         try:
             await func()
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            today = get_local_today().isoformat()
             self._save_cron_state(job_id, today)
         except Exception as e:
             logger.error("执行任务 %s 失败: error=%s", job_id, e)
@@ -328,7 +331,8 @@ class ScheduleService:
         if hours is not None:
             interval_kwargs["hours"] = hours
 
-        trigger = IntervalTrigger(**interval_kwargs, timezone=pytz.UTC)
+        local_tz = pytz.timezone(get_user_timezone())
+        trigger = IntervalTrigger(**interval_kwargs, timezone=local_tz)
         job: Job = self._scheduler.add_job(func, trigger, id=job_id)
 
         logger.info(
@@ -363,13 +367,14 @@ class ScheduleService:
         if self._scheduler is None:
             raise RuntimeError("调度器未启动，请先调用 start()")
 
-        trigger = CronTrigger.from_crontab(cron_expr, timezone=pytz.UTC)
+        local_tz = pytz.timezone(get_user_timezone())
+        trigger = CronTrigger.from_crontab(cron_expr, timezone=local_tz)
 
         # 包装原函数，执行后记录状态
         async def wrapped_func():
             await func()
             if job_id:
-                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                today = get_local_today().isoformat()
                 self._save_cron_state(job_id, today)
 
         job: Job = self._scheduler.add_job(wrapped_func, trigger, id=job_id)
