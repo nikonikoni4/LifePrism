@@ -70,21 +70,35 @@ class LWBaseDataProvider:
     # ==================== 类级别缓存 ====================
 
     _TABLES_WITH_UPDATE_AT: set[str] | None = None  # 需要自动更新 updated_at 的表名集合
+    _TABLES_WITH_TIMESTAMPS: set[str] | None = None  # 配置了 timestamps=True 的表名集合
 
     @classmethod
     def _init_update_at_cache(cls):
-        """初始化 update_at 缓存，加载所有配置了 update_at=True 的表名"""
-        if cls._TABLES_WITH_UPDATE_AT is None:
+        """初始化时间戳缓存，加载表配置
+
+        注意：缓存始终设置在 LWBaseDataProvider 基类上，确保所有子类共享同一份缓存。
+        避免通过子类实例调用时在子类上创建屏蔽副本，导致基类缓存修改对子类不可见。
+        """
+        if (
+            LWBaseDataProvider._TABLES_WITH_UPDATE_AT is None
+            or LWBaseDataProvider._TABLES_WITH_TIMESTAMPS is None
+        ):
             from lifeprism.config.database import TABLE_CONFIGS
 
-            cls._TABLES_WITH_UPDATE_AT = {
+            LWBaseDataProvider._TABLES_WITH_TIMESTAMPS = {
+                table_name
+                for table_name, config in TABLE_CONFIGS.items()
+                if config.get("timestamps", False)
+            }
+            LWBaseDataProvider._TABLES_WITH_UPDATE_AT = {
                 table_name
                 for table_name, config in TABLE_CONFIGS.items()
                 if config.get("update_at", False)
             }
             logger.debug(
-                "初始化 update_at 缓存，共 %s 个表需要自动更新时间戳",
-                len(cls._TABLES_WITH_UPDATE_AT),
+                "初始化时间戳缓存：timestamps=%s 个表，update_at=%s 个表",
+                len(LWBaseDataProvider._TABLES_WITH_TIMESTAMPS),
+                len(LWBaseDataProvider._TABLES_WITH_UPDATE_AT),
             )
 
     def __init__(self, db_manager=None):
@@ -1102,6 +1116,21 @@ class LWBaseDataProvider:
                 max_order = result[0] if result and result[0] is not None else 0
                 data["order_index"] = max_order + 1
 
+        # 2.5 自动写入 created_at / updated_at（ISO 8601 + UTC 格式）
+        # 避免依赖数据库 DEFAULT datetime('now')，该函数输出 YYYY-MM-DD HH:MM:SS 格式
+        # （无 T 分隔符、无时区标识），不符合 PRD 要求的 ISO 8601 + UTC 格式
+        if self._TABLES_WITH_TIMESTAMPS is None:
+            self._init_update_at_cache()
+
+        if self._TABLE_NAME in self._TABLES_WITH_TIMESTAMPS:
+            from lifeprism.utils.time_utils import get_utc_now_iso
+
+            now_iso = get_utc_now_iso()
+            if "created_at" not in data:
+                data["created_at"] = now_iso
+            if self._TABLE_NAME in self._TABLES_WITH_UPDATE_AT and "updated_at" not in data:
+                data["updated_at"] = now_iso
+
         # 3. 构建 INSERT 语句
         columns = list(data.keys())
         placeholders = ",".join(["?"] * len(columns))
@@ -1179,9 +1208,9 @@ class LWBaseDataProvider:
             self._init_update_at_cache()
 
         if self._TABLE_NAME in self._TABLES_WITH_UPDATE_AT and "updated_at" not in data:
-            from datetime import datetime, timezone
+            from lifeprism.utils.time_utils import get_utc_now_iso
 
-            data["updated_at"] = datetime.now(timezone.utc).isoformat()
+            data["updated_at"] = get_utc_now_iso()
 
         # 3. 构建 UPDATE 语句
         set_clause = ", ".join([f"{key} = ?" for key in data])

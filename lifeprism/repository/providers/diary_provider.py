@@ -143,9 +143,6 @@ class DiaryProvider(LWBaseDataProvider):
         """
         更新日记记录
 
-        注意：此方法使用自定义 SQL 是因为需要 SQLite 特定的时间戳函数
-        datetime('now','localtime')
-
         Args:
             date: 日期 YYYY-MM-DD
             data: 要更新的字段
@@ -159,32 +156,9 @@ class DiaryProvider(LWBaseDataProvider):
         if not data:
             return True
 
+        # 使用 _generic_update，它会自动写入 updated_at（ISO 8601 + UTC 格式）
         try:
-            # 使用自定义 SQL 以支持 SQLite 的 datetime('now','localtime')
-            if "updated_at" not in data:
-                # 使用 SQLite 特定的时间戳更新
-                with self.db.get_connection() as conn:
-                    cursor = conn.cursor()
-
-                    # 白名单验证
-                    invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
-                    if invalid_fields:
-                        raise ValueError(f"Invalid update fields: {invalid_fields}")
-
-                    set_clauses = [f"{key} = ?" for key in data]
-                    set_clauses.append("updated_at = datetime('now','localtime')")
-                    values = list(data.values()) + [date]
-
-                    sql = f"UPDATE diary SET {', '.join(set_clauses)} WHERE date = ?"
-                    cursor.execute(sql, values)
-                    conn.commit()
-
-                    if cursor.rowcount > 0:
-                        logger.info("更新日记: date=%s", date)
-                    return cursor.rowcount > 0
-            else:
-                # 如果已经提供了 updated_at，使用通用方法
-                return self._generic_update(date, data)
+            return self._generic_update(date, data)
         except Exception as e:
             logger.error("更新日记 %s 失败: %s", date, e)
             raise DataAccessError(f"更新日记 {date} 失败") from e

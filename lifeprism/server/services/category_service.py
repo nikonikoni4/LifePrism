@@ -24,6 +24,7 @@ from lifeprism.server.schemas.category_schemas import (
     TitleDuration,
 )
 from lifeprism.utils import LazySingleton, get_logger
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -938,13 +939,14 @@ class CategoryService:
                 total_affected = 0
 
                 # 更新 multi_purpose_map_cache 表
+                now_iso = get_utc_now_iso()
                 cursor.execute(
                     """
                     UPDATE multi_purpose_map_cache
-                    SET state = 0, updated_at = CURRENT_TIMESTAMP
+                    SET state = 0, updated_at = ?
                     WHERE category_id = ?
                 """,
-                    (category_id,),
+                    (now_iso, category_id),
                 )
                 total_affected += cursor.rowcount
 
@@ -952,10 +954,10 @@ class CategoryService:
                 cursor.execute(
                     """
                     UPDATE single_purpose_map_cache
-                    SET state = 0, updated_at = CURRENT_TIMESTAMP
+                    SET state = 0, updated_at = ?
                     WHERE category_id = ?
                 """,
-                    (category_id,),
+                    (now_iso, category_id),
                 )
                 total_affected += cursor.rowcount
 
@@ -975,13 +977,14 @@ class CategoryService:
                 total_affected = 0
 
                 # 更新 multi_purpose_map_cache 表
+                now_iso = get_utc_now_iso()
                 cursor.execute(
                     """
                     UPDATE multi_purpose_map_cache
-                    SET state = 0, updated_at = CURRENT_TIMESTAMP
+                    SET state = 0, updated_at = ?
                     WHERE sub_category_id = ?
                 """,
-                    (sub_category_id,),
+                    (now_iso, sub_category_id),
                 )
                 total_affected += cursor.rowcount
 
@@ -989,10 +992,10 @@ class CategoryService:
                 cursor.execute(
                     """
                     UPDATE single_purpose_map_cache
-                    SET state = 0, updated_at = CURRENT_TIMESTAMP
+                    SET state = 0, updated_at = ?
                     WHERE sub_category_id = ?
                 """,
-                    (sub_category_id,),
+                    (now_iso, sub_category_id),
                 )
                 total_affected += cursor.rowcount
 
@@ -1026,6 +1029,7 @@ class CategoryService:
 
                 total_enabled = 0
                 total_deleted = 0
+                now_iso = get_utc_now_iso()
 
                 # 处理 multi_purpose_map_cache 表
                 cursor.execute(
@@ -1058,10 +1062,10 @@ class CategoryService:
                     cursor.execute(
                         """
                         UPDATE multi_purpose_map_cache
-                        SET state = 1, updated_at = CURRENT_TIMESTAMP
+                        SET state = 1, updated_at = ?
                         WHERE id = ?
                     """,
-                        (record_id,),
+                        (now_iso, record_id),
                     )
                     total_enabled += cursor.rowcount
 
@@ -1096,10 +1100,10 @@ class CategoryService:
                     cursor.execute(
                         """
                         UPDATE single_purpose_map_cache
-                        SET state = 1, updated_at = CURRENT_TIMESTAMP
+                        SET state = 1, updated_at = ?
                         WHERE id = ?
                     """,
-                        (record_id,),
+                        (now_iso, record_id),
                     )
                     total_enabled += cursor.rowcount
 
@@ -1141,6 +1145,7 @@ class CategoryService:
 
                 total_enabled = 0
                 total_deleted = 0
+                now_iso = get_utc_now_iso()
 
                 # 处理 multi_purpose_map_cache 表
                 cursor.execute(
@@ -1169,10 +1174,10 @@ class CategoryService:
                     cursor.execute(
                         """
                         UPDATE multi_purpose_map_cache
-                        SET state = 1, updated_at = CURRENT_TIMESTAMP
+                        SET state = 1, updated_at = ?
                         WHERE id = ?
                     """,
-                        (record_id,),
+                        (now_iso, record_id),
                     )
                     total_enabled += cursor.rowcount
 
@@ -1203,10 +1208,10 @@ class CategoryService:
                     cursor.execute(
                         """
                         UPDATE single_purpose_map_cache
-                        SET state = 1, updated_at = CURRENT_TIMESTAMP
+                        SET state = 1, updated_at = ?
                         WHERE id = ?
                     """,
-                        (record_id,),
+                        (now_iso, record_id),
                     )
                     total_enabled += cursor.rowcount
 

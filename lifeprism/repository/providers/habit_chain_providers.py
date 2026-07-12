@@ -85,6 +85,9 @@ class HabitChainProvider(LWBaseDataProvider):
         Returns:
             新插入记录的 INTEGER 主键
         """
+        from lifeprism.utils.time_utils import get_utc_now_iso
+
+        now_iso = get_utc_now_iso()
         insert_data = {
             "name": data["name"],
             "description": data.get("description"),
@@ -94,12 +97,14 @@ class HabitChainProvider(LWBaseDataProvider):
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.execute(
-                    """INSERT INTO habit_chains (name, description, show_in_timeline)
-                       VALUES (?, ?, ?)""",
+                    """INSERT INTO habit_chains (name, description, show_in_timeline, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?)""",
                     (
                         insert_data["name"],
                         insert_data["description"],
                         insert_data["show_in_timeline"],
+                        now_iso,
+                        now_iso,
                     ),
                 )
                 chain_id = cursor.lastrowid
@@ -267,18 +272,23 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         Returns:
             新插入记录的 INTEGER 主键
         """
+        from lifeprism.utils.time_utils import get_utc_now_iso
+
+        now_iso = get_utc_now_iso()
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.execute(
                     """INSERT INTO habit_chain_nodes
-                       (chain_id, sort_order, name, habit_id, trigger_time)
-                       VALUES (?, ?, ?, ?, ?)""",
+                       (chain_id, sort_order, name, habit_id, trigger_time, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
                     (
                         data["chain_id"],
                         data["sort_order"],
                         data["name"],
                         data.get("habit_id"),
                         data.get("trigger_time"),
+                        now_iso,
+                        now_iso,
                     ),
                 )
                 node_id = cursor.lastrowid

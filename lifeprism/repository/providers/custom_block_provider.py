@@ -157,12 +157,6 @@ class CustomBlockProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            # 将 ISO 格式的时间（带 T）转换为标准格式（用空格分隔）
-            if "start_time" in data and data["start_time"]:
-                data["start_time"] = data["start_time"].replace("T", " ")
-            if "end_time" in data and data["end_time"]:
-                data["end_time"] = data["end_time"].replace("T", " ")
-
             # 白名单验证
             allowed_fields = self._UPDATE_FIELDS
             invalid_fields = set(data.keys()) - allowed_fields
@@ -198,12 +192,6 @@ class CustomBlockProvider(LWBaseDataProvider):
             - todo_id, category_id, sub_category_id 允许设置为 None（清除绑定）
             - 其他字段（content, start_time 等）不接受 None 值
         """
-        # 将 ISO 格式的时间（带 T）转换为标准格式（用空格分隔）
-        if "start_time" in data and data["start_time"]:
-            data["start_time"] = data["start_time"].replace("T", " ")
-        if "end_time" in data and data["end_time"]:
-            data["end_time"] = data["end_time"].replace("T", " ")
-
         # 可清空的字段列表（这些字段允许显式设置为 None）
         nullable_fields = {"todo_id", "category_id", "sub_category_id"}
 
