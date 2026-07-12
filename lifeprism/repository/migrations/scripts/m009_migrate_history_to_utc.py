@@ -71,7 +71,7 @@ _MIGRATION_FIELDS = [
     ("sub_category", "created_at"),
     ("sub_category", "updated_at"),
     ("tokens_usage_log", "created_at"),
-    # todo_list.created_at 已排除（CURRENT_TIMESTAMP = UTC）
+    ("todo_list", "created_at"),
     ("todo_list", "updated_at"),
     ("daily_focus", "created_at"),
     ("daily_focus", "updated_at"),
@@ -85,7 +85,8 @@ _MIGRATION_FIELDS = [
     ("plan_doc", "updated_at"),
     ("chat_session", "created_at"),
     ("chat_session", "updated_at"),
-    # timeline_custom_block.created_at 和 updated_at 已排除（CURRENT_TIMESTAMP = UTC）
+    ("timeline_custom_block", "created_at"),
+    ("timeline_custom_block", "updated_at"),
     ("goal_stats", "created_at"),
     ("daily_report", "created_at"),
     ("daily_report", "updated_at"),
