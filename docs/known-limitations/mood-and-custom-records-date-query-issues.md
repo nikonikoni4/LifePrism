@@ -7,11 +7,11 @@
 | 问题 | 类型 | 严重程度 |
 |------|------|---------|
 | 自定义数据表 UTC 迁移遗漏 | **数据一致性问题** | ✅ 已修复（2026-07-13） |
-| Mood Entries 缺少独立日期字段 | 表设计限制 | ❌ 未修复 |
+| Mood Entries 缺少独立日期字段 | 表设计限制 | ✅ 已修复（2026-07-13），新增 `event_time` + 组件内 UTC 转换 |
 | Custom Records 缺少独立日期字段 | 表设计限制 | ✅ 已修复（2026-07-13），新增 `event_time` + 组件内 UTC 转换 |
 
 - **发现时间**: 2026-07-13
-- **状态**: 自定义数据表迁移遗漏 + Custom Records 日期查询已修复；Mood Entries 仍为已知限制
+- **状态**: 所有问题已修复
 
 ## 问题描述
 
@@ -92,30 +92,22 @@ for row in cursor.fetchall():
         ''')
 ```
 
-### 2. Mood Entries API
+### 2. Mood Entries API（✅ 已修复）
 
-**表结构**：
-```sql
-CREATE TABLE mood_entries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    mood_level INTEGER,
-    note TEXT,
-    created_at TEXT,  -- UTC ISO 8601
-    updated_at TEXT
-);
-```
-
-**API 查询参数**：
-```typescript
-// frontend/apps/mindspace/components/mood/moodApi.ts
-GET /api/v2/mood/entries?start_date=2026-07-01&end_date=2026-07-31
-```
-
-**问题**：
+**原问题**：
 - 表中只有 `created_at` datetime 字段（UTC）
 - **没有独立的 `date` 字段**用于快速按日期查询
 - 每次查询都需要在后端将日期范围转换为 UTC 时间范围
 - 无法在数据库层建立基于日期的索引
+
+**修复方案**：
+1. 新增系统级 `event_time` 字段（UTC ISO 8601），由 Agent 以本地 `YYYY-MM-DD HH:MM:SS` 提供，execute 层 `local_to_utc_iso()` 转 UTC 存储
+2. 查询改用 `WHERE event_time >= ? AND event_time < ?` 替代 `WHERE created_at`
+3. 前端 moodTransform.ts 使用 `entry.event_time` 构建 `timestamp`（兼容降级到 `created_at`）
+4. LLM Tool Query 工具已有 `local_to_utc_iso()` 转换；Create 工具新增 `event_time` 参数 + 格式校验
+5. API 查询参数从 `start_date`/`end_date` 改为 `start_time`/`end_time`（UTC ISO 8601）
+
+**m011 迁移**：`ALTER TABLE mood_entries ADD COLUMN event_time TEXT` + `UPDATE SET event_time = created_at` 回填
 
 ### 3. Custom Records API（✅ 已修复）
 
@@ -136,47 +128,42 @@ GET /api/v2/mood/entries?start_date=2026-07-01&end_date=2026-07-31
 
 ### 后端处理逻辑
 
-两个 API 都在后端 Service 层将日期转换为 UTC 时间范围：
+Mood 和 Custom Records 均已修复，使用 `event_time` 字段替代 `created_at` 进行查询：
 
 ```python
 # mood_service.py / custom_records_service.py
-from lifeprism.utils.time_utils import build_utc_time_range
-
-def get_entries(start_date: str, end_date: str):
-    start_time, end_time = build_utc_time_range(start_date, end_date)
-    # start_time: "2026-06-30T16:00:00.000Z" (UTC+8 → UTC)
-    # end_time: "2026-07-31T15:59:59.999Z"
-    
+def get_entries(start_time: str | None, end_time: str | None):
+    # start_time / end_time 已是 UTC ISO 8601（由前端组件或 LLM execute 层转换）
     results = repository.query_by_time_range(start_time, end_time)
     return results
 ```
 
 ### 查询流程
 
-1. 前端：传本地日期范围 `start_date=2026-07-01&end_date=2026-07-31`
-2. Service 层：调用 `build_utc_time_range()` 转换为 UTC 时间范围
-3. Repository 层：`WHERE created_at >= ? AND created_at <= ?`
-4. 数据库：扫描 `created_at` datetime 字段
+1. **前端**：组件内 `toISOStringUTC()` 将日期转为 UTC 时间范围，传 `start_time`/`end_time`（UTC ISO）
+2. **Service 层**：直接透传 UTC ISO 参数
+3. **Repository 层**：`WHERE event_time >= ? AND event_time < ?`
+4. **LLM Tool execute 层**：`local_to_utc_iso()` 将 Agent 的本地时间转 UTC ISO
 
-## 为什么是"已知限制"而非"bug"
+## 为什么曾经是"已知限制"
 
 ### 三类问题的性质对比
 
 | 对比项 | 自定义表迁移遗漏 | Timeline Custom Block | Mood/Custom Records |
 |--------|-----------------|----------------------|---------------------|
-| 问题性质 | **数据一致性 bug** | 代码 bug | 表设计限制 |
-| 表结构 | 动态表 `custom_<slug>` | `timeline_custom_block` | `mood_entries` / `custom_records_<type_id>` |
-| API 参数 | 无（迁移脚本内部） | 传日期 `date=2026-07-13` | 传日期范围 `start_date/end_date` |
-| 后端处理 | ❌ 迁移列表未包含动态表 | ❌ 直接拼接字符串 | ✅ 使用 `build_utc_time_range()` 转换 |
-| 数据后果 | ❌ 时间偏差 8 小时（数据错误） | ❌ 查询失败（查不到数据） | ✅ 查询正确，仅效率低 |
+| 问题性质 | **数据一致性 bug** | 代码 bug | 表设计限制 → ✅ 已修复 |
+| 表结构 | 动态表 `custom_<slug>` | `timeline_custom_block` | `mood_entries` / `custom_<slug>` |
+| API 参数 | 无（迁移脚本内部） | 传日期 `date=2026-07-13` | 传时间范围 `start_time/end_time`（UTC ISO） |
+| 后端处理 | ✅ m009 已补全迁移 | ✅ 已修复 | ✅ 使用 `event_time` 查询 |
+| 数据后果 | ✅ 已修复 | ✅ 已修复 | ✅ 已修复 |
 
 ### 性质判定
 
-- **自定义表迁移遗漏** 是 **数据一致性 bug**：m009 迁移脚本遗漏了动态表 `custom_<slug>`，导致自定义记录的时间比实际 UTC 时间早 8 小时。这属于**数据正确性问题**，应该修复。
+- **自定义表迁移遗漏** 是 **数据一致性 bug**：m009 迁移脚本遗漏了动态表 `custom_<slug>`，导致自定义记录的时间比实际 UTC 时间早 8 小时。已修复。
 
-- **Timeline Custom Block** 是 **代码 bug**：查询逻辑错误导致查询失败。
+- **Timeline Custom Block** 是 **代码 bug**：查询逻辑错误导致查询失败。已修复。
 
-- **Mood/Custom Records** 是 **设计限制**：代码逻辑正确，查询结果准确，但因为缺少独立 `date` 字段，无法优化查询性能。
+- **Mood/Custom Records** 是 **表设计限制**：缺少独立事件时间字段。已通过新增 `event_time` 字段修复。
 
 ## 影响
 
@@ -191,26 +178,19 @@ def get_entries(start_date: str, end_date: str):
    - 自定义记录列表中显示的时间会偏差 8 小时
    - 按时间排序时，新旧数据可能交错
 
-### Mood Entries / Custom Records 性能影响
+### Mood Entries / Custom Records 性能影响（已修复）
 
-1. **无法建立日期索引**：
-   - `created_at` 是完整时间戳，无法基于日期快速过滤
-   - 需要扫描时间范围内的所有记录
+1. **event_time 索引**：
+   - `event_time` 字段已有索引（`idx_mood_entries_event_time`）
+   - 查询效率与日期字段相当
 
-2. **时区转换开销**：
-   - 每次查询都需要调用 `build_utc_time_range()`
-   - 需要读取 `user_timezone` 配置
+2. **时区转换**：
+   - 前端组件内 `toISOStringUTC()` 就近转换
+   - LLM Tool execute 层 `local_to_utc_iso()` 转换
+   - Repository 层接收纯 UTC ISO，无需转换
 
-3. **聚合统计效率低**：
-   - 按日期分组统计时，需要在应用层转换时间
-   - 无法利用数据库的 `DATE()` 函数
-
-### 功能影响
-
-- ✅ 查询功能正常（结果正确）
-- ✅ 时区处理正确
-- ⚠️ 大数据量时查询较慢
-- ⚠️ 按日期聚合时需要额外转换
+3. **聚合统计**：
+   - 前端使用 `new Date(entry.event_time)` 获取本地日期进行分组
 
 ## 理想设计
 
@@ -300,16 +280,13 @@ CREATE TABLE mood_entries (
 
 ## 决策记录
 
-### Mood Entries / Custom Records（缺少日期字段）
+### Mood Entries（✅ 已修复）
 
 - **决策时间**: 2026-07-13
-- **决策者**: 架构评审
-- **决策内容**: 暂不修复，作为已知限制记录
-- **理由**:
-  1. 当前实现功能正确，无数据错误
-  2. 性能影响在可接受范围内
-  3. 添加 `date` 字段需要数据迁移，成本高
-  4. 优先修复 Custom Block 等有数据错误的 bug
+- **决策内容**: 已修复 — 新增 `event_time` 字段，替代 `created_at` 用于查询/排序
+- **修复**: m011 迁移 `ALTER TABLE mood_entries ADD COLUMN event_time TEXT` + 回填 `event_time = created_at`
+- **数据流**: 前端 `event_time` → `new Date()` 本地时间显示；LLM Agent 本地 `YYYY-MM-DD HH:MM:SS` → execute 层 `local_to_utc_iso()` → UTC ISO 存储
+- **决策依据**: `docs/adr/2026-07-13-custom-records-time-string-not-convert.md`（同样设计原则）
 
 ### 自定义表 UTC 迁移遗漏（✅ 已修复）
 

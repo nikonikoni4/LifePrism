@@ -18,6 +18,7 @@ export interface MoodEntryItem {
   content: string | null;
   factors: string[];
   created_at: string;
+  event_time: string;
 }
 
 export interface MoodImpactItem {
@@ -66,6 +67,7 @@ export interface CreateMoodEntryRequest {
   mood_type_id: string;
   content?: string;
   factors?: string[];
+  event_time?: string;
 }
 
 export interface UpdateMoodEntryRequest {

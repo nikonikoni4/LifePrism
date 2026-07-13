@@ -66,21 +66,21 @@ class MoodAggregator:
             ) from e
 
     def get_mood_entries_with_types(
-        self, start_date: str | None = None, end_date: str | None = None
+        self, start_time: str | None = None, end_time: str | None = None
     ) -> list[dict[str, Any]]:
         """
         获取心情条目列表（每个包含类型信息）
 
         Args:
-            start_date: 开始日期 YYYY-MM-DD（可选）
-            end_date: 结束日期 YYYY-MM-DD（可选）
+            start_time: 开始时间 UTC ISO 8601（可选）
+            end_time: 结束时间 UTC ISO 8601（可选）
 
         Returns:
             List[Dict]: 包含类型信息的心情条目列表
         """
         try:
             # 获取心情条目列表
-            entries = self.entry_provider.get_mood_entries(start_date, end_date)
+            entries = self.entry_provider.get_mood_entries(start_time, end_time)
             if not entries:
                 return []
 
@@ -97,11 +97,11 @@ class MoodAggregator:
             return entries
         except Exception as e:
             logger.error(
-                "获取心情条目列表失败: start=%s, end=%s, error=%s", start_date, end_date, e
+                "获取心情条目列表失败: start=%s, end=%s, error=%s", start_time, end_time, e
             )
             raise DataAccessError(
                 message="获取心情条目列表失败",
-                details={"start_date": start_date, "end_date": end_date, "error": str(e)},
+                details={"start_time": start_time, "end_time": end_time, "error": str(e)},
                 cause=e,
             ) from e
 
@@ -135,21 +135,21 @@ class MoodAggregator:
             ) from e
 
     def get_mood_analysis_with_impacts(
-        self, start_date: str | None = None, end_date: str | None = None
+        self, start_time: str | None = None, end_time: str | None = None
     ) -> dict[str, Any]:
         """
         获取心情分析（包含影响因素）
 
         Args:
-            start_date: 开始日期 YYYY-MM-DD（可选）
-            end_date: 结束日期 YYYY-MM-DD（可选）
+            start_time: 开始时间 UTC ISO 8601（可选）
+            end_time: 结束时间 UTC ISO 8601（可选）
 
         Returns:
             Dict: 包含心情条目、类型、影响因素的分析数据
         """
         try:
             # 获取心情条目（带类型）
-            entries = self.get_mood_entries_with_types(start_date, end_date)
+            entries = self.get_mood_entries_with_types(start_time, end_time)
 
             # 获取所有影响因素
             impacts = self.impact_provider.get_mood_impacts()
@@ -161,16 +161,16 @@ class MoodAggregator:
                 "summary": {
                     "total_entries": len(entries),
                     "total_impacts": len(impacts),
-                    "date_range": {"start": start_date, "end": end_date},
+                    "time_range": {"start": start_time, "end": end_time},
                 },
             }
 
             return analysis
         except Exception as e:
-            logger.error("获取心情分析失败: start=%s, end=%s, error=%s", start_date, end_date, e)
+            logger.error("获取心情分析失败: start=%s, end=%s, error=%s", start_time, end_time, e)
             raise DataAccessError(
                 message="获取心情分析失败",
-                details={"start_date": start_date, "end_date": end_date, "error": str(e)},
+                details={"start_time": start_time, "end_time": end_time, "error": str(e)},
                 cause=e,
             ) from e
 

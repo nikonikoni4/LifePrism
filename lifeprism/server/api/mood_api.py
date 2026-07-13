@@ -101,11 +101,11 @@ async def delete_mood_impact(
 
 @router.get("/entries", response_model=MoodEntryListResponse, summary="获取心情记录列表")
 async def get_mood_entries(
-    start_date: str | None = Query(default=None, description="开始日期 YYYY-MM-DD"),
-    end_date: str | None = Query(default=None, description="结束日期 YYYY-MM-DD"),
+    start_time: str | None = Query(default=None, description="开始时间 UTC ISO 8601"),
+    end_time: str | None = Query(default=None, description="结束时间 UTC ISO 8601"),
 ):
-    """获取心情记录列表，支持日期范围过滤"""
-    return mood_service.get_mood_entries(start_date, end_date)
+    """获取心情记录列表，支持时间范围过滤"""
+    return mood_service.get_mood_entries(start_time, end_time)
 
 
 @router.get("/entries/{entry_id}", response_model=MoodEntryItem, summary="获取单条心情记录")

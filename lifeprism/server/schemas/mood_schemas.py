@@ -62,6 +62,7 @@ class MoodEntryItem(BaseModel):
     content: str | None = Field(default=None, description="用户输入的文字内容")
     factors: list[str] = Field(default=[], description="影响因素列表")
     created_at: str = Field(default="", description="创建时间")
+    event_time: str = Field(default="", description="事件时间（UTC ISO 8601）")
 
 
 class MoodEntryListResponse(BaseModel):
@@ -76,6 +77,7 @@ class CreateMoodEntryRequest(BaseModel):
     mood_type_id: str = Field(..., description="关联心情类型 ID")
     content: str | None = Field(default=None, description="用户输入的文字内容")
     factors: list[str] | None = Field(default=None, description="影响因素列表")
+    event_time: str | None = Field(default=None, description="事件时间（UTC ISO 8601），不传则使用当前时间")
 
 
 class UpdateMoodEntryRequest(BaseModel):

@@ -62,6 +62,7 @@ def _convert_to_mood_entry_item(item: dict) -> MoodEntryItem:
         content=item.get("content"),
         factors=_parse_factors(item.get("factors")),
         created_at=item.get("created_at", ""),
+        event_time=item.get("event_time", ""),
     )
 
 
@@ -162,19 +163,19 @@ def delete_mood_type(mood_type_id: str) -> bool:
 
 
 def get_mood_entries(
-    start_date: str | None = None, end_date: str | None = None
+    start_time: str | None = None, end_time: str | None = None
 ) -> MoodEntryListResponse:
     """
     获取心情记录列表
 
     Args:
-        start_date: 开始日期 YYYY-MM-DD（可选）
-        end_date: 结束日期 YYYY-MM-DD（可选）
+        start_time: 开始时间 UTC ISO 8601（可选）
+        end_time: 结束时间 UTC ISO 8601（可选）
 
     Returns:
         MoodEntryListResponse: 心情记录列表
     """
-    items = mood_repository.get_mood_entries(start_date, end_date)
+    items = mood_repository.get_mood_entries(start_time, end_time)
     return MoodEntryListResponse(items=[_convert_to_mood_entry_item(item) for item in items])
 
 
@@ -214,6 +215,8 @@ def create_mood_entry(request: CreateMoodEntryRequest) -> MoodEntryItem | None:
         "content": request.content,
         "factors": json.dumps(request.factors, ensure_ascii=False) if request.factors else None,
     }
+    if request.event_time:
+        data["event_time"] = request.event_time
     new_id = mood_repository.create_mood_entry(data)
     if not new_id:
         return None

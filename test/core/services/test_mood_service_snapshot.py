@@ -87,10 +87,10 @@ def test_get_mood_entries_snapshot(snapshot: SnapshotAssertion):
 
 
 def test_get_mood_entries_with_date_range_snapshot(snapshot: SnapshotAssertion):
-    """测试按日期范围获取心情记录"""
+    """测试按时间范围获取心情记录"""
     result = mood_service.get_mood_entries(
-        start_date="2026-01-01",
-        end_date="2026-12-31"
+        start_time="2026-01-01T00:00:00+00:00",
+        end_time="2026-12-31T23:59:59+00:00"
     )
     assert result == snapshot
 

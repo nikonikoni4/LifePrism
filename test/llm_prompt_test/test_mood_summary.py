@@ -57,7 +57,7 @@ class MoodSummaryTest(LLMTestBase):
         """格式化心情记录为 prompt 输入格式"""
         formatted_records = []
         for record in mood_data:
-            time = record.get("created_at", "未知时间")
+            time = record.get("event_time", "未知时间")
             score = record.get("score", "未知")
             content = record.get("content", "")
             factors = record.get("factors", [])
@@ -113,10 +113,10 @@ class MoodSummaryTest(LLMTestBase):
 
         date_groups = defaultdict(list)
         for record in mood_data:
-            created_at = record.get("created_at", "")
-            if created_at:
+            event_time = record.get("event_time", "")
+            if event_time:
                 # 提取日期部分 (YYYY-MM-DD)
-                date = created_at.split()[0]
+                date = event_time.split()[0]
                 date_groups[date].append(record)
 
         # 如果指定了 input_files，则只处理指定日期

@@ -80,10 +80,10 @@ export const MoodAPI = {
 
   // ==================== 心情记录 ====================
 
-  async getEntries(startDate?: string, endDate?: string): Promise<MoodEntryItem[]> {
+  async getEntries(startTime?: string, endTime?: string): Promise<MoodEntryItem[]> {
     const params = new URLSearchParams();
-    if (startDate) params.set('start_date', startDate);
-    if (endDate) params.set('end_date', endDate);
+    if (startTime) params.set('start_time', startTime);
+    if (endTime) params.set('end_time', endTime);
     const qs = params.toString();
     const res = await fetch(`${getApiBase()}/entries${qs ? `?${qs}` : ''}`);
     if (!res.ok) throw new Error(`获取心情记录失败: ${res.statusText}`);

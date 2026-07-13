@@ -16,6 +16,7 @@ from . import (
     m008_migrate_to_utc,
     m009_migrate_history_to_utc,
     m010_add_event_time,
+    m011_add_event_time_to_mood,
 )
 
 MIGRATIONS = [
@@ -29,4 +30,5 @@ MIGRATIONS = [
     m008_migrate_to_utc,
     m009_migrate_history_to_utc,
     m010_add_event_time,
+    m011_add_event_time_to_mood,
 ]

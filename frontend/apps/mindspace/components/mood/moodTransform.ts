@@ -31,7 +31,7 @@ export function toMoodEntryUI(
   return {
     ...entry,
     mood,
-    timestamp: new Date(entry.created_at),
+    timestamp: new Date(entry.event_time || entry.created_at),
     note: entry.content,
     impacts: entry.factors,
   };

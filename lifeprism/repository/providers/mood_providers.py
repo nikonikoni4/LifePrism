@@ -233,13 +233,13 @@ class MoodEntryProvider(LWBaseDataProvider):
 
     _TABLE_NAME = "mood_entries"
     _PRIMARY_KEY = "id"
-    _DATE_FIELD = None  # 没有独立的 date 字段，使用 created_at
+    _DATE_FIELD = None  # 没有独立的 date 字段，使用 event_time
     _TIME_FIELD = None
 
-    _FILTER_FIELDS: set[str] = {"id", "mood_type_id", "score", "content", "factors", "created_at"}
-    _ORDER_FIELDS: set[str] = {"id", "score", "created_at"}
-    _SELECT_FIELDS: set[str] = {"id", "mood_type_id", "score", "content", "factors", "created_at"}
-    _UPDATE_FIELDS: set[str] = {"mood_type_id", "score", "content", "factors"}
+    _FILTER_FIELDS: set[str] = {"id", "mood_type_id", "score", "content", "factors", "created_at", "event_time"}
+    _ORDER_FIELDS: set[str] = {"id", "score", "created_at", "event_time"}
+    _SELECT_FIELDS: set[str] = {"id", "mood_type_id", "score", "content", "factors", "created_at", "event_time"}
+    _UPDATE_FIELDS: set[str] = {"mood_type_id", "score", "content", "factors", "event_time"}
 
     def __init__(self, db_manager=None):
         super().__init__(db_manager)
@@ -276,11 +276,11 @@ class MoodEntryProvider(LWBaseDataProvider):
         self, start_time: str | None = None, end_time: str | None = None
     ) -> list[dict[str, Any]]:
         """
-        获取心情记录列表（按 created_at ASC 排序）
+        获取心情记录列表（按 event_time ASC 排序）
 
         Args:
-            start_time: 开始时间 YYYY-MM-DD HH:MM:SS（可选）
-            end_time: 结束时间 YYYY-MM-DD HH:MM:SS（可选，不包含此时刻）
+            start_time: 开始时间 UTC ISO 8601（可选）
+            end_time: 结束时间 UTC ISO 8601（可选，不包含此时刻）
 
         Returns:
             List[Dict]: 心情记录列表
@@ -295,13 +295,13 @@ class MoodEntryProvider(LWBaseDataProvider):
                 conditions = []
                 params = []
                 if start_time:
-                    conditions.append("created_at >= ?")
+                    conditions.append("event_time >= ?")
                     params.append(start_time)
                 if end_time:
-                    conditions.append("created_at < ?")
+                    conditions.append("event_time < ?")
                     params.append(end_time)
                 where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
-                cursor.execute(f"SELECT * FROM mood_entries{where} ORDER BY created_at ASC", params)
+                cursor.execute(f"SELECT * FROM mood_entries{where} ORDER BY event_time ASC", params)
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
         except Exception as e:
@@ -328,6 +328,7 @@ class MoodEntryProvider(LWBaseDataProvider):
 
         Args:
             data: 心情记录数据（需包含 mood_type_id, score）
+                event_time 可选，不传则使用当前 UTC 时间
 
         Returns:
             str: 新创建的 ID
@@ -346,6 +347,11 @@ class MoodEntryProvider(LWBaseDataProvider):
                 raise ValueError(f"Invalid insert fields: {invalid_fields}")
 
             insert_data.update(data)
+
+            # event_time 默认值（代码注入，不用 SQLite DEFAULT）
+            if not insert_data.get("event_time"):
+                insert_data["event_time"] = get_utc_now_iso()
+
             self._generic_insert(insert_data)
             logger.info("创建心情记录成功: %s", new_id)
             return new_id

@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -799,7 +800,7 @@ def query_user_mood(
         else:
             factors_str = ""
         formatted_result.append(
-            f"{idx}. {_utc_to_local(entry.get('created_at', ''))} 心情: {entry.get('score', 'N/A')}分\n"
+            f"{idx}. {_utc_to_local(entry.get('event_time', ''))} 心情: {entry.get('score', 'N/A')}分\n"
             f"   内容：{entry.get('content', '无') or '无'}\n"
             f"   影响因素: {factors_str if factors_str else '无'}"
         )
@@ -840,6 +841,10 @@ class UserMoodCreateTool(Tool):
                     "description": "可选，可多选，影响心情的因素列表",
                     "items": {"type": "string", "enum": self._get_factors()},
                 },
+                "event_time": {
+                    "type": "string",
+                    "description": "事件发生时间，格式 YYYY-MM-DD HH:MM:SS（本地时间）。不提供则默认当前时间",
+                },
             },
             "required": ["content", "mood_type_id"],
         }
@@ -864,6 +869,7 @@ class UserMoodCreateTool(Tool):
             content = kwargs.get("content", "")
             mood_type_id = kwargs.get("mood_type_id", "")
             factors = kwargs.get("factors")
+            event_time_raw = kwargs.get("event_time")
             if not mood_type_id:
                 return f"{ERROR}请输入心情类型ID"
 
@@ -873,7 +879,17 @@ class UserMoodCreateTool(Tool):
                 return f"{ERROR}心情类型ID {mood_type_id} 不存在"
             score = mood_type.get("score", 50)
 
-            return create_user_mood(content, score, mood_type_id, factors)
+            # event_time：Agent 提供本地 YYYY-MM-DD HH:MM:SS → 转 UTC ISO
+            # 不提供则使用 None，Repository 层默认当前 UTC 时间
+            event_time_utc = None
+            if event_time_raw:
+                if not isinstance(event_time_raw, str):
+                    return f"{ERROR}参数错误：event_time 必须是字符串"
+                if not re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$", event_time_raw):
+                    return f"{ERROR}参数格式错误：event_time 格式应为 YYYY-MM-DD HH:MM:SS，例如 2026-07-13 14:30:00"
+                event_time_utc = local_to_utc_iso(event_time_raw)
+
+            return create_user_mood(content, score, mood_type_id, factors, event_time_utc)
         except ValueError as e:
             return f"{ERROR}参数错误: {str(e)}"
         except Exception as e:
@@ -881,7 +897,8 @@ class UserMoodCreateTool(Tool):
 
 
 def create_user_mood(
-    content: str, score: int, mood_type_id: str, factors_raw: list[str] | None = None
+    content: str, score: int, mood_type_id: str, factors_raw: list[str] | None = None,
+    event_time: str | None = None,
 ) -> str:
     """
     创建用户心情记录。
@@ -890,6 +907,7 @@ def create_user_mood(
         score: 心情评分
         mood_type_id: 心情类型ID
         factors_raw: 可选，影响因素，格式：JSON字符串
+        event_time: 可选，事件时间（UTC ISO 8601），不提供则使用当前时间
     return:
         新创建的 ID
     """
@@ -901,6 +919,8 @@ def create_user_mood(
     }
     if factors_raw:
         data["factors"] = json.dumps(factors_raw)
+    if event_time:
+        data["event_time"] = event_time
     mood_id = mood_repository.create_mood_entry(data)
     return f"{SUCCESS}创建心情记录成功，ID: {mood_id}"
 
