@@ -1024,7 +1024,7 @@ MOOD_TYPES_CONFIG = {
     "table_constraints": [],
     "indexes": [],
     "timestamps": True,
-    "update_at": False,
+    "update_at": True,
 }
 
 # 心情记录表配置（Mind Space 心情模块）
@@ -1087,7 +1087,7 @@ MOOD_IMPACTS_CONFIG = {
     "table_constraints": [],
     "indexes": [],
     "timestamps": True,
-    "update_at": False,
+    "update_at": True,
 }
 
 
@@ -1277,7 +1277,7 @@ HABIT_CHECKINS_CONFIG = {
         {"name": "idx_checkins_habit_date", "columns": ["habit_id", "date"]},
     ],
     "timestamps": True,
-    "update_at": False,
+    "update_at": True,
 }
 
 HABIT_CHAINS_CONFIG = {
@@ -1430,7 +1430,7 @@ RAW_BEHAVIOR_ANALYSIS_CONFIG = {
         {"name": "idx_raw_behavior_time_range", "columns": ["start_time", "end_time"]},
     ],
     "timestamps": True,
-    "update_at": False,
+    "update_at": True,
 }
 
 BEHAVIOR_ANALYSIS_CONFIG = {
@@ -1555,7 +1555,7 @@ CUSTOM_RECORD_FIELDS_CONFIG = {
     "table_constraints": ["UNIQUE (type_id, field_key)"],
     "indexes": [],
     "timestamps": True,
-    "update_at": False,
+    "update_at": True,
 }
 
 
