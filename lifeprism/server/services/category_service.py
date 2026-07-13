@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from lifeprism.repository import (
     category_repository,
+    computer_usage_repository,
     map_cache_repository,
 )
 from lifeprism.server.providers import server_lw_data_provider
@@ -188,12 +189,12 @@ class CategoryService:
             include_app = include_options.include_app
             include_title = include_options.include_title
 
-            # 转换时间为字符串格式（UTC，用于 SQL 查询）
-            start_time_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
-            end_time_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
+            # 转换时间为 UTC ISO 格式（用于 SQL 查询）
+            start_time_str = start_time.isoformat()
+            end_time_str = end_time.isoformat()
 
             # 加载行为日志数据
-            behavior_df = self.server_lw_data_provider.load_user_app_behavior_log(
+            behavior_df = computer_usage_repository.load_user_app_behavior_log(
                 start_time=start_time_str, end_time=end_time_str
             )
 

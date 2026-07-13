@@ -341,8 +341,9 @@ class CustomRecordRepository:
         data_table = f"{self._DATA_TABLE_PREFIX}{t['slug']}"
         return t, data_table
 
-    def create_entry(self, type_id: str, data: dict[str, Any],
-                     event_time: str | None = None) -> str:
+    def create_entry(
+        self, type_id: str, data: dict[str, Any], event_time: str | None = None
+    ) -> str:
         """
         录入一条记录到 custom_<slug> 表
 

@@ -11,7 +11,7 @@ from typing import Literal
 
 import pandas as pd
 
-from lifeprism.repository import custom_block_repository
+from lifeprism.repository import computer_usage_repository
 from lifeprism.server.providers.category_color_provider import (
     color_manager,
     get_log_color,
@@ -101,7 +101,7 @@ def load_day_events(start_time: str, end_time: str) -> pd.DataFrame:
     Returns:
         pd.DataFrame: 预处理后的事件 DataFrame
     """
-    df = custom_block_repository.load_user_app_behavior_log(
+    df = computer_usage_repository.load_user_app_behavior_log(
         start_time=start_time, end_time=end_time
     )
 

@@ -5,6 +5,7 @@ Activity V2 Service 层 - 纯函数模块
 无状态缓存，每次调用直接访问 provider
 """
 
+from lifeprism.repository import computer_usage_repository
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.schemas.activity_schemas import (
     ActivityLogItem,
@@ -98,8 +99,8 @@ def get_activity_logs(
 
     Args:
         date: 查询日期 (YYYY-MM-DD 格式)，提供时查询整天数据
-        start_time: 开始时间 (YYYY-MM-DD HH:MM:SS 格式)
-        end_time: 结束时间 (YYYY-MM-DD HH:MM:SS 格式)
+        start_time: 开始时间 (UTC ISO 8601 格式)
+        end_time: 结束时间 (UTC ISO 8601 格式)
         device_filter: 设备过滤 (all/pc/mobile)，当前未使用
         category_id: 主分类ID筛选
         sub_category_id: 子分类ID筛选
@@ -116,8 +117,7 @@ def get_activity_logs(
     """
     # 通过 provider 的统一方法获取数据
     # sort_by 为 None 时使用默认值 start_time，避免 SQL 拼接出 uabl.None
-    logs, total = server_lw_data_provider.get_activity_logs(
-        date=date,
+    logs, total = computer_usage_repository.get_activity_logs(
         start_time=start_time,
         end_time=end_time,
         category_id=category_id,

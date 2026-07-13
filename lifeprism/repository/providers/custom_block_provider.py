@@ -11,6 +11,7 @@ from lifeprism.repository.base_providers import LWBaseDataProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
+from lifeprism.utils.time_utils import build_utc_time_range
 
 logger = get_logger(__name__)
 
@@ -328,7 +329,7 @@ class CustomBlockProvider(LWBaseDataProvider):
         """
         获取指定日期的时间线事件数据
 
-        内部调用基类 get_activity_logs，封装为 timeline 专用格式
+        内部调用 get_activity_logs，封装为 timeline 专用格式
 
         Args:
             date: str, 日期（YYYY-MM-DD 格式）
@@ -337,9 +338,11 @@ class CustomBlockProvider(LWBaseDataProvider):
         Returns:
             list[dict]: 事件列表
         """
-        # 调用基类方法
+        # 将本地日期转换为 UTC 时间范围
+        start_time, end_time = build_utc_time_range(date)
         logs, _ = self.get_activity_logs(
-            date=date,
+            start_time=start_time,
+            end_time=end_time,
             query_fields=[
                 "id",
                 "start_time",

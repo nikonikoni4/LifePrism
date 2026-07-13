@@ -46,3 +46,10 @@
 - path: `docs/coding-rules/create-table-rules.md`
 - 触发规则：创建新表，修改现有的`lifeprism/repository/provider`和`lifeprism/repository/aggregators`下的文件时阅读
 - 内容摘要：创建新表，新repository.provider和新aggregators时阅读
+
+## repository-module-rules.md
+
+- updated_at: 2026-07-13
+- path: `docs/coding-rules/repository-module-rules.md`
+- 触发规则：编写、修改或重构 `lifeprism/repository/` 模块下的 Provider、Aggregator 或 `__init__.py` 导出时阅读
+- 内容摘要：Repository 数据访问层编码规则，覆盖三层架构（base_providers → providers/aggregators → __init__.py）、Provider 继承体系与元数据驱动 CRUD、Aggregator 组合模式（内部创建 Provider 实例禁止引入全局单例）、统一 `xxx_repository` 导出规范、LazySingleton 实例化策略、导入纪律（外部只能从 `lifeprism.repository` 导入）、时间处理规则（调用方边界处 date→UTC，Repository 层不收 date 参数）、常见反模式清单

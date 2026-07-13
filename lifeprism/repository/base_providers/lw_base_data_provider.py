@@ -148,9 +148,8 @@ class LWBaseDataProvider:
 
     def get_activity_logs(
         self,
-        date: str | None = None,
-        start_time: str | None = None,
-        end_time: str | None = None,
+        start_time: str,
+        end_time: str,
         category_id: str | None = None,
         sub_category_id: str | None = None,
         query_fields: list[str] | None = None,
@@ -162,12 +161,11 @@ class LWBaseDataProvider:
         """
         统一的活动日志查询方法
 
-        支持按日期或时间范围查询，支持分类过滤和分页，支持自定义返回字段
+        查询 user_app_behavior_log 表，支持时间范围查询、分类过滤和分页
 
         Args:
-            date: 查询日期 (YYYY-MM-DD 格式)，会自动设置 start_time 和 end_time 为当天范围
-            start_time: 开始时间 (YYYY-MM-DD HH:MM:SS 格式)
-            end_time: 结束时间 (YYYY-MM-DD HH:MM:SS 格式)
+            start_time: 开始时间（UTC ISO 8601 格式，如 2026-07-12T16:00:00.000000+00:00）
+            end_time: 结束时间（UTC ISO 8601 格式）
             category_id: 主分类ID筛选（可选）
             sub_category_id: 子分类ID筛选（可选）
             query_fields: 要查询的字段列表（可选，默认返回常用字段）
@@ -184,16 +182,9 @@ class LWBaseDataProvider:
         """
         from lifeprism.config.database import get_table_columns
 
-        # 1. 确定时间范围
-        if date:
-            self.current_date = date
-            query_start_time = self._start_time
-            query_end_time = self._end_time
-        elif start_time and end_time:
-            query_start_time = start_time
-            query_end_time = end_time
-        else:
-            raise ValueError("必须提供 date 或 (start_time 和 end_time)")
+        # 1. 使用调用方传入的 UTC 时间范围
+        query_start_time = start_time
+        query_end_time = end_time
 
         # 2. 验证并构建查询字段
         valid_columns = get_table_columns("user_app_behavior_log")
@@ -742,8 +733,8 @@ class LWBaseDataProvider:
         从 user_app_behavior_log 表加载数据
 
         Args:
-            start_time: 开始时间（可选），格式：'YYYY-MM-DD HH:MM:SS'
-            end_time: 结束时间（可选）
+            start_time: 开始时间（可选），UTC ISO 8601 格式
+            end_time: 结束时间（可选），UTC ISO 8601 格式
             app_filter: 应用过滤（可选）
 
         Returns:
@@ -1400,6 +1391,9 @@ class LWBaseDataProvider:
 
 
 if __name__ == "__main__":
+    from lifeprism.utils.time_utils import build_utc_time_range
+
     lw_base_data_provider = LWBaseDataProvider()
-    data = lw_base_data_provider.get_activity_logs(date="2025-12-31")[0][:10]
+    start_time, end_time = build_utc_time_range("2025-12-31")
+    data = lw_base_data_provider.get_activity_logs(start_time=start_time, end_time=end_time)[0][:10]
     print(data)

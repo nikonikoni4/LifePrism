@@ -17,8 +17,7 @@ import pandas as pd
 import pytz
 
 from lifeprism.config import get_user_timezone, settings
-from lifeprism.repository import goal_repository, todo_repository
-from lifeprism.server.providers import server_lw_data_provider
+from lifeprism.repository import computer_usage_repository, goal_repository, todo_repository
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
 from lifeprism.server.providers.report_provider import (
     comparison_data_provider,
@@ -566,7 +565,7 @@ def _calc_sunburst_data(
     try:
         # 将本地日期转为 UTC ISO 时间范围
         start_time, end_time = _build_utc_time_range(start_date, end_date)
-        df = server_lw_data_provider.load_user_app_behavior_log(
+        df = computer_usage_repository.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time
         )
 
@@ -780,7 +779,7 @@ def _calc_goal_time_invested(goal_id: str, start_date: str, end_date: str) -> in
     try:
         start_time, end_time = _build_utc_time_range(start_date, end_date)
 
-        df = server_lw_data_provider.load_user_app_behavior_log(
+        df = computer_usage_repository.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time
         )
 
@@ -821,7 +820,7 @@ def _calc_hourly_trend(date: str) -> list[dict[str, Any]]:
     try:
         start_time, end_time = _build_utc_time_range(date, date)
 
-        df = server_lw_data_provider.load_user_app_behavior_log(
+        df = computer_usage_repository.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time
         )
 
@@ -895,7 +894,7 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
     try:
         start_time, end_time = _build_utc_time_range(start_date, end_date)
 
-        df = server_lw_data_provider.load_user_app_behavior_log(
+        df = computer_usage_repository.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time
         )
 
@@ -968,7 +967,7 @@ def _calc_monthly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
     try:
         start_time, end_time = _build_utc_time_range(start_date, end_date)
 
-        df = server_lw_data_provider.load_user_app_behavior_log(
+        df = computer_usage_repository.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time
         )
 
@@ -1042,7 +1041,7 @@ def _calc_heatmap_data(start_date: str, end_date: str) -> list[HeatmapDataItem]:
     try:
         start_time, end_time = _build_utc_time_range(start_date, end_date)
 
-        df = server_lw_data_provider.load_user_app_behavior_log(
+        df = computer_usage_repository.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time
         )
 

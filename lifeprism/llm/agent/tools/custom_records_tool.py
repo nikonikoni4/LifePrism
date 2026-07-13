@@ -200,13 +200,16 @@ class CreateCustomRecordEntryTool(Tool):
                 return f"{ERROR}参数错误：event_time 必须是字符串"
             # 格式校验
             import re
-            if not re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$', event_time_raw):
+
+            if not re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$", event_time_raw):
                 return f"{ERROR}参数格式错误：event_time 格式应为 YYYY-MM-DD HH:MM:SS，例如 2026-07-13 14:30:00"
             event_time_utc = local_to_utc_iso(event_time_raw)
 
         try:
             entry_id = custom_record_repository.create_entry(
-                type_id=type_id, data=data, event_time=event_time_utc,
+                type_id=type_id,
+                data=data,
+                event_time=event_time_utc,
             )
             result = {"entry_id": entry_id, "type_id": type_id}
             return f"{SUCCESS}录入自定义记录成功: {json.dumps(result, ensure_ascii=False)}"

@@ -22,10 +22,10 @@ from lifeprism.llm.exceptions import LLMOutputParseError, LLMResponseError
 from lifeprism.llm.prompts import Prompts, prompt_loader
 from lifeprism.llm.utils.parse_utils import extract_json_from_response
 from lifeprism.repository import (
-    LWBaseDataProvider,
     QueryOptions,
     behavior_analysis_repository,
     category_repository,
+    computer_usage_repository,
     map_cache_repository,
     raw_behavior_analysis_repository,
     screen_capture_repository,
@@ -452,8 +452,8 @@ async def screenshot_analysis(
     4. 调用 LLM 分析截图语义
 
     Args:
-        start_time: 开始时间（YYYY-MM-DD HH:MM:SS 格式）
-        end_time: 结束时间（YYYY-MM-DD HH:MM:SS 格式）
+        start_time: 开始时间（UTC ISO 8601 格式）
+        end_time: 结束时间（UTC ISO 8601 格式）
         todolist: 用户目标列表文本
         density_threshold: 密度阈值（默认 0.6）
         min_duration_minutes: 最小时长（默认 6 分钟）
@@ -477,8 +477,9 @@ async def screenshot_analysis(
     )
 
     # Step 1: 查询活动日志
-    provider = LWBaseDataProvider()
-    logs, total = provider.get_activity_logs(start_time=start_time, end_time=end_time)
+    logs, total = computer_usage_repository.get_activity_logs(
+        start_time=start_time, end_time=end_time
+    )
     logger.info("查询到 %s 条行为记录", total)
 
     adapted_logs = []

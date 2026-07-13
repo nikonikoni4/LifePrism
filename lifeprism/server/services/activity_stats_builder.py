@@ -12,6 +12,7 @@ import pandas as pd
 import pytz
 
 from lifeprism.config import get_user_timezone
+from lifeprism.repository import computer_usage_repository
 from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
 from lifeprism.server.schemas.activity_schemas import (
@@ -202,7 +203,7 @@ def build_time_overview(date: str) -> TimeOverviewData:
     """
     # 1. 加载数据（将本地日期转换为 UTC ISO 8601 时间范围，符合 time-handling-rules 规则 3.7）
     start_time, end_time = build_utc_time_range(date)
-    df = server_lw_data_provider.load_user_app_behavior_log(
+    df = computer_usage_repository.load_user_app_behavior_log(
         start_time=start_time, end_time=end_time
     )
 

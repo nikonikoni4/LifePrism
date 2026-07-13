@@ -7,6 +7,8 @@ Computer Usage Aggregator - 计算机使用数据聚合层
 
 from typing import Any
 
+import pandas as pd
+
 from lifeprism.repository.providers.category_provider import CategoryProvider, SubCategoryProvider
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.repository.providers.computer_usage_provider import ComputerUsageProvider
@@ -130,3 +132,38 @@ class ComputerUsageAggregator:
     def delete_computer_usage(self, record_id: str) -> bool:
         """透传：删除记录"""
         return self.computer_usage_provider.delete_computer_usage(record_id)
+
+    # ==================== 透传 Base 方法 ====================
+
+    def get_activity_logs(
+        self,
+        start_time: str,
+        end_time: str,
+        category_id: str | None = None,
+        sub_category_id: str | None = None,
+        query_fields: list[str] | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+        order_by: str = "start_time",
+        order_desc: bool = True,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """透传：统一的活动日志查询"""
+        return self.computer_usage_provider.get_activity_logs(
+            start_time=start_time,
+            end_time=end_time,
+            category_id=category_id,
+            sub_category_id=sub_category_id,
+            query_fields=query_fields,
+            page=page,
+            page_size=page_size,
+            order_by=order_by,
+            order_desc=order_desc,
+        )
+
+    def load_user_app_behavior_log(
+        self, start_time: str = None, end_time: str = None, app_filter: str = None
+    ) -> pd.DataFrame | None:
+        """透传：从 user_app_behavior_log 表加载数据"""
+        return self.computer_usage_provider.load_user_app_behavior_log(
+            start_time=start_time, end_time=end_time, app_filter=app_filter
+        )
