@@ -10,6 +10,7 @@ import { analyzeCardLayout } from '../utils/cardLayoutEngine';
 import type { Overrides } from '../utils/cardLayoutEngine';
 import { getFieldColor } from '../utils/fieldColors';
 import { getTemplatePreset } from '../utils/templatePresets';
+import { parseISOString, toLocalDateTimeString } from '../../../core/utils/dateUtils';
 import type { FieldDefinition, CustomRecordEntryItem } from '../types';
 
 interface EntryCardProps {
@@ -27,8 +28,7 @@ const LAYOUT_LABELS: Record<string, string> = {
 
 const formatDate = (dateStr: string): string => {
   if (!dateStr) return '';
-  const dt = dateStr.replace('T', ' ');
-  return dt.slice(0, 16);
+  return toLocalDateTimeString(parseISOString(dateStr)).replace('T', ' ').slice(0, 16);
 };
 
 export const EntryCard: React.FC<EntryCardProps> = ({
@@ -66,7 +66,7 @@ export const EntryCard: React.FC<EntryCardProps> = ({
           <div className="flex items-center gap-2">
             <Clock size={12} className="opacity-30" />
             <span className={`text-[11px] opacity-50 font-mono`}>
-              {formatDate(entry.created_at)}
+              {formatDate(entry.event_time)}
             </span>
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${tpl.chipClass}`}>
               {layoutLabel}

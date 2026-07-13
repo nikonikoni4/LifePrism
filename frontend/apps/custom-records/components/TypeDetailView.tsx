@@ -425,7 +425,7 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
                       {f.field_name}
                     </th>
                   ))}
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">创建时间</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">事件时间</th>
                   <th className="px-5 py-3.5 w-12"></th>
                 </tr>
               </thead>
