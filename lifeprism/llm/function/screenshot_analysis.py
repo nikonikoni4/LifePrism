@@ -13,7 +13,7 @@ import asyncio
 import base64
 import json
 import mimetypes
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 from lifeprism.config import settings
@@ -31,7 +31,7 @@ from lifeprism.repository import (
     screen_capture_repository,
 )
 from lifeprism.utils import get_logger
-from lifeprism.utils.time_utils import utc_to_local_display
+from lifeprism.utils.time_utils import parse_iso_to_aware, utc_to_local_display
 
 logger = get_logger(__name__)
 # logger.setLevel(DEBUG)
@@ -65,8 +65,8 @@ def split_segment_into_chunks(segment: dict[str, str], chunk_minutes: int) -> li
     Returns:
         List[Dict[str, str]]: chunk 列表，每项包含 start 和 end
     """
-    start_dt = datetime.fromisoformat(segment["start"])
-    end_dt = datetime.fromisoformat(segment["end"])
+    start_dt = parse_iso_to_aware(segment["start"])
+    end_dt = parse_iso_to_aware(segment["end"])
     chunk_delta = timedelta(minutes=chunk_minutes)
 
     chunks = []
@@ -564,8 +564,8 @@ async def _behavior_summary(
     """
     对输入的行为内容进行总结
     args ：
-        start_time : 开始时间（YYYY-MM-DD HH:MM:SS 格式）
-        end_time : 结束时间（YYYY-MM-DD HH:MM:SS 格式）
+        start_time : 开始时间（UTC ISO 8601 格式，写入数据库时间戳字段）
+        end_time : 结束时间（UTC ISO 8601 格式，写入数据库时间戳字段）
         screen_count : 截图数量
         todolist : 用户今日目标文本（可选）
         behavior : 输入的行为
@@ -733,7 +733,7 @@ if __name__ == "__main__":
 
         """测试单个 chunk 的 LLM 分析，验证 _clean_llm_response 过滤问题"""
         # 使用日志中有截图但 behavior=None 的时间段
-        chunk = {"start": "2026-05-24T00:15:25", "end": "2026-05-24T00:25:25"}
+        chunk = {"start": "2026-05-24T00:15:25+00:00", "end": "2026-05-24T00:25:25+00:00"}
 
         # 获取该时间段的截图
         screenshots = get_active_screenshots(chunk["start"], chunk["end"])

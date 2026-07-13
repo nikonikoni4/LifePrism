@@ -25,9 +25,7 @@ def check_if_applied(cursor) -> bool:
 
 
 def upgrade(cursor) -> None:
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='mood_entries'"
-    )
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mood_entries'")
     if not cursor.fetchone():
         logger.info("m011: mood_entries 表不存在，跳过")
         return

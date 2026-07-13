@@ -1048,7 +1048,11 @@ MOOD_ENTRIES_CONFIG = {
         },
         "content": {"type": "TEXT", "constraints": [], "comment": "用户输入的文字内容（可为空）"},
         "factors": {"type": "TEXT", "constraints": [], "comment": "JSON 数组，影响心情的 tag 列表"},
-        "event_time": {"type": "TEXT", "constraints": [], "comment": "事件时间（UTC ISO 8601），Agent 可控，替代 created_at 用于查询/排序"},
+        "event_time": {
+            "type": "TEXT",
+            "constraints": [],
+            "comment": "事件时间（UTC ISO 8601），Agent 可控，替代 created_at 用于查询/排序",
+        },
     },
     "table_constraints": [],
     "indexes": [

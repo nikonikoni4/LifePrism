@@ -236,9 +236,25 @@ class MoodEntryProvider(LWBaseDataProvider):
     _DATE_FIELD = None  # 没有独立的 date 字段，使用 event_time
     _TIME_FIELD = None
 
-    _FILTER_FIELDS: set[str] = {"id", "mood_type_id", "score", "content", "factors", "created_at", "event_time"}
+    _FILTER_FIELDS: set[str] = {
+        "id",
+        "mood_type_id",
+        "score",
+        "content",
+        "factors",
+        "created_at",
+        "event_time",
+    }
     _ORDER_FIELDS: set[str] = {"id", "score", "created_at", "event_time"}
-    _SELECT_FIELDS: set[str] = {"id", "mood_type_id", "score", "content", "factors", "created_at", "event_time"}
+    _SELECT_FIELDS: set[str] = {
+        "id",
+        "mood_type_id",
+        "score",
+        "content",
+        "factors",
+        "created_at",
+        "event_time",
+    }
     _UPDATE_FIELDS: set[str] = {"mood_type_id", "score", "content", "factors", "event_time"}
 
     def __init__(self, db_manager=None):

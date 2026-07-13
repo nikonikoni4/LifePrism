@@ -897,7 +897,10 @@ class UserMoodCreateTool(Tool):
 
 
 def create_user_mood(
-    content: str, score: int, mood_type_id: str, factors_raw: list[str] | None = None,
+    content: str,
+    score: int,
+    mood_type_id: str,
+    factors_raw: list[str] | None = None,
     event_time: str | None = None,
 ) -> str:
     """
