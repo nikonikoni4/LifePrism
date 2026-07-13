@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, Trash2, ChevronLeft, ChevronRight, Loader2, Edit3, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { CategoryTreeItem, ActivityLogItem } from '../../../../../core/types/common-components';
 import { ActivityLogsAPI } from '../../../../../core/services/commonApi';
+import { toISOStringUTC } from '../../../../../core/utils/dateUtils';
 
 // 排序字段类型
 type SortField = 'duration' | 'timestamp';
@@ -83,16 +84,17 @@ const DataReviewTab: React.FC<DataReviewTabProps> = ({ categories }) => {
             setError(null);
 
             try {
-                // 构建时间范围参数
-                const startTime = `${dateRange.start} 00:00:00`;
-                const endTime = `${dateRange.end} 23:59:59`;
+                // 构建时间范围参数（本地日期 → UTC ISO 8601）
+                // 符合 time-handling-rules 组件内转换原则
+                const startOfDay = new Date(`${dateRange.start}T00:00:00`);
+                const endOfDay = new Date(`${dateRange.end}T23:59:59.999`);
 
                 // 将前端排序字段映射到后端字段
                 const backendSortBy = sortBy === 'timestamp' ? 'start_time' : sortBy;
 
                 const response = await ActivityLogsAPI.getLogs({
-                    start_time: startTime,
-                    end_time: endTime,
+                    start_time: toISOStringUTC(startOfDay),
+                    end_time: toISOStringUTC(endOfDay),
                     page: currentPage,
                     page_size: pageSize,
                     sort_by: backendSortBy,

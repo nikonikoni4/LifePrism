@@ -92,13 +92,13 @@ async def get_activity_stats(
 async def get_activity_logs(
     start_time: str = Query(
         ...,
-        description="开始时间 (YYYY-MM-DD HH:MM:SS 格式)",
-        pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$",
+        description="开始时间 (UTC ISO 8601 格式，如 2026-07-13T00:00:00+00:00)",
+        pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$",
     ),
     end_time: str = Query(
         ...,
-        description="结束时间 (YYYY-MM-DD HH:MM:SS 格式)",
-        pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$",
+        description="结束时间 (UTC ISO 8601 格式，如 2026-07-13T23:59:59+00:00)",
+        pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$",
     ),
     device_filter: str = Query("all", description="设备过滤：all/pc/mobile"),
     category_id: str | None = Query(None, description="主分类ID筛选（可选）"),
@@ -120,6 +120,10 @@ async def get_activity_logs(
     **返回数据：**
     - 活动事件列表（包含时间、应用、标题、分类ID等）
 
+    **时间格式：**
+    - start_time / end_time 使用 UTC ISO 8601 格式（带时区标识）
+    - 前端应将本地时间转换为 UTC ISO 8601 后发送，符合 time-handling-rules 组件内转换原则
+
     **颜色说明：**
     - 本接口只返回 category_id，不返回颜色值
     - Timeline 非缩略图模式的分类颜色由前端自行计算
@@ -127,8 +131,8 @@ async def get_activity_logs(
     - @see frontend/page/timeline/Timeline.tsx 中的 TAILWIND_500_TO_300 映射表
 
     **示例：**
-    - `/api/v2/activity/logs?start_time=2025-12-19 00:00:00&end_time=2025-12-19 23:59:59`
-    - `/api/v2/activity/logs?start_time=2025-12-18 00:00:00&end_time=2025-12-20 23:59:59&sort_by=start_time&sort_order=asc`
+    - `/api/v2/activity/logs?start_time=2026-07-13T00:00:00%2B00:00&end_time=2026-07-13T23:59:59%2B00:00`
+    - `/api/v2/activity/logs?start_time=2026-07-13T00:00:00Z&end_time=2026-07-13T23:59:59Z&sort_by=start_time&sort_order=asc`
     """
     try:
         return activity_service.get_activity_logs(

@@ -176,12 +176,18 @@ class ServerLWDataProvider(LWBaseDataProvider):
     def get_range_active_time(self, start_date: str, end_date: str) -> int:
         """
         获取指定日期范围的活跃时长
-        arg:
-            start_date: str, 开始日期（YYYY-MM-DD 格式）
-            end_date: str, 结束日期（YYYY-MM-DD 格式）
-        return
+
+        Args:
+            start_date: 本地开始日期（YYYY-MM-DD 格式）
+            end_date: 本地结束日期（YYYY-MM-DD 格式）
+
+        Returns:
             int, 活跃时长（秒）
         """
+        # 将本地日期范围转换为 UTC ISO 8601 时间范围
+        start_utc, _ = build_utc_time_range(start_date)
+        _, end_utc = build_utc_time_range(end_date)
+
         sql = """
         SELECT SUM(duration) as total_duration
         FROM user_app_behavior_log
@@ -189,7 +195,7 @@ class ServerLWDataProvider(LWBaseDataProvider):
         """
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (start_date, end_date))
+            cursor.execute(sql, (start_utc, end_utc))
             result = cursor.fetchone()
         return result[0] if result[0] else 0
 
@@ -208,9 +214,13 @@ class ServerLWDataProvider(LWBaseDataProvider):
                 date: str, 日期（YYYY-MM-DD 格式）
                 active_time_percentage: int, 活动时长占比（%）
         """
+        # 将本地日期范围转换为 UTC ISO 8601 时间范围
+        start_utc, _ = build_utc_time_range(start_date)
+        _, end_utc = build_utc_time_range(end_date)
+
         # 构建动态SQL查询
         where_conditions = ["start_time >= ?", "start_time <= ?"]
-        params = [start_date, end_date]
+        params = [start_utc, end_utc]
 
         if category_id:
             where_conditions.append("category_id = ?")
@@ -220,28 +230,41 @@ class ServerLWDataProvider(LWBaseDataProvider):
             where_conditions.append("sub_category_id = ?")
             params.append(sub_category_id)
 
+        # 不在 SQL 中按 DATE(start_time) 分组（会按 UTC 日期分组导致跨时区错位），
+        # 而是查出原始数据后在 Python 层按本地日期分组。
         sql = f"""
         SELECT
-            DATE(start_time) as activity_date,
-            SUM(duration) as total_duration,
-            CAST((SUM(duration) * 100.0 / 86400) AS INTEGER) as active_time_percentage
+            start_time,
+            duration
         FROM user_app_behavior_log
         WHERE {" AND ".join(where_conditions)}
-        GROUP BY DATE(start_time)
-        ORDER BY activity_date
+        ORDER BY start_time
         """
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(sql, params)
             results = cursor.fetchall()
 
-        # 转换为响应格式
-        daily_activities = []
+        # 按本地日期分组聚合
+        daily_durations: dict[str, int] = {}
         for row in results:
+            start_time_iso = row[0]
+            duration = row[1] if row[1] is not None else 0
+            try:
+                local_date = utc_to_local_display(start_time_iso)[:10]
+            except (ValueError, TypeError):
+                continue
+            daily_durations[local_date] = daily_durations.get(local_date, 0) + duration
+
+        # 转换为响应格式并计算百分比
+        daily_activities = []
+        for local_date, total_duration in sorted(daily_durations.items()):
+            # 按当天总秒数 86400 计算占比
+            active_time_percentage = int(total_duration * 100 / 86400) if total_duration > 0 else 0
             daily_activities.append(
                 {
-                    "date": row[0],
-                    "active_time_percentage": row[2],  # 直接使用计算好的百分比
+                    "date": local_date,
+                    "active_time_percentage": active_time_percentage,
                 }
             )
 
@@ -636,14 +659,15 @@ class ServerLWDataProvider(LWBaseDataProvider):
                     }
                 }
         """
-        # 1. 确定时间范围
+        # 1. 确定时间范围（转为 UTC 查询时间戳字段）
         params = []
         where_conditions = []
 
         if date:
-            self.current_date = date
+            # 将本地日期转换为 UTC ISO 8601 时间范围
+            query_start_time, query_end_time = build_utc_time_range(date)
             where_conditions.append("created_at >= ? AND created_at <= ?")
-            params.extend([self._start_time, self._end_time])
+            params.extend([query_start_time, query_end_time])
         elif start_time and end_time:
             where_conditions.append("created_at >= ? AND created_at <= ?")
             params.extend([start_time, end_time])

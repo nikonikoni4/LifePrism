@@ -254,12 +254,13 @@ class CustomBlockProvider(LWBaseDataProvider):
     # WAID 累计时长查询（保留业务逻辑方法）
     # ============================================================================
 
-    def get_duration_by_todo(self, todo_id: str, date: str) -> int:
-        """查询指定 todo 在指定日期的累计时长（分钟）
+    def get_duration_by_todo(self, todo_id: str, start_time: str, end_time: str) -> int:
+        """查询指定 todo 在指定时间范围的累计时长（分钟）
 
         Args:
             todo_id: 待办事项 ID
-            date: 日期（YYYY-MM-DD 格式）
+            start_time: 开始时间（ISO 8601 UTC 格式）
+            end_time: 结束时间（ISO 8601 UTC 格式）
 
         Returns:
             int: 累计时长（分钟），无记录返回 0
@@ -268,26 +269,27 @@ class CustomBlockProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            start_of_day = f"{date} 00:00:00"
-            end_of_day = f"{date} 23:59:59"
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     f"""SELECT COALESCE(SUM(duration), 0) FROM {self._TABLE_NAME}
                        WHERE todo_id = ? AND start_time >= ? AND start_time <= ?""",
-                    (todo_id, start_of_day, end_of_day),
+                    (todo_id, start_time, end_time),
                 )
                 return cursor.fetchone()[0]
         except Exception as e:
             logger.error("查询 todo %s 累计时长失败: %s", todo_id, e)
             raise DataAccessError(f"查询 todo {todo_id} 累计时长失败") from e
 
-    def batch_get_duration_by_todos(self, todo_ids: list[str], date: str) -> dict[str, int]:
-        """批量查询多个 todo 在指定日期的累计时长
+    def batch_get_duration_by_todos(
+        self, todo_ids: list[str], start_time: str, end_time: str
+    ) -> dict[str, int]:
+        """批量查询多个 todo 在指定时间范围的累计时长
 
         Args:
             todo_ids: 待办事项 ID 列表
-            date: 日期（YYYY-MM-DD 格式）
+            start_time: 开始时间（ISO 8601 UTC 格式）
+            end_time: 结束时间（ISO 8601 UTC 格式）
 
         Returns:
             dict: {todo_id: 累计分钟数}
@@ -298,8 +300,6 @@ class CustomBlockProvider(LWBaseDataProvider):
         if not todo_ids:
             return {}
         try:
-            start_of_day = f"{date} 00:00:00"
-            end_of_day = f"{date} 23:59:59"
             placeholders = ",".join("?" * len(todo_ids))
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
@@ -309,7 +309,7 @@ class CustomBlockProvider(LWBaseDataProvider):
                         WHERE todo_id IN ({placeholders})
                           AND start_time >= ? AND start_time <= ?
                         GROUP BY todo_id""",
-                    (*todo_ids, start_of_day, end_of_day),
+                    (*todo_ids, start_time, end_time),
                 )
                 result = {row[0]: row[1] for row in cursor.fetchall()}
                 for tid in todo_ids:

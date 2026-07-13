@@ -115,13 +115,14 @@ def get_activity_logs(
         必须提供 date 或 (start_time 和 end_time) 之一
     """
     # 通过 provider 的统一方法获取数据
+    # sort_by 为 None 时使用默认值 start_time，避免 SQL 拼接出 uabl.None
     logs, total = server_lw_data_provider.get_activity_logs(
         date=date,
         start_time=start_time,
         end_time=end_time,
         category_id=category_id,
         sub_category_id=sub_category_id,
-        order_by=sort_by,
+        order_by=sort_by or "start_time",
         order_desc=(sort_order == "desc"),
         page=page,
         page_size=page_size,

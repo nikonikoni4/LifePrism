@@ -120,7 +120,7 @@ def _add_local_date_column(df: pd.DataFrame, time_col: str = "start_time") -> pd
     local_tz = pytz.timezone(get_user_timezone())
     # 解析时间戳并标记为 UTC，然后转为本地时区，最后提取日期
     df = df.copy()
-    utc_times = pd.to_datetime(df[time_col], utc=True, errors="coerce")
+    utc_times = pd.to_datetime(df[time_col], format="ISO8601", utc=True, errors="coerce")
     local_times = utc_times.dt.tz_convert(local_tz)
     df["local_date"] = local_times.dt.strftime("%Y-%m-%d")
     # NaT 转为空字符串
@@ -574,8 +574,8 @@ def _calc_sunburst_data(
             return _build_empty_sunburst(start_date, end_date, title, total_range_minutes)
 
         # 预计算时长（分钟）
-        df["start_dt"] = pd.to_datetime(df["start_time"])
-        df["end_dt"] = pd.to_datetime(df["end_time"])
+        df["start_dt"] = pd.to_datetime(df["start_time"], format="ISO8601", utc=True)
+        df["end_dt"] = pd.to_datetime(df["end_time"], format="ISO8601", utc=True)
         df["duration_minutes"] = (df["end_dt"] - df["start_dt"]).dt.total_seconds() / 60
 
         # 获取分类名称映射（使用 CategoryService 缓存）
@@ -795,8 +795,8 @@ def _calc_goal_time_invested(goal_id: str, start_date: str, end_date: str) -> in
 
         # 计算时长
         goal_df = goal_df.copy()
-        goal_df["start_dt"] = pd.to_datetime(goal_df["start_time"])
-        goal_df["end_dt"] = pd.to_datetime(goal_df["end_time"])
+        goal_df["start_dt"] = pd.to_datetime(goal_df["start_time"], format="ISO8601", utc=True)
+        goal_df["end_dt"] = pd.to_datetime(goal_df["end_time"], format="ISO8601", utc=True)
         goal_df["duration_minutes"] = (
             goal_df["end_dt"] - goal_df["start_dt"]
         ).dt.total_seconds() / 60
@@ -815,7 +815,8 @@ def _calc_hourly_trend(date: str) -> list[dict[str, Any]]:
     """
     计算24小时趋势数据（日报专用）
 
-    按小时分组，统计各分类时长
+    按本地时区小时分组，统计各分类时长。
+    符合 time-handling-rules：在 Service 层将 UTC 时间转换为本地时区后分组。
     """
     try:
         start_time, end_time = _build_utc_time_range(date, date)
@@ -830,11 +831,17 @@ def _calc_hourly_trend(date: str) -> list[dict[str, Any]]:
         # 获取分类名称映射（使用 CategoryService 缓存）
         category_name_map = category_service.category_name_map
 
-        # 预处理时间
-        df["start_dt"] = pd.to_datetime(df["start_time"])
-        df["end_dt"] = pd.to_datetime(df["end_time"])
+        # 预处理时间：解析为 UTC aware，再转为本地时区
+        # 这样按小时分组时使用的是用户感知的本地小时，而非 UTC 小时
+        local_tz = pytz.timezone(get_user_timezone())
+        df["start_dt"] = pd.to_datetime(df["start_time"], format="ISO8601", utc=True).dt.tz_convert(
+            local_tz
+        )
+        df["end_dt"] = pd.to_datetime(df["end_time"], format="ISO8601", utc=True).dt.tz_convert(
+            local_tz
+        )
 
-        # 按小时统计各分类时长
+        # 按本地小时统计各分类时长
         hourly_data = defaultdict(lambda: defaultdict(int))
 
         for _, row in df.iterrows():
@@ -843,7 +850,7 @@ def _calc_hourly_trend(date: str) -> list[dict[str, Any]]:
             cat_id = str(row["category_id"]) if pd.notna(row["category_id"]) else "unknown"
             cat_name = category_name_map.get(cat_id, "Uncategorized")
 
-            # 遍历每个小时
+            # 遍历每个本地小时
             for hour in range(24):
                 hour_start = start.replace(hour=hour, minute=0, second=0, microsecond=0)
                 hour_end = hour_start.replace(minute=59, second=59)
@@ -880,6 +887,9 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
     """
     计算每日趋势数据（周报专用）
 
+    按本地时区日期分组，确保跨时区边界的数据分到正确的本地日期。
+    符合 time-handling-rules：使用 _add_local_date_column 进行本地日期分组。
+
     返回格式: [{'label': '周一', 'work': 120, 'entertainment': 60, ...}, ...]
     """
     try:
@@ -896,18 +906,22 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
         category_name_map = category_service.category_name_map
 
         # 预处理时间
-        df["start_dt"] = pd.to_datetime(df["start_time"])
-        df["end_dt"] = pd.to_datetime(df["end_time"])
-        df["date"] = df["start_dt"].dt.date
+        df["start_dt"] = pd.to_datetime(df["start_time"], format="ISO8601", utc=True)
+        df["end_dt"] = pd.to_datetime(df["end_time"], format="ISO8601", utc=True)
         df["duration_minutes"] = (df["end_dt"] - df["start_dt"]).dt.total_seconds() / 60
 
-        # 按日期和分类聚合
+        # 使用本地日期分组（避免 UTC 日期导致跨时区边界数据错位）
+        df = _add_local_date_column(df)
+
+        # 按本地日期字符串和分类聚合
         daily_data = defaultdict(lambda: defaultdict(int))
 
         start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
 
         for _, row in df.iterrows():
-            row_date = row["date"]
+            row_date = row["local_date"]  # 本地日期字符串 YYYY-MM-DD
+            if not row_date:
+                continue
             cat_id = str(row["category_id"]) if pd.notna(row["category_id"]) else "unknown"
             cat_name = category_name_map.get(cat_id, "Uncategorized")
             minutes = row["duration_minutes"]
@@ -925,11 +939,12 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
 
         for i in range(7):
             current_date = start_dt + timedelta(days=i)
+            current_date_str = current_date.strftime("%Y-%m-%d")
             data_point = {"label": weekday_names[i], "date": str(current_date)}
 
             # 为所有分类设置值（没有数据的为 0）
             for cat_name in all_categories:
-                data_point[cat_name] = int(daily_data[current_date].get(cat_name, 0))
+                data_point[cat_name] = int(daily_data.get(current_date_str, {}).get(cat_name, 0))
 
             result.append(data_point)
 
@@ -943,6 +958,9 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
 def _calc_monthly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
     """
     计算月度每日趋势数据（月报专用）
+
+    按本地时区日期分组，确保跨时区边界的数据分到正确的本地日期。
+    符合 time-handling-rules：使用 _add_local_date_column 进行本地日期分组。
 
     返回格式: [{'label': '1', 'work': 120, 'entertainment': 60, ...}, ...]
     label 为日期的天数（1, 2, 3, ...）
@@ -961,19 +979,23 @@ def _calc_monthly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
         category_name_map = category_service.category_name_map
 
         # 预处理时间
-        df["start_dt"] = pd.to_datetime(df["start_time"])
-        df["end_dt"] = pd.to_datetime(df["end_time"])
-        df["date"] = df["start_dt"].dt.date
+        df["start_dt"] = pd.to_datetime(df["start_time"], format="ISO8601", utc=True)
+        df["end_dt"] = pd.to_datetime(df["end_time"], format="ISO8601", utc=True)
         df["duration_minutes"] = (df["end_dt"] - df["start_dt"]).dt.total_seconds() / 60
 
-        # 按日期和分类聚合
+        # 使用本地日期分组（避免 UTC 日期导致跨时区边界数据错位）
+        df = _add_local_date_column(df)
+
+        # 按本地日期字符串和分类聚合
         daily_data = defaultdict(lambda: defaultdict(int))
 
         start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
 
         for _, row in df.iterrows():
-            row_date = row["date"]
+            row_date = row["local_date"]  # 本地日期字符串 YYYY-MM-DD
+            if not row_date:
+                continue
             cat_id = str(row["category_id"]) if pd.notna(row["category_id"]) else "unknown"
             cat_name = category_name_map.get(cat_id, "Uncategorized")
             minutes = row["duration_minutes"]
@@ -991,12 +1013,13 @@ def _calc_monthly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
 
         for i in range(days):
             current_date = start_dt + timedelta(days=i)
+            current_date_str = current_date.strftime("%Y-%m-%d")
             day_of_month = current_date.day
             data_point = {"label": str(day_of_month), "date": str(current_date)}
 
             # 为所有分类设置值（没有数据的为 0）
             for cat_name in all_categories:
-                data_point[cat_name] = int(daily_data[current_date].get(cat_name, 0))
+                data_point[cat_name] = int(daily_data.get(current_date_str, {}).get(cat_name, 0))
 
             result.append(data_point)
 
@@ -1010,6 +1033,9 @@ def _calc_monthly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
 def _calc_heatmap_data(start_date: str, end_date: str) -> list[HeatmapDataItem]:
     """
     计算热力图数据（月报专用）
+
+    按本地时区日期分组，确保跨时区边界的数据分到正确的本地日期。
+    符合 time-handling-rules：使用 _add_local_date_column 进行本地日期分组。
 
     为每一天计算总追踪分钟数和分类分解
     """
@@ -1027,17 +1053,21 @@ def _calc_heatmap_data(start_date: str, end_date: str) -> list[HeatmapDataItem]:
         category_name_map = category_service.category_name_map
 
         # 预处理时间
-        df["start_dt"] = pd.to_datetime(df["start_time"])
-        df["end_dt"] = pd.to_datetime(df["end_time"])
-        df["date"] = df["start_dt"].dt.date
+        df["start_dt"] = pd.to_datetime(df["start_time"], format="ISO8601", utc=True)
+        df["end_dt"] = pd.to_datetime(df["end_time"], format="ISO8601", utc=True)
         df["duration_minutes"] = (df["end_dt"] - df["start_dt"]).dt.total_seconds() / 60
 
-        # 按日期和分类聚合（使用 float 累加保持精度）
+        # 使用本地日期分组（避免 UTC 日期导致跨时区边界数据错位）
+        df = _add_local_date_column(df)
+
+        # 按本地日期字符串和分类聚合（使用 float 累加保持精度）
         daily_totals = defaultdict(float)
         daily_breakdown = defaultdict(lambda: defaultdict(float))
 
         for _, row in df.iterrows():
-            row_date = row["date"]
+            row_date = row["local_date"]  # 本地日期字符串 YYYY-MM-DD
+            if not row_date:
+                continue
             cat_id = str(row["category_id"]) if pd.notna(row["category_id"]) else "unknown"
             cat_name = category_name_map.get(cat_id, "Uncategorized")
             minutes = row["duration_minutes"]
@@ -1056,13 +1086,13 @@ def _calc_heatmap_data(start_date: str, end_date: str) -> list[HeatmapDataItem]:
             date_str = current_date.strftime("%Y-%m-%d")
 
             # 最终输出时取整
-            breakdown = daily_breakdown.get(current_date, {})
+            breakdown = daily_breakdown.get(date_str, {})
             breakdown_int = {k: int(v) for k, v in breakdown.items()} if breakdown else None
 
             result.append(
                 HeatmapDataItem(
                     date=date_str,
-                    total_minutes=int(daily_totals.get(current_date, 0)),
+                    total_minutes=int(daily_totals.get(date_str, 0)),
                     category_breakdown=breakdown_int,
                 )
             )

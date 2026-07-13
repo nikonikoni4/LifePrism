@@ -13,6 +13,7 @@ import {
 
 import { TimeOverviewWidget } from '../../../../core/components';
 import { TimelineAPIV2, ActivityLogsAPI, CategoryAPI, BehaviorAPI } from './api';
+import { toISOStringUTC } from '../../../../core/utils/dateUtils';
 import {
     TimelineStatsResponse,
     TimelineBlockStats,
@@ -710,11 +711,13 @@ const Timeline: React.FC = () => {
             setLogsLoading(true);
             setLogsError(null);
             try {
-                const startTime = `${currentDate} 00:00:00`;
-                const endTime = `${currentDate} 23:59:59`;
+                // 就近转换：本地日期 → UTC ISO 8601 时间范围
+                // 符合 time-handling-rules 组件内转换原则
+                const startOfDay = new Date(`${currentDate}T00:00:00`);
+                const endOfDay = new Date(`${currentDate}T23:59:59.999`);
                 const response = await ActivityLogsAPI.getLogs({
-                    start_time: startTime,
-                    end_time: endTime,
+                    start_time: toISOStringUTC(startOfDay),
+                    end_time: toISOStringUTC(endOfDay),
                     sort_by: 'start_time',
                     sort_order: 'asc',
                     page_size: 3000,

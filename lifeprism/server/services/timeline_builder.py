@@ -70,9 +70,9 @@ def slice_events_by_time_range(
 
     # 确保有 datetime 列
     if "start_dt" not in df.columns:
-        df["start_dt"] = pd.to_datetime(df["start_time"])
+        df["start_dt"] = pd.to_datetime(df["start_time"], format="ISO8601", utc=True)
     if "end_dt" not in df.columns:
-        df["end_dt"] = pd.to_datetime(df["end_time"])
+        df["end_dt"] = pd.to_datetime(df["end_time"], format="ISO8601", utc=True)
 
     # 过滤完全不在范围内的事件
     df = df[(df["end_dt"] > range_start) & (df["start_dt"] < range_end)]
@@ -109,8 +109,8 @@ def load_day_events(start_time: str, end_time: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     # 预处理时间字段
-    df["start_dt"] = pd.to_datetime(df["start_time"])
-    df["end_dt"] = pd.to_datetime(df["end_time"])
+    df["start_dt"] = pd.to_datetime(df["start_time"], format="ISO8601", utc=True)
+    df["end_dt"] = pd.to_datetime(df["end_time"], format="ISO8601", utc=True)
     df["duration_minutes"] = (df["end_dt"] - df["start_dt"]).dt.total_seconds() / 60
 
     return df
@@ -302,8 +302,8 @@ def build_time_overview_from_df(
     # 确保有 duration_minutes 列
     if "duration_minutes" not in df.columns:
         df = df.copy()
-        df["start_dt"] = pd.to_datetime(df["start_time"])
-        df["end_dt"] = pd.to_datetime(df["end_time"])
+        df["start_dt"] = pd.to_datetime(df["start_time"], format="ISO8601", utc=True)
+        df["end_dt"] = pd.to_datetime(df["end_time"], format="ISO8601", utc=True)
         df["duration_minutes"] = (df["end_dt"] - df["start_dt"]).dt.total_seconds() / 60
 
     # 获取分类名称映射（从分类表加载，确保使用最新名称）

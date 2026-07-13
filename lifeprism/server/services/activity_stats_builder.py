@@ -24,6 +24,7 @@ from lifeprism.server.schemas.activity_schemas import (
     TopTitleData,
 )
 from lifeprism.server.services.category_service import category_service
+from lifeprism.utils.time_utils import build_utc_time_range
 
 # ============================================================================
 # UTC 时区迁移辅助函数
@@ -89,38 +90,11 @@ def _add_local_date_column(df: pd.DataFrame, time_col: str = "start_time") -> pd
 
     local_tz = pytz.timezone(get_user_timezone())
     df = df.copy()
-    utc_times = pd.to_datetime(df[time_col], utc=True, errors="coerce")
+    utc_times = pd.to_datetime(df[time_col], format="ISO8601", utc=True, errors="coerce")
     local_times = utc_times.dt.tz_convert(local_tz)
     df["local_date"] = local_times.dt.strftime("%Y-%m-%d")
     df["local_date"] = df["local_date"].where(df["local_date"].notna(), "")
     return df
-
-
-def _build_utc_time_range(start_date: str, end_date: str = None) -> tuple[str, str]:
-    """将本地日期（范围）转换为 UTC 时间范围用于数据库查询。
-
-    例如本地 2026-07-12 (UTC+8) -> UTC 2026-07-11 16:00:00 ~ 2026-07-12 15:59:59
-
-    Args:
-        start_date: 本地开始日期 'YYYY-MM-DD'
-        end_date: 本地结束日期 'YYYY-MM-DD'，若为 None 则等于 start_date
-
-    Returns:
-        tuple[str, str]: (utc_start, utc_end) 'YYYY-MM-DD HH:MM:SS' 格式
-    """
-    if end_date is None:
-        end_date = start_date
-
-    local_tz = pytz.timezone(get_user_timezone())
-    local_start = local_tz.localize(datetime.strptime(start_date, "%Y-%m-%d"))
-    local_end = (
-        local_tz.localize(datetime.strptime(end_date, "%Y-%m-%d"))
-        + timedelta(days=1)
-        - timedelta(seconds=1)
-    )
-    utc_start = local_start.astimezone(timezone.utc)
-    utc_end = local_end.astimezone(timezone.utc)
-    return utc_start.strftime("%Y-%m-%d %H:%M:%S"), utc_end.strftime("%Y-%m-%d %H:%M:%S")
 
 
 # ============================================================================
@@ -221,14 +195,13 @@ def build_time_overview(date: str) -> TimeOverviewData:
     获取时间概览数据（三层嵌套结构：Category → SubCategory → App）
 
     Args:
-        date: 查询日期 (YYYY-MM-DD 格式)
+        date: 查询日期 (YYYY-MM-DD 格式，本地时区)
 
     Returns:
         TimeOverviewData: 时间概览数据
     """
-    # 1. 加载数据
-    start_time = f"{date} 00:00:00"
-    end_time = f"{date} 23:59:59"
+    # 1. 加载数据（将本地日期转换为 UTC ISO 8601 时间范围，符合 time-handling-rules 规则 3.7）
+    start_time, end_time = build_utc_time_range(date)
     df = server_lw_data_provider.load_user_app_behavior_log(
         start_time=start_time, end_time=end_time
     )
@@ -237,8 +210,8 @@ def build_time_overview(date: str) -> TimeOverviewData:
         return _build_empty_time_overview(date)
 
     # 预计算时长（分钟）
-    df["start_dt"] = pd.to_datetime(df["start_time"])
-    df["end_dt"] = pd.to_datetime(df["end_time"])
+    df["start_dt"] = pd.to_datetime(df["start_time"], format="ISO8601", utc=True)
+    df["end_dt"] = pd.to_datetime(df["end_time"], format="ISO8601", utc=True)
     df["duration_minutes"] = (df["end_dt"] - df["start_dt"]).dt.total_seconds() / 60
 
     # 获取分类名称映射（从分类表加载，确保使用最新名称）

@@ -131,13 +131,17 @@ class LWBaseDataProvider:
 
     @current_date.setter
     def current_date(self, value):
-        """设置当前日期，自动计算时间范围"""
-        from datetime import datetime
+        """设置当前日期，自动计算 UTC 时间范围
 
-        start_time = datetime.strptime(value, "%Y-%m-%d").replace(hour=0, minute=0, second=0)
-        end_time = datetime.strptime(value, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-        self._start_time = start_time.strftime("%Y-%m-%d %H:%M:%S")
-        self._end_time = end_time.strftime("%Y-%m-%d %H:%M:%S")
+        将本地日期转换为 UTC ISO 8601 格式，用于查询数据库中
+        以 UTC ISO 8601 存储的时间戳字段（如 start_time/end_time）。
+
+        符合 docs/coding-rules/time-handling-rules.md 规则 3.7：
+        禁止字符串拼接本地时间查询 datetime 字段表。
+        """
+        from lifeprism.utils.time_utils import build_utc_time_range
+
+        self._start_time, self._end_time = build_utc_time_range(value)
         self._current_date = value
 
     # ==================== 活动日志查询 ====================

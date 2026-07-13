@@ -114,11 +114,12 @@ async def get_custom_blocks(
 )
 async def get_duration_by_todo(
     todo_id: str = Query(..., description="待办事项 ID"),
-    date: str = Query(..., description="查询日期（YYYY-MM-DD）"),
+    start_time: str = Query(..., description="开始时间 (ISO 8601 UTC)"),
+    end_time: str = Query(..., description="结束时间 (ISO 8601 UTC)"),
 ):
-    """查询指定 todo 在指定日期的累计时长（分钟）"""
-    duration = custom_block_repository.get_duration_by_todo(todo_id, date)
-    return TodoDurationResponse(todo_id=todo_id, date=date, duration=duration)
+    """查询指定 todo 在指定时间范围的累计时长（分钟）"""
+    duration = custom_block_repository.get_duration_by_todo(todo_id, start_time, end_time)
+    return TodoDurationResponse(todo_id=todo_id, date="", duration=duration)
 
 
 @router.post(
@@ -128,7 +129,9 @@ async def get_duration_by_todo(
 )
 async def batch_get_duration(request: BatchDurationRequest):
     """批量查询多个 todo 的累计时长。返回 { "data": { "1": 45, "2": 0 } }"""
-    result = custom_block_repository.batch_get_duration_by_todos(request.todo_ids, request.date)
+    result = custom_block_repository.batch_get_duration_by_todos(
+        request.todo_ids, request.start_time, request.end_time
+    )
     return BatchDurationResponse(data=result)
 
 
