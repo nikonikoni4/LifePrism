@@ -2,6 +2,15 @@
 
 错误处理详见 `docs/coding-rules/backend-error-handling.md`
 
+## 时间处理
+
+**涉及时间格式、时区转换的任务，必须执行以下两步：**
+
+1. **阅读规则文档**：`docs/coding-rules/time-handling-rules.md`
+2. **查阅工具函数**：`lifeprism/utils/time_utils.py`，优先复用已有函数，**禁止**手写时区转换逻辑
+
+核心原则：内部 UTC + ISO 8601，对外本地时区 + `YYYY-MM-DD HH:MM:SS`，所有转换在边界处就地完成。
+
 ## 类型注解规范
 
 **禁止使用 `Any` 作为返回类型**：

@@ -30,15 +30,23 @@ async def screen_behavior_anlysis(start_time: str, end_time: str) -> list[Behavi
     return
 
     """
-    # 0. 时间格式转换：将 ISO 8601 格式转换为标准格式
-    # 替换 'T' 为空格，确保统一格式
-    start_time = start_time.replace("T", " ")
-    end_time = end_time.replace("T", " ")
+    # 0. 统一转为 UTC ISO 8601 格式（遵循 time-handling-rules.md）
+    # 有时区标识 → 已是 UTC，直接 .isoformat()
+    # 无时区标识 → 视为本地时间（LLM 工具输入路径），用 local_to_utc_iso 转 UTC
+    from lifeprism.utils.time_utils import local_to_utc_iso
 
-    # 1. 计算开始时间
+    def _to_utc_iso(time_str: str) -> str:
+        dt = datetime.fromisoformat(time_str)
+        if dt.tzinfo is not None:
+            return dt.isoformat()
+        return local_to_utc_iso(time_str)
+
+    start_time = _to_utc_iso(start_time)
+    end_time = _to_utc_iso(end_time)
+
+    # 1. 截断 start_time 到最早可用时间
     screenshot_retention_days = settings.get("screenshot_retention_days", 3)
     requested_start_time = datetime.fromisoformat(start_time)
-    # 迁移后输入字符串视为 UTC 时间：若 naive 则补充 UTC tzinfo，避免与 aware 比较抛错
     if requested_start_time.tzinfo is None:
         requested_start_time = requested_start_time.replace(tzinfo=timezone.utc)
     earliest_available_time = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(

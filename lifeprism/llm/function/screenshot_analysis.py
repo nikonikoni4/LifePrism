@@ -31,6 +31,7 @@ from lifeprism.repository import (
     screen_capture_repository,
 )
 from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import utc_to_local_display
 
 logger = get_logger(__name__)
 # logger.setLevel(DEBUG)
@@ -305,6 +306,7 @@ async def analyze_chunk_screenshots(
         app = sc.get("window_app", "")
         title = sc.get("window_title", "")[:50]
         captured_at = sc.get("captured_at", "")
+        captured_at_local = utc_to_local_display(captured_at) if captured_at else ""
 
         # 一次查询获取所有分类信息（包括是否忽略）
         category_info = _get_screenshot_category_info(app, title)
@@ -323,13 +325,13 @@ async def analyze_chunk_screenshots(
                     content_parts.append(
                         {
                             "type": "text",
-                            "text": f"[{img_idx}] | timestamp: {captured_at} app: {app} | title: {title}",
+                            "text": f"[{img_idx}] | timestamp: {captured_at_local} app: {app} | title: {title}",
                         }
                     )
                     logger.debug(
                         "[%s] | timestamp: %s app: %s | title: %s (首张截图，保留)",
                         img_idx,
-                        captured_at,
+                        captured_at_local,
                         app,
                         title,
                     )
@@ -341,12 +343,12 @@ async def analyze_chunk_screenshots(
                 content_parts.append(
                     {
                         "type": "text",
-                        "text": f"[无截图] timestamp: {captured_at} | app: {app} | title: {title} | category: {category_name} | description: {category_info['app_description']}",
+                        "text": f"[无截图] timestamp: {captured_at_local} | app: {app} | title: {title} | category: {category_name} | description: {category_info['app_description']}",
                     }
                 )
                 logger.debug(
                     "[无截图] timestamp: %s | app: %s | title: %s | category: %s | description: %s",
-                    captured_at,
+                    captured_at_local,
                     app,
                     title,
                     category_name,
@@ -362,11 +364,11 @@ async def analyze_chunk_screenshots(
             content_parts.append(
                 {
                     "type": "text",
-                    "text": f"[{img_idx}] | timestamp: {captured_at} app: {app} | title: {title}",
+                    "text": f"[{img_idx}] | timestamp: {captured_at_local} app: {app} | title: {title}",
                 }
             )
             logger.debug(
-                "[%s] | timestamp: %s app: %s | title: %s", img_idx, captured_at, app, title
+                "[%s] | timestamp: %s app: %s | title: %s", img_idx, captured_at_local, app, title
             )
             img_idx += 1
 
@@ -396,12 +398,15 @@ async def analyze_chunk_screenshots(
             # 保持 ISO 8601 格式写入数据库（UTC 时间戳字段）
             start_time_db = chunk["start"]
             end_time_db = chunk["end"]
+            # 发给 LLM 做摘要的时间转为本地时区（遵循 time-handling-rules.md Rule 4.1）
+            start_time_local = utc_to_local_display(start_time_db) if start_time_db else ""
+            end_time_local = utc_to_local_display(end_time_db) if end_time_db else ""
 
             data = {
                 "start_time": start_time_db,
                 "end_time": end_time_db,
                 "screen_count": len(screenshots),
-                "behavior": f"{start_time_db} ~ {end_time_db}\n behavior: {cleaned_response} \n",
+                "behavior": f"{start_time_local} ~ {end_time_local}\n behavior: {cleaned_response} \n",
             }
 
             raw_behavior_analysis_repository.create_raw_behavior(data)

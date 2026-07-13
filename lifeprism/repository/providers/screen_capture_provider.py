@@ -226,16 +226,13 @@ class ScreenCaptureProvider(LWBaseDataProvider):
             ...     capture_reason="active"
             ... )
         """
-        # 将 ISO 格式（带 T）转换为数据库格式（空格分隔）
-        start_time_db = start_time.replace("T", " ") if "T" in start_time else start_time
-        end_time_db = end_time.replace("T", " ") if "T" in end_time else end_time
-
+        # 直接使用 ISO 8601 格式查询（数据库存储格式为 UTC ISO 8601）
         filters = {}
         if capture_reason is not None:
             filters["capture_reason"] = capture_reason
 
         options = QueryOptions(
-            time_range=(start_time_db, end_time_db),
+            time_range=(start_time, end_time),
             filters=filters,
             order_by="captured_at",
             order_desc=False,  # 升序排序
