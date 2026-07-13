@@ -3,6 +3,9 @@ from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from typing import Any
 
+import pytz
+
+from lifeprism.config import get_user_timezone
 from lifeprism.server.schemas.chatbot_schemas import (
     ChatHistoryResponse,
     ChatMessage,
@@ -120,7 +123,8 @@ class ChatbotService:
             name = first_message.strip()[:20]
             if len(first_message) > 20:
                 name += "..."
-            session.name = name or f"新会话 {datetime.now(timezone.utc).strftime('%m-%d %H:%M')}"
+            local_now = datetime.now(timezone.utc).astimezone(pytz.timezone(get_user_timezone()))
+            session.name = name or f"新会话 {local_now.strftime('%m-%d %H:%M')}"
             self._chatbot.save_session(session)
             is_new = True
         else:

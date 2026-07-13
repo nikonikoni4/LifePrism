@@ -42,11 +42,18 @@ interface CustomBlockPopoverProps {
 
 /**
  * 从时间字符串提取 HH:MM 格式
+ *
+ * ⚠️ 规则：接收 UTC ISO 时间，转换为本地时间后提取 HH:MM
+ * 后端存储的是 UTC，前端编辑框显示必须是本地时间
  */
 function extractTime(timeStr: string): string {
     if (!timeStr) return '00:00';
-    const timePart = timeStr.includes('T') ? timeStr.split('T')[1] : timeStr.split(' ')[1] || timeStr;
-    return timePart.slice(0, 5);
+
+    // 解析 UTC ISO 字符串为 Date 对象（浏览器自动转为本地时间）
+    const date = new Date(timeStr);
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
 const CustomBlockPopover: React.FC<CustomBlockPopoverProps> = ({

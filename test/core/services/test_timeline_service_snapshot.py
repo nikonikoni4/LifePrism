@@ -9,7 +9,7 @@ from datetime import datetime
 
 from lifeprism.server.services.timeline_service import (
     get_custom_block,
-    get_custom_blocks_by_date,
+    get_custom_blocks_by_time_range,
     create_custom_block,
     update_custom_block,
     delete_custom_block,
@@ -25,7 +25,10 @@ class TestTimelineServiceSnapshot:
 
     def test_get_custom_blocks_by_date_snapshot(self, snapshot: SnapshotAssertion):
         """测试获取指定日期的自定义时间块列表"""
-        result = get_custom_blocks_by_date(date='2026-04-24')
+        # 转换日期为 UTC 时间范围
+        start_time = "2026-04-24T00:00:00.000Z"
+        end_time = "2026-04-24T23:59:59.999Z"
+        result = get_custom_blocks_by_time_range(start_time=start_time, end_time=end_time)
         assert result == snapshot
 
     def test_create_and_delete_custom_block(self):

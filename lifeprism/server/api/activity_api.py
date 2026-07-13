@@ -348,8 +348,8 @@ async def update_logs_by_cache(
     goal_id: str | None = Query(
         None, description="目标ID（None=不修改, ''=清除, 'goal-xxx'=设置）"
     ),
-    start_date: str | None = Query(None, description="开始日期 YYYY-MM-DD（可选）"),
-    end_date: str | None = Query(None, description="结束日期 YYYY-MM-DD（可选）"),
+    start_time: str | None = Query(None, description="开始时间 ISO 8601 格式（可选）"),
+    end_time: str | None = Query(None, description="结束时间 ISO 8601 格式（可选）"),
 ) -> StandardResponse:
     """
     根据缓存匹配条件批量更新日志分类
@@ -365,44 +365,30 @@ async def update_logs_by_cache(
     - category_id: 主分类ID
     - sub_category_id: 子分类ID（可选）
     - goal_id: 目标ID（None=不修改, ''=清除, 'goal-xxx'=设置）
-    - start_date: 开始日期 YYYY-MM-DD（可选，用于限制更新范围）
-    - end_date: 结束日期 YYYY-MM-DD（可选，用于限制更新范围）
+    - start_time: 开始时间 ISO 8601 格式（可选，用于限制更新范围）
+    - end_time: 结束时间 ISO 8601 格式（可选，用于限制更新范围）
 
     **返回：**
     - success: 是否成功
     - data.updated_count: 更新的日志数量
     """
-    try:
-        # 验证：多用途应用必须提供 title
-        if is_multipurpose_app and not title:
-            raise HTTPException(status_code=400, detail="多用途应用必须提供 title 参数")
+    # 验证：多用途应用必须提供 title
+    if is_multipurpose_app and not title:
+        raise HTTPException(status_code=400, detail="多用途应用必须提供 title 参数")
 
-        updated_count = activity_service.update_logs_by_app_title(
-            app=app,
-            title=title,
-            is_multipurpose_app=is_multipurpose_app,
-            category_id=category_id,
-            sub_category_id=sub_category_id,
-            goal_id=goal_id,
-            start_date=start_date,
-            end_date=end_date,
-        )
-        logger.info(
-            "根据缓存更新日志: app=%s, title=%s, updated_count=%s", app, title, updated_count
-        )
-        return StandardResponse(
-            success=True,
-            data={"updated_count": updated_count},
-            message=f"成功更新 {updated_count} 条日志",
-        )
-    except LWBaseError:
-        raise
-    except HTTPException:
-        raise
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        logger.error(
-            "根据缓存更新日志分类失败: app=%s, title=%s, error=%s", app, title, e, exc_info=True
-        )
-        raise HTTPException(status_code=500, detail="服务器内部错误") from e
+    updated_count = activity_service.update_logs_by_app_title(
+        app=app,
+        title=title,
+        is_multipurpose_app=is_multipurpose_app,
+        category_id=category_id,
+        sub_category_id=sub_category_id,
+        goal_id=goal_id,
+        start_time=start_time,
+        end_time=end_time,
+    )
+    logger.info("根据缓存更新日志: app=%s, title=%s, updated_count=%s", app, title, updated_count)
+    return StandardResponse(
+        success=True,
+        data={"updated_count": updated_count},
+        message=f"成功更新 {updated_count} 条日志",
+    )

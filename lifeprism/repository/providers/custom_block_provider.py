@@ -112,20 +112,17 @@ class CustomBlockProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def get_custom_blocks_by_date(self, date: str) -> list[dict[str, Any]]:
+    def get_custom_blocks_by_time_range(self, start_time: str, end_time: str) -> list[dict[str, Any]]:
         """
-        获取指定日期的所有自定义时间块
+        获取指定时间范围的所有自定义时间块
 
         Args:
-            date: str, 日期（YYYY-MM-DD 格式）
+            start_time: str, 开始时间（ISO 8601 UTC 格式）
+            end_time: str, 结束时间（ISO 8601 UTC 格式）
 
         Returns:
             list[dict]: 时间块列表
         """
-        # 使用 start_time 的日期部分过滤
-        start_of_day = f"{date} 00:00:00"
-        end_of_day = f"{date} 23:59:59"
-
         # 使用原生 SQL 查询时间范围（复杂查询保留手写 SQL）
         sql = """
         SELECT * FROM timeline_custom_block
@@ -135,7 +132,7 @@ class CustomBlockProvider(LWBaseDataProvider):
 
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, [start_of_day, end_of_day])
+            cursor.execute(sql, [start_time, end_time])
             rows = cursor.fetchall()
             if not rows:
                 return []

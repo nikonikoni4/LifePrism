@@ -45,9 +45,7 @@ async def screen_behavior_anlysis(start_time: str, end_time: str) -> list[Behavi
         days=screenshot_retention_days
     )
     start_time = (
-        max(requested_start_time, earliest_available_time)
-        .replace(microsecond=0)
-        .strftime("%Y-%m-%d %H:%M:%S")
+        max(requested_start_time, earliest_available_time).replace(microsecond=0).isoformat()
     )
 
     # 2.  查询todolist
@@ -139,12 +137,12 @@ class SyncService:
                     analysis_start_time = last_records[0]["end_time"]
                 else:
                     # 如果表为空，使用当前时间往前推 1 天
-                    analysis_start_time = (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    )
+                    analysis_start_time = (
+                        datetime.now(timezone.utc) - timedelta(days=1)
+                    ).isoformat()
 
                 # 使用当前时间作为结束时间
-                analysis_end_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                analysis_end_time = datetime.now(timezone.utc).isoformat()
 
                 # 后台执行截图分析，不阻塞 sync 响应
                 asyncio.create_task(screen_behavior_anlysis(analysis_start_time, analysis_end_time))

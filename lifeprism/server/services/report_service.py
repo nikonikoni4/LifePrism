@@ -129,16 +129,16 @@ def _add_local_date_column(df: pd.DataFrame, time_col: str = "start_time") -> pd
 
 
 def _build_utc_time_range(start_date: str, end_date: str = None) -> tuple[str, str]:
-    """将本地日期（范围）转换为 UTC 时间范围用于数据库查询。
+    """将本地日期（范围）转换为 UTC ISO 8601 时间范围用于数据库查询。
 
-    例如本地 2026-07-12 (UTC+8) -> UTC 2026-07-11 16:00:00 ~ 2026-07-12 15:59:59
+    例如本地 2026-07-12 (UTC+8) -> UTC 2026-07-11T16:00:00+00:00 ~ 2026-07-12T15:59:59+00:00
 
     Args:
         start_date: 本地开始日期 'YYYY-MM-DD'
         end_date: 本地结束日期 'YYYY-MM-DD'，若为 None 则等于 start_date
 
     Returns:
-        tuple[str, str]: (utc_start, utc_end) 'YYYY-MM-DD HH:MM:SS' 格式
+        tuple[str, str]: (utc_start, utc_end) ISO 8601 格式（含时区标识）
     """
     if end_date is None:
         end_date = start_date
@@ -152,7 +152,7 @@ def _build_utc_time_range(start_date: str, end_date: str = None) -> tuple[str, s
     )
     utc_start = local_start.astimezone(timezone.utc)
     utc_end = local_end.astimezone(timezone.utc)
-    return utc_start.strftime("%Y-%m-%d %H:%M:%S"), utc_end.strftime("%Y-%m-%d %H:%M:%S")
+    return utc_start.isoformat(), utc_end.isoformat()
 
 
 # ==================== 辅助：从 behavior.md 读取 AI 总结 ====================
@@ -218,9 +218,7 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
     if not need_recalc and cached:
         logger.info("返回缓存的日报告 %s", date)
         # 环比数据始终实时计算（不缓存）
-        comparison_data = _calc_comparison_data(
-            current_start=f"{date} 00:00:00", current_end=f"{date} 23:59:59", period_type="daily"
-        )
+        comparison_data = _calc_comparison_data(start_date=date, end_date=date, period_type="daily")
         response = _daily_dict_to_response(cached)
         response.comparison_data = comparison_data
         # AI 总结从 behavior.md 实时读取（每天 10:00 自动更新）
@@ -238,9 +236,7 @@ def get_daily_report(date: str, force_refresh: bool) -> DailyReportResponse:
     daily_trend_data = _calc_hourly_trend(date)
 
     # 计算环比对比数据（与前一天对比）
-    comparison_data = _calc_comparison_data(
-        current_start=f"{date} 00:00:00", current_end=f"{date} 23:59:59", period_type="daily"
-    )
+    comparison_data = _calc_comparison_data(start_date=date, end_date=date, period_type="daily")
 
     # 4. 保存到数据库
     # 判断状态：只有当今天的日期晚于报告日期时，才标记为已完成
@@ -307,9 +303,7 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
         logger.info("返回缓存的周报告 %s", week_start_date)
         # 环比数据始终实时计算（不缓存）
         comparison_data = _calc_comparison_data(
-            current_start=f"{week_start_date} 00:00:00",
-            current_end=f"{week_end_date} 23:59:59",
-            period_type="weekly",
+            start_date=week_start_date, end_date=week_end_date, period_type="weekly"
         )
         response = _weekly_dict_to_response(cached, week_start_date, week_end_date)
         response.comparison_data = comparison_data
@@ -332,9 +326,7 @@ def get_weekly_report(week_start_date: str, force_refresh: bool) -> WeeklyReport
 
     # 计算环比对比数据（与上一周对比）
     comparison_data = _calc_comparison_data(
-        current_start=f"{week_start_date} 00:00:00",
-        current_end=f"{week_end_date} 23:59:59",
-        period_type="weekly",
+        start_date=week_start_date, end_date=week_end_date, period_type="weekly"
     )
 
     # 4. 保存到数据库
@@ -406,9 +398,7 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
         logger.info("返回缓存的月报告 %s", month)
         # 环比数据始终实时计算（不缓存）
         comparison_data = _calc_comparison_data(
-            current_start=f"{month_start_date} 00:00:00",
-            current_end=f"{month_end_date} 23:59:59",
-            period_type="monthly",
+            start_date=month_start_date, end_date=month_end_date, period_type="monthly"
         )
         response = _monthly_dict_to_response(cached, month_start_date, month_end_date)
         response.comparison_data = comparison_data
@@ -435,9 +425,7 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
 
     # 计算环比对比数据（与上一月对比）
     comparison_data = _calc_comparison_data(
-        current_start=f"{month_start_date} 00:00:00",
-        current_end=f"{month_end_date} 23:59:59",
-        period_type="monthly",
+        start_date=month_start_date, end_date=month_end_date, period_type="monthly"
     )
 
     # 4. 保存到数据库
@@ -472,13 +460,15 @@ def get_monthly_report(month: str, force_refresh: bool) -> MonthlyReportResponse
     )
 
 
-def _calc_comparison_data(current_start: str, current_end: str, period_type: str = "daily"):
+def _calc_comparison_data(start_date: str, end_date: str, period_type: str = "daily"):
     """
     计算环比对比数据（内部函数）
 
+    接收本地日期，内部转换为 UTC ISO 8601 后再查询数据库。
+
     Args:
-        current_start: 当前周期开始时间 YYYY-MM-DD HH:MM:SS
-        current_end: 当前周期结束时间 YYYY-MM-DD HH:MM:SS
+        start_date: 当前周期开始日期 YYYY-MM-DD（本地时区）
+        end_date: 当前周期结束日期 YYYY-MM-DD（本地时区）
         period_type: 周期类型 ("daily", "weekly", "monthly")
 
     Returns:
@@ -492,23 +482,22 @@ def _calc_comparison_data(current_start: str, current_end: str, period_type: str
         GoalComparisonItem,
     )
 
-    # 解析当前周期时间
-    current_start_dt = datetime.strptime(current_start, "%Y-%m-%d %H:%M:%S")
-    current_end_dt = datetime.strptime(current_end, "%Y-%m-%d %H:%M:%S")
+    # 当前周期：本地日期 → UTC ISO 8601
+    current_start, current_end = _build_utc_time_range(start_date, end_date)
 
-    # 根据周期类型计算上一周期时间
+    # 解析本地日期，计算上一周期的本地日期范围
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+
     if period_type == "daily":
-        # 日报：上一天
-        previous_start_dt = current_start_dt - timedelta(days=1)
-        previous_end_dt = current_end_dt - timedelta(days=1)
+        prev_start_dt = start_dt - timedelta(days=1)
+        prev_end_dt = end_dt - timedelta(days=1)
     elif period_type == "weekly":
-        # 周报：上一周
-        previous_start_dt = current_start_dt - timedelta(days=7)
-        previous_end_dt = current_end_dt - timedelta(days=7)
+        prev_start_dt = start_dt - timedelta(days=7)
+        prev_end_dt = end_dt - timedelta(days=7)
     elif period_type == "monthly":
-        # 月报：上一月
-        year = current_start_dt.year
-        month = current_start_dt.month
+        year = start_dt.year
+        month = start_dt.month
         if month == 1:
             prev_year = year - 1
             prev_month = 12
@@ -516,16 +505,17 @@ def _calc_comparison_data(current_start: str, current_end: str, period_type: str
             prev_year = year
             prev_month = month - 1
         prev_last_day = calendar.monthrange(prev_year, prev_month)[1]
-        previous_start_dt = datetime(prev_year, prev_month, 1, 0, 0, 0)
-        previous_end_dt = datetime(prev_year, prev_month, prev_last_day, 23, 59, 59)
+        prev_start_dt = datetime(prev_year, prev_month, 1)
+        prev_end_dt = datetime(prev_year, prev_month, prev_last_day)
     else:
-        # 默认：按时间跨度计算
-        duration = current_end_dt - current_start_dt
-        previous_end_dt = current_start_dt
-        previous_start_dt = previous_end_dt - duration
+        duration = end_dt - start_dt
+        prev_end_dt = start_dt
+        prev_start_dt = prev_end_dt - duration
 
-    previous_start = previous_start_dt.strftime("%Y-%m-%d %H:%M:%S")
-    previous_end = previous_end_dt.strftime("%Y-%m-%d %H:%M:%S")
+    prev_start_date = prev_start_dt.strftime("%Y-%m-%d")
+    prev_end_date = prev_end_dt.strftime("%Y-%m-%d")
+    # 上一周期：本地日期 → UTC ISO 8601
+    previous_start, previous_end = _build_utc_time_range(prev_start_date, prev_end_date)
 
     logger.info(
         "计算环比对比数据: %s ~ %s vs %s ~ %s",
@@ -535,7 +525,7 @@ def _calc_comparison_data(current_start: str, current_end: str, period_type: str
         previous_end,
     )
 
-    # 调用 provider 获取原始数据
+    # 调用 provider 获取原始数据（传入 UTC ISO 8601 格式）
     raw_data = comparison_data_provider.get_period_comparison(
         current_start=current_start,
         current_end=current_end,
@@ -574,9 +564,8 @@ def _calc_sunburst_data(
     - 周报: start_date ~ end_date (7天), title="本周时间分布", total_range_minutes=10080
     """
     try:
-        # 加载数据
-        start_time = f"{start_date} 00:00:00"
-        end_time = f"{end_date} 23:59:59"
+        # 将本地日期转为 UTC ISO 时间范围
+        start_time, end_time = _build_utc_time_range(start_date, end_date)
         df = server_lw_data_provider.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time
         )
@@ -789,8 +778,7 @@ def _calc_goal_time_invested(goal_id: str, start_date: str, end_date: str) -> in
     从 user_app_behavior_log 中查询 link_to_goal_id 匹配的记录
     """
     try:
-        start_time = f"{start_date} 00:00:00"
-        end_time = f"{end_date} 23:59:59"
+        start_time, end_time = _build_utc_time_range(start_date, end_date)
 
         df = server_lw_data_provider.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time
@@ -830,8 +818,7 @@ def _calc_hourly_trend(date: str) -> list[dict[str, Any]]:
     按小时分组，统计各分类时长
     """
     try:
-        start_time = f"{date} 00:00:00"
-        end_time = f"{date} 23:59:59"
+        start_time, end_time = _build_utc_time_range(date, date)
 
         df = server_lw_data_provider.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time
@@ -896,8 +883,7 @@ def _calc_weekly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
     返回格式: [{'label': '周一', 'work': 120, 'entertainment': 60, ...}, ...]
     """
     try:
-        start_time = f"{start_date} 00:00:00"
-        end_time = f"{end_date} 23:59:59"
+        start_time, end_time = _build_utc_time_range(start_date, end_date)
 
         df = server_lw_data_provider.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time
@@ -962,8 +948,7 @@ def _calc_monthly_trend(start_date: str, end_date: str) -> list[dict[str, Any]]:
     label 为日期的天数（1, 2, 3, ...）
     """
     try:
-        start_time = f"{start_date} 00:00:00"
-        end_time = f"{end_date} 23:59:59"
+        start_time, end_time = _build_utc_time_range(start_date, end_date)
 
         df = server_lw_data_provider.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time
@@ -1029,8 +1014,7 @@ def _calc_heatmap_data(start_date: str, end_date: str) -> list[HeatmapDataItem]:
     为每一天计算总追踪分钟数和分类分解
     """
     try:
-        start_time = f"{start_date} 00:00:00"
-        end_time = f"{end_date} 23:59:59"
+        start_time, end_time = _build_utc_time_range(start_date, end_date)
 
         df = server_lw_data_provider.load_user_app_behavior_log(
             start_time=start_time, end_time=end_time

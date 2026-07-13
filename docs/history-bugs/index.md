@@ -1,3 +1,10 @@
+## 2026-07-13-timeline-custom-block-date-query-datetime-field
+
+- updated_at: 2026-07-13
+- path: `docs/history-bugs/2026-07-13-timeline-custom-block-date-query-datetime-field.md`
+- 触发规则：在排查前端传日期参数查询、数据库表只有 datetime 字段、查询结果不完整、时区转换错误、SQLite 字符串比较失败时阅读
+- 内容摘要：**标准模板** - 记录了 timeline_custom_block 前端传本地日期 `date=2026-07-13` 查询，但数据库表只有 UTC datetime 字段 `start_time`，导致 Repository 层直接拼接字符串 `"2026-07-13 00:00:00"` 与 UTC ISO 格式 `"2026-07-12T21:20:00.000Z"` 进行字符串比较失败。修复方案是前端传 UTC 时间范围 `start_time/end_time`，后端直接使用。包含完整的根因分析、修复方案、验证方法、预防措施，作为此类问题的标准模板。
+
 ## 2026-07-11-cloud-init-provider-display-name-mismatch
 
 - updated_at: 2026-07-11

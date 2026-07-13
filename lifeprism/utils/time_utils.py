@@ -76,7 +76,14 @@ def local_to_utc_iso(local_str: str, format: str = "%Y-%m-%d %H:%M:%S") -> str:
     """
     tz = pytz.timezone(get_user_timezone())
     dt = datetime.strptime(local_str, format)
-    dt = tz.localize(dt)
+    try:
+        dt = tz.localize(dt)
+    except pytz.exceptions.NonExistentTimeError:
+        # DST 夏令时跳变间隙（如 spring-forward 时 02:30 不存在），向前调整
+        dt = tz.localize(dt, is_dst=False)
+    except pytz.exceptions.AmbiguousTimeError:
+        # DST 冬令时回退重叠（如 fall-back 时 01:30 出现两次），使用标准时间
+        dt = tz.localize(dt, is_dst=False)
     return dt.astimezone(timezone.utc).isoformat()
 
 

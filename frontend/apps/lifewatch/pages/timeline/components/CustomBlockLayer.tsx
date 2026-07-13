@@ -17,6 +17,7 @@ import { CategoryTreeItem } from '../../../../../core/types/common-components';
 import CustomBlockLabel, { calculateLabelOffsets } from './CustomBlockLabel';
 import CustomBlockPopover from './CustomBlockPopover';
 import { CustomBlockAPI } from './customBlockApi';
+import { toISOStringUTC, parseISOString } from '../../../../../core/utils/dateUtils';
 
 interface CustomBlockLayerProps {
     /** 当前日期 (YYYY-MM-DD) */
@@ -37,10 +38,15 @@ interface CustomBlockLayerProps {
 
 /**
  * 将时间字符串转换为小时浮点数
+ *
+ * ⚠️ 规则：接收 UTC ISO 时间，转换为本地时间后计算小时数
+ * 后端存储的是 UTC，前端显示必须转为本地时间
  */
 function timeToHour(timeStr: string): number {
-    const timePart = timeStr.includes('T') ? timeStr.split('T')[1] : timeStr.split(' ')[1] || timeStr;
-    const [hours, minutes] = timePart.split(':').map(Number);
+    // 解析 UTC ISO 字符串为 Date 对象（浏览器自动转为本地时间）
+    const date = parseISOString(timeStr);
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
     return hours + minutes / 60;
 }
 
@@ -167,9 +173,14 @@ const CustomBlockLayer: React.FC<CustomBlockLayerProps> = ({
     const handleSavePopover = useCallback(async (data: PopoverFormData, blockId?: number) => {
         setIsSaving(true);
         try {
-            const startTimeStr = `${currentDate}T${data.startTime}:00`;
-            const endTimeStr = `${currentDate}T${data.endTime}:00`;
-            const duration = calculateDuration(startTimeStr, endTimeStr);
+            // ✅ 就近转换：构造本地 Date 对象，立即转为 UTC ISO 后提交
+            const localStartDate = new Date(`${currentDate}T${data.startTime}:00`);
+            const localEndDate = new Date(`${currentDate}T${data.endTime}:00`);
+
+            const startTimeStr = toISOStringUTC(localStartDate);
+            const endTimeStr = toISOStringUTC(localEndDate);
+
+            const duration = calculateDuration(`${currentDate}T${data.startTime}:00`, `${currentDate}T${data.endTime}:00`);
 
             if (blockId) {
                 // 更新

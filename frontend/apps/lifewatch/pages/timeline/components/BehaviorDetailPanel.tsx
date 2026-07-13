@@ -12,6 +12,7 @@
 import React from 'react';
 import { Clock } from 'lucide-react';
 import { BehaviorAnalysisItem } from '../types';
+import { parseISOString, toLocalDateString } from '../../../../../core/utils/dateUtils';
 
 interface BehaviorDetailPanelProps {
     behavior: BehaviorAnalysisItem | null;
@@ -22,8 +23,8 @@ interface BehaviorDetailPanelProps {
  * 格式化持续时长
  */
 function formatDuration(startTime: string, endTime: string): string {
-    const start = new Date(startTime.replace(' ', 'T'));
-    const end = new Date(endTime.replace(' ', 'T'));
+    const start = parseISOString(startTime);
+    const end = parseISOString(endTime);
     const diffMs = end.getTime() - start.getTime();
     const diffMinutes = Math.floor(diffMs / 60000);
 
@@ -37,23 +38,21 @@ function formatDuration(startTime: string, endTime: string): string {
 }
 
 /**
- * 格式化时间为 HH:MM
+ * 格式化时间为 HH:MM（本地时区）
  */
 function formatTime(timeStr: string): string {
-    const timePart = timeStr.includes('T')
-        ? timeStr.split('T')[1]
-        : timeStr.split(' ')[1] || timeStr;
-    return timePart.substring(0, 5);
+    const date = parseISOString(timeStr);
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
 /**
- * 格式化日期为 YYYY-MM-DD
+ * 格式化日期为 YYYY-MM-DD（本地时区）
  */
 function formatDate(timeStr: string): string {
-    const datePart = timeStr.includes('T')
-        ? timeStr.split('T')[0]
-        : timeStr.split(' ')[0] || timeStr;
-    return datePart;
+    const date = parseISOString(timeStr);
+    return toLocalDateString(date);
 }
 
 const BehaviorDetailPanel: React.FC<BehaviorDetailPanelProps> = ({

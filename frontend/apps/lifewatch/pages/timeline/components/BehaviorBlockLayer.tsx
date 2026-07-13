@@ -12,6 +12,7 @@
 
 import React from 'react';
 import { BehaviorAnalysisItem } from '../types';
+import { parseISOString } from '../../../../../core/utils/dateUtils';
 
 interface BehaviorBlockLayerProps {
     behaviors: BehaviorAnalysisItem[];
@@ -21,18 +22,15 @@ interface BehaviorBlockLayerProps {
 }
 
 /**
- * 将时间字符串转换为小时浮点数
+ * 将 UTC ISO 时间转换为本地小时浮点数
  */
 function timeToHour(timeStr: string): number {
-    const timePart = timeStr.includes('T')
-        ? timeStr.split('T')[1]
-        : timeStr.split(' ')[1] || timeStr;
-    const [hours, minutes] = timePart.split(':').map(Number);
-    return hours + minutes / 60;
+    const date = parseISOString(timeStr);
+    return date.getHours() + date.getMinutes() / 60;
 }
 
 /**
- * 格式化 HH:MM
+ * 格式化小时数为 HH:MM
  */
 function formatHHMM(hour: number): string {
     const h = Math.floor(hour);

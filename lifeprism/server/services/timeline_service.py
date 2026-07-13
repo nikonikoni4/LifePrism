@@ -262,17 +262,18 @@ def get_custom_block(block_id: int) -> UserCustomBlockResponse:
     return UserCustomBlockResponse(data=UserCustomBlock(**enriched_record))
 
 
-def get_custom_blocks_by_date(date: str) -> UserCustomBlockListResponse:
+def get_custom_blocks_by_time_range(start_time: str, end_time: str) -> UserCustomBlockListResponse:
     """
-    获取指定日期的所有自定义时间块
+    获取指定时间范围的所有自定义时间块
 
     Args:
-        date: str, 日期（YYYY-MM-DD 格式）
+        start_time: str, 开始时间（ISO 8601 UTC 格式）
+        end_time: str, 结束时间（ISO 8601 UTC 格式）
 
     Returns:
         UserCustomBlockListResponse: 时间块列表（每条含名称和颜色）
     """
-    records = custom_block_repository.get_custom_blocks_by_date(date)
+    records = custom_block_repository.get_custom_blocks_by_time_range(start_time, end_time)
     blocks = [UserCustomBlock(**_enrich_block_record(r)) for r in records]
     return UserCustomBlockListResponse(data=blocks, total=len(blocks))
 

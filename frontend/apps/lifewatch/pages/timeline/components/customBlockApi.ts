@@ -12,6 +12,7 @@ import {
     UserCustomBlockResponse,
 } from './types';
 import { createApiV2UrlGetter } from '../../../../../core/services/apiConfig';
+import { toISOStringUTC } from '../../../../../core/utils/dateUtils';
 
 // 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
 const getApiBase = createApiV2UrlGetter();
@@ -42,12 +43,18 @@ export const CustomBlockAPI = {
 
     /**
      * 按日期获取自定义时间块列表
-     * 
+     *
      * @param date 查询日期 (YYYY-MM-DD)
      * @returns 时间块列表
      */
     async getByDate(date: string): Promise<UserCustomBlock[]> {
-        const params = new URLSearchParams({ date });
+        // 前端转换日期为 UTC 时间范围
+        const startOfDay = new Date(`${date}T00:00:00`);
+        const endOfDay = new Date(`${date}T23:59:59.999`);
+        const start_time = toISOStringUTC(startOfDay);
+        const end_time = toISOStringUTC(endOfDay);
+
+        const params = new URLSearchParams({ start_time, end_time });
         const response = await fetch(`${getApiBase()}/timeline/custom-blocks?${params.toString()}`);
 
         if (!response.ok) {

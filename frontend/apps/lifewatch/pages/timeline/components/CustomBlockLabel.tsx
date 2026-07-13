@@ -12,6 +12,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { UserCustomBlock } from './types';
+import { parseISOString } from '../../../../../core/utils/dateUtils';
 
 interface CustomBlockLabelProps {
     /** 自定义时间块数据 */
@@ -36,12 +37,11 @@ const LABEL_VERTICAL_GAP = 4;   // 标签垂直间距（像素）
 const MAX_LABEL_CHARS = 4;      // 默认显示的最大字符数
 
 /**
- * 将时间字符串转换为小时浮点数
+ * 将 UTC ISO 时间转换为本地小时浮点数
  */
 function timeToHour(timeStr: string): number {
-    const timePart = timeStr.includes('T') ? timeStr.split('T')[1] : timeStr.split(' ')[1] || timeStr;
-    const [hours, minutes] = timePart.split(':').map(Number);
-    return hours + minutes / 60;
+    const date = parseISOString(timeStr);
+    return date.getHours() + date.getMinutes() / 60;
 }
 
 /**

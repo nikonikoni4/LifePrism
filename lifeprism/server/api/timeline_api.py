@@ -88,13 +88,17 @@ async def create_custom_block(data: UserCustomBlockCreate):
 
 
 @router.get("/custom-blocks", response_model=UserCustomBlockListResponse)
-async def get_custom_blocks(date: str = Query(..., description="查询日期 (YYYY-MM-DD)")):
+async def get_custom_blocks(
+    start_time: str = Query(..., description="开始时间 (ISO 8601 UTC)"),
+    end_time: str = Query(..., description="结束时间 (ISO 8601 UTC)")
+):
     """
-    获取指定日期的所有自定义时间块
+    获取指定时间范围的所有自定义时间块
 
-    - **date**: 查询日期，格式 YYYY-MM-DD
+    - **start_time**: 开始时间，ISO 8601 格式 UTC (如 2026-07-13T00:00:00.000Z)
+    - **end_time**: 结束时间，ISO 8601 格式 UTC (如 2026-07-13T23:59:59.999Z)
     """
-    return timeline_service.get_custom_blocks_by_date(date)
+    return timeline_service.get_custom_blocks_by_time_range(start_time, end_time)
 
 
 # ============================================================================
