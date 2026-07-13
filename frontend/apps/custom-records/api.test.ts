@@ -219,8 +219,8 @@ describe('CustomRecordsAPI', () => {
   describe('getEntries', () => {
     it('should call GET /custom-records/{type_id}/entries and return items with total', async () => {
       const mockEntries: CustomRecordEntryItem[] = [
-        { id: 'cre-001', created_at: '2026-07-07T10:00:00', updated_at: '', book_title: '百年孤独', notes: '精彩' },
-        { id: 'cre-002', created_at: '2026-07-06T10:00:00', updated_at: '', book_title: '三体', notes: '震撼' },
+        { id: 'cre-001', event_time: '2026-07-07T10:00:00', created_at: '2026-07-07T10:00:00', updated_at: '', book_title: '百年孤独', notes: '精彩' },
+        { id: 'cre-002', event_time: '2026-07-06T10:00:00', created_at: '2026-07-06T10:00:00', updated_at: '', book_title: '三体', notes: '震撼' },
       ];
       vi.spyOn(globalThis, 'fetch').mockResolvedValue({
         ok: true,
@@ -243,17 +243,17 @@ describe('CustomRecordsAPI', () => {
       } as Response);
 
       await CustomRecordsAPI.getEntries('crt-abc12345', {
-        start_date: '2026-07-01',
-        end_date: '2026-07-07',
+        start_time: '2026-07-01',
+        end_time: '2026-07-07',
         page: 2,
         page_size: 10,
       });
 
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('start_date=2026-07-01'),
+        expect.stringContaining('start_time=2026-07-01'),
       );
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('end_date=2026-07-07'),
+        expect.stringContaining('end_time=2026-07-07'),
       );
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('page=2'),
@@ -295,6 +295,7 @@ describe('CustomRecordsAPI', () => {
       };
       const mockCreated: CustomRecordEntryItem = {
         id: 'cre-001',
+        event_time: '2026-07-07T10:00:00',
         created_at: '2026-07-07T10:00:00',
         updated_at: '',
         book_title: '百年孤独',
