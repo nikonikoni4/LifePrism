@@ -203,6 +203,7 @@ def cmd_show_config(args: argparse.Namespace) -> None:
     - Provider、Model、API Base
     - API Key（只显示后 8 位，格式 ***...后8位）
     - Monitor Type、Run Mode
+    - Timezone（用户时区，影响 AI 工具时间显示）
 
     Args:
         args: argparse 解析后的参数（show-config 命令无额外参数）
@@ -212,6 +213,7 @@ def cmd_show_config(args: argparse.Namespace) -> None:
     api_base = settings.api_base
     monitor_type = settings.monitor_type
     run_mode = settings.run_mode
+    timezone = settings.timezone
 
     # API Key 脱敏：通过 provider_manager 读取（云端 keyring 不可用时 fallback 到 providers.yaml）
     provider_id = provider_manager.get_provider_id(provider) if provider else ""
@@ -227,6 +229,7 @@ def cmd_show_config(args: argparse.Namespace) -> None:
     print(f"API Key:       {masked_key}")
     print(f"Monitor Type:  {monitor_type}")
     print(f"Run Mode:      {run_mode}")
+    print(f"Timezone:      {timezone}")
     print("=" * 50)
 
 

@@ -41,6 +41,7 @@ def cloud_init_data():
         },
         "wechat_token": "wx_token_test",
         "monitor_type": "none",
+        "timezone": "Asia/Shanghai",
         "providers": [
             {
                 "name": "anthropic",
@@ -551,6 +552,78 @@ class TestConfigYamlContent:
         with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
         assert config["monitor_type"] == "none"
+
+    def test_config_yaml_contains_timezone_from_cloud_init(self, setup_paths, cloud_init_data):
+        """config.yaml 中 timezone 来自 cloud_init.timezone"""
+        data_path = setup_paths["data_path"]
+        config_path = setup_paths["config_path"]
+        _write_cloud_init(data_path, cloud_init_data)
+
+        CloudInitializer(data_path).initialize()
+
+        with open(config_path, encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        assert config["timezone"] == "Asia/Shanghai"
+
+    def test_config_yaml_timezone_passthrough_custom_value(self, setup_paths, cloud_init_data):
+        """cloud_init.yaml 中 timezone 为自定义值（如 America/New_York）时，透传到 config.yaml"""
+        data_path = setup_paths["data_path"]
+        config_path = setup_paths["config_path"]
+        data = dict(cloud_init_data)
+        data["timezone"] = "America/New_York"
+        _write_cloud_init(data_path, data)
+
+        CloudInitializer(data_path).initialize()
+
+        with open(config_path, encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        assert config["timezone"] == "America/New_York"
+
+    def test_config_yaml_omits_timezone_when_cloud_init_missing_it(
+        self, setup_paths, cloud_init_data
+    ):
+        """cloud_init.yaml 中无 timezone 字段时，config.yaml 也不写入 timezone（让 DEFAULTS 兜底）"""
+        data_path = setup_paths["data_path"]
+        config_path = setup_paths["config_path"]
+        data = dict(cloud_init_data)
+        data.pop("timezone")
+        _write_cloud_init(data_path, data)
+
+        CloudInitializer(data_path).initialize()
+
+        with open(config_path, encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        # timezone 字段不应被写入（由 settings_manager DEFAULTS 兜底为 Asia/Shanghai）
+        assert "timezone" not in config
+
+    def test_config_yaml_preserves_existing_timezone_when_cloud_init_missing_it(
+        self, setup_paths, cloud_init_data
+    ):
+        """cloud_init.yaml 无 timezone，但 config.yaml 已有 timezone 时，保留现有值"""
+        data_path = setup_paths["data_path"]
+        config_path = setup_paths["config_path"]
+
+        # 预写入已有配置（含 timezone）
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, "w", encoding="utf-8") as f:
+            yaml.dump(
+                {"timezone": "Europe/London", "user_name": "已有用户"},
+                f,
+                allow_unicode=True,
+                sort_keys=False,
+            )
+
+        # cloud_init.yaml 不含 timezone
+        data = dict(cloud_init_data)
+        data.pop("timezone")
+        _write_cloud_init(data_path, data)
+
+        CloudInitializer(data_path).initialize()
+
+        with open(config_path, encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        # 保留已有 timezone
+        assert config["timezone"] == "Europe/London"
 
     def test_config_yaml_preserves_existing_fields(self, setup_paths, cloud_init_data):
         """写入 config.yaml 时保留已有字段（合并策略）"""

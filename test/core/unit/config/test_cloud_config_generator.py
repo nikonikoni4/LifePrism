@@ -63,6 +63,7 @@ def mock_env(tmp_path):
     mock_settings.get.side_effect = lambda key, default=None: {
         "provider": "anthropic",
         "model": "claude-opus-4",
+        "timezone": "Asia/Shanghai",
     }.get(key, default if default is not None else "")
     mock_settings.lifeprism_data_path = tmp_path
 
@@ -330,6 +331,61 @@ class TestCloudConfigGeneratorCompleteConfig:
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
         names = [p["name"] for p in config["providers"]]
         assert "custom" not in names
+
+
+class TestCloudConfigGeneratorTimezone:
+    """测试 timezone 字段透传"""
+
+    def test_includes_timezone_field(self, mock_env):
+        """生成的配置包含 timezone 字段"""
+        from lifeprism.config.cloud_config_generator import CloudConfigGenerator
+
+        generator = CloudConfigGenerator()
+        path, _ = generator.generate_cloud_config()
+
+        config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        assert "timezone" in config
+        assert config["timezone"] == "Asia/Shanghai"
+
+    def test_timezone_from_settings(self, mock_env):
+        """timezone 字段值来自 settings.get('timezone')"""
+        from lifeprism.config.cloud_config_generator import CloudConfigGenerator
+
+        # 修改 settings.get 返回的 timezone
+        original_side_effect = mock_env["settings"].get.side_effect
+
+        def get_side_effect(key, default=None):
+            if key == "timezone":
+                return "America/New_York"
+            return original_side_effect(key, default)
+
+        mock_env["settings"].get.side_effect = get_side_effect
+
+        generator = CloudConfigGenerator()
+        path, _ = generator.generate_cloud_config()
+
+        config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        assert config["timezone"] == "America/New_York"
+
+    def test_timezone_fallback_to_default_when_settings_missing(self, mock_env):
+        """settings 中没有 timezone 字段时，使用默认值 Asia/Shanghai"""
+        from lifeprism.config.cloud_config_generator import CloudConfigGenerator
+
+        original_side_effect = mock_env["settings"].get.side_effect
+
+        def get_side_effect(key, default=None):
+            if key == "timezone":
+                return default  # 模拟 settings 中没有 timezone，返回 default
+            return original_side_effect(key, default)
+
+        mock_env["settings"].get.side_effect = get_side_effect
+
+        generator = CloudConfigGenerator()
+        path, _ = generator.generate_cloud_config()
+
+        config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        # settings.get("timezone", "Asia/Shanghai") 在 key 不存在时返回默认值
+        assert config["timezone"] == "Asia/Shanghai"
 
 
 class TestCloudConfigGeneratorMonitorType:

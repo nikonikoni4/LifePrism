@@ -55,7 +55,7 @@ def noop_agent_loop(monkeypatch):
 
 @pytest.fixture
 def mock_settings_config(monkeypatch):
-    """Mock settings.get，使 settings.provider/model/api_base/monitor_type 返回受控值。
+    """Mock settings.get，使 settings.provider/model/api_base/monitor_type/timezone 返回受控值。
 
     settings 的 provider 等属性内部调用 self.get(key)，因此 patch get 即可控制。
     """
@@ -65,6 +65,7 @@ def mock_settings_config(monkeypatch):
         "api_base": "https://api.anthropic.com",
         "monitor_type": "none",
         "run_mode": "agent_only",
+        "timezone": "Asia/Shanghai",
     }
     monkeypatch.setattr(
         main_agent_only.settings,
@@ -322,6 +323,41 @@ class TestShowConfigCommand:
         out = capsys.readouterr().out
         assert "none" in out
 
+    def test_show_config_displays_timezone(
+        self, mock_cloud_initializer, mock_settings_config, monkeypatch, capsys
+    ):
+        """show-config 显示 timezone"""
+        monkeypatch.setattr(
+            main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None
+        )
+
+        main_agent_only.main(["show-config"])
+
+        out = capsys.readouterr().out
+        assert "Asia/Shanghai" in out
+
+    def test_show_config_displays_timezone_custom_value(
+        self, mock_cloud_initializer, mock_settings_config, monkeypatch, capsys
+    ):
+        """show-config 显示自定义 timezone 值（如 America/New_York）"""
+        # 修改 timezone 返回值
+        original_get = main_agent_only.settings.get
+
+        def mock_get(key, default=None):
+            if key == "timezone":
+                return "America/New_York"
+            return original_get(key, default)
+
+        monkeypatch.setattr(main_agent_only.settings, "get", mock_get)
+        monkeypatch.setattr(
+            main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None
+        )
+
+        main_agent_only.main(["show-config"])
+
+        out = capsys.readouterr().out
+        assert "America/New_York" in out
+
 
 # ==================== Slice 4: test-llm 命令 ====================
 
@@ -480,6 +516,7 @@ class TestCliDispatch:
             "api_base": "https://api.anthropic.com",
             "monitor_type": "none",
             "run_mode": "agent_only",
+            "timezone": "Asia/Shanghai",
         }
         monkeypatch.setattr(
             main_agent_only.settings,

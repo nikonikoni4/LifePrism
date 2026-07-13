@@ -217,6 +217,7 @@ class CloudInitializer:
         - wechat_token: 来自 cloud_init.wechat_token
         - sync_api_key: 来自 cloud_init.sync.api_key
         - monitor_type: 强制为 none
+        - timezone: 来自 cloud_init.timezone（透传用户时区配置）
 
         采用合并策略: 读取现有 config.yaml（如存在），更新上述字段后写回。
 
@@ -242,6 +243,12 @@ class CloudInitializer:
         existing_config["wechat_token"] = cloud_config.get("wechat_token", "")
         existing_config["sync_api_key"] = sync_config.get("api_key", "")
         existing_config["monitor_type"] = "none"  # 强制为 none
+        # 透传 timezone（cloud_init.yaml 中已有此字段，由 cloud_config_generator 写入）
+        # 仅在 cloud_init.yaml 显式提供 timezone 时才写入 config.yaml，
+        # 否则保留 config.yaml 已有值或让 settings_manager DEFAULTS 兜底
+        timezone_from_cloud = cloud_config.get("timezone")
+        if timezone_from_cloud:
+            existing_config["timezone"] = timezone_from_cloud
 
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(
@@ -253,9 +260,10 @@ class CloudInitializer:
             os.chmod(config_path, 0o600)
 
         logger.info(
-            "已写入 config.yaml: provider=%s, model=%s, wechat_token=***, sync_api_key=***, monitor_type=none",
+            "已写入 config.yaml: provider=%s, model=%s, wechat_token=***, sync_api_key=***, monitor_type=none, timezone=%s",
             existing_config["provider"],
             existing_config["model"],
+            existing_config.get("timezone", "(未设置)"),
         )
 
     def _write_providers_yaml(self, cloud_config: dict[str, Any]) -> None:

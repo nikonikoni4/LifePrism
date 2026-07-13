@@ -150,6 +150,7 @@ class CloudConfigGenerator:
               api_key: "lifeprism_sync_..."
             wechat_token: "wx_token_..."
             monitor_type: none
+            timezone: Asia/Shanghai
             providers:
               - name: anthropic
                 env_key: api_key_anthropic
@@ -167,6 +168,7 @@ class CloudConfigGenerator:
             },
             "wechat_token": wechat_token,
             "monitor_type": "none",  # 强制覆盖：云端必须禁用 Monitor
+            "timezone": settings.get("timezone", "Asia/Shanghai"),  # 透传用户时区配置
             "providers": providers_list,
         }
 
