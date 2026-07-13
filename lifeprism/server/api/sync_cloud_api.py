@@ -2,6 +2,7 @@
 云端数据同步 API 路由
 
 提供 Pull + Push 双向同步的 REST API 端点：
+- GET  /api/sync/health: 健康检查（无需认证）
 - POST /api/sync/pull: 从云端拉取增量数据（同时更新心跳）
 - POST /api/sync/push: 推送本地变更到云端
 - POST /api/sync/heartbeat: 接收本地心跳/生命周期事件
@@ -125,6 +126,22 @@ def verify_sync_api_key(authorization: str | None = Header(default=None)) -> Non
 
 
 # ==================== API 端点 ====================
+
+
+@router.get("/health", summary="健康检查")
+def health_check():
+    """健康检查端点（无需认证）
+
+    用于测试云端服务连通性，直接返回服务状态。
+
+    **响应**:
+    - status: 服务状态
+    - mode: 运行模式
+    """
+    return {
+        "status": "ok",
+        "mode": "agent-only",
+    }
 
 
 @router.post("/pull", summary="从云端拉取增量数据")
