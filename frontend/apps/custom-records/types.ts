@@ -43,6 +43,7 @@ export interface CreateCustomRecordTypeRequest {
 
 export interface CustomRecordEntryItem {
   id: string;
+  event_time: string;
   created_at: string;
   updated_at: string;
   [key: string]: string; // 动态字段
@@ -58,8 +59,8 @@ export interface CreateCustomRecordEntryRequest {
 }
 
 export interface GetEntriesParams {
-  start_date?: string;
-  end_date?: string;
+  start_time?: string;
+  end_time?: string;
   page?: number;
   page_size?: number;
 }

@@ -1,16 +1,98 @@
-# Mood Entries 和 Custom Records 日期查询问题
+# Mood Entries / Custom Records 日期查询问题 & 自定义数据表 UTC 迁移遗漏
 
 ## 元信息
 
+本文件记录了三类相关但性质不同的已知问题：
+
+| 问题 | 类型 | 严重程度 |
+|------|------|---------|
+| 自定义数据表 UTC 迁移遗漏 | **数据一致性问题** | ✅ 已修复（2026-07-13） |
+| Mood Entries 缺少独立日期字段 | 表设计限制 | ❌ 未修复 |
+| Custom Records 缺少独立日期字段 | 表设计限制 | ✅ 已修复（2026-07-13），新增 `event_time` + 组件内 UTC 转换 |
+
 - **发现时间**: 2026-07-13
-- **状态**: ❌ 未修复（已知限制）
-- **影响范围**: Mood Entries API、Custom Records API
-- **问题类型**: 数据表设计问题 - 缺少独立日期字段
-- **严重程度**: 中（功能可用，但查询效率低）
+- **状态**: 自定义数据表迁移遗漏 + Custom Records 日期查询已修复；Mood Entries 仍为已知限制
 
 ## 问题描述
 
-### 1. Mood Entries API
+### 1. 自定义数据表迁移缺失（UTC 迁移遗漏）✅ 已修复
+
+**修复**：m009 迁移末尾新增 `_migrate_custom_data_tables()` 函数，遍历 `custom_record_types.slug` 对每个 `custom_<slug>` 表执行 `created_at` / `updated_at` 的 UTC 转换。
+
+**背景**：m009 迁移脚本（[m009_migrate_history_to_utc.py](file:///d:/desktop/软件开发/LifeWatch-AI/lifeprism/repository/migrations/scripts/m009_migrate_history_to_utc.py)）负责将历史数据从本地时区 (UTC+8) 减 8 小时转为 UTC。该迁移只处理 `TABLE_CONFIGS` 中**静态注册**的表。
+
+**问题**：
+
+- 自定义记录的数据表是**运行时动态创建**的，表名由 `custom_record_types.slug` 决定，格式为 `custom_<slug>`（如 `custom_sport`、`custom_reading`）
+- 这些动态表不在 `TABLE_CONFIGS` 中注册，因此 m009 的迁移列表**没有包含它们**
+- 结果：`custom_record_types` 和 `custom_record_fields` 的 `created_at` 得到了迁移，但动态数据表 `custom_<slug>` 中的 `created_at` 和 `updated_at` **仍然是本地时区**，没有转换为 UTC
+
+**动态表结构示例**：
+
+```sql
+-- custom_record_types 表（元数据，已迁移 ✅）
+CREATE TABLE custom_record_types (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,   -- 如 "sport", "reading"
+    ...
+    created_at TEXT,   -- UTC ✅
+    updated_at TEXT    -- UTC ✅
+);
+
+-- custom_sport 表（动态数据，未迁移 ❌）
+CREATE TABLE custom_sport (
+    id TEXT PRIMARY KEY NOT NULL,
+    distance TEXT,
+    duration TEXT,
+    ...
+    created_at TEXT,   -- 本地时区 ❌
+    updated_at TEXT    -- 本地时区 ❌
+);
+```
+
+**m009 迁移当前覆盖情况**：
+
+| 表 | 迁移状态 |
+|----|---------|
+| `custom_record_types` (created_at, updated_at) | ✅ 已迁移 |
+| `custom_record_fields` (created_at) | ✅ 已迁移 |
+| `custom_<slug>` 动态表 (created_at, updated_at) | ❌ **未迁移** |
+
+**正确做法**：迁移时应：
+
+1. 从 `custom_record_types` 读取所有 `slug`
+2. 动态组成表名 `custom_<slug>`
+3. 对每个动态表执行 `created_at` 和 `updated_at` 的 UTC 转换（减 8 小时）
+
+```python
+# 伪代码：正确的迁移逻辑
+cursor.execute("SELECT slug FROM custom_record_types")
+for row in cursor.fetchall():
+    table_name = f"custom_{row['slug']}"
+    # 检查表是否存在
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,)
+    )
+    if cursor.fetchone():
+        # 迁移 created_at
+        cursor.execute(f'''
+            UPDATE "{table_name}"
+            SET "created_at" = strftime('%Y-%m-%dT%H:%M:%f',
+                datetime("created_at", '-8 hours')) || '+00:00'
+            WHERE "created_at" IS NOT NULL AND "created_at" != ''
+        ''')
+        # 迁移 updated_at
+        cursor.execute(f'''
+            UPDATE "{table_name}"
+            SET "updated_at" = strftime('%Y-%m-%dT%H:%M:%f',
+                datetime("updated_at", '-8 hours')) || '+00:00'
+            WHERE "updated_at" IS NOT NULL AND "updated_at" != ''
+        ''')
+```
+
+### 2. Mood Entries API
 
 **表结构**：
 ```sql
@@ -35,29 +117,20 @@ GET /api/v2/mood/entries?start_date=2026-07-01&end_date=2026-07-31
 - 每次查询都需要在后端将日期范围转换为 UTC 时间范围
 - 无法在数据库层建立基于日期的索引
 
-### 2. Custom Records API
+### 3. Custom Records API（✅ 已修复）
 
-**表结构**：
-```sql
-CREATE TABLE custom_records_<type_id> (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    field_1 TEXT,
-    field_2 TEXT,
-    created_at TEXT,  -- UTC ISO 8601
-    updated_at TEXT
-);
-```
-
-**API 查询参数**：
-```typescript
-// frontend/apps/custom-records/api.ts
-GET /api/v2/custom-records/:typeId/entries?start_date=2026-07-01&end_date=2026-07-31
-```
-
-**问题**：
+**原问题**：
 - 表中只有 `created_at/updated_at` datetime 字段
-- **没有独立的 `date` 字段**
-- 按日期聚合统计时需要额外的时间转换
+- 前端直接传 YYYY-MM-DD → 后端直接做 `created_at >= 'YYYY-MM-DD'` 字符串比较
+- 字符串比较逻辑与 UTC ISO 格式不兼容，导致查询结果不正确
+
+**修复方案**：
+1. 新增系统级 `event_time` 字段（UTC ISO 8601），由 Agent 以本地 `YYYY-MM-DD HH:MM:SS` 提供，execute 层 `local_to_utc_iso()` 转 UTC 存储
+2. 查询改用 `WHERE event_time >= ? AND event_time <= ?` 替代 `WHERE created_at`
+3. 前端 TypeDetailView 组件内 `toISOStringUTC()` 将日期转为 UTC 时间范围，遵循就近原则
+4. LLM Tool Query 工具 `date_range` 在 execute 层通过 `build_utc_time_range()` 转 UTC
+
+**m010 迁移**：为已有动态表 `ALTER TABLE ADD COLUMN event_time TEXT` + `UPDATE SET event_time = created_at` 回填
 
 ## 当前实现
 
@@ -87,26 +160,38 @@ def get_entries(start_date: str, end_date: str):
 
 ## 为什么是"已知限制"而非"bug"
 
-### 与 Timeline Custom Block 的区别
+### 三类问题的性质对比
 
-| 对比项 | Timeline Custom Block（bug） | Mood/Custom Records（限制） |
-|--------|------------------------------|----------------------------|
-| 表结构 | 只有 `start_time/end_time` datetime | 只有 `created_at/updated_at` datetime |
-| API 参数 | 传日期 `date=2026-07-13` | 传日期范围 `start_date/end_date` |
-| 后端处理 | ❌ 直接拼接字符串（错误） | ✅ 使用 `build_utc_time_range()` 转换 |
-| 查询结果 | ❌ 字符串比较失败，查不到数据 | ✅ 查询正确，但效率低 |
-| 问题性质 | 代码 bug（逻辑错误） | 表设计限制（缺少日期字段） |
+| 对比项 | 自定义表迁移遗漏 | Timeline Custom Block | Mood/Custom Records |
+|--------|-----------------|----------------------|---------------------|
+| 问题性质 | **数据一致性 bug** | 代码 bug | 表设计限制 |
+| 表结构 | 动态表 `custom_<slug>` | `timeline_custom_block` | `mood_entries` / `custom_records_<type_id>` |
+| API 参数 | 无（迁移脚本内部） | 传日期 `date=2026-07-13` | 传日期范围 `start_date/end_date` |
+| 后端处理 | ❌ 迁移列表未包含动态表 | ❌ 直接拼接字符串 | ✅ 使用 `build_utc_time_range()` 转换 |
+| 数据后果 | ❌ 时间偏差 8 小时（数据错误） | ❌ 查询失败（查不到数据） | ✅ 查询正确，仅效率低 |
 
-**Custom Block 是 bug**：代码逻辑错误导致查询失败。
+### 性质判定
 
-**Mood/Custom Records 是限制**：
-- 代码逻辑正确（后端转换了时间范围）
-- 查询结果准确
-- 但因为缺少独立 `date` 字段，无法优化查询性能
+- **自定义表迁移遗漏** 是 **数据一致性 bug**：m009 迁移脚本遗漏了动态表 `custom_<slug>`，导致自定义记录的时间比实际 UTC 时间早 8 小时。这属于**数据正确性问题**，应该修复。
+
+- **Timeline Custom Block** 是 **代码 bug**：查询逻辑错误导致查询失败。
+
+- **Mood/Custom Records** 是 **设计限制**：代码逻辑正确，查询结果准确，但因为缺少独立 `date` 字段，无法优化查询性能。
 
 ## 影响
 
-### 性能影响
+### 自定义表迁移遗漏（严重）
+
+1. **时间偏差 8 小时**：
+   - 动态表 `custom_<slug>` 中的 `created_at` 和 `updated_at` 仍为本地时区 (UTC+8)
+   - 新写入的数据使用 `datetime('now')`（UTC），与旧数据时区不一致
+   - 新旧数据混合查询时时间比较可能出错
+
+2. **功能影响**：
+   - 自定义记录列表中显示的时间会偏差 8 小时
+   - 按时间排序时，新旧数据可能交错
+
+### Mood Entries / Custom Records 性能影响
 
 1. **无法建立日期索引**：
    - `created_at` 是完整时间戳，无法基于日期快速过滤
@@ -215,6 +300,8 @@ CREATE TABLE mood_entries (
 
 ## 决策记录
 
+### Mood Entries / Custom Records（缺少日期字段）
+
 - **决策时间**: 2026-07-13
 - **决策者**: 架构评审
 - **决策内容**: 暂不修复，作为已知限制记录
@@ -223,6 +310,19 @@ CREATE TABLE mood_entries (
   2. 性能影响在可接受范围内
   3. 添加 `date` 字段需要数据迁移，成本高
   4. 优先修复 Custom Block 等有数据错误的 bug
+
+### 自定义表 UTC 迁移遗漏（✅ 已修复）
+
+- **决策时间**: 2026-07-13
+- **决策内容**: 已修复 — m009 末尾新增动态表迁移逻辑
+- **修复**: `_migrate_custom_data_tables()` 遍历 `custom_record_types.slug` 迁移 `custom_<slug>` 的 `created_at`/`updated_at`
+
+### Custom Records 日期查询（✅ 已修复）
+
+- **决策时间**: 2026-07-13
+- **决策内容**: 已修复 — 新增 `event_time` 字段，前端组件内 UTC 转换
+- **数据流**: 前端 `input[type="date"]` → `toISOStringUTC()` → 后端 `start_time`/`end_time`（UTC ISO） → `WHERE event_time >= ?`
+- **决策依据**: `docs/adr/2026-07-13-custom-records-time-string-not-convert.md`
 
 ## 未来重构建议
 

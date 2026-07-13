@@ -249,6 +249,13 @@ def upgrade(cursor) -> None:
         migrated_fields += 1
         total_rows += affected
 
+    # 迁移动态自定义数据表 custom_<slug> 的 created_at / updated_at
+    # 这些表不在 TABLE_CONFIGS 中，由 custom_record_types.slug 运行时决定
+    custom_migrated, custom_skipped, custom_rows = _migrate_custom_data_tables(cursor)
+    migrated_fields += custom_migrated
+    skipped_fields += custom_skipped
+    total_rows += custom_rows
+
     logger.info(
         "m009: 历史数据迁移完成 — 迁移 %d 个字段，跳过 %d 个（表/字段不存在），共更新 %d 行",
         migrated_fields,
@@ -387,3 +394,78 @@ def _migrate_table_with_constraints(cursor, table_name: str, fields: list) -> in
         logger.debug("m009: 重建索引 %s", index_name)
 
     return copied_rows
+
+
+def _migrate_custom_data_tables(cursor) -> tuple[int, int, int]:
+    """
+    迁移动态自定义数据表 custom_<slug> 的 created_at / updated_at。
+
+    这些表不在 TABLE_CONFIGS 中静态注册，由 custom_record_types.slug 运行时决定表名。
+    遍历 custom_record_types 获取所有 slug，对存在的 custom_<slug> 表执行逐字段 UPDATE。
+
+    Args:
+        cursor: 数据库游标
+
+    Returns:
+        tuple[int, int, int]: (迁移字段数, 跳过的表数, 总影响行数)
+    """
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='custom_record_types'"
+    )
+    if not cursor.fetchone():
+        logger.debug("m009: custom_record_types 表不存在，跳过动态表迁移")
+        return 0, 0, 0
+
+    cursor.execute("SELECT slug FROM custom_record_types")
+    slugs = [row[0] for row in cursor.fetchall()]
+    if not slugs:
+        return 0, 0, 0
+
+    total_migrated = 0
+    total_skipped = 0
+    total_rows = 0
+
+    for slug in slugs:
+        table_name = f"custom_{slug}"
+
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,),
+        )
+        if not cursor.fetchone():
+            logger.debug("m009: 动态表 %s 不存在，跳过", table_name)
+            total_skipped += 2
+            continue
+
+        for field_name in ("created_at", "updated_at"):
+            cursor.execute(f'PRAGMA table_info("{table_name}")')
+            columns = {row[1] for row in cursor.fetchall()}
+            if field_name not in columns:
+                logger.debug("m009: 动态表 %s 无字段 %s，跳过", table_name, field_name)
+                total_skipped += 1
+                continue
+
+            sql = (
+                f'UPDATE "{table_name}" '
+                f"SET \"{field_name}\" = strftime('%Y-%m-%dT%H:%M:%f', datetime(\"{field_name}\", ?)) || '+00:00' "
+                f'WHERE "{field_name}" IS NOT NULL AND "{field_name}" != ?'
+            )
+            cursor.execute(sql, (_TIMEZONE_OFFSET, ""))
+            affected = cursor.rowcount
+
+            logger.info(
+                "m009: 迁移动态表 %s.%s，影响 %d 行",
+                table_name,
+                field_name,
+                affected,
+            )
+            total_migrated += 1
+            total_rows += affected
+
+    logger.info(
+        "m009: 动态表迁移完成 — 迁移 %d 个字段，跳过 %d 个，共更新 %d 行",
+        total_migrated,
+        total_skipped,
+        total_rows,
+    )
+    return total_migrated, total_skipped, total_rows

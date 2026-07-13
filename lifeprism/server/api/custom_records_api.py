@@ -98,16 +98,16 @@ async def update_custom_record_field_role(
 )
 async def get_custom_record_entries(
     type_id: str = Path(..., description="类型 ID"),
-    start_date: str | None = Query(default=None, description="开始日期 YYYY-MM-DD"),
-    end_date: str | None = Query(default=None, description="结束日期 YYYY-MM-DD"),
+    start_time: str | None = Query(default=None, description="开始时间 UTC ISO 8601"),
+    end_time: str | None = Query(default=None, description="结束时间 UTC ISO 8601"),
     page: int = Query(default=1, ge=1, description="页码，从 1 开始"),
     page_size: int = Query(default=50, ge=1, le=500, description="每页条数"),
 ):
-    """查询记录（按创建时间倒序，支持日期筛选 + 分页）。类型不存在返回 404"""
+    """查询记录（按事件时间倒序，支持时间范围筛选 + 分页）。类型不存在返回 404"""
     return custom_records_service.get_entries(
         type_id=type_id,
-        start_date=start_date,
-        end_date=end_date,
+        start_time=start_time,
+        end_time=end_time,
         page=page,
         page_size=page_size,
     )

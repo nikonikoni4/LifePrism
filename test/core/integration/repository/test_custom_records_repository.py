@@ -454,13 +454,13 @@ class TestCreateEntry:
 # ==================== 查询记录测试 ====================
 
 
-def _set_created_at(db_manager, table: str, entry_id: str, created_at: str):
-    """直接修改记录的 created_at（用于测试日期筛选）"""
+def _set_event_time(db_manager, table: str, entry_id: str, event_time: str):
+    """用直接 SQL 设置 event_time（避免真实 UTC ISO 计算），同时同步 created_at"""
     with db_manager.get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            f"UPDATE {table} SET created_at = ? WHERE id = ?",
-            (created_at, entry_id),
+            f"UPDATE {table} SET event_time = ?, created_at = ? WHERE id = ?",
+            (event_time, event_time, entry_id),
         )
         conn.commit()
 
@@ -469,7 +469,7 @@ class TestQueryEntries:
     """测试 query_entries() 方法"""
 
     def test_query_entries_with_date_range_returns_correct_subset(self, repository):
-        """查询记录（日期筛选）：返回正确子集（date_range 过滤 created_at）"""
+        """查询记录（时间范围筛选）：返回正确子集（date_range 过滤 event_time）"""
         # Arrange: 创建类型并录入 3 条记录
         type_id = repository.create_type(
             name="体育活动",
@@ -479,15 +479,15 @@ class TestQueryEntries:
         eid1 = repository.create_entry(type_id=type_id, data={"content": "7月1日"})
         eid2 = repository.create_entry(type_id=type_id, data={"content": "7月5日"})
         eid3 = repository.create_entry(type_id=type_id, data={"content": "7月10日"})
-        # 用直接 SQL 设置不同的 created_at
-        _set_created_at(repository.db, "custom_sport", eid1, "2026-07-01 10:00:00")
-        _set_created_at(repository.db, "custom_sport", eid2, "2026-07-05 10:00:00")
-        _set_created_at(repository.db, "custom_sport", eid3, "2026-07-10 10:00:00")
+        # 用直接 SQL 设置不同的 event_time（UTC ISO 格式）
+        _set_event_time(repository.db, "custom_sport", eid1, "2026-07-01T10:00:00+00:00")
+        _set_event_time(repository.db, "custom_sport", eid2, "2026-07-05T10:00:00+00:00")
+        _set_event_time(repository.db, "custom_sport", eid3, "2026-07-10T10:00:00+00:00")
 
-        # Act: 查询 7月3日~7月8日 的记录
+        # Act: 查询 7月3日~7月8日 的记录（UTC 时间范围）
         entries, total_count = repository.query_entries(
             type_id=type_id,
-            date_range=("2026-07-03", "2026-07-08"),
+            date_range=("2026-07-03T00:00:00+00:00", "2026-07-08T23:59:59+00:00"),
         )
 
         # Assert: 只返回 7月5日 的记录
@@ -506,14 +506,14 @@ class TestQueryEntries:
         eid1 = repository.create_entry(type_id=type_id, data={"content": "7月1日"})
         eid2 = repository.create_entry(type_id=type_id, data={"content": "7月10日"})
         eid3 = repository.create_entry(type_id=type_id, data={"content": "7月20日"})
-        _set_created_at(repository.db, "custom_sport", eid1, "2026-07-01 10:00:00")
-        _set_created_at(repository.db, "custom_sport", eid2, "2026-07-10 10:00:00")
-        _set_created_at(repository.db, "custom_sport", eid3, "2026-07-20 10:00:00")
+        _set_event_time(repository.db, "custom_sport", eid1, "2026-07-01T10:00:00+00:00")
+        _set_event_time(repository.db, "custom_sport", eid2, "2026-07-10T10:00:00+00:00")
+        _set_event_time(repository.db, "custom_sport", eid3, "2026-07-20T10:00:00+00:00")
 
         # Act: 只传 start
         entries, total_count = repository.query_entries(
             type_id=type_id,
-            date_range=("2026-07-05", None),
+            date_range=("2026-07-05T00:00:00+00:00", None),
         )
 
         # Assert: 返回 7月10日 + 7月20日
@@ -533,14 +533,14 @@ class TestQueryEntries:
         eid1 = repository.create_entry(type_id=type_id, data={"content": "7月1日"})
         eid2 = repository.create_entry(type_id=type_id, data={"content": "7月10日"})
         eid3 = repository.create_entry(type_id=type_id, data={"content": "7月20日"})
-        _set_created_at(repository.db, "custom_sport", eid1, "2026-07-01 10:00:00")
-        _set_created_at(repository.db, "custom_sport", eid2, "2026-07-10 10:00:00")
-        _set_created_at(repository.db, "custom_sport", eid3, "2026-07-20 10:00:00")
+        _set_event_time(repository.db, "custom_sport", eid1, "2026-07-01T10:00:00+00:00")
+        _set_event_time(repository.db, "custom_sport", eid2, "2026-07-10T10:00:00+00:00")
+        _set_event_time(repository.db, "custom_sport", eid3, "2026-07-20T10:00:00+00:00")
 
         # Act: 只传 end
         entries, total_count = repository.query_entries(
             type_id=type_id,
-            date_range=(None, "2026-07-15"),
+            date_range=(None, "2026-07-15T23:59:59+00:00"),
         )
 
         # Assert: 返回 7月1日 + 7月10日
@@ -551,7 +551,7 @@ class TestQueryEntries:
 
     def test_query_entries_pagination(self, repository):
         """查询分页：page/page_size 生效"""
-        # Arrange: 录入 5 条记录，设置不同 created_at 以保证排序稳定
+        # Arrange: 录入 5 条记录，设置不同 event_time 以保证排序稳定
         type_id = repository.create_type(
             name="体育活动",
             slug="sport",
@@ -561,7 +561,7 @@ class TestQueryEntries:
         for day in ["2026-07-01", "2026-07-02", "2026-07-03", "2026-07-04", "2026-07-05"]:
             eid = repository.create_entry(type_id=type_id, data={"content": day})
             eids.append(eid)
-            _set_created_at(repository.db, "custom_sport", eid, f"{day} 10:00:00")
+            _set_event_time(repository.db, "custom_sport", eid, f"{day}T10:00:00+00:00")
 
         # Act: 第 1 页，每页 2 条
         page1, total1 = repository.query_entries(
@@ -571,7 +571,7 @@ class TestQueryEntries:
             type_id=type_id, date_range=None, page=2, page_size=2
         )
 
-        # Assert: 每页 2 条，且按 created_at DESC 排序（7月5日、7月4日在 page1）
+        # Assert: 每页 2 条，且按 event_time DESC 排序（7月5日、7月4日在 page1）
         assert len(page1) == 2
         assert len(page2) == 2
         assert total1 == 5  # 总记录数始终为 5
@@ -590,12 +590,12 @@ class TestQueryEntries:
             fields=[{"field_name": "内容", "field_key": "content", "field_type": "text"}],
         )
         eid = repository.create_entry(type_id=type_id, data={"content": "7月1日"})
-        _set_created_at(repository.db, "custom_sport", eid, "2026-07-01 10:00:00")
+        _set_event_time(repository.db, "custom_sport", eid, "2026-07-01T10:00:00+00:00")
 
-        # Act: 查询一个没有记录的日期范围
+        # Act: 查询一个没有记录的日期范围（UTC）
         entries, total_count = repository.query_entries(
             type_id=type_id,
-            date_range=("2026-08-01", "2026-08-31"),
+            date_range=("2026-08-01T00:00:00+00:00", "2026-08-31T23:59:59+00:00"),
         )
 
         # Assert

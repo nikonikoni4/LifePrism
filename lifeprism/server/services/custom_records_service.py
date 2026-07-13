@@ -112,23 +112,23 @@ def delete_type(type_id: str) -> bool:
 
 def get_entries(
     type_id: str,
-    start_date: str | None = None,
-    end_date: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> CustomRecordEntryListResponse:
-    """查询记录（支持日期筛选 + 分页）
+    """查询记录（支持时间范围筛选 + 分页）
 
     Raises:
         EntityNotFoundError: 类型不存在
     """
-    date_range = None
-    if start_date or end_date:
-        date_range = (start_date, end_date)
+    time_range = None
+    if start_time or end_time:
+        time_range = (start_time, end_time)
 
     entries, total_count = custom_record_repository.query_entries(
         type_id=type_id,
-        date_range=date_range,
+        date_range=time_range,
         page=page,
         page_size=page_size,
     )

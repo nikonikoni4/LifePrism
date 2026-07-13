@@ -15,6 +15,7 @@ from . import (
     m007_add_updated_at_supplement,
     m008_migrate_to_utc,
     m009_migrate_history_to_utc,
+    m010_add_event_time,
 )
 
 MIGRATIONS = [
@@ -27,4 +28,5 @@ MIGRATIONS = [
     m007_add_updated_at_supplement,
     m008_migrate_to_utc,
     m009_migrate_history_to_utc,
+    m010_add_event_time,
 ]

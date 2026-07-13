@@ -157,6 +157,7 @@ class CustomRecordRepository:
                 column_defs = ["id TEXT PRIMARY KEY"]
                 for f in fields:
                     column_defs.append(f"{f['field_key']} TEXT")
+                column_defs.append("event_time TEXT")
                 column_defs.append("created_at TEXT")
                 column_defs.append("updated_at TEXT")
 
@@ -340,7 +341,8 @@ class CustomRecordRepository:
         data_table = f"{self._DATA_TABLE_PREFIX}{t['slug']}"
         return t, data_table
 
-    def create_entry(self, type_id: str, data: dict[str, Any]) -> str:
+    def create_entry(self, type_id: str, data: dict[str, Any],
+                     event_time: str | None = None) -> str:
         """
         录入一条记录到 custom_<slug> 表
 
@@ -348,6 +350,7 @@ class CustomRecordRepository:
             type_id: 类型 ID
             data: 字段值字典 {field_key: value}，允许为空字典（插入全 NULL 行）
                   缺失字段存为 NULL，field_key 错误抛 ValidationError
+            event_time: 事件时间 UTC ISO 8601，None 则使用当前 UTC 时间
 
         Returns:
             str: 新创建的 entry_id
@@ -380,10 +383,13 @@ class CustomRecordRepository:
         entry_id = f"{self._ENTRY_ID_PREFIX}{uuid.uuid4().hex[:8]}"
         now = datetime.now(timezone.utc).isoformat()
 
-        # 构造 INSERT：只插入 data 中出现的字段 + id/created_at/updated_at
-        columns = ["id", "created_at", "updated_at"]
-        placeholders = ["?", "?", "?"]
-        values: list[Any] = [entry_id, now, now]
+        # event_time 已由调用方转为 UTC ISO，未提供则默认当前时间
+        event_time_val = event_time if event_time else now
+
+        # 构造 INSERT：系统字段 + 用户字段
+        columns = ["id", "event_time", "created_at", "updated_at"]
+        placeholders = ["?", "?", "?", "?"]
+        values: list[Any] = [entry_id, event_time_val, now, now]
         for key in data:
             columns.append(key)
             placeholders.append("?")
@@ -418,7 +424,7 @@ class CustomRecordRepository:
         page_size: int = 50,
     ) -> tuple[list[dict[str, Any]], int]:
         """
-        按日期范围分页查询记录（date_range 过滤 created_at，按 created_at DESC 排序）
+        按时间范围分页查询记录（date_range 过滤 event_time，按 event_time DESC 排序）
 
         Args:
             type_id: 类型 ID
@@ -440,10 +446,10 @@ class CustomRecordRepository:
         if date_range:
             start, end = date_range
             if start:
-                where_clauses.append("created_at >= ?")
+                where_clauses.append("event_time >= ?")
                 params.append(start)
             if end:
-                where_clauses.append("created_at <= ?")
+                where_clauses.append("event_time <= ?")
                 params.append(end)
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
@@ -453,7 +459,7 @@ class CustomRecordRepository:
         count_sql = f"SELECT COUNT(*) FROM {data_table} {where_sql}"
         # 数据查询
         data_sql = (
-            f"SELECT * FROM {data_table} {where_sql} ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            f"SELECT * FROM {data_table} {where_sql} ORDER BY event_time DESC LIMIT ? OFFSET ?"
         )
         data_params = list(params) + [page_size, offset]
 

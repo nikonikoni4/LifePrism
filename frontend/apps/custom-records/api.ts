@@ -70,8 +70,8 @@ export const CustomRecordsAPI = {
 
   async getEntries(typeId: string, params?: GetEntriesParams): Promise<CustomRecordEntryListResponse> {
     const query = new URLSearchParams();
-    if (params?.start_date) query.set('start_date', params.start_date);
-    if (params?.end_date) query.set('end_date', params.end_date);
+    if (params?.start_time) query.set('start_time', params.start_time);
+    if (params?.end_time) query.set('end_time', params.end_time);
     if (params?.page) query.set('page', String(params.page));
     if (params?.page_size) query.set('page_size', String(params.page_size));
     const qs = query.toString();

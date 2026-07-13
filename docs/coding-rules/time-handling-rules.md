@@ -2,7 +2,7 @@
 version: 4.0
 created_at: 2026-07-12
 updated_at: 2026-07-13
-last_updated: 新增日期查询 datetime 字段表的前端/后端规则
+last_updated: 新增自定义记录用户定义字段不视为时间的规则
 abstract: 时间处理规则，明确"内部 UTC + ISO 8601，对外本地时区 + YYYY-MM-DD HH:MM:SS"的内外分离原则，所有转换在边界处就地完成。新增前端组件内转换 date → UTC 时间范围、后端直接使用 UTC 参数的规则
 ---
 
@@ -48,6 +48,35 @@ abstract: 时间处理规则，明确"内部 UTC + ISO 8601，对外本地时区
 **格式示例**：`2026-07-12`
 
 **理由**：用户在 UTC+8 的 00:30 打卡，UTC 日期是"昨天"，但用户认为是"今天"。存 UTC 日期会导致"今日打卡"看不到刚打的卡。
+
+### 2.3 自定义记录的用户定义字段（视为字符串，不视为时间）
+
+自定义记录（`custom_<slug>`）中用户通过自定义字段输入的时间值，**视为普通字符串**，不做时区转换。
+
+**适用对象**：
+- `custom_record_fields` 定义的动态字段（`field_N`），当前 `field_type` 仅有 `text`
+- Agent 写入的时间字符串（本地 `YYYY-MM-DD HH:MM:SS`）
+
+**核心规则**：
+- 原样存储、原样显示，**不进行任何时区转换**
+- **禁止**对这些字段执行 UTC 转换（如 `datetime(col, '-8 hours')`）
+- **禁止**将这些字段用于系统级查询、筛选、排序（由 `created_at` 或未来的 `event_time` 负责）
+
+**与系统级字段的职责边界**：
+
+| 字段类型 | 例子 | 时区处理 | 用途 |
+|---------|------|---------|------|
+| **系统级字段** | `created_at`, `updated_at`, `event_time` | UTC 转换 | 查询、筛选、排序、同步 |
+| **用户定义字段** | `field_1`, `field_2`（自定义记录） | **不转换** | 仅前端展示 |
+
+**理由**：
+- 自定义字段是"用户输入的数据"，不是"系统时间"
+- 数据路径：后端 DB → 前端展示，中间不经过时间计算，无需转换
+- `field_type` 仅有 `text`（未来 `int`/`float`），均与时间无关
+- Agent 写入的 `YYYY-MM-DD HH:MM:SS` 格式天然字典序 = 时间序
+- 尝试识别并转换存在误转换、漏转换风险
+
+**决策依据**：`docs/adr/2026-07-13-custom-records-time-string-not-convert.md`
 
 ---
 
@@ -158,6 +187,7 @@ def load_logs(date: str):
 - Timeline Stats API（查询 `user_app_behavior_log` 只有 `start_time/end_time`）
 - Timeline Overview API（同上）
 - Custom Block API（查询 `timeline_custom_block` 只有 `start_time/end_time`）
+- Custom Records API（查询 `custom_<slug>` 只有 `event_time` datetime 字段）
 
 **不适用场景**：
 - 查询有独立 `date` 字段的表（如 `todo_list.date`），接收 `date=YYYY-MM-DD` 参数
@@ -330,6 +360,7 @@ async function getStats(date: string) {
 - `docs/adr/2026-07-12-migrate-to-utc-timezone.md` - UTC 迁移决策
 - `docs/adr/2026-07-12-time-conversion-layering.md` - 时间转换职责分层决策
 - `docs/adr/2026-07-13-date-to-utc-conversion-boundary.md` - 日期到 UTC 转换边界决策
+- `docs/adr/2026-07-13-custom-records-time-string-not-convert.md` - 自定义字段时间不转换决策
 - `docs/coding-rules/frontend-date-handling.md` - 前端日期格式化详细规则
 - `docs/coding-rules/create-table-rules.md` - 建表规范
 - 项目时间工具模块（后端/前端各自单一真相源）

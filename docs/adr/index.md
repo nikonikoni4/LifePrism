@@ -2,9 +2,15 @@
 version: 2.0
 created_at: 2026-04-10
 updated_at: 2026-07-13
-last_updated: 新增日期到 UTC 转换边界与查询参数传递策略决策
+last_updated: 新增自定义字段时间不转换 + 系统级 datetime 字段决策
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## custom-records-time-string-not-convert
+- updated_at: 2026-07-13
+- path: `docs/adr/2026-07-13-custom-records-time-string-not-convert.md`
+- 触发规则：当需要理解自定义记录模块中自定义字段的时间处理策略、为什么自定义字段时间不做 UTC 转换、或计划新增系统级 datetime 字段时读取
+- 内容摘要：两个关联决策——（决策 A）自定义字段中的时间视为普通字符串，原样存储原样显示，不做时区转换；核心原因是自定义字段是"用户数据"而非"系统时间"。（决策 B，未来方向）为动态表新增必填系统级 datetime 字段替代 created_at 做日期筛选，Agent 输入本地 YYYY-MM-DD HH:MM:SS 经格式校验后转 UTC ISO 存储。决策 A 的前提：自定义字段不用于查询/筛选、field_type 不引入 date/datetime 类型、YYYY-MM-DD HH:MM:SS 格式天然字典序=时间序。
 
 ## date-to-utc-conversion-boundary
 - updated_at: 2026-07-13

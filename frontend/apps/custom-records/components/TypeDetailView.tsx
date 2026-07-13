@@ -9,6 +9,7 @@ import { EntryCard } from './EntryCard';
 import { TemplatePicker } from './TemplatePicker';
 import { FieldRoleModal } from './FieldRoleModal';
 import { TEMPLATE_PRESETS, getTemplatePreset } from '../utils/templatePresets';
+import { toISOStringUTC, parseISOString, toLocalDateString, toLocalDateTimeString } from '../../../core/utils/dateUtils';
 import type { CustomRecordTypeItem, CustomRecordEntryItem, FieldDefinition } from '../types';
 
 interface TypeDetailViewProps {
@@ -22,7 +23,7 @@ type ViewTab = 'card' | 'table' | 'compare';
 
 const getDateGroup = (dateStr: string): string => {
   if (!dateStr) return '未知日期';
-  const date = new Date(dateStr.replace(' ', 'T'));
+  const date = parseISOString(dateStr);
   if (isNaN(date.getTime())) return '未知日期';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -37,7 +38,7 @@ const getDateGroup = (dateStr: string): string => {
 
 const getDateKey = (dateStr: string): string => {
   if (!dateStr) return '0000-00-00';
-  return dateStr.split('T')[0].split(' ')[0];
+  return toLocalDateString(parseISOString(dateStr));
 };
 
 export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }) => {
@@ -63,11 +64,22 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
     try {
       setLoading(true);
       setError('');
+
+      // 组件内转换：YYYY-MM-DD → UTC 时间范围（就近原则）
+      let start_time: string | undefined;
+      let end_time: string | undefined;
+      if (startDate) {
+        start_time = toISOStringUTC(new Date(`${startDate}T00:00:00`));
+      }
+      if (endDate) {
+        end_time = toISOStringUTC(new Date(`${endDate}T23:59:59.999`));
+      }
+
       const [typeData, entryData] = await Promise.all([
         CustomRecordsAPI.getTypeById(typeId),
         CustomRecordsAPI.getEntries(typeId, {
-          start_date: startDate || undefined,
-          end_date: endDate || undefined,
+          start_time,
+          end_time,
           page,
           page_size: pageSize,
         }),
@@ -161,8 +173,8 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
   const groupedEntries = useMemo(() => {
     const groups: { label: string; dateKey: string; items: CustomRecordEntryItem[] }[] = [];
     for (const entry of entries) {
-      const dateKey = getDateKey(entry.created_at);
-      const label = getDateGroup(entry.created_at);
+      const dateKey = getDateKey(entry.event_time);
+      const label = getDateGroup(entry.event_time);
       let group = groups.find(g => g.dateKey === dateKey);
       if (!group) {
         group = { label, dateKey, items: [] };
@@ -426,7 +438,7 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
                       </td>
                     ))}
                     <td className="px-5 py-3.5 text-slate-400 text-xs whitespace-nowrap">
-                      {entry.created_at ? entry.created_at.replace('T', ' ').slice(0, 16) : '—'}
+                      {entry.event_time ? toLocalDateTimeString(parseISOString(entry.event_time)).replace('T', ' ').slice(0, 16) : '—'}
                     </td>
                     <td className="px-5 py-3.5">
                       <button

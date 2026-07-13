@@ -11,7 +11,7 @@ from typing import Any
 from lifeprism.llm.agent.tools.base import ERROR, SUCCESS, Tool
 from lifeprism.repository import custom_record_repository
 from lifeprism.utils.exceptions import ValidationError
-from lifeprism.utils.time_utils import utc_to_local_display
+from lifeprism.utils.time_utils import build_utc_time_range, local_to_utc_iso, utc_to_local_display
 
 
 class ListCustomRecordTypesTool(Tool):
@@ -156,7 +156,8 @@ class CreateCustomRecordEntryTool(Tool):
             "向已存在的自定义记录类型录入一条数据。\n"
             "调用前应先用 list_custom_record_types 获取 type_id 和字段定义。\n"
             "data 中的 key 必须是类型的 field_key，缺失的字段存为 NULL，空字典允许。\n"
-            "若 field_key 错误，返回 INVALID_FIELD_KEY 错误及 valid_fields 列表，请据此重新解析后重试。"
+            "若 field_key 错误，返回 INVALID_FIELD_KEY 错误及 valid_fields 列表，请据此重新解析后重试。\n"
+            "event_time 为事件发生时间（本地 YYYY-MM-DD HH:MM:SS），不提供则默认使用当前时间。"
         )
 
     @property
@@ -173,6 +174,10 @@ class CreateCustomRecordEntryTool(Tool):
                     "description": "字段值字典 {field_key: value}，key 必须匹配类型的 field_key",
                     "additionalProperties": {"type": "string"},
                 },
+                "event_time": {
+                    "type": "string",
+                    "description": "事件发生时间，格式 YYYY-MM-DD HH:MM:SS（本地时间）。不提供则默认当前时间",
+                },
             },
             "required": ["type_id", "data"],
         }
@@ -180,14 +185,29 @@ class CreateCustomRecordEntryTool(Tool):
     async def execute(self, **kwargs: Any) -> str:
         type_id = kwargs.get("type_id", "")
         data = kwargs.get("data", {})
+        event_time_raw = kwargs.get("event_time")
 
         if not type_id:
             return f"{ERROR}参数缺失：type_id 必填"
         if not isinstance(data, dict):
             return f"{ERROR}参数错误：data 必须是字典"
 
+        # event_time：Agent 提供本地 YYYY-MM-DD HH:MM:SS → 转 UTC ISO
+        # 不提供则使用 None，Repository 层默认当前 UTC 时间
+        event_time_utc = None
+        if event_time_raw:
+            if not isinstance(event_time_raw, str):
+                return f"{ERROR}参数错误：event_time 必须是字符串"
+            # 格式校验
+            import re
+            if not re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$', event_time_raw):
+                return f"{ERROR}参数格式错误：event_time 格式应为 YYYY-MM-DD HH:MM:SS，例如 2026-07-13 14:30:00"
+            event_time_utc = local_to_utc_iso(event_time_raw)
+
         try:
-            entry_id = custom_record_repository.create_entry(type_id=type_id, data=data)
+            entry_id = custom_record_repository.create_entry(
+                type_id=type_id, data=data, event_time=event_time_utc,
+            )
             result = {"entry_id": entry_id, "type_id": type_id}
             return f"{SUCCESS}录入自定义记录成功: {json.dumps(result, ensure_ascii=False)}"
         except ValidationError as e:
@@ -215,8 +235,8 @@ class QueryCustomRecordEntriesTool(Tool):
     @property
     def description(self) -> str:
         return (
-            "查询某个自定义记录类型的记录列表，按创建时间倒序返回。\n"
-            "可通过 date_range 按创建时间筛选（格式 YYYY-MM-DD），任一侧可省略。\n"
+            "查询某个自定义记录类型的记录列表，按事件时间倒序返回。\n"
+            "可通过 date_range 按事件时间筛选（格式 YYYY-MM-DD），任一侧可省略。\n"
             "limit 控制返回条数（默认 50，AI 场景一次拿够，无需分页）。"
         )
 
@@ -231,7 +251,7 @@ class QueryCustomRecordEntriesTool(Tool):
                 },
                 "date_range": {
                     "type": "array",
-                    "description": "创建时间筛选区间 [start, end]，格式 YYYY-MM-DD；任一侧可为 null 表示不限制",
+                    "description": "事件时间筛选区间 [start, end]，格式 YYYY-MM-DD；任一侧可为 null 表示不限制",
                     "items": {"type": "string"},
                     "minItems": 2,
                     "maxItems": 2,
@@ -254,14 +274,21 @@ class QueryCustomRecordEntriesTool(Tool):
         if not type_id:
             return f"{ERROR}参数缺失：type_id 必填"
 
-        # 转换 date_range：[start, end] -> (start, end)，None 或空串表示不限制
-        # date_range 是日期字段（YYYY-MM-DD），保持本地日期，不转 UTC
+        # date_range：Agent 提供本地 YYYY-MM-DD → execute 层转 UTC 范围
         date_range = None
         if date_range_raw and isinstance(date_range_raw, list) and len(date_range_raw) == 2:
             start = date_range_raw[0] or None
             end = date_range_raw[1] or None
-            if start or end:
-                date_range = (start, end)
+            if start:
+                start_utc, _ = build_utc_time_range(start)
+            else:
+                start_utc = None
+            if end:
+                _, end_utc = build_utc_time_range(end)
+            else:
+                end_utc = None
+            if start_utc or end_utc:
+                date_range = (start_utc, end_utc)
 
         try:
             entries = custom_record_repository.query_entries(
@@ -273,6 +300,8 @@ class QueryCustomRecordEntriesTool(Tool):
 
             # 输出转换：UTC ISO → 本地 YYYY-MM-DD HH:MM:SS（显示用字段）
             for entry in entries:
+                if "event_time" in entry and entry["event_time"]:
+                    entry["event_time"] = utc_to_local_display(entry["event_time"])
                 if "created_at" in entry and entry["created_at"]:
                     entry["created_at"] = utc_to_local_display(entry["created_at"])
                 if "updated_at" in entry and entry["updated_at"]:
