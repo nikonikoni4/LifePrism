@@ -4,16 +4,8 @@
 
 ## 索引
 
-### 1. 时间格式不一致导致 SQL 字符串比对丢失数据
 
-- **文件**: `time-format-iso-vs-space-in-db-queries.md`
-- **状态**: `mitigating`（sync_service.py 已修复，screen_capture_provider / category_service 待修复）
-- **严重程度**: 高
-- **影响范围**: 截图分析、截图查询、分类统计
-- **问题描述**: 部分代码将 UTC ISO 8601 格式（`T` 分隔符）转为空格格式后直接用于 SQL 查询，SQLite 字符串比对 `T(84) > 空格(32)` 导致数据被静默排除
-- **修复计划**: `sync_service.py` 已修复，其余待排期
-
-### 2. Mood Entries 和 Custom Records 日期查询问题
+### 1. Mood Entries 和 Custom Records 日期查询问题
 
 - **文件**: `mood-and-custom-records-date-query-issues.md`
 - **状态**: `acknowledged`（已确认但尚未修复）
