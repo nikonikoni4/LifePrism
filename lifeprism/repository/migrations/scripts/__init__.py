@@ -18,6 +18,8 @@ from . import (
     m010_add_event_time,
     m011_add_event_time_to_mood,
     m012_add_updated_at_to_sync_tables,
+    m013_add_updated_at_to_tokens_usage_log,
+    m014_drop_order_index_from_category_tables,
 )
 
 MIGRATIONS = [
@@ -33,4 +35,6 @@ MIGRATIONS = [
     m010_add_event_time,
     m011_add_event_time_to_mood,
     m012_add_updated_at_to_sync_tables,
+    m013_add_updated_at_to_tokens_usage_log,
+    m014_drop_order_index_from_category_tables,
 ]

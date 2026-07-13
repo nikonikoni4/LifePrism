@@ -341,6 +341,7 @@ TOKENS_USAGE_LOG_CONFIG = {
         {"name": "idx_tokens_usage_mode", "columns": ["mode"]},
     ],
     "timestamps": True,  # 自动添加 created_at
+    "update_at": True,
 }
 
 
