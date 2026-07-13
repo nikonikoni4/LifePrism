@@ -6,11 +6,7 @@ m009_migrate_history_to_utc - 将历史数据从本地时区(UTC+8)转换为 UTC
 本脚本仅处理历史数据。
 
 排除的字段：
-1. 3 张旧表的 created_at/updated_at（已经是 UTC）：
-   - todo_list.created_at
-   - timeline_custom_block.created_at
-   - timeline_custom_block.updated_at
-2. 日期字段（YYYY-MM-DD 格式）：date, start_date, end_date,
+1. 日期字段（YYYY-MM-DD 格式）：date, start_date, end_date,
    expected_finished_at, actual_finished_at 等
 3. 时间字段（HH:MM 格式）：time, trigger_time
 4. 整数字段：year, month, week_num
@@ -237,7 +233,7 @@ def upgrade(cursor) -> None:
         # 跳过 NULL 和空字符串（datetime('') 返回 NULL，会污染数据）
         sql = (
             f'UPDATE "{table_name}" '
-            f"SET \"{field_name}\" = strftime('%Y-%m-%dT%H:%M:%S', datetime(\"{field_name}\", ?)) || '+00:00' "
+            f"SET \"{field_name}\" = strftime('%Y-%m-%dT%H:%M:%f', datetime(\"{field_name}\", ?)) || '+00:00' "
             f'WHERE "{field_name}" IS NOT NULL AND "{field_name}" != ?'
         )
         cursor.execute(sql, (_TIMEZONE_OFFSET, ""))
@@ -351,7 +347,7 @@ def _migrate_table_with_constraints(cursor, table_name: str, fields: list) -> in
         if col in existing_fields:
             select_cols.append(
                 f'CASE WHEN "{col}" IS NOT NULL AND "{col}" != ? '
-                f"THEN strftime('%Y-%m-%dT%H:%M:%S', datetime(\"{col}\", ?)) || '+00:00' "
+                f"THEN strftime('%Y-%m-%dT%H:%M:%f', datetime(\"{col}\", ?)) || '+00:00' "
                 f'ELSE "{col}" END AS "{col}"'
             )
         else:

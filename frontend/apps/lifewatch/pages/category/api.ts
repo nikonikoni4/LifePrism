@@ -341,7 +341,7 @@ export const CategoryMapCacheAPI = {
 
     /**
      * 根据缓存匹配条件更新日志分类
-     * 
+     *
      * @param params 更新参数
      * @returns 标准响应 (包含 updated_count)
      */
@@ -352,8 +352,8 @@ export const CategoryMapCacheAPI = {
         category_id: string;
         sub_category_id?: string | null;
         goal_id?: string | null;  // null=不修改, ""=清除, "goal-xxx"=设置
-        start_date?: string;      // 可选，YYYY-MM-DD 格式
-        end_date?: string;        // 可选，YYYY-MM-DD 格式
+        start_date?: string;      // 可选，YYYY-MM-DD 格式（前端会转换为 UTC 时间范围）
+        end_date?: string;        // 可选，YYYY-MM-DD 格式（前端会转换为 UTC 时间范围）
     }): Promise<StandardResponse> {
         const searchParams = new URLSearchParams();
         searchParams.set('app', params.app);
@@ -370,11 +370,15 @@ export const CategoryMapCacheAPI = {
         if (params.goal_id !== null && params.goal_id !== undefined) {
             searchParams.set('goal_id', params.goal_id);
         }
+
+        // 前端将日期转换为 UTC 时间范围
         if (params.start_date) {
-            searchParams.set('start_date', params.start_date);
+            const startOfDay = new Date(`${params.start_date}T00:00:00`);
+            searchParams.set('start_time', toISOStringUTC(startOfDay));
         }
         if (params.end_date) {
-            searchParams.set('end_date', params.end_date);
+            const endOfDay = new Date(`${params.end_date}T23:59:59.999`);
+            searchParams.set('end_time', toISOStringUTC(endOfDay));
         }
 
         const getActivityApiBase = createApiV2UrlGetter('/activity');

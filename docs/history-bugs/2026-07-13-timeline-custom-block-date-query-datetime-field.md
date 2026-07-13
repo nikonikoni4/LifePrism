@@ -341,10 +341,16 @@ curl "http://localhost:5050/api/v2/timeline/custom-blocks?start_time=2026-07-12T
 
 ## 相关问题
 
-排查发现以下类似问题（待修复）：
-1. **Mood Entries API**：`mood_entries` 表只有 `created_at`，但查询用 `start_date/end_date`
-2. **Custom Records API**：`custom_records` 表只有 datetime，但查询用日期
-3. **Category Update Logs API**：`user_app_behavior_log` 表只有 datetime，但查询用日期
+排查发现以下类似问题：
+1. **Timeline Stats API**：✅ 已修复（2026-07-13）
+   - 修改文件：`frontend/apps/lifewatch/pages/timeline/api.ts`、`lifeprism/server/api/timeline_api.py`、`lifeprism/server/services/timeline_service.py`、`lifeprism/server/services/timeline_builder.py`
+   - 前端：组件内转换 date → UTC 时间范围
+   - 后端：参数改为 `start_time/end_time`，删除字符串拼接
+2. **Timeline Overview API**：✅ 已修复（2026-07-13）
+   - 同上，参数改为 `start_time/end_time`
+3. **Mood Entries API**：❌ 待修复 - `mood_entries` 表只有 `created_at`，但查询用 `start_date/end_date`
+4. **Custom Records API**：❌ 待修复 - `custom_records` 表只有 datetime，但查询用日期
+5. **Category Update Logs API**：❌ 待修复 - `user_app_behavior_log` 表只有 datetime，但查询用日期
 
 参考此文档的修复方案进行修复。
 

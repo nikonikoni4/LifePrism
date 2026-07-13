@@ -366,9 +366,12 @@ def query_user_activity_summary(query_option: set[str], start_time: str, end_tim
     #             content += f"{i}. {goals[i]['name']},{description}\n"
     #         parts.append(content)
     if "todolist" in query_option:
+        # todo_list.date 是本地日期字段，需将 UTC ISO 转回本地日期
+        local_start_date = utc_to_local_display(start_time)[:10]
+        local_end_date = utc_to_local_display(end_time)[:10]
         todolists, _ = todo_repository.query_todos(
             QueryOptions(fields=["content", "date", "state"]).with_date_range(
-                start_time[:10], end_time[:10]
+                local_start_date, local_end_date
             )
         )
 

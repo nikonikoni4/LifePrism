@@ -4,7 +4,15 @@
 
 ## 索引
 
-当前无已知限制。
+### 1. Mood Entries 和 Custom Records 日期查询问题
+
+- **文件**: `mood-and-custom-records-date-query-issues.md`
+- **状态**: `acknowledged`（已确认但尚未修复）
+- **严重程度**: 中
+- **影响范围**: Mood Entries API、Custom Records API
+- **问题描述**: 表中缺少独立 `date` 字段，只有 `created_at/updated_at` datetime 字段，导致按日期查询需要后端时区转换，无法建立日期索引，查询效率低
+- **触发条件**: 数据量超过 10 万条或查询响应时间超过 1 秒时需重构
+- **临时方案**: 当前使用 `build_utc_time_range()` 转换，功能正确但效率低
 
 > 时区和时间格式不一致问题已于 2026-07-12 通过 UTC 时区迁移解决，相关规范见 `docs/coding-rules/time-handling-rules.md`，决策见 `docs/adr/2026-07-12-migrate-to-utc-timezone.md`。
 

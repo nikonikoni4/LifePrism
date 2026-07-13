@@ -10,6 +10,7 @@ import {
     BehaviorAnalysisResponse,
 } from './types';
 import { createApiV2UrlGetter } from '../../../../core/services/apiConfig';
+import { toISOStringUTC } from '../../../../core/utils/dateUtils';
 
 // 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
 const getApiBase = createApiV2UrlGetter();
@@ -21,7 +22,7 @@ const getApiBase = createApiV2UrlGetter();
 export const TimelineAPIV2 = {
     /**
      * 获取缩略图 Timeline 统计数据
-     * 
+     *
      * @param date 查询日期 (YYYY-MM-DD)
      * @param hourGranularity 时间粒度（1-6 小时）
      * @param categoryLevel 分类级别 (main/sub)
@@ -32,8 +33,13 @@ export const TimelineAPIV2 = {
         hourGranularity: number = 1,
         categoryLevel: 'main' | 'sub' = 'main'
     ): Promise<TimelineStatsResponse> {
+        // 就近转换：本地日期 → UTC 时间范围
+        const startOfDay = new Date(`${date}T00:00:00`);
+        const endOfDay = new Date(`${date}T23:59:59.999`);
+
         const params = new URLSearchParams({
-            date,
+            start_time: toISOStringUTC(startOfDay),
+            end_time: toISOStringUTC(endOfDay),
             hour_granularity: hourGranularity.toString(),
             category_level: categoryLevel,
         });
@@ -49,9 +55,9 @@ export const TimelineAPIV2 = {
 
     /**
      * 获取指定时间块的 Time Overview 详情
-     * 
+     *
      * 点击缩略图时间块后，获取该时间范围内的详细活动分布
-     * 
+     *
      * @param date 查询日期 (YYYY-MM-DD)
      * @param startHour 时间块开始小时（0-23）
      * @param endHour 时间块结束小时（1-24）
@@ -62,10 +68,15 @@ export const TimelineAPIV2 = {
         startHour: number,
         endHour: number
     ): Promise<TimelineTimeOverviewResponse> {
+        // 就近转换：本地日期+小时 → UTC 时间范围
+        const startTime = new Date(`${date}T${String(startHour).padStart(2, '0')}:00:00`);
+        const endTime = endHour === 24
+            ? new Date(`${date}T23:59:59.999`)
+            : new Date(`${date}T${String(endHour).padStart(2, '0')}:00:00`);
+
         const params = new URLSearchParams({
-            date,
-            start_hour: startHour.toString(),
-            end_hour: endHour.toString(),
+            start_time: toISOStringUTC(startTime),
+            end_time: toISOStringUTC(endTime),
         });
 
         const response = await fetch(`${getApiBase()}/timeline/overview?${params.toString()}`);

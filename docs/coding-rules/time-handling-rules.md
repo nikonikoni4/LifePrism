@@ -1,9 +1,9 @@
 ---
-version: 3.0
+version: 4.0
 created_at: 2026-07-12
-updated_at: 2026-07-12
-last_updated: 重构为规则导向——移除具体函数名、文件路径等易腐坏内容，控制在 200 行以内
-abstract: 时间处理规则，明确"内部 UTC + ISO 8601，对外本地时区 + YYYY-MM-DD HH:MM:SS"的内外分离原则，所有转换在边界处就地完成
+updated_at: 2026-07-13
+last_updated: 新增日期查询 datetime 字段表的前端/后端规则
+abstract: 时间处理规则，明确"内部 UTC + ISO 8601，对外本地时区 + YYYY-MM-DD HH:MM:SS"的内外分离原则，所有转换在边界处就地完成。新增前端组件内转换 date → UTC 时间范围、后端直接使用 UTC 参数的规则
 ---
 
 # 时间处理规则
@@ -114,6 +114,57 @@ start_time = f"{date} {DAILY_START_HOUR}"
 
 **"今天"/"昨天"语义**：基于用户本地时区，**禁止**基于 UTC 计算业务日期。
 
+### 3.7 日期查询 datetime 字段表：后端直接使用 UTC 参数
+
+**场景**：前端传 UTC 时间范围查询只有 datetime 字段的表。
+
+**规则**：后端直接使用 UTC 参数，**禁止**字符串拼接本地时间。
+
+```python
+# ✅ 正确：直接使用 UTC 参数
+def get_timeline_stats(start_time: str, end_time: str):
+    """
+    Args:
+        start_time: ISO 8601 UTC 格式（如 "2026-07-12T16:00:00.000Z"）
+        end_time: ISO 8601 UTC 格式（如 "2026-07-13T15:59:59.999Z"）
+    """
+    df = repository.load_logs(start_time=start_time, end_time=end_time)
+    # 直接传 UTC ISO 字符串给 Repository
+    
+# ❌ 错误：字符串拼接本地时间
+def get_timeline_stats(date: str):
+    start_time = f"{date} 00:00:00"  # 本地时间字符串，无时区标识
+    end_time = f"{date} 23:59:59"
+    df = repository.load_logs(start_time=start_time, end_time=end_time)
+```
+
+**Repository 层**：
+
+```python
+# ✅ 正确：直接使用 UTC 参数查询
+def load_logs(start_time: str, end_time: str):
+    cursor.execute(
+        "SELECT * FROM logs WHERE start_time >= ? AND start_time <= ?",
+        (start_time, end_time)
+    )
+    
+# ❌ 错误：在 Repository 层拼接时间字符串
+def load_logs(date: str):
+    start_time = f"{date} 00:00:00"  # 违反"就近转换"原则
+    cursor.execute("SELECT * FROM logs WHERE start_time >= ?", (start_time,))
+```
+
+**适用场景**：
+- Timeline Stats API（查询 `user_app_behavior_log` 只有 `start_time/end_time`）
+- Timeline Overview API（同上）
+- Custom Block API（查询 `timeline_custom_block` 只有 `start_time/end_time`）
+
+**不适用场景**：
+- 查询有独立 `date` 字段的表（如 `todo_list.date`），接收 `date=YYYY-MM-DD` 参数
+- 聚合查询（混合表），需同时接收 `date` + `start_time/end_time` 参数
+
+**决策依据**：`docs/adr/2026-07-13-date-to-utc-conversion-boundary.md`
+
 ---
 
 ## 4. 大模型交互规则
@@ -202,7 +253,46 @@ const display = toLocalDateTimeString(parseISOString(isoString));
 - 日期字段使用本地时区方法，**禁止** `.toISOString().split('T')[0]`
 - 后端返回的 `YYYY-MM-DD` 字符串直接使用，不要转 `Date` 再格式化
 
-### 5.4 禁止事项
+### 5.4 日期查询 datetime 字段表：前端组件内转换
+
+**场景**：查询只有 datetime 字段（无独立 date 字段）的表时，前端传日期参数。
+
+**规则**：在 API 调用前（组件内），将本地日期转换为 UTC 时间范围再传给后端。
+
+```typescript
+// ✅ 正确：组件内转换 date → UTC 时间范围
+import { toISOStringUTC } from '@core/utils/dateUtils';
+
+async function getStats(date: string) {
+    const startOfDay = new Date(`${date}T00:00:00`);
+    const endOfDay = new Date(`${date}T23:59:59.999`);
+    
+    const params = {
+        start_time: toISOStringUTC(startOfDay),  // "2026-07-12T16:00:00.000Z"
+        end_time: toISOStringUTC(endOfDay)       // "2026-07-13T15:59:59.999Z"
+    };
+    
+    return fetch(`/api/stats?start_time=${params.start_time}&end_time=${params.end_time}`);
+}
+
+// ❌ 错误：直接传本地日期字符串给后端
+async function getStats(date: string) {
+    return fetch(`/api/stats?date=${date}`);  // 后端会字符串拼接出错
+}
+```
+
+**适用场景**：
+- Timeline Stats API（查询 `user_app_behavior_log` 只有 `start_time/end_time`）
+- Timeline Overview API（同上）
+- Custom Block API（查询 `timeline_custom_block` 只有 `start_time/end_time`）
+
+**不适用场景**：
+- 查询有独立 `date` 字段的表（如 `todo_list.date`、`diary.date`），直接传 `date=YYYY-MM-DD`
+- 聚合查询（混合有 date 字段和只有 datetime 的表），见后端规则 3.7
+
+**决策依据**：`docs/adr/2026-07-13-date-to-utc-conversion-boundary.md`
+
+### 5.5 禁止事项
 
 | 禁止项 | 正确做法 |
 |--------|---------|
@@ -239,6 +329,7 @@ const display = toLocalDateTimeString(parseISOString(isoString));
 
 - `docs/adr/2026-07-12-migrate-to-utc-timezone.md` - UTC 迁移决策
 - `docs/adr/2026-07-12-time-conversion-layering.md` - 时间转换职责分层决策
+- `docs/adr/2026-07-13-date-to-utc-conversion-boundary.md` - 日期到 UTC 转换边界决策
 - `docs/coding-rules/frontend-date-handling.md` - 前端日期格式化详细规则
 - `docs/coding-rules/create-table-rules.md` - 建表规范
 - 项目时间工具模块（后端/前端各自单一真相源）

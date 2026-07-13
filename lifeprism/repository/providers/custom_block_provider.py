@@ -112,7 +112,9 @@ class CustomBlockProvider(LWBaseDataProvider):
         results, _ = self._generic_query(options)
         return results[0] if results else None
 
-    def get_custom_blocks_by_time_range(self, start_time: str, end_time: str) -> list[dict[str, Any]]:
+    def get_custom_blocks_by_time_range(
+        self, start_time: str, end_time: str
+    ) -> list[dict[str, Any]]:
         """
         获取指定时间范围的所有自定义时间块
 

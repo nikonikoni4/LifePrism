@@ -1,10 +1,16 @@
 ---
-version: 1.9
+version: 2.0
 created_at: 2026-04-10
-updated_at: 2026-07-12
-last_updated: 新增时间转换职责分层架构决策
+updated_at: 2026-07-13
+last_updated: 新增日期到 UTC 转换边界与查询参数传递策略决策
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## date-to-utc-conversion-boundary
+- updated_at: 2026-07-13
+- path: `docs/adr/2026-07-13-date-to-utc-conversion-boundary.md`
+- 触发规则：当需要理解前端日期查询的转换位置、单表/聚合查询的参数传递策略、或新增日期查询 API 时读取
+- 内容摘要：确立日期到 UTC 时间范围的转换边界为"组件内转换"（组件 onChange 回调），系统内部保持 UTC ISO 8601 纯净格式。单表查询：有 date 字段传 date，只有 datetime 传 start_time/end_time（UTC）。聚合查询（混合表）传 date + start_time/end_time，后端根据表结构选择使用哪个参数。决策基于：工程复用性不存在（只有 2 处转换）、架构清晰性优先、前端日期来源可靠（input[type="date"] 保证格式）。决策前提：转换需求量 <= 5 个 API、无统一 DatePicker 组件、14 行代码重复可接受。
 
 ## time-conversion-layering
 - updated_at: 2026-07-12

@@ -398,8 +398,8 @@ class ServerLWDataProvider(LWBaseDataProvider):
         category_id: str,
         sub_category_id: str | None = None,
         goal_id: str | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
     ) -> int:
         """
         根据 app 和可选的 title 批量更新日志分类
@@ -415,8 +415,8 @@ class ServerLWDataProvider(LWBaseDataProvider):
             category_id: 主分类ID
             sub_category_id: 子分类ID（可选）
             goal_id: 目标ID（None=不修改, ''=清除, 'goal-xxx'=设置）
-            start_date: 开始日期 YYYY-MM-DD（可选）
-            end_date: 结束日期 YYYY-MM-DD（可选）
+            start_time: 开始时间 ISO 8601 格式（可选）
+            end_time: 结束时间 ISO 8601 格式（可选）
 
         Returns:
             int: 成功更新的数量
@@ -442,13 +442,13 @@ class ServerLWDataProvider(LWBaseDataProvider):
             where_parts.append("title = ?")
             where_params.append(title)
 
-        # 日期范围过滤
-        if start_date:
-            where_parts.append("DATE(start_time) >= ?")
-            where_params.append(start_date)
-        if end_date:
-            where_parts.append("DATE(start_time) <= ?")
-            where_params.append(end_date)
+        # UTC 时间范围过滤
+        if start_time:
+            where_parts.append("start_time >= ?")
+            where_params.append(start_time)
+        if end_time:
+            where_parts.append("start_time <= ?")
+            where_params.append(end_time)
 
         sql = f"""
         UPDATE user_app_behavior_log
@@ -464,12 +464,12 @@ class ServerLWDataProvider(LWBaseDataProvider):
             conn.commit()
             updated_count = cursor.rowcount
 
-        date_range_msg = ""
-        if start_date or end_date:
-            date_range_msg = f" (范围: {start_date or '开始'} ~ {end_date or '至今'})"
+        time_range_msg = ""
+        if start_time or end_time:
+            time_range_msg = f" (时间范围: {start_time or '开始'} ~ {end_time or '至今'})"
 
         logger.info(
-            f"根据 app='{app}' {'+ title' if is_multipurpose_app else ''}{date_range_msg} 更新了 {updated_count} 条日志"
+            f"根据 app='{app}' {'+ title' if is_multipurpose_app else ''}{time_range_msg} 更新了 {updated_count} 条日志"
         )
         return updated_count
 

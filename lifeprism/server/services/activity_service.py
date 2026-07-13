@@ -206,8 +206,8 @@ def update_logs_by_app_title(
     category_id: str,
     sub_category_id: str | None = None,
     goal_id: str | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
 ) -> int:
     """
     根据 app 和可选的 title 批量更新日志分类
@@ -223,8 +223,8 @@ def update_logs_by_app_title(
         category_id: 主分类ID
         sub_category_id: 子分类ID（可选）
         goal_id: 目标ID（None=不修改, ''=清除, 'goal-xxx'=设置）
-        start_date: 开始日期 YYYY-MM-DD（可选）
-        end_date: 结束日期 YYYY-MM-DD（可选）
+        start_time: 开始时间 ISO 8601 格式（可选）
+        end_time: 结束时间 ISO 8601 格式（可选）
 
     Returns:
         int: 成功更新的数量
@@ -236,6 +236,6 @@ def update_logs_by_app_title(
         category_id=category_id,
         sub_category_id=sub_category_id,
         goal_id=goal_id,
-        start_date=start_date,
-        end_date=end_date,
+        start_time=start_time,
+        end_time=end_time,
     )

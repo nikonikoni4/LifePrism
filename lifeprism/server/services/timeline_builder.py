@@ -90,18 +90,17 @@ def slice_events_by_time_range(
     return df
 
 
-def load_day_events(date: str) -> pd.DataFrame:
+def load_day_events(start_time: str, end_time: str) -> pd.DataFrame:
     """
-    加载当天所有事件并预处理
+    加载指定时间范围内的所有事件并预处理
 
     Args:
-        date: 日期字符串 (YYYY-MM-DD)
+        start_time: 开始时间（ISO 8601 UTC 格式）
+        end_time: 结束时间（ISO 8601 UTC 格式）
 
     Returns:
         pd.DataFrame: 预处理后的事件 DataFrame
     """
-    start_time = f"{date} 00:00:00"
-    end_time = f"{date} 23:59:59"
     df = custom_block_repository.load_user_app_behavior_log(
         start_time=start_time, end_time=end_time
     )
@@ -123,29 +122,54 @@ def load_day_events(date: str) -> pd.DataFrame:
 
 
 def build_timeline_stats(
-    date: str, hour_granularity: int = 1, category_level: Literal["main", "sub"] = "main"
+    start_time: str,
+    end_time: str,
+    hour_granularity: int = 1,
+    category_level: Literal["main", "sub"] = "main",
 ) -> TimelineStatsResponse:
     """
     构建缩略图 Timeline 统计数据
 
     Args:
-        date: 查询日期 (YYYY-MM-DD)
+        start_time: 开始时间（ISO 8601 UTC 格式）
+        end_time: 结束时间（ISO 8601 UTC 格式）
         hour_granularity: 时间粒度（1/2/3/4/6 小时）
         category_level: 分类级别（main=主分类, sub=子分类）
 
     Returns:
         TimelineStatsResponse: 缩略图统计响应
     """
-    # 1. 加载当天所有事件
-    df = load_day_events(date)
+    # 1. 加载时间范围内的所有事件
+    df = load_day_events(start_time, end_time)
 
-    # 2. 按时间块切割并聚合
+    # 2. 解析时间范围，计算本地日期（用于响应中的 date 字段）
+    from lifeprism.utils.time_utils import utc_to_local
+
+    range_start = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+    range_end = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+    local_start = utc_to_local(start_time)
+    date = local_start.strftime("%Y-%m-%d")
+
+    # 3. 按时间块切割并聚合
     blocks: list[TimelineBlockStats] = []
     total_tracked = 0
 
-    for start_hour in range(0, 24, hour_granularity):
-        end_hour = start_hour + hour_granularity
-        block = _calculate_block_stats(df, date, start_hour, end_hour, category_level)
+    # 计算时间范围覆盖的小时数
+    total_hours = int((range_end - range_start).total_seconds() / 3600)
+
+    for i in range(0, total_hours, hour_granularity):
+        block_start = range_start + pd.Timedelta(hours=i)
+        block_end = min(range_start + pd.Timedelta(hours=i + hour_granularity), range_end)
+
+        # 计算本地小时用于显示
+        local_block_start = utc_to_local(block_start.isoformat())
+        local_block_end = utc_to_local(block_end.isoformat())
+        start_hour = local_block_start.hour
+        end_hour = local_block_end.hour if local_block_end.hour > 0 else 24
+
+        block = _calculate_block_stats(
+            df, block_start, block_end, start_hour, end_hour, category_level
+        )
         blocks.append(block)
         total_tracked += block.total_duration
 
@@ -159,33 +183,28 @@ def build_timeline_stats(
 
 
 def _calculate_block_stats(
-    df: pd.DataFrame, date: str, start_hour: int, end_hour: int, category_level: str
+    df: pd.DataFrame,
+    range_start: datetime,
+    range_end: datetime,
+    start_hour: int,
+    end_hour: int,
+    category_level: str,
 ) -> TimelineBlockStats:
     """
     计算单个时间块的统计数据
 
     Args:
         df: 当天所有事件的 DataFrame
-        date: 日期字符串
-        start_hour: 开始小时（0-23）
-        end_hour: 结束小时（1-24）
+        range_start: UTC 时间范围开始
+        range_end: UTC 时间范围结束
+        start_hour: 本地开始小时（0-23，用于显示）
+        end_hour: 本地结束小时（1-24，用于显示）
         category_level: 分类级别 ("main" 或 "sub")
 
     Returns:
         TimelineBlockStats: 时间块统计
     """
     # 1. 切割事件到时间块范围
-    range_start = datetime.strptime(f"{date} {start_hour:02d}:00:00", "%Y-%m-%d %H:%M:%S")
-
-    # 处理 end_hour=24 的情况（视为次日 00:00）
-    if end_hour == 24:
-        from datetime import timedelta
-
-        next_day = datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)
-        range_end = next_day.replace(hour=0, minute=0, second=0)
-    else:
-        range_end = datetime.strptime(f"{date} {end_hour:02d}:00:00", "%Y-%m-%d %H:%M:%S")
-
     block_df = slice_events_by_time_range(df, range_start, range_end)
 
     # 2. 确定分组字段、颜色获取函数和名称映射
@@ -206,7 +225,7 @@ def _calculate_block_stats(
         name_map = _get_sub_category_name_map()
 
     # 3. 聚合分类统计
-    block_seconds = (end_hour - start_hour) * 3600
+    block_seconds = int((range_end - range_start).total_seconds())
     categories: list[TimelineCategoryStats] = []
 
     if not block_df.empty:

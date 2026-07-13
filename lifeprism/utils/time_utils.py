@@ -105,6 +105,22 @@ def build_local_datetime(date_str: str, time_str: str = "00:00:00") -> str:
     return combined
 
 
+def utc_to_local(utc_iso: str) -> datetime:
+    """将 UTC ISO 8601 时间字符串转换为本地时区 datetime 对象
+
+    用于需要进一步处理本地时间的场景（如提取小时、日期等）。
+
+    Args:
+        utc_iso: UTC ISO 8601 时间字符串（如 "2026-07-11T20:00:00+00:00"）
+
+    Returns:
+        datetime: 本地时区的 datetime 对象（带时区信息）
+    """
+    dt = parse_iso_to_aware(utc_iso)
+    tz = pytz.timezone(get_user_timezone())
+    return dt.astimezone(tz)
+
+
 def utc_to_local_display(utc_iso: str) -> str:
     """将 UTC ISO 8601 时间字符串转换为本地时区显示格式
 
@@ -117,9 +133,7 @@ def utc_to_local_display(utc_iso: str) -> str:
     Returns:
         str: 本地时间字符串 "YYYY-MM-DD HH:MM:SS"（面向 AI/用户格式）
     """
-    dt = parse_iso_to_aware(utc_iso)
-    tz = pytz.timezone(get_user_timezone())
-    local_dt = dt.astimezone(tz)
+    local_dt = utc_to_local(utc_iso)
     return local_dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
