@@ -5,10 +5,10 @@ Web-Demo 演示数据生成器
 - 数据库表：21 张表
 - 文件数据：diary MD 文件、behavior.md、recent_state.md
 
-修复记录（2026-07-10）：
-- Bug 1: timeline_custom_block 时间格式从 T 分隔改为空格分隔
-- Bug 2: user_app_behavior_log 使用时间槽分区算法避免重叠
-- Bug 3: behavior_analysis 使用时间槽分区算法避免重叠
+时间格式（2026-07-13 更新）：
+- 所有时间戳字段（created_at/updated_at/start_time/end_time/event_time）使用 UTC ISO 8601 格式
+- 日期字段（date）仍使用 YYYY-MM-DD 格式
+- mood_entries 和 custom_records 使用 event_time 字段替代 created_at 进行查询
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ from scripts.demo.demo_data_config import (
     WORK_BLOCKS,
 )
 from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 LOGGER = get_logger(__name__)
 
@@ -47,8 +48,8 @@ LOGGER = get_logger(__name__)
 
 
 def _now_str() -> str:
-    """当前时间的空格分隔格式字符串（与应用代码约定一致）"""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    """当前时间的 UTC ISO 8601 字符串"""
+    return get_utc_now_iso()
 
 
 def _uid(prefix: str = "") -> str:
@@ -57,8 +58,10 @@ def _uid(prefix: str = "") -> str:
 
 
 def _format_time(dt: datetime) -> str:
-    """datetime → 空格分隔格式"""
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
+    """datetime → UTC ISO 8601 格式"""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
 
 
 # ==================== 非重叠时间槽生成 ====================
@@ -139,7 +142,7 @@ class DemoDataGenerator:
         self.data_path = data_path.resolve()
         self.days = days
         self.db_path = self.data_path / "dataset" / "lifewatch_ai.db"
-        self.today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        self.today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         self.start_date = self.today - timedelta(days=days - 1)
 
     # ==================== 入口 ====================
@@ -178,23 +181,31 @@ class DemoDataGenerator:
         date_end = self.today.strftime("%Y-%m-%d")
 
         # 日期范围表：删除时间窗口内的数据
-        date_range_tables: list[tuple[str, str]] = [
-            ("user_app_behavior_log", "start_time"),
-            ("behavior_analysis", "start_time"),
-            ("raw_behavior_analysis", "start_time"),
-            ("diary", "date"),
-            ("daily_focus", "date"),
-            ("goal_stats", "date"),
-            ("goal_journal", "date"),
-            ("timeline_custom_block", "start_time"),
-            ("habit_checkins", "date"),
-            ("mood_entries", "created_at"),
+        # date 列存储 YYYY-MM-DD，timestamp 列存储 UTC ISO 8601
+        date_range_tables: list[tuple[str, str, str]] = [
+            ("user_app_behavior_log", "start_time", "timestamp"),
+            ("behavior_analysis", "start_time", "timestamp"),
+            ("raw_behavior_analysis", "start_time", "timestamp"),
+            ("diary", "date", "date"),
+            ("daily_focus", "date", "date"),
+            ("goal_stats", "date", "date"),
+            ("goal_journal", "date", "date"),
+            ("timeline_custom_block", "start_time", "timestamp"),
+            ("habit_checkins", "date", "date"),
+            ("mood_entries", "event_time", "timestamp"),
         ]
-        for table, col in date_range_tables:
-            conn.execute(
-                f"DELETE FROM {table} WHERE {col} >= ? AND {col} <= ?",
-                (date_start, f"{date_end} 23:59:59"),
-            )
+        for table, col, col_type in date_range_tables:
+            if col_type == "date":
+                conn.execute(
+                    f"DELETE FROM {table} WHERE {col} >= ? AND {col} <= ?",
+                    (date_start, date_end),
+                )
+            else:
+                # ISO 8601 格式，用 T 分隔
+                conn.execute(
+                    f"DELETE FROM {table} WHERE {col} >= ? AND {col} <= ?",
+                    (f"{date_start}T00:00:00+00:00", f"{date_end}T23:59:59+00:00"),
+                )
 
         # ID 前缀表：删除 demo 前缀的
         conn.execute("DELETE FROM todo_list WHERE id LIKE 't-demo-%'")
@@ -464,15 +475,17 @@ class DemoDataGenerator:
             for _ in range(random.randint(1, 2)):
                 template = random.choice(MOOD_TEMPLATES)
                 factors_json = '["工作","健康","学习"]'
+                event_time = _format_time(
+                    day.replace(hour=random.randint(8, 22), minute=random.randint(0, 59))
+                )
                 conn.execute(
                     """INSERT INTO mood_entries
-                       (id, mood_type_id, score, content, factors, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                       (id, mood_type_id, score, content, factors, event_time, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     (f"mood-{uuid.uuid4().hex[:8]}",
                      template["mood_type_id"], template["score"],
                      template["content"], factors_json,
-                     _format_time(day.replace(hour=random.randint(8, 22), minute=random.randint(0, 59))),
-                     _now_str()),
+                     event_time, _now_str(), _now_str()),
                 )
                 total += 1
         LOGGER.info("  [ok] mood_entries: %d 条", total)
@@ -720,10 +733,8 @@ class DemoDataGenerator:
             )
         LOGGER.info("  [ok] time_paradoxes: %d 条", len(TIME_PARADOX_ENTRIES))
 
-    # ---- Bug 1 修复: timeline_custom_block 使用空格分隔格式 ----
-
     def _gen_timeline_custom_blocks(self, conn: sqlite3.Connection) -> None:
-        """生成手动时间块（空格分隔时间格式）"""
+        """生成手动时间块"""
         total = 0
         for day in self._date_range():
             num_blocks = random.randint(2, 4)
@@ -822,6 +833,7 @@ class DemoDataGenerator:
             column_defs = ["id TEXT PRIMARY KEY"]
             for f in record_def["fields"]:
                 column_defs.append(f"{f['field_key']} TEXT")
+            column_defs.append("event_time TEXT")
             column_defs.append("created_at TEXT")
             column_defs.append("updated_at TEXT")
             ddl = f"CREATE TABLE IF NOT EXISTS {data_table} ({', '.join(column_defs)})"
@@ -841,9 +853,9 @@ class DemoDataGenerator:
                     field_keys = [f["field_key"] for f in record_def["fields"]]
                     values = [tmpl[k] for k in field_keys]
 
-                    columns = ["id"] + field_keys + ["created_at", "updated_at"]
+                    columns = ["id"] + field_keys + ["event_time", "created_at", "updated_at"]
                     placeholders = ["?"] * len(columns)
-                    params = [entry_id] + values + [entry_time, now]
+                    params = [entry_id] + values + [entry_time, now, now]
 
                     conn.execute(
                         f"INSERT INTO {data_table} ({', '.join(columns)}) "
