@@ -33,6 +33,8 @@ class SettingItems(BaseModel):
     )
     input_tokens_cost: float = Field(description="输入token单价 /1k")
     output_tokens_cost: float = Field(description="输出token单价 /1k")
+    # 同步配置
+    sync_remote_url: str = Field(default="", description="云端服务器地址")
     # 分类配置
     classification_mode: str = Field(description="分类模式")
     long_log_threshold: int = Field(description="长时长阈值 (秒)")
@@ -97,6 +99,7 @@ class UpdateSettingsRequest(BaseModel):
     monitor_type: str | None = None
     screen_analysis_ignore: list[str] | None = None
     timezone: str | None = None
+    sync_remote_url: str | None = None
 
 
 class UpdateApiKeyRequest(BaseModel):

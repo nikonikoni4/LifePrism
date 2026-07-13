@@ -33,6 +33,11 @@ def get_settings() -> SettingItems:
         SettingItems: 完整配置，API Key 已脱敏
     """
     config = settings.get_for_display()
+
+    # sync.remote_url 在 config.yaml 中是点号分隔的 key，映射为 Pydantic 的 sync_remote_url
+    if "sync.remote_url" in config:
+        config["sync_remote_url"] = config.pop("sync.remote_url")
+
     # 添加 provider_list (来自 provider_manager)
     config["provider_list"] = provider_manager.provider_list
     # 添加 provider_id_map (名称到 ID 的映射)
@@ -59,6 +64,10 @@ def update_settings(request: UpdateSettingsRequest) -> SettingItems:
         ValueError: 当 screenshot_monitor=True 但 is_vlm[provider/model] 不存在或为 false 时
     """
     updates = request.model_dump(exclude_none=True)
+
+    # sync_remote_url 在 config.yaml 中存储为 sync.remote_url
+    if "sync_remote_url" in updates:
+        updates["sync.remote_url"] = updates.pop("sync_remote_url")
     if updates:
         logger.info("更新配置: %s", list(updates.keys()))
 

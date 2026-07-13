@@ -73,6 +73,7 @@ class SettingsManager:
         "auto_summary_session": True,  # 自动总结会话
         "auto_update_memory": True,  # 自动更新记忆
         "timezone": "Asia/Shanghai",  # 用户时区（IANA 标识符）
+        "sync.remote_url": "",  # 云端服务器地址
     }
 
     def __new__(cls) -> "SettingsManager":
