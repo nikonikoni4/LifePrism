@@ -38,6 +38,10 @@ class SettingsManager:
         "api_key": "LIFEWATCH_API_KEY",
     }
 
+    # storage.yaml 承载的 Key 类字段（run_mode 为云端时从 storage.yaml 读写）
+    # api_key 不纳入，保持现有 ENV_VAR + keyring 路径
+    STORAGE_KEY_FIELDS = {"sync_api_key", "wechat_token"}
+
     # 默认配置值
     DEFAULTS = {
         "user_name": "默认用户",
@@ -120,6 +124,16 @@ class SettingsManager:
 
         # 7. 解析允许的工作目录路径
         self._allowed_dir_path = self._resolve_allowed_dir_paths()
+
+        # 8. 初始化 storage 状态
+        self._storage_config: dict[str, Any] = {}
+        self._storage_loaded_mode: str | None = None
+
+        # 9. 迁移 config.yaml 中残留的 Key 字段（向后兼容，Issue #29）
+        self._migrate_keys_from_config()
+
+        # 10. 加载 storage.yaml（云端模式专用，本地模式跳过）
+        self._load_storage()
 
     def _resolve_config_base_path(self) -> Path:
         """
@@ -221,9 +235,9 @@ class SettingsManager:
             pass  # ValueError=不是子目录（安全），OSError=resolve失败（不阻塞启动）
 
     @property
-    def warnings(self) -> list[str]:
+    def warnings(self) -> list[dict[str, str]]:
         """获取系统警告列表"""
-        return list(self._warnings)  # List[Dict[str, str]]
+        return list(self._warnings)
 
     def _load_config(self) -> None:
         """从 YAML 文件加载配置"""
@@ -242,14 +256,249 @@ class SettingsManager:
         )
 
     def _save_config(self) -> None:
-        """保存配置到 YAML 文件"""
+        """保存配置到 YAML 文件（原子写入）"""
         # 确保目录存在
         self._config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(self._config_path, "w", encoding="utf-8") as f:
+        tmp_path = self._config_path.with_suffix(".tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
             yaml.dump(
                 self._config, f, allow_unicode=True, default_flow_style=False, sort_keys=False
             )
+        os.replace(tmp_path, self._config_path)
+
+    # ===================== storage.yaml 管理 =====================
+
+    def _load_storage(self) -> None:
+        """加载 storage.yaml（云端模式专用，本地模式跳过）
+
+        storage.yaml 承载 sync_api_key、wechat_token、providers.* 三类 Key。
+        本地模式 (run_mode == "full") 不读取文件，仅初始化空字典。
+        云端模式从 {config_base_path}/storage.yaml 加载，文件不存在时返回空字典。
+        """
+        self._storage_loaded_mode = self.run_mode
+        self._storage_config = {}
+        if self.run_mode == "full":
+            return
+        storage_path = self._config_base_path / "storage.yaml"
+        if not storage_path.exists():
+            return
+        try:
+            with open(storage_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            if isinstance(data, dict):
+                self._storage_config = data
+        except Exception as e:
+            logger.warning("加载 storage.yaml 失败: %s", e)
+            self._storage_config = {}
+
+    def _save_storage(self) -> None:
+        """保存 storage.yaml 到磁盘（原子写入），权限设为 600（非 Windows 平台）"""
+        storage_path = self._config_base_path / "storage.yaml"
+        storage_path.parent.mkdir(parents=True, exist_ok=True)
+
+        tmp_path = storage_path.with_suffix(".tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            yaml.dump(
+                self._storage_config,
+                f,
+                allow_unicode=True,
+                default_flow_style=False,
+                sort_keys=False,
+            )
+        os.replace(tmp_path, storage_path)
+        if sys.platform != "win32":
+            os.chmod(storage_path, 0o600)
+
+    def _migrate_keys_from_config(self) -> None:
+        """迁移 config.yaml 中残留的 Key 字段（向后兼容，Issue #29）
+
+        用户从旧版本升级后首次启动时，config.yaml 中可能残留
+        sync_api_key、wechat_token 等 Key 字段。本方法检测并迁移这些字段。
+
+        迁移策略：
+        - storage.yaml 已存在 → 跳过迁移（Key 已在 storage.yaml 中），仅清理 config.yaml
+        - storage.yaml 不存在 + 本地模式 (full) → 写入 keyring
+        - storage.yaml 不存在 + 云端模式 → 写入 storage.yaml
+        - 最后从 config.yaml 中移除 Key 字段并保存
+
+        迁移后 config.yaml 中其他配置（如 llm.provider）保持不变。
+        """
+        # 检测残留的 Key 字段（STORAGE_KEY_FIELDS = sync_api_key, wechat_token）
+        residual_keys: dict[str, Any] = {
+            k: self._config[k]
+            for k in list(self._config)
+            if k in self.STORAGE_KEY_FIELDS and self._config[k]
+        }
+        if not residual_keys:
+            return
+
+        logger.info(
+            "检测到 config.yaml 中残留 Key 字段，开始迁移: %s",
+            list(residual_keys.keys()),
+        )
+
+        storage_path = self._config_base_path / "storage.yaml"
+        if not storage_path.exists():
+            # storage.yaml 不存在 → 根据 run_mode 写入 keyring 或 storage.yaml
+            for key_name, value in residual_keys.items():
+                if self.run_mode == "full":
+                    self._set_storage_key_to_keyring(key_name, str(value))
+                else:
+                    self.set_storage_key(key_name, str(value))
+        # storage.yaml 已存在 → 跳过迁移（Key 已在 storage.yaml 中）
+
+        # 从 config.yaml 中移除残留 Key 字段
+        for key_name in residual_keys:
+            self._config.pop(key_name, None)
+        self._save_config()
+        logger.info(
+            "已从 config.yaml 中移除残留 Key 字段: %s",
+            list(residual_keys.keys()),
+        )
+
+    @staticmethod
+    def _get_nested_key(data: dict[str, Any], key_name: str) -> str | None:
+        """从嵌套字典中按点分路径读取值（如 providers.anthropic）"""
+        parts = key_name.split(".")
+        current: Any = data
+        for part in parts:
+            if not isinstance(current, dict):
+                return None
+            current = current.get(part)
+            if current is None:
+                return None
+        return current if isinstance(current, str) else None
+
+    @staticmethod
+    def _set_nested_key(data: dict[str, Any], key_name: str, value: str) -> None:
+        """向嵌套字典中按点分路径写入值（如 providers.anthropic）"""
+        parts = key_name.split(".")
+        current = data
+        for part in parts[:-1]:
+            if part not in current or not isinstance(current[part], dict):
+                current[part] = {}
+            current = current[part]
+        current[parts[-1]] = value
+
+    @staticmethod
+    def _delete_nested_key(data: dict[str, Any], key_name: str) -> None:
+        """从嵌套字典中按点分路径删除值（如 providers.anthropic）"""
+        parts = key_name.split(".")
+        current: Any = data
+        for part in parts[:-1]:
+            if not isinstance(current, dict) or part not in current:
+                return
+            current = current[part]
+        if isinstance(current, dict):
+            current.pop(parts[-1], None)
+
+    def _get_storage_key_from_keyring(self, key_name: str) -> str | None:
+        """从 keyring 读取 storage Key（本地模式使用）
+
+        顶层 key（sync_api_key、wechat_token）使用 KEYRING_SERVICE_NAME + key_name。
+        嵌套 key（providers.{provider_id}）委托给 _get_api_key_from_keyring_by_provider。
+        """
+        if key_name.startswith("providers."):
+            provider_id = key_name[len("providers.") :]
+            return self._get_api_key_from_keyring_by_provider(provider_id)
+        try:
+            return keyring.get_password(KEYRING_SERVICE_NAME, key_name)
+        except Exception:
+            return None
+
+    def _set_storage_key_to_keyring(self, key_name: str, value: str) -> None:
+        """向 keyring 写入 storage Key（本地模式使用）"""
+        if key_name.startswith("providers."):
+            provider_id = key_name[len("providers.") :]
+            self._set_api_key_to_keyring_by_provider(provider_id, value)
+            return
+        try:
+            keyring.set_password(KEYRING_SERVICE_NAME, key_name, value)
+        except Exception as e:
+            logger.warning("写入 keyring %s 失败: %s", key_name, e)
+
+    def _delete_storage_key_from_keyring(self, key_name: str) -> None:
+        """从 keyring 删除 storage Key（本地模式使用）"""
+        if key_name.startswith("providers."):
+            provider_id = key_name[len("providers.") :]
+            self._delete_api_key_from_keyring_by_provider(provider_id)
+            return
+        try:
+            keyring.delete_password(KEYRING_SERVICE_NAME, key_name)
+        except keyring.errors.PasswordDeleteError:
+            pass
+        except Exception as e:
+            logger.warning("从 keyring 删除 %s 失败: %s", key_name, e)
+
+    def get_storage_key(self, key_name: str) -> str | None:
+        """根据 run_mode 路由读取 Key
+
+        本地模式 (full)：从 keyring 读取
+        云端模式 (agent_only/web_demo)：从 storage.yaml 读取，支持嵌套 key（如 providers.anthropic）
+
+        Args:
+            key_name: Key 名称，支持点分路径（如 "sync_api_key"、"providers.anthropic"）
+
+        Returns:
+            Key 值，不存在时返回 None
+        """
+        if self.run_mode == "full":
+            return self._get_storage_key_from_keyring(key_name)
+        # 云端模式：确保以当前模式加载过 storage.yaml
+        if self._storage_loaded_mode != self.run_mode:
+            self._load_storage()
+        return self._get_nested_key(self._storage_config, key_name)
+
+    def set_storage_key(self, key_name: str, value: str) -> None:
+        """根据 run_mode 路由写入 Key
+
+        本地模式 (full)：写入 keyring
+        云端模式 (agent_only/web_demo)：写入 storage.yaml
+
+        Args:
+            key_name: Key 名称，支持点分路径（如 "sync_api_key"、"providers.anthropic"）
+            value: Key 值
+        """
+        if self.run_mode == "full":
+            self._set_storage_key_to_keyring(key_name, value)
+            return
+        # 云端模式：确保以当前模式加载过 storage.yaml
+        if self._storage_loaded_mode != self.run_mode:
+            self._load_storage()
+        self._set_nested_key(self._storage_config, key_name, value)
+        self._save_storage()
+
+    def delete_storage_key(self, key_name: str) -> None:
+        """根据 run_mode 路由删除 Key
+
+        本地模式 (full)：从 keyring 删除
+        云端模式 (agent_only/web_demo)：从 storage.yaml 删除
+
+        Args:
+            key_name: Key 名称，支持点分路径（如 "sync_api_key"、"providers.anthropic"）
+        """
+        if self.run_mode == "full":
+            self._delete_storage_key_from_keyring(key_name)
+            return
+        # 云端模式：确保以当前模式加载过 storage.yaml
+        if self._storage_loaded_mode != self.run_mode:
+            self._load_storage()
+        self._delete_nested_key(self._storage_config, key_name)
+        self._save_storage()
+
+    def save_storage_yaml(self, data: dict[str, Any]) -> None:
+        """批量写入 storage.yaml（public 接口，供 CloudInitializer 调用）
+
+        替换整个 storage.yaml 内容，保证权限 600 和文件结构一致。
+        SettingsManager 管理所有 storage.yaml 的生命周期，外部模块不直接写文件。
+
+        Args:
+            data: 完整的 storage.yaml 数据字典
+        """
+        self._storage_config = data
+        self._storage_loaded_mode = self.run_mode
+        self._save_storage()
 
     def _normalize_model_history(
         self, raw_history: dict[str, Any] | None
@@ -316,6 +565,10 @@ class SettingsManager:
             if keyring_value:
                 return keyring_value
 
+        # 2.5 STORAGE_KEY_FIELDS 路由：本地模式从 keyring，云端模式从 storage.yaml
+        if key in self.STORAGE_KEY_FIELDS:
+            return self.get_storage_key(key)
+
         # 3. 检查 yaml 配置
         if key in self._config and self._config[key] is not None:
             return self._config[key]
@@ -351,7 +604,7 @@ class SettingsManager:
             keyring.set_password(KEYRING_SERVICE_NAME, KEYRING_API_KEY_USERNAME, api_key)
             return True
         except Exception as e:
-            print(f"Warning: Failed to save API key to keyring: {e}")
+            logger.warning("保存 API key 到 keyring 失败: %s", e)
             return False
 
     def _set_api_key_to_keyring_by_provider(self, provider_id: str, api_key: str) -> bool:
@@ -366,7 +619,7 @@ class SettingsManager:
                 return True
             return False
         except Exception as e:
-            print(f"Warning: Failed to save API key for {provider_id} to keyring: {e}")
+            logger.warning("保存 provider %s 的 API key 到 keyring 失败: %s", provider_id, e)
             return False
 
     def _delete_api_key_from_keyring(self) -> bool:
@@ -459,6 +712,14 @@ class SettingsManager:
             # 不保存到 yaml 文件
             return
 
+        # STORAGE_KEY_FIELDS 路由：本地模式写 keyring，云端模式写 storage.yaml
+        if key in self.STORAGE_KEY_FIELDS:
+            if value:
+                self.set_storage_key(key, str(value))
+            else:
+                self.delete_storage_key(key)
+            return
+
         self._config[key] = value
         if save:
             self._save_config()
@@ -508,6 +769,16 @@ class SettingsManager:
                 self._set_api_key_to_keyring(api_key)
             else:
                 self._delete_api_key_from_keyring()
+
+        # 分离出 storage Key 类字段（通过 SettingsManager 路由：本地模式写 keyring，云端模式写 storage.yaml）
+        storage_keys = {k for k in list(updates) if k in self.STORAGE_KEY_FIELDS}
+        if storage_keys:
+            for sk in storage_keys:
+                sv = updates.pop(sk)
+                if sv:
+                    self.set_storage_key(sk, str(sv))
+                else:
+                    self.delete_storage_key(sk)
 
         # 更新其他配置
         if updates:

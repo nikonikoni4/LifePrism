@@ -1,17 +1,31 @@
 """云端配置初始化器
 
-读取 cloud_init.yaml 并写入 config.yaml 和 providers.yaml，
+读取 cloud_init.yaml 并写入 config.yaml 和 storage.yaml，
 完成云端启动时的配置初始化。
+
+cloud_init.yaml 结构（Issue #28）::
+
+    storage:
+      sync_api_key: "..."
+      wechat_token: "..."
+      providers:           # dict: provider_id -> api_key
+        anthropic: "sk-ant-..."
+    config:
+      llm:
+        provider: "anthropic"
+        model: "claude-opus-4"
+      monitor_type: none
+      timezone: Asia/Shanghai
 
 流程:
 1. 检测 {data_path}/cloud_init.yaml 是否存在
-2. 读取并验证配置完整性
-3. 写入 config.yaml（wechat_token、sync_api_key、llm.provider、llm.model、monitor_type: none）
-4. 写入 providers.yaml（为对应 provider 注入 api_key 字段）
+2. 读取并验证配置完整性（storage 段 + config 段）
+3. 写入 config.yaml（仅非 Key 字段：llm、monitor_type、timezone）
+4. 写入 storage.yaml（Key 字段：sync_api_key、wechat_token、providers）via SettingsManager
 5. 全部成功后删除 cloud_init.yaml
 
 参考:
-- Issue #09: .scratch/linux-deployment-discussion/issues-p2/09-cloud-initializer.md
+- Issue #28: .scratch/linux-deployment-discussion/issues-p2/28-cloud-init-storage-segment.md
 - PRD: .scratch/linux-deployment-discussion/linux-deployment-prd.md (云端初始化流程)
 """
 
@@ -32,7 +46,8 @@ class CloudInitializer:
     """云端配置初始化器
 
     读取 {data_path}/cloud_init.yaml，验证配置完整性后写入
-    config.yaml 和 providers.yaml，成功后删除临时文件。
+    config.yaml（非 Key 字段）和 storage.yaml（Key 字段，via SettingsManager），
+    成功后删除临时文件。
 
     Attributes:
         _data_path: lifeprism 数据路径
@@ -59,7 +74,7 @@ class CloudInitializer:
         return self._cloud_init_path.exists()
 
     # ------------------------------------------------------------------
-    # 路径获取（通过 settings_manager / provider_manager 单例，便于测试 mock）
+    # 路径获取（通过 settings_manager 单例，便于测试 mock）
     # ------------------------------------------------------------------
 
     def _get_config_yaml_path(self) -> Path:
@@ -67,12 +82,6 @@ class CloudInitializer:
         from lifeprism.config.settings_manager import settings
 
         return settings.get_config_path()
-
-    def _get_providers_yaml_path(self) -> Path:
-        """获取 providers.yaml 路径（来自 provider_manager）"""
-        from lifeprism.config.provider_manager import provider_manager
-
-        return provider_manager.get_config_path()
 
     # ------------------------------------------------------------------
     # 初始化主流程
@@ -86,8 +95,8 @@ class CloudInitializer:
         1. 检测 cloud_init.yaml 是否存在，不存在则直接返回
         2. 读取 cloud_init.yaml
         3. 验证配置完整性（失败时抛出 ConfigError，不删除文件）
-        4. 写入 config.yaml
-        5. 写入 providers.yaml
+        4. 写入 config.yaml（仅非 Key 字段）
+        5. 写入 storage.yaml（Key 字段，via SettingsManager.save_storage_yaml）
         6. 全部成功后删除 cloud_init.yaml
 
         Returns:
@@ -99,7 +108,7 @@ class CloudInitializer:
         if not self.should_initialize():
             return
 
-        logger.info(f"检测到 cloud_init.yaml，开始云端配置初始化: {self._cloud_init_path}")
+        logger.info("检测到 cloud_init.yaml，开始云端配置初始化: %s", self._cloud_init_path)
 
         # 1. 读取 cloud_init.yaml
         cloud_config = self._read_cloud_init()
@@ -107,11 +116,11 @@ class CloudInitializer:
         # 2. 验证配置完整性（失败时抛出 ConfigError，不删除文件）
         self._validate(cloud_config)
 
-        # 3. 写入 config.yaml
+        # 3. 写入 config.yaml（仅非 Key 字段）
         self._write_config_yaml(cloud_config)
 
-        # 4. 写入 providers.yaml
-        self._write_providers_yaml(cloud_config)
+        # 4. 写入 storage.yaml（Key 字段，via SettingsManager）
+        self._write_storage_yaml(cloud_config)
 
         # 5. 全部成功后删除 cloud_init.yaml
         self._cloud_init_path.unlink()
@@ -147,14 +156,15 @@ class CloudInitializer:
 
     def _validate(self, cloud_config: dict[str, Any]) -> None:
         """
-        验证 cloud_init.yaml 配置完整性
+        验证 cloud_init.yaml 配置完整性（storage 段 + config 段）
 
         检查必需字段:
-        - wechat_token
-        - sync.api_key（对应 config.yaml 中的 sync_api_key）
-        - llm.provider
-        - llm.model
-        - providers 列表中对应 provider 的 api_key
+        - storage.sync_api_key
+        - storage.wechat_token
+        - config.llm.provider
+        - config.llm.model
+
+        storage.providers 为可选字段，空字典或缺失均不报错。
 
         Args:
             cloud_config: cloud_init.yaml 解析后的配置字典
@@ -164,43 +174,36 @@ class CloudInitializer:
         """
         errors: list[str] = []
 
-        # 检查 wechat_token
-        if not cloud_config.get("wechat_token"):
-            errors.append("缺少必需字段: wechat_token")
+        # 检查 storage 段
+        storage_config = cloud_config.get("storage") or {}
+        if not isinstance(storage_config, dict):
+            errors.append(f"storage 段格式错误: 期望字典，实际 {type(storage_config).__name__}")
+            storage_config = {}
 
-        # 检查 sync.api_key
-        sync_config = cloud_config.get("sync") or {}
-        if not sync_config.get("api_key"):
-            errors.append("缺少必需字段: sync.api_key")
+        # 检查 storage.sync_api_key
+        if not storage_config.get("sync_api_key"):
+            errors.append("缺少必需字段: storage.sync_api_key")
 
-        # 检查 llm.provider 和 llm.model
-        llm_config = cloud_config.get("llm") or {}
-        provider = llm_config.get("provider")
-        if not provider:
-            errors.append("缺少必需字段: llm.provider")
+        # 检查 storage.wechat_token
+        if not storage_config.get("wechat_token"):
+            errors.append("缺少必需字段: storage.wechat_token")
+
+        # 检查 config 段
+        config_section = cloud_config.get("config") or {}
+        if not isinstance(config_section, dict):
+            errors.append(f"config 段格式错误: 期望字典，实际 {type(config_section).__name__}")
+            config_section = {}
+
+        # 检查 config.llm.provider 和 config.llm.model
+        llm_config = config_section.get("llm") or {}
+        if not llm_config.get("provider"):
+            errors.append("缺少必需字段: config.llm.provider")
         if not llm_config.get("model"):
-            errors.append("缺少必需字段: llm.model")
-
-        # 检查 providers 列表中对应 provider 的 api_key
-        providers = cloud_config.get("providers") or []
-        if not providers:
-            errors.append("缺少必需字段: providers（不能为空）")
-        elif provider:
-            # 将 display_name 转为内部 name（如 "Xiaomi MIMO" → "xiaomi_mimo"）
-            # cloud_init.yaml 的 llm.provider 来自本地 settings.get("provider")，
-            # 存储的是 display_name；而 providers[].name 是内部 name
-            from lifeprism.config.provider_manager import provider_manager
-
-            provider_id = provider_manager.get_provider_id(provider)
-            provider_spec = next((p for p in providers if p.get("name") == provider_id), None)
-            if provider_spec is None:
-                errors.append(f"providers 列表中未找到 llm.provider 对应的 provider: {provider}")
-            elif not provider_spec.get("api_key"):
-                errors.append(f"providers 列表中 provider '{provider}' 缺少 api_key")
+            errors.append("缺少必需字段: config.llm.model")
 
         if errors:
             error_detail = "; ".join(errors)
-            logger.error(f"cloud_init.yaml 配置验证失败: {error_detail}")
+            logger.error("cloud_init.yaml 配置验证失败: %s", error_detail)
             raise ConfigError(
                 message=f"cloud_init.yaml 配置验证失败: {error_detail}",
                 code="CLOUD_INIT_VALIDATION_ERROR",
@@ -209,15 +212,16 @@ class CloudInitializer:
 
     def _write_config_yaml(self, cloud_config: dict[str, Any]) -> None:
         """
-        写入 config.yaml
+        写入 config.yaml（仅非 Key 字段）
 
         写入字段:
-        - provider: 来自 cloud_init.llm.provider
-        - model: 来自 cloud_init.llm.model
-        - wechat_token: 来自 cloud_init.wechat_token
-        - sync_api_key: 来自 cloud_init.sync.api_key
+        - provider: 来自 cloud_init.config.llm.provider
+        - model: 来自 cloud_init.config.llm.model
         - monitor_type: 强制为 none
-        - timezone: 来自 cloud_init.timezone（透传用户时区配置）
+        - timezone: 来自 cloud_init.config.timezone（如存在）
+
+        不写入 Key 字段（sync_api_key、wechat_token、providers），
+        这些字段由 _write_storage_yaml 写入 storage.yaml。
 
         采用合并策略: 读取现有 config.yaml（如存在），更新上述字段后写回。
 
@@ -234,19 +238,17 @@ class CloudInitializer:
             existing_config = {}
             config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # 合并 cloud_init 字段
-        llm_config = cloud_config.get("llm") or {}
-        sync_config = cloud_config.get("sync") or {}
+        # 合并 cloud_init.config 字段（仅非 Key 字段）
+        config_section = cloud_config.get("config") or {}
+        llm_config = config_section.get("llm") or {}
 
         existing_config["provider"] = llm_config.get("provider", "")
         existing_config["model"] = llm_config.get("model", "")
-        existing_config["wechat_token"] = cloud_config.get("wechat_token", "")
-        existing_config["sync_api_key"] = sync_config.get("api_key", "")
         existing_config["monitor_type"] = "none"  # 强制为 none
         # 透传 timezone（cloud_init.yaml 中已有此字段，由 cloud_config_generator 写入）
         # 仅在 cloud_init.yaml 显式提供 timezone 时才写入 config.yaml，
         # 否则保留 config.yaml 已有值或让 settings_manager DEFAULTS 兜底
-        timezone_from_cloud = cloud_config.get("timezone")
+        timezone_from_cloud = config_section.get("timezone")
         if timezone_from_cloud:
             existing_config["timezone"] = timezone_from_cloud
 
@@ -260,65 +262,46 @@ class CloudInitializer:
             os.chmod(config_path, 0o600)
 
         logger.info(
-            "已写入 config.yaml: provider=%s, model=%s, wechat_token=***, sync_api_key=***, monitor_type=none, timezone=%s",
+            "已写入 config.yaml: provider=%s, model=%s, monitor_type=none, timezone=%s",
             existing_config["provider"],
             existing_config["model"],
             existing_config.get("timezone", "(未设置)"),
         )
 
-    def _write_providers_yaml(self, cloud_config: dict[str, Any]) -> None:
+    def _write_storage_yaml(self, cloud_config: dict[str, Any]) -> None:
         """
-        写入 providers.yaml
+        写入 storage.yaml（Key 字段，via SettingsManager.save_storage_yaml）
 
-        为 cloud_init.providers 中列出的 provider 注入 api_key 字段。
-        采用合并策略: 读取现有 providers.yaml，更新对应 provider 的 api_key 后写回。
+        写入字段（来自 cloud_init.storage）:
+        - sync_api_key
+        - wechat_token
+        - providers: dict[provider_id, api_key]
+
+        通过 SettingsManager 的 public 接口 save_storage_yaml() 写入，
+        保证权限 600 和文件结构一致。SettingsManager 管理所有 storage.yaml
+        的生命周期，外部模块不直接写文件。
 
         Args:
             cloud_config: cloud_init.yaml 解析后的配置字典
         """
-        providers_path = self._get_providers_yaml_path()
+        from lifeprism.config.settings_manager import settings
 
-        # 读取现有 providers.yaml（如存在）
-        if providers_path.exists():
-            with open(providers_path, encoding="utf-8") as f:
-                providers_data = yaml.safe_load(f) or {}
-        else:
-            providers_data = {"allowed_providers": [], "providers": []}
-            providers_path.parent.mkdir(parents=True, exist_ok=True)
+        storage_config = cloud_config.get("storage") or {}
 
-        existing_providers: list[dict[str, Any]] = providers_data.get("providers", [])
+        # 构建 storage.yaml 数据（确保 providers 为 dict）
+        storage_data: dict[str, Any] = {
+            "sync_api_key": storage_config.get("sync_api_key", ""),
+            "wechat_token": storage_config.get("wechat_token", ""),
+            "providers": storage_config.get("providers") or {},
+        }
 
-        # 为 cloud_init 中列出的 provider 注入 api_key
-        cloud_providers = cloud_config.get("providers") or []
-        injected_names: list[str] = []
-        for cloud_provider in cloud_providers:
-            name = cloud_provider.get("name")
-            api_key = cloud_provider.get("api_key")
-            if not name:
-                continue
+        # 通过 SettingsManager public 接口写入（保证权限 600）
+        settings.save_storage_yaml(storage_data)
 
-            # 查找现有 provider spec
-            spec = next((p for p in existing_providers if p.get("name") == name), None)
-            if spec is not None:
-                spec["api_key"] = api_key
-            else:
-                # 不存在则追加
-                new_spec = dict(cloud_provider)
-                existing_providers.append(new_spec)
-            injected_names.append(name)
-
-        providers_data["providers"] = existing_providers
-
-        with open(providers_path, "w", encoding="utf-8") as f:
-            yaml.dump(
-                providers_data, f, allow_unicode=True, default_flow_style=False, sort_keys=False
-            )
-
-        # 云端配置文件权限 600（PRD 安全要求）
-        if sys.platform != "win32":
-            os.chmod(providers_path, 0o600)
-
-        logger.info("已写入 providers.yaml，注入 api_key 的 provider: %s", injected_names)
+        logger.info(
+            "已写入 storage.yaml: sync_api_key=***, wechat_token=***, providers_count=%d",
+            len(storage_data["providers"]),
+        )
 
     # ------------------------------------------------------------------
     # 运行时校验

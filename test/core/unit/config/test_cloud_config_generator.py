@@ -4,6 +4,19 @@ CloudConfigGenerator 单元测试
 验证云端配置生成逻辑：从 keyring 读取所有 Key（LLM/微信/同步），
 生成完整的 cloud_init.yaml。
 
+cloud_init.yaml 结构（Issue #28）:
+    storage:
+      sync_api_key: "..."
+      wechat_token: "..."
+      providers:        # dict: provider_id -> api_key
+        anthropic: "sk-ant-..."
+    config:
+      llm:
+        provider: "anthropic"
+        model: "claude-opus-4"
+      monitor_type: none
+      timezone: Asia/Shanghai
+
 测试 Seams:
 1. CloudConfigGenerator.generate_cloud_config() 公开接口
    - 测试从 keyring 读取已有 Key（key_is_new = false）
@@ -11,6 +24,8 @@ CloudConfigGenerator 单元测试
    - 测试生成完整配置（包含所有 Provider）
    - 测试 monitor_type 强制覆盖为 none
    - 测试文件保存路径正确
+2. storage 段结构正确性（sync_api_key、wechat_token、providers dict）
+3. config 段结构正确性（llm、monitor_type、timezone）
 """
 
 import pytest
@@ -137,15 +152,15 @@ class TestCloudConfigGeneratorReadsExistingKey:
 
         mock_env["set_sync_api_key"].assert_not_called()
 
-    def test_existing_key_written_to_yaml(self, mock_env):
-        """已有的同步 Key 被写入 YAML 配置文件"""
+    def test_existing_key_written_to_storage_section(self, mock_env):
+        """已有的同步 Key 被写入 storage.sync_api_key"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         generator = CloudConfigGenerator()
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        assert config["sync"]["api_key"] == "existing-sync-key"
+        assert config["storage"]["sync_api_key"] == "existing-sync-key"
 
 
 class TestCloudConfigGeneratorGeneratesNewKey:
@@ -186,8 +201,8 @@ class TestCloudConfigGeneratorGeneratesNewKey:
         assert isinstance(saved_key, str)
         assert len(saved_key) >= 32
 
-    def test_generated_key_written_to_yaml(self, mock_env):
-        """新生成的 Key 被写入 YAML 配置文件"""
+    def test_generated_key_written_to_storage_section(self, mock_env):
+        """新生成的 Key 被写入 storage.sync_api_key"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         mock_env["get_sync_api_key"].return_value = None
@@ -197,86 +212,81 @@ class TestCloudConfigGeneratorGeneratesNewKey:
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
         saved_key = mock_env["set_sync_api_key"].call_args[0][0]
-        assert config["sync"]["api_key"] == saved_key
+        assert config["storage"]["sync_api_key"] == saved_key
 
 
-class TestCloudConfigGeneratorCompleteConfig:
-    """测试生成完整配置"""
+class TestCloudConfigGeneratorStorageSection:
+    """测试 storage 段结构正确性（Issue #28）"""
 
-    def test_includes_all_providers(self, mock_env):
-        """生成的配置包含所有有 Key 的 Provider"""
+    def test_storage_section_exists(self, mock_env):
+        """cloud_init.yaml 输出包含 storage 段"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         generator = CloudConfigGenerator()
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        assert "providers" in config
-        assert len(config["providers"]) == 2
+        assert "storage" in config
 
-        names = [p["name"] for p in config["providers"]]
-        assert "anthropic" in names
-        assert "deepseek" in names
-
-    def test_provider_has_name_env_key_api_key(self, mock_env):
-        """每个 provider 包含 name、env_key、api_key 三个字段"""
+    def test_storage_contains_sync_api_key(self, mock_env):
+        """storage 段包含 sync_api_key"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         generator = CloudConfigGenerator()
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        for p in config["providers"]:
-            assert "name" in p
-            assert "env_key" in p
-            assert "api_key" in p
+        assert "sync_api_key" in config["storage"]
+        assert config["storage"]["sync_api_key"] == "existing-sync-key"
 
-    def test_provider_api_key_correct(self, mock_env):
-        """provider 的 api_key 值正确"""
+    def test_storage_contains_wechat_token(self, mock_env):
+        """storage 段包含 wechat_token"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         generator = CloudConfigGenerator()
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        key_map = {p["name"]: p["api_key"] for p in config["providers"]}
-        assert key_map["anthropic"] == "sk-ant-xxx"
-        assert key_map["deepseek"] == "sk-ds-xxx"
+        assert "wechat_token" in config["storage"]
+        assert config["storage"]["wechat_token"] == "wx-token-xxx"
 
-    def test_includes_llm_section(self, mock_env):
-        """配置包含 llm 部分（provider 和 model）"""
+    def test_storage_providers_is_dict(self, mock_env):
+        """storage.providers 是字典（provider_id -> api_key），不是列表"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         generator = CloudConfigGenerator()
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        assert config["llm"]["provider"] == "anthropic"
-        assert config["llm"]["model"] == "claude-opus-4"
+        providers = config["storage"]["providers"]
+        assert isinstance(providers, dict)
 
-    def test_includes_sync_section(self, mock_env):
-        """配置包含 sync 部分（enabled 和 api_key）"""
+    def test_storage_providers_contains_all_keys(self, mock_env):
+        """storage.providers 包含所有有 Key 的 Provider"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         generator = CloudConfigGenerator()
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        assert config["sync"]["enabled"] is True
-        assert config["sync"]["api_key"] == "existing-sync-key"
+        providers = config["storage"]["providers"]
+        assert "anthropic" in providers
+        assert "deepseek" in providers
 
-    def test_includes_wechat_token(self, mock_env):
-        """配置包含微信 Token"""
+    def test_storage_providers_values_are_api_keys(self, mock_env):
+        """storage.providers 的值是对应的 api_key"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         generator = CloudConfigGenerator()
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        assert config["wechat_token"] == "wx-token-xxx"
+        providers = config["storage"]["providers"]
+        assert providers["anthropic"] == "sk-ant-xxx"
+        assert providers["deepseek"] == "sk-ds-xxx"
 
-    def test_skips_provider_without_api_key(self, mock_env):
-        """没有 API Key 的 provider 不包含在配置中"""
+    def test_storage_providers_skips_provider_without_api_key(self, mock_env):
+        """没有 API Key 的 provider 不包含在 storage.providers 中"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         # 添加一个没有 Key 的 provider
@@ -301,13 +311,13 @@ class TestCloudConfigGeneratorCompleteConfig:
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        names = [p["name"] for p in config["providers"]]
-        assert "anthropic" in names
-        assert "deepseek" in names
-        assert "openai" not in names
+        providers = config["storage"]["providers"]
+        assert "anthropic" in providers
+        assert "deepseek" in providers
+        assert "openai" not in providers
 
-    def test_skips_provider_without_env_key(self, mock_env):
-        """没有 env_key 的 provider（如 custom）不包含在配置中"""
+    def test_storage_providers_skips_provider_without_env_key(self, mock_env):
+        """没有 env_key 的 provider（如 custom）不包含在 storage.providers 中"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         # 添加一个没有 env_key 的 provider
@@ -329,26 +339,74 @@ class TestCloudConfigGeneratorCompleteConfig:
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        names = [p["name"] for p in config["providers"]]
-        assert "custom" not in names
+        providers = config["storage"]["providers"]
+        assert "custom" not in providers
 
 
-class TestCloudConfigGeneratorTimezone:
-    """测试 timezone 字段透传"""
+class TestCloudConfigGeneratorConfigSection:
+    """测试 config 段结构正确性（Issue #28）"""
 
-    def test_includes_timezone_field(self, mock_env):
-        """生成的配置包含 timezone 字段"""
+    def test_config_section_exists(self, mock_env):
+        """cloud_init.yaml 输出包含 config 段"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         generator = CloudConfigGenerator()
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        assert "timezone" in config
-        assert config["timezone"] == "Asia/Shanghai"
+        assert "config" in config
+
+    def test_config_contains_llm_section(self, mock_env):
+        """config 段包含 llm 部分（provider 和 model）"""
+        from lifeprism.config.cloud_config_generator import CloudConfigGenerator
+
+        generator = CloudConfigGenerator()
+        path, _ = generator.generate_cloud_config()
+
+        config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        assert config["config"]["llm"]["provider"] == "anthropic"
+        assert config["config"]["llm"]["model"] == "claude-opus-4"
+
+    def test_config_contains_monitor_type(self, mock_env):
+        """config 段包含 monitor_type"""
+        from lifeprism.config.cloud_config_generator import CloudConfigGenerator
+
+        generator = CloudConfigGenerator()
+        path, _ = generator.generate_cloud_config()
+
+        config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        assert "monitor_type" in config["config"]
+
+    def test_config_contains_timezone(self, mock_env):
+        """config 段包含 timezone"""
+        from lifeprism.config.cloud_config_generator import CloudConfigGenerator
+
+        generator = CloudConfigGenerator()
+        path, _ = generator.generate_cloud_config()
+
+        config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        assert "timezone" in config["config"]
+        assert config["config"]["timezone"] == "Asia/Shanghai"
+
+    def test_config_does_not_contain_keys(self, mock_env):
+        """config 段不包含任何 Key 字段（sync_api_key、wechat_token、providers）"""
+        from lifeprism.config.cloud_config_generator import CloudConfigGenerator
+
+        generator = CloudConfigGenerator()
+        path, _ = generator.generate_cloud_config()
+
+        config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        config_section = config["config"]
+        assert "sync_api_key" not in config_section
+        assert "wechat_token" not in config_section
+        assert "providers" not in config_section
+
+
+class TestCloudConfigGeneratorTimezone:
+    """测试 timezone 字段透传（位于 config 段下）"""
 
     def test_timezone_from_settings(self, mock_env):
-        """timezone 字段值来自 settings.get('timezone')"""
+        """timezone 字段值来自 settings.get('timezone')，位于 config 段"""
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         # 修改 settings.get 返回的 timezone
@@ -365,7 +423,7 @@ class TestCloudConfigGeneratorTimezone:
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        assert config["timezone"] == "America/New_York"
+        assert config["config"]["timezone"] == "America/New_York"
 
     def test_timezone_fallback_to_default_when_settings_missing(self, mock_env):
         """settings 中没有 timezone 字段时，使用默认值 Asia/Shanghai"""
@@ -385,11 +443,11 @@ class TestCloudConfigGeneratorTimezone:
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
         # settings.get("timezone", "Asia/Shanghai") 在 key 不存在时返回默认值
-        assert config["timezone"] == "Asia/Shanghai"
+        assert config["config"]["timezone"] == "Asia/Shanghai"
 
 
 class TestCloudConfigGeneratorMonitorType:
-    """测试 monitor_type 强制覆盖"""
+    """测试 monitor_type 强制覆盖（位于 config 段下）"""
 
     def test_monitor_type_forced_to_none(self, mock_env):
         """monitor_type 强制覆盖为 none"""
@@ -399,7 +457,7 @@ class TestCloudConfigGeneratorMonitorType:
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        assert config["monitor_type"] == "none"
+        assert config["config"]["monitor_type"] == "none"
 
     def test_monitor_type_none_even_if_settings_has_lifeprism(self, mock_env):
         """即使 settings 中 monitor_type 为 lifeprism，输出仍为 none"""
@@ -419,7 +477,7 @@ class TestCloudConfigGeneratorMonitorType:
         path, _ = generator.generate_cloud_config()
 
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        assert config["monitor_type"] == "none"
+        assert config["config"]["monitor_type"] == "none"
 
 
 class TestCloudConfigGeneratorFilePath:

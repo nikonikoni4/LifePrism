@@ -1,13 +1,16 @@
 """
-Key 读取 Fallback 机制单元测试
+Key 读取路由机制单元测试
 
-验证统一的 Key 读取逻辑：优先从 keyring 读取（本地 Windows），
-fallback 到 config.yaml（云端 Linux）。
+验证 Key 消费方统一通过 SettingsManager 的 run_mode 路由读写 Key：
+- 本地模式 (full)：SettingsManager 内部读 keyring
+- 云端模式 (agent_only/web_demo)：SettingsManager 读 storage.yaml
 
 三个 Seams:
 1. provider_manager.get_api_key()
 2. WechatAuth._load_token_from_keyring()
 3. sync_config.get_sync_api_key()
+
+详细迁移测试见 test_key_consumer_migration.py。
 """
 
 import pytest
@@ -94,16 +97,24 @@ class TestWechatAuthLoadTokenFallback:
             result = WechatAuth._load_token_from_keyring()
             assert result == "keyring-token"
 
-    def test_wechat_token_fallback_to_config(self):
-        """keyring 返回 None 时，fallback 到 config.yaml 的 wechat_token 字段"""
+    def test_wechat_token_cloud_mode_reads_storage_via_settings(self, tmp_path):
+        """云端模式：通过 SettingsManager 从 storage.yaml 读取 wechat_token"""
         from unittest.mock import patch
+        import yaml
 
+        from lifeprism.config.settings_manager import settings
         from lifeprism.llm.channel.wechat.auth import WechatAuth
 
-        with patch("keyring.get_password", return_value=None), \
-             patch("lifeprism.config.settings_manager.get_setting", return_value="config-token"):
+        storage_path = tmp_path / "storage.yaml"
+        with open(storage_path, "w", encoding="utf-8") as f:
+            yaml.dump({"wechat_token": "storage-token"}, f)
+
+        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
+             patch.object(settings, "_config_base_path", tmp_path), \
+             patch.object(settings, "_storage_loaded_mode", None), \
+             patch.object(settings, "_storage_config", {}):
             result = WechatAuth._load_token_from_keyring()
-            assert result == "config-token"
+            assert result == "storage-token"
 
     def test_wechat_token_both_empty_returns_empty(self):
         """keyring 和 config 都无值时，返回空字符串"""
@@ -134,16 +145,24 @@ class TestSyncConfigApiKey:
             result = get_sync_api_key()
             assert result == "keyring-sync-key"
 
-    def test_sync_api_key_fallback_to_config(self):
-        """keyring 返回 None 时，fallback 到 config.yaml 的 sync_api_key 字段"""
+    def test_sync_api_key_cloud_mode_reads_storage_via_settings(self, tmp_path):
+        """云端模式：通过 SettingsManager 从 storage.yaml 读取 sync_api_key"""
         from unittest.mock import patch
+        import yaml
 
+        from lifeprism.config.settings_manager import settings
         from lifeprism.sync.sync_config import get_sync_api_key
 
-        with patch("keyring.get_password", return_value=None), \
-             patch("lifeprism.config.settings_manager.get_setting", return_value="config-sync-key"):
+        storage_path = tmp_path / "storage.yaml"
+        with open(storage_path, "w", encoding="utf-8") as f:
+            yaml.dump({"sync_api_key": "storage-sync-key"}, f)
+
+        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
+             patch.object(settings, "_config_base_path", tmp_path), \
+             patch.object(settings, "_storage_loaded_mode", None), \
+             patch.object(settings, "_storage_config", {}):
             result = get_sync_api_key()
-            assert result == "config-sync-key"
+            assert result == "storage-sync-key"
 
     def test_sync_api_key_both_empty_returns_none(self):
         """keyring 和 config 都无值时，返回 None"""
@@ -156,12 +175,13 @@ class TestSyncConfigApiKey:
             result = get_sync_api_key()
             assert result is None
 
-    def test_set_sync_api_key_writes_to_keyring(self):
-        """set_sync_api_key 将 key 写入 keyring（正确的 service 和 username）"""
-        from unittest.mock import patch, call
+    def test_set_sync_api_key_routes_through_settings(self):
+        """set_sync_api_key 通过 SettingsManager.set_storage_key 路由写入"""
+        from unittest.mock import patch
 
+        from lifeprism.config.settings_manager import settings
         from lifeprism.sync.sync_config import set_sync_api_key
 
-        with patch("keyring.set_password") as mock_set:
+        with patch.object(settings, "set_storage_key") as mock_set:
             set_sync_api_key("my-secret-key")
-            mock_set.assert_called_once_with("LifePrism", "sync_api_key", "my-secret-key")
+            mock_set.assert_called_once_with("sync_api_key", "my-secret-key")

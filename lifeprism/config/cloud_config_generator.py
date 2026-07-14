@@ -7,11 +7,27 @@
 1. 生成或读取同步 API Key（优先从 keyring 读取，不存在则生成新的）
 2. 从 keyring 读取所有 LLM Provider 的 API Key
 3. 从 keyring 读取微信 Token
-4. 构建完整配置 dict（monitor_type 强制为 none）
+4. 构建完整配置 dict（storage 段 + config 段，monitor_type 强制为 none）
 5. 保存到 {lifeprism_data_path}/cloud_init.yaml
+
+cloud_init.yaml 结构（Issue #28）::
+
+    storage:
+      sync_api_key: "..."
+      wechat_token: "..."
+      providers:          # dict: provider_id -> api_key
+        anthropic: "sk-ant-..."
+    config:
+      llm:
+        provider: "anthropic"
+        model: "claude-opus-4"
+      monitor_type: none
+      timezone: Asia/Shanghai
 """
 
+import os
 import secrets
+import sys
 from typing import Any
 
 import yaml
@@ -51,15 +67,15 @@ class CloudConfigGenerator:
         logger.info("同步 API Key 已就绪, key_is_new=%s", key_is_new)
 
         # 2. 从 keyring 读取所有 LLM Provider 的 API Key
-        providers_list = self._collect_provider_keys()
+        providers_map = self._collect_provider_keys()
 
         # 3. 从 keyring 读取微信 Token
         wechat_token = self._load_wechat_token()
 
-        # 4. 构建完整配置
+        # 4. 构建完整配置（storage 段 + config 段）
         config = self._build_config(
             sync_api_key=sync_api_key,
-            providers_list=providers_list,
+            providers_map=providers_map,
             wechat_token=wechat_token,
         )
 
@@ -86,16 +102,16 @@ class CloudConfigGenerator:
         set_sync_api_key(new_key)
         return new_key, True
 
-    def _collect_provider_keys(self) -> list[dict[str, Any]]:
+    def _collect_provider_keys(self) -> dict[str, str]:
         """从 keyring 读取所有 LLM Provider 的 API Key。
 
         遍历 providers.yaml 中的所有 provider，对每个有 env_key 的 provider
         调用 get_api_key() 读取 Key。只包含同时有 env_key 和 api_key 的 provider。
 
         Returns:
-            provider 列表，每个元素包含 name、env_key、api_key。
+            dict: {provider_id: api_key}，key 为 provider name（id），value 为 api_key。
         """
-        providers_list: list[dict[str, Any]] = []
+        providers_map: dict[str, str] = {}
         all_providers = provider_manager.get_all_providers(allowed_only=False)
         for provider in all_providers:
             name = provider.get("name", "")
@@ -107,14 +123,8 @@ class CloudConfigGenerator:
             api_key = provider_manager.get_api_key(name)
             if not api_key:
                 continue
-            providers_list.append(
-                {
-                    "name": name,
-                    "env_key": env_key,
-                    "api_key": api_key,
-                }
-            )
-        return providers_list
+            providers_map[name] = api_key
+        return providers_map
 
     def _load_wechat_token(self) -> str:
         """从 keyring 读取微信 Token。
@@ -129,51 +139,50 @@ class CloudConfigGenerator:
     def _build_config(
         self,
         sync_api_key: str,
-        providers_list: list[dict[str, Any]],
+        providers_map: dict[str, str],
         wechat_token: str,
     ) -> dict[str, Any]:
-        """构建完整的云端配置 dict。
+        """构建完整的云端配置 dict（storage 段 + config 段）。
 
         Args:
             sync_api_key: 同步 API Key
-            providers_list: provider 列表
+            providers_map: {provider_id: api_key} 字典
             wechat_token: 微信 Token
 
         Returns:
             完整配置字典，结构如下：
             ```yaml
-            llm:
-              provider: anthropic
-              model: claude-opus-4
-            sync:
-              enabled: true
-              api_key: "lifeprism_sync_..."
-            wechat_token: "wx_token_..."
-            monitor_type: none
-            timezone: Asia/Shanghai
-            providers:
-              - name: anthropic
-                env_key: api_key_anthropic
-                api_key: "sk-ant-..."
+            storage:
+              sync_api_key: "lifeprism_sync_..."
+              wechat_token: "wx_token_..."
+              providers:
+                anthropic: "sk-ant-..."
+            config:
+              llm:
+                provider: anthropic
+                model: claude-opus-4
+              monitor_type: none
+              timezone: Asia/Shanghai
             ```
         """
         return {
-            "llm": {
-                "provider": settings.get("provider", ""),
-                "model": settings.get("model", ""),
+            "storage": {
+                "sync_api_key": sync_api_key,
+                "wechat_token": wechat_token,
+                "providers": providers_map,
             },
-            "sync": {
-                "enabled": True,
-                "api_key": sync_api_key,
+            "config": {
+                "llm": {
+                    "provider": settings.get("provider", ""),
+                    "model": settings.get("model", ""),
+                },
+                "monitor_type": "none",  # 强制覆盖：云端必须禁用 Monitor
+                "timezone": settings.get("timezone", "Asia/Shanghai"),  # 透传用户时区配置
             },
-            "wechat_token": wechat_token,
-            "monitor_type": "none",  # 强制覆盖：云端必须禁用 Monitor
-            "timezone": settings.get("timezone", "Asia/Shanghai"),  # 透传用户时区配置
-            "providers": providers_list,
         }
 
     def _save_config(self, config: dict[str, Any]) -> str:
-        """将配置保存到 cloud_init.yaml。
+        """将配置保存到 cloud_init.yaml，权限设为 600（非 Windows 平台）。
 
         Args:
             config: 完整配置字典
@@ -190,4 +199,6 @@ class CloudConfigGenerator:
                 default_flow_style=False,
                 sort_keys=False,
             )
+        if sys.platform != "win32":
+            os.chmod(cloud_config_path, 0o600)
         return str(cloud_config_path)

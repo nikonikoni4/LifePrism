@@ -10,11 +10,9 @@ LLM 服务商配置管理器（纯数据层）
 不导入任何 llm/ 模块，依赖方向：config → llm
 """
 
-import contextlib
 from pathlib import Path
 from typing import Any
 
-import keyring
 import yaml
 
 from lifeprism.utils import get_logger
@@ -619,39 +617,56 @@ class ProviderManager:
 
     def get_api_key(self, provider_name: str) -> str | None:
         """
-        从 keyring 读取 provider 的 API key。
-        env_key 为空（如 custom）时返回 None。
+        通过 SettingsManager 路由读取 provider 的 API key。
 
-        keyring 读取失败时，fallback 到 providers.yaml 的 api_key 字段（云端 Linux）。
+        本地模式 (full)：SettingsManager 内部读 keyring（按 provider 的 env_key 映射）。
+        云端模式 (agent_only/web_demo)：SettingsManager 读 storage.yaml 的 providers.{id} 嵌套字段。
+
+        env_key 为空（如 custom）时返回 None。
+        SettingsManager 未命中时，fallback 到 providers.yaml 的 api_key 字段（云端部署兜底）。
         """
         env_key = self._get_env_key(provider_name)
         if not env_key:
             return None
-        # 优先从 keyring 读取
-        api_key = keyring.get_password(_KEYRING_SERVICE, env_key)
+        from lifeprism.config.settings_manager import settings
+
+        # 走 SettingsManager 路由（本地 keyring / 云端 storage.yaml）
+        api_key = settings.get_storage_key(f"providers.{provider_name}")
         if api_key:
             return api_key
-        # Fallback: 从 providers.yaml 的 api_key 字段读取（云端 Linux 部署）
+        # Fallback: 从 providers.yaml 的 api_key 字段读取（云端 Linux 部署兜底）
         for spec in self._raw_specs:
             if spec.get("name") == provider_name:
                 return spec.get("api_key") or None
         return None
 
     def set_api_key(self, provider_name: str, api_key: str) -> None:
-        """将 API key 写入 keyring。"""
+        """通过 SettingsManager 路由写入 provider 的 API key。
+
+        本地模式写 keyring，云端模式写 storage.yaml。
+        env_key 为空（如 custom）时跳过写入。
+        """
         env_key = self._get_env_key(provider_name)
         if not env_key:
-            logger.warning(f"Provider '{provider_name}' has no env_key, skipping keyring write")
+            logger.warning(
+                "Provider '%s' has no env_key, skipping storage key write", provider_name
+            )
             return
-        keyring.set_password(_KEYRING_SERVICE, env_key, api_key)
+        from lifeprism.config.settings_manager import settings
+
+        settings.set_storage_key(f"providers.{provider_name}", api_key)
 
     def delete_api_key(self, provider_name: str) -> None:
-        """从 keyring 删除 API key。"""
+        """通过 SettingsManager 路由删除 API key。
+
+        本地模式从 keyring 删除，云端模式从 storage.yaml 删除。
+        """
         env_key = self._get_env_key(provider_name)
         if not env_key:
             return
-        with contextlib.suppress(keyring.errors.PasswordDeleteError):
-            keyring.delete_password(_KEYRING_SERVICE, env_key)
+        from lifeprism.config.settings_manager import settings
+
+        settings.delete_storage_key(f"providers.{provider_name}")
 
     def _get_env_key(self, provider_name: str) -> str:
         """从 raw_specs 中查找 provider 的 env_key。"""

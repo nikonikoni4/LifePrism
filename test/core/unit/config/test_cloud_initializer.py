@@ -3,13 +3,27 @@
 
 验证 CloudInitializer 的云端启动配置初始化逻辑：
 1. 检测 cloud_init.yaml 是否存在
-2. 读取 cloud_init.yaml 并验证配置完整性
-3. 写入 config.yaml 和 providers.yaml
-4. 成功后删除 cloud_init.yaml，失败时保留
-5. 强制 monitor_type 为 none
+2. 读取 cloud_init.yaml 并验证配置完整性（storage 段 + config 段）
+3. 写入 config.yaml（仅非 Key 字段：llm、monitor_type、timezone）
+4. 写入 storage.yaml（Key 字段：sync_api_key、wechat_token、providers）via SettingsManager
+5. 成功后删除 cloud_init.yaml，失败时保留
+6. 强制 monitor_type 为 none
+
+cloud_init.yaml 结构（Issue #28）::
+    storage:
+      sync_api_key: "..."
+      wechat_token: "..."
+      providers:           # dict: provider_id -> api_key
+        anthropic: "sk-ant-..."
+    config:
+      llm:
+        provider: "anthropic"
+        model: "claude-opus-4"
+      monitor_type: none
+      timezone: Asia/Shanghai
 
 参考:
-- Issue #09: .scratch/linux-deployment-discussion/issues-p2/09-cloud-initializer.md
+- Issue #28: .scratch/linux-deployment-discussion/issues-p2/28-cloud-init-storage-segment.md
 - PRD: .scratch/linux-deployment-discussion/linux-deployment-prd.md (云端初始化流程)
 """
 
@@ -29,26 +43,23 @@ pytestmark = pytest.mark.core
 
 @pytest.fixture
 def cloud_init_data():
-    """完整的 cloud_init.yaml 数据（合法配置）"""
+    """完整的 cloud_init.yaml 数据（合法配置，新结构：storage 段 + config 段）"""
     return {
-        "llm": {
-            "provider": "anthropic",
-            "model": "claude-opus-4",
+        "storage": {
+            "sync_api_key": "lifeprism_sync_test_key",
+            "wechat_token": "wx_token_test",
+            "providers": {
+                "anthropic": "sk-ant-test-key",
+            },
         },
-        "sync": {
-            "enabled": True,
-            "api_key": "lifeprism_sync_test_key",
+        "config": {
+            "llm": {
+                "provider": "anthropic",
+                "model": "claude-opus-4",
+            },
+            "monitor_type": "none",
+            "timezone": "Asia/Shanghai",
         },
-        "wechat_token": "wx_token_test",
-        "monitor_type": "none",
-        "timezone": "Asia/Shanghai",
-        "providers": [
-            {
-                "name": "anthropic",
-                "env_key": "api_key_anthropic",
-                "api_key": "sk-ant-test-key",
-            }
-        ],
     }
 
 
@@ -83,6 +94,7 @@ def setup_paths(tmp_path, monkeypatch, default_providers_config):
     - cloud_init.yaml 写入 tmp_path/cloud_init.yaml
     - config.yaml 写入 tmp_path/config/config.yaml
     - providers.yaml 预创建为默认配置，写入 tmp_path/config/providers.yaml
+    - storage.yaml 写入 tmp_path/storage.yaml（通过 settings._config_base_path）
     """
     from lifeprism.config.settings_manager import settings
     from lifeprism.config.provider_manager import provider_manager
@@ -99,11 +111,14 @@ def setup_paths(tmp_path, monkeypatch, default_providers_config):
     # Mock 路径方法
     monkeypatch.setattr(settings, "get_config_path", lambda: config_path)
     monkeypatch.setattr(provider_manager, "get_config_path", lambda: providers_path)
+    # 设置 _config_base_path 为 tmp_path，使 save_storage_yaml 写入临时路径
+    monkeypatch.setattr(settings, "_config_base_path", tmp_path)
 
     return {
         "data_path": tmp_path,
         "config_path": config_path,
         "providers_path": providers_path,
+        "storage_path": tmp_path / "storage.yaml",
     }
 
 
@@ -123,7 +138,7 @@ class TestShouldInitialize:
 
     def test_should_initialize_returns_true_when_cloud_init_exists(self, tmp_path):
         """cloud_init.yaml 存在时返回 True"""
-        _write_cloud_init(tmp_path, {"llm": {}})
+        _write_cloud_init(tmp_path, {"config": {}})
         initializer = CloudInitializer(tmp_path)
         assert initializer.should_initialize() is True
 
@@ -153,23 +168,19 @@ class TestInitializeBasicFlow:
             config = yaml.safe_load(f)
         assert config is not None
 
-    def test_initialize_writes_providers_yaml(self, setup_paths, cloud_init_data):
-        """initialize() 成功后 providers.yaml 包含注入的 api_key"""
+    def test_initialize_writes_storage_yaml(self, setup_paths, cloud_init_data):
+        """initialize() 成功后 storage.yaml 被创建（via SettingsManager.save_storage_yaml）"""
         data_path = setup_paths["data_path"]
-        providers_path = setup_paths["providers_path"]
+        storage_path = setup_paths["storage_path"]
         _write_cloud_init(data_path, cloud_init_data)
 
         initializer = CloudInitializer(data_path)
         initializer.initialize()
 
-        assert providers_path.exists()
-        with open(providers_path, encoding="utf-8") as f:
-            providers_data = yaml.safe_load(f)
-        # 对应 provider 的 api_key 应被注入
-        anthropic_spec = next(
-            p for p in providers_data["providers"] if p["name"] == "anthropic"
-        )
-        assert anthropic_spec.get("api_key") == "sk-ant-test-key"
+        assert storage_path.exists()
+        with open(storage_path, encoding="utf-8") as f:
+            storage = yaml.safe_load(f)
+        assert storage is not None
 
     def test_initialize_deletes_cloud_init_on_success(self, setup_paths, cloud_init_data):
         """initialize() 全部成功后删除 cloud_init.yaml"""
@@ -204,18 +215,21 @@ class TestInitializeBasicFlow:
         assert not config_path.exists()
 
 
-# ==================== Slice 3: 配置验证 ====================
+# ==================== Slice 3: 配置验证（storage 段） ====================
 
 
 class TestInitializeValidation:
-    """测试 CloudInitializer.initialize() 的配置验证逻辑"""
+    """测试 CloudInitializer.initialize() 的配置验证逻辑（storage 段必需字段）"""
 
     def test_initialize_raises_config_error_when_missing_wechat_token(
         self, setup_paths, cloud_init_data
     ):
-        """缺少 wechat_token 时抛出 ConfigError"""
-        data = dict(cloud_init_data)
-        data.pop("wechat_token")
+        """缺少 storage.wechat_token 时抛出 ConfigError"""
+        data = {
+            "storage": dict(cloud_init_data["storage"]),
+            "config": dict(cloud_init_data["config"]),
+        }
+        data["storage"].pop("wechat_token")
         data_path = setup_paths["data_path"]
         _write_cloud_init(data_path, data)
 
@@ -226,22 +240,27 @@ class TestInitializeValidation:
     def test_initialize_raises_config_error_when_missing_sync_api_key(
         self, setup_paths, cloud_init_data
     ):
-        """缺少 sync.api_key 时抛出 ConfigError"""
-        data = dict(cloud_init_data)
-        data["sync"] = {"enabled": True}
+        """缺少 storage.sync_api_key 时抛出 ConfigError"""
+        data = {
+            "storage": dict(cloud_init_data["storage"]),
+            "config": dict(cloud_init_data["config"]),
+        }
+        data["storage"].pop("sync_api_key")
         data_path = setup_paths["data_path"]
         _write_cloud_init(data_path, data)
 
         initializer = CloudInitializer(data_path)
-        with pytest.raises(ConfigError, match="sync.api_key"):
+        with pytest.raises(ConfigError, match="sync_api_key"):
             initializer.initialize()
 
     def test_initialize_raises_config_error_when_missing_llm_provider(
         self, setup_paths, cloud_init_data
     ):
-        """缺少 llm.provider 时抛出 ConfigError"""
-        data = dict(cloud_init_data)
-        data["llm"] = {"model": "claude-opus-4"}
+        """缺少 config.llm.provider 时抛出 ConfigError"""
+        data = {
+            "storage": dict(cloud_init_data["storage"]),
+            "config": {"llm": {"model": "claude-opus-4"}, "monitor_type": "none"},
+        }
         data_path = setup_paths["data_path"]
         _write_cloud_init(data_path, data)
 
@@ -252,9 +271,11 @@ class TestInitializeValidation:
     def test_initialize_raises_config_error_when_missing_llm_model(
         self, setup_paths, cloud_init_data
     ):
-        """缺少 llm.model 时抛出 ConfigError"""
-        data = dict(cloud_init_data)
-        data["llm"] = {"provider": "anthropic"}
+        """缺少 config.llm.model 时抛出 ConfigError"""
+        data = {
+            "storage": dict(cloud_init_data["storage"]),
+            "config": {"llm": {"provider": "anthropic"}, "monitor_type": "none"},
+        }
         data_path = setup_paths["data_path"]
         _write_cloud_init(data_path, data)
 
@@ -262,54 +283,39 @@ class TestInitializeValidation:
         with pytest.raises(ConfigError, match="llm.model"):
             initializer.initialize()
 
-    def test_initialize_raises_config_error_when_provider_api_key_missing(
+    def test_initialize_raises_config_error_when_storage_section_missing(
         self, setup_paths, cloud_init_data
     ):
-        """providers 列表中对应 provider 缺少 api_key 时抛出 ConfigError"""
-        data = dict(cloud_init_data)
-        data["providers"] = [{"name": "anthropic", "env_key": "api_key_anthropic"}]
+        """缺少整个 storage 段时抛出 ConfigError"""
+        data = {"config": dict(cloud_init_data["config"])}
         data_path = setup_paths["data_path"]
         _write_cloud_init(data_path, data)
 
         initializer = CloudInitializer(data_path)
-        with pytest.raises(ConfigError, match="api_key"):
+        with pytest.raises(ConfigError):
             initializer.initialize()
 
-    def test_initialize_raises_config_error_when_provider_not_in_providers_list(
+    def test_initialize_raises_config_error_when_config_section_missing(
         self, setup_paths, cloud_init_data
     ):
-        """llm.provider 在 providers 列表中不存在时抛出 ConfigError"""
-        data = dict(cloud_init_data)
-        data["llm"] = {"provider": "openai", "model": "gpt-4o"}
-        data["providers"] = [
-            {"name": "anthropic", "env_key": "api_key_anthropic", "api_key": "sk-ant-..."}
-        ]
+        """缺少整个 config 段时抛出 ConfigError"""
+        data = {"storage": dict(cloud_init_data["storage"])}
         data_path = setup_paths["data_path"]
         _write_cloud_init(data_path, data)
 
         initializer = CloudInitializer(data_path)
-        with pytest.raises(ConfigError, match="openai"):
-            initializer.initialize()
-
-    def test_initialize_raises_config_error_when_providers_empty(
-        self, setup_paths, cloud_init_data
-    ):
-        """providers 列表为空时抛出 ConfigError"""
-        data = dict(cloud_init_data)
-        data["providers"] = []
-        data_path = setup_paths["data_path"]
-        _write_cloud_init(data_path, data)
-
-        initializer = CloudInitializer(data_path)
-        with pytest.raises(ConfigError, match="providers"):
+        with pytest.raises(ConfigError):
             initializer.initialize()
 
     def test_initialize_does_not_delete_cloud_init_on_validation_failure(
         self, setup_paths, cloud_init_data
     ):
         """验证失败时不删除 cloud_init.yaml（方便用户修复后重试）"""
-        data = dict(cloud_init_data)
-        data.pop("wechat_token")
+        data = {
+            "storage": dict(cloud_init_data["storage"]),
+            "config": dict(cloud_init_data["config"]),
+        }
+        data["storage"].pop("wechat_token")
         data_path = setup_paths["data_path"]
         cloud_init_file = _write_cloud_init(data_path, data)
 
@@ -324,8 +330,11 @@ class TestInitializeValidation:
         self, setup_paths, cloud_init_data
     ):
         """验证失败时不写入 config.yaml"""
-        data = dict(cloud_init_data)
-        data.pop("wechat_token")
+        data = {
+            "storage": dict(cloud_init_data["storage"]),
+            "config": dict(cloud_init_data["config"]),
+        }
+        data["storage"].pop("wechat_token")
         data_path = setup_paths["data_path"]
         config_path = setup_paths["config_path"]
         _write_cloud_init(data_path, data)
@@ -341,9 +350,10 @@ class TestInitializeValidation:
         self, setup_paths, cloud_init_data
     ):
         """ConfigError 的 details 中包含缺失字段列表"""
-        data = dict(cloud_init_data)
-        data.pop("wechat_token")
-        data.pop("llm")
+        data = {
+            "storage": {"sync_api_key": "key"},  # 缺 wechat_token
+            "config": {},  # 缺 llm
+        }
         data_path = setup_paths["data_path"]
         _write_cloud_init(data_path, data)
 
@@ -357,6 +367,52 @@ class TestInitializeValidation:
         assert any("llm.provider" in e for e in errors)
 
 
+# ==================== Slice 3b: storage.providers 空字典处理 ====================
+
+
+class TestStorageProvidersEmptyDict:
+    """测试 storage.providers 为空字典时的处理（Issue #28 验收标准）"""
+
+    def test_initialize_ok_when_providers_empty_dict(self, setup_paths, cloud_init_data):
+        """storage.providers 为空字典时正常处理（不报错）"""
+        data = {
+            "storage": {
+                "sync_api_key": "lifeprism_sync_test_key",
+                "wechat_token": "wx_token_test",
+                "providers": {},
+            },
+            "config": dict(cloud_init_data["config"]),
+        }
+        data_path = setup_paths["data_path"]
+        storage_path = setup_paths["storage_path"]
+        _write_cloud_init(data_path, data)
+
+        initializer = CloudInitializer(data_path)
+        # 不应抛出异常
+        initializer.initialize()
+
+        # storage.yaml 应被写入，providers 为空字典
+        with open(storage_path, encoding="utf-8") as f:
+            storage = yaml.safe_load(f)
+        assert storage["providers"] == {}
+
+    def test_initialize_ok_when_providers_missing(self, setup_paths, cloud_init_data):
+        """storage.providers 字段缺失时正常处理（不报错）"""
+        data = {
+            "storage": {
+                "sync_api_key": "lifeprism_sync_test_key",
+                "wechat_token": "wx_token_test",
+            },
+            "config": dict(cloud_init_data["config"]),
+        }
+        data_path = setup_paths["data_path"]
+        _write_cloud_init(data_path, data)
+
+        initializer = CloudInitializer(data_path)
+        # 不应抛出异常
+        initializer.initialize()
+
+
 # ==================== Slice 4: monitor_type 强制校验 ====================
 
 
@@ -367,8 +423,11 @@ class TestMonitorTypeEnforcement:
         self, setup_paths, cloud_init_data
     ):
         """cloud_init.yaml 中 monitor_type 非 none 时，config.yaml 中仍强制为 none"""
-        data = dict(cloud_init_data)
-        data["monitor_type"] = "lifeprism"  # 非 none
+        data = {
+            "storage": dict(cloud_init_data["storage"]),
+            "config": dict(cloud_init_data["config"]),
+        }
+        data["config"]["monitor_type"] = "lifeprism"  # 非 none
         data_path = setup_paths["data_path"]
         config_path = setup_paths["config_path"]
         _write_cloud_init(data_path, data)
@@ -384,8 +443,13 @@ class TestMonitorTypeEnforcement:
         self, setup_paths, cloud_init_data
     ):
         """cloud_init.yaml 中无 monitor_type 字段时，config.yaml 中仍为 none"""
-        data = dict(cloud_init_data)
-        data.pop("monitor_type")
+        data = {
+            "storage": dict(cloud_init_data["storage"]),
+            "config": {
+                "llm": dict(cloud_init_data["config"]["llm"]),
+                "timezone": "Asia/Shanghai",
+            },
+        }
         data_path = setup_paths["data_path"]
         config_path = setup_paths["config_path"]
         _write_cloud_init(data_path, data)
@@ -487,14 +551,14 @@ class TestValidateMonitorType:
         assert config["user_name"] == "测试用户"
 
 
-# ==================== Slice 5: 写入内容正确性 ====================
+# ==================== Slice 5: config.yaml 写入内容正确性 ====================
 
 
 class TestConfigYamlContent:
-    """测试 initialize() 写入 config.yaml 的字段内容"""
+    """测试 initialize() 写入 config.yaml 的字段内容（仅非 Key 字段）"""
 
     def test_config_yaml_contains_provider(self, setup_paths, cloud_init_data):
-        """config.yaml 中 provider 来自 cloud_init.llm.provider"""
+        """config.yaml 中 provider 来自 cloud_init.config.llm.provider"""
         data_path = setup_paths["data_path"]
         config_path = setup_paths["config_path"]
         _write_cloud_init(data_path, cloud_init_data)
@@ -506,7 +570,7 @@ class TestConfigYamlContent:
         assert config["provider"] == "anthropic"
 
     def test_config_yaml_contains_model(self, setup_paths, cloud_init_data):
-        """config.yaml 中 model 来自 cloud_init.llm.model"""
+        """config.yaml 中 model 来自 cloud_init.config.llm.model"""
         data_path = setup_paths["data_path"]
         config_path = setup_paths["config_path"]
         _write_cloud_init(data_path, cloud_init_data)
@@ -517,8 +581,8 @@ class TestConfigYamlContent:
             config = yaml.safe_load(f)
         assert config["model"] == "claude-opus-4"
 
-    def test_config_yaml_contains_wechat_token(self, setup_paths, cloud_init_data):
-        """config.yaml 中 wechat_token 来自 cloud_init.wechat_token"""
+    def test_config_yaml_does_not_contain_wechat_token(self, setup_paths, cloud_init_data):
+        """config.yaml 中不包含 wechat_token（Key 字段写入 storage.yaml）"""
         data_path = setup_paths["data_path"]
         config_path = setup_paths["config_path"]
         _write_cloud_init(data_path, cloud_init_data)
@@ -527,10 +591,10 @@ class TestConfigYamlContent:
 
         with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
-        assert config["wechat_token"] == "wx_token_test"
+        assert "wechat_token" not in config
 
-    def test_config_yaml_contains_sync_api_key(self, setup_paths, cloud_init_data):
-        """config.yaml 中 sync_api_key 来自 cloud_init.sync.api_key"""
+    def test_config_yaml_does_not_contain_sync_api_key(self, setup_paths, cloud_init_data):
+        """config.yaml 中不包含 sync_api_key（Key 字段写入 storage.yaml）"""
         data_path = setup_paths["data_path"]
         config_path = setup_paths["config_path"]
         _write_cloud_init(data_path, cloud_init_data)
@@ -539,7 +603,7 @@ class TestConfigYamlContent:
 
         with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
-        assert config["sync_api_key"] == "lifeprism_sync_test_key"
+        assert "sync_api_key" not in config
 
     def test_config_yaml_contains_monitor_type_none(self, setup_paths, cloud_init_data):
         """config.yaml 中 monitor_type 强制为 none"""
@@ -554,7 +618,7 @@ class TestConfigYamlContent:
         assert config["monitor_type"] == "none"
 
     def test_config_yaml_contains_timezone_from_cloud_init(self, setup_paths, cloud_init_data):
-        """config.yaml 中 timezone 来自 cloud_init.timezone"""
+        """config.yaml 中 timezone 来自 cloud_init.config.timezone"""
         data_path = setup_paths["data_path"]
         config_path = setup_paths["config_path"]
         _write_cloud_init(data_path, cloud_init_data)
@@ -566,11 +630,14 @@ class TestConfigYamlContent:
         assert config["timezone"] == "Asia/Shanghai"
 
     def test_config_yaml_timezone_passthrough_custom_value(self, setup_paths, cloud_init_data):
-        """cloud_init.yaml 中 timezone 为自定义值（如 America/New_York）时，透传到 config.yaml"""
+        """cloud_init.yaml 中 timezone 为自定义值时，透传到 config.yaml"""
         data_path = setup_paths["data_path"]
         config_path = setup_paths["config_path"]
-        data = dict(cloud_init_data)
-        data["timezone"] = "America/New_York"
+        data = {
+            "storage": dict(cloud_init_data["storage"]),
+            "config": dict(cloud_init_data["config"]),
+        }
+        data["config"]["timezone"] = "America/New_York"
         _write_cloud_init(data_path, data)
 
         CloudInitializer(data_path).initialize()
@@ -582,18 +649,23 @@ class TestConfigYamlContent:
     def test_config_yaml_omits_timezone_when_cloud_init_missing_it(
         self, setup_paths, cloud_init_data
     ):
-        """cloud_init.yaml 中无 timezone 字段时，config.yaml 也不写入 timezone（让 DEFAULTS 兜底）"""
+        """cloud_init.yaml 中无 timezone 字段时，config.yaml 也不写入 timezone"""
         data_path = setup_paths["data_path"]
         config_path = setup_paths["config_path"]
-        data = dict(cloud_init_data)
-        data.pop("timezone")
+        data = {
+            "storage": dict(cloud_init_data["storage"]),
+            "config": {
+                "llm": dict(cloud_init_data["config"]["llm"]),
+                "monitor_type": "none",
+            },
+        }
         _write_cloud_init(data_path, data)
 
         CloudInitializer(data_path).initialize()
 
         with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
-        # timezone 字段不应被写入（由 settings_manager DEFAULTS 兜底为 Asia/Shanghai）
+        # timezone 字段不应被写入（由 settings_manager DEFAULTS 兜底）
         assert "timezone" not in config
 
     def test_config_yaml_preserves_existing_timezone_when_cloud_init_missing_it(
@@ -614,8 +686,13 @@ class TestConfigYamlContent:
             )
 
         # cloud_init.yaml 不含 timezone
-        data = dict(cloud_init_data)
-        data.pop("timezone")
+        data = {
+            "storage": dict(cloud_init_data["storage"]),
+            "config": {
+                "llm": dict(cloud_init_data["config"]["llm"]),
+                "monitor_type": "none",
+            },
+        }
         _write_cloud_init(data_path, data)
 
         CloudInitializer(data_path).initialize()
@@ -647,105 +724,115 @@ class TestConfigYamlContent:
             config = yaml.safe_load(f)
         # 新字段
         assert config["provider"] == "anthropic"
-        assert config["wechat_token"] == "wx_token_test"
         assert config["monitor_type"] == "none"
         # 已有字段保留
         assert config["user_name"] == "已有用户"
         assert config["classification_mode"] == "classify_graph"
 
 
-class TestProvidersYamlContent:
-    """测试 initialize() 写入 providers.yaml 的字段内容"""
+# ==================== Slice 6: storage.yaml 写入内容正确性 ====================
 
-    def test_providers_yaml_injects_api_key_to_matching_provider(
-        self, setup_paths, cloud_init_data
-    ):
-        """providers.yaml 中匹配的 provider 被注入 api_key"""
+
+class TestStorageYamlContent:
+    """测试 initialize() 写入 storage.yaml 的字段内容（via SettingsManager.save_storage_yaml）"""
+
+    def test_storage_yaml_contains_sync_api_key(self, setup_paths, cloud_init_data):
+        """storage.yaml 中 sync_api_key 来自 cloud_init.storage.sync_api_key"""
         data_path = setup_paths["data_path"]
-        providers_path = setup_paths["providers_path"]
+        storage_path = setup_paths["storage_path"]
         _write_cloud_init(data_path, cloud_init_data)
 
         CloudInitializer(data_path).initialize()
 
-        with open(providers_path, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+        with open(storage_path, encoding="utf-8") as f:
+            storage = yaml.safe_load(f)
+        assert storage["sync_api_key"] == "lifeprism_sync_test_key"
 
-        anthropic = next(p for p in data["providers"] if p["name"] == "anthropic")
-        assert anthropic["api_key"] == "sk-ant-test-key"
-
-    def test_providers_yaml_preserves_other_providers(
-        self, setup_paths, cloud_init_data
-    ):
-        """providers.yaml 中未被 cloud_init 涉及的 provider 保持不变"""
+    def test_storage_yaml_contains_wechat_token(self, setup_paths, cloud_init_data):
+        """storage.yaml 中 wechat_token 来自 cloud_init.storage.wechat_token"""
         data_path = setup_paths["data_path"]
-        providers_path = setup_paths["providers_path"]
+        storage_path = setup_paths["storage_path"]
         _write_cloud_init(data_path, cloud_init_data)
 
         CloudInitializer(data_path).initialize()
 
-        with open(providers_path, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+        with open(storage_path, encoding="utf-8") as f:
+            storage = yaml.safe_load(f)
+        assert storage["wechat_token"] == "wx_token_test"
 
-        # openai 应仍然存在且无 api_key
-        openai = next(p for p in data["providers"] if p["name"] == "openai")
-        assert "api_key" not in openai or openai.get("api_key") is None
-
-    def test_providers_yaml_preserves_provider_metadata(
-        self, setup_paths, cloud_init_data
-    ):
-        """注入 api_key 时保留 provider 的其他元数据（display_name 等）"""
+    def test_storage_yaml_contains_providers_dict(self, setup_paths, cloud_init_data):
+        """storage.yaml 中 providers 是字典（provider_id -> api_key）"""
         data_path = setup_paths["data_path"]
-        providers_path = setup_paths["providers_path"]
+        storage_path = setup_paths["storage_path"]
         _write_cloud_init(data_path, cloud_init_data)
 
         CloudInitializer(data_path).initialize()
 
-        with open(providers_path, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+        with open(storage_path, encoding="utf-8") as f:
+            storage = yaml.safe_load(f)
+        assert isinstance(storage["providers"], dict)
+        assert storage["providers"]["anthropic"] == "sk-ant-test-key"
 
-        anthropic = next(p for p in data["providers"] if p["name"] == "anthropic")
-        assert anthropic["display_name"] == "Anthropic"
-        assert anthropic["default_model"] == "claude-opus-4-5"
-        assert anthropic["env_key"] == "api_key_anthropic"
+    def test_storage_yaml_written_via_settings_manager(self, setup_paths, cloud_init_data):
+        """storage.yaml 通过 SettingsManager.save_storage_yaml() 写入（不直接写文件）"""
+        data_path = setup_paths["data_path"]
+        _write_cloud_init(data_path, cloud_init_data)
 
-    def test_providers_yaml_preserves_allowed_providers(
+        with patch(
+            "lifeprism.config.settings_manager.settings.save_storage_yaml"
+        ) as mock_save:
+            CloudInitializer(data_path).initialize()
+
+        mock_save.assert_called_once()
+        saved_data = mock_save.call_args[0][0]
+        assert saved_data["sync_api_key"] == "lifeprism_sync_test_key"
+        assert saved_data["wechat_token"] == "wx_token_test"
+        assert saved_data["providers"]["anthropic"] == "sk-ant-test-key"
+
+
+# ==================== Slice 7: config 段和 storage 段分离写入 ====================
+
+
+class TestConfigAndStorageSeparation:
+    """测试 cloud_init.yaml 中 config 段和 storage 段同时存在时正确分离写入"""
+
+    def test_config_and_storage_written_to_separate_files(
         self, setup_paths, cloud_init_data
     ):
-        """providers.yaml 中 allowed_providers 列表保持不变"""
+        """config 段写入 config.yaml，storage 段写入 storage.yaml，互不污染"""
         data_path = setup_paths["data_path"]
-        providers_path = setup_paths["providers_path"]
+        config_path = setup_paths["config_path"]
+        storage_path = setup_paths["storage_path"]
         _write_cloud_init(data_path, cloud_init_data)
 
         CloudInitializer(data_path).initialize()
 
-        with open(providers_path, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+        with open(config_path, encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        with open(storage_path, encoding="utf-8") as f:
+            storage = yaml.safe_load(f)
 
-        assert data["allowed_providers"] == ["anthropic", "openai"]
+        # config.yaml 包含非 Key 字段
+        assert config["provider"] == "anthropic"
+        assert config["model"] == "claude-opus-4"
+        assert config["monitor_type"] == "none"
+        # config.yaml 不包含 Key 字段
+        assert "sync_api_key" not in config
+        assert "wechat_token" not in config
+        assert "providers" not in config
 
-    def test_providers_yaml_injects_multiple_providers(self, setup_paths, cloud_init_data):
-        """cloud_init.yaml 包含多个 provider 时，全部注入 api_key"""
-        data = dict(cloud_init_data)
-        data["providers"] = [
-            {"name": "anthropic", "env_key": "api_key_anthropic", "api_key": "sk-ant-1"},
-            {"name": "openai", "env_key": "api_key_openai", "api_key": "sk-openai-1"},
-        ]
-        data_path = setup_paths["data_path"]
-        providers_path = setup_paths["providers_path"]
-        _write_cloud_init(data_path, data)
-
-        CloudInitializer(data_path).initialize()
-
-        with open(providers_path, encoding="utf-8") as f:
-            pdata = yaml.safe_load(f)
-
-        anthropic = next(p for p in pdata["providers"] if p["name"] == "anthropic")
-        openai = next(p for p in pdata["providers"] if p["name"] == "openai")
-        assert anthropic["api_key"] == "sk-ant-1"
-        assert openai["api_key"] == "sk-openai-1"
+        # storage.yaml 包含 Key 字段
+        assert storage["sync_api_key"] == "lifeprism_sync_test_key"
+        assert storage["wechat_token"] == "wx_token_test"
+        assert "anthropic" in storage["providers"]
+        # storage.yaml 不包含非 Key 字段
+        assert "provider" not in storage
+        assert "model" not in storage
+        assert "monitor_type" not in storage
+        assert "timezone" not in storage
 
 
-# ==================== Slice 6: 文件权限 600 ====================
+# ==================== Slice 8: 文件权限 600 ====================
 
 
 class TestFilePermissions:
@@ -771,24 +858,24 @@ class TestFilePermissions:
             f"未找到对 config.yaml 设置权限 0o600 的调用，实际: {chmod_calls}"
         )
 
-    def test_providers_yaml_sets_permission_600_on_linux(self, setup_paths, cloud_init_data):
-        """非 Windows 平台写入 providers.yaml 后设置文件权限 600"""
+    def test_storage_yaml_sets_permission_600_on_linux(self, setup_paths, cloud_init_data):
+        """非 Windows 平台写入 storage.yaml 后设置文件权限 600（通过 SettingsManager）"""
         data_path = setup_paths["data_path"]
-        providers_path = setup_paths["providers_path"]
+        storage_path = setup_paths["storage_path"]
         _write_cloud_init(data_path, cloud_init_data)
 
         with (
-            patch("lifeprism.config.cloud_initializer.sys.platform", "linux"),
-            patch("lifeprism.config.cloud_initializer.os.chmod") as mock_chmod,
+            patch("lifeprism.config.settings_manager.sys.platform", "linux"),
+            patch("lifeprism.config.settings_manager.os.chmod") as mock_chmod,
         ):
             CloudInitializer(data_path).initialize()
 
-        # 验证 os.chmod 被调用且包含对 providers.yaml 设置 0o600
+        # 验证 os.chmod 被调用且包含对 storage.yaml 设置 0o600
         chmod_calls = [
             (call.args[0], call.args[1]) for call in mock_chmod.call_args_list
         ]
-        assert (providers_path, 0o600) in chmod_calls, (
-            f"未找到对 providers.yaml 设置权限 0o600 的调用，实际: {chmod_calls}"
+        assert (storage_path, 0o600) in chmod_calls, (
+            f"未找到对 storage.yaml 设置权限 0o600 的调用，实际: {chmod_calls}"
         )
 
     def test_validate_monitor_type_sets_permission_600_on_linux(self, setup_paths):
@@ -822,9 +909,12 @@ class TestFilePermissions:
 
         with (
             patch("lifeprism.config.cloud_initializer.sys.platform", "win32"),
-            patch("lifeprism.config.cloud_initializer.os.chmod") as mock_chmod,
+            patch("lifeprism.config.cloud_initializer.os.chmod") as mock_chmod_ci,
+            patch("lifeprism.config.settings_manager.sys.platform", "win32"),
+            patch("lifeprism.config.settings_manager.os.chmod") as mock_chmod_sm,
         ):
             CloudInitializer(data_path).initialize()
 
         # Windows 平台不应调用 os.chmod
-        mock_chmod.assert_not_called()
+        mock_chmod_ci.assert_not_called()
+        mock_chmod_sm.assert_not_called()

@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-import keyring
 import qrcode
 
 from lifeprism.llm.channel.wechat.client import WechatClient
@@ -50,34 +49,30 @@ class WechatAuth:
 
     @staticmethod
     def _load_token_from_keyring() -> str:
-        """从 keyring 加载 token
+        """从 SettingsManager 加载 token
+
+        通过 settings.get_storage_key("wechat_token") 路由：
+        本地模式读 keyring，云端模式读 storage.yaml。
 
         Returns:
-            token 字符串，失败返回空字符串
-
-        keyring 读取失败时，fallback 到 config.yaml 的 wechat_token 字段（云端 Linux）。
+            token 字符串，失败或不存在时返回空字符串
         """
+        from lifeprism.config.settings_manager import settings
+
         try:
-            token = keyring.get_password(KEYRING_SERVICE_NAME, KEYRING_WECHAT_TOKEN_USERNAME)
+            token = settings.get_storage_key("wechat_token")
             if token:
                 return token
-        except (keyring.errors.KeyringError, OSError) as e:
-            logger.debug("从 keyring 加载 token 失败: %s", e)
-        # Fallback: 从 config.yaml 读取 wechat_token 字段（云端 Linux 部署）
-        try:
-            from lifeprism.config.settings_manager import get_setting
-
-            config_token = get_setting("wechat_token")
-            if config_token:
-                logger.debug("keyring 未找到微信 token，已从 config fallback")
-                return str(config_token)
         except Exception as e:
-            logger.debug("从 config 读取 wechat_token 失败: %s", e)
+            logger.debug("从 SettingsManager 加载 wechat_token 失败: %s", e)
         return ""
 
     @staticmethod
     def _save_token_to_keyring(token: str) -> bool:
-        """保存 token 到 keyring
+        """保存 token 到 SettingsManager
+
+        通过 settings.set_storage_key("wechat_token", token) 路由：
+        本地模式写 keyring，云端模式写 storage.yaml。
 
         Args:
             token: 要保存的 token
@@ -85,12 +80,14 @@ class WechatAuth:
         Returns:
             是否成功
         """
+        from lifeprism.config.settings_manager import settings
+
         try:
-            keyring.set_password(KEYRING_SERVICE_NAME, KEYRING_WECHAT_TOKEN_USERNAME, token)
-            logger.info("Token 已保存到 keyring")
+            settings.set_storage_key("wechat_token", token)
+            logger.info("Token 已保存到 SettingsManager")
             return True
-        except (keyring.errors.KeyringError, OSError) as e:
-            logger.error("保存 token 到 keyring 失败: %s", e, exc_info=True)
+        except Exception as e:
+            logger.error("保存 token 到 SettingsManager 失败: %s", e, exc_info=True)
             return False
 
     def _save_state_to_file(self, state: dict[str, Any]) -> None:
@@ -109,21 +106,21 @@ class WechatAuth:
     def delete_token(self) -> bool:
         """删除保存的 token
 
-        同时清理 keyring 和文件中的 token。
+        同时清理 storage（keyring/storage.yaml）和文件中的 token。
 
         Returns:
             是否成功
         """
         success = True
 
-        # 1. 从 keyring 删除
+        # 1. 通过 SettingsManager 路由删除（本地模式从 keyring 删除，云端模式从 storage.yaml 删除）
         try:
-            keyring.delete_password(KEYRING_SERVICE_NAME, KEYRING_WECHAT_TOKEN_USERNAME)
-            logger.info("已从 keyring 删除 token")
-        except keyring.errors.PasswordDeleteError:
-            logger.debug("Keyring 中没有 token")
-        except (keyring.errors.KeyringError, OSError) as e:
-            logger.error("从 keyring 删除 token 失败: %s", e, exc_info=True)
+            from lifeprism.config.settings_manager import settings
+
+            settings.delete_storage_key("wechat_token")
+            logger.info("已通过 SettingsManager 删除 token")
+        except Exception as e:
+            logger.error("通过 SettingsManager 删除 token 失败: %s", e, exc_info=True)
             success = False
         # 2. 从文件删除（如果存在）
         if self.state_file.exists():

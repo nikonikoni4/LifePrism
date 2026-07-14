@@ -61,10 +61,16 @@ from lifeprism.repository.providers import (
 from lifeprism.repository.providers import custom_block_provider as custom_block_repository
 from lifeprism.repository.providers import diary_provider as diary_repository
 from lifeprism.repository.providers import (
+    file_sync_state_provider as file_sync_state_repository,
+)
+from lifeprism.repository.providers import (
     raw_behavior_analysis_provider as raw_behavior_analysis_repository,
 )
 from lifeprism.repository.providers import screen_capture_provider as screen_capture_repository
 from lifeprism.repository.providers import tokens_usage_provider as tokens_usage_repository
+from lifeprism.repository.providers import (
+    wechat_account_state_provider as wechat_account_state_repository,
+)
 
 from .base_providers import AWBaseDataProvider, LWBaseDataProvider
 from .sync_repository import SyncRepository
@@ -85,6 +91,8 @@ __all__ = [
     "raw_behavior_analysis_repository",
     "behavior_analysis_repository",
     "screen_capture_repository",
+    "wechat_account_state_repository",
+    "file_sync_state_repository",
     # 多表 repository
     "habit_repository",
     "mood_repository",
