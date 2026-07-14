@@ -123,6 +123,30 @@ session_id: xyz789ghi012
 
 用户可以通过自然语言让 AI 创建"自定义记录类型"并录入数据。每个类型对应一张数据表，字段由用户描述后 AI 生成。
 
+### 字段类型选择指导
+
+创建类型时，每个字段需选择 `field_type`（text/integer/float）：
+
+| field_type | 适用场景 | 示例 |
+|------------|---------|------|
+| `text` | 文本内容 | 锻炼内容、备注、书名、感想 |
+| `integer` | 整数计数 | 次数、金额（以元为单位）、步数、页数 |
+| `float` | 浮点数值 | 心率、体重、温度、里程、时长（以小时为单位） |
+
+#### 字段单位约定
+
+将单位以括号形式写入 `field_name`，不单独传递 unit 参数。示例：
+
+- `field_name="心率(bpm)"`、`field_name="体重(kg)"`、`field_name="里程(km)"`
+- `field_name="金额(元)"`、`field_name="完成度(%)"`、`field_name="时长(小时)"`
+
+#### 百分比存储约定
+
+百分比数据按「百分点」单位存储为数值，**不写小数形式**：
+
+- 正确：完成度 85% → `field_name="完成度(%)"`、`field_type="integer"`、值 `85`
+- 错误：完成度 85% → 值 `0.85`（不要这样存）
+
 ### 可用工具
 
 | 工具名 | 用途 | 适用场景 |
@@ -171,9 +195,13 @@ AI 操作：
 2. **调用 `query_custom_record_entries`**：传入 `type_id` 和 `date_range`（可选）
 3. **整理结果回复用户**：将记录列表格式化为易读的文本
 
-### field_key 错误处理
+### 校验错误处理
 
-录入数据时，如果 `data` 中的 key 不匹配类型的 field_key，工具会返回 `INVALID_FIELD_KEY` 错误，包含 `valid_fields` 列表：
+录入数据时，可能遇到两类校验错误：
+
+#### INVALID_FIELD_KEY（field_key 错误）
+
+`data` 中的 key 不匹配类型的 field_key：
 
 ```json
 {
@@ -187,6 +215,30 @@ AI 操作：
 ```
 
 收到此错误时，**根据 `valid_fields` 重新解析用户输入**，匹配正确的 field_key 后重试 `create_custom_record_entry`。
+
+#### INVALID_FIELD_VALUE（值类型不匹配）
+
+`data` 中的 value 类型与字段 `field_type` 不匹配（如给 integer 字段传 "abc" 或 "5.5"）：
+
+```json
+{
+  "error": "INVALID_FIELD_VALUE",
+  "message": "字段值类型不匹配: steps",
+  "invalid_fields": [
+    {"field_key": "steps", "value": "abc", "expected_type": "integer"}
+  ],
+  "valid_fields": [
+    {"field_key": "steps", "field_name": "步数", "field_type": "integer"}
+  ]
+}
+```
+
+收到此错误时，**根据 `valid_fields` 中的 `field_type` 重新解析用户输入**：
+- `integer` 字段：值必须是整数或整数字符串（如 5 或 "5"，不接受 "5.5"）
+- `float` 字段：值必须是数值或数值字符串（如 65.5 或 70 或 "65.5"）
+- `text` 字段：值可以是任意类型（会被转为字符串）
+
+重新解析后重试 `create_custom_record_entry`。
 
 ### 注意事项
 

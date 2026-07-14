@@ -1,9 +1,9 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-08
-updated_at: 2026-07-08
-last_updated: 创建 Nginx 配置指南初稿
-abstract: LifePrism Web Demo 模式的 Nginx 反向代理配置指南，包含静态文件托管、API 代理、SSE 流式响应支持及验证方法。
+updated_at: 2026-07-14
+last_updated: v1.1——HTTPS 从可选改为默认；新增同步端口 8102 代理配置
+abstract: LifePrism 的 Nginx 反向代理配置指南，覆盖前端静态文件托管、Web Demo API（8101）代理、同步 API（8102）代理、HTTPS 默认配置、SSE 流式响应支持。
 ---
 
 # Nginx 配置指南
@@ -12,6 +12,7 @@ abstract: LifePrism Web Demo 模式的 Nginx 反向代理配置指南，包含�
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 1.1  | HTTPS 从可选改为默认配置；新增同步端口 8102 代理（`/api/sync/` → `http://127.0.0.1:8102`） |
 | 1.0  | 创建文档初稿 |
 
 ---
@@ -48,6 +49,9 @@ server {
     listen 80;
     server_name your-domain.com;  # 替换为你的域名或 IP
 
+    # HTTP → HTTPS 强制跳转（首次配置时建议注释掉，等 HTTPS 证书就绪后再启用）
+    # return 301 https://$host$request_uri;
+
     # 前端静态文件
     root /var/www/lifeprism;
     index index.html;
@@ -57,7 +61,7 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # 后端 API 反向代理
+    # Web Demo 后端 API 反向代理
     location /api/ {
         proxy_pass http://127.0.0.1:8101;
         proxy_set_header Host $host;
@@ -72,6 +76,24 @@ server {
         # SSE 长连接超时设置
         proxy_read_timeout 300s;
         proxy_send_timeout 300s;
+    }
+}
+
+# 同步端口 HTTPS（默认配置）
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+
+    ssl_certificate     /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+
+    # 本地 SyncClient 通过 HTTPS 访问同步 API
+    location /api/sync/ {
+        proxy_pass http://127.0.0.1:8102;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
     }
 }
 ```
@@ -91,7 +113,9 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## 4. HTTPS 配置（可选）
+## 4. HTTPS 配置（默认，建议必须）
+
+> ⚠ **同步 API Key 通过 HTTP Header 传输。不走 HTTPS 时，公网中间人可直接拦截 Bearer Token。** 详见已知限制 [cloud-security-limitations.md](../known-limitations/cloud-security-limitations.md) 限制 4。
 
 使用 Let's Encrypt 获取免费 SSL 证书：
 
@@ -101,6 +125,15 @@ sudo certbot --nginx -d your-domain.com
 ```
 
 证书自动续期已由 certbot 配置，无需手动处理。
+
+证书就绪后，取消注释 Nginx 配置中的 HTTP→HTTPS 跳转行：
+
+```nginx
+# 取消这行的注释
+return 301 https://$host$request_uri;
+```
+
+然后在本地前端将 `sync.remote_url` 设为 `https://your-domain.com`（不带端口号——443 是 HTTPS 默认端口，Nginx 会自动路由 `/api/sync/` 到 8102）。
 
 ## 5. SSE 流式响应验证
 

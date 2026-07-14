@@ -1,3 +1,17 @@
+## 2026-07-14-sync-key-regeneration-and-config-fallback
+
+- updated_at: 2026-07-14
+- path: `docs/history-bugs/2026-07-14-sync-key-regeneration-and-config-fallback.md`
+- 触发规则：在修改云端配置生成逻辑（`cloud_config_generator.py`、`cloud_config_api.py`）、修改同步 API Key 读取逻辑（`sync_config.py`）、用户反馈"生成的同步 Key 始终是同一个测试值"、讨论同步 API Key 的生成/更新/轮换策略、排查 config.yaml 中的 `sync_api_key` 字段如何被消费时阅读
+- 内容摘要：记录了同步 API Key 的四个关联问题：(1) 前端生成云端配置时无确认键，用户无法选择"保留当前 Key"还是"更换 Key"；(2) Key 读取链路被 config.yaml fallback 污染，导致 `get_sync_api_key()` 将 config.yaml 中手动写入的弱 Key 当作"已有的 Key"，`secrets.token_urlsafe(32)` 永不触发；(3) 所有 Key（sync_api_key、wechat_token、Provider API Key）统一到 `storage.yaml` 专用文件，通过 `run_mode` 控制读写——本地仅 keyring，云端才用文件 fallback。config.yaml 移除所有 Key 字段；(4) keyring 顶层 import 导致 Linux 模块加载崩溃，修复方案为懒加载（`_get_keyring()` 仅在 Windows 上首次调用时导入），subagent 评估确认可行，改造 5 个文件约 64 行。
+
+## 2026-07-14-sync-client-not-started-and-empty-file-lww-overwrite
+
+- updated_at: 2026-07-14
+- path: `docs/history-bugs/2026-07-14-sync-client-not-started-and-empty-file-lww-overwrite.md`
+- 触发规则：在排查本地与云端数据不一致、定时同步不执行、启动时未拉取云端新增数据、`SyncClient`/`start_scheduled_sync`/`sync_once` 是否被实际调用、云端首次部署后本地文档被空文档反向覆盖、基于 `mtime` 的 LWW 文件冲突解决在空文件 vs 有内容文件场景下失效时阅读
+- 内容摘要：**严重生产级 bug（P0，待修复）** - 记录了两个关联问题：(1) 数据同步链路未打通，`SyncClient` 在 `main.py:331` 实例化后从未调用 `start_scheduled_sync()` 和启动时 `sync_once()`，导致 Spec 要求的"启动时同步"和"每 10 分钟定时同步"完全失效，仅关闭时和前端手动触发可用；(2) 文件 LWW 算法只比较 `mtime` 不比较内容，云端新部署自动创建的空文档（mtime 为当前时间）会反向覆盖本地有内容的文档（mtime 为历史时间），造成数据丢失。Bug 1 修复前 Bug 2 被掩盖未暴露，必须一起修复。Bug 2 给出 4 个候选方案（云端不创建空文档/LWW 加内容大小判断/首次同步只 push/云端初始化标记）待讨论选择。附录包含思源笔记同步机制调研（git-like 内容寻址快照 + 3-way merge），提供短期/中期/长期三档改造方案参考。
+
 ## 2026-07-13-timeline-custom-block-date-query-datetime-field
 
 - updated_at: 2026-07-13
@@ -94,4 +108,4 @@
 - updated_at: 2026-04-19
 - path: `docs/history-bugs/2026-04-19-chain-node-menu-occlusion.md`
 - 触发规则：在排查包含弹窗、拖拽操作或多层嵌套列表组件导致的 z-index 层叠/遮挡等渲染错误时阅读
-- 内容摘要：整理了 dnd-kit 修改 transform 引起的”层叠上下文封闭”从而致菜单被底部节点遮挡的原理，以及应用 React Portals 和 Floating UI 的标准处理方案。
+- 内容摘要：整理了 dnd-kit 修改 transform 引起的"层叠上下文封闭"从而致菜单被底部节点遮挡的原理，以及应用 React Portals 和 Floating UI 的标准处理方案。

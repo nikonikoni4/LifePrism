@@ -14,6 +14,7 @@
 - [打包模式](#打包模式)
   - [Windows Electron 桌面版](#windows-electron-桌面版)
   - [Web-Demo 部署版](#web-demo-部署版)
+- [云端部署](#云端部署)
 
 ---
 
@@ -418,7 +419,40 @@ done
 
 ---
 
-## 🔍 常见问题
+## 云端部署
+
+云端部署指在 Linux 服务器上运行 Agent Only 模式，并配置 HTTPS 供本地同步 API 调用。
+
+完整部署配置见：**[云端 HTTPS 部署配置](deployment/cloud-https-setup.md)**
+
+### 部署文档索引
+
+| 文档 | 说明 |
+|------|------|
+| [云端 HTTPS 部署配置](deployment/cloud-https-setup.md) | 两种 HTTPS 模式（Nginx 代理 / uvicorn 直连）的完整配置，含 Nginx config、systemd、防火墙设置 |
+| [Linux 部署指南](deployment/linux-deployment-guide.md) | 系统要求、依赖安装、三种运行模式的启动命令 |
+| [Nginx 配置指南](deployment/nginx-setup.md) | Nginx 反向代理、SSE 支持、HTTPS 配置 |
+
+### 快速启动
+
+```bash
+# 1. 启动 Agent Only 模式（同步 API 在 8102 端口）
+python -m lifeprism.server.main_agent_only
+
+# 2. 或使用启动脚本
+./scripts/start.sh agent-only start
+```
+
+### HTTPS 两种模式
+
+| 模式 | 本地 remote_url | 服务器需开放端口 | 说明 |
+|------|----------------|-----------------|------|
+| Nginx 代理（推荐） | `https://your-domain.com` | 443 | Nginx 解密后转发 → uvicorn:8102 |
+| uvicorn 直连 | `https://your-domain.com:8102` | 8102 | uvicorn 自己加载证书，需 IP 限制 |
+
+---
+
+## 常见问题
 
 ### Q1：Demo 弹窗不显示？
 

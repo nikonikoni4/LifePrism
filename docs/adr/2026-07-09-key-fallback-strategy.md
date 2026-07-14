@@ -1,9 +1,9 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-09
-updated_at: 2026-07-09
-last_updated: 2026-07-09
-abstract: 密钥存储采用 keyring 优先 + config.yaml fallback 策略，否决 .env 环境变量方案。核心原因：.env 本质也是文件，而 config.yaml 已被 settings_manager 加载，无需引入额外依赖和加载逻辑。
+updated_at: 2026-07-14
+last_updated: v1.1——Key 从 config.yaml 分离到 storage.yaml，通过 run_mode 隔离本地/云端读写路径
+abstract: 密钥存储从"keyring + config.yaml fallback"演进为"keyring（本地）+ storage.yaml（云端）"分离架构。核心原因：config.yaml fallback 导致弱 Key 永久固化，且混合了普通配置与敏感凭据。新增 storage.yaml（权限 600）专用于 Key 存储，命名避开 "keys.yaml" 以降低文件直接暴露时的敏感度。通过 run_mode 控制读写路径：本地（full）只用 keyring，云端（agent_only/web_demo）用 storage.yaml。
 status: decided
 ---
 
@@ -13,7 +13,8 @@ status: decided
 
 | 版本 | 更新内容 |
 | ---- | -------- |
-| 1.0 | 创建文档初稿 |
+| 1.1 | Key 从 config.yaml 分离到 storage.yaml，通过 run_mode 隔离本地/云端读写路径。新增演进历史节，记录 v1.0 的 config.yaml fallback 带来的 Key 固化 bug |
+| 1.0 | 创建文档初稿，决策 keyring + config.yaml fallback |
 
 ## 问题界定
 
@@ -113,9 +114,97 @@ LifeWatch-AI 需要在 Windows 本地和 Linux 云端两种环境读取密钥（
 - 原因 3：providers.yaml 已有 provider 列表结构。LLM API Key 天然属于 provider 的属性，写入 providers.yaml 的对应 provider 条目下（新增 `api_key` 字段）比扁平化到 .env 更自然。
 - 原因 4：部署便捷。云端只需复制一个 cloud_init.yaml 文件，CloudInitializer 自动拆分写入 config.yaml 和 providers.yaml。如果用 .env，部署时需要多管理一个文件。
 
+## 演进历史
+
+| 版本 | 方案 | 解决的问题 | 引入的新问题 |
+| ---- | ---- | ---------- | ------------ |
+| v1.0 | keyring + config.yaml fallback | 云端 keyring 不可用时 Key 无处存放 | config.yaml fallback 被 `cloud_config_generator._resolve_sync_api_key()` 复用，导致 config.yaml 中手动写入的弱 Key 被永久固化为同步 API Key（`secrets.token_urlsafe(32)` 永不触发）。详见 Bug 记录 [2026-07-14-sync-key-regeneration-and-config-fallback](../history-bugs/2026-07-14-sync-key-regeneration-and-config-fallback.md) Bug 2 |
+| v1.1 | keyring（本地）+ storage.yaml（云端）分离 | 根除 config.yaml fallback 导致的 Key 固化污染 | 新增 storage.yaml 文件需在部署流程中管理；需通过 run_mode 控制读写路径 |
+
+## v1.1 修订：Key 分离到 storage.yaml
+
+### 问题发现
+
+v1.0 的 `get_sync_api_key()` 在 `cloud_config_generator._resolve_sync_api_key()` 和 `sync_cloud_api.verify_sync_api_key()` 两个场景复用，但这两个场景对"fallback 到 config.yaml"的需求完全相反：
+
+- **验证场景**（verify_sync_api_key）：fallback 到 config.yaml 是**合理的**——云端部署时 keyring 不可用，必须从文件验证
+- **生成场景**（_resolve_sync_api_key）：fallback 到 config.yaml 是**不该发生的**——生成新配置时，config.yaml 的值不应被当作"现有的 Key"。一旦 config.yaml 中存在该字段（如开发时手动写入的 `test_heartbeat_key_abc123xyz`），会被永久固化为同步 API Key
+
+### 解决方案
+
+将所有 Key 从 `config.yaml` 中分离，统一到专用文件 `storage.yaml`。通过 `run_mode` 控制读写行为。
+
+### storage.yaml 命名理由
+
+候选名 `keys.yaml` / `secrets.yaml` 被否决——从文件名一眼就能看出存放的是密钥，文件暴露时等于直接宣示"这里是所有凭据"。选择 **`storage.yaml`**：
+
+- 看起来像普通存储配置文件，不直接暗示"密钥"
+- 权限 `600` 作为第一道防线，文件名不暴露内容性质作为第二道防线（深度防御）
+- 与已有 `providers.yaml`（Provider 配置）、`config.yaml`（应用配置）形成命名一致性（都是 `*.yaml`）
+
+| 候选名 | 问题 |
+|--------|------|
+| `keys.yaml` | 直接宣示"这是密钥文件"，暴露时攻击者第一眼就看到关键目标 |
+| `secrets.yaml` | 同上，一眼就知道内容敏感 |
+| `storage.yaml` | 中性命名，降低识别度 ✅ |
+
+### 文件结构
+
+```yaml
+# storage.yaml（仅 Key，文件权限 600）
+sync_api_key: "N7kX..."
+wechat_token: "wx_token_..."
+providers:
+  anthropic: "sk-ant-..."
+  deepseek: "sk-ds-..."
+```
+
+位置：`{config_base_path}/storage.yaml`
+
+### 读取层级
+
+```
+本地 (run_mode == "full")：
+  sync_api_key       → keyring（没有就 None，不读任何文件）
+  wechat_token        → keyring（没有就 None，不读任何文件）
+  Provider API Key    → keyring（没有就 None，不读任何文件）
+
+云端 (run_mode == "agent_only" | "web_demo")：
+  sync_api_key       → storage.yaml
+  wechat_token        → storage.yaml
+  Provider API Key    → storage.yaml → providers.yaml（兜底）
+```
+
+### 写入层级
+
+```
+本地 (run_mode == "full")：
+  所有 Key → 写入 keyring（不写任何文件）
+
+云端 (run_mode == "agent_only" | "web_demo")：
+  所有 Key → 写入 storage.yaml（keyring 不可用，不尝试写入）
+```
+
+### 涉及改动
+
+| 文件 | 改动 |
+|------|------|
+| 新增 `storage.yaml` | `{config_base_path}/storage.yaml`，权限 600 |
+| `sync_config.py:get_sync_api_key()` | `run_mode == "full"` → 只读 keyring；云端 → 读 storage.yaml |
+| `wechat/auth.py:_load_token_from_keyring()` | 同上 |
+| `provider_manager.py:get_api_key()` | 同上，云端再加一层 providers.yaml 兜底 |
+| `cloud_config_generator.py` | cloud_init.yaml 输出 storage 段 |
+| `cloud_initializer.py` | 初始化时 Key 写入 storage.yaml 而非 config.yaml |
+| `config.yaml` | 移除 sync_api_key、wechat_token 字段（从 DEFAULTS 和现有文件中清理）|
+
+**`providers.yaml` 不动**，它已有自己的结构和 fallback 层级。
+
 ## 后续影响
 
-- 所有新增密钥类型都应遵循 keyring 优先 + config.yaml fallback 模式
-- config.yaml 和 providers.yaml 的文件权限必须为 600（已在 Code Review 中修复）
-- .gitignore 必须排除 config.yaml 和 providers.yaml（项目已有此配置）
-- 如果未来云端迁移到容器化部署（Docker/K8s），可能需要重新评估是否改用环境变量（容器场景下环境变量注入更方便）
+- 所有新增密钥类型都应遵循 `keyring（本地） + storage.yaml（云端）` 分离模式
+- storage.yaml 和 providers.yaml 的文件权限必须为 600
+- config.yaml 不再包含任何 Key 字段（sync_api_key、wechat_token 等已移除）
+- .gitignore 必须排除 storage.yaml
+- 部署流程中 cloud_init.yaml 的 storage 段由 CloudInitializer 写入 storage.yaml
+- keyring 在 Linux headless 环境不可用，需配合 keyring 懒加载方案（见 Bug 记录 [2026-07-14-sync-key-regeneration-and-config-fallback](../history-bugs/2026-07-14-sync-key-regeneration-and-config-fallback.md) Bug 4）
+- 如果未来云端迁移到容器化部署（Docker/K8s），可能需要重新评估是否改用环境变量（容器场景下环境变量注入更方便），但 storage.yaml 的中性命名策略在容器场景中同样适用（挂载为 volume 时文件名不暴露内容性质）

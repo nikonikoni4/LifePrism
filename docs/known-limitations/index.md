@@ -15,7 +15,17 @@
 - **触发条件**: 数据量超过 10 万条或查询响应时间超过 1 秒时需重构
 - **临时方案**: 当前使用 `build_utc_time_range()` 转换，功能正确但效率低
 
-### 2. 前端时间显示与后端时区配置解耦
+### 2. 数据库同步时间依赖与主备时钟偏差
+
+- **文件**: `sync-time-dependency-and-clock-skew.md`
+- **状态**: `acknowledged`（已确认，按当前使用场景不修复）
+- **严重程度**: 低
+- **影响范围**: 数据库同步（30 张静态表 + 动态自定义记录表 + 文件同步）
+- **问题描述**: 同步完全依赖客户端 `last_sync_time` 判断增量范围，主备切换场景下若云端时钟慢于本机时钟，极端情况下可能丢失云端新写入的数据。已确认所有时间均使用 UTC ISO 8601，当前不是 bug
+- **触发条件**: 主备切换 + 云端时钟比本机慢 + 偏差窗口内恰好有数据写入（NTP 正常时偏差 < 1 秒，风险极低）
+- **根本前提**: 本机使用时云端不产生数据（Agent 不处理消息）。若前提改变（多客户端等），同步需重做
+
+### 3. 前端时间显示与后端时区配置解耦
 
 - **文件**: `frontend-timezone-display-decoupled-from-config.md`
 - **状态**: `acknowledged`（已确认，按当前使用场景不修复）
@@ -24,6 +34,24 @@
 - **问题描述**: 前端时间显示走浏览器本地时区（`new Date` 自动跟随系统），不读取后端 `settings.timezone` 配置；后端 AI 工具按配置时区显示。二者各自动态获取，非硬编码，但当浏览器时区与配置时区不一致时会出现显示差异
 - **触发条件**: 浏览器/系统时区与 `settings.timezone` 配置不一致（如跨时区出差未同步修改系统时区）
 - **临时方案**: 保持现状，依赖"用户所在地 = 系统时区 = 配置时区"的使用前提
+
+### 4. 云端部署安全限制
+
+- **文件**: `cloud-security-limitations.md`
+- **状态**: `acknowledged`（已确认，按当前使用场景不修复）
+- **严重程度**: 高
+- **影响范围**: 云端部署全链路（密钥存储、传输、生成）
+- **问题描述**: (1) wxid 明文存储，攻击者可伪装 AI 机器人；(2) API Key 明文存储，攻击者可滥用 LLM 服务；(3) 同步 API Key 无法重新生成（config.yaml fallback 污染）；(4) 同步数据传输未启用 HTTPS，Bearer Token 明文传输
+- **计划改进**: frontend 增加 Key 更换确认键、Key 统一到 storage.yaml + run_mode 隔离读写、Let's Encrypt TLS + Nginx 反向代理
+
+### 5. keyring 包在 Linux headless 环境可能不可用
+
+- **文件**: `cloud-security-limitations.md`（限制 5）
+- **状态**: `discussing`（方案待讨论）
+- **严重程度**: 中
+- **影响范围**: 所有 Key 读取链路（sync_config、wechat/auth、provider_manager、settings_manager）
+- **问题描述**: keyring 是顶层 import，Linux headless 环境可能缺少 D-Bus/gnome-keyring 等系统组件导致 import 失败。所有模块的 lazy fallback 逻辑只在运行时生效，import 阶段无法保护
+- **计划改进**: 三个候选方案待讨论——(A) keyring import 懒加载 (B) 本地也放弃 keyring 统一 storage.yaml (C) keyring 配置为 Windows-only 可选依赖
 
 > 时区和时间格式不一致问题已于 2026-07-12 通过 UTC 时区迁移解决，相关规范见 `docs/coding-rules/time-handling-rules.md`，决策见 `docs/adr/2026-07-12-migrate-to-utc-timezone.md`。
 
