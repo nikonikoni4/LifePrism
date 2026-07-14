@@ -295,12 +295,9 @@ class SyncClient:
                 # 优化：使用 batch_get_existing_updated_at 单连接批量查询，
                 # 替代逐条 get_row_by_pk（避免 N+1 查询）。
                 #
-                # 兼容：部分表（mood_types / user_values / habit_checkins /
-                # raw_behavior_analysis / custom_record_fields）无物理 updated_at
-                # 列，无法做 LWW 比较。原实现中 get_row_by_pk 返回的行不含
-                # updated_at 键，local_row.get("updated_at", "") 为 ""，
-                # str("") <= str(last_sync_time) 恒为 True，即始终覆盖。
-                # 此处对无 updated_at 列的表直接全量 upsert，保持等价。
+                # 所有同步表都配置了 update_at: True，都有物理 updated_at 列，
+                # 因此都走 LWW 比较分支。has_updated_at 主要用于防御性检查
+                # （未来如果新增无 updated_at 的表，会走 else 分支直接全量 upsert）。
                 if self.sync_repository.has_updated_at(table_name):
                     # 收集本批所有 pk 值
                     pk_values = [row.get(pk_field) for row in rows]
@@ -325,6 +322,9 @@ class SyncClient:
                         elif str(remote_row.get("updated_at", "")) > str(local_updated_at):
                             # 云端更晚 -> 覆盖本地
                             rows_to_upsert.append(remote_row)
+                        elif str(remote_row.get("updated_at", "")) == str(local_updated_at):
+                            # 时间相同 -> 跳过
+                            pass
                         else:
                             # 本地更晚 -> 保留本地（稍后推送）
                             logger.debug(

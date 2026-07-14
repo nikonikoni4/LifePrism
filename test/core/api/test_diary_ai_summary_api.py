@@ -6,7 +6,7 @@ from lifeprism.server.main import app
 
 @pytest.mark.core
 def test_generate_diary_ai_summary_rejects_empty_content(monkeypatch):
-    from lifeprism.server.providers.diary_provider import diary_provider
+    from lifeprism.repository.providers import diary_provider
 
     repositoryd = {
         "date": "2026-04-17",
@@ -29,7 +29,7 @@ def test_generate_diary_ai_summary_rejects_empty_content(monkeypatch):
 
 @pytest.mark.core
 def test_generate_diary_ai_summary_overwrites_summary_and_source_hash(monkeypatch):
-    from lifeprism.server.providers.diary_provider import diary_provider
+    from lifeprism.repository.providers import diary_provider
 
     repositoryd = {
         "date": "2026-04-17",
@@ -71,7 +71,7 @@ def test_generate_diary_ai_summary_overwrites_summary_and_source_hash(monkeypatc
 
 @pytest.mark.core
 def test_generate_diary_ai_summary_overwrites_existing_summary(monkeypatch):
-    from lifeprism.server.providers.diary_provider import diary_provider
+    from lifeprism.repository.providers import diary_provider
 
     repositoryd = {
         "date": "2026-04-17",
@@ -107,7 +107,7 @@ def test_generate_diary_ai_summary_overwrites_existing_summary(monkeypatch):
 
 @pytest.mark.core
 def test_generate_diary_ai_summary_does_not_overwrite_on_llm_failure(monkeypatch):
-    from lifeprism.server.providers.diary_provider import diary_provider
+    from lifeprism.repository.providers import diary_provider
 
     repositoryd = {
         "date": "2026-04-17",
@@ -142,7 +142,7 @@ def test_generate_diary_ai_summary_does_not_overwrite_on_llm_failure(monkeypatch
 @pytest.mark.core
 def test_generate_diary_ai_summary_passes_existing_summary_to_llm(monkeypatch):
     """Single-day regeneration should pass existing summary as outdate_summary to ai_diary_summary"""
-    from lifeprism.server.providers.diary_provider import diary_provider
+    from lifeprism.repository.providers import diary_provider
 
     repositoryd = {
         "date": "2026-04-17",

@@ -17,7 +17,9 @@ class FieldDefinition(BaseModel):
     id: str = Field(default="", description="字段 ID（crf-{uuid[:8]}）")
     field_name: str = Field(..., description="字段显示名")
     field_key: str = Field(..., description="字段标识，英文小写+下划线")
-    field_type: str = Field(default="text", description="字段类型，P1 仅 text")
+    field_type: Literal["text", "integer", "float"] = Field(
+        default="text", description="字段类型：text 文本 / integer 整数 / float 浮点数"
+    )
     display_role: Literal["auto", "title", "main", "chip", "hidden"] = Field(
         default="auto", description="字段展示角色"
     )
@@ -82,7 +84,9 @@ class CustomRecordEntryListResponse(BaseModel):
 class CreateCustomRecordEntryRequest(BaseModel):
     """录入自定义记录"""
 
-    data: dict[str, str] = Field(default={}, description="字段值字典 {field_key: value}")
+    data: dict[str, str | int | float] = Field(
+        default={}, description="字段值字典 {field_key: value}，value 类型由字段定义决定"
+    )
 
 
 # ==================== 配置更新 ====================

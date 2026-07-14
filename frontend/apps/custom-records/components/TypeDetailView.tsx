@@ -11,6 +11,7 @@ import { FieldRoleModal } from './FieldRoleModal';
 import { TEMPLATE_PRESETS, getTemplatePreset } from '../utils/templatePresets';
 import { toISOStringUTC, parseISOString, toLocalDateString, toLocalDateTimeString } from '../../../core/utils/dateUtils';
 import type { CustomRecordTypeItem, CustomRecordEntryItem, FieldDefinition } from '../types';
+import { formatFieldValue } from '../utils/fieldFormatter';
 
 interface TypeDetailViewProps {
   typeId: string;
@@ -432,11 +433,16 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
               <tbody>
                 {entries.map(entry => (
                   <tr key={entry.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 group">
-                    {localFields.map(f => (
-                      <td key={f.field_key} className="px-5 py-3.5 text-slate-700 max-w-xs truncate">
-                        {entry[f.field_key] || <span className="text-slate-300">—</span>}
-                      </td>
-                    ))}
+                    {localFields.map(f => {
+                      const val = entry[f.field_key];
+                      return (
+                        <td key={f.field_key} className="px-5 py-3.5 text-slate-700 max-w-xs truncate">
+                          {val != null && val !== ''
+                            ? formatFieldValue(val, f.field_type)
+                            : <span className="text-slate-300">—</span>}
+                        </td>
+                      );
+                    })}
                     <td className="px-5 py-3.5 text-slate-400 text-xs whitespace-nowrap">
                       {entry.event_time ? toLocalDateTimeString(parseISOString(entry.event_time)).replace('T', ' ').slice(0, 16) : '—'}
                     </td>

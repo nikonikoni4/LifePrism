@@ -22,6 +22,8 @@ CLI 命令：
 
 环境变量：
     LIFEPRISM_DATA_PATH — 数据目录路径（可选，默认 localData/）
+    LIFEPRISM_SSL_KEYFILE — SSL 私钥路径（可选，设置后启用 HTTPS）
+    LIFEPRISM_SSL_CERTFILE — SSL 证书路径（可选，设置后启用 HTTPS）
 
 参考:
 - Issue #10: .scratch/linux-deployment-discussion/issues-p2/10-cloud-cli-management.md
@@ -31,6 +33,7 @@ CLI 命令：
 import argparse
 import asyncio
 import contextlib
+import os
 import signal
 
 import uvicorn
@@ -303,15 +306,29 @@ async def _run_agent_and_api() -> None:
     logger.info("[AGENT-ONLY] FastAPI 实例创建完成（仅同步 API）")
 
     # 2. 启动 FastAPI（后台任务）
+    ssl_keyfile = os.environ.get("LIFEPRISM_SSL_KEYFILE")
+    ssl_certfile = os.environ.get("LIFEPRISM_SSL_CERTFILE")
+    use_ssl = (
+        ssl_keyfile
+        and ssl_certfile
+        and os.path.exists(ssl_keyfile)
+        and os.path.exists(ssl_certfile)
+    )
+
     config = uvicorn.Config(
         app,
         host="0.0.0.0",
         port=8102,
+        ssl_keyfile=ssl_keyfile if use_ssl else None,
+        ssl_certfile=ssl_certfile if use_ssl else None,
         log_level="info",
     )
     server = uvicorn.Server(config)
     api_task = asyncio.create_task(server.serve())
-    logger.info("[AGENT-ONLY] FastAPI 启动: host=0.0.0.0, port=8102")
+    logger.info(
+        "[AGENT-ONLY] FastAPI 启动: host=0.0.0.0, port=8102, https=%s",
+        use_ssl,
+    )
 
     # 3. 数据库初始化
     logger.info("正在初始化数据库...")

@@ -20,6 +20,9 @@ from lifeprism.utils.exceptions import DataAccessError, ValidationError
 
 logger = get_logger(__name__)
 
+# P2: 类型转换失败哨兵（不直接用 None，避免与合法 NULL 混淆）
+_INVALID_SENTINEL = object()
+
 
 class CustomRecordRepository:
     """
@@ -40,6 +43,13 @@ class CustomRecordRepository:
 
     _SLUG_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
     _FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+
+    # P2: field_type → SQLite 列类型映射
+    _FIELD_TYPE_TO_SQL = {
+        "text": "TEXT",
+        "integer": "INTEGER",
+        "float": "REAL",
+    }
 
     def __init__(self, db_manager=None):
         if db_manager is None:
@@ -98,6 +108,19 @@ class CustomRecordRepository:
                     details={"field_key": f["field_key"]},
                 )
 
+        # P2: 校验 field_type 必须在映射字典中
+        for f in fields:
+            ftype = f.get("field_type", "text")
+            if ftype not in self._FIELD_TYPE_TO_SQL:
+                raise ValidationError(
+                    message=f"field_type 无效: {ftype}（可选 text/integer/float）",
+                    code="INVALID_FIELD_TYPE",
+                    details={
+                        "field_type": ftype,
+                        "valid_types": list(self._FIELD_TYPE_TO_SQL.keys()),
+                    },
+                )
+
         # 校验 field_key 同类型内唯一
         seen_keys = set()
         for f in fields:
@@ -153,10 +176,12 @@ class CustomRecordRepository:
                         ),
                     )
 
-                # 3. DDL: 创建数据表
+                # 3. DDL: 创建数据表（P2: 按 field_type 映射 SQLite 列类型）
                 column_defs = ["id TEXT PRIMARY KEY"]
                 for f in fields:
-                    column_defs.append(f"{f['field_key']} TEXT")
+                    ftype = f.get("field_type", "text")
+                    sql_type = self._FIELD_TYPE_TO_SQL.get(ftype, "TEXT")
+                    column_defs.append(f"{f['field_key']} {sql_type}")
                 column_defs.append("event_time TEXT")
                 column_defs.append("created_at TEXT")
                 column_defs.append("updated_at TEXT")
@@ -330,6 +355,60 @@ class CustomRecordRepository:
 
     # ==================== 记录管理 ====================
 
+    def _coerce_field_value(self, field_key: str, value: Any, field_type: str) -> Any:
+        """
+        P2: 按 field_type 校验并转换 data 字段值。
+
+        - text: 任何值都转为字符串（保持 P1 行为）
+        - integer: 接受 int 或可解析为 int 的字符串（不含小数点），拒绝浮点字符串/非数值
+        - float: 接受 int/float 或可解析为 float 的字符串，拒绝非数值
+
+        Args:
+            field_key: 字段 key（用于错误日志）
+            value: 待校验的原始值
+            field_type: 字段类型 text/integer/float
+
+        Returns:
+            转换后的值（int/float/str）；校验失败返回 _INVALID_SENTINEL
+        """
+        if value is None:
+            return None  # 允许字段缺失（NULL）
+
+        if field_type == "text":
+            return str(value)
+
+        if field_type == "integer":
+            # 决策 D: 不显式处理 bool（Python 中 isinstance(True, int) 为 True，会被当作 int 1）
+            if isinstance(value, int):
+                return value
+            if isinstance(value, float):
+                return _INVALID_SENTINEL  # float 不能存入 integer 字段
+            if isinstance(value, str):
+                stripped = value.strip()
+                # 必须不含小数点且能 int() 成功
+                if "." in stripped:
+                    return _INVALID_SENTINEL
+                try:
+                    return int(stripped)
+                except ValueError:
+                    return _INVALID_SENTINEL
+            return _INVALID_SENTINEL
+
+        if field_type == "float":
+            # 决策 D: 不显式处理 bool
+            if isinstance(value, (int, float)):
+                return float(value)
+            if isinstance(value, str):
+                try:
+                    return float(value.strip())
+                except ValueError:
+                    return _INVALID_SENTINEL
+            return _INVALID_SENTINEL
+
+        # 未知 field_type（理论上 create_type 已拦截）
+        logger.warning("未知 field_type: field_key=%s, field_type=%s", field_key, field_type)
+        return _INVALID_SENTINEL
+
     def _get_type_and_table(self, type_id: str) -> tuple[dict[str, Any], str]:
         """按 type_id 获取类型元信息 + 数据表名。类型不存在抛 EntityNotFoundError。"""
         t = self._query_one(
@@ -376,6 +455,41 @@ class CustomRecordRepository:
                 code="INVALID_FIELD_KEY",
                 details={
                     "invalid_keys": sorted(invalid_keys),
+                    "valid_fields": valid_fields,
+                },
+            )
+
+        # P2: 校验 data 的值类型与 field_type 匹配
+        field_type_map = {f["field_key"]: f["field_type"] for f in fields}
+        invalid_value_fields: list[dict] = []
+        for key, value in data.items():
+            ftype = field_type_map[key]
+            converted = self._coerce_field_value(key, value, ftype)
+            if converted is _INVALID_SENTINEL:
+                invalid_value_fields.append(
+                    {
+                        "field_key": key,
+                        "value": value,
+                        "expected_type": ftype,
+                    }
+                )
+            else:
+                data[key] = converted
+
+        if invalid_value_fields:
+            valid_fields = [
+                {
+                    "field_key": f["field_key"],
+                    "field_name": f["field_name"],
+                    "field_type": f["field_type"],
+                }
+                for f in fields
+            ]
+            raise ValidationError(
+                message=f"字段值类型不匹配: {','.join(iv['field_key'] for iv in invalid_value_fields)}",
+                code="INVALID_FIELD_VALUE",
+                details={
+                    "invalid_fields": invalid_value_fields,
                     "valid_fields": valid_fields,
                 },
             )

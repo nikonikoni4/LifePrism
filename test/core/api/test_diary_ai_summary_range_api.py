@@ -15,7 +15,7 @@ from lifeprism.server.main import app
 @pytest.mark.core
 def test_range_summary_mode_regenerate_all_updates_existing_summaries(monkeypatch):
     """regenerate_all should call generate_ai_summary for ALL dates in range"""
-    from lifeprism.server.providers.diary_provider import diary_provider
+    from lifeprism.repository.providers import diary_provider
 
     called_dates = []
 
@@ -69,7 +69,7 @@ def test_range_summary_mode_regenerate_all_updates_existing_summaries(monkeypatc
 @pytest.mark.core
 def test_range_summary_mode_regenerate_changed_only_updates_mismatched_hashes(monkeypatch):
     """regenerate_changed should only update dates where hash doesn't match"""
-    from lifeprism.server.providers.diary_provider import diary_provider
+    from lifeprism.repository.providers import diary_provider
     import hashlib
 
     called_dates = []
@@ -134,7 +134,7 @@ def test_range_summary_mode_regenerate_changed_only_updates_mismatched_hashes(mo
 @pytest.mark.core
 def test_range_summary_mode_skip_existing_only_creates_missing_summaries(monkeypatch):
     """skip_existing should only create summaries for dates without existing summaries"""
-    from lifeprism.server.providers.diary_provider import diary_provider
+    from lifeprism.repository.providers import diary_provider
 
     called_dates = []
 

@@ -19,6 +19,7 @@ vi.mock('../syncApi', () => ({
     saveRemoteUrl: vi.fn(),
     getRemoteUrl: vi.fn(),
     openFolderAndSelect: vi.fn(),
+    resetSyncProgress: vi.fn(),
   },
 }));
 

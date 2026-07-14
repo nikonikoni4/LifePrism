@@ -825,3 +825,348 @@ class TestUpdateFieldRole:
             repository.update_field_role(
                 type_id=type_id, field_id="crf-nonexist", display_role="hidden"
             )
+
+
+# ==================== P2: 数值字段类型测试 ====================
+
+
+class TestCreateTypeWithNumericFields:
+    """P2: 测试 create_type() 对 integer/float 字段类型的 DDL 列类型映射"""
+
+    def test_create_type_with_integer_field_creates_integer_column(self, repository):
+        """创建含 integer 字段的类型：DDL 列类型应为 INTEGER"""
+        type_id = repository.create_type(
+            name="步数记录",
+            slug="step_count",
+            fields=[
+                {"field_name": "步数", "field_key": "steps", "field_type": "integer"},
+            ],
+        )
+
+        # Assert: 数据表存在
+        assert _table_exists(repository.db, "custom_step_count")
+
+        # Assert: steps 列类型为 INTEGER
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(custom_step_count)")
+            columns = {row[1]: row[2] for row in cursor.fetchall()}
+            assert "steps" in columns
+            assert columns["steps"].upper() == "INTEGER"
+
+    def test_create_type_with_float_field_creates_real_column(self, repository):
+        """创建含 float 字段的类型：DDL 列类型应为 REAL"""
+        type_id = repository.create_type(
+            name="体重记录",
+            slug="body_weight",
+            fields=[
+                {"field_name": "体重(kg)", "field_key": "weight", "field_type": "float"},
+            ],
+        )
+
+        # Assert: 数据表存在
+        assert _table_exists(repository.db, "custom_body_weight")
+
+        # Assert: weight 列类型为 REAL
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(custom_body_weight)")
+            columns = {row[1]: row[2] for row in cursor.fetchall()}
+            assert "weight" in columns
+            assert columns["weight"].upper() == "REAL"
+
+    def test_create_type_with_mixed_field_types_creates_correct_columns(self, repository):
+        """创建含混合字段类型的类型：各列类型正确映射"""
+        repository.create_type(
+            name="运动记录",
+            slug="mixed_sport",
+            fields=[
+                {"field_name": "内容", "field_key": "content", "field_type": "text"},
+                {"field_name": "次数", "field_key": "count", "field_type": "integer"},
+                {"field_name": "里程(km)", "field_key": "distance", "field_type": "float"},
+            ],
+        )
+
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(custom_mixed_sport)")
+            columns = {row[1]: row[2].upper() for row in cursor.fetchall()}
+            assert columns["content"] == "TEXT"
+            assert columns["count"] == "INTEGER"
+            assert columns["distance"] == "REAL"
+
+    def test_create_type_with_unknown_field_type_raises_validation_error(self, repository):
+        """未知 field_type：抛 ValidationError(code=INVALID_FIELD_TYPE)"""
+        with pytest.raises(ValidationError) as exc_info:
+            repository.create_type(
+                name="错误类型",
+                slug="bad_type",
+                fields=[
+                    {"field_name": "字段", "field_key": "field", "field_type": "boolean"},
+                ],
+            )
+        assert exc_info.value.code == "INVALID_FIELD_TYPE"
+
+
+# ==================== P2: 数值字段录入校验测试 ====================
+
+
+class TestCreateEntryWithNumericFields:
+    """P2: 测试 create_entry() 对 integer/float 字段值的类型校验"""
+
+    def test_create_entry_with_integer_int_value_persists(self, repository):
+        """录入 integer 字段正确 int 值：落库成功"""
+        type_id = repository.create_type(
+            name="步数记录",
+            slug="step_int",
+            fields=[{"field_name": "步数", "field_key": "steps", "field_type": "integer"}],
+        )
+
+        entry_id = repository.create_entry(
+            type_id=type_id, data={"steps": 5}
+        )
+
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT steps FROM custom_step_int WHERE id = ?", (entry_id,))
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == 5
+
+    def test_create_entry_with_integer_numeric_string_persists(self, repository):
+        """录入 integer 字段字符串数字 "5"：落库成功，存储为 int 5"""
+        type_id = repository.create_type(
+            name="步数记录",
+            slug="step_str",
+            fields=[{"field_name": "步数", "field_key": "steps", "field_type": "integer"}],
+        )
+
+        entry_id = repository.create_entry(
+            type_id=type_id, data={"steps": "5"}
+        )
+
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT steps FROM custom_step_str WHERE id = ?", (entry_id,))
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == 5
+
+    def test_create_entry_with_integer_non_numeric_string_raises(self, repository):
+        """录入 integer 字段非数值字符串 "abc"：抛 ValidationError(code=INVALID_FIELD_VALUE)"""
+        type_id = repository.create_type(
+            name="步数记录",
+            slug="step_bad",
+            fields=[{"field_name": "步数", "field_key": "steps", "field_type": "integer"}],
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            repository.create_entry(type_id=type_id, data={"steps": "abc"})
+
+        assert exc_info.value.code == "INVALID_FIELD_VALUE"
+        details = exc_info.value.details
+        assert "invalid_fields" in details
+        assert len(details["invalid_fields"]) == 1
+        assert details["invalid_fields"][0]["field_key"] == "steps"
+        assert details["invalid_fields"][0]["expected_type"] == "integer"
+        assert "valid_fields" in details
+
+    def test_create_entry_with_integer_float_string_raises(self, repository):
+        """录入 integer 字段浮点字符串 "5.5"：抛 ValidationError(code=INVALID_FIELD_VALUE)"""
+        type_id = repository.create_type(
+            name="步数记录",
+            slug="step_float_str",
+            fields=[{"field_name": "步数", "field_key": "steps", "field_type": "integer"}],
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            repository.create_entry(type_id=type_id, data={"steps": "5.5"})
+
+        assert exc_info.value.code == "INVALID_FIELD_VALUE"
+
+    def test_create_entry_with_float_float_value_persists(self, repository):
+        """录入 float 字段正确 float 值：落库成功"""
+        type_id = repository.create_type(
+            name="体重记录",
+            slug="weight_float",
+            fields=[{"field_name": "体重(kg)", "field_key": "weight", "field_type": "float"}],
+        )
+
+        entry_id = repository.create_entry(
+            type_id=type_id, data={"weight": 65.5}
+        )
+
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT weight FROM custom_weight_float WHERE id = ?", (entry_id,))
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == 65.5
+
+    def test_create_entry_with_float_int_value_persists_as_float(self, repository):
+        """录入 float 字段 int 值：落库成功，存储为 float"""
+        type_id = repository.create_type(
+            name="体重记录",
+            slug="weight_int",
+            fields=[{"field_name": "体重(kg)", "field_key": "weight", "field_type": "float"}],
+        )
+
+        entry_id = repository.create_entry(
+            type_id=type_id, data={"weight": 70}
+        )
+
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT weight FROM custom_weight_int WHERE id = ?", (entry_id,))
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == 70.0  # int 70 被转为 float 70.0
+
+    def test_create_entry_with_float_non_numeric_string_raises(self, repository):
+        """录入 float 字段非数值字符串 "abc"：抛 ValidationError(code=INVALID_FIELD_VALUE)"""
+        type_id = repository.create_type(
+            name="体重记录",
+            slug="weight_bad",
+            fields=[{"field_name": "体重(kg)", "field_key": "weight", "field_type": "float"}],
+        )
+
+        with pytest.raises(ValidationError) as exc_info:
+            repository.create_entry(type_id=type_id, data={"weight": "abc"})
+
+        assert exc_info.value.code == "INVALID_FIELD_VALUE"
+
+
+# ==================== P2: 查询返回值类型保留测试 ====================
+
+
+class TestQueryEntriesNumericTypePreservation:
+    """P2: 测试 query_entries() / get_entry() 返回的数值字段保留原始类型"""
+
+    def test_query_entries_returns_integer_field_as_int(self, repository):
+        """查询 integer 字段：返回值为 Python int 类型"""
+        type_id = repository.create_type(
+            name="步数记录",
+            slug="step_query",
+            fields=[{"field_name": "步数", "field_key": "steps", "field_type": "integer"}],
+        )
+        repository.create_entry(type_id=type_id, data={"steps": 5})
+
+        entries, _ = repository.query_entries(type_id=type_id, date_range=None)
+
+        assert len(entries) == 1
+        assert entries[0]["steps"] == 5
+        assert isinstance(entries[0]["steps"], int)
+
+    def test_query_entries_returns_float_field_as_float(self, repository):
+        """查询 float 字段：返回值为 Python float 类型"""
+        type_id = repository.create_type(
+            name="体重记录",
+            slug="weight_query",
+            fields=[{"field_name": "体重(kg)", "field_key": "weight", "field_type": "float"}],
+        )
+        repository.create_entry(type_id=type_id, data={"weight": 65.5})
+
+        entries, _ = repository.query_entries(type_id=type_id, date_range=None)
+
+        assert len(entries) == 1
+        assert entries[0]["weight"] == 65.5
+        assert isinstance(entries[0]["weight"], float)
+
+    def test_get_entry_returns_integer_and_float_with_correct_types(self, repository):
+        """get_entry 返回的 integer/float 字段类型正确"""
+        type_id = repository.create_type(
+            name="运动记录",
+            slug="mixed_query",
+            fields=[
+                {"field_name": "内容", "field_key": "content", "field_type": "text"},
+                {"field_name": "次数", "field_key": "count", "field_type": "integer"},
+                {"field_name": "里程(km)", "field_key": "distance", "field_type": "float"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id,
+            data={"content": "跑步", "count": 3, "distance": 5.2},
+        )
+
+        entry = repository.get_entry(type_id=type_id, entry_id=entry_id)
+        assert entry is not None
+        assert entry["content"] == "跑步"
+        assert isinstance(entry["content"], str)
+        assert entry["count"] == 3
+        assert isinstance(entry["count"], int)
+        assert entry["distance"] == 5.2
+        assert isinstance(entry["distance"], float)
+
+
+# ==================== P2: text 字段回归测试 ====================
+
+
+class TestTextFieldRegression:
+    """P2: 确保 text 字段行为与 P1 一致（_coerce_field_value 的 text 分支不破坏现有行为）"""
+
+    def test_text_field_accepts_string_value(self, repository):
+        """text 字段接受字符串值：落库成功，查询返回 str"""
+        type_id = repository.create_type(
+            name="阅读",
+            slug="reading_regression",
+            fields=[{"field_name": "书名", "field_key": "title", "field_type": "text"}],
+        )
+        repository.create_entry(type_id=type_id, data={"title": "三体"})
+
+        entries, _ = repository.query_entries(type_id=type_id, date_range=None)
+        assert len(entries) == 1
+        assert entries[0]["title"] == "三体"
+        assert isinstance(entries[0]["title"], str)
+
+    def test_text_field_coerces_int_to_string(self, repository):
+        """text 字段接受 int 值：转为字符串存储（保持 P1 行为）"""
+        type_id = repository.create_type(
+            name="笔记",
+            slug="note_regression",
+            fields=[{"field_name": "内容", "field_key": "content", "field_type": "text"}],
+        )
+        repository.create_entry(type_id=type_id, data={"content": 123})
+
+        entries, _ = repository.query_entries(type_id=type_id, date_range=None)
+        assert len(entries) == 1
+        assert entries[0]["content"] == "123"
+        assert isinstance(entries[0]["content"], str)
+
+    def test_text_field_with_explicit_field_type_text_works(self, repository):
+        """显式声明 field_type='text'：行为与 P1 默认一致"""
+        type_id = repository.create_type(
+            name="日记",
+            slug="diary_regression",
+            fields=[
+                {"field_name": "标题", "field_key": "title", "field_type": "text"},
+                {"field_name": "正文", "field_key": "body", "field_type": "text"},
+            ],
+        )
+        entry_id = repository.create_entry(
+            type_id=type_id, data={"title": "今日", "body": "天气晴"}
+        )
+
+        entry = repository.get_entry(type_id=type_id, entry_id=entry_id)
+        assert entry is not None
+        assert entry["title"] == "今日"
+        assert entry["body"] == "天气晴"
+
+    def test_text_field_default_field_type_works(self, repository):
+        """field_type 缺省时默认为 text：DDL 列为 TEXT，行为与 P1 一致"""
+        type_id = repository.create_type(
+            name="默认字段类型",
+            slug="default_ftype",
+            fields=[
+                {"field_name": "字段", "field_key": "field"}  # 不传 field_type
+            ],
+        )
+
+        # DDL 列应为 TEXT
+        with repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(custom_default_ftype)")
+            columns = {row[1]: row[2].upper() for row in cursor.fetchall()}
+            assert columns["field"] == "TEXT"
+
+        # 录入正常
+        repository.create_entry(type_id=type_id, data={"field": "值"})

@@ -34,3 +34,9 @@ export interface TriggerSyncResponse {
     /** 同步状态 */
     status: string;
 }
+
+/** 重置同步进度的响应 */
+export interface ResetSyncProgressResponse {
+    /** 提示消息 */
+    message: string;
+}

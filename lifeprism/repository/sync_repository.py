@@ -634,7 +634,7 @@ class SyncRepository:
 
             existing_updated_at = existing_map.get(get_lookup_key(row))
 
-            if existing_updated_at is not None and existing_updated_at > incoming_updated_at:
+            if existing_updated_at is not None and existing_updated_at >= incoming_updated_at:
                 # 本地数据更新，跳过该行
                 skipped_count += 1
                 logger.debug(

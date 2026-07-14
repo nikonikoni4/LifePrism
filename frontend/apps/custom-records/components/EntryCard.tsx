@@ -12,6 +12,7 @@ import { getFieldColor } from '../utils/fieldColors';
 import { getTemplatePreset } from '../utils/templatePresets';
 import { parseISOString, toLocalDateTimeString } from '../../../core/utils/dateUtils';
 import type { FieldDefinition, CustomRecordEntryItem } from '../types';
+import { formatFieldValue } from '../utils/fieldFormatter';
 
 interface EntryCardProps {
   fields: FieldDefinition[];
@@ -40,7 +41,7 @@ export const EntryCard: React.FC<EntryCardProps> = ({
   const data: Record<string, string> = {};
   for (const f of fields) {
     const val = entry[f.field_key];
-    if (val != null) data[f.field_key] = String(val);
+    if (val != null) data[f.field_key] = formatFieldValue(val, f.field_type);
   }
 
   // 构建 overrides：字段的 display_role 覆盖

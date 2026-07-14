@@ -7,11 +7,12 @@
  * - GET  /api/v2/settings: 读取 sync_remote_url
  * - GET  /api/sync/status: 获取同步状态
  * - POST /api/sync/trigger: 手动触发同步
+ * - POST /api/sync/reset-sync-progress: 重置同步进度（清空 last_sync_time，下次同步变为全量同步）
  * - Electron IPC open-folder-and-select: 打开文件夹并选中文件
  */
 
 import { createApiV2UrlGetter, getApiBaseUrlSync } from '../../core/services/apiConfig';
-import type { GenerateCloudConfigResponse, OpenFolderResult, SyncStatus, TriggerSyncResponse } from './syncTypes';
+import type { GenerateCloudConfigResponse, OpenFolderResult, ResetSyncProgressResponse, SyncStatus, TriggerSyncResponse } from './syncTypes';
 
 // 使用 getter 函数延迟求值，确保在初始化完成后获取正确的 URL
 const getApiV2Base = createApiV2UrlGetter();
@@ -126,6 +127,32 @@ export const SyncConfigAPI = {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `触发同步失败: ${response.statusText}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * 重置同步进度（清空 last_sync_time）
+     *
+     * 调用后端 POST /api/sync/reset-sync-progress，
+     * 清空本地的 last_sync_time，使下次同步变为全量同步。
+     * 适用场景：换服务器、云端数据库重置、本地数据库重置后需要全量同步。
+     *
+     * @returns 重置结果消息
+     */
+    async resetSyncProgress(): Promise<ResetSyncProgressResponse> {
+        const response = await fetch(`${getApiBaseUrlSync()}/api/sync/reset-sync-progress`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (response.status === 409) {
+            // 同步进行中，无法重置
+            const data = await response.json();
+            throw new Error(data.message || '同步正在进行中，无法重置进度');
+        }
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `重置同步进度失败: ${response.statusText}`);
         }
         return response.json();
     },

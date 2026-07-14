@@ -70,7 +70,13 @@ class CreateCustomRecordTypeTool(Tool):
             "参数说明：\n"
             "- name: 类型显示名（如「体育活动」）\n"
             "- slug: 语义化标识，英文小写+下划线（如 sport），用作表名后缀\n"
-            "- fields: 字段定义列表，每项含 field_name（显示名）、field_key（列名，英文小写+下划线）、field_type（P1 仅 text）\n"
+            "- fields: 字段定义列表，每项含 field_name（显示名）、field_key（列名，英文小写+下划线）、field_type（text/integer/float）\n"
+            "字段类型选择指导：\n"
+            "- text：文本内容（如锻炼内容、备注、书名、感想）\n"
+            "- integer：整数计数（如次数、金额以元为单位、步数、页数）\n"
+            "- float：浮点数值（如心率、体重、温度、里程、时长以小时为单位）\n"
+            "字段单位约定：将单位以括号形式写入 field_name（如「体重(kg)」「心率(bpm)」「里程(km)」「金额(元)」「完成度(%)」）。\n"
+            "百分比存储约定：百分比按「百分点」单位存储为数值，不写小数形式（85% 存为 85，不存 0.85）。\n"
             "约束：fields 至少 1 个；slug 和 field_key 需匹配 ^[a-z][a-z0-9_]*$；slug 全局唯一。"
         )
 
@@ -95,7 +101,7 @@ class CreateCustomRecordTypeTool(Tool):
                         "properties": {
                             "field_name": {
                                 "type": "string",
-                                "description": "字段显示名（如「锻炼内容」）",
+                                "description": "字段显示名（如「锻炼内容」、「体重(kg)」）。数值字段建议在名称中用括号标注单位",
                             },
                             "field_key": {
                                 "type": "string",
@@ -103,8 +109,8 @@ class CreateCustomRecordTypeTool(Tool):
                             },
                             "field_type": {
                                 "type": "string",
-                                "description": "字段类型，P1 仅 text",
-                                "enum": ["text"],
+                                "description": "字段类型：text 文本 / integer 整数 / float 浮点数",
+                                "enum": ["text", "integer", "float"],
                             },
                         },
                         "required": ["field_name", "field_key", "field_type"],
@@ -157,7 +163,12 @@ class CreateCustomRecordEntryTool(Tool):
             "向已存在的自定义记录类型录入一条数据。\n"
             "调用前应先用 list_custom_record_types 获取 type_id 和字段定义。\n"
             "data 中的 key 必须是类型的 field_key，缺失的字段存为 NULL，空字典允许。\n"
-            "若 field_key 错误，返回 INVALID_FIELD_KEY 错误及 valid_fields 列表，请据此重新解析后重试。\n"
+            "data 的 value 类型必须与字段定义的 field_type 匹配：\n"
+            "- text 字段：字符串（或可转字符串的值）\n"
+            '- integer 字段：整数或整数字符串（如 5 或 "5"，不接受 "5.5"）\n'
+            '- float 字段：数值或数值字符串（如 65.5 或 70 或 "65.5"）\n'
+            "若 field_key 错误，返回 INVALID_FIELD_KEY 错误及 valid_fields 列表。\n"
+            "若 value 类型不匹配，返回 INVALID_FIELD_VALUE 错误及 invalid_fields + valid_fields 列表，请据此重新解析后重试。\n"
             "event_time 为事件发生时间（本地 YYYY-MM-DD HH:MM:SS），不提供则默认使用当前时间。"
         )
 
@@ -172,8 +183,14 @@ class CreateCustomRecordEntryTool(Tool):
                 },
                 "data": {
                     "type": "object",
-                    "description": "字段值字典 {field_key: value}，key 必须匹配类型的 field_key",
-                    "additionalProperties": {"type": "string"},
+                    "description": "字段值字典 {field_key: value}，key 必须匹配类型的 field_key，value 类型由字段定义决定",
+                    "additionalProperties": {
+                        "anyOf": [
+                            {"type": "string"},
+                            {"type": "integer"},
+                            {"type": "number"},
+                        ]
+                    },
                 },
                 "event_time": {
                     "type": "string",
@@ -213,12 +230,15 @@ class CreateCustomRecordEntryTool(Tool):
             result = {"entry_id": entry_id, "type_id": type_id}
             return f"{SUCCESS}录入自定义记录成功: {json.dumps(result, ensure_ascii=False)}"
         except ValidationError as e:
-            # field_key 错误：返回结构化 JSON，引导 AI 根据 valid_fields 重新解析
+            # field_key 错误或 value 类型不匹配：返回结构化 JSON，引导 AI 根据 valid_fields 重新解析
             error_payload = {
-                "error": e.code or "INVALID_FIELD_KEY",
+                "error": e.code or "VALIDATION_ERROR",
                 "message": e.message,
                 "valid_fields": e.details.get("valid_fields", []),
             }
+            # INVALID_FIELD_VALUE 额外返回 invalid_fields
+            if e.code == "INVALID_FIELD_VALUE":
+                error_payload["invalid_fields"] = e.details.get("invalid_fields", [])
             return f"{ERROR}{json.dumps(error_payload, ensure_ascii=False)}"
         except Exception as e:
             return f"{ERROR}录入自定义记录失败: {e}"

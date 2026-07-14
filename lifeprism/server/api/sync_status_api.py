@@ -4,6 +4,7 @@
 提供同步状态查询和手动触发同步的 REST API 端点：
 - GET /api/sync/status: 获取同步状态信息（上次同步时间、状态、远程 URL、各表记录数）
 - POST /api/sync/trigger: 手动触发一次同步（后台线程执行，立即返回 202）
+- POST /api/sync/reset-sync-progress: 重置同步进度（清空 last_sync_time，下次同步变为全量同步）
 
 API 层不直接编写 SQL，所有数据库操作通过 SyncRepository。
 API 层不使用 try/except，异常自然冒泡到全局异常处理器。
@@ -18,7 +19,7 @@ import threading
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from lifeprism.config.settings_manager import get_setting
+from lifeprism.config.settings_manager import get_setting, set_setting
 from lifeprism.sync.sync_client import SYNC_TABLES
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import ExternalServiceError
@@ -113,6 +114,44 @@ async def trigger_sync(request: Request):
             "status": "syncing",
         },
     )
+
+
+@router.post("/reset-sync-progress", summary="重置同步进度")
+def reset_sync_progress(request: Request):
+    """重置同步进度（清空 last_sync_time）
+
+    清空本地的 last_sync_time，使下次同步变为全量同步。
+    适用场景：换服务器、云端数据库重置、本地数据库重置后需要全量同步。
+
+    安全约束：
+    - 同步进行中时拒绝执行（返回 409），避免状态不一致
+
+    **响应**:
+    - 200: {"message": "同步进度已重置，下次同步将为全量同步"}
+    - 409: 同步进行中，拒绝执行
+    """
+    sync_client = getattr(request.app.state, "sync_client", None)
+    if sync_client is None:
+        raise ExternalServiceError(message="同步服务不可用")
+
+    # 同步进行中时拒绝执行（避免状态不一致）
+    if sync_client.is_syncing:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "message": "同步正在进行中，无法重置进度",
+                "status": "syncing",
+            },
+        )
+
+    # 清空 last_sync_time，下次同步将变为全量同步
+    # （WHERE updated_at > '' 返回所有记录）
+    set_setting("sync.last_sync_time", "")
+    logger.info("同步进度已重置，last_sync_time 已清空，下次同步将为全量同步")
+
+    return {
+        "message": "同步进度已重置，下次同步将为全量同步",
+    }
 
 
 # ==================== 内部辅助函数 ====================

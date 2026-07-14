@@ -7,9 +7,8 @@ import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from lifeprism.server.providers.diary_provider import diary_provider
+from lifeprism.repository.providers import diary_provider, tokens_usage_provider
 from lifeprism.server.services import diary_service
-from lifeprism.repository.providers import tokens_usage_provider
 
 
 @pytest.fixture(scope="session")

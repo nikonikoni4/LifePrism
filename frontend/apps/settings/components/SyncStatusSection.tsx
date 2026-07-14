@@ -6,6 +6,7 @@
  * - 同步状态徽章（idle/syncing/error）
  * - 同步记录数（按表展开，可折叠）
  * - 手动同步按钮（带 loading 状态）
+ * - 重置同步进度按钮（带二次确认弹窗，清空 last_sync_time 触发下次全量同步）
  * - 自动刷新（idle 每 30 秒，syncing 每 5 秒）
  */
 
@@ -17,13 +18,14 @@ import {
     AlertCircle,
     ChevronDown,
     ChevronUp,
-    Cloud,
     Server,
+    RotateCcw,
 } from 'lucide-react';
 import { SyncConfigAPI } from '../syncApi';
 import type { SyncStatus } from '../syncTypes';
 import { formatRelativeTime } from '../syncUtils';
 import { toast } from '../../../core/components';
+import { ConfirmDialog } from '../../goals/components/shared/components/ConfirmDialog';
 
 /** 同步进行中时的轮询间隔（毫秒） */
 const POLL_INTERVAL_SYNCING = 5000;
@@ -36,6 +38,8 @@ const SyncStatusSection: React.FC = () => {
     const [isTriggering, setIsTriggering] = useState(false);
     const [isExpanded, setIsExpanded] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
 
     // 用于在 fetchStatus 中引用最新状态（避免闭包陷阱）
     const statusRef = useRef<SyncStatus | null>(null);
@@ -81,6 +85,22 @@ const SyncStatusSection: React.FC = () => {
             toast.error(err instanceof Error ? err.message : '触发同步失败');
         } finally {
             setIsTriggering(false);
+        }
+    }, [fetchStatus]);
+
+    // 确认重置同步进度（清空 last_sync_time，下次同步将变为全量同步）
+    const handleConfirmReset = useCallback(async () => {
+        setIsResetting(true);
+        try {
+            await SyncConfigAPI.resetSyncProgress();
+            // 重置后刷新状态（last_sync_time 会变为空）
+            await fetchStatus();
+            toast.success('同步进度已重置，下次同步将为全量同步');
+            setIsResetDialogOpen(false);
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : '重置同步进度失败');
+        } finally {
+            setIsResetting(false);
         }
     }, [fetchStatus]);
 
@@ -176,24 +196,35 @@ const SyncStatusSection: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* 手动同步按钮 */}
-                        <button
-                            onClick={handleTriggerSync}
-                            disabled={isSyncing}
-                            className="px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-bold text-sm flex items-center gap-2"
-                        >
-                            {isSyncing ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    同步中...
-                                </>
-                            ) : (
-                                <>
-                                    <RefreshCw className="w-4 h-4" />
-                                    手动同步
-                                </>
-                            )}
-                        </button>
+                        {/* 手动同步按钮 + 重置同步进度按钮 */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleTriggerSync}
+                                disabled={isSyncing}
+                                className="px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-bold text-sm flex items-center gap-2"
+                            >
+                                {isSyncing ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        同步中...
+                                    </>
+                                ) : (
+                                    <>
+                                        <RefreshCw className="w-4 h-4" />
+                                        手动同步（增量）
+                                    </>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setIsResetDialogOpen(true)}
+                                disabled={isSyncing}
+                                className="px-4 py-2.5 bg-white text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-bold text-sm flex items-center gap-2"
+                                title="清空同步进度，下次同步将变为全量同步。适用于换服务器或云端数据重置场景。"
+                            >
+                                <RotateCcw className="w-4 h-4" />
+                                重置同步进度
+                            </button>
+                        </div>
                     </div>
 
                     {/* 远程地址 */}
@@ -256,6 +287,30 @@ const SyncStatusSection: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* 重置同步进度二次确认弹窗 */}
+            <ConfirmDialog
+                isOpen={isResetDialogOpen}
+                onClose={() => !isResetting && setIsResetDialogOpen(false)}
+                onConfirm={handleConfirmReset}
+                title="重置同步进度"
+                variant="danger"
+                confirmText={isResetting ? '重置中...' : '确认重置'}
+                cancelText={isResetting ? undefined : '取消'}
+                message={
+                    <div className="space-y-2">
+                        <p className="text-sm text-slate-600">
+                            此操作将清空本地的同步进度记录（last_sync_time），使下次同步变为全量同步。
+                        </p>
+                        <p className="text-sm text-slate-600">
+                            <span className="font-semibold text-slate-800">适用场景：</span>换服务器、云端数据库重置、本地数据库重置后需要全量同步。
+                        </p>
+                        <p className="text-sm text-red-600">
+                            <span className="font-semibold">注意：</span>全量同步可能耗时较长（取决于数据量），期间同步状态会显示"同步中"。
+                        </p>
+                    </div>
+                }
+            />
         </section>
     );
 };

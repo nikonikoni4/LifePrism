@@ -5,11 +5,14 @@
 
 // ==================== 字段定义 ====================
 
+/** 字段类型：text 文本 / integer 整数 / float 浮点数 */
+export type FieldType = 'text' | 'integer' | 'float';
+
 export interface FieldDefinition {
   id?: string;
   field_name: string;
   field_key: string;
-  field_type: string;
+  field_type: FieldType;
   display_role?: string; // auto|title|main|chip|hidden
 }
 
@@ -46,7 +49,7 @@ export interface CustomRecordEntryItem {
   event_time: string;
   created_at: string;
   updated_at: string;
-  [key: string]: string; // 动态字段
+  [key: string]: string | number | undefined; // 动态字段（含数值字段）
 }
 
 export interface CustomRecordEntryListResponse {
@@ -55,7 +58,7 @@ export interface CustomRecordEntryListResponse {
 }
 
 export interface CreateCustomRecordEntryRequest {
-  data: Record<string, string>;
+  data: Record<string, string | number>;
 }
 
 export interface GetEntriesParams {

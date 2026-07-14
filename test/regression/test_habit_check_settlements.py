@@ -21,7 +21,8 @@ def test_get_expired_in_progress_challenges_returns_all_in_progress_challenges(m
     验证 get_expired_in_progress_challenges 返回所有 in_progress 挑战，
     不应该只返回 end_date <= today 的挑战。
     """
-    from lifeprism.server.providers.habit_challenge_provider import habit_challenge_provider
+    from lifeprism.repository.aggregators import habit_aggregator
+    habit_challenge_provider = habit_aggregator.challenge_provider
 
     future_end = (date.today() + timedelta(days=30)).isoformat()
     past_end = (date.today() - timedelta(days=1)).isoformat()
@@ -53,9 +54,10 @@ def test_check_settlements_detects_premature_failure(monkeypatch):
     验证 check_settlements 能检测到提前判定失败的挑战
     （end_date > today 但数学上不可能达标）
     """
-    from lifeprism.server.providers.habit_challenge_provider import habit_challenge_provider
-    from lifeprism.server.providers.habit_checkin_provider import habit_checkin_provider
-    from lifeprism.server.providers.habit_provider import habit_provider
+    from lifeprism.repository.aggregators import habit_aggregator
+    habit_challenge_provider = habit_aggregator.challenge_provider
+    habit_checkin_provider = habit_aggregator.checkin_provider
+    habit_provider = habit_aggregator.habit_provider
 
     # 挑战 end_date 在未来，但 completed=1, required=24，数学上不可能达标
     future_end = (date.today() + timedelta(days=20)).isoformat()
@@ -115,9 +117,10 @@ def test_check_settlements_api_returns_premature_failures(monkeypatch):
     """
     验证 /check-settlements API 能返回提前判定失败的挑战
     """
-    from lifeprism.server.providers.habit_challenge_provider import habit_challenge_provider
-    from lifeprism.server.providers.habit_checkin_provider import habit_checkin_provider
-    from lifeprism.server.providers.habit_provider import habit_provider
+    from lifeprism.repository.aggregators import habit_aggregator
+    habit_challenge_provider = habit_aggregator.challenge_provider
+    habit_checkin_provider = habit_aggregator.checkin_provider
+    habit_provider = habit_aggregator.habit_provider
 
     future_end = (date.today() + timedelta(days=20)).isoformat()
     past_start = (date.today() - timedelta(days=20)).isoformat()

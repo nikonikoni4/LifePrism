@@ -144,6 +144,8 @@ export const CreateTypeView: React.FC<CreateTypeViewProps> = ({ onBack, onSucces
                   className="px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-500 bg-slate-50 focus:outline-none"
                 >
                   <option value="text">文本</option>
+                  <option value="integer">整数</option>
+                  <option value="float">浮点数</option>
                 </select>
                 <button
                   onClick={() => removeField(field._id)}
