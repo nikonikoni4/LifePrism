@@ -25,6 +25,20 @@ export const FIELD_COLORS: FieldColor[] = [
   { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-100', dot: 'bg-indigo-400', solid: 'bg-indigo-500' },
 ];
 
+// P2: 与 FIELD_COLORS 一一对应的 hex 调色板（供 recharts 使用）
+export const FIELD_HEX_COLORS: string[] = [
+  '#06b6d4', // cyan-500
+  '#8b5cf6', // violet-500
+  '#f59e0b', // amber-500
+  '#10b981', // emerald-500
+  '#f43f5e', // rose-500
+  '#3b82f6', // blue-500
+  '#f97316', // orange-500
+  '#14b8a6', // teal-500
+  '#ec4899', // pink-500
+  '#6366f1', // indigo-500
+];
+
 /**
  * 稳定哈希函数 — 将字符串转为非负整数
  * 同一输入永远产生同一输出
@@ -44,4 +58,12 @@ export const hashStr = (s: string): number => {
  */
 export const getFieldColor = (fieldKey: string): FieldColor => {
   return FIELD_COLORS[hashStr(fieldKey) % FIELD_COLORS.length];
+};
+
+/**
+ * 根据 field_key 获取稳定的 hex 颜色（供 recharts 等需要 hex 值的场景使用）
+ * 与 getFieldColor 共享同一哈希，确保 Tailwind 类名与 hex 颜色一致
+ */
+export const getFieldHexColor = (fieldKey: string): string => {
+  return FIELD_HEX_COLORS[hashStr(fieldKey) % FIELD_HEX_COLORS.length];
 };

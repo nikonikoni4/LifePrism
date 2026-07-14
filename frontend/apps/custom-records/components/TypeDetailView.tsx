@@ -3,22 +3,23 @@
  * 卡片按日期分组，支持模板切换和字段角色配置
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, Database, FileText, Clock, Trash2, AlertTriangle, ChevronLeft, ChevronRight, LayoutGrid, Table, Columns3, Settings2 } from 'lucide-react';
+import { ArrowLeft, Database, FileText, Clock, Trash2, AlertTriangle, ChevronLeft, ChevronRight, LayoutGrid, Table, Columns3, Settings2, LineChart as LineChartIcon } from 'lucide-react';
 import { CustomRecordsAPI } from '../api';
 import { EntryCard } from './EntryCard';
+import { EntryChart } from './EntryChart';
 import { TemplatePicker } from './TemplatePicker';
 import { FieldRoleModal } from './FieldRoleModal';
 import { TEMPLATE_PRESETS, getTemplatePreset } from '../utils/templatePresets';
 import { toISOStringUTC, parseISOString, toLocalDateString, toLocalDateTimeString } from '../../../core/utils/dateUtils';
 import type { CustomRecordTypeItem, CustomRecordEntryItem, FieldDefinition } from '../types';
-import { formatFieldValue } from '../utils/fieldFormatter';
+import { formatFieldValue, isNumericField } from '../utils/fieldFormatter';
 
 interface TypeDetailViewProps {
   typeId: string;
   onBack: () => void;
 }
 
-type ViewTab = 'card' | 'table' | 'compare';
+type ViewTab = 'card' | 'table' | 'chart' | 'compare';
 
 // ==================== 日期分组工具 ====================
 
@@ -56,10 +57,20 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
   const [localFields, setLocalFields] = useState<FieldDefinition[]>([]);
 
   // 筛选与分页
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  // 默认时间范围：进入详情页时自动填充最近一周（今天 ~ 7 天前）
+  // 用户主动"清除"后会变为空字符串，不再自动填充
+  const [startDate, setStartDate] = useState(() => {
+    const today = new Date();
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    return toLocalDateString(weekAgo);
+  });
+  const [endDate, setEndDate] = useState(() => toLocalDateString(new Date()));
   const [page, setPage] = useState(1);
-  const pageSize = 20;
+  // chart 视图需要展示时间范围内所有数据点，使用较大 page_size；
+  // card/table 视图维持 20 条/页的分页体验
+  // 后端限制 page_size ≤ 500（见 custom_records_api.py），取上限值
+  const pageSize = activeTab === 'chart' ? 500 : 20;
 
   const loadData = useCallback(async () => {
     try {
@@ -95,7 +106,7 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
     } finally {
       setLoading(false);
     }
-  }, [typeId, startDate, endDate, page]);
+  }, [typeId, startDate, endDate, page, pageSize]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -186,6 +197,19 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
     return groups;
   }, [entries]);
 
+  // 是否含数值字段 — 决定 chart Tab 是否显示
+  const hasNumericField = useMemo(
+    () => localFields.some(f => isNumericField(f.field_type)),
+    [localFields]
+  );
+
+  // 当前时间范围描述 — 用于 EntryChart subtitle
+  const timeRangeLabel = useMemo(() => {
+    if (!startDate && !endDate) return '';
+    if (startDate && endDate) return `${startDate} ~ ${endDate}`;
+    return startDate || endDate || '';
+  }, [startDate, endDate]);
+
   if (loading && !type) {
     return (
       <div className="flex items-center justify-center py-20 text-slate-400">
@@ -271,6 +295,16 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
           >
             <Table size={14} />表格
           </button>
+          {hasNumericField && (
+            <button
+              onClick={() => setActiveTab('chart')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'chart' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <LineChartIcon size={14} />图表
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('compare')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
@@ -380,6 +414,13 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
             ))
           )}
         </div>
+      ) : activeTab === 'chart' ? (
+        /* 图表视图 — 即使无数值字段或无记录，EntryChart 内部都会处理空状态 */
+        <EntryChart
+          entries={entries}
+          fields={localFields}
+          timeRangeLabel={timeRangeLabel}
+        />
       ) : entries.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-16 flex flex-col items-center text-slate-400">
           <Database size={36} strokeWidth={1} className="mb-3 opacity-40" />
@@ -462,8 +503,8 @@ export const TypeDetailView: React.FC<TypeDetailViewProps> = ({ typeId, onBack }
         </div>
       )}
 
-      {/* 分页 */}
-      {totalPages > 1 && activeTab !== 'compare' && (
+      {/* 分页 — chart 视图展示全部数据点，不分页 */}
+      {totalPages > 1 && activeTab !== 'compare' && activeTab !== 'chart' && (
         <div className="flex items-center justify-center gap-1 mt-5">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
