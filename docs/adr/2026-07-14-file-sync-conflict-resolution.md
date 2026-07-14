@@ -1,9 +1,9 @@
 ---
-version: 1.0
+version: 2.1
 created_at: 2026-07-14
-updated_at: 2026-07-14
-last_updated: v2.0——MD 冲突改为 AI 驱动 + chat_history.json 明确排除
-abstract: 文件同步采用 per-file version tracking（parent_hash + current_hash）替代纯 LWW mtime 比较。同步白名单对齐 Agent 工具白名单（ALLOWED_DIRS + session），chat_history.json 明确排除。MD 冲突由 AI 驱动解决（CONFLICT_RESOLVE 消息类型），替代用户手动处理。account.json 改为数据库存储从白名单移除。所有决策基于主备模式前提（同一时间只有一端 Agent 工作）。
+updated_at: 2026-07-15
+last_updated: v2.1——新增决策 5（API 协议设计）+ hash 规范化策略
+abstract: 文件同步采用 per-file version tracking（parent_hash + current_hash）替代纯 LWW mtime 比较。同步白名单对齐 Agent 工具白名单（ALLOWED_DIRS + session），chat_history.json 明确排除。MD 冲突由 AI 驱动解决（CONFLICT_RESOLVE 消息类型），替代用户手动处理。account.json 改为数据库存储从白名单移除。API 协议采用三阶段设计（check → fetch/push → verify），mtime 作为第一重过滤 + hash 作为精确判断。hash 计算去除所有空白字符以避免格式差异干扰。所有决策基于主备模式前提（同一时间只有一端 Agent 工作）。
 status: decided
 ---
 
@@ -13,6 +13,7 @@ status: decided
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 2.1 | 新增决策 5：API 协议设计（三阶段 check/fetch/push/verify + hash 规范化策略） |
 | 2.0 | 决策 3：MD 冲突改为 AI 驱动（CONFLICT_RESOLVE 消息类型）。决策 2：chat_history.json 明确排除同步。新增前提 7（user/ MD 由 AI 生成）、前提 8（chat_history.json 仅定时任务改写） |
 | 1.0 | 创建文档初稿 |
 
@@ -163,6 +164,7 @@ status: decided
 
 - **"云端有 parent，本地没 parent，本地数据是正确的"**：**不存在**。如果本地从未同步过（没 parent），云端不可能有 parent（parent 是成功同步时写入的）。唯一例外是用户手动拷贝文件跳过同步——属于越界操作，系统不保护。
 - **"云端和本地 parent 不一致"**：理论上不应存在（同步成功时两端同时推进），但实际可能发生（同步中断、用户越界修改云端文件）。直接判 CONFLICT。
+- **"文件被删除"**：当前 Agent 没有通用 delete_file 工具（前提 2 的延伸——Agent 文件工具只有 write_file、edit_file、read_file 等，不含删除）。因此 11 状态矩阵不覆盖"文件之前同步过（parent 有值）但现在文件不存在"的场景。如果未来 Agent 新增删除文件能力，或 session 清理逻辑删除文件，需要扩展矩阵覆盖"parent 有值但文件不存在"的状态组合（如：本地删 → 通知云端删 + 清理 file_sync_state；云端删 → 通知本地删 + 清理 file_sync_state）。
 
 **hash 更新逻辑**：
 
@@ -171,9 +173,13 @@ status: decided
 
 **数据表存储位置**：
 
-`file_sync_state` 存储在 `localData/dataset/lifewatch_ai.db` 中，与业务表同一个数据库。本地和云端均需对称维护。**不加入 `SYNC_TABLES`**（[sync_client.py:25](file:///d:/desktop/软件开发/LifeWatch-AI/lifeprism/sync/sync_client.py#L25)）——它是同步元数据，`parent_hash` 和 `current_hash` 通过 pull-files/push-files API 扩展字段传递，不在数据库同步链路中传输。读写通过 `FileSyncStateProvider`（新增，见 `lifeprism/repository/providers/`）访问。
+`file_sync_state` 存储在 `localData/dataset/lifewatch_ai.db` 中，与业务表同一个数据库。本地和云端均需对称维护。**不加入 `SYNC_TABLES`**（[sync_client.py:25](file:///d:/desktop/软件开发/LifeWatch-AI/lifeprism/sync/sync_client.py#L25)）——它是同步元数据，`parent_hash` 和 `current_hash` 通过 pull-files/push-files API 扩展字段传递，不在数据库同步链路中传输。
 
-对应 Provider 在 `lifeprism/repository/providers/` 下新建 `file_sync_state_provider.py`，遵循现有模式：继承 `LWBaseDataProvider`，定义 `_TABLE_NAME = "file_sync_state"`、`_PRIMARY_KEY = "file_path"` 等元数据，提供 `refresh_current_hash()`、`commit_sync()`、`get_state()` 等方法。
+**职责分层**：
+
+- **Repository 层**：在 `lifeprism/repository/providers/` 下新建 `file_sync_state_provider.py`，继承 `LWBaseDataProvider`，**只做纯 CRUD**——定义 `_TABLE_NAME = "file_sync_state"`、`_PRIMARY_KEY = "file_path"` 等元数据。方法仅包含 `get_state()`、`get_all_states()`、`upsert_state()`、`delete_state()`。不包含 hash 计算、矩阵判定等同步业务逻辑。
+- **Sync 层**：hash 刷新、11 状态矩阵判定、parent_hash 推进等同步业务逻辑内联在 `SyncClient` 中（作为 private 方法），调用 `FileSyncStateProvider` 做 CRUD，调用 `compute_file_hash()` 工具函数算 hash。不新建独立的 `FileSyncManager` 类——SyncClient 是文件同步的唯一入口，这些逻辑是同步流程的内联步骤，不是独立可复用的模块。
+- **`compute_file_hash()`** 作为独立工具函数，放在 `lifeprism/sync/` 或 `lifeprism/utils/`。Provider、SyncClient、API handler 均可直接调用。
 
 ---
 
@@ -317,17 +323,36 @@ SyncClient 检测到 CONFLICT (MD 文件)
     - extra: file_path, local_hash, remote_hash
     ↓
 3. 发送到 bus → AgentLoop._process_msg 处理
+    - SyncClient 在同步线程中通过 `asyncio.run_coroutine_threadsafe(bus.send(msg), loop)` 
+      将 async 的 bus.send() 提交到主线程事件循环，同步等待结果（future.result(timeout=600)）
+    - 事件循环引用在 main.py 创建 SyncClient 时传入（`asyncio.get_event_loop()`）
+    - bus 和 AgentLoop 零改动，继续在事件循环中运行
     - CONFLICT_RESOLVE 不走 session（不保存到 session/*.jsonl）
       这是系统内部任务，类似 DREAM_TASK，不是用户对话
     - AI 用 read_file 读相关上下文（可选）
     - AI 用 write_file 写合并结果到原路径
     ↓
 4. AI 完成后，SyncClient 校验文件已更新
-    - new_hash = sha256(合并后内容)
+    - new_hash = compute_file_hash(合并后内容)
     - 更新 file_sync_state: parent_hash = new_hash
     ↓
 5. 下次同步双方 parent_hash 一致 → SKIP
 ```
+
+**跨线程桥接方式**：`asyncio.run_coroutine_threadsafe()`
+
+SyncClient 的 `sync_once()` 是同步方法，通过 `asyncio.to_thread()` 在独立线程中运行。bus.send() 是 async 方法，在主线程事件循环中运行。使用 Python 标准库的 `asyncio.run_coroutine_threadsafe()` 将 async 调用提交到主线程事件循环，是官方设计的跨线程调用方式，非 hack。
+
+```python
+# SyncClient 中
+def _resolve_conflict_via_ai(self, file_path, local_content, remote_content):
+    msg = InboundMessage(type=MessageType.CONFLICT_RESOLVE, content=..., extra=...)
+    future = asyncio.run_coroutine_threadsafe(bus.send(msg), self._main_event_loop)
+    result = future.result(timeout=600)  # 阻塞等待 AI 完成，在同步线程中不影响主线程
+    return result
+```
+
+**不选方案 B（SyncClient 改 async）的原因**：改动面大——pull/push 全部方法 + httpx 同步客户端都要改异步，违反"务实优先"和"改造范围可控"。
 
 **AI 合并失败时的处理**：
 - 保留本地版本（不做任何修改）
@@ -366,6 +391,198 @@ CREATE TABLE wechat_account_state (
 
 ---
 
+### 决策 5：API 协议设计——三阶段 check → fetch/push → verify
+
+**前提依赖**：前提 1（主备模式）、决策 1（per-file version tracking）
+
+**选择逻辑**：文件同步的 API 协议需要同时满足两个需求：(1) mtime 作为第一重过滤，快速排除未变更文件，避免 700+ 文件全量传输；(2) hash 作为精确判断，执行 11 状态决策矩阵。三阶段设计将"快照交换"（轻量）、"内容传输"（重量）、"一致性校验"（轻量）分离，每个端点职责单一。
+
+**核心原则：hash 时效性**
+
+> **发送 hash 或对比 hash 时，必须确保 hash 是最新的。**
+
+hash 代表的是"文件此刻的内容状态"。任何时间点发送或比对 hash，都必须是此刻实时计算的——不能用缓存值、不能用历史值。具体来说：
+- Phase 1（check）：两端在同步开始时计算 current_hash
+- Phase 2b/2c（fetch/push）：写入文件后立即计算 current_hash 并更新 DB
+- Phase 3（verify）：云端实时计算 current_hash 返回，本地也用刚计算的 current_hash 比对
+
+**hash 规范化策略**
+
+hash 计算前对文件内容做规范化处理，去除所有空白字符（空格、换行 `\n`、回车 `\r`、制表符 `\t` 等），避免格式差异导致 hash 不一致。
+
+```python
+import hashlib
+
+def compute_file_hash(content: bytes) -> str:
+    """计算文件内容的规范化 hash
+
+    规则：去除所有空白字符后计算 SHA-256。
+    源文件不受影响，仅 hash 计算时做规范化。
+    """
+    text = content.decode("utf-8", errors="replace")
+    # 去除所有空白字符（空格、换行、回车、制表符等）
+    normalized = "".join(text.split())
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+```
+
+**设计理由**：
+- 两端可能因操作系统差异（Windows `\r\n` vs Linux `\n`）导致内容字节不同但语义相同
+- AI 编辑文件时可能调整格式（加空行、改缩进），只要文字内容不变，hash 应保持一致
+- 源文件保持原始格式不变，仅 hash 计算时做规范化
+- `.jsonl` 文件（session/）同理，去除空白后比较内容
+
+**四个端点设计**
+
+| 端点 | 方法 | 性质 | 职责 |
+|------|------|------|------|
+| `/api/sync/pull-files/check` | POST | 新增 | 云端按 mtime 过滤，返回变更文件的 {path, parent_hash, current_hash} |
+| `/api/sync/pull-files/fetch` | POST | 新增 | 云端按路径返回文件内容（仅 PULL + CONFLICT 文件） |
+| `/api/sync/pull-files/verify` | POST | 新增 | 云端实时计算 hash，用于 Phase 3 一致性校验 |
+| `/api/sync/push-files` | POST | 改造 | 推送文件内容 + hash，云端写入并更新 file_sync_state |
+
+所有端点保持 POST 方法，与现有 sync API 惯例一致（路径列表可能很长，放 body 比 URL 参数更合适）。
+
+**Phase 1：快照交换 `POST /pull-files/check`**
+
+同步开始时，两端都计算"此刻"的 current_hash。
+
+```python
+# Request
+{
+    "last_sync_time": "2026-07-14T08:00:00+00:00",
+    "directories": ["session/", "diary/", "agent/", "user/"]
+}
+
+# Response
+{
+    "files": [
+        {"path": "user/user.md",        "parent_hash": "abc123", "current_hash": "def456"},
+        {"path": "diary/2026-07-13.md", "parent_hash": null,     "current_hash": "xyz789"}
+    ],
+    "sync_time": "2026-07-14T08:10:00+00:00"
+}
+```
+
+云端逻辑：遍历 directories（排除 `chat_history.json`），找到 mtime > last_sync_time 的文件 → 实时计算 current_hash → 从 `file_sync_state` 表读 parent_hash → 返回。
+
+**Phase 2a：本地执行 11 状态矩阵**
+
+本地拿到云端 hash 后，结合自己的 `file_sync_state` 做比较（决策 1 的 11 状态矩阵），分出：
+
+| 判定 | 处理 |
+|------|------|
+| PULL（仅云端改） | Phase 2b 拉取内容 → 写入本地 → 立即更新 current_hash |
+| PUSH（仅本地改） | Phase 2c 推送内容 + hash |
+| CONFLICT（双方改 / parent 不一致） | Phase 2b 拉取云端内容 → AI 合并 → Phase 2c 推送合并结果 |
+| SKIP（都没改） | 不操作 |
+
+**Phase 2b：拉取内容 `POST /pull-files/fetch`**
+
+仅拉取 PULL 和 CONFLICT 文件的实际内容。
+
+```python
+# Request
+{
+    "paths": ["user/user.md", "diary/2026-07-13.md"]
+}
+
+# Response
+{
+    "files": [
+        {"path": "user/user.md",        "content": "base64...", "parent_hash": "abc123", "current_hash": "def456"},
+        {"path": "diary/2026-07-13.md", "content": "base64...", "parent_hash": null,     "current_hash": "xyz789"}
+    ]
+}
+```
+
+本地写入文件后**立即**计算新 current_hash 并更新 DB。
+
+**Phase 2c：推送 `POST /push-files`**
+
+推送 PUSH 文件 + AI 合并后的 CONFLICT 结果。
+
+```python
+# Request
+{
+    "files": [
+        {"path": "agent/identity.md", "content": "base64...", "parent_hash": "old111", "current_hash": "new222"},
+        {"path": "user/user.md",      "content": "base64...", "parent_hash": "abc123", "current_hash": "merged333"}
+    ]
+}
+
+# Response
+{
+    "results": [
+        {"path": "agent/identity.md", "action": "accepted"},
+        {"path": "user/user.md",      "action": "accepted"}
+    ],
+    "sync_time": "..."
+}
+```
+
+云端写入文件后**立即**计算新 current_hash 并更新 DB。
+
+**Phase 3：一致性校验 `POST /pull-files/verify`**
+
+Phase 2b/2c 完成后，验证两端文件内容一致。
+
+```python
+# Request
+{
+    "paths": [
+        "user/user.md",        # PULL 过来的
+        "agent/identity.md",   # PUSH 上去的
+        "diary/2026-07-13.md"  # CONFLICT 合并的
+    ]
+}
+
+# Response
+{
+    "files": [
+        {"path": "user/user.md",        "current_hash": "xxx"},
+        {"path": "agent/identity.md",   "current_hash": "yyy"},
+        {"path": "diary/2026-07-13.md", "current_hash": "zzz"}
+    ]
+}
+```
+
+云端对 `paths` 中的文件**实时计算** current_hash（再次读取文件内容 → 规范化 → SHA-256）。
+
+本地比较：
+- 本地 current_hash（Phase 2b/2c 写入后刚更新的）== 云端 current_hash（Phase 3 刚返回的）
+  - 一致 ✅ → `parent_hash = current_hash`（两端各自推进）
+  - 不一致 ❌ → 不推进 parent，下次同步重试
+
+**完整时间线**
+
+```
+Phase 1          Phase 2a     Phase 2b/2c              Phase 3
+─────●──────────────●──────────────●──────────────────────●─────→
+     │              │              │                      │
+  两端快照      本地矩阵判定    pull写入→本地算hash      verify
+  hash（此刻）                 push写入→云端算hash      比对→推进parent
+```
+
+**原 pull-files / push-files 端点的处理**
+
+| 原端点 | 处理 |
+|--------|------|
+| `POST /pull-files` | 替换为 `/pull-files/check` + `/pull-files/fetch` |
+| `POST /push-files` | 改造，新增 parent_hash + current_hash 字段 |
+| 新增 `/pull-files/verify` | 新建 |
+
+**涉及改动**
+
+| 文件 | 改动 |
+|------|------|
+| `sync_cloud_api.py` | 替换 `/pull-files` 为 `/pull-files/check` + `/pull-files/fetch` + `/pull-files/verify`；改造 `/push-files` 增加 hash 字段 |
+| `sync_client.py:pull_files_from_remote()` | 拆为三步：check → 本地矩阵判定 → fetch |
+| `sync_client.py:push_files_to_remote()` | 改造：附带 parent_hash + current_hash |
+| `sync_client.py` | 新增 Phase 3 verify 逻辑 + parent_hash 推进逻辑 |
+| 新增 `compute_file_hash()` 工具函数 | 规范化 hash 计算（去除空白 + SHA-256） |
+
+---
+
 ## 方案优点汇总
 
 1. ✅ 彻底解决 Bug 2（空文档覆盖）—— 通过 parent_hash 判定为 CONFLICT 或 PUSH
@@ -376,6 +593,8 @@ CREATE TABLE wechat_account_state (
 6. ✅ account.json 改数据库节省同步链路 —— 复用已有 LWW 机制
 7. ✅ AI 自动合并替代用户手动 —— user/ 下 MD 全由 AI 生成，AI 最理解内容语义，无需用户介入
 8. ✅ 改造范围可控 —— 新增 2 张表（`file_sync_state`、`wechat_account_state`，均在 `lifewatch_ai.db` 中）+ 2 个 Provider（`FileSyncStateProvider`、`WechatAccountStateProvider`）+ 云端 API 扩展 hash 字段 + 新增 CONFLICT_RESOLVE 消息类型
+9. ✅ 三阶段 API 协议 —— mtime 第一重过滤（快速排除未变更文件）+ hash 精确判断（11 状态矩阵）+ verify 校验（推进 parent 前确认两端一致）
+10. ✅ hash 规范化 —— 去除空白字符后计算 SHA-256，避免 OS 差异（`\r\n` vs `\n`）和格式调整导致 false positive
 
 ## 备选触发
 

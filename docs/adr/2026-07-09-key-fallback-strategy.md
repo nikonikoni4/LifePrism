@@ -1,8 +1,8 @@
 ---
-version: 1.1
+version: 1.2
 created_at: 2026-07-09
-updated_at: 2026-07-14
-last_updated: v1.1——Key 从 config.yaml 分离到 storage.yaml，通过 run_mode 隔离本地/云端读写路径
+updated_at: 2026-07-15
+last_updated: v1.2——SettingsManager 管理 storage.yaml 全生命周期，新增 public 接口 save_storage_yaml() 供 CloudInitializer 调用
 abstract: 密钥存储从"keyring + config.yaml fallback"演进为"keyring（本地）+ storage.yaml（云端）"分离架构。核心原因：config.yaml fallback 导致弱 Key 永久固化，且混合了普通配置与敏感凭据。新增 storage.yaml（权限 600）专用于 Key 存储，命名避开 "keys.yaml" 以降低文件直接暴露时的敏感度。通过 run_mode 控制读写路径：本地（full）只用 keyring，云端（agent_only/web_demo）用 storage.yaml。
 status: decided
 ---
@@ -13,6 +13,7 @@ status: decided
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 1.2 | 决策 storage.yaml 的加载方：扩展 SettingsManager（方案 A），不新建 StorageManager。消费方通过现有 SettingsManager 接口获取 Key，内部根据 run_mode 自动路由到 keyring 或 storage.yaml。新增 `save_storage_yaml()` public 接口供 CloudInitializer 批量写入。原则：SettingsManager 管理所有 storage.yaml 的生命周期，外部模块不直接写文件 |
 | 1.1 | Key 从 config.yaml 分离到 storage.yaml，通过 run_mode 隔离本地/云端读写路径。新增演进历史节，记录 v1.0 的 config.yaml fallback 带来的 Key 固化 bug |
 | 1.0 | 创建文档初稿，决策 keyring + config.yaml fallback |
 
@@ -185,11 +186,22 @@ providers:
   所有 Key → 写入 storage.yaml（keyring 不可用，不尝试写入）
 ```
 
+### v1.2 补充决策：storage.yaml 谁负责加载？
+
+**决策**：扩展 `SettingsManager`（方案 A），不新建独立 `StorageManager`。
+
+**理由**：
+1. 用户偏好"全部写在一个地方读取方便"——SettingsManager 是唯一的配置入口，消费方用 `settings.get("sync_api_key")` 即可，不感知后端是 keyring 还是 storage.yaml
+2. SettingsManager 已有 `run_mode` 属性和 keyring 操作方法，新增 ~40 行加载/保存方法即可路由到 storage.yaml
+3. 消费方零改动——`sync_config.py`、`wechat/auth.py`、`provider_manager.py` 通过现有接口获取 Key
+4. config.yaml 和 storage.yaml 的分离是文件级别的安全措施（不同权限、不同 .gitignore），代码层面统一管理不矛盾
+
 ### 涉及改动
 
 | 文件 | 改动 |
 |------|------|
 | 新增 `storage.yaml` | `{config_base_path}/storage.yaml`，权限 600 |
+| `settings_manager.py` | 新增 `storage.yaml` 加载/保存方法，`get()`/`set()` 根据 `run_mode` 路由到 keyring 或 storage.yaml |
 | `sync_config.py:get_sync_api_key()` | `run_mode == "full"` → 只读 keyring；云端 → 读 storage.yaml |
 | `wechat/auth.py:_load_token_from_keyring()` | 同上 |
 | `provider_manager.py:get_api_key()` | 同上，云端再加一层 providers.yaml 兜底 |

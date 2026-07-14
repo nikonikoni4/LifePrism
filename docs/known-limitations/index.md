@@ -53,6 +53,16 @@
 - **问题描述**: keyring 是顶层 import，Linux headless 环境可能缺少 D-Bus/gnome-keyring 等系统组件导致 import 失败。所有模块的 lazy fallback 逻辑只在运行时生效，import 阶段无法保护
 - **计划改进**: 三个候选方案待讨论——(A) keyring import 懒加载 (B) 本地也放弃 keyring 统一 storage.yaml (C) keyring 配置为 Windows-only 可选依赖
 
+### 6. behavior.md 持续增长与同步影响
+
+- **文件**: `behavior-md-growth-and-sync-impact.md`
+- **状态**: `acknowledged`（已确认，当前阶段不处理）
+- **严重程度**: 低（当前）→ 中（未来文件增长到 1MB+ 时）
+- **影响范围**: 文件同步（传输大小 + AI 冲突合并 token 消耗）
+- **问题描述**: behavior.md 由 dreaming task 追加式写入，持续增长。当前约 300KB 可接受，但增长到 1MB+ 后 AI 冲突合并可能超出 token 限制
+- **触发条件**: behavior.md 超过 1MB 或 AI 冲突合并因 token 限制失败
+- **计划改进**: 按月拆分 behavior.md（当前月活跃写入 + 历史归档不再修改），需修改 dreaming task 写入逻辑
+
 > 时区和时间格式不一致问题已于 2026-07-12 通过 UTC 时区迁移解决，相关规范见 `docs/coding-rules/time-handling-rules.md`，决策见 `docs/adr/2026-07-12-migrate-to-utc-timezone.md`。
 
 ## 说明
