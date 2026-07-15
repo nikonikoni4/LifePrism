@@ -4,7 +4,7 @@ HeartbeatManager 单元测试
 测试 seam:
 - Seam 1: is_local_online() - 初始状态、在线判断、超时判断
 - Seam 2: set_event() - offline 立即生效、online 重置状态
-- Seam 3: update_heartbeat() - 更新心跳、不覆盖 offline 事件
+- Seam 3: update_heartbeat() - 更新心跳、覆盖 offline（同步即在线）
 - Seam 4: 线程安全 - 多线程并发调用不崩溃
 
 参考: docs/specs/ 中 sync 相关规格
@@ -18,8 +18,8 @@ pytestmark = pytest.mark.core
 # ==================== Seam 1: is_local_online() ====================
 
 
-def test_is_local_online_initial_state_false():
-    """初始状态：从未连接时返回 False"""
+def test_is_local_online_initial_state_online():
+    """初始状态：默认假定本地在线（15 分钟窗口等待首次同步）"""
     # Arrange
     from lifeprism.sync.heartbeat_manager import HeartbeatManager
 
@@ -29,7 +29,7 @@ def test_is_local_online_initial_state_false():
     result = manager.is_local_online()
 
     # Assert
-    assert result is False
+    assert result is True
 
 
 def test_is_local_online_true_after_update_heartbeat():
@@ -109,11 +109,11 @@ def test_set_event_online_resets_state():
     assert result is True
 
 
-# ==================== Seam 3: update_heartbeat() 不覆盖 offline ====================
+# ==================== Seam 3: update_heartbeat() 覆盖 offline ====================
 
 
 def test_update_heartbeat_overrides_offline_event():
-    """offline 后调用 update_heartbeat() 仍返回 False（显式 offline 优先判断）"""
+    """offline 后调用 update_heartbeat() 恢复在线（同步即在线）"""
     # Arrange
     from lifeprism.sync.heartbeat_manager import HeartbeatManager
 
@@ -121,12 +121,12 @@ def test_update_heartbeat_overrides_offline_event():
     manager.set_event("offline")  # 显式离线
     assert manager.is_local_online() is False  # 确认离线
 
-    # Act: 调用 update_heartbeat 不会清除 _last_event
+    # Act: 同步请求到达，证明本地在线，清除 offline
     manager.update_heartbeat()
     result = manager.is_local_online()
 
-    # Assert: 仍然离线，因为 _last_event == "offline" 优先判断
-    assert result is False
+    # Assert: 恢复在线（同步即在线）
+    assert result is True
 
 
 # ==================== Seam 4: 线程安全 ====================
