@@ -13,7 +13,6 @@ TDD: 严格 red-green 循环
 import base64
 import gzip
 import shutil
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -33,8 +32,8 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
     from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
@@ -176,8 +175,8 @@ class TestBusBridge:
         })
 
         # Mock bus bridge: run_coroutine_threadsafe 返回 mock future
-        from lifeprism.llm.providers import LLMResponse
         from lifeprism.llm.bus.events import OutboundMessage
+        from lifeprism.llm.providers import LLMResponse
 
         mock_future = MagicMock()
         mock_future.result.return_value = OutboundMessage(
@@ -820,7 +819,7 @@ class TestFullFlowConflictIntegration:
         """创建内部方法均已 mock 的 SyncClient"""
         # Mock 所有子方法，便于隔离测试 _sync_files_full_flow 的编排逻辑
         sync_client._refresh_current_hashes = MagicMock()
-        sync_client._pull_files_check = MagicMock(return_value=[])
+        sync_client._pull_files_check = MagicMock(return_value=([], []))
         sync_client._pull_files_fetch = MagicMock()
         sync_client._push_files = MagicMock()
         sync_client._verify_and_advance_parent = MagicMock()
@@ -845,11 +844,11 @@ class TestFullFlowConflictIntegration:
         )
 
         mock_sync_client._refresh_current_hashes.return_value = [conflict_path]
-        mock_sync_client._pull_files_check.return_value = [{
+        mock_sync_client._pull_files_check.return_value = ([{
             "path": conflict_path,
             "parent_hash": "hash_a",
             "current_hash": "hash_c",
-        }]
+        }], [])
 
         # Act
         mock_sync_client._sync_files_full_flow(
@@ -882,11 +881,11 @@ class TestFullFlowConflictIntegration:
         )
 
         mock_sync_client._refresh_current_hashes.return_value = [conflict_path]
-        mock_sync_client._pull_files_check.return_value = [{
+        mock_sync_client._pull_files_check.return_value = ([{
             "path": conflict_path,
             "parent_hash": "hash_a",
             "current_hash": "hash_c",
-        }]
+        }], [])
         mock_sync_client._resolve_conflicts.return_value = [conflict_path]
 
         # Act
@@ -917,11 +916,11 @@ class TestFullFlowConflictIntegration:
         )
 
         mock_sync_client._refresh_current_hashes.return_value = [conflict_path]
-        mock_sync_client._pull_files_check.return_value = [{
+        mock_sync_client._pull_files_check.return_value = ([{
             "path": conflict_path,
             "parent_hash": "hash_a",
             "current_hash": "hash_c",
-        }]
+        }], [])
         mock_sync_client._resolve_conflicts.return_value = [conflict_path]
 
         # Act
@@ -953,11 +952,11 @@ class TestFullFlowConflictIntegration:
 
         mock_sync_client._refresh_current_hashes.return_value = [push_path]
         # 云端有 parent 但 current=parent（未改）→ PUSH (Row 7)
-        mock_sync_client._pull_files_check.return_value = [{
+        mock_sync_client._pull_files_check.return_value = ([{
             "path": push_path,
             "parent_hash": "hash_a",
             "current_hash": "hash_a",
-        }]
+        }], [])
 
         # Act
         mock_sync_client._sync_files_full_flow(
@@ -985,11 +984,11 @@ class TestFullFlowConflictIntegration:
         )
 
         mock_sync_client._refresh_current_hashes.return_value = [conflict_path]
-        mock_sync_client._pull_files_check.return_value = [{
+        mock_sync_client._pull_files_check.return_value = ([{
             "path": conflict_path,
             "parent_hash": "hash_a",
             "current_hash": "hash_c",
-        }]
+        }], [])
         # _resolve_conflicts 返回空列表（全部失败）
         mock_sync_client._resolve_conflicts.return_value = []
 
@@ -1020,11 +1019,11 @@ class TestFullFlowConflictIntegration:
         )
 
         mock_sync_client._refresh_current_hashes.return_value = [conflict_path]
-        mock_sync_client._pull_files_check.return_value = [{
+        mock_sync_client._pull_files_check.return_value = ([{
             "path": conflict_path,
             "parent_hash": "hash_a",
             "current_hash": "hash_c",
-        }]
+        }], [])
 
         # Act
         mock_sync_client._sync_files_full_flow(
@@ -1059,10 +1058,10 @@ class TestFullFlowConflictIntegration:
             )
 
         mock_sync_client._refresh_current_hashes.return_value = [jsonl_path, md_path]
-        mock_sync_client._pull_files_check.return_value = [
+        mock_sync_client._pull_files_check.return_value = ([
             {"path": jsonl_path, "parent_hash": "hash_a", "current_hash": "hash_c"},
             {"path": md_path, "parent_hash": "hash_a", "current_hash": "hash_c"},
-        ]
+        ], [])
         mock_sync_client._resolve_conflicts.return_value = [md_path]
 
         # Act
@@ -1103,10 +1102,10 @@ class TestFullFlowConflictIntegration:
             )
 
         mock_sync_client._refresh_current_hashes.return_value = [jsonl_1, jsonl_2]
-        mock_sync_client._pull_files_check.return_value = [
+        mock_sync_client._pull_files_check.return_value = ([
             {"path": jsonl_1, "parent_hash": "hash_a", "current_hash": "hash_c"},
             {"path": jsonl_2, "parent_hash": "hash_a", "current_hash": "hash_c"},
-        ]
+        ], [])
 
         # Act
         mock_sync_client._sync_files_full_flow(

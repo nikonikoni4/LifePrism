@@ -43,7 +43,7 @@ def initialized_db(test_data_path):
     认证：get_sync_api_key() 在 full 模式下只从 keyring 读取（service="lifeprism"），
     不 fallback 到 config。因此必须用 set_sync_api_key() 写入 keyring。
     """
-    from lifeprism.config.settings_manager import settings, KEYRING_SERVICE_NAME
+    from lifeprism.config.settings_manager import KEYRING_SERVICE_NAME, settings
 
     settings._initialize()
 
@@ -199,6 +199,7 @@ class TestSyncPullFilesCheck:
         assert response.status_code == 200
         data = response.json()
         assert "files" in data
+        assert "all_paths" in data
         assert "sync_time" in data
         assert len(data["files"]) == 1
         file_info = data["files"][0]
@@ -212,6 +213,11 @@ class TestSyncPullFilesCheck:
         assert file_info["current_hash"] == expected_hash
         # parent_hash 应为 None（file_sync_state 中无记录）
         assert file_info["parent_hash"] is None
+        # all_paths 应包含所有非黑名单文件（old + new）
+        assert set(data["all_paths"]) == {
+            f"{TEST_DIR_NAME}/notes/old.txt",
+            f"{TEST_DIR_NAME}/notes/new.txt",
+        }
 
     def test_check_excludes_chat_history_json(
         self, client, clean_test_dir, clean_file_sync_state
@@ -245,6 +251,9 @@ class TestSyncPullFilesCheck:
         paths = {f["path"] for f in data["files"]}
         assert f"{TEST_DIR_NAME}/session/session_001.jsonl" in paths
         assert f"{TEST_DIR_NAME}/session/chat_history.json" not in paths
+        # all_paths 也应排除 chat_history.json
+        assert f"{TEST_DIR_NAME}/session/chat_history.json" not in data["all_paths"]
+        assert f"{TEST_DIR_NAME}/session/session_001.jsonl" in data["all_paths"]
 
     def test_check_returns_empty_list_when_no_changes(
         self, client, clean_test_dir, clean_file_sync_state
@@ -272,6 +281,8 @@ class TestSyncPullFilesCheck:
         data = response.json()
         assert data["files"] == []
         assert "sync_time" in data
+        # all_paths 仍应包含所有文件（即使无变更）
+        assert f"{TEST_DIR_NAME}/stable/old.txt" in data["all_paths"]
 
     def test_check_rejects_wrong_api_key(self, client, clean_test_dir):
         """错误 API Key 返回 422"""
@@ -297,6 +308,56 @@ class TestSyncPullFilesCheck:
             },
         )
         assert response.status_code == 422
+
+    def test_check_all_paths_excludes_blacklist_and_includes_all_files(
+        self, client, clean_test_dir, clean_file_sync_state
+    ):
+        """all_paths 包含所有非黑名单文件，排除 chat_history.json 和 bootstrap.md；
+        files 只包含 mtime > last_sync_time 的文件"""
+        # Arrange: 创建多种文件，含黑名单文件
+        sync_dir = clean_test_dir / "mixed"
+        sync_dir.mkdir()
+
+        # 普通文件（新 + 旧）
+        new_md = sync_dir / "new.md"
+        new_md.write_text("new", encoding="utf-8")
+        set_file_mtime(new_md, "2026-07-01T12:00:00+00:00")
+
+        old_jsonl = sync_dir / "old.jsonl"
+        old_jsonl.write_text("line\n", encoding="utf-8")
+        set_file_mtime(old_jsonl, "2026-07-01T10:00:00+00:00")
+
+        # 黑名单文件
+        chat_history = sync_dir / "chat_history.json"
+        chat_history.write_text("{}", encoding="utf-8")
+        set_file_mtime(chat_history, "2026-07-01T12:00:00+00:00")
+
+        bootstrap = sync_dir / "bootstrap.md"
+        bootstrap.write_text("bootstrap", encoding="utf-8")
+        set_file_mtime(bootstrap, "2026-07-01T12:00:00+00:00")
+
+        # Act: 检查 11:00 之后修改的文件
+        response = client.post(
+            "/api/sync/pull-files/check",
+            json={
+                "last_sync_time": "2026-07-01T11:00:00+00:00",
+                "directories": [f"{TEST_DIR_NAME}/mixed"],
+            },
+            headers=AUTH_HEADERS,
+        )
+
+        # Assert: files 只包含 mtime > 11:00 的非黑名单文件（new.md）
+        assert response.status_code == 200
+        data = response.json()
+        file_paths = {f["path"] for f in data["files"]}
+        assert file_paths == {f"{TEST_DIR_NAME}/mixed/new.md"}
+
+        # all_paths 包含所有非黑名单文件（new.md + old.jsonl），排除黑名单
+        all_paths_set = set(data["all_paths"])
+        assert f"{TEST_DIR_NAME}/mixed/new.md" in all_paths_set
+        assert f"{TEST_DIR_NAME}/mixed/old.jsonl" in all_paths_set
+        assert f"{TEST_DIR_NAME}/mixed/chat_history.json" not in all_paths_set
+        assert f"{TEST_DIR_NAME}/mixed/bootstrap.md" not in all_paths_set
 
 
 # ==================== Pull-Files Fetch Tests ====================

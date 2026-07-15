@@ -17,7 +17,6 @@ TDD: 严格 red-green 循环，一个 seam 一个测试一个最小实现
 """
 
 import shutil
-from pathlib import Path
 
 import pytest
 
@@ -35,8 +34,8 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
     from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
@@ -187,7 +186,7 @@ class TestRefreshCurrentHashes:
         assert "sync_full_flow_test/diary/2026-07-14.md" in state_map
 
         # current_hash 应等于实时计算的 hash（已知字面量 "用户数据" 经 compute_file_hash）
-        user_hash = compute_file_hash("用户数据".encode("utf-8"))
+        user_hash = compute_file_hash("用户数据".encode())
         assert state_map["sync_full_flow_test/user/user.md"]["current_hash"] == user_hash
 
         # 新文件 parent_hash 应为 NULL
@@ -211,7 +210,11 @@ class TestPullFilesCheck:
             {"path": "user/user.md", "parent_hash": "abc123", "current_hash": "def456"},
             {"path": "diary/2026-07-14.md", "parent_hash": None, "current_hash": "xyz789"},
         ]
-        mock_response = _make_mock_response({"files": remote_files, "sync_time": "..."})
+        mock_response = _make_mock_response({
+            "files": remote_files,
+            "all_paths": ["user/user.md", "diary/2026-07-14.md"],
+            "sync_time": "...",
+        })
 
         with patch(
             "lifeprism.sync.sync_client.httpx.post", return_value=mock_response
@@ -237,8 +240,8 @@ class TestPullFilesCheck:
         ]
         assert call_args.kwargs["headers"]["Authorization"] == "Bearer test-key"
 
-        # Assert: 返回云端文件列表
-        assert result == remote_files
+        # Assert: 返回云端文件列表 + all_paths（tuple）
+        assert result == (remote_files, ["user/user.md", "diary/2026-07-14.md"])
 
 
 # ==================== Seam 5: Phase 2a - 11 态矩阵判断 ====================
@@ -603,6 +606,7 @@ class TestSyncFilesFullFlow:
                 "parent_hash": old_hash,
                 "current_hash": new_hash,
             }],
+            "all_paths": ["sync_full_flow_test/user/user.md"],
             "sync_time": "...",
         })
         # Phase 2b fetch: 返回新内容
@@ -661,8 +665,6 @@ class TestSyncFilesFullFlow:
 
         Row 7: local_parent=A, local_current=A1, remote_parent=A, remote_current=A → PUSH
         """
-        import base64
-        import gzip
         from unittest.mock import patch
 
         from lifeprism.config.settings_manager import settings
@@ -687,8 +689,11 @@ class TestSyncFilesFullFlow:
             current_hash=old_hash,
         )
 
-        # Mock: check 返回空（远端无变更）→ PUSH → verify → commit
-        check_response = _make_mock_response({"files": []})
+        # Mock: check 返回空变更，但云端有此文件（all_paths 含路径）→ PUSH → verify → commit
+        check_response = _make_mock_response({
+            "files": [],
+            "all_paths": ["sync_full_flow_test/agent/identity.md"],
+        })
         push_response = _make_mock_response({
             "results": [{"path": "sync_full_flow_test/agent/identity.md", "action": "accepted"}]
         })
@@ -752,8 +757,11 @@ class TestSyncFilesFullFlow:
             current_hash=content_hash,
         )
 
-        # Mock: check 返回空（远端无变更）
-        check_response = _make_mock_response({"files": []})
+        # Mock: check 返回空变更，但云端有此文件（all_paths 含路径）→ SKIP
+        check_response = _make_mock_response({
+            "files": [],
+            "all_paths": ["sync_full_flow_test/user/user.md"],
+        })
 
         with patch(
             "lifeprism.sync.sync_client.httpx.post", return_value=check_response
@@ -815,6 +823,7 @@ class TestSyncFilesFullFlow:
                 "parent_hash": old_hash,
                 "current_hash": remote_new_hash,
             }],
+            "all_paths": ["sync_full_flow_test/diary/2026-07-14.md"],
             "sync_time": "...",
         })
 
@@ -871,6 +880,7 @@ class TestSyncFilesFullFlow:
                 "parent_hash": cloud_hash,
                 "current_hash": cloud_hash,
             }],
+            "all_paths": ["sync_full_flow_test/user/user.md"],
             "sync_time": "...",
         })
         # fetch 返回云端内容
@@ -929,8 +939,6 @@ class TestSyncFilesFullFlow:
         Row 5: local_parent=A, local_current=A, remote_parent=NULL, remote_current=A2 → PUSH
         本地推送有内容的文件，不会反向被云端空文档覆盖。
         """
-        import base64
-        import gzip
         from unittest.mock import patch
 
         from lifeprism.config.settings_manager import settings
@@ -945,7 +953,7 @@ class TestSyncFilesFullFlow:
         local_file.write_text(local_content, encoding="utf-8")
 
         local_hash = compute_file_hash(local_content.encode("utf-8"))
-        cloud_empty_hash = compute_file_hash("".encode("utf-8"))
+        cloud_empty_hash = compute_file_hash(b"")
 
         provider = FileSyncStateProvider(db_manager=initialized_db)
         provider.upsert_state(
@@ -961,6 +969,7 @@ class TestSyncFilesFullFlow:
                 "parent_hash": None,
                 "current_hash": cloud_empty_hash,
             }],
+            "all_paths": ["sync_full_flow_test/user/user.md"],
             "sync_time": "...",
         })
         push_response = _make_mock_response({
@@ -1043,6 +1052,7 @@ class TestSyncFilesFullFlow:
                 "parent_hash": old_hash,
                 "current_hash": new_hash,
             }],
+            "all_paths": ["sync_full_flow_test/diary/2026-07-14.md"],
             "sync_time": "...",
         })
         # fetch 返回新内容
@@ -1089,3 +1099,90 @@ class TestSyncFilesFullFlow:
         assert state["parent_hash"] == old_hash
         # current_hash 被 fetch 更新为 new_hash
         assert state["current_hash"] == new_hash
+
+
+# ==================== Seam 10: 云端缺失文件 → PUSH（bug 修复） ====================
+
+
+class TestCloudMissingFilePush:
+    """Seam 10: 云端缺失文件应被 PUSH 到远端
+
+    修复 cloud-missing-files-not-synced bug：
+    当云端没有某文件（不在 all_paths 中），但本地有该文件且
+    parent_hash == current_hash（之前已同步、未修改），
+    应将该文件 PUSH 到云端，而不是错误地 SKIP。
+
+    矩阵判定：local_parent=A, local_current=A, remote_parent=None, remote_current=None
+    → _decide_sync_action 走 Row 1（remote_current is None → PUSH）
+    """
+
+    def test_cloud_missing_file_pushed_to_remote(
+        self, sync_client, initialized_db, clean_file_dir, clean_file_sync_state
+    ):
+        """云端缺失文件（all_paths 为空）应被 PUSH 到远端"""
+        from unittest.mock import patch
+
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        # Arrange: 创建本地文件（已同步过、未修改），设置 file_sync_state
+        # parent_hash == current_hash 表示此前已同步且本地未变更
+        test_base = settings.lifeprism_data_path / "sync_full_flow_test"
+        (test_base / "session").mkdir(parents=True, exist_ok=True)
+        file_content = "session 数据"
+        local_file = test_base / "session" / "test.jsonl"
+        local_file.write_text(file_content, encoding="utf-8")
+
+        content_hash = compute_file_hash(file_content.encode("utf-8"))
+
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        provider.upsert_state(
+            file_path="sync_full_flow_test/session/test.jsonl",
+            parent_hash=content_hash,
+            current_hash=content_hash,
+        )
+
+        # Mock: check 返回空变更 + 空 all_paths（云端完全无此文件）
+        check_response = _make_mock_response({
+            "files": [],
+            "all_paths": [],
+            "sync_time": "...",
+        })
+        push_response = _make_mock_response({
+            "results": [{"path": "sync_full_flow_test/session/test.jsonl", "action": "accepted"}]
+        })
+        verify_response = _make_mock_response({
+            "files": [{"path": "sync_full_flow_test/session/test.jsonl", "current_hash": content_hash}]
+        })
+        commit_response = _make_mock_response({
+            "committed": [{"path": "sync_full_flow_test/session/test.jsonl", "parent_hash": content_hash}]
+        })
+
+        responses = [check_response, push_response, verify_response, commit_response]
+
+        with patch(
+            "lifeprism.sync.sync_client.httpx.post", side_effect=responses
+        ) as mock_post:
+            # Act: 执行全流程
+            sync_client._sync_files_full_flow(
+                remote_url="http://test:8000",
+                api_key="test-key",
+                last_sync_time="2026-07-01T00:00:00+00:00",
+                directories=["sync_full_flow_test/"],
+            )
+
+        # Assert: check → push-files → verify → commit（4 次调用）
+        assert mock_post.call_count == 4
+        urls = [call.kwargs["url"] for call in mock_post.call_args_list]
+        assert urls[0] == "http://test:8000/api/sync/pull-files/check"
+        assert urls[1] == "http://test:8000/api/sync/push-files"
+        assert urls[2] == "http://test:8000/api/sync/pull-files/verify"
+        assert urls[3] == "http://test:8000/api/sync/pull-files/commit"
+
+        # Assert: _push_files 被调用，且请求体包含该文件路径
+        push_call = mock_post.call_args_list[1]
+        assert push_call.kwargs["url"] == "http://test:8000/api/sync/push-files"
+        files_payload = push_call.kwargs["json"]["files"]
+        pushed_paths = [f["path"] for f in files_payload]
+        assert "sync_full_flow_test/session/test.jsonl" in pushed_paths
