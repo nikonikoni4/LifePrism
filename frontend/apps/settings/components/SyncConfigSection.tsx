@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Cloud, Loader2, CheckCircle, AlertTriangle, FolderOpen, X, Key, RefreshCw } from 'lucide-react';
 import { SyncConfigAPI } from '../syncApi';
 import type { GenerateCloudConfigResponse } from '../syncTypes';
@@ -203,10 +204,11 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                 )}
             </div>
 
-            {/* 生成选项弹框 */}
-            {showChoiceDialog && (
+            {/* 生成选项弹框：通过 Portal 挂到 document.body，
+                避免 SettingsApp 根容器 animate-fade-in 的 transform 导致 fixed 失效 */}
+            {showChoiceDialog && createPortal(
                 <div
-                    className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/30 flex items-center justify-center z-[9999]"
                     onClick={() => setShowChoiceDialog(false)}
                 >
                     <div
@@ -266,7 +268,8 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </section>
     );

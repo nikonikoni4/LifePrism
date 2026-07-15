@@ -65,11 +65,16 @@ def sync_client(initialized_db, sync_repository):
 
     定时同步测试不依赖真实数据库交互（sync_once 被 mock），
     但复用 SyncClient 构造以保持与生产代码一致。
+
+    _read_remote_url 默认 patch 为返回有效 url，避免新加的配置检查
+    导致 sync_once 被跳过。个别测试需要验证"未配置 url"行为时，
+    可在该测试内部重新 patch _read_remote_url 返回空字符串。
     """
     from lifeprism.sync.sync_client import SyncClient
 
     client = SyncClient(db_manager=initialized_db, sync_repository=sync_repository)
-    yield client
+    with patch.object(client, "_read_remote_url", return_value="https://example.com"):
+        yield client
 
 
 # ==================== 辅助函数 ====================
@@ -395,3 +400,105 @@ class TestSuccessLogging:
         # 完成日志格式：定时同步完成，耗时 {duration}s
         assert "耗时" in complete_msgs[0]
         assert complete_msgs[0].rstrip().endswith("s")
+
+
+# ==================== Seam 5: 未配置 remote_url 时跳过同步 ====================
+
+
+class TestMissingRemoteUrl:
+    """Seam 5: sync.remote_url 未配置时跳过本次同步（不取消整个定时任务）"""
+
+    async def test_skips_sync_when_url_empty(self, sync_client, caplog):
+        """_read_remote_url 返回空字符串时跳过本次，sync_once 不被调用"""
+        # Arrange: 重新 patch _read_remote_url 返回空字符串
+        mock_sync_once = MagicMock()
+        caplog.set_level(logging.INFO, logger="lifeprism.sync.sync_client")
+
+        with patch.object(sync_client, "_read_remote_url", return_value=""):
+            with patch.object(sync_client, "sync_once", new=mock_sync_once):
+                await _run_loop_until_cancelled(sync_client, max_calls=1)
+
+        # Assert: sync_once 未被调用
+        mock_sync_once.assert_not_called()
+        # 日志包含跳过提示
+        info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+        assert any("未配置 sync.remote_url" in m for m in info_messages), (
+            f"未找到跳过提示 INFO 日志，实际: {info_messages}"
+        )
+
+    async def test_skips_sync_when_url_none(self, sync_client, caplog):
+        """_read_remote_url 返回 None（被 helper 转为 ""）时同样跳过"""
+        mock_sync_once = MagicMock()
+        caplog.set_level(logging.INFO, logger="lifeprism.sync.sync_client")
+
+        with patch.object(sync_client, "_read_remote_url", return_value=None):
+            with patch.object(sync_client, "sync_once", new=mock_sync_once):
+                await _run_loop_until_cancelled(sync_client, max_calls=1)
+
+        mock_sync_once.assert_not_called()
+
+    async def test_loop_continues_after_url_configured(
+        self, sync_client, initialized_db, sync_repository, caplog
+    ):
+        """url 为空时跳过，配置 url 后下次定时自动开始同步"""
+        # Arrange: 第一次返回空，第二次返回有效 url
+        url_values = iter(["", "https://example.com"])
+        mock_sync_once = MagicMock()
+        caplog.set_level(logging.INFO, logger="lifeprism.sync.sync_client")
+
+        def _side_effect():
+            return next(url_values)
+
+        with patch.object(sync_client, "_read_remote_url", side_effect=_side_effect):
+            with patch.object(sync_client, "sync_once", new=mock_sync_once):
+                await _run_loop_until_cancelled(sync_client, max_calls=2)
+
+        # Assert: 第一次跳过，第二次执行 sync_once
+        assert mock_sync_once.call_count == 1
+        info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+        assert any("未配置 sync.remote_url" in m for m in info_messages)
+        assert any("定时同步开始" in m for m in info_messages)
+
+    async def test_does_not_set_is_syncing_when_skipped(self, sync_client, caplog):
+        """url 为空时跳过不会设置 _is_syncing（不占用锁）"""
+        caplog.set_level(logging.INFO, logger="lifeprism.sync.sync_client")
+
+        with patch.object(sync_client, "_read_remote_url", return_value=""):
+            await _run_loop_until_cancelled(sync_client, max_calls=1)
+
+        # _is_syncing 应保持 False（没有进入 try_start_sync 分支）
+        assert sync_client._is_syncing is False
+
+
+class TestSyncOnceValidation:
+    """Seam 5 补充: sync_once 入口对未配置 url/api_key 的防御性检查"""
+
+    def test_sync_once_raises_when_url_empty(self, sync_client):
+        """sync_once 在 remote_url 为空时抛出 ValidationError"""
+        from lifeprism.utils.exceptions import ValidationError
+
+        with patch(
+            "lifeprism.config.settings_manager.get_setting",
+            return_value="",
+        ):
+            with patch(
+                "lifeprism.sync.sync_config.get_sync_api_key",
+                return_value="some_key",
+            ):
+                with pytest.raises(ValidationError, match="sync.remote_url 未配置"):
+                    sync_client.sync_once()
+
+    def test_sync_once_raises_when_api_key_empty(self, sync_client):
+        """sync_once 在 api_key 为空时抛出 ValidationError"""
+        from lifeprism.utils.exceptions import ValidationError
+
+        with patch(
+            "lifeprism.config.settings_manager.get_setting",
+            return_value="https://example.com",
+        ):
+            with patch(
+                "lifeprism.sync.sync_config.get_sync_api_key",
+                return_value="",
+            ):
+                with pytest.raises(ValidationError, match="sync_api_key 未配置"):
+                    sync_client.sync_once()

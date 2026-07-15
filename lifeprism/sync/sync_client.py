@@ -39,7 +39,9 @@ def _safe_write_file(file_path: Path, content: bytes) -> None:
         with os.fdopen(fd, "wb") as f:
             f.write(content)
         os.replace(tmp_path, file_path)
-    except Exception:
+    except OSError:
+        # 清理临时文件后重新抛出（仅捕获文件操作可能抛出的 OSError，
+        # 不使用 except Exception 避免吞掉编程错误）
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
         raise
@@ -254,21 +256,28 @@ class SyncClient:
             directories: 文件同步目录列表，None 则使用默认 SYNC_DIRECTORIES
 
         Raises:
-            ValueError: sync.remote_url 或 sync_api_key 未配置时抛出
+            ValidationError: sync.remote_url 或 sync_api_key 未配置时抛出
         """
         from lifeprism.config.settings_manager import get_setting, set_setting
         from lifeprism.sync.sync_config import get_sync_api_key
+        from lifeprism.utils.exceptions import ValidationError
 
         remote_url = get_setting("sync.remote_url")
         api_key = get_sync_api_key()
         last_sync_time = get_setting("sync.last_sync_time", "")
 
-        # 防御性检查：未配置 remote_url 或 api_key 时直接抛出，
+        # 防御性检查：未配置 remote_url 或 api_key 时直接抛出业务校验异常，
         # 避免发起 HTTP 请求时因 url 格式错误导致 httpx.UnsupportedProtocol
         if not remote_url:
-            raise ValueError("sync.remote_url 未配置，请先在前端设置云端地址")
+            raise ValidationError(
+                message="sync.remote_url 未配置，请先在前端设置云端地址",
+                code="SYNC_REMOTE_URL_NOT_CONFIGURED",
+            )
         if not api_key:
-            raise ValueError("sync_api_key 未配置，请先生成云端配置")
+            raise ValidationError(
+                message="sync_api_key 未配置，请先生成云端配置",
+                code="SYNC_API_KEY_NOT_CONFIGURED",
+            )
 
         if tables is None:
             tables = self.get_all_sync_tables()
