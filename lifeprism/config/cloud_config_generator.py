@@ -51,11 +51,16 @@ class CloudConfigGenerator:
         """初始化配置生成器。"""
         pass
 
-    def generate_cloud_config(self) -> tuple[str, bool]:
+    def generate_cloud_config(self, replace_key: bool = False) -> tuple[str, bool]:
         """生成完整的云端配置文件 cloud_init.yaml。
 
         从 keyring 读取所有 Key（LLM/微信/同步），生成包含完整配置的 YAML 文件，
         保存到 {lifeprism_data_path}/cloud_init.yaml。
+
+        Args:
+            replace_key: 是否强制重新生成 sync_api_key。
+                         True=丢弃现有 Key 生成新的（适用于 Key 轮换），
+                         False=优先复用已有 Key（默认）。
 
         Returns:
             tuple: (cloud_config_path, key_is_new)
@@ -63,7 +68,7 @@ class CloudConfigGenerator:
             - key_is_new: 同步 API Key 是否为新生成（True=新生成，False=已有）
         """
         # 1. 生成或读取同步 API Key
-        sync_api_key, key_is_new = self._resolve_sync_api_key()
+        sync_api_key, key_is_new = self._resolve_sync_api_key(replace_key=replace_key)
         logger.info("同步 API Key 已就绪, key_is_new=%s", key_is_new)
 
         # 2. 从 keyring 读取所有 LLM Provider 的 API Key
@@ -85,19 +90,24 @@ class CloudConfigGenerator:
         logger.info("云端配置已生成: %s", cloud_config_path)
         return cloud_config_path, key_is_new
 
-    def _resolve_sync_api_key(self) -> tuple[str, bool]:
+    def _resolve_sync_api_key(self, replace_key: bool = False) -> tuple[str, bool]:
         """生成或读取同步 API Key。
 
-        优先从 keyring 读取已有 Key；如果不存在，生成新的 32 字节随机 Key 并保存。
+        优先从 keyring 读取已有 Key；如果不存在或 replace_key=True，生成新的
+        32 字节随机 Key 并保存到 keyring。
+
+        Args:
+            replace_key: True 时强制生成新 Key（丢弃现有 Key）。
 
         Returns:
             tuple: (api_key, key_is_new)
             - api_key: 同步 API Key 字符串
             - key_is_new: True 表示新生成，False 表示已有
         """
-        existing_key = get_sync_api_key()
-        if existing_key:
-            return existing_key, False
+        if not replace_key:
+            existing_key = get_sync_api_key()
+            if existing_key:
+                return existing_key, False
         new_key = secrets.token_urlsafe(32)
         set_sync_api_key(new_key)
         return new_key, True

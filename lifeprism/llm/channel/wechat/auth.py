@@ -17,10 +17,6 @@ from lifeprism.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Keyring 配置
-KEYRING_SERVICE_NAME = "lifeprism"
-KEYRING_WECHAT_TOKEN_USERNAME = "wechat_bot_token"
-
 
 class WechatAuth:
     """微信认证模块"""

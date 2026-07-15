@@ -26,6 +26,8 @@ ALLOWED_DIRS = ["user", "diary", "agent"]
 # Keyring 服务名称
 KEYRING_SERVICE_NAME = "lifeprism"
 KEYRING_API_KEY_USERNAME = "api_key"  # 保留向后兼容
+# 微信 token 在 keyring 中使用的历史 username（PRD 规范，不可更改以保证向后兼容）
+KEYRING_WECHAT_TOKEN_USERNAME = "wechat_bot_token"
 
 
 class SettingsManager:
@@ -41,6 +43,13 @@ class SettingsManager:
     # storage.yaml 承载的 Key 类字段（run_mode 为云端时从 storage.yaml 读写）
     # api_key 不纳入，保持现有 ENV_VAR + keyring 路径
     STORAGE_KEY_FIELDS = {"sync_api_key", "wechat_token"}
+
+    # storage key → keyring username 映射
+    # storage.yaml 中用 wechat_token 作为字段名，但 keyring 中历史使用 wechat_bot_token 作为 username（PRD 规范）。
+    # 此映射保证本地模式读写 keyring 时使用正确的 username。
+    STORAGE_KEY_TO_KEYRING_USERNAME = {
+        "wechat_token": KEYRING_WECHAT_TOKEN_USERNAME,
+    }
 
     # 默认配置值
     DEFAULTS = {
@@ -393,17 +402,38 @@ class SettingsManager:
         if isinstance(current, dict):
             current.pop(parts[-1], None)
 
+    def _resolve_keyring_username(self, key_name: str) -> str:
+        """将 storage key 名称映射为 keyring username
+
+        大多数 key 在 keyring 中的 username 与 storage key 相同（如 sync_api_key），
+        但 wechat_token 在 keyring 中历史使用 wechat_bot_token 作为 username（PRD 规范），
+        此映射保证向后兼容。
+
+        Args:
+            key_name: storage key 名称（如 "sync_api_key"、"wechat_token"）
+
+        Returns:
+            对应的 keyring username
+        """
+        return self.STORAGE_KEY_TO_KEYRING_USERNAME.get(key_name, key_name)
+
     def _get_storage_key_from_keyring(self, key_name: str) -> str | None:
         """从 keyring 读取 storage Key（本地模式使用）
 
-        顶层 key（sync_api_key、wechat_token）使用 KEYRING_SERVICE_NAME + key_name。
+        顶层 key（sync_api_key、wechat_token）使用 KEYRING_SERVICE_NAME + 映射后的 username。
         嵌套 key（providers.{provider_id}）委托给 _get_api_key_from_keyring_by_provider。
         """
         if key_name.startswith("providers."):
             provider_id = key_name[len("providers.") :]
             return self._get_api_key_from_keyring_by_provider(provider_id)
+        username = self._resolve_keyring_username(key_name)
         try:
-            return keyring.get_password(KEYRING_SERVICE_NAME, key_name)
+            value = keyring.get_password(KEYRING_SERVICE_NAME, username)
+            # 向后兼容：如果映射后的 username 读不到，尝试用原始 key_name 再读一次
+            # （防止用户曾用旧版本代码以 wechat_token 作为 username 存过）
+            if not value and username != key_name:
+                value = keyring.get_password(KEYRING_SERVICE_NAME, key_name)
+            return value
         except Exception:
             return None
 
@@ -413,10 +443,11 @@ class SettingsManager:
             provider_id = key_name[len("providers.") :]
             self._set_api_key_to_keyring_by_provider(provider_id, value)
             return
+        username = self._resolve_keyring_username(key_name)
         try:
-            keyring.set_password(KEYRING_SERVICE_NAME, key_name, value)
+            keyring.set_password(KEYRING_SERVICE_NAME, username, value)
         except Exception as e:
-            logger.warning("写入 keyring %s 失败: %s", key_name, e)
+            logger.warning("写入 keyring %s 失败: %s", username, e)
 
     def _delete_storage_key_from_keyring(self, key_name: str) -> None:
         """从 keyring 删除 storage Key（本地模式使用）"""
@@ -424,12 +455,15 @@ class SettingsManager:
             provider_id = key_name[len("providers.") :]
             self._delete_api_key_from_keyring_by_provider(provider_id)
             return
-        try:
-            keyring.delete_password(KEYRING_SERVICE_NAME, key_name)
-        except keyring.errors.PasswordDeleteError:
-            pass
-        except Exception as e:
-            logger.warning("从 keyring 删除 %s 失败: %s", key_name, e)
+        username = self._resolve_keyring_username(key_name)
+        # 同时删除映射后的 username 和原始 key_name（以防用户曾用旧版本存过）
+        for uname in {username, key_name}:
+            try:
+                keyring.delete_password(KEYRING_SERVICE_NAME, uname)
+            except keyring.errors.PasswordDeleteError:
+                pass
+            except Exception as e:
+                logger.warning("从 keyring 删除 %s 失败: %s", uname, e)
 
     def get_storage_key(self, key_name: str) -> str | None:
         """根据 run_mode 路由读取 Key

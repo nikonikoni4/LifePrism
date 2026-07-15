@@ -38,6 +38,7 @@ describe('SyncConfigAPI', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ replace_key: false }),
         },
       );
       expect(result.cloud_config_path).toBe('C:\\Users\\data\\cloud_init.yaml');

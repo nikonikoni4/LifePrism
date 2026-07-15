@@ -121,8 +121,14 @@ describe('SyncConfigSection', () => {
       const button = screen.getByRole('button', { name: /生成云端配置/i });
       await userEvent.setup().click(button);
 
+      // 选择框出现后点击"保留当前 Key"
       await waitFor(() => {
-        expect(SyncConfigAPI.generateCloudConfig).toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: /保留当前 Key/i })).toBeInTheDocument();
+      });
+      await userEvent.setup().click(screen.getByRole('button', { name: /保留当前 Key/i }));
+
+      await waitFor(() => {
+        expect(SyncConfigAPI.generateCloudConfig).toHaveBeenCalledWith(false);
       });
     });
 
@@ -139,6 +145,11 @@ describe('SyncConfigSection', () => {
       });
 
       await userEvent.setup().click(screen.getByRole('button', { name: /生成云端配置/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /保留当前 Key/i })).toBeInTheDocument();
+      });
+      await userEvent.setup().click(screen.getByRole('button', { name: /保留当前 Key/i }));
 
       await waitFor(() => {
         expect(SyncConfigAPI.openFolderAndSelect).toHaveBeenCalledWith('C:\\Users\\data\\cloud_init.yaml');
@@ -158,6 +169,11 @@ describe('SyncConfigSection', () => {
       });
 
       await userEvent.setup().click(screen.getByRole('button', { name: /生成云端配置/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /保留当前 Key/i })).toBeInTheDocument();
+      });
+      await userEvent.setup().click(screen.getByRole('button', { name: /保留当前 Key/i }));
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /生成中/i })).toBeDisabled();
@@ -180,6 +196,11 @@ describe('SyncConfigSection', () => {
       });
 
       await userEvent.setup().click(screen.getByRole('button', { name: /生成云端配置/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /保留当前 Key/i })).toBeInTheDocument();
+      });
+      await userEvent.setup().click(screen.getByRole('button', { name: /保留当前 Key/i }));
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('keyring 不可用');
@@ -205,6 +226,11 @@ describe('SyncConfigSection', () => {
       await userEvent.setup().click(screen.getByRole('button', { name: /生成云端配置/i }));
 
       await waitFor(() => {
+        expect(screen.getByRole('button', { name: /保留当前 Key/i })).toBeInTheDocument();
+      });
+      await userEvent.setup().click(screen.getByRole('button', { name: /保留当前 Key/i }));
+
+      await waitFor(() => {
         expect(toast.success).toHaveBeenCalledWith(
           expect.stringContaining('配置已生成'),
         );
@@ -224,6 +250,12 @@ describe('SyncConfigSection', () => {
       });
 
       await userEvent.setup().click(screen.getByRole('button', { name: /生成云端配置/i }));
+
+      // 选择"更换 Key 并生成"
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /更换 Key 并生成/i })).toBeInTheDocument();
+      });
+      await userEvent.setup().click(screen.getByRole('button', { name: /更换 Key 并生成/i }));
 
       await waitFor(() => {
         expect(toast.warning).toHaveBeenCalledWith(
@@ -247,6 +279,11 @@ describe('SyncConfigSection', () => {
       await userEvent.setup().click(screen.getByRole('button', { name: /生成云端配置/i }));
 
       await waitFor(() => {
+        expect(screen.getByRole('button', { name: /保留当前 Key/i })).toBeInTheDocument();
+      });
+      await userEvent.setup().click(screen.getByRole('button', { name: /保留当前 Key/i }));
+
+      await waitFor(() => {
         expect(screen.getByText(/C:\\Users\\data\\cloud_init.yaml/)).toBeInTheDocument();
       });
     });
@@ -264,6 +301,11 @@ describe('SyncConfigSection', () => {
       });
 
       await userEvent.setup().click(screen.getByRole('button', { name: /生成云端配置/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /更换 Key 并生成/i })).toBeInTheDocument();
+      });
+      await userEvent.setup().click(screen.getByRole('button', { name: /更换 Key 并生成/i }));
 
       await waitFor(() => {
         // 警告提示应包含 reinit-config 指令

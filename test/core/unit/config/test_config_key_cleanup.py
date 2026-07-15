@@ -19,7 +19,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from lifeprism.config.settings_manager import KEYRING_SERVICE_NAME, settings
+from lifeprism.config.settings_manager import KEYRING_SERVICE_NAME, KEYRING_WECHAT_TOKEN_USERNAME, settings
 
 pytestmark = pytest.mark.core
 
@@ -71,7 +71,7 @@ class TestKeyMigrationLocalMode:
             settings._migrate_keys_from_config()
 
             mock_set.assert_called_once_with(
-                KEYRING_SERVICE_NAME, "wechat_token", "legacy_wx_token"
+                KEYRING_SERVICE_NAME, KEYRING_WECHAT_TOKEN_USERNAME, "legacy_wx_token"
             )
             assert "wechat_token" not in settings._config
 

@@ -24,12 +24,14 @@ export const SyncConfigAPI = {
      * 调用后端 POST /api/sync/generate-cloud-config，
      * 从 keyring 读取所有 Key 并生成完整配置文件。
      *
+     * @param replaceKey 是否强制重新生成 sync_api_key（默认 false）
      * @returns {cloud_config_path, key_is_new}
      */
-    async generateCloudConfig(): Promise<GenerateCloudConfigResponse> {
+    async generateCloudConfig(replaceKey?: boolean): Promise<GenerateCloudConfigResponse> {
         const response = await fetch(`${getApiBaseUrlSync()}/api/sync/generate-cloud-config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ replace_key: replaceKey ?? false }),
         });
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));

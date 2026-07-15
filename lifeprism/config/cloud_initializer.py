@@ -159,12 +159,13 @@ class CloudInitializer:
         验证 cloud_init.yaml 配置完整性（storage 段 + config 段）
 
         检查必需字段:
-        - storage.sync_api_key
-        - storage.wechat_token
-        - config.llm.provider
-        - config.llm.model
+        - storage.sync_api_key（必需）
+        - storage.wechat_token（必需）
+        - config.llm.provider（必需）
+        - config.llm.model（必需）
 
-        storage.providers 为可选字段，空字典或缺失均不报错。
+        可选字段:
+        - storage.providers：空字典或缺失均不报错
 
         Args:
             cloud_config: cloud_init.yaml 解析后的配置字典
@@ -180,11 +181,11 @@ class CloudInitializer:
             errors.append(f"storage 段格式错误: 期望字典，实际 {type(storage_config).__name__}")
             storage_config = {}
 
-        # 检查 storage.sync_api_key
+        # 检查 storage.sync_api_key（必需）
         if not storage_config.get("sync_api_key"):
             errors.append("缺少必需字段: storage.sync_api_key")
 
-        # 检查 storage.wechat_token
+        # 检查 storage.wechat_token（必需）
         if not storage_config.get("wechat_token"):
             errors.append("缺少必需字段: storage.wechat_token")
 

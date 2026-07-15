@@ -3,11 +3,11 @@
  *
  * 提供云端地址输入和云端配置生成功能：
  * - 云端地址输入框（保存到 config.yaml::sync.remote_url）
- * - 生成云端配置按钮（调用后端 API 生成 cloud_init.yaml 并打开文件夹）
+ * - 生成云端配置按钮（弹出选择框：保留 Key / 更换 Key）
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Cloud, Loader2, CheckCircle, AlertTriangle, FolderOpen } from 'lucide-react';
+import { Cloud, Loader2, CheckCircle, AlertTriangle, FolderOpen, X, Key, RefreshCw } from 'lucide-react';
 import { SyncConfigAPI } from '../syncApi';
 import type { GenerateCloudConfigResponse } from '../syncTypes';
 import { toast } from '../../../core/components';
@@ -23,6 +23,7 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
     const [isSaving, setIsSaving] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [result, setResult] = useState<GenerateCloudConfigResponse | null>(null);
+    const [showChoiceDialog, setShowChoiceDialog] = useState(false);
 
     // 加载云端地址
     useEffect(() => {
@@ -63,25 +64,29 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
         }
     }, [remoteUrl]);
 
-    // 生成云端配置
-    const handleGenerate = useCallback(async () => {
+    // 点击生成按钮 -> 弹出选择框
+    const handleGenerateClick = useCallback(() => {
+        setShowChoiceDialog(true);
+    }, []);
+
+    // 执行生成（带 replace_key 参数）
+    const doGenerate = useCallback(async (replaceKey: boolean) => {
+        setShowChoiceDialog(false);
         setIsGenerating(true);
         setResult(null);
         try {
-            const res = await SyncConfigAPI.generateCloudConfig();
+            const res = await SyncConfigAPI.generateCloudConfig(replaceKey);
             setResult(res);
 
             // 打开文件夹并选中文件
             await SyncConfigAPI.openFolderAndSelect(res.cloud_config_path);
 
             if (res.key_is_new) {
-                // 新 Key 已生成，需要警告
                 toast.warning(
                     '配置已生成！新的同步 API Key 已生成。' +
                     '请在云端执行 reinit-config 以使用新 Key，否则同步将无法认证。'
                 );
             } else {
-                // 使用已有 Key，正常提示
                 toast.success('配置已生成！使用已有的同步 API Key，请将配置文件复制到云端。');
             }
         } catch (err) {
@@ -125,7 +130,7 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                 {/* 生成云端配置按钮 */}
                 <div>
                     <button
-                        onClick={handleGenerate}
+                        onClick={handleGenerateClick}
                         disabled={isGenerating}
                         className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-bold text-sm"
                     >
@@ -165,18 +170,18 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                                 {result.key_is_new ? (
                                     <div className="space-y-2">
                                         <p className="text-sm font-bold text-amber-800">
-                                            配置已生成！新的同步 API Key 已生成。
-                                        </p>
-                                        <p className="text-xs text-amber-700">
-                                            【重要】本地没有检测到已有的同步 Key，已重新生成。
+                                            配置已生成！同步 API Key 已更换。
                                         </p>
                                         <ol className="list-decimal list-inside space-y-1 text-xs text-amber-700">
-                                            <li>将配置文件复制到云端：{result.cloud_config_path}</li>
-                                            <li>在云端执行：python -m lifeprism.server.main_agent_only reinit-config</li>
-                                            <li>如果云端之前已配置过，此操作会替换旧的 Key</li>
+                                            <li>将配置文件复制到云端 LifePrism/localData/ 目录</li>
+                                            <li>在云端 LifePrism 目录下执行：python lifeprism/server/main_agent_only.py reinit-config</li>
+                                            <li>重启云端服务使新 Key 生效</li>
                                         </ol>
                                         <p className="text-xs text-amber-700 font-medium">
-                                            如果云端使用旧的 Key，同步将无法认证。
+                                            如果云端仍使用旧 Key，同步将无法认证。
+                                        </p>
+                                        <p className="text-xs text-amber-600 font-mono break-all">
+                                            {result.cloud_config_path}
                                         </p>
                                     </div>
                                 ) : (
@@ -185,7 +190,7 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                                             配置已生成！
                                         </p>
                                         <p className="text-xs text-green-700">
-                                            使用已有的同步 API Key。请将配置文件复制到云端并启动服务。
+                                            使用已有的同步 API Key。请将配置文件复制到云端并执行 reinit-config。
                                         </p>
                                         <p className="text-xs text-green-600 font-mono break-all">
                                             {result.cloud_config_path}
@@ -197,6 +202,72 @@ const SyncConfigSection: React.FC<SyncConfigSectionProps> = ({ initialRemoteUrl 
                     </div>
                 )}
             </div>
+
+            {/* 生成选项弹框 */}
+            {showChoiceDialog && (
+                <div
+                    className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+                    onClick={() => setShowChoiceDialog(false)}
+                >
+                    <div
+                        className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* 弹框标题 */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                            <h3 className="text-base font-bold text-slate-800">生成云端配置</h3>
+                            <button
+                                onClick={() => setShowChoiceDialog(false)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* 弹框内容 */}
+                        <div className="p-6 space-y-3">
+                            {/* 选项 1：保留 Key */}
+                            <button
+                                onClick={() => doGenerate(false)}
+                                className="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all group"
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className="p-2 bg-green-50 rounded-lg text-green-600 group-hover:bg-green-100 transition-colors">
+                                        <Key size={18} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-slate-800">保留当前 Key</p>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            使用已有的 sync_api_key，仅生成配置文档。适用于更新 LLM 配置或测试。
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* 选项 2：更换 Key */}
+                            <button
+                                onClick={() => doGenerate(true)}
+                                className="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-amber-300 hover:bg-amber-50/50 transition-all group"
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className="p-2 bg-amber-50 rounded-lg text-amber-600 group-hover:bg-amber-100 transition-colors">
+                                        <RefreshCw size={18} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-slate-800">更换 Key 并生成</p>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            重新生成 sync_api_key。适用于 Key 轮换或可能泄露。
+                                        </p>
+                                        <div className="mt-2 px-2 py-1 bg-amber-50 rounded text-[11px] text-amber-700">
+                                            更换后必须将 cloud_init.yaml 复制到云端并执行 reinit-config，否则同步无法认证。
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </section>
     );
 };

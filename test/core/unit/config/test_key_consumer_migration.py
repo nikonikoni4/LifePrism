@@ -23,7 +23,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from lifeprism.config.settings_manager import settings
+from lifeprism.config.settings_manager import KEYRING_WECHAT_TOKEN_USERNAME, settings
 
 pytestmark = pytest.mark.core
 
@@ -123,7 +123,7 @@ class TestWechatAuthKeyMigration:
              ) as mock_kr:
             result = WechatAuth._load_token_from_keyring()
             assert result == "kr_wechat_token"
-            mock_kr.assert_called_once_with("lifeprism", "wechat_token")
+            mock_kr.assert_called_once_with("lifeprism", KEYRING_WECHAT_TOKEN_USERNAME)
 
     def test_wechat_auth_cloud_mode_reads_storage_via_settings(self, tmp_path):
         """云端模式：_load_token_from_keyring 通过 SettingsManager 从 storage.yaml 读取"""
