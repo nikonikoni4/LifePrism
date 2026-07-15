@@ -40,3 +40,10 @@
 - path: `docs/docs-rules/flow-write-guide.md`
 - 触发规则：编写或修改 `docs/flows/` 目录下的数据流文档时阅读
 - 内容摘要：Flow 文档编写规则，定义 Flow 对象数据结构、耦合关系、反常设计说明的写法，以及 5 类必须记录的节点判断标准
+
+## known-limitations-and-debt-rules
+
+- updated_at: 2026-07-15
+- path: `docs/docs-rules/known-limitations-and-debt-rules.md`
+- 触发规则：写入 `docs/known-limitations/`、`docs/technical-debt/`、`docs/progress/` 任一目录的文档前阅读
+- 内容摘要：定义已知限制、技术债、待办调研三类文档的判定标准、消费场景、写作视角、重叠处理规则和 progress 的生命周期
