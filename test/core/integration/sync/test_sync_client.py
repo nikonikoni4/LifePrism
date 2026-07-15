@@ -416,6 +416,16 @@ class TestPushToRemote:
         self, sync_client, initialized_db, clean_tables
     ):
         """推送：HTTP 请求包含正确的认证头"""
+        # Arrange: 插入一条增量数据使 push 实际发送请求
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                ("todo-push-auth", "认证测试", "pool", "2026-07-01 10:00:00", "2026-07-01 11:00:00"),
+            )
+            conn.commit()
+
         mock_response = _make_mock_response({"success": True})
 
         with (
@@ -434,7 +444,7 @@ class TestPushToRemote:
     def test_push_handles_no_local_changes(
         self, sync_client, initialized_db, clean_tables
     ):
-        """推送：本地无增量数据时仍发送请求（空 tables）"""
+        """推送：本地无增量数据时不发送请求"""
         mock_response = _make_mock_response({"success": True})
 
         with (
@@ -447,9 +457,8 @@ class TestPushToRemote:
                 tables=["todo_list"],
             )
 
-        mock_post.assert_called_once()
-        tables_data = mock_post.call_args.kwargs["json"]["changes"]
-        assert tables_data == {}
+        # 无增量数据时不发送 POST 请求
+        mock_post.assert_not_called()
 
     def test_push_only_sends_incremental_changes(
         self, sync_client, initialized_db, clean_tables
@@ -558,6 +567,16 @@ class TestSyncOnce:
 
         空目录场景下仅触发 check 端点，不触发 fetch/push-files/verify/commit。
         """
+        # Arrange: 插入本地增量数据，使 push 实际发送请求
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                ("todo-sync-order", "同步顺序测试", "pool", "2026-07-01 10:00:00", "2026-07-01 12:00:00"),
+            )
+            conn.commit()
+
         call_order = []
 
         def mock_post_side_effect(*args, **kwargs):
@@ -758,6 +777,16 @@ class TestSyncOnceAtomicity:
         self, sync_client, initialized_db, clean_tables
     ):
         """原子性：Push 失败时不更新 last_sync_time"""
+        # Arrange: 插入本地增量数据，使 push 实际发送请求并触发失败
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                ("todo-push-fail-sync", "Push失败测试", "pool", "2026-07-01 10:00:00", "2026-07-01 12:00:00"),
+            )
+            conn.commit()
+
         with (
             patch(
                 "lifeprism.sync.sync_client.httpx.post",

@@ -99,6 +99,10 @@ SYNC_DIRECTORIES = [
     "user/",  # 用户级数据（Agent write_file/edit_file，排除 chat_history.json）
 ]
 
+# 文件推送分批大小：每批最多推送 FILE_BATCH_SIZE 个文件
+# 单文件经 gzip+base64 编码后通常几 KB~几百 KB，50 个/批约 5MB，云端内存安全
+FILE_BATCH_SIZE = 50
+
 
 class SyncClient:
     """本地同步客户端
@@ -490,10 +494,10 @@ class SyncClient:
             logger.info("表 %s 拉取完成, 总计 %d 条记录", table_name, total_rows)
 
     def push_to_remote(self, remote_url, api_key, tables):
-        """推送本地增量数据到云端
+        """推送本地增量数据到云端（逐表 + 分批）
 
-        使用 query_incremental 获取本地变更（updated_at > last_sync_time），
-        通过 HTTP POST 推送到远程。
+        对每张表查询增量记录（updated_at > last_sync_time），
+        按 batch_size=1000 切分后逐批 POST 推送，避免单请求 payload 过大导致云端 OOM。
 
         Args:
             remote_url: 远程服务器 URL
@@ -503,8 +507,9 @@ class SyncClient:
         from lifeprism.config.settings_manager import get_setting
 
         last_sync_time = get_setting("sync.last_sync_time", "")
+        batch_size = 1000  # 与 pull_from_remote 保持一致
+        total_batches = 0
 
-        tables_data = {}
         for table_name in tables:
             # 跳过无 updated_at 列的表（无法增量查询）
             if not self.sync_repository.has_updated_at(table_name):
@@ -513,32 +518,50 @@ class SyncClient:
                     table_name,
                 )
                 continue
+
             rows = self.sync_repository.query_incremental(table_name, last_sync_time)
-            if rows:
-                tables_data[table_name] = rows
+            if not rows:
+                continue
 
-        try:
-            response = httpx.post(
-                url=f"{remote_url}/api/sync/push",
-                json={
-                    "changes": tables_data,
-                },
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                },
-                timeout=60.0,
-            )
-            response.raise_for_status()
-        except (httpx.HTTPStatusError, httpx.RequestError) as e:
-            logger.error(
-                "push_to_remote: 推送失败, tables=%s, remote_url=%s, error=%s",
-                list(tables_data.keys()),
-                remote_url,
-                e,
-            )
-            raise
+            # 内存切分，逐批推送
+            for offset in range(0, len(rows), batch_size):
+                chunk = rows[offset : offset + batch_size]
+                try:
+                    response = httpx.post(
+                        url=f"{remote_url}/api/sync/push",
+                        json={"changes": {table_name: chunk}},
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        timeout=60.0,
+                    )
+                    response.raise_for_status()
+                except (httpx.HTTPStatusError, httpx.RequestError) as e:
+                    logger.error(
+                        "push_to_remote: 推送失败, table=%s, batch_offset=%d, "
+                        "batch_size=%d, remote_url=%s, error=%s",
+                        table_name,
+                        offset,
+                        len(chunk),
+                        remote_url,
+                        e,
+                    )
+                    raise
 
-        logger.info("push_to_remote: 推送 %d 张表的数据", len(tables_data))
+                total_batches += 1
+                logger.debug(
+                    "push_to_remote: 表 %s 批次推送成功, offset=%d, 行数=%d",
+                    table_name,
+                    offset,
+                    len(chunk),
+                )
+
+            logger.info(
+                "push_to_remote: 表 %s 推送完成, 总行数=%d, 批次数=%d",
+                table_name,
+                len(rows),
+                (len(rows) + batch_size - 1) // batch_size,
+            )
+
+        logger.info("push_to_remote: 全部推送完成, 总批次数=%d", total_batches)
 
     # ==================== 文件同步全流程（Issue 33） ====================
 
@@ -847,7 +870,8 @@ class SyncClient:
         """Phase 2c: 推送本地文件（含 parent_hash + current_hash）到云端
 
         读取本地文件内容（gzip+base64 编码），附带 file_sync_state 中的
-        parent_hash 和 current_hash，通过 POST /push-files 推送到云端。
+        parent_hash 和 current_hash，按 FILE_BATCH_SIZE 分批通过 POST /push-files 推送到云端，
+        避免单请求 payload 过大导致云端 OOM。
 
         CONFLICT 文件不由此方法处理（由调用方在矩阵判定阶段跳过，仅记录日志）。
 
@@ -896,26 +920,44 @@ class SyncClient:
             logger.info("_push_files: 无文件需要推送")
             return
 
-        try:
-            response = httpx.post(
-                url=f"{remote_url}/api/sync/push-files",
-                json={"files": files_payload},
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                },
-                timeout=60.0,
-            )
-            response.raise_for_status()
-        except (httpx.HTTPStatusError, httpx.RequestError) as e:
-            logger.error(
-                "_push_files: 推送失败, remote_url=%s, files=%d, error=%s",
-                remote_url,
-                len(files_payload),
-                e,
-            )
-            raise
+        # 按 FILE_BATCH_SIZE 分批推送，避免单请求 payload 过大导致云端 OOM
+        total_batches = 0
+        for offset in range(0, len(files_payload), FILE_BATCH_SIZE):
+            chunk = files_payload[offset : offset + FILE_BATCH_SIZE]
+            try:
+                response = httpx.post(
+                    url=f"{remote_url}/api/sync/push-files",
+                    json={"files": chunk},
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                    },
+                    timeout=60.0,
+                )
+                response.raise_for_status()
+            except (httpx.HTTPStatusError, httpx.RequestError) as e:
+                logger.error(
+                    "_push_files: 推送失败, batch_offset=%d, batch_size=%d, "
+                    "total_files=%d, remote_url=%s, error=%s",
+                    offset,
+                    len(chunk),
+                    len(files_payload),
+                    remote_url,
+                    e,
+                )
+                raise
 
-        logger.info("_push_files: 推送 %d 个文件", len(files_payload))
+            total_batches += 1
+            logger.debug(
+                "_push_files: 批次推送成功, offset=%d, 文件数=%d",
+                offset,
+                len(chunk),
+            )
+
+        logger.info(
+            "_push_files: 推送 %d 个文件, 批次数=%d",
+            len(files_payload),
+            total_batches,
+        )
 
     def _verify_and_advance_parent(self, remote_url, api_key, paths):
         """Phase 3: 一致性校验 + parent_hash 推进

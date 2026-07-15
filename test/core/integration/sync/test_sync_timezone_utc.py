@@ -453,8 +453,8 @@ class TestCrossTimezoneSync:
             )
 
         # Assert: 不应推送该记录（因为 updated_at <= last_sync_time）
-        tables_data = mock_post.call_args.kwargs["json"]["changes"]
-        assert "todo_list" not in tables_data or len(tables_data.get("todo_list", [])) == 0
+        # 无增量数据时 push_to_remote 不发送 POST 请求
+        mock_post.assert_not_called()
 
     def test_cross_timezone_sync_local_newer_keeps_local(
         self, sync_client, initialized_db, clean_tables

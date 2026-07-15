@@ -134,6 +134,17 @@ class TestSyncOnceIncludesFileSync:
 
         空目录场景下仅触发 check 端点，不触发 fetch/push-files/verify/commit。
         """
+        # Arrange: 插入本地增量数据，使 push 实际发送请求
+        # updated_at 使用 ISO 8601 格式，确保 > last_sync_time "2026-07-01T00:00:00+00:00"
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                ("todo-file-sync", "文件同步测试", "pool", "2026-07-01T10:00:00+00:00", "2026-07-01T12:00:00+00:00"),
+            )
+            conn.commit()
+
         # Arrange: 记录调用顺序
         call_order = []
 

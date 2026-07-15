@@ -289,3 +289,160 @@ class TestPullBatched:
         assert any("分批拉取" in msg for msg in log_messages), (
             "日志应包含 '分批拉取' 进度信息"
         )
+
+
+# ==================== Seam: push_to_remote() 分批推送 ====================
+
+
+class TestPushBatched:
+    """Seam: push_to_remote() - 逐表 + 分批 1000 条推送
+
+    验证 push_to_remote() 对每张表查询增量后按 batch_size=1000 切分，
+    逐批 POST 推送，避免单请求 payload 过大导致云端 OOM。
+    """
+
+    def test_push_large_table_split_into_batches(
+        self, sync_client, initialized_db, clean_tables
+    ):
+        """分批推送：超过 1000 条的表被正确切分为多个 POST 请求"""
+        # Arrange: 插入 2500 条增量记录
+        rows_data = [
+            (
+                f"todo-push-batch-{i:04d}",
+                f"批量任务-{i}",
+                "pool",
+                "2026-07-01 10:00:00",
+                "2026-07-01 12:00:00",
+            )
+            for i in range(2500)
+        ]
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executemany(
+                "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                rows_data,
+            )
+            conn.commit()
+
+        mock_response = _make_mock_response({"success": True})
+
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post,
+            patch("lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"),
+        ):
+            sync_client.push_to_remote(
+                remote_url="http://test:8000",
+                api_key="test-key",
+                tables=["todo_list"],
+            )
+
+        # Assert: 3 批请求（1000 + 1000 + 500）
+        assert mock_post.call_count == 3
+
+        # 验证每次 POST 只含一张表的一批数据
+        for i, call in enumerate(mock_post.call_args_list):
+            changes = call.kwargs["json"]["changes"]
+            assert "todo_list" in changes
+            if i < 2:
+                assert len(changes["todo_list"]) == 1000
+            else:
+                assert len(changes["todo_list"]) == 500
+
+    def test_push_multiple_tables_separate_requests(
+        self, sync_client, initialized_db, clean_tables
+    ):
+        """多张表各自独立发送 POST 请求"""
+        # 使用 mock 控制 query_incremental 返回值，避免依赖多表 schema
+        table_data_map = {
+            "todo_list": [
+                {
+                    "id": "todo-multi-001",
+                    "content": "任务1",
+                    "state": "pool",
+                    "created_at": "2026-07-01 10:00:00",
+                    "updated_at": "2026-07-01 12:00:00",
+                }
+            ],
+            "diary": [
+                {
+                    "id": "diary-multi-001",
+                    "content": "日记1",
+                    "created_at": "2026-07-01 10:00:00",
+                    "updated_at": "2026-07-01 12:00:00",
+                }
+            ],
+        }
+
+        mock_response = _make_mock_response({"success": True})
+
+        with (
+            patch.object(sync_client.sync_repository, "has_updated_at", return_value=True),
+            patch.object(
+                sync_client.sync_repository,
+                "query_incremental",
+                side_effect=lambda table_name, last_sync_time: table_data_map.get(table_name, []),
+            ),
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post,
+            patch("lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"),
+        ):
+            sync_client.push_to_remote(
+                remote_url="http://test:8000",
+                api_key="test-key",
+                tables=["todo_list", "diary"],
+            )
+
+        # Assert: 2 次请求（每张表各一次）
+        assert mock_post.call_count == 2
+        # 第一次只含 todo_list
+        changes_0 = mock_post.call_args_list[0].kwargs["json"]["changes"]
+        assert "todo_list" in changes_0
+        assert len(changes_0["todo_list"]) == 1
+        # 第二次只含 diary
+        changes_1 = mock_post.call_args_list[1].kwargs["json"]["changes"]
+        assert "diary" in changes_1
+        assert len(changes_1["diary"]) == 1
+
+    def test_push_batch_failure_raises_immediately(
+        self, sync_client, initialized_db, clean_tables
+    ):
+        """单批失败立即抛异常，不继续推送后续批次"""
+        # Arrange: 插入 2500 条记录（需要 3 批）
+        rows_data = [
+            (
+                f"todo-push-fail-{i:04d}",
+                f"失败测试-{i}",
+                "pool",
+                "2026-07-01 10:00:00",
+                "2026-07-01 12:00:00",
+            )
+            for i in range(2500)
+        ]
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executemany(
+                "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                rows_data,
+            )
+            conn.commit()
+
+        # 第一批返回 500 错误
+        error_response = MagicMock()
+        error_response.status_code = 500
+        error_response.raise_for_status.side_effect = Exception("HTTP 500 Push Failed")
+
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=error_response) as mock_post,
+            patch("lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"),
+        ):
+            # Act & Assert: 应抛出异常
+            with pytest.raises(Exception, match="HTTP 500 Push Failed"):
+                sync_client.push_to_remote(
+                    remote_url="http://test:8000",
+                    api_key="test-key",
+                    tables=["todo_list"],
+                )
+
+        # 只调用了 1 次（第一批失败后不再继续）
+        assert mock_post.call_count == 1
