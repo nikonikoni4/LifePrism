@@ -53,7 +53,8 @@ class TestStorageYamlRead:
 
     def test_get_storage_key_reads_sync_api_key_from_storage(self, tmp_path):
         """云端模式下 get_storage_key('sync_api_key') 返回 storage.yaml 中的值"""
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "N7kX_test_key"}, f)
 
@@ -66,7 +67,8 @@ class TestStorageYamlRead:
 
     def test_get_storage_key_reads_wechat_token_from_storage(self, tmp_path):
         """云端模式下 get_storage_key('wechat_token') 返回 storage.yaml 中的值"""
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"wechat_token": "wx_token_abc"}, f)
 
@@ -86,7 +88,8 @@ class TestStorageYamlNestedKey:
 
     def test_get_storage_key_reads_nested_provider_key(self, tmp_path):
         """get_storage_key('providers.anthropic') 返回嵌套结构中的值"""
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump(
                 {
@@ -108,7 +111,8 @@ class TestStorageYamlNestedKey:
 
     def test_get_storage_key_nested_key_not_exist_returns_none(self, tmp_path):
         """嵌套 key 不存在时返回 None"""
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"providers": {"anthropic": "sk-ant-xxx"}}, f)
 
@@ -134,7 +138,7 @@ class TestStorageYamlWrite:
              patch.object(settings, "_storage_config", {}):
             settings.set_storage_key("sync_api_key", "N7kX_new_key")
 
-            storage_path = tmp_path / "storage.yaml"
+            storage_path = tmp_path / "config" / "storage.yaml"
             assert storage_path.exists()
             with open(storage_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
@@ -148,7 +152,7 @@ class TestStorageYamlWrite:
              patch.object(settings, "_storage_config", {}):
             settings.set_storage_key("providers.anthropic", "sk-ant-new")
 
-            storage_path = tmp_path / "storage.yaml"
+            storage_path = tmp_path / "config" / "storage.yaml"
             with open(storage_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             assert data["providers"]["anthropic"] == "sk-ant-new"
@@ -180,7 +184,7 @@ class TestStorageYamlPermissions:
              patch("lifeprism.config.settings_manager.os.chmod") as mock_chmod:
             settings.set_storage_key("sync_api_key", "test_key")
 
-            storage_path = tmp_path / "storage.yaml"
+            storage_path = tmp_path / "config" / "storage.yaml"
             chmod_calls = [
                 (call.args[0], call.args[1]) for call in mock_chmod.call_args_list
             ]
@@ -196,7 +200,7 @@ class TestStorageYamlPermissions:
              patch("lifeprism.config.settings_manager.os.chmod") as mock_chmod:
             settings.save_storage_yaml({"sync_api_key": "bulk_key"})
 
-            storage_path = tmp_path / "storage.yaml"
+            storage_path = tmp_path / "config" / "storage.yaml"
             chmod_calls = [
                 (call.args[0], call.args[1]) for call in mock_chmod.call_args_list
             ]
@@ -243,12 +247,13 @@ class TestStorageYamlFullMode:
             settings.set_storage_key("sync_api_key", "kr_write_val")
             mock_set.assert_called_once_with(KEYRING_SERVICE_NAME, "sync_api_key", "kr_write_val")
             # storage.yaml 不应被创建
-            assert not (tmp_path / "storage.yaml").exists()
+            assert not (tmp_path / "config" / "storage.yaml").exists()
 
     def test_full_mode_get_storage_key_does_not_load_storage_file(self, tmp_path):
         """full 模式下 get_storage_key() 不读取 storage.yaml 文件"""
         # 预创建 storage.yaml，验证 full 模式不读取它
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "storage_value"}, f)
 
@@ -280,7 +285,7 @@ class TestSaveStorageYaml:
              patch.object(settings, "_config_base_path", tmp_path):
             settings.save_storage_yaml(data)
 
-            storage_path = tmp_path / "storage.yaml"
+            storage_path = tmp_path / "config" / "storage.yaml"
             assert storage_path.exists()
             with open(storage_path, encoding="utf-8") as f:
                 loaded = yaml.safe_load(f)
@@ -307,7 +312,8 @@ class TestGetSetRouting:
 
     def test_get_sync_api_key_from_storage_in_cloud_mode(self, tmp_path):
         """云端模式下 get('sync_api_key') 从 storage.yaml 读取"""
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "via_get_method"}, f)
 
@@ -320,7 +326,8 @@ class TestGetSetRouting:
 
     def test_get_wechat_token_from_storage_in_cloud_mode(self, tmp_path):
         """云端模式下 get('wechat_token') 从 storage.yaml 读取"""
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"wechat_token": "wx_via_get"}, f)
 
@@ -348,14 +355,15 @@ class TestGetSetRouting:
              patch.object(settings, "_storage_config", {}):
             settings.set("sync_api_key", "set_via_set_method")
 
-            storage_path = tmp_path / "storage.yaml"
+            storage_path = tmp_path / "config" / "storage.yaml"
             with open(storage_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             assert data["sync_api_key"] == "set_via_set_method"
 
     def test_get_api_key_not_routed_to_storage_in_cloud_mode(self, tmp_path):
         """api_key 字段不路由到 storage.yaml，保持现有 ENV_VAR + keyring 路径"""
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"api_key": "should_not_read_this"}, f)
 
@@ -371,7 +379,8 @@ class TestGetSetRouting:
 
     def test_full_mode_get_sync_api_key_not_from_storage(self, tmp_path):
         """full 模式下 get('sync_api_key') 不从 storage.yaml 读取"""
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "storage_value"}, f)
 

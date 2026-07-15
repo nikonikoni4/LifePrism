@@ -105,7 +105,8 @@ class TestWechatAuthLoadTokenFallback:
         from lifeprism.config.settings_manager import settings
         from lifeprism.llm.channel.wechat.auth import WechatAuth
 
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"wechat_token": "storage-token"}, f)
 
@@ -153,7 +154,8 @@ class TestSyncConfigApiKey:
         from lifeprism.config.settings_manager import settings
         from lifeprism.sync.sync_config import get_sync_api_key
 
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "storage-sync-key"}, f)
 

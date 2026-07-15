@@ -110,12 +110,12 @@ class TestKeyMigrationStorageExists:
     def test_skip_migration_when_storage_yaml_exists(self, tmp_path):
         """storage.yaml 已存在时不写入 keyring，仅从 config.yaml 移除残留 Key"""
         # 预创建 storage.yaml（模拟 CloudInitializer 已写入）
-        storage_path = tmp_path / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
+        storage_path = tmp_path / "config" / "storage.yaml"
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "already_in_storage"}, f)
 
         config_path = tmp_path / "config" / "config.yaml"
-        config_path.parent.mkdir(parents=True, exist_ok=True)
 
         with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
              patch.object(settings, "_config_base_path", tmp_path), \
@@ -133,13 +133,13 @@ class TestKeyMigrationStorageExists:
 
     def test_storage_yaml_unchanged_when_already_exists(self, tmp_path):
         """storage.yaml 已存在时其内容不被修改"""
-        storage_path = tmp_path / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
+        storage_path = tmp_path / "config" / "storage.yaml"
         original_storage = {"sync_api_key": "original_storage_key", "wechat_token": "original_wx"}
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump(original_storage, f)
 
         config_path = tmp_path / "config" / "config.yaml"
-        config_path.parent.mkdir(parents=True, exist_ok=True)
 
         with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
              patch.object(settings, "_config_base_path", tmp_path), \
@@ -168,7 +168,7 @@ class TestKeyMigrationCloudMode:
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
         # storage.yaml 不存在
-        assert not (tmp_path / "storage.yaml").exists()
+        assert not (tmp_path / "config" / "storage.yaml").exists()
 
         with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
              patch.object(settings, "_config_base_path", tmp_path), \
@@ -179,7 +179,7 @@ class TestKeyMigrationCloudMode:
             settings._migrate_keys_from_config()
 
             # storage.yaml 被创建，包含迁移的 Key
-            storage_path = tmp_path / "storage.yaml"
+            storage_path = tmp_path / "config" / "storage.yaml"
             assert storage_path.exists()
             with open(storage_path, encoding="utf-8") as f:
                 storage_data = yaml.safe_load(f)
@@ -200,7 +200,7 @@ class TestKeyMigrationCloudMode:
              patch.object(settings, "_storage_loaded_mode", None):
             settings._migrate_keys_from_config()
 
-            storage_path = tmp_path / "storage.yaml"
+            storage_path = tmp_path / "config" / "storage.yaml"
             with open(storage_path, encoding="utf-8") as f:
                 storage_data = yaml.safe_load(f)
             assert storage_data["wechat_token"] == "legacy_wx_cloud"
@@ -219,7 +219,7 @@ class TestKeyMigrationCloudMode:
              patch.object(settings, "_storage_loaded_mode", None):
             settings._migrate_keys_from_config()
 
-            storage_path = tmp_path / "storage.yaml"
+            storage_path = tmp_path / "config" / "storage.yaml"
             with open(storage_path, encoding="utf-8") as f:
                 storage_data = yaml.safe_load(f)
             assert storage_data["sync_api_key"] == "sync_k"

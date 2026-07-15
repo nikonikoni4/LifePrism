@@ -35,7 +35,8 @@ class TestDeleteStorageKeyRouting:
 
     def test_delete_in_cloud_mode_removes_from_storage(self, tmp_path):
         """云端模式下 delete_storage_key 从 storage.yaml 删除"""
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "val", "wechat_token": "wx"}, f)
 
@@ -297,7 +298,7 @@ class TestAtomicWrites:
             mock_replace.assert_called_once()
             args = mock_replace.call_args[0]
             assert str(args[0]).endswith(".tmp")
-            storage_path = tmp_path / "storage.yaml"
+            storage_path = tmp_path / "config" / "storage.yaml"
             assert args[1] == storage_path
 
     def test_save_config_no_direct_write_to_target(self, tmp_path):

@@ -60,7 +60,8 @@ class TestSyncConfigKeyMigration:
         """云端模式：get_sync_api_key 通过 SettingsManager 从 storage.yaml 读取"""
         from lifeprism.sync.sync_config import get_sync_api_key
 
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "storage_sync_key"}, f)
 
@@ -129,7 +130,8 @@ class TestWechatAuthKeyMigration:
         """云端模式：_load_token_from_keyring 通过 SettingsManager 从 storage.yaml 读取"""
         from lifeprism.llm.channel.wechat.auth import WechatAuth
 
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"wechat_token": "storage_wechat_token"}, f)
 
@@ -208,7 +210,8 @@ class TestProviderManagerKeyMigration:
         from lifeprism.config.provider_manager import provider_manager
 
         raw_specs = _make_raw_specs(("anthropic", "api_key_anthropic"))
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"providers": {"anthropic": "sk-ant-storage"}}, f)
 
@@ -273,7 +276,8 @@ class TestProviderManagerKeyMigration:
             {"name": "anthropic", "env_key": "api_key_anthropic", "api_key": "yaml-fallback-key"}
         ]
         # storage.yaml 不含 providers.anthropic
-        storage_path = tmp_path / "storage.yaml"
+        storage_path = tmp_path / "config" / "storage.yaml"
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "other"}, f)
 

@@ -172,7 +172,9 @@ class SyncClient:
     async def _run_sync_loop(self, interval_seconds: int):
         """定时同步循环的内部实现。
 
-        循环执行：等待 interval_seconds -> 调用 sync_once()。
+        循环执行：等待 interval_seconds -> 检查配置 -> 调用 sync_once()。
+        - 配置检查：每次执行前重新读取 sync.remote_url，为空则跳过本次
+          （不取消整个定时任务，方便用户后续在前端配置 url 后自动开始同步）
         - 并发控制：通过 try_start_sync() 原子地检查并设置同步标志，
           若已在同步中则跳过本次并记录 WARNING
         - 失败重试：sync_once 抛异常时记录 ERROR，下次定时触发时自动重试
@@ -183,6 +185,12 @@ class SyncClient:
         """
         while True:
             await asyncio.sleep(interval_seconds)
+            # 配置检查：未配置 remote_url 时跳过本次（不取消定时任务）
+            # 这样用户后续在前端配置 url 后，下次定时自动开始同步，无需重启
+            remote_url = self._read_remote_url()
+            if not remote_url:
+                logger.info("跳过定时同步：未配置 sync.remote_url")
+                continue
             # 并发控制：原子地检查并设置同步标志
             if not self.try_start_sync():
                 logger.warning("跳过定时同步（上次同步未完成）")
@@ -199,6 +207,20 @@ class SyncClient:
                 logger.error("定时同步失败", exc_info=True)
             finally:
                 self.finish_sync()
+
+    def _read_remote_url(self) -> str:
+        """读取 sync.remote_url 配置（每次调用都从 SettingsManager 内存读取，支持热重载）
+
+        前端通过 PATCH /api/v2/settings 修改 sync_remote_url 后，
+        SettingsManager.update 会立即更新内存中的 _config，
+        因此此处调用 get_setting 能立即读到新值，无需重启或 reload。
+
+        Returns:
+            remote_url 字符串，未配置时返回空字符串
+        """
+        from lifeprism.config.settings_manager import get_setting
+
+        return get_setting("sync.remote_url") or ""
 
     def get_all_sync_tables(self) -> list[str]:
         """获取所有需要同步的表（包括动态表）
@@ -230,6 +252,9 @@ class SyncClient:
         Args:
             tables: 同步表列表，None 则使用 get_all_sync_tables()（包含动态表）
             directories: 文件同步目录列表，None 则使用默认 SYNC_DIRECTORIES
+
+        Raises:
+            ValueError: sync.remote_url 或 sync_api_key 未配置时抛出
         """
         from lifeprism.config.settings_manager import get_setting, set_setting
         from lifeprism.sync.sync_config import get_sync_api_key
@@ -237,6 +262,13 @@ class SyncClient:
         remote_url = get_setting("sync.remote_url")
         api_key = get_sync_api_key()
         last_sync_time = get_setting("sync.last_sync_time", "")
+
+        # 防御性检查：未配置 remote_url 或 api_key 时直接抛出，
+        # 避免发起 HTTP 请求时因 url 格式错误导致 httpx.UnsupportedProtocol
+        if not remote_url:
+            raise ValueError("sync.remote_url 未配置，请先在前端设置云端地址")
+        if not api_key:
+            raise ValueError("sync_api_key 未配置，请先生成云端配置")
 
         if tables is None:
             tables = self.get_all_sync_tables()

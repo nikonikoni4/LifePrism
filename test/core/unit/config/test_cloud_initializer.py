@@ -94,7 +94,7 @@ def setup_paths(tmp_path, monkeypatch, default_providers_config):
     - cloud_init.yaml 写入 tmp_path/cloud_init.yaml
     - config.yaml 写入 tmp_path/config/config.yaml
     - providers.yaml 预创建为默认配置，写入 tmp_path/config/providers.yaml
-    - storage.yaml 写入 tmp_path/storage.yaml（通过 settings._config_base_path）
+    - storage.yaml 写入 tmp_path/config/storage.yaml（通过 settings._config_base_path）
     """
     from lifeprism.config.settings_manager import settings
     from lifeprism.config.provider_manager import provider_manager
@@ -118,7 +118,7 @@ def setup_paths(tmp_path, monkeypatch, default_providers_config):
         "data_path": tmp_path,
         "config_path": config_path,
         "providers_path": providers_path,
-        "storage_path": tmp_path / "storage.yaml",
+        "storage_path": tmp_path / "config" / "storage.yaml",
     }
 
 

@@ -283,13 +283,13 @@ class SettingsManager:
 
         storage.yaml 承载 sync_api_key、wechat_token、providers.* 三类 Key。
         本地模式 (run_mode == "full") 不读取文件，仅初始化空字典。
-        云端模式从 {config_base_path}/storage.yaml 加载，文件不存在时返回空字典。
+        云端模式从 {config_base_path}/config/storage.yaml 加载，文件不存在时返回空字典。
         """
         self._storage_loaded_mode = self.run_mode
         self._storage_config = {}
         if self.run_mode == "full":
             return
-        storage_path = self._config_base_path / "storage.yaml"
+        storage_path = self._config_base_path / "config" / "storage.yaml"
         if not storage_path.exists():
             return
         try:
@@ -303,7 +303,7 @@ class SettingsManager:
 
     def _save_storage(self) -> None:
         """保存 storage.yaml 到磁盘（原子写入），权限设为 600（非 Windows 平台）"""
-        storage_path = self._config_base_path / "storage.yaml"
+        storage_path = self._config_base_path / "config" / "storage.yaml"
         storage_path.parent.mkdir(parents=True, exist_ok=True)
 
         tmp_path = storage_path.with_suffix(".tmp")
@@ -347,7 +347,7 @@ class SettingsManager:
             list(residual_keys.keys()),
         )
 
-        storage_path = self._config_base_path / "storage.yaml"
+        storage_path = self._config_base_path / "config" / "storage.yaml"
         if not storage_path.exists():
             # storage.yaml 不存在 → 根据 run_mode 写入 keyring 或 storage.yaml
             for key_name, value in residual_keys.items():
