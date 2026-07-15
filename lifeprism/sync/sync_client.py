@@ -195,7 +195,7 @@ class SyncClient:
             # 这样用户后续在前端配置 url 后，下次定时自动开始同步，无需重启
             remote_url = self._read_remote_url()
             if not remote_url:
-                logger.info("跳过定时同步：未配置 sync.remote_url")
+                logger.debug("跳过定时同步：未配置 sync.remote_url")
                 continue
             # 并发控制：原子地检查并设置同步标志
             if not self.try_start_sync():
@@ -386,9 +386,11 @@ class SyncClient:
             tables: 同步表列表
         """
         batch_size = 1000
+        grand_total_rows = 0
+        tables_with_data = 0
 
         for table_name in tables:
-            logger.info("开始拉取表: %s", table_name)
+            logger.debug("开始拉取表: %s", table_name)
             offset = 0
             total_rows = 0
 
@@ -491,7 +493,20 @@ class SyncClient:
 
                 offset += batch_size
 
-            logger.info("表 %s 拉取完成, 总计 %d 条记录", table_name, total_rows)
+            logger.debug("表 %s 拉取完成, 总计 %d 条记录", table_name, total_rows)
+
+            if total_rows > 0:
+                tables_with_data += 1
+                grand_total_rows += total_rows
+
+        if grand_total_rows > 0:
+            logger.info(
+                "pull_from_remote: 全部拉取完成, 共 %d 张表有数据, 总计 %d 条记录",
+                tables_with_data,
+                grand_total_rows,
+            )
+        else:
+            logger.info("pull_from_remote: 无需要拉取的内容")
 
     def push_to_remote(self, remote_url, api_key, tables):
         """推送本地增量数据到云端（逐表 + 分批）
@@ -509,6 +524,8 @@ class SyncClient:
         last_sync_time = get_setting("sync.last_sync_time", "")
         batch_size = 1000  # 与 pull_from_remote 保持一致
         total_batches = 0
+        total_rows_pushed = 0
+        tables_pushed = 0
 
         for table_name in tables:
             # 跳过无 updated_at 列的表（无法增量查询）
@@ -522,6 +539,9 @@ class SyncClient:
             rows = self.sync_repository.query_incremental(table_name, last_sync_time)
             if not rows:
                 continue
+
+            tables_pushed += 1
+            total_rows_pushed += len(rows)
 
             # 内存切分，逐批推送
             for offset in range(0, len(rows), batch_size):
@@ -554,14 +574,22 @@ class SyncClient:
                     len(chunk),
                 )
 
-            logger.info(
+            logger.debug(
                 "push_to_remote: 表 %s 推送完成, 总行数=%d, 批次数=%d",
                 table_name,
                 len(rows),
                 (len(rows) + batch_size - 1) // batch_size,
             )
 
-        logger.info("push_to_remote: 全部推送完成, 总批次数=%d", total_batches)
+        if total_batches > 0:
+            logger.info(
+                "push_to_remote: 全部推送完成, 共 %d 张表, 总行数=%d, 批次数=%d",
+                tables_pushed,
+                total_rows_pushed,
+                total_batches,
+            )
+        else:
+            logger.info("push_to_remote: 无需要推送的内容")
 
     # ==================== 文件同步全流程（Issue 33） ====================
 
@@ -654,7 +682,7 @@ class SyncClient:
         if to_upsert:
             provider.batch_upsert_states(to_upsert)
 
-        logger.info("_refresh_current_hashes: 刷新 %d 个文件的 current_hash", len(rel_paths))
+        logger.debug("_refresh_current_hashes: 刷新 %d 个文件的 current_hash", len(rel_paths))
         return rel_paths
 
     def _pull_files_check(self, remote_url, api_key, last_sync_time, directories):
@@ -695,7 +723,7 @@ class SyncClient:
 
         data = response.json()
         files = data.get("files", [])
-        logger.info("_pull_files_check: 云端返回 %d 个变更文件", len(files))
+        logger.debug("_pull_files_check: 云端返回 %d 个变更文件", len(files))
         return files
 
     def _decide_sync_action(
@@ -917,7 +945,7 @@ class SyncClient:
             )
 
         if not files_payload:
-            logger.info("_push_files: 无文件需要推送")
+            logger.debug("_push_files: 无文件需要推送")
             return
 
         # 按 FILE_BATCH_SIZE 分批推送，避免单请求 payload 过大导致云端 OOM
@@ -1034,7 +1062,7 @@ class SyncClient:
                 )
 
         if not consistent_paths:
-            logger.info("_verify_and_advance_parent: 无一致文件，跳过 commit")
+            logger.debug("_verify_and_advance_parent: 无一致文件，跳过 commit")
             return
 
         # Step 3: 调用 commit 推进云端 parent_hash
@@ -1235,7 +1263,7 @@ class SyncClient:
                 )
 
                 duration = (datetime.now(timezone.utc) - start_time).total_seconds()
-                logger.info(
+                logger.debug(
                     "_resolve_conflicts: 文件 %s AI 合并完成，耗时 %ss，new_hash=%s",
                     file_path,
                     duration,
