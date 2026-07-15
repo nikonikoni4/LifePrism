@@ -134,10 +134,7 @@ class WechatAccountStateProvider(LWBaseDataProvider):
                 "last_session_id": last_session_id,
             }
             self._generic_insert(insert_data)
-            logger.info(
-                "保存微信账户状态成功: wechat_user_id=%s",
-                wechat_user_id,
-            )
+            logger.info("保存微信账户状态成功")
             return True
         except Exception as e:
             logger.error(
