@@ -1286,7 +1286,7 @@ HABIT_CHAINS_CONFIG = {
     "columns": {
         "id": {
             "type": "INTEGER",
-            "constraints": ["PRIMARY KEY AUTOINCREMENT"],
+            "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
             "comment": "链条自增ID",
         },
         "name": {"type": "TEXT", "constraints": ["NOT NULL"], "comment": "链条名称"},
@@ -1308,7 +1308,7 @@ HABIT_CHAIN_NODES_CONFIG = {
     "columns": {
         "id": {
             "type": "INTEGER",
-            "constraints": ["PRIMARY KEY AUTOINCREMENT"],
+            "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
             "comment": "节点自增ID",
         },
         "chain_id": {"type": "INTEGER", "constraints": ["NOT NULL"], "comment": "所属链条ID"},
