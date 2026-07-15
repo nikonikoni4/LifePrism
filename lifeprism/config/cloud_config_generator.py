@@ -21,6 +21,7 @@ cloud_init.yaml 结构（Issue #28）::
       llm:
         provider: "anthropic"
         model: "claude-opus-4"
+        api_base: "https://api.anthropic.com/v1"
       monitor_type: none
       timezone: Asia/Shanghai
 """
@@ -171,10 +172,10 @@ class CloudConfigGenerator:
               llm:
                 provider: anthropic
                 model: claude-opus-4
+                api_base: https://api.anthropic.com/v1
               monitor_type: none
               timezone: Asia/Shanghai
-            ```
-        """
+            ```"""
         return {
             "storage": {
                 "sync_api_key": sync_api_key,
@@ -185,6 +186,7 @@ class CloudConfigGenerator:
                 "llm": {
                     "provider": settings.get("provider", ""),
                     "model": settings.get("model", ""),
+                    "api_base": settings.get("api_base", ""),
                 },
                 "monitor_type": "none",  # 强制覆盖：云端必须禁用 Monitor
                 "timezone": settings.get("timezone", "Asia/Shanghai"),  # 透传用户时区配置
