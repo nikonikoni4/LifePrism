@@ -125,7 +125,13 @@ class CloudInitializer:
 
         # 5. 全部成功后删除 cloud_init.yaml
         self._cloud_init_path.unlink()
-        logger.info("云端配置初始化完成，已删除 cloud_init.yaml")
+
+        # 6. 重新加载配置到内存（settings 在 CloudInitializer 之前已初始化，
+        #    此时 _config 仍是旧值，必须 reload 才能让后续代码读到新配置）
+        from lifeprism.config.settings_manager import settings
+
+        settings.reload()
+        logger.info("云端配置初始化完成，已删除 cloud_init.yaml 并重新加载配置")
 
     def _read_cloud_init(self) -> dict[str, Any]:
         """

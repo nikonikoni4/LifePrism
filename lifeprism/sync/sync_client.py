@@ -686,10 +686,13 @@ class SyncClient:
         return rel_paths
 
     def _pull_files_check(self, remote_url, api_key, last_sync_time, directories):
-        """Phase 1: 快照交换 - 调用 POST /pull-files/check 获取云端文件 hash 状态
+        """Phase 1: 快照交换 - 调用 POST /pull-files/check 获取云端文件 hash 状态 + 完整路径清单
 
-        云端按 mtime 过滤变更文件，返回 {path, parent_hash, current_hash} 列表。
-        此阶段不传输文件内容，仅交换 hash 快照供本地做 11 态矩阵判定。
+        云端按 mtime 过滤变更文件，返回 {path, parent_hash, current_hash} 列表（files），
+        同时返回所有非黑名单文件的相对路径列表（all_paths）用于存在性判断。
+
+        all_paths 让本地能区分"云端有但未变更"和"云端不存在"两种情况，
+        避免云端缺失文件被错误 SKIP。
 
         Args:
             remote_url: 远程服务器 URL
@@ -698,7 +701,7 @@ class SyncClient:
             directories: 文件同步目录列表
 
         Returns:
-            list[dict]: 云端变更文件的 hash 状态列表，每项含 path/parent_hash/current_hash
+            tuple[list[dict], list[str]]: (变更文件 hash 状态列表, 云端所有文件相对路径列表)
         """
         try:
             response = httpx.post(
@@ -723,8 +726,13 @@ class SyncClient:
 
         data = response.json()
         files = data.get("files", [])
-        logger.debug("_pull_files_check: 云端返回 %d 个变更文件", len(files))
-        return files
+        all_paths = data.get("all_paths", [])
+        logger.debug(
+            "_pull_files_check: 云端返回 %d 个变更文件, %d 个总文件",
+            len(files),
+            len(all_paths),
+        )
+        return files, all_paths
 
     def _decide_sync_action(
         self,
@@ -1296,12 +1304,16 @@ class SyncClient:
 
         编排完整的文件同步流程：
         1. Pre-sync: 全量扫描刷新本地 current_hash
-        2. Phase 1: 快照交换（POST /pull-files/check）
-        3. Phase 2a: 11 态矩阵判定（PULL/PUSH/CONFLICT/SKIP）
+        2. Phase 1: 快照交换（POST /pull-files/check），获取云端变更文件 hash + 完整路径清单
+        3. Phase 2a: 11 态矩阵判定（PULL/PUSH/CONFLICT/SKIP），使用 all_paths 区分云端缺失
         4. Phase 2b: PULL 文件（fetch → write → update current_hash）
         5. Phase 2c-1: CONFLICT → AI 合并解决（Issue 34，串行处理 + bus 桥接）
-        6. Phase 2c-2: PUSH 文件（含合并成功的 CONFLICT 文件）
+        6. Phase 2c-2: PUSH 文件（含合并成功的 CONFLICT 文件 + 云端缺失文件）
         7. Phase 3: verify + parent_hash 推进
+
+        使用云端 all_paths（完整文件路径清单）区分两种情况：
+        - 云端有文件但未变更（mtime <= last_sync_time）→ SKIP
+        - 云端不存在此文件 → PUSH（修复 cloud-missing-files-not-synced bug）
 
         参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md v2.1
 
@@ -1318,9 +1330,12 @@ class SyncClient:
         # Pre-sync: 全量扫描刷新本地 current_hash（返回扫描结果供复用，避免重复扫描）
         local_rel_paths = self._refresh_current_hashes(directories)
 
-        # Phase 1: 快照交换
-        remote_files = self._pull_files_check(remote_url, api_key, last_sync_time, directories)
+        # Phase 1: 快照交换（变更文件 hash 状态 + 完整路径清单）
+        remote_files, remote_all_paths = self._pull_files_check(
+            remote_url, api_key, last_sync_time, directories
+        )
         remote_state_map = {f["path"]: f for f in remote_files}
+        remote_all_paths_set = set(remote_all_paths)
 
         # 复用 pre-sync 扫描结果（不重复扫描）
         local_paths_set = set(local_rel_paths)
@@ -1348,14 +1363,15 @@ class SyncClient:
             remote_parent = remote_state["parent_hash"] if remote_state else None
             remote_current = remote_state["current_hash"] if remote_state else None
 
-            # 文件不在 check 响应中 → 远端未变更或不存在
+            # 文件不在 check 变更列表中 → 用 all_paths 判断是"云端有但未改"还是"云端不存在"
             if remote_state is None:
-                if local_parent is not None:
-                    # 本地有 parent（之前同步过）→ 远端有但未改
+                if path in remote_all_paths_set:
+                    # 云端有文件但未变更 → 用 last-synced 状态（local_parent）作为云端状态
+                    # 主备模式下云端未改，云端 current == local_parent
                     remote_parent = local_parent
                     remote_current = local_parent
                 else:
-                    # 本地无 parent（新文件）→ 远端不存在
+                    # 云端没有此文件 → PUSH（修复云端缺失文件被错误 SKIP 的 bug）
                     remote_parent = None
                     remote_current = None
 

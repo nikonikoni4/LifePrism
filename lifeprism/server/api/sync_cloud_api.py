@@ -533,10 +533,14 @@ def sync_pull_files_check(
     request: SyncPullFilesCheckRequest,
     _: None = Depends(verify_sync_api_key),
 ):
-    """Phase 1 快照交换：云端按 mtime 过滤，返回变更文件的 hash 状态（轻量，不传内容）
+    """Phase 1 快照交换：云端按 mtime 过滤返回变更文件 hash 状态 + 完整文件路径清单
 
-    遍历 directories（排除 chat_history.json），找到 mtime > last_sync_time 的文件，
-    实时计算 current_hash（调用 compute_file_hash），从 file_sync_state 表读 parent_hash。
+    遍历 directories（排除 EXCLUDED_FILENAMES 黑名单），单次遍历同时收集：
+    - files: mtime > last_sync_time 的变更文件（含 path + parent_hash + current_hash）
+    - all_paths: 所有非黑名单文件的相对路径列表（仅路径字符串，不做 mtime 过滤）
+
+    all_paths 用于本地区分"云端有但未变更"和"云端不存在"两种情况，
+    避免云端缺失文件被错误 SKIP（修复 cloud-missing-files-not-synced bug）。
 
     **请求参数**:
     - last_sync_time: 上次同步时间（ISO 8601 格式，空字符串表示首次同步）
@@ -547,6 +551,7 @@ def sync_pull_files_check(
 
     **响应**:
     - files: [{path, parent_hash, current_hash}] 变更文件 hash 状态列表
+    - all_paths: [str] 云端所有非黑名单文件的相对路径列表
     - sync_time: 本次同步时间
     """
     logger.debug(
@@ -560,6 +565,7 @@ def sync_pull_files_check(
     last_sync_dt = parse_iso_to_aware(request.last_sync_time) if request.last_sync_time else None
 
     files: list[dict[str, Any]] = []
+    all_paths: list[str] = []
     for dir_rel in request.directories:
         dir_path = (data_path / dir_rel).resolve()
 
@@ -572,6 +578,10 @@ def sync_pull_files_check(
             # 单文件处理
             if dir_path.name in _EXCLUDED_FILENAMES:
                 continue
+            # 收集所有非黑名单文件路径（不做 mtime 过滤，用于存在性判断）
+            rel_path = str(dir_path.relative_to(data_path)).replace("\\", "/")
+            all_paths.append(rel_path)
+            # mtime 过滤，仅变更文件才计算 hash
             file_mtime_dt = datetime.fromtimestamp(dir_path.stat().st_mtime, tz=timezone.utc)
             if last_sync_dt and file_mtime_dt <= last_sync_dt:
                 continue
@@ -583,6 +593,10 @@ def sync_pull_files_check(
                     continue
                 if file_path.name in _EXCLUDED_FILENAMES:
                     continue
+                # 收集所有非黑名单文件路径（不做 mtime 过滤，用于存在性判断）
+                rel_path = str(file_path.relative_to(data_path)).replace("\\", "/")
+                all_paths.append(rel_path)
+                # mtime 过滤，仅变更文件才计算 hash
                 file_mtime_dt = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
                 if last_sync_dt and file_mtime_dt <= last_sync_dt:
                     continue
@@ -594,18 +608,21 @@ def sync_pull_files_check(
     elapsed_ms = (time.perf_counter() - start_time) * 1000
     if files:
         logger.info(
-            "同步 Pull-Files-Check 完成: 文件数=%d, 耗时=%.2fms",
+            "同步 Pull-Files-Check 完成: 变更文件=%d, 总文件=%d, 耗时=%.2fms",
             len(files),
+            len(all_paths),
             elapsed_ms,
         )
     else:
         logger.debug(
-            "同步 Pull-Files-Check 完成: 无变更文件, 耗时=%.2fms",
+            "同步 Pull-Files-Check 完成: 无变更文件, 总文件=%d, 耗时=%.2fms",
+            len(all_paths),
             elapsed_ms,
         )
 
     return {
         "files": files,
+        "all_paths": all_paths,
         "sync_time": datetime.now(timezone.utc).isoformat(),
     }
 

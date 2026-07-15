@@ -830,8 +830,9 @@ class SettingsManager:
                 os.environ["LIFEPRISM_DATA_PATH"] = str(self._lifeprism_data_path)
 
     def reload(self) -> None:
-        """重新加载配置文件"""
+        """重新加载配置文件（config.yaml + storage.yaml）"""
         self._load_config()
+        self._load_storage()
 
     def set_runtime_config(self, key: str, value: Any) -> None:
         """设置运行时配置（仅内存，不持久化到 yaml）
