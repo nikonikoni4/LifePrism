@@ -821,3 +821,178 @@ class SyncRepository:
                 details={"error": str(e)},
                 cause=e,
             ) from e
+
+    def get_custom_record_types_snapshot(self) -> set[tuple[str, str]]:
+        """获取本地 custom_record_types 的快照（id, updated_at 集合）
+
+        用于 sync_once 中 pull 前后对比，判断云端 meta 表是否有变更。
+        如果 pull 后快照变化，说明云端 custom_record_types 有新增/修改/删除。
+
+        Returns:
+            (type_id, updated_at) 元组集合，无记录时返回空集合
+        """
+        sql = "SELECT id, updated_at FROM custom_record_types"
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql)
+                rows = cursor.fetchall()
+            return {(row[0], row[1]) for row in rows}
+        except sqlite3.Error as e:
+            logger.error("获取 custom_record_types 快照失败: error=%s", e)
+            raise DataAccessError(
+                message="获取 custom_record_types 快照失败",
+                details={"error": str(e)},
+                cause=e,
+            ) from e
+
+    def get_custom_record_types_full_definitions(self) -> list[dict[str, Any]]:
+        """查询所有自定义记录类型的完整定义（含字段列表）
+
+        返回每个 type 的 slug 和 fields 列表，用于发送给云端重建动态表。
+
+        Returns:
+            类型定义列表，每项格式：{"slug": str, "fields": [{"field_key": str, "field_type": str}]}
+            无自定义记录类型时返回空列表
+
+        Raises:
+            DataAccessError: 数据库操作失败
+        """
+        sql_types = "SELECT id, slug FROM custom_record_types"
+        sql_fields = (
+            "SELECT field_key, field_type FROM custom_record_fields "
+            "WHERE type_id = ? ORDER BY sort_order ASC"
+        )
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql_types)
+                types_rows = cursor.fetchall()
+
+                result = []
+                for type_id, slug in types_rows:
+                    cursor.execute(sql_fields, (type_id,))
+                    fields_rows = cursor.fetchall()
+                    fields = [{"field_key": r[0], "field_type": r[1]} for r in fields_rows]
+                    result.append({"slug": slug, "fields": fields})
+
+            logger.debug(
+                "查询自定义记录类型完整定义: 返回 %d 条",
+                len(result),
+            )
+            return result
+        except sqlite3.Error as e:
+            logger.error(
+                "查询自定义记录类型完整定义失败: error=%s",
+                e,
+            )
+            raise DataAccessError(
+                message="查询自定义记录类型完整定义失败",
+                details={"error": str(e)},
+                cause=e,
+            ) from e
+
+    def rebuild_dynamic_tables(self, types: list[dict[str, Any]]) -> list[dict[str, str]]:
+        """根据传入的自定义记录类型定义，重建/同步云端动态表
+
+        对每个本地传入的 type：
+        - 表不存在 → CREATE TABLE（调用 CustomRecordRepository.generate_create_table_ddl）
+        - 表存在但字段缺失 → ALTER TABLE ADD COLUMN（只增不删，SQLite 兼容）
+
+        对云端有但本地无的 slug → DROP TABLE（清理已删除类型，保持两端一致）
+
+        所有操作在同一事务中执行，失败则回滚。
+
+        Args:
+            types: 类型定义列表，每项含 slug 和 fields
+
+        Returns:
+            每个 type 的处理结果列表，每项 {"slug": str, "action": "created"|"altered"|"skipped"|"dropped"}
+
+        Raises:
+            DataAccessError: 数据库操作失败
+        """
+        from lifeprism.repository.aggregators.custom_record_aggregator import (
+            CustomRecordRepository,
+        )
+
+        results: list[dict[str, str]] = []
+        local_slugs = {t["slug"] for t in types}
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # 1. 处理本地传入的 type：CREATE IF NOT EXISTS + ALTER ADD COLUMN
+                for t in types:
+                    slug = t["slug"]
+                    fields = t.get("fields", [])
+                    data_table = f"custom_{slug}"
+
+                    # 检查表是否存在
+                    cursor.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                        (data_table,),
+                    )
+                    existing = cursor.fetchone()
+
+                    if existing is None:
+                        # 表不存在 → CREATE TABLE
+                        ddl = CustomRecordRepository.generate_create_table_ddl(slug, fields)
+                        cursor.execute(ddl)
+                        results.append({"slug": slug, "action": "created"})
+                        logger.info("重建动态表: 创建表 %s", data_table)
+                    else:
+                        # 表存在 → 检查并 ALTER ADD COLUMN（只增不删）
+                        cursor.execute(f"PRAGMA table_info({data_table})")
+                        existing_columns = {row[1] for row in cursor.fetchall()}
+
+                        altered = False
+                        for f in fields:
+                            field_key = f["field_key"]
+                            if field_key not in existing_columns:
+                                ftype = f.get("field_type", "text")
+                                sql_type = CustomRecordRepository._FIELD_TYPE_TO_SQL.get(
+                                    ftype, "TEXT"
+                                )
+                                cursor.execute(
+                                    f"ALTER TABLE {data_table} ADD COLUMN {field_key} {sql_type}"
+                                )
+                                altered = True
+                                logger.info(
+                                    "重建动态表: %s 新增列 %s (%s)",
+                                    data_table,
+                                    field_key,
+                                    sql_type,
+                                )
+
+                        results.append(
+                            {"slug": slug, "action": "altered" if altered else "skipped"}
+                        )
+
+                # 2. 清理云端有但本地无的 slug → DROP TABLE
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'custom_%'"
+                )
+                cloud_tables = [row[0] for row in cursor.fetchall()]
+
+                for table_name in cloud_tables:
+                    # 跳过 meta 表（custom_record_types, custom_record_fields）
+                    if table_name in TABLE_CONFIGS:
+                        continue
+                    # 提取 slug（去掉 custom_ 前缀）
+                    slug = table_name[len("custom_") :]
+                    if slug not in local_slugs:
+                        cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
+                        results.append({"slug": slug, "action": "dropped"})
+                        logger.info("重建动态表: 删除孤儿表 %s", table_name)
+
+            logger.info("重建动态表完成: %s", results)
+            return results
+        except sqlite3.Error as e:
+            logger.error("重建动态表失败: error=%s", e)
+            raise DataAccessError(
+                message="重建动态表失败",
+                details={"error": str(e)},
+                cause=e,
+            ) from e

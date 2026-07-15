@@ -51,6 +51,31 @@ class CustomRecordRepository:
         "float": "REAL",
     }
 
+    @staticmethod
+    def generate_create_table_ddl(slug: str, fields: list[dict[str, Any]]) -> str:
+        """生成动态数据表的 CREATE TABLE DDL 语句
+
+        提取为静态方法供云端重建动态表复用，保证 DDL 生成逻辑一致。
+        Schema 固定包含：id PRIMARY KEY + 用户字段 + event_time + created_at + updated_at。
+
+        Args:
+            slug: 类型 slug，用于生成表名 custom_{slug}
+            fields: 字段定义列表，每项含 field_key / field_type
+
+        Returns:
+            CREATE TABLE DDL 语句字符串
+        """
+        data_table = f"{CustomRecordRepository._DATA_TABLE_PREFIX}{slug}"
+        column_defs = ["id TEXT PRIMARY KEY"]
+        for f in fields:
+            ftype = f.get("field_type", "text")
+            sql_type = CustomRecordRepository._FIELD_TYPE_TO_SQL.get(ftype, "TEXT")
+            column_defs.append(f"{f['field_key']} {sql_type}")
+        column_defs.append("event_time TEXT")
+        column_defs.append("created_at TEXT")
+        column_defs.append("updated_at TEXT")
+        return f"CREATE TABLE {data_table} ({', '.join(column_defs)})"
+
     def __init__(self, db_manager=None):
         if db_manager is None:
             from lifeprism.repository import lw_db_manager
@@ -176,17 +201,8 @@ class CustomRecordRepository:
                         ),
                     )
 
-                # 3. DDL: 创建数据表（P2: 按 field_type 映射 SQLite 列类型）
-                column_defs = ["id TEXT PRIMARY KEY"]
-                for f in fields:
-                    ftype = f.get("field_type", "text")
-                    sql_type = self._FIELD_TYPE_TO_SQL.get(ftype, "TEXT")
-                    column_defs.append(f"{f['field_key']} {sql_type}")
-                column_defs.append("event_time TEXT")
-                column_defs.append("created_at TEXT")
-                column_defs.append("updated_at TEXT")
-
-                ddl = f"CREATE TABLE {data_table} ({', '.join(column_defs)})"
+                # 3. DDL: 创建数据表（复用 generate_create_table_ddl 保证逻辑一致）
+                ddl = self.generate_create_table_ddl(slug, fields)
                 cursor.execute(ddl)
 
                 logger.info(

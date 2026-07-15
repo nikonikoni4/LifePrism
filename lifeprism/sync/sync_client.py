@@ -284,8 +284,22 @@ class SyncClient:
         if directories is None:
             directories = SYNC_DIRECTORIES
 
+        # pull 前记录 custom_record_types 快照，用于 pull 后判断云端 meta 是否有变更
+        # 如果云端有新增/修改/删除 type，pull 会同步到本地，快照会变化
+        snapshot_before = self.sync_repository.get_custom_record_types_snapshot()
+
         # 数据库同步：Pull -> Push，任一步骤失败则不更新 last_sync_time
         self.pull_from_remote(remote_url, api_key, last_sync_time, tables)
+
+        # pull 后判断 custom_record_types meta 表是否有变更
+        # 如果有变更，发送本地最新定义给云端重建动态表，确保 push 阶段动态表数据能正确写入
+        snapshot_after = self.sync_repository.get_custom_record_types_snapshot()
+        if snapshot_before != snapshot_after:
+            logger.info("pull 后检测到 custom_record_types 变更，触发云端动态表重建")
+            self._rebuild_remote_dynamic_tables(remote_url, api_key)
+        else:
+            logger.debug("pull 后 custom_record_types 无变更，跳过动态表重建")
+
         self.push_to_remote(remote_url, api_key, tables)
 
         # 文件同步：全流程（Phase 1-3，参考 ADR v2.1）
@@ -295,6 +309,53 @@ class SyncClient:
         current_time = datetime.now(timezone.utc).isoformat()
         set_setting("sync.last_sync_time", current_time)
         logger.info("sync_once: 同步完成，last_sync_time 已更新为 %s", current_time)
+
+    def _rebuild_remote_dynamic_tables(self, remote_url: str, api_key: str) -> None:
+        """发送本地自定义记录类型定义给云端，触发云端重建动态表
+
+        pull 后检测到 custom_record_types meta 表有变更时调用。
+        查询本地最新的 type + fields 完整定义，POST 到云端 /api/sync/rebuild-dynamic-tables，
+        云端根据定义 CREATE TABLE / ALTER TABLE ADD COLUMN / DROP TABLE。
+
+        失败则抛异常，不继续后续 push（避免动态表数据写入失败）。
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+
+        Raises:
+            httpx.HTTPStatusError / httpx.RequestError: HTTP 请求失败
+        """
+        types = self.sync_repository.get_custom_record_types_full_definitions()
+        logger.info(
+            "发送动态表重建请求到云端: %d 个类型定义",
+            len(types),
+        )
+
+        try:
+            response = httpx.post(
+                url=f"{remote_url}/api/sync/rebuild-dynamic-tables",
+                json={"types": types},
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                },
+                timeout=60.0,
+            )
+            response.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(
+                "_rebuild_remote_dynamic_tables: 重建动态表失败, remote_url=%s, error=%s",
+                remote_url,
+                e,
+            )
+            raise
+
+        result = response.json()
+        rebuilt = result.get("rebuilt", [])
+        logger.info(
+            "云端动态表重建完成: %s",
+            rebuilt,
+        )
 
     def pull_from_remote(self, remote_url, api_key, last_sync_time, tables):
         """拉取云端数据（分批拉取），应用 Last-Write-Wins 冲突解决
@@ -341,6 +402,16 @@ class SyncClient:
                     )
                     response.raise_for_status()
                 except (httpx.HTTPStatusError, httpx.RequestError) as e:
+                    # 动态表（custom_{slug}）在云端可能尚未创建，pull 时返回 500
+                    # 容错跳过该表，不中断整个 pull 流程
+                    # 后续 rebuild-dynamic-tables 端点会在云端创建表，下次同步恢复正常
+                    if self.sync_repository._is_dynamic_table(table_name):
+                        logger.warning(
+                            "pull_from_remote: 动态表 %s 拉取失败，跳过（云端可能尚未建表）, error=%s",
+                            table_name,
+                            e,
+                        )
+                        break
                     logger.error(
                         "pull_from_remote: 拉取表 %s 失败, offset=%d, remote_url=%s, error=%s",
                         table_name,

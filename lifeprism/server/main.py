@@ -392,16 +392,19 @@ async def lifespan(app: FastAPI):
         logger.warning("创建 SyncClient 失败: error=%s", e)
         app.state.sync_client = None
 
-    # 启动时立即同步一次 + 定时同步（仅在 run_mode == "full" 时启用）
-    await _start_sync_on_startup(app)
-
-    # 初始化 ChatBot 服务和 AgentLoop
+    # 先启动 AgentLoop，再执行启动同步
+    # 原因：sync_once 在遇到 CONFLICT 时会通过 bus.send 发送 AI 合并请求，
+    # 若 AgentLoop 未启动，请求会在队列中积压直到 timeout 超时降级。
+    # 必须先启动 AgentLoop 作为消费者，sync_once 的冲突合并请求才能被及时处理。
     import asyncio
 
     from lifeprism.llm.agent.loop import agent_loop
 
     loop_task = asyncio.create_task(agent_loop.loop())
     logger.info("[STARTUP] AgentLoop started")
+
+    # 启动时立即同步一次 + 定时同步（仅在 run_mode == "full" 时启用）
+    await _start_sync_on_startup(app)
 
     yield  # 应用运行期间
 

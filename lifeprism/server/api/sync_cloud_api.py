@@ -107,6 +107,28 @@ class HeartbeatRequest(BaseModel):
     event: str = Field(..., description="事件类型（online/offline/ping）")
 
 
+class DynamicTableFieldDef(BaseModel):
+    """动态表字段定义"""
+
+    field_key: str = Field(..., description="字段 key（^[a-z][a-z0-9_]*$）")
+    field_type: str = Field(default="text", description="字段类型（text/integer/float）")
+
+
+class DynamicTypeDef(BaseModel):
+    """动态表类型定义"""
+
+    slug: str = Field(..., description="类型 slug（^[a-z][a-z0-9_]*$）")
+    fields: list[DynamicTableFieldDef] = Field(..., description="字段定义列表")
+
+
+class RebuildDynamicTablesRequest(BaseModel):
+    """重建动态表请求"""
+
+    types: list[DynamicTypeDef] = Field(
+        ..., description="自定义记录类型定义列表（含 slug 和 fields）"
+    )
+
+
 # ==================== 认证依赖 ====================
 
 
@@ -253,6 +275,54 @@ def sync_push(request: SyncPushRequest, _: None = Depends(verify_sync_api_key)):
 
     return {
         "status": "ok",
+        "sync_time": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/rebuild-dynamic-tables", summary="根据本地定义重建云端动态表")
+def sync_rebuild_dynamic_tables(
+    request: RebuildDynamicTablesRequest,
+    _: None = Depends(verify_sync_api_key),
+):
+    """根据本地发送的自定义记录类型定义，重建/同步云端动态表
+
+    本地 pull 完成后检测到 custom_record_types meta 表有变更时调用此端点，
+    云端根据最新的 type + fields 定义：
+    - 新增 type → CREATE TABLE
+    - 已有 type 缺字段 → ALTER TABLE ADD COLUMN（只增不删）
+    - 云端有但本地已删除的 type → DROP TABLE
+
+    幂等操作：重复调用不会产生副作用。
+
+    **请求参数**:
+    - types: 自定义记录类型定义列表
+
+    **认证**:
+    - Authorization: Bearer {api_key} HTTP Header
+
+    **响应**:
+    - rebuilt: [{slug, action}] 每个类型的处理结果（created/altered/skipped/dropped）
+    - sync_time: 本次同步时间
+    """
+    logger.info("重建动态表请求开始: types=%d", len(request.types))
+    start_time = time.perf_counter()
+
+    # 将 Pydantic 模型转为普通 dict 供 Repository 层处理
+    types_data = [
+        {
+            "slug": t.slug,
+            "fields": [{"field_key": f.field_key, "field_type": f.field_type} for f in t.fields],
+        }
+        for t in request.types
+    ]
+
+    rebuilt = sync_repository.rebuild_dynamic_tables(types_data)
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+    logger.info("重建动态表完成: results=%s, 耗时=%.2fms", rebuilt, elapsed_ms)
+
+    return {
+        "rebuilt": rebuilt,
         "sync_time": datetime.now(timezone.utc).isoformat(),
     }
 
