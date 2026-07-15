@@ -209,7 +209,7 @@ def sync_pull(request: SyncPullRequest, _: None = Depends(verify_sync_api_key)):
 
     heartbeat_manager.update_heartbeat()
 
-    logger.info(
+    logger.debug(
         "同步 Pull 请求开始: last_sync_time=%s, tables=%s, offset=%d, limit=%s",
         request.last_sync_time,
         request.tables,
@@ -232,11 +232,17 @@ def sync_pull(request: SyncPullRequest, _: None = Depends(verify_sync_api_key)):
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
     record_counts = {table: len(rows) for table, rows in changes.items()}
-    logger.info(
-        "同步 Pull 完成: 记录数=%s, 耗时=%.2fms",
-        record_counts,
-        elapsed_ms,
-    )
+    if changes:
+        logger.info(
+            "同步 Pull 完成: 记录数=%s, 耗时=%.2fms",
+            record_counts,
+            elapsed_ms,
+        )
+    else:
+        logger.debug(
+            "同步 Pull 完成: 无新记录, 耗时=%.2fms",
+            elapsed_ms,
+        )
 
     return {
         "changes": changes,
@@ -460,7 +466,7 @@ def sync_pull_files(
     - files: [{path, content, mtime}] 变更文件列表
     - sync_time: 本次同步时间
     """
-    logger.info(
+    logger.debug(
         "同步 Pull-Files 请求开始: last_sync_time=%s, directories=%s",
         request.last_sync_time,
         request.directories,
@@ -501,11 +507,17 @@ def sync_pull_files(
             continue
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
-    logger.info(
-        "同步 Pull-Files 完成: 文件数=%d, 耗时=%.2fms",
-        len(files),
-        elapsed_ms,
-    )
+    if files:
+        logger.info(
+            "同步 Pull-Files 完成: 文件数=%d, 耗时=%.2fms",
+            len(files),
+            elapsed_ms,
+        )
+    else:
+        logger.debug(
+            "同步 Pull-Files 完成: 无新文件, 耗时=%.2fms",
+            elapsed_ms,
+        )
 
     return {
         "files": files,
@@ -537,7 +549,7 @@ def sync_pull_files_check(
     - files: [{path, parent_hash, current_hash}] 变更文件 hash 状态列表
     - sync_time: 本次同步时间
     """
-    logger.info(
+    logger.debug(
         "同步 Pull-Files-Check 请求开始: last_sync_time=%s, directories=%s",
         request.last_sync_time,
         request.directories,
@@ -580,11 +592,17 @@ def sync_pull_files_check(
             continue
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
-    logger.info(
-        "同步 Pull-Files-Check 完成: 文件数=%d, 耗时=%.2fms",
-        len(files),
-        elapsed_ms,
-    )
+    if files:
+        logger.info(
+            "同步 Pull-Files-Check 完成: 文件数=%d, 耗时=%.2fms",
+            len(files),
+            elapsed_ms,
+        )
+    else:
+        logger.debug(
+            "同步 Pull-Files-Check 完成: 无变更文件, 耗时=%.2fms",
+            elapsed_ms,
+        )
 
     return {
         "files": files,

@@ -36,6 +36,7 @@ from lifeprism.llm.bus import (
     OutboundMessage,
     bus,
 )
+from lifeprism.llm.exceptions import LLMError, LLMResponseError
 from lifeprism.llm.providers import LLMResponse, create_llm_client
 from lifeprism.llm.session import Session, session_manager
 from lifeprism.llm.utils.helpers import estimate_prompt_tokens
@@ -109,6 +110,11 @@ class AgentLoop:
         #                     len(block.get('text', '')) if 'text' in block else 0
         #                 )
         response: LLMResponse = await llm.chat(messages=messages, tools=tools)
+        if response.finish_reason == "error":
+            raise LLMResponseError(
+                model=settings.model or "unknown",
+                raw_response=response.content or "",
+            )
         session.add_message(
             "assistant",
             content=response.content or "",
@@ -207,6 +213,11 @@ class AgentLoop:
             #                     str(block.get('text', ''))[:100] if 'text' in block else 'N/A'
             #                 )
             response: LLMResponse = await llm.chat(messages=messages, tools=tools)
+            if response.finish_reason == "error":
+                raise LLMResponseError(
+                    model=settings.model or "unknown",
+                    raw_response=response.content or "",
+                )
             session.add_message(
                 "assistant",
                 content=response.content or "",
@@ -237,6 +248,11 @@ class AgentLoop:
             )
             messages = Context.build_prompt(system_prompt, session.get_history_message())
             response = await llm.chat(messages=messages)
+            if response.finish_reason == "error":
+                raise LLMResponseError(
+                    model=settings.model or "unknown",
+                    raw_response=response.content or "",
+                )
             session.add_message(
                 "assistant",
                 content=response.content or "",
@@ -503,6 +519,14 @@ class AgentLoop:
         except ValueError as e:
             logger.error("处理消息失败: msg_id=%s, error=%s", msg.id, e)
             raise
+        except LLMError as e:
+            logger.error("[AgentLoop] LLM 服务调用失败: msg_id=%s, error=%s", msg.id, e)
+            await self._bus.publish_outbound(
+                OutboundMessage(
+                    id=msg.id,
+                    response=LLMResponse(content="抱歉，AI 服务暂时不可用，请稍后重试。"),
+                )
+            )
         except Exception as e:
             logger.error("[AgentLoop] 处理消息 id=%s 时出错: %s", msg.id, e, exc_info=True)
             await self._bus.publish_outbound(

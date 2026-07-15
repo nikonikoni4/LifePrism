@@ -14,6 +14,7 @@ cloud_init.yaml 结构（Issue #28）::
       llm:
         provider: "anthropic"
         model: "claude-opus-4"
+        api_base: "https://api.anthropic.com/v1"  # 可选，CustomProvider 路由时必需
       monitor_type: none
       timezone: Asia/Shanghai
 
@@ -218,6 +219,7 @@ class CloudInitializer:
         写入字段:
         - provider: 来自 cloud_init.config.llm.provider
         - model: 来自 cloud_init.config.llm.model
+        - api_base: 来自 cloud_init.config.llm.api_base（可选，CustomProvider 路由时必需）
         - monitor_type: 强制为 none
         - timezone: 来自 cloud_init.config.timezone（如存在）
 
@@ -245,6 +247,11 @@ class CloudInitializer:
 
         existing_config["provider"] = llm_config.get("provider", "")
         existing_config["model"] = llm_config.get("model", "")
+        # api_base 为可选字段，仅在 cloud_init.yaml 显式提供时才写入 config.yaml，
+        # 否则保留 config.yaml 已有值或让 CustomProvider 使用默认值
+        api_base_from_cloud = llm_config.get("api_base")
+        if api_base_from_cloud:
+            existing_config["api_base"] = api_base_from_cloud
         existing_config["monitor_type"] = "none"  # 强制为 none
         # 透传 timezone（cloud_init.yaml 中已有此字段，由 cloud_config_generator 写入）
         # 仅在 cloud_init.yaml 显式提供 timezone 时才写入 config.yaml，
@@ -263,9 +270,10 @@ class CloudInitializer:
             os.chmod(config_path, 0o600)
 
         logger.info(
-            "已写入 config.yaml: provider=%s, model=%s, monitor_type=none, timezone=%s",
+            "已写入 config.yaml: provider=%s, model=%s, api_base=%s, monitor_type=none, timezone=%s",
             existing_config["provider"],
             existing_config["model"],
+            existing_config.get("api_base", "(未设置)"),
             existing_config.get("timezone", "(未设置)"),
         )
 
