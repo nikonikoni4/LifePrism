@@ -1391,8 +1391,9 @@ class SyncClient:
         resolved_paths = []
         if conflict_paths:
             logger.info(
-                "_sync_files_full_flow: 检测到 %d 个 CONFLICT 文件，开始 AI 合并",
+                "_sync_files_full_flow: 检测到 %d 个 CONFLICT 文件，开始 AI 合并: %s",
                 len(conflict_paths),
+                conflict_paths,
             )
             resolved_paths = self._resolve_conflicts(
                 conflict_paths,
