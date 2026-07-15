@@ -30,6 +30,12 @@
 - 触发规则：P2 数据同步方案 issue01~issue10 文档审查
 - 内容摘要：P2 数据同步方案 10 个 Issue 文档的审查报告，覆盖安全、性能、架构、代码质量、最佳实践、测试、文档一致性 7 个维度，发现 19 个问题（置信度 >= 80），其中 4 个阻断性问题（API 契约不一致、时间戳格式不统一、阻塞事件循环）、4 个安全/架构隐患、11 个文档/质量问题
 
+## code-review-2026-07-15-sync-jsonl-lww
+- updated_at: 2026-07-15
+- path: `docs/generated/012/code-review-2026-07-15-sync-jsonl-lww.md`
+- 触发规则：sync_client.py JSONL LWW 分流逻辑变更审查时查看
+- 内容摘要：sync_client.py Phase 2c-1 冲突解决分流逻辑（JSONL→LWW、MD→AI 合并）+ ADR v2.1→v2.2 的代码审查报告，覆盖 8 个维度，发现 4 个问题（置信度 ≥ 80）：ADR 决策 5 hash 规范化描述与代码冲突（85）、JSONL LWW 分流逻辑无测试覆盖（90）、md_conflicts 命名与实际语义不符（80）、混合冲突场景测试缺失（80）
+
 ## utc-migration-audit-report
 - updated_at: 2026-07-12
 - path: `docs/generated/utc-migration-audit-report.md`

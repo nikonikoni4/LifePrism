@@ -1386,28 +1386,43 @@ class SyncClient:
         if pull_paths:
             self._pull_files_fetch(remote_url, api_key, pull_paths)
 
-        # Phase 2c-1: CONFLICT → AI 合并解决（Issue 34）
-        # 串行处理每个 CONFLICT 文件，成功合并的文件加入 push_paths 推送
+        # Phase 2c-1: CONFLICT 分流解决
+        # JSONL 走文件级 LWW（直接保留本地版本 PUSH），非 JSONL 走 AI 合并
+        # 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md v2.2 决策 3
         resolved_paths = []
         if conflict_paths:
-            logger.info(
-                "_sync_files_full_flow: 检测到 %d 个 CONFLICT 文件，开始 AI 合并: %s",
-                len(conflict_paths),
-                conflict_paths,
-            )
-            resolved_paths = self._resolve_conflicts(
-                conflict_paths,
-                remote_url,
-                api_key,
-            )
-            logger.info(
-                "_sync_files_full_flow: CONFLICT 解决完成，成功 %d/%d",
-                len(resolved_paths),
-                len(conflict_paths),
-            )
+            # 按文件类型分流
+            jsonl_conflicts = [p for p in conflict_paths if p.endswith(".jsonl")]
+            non_jsonl_conflicts = [p for p in conflict_paths if not p.endswith(".jsonl")]
 
-        # Phase 2c-2: PUSH 文件（包含合并成功的 CONFLICT 文件）
-        push_paths.extend(resolved_paths)
+            # JSONL 走 LWW：直接保留本地版本，加入 push_paths 覆盖云端
+            # 主备模式下（前提 1），发起同步的本地端通常是刚工作的活跃端
+            if jsonl_conflicts:
+                logger.info(
+                    "_sync_files_full_flow: JSONL 冲突走 LWW（保留本地版本）: %d 个: %s",
+                    len(jsonl_conflicts),
+                    jsonl_conflicts,
+                )
+                push_paths.extend(jsonl_conflicts)
+
+            # 非 JSONL 文件走 AI 合并（Issue 34）
+            if non_jsonl_conflicts:
+                logger.info(
+                    "_sync_files_full_flow: 非 JSONL 冲突走 AI 合并: %d 个: %s",
+                    len(non_jsonl_conflicts),
+                    non_jsonl_conflicts,
+                )
+                resolved_paths = self._resolve_conflicts(
+                    non_jsonl_conflicts,
+                    remote_url,
+                    api_key,
+                )
+                push_paths.extend(resolved_paths)
+                logger.info(
+                    "_sync_files_full_flow: 非 JSONL CONFLICT 解决完成，成功 %d/%d",
+                    len(resolved_paths),
+                    len(non_jsonl_conflicts),
+                )
         if push_paths:
             self._push_files(remote_url, api_key, push_paths)
 

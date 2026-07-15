@@ -1,6 +1,6 @@
 """文件同步 hash 工具函数
 
-参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md v2.1 决策 5（hash 规范化策略）
+参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md v2.2 决策 5（hash 规范化策略）
 """
 
 import hashlib

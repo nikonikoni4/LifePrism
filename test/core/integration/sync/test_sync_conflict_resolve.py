@@ -1004,6 +1004,131 @@ class TestFullFlowConflictIntegration:
         # Assert: _push_files 未被调用（无文件需推送）
         mock_sync_client._push_files.assert_not_called()
 
+    def test_full_flow_jsonl_conflict_goes_lww_not_ai_merge(
+        self, mock_sync_client, initialized_db, clean_file_sync_state,
+    ):
+        """JSONL CONFLICT 文件应走 LWW（直接 push），不调用 _resolve_conflicts"""
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+
+        # Arrange: 设置 JSONL 文件为 CONFLICT
+        conflict_path = "session/test.jsonl"
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        provider.upsert_state(
+            file_path=conflict_path,
+            parent_hash="hash_a",
+            current_hash="hash_b",
+        )
+
+        mock_sync_client._refresh_current_hashes.return_value = [conflict_path]
+        mock_sync_client._pull_files_check.return_value = [{
+            "path": conflict_path,
+            "parent_hash": "hash_a",
+            "current_hash": "hash_c",
+        }]
+
+        # Act
+        mock_sync_client._sync_files_full_flow(
+            remote_url="http://test:8000",
+            api_key="test-key",
+            last_sync_time="2026-07-14T00:00:00Z",
+            directories=["session/"],
+        )
+
+        # Assert: _resolve_conflicts 未被调用（JSONL 走 LWW）
+        mock_sync_client._resolve_conflicts.assert_not_called()
+        # Assert: _push_files 被调用且包含 JSONL 路径
+        mock_sync_client._push_files.assert_called_once()
+        push_paths = mock_sync_client._push_files.call_args[0][2]
+        assert conflict_path in push_paths
+
+    def test_full_flow_mixed_conflicts_split_correctly(
+        self, mock_sync_client, initialized_db, clean_file_sync_state,
+    ):
+        """混合冲突时 JSONL 走 LWW，MD 走 AI 合并，两条路径互不干扰"""
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+
+        # Arrange: 一个 JSONL 和一个 MD 同时 CONFLICT
+        jsonl_path = "session/test.jsonl"
+        md_path = "diary/conflict.md"
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        for path in [jsonl_path, md_path]:
+            provider.upsert_state(
+                file_path=path,
+                parent_hash="hash_a",
+                current_hash="hash_b",
+            )
+
+        mock_sync_client._refresh_current_hashes.return_value = [jsonl_path, md_path]
+        mock_sync_client._pull_files_check.return_value = [
+            {"path": jsonl_path, "parent_hash": "hash_a", "current_hash": "hash_c"},
+            {"path": md_path, "parent_hash": "hash_a", "current_hash": "hash_c"},
+        ]
+        mock_sync_client._resolve_conflicts.return_value = [md_path]
+
+        # Act
+        mock_sync_client._sync_files_full_flow(
+            remote_url="http://test:8000",
+            api_key="test-key",
+            last_sync_time="2026-07-14T00:00:00Z",
+            directories=["session/", "diary/"],
+        )
+
+        # Assert: _resolve_conflicts 被调用且只包含 MD 路径
+        mock_sync_client._resolve_conflicts.assert_called_once()
+        resolve_args = mock_sync_client._resolve_conflicts.call_args[0][0]
+        assert md_path in resolve_args
+        assert jsonl_path not in resolve_args
+
+        # Assert: _push_files 被调用且同时包含 JSONL 和 MD 路径
+        mock_sync_client._push_files.assert_called_once()
+        push_paths = mock_sync_client._push_files.call_args[0][2]
+        assert jsonl_path in push_paths
+        assert md_path in push_paths
+
+    def test_full_flow_jsonl_only_conflicts_call_push_directly(
+        self, mock_sync_client, initialized_db, clean_file_sync_state,
+    ):
+        """仅 JSONL 冲突时应直接 push，不调用 _resolve_conflicts 和备份"""
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+
+        # Arrange: 两个 JSONL 文件 CONFLICT
+        jsonl_1 = "session/chat.jsonl"
+        jsonl_2 = "session/memory.jsonl"
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        for path in [jsonl_1, jsonl_2]:
+            provider.upsert_state(
+                file_path=path,
+                parent_hash="hash_a",
+                current_hash="hash_b",
+            )
+
+        mock_sync_client._refresh_current_hashes.return_value = [jsonl_1, jsonl_2]
+        mock_sync_client._pull_files_check.return_value = [
+            {"path": jsonl_1, "parent_hash": "hash_a", "current_hash": "hash_c"},
+            {"path": jsonl_2, "parent_hash": "hash_a", "current_hash": "hash_c"},
+        ]
+
+        # Act
+        mock_sync_client._sync_files_full_flow(
+            remote_url="http://test:8000",
+            api_key="test-key",
+            last_sync_time="2026-07-14T00:00:00Z",
+            directories=["session/"],
+        )
+
+        # Assert: _resolve_conflicts 未被调用
+        mock_sync_client._resolve_conflicts.assert_not_called()
+        # Assert: _push_files 被调用且包含全部 JSONL 路径
+        mock_sync_client._push_files.assert_called_once()
+        push_paths = mock_sync_client._push_files.call_args[0][2]
+        assert jsonl_1 in push_paths
+        assert jsonl_2 in push_paths
+        # Assert: verify 也被调用且包含 JSONL 路径
+        mock_sync_client._verify_and_advance_parent.assert_called_once()
+        verify_paths = mock_sync_client._verify_and_advance_parent.call_args[0][2]
+        assert jsonl_1 in verify_paths
+        assert jsonl_2 in verify_paths
+
 
 # ==================== Seam 5: 全流程集成测试（CONFLICT→AI合并→推送→校验） ====================
 

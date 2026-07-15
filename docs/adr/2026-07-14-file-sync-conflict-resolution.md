@@ -1,9 +1,9 @@
 ---
-version: 2.1
+version: 2.2
 created_at: 2026-07-14
 updated_at: 2026-07-15
-last_updated: v2.1——新增决策 5（API 协议设计）+ hash 规范化策略
-abstract: 文件同步采用 per-file version tracking（parent_hash + current_hash）替代纯 LWW mtime 比较。同步白名单对齐 Agent 工具白名单（ALLOWED_DIRS + session），chat_history.json 明确排除。MD 冲突由 AI 驱动解决（CONFLICT_RESOLVE 消息类型），替代用户手动处理。account.json 改为数据库存储从白名单移除。API 协议采用三阶段设计（check → fetch/push → verify），mtime 作为第一重过滤 + hash 作为精确判断。hash 计算去除所有空白字符以避免格式差异干扰。所有决策基于主备模式前提（同一时间只有一端 Agent 工作）。
+last_updated: v2.2——决策 3 补充 JSONL LWW 实现细节（按文件后缀分流：JSONL→LWW，MD→AI 合并）
+abstract: 文件同步采用 per-file version tracking（parent_hash + current_hash）替代纯 LWW mtime 比较。同步白名单对齐 Agent 工具白名单（ALLOWED_DIRS + session），chat_history.json 明确排除。冲突按文件类型分流：JSONL 走文件级 LWW（直接保留本地版本），MD 冲突由 AI 驱动解决（CONFLICT_RESOLVE 消息类型）。account.json 改为数据库存储从白名单移除。API 协议采用三阶段设计（check → fetch/push → verify），mtime 作为第一重过滤 + hash 作为精确判断。hash 计算统一行尾符并去除行尾空白后计算 SHA-256，保留词语间空格避免内容碰撞。所有决策基于主备模式前提（同一时间只有一端 Agent 工作）。
 status: decided
 ---
 
@@ -13,6 +13,7 @@ status: decided
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 2.2 | 决策 3 补充 JSONL LWW 实现细节：CONFLICT 按 `.jsonl` 后缀分流，JSONL 直接保留本地版本 PUSH，MD 走 AI 合并。决策 5 hash 规范化策略修正：从"去除所有空白字符"修正为"统一行尾符+去行尾空白+保留词语间空格"，与 `hash_utils.py` 实际实现对齐 |
 | 2.1 | 新增决策 5：API 协议设计（三阶段 check/fetch/push/verify + hash 规范化策略） |
 | 2.0 | 决策 3：MD 冲突改为 AI 驱动（CONFLICT_RESOLVE 消息类型）。决策 2：chat_history.json 明确排除同步。新增前提 7（user/ MD 由 AI 生成）、前提 8（chat_history.json 仅定时任务改写） |
 | 1.0 | 创建文档初稿 |
@@ -237,9 +238,27 @@ SYNC_DIRECTORIES = [
 
 | 文件类型 | 策略 | 理由 |
 |---------|------|------|
-| `session/*.jsonl` | 文件级 LWW（整体覆盖，按最终 hash 或 mtime 取最新） | 追加式写入，每行有 timestamp，冲突场景下"各加一行"合并容易。文件级 LWW 取最新版本不丢独立记录 |
+| `session/*.jsonl` | 文件级 LWW（直接保留本地版本 PUSH 覆盖云端） | 追加式写入但无消息 ID，主备模式下（前提 1）发起同步的本地端通常是刚工作的活跃端。LWW 实现最简，不会破坏 JSONL 格式。代价：可能丢失云端新增的追加行，但主备模式下此场景罕见 |
 | `agent/`/`diary/`/`user/` 下 `.md` | **AI 冲突解决**（CONFLICT_RESOLVE 消息类型） | 全部由 AI 生成（前提 7），AI 最理解内容语义。可通过 read_file 阅读相关上下文做智能合并 |
 | `account.json`（过渡期） | 保留本地版 + 备份云端版 | 改为数据库后不再走文件同步 |
+
+**JSONL LWW 实现细节**（v2.2 补充）：
+
+CONFLICT 文件按 `.jsonl` 后缀分流：
+- `.jsonl` 后缀 → 直接加入 `push_paths`，保留本地版本覆盖云端（不送 AI 合并）
+- 其他后缀（`.md` 等）→ 送 `_resolve_conflicts` 走 AI 合并
+
+**为什么选择"保留本地"而非"比较 mtime 取最新"**：
+1. 主备模式下（前提 1），发起 `sync_once` 的本地端通常是"刚工作的活跃端"，本地数据是最新版本
+2. 如果本地是旧版本（用户在云端工作后切回本地），正确做法是先 PULL 再工作，这是使用规范
+3. 比较两端 mtime 需要在 check 端点增加 mtime 字段，改动云端 API，与"简单优先"原则冲突
+4. JSONL 无消息 ID，按时间戳排序合并有歧义（同一秒多条消息如何排序），复杂度高收益低
+
+**数据丢失风险评估**：
+- 场景：云端 Agent 写了新 JSONL 行，本地也写了新 JSONL 行，sync 时 CONFLICT
+- LWW 保留本地 → 云端新写入的行丢失
+- 缓解：`sync_conflict/` 备份机制不适用于 JSONL（JSONL 不走 AI 合并，不触发备份）
+- 接受理由：主备模式下此场景需要"双方同时改同一 JSONL 文件"，违反前提 1（同一时间只有一端工作），属极端异常
 
 **新增消息类型 CONFLICT_RESOLVE**：
 
@@ -408,7 +427,7 @@ hash 代表的是"文件此刻的内容状态"。任何时间点发送或比对 
 
 **hash 规范化策略**
 
-hash 计算前对文件内容做规范化处理，去除所有空白字符（空格、换行 `\n`、回车 `\r`、制表符 `\t` 等），避免格式差异导致 hash 不一致。
+hash 计算前对文件内容做规范化处理：统一行尾符（`\r\n` → `\n`，孤立 `\r` → `\n`）并去除每行行尾空白（trailing spaces/tabs），保留词语间空格，避免格式差异导致 hash 不一致同时防止内容碰撞。
 
 ```python
 import hashlib
@@ -416,20 +435,27 @@ import hashlib
 def compute_file_hash(content: bytes) -> str:
     """计算文件内容的规范化 hash
 
-    规则：去除所有空白字符后计算 SHA-256。
+    规则：统一行尾符（\\r\\n → \\n）并去除每行行尾空白后计算 SHA-256。
     源文件不受影响，仅 hash 计算时做规范化。
+
+    保留词语间的空格（避免 "hello world" 与 "helloworld" 产生相同 hash），
+    仅消除操作系统换行差异（Windows \\r\\n vs Linux \\n）和
+    行尾 trailing 空白导致的 hash 不一致。
     """
     text = content.decode("utf-8", errors="replace")
-    # 去除所有空白字符（空格、换行、回车、制表符等）
-    normalized = "".join(text.split())
+    # 统一行尾符：\r\n → \n，孤立 \r → \n
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    # 去除每行行尾空白（trailing spaces/tabs），保留行内空格
+    normalized = "\n".join(line.rstrip() for line in normalized.split("\n"))
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 ```
 
 **设计理由**：
 - 两端可能因操作系统差异（Windows `\r\n` vs Linux `\n`）导致内容字节不同但语义相同
-- AI 编辑文件时可能调整格式（加空行、改缩进），只要文字内容不变，hash 应保持一致
+- 去除每行行尾空白避免编辑器自动 strip trailing 空格导致的误判
+- 保留词语间空格避免内容碰撞（`"hello world"` 与 `"helloworld"` 产生相同 hash）
 - 源文件保持原始格式不变，仅 hash 计算时做规范化
-- `.jsonl` 文件（session/）同理，去除空白后比较内容
+- `.jsonl` 文件（session/）同理，规范化后比较内容
 
 **四个端点设计**
 
@@ -594,7 +620,7 @@ Phase 1          Phase 2a     Phase 2b/2c              Phase 3
 7. ✅ AI 自动合并替代用户手动 —— user/ 下 MD 全由 AI 生成，AI 最理解内容语义，无需用户介入
 8. ✅ 改造范围可控 —— 新增 2 张表（`file_sync_state`、`wechat_account_state`，均在 `lifewatch_ai.db` 中）+ 2 个 Provider（`FileSyncStateProvider`、`WechatAccountStateProvider`）+ 云端 API 扩展 hash 字段 + 新增 CONFLICT_RESOLVE 消息类型
 9. ✅ 三阶段 API 协议 —— mtime 第一重过滤（快速排除未变更文件）+ hash 精确判断（11 状态矩阵）+ verify 校验（推进 parent 前确认两端一致）
-10. ✅ hash 规范化 —— 去除空白字符后计算 SHA-256，避免 OS 差异（`\r\n` vs `\n`）和格式调整导致 false positive
+10. ✅ hash 规范化 —— 统一行尾符并去除行尾空白后计算 SHA-256，避免 OS 差异（`\r\n` vs `\n`）和 trailing 空白导致 false positive，保留词语间空格防止内容碰撞
 
 ## 备选触发
 
