@@ -1560,6 +1560,72 @@ CUSTOM_RECORD_FIELDS_CONFIG = {
 }
 
 
+# 微信账户状态表配置（存储 context_token 和 last_session_id）
+# 替代原 channel/wechat/account.json 文件存储方式
+# 加入 SYNC_TABLES 自动走数据库同步的记录级 LWW
+WECHAT_ACCOUNT_STATE_CONFIG = {
+    "table_name": "wechat_account_state",
+    "columns": {
+        "wechat_user_id": {
+            "type": "TEXT",
+            "constraints": ["PRIMARY KEY"],
+            "comment": "微信用户 ID（主键，设计上支持多微信用户）",
+        },
+        "context_token": {
+            "type": "TEXT",
+            "constraints": [],
+            "comment": "微信对话上下文 token",
+        },
+        "last_session_id": {
+            "type": "TEXT",
+            "constraints": [],
+            "comment": "最后一次会话 ID",
+        },
+    },
+    "table_constraints": [],
+    "indexes": [
+        {"name": "idx_wechat_account_state_updated_at", "columns": ["updated_at"]},
+    ],
+    "timestamps": True,  # 自动添加 created_at, updated_at（用于 LWW 的 updated_at 自动管理）
+    "update_at": True,
+}
+
+
+# 文件同步状态表配置（per-file version tracking）
+# 存储 parent_hash + current_hash，用于 11 状态矩阵判定
+# 不加入 SYNC_TABLES——它是同步元数据，通过 API 扩展字段传递
+# 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md v2.1 决策 1
+FILE_SYNC_STATE_CONFIG = {
+    "table_name": "file_sync_state",
+    "columns": {
+        "file_path": {
+            "type": "TEXT",
+            "constraints": ["PRIMARY KEY", "NOT NULL"],
+            "comment": "相对 lifeprism_data_path 的路径（如 user/user.md）",
+        },
+        "parent_hash": {
+            "type": "TEXT",
+            "constraints": [],
+            "comment": "上次同步成功时的 hash（NULL = 从未同步）",
+        },
+        "current_hash": {
+            "type": "TEXT",
+            "constraints": [],
+            "comment": "当前文件内容的 hash",
+        },
+        "updated_at": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL"],
+            "comment": "更新时间（ISO 8601 + UTC）",
+        },
+    },
+    "table_constraints": [],
+    "indexes": [],
+    "timestamps": False,  # 不自动添加 created_at（表只有 updated_at，由 Provider 手动管理）
+    "update_at": False,
+}
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     "category_map_cache": category_map_cache_CONFIG,
@@ -1600,6 +1666,8 @@ TABLE_CONFIGS = {
     "behavior_analysis": BEHAVIOR_ANALYSIS_CONFIG,
     "custom_record_types": CUSTOM_RECORD_TYPES_CONFIG,
     "custom_record_fields": CUSTOM_RECORD_FIELDS_CONFIG,
+    "wechat_account_state": WECHAT_ACCOUNT_STATE_CONFIG,
+    "file_sync_state": FILE_SYNC_STATE_CONFIG,
 }
 
 

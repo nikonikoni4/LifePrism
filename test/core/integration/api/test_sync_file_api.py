@@ -35,14 +35,33 @@ WRONG_AUTH_HEADERS = {"Authorization": "Bearer wrong_key"}
 
 @pytest.fixture(scope="module")
 def initialized_settings(test_data_path):
-    """初始化设置，确保 lifeprism_data_path 指向测试路径"""
+    """初始化设置，确保 lifeprism_data_path 指向测试路径，并初始化数据库"""
     from lifeprism.config.settings_manager import settings
 
     settings._initialize()
 
-    from lifeprism.config import settings_manager
+    # 覆盖 lifeprism_data_path 指向测试路径
+    # （config.yaml 可能配置了不同的路径，但文件同步测试需要 test_data_path）
+    settings._lifeprism_data_path = test_data_path
 
-    settings_manager.set_setting("sync_api_key", TEST_API_KEY)
+    # 设置测试用 sync_api_key
+    # 注意：必须使用 set_sync_api_key() 而非 set_setting()，
+    # 因为 get_sync_api_key() 在 full 模式下从 keyring 读取，
+    # 而 set_setting() 在 full 模式下写入 config.yaml（不路由到 keyring）
+    from lifeprism.sync.sync_config import set_sync_api_key
+
+    set_sync_api_key(TEST_API_KEY)
+
+    # 初始化数据库（file_sync_state 表需要存在）
+    from lifeprism.repository import lw_db_manager
+    from lifeprism.repository.lw_table_manager import LWTableManager
+    from lifeprism.repository.base_providers.lw_base_data_provider import (
+        LWBaseDataProvider,
+    )
+
+    LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
+    manager = LWTableManager(db_manager=lw_db_manager)
+    manager.init_database()
 
     yield settings
 
@@ -79,6 +98,22 @@ def clean_test_dir(test_data_path):
     yield test_dir
     if test_dir.exists():
         shutil.rmtree(test_dir, ignore_errors=True)
+
+
+@pytest.fixture
+def clean_file_sync_state(initialized_settings):
+    """每个测试前后清理 file_sync_state 表"""
+    from lifeprism.repository import lw_db_manager
+
+    with lw_db_manager.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM file_sync_state")
+        conn.commit()
+    yield
+    with lw_db_manager.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM file_sync_state")
+        conn.commit()
 
 
 # ==================== Helper Functions ====================
@@ -291,14 +326,22 @@ class TestSyncPullFiles:
 
 
 class TestSyncPushFiles:
-    """测试 POST /api/sync/push-files 端点"""
+    """测试 POST /api/sync/push-files 端点（Issue 32: hash-based 同步）"""
 
-    def test_push_files_writes_new_file(self, client, clean_test_dir):
-        """推送新文件时写入成功"""
+    def test_push_files_accepts_hash_schema_and_returns_results(
+        self, client, clean_test_dir, clean_file_sync_state
+    ):
+        """推送文件使用 parent_hash + current_hash 字段（无 mtime），返回 results 格式
+
+        验收标准：
+        - FilePushItem 新增 parent_hash + current_hash 字段
+        - FilePushItem 移除 mtime 字段
+        - Response 包含 results 字段（每文件的 action）
+        """
         # Arrange
         encoded_content = encode_content("推送的新文件内容")
 
-        # Act
+        # Act: 使用新 schema（parent_hash + current_hash，无 mtime）
         response = client.post(
             "/api/sync/push-files",
             json={
@@ -306,143 +349,29 @@ class TestSyncPushFiles:
                     {
                         "path": "sync_file_api_test/pushed/new_file.txt",
                         "content": encoded_content,
-                        "mtime": "2026-07-01T12:00:00+00:00",
+                        "parent_hash": None,
+                        "current_hash": "client_computed_hash_abc",
                     }
                 ]
             },
             headers=AUTH_HEADERS,
         )
 
-        # Assert: 文件已写入
+        # Assert: 响应 200，包含 results 字段
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "ok"
-        assert data["written"] == 1
-        assert data["skipped"] == 0
+        assert "results" in data
+        assert "sync_time" in data
+        assert len(data["results"]) == 1
+        assert data["results"][0]["path"] == "sync_file_api_test/pushed/new_file.txt"
+        assert data["results"][0]["action"] == "accepted"
 
+        # 文件已写入
         written_file = clean_test_dir / "pushed" / "new_file.txt"
         assert written_file.exists()
         assert written_file.read_text(encoding="utf-8") == "推送的新文件内容"
 
-    def test_push_files_lww_skips_when_local_newer(self, client, clean_test_dir):
-        """本地文件 mtime 更新时跳过（LWW）"""
-        # Arrange: 创建本地文件，mtime = 12:00（较新）
-        local_file = clean_test_dir / "lww_test.txt"
-        local_file.write_text("本地新内容", encoding="utf-8")
-        set_file_mtime(local_file, "2026-07-01T12:00:00+00:00")
-
-        # Act: 推送相同路径但 mtime = 10:00（较旧）的文件
-        encoded_content = encode_content("远程旧内容")
-        response = client.post(
-            "/api/sync/push-files",
-            json={
-                "files": [
-                    {
-                        "path": "sync_file_api_test/lww_test.txt",
-                        "content": encoded_content,
-                        "mtime": "2026-07-01T10:00:00+00:00",
-                    }
-                ]
-            },
-            headers=AUTH_HEADERS,
-        )
-
-        # Assert: 本地文件未被覆盖
-        assert response.status_code == 200
-        data = response.json()
-        assert data["written"] == 0
-        assert data["skipped"] == 1
-        assert local_file.read_text(encoding="utf-8") == "本地新内容"
-
-    def test_push_files_lww_overwrites_when_remote_newer(self, client, clean_test_dir):
-        """远程文件 mtime 更新时覆盖本地"""
-        # Arrange: 创建本地文件，mtime = 10:00（较旧）
-        local_file = clean_test_dir / "lww_overwrite.txt"
-        local_file.write_text("本地旧内容", encoding="utf-8")
-        set_file_mtime(local_file, "2026-07-01T10:00:00+00:00")
-
-        # Act: 推送相同路径但 mtime = 12:00（较新）的文件
-        encoded_content = encode_content("远程新内容")
-        response = client.post(
-            "/api/sync/push-files",
-            json={
-                "files": [
-                    {
-                        "path": "sync_file_api_test/lww_overwrite.txt",
-                        "content": encoded_content,
-                        "mtime": "2026-07-01T12:00:00+00:00",
-                    }
-                ]
-            },
-            headers=AUTH_HEADERS,
-        )
-
-        # Assert: 本地文件被覆盖
-        assert response.status_code == 200
-        data = response.json()
-        assert data["written"] == 1
-        assert data["skipped"] == 0
-        assert local_file.read_text(encoding="utf-8") == "远程新内容"
-
-    def test_push_files_creates_parent_directories(self, client, clean_test_dir):
-        """自动创建父目录"""
-        # Arrange
-        encoded_content = encode_content("深层目录文件")
-
-        # Act: 推送到深层路径
-        response = client.post(
-            "/api/sync/push-files",
-            json={
-                "files": [
-                    {
-                        "path": "sync_file_api_test/deep/nested/dir/file.txt",
-                        "content": encoded_content,
-                        "mtime": "2026-07-01T12:00:00+00:00",
-                    }
-                ]
-            },
-            headers=AUTH_HEADERS,
-        )
-
-        # Assert: 父目录已创建，文件已写入
-        assert response.status_code == 200
-        data = response.json()
-        assert data["written"] == 1
-
-        deep_file = clean_test_dir / "deep" / "nested" / "dir" / "file.txt"
-        assert deep_file.exists()
-        assert deep_file.read_text(encoding="utf-8") == "深层目录文件"
-
-    def test_push_files_sets_mtime(self, client, clean_test_dir):
-        """写入后正确设置 mtime"""
-        # Arrange
-        encoded_content = encode_content("设置mtime的文件")
-        target_mtime = "2026-07-01T12:00:00+00:00"
-
-        # Act
-        response = client.post(
-            "/api/sync/push-files",
-            json={
-                "files": [
-                    {
-                        "path": "sync_file_api_test/mtime_test.txt",
-                        "content": encoded_content,
-                        "mtime": target_mtime,
-                    }
-                ]
-            },
-            headers=AUTH_HEADERS,
-        )
-
-        # Assert: 文件的 mtime 与推送的 mtime 匹配
-        assert response.status_code == 200
-
-        written_file = clean_test_dir / "mtime_test.txt"
-        actual_mtime = written_file.stat().st_mtime
-        expected_mtime = datetime.fromisoformat(target_mtime).timestamp()
-        assert abs(actual_mtime - expected_mtime) < 2  # 允许 2 秒误差
-
-    def test_push_files_requires_api_key(self, client, clean_test_dir):
+    def test_push_files_requires_api_key(self, client, clean_test_dir, clean_file_sync_state):
         """无 API Key 时返回 422"""
         # Act
         response = client.post(
@@ -452,7 +381,8 @@ class TestSyncPushFiles:
                     {
                         "path": "sync_file_api_test/auth_test.txt",
                         "content": encode_content("test"),
-                        "mtime": "2026-07-01T12:00:00+00:00",
+                        "parent_hash": None,
+                        "current_hash": "hash_abc",
                     }
                 ]
             },
@@ -464,6 +394,121 @@ class TestSyncPushFiles:
         data = response.json()
         assert data["error_code"] == "INVALID_SYNC_API_KEY"
 
+    def test_push_files_new_file_cloud_computes_hash_and_updates_state(
+        self, client, clean_test_dir, clean_file_sync_state
+    ):
+        """新文件推送：云端写入后自行计算 current_hash 并插入 file_sync_state（parent_hash=NULL）
+
+        验收标准：
+        - 云端写入文件后立即调用 compute_file_hash 计算 current_hash
+        - 新文件（file_sync_state 中无记录）插入：parent_hash=NULL, current_hash=云端计算值
+        - 云端的 current_hash 不使用客户端传入的 current_hash（不信任客户端）
+        """
+        # Arrange: 推送新文件，客户端 current_hash 是一个明显的假值
+        content = "云端 hash 计算测试内容"
+        encoded_content = encode_content(content)
+        client_fake_hash = "CLIENT_FAKE_HASH_SHOULD_BE_IGNORED"
+
+        # Act
+        response = client.post(
+            "/api/sync/push-files",
+            json={
+                "files": [
+                    {
+                        "path": "sync_file_api_test/hash_test/new.txt",
+                        "content": encoded_content,
+                        "parent_hash": None,
+                        "current_hash": client_fake_hash,
+                    }
+                ]
+            },
+            headers=AUTH_HEADERS,
+        )
+
+        # Assert: 响应成功
+        assert response.status_code == 200
+
+        # Assert: file_sync_state 中已插入记录
+        from lifeprism.repository.providers import file_sync_state_provider
+
+        state = file_sync_state_provider.get_state("sync_file_api_test/hash_test/new.txt")
+        assert state is not None, "新文件推送后 file_sync_state 应有记录"
+
+        # Assert: parent_hash 为 None（新文件，push-files 不推进 parent_hash）
+        assert state["parent_hash"] is None, "新文件 parent_hash 应为 None"
+
+        # Assert: current_hash 是云端计算的值，而非客户端传入的假值
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        expected_cloud_hash = compute_file_hash(content.encode("utf-8"))
+        assert state["current_hash"] == expected_cloud_hash, (
+            "云端 current_hash 应由 compute_file_hash(content_bytes) 计算，不信任客户端值"
+        )
+        assert state["current_hash"] != client_fake_hash, (
+            "云端 current_hash 不应等于客户端传入的假值"
+        )
+
+    def test_push_files_existing_record_preserves_parent_hash(
+        self, client, clean_test_dir, clean_file_sync_state
+    ):
+        """已有记录推送：只更新 current_hash，不修改 parent_hash
+
+        验收标准：
+        - file_sync_state 中已有记录（parent_hash 已设值）时，推送文件更新
+        - parent_hash 保持原值不变（push-files 不推进 parent_hash，那是 commit 端点的职责）
+        - current_hash 更新为云端新计算的值
+        """
+        # Arrange: 预置一条已有记录（模拟之前已 commit 过的文件）
+        from lifeprism.repository.providers import file_sync_state_provider
+
+        existing_parent_hash = "previously_committed_parent_hash_abc"
+        old_current_hash = "old_current_hash_will_be_replaced"
+        file_path_rel = "sync_file_api_test/existing/update.txt"
+        file_sync_state_provider.upsert_state(
+            file_path=file_path_rel,
+            parent_hash=existing_parent_hash,
+            current_hash=old_current_hash,
+        )
+
+        # Act: 推送该文件的新内容
+        new_content = "更新后的文件内容"
+        encoded_content = encode_content(new_content)
+        response = client.post(
+            "/api/sync/push-files",
+            json={
+                "files": [
+                    {
+                        "path": file_path_rel,
+                        "content": encoded_content,
+                        "parent_hash": None,
+                        "current_hash": "client_hash_ignored",
+                    }
+                ]
+            },
+            headers=AUTH_HEADERS,
+        )
+
+        # Assert: 响应成功
+        assert response.status_code == 200
+
+        # Assert: file_sync_state 中 parent_hash 保持不变
+        state = file_sync_state_provider.get_state(file_path_rel)
+        assert state is not None, "已有记录不应被删除"
+        assert state["parent_hash"] == existing_parent_hash, (
+            "已有记录的 parent_hash 应保持不变，push-files 不推进 parent_hash"
+        )
+
+        # Assert: current_hash 已更新为云端新计算的值
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        expected_new_hash = compute_file_hash(new_content.encode("utf-8"))
+        assert state["current_hash"] == expected_new_hash, (
+            "current_hash 应更新为云端新计算的值"
+        )
+        assert state["current_hash"] != old_current_hash, (
+            "current_hash 不应保持旧值"
+        )
+
 
 # ==================== 路径遍历安全测试 ====================
 
@@ -471,7 +516,7 @@ class TestSyncPushFiles:
 class TestPathTraversalSecurity:
     """测试 _is_path_safe() 路径遍历防护"""
 
-    def test_push_files_rejects_path_traversal(self, client, clean_test_dir):
+    def test_push_files_rejects_path_traversal(self, client, clean_test_dir, clean_file_sync_state):
         """测试路径遍历攻击被拒绝"""
         # Arrange: 构造恶意路径，尝试写到 data_path 之外
         from lifeprism.config.settings_manager import settings
@@ -493,25 +538,29 @@ class TestPathTraversalSecurity:
                         {
                             "path": "../evil_traversal_test.txt",
                             "content": encoded_content,
-                            "mtime": "2026-07-01T12:00:00+00:00",
+                            "parent_hash": None,
+                            "current_hash": "hash_abc",
                         }
                     ]
                 },
                 headers=AUTH_HEADERS,
             )
 
-            # Assert: 文件未被写入，返回 skipped
+            # Assert: 文件未被写入，恶意路径不在 results 中
             assert response.status_code == 200
             data = response.json()
-            assert data["written"] == 0
-            assert data["skipped"] == 1
+            assert "results" in data
+            paths = {r["path"] for r in data["results"]}
+            assert "../evil_traversal_test.txt" not in paths
             assert not evil_file.exists()
         finally:
             # 清理：确保恶意文件未被创建
             if evil_file.exists():
                 evil_file.unlink()
 
-    def test_push_files_rejects_nested_path_traversal(self, client, clean_test_dir):
+    def test_push_files_rejects_nested_path_traversal(
+        self, client, clean_test_dir, clean_file_sync_state
+    ):
         """测试嵌套路径遍历攻击被拒绝（../../etc/evil 模式）"""
         # Arrange: 构造嵌套恶意路径
         from lifeprism.config.settings_manager import settings
@@ -532,18 +581,20 @@ class TestPathTraversalSecurity:
                         {
                             "path": "../../evil_nested.txt",
                             "content": encoded_content,
-                            "mtime": "2026-07-01T12:00:00+00:00",
+                            "parent_hash": None,
+                            "current_hash": "hash_abc",
                         }
                     ]
                 },
                 headers=AUTH_HEADERS,
             )
 
-            # Assert: 文件未被写入，返回 skipped
+            # Assert: 文件未被写入，恶意路径不在 results 中
             assert response.status_code == 200
             data = response.json()
-            assert data["written"] == 0
-            assert data["skipped"] == 1
+            assert "results" in data
+            paths = {r["path"] for r in data["results"]}
+            assert "../../evil_nested.txt" not in paths
             assert not evil_file.exists()
         finally:
             if evil_file.exists():

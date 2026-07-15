@@ -12,16 +12,40 @@ import asyncio
 import base64
 import gzip
 import os
+import tempfile
 import threading
 from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 
+from lifeprism.sync.constants import EXCLUDED_FILENAMES as _EXCLUDED_FILENAMES
+from lifeprism.sync.constants import safe_gzip_decompress
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
 
-# 同步范围：除 window_events 外的所有需要同步的静态表（30 张）
+
+def _safe_write_file(file_path: Path, content: bytes) -> None:
+    """原子写入文件：先写临时文件再 os.replace，防止写入中途崩溃导致文件损坏
+
+    Args:
+        file_path: 目标文件路径
+        content: 文件内容字节串
+    """
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=file_path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(content)
+        os.replace(tmp_path, file_path)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
+
+
+# 同步范围：除 window_events 外的所有需要同步的静态表（31 张）
 SYNC_TABLES = [
     # 用户输入数据（15张）
     "mood_entries",
@@ -58,22 +82,19 @@ SYNC_TABLES = [
     "category_map_cache",
     # 统计数据（1张）
     "tokens_usage_log",
+    # 微信账户状态（1张）- 替代原 channel/wechat/account.json 文件存储
+    # 走数据库同步的记录级 LWW，参考 ADR 2026-07-14-file-sync-conflict-resolution.md 决策 4
+    "wechat_account_state",
 ]
 
 # 文件同步白名单：相对 lifeprism_data_path 的路径
-# 目录以 / 结尾，单文件为完整路径
+# 对齐 Agent 工具白名单（ALLOWED_DIRS = user/diary/agent）+ session（会话层写入）
+# 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md v2.1 决策 2
 SYNC_DIRECTORIES = [
-    "agent/",
-    "assets/",
-    "channel/wechat/account.json",  # 单文件特殊处理
-    "diary/",
-    "docs/",
-    "external_files/",
-    "plan/",
-    "prompts/",
-    "session/",
-    "user/",
-    "workflow/",
+    "session/",  # 聊天会话 JSONL（Agent 会话层写入）
+    "diary/",  # 日记 MD（Agent write_file/edit_file）
+    "agent/",  # Agent 身份/记忆/chat 配置（Agent write_file/edit_file）
+    "user/",  # 用户级数据（Agent write_file/edit_file，排除 chat_history.json）
 ]
 
 
@@ -88,15 +109,19 @@ class SyncClient:
         sync_repository: SyncRepository 实例
     """
 
-    def __init__(self, db_manager, sync_repository):
+    def __init__(self, db_manager, sync_repository, main_event_loop=None):
         """初始化同步客户端
 
         Args:
             db_manager: DatabaseManager 实例
             sync_repository: SyncRepository 实例
+            main_event_loop: 主线程的 asyncio 事件循环引用，
+                             用于通过 run_coroutine_threadsafe 桥接 bus.send（冲突解决时需要）
         """
         self.db = db_manager
         self.sync_repository = sync_repository
+        # 主线程事件循环引用（用于 bus 桥接）
+        self._main_event_loop = main_event_loop
         # 并发控制锁：保护 _is_syncing 的原子 check-then-set
         self._sync_lock = threading.Lock()
         # 并发控制标志：True 表示一次同步正在进行中
@@ -222,9 +247,8 @@ class SyncClient:
         self.pull_from_remote(remote_url, api_key, last_sync_time, tables)
         self.push_to_remote(remote_url, api_key, tables)
 
-        # 文件同步：Pull -> Push
-        self.pull_files_from_remote(remote_url, api_key, last_sync_time, directories)
-        self.push_files_to_remote(remote_url, api_key, last_sync_time, directories)
+        # 文件同步：全流程（Phase 1-3，参考 ADR v2.1）
+        self._sync_files_full_flow(remote_url, api_key, last_sync_time, directories)
 
         # 只有全部成功才更新 last_sync_time（使用 ISO 8601 格式，与服务端保持一致）
         current_time = datetime.now(timezone.utc).isoformat()
@@ -406,23 +430,118 @@ class SyncClient:
 
         logger.info("push_to_remote: 推送 %d 张表的数据", len(tables_data))
 
-    # ==================== 文件同步 ====================
+    # ==================== 文件同步全流程（Issue 33） ====================
 
-    def pull_files_from_remote(self, remote_url, api_key, last_sync_time, directories):
-        """从云端拉取增量文件并写入本地
+    def _scan_sync_files(self, directories):
+        """扫描同步目录下的所有文件，返回相对路径列表
 
-        调用 POST /api/sync/pull-files 获取云端变更文件，
-        对每个文件应用 LWW 冲突解决后写入本地。
+        遍历 directories 中的路径，递归查找所有文件，
+        排除 _EXCLUDED_FILENAMES 中的文件名（如 chat_history.json）。
+
+        Args:
+            directories: 文件同步目录列表（相对 lifeprism_data_path）
+
+        Returns:
+            list[str]: 文件相对路径列表（使用 / 分隔符）
+        """
+        from lifeprism.config.settings_manager import settings
+
+        data_path = settings.lifeprism_data_path.resolve()
+
+        files = []
+        for dir_rel in directories:
+            target = (data_path / dir_rel).resolve()
+
+            if not target.exists():
+                logger.debug("_scan_sync_files: 路径不存在，跳过 %s", dir_rel)
+                continue
+
+            if target.is_file():
+                if target.name in _EXCLUDED_FILENAMES:
+                    continue
+                rel_path = str(target.relative_to(data_path)).replace("\\", "/")
+                files.append(rel_path)
+            elif target.is_dir():
+                for file_path in target.rglob("*"):
+                    if not file_path.is_file():
+                        continue
+                    if file_path.name in _EXCLUDED_FILENAMES:
+                        continue
+                    rel_path = str(file_path.relative_to(data_path)).replace("\\", "/")
+                    files.append(rel_path)
+
+        return files
+
+    def _refresh_current_hashes(self, directories):
+        """同步前全量扫描：刷新 file_sync_state 中所有文件的 current_hash
+
+        遍历 directories 下所有文件（排除 chat_history.json），
+        实时计算 current_hash 并批量更新 file_sync_state 表。
+        新文件 parent_hash = NULL；已存在记录保持 parent_hash 不变。
+
+        参考 ADR v2.1 决策 1：hash 更新逻辑 - 同步前刷新 current_hash。
+
+        Args:
+            directories: 文件同步目录列表（相对 lifeprism_data_path）
+
+        Returns:
+            list[str]: 扫描到的文件相对路径列表（供调用方复用，避免重复扫描）
+        """
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        data_path = settings.lifeprism_data_path.resolve()
+        provider = FileSyncStateProvider(db_manager=self.db)
+
+        rel_paths = self._scan_sync_files(directories)
+
+        # 批量获取现有状态（单次 DB 查询，避免逐文件往返）
+        existing_states = provider.batch_get_states(rel_paths)
+
+        # 逐文件计算 hash（CPU 密集，无法批量）
+        to_upsert = []
+        for rel_path in rel_paths:
+            file_path = (data_path / rel_path).resolve()
+            content_bytes = file_path.read_bytes()
+            new_hash = compute_file_hash(content_bytes)
+
+            existing = existing_states.get(rel_path)
+            parent_hash = existing["parent_hash"] if existing else None
+
+            to_upsert.append(
+                {
+                    "file_path": rel_path,
+                    "parent_hash": parent_hash,
+                    "current_hash": new_hash,
+                }
+            )
+
+        # 批量 upsert（单次事务）
+        if to_upsert:
+            provider.batch_upsert_states(to_upsert)
+
+        logger.info("_refresh_current_hashes: 刷新 %d 个文件的 current_hash", len(rel_paths))
+        return rel_paths
+
+    def _pull_files_check(self, remote_url, api_key, last_sync_time, directories):
+        """Phase 1: 快照交换 - 调用 POST /pull-files/check 获取云端文件 hash 状态
+
+        云端按 mtime 过滤变更文件，返回 {path, parent_hash, current_hash} 列表。
+        此阶段不传输文件内容，仅交换 hash 快照供本地做 11 态矩阵判定。
 
         Args:
             remote_url: 远程服务器 URL
             api_key: API Key
-            last_sync_time: 上次同步时间（ISO 8601 字符串）
+            last_sync_time: 上次同步时间（ISO 8601 字符串，空字符串表示首次同步）
             directories: 文件同步目录列表
+
+        Returns:
+            list[dict]: 云端变更文件的 hash 状态列表，每项含 path/parent_hash/current_hash
         """
         try:
             response = httpx.post(
-                url=f"{remote_url}/api/sync/pull-files",
+                url=f"{remote_url}/api/sync/pull-files/check",
                 json={
                     "last_sync_time": last_sync_time,
                     "directories": directories,
@@ -435,50 +554,129 @@ class SyncClient:
             response.raise_for_status()
         except (httpx.HTTPStatusError, httpx.RequestError) as e:
             logger.error(
-                "pull_files_from_remote: 拉取文件失败, remote_url=%s, directories=%s, error=%s",
+                "_pull_files_check: 调用 check 失败, remote_url=%s, error=%s",
                 remote_url,
-                directories,
                 e,
             )
             raise
+
         data = response.json()
-
         files = data.get("files", [])
-        written = 0
-        skipped = 0
-        for file_item in files:
-            if self._write_file(file_item):
-                written += 1
-            else:
-                skipped += 1
+        logger.info("_pull_files_check: 云端返回 %d 个变更文件", len(files))
+        return files
 
-        logger.info(
-            "pull_files_from_remote: 拉取 %d 个文件, 写入 %d, 跳过 %d",
-            len(files),
-            written,
-            skipped,
-        )
+    def _decide_sync_action(
+        self,
+        local_parent,
+        local_current,
+        remote_parent,
+        remote_current,
+    ):
+        """Phase 2a: 按 11 态矩阵判定文件同步动作
 
-    def push_files_to_remote(self, remote_url, api_key, last_sync_time, directories):
-        """推送本地变更文件到云端
+        参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md v2.1 决策 1
 
-        收集本地变更文件（mtime > last_sync_time），
-        通过 POST /api/sync/push-files 推送到远程。
+        11 态矩阵:
+        | # | L.P | L.C | R.P | R.C | Decision |
+        | 1 | NULL | A1 | 不存在 | - | PUSH |
+        | 2 | 不存在 | - | NULL | A2 | PULL |
+        | 3 | NULL | A1 | NULL | A2 | CONFLICT |
+        | 4 | NULL | A1 | A | A | PULL |
+        | 5 | A | A | NULL | A2 | PUSH |
+        | 6 | A | A | A | A | SKIP |
+        | 7 | A | A1 | A | A | PUSH |
+        | 8 | A | A | A | A1 | PULL |
+        | 9 | A | A1 | A | A2 | CONFLICT |
+        | 10 | A1 | A1 | A2 | A2 | CONFLICT |
+        | 11 | A | A1 | A2 | A2 | CONFLICT |
+
+        Args:
+            local_parent: 本地 parent_hash（None = 从未同步或文件不存在）
+            local_current: 本地 current_hash（None = 文件不存在本地）
+            remote_parent: 云端 parent_hash（None = 从未同步或文件不存在）
+            remote_current: 云端 current_hash（None = 文件不存在云端）
+
+        Returns:
+            str: "PULL" / "PUSH" / "CONFLICT" / "SKIP"
+        """
+        # 文件不存在的一侧：current_hash 为 None
+        # Row 2: 本地不存在 → PULL
+        if local_current is None:
+            return "PULL"
+
+        # Row 1: 云端不存在 → PUSH
+        if remote_current is None:
+            return "PUSH"
+
+        # 双方都存在：先比较内容
+        # 内容相同 → SKIP（覆盖 Row 3/9 的同内容边界场景）
+        if local_current == remote_current:
+            return "SKIP"
+
+        # 内容不同，检查 parent 状态
+        local_has_parent = local_parent is not None
+        remote_has_parent = remote_parent is not None
+
+        # Row 3: 双方都从未同步（parent 均为 None），内容不同 → CONFLICT
+        if not local_has_parent and not remote_has_parent:
+            return "CONFLICT"
+
+        # Row 4: 本地从未同步（parent=None），云端有历史 → PULL
+        if not local_has_parent and remote_has_parent:
+            return "PULL"
+
+        # Row 5: 本地有历史，云端从未同步（parent=None） → PUSH
+        if local_has_parent and not remote_has_parent:
+            return "PUSH"
+
+        # 双方都有 parent，检查是否一致
+        # Row 10/11: parent 不一致 → CONFLICT
+        if local_parent != remote_parent:
+            return "CONFLICT"
+
+        # parent 一致，判断哪一方改了
+        local_changed = local_current != local_parent
+        remote_changed = remote_current != remote_parent
+
+        # Row 7: 仅本地改 → PUSH
+        if local_changed and not remote_changed:
+            return "PUSH"
+
+        # Row 8: 仅云端改 → PULL
+        if not local_changed and remote_changed:
+            return "PULL"
+
+        # Row 9: 双方都改且内容不同 → CONFLICT
+        if local_changed and remote_changed:
+            return "CONFLICT"
+
+        # Row 6: 双方都没改（理论上方内容已相同，已被前面的 SKIP 捕获）
+        return "SKIP"
+
+    def _pull_files_fetch(self, remote_url, api_key, paths):
+        """Phase 2b: 拉取文件内容 → 写入本地 → 立即更新 current_hash
+
+        调用 POST /pull-files/fetch 获取文件内容（gzip+base64），
+        解码解压后写入本地文件，然后立即计算 current_hash 并更新 file_sync_state。
+
+        hash 时效性：写入后实时计算 current_hash，不使用云端返回的 hash 值。
 
         Args:
             remote_url: 远程服务器 URL
             api_key: API Key
-            last_sync_time: 上次同步时间（ISO 8601 字符串）
-            directories: 文件同步目录列表
+            paths: 需要拉取的文件相对路径列表
         """
-        files = self._collect_changed_files(last_sync_time, directories)
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        if not paths:
+            return
 
         try:
             response = httpx.post(
-                url=f"{remote_url}/api/sync/push-files",
-                json={
-                    "files": files,
-                },
+                url=f"{remote_url}/api/sync/pull-files/fetch",
+                json={"paths": paths},
                 headers={
                     "Authorization": f"Bearer {api_key}",
                 },
@@ -487,144 +685,552 @@ class SyncClient:
             response.raise_for_status()
         except (httpx.HTTPStatusError, httpx.RequestError) as e:
             logger.error(
-                "push_files_to_remote: 推送文件失败, remote_url=%s, files=%d, error=%s",
+                "_pull_files_fetch: 调用 fetch 失败, remote_url=%s, paths=%d, error=%s",
                 remote_url,
-                len(files),
+                len(paths),
                 e,
             )
             raise
 
-        logger.info("push_files_to_remote: 推送 %d 个文件", len(files))
-
-    def _collect_changed_files(self, last_sync_time, directories):
-        """收集本地变更文件（gzip 压缩 + base64 编码）
-
-        遍历 directories 中的路径，找到 mtime > last_sync_time 的文件，
-        读取内容并编码后返回。
-
-        单文件路径（如 channel/wechat/account.json）直接检查；
-        目录路径递归遍历（rglob）。
-
-        Args:
-            last_sync_time: 上次同步时间（ISO 8601 字符串）
-            directories: 文件同步目录/文件列表（相对 lifeprism_data_path）
-
-        Returns:
-            list[dict]: 变更文件列表，每项包含 path、content、mtime
-        """
-        from lifeprism.config.settings_manager import settings
+        data = response.json()
+        files = data.get("files", [])
 
         data_path = settings.lifeprism_data_path.resolve()
+        provider = FileSyncStateProvider(db_manager=self.db)
 
-        if last_sync_time:
-            last_sync_dt = datetime.fromisoformat(last_sync_time)
-        else:
-            # 首次同步：同步所有文件
-            last_sync_dt = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        for file_item in files:
+            rel_path = file_item["path"]
+            file_path = (data_path / rel_path).resolve()
 
-        files = []
-        for dir_rel in directories:
-            target = (data_path / dir_rel).resolve()
-
-            if not target.exists():
-                logger.debug("_collect_changed_files: 路径不存在，跳过 %s", dir_rel)
+            # 路径安全检查
+            try:
+                file_path.relative_to(data_path)
+            except ValueError:
+                logger.warning("_pull_files_fetch: 跳过不安全路径 %s", rel_path)
                 continue
 
-            if target.is_file():
-                # 单文件特殊处理
-                if self._should_sync_file(target, last_sync_dt):
-                    files.append(self._encode_file(target, data_path))
-            elif target.is_dir():
-                # 目录递归遍历
-                for file_path in target.rglob("*"):
-                    if file_path.is_file() and self._should_sync_file(file_path, last_sync_dt):
-                        files.append(self._encode_file(file_path, data_path))
+            # base64 解码 + gzip 解压（带大小限制）
+            compressed = base64.b64decode(file_item["content"])
+            content_bytes = safe_gzip_decompress(compressed)
 
-        return files
+            # 原子写入文件
+            _safe_write_file(file_path, content_bytes)
 
-    def _should_sync_file(self, file_path, last_sync_dt):
-        """判断文件是否需要同步（mtime > last_sync_time）
+            # 立即计算 current_hash（实时计算，不使用云端返回的值）
+            new_hash = compute_file_hash(content_bytes)
 
-        Args:
-            file_path: 文件绝对路径
-            last_sync_dt: 上次同步时间（datetime 对象）
+            # 更新 file_sync_state：保持 parent_hash 不变，更新 current_hash
+            existing = provider.get_state(rel_path)
+            parent_hash = existing["parent_hash"] if existing else file_item.get("parent_hash")
 
-        Returns:
-            bool: 文件 mtime 大于 last_sync_time 时返回 True
-        """
-        file_mtime = file_path.stat().st_mtime
-        return file_mtime > last_sync_dt.timestamp()
+            provider.upsert_state(
+                file_path=rel_path,
+                parent_hash=parent_hash,
+                current_hash=new_hash,
+            )
 
-    def _encode_file(self, file_path, data_path):
-        """编码文件（gzip 压缩 + base64 编码）
+            logger.debug("_pull_files_fetch: 写入 %s, current_hash=%s", rel_path, new_hash)
 
-        Args:
-            file_path: 文件绝对路径
-            data_path: 数据根目录（用于计算相对路径）
+        logger.info("_pull_files_fetch: 拉取并写入 %d 个文件", len(files))
 
-        Returns:
-            dict: 包含 path（相对路径）、content（编码内容）、mtime（ISO 8601）
-        """
-        content_bytes = file_path.read_bytes()
-        compressed = gzip.compress(content_bytes)
-        encoded = base64.b64encode(compressed).decode("ascii")
-        rel_path = str(file_path.relative_to(data_path)).replace("\\", "/")
-        mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc).isoformat()
-        return {
-            "path": rel_path,
-            "content": encoded,
-            "mtime": mtime,
-        }
+    def _push_files(self, remote_url, api_key, paths):
+        """Phase 2c: 推送本地文件（含 parent_hash + current_hash）到云端
 
-    def _write_file(self, file_item):
-        """写入文件（LWW 冲突解决 + 解码解压 + 设置 mtime）
+        读取本地文件内容（gzip+base64 编码），附带 file_sync_state 中的
+        parent_hash 和 current_hash，通过 POST /push-files 推送到云端。
 
-        对比本地文件 mtime 与远程 mtime：
-        - 本地更新（mtime > remote）-> 跳过
-        - 远程更新或本地不存在 -> 解码解压写入并设置 mtime
+        CONFLICT 文件不由此方法处理（由调用方在矩阵判定阶段跳过，仅记录日志）。
 
         Args:
-            file_item: dict，包含 path、content、mtime
-
-        Returns:
-            bool: True 表示已写入，False 表示跳过（本地更新）
+            remote_url: 远程服务器 URL
+            api_key: API Key
+            paths: 需要推送的文件相对路径列表
         """
         from lifeprism.config.settings_manager import settings
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+
+        if not paths:
+            return
 
         data_path = settings.lifeprism_data_path.resolve()
-        file_path = (data_path / file_item["path"]).resolve()
+        provider = FileSyncStateProvider(db_manager=self.db)
 
-        # 路径安全检查：防止路径遍历攻击（与服务端 _is_path_safe 对称）
+        files_payload = []
+        for rel_path in paths:
+            file_path = (data_path / rel_path).resolve()
+
+            if not file_path.is_file():
+                logger.warning("_push_files: 文件不存在，跳过 %s", rel_path)
+                continue
+
+            # 读取并编码文件内容
+            content_bytes = file_path.read_bytes()
+            compressed = gzip.compress(content_bytes)
+            encoded = base64.b64encode(compressed).decode("ascii")
+
+            # 从 file_sync_state 获取 hash
+            state = provider.get_state(rel_path)
+            parent_hash = state["parent_hash"] if state else None
+            current_hash = state["current_hash"] if state else None
+
+            files_payload.append(
+                {
+                    "path": rel_path,
+                    "content": encoded,
+                    "parent_hash": parent_hash,
+                    "current_hash": current_hash,
+                }
+            )
+
+        if not files_payload:
+            logger.info("_push_files: 无文件需要推送")
+            return
+
         try:
-            file_path.relative_to(data_path)
-        except ValueError:
-            logger.warning("_write_file: 跳过不安全路径 %s", file_item["path"])
-            return False
+            response = httpx.post(
+                url=f"{remote_url}/api/sync/push-files",
+                json={"files": files_payload},
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                },
+                timeout=60.0,
+            )
+            response.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(
+                "_push_files: 推送失败, remote_url=%s, files=%d, error=%s",
+                remote_url,
+                len(files_payload),
+                e,
+            )
+            raise
 
-        remote_mtime_dt = datetime.fromisoformat(file_item["mtime"])
-        remote_mtime_ts = remote_mtime_dt.timestamp()
+        logger.info("_push_files: 推送 %d 个文件", len(files_payload))
 
-        # LWW 冲突解决：本地文件更新时跳过
-        if file_path.exists():
-            local_mtime_ts = file_path.stat().st_mtime
-            if local_mtime_ts > remote_mtime_ts:
-                logger.debug(
-                    "_write_file: 本地更新，跳过 %s",
-                    file_item["path"],
+    def _verify_and_advance_parent(self, remote_url, api_key, paths):
+        """Phase 3: 一致性校验 + parent_hash 推进
+
+        1. 调用 POST /pull-files/verify 获取云端实时 current_hash
+        2. 比较本地 current_hash（file_sync_state）与云端 current_hash
+        3. 一致的文件：调用 POST /pull-files/commit 推进云端 parent_hash
+        4. 一致的文件：本地 parent_hash = current_hash
+        5. 不一致的文件：不推进 parent_hash，下次同步重试
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+            paths: 需要校验的文件相对路径列表
+        """
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+
+        if not paths:
+            return
+
+        provider = FileSyncStateProvider(db_manager=self.db)
+
+        # Step 1: 调用 verify 获取云端实时 hash
+        try:
+            response = httpx.post(
+                url=f"{remote_url}/api/sync/pull-files/verify",
+                json={"paths": paths},
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                },
+                timeout=60.0,
+            )
+            response.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(
+                "_verify_and_advance_parent: verify 失败, remote_url=%s, error=%s",
+                remote_url,
+                e,
+            )
+            raise
+
+        cloud_files = response.json().get("files", [])
+        cloud_hash_map = {f["path"]: f["current_hash"] for f in cloud_files}
+
+        # Step 2: 比较本地与云端 hash，收集一致的路径
+        consistent_paths = []
+        for rel_path in paths:
+            local_state = provider.get_state(rel_path)
+            if local_state is None:
+                logger.warning(
+                    "_verify_and_advance_parent: 本地无 file_sync_state 记录 %s",
+                    rel_path,
                 )
-                return False
+                continue
 
-        # base64 解码 + gzip 解压
+            local_current = local_state["current_hash"]
+            cloud_current = cloud_hash_map.get(rel_path)
+
+            if cloud_current is None:
+                logger.warning(
+                    "_verify_and_advance_parent: 云端 verify 未返回 %s",
+                    rel_path,
+                )
+                continue
+
+            if local_current == cloud_current:
+                consistent_paths.append(rel_path)
+            else:
+                logger.warning(
+                    "_verify_and_advance_parent: hash 不一致 %s, local=%s, cloud=%s",
+                    rel_path,
+                    local_current,
+                    cloud_current,
+                )
+
+        if not consistent_paths:
+            logger.info("_verify_and_advance_parent: 无一致文件，跳过 commit")
+            return
+
+        # Step 3: 调用 commit 推进云端 parent_hash
+        try:
+            commit_response = httpx.post(
+                url=f"{remote_url}/api/sync/pull-files/commit",
+                json={"paths": consistent_paths},
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                },
+                timeout=60.0,
+            )
+            commit_response.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(
+                "_verify_and_advance_parent: commit 失败, remote_url=%s, error=%s",
+                remote_url,
+                e,
+            )
+            raise
+
+        # Step 4: 推进本地 parent_hash = current_hash
+        for rel_path in consistent_paths:
+            local_state = provider.get_state(rel_path)
+            if local_state:
+                provider.upsert_state(
+                    file_path=rel_path,
+                    parent_hash=local_state["current_hash"],
+                    current_hash=local_state["current_hash"],
+                )
+
+        logger.info(
+            "_verify_and_advance_parent: 校验 %d 个文件, 一致 %d, 推进 parent_hash",
+            len(paths),
+            len(consistent_paths),
+        )
+
+    # ==================== CONFLICT_RESOLVE 冲突解决（Issue 34） ====================
+
+    def _fetch_remote_file_content(self, remote_url, api_key, file_path):
+        """获取远端文件内容（不写入本地）
+
+        调用 POST /pull-files/fetch 获取文件内容（gzip+base64），
+        解码解压后返回字符串内容，不写入本地文件。
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+            file_path: 文件相对路径
+
+        Returns:
+            str: 解码后的文件内容，获取失败返回 None
+        """
+        try:
+            response = httpx.post(
+                url=f"{remote_url}/api/sync/pull-files/fetch",
+                json={"paths": [file_path]},
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                },
+                timeout=60.0,
+            )
+            response.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(
+                "_fetch_remote_file_content: 获取远端文件失败 %s, error=%s",
+                file_path,
+                e,
+            )
+            return None
+
+        data = response.json()
+        files = data.get("files", [])
+        if not files:
+            logger.warning("_fetch_remote_file_content: 远端无文件内容 %s", file_path)
+            return None
+
+        file_item = files[0]
         compressed = base64.b64decode(file_item["content"])
-        content_bytes = gzip.decompress(compressed)
+        content_bytes = safe_gzip_decompress(compressed)
+        return content_bytes.decode("utf-8")
 
-        # 自动创建父目录
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+    def _resolve_conflicts(self, conflict_paths, remote_url, api_key):
+        """通过 AI 合并解决 CONFLICT 文件（串行处理）
 
-        # 写入文件
-        file_path.write_bytes(content_bytes)
+        对每个 CONFLICT 文件（一次一个发送给 AI）：
+        1. 读取本地文件内容
+        2. 获取远端文件内容
+        3. 构建 CONFLICT_RESOLVE 消息（Markdown 格式）
+        4. 通过 run_coroutine_threadsafe 桥接 bus.send 到主线程事件循环
+        5. 等待 AI 合并结果（timeout=600）
+        6. 处理结果：备份本地版本 → 写入合并内容 → 更新 file_sync_state
+        7. 失败/超时：保留本地版本，记录 ERROR 日志
 
-        # 设置 mtime
-        os.utime(file_path, (remote_mtime_ts, remote_mtime_ts))
+        Args:
+            conflict_paths: CONFLICT 文件相对路径列表
+            remote_url: 远程服务器 URL
+            api_key: API Key
 
-        return True
+        Returns:
+            list[str]: 成功合并的文件路径列表（用于后续 Phase 2c 推送）
+        """
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.llm.bus.events import InboundMessage, MessageType, OutboundMessage
+        from lifeprism.llm.bus.queue import bus
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        if not conflict_paths:
+            return []
+
+        if self._main_event_loop is None:
+            logger.error("_resolve_conflicts: main_event_loop 未设置，跳过冲突解决")
+            return []
+
+        data_path = settings.lifeprism_data_path.resolve()
+        provider = FileSyncStateProvider(db_manager=self.db)
+
+        resolved_paths = []
+        for file_path in conflict_paths:
+            try:
+                start_time = datetime.now(timezone.utc)
+
+                # 1. 读取本地文件内容
+                local_file = (data_path / file_path).resolve()
+                if not local_file.is_file():
+                    logger.warning("_resolve_conflicts: 本地文件不存在 %s，跳过", file_path)
+                    continue
+                local_content = local_file.read_text(encoding="utf-8")
+
+                # 2. 获取远端文件内容
+                remote_content = self._fetch_remote_file_content(remote_url, api_key, file_path)
+                if remote_content is None:
+                    logger.error(
+                        "_resolve_conflicts: 无法获取远端文件内容 %s，跳过",
+                        file_path,
+                    )
+                    continue
+
+                # 3. 构建 CONFLICT_RESOLVE 消息（Markdown 格式）
+                msg = InboundMessage(
+                    type=MessageType.CONFLICT_RESOLVE,
+                    content=(
+                        f"## 文件冲突需要解决\n\n"
+                        f"文件路径: {file_path}\n\n"
+                        f"### 本地版本\n\n{local_content}\n\n"
+                        f"### 云端版本\n\n{remote_content}\n\n"
+                        f"### 合并指令\n\n"
+                        f"请合并以上两份文档，保留双方的有效信息，生成一份完整的合并文档。"
+                    ),
+                    extra={
+                        "conflict_file_path": file_path,
+                        "system_prompt": (
+                            "你是文档合并助手。请合并两份 Markdown 文档，"
+                            "保留双方的有效信息，移除重复内容，保持文档结构清晰。"
+                            "直接输出合并后的文档内容，不要解释。"
+                        ),
+                    },
+                )
+
+                # 4. 通过 run_coroutine_threadsafe 桥接 bus.send 到主线程事件循环
+                future = asyncio.run_coroutine_threadsafe(
+                    bus.send(msg),
+                    self._main_event_loop,
+                )
+
+                # 5. 等待 AI 合并结果（timeout=600）
+                result: OutboundMessage = future.result(timeout=600)
+
+                # 6. 提取合并后的内容
+                merged_content = result.response.content if result.response else ""
+                if not merged_content or not merged_content.strip():
+                    logger.error(
+                        "_resolve_conflicts: AI 返回空内容 %s，保留本地版本",
+                        file_path,
+                    )
+                    continue
+
+                # 6a. 计算合并后内容的 new_hash
+                new_hash = compute_file_hash(merged_content.encode("utf-8"))
+
+                # 6b. 冲突备份：将本地版本备份到 sync_conflict/{timestamp}/{file_path}
+                timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                backup_path = (data_path / "sync_conflict" / timestamp_str / file_path).resolve()
+                backup_path.parent.mkdir(parents=True, exist_ok=True)
+                backup_path.write_text(local_content, encoding="utf-8")
+
+                # 6c. 原子写入合并后的内容到本地文件
+                _safe_write_file(local_file, merged_content.encode("utf-8"))
+
+                # 6d. 更新 file_sync_state: current_hash = new_hash
+                existing = provider.get_state(file_path)
+                parent_hash = existing["parent_hash"] if existing else None
+                provider.upsert_state(
+                    file_path=file_path,
+                    parent_hash=parent_hash,
+                    current_hash=new_hash,
+                )
+
+                duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+                logger.info(
+                    "_resolve_conflicts: 文件 %s AI 合并完成，耗时 %ss，new_hash=%s",
+                    file_path,
+                    duration,
+                    new_hash,
+                )
+                resolved_paths.append(file_path)
+
+            except TimeoutError:
+                logger.error(
+                    "_resolve_conflicts: AI 合并超时 %s，保留本地版本",
+                    file_path,
+                )
+            except Exception as e:
+                logger.error(
+                    "_resolve_conflicts: AI 合并失败 %s，error=%s",
+                    file_path,
+                    e,
+                    exc_info=True,
+                )
+
+        logger.info(
+            "_resolve_conflicts: 冲突解决完成，成功 %d/%d",
+            len(resolved_paths),
+            len(conflict_paths),
+        )
+        return resolved_paths
+
+    def _sync_files_full_flow(self, remote_url, api_key, last_sync_time, directories):
+        """文件同步全流程（Phase 1-3）
+
+        编排完整的文件同步流程：
+        1. Pre-sync: 全量扫描刷新本地 current_hash
+        2. Phase 1: 快照交换（POST /pull-files/check）
+        3. Phase 2a: 11 态矩阵判定（PULL/PUSH/CONFLICT/SKIP）
+        4. Phase 2b: PULL 文件（fetch → write → update current_hash）
+        5. Phase 2c-1: CONFLICT → AI 合并解决（Issue 34，串行处理 + bus 桥接）
+        6. Phase 2c-2: PUSH 文件（含合并成功的 CONFLICT 文件）
+        7. Phase 3: verify + parent_hash 推进
+
+        参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md v2.1
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+            last_sync_time: 上次同步时间（ISO 8601 字符串，空字符串表示首次同步）
+            directories: 文件同步目录列表
+        """
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+
+        provider = FileSyncStateProvider(db_manager=self.db)
+
+        # Pre-sync: 全量扫描刷新本地 current_hash（返回扫描结果供复用，避免重复扫描）
+        local_rel_paths = self._refresh_current_hashes(directories)
+
+        # Phase 1: 快照交换
+        remote_files = self._pull_files_check(remote_url, api_key, last_sync_time, directories)
+        remote_state_map = {f["path"]: f for f in remote_files}
+
+        # 复用 pre-sync 扫描结果（不重复扫描）
+        local_paths_set = set(local_rel_paths)
+
+        # 构建所有文件路径的并集
+        all_paths = local_paths_set | set(remote_state_map.keys())
+
+        # Phase 2a: 11 态矩阵判定
+        pull_paths = []
+        push_paths = []
+        conflict_paths = []
+
+        for path in all_paths:
+            # 获取本地状态
+            local_state = provider.get_state(path)
+            local_parent = local_state["parent_hash"] if local_state else None
+            local_current = local_state["current_hash"] if local_state else None
+
+            # 文件不在本地扫描结果中 → 本地不存在
+            if path not in local_paths_set:
+                local_current = None
+
+            # 获取远端状态
+            remote_state = remote_state_map.get(path)
+            remote_parent = remote_state["parent_hash"] if remote_state else None
+            remote_current = remote_state["current_hash"] if remote_state else None
+
+            # 文件不在 check 响应中 → 远端未变更或不存在
+            if remote_state is None:
+                if local_parent is not None:
+                    # 本地有 parent（之前同步过）→ 远端有但未改
+                    remote_parent = local_parent
+                    remote_current = local_parent
+                else:
+                    # 本地无 parent（新文件）→ 远端不存在
+                    remote_parent = None
+                    remote_current = None
+
+            action = self._decide_sync_action(
+                local_parent=local_parent,
+                local_current=local_current,
+                remote_parent=remote_parent,
+                remote_current=remote_current,
+            )
+
+            if action == "PULL":
+                pull_paths.append(path)
+            elif action == "PUSH":
+                push_paths.append(path)
+            elif action == "CONFLICT":
+                conflict_paths.append(path)
+            # SKIP: 不操作
+
+        logger.info(
+            "_sync_files_full_flow: 矩阵判定完成 PULL=%d, PUSH=%d, CONFLICT=%d, SKIP=%d",
+            len(pull_paths),
+            len(push_paths),
+            len(conflict_paths),
+            len(all_paths) - len(pull_paths) - len(push_paths) - len(conflict_paths),
+        )
+
+        # Phase 2b: PULL 文件
+        if pull_paths:
+            self._pull_files_fetch(remote_url, api_key, pull_paths)
+
+        # Phase 2c-1: CONFLICT → AI 合并解决（Issue 34）
+        # 串行处理每个 CONFLICT 文件，成功合并的文件加入 push_paths 推送
+        resolved_paths = []
+        if conflict_paths:
+            logger.info(
+                "_sync_files_full_flow: 检测到 %d 个 CONFLICT 文件，开始 AI 合并",
+                len(conflict_paths),
+            )
+            resolved_paths = self._resolve_conflicts(
+                conflict_paths,
+                remote_url,
+                api_key,
+            )
+            logger.info(
+                "_sync_files_full_flow: CONFLICT 解决完成，成功 %d/%d",
+                len(resolved_paths),
+                len(conflict_paths),
+            )
+
+        # Phase 2c-2: PUSH 文件（包含合并成功的 CONFLICT 文件）
+        push_paths.extend(resolved_paths)
+        if push_paths:
+            self._push_files(remote_url, api_key, push_paths)
+
+        # Phase 3: verify + parent_hash 推进（包含合并成功的文件）
+        verify_paths = pull_paths + push_paths
+        if verify_paths:
+            self._verify_and_advance_parent(remote_url, api_key, verify_paths)

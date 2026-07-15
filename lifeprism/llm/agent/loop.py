@@ -461,13 +461,21 @@ class AgentLoop:
                 tool_registry.register(SearchFileTool())
                 tool_registry.register(SearchStringTool())
                 tools: list[dict[str, Any]] = tool_registry.get_definitions()
+            elif msg.type == MessageType.CONFLICT_RESOLVE:
+                tool_registry.register(ReadFileTool())
+                tool_registry.register(WriteFileTool())
+                tool_registry.register(EditFileTool())
+                tool_registry.register(FileTreeTool())
+                tool_registry.register(SearchFileTool())
+                tool_registry.register(SearchStringTool())
+                tools: list[dict[str, Any]] = tool_registry.get_definitions()
             elif msg.type == MessageType.CLASSIFY:
                 tools = []
 
             # 3. 构建完整消息（含历史）
             session: Session = session_manager.get_or_create_session(msg.session_id)
             # 判断token是否超标,自动压缩
-            session = await self.auto_compact(session, tools)
+            session = await self.auto_compact(session, tools, msg)
             session.add_message("user", content=Context._build_user_message(msg))
             if msg.type == MessageType.CHAT:
                 session_manager.save_session(session)
@@ -530,8 +538,15 @@ class AgentLoop:
     def stop(self):
         self._running = False
 
-    async def auto_compact(self, session: Session, tools) -> Session:
-        """计算session是否超过最大token限制，超过则进行自动压缩"""
+    async def auto_compact(self, session: Session, tools, msg=None) -> Session:
+        """计算session是否超过最大token限制，超过则进行自动压缩
+
+        Args:
+            session: 会话对象
+            tools: 工具定义列表
+            msg: InboundMessage（用于判断是否需要持久化 session）；
+                 None 时保持向后兼容（始终保存），传入时仅 CHAT 类型保存
+        """
         messages = session.get_history_message()
         # 1.判断token是否超过限制
         if not estimate_prompt_tokens(messages, tools) > settings.token_limit:
@@ -579,8 +594,9 @@ class AgentLoop:
             "user", f"# 消息压缩总结 \n\n{response.content}", **{"is_compact_summary": True}
         )
         # 5. 保存session
-        session_manager.save_session(session)
-        logger.info("保存会话: session_id=%s", session.id)
+        if msg is None or msg.type == MessageType.CHAT:
+            session_manager.save_session(session)
+            logger.info("保存会话: session_id=%s", session.id)
         return session
 
 

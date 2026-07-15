@@ -10,6 +10,7 @@ SyncClient 集成测试
 参考: test/core/integration/repository/test_sync_repository.py
 """
 
+import shutil
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -76,6 +77,24 @@ def clean_tables(initialized_db):
         for table_name in sync_tables:
             cursor.execute(f"DELETE FROM {table_name}")
         conn.commit()
+
+
+@pytest.fixture
+def clean_file_dir(initialized_db):
+    """为每个测试提供干净的文件目录（测试后清理）
+
+    使用独立测试目录 sync_client_test/，避免扫描真实数据文件（session/diary/agent/user）
+    导致文件同步全流程产生额外的 PULL/PUSH/verify 调用。
+    """
+    from lifeprism.config.settings_manager import settings
+
+    test_dir = settings.lifeprism_data_path / "sync_client_test"
+    if test_dir.exists():
+        shutil.rmtree(test_dir, ignore_errors=True)
+    test_dir.mkdir(parents=True, exist_ok=True)
+    yield test_dir
+    if test_dir.exists():
+        shutil.rmtree(test_dir, ignore_errors=True)
 
 
 def _make_mock_response(json_data, status_code=200):
@@ -526,9 +545,19 @@ class TestSyncOnce:
     """Seam 1: sync_once() - 完整同步流程"""
 
     def test_sync_once_executes_pull_then_push(
-        self, sync_client, initialized_db, clean_tables
+        self, sync_client, initialized_db, clean_tables, clean_file_dir
     ):
-        """完整同步：先 Pull 再 Push"""
+        """完整同步：先 Pull 再 Push，文件同步全流程在数据库同步之后
+
+        新流程（Issue 33）下文件同步走 _sync_files_full_flow：
+        - Pre-sync: _refresh_current_hashes（无 HTTP，扫描本地文件刷新 current_hash）
+        - Phase 1: POST /pull-files/check（快照交换）
+        - Phase 2a: 11 态矩阵判定
+        - Phase 2b/2c: PULL/PUSH（空目录时无操作）
+        - Phase 3: verify + commit（无变更时无操作）
+
+        空目录场景下仅触发 check 端点，不触发 fetch/push-files/verify/commit。
+        """
         call_order = []
 
         def mock_post_side_effect(*args, **kwargs):
@@ -556,10 +585,13 @@ class TestSyncOnce:
             patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
             patch("lifeprism.config.settings_manager.set_setting") as mock_set_setting,
         ):
-            sync_client.sync_once(tables=["todo_list"])
+            sync_client.sync_once(
+                tables=["todo_list"], directories=["sync_client_test/"]
+            )
 
-        # Assert: 数据库 pull -> push, 文件 pull -> push
-        assert call_order == ["pull", "push", "pull-files", "push-files"]
+        # Assert: 数据库 pull -> push -> 文件同步全流程（pull-files/check）
+        # 空目录场景下文件同步仅触发 check 端点，不触发 fetch/push-files/verify/commit
+        assert call_order == ["pull", "push", "pull-files"]
         # set_setting 被调用（更新 last_sync_time）
         mock_set_setting.assert_called_once()
 

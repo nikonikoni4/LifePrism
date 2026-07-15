@@ -2,7 +2,7 @@
 同步表范围扩展测试（Issue #13）
 
 测试 seam:
-- Seam 1: SYNC_TABLES 常量 - 验证 30 张静态表完整性
+- Seam 1: SYNC_TABLES 常量 - 验证 31 张静态表完整性
 - Seam 2: get_all_sync_tables() - 验证动态表（custom_{slug}）的运行时获取
 
 参考: test/core/integration/sync/test_sync_client.py
@@ -13,7 +13,7 @@ import pytest
 pytestmark = pytest.mark.core
 
 
-# ==================== 30 张静态表期望清单 ====================
+# ==================== 31 张静态表期望清单 ====================
 
 EXPECTED_STATIC_TABLES = [
     # 用户输入数据（15张）
@@ -51,6 +51,8 @@ EXPECTED_STATIC_TABLES = [
     "category_map_cache",
     # 统计数据（1张）
     "tokens_usage_log",
+    # 微信账户状态（1张）- 替代 channel/wechat/account.json 文件存储（Issue 35）
+    "wechat_account_state",
 ]
 
 
@@ -110,24 +112,24 @@ def clean_custom_record_types(initialized_db):
 
 
 class TestSyncTablesStatic:
-    """Seam 1: SYNC_TABLES 常量 - 验证 30 张静态表完整性"""
+    """Seam 1: SYNC_TABLES 常量 - 验证 31 张静态表完整性"""
 
-    def test_sync_tables_contains_all_30_static_tables(self):
-        """验证 SYNC_TABLES 包含所有 30 张静态表"""
+    def test_sync_tables_contains_all_31_static_tables(self):
+        """验证 SYNC_TABLES 包含所有 31 张静态表"""
         # Arrange: 从模块导入 SYNC_TABLES
         from lifeprism.sync.sync_client import SYNC_TABLES
 
         # Act: 检查每张期望表是否在 SYNC_TABLES 中
 
-        # Assert: 所有 30 张期望表都在 SYNC_TABLES 中
+        # Assert: 所有 31 张期望表都在 SYNC_TABLES 中
         for table in EXPECTED_STATIC_TABLES:
             assert table in SYNC_TABLES, (
                 f"静态表 {table} 不在 SYNC_TABLES 中"
             )
 
-        # Assert: SYNC_TABLES 恰好包含 30 张表
-        assert len(SYNC_TABLES) == 30, (
-            f"SYNC_TABLES 应包含 30 张表，实际 {len(SYNC_TABLES)} 张"
+        # Assert: SYNC_TABLES 恰好包含 31 张表
+        assert len(SYNC_TABLES) == 31, (
+            f"SYNC_TABLES 应包含 31 张表，实际 {len(SYNC_TABLES)} 张"
         )
 
 
@@ -214,9 +216,9 @@ class TestGetAllSyncTables:
         # Act: 调用 get_all_sync_tables()
         tables = sync_client.get_all_sync_tables()
 
-        # Assert: 返回列表恰好等于 30 张静态表（无动态表）
-        assert len(tables) == 30, (
-            f"无自定义记录类型时应返回 30 张静态表，实际 {len(tables)} 张"
+        # Assert: 返回列表恰好等于 31 张静态表（无动态表）
+        assert len(tables) == 31, (
+            f"无自定义记录类型时应返回 31 张静态表，实际 {len(tables)} 张"
         )
         assert set(tables) == set(EXPECTED_STATIC_TABLES), (
             "无自定义记录类型时返回列表应与 SYNC_TABLES 完全一致"

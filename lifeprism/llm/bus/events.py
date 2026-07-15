@@ -14,6 +14,7 @@ class MessageType:
     CHAT = "chat"  # 会添加专门的系统提示词
     GENERAL_TASK = "general_task"  # 不会添加任何系统提示词，可以自行通过extra传递
     DREAM_TASK = "dream_task"  # 1. 从聊天数据中提取内容在chat_history.json和user.md 2. 从chat_history提取内容到behavior.md 3. 从behavior.md提取内容到recent_state.md
+    CONFLICT_RESOLVE = "conflict_resolve"  # 文件冲突 AI 合并：SyncClient 检测到 CONFLICT 后通过 bus 发送给 AgentLoop 合并
 
 
 class TokenType:
@@ -33,6 +34,7 @@ MESSAGE_TYPE = [
     MessageType.CHAT,
     MessageType.GENERAL_TASK,
     MessageType.DREAM_TASK,
+    MessageType.CONFLICT_RESOLVE,
 ]
 CHANNEL_TYPE = [ChannelType.WECHAT, ChannelType.LOCAL]
 

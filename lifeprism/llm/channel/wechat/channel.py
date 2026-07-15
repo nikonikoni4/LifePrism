@@ -4,6 +4,7 @@
 
 import asyncio
 import contextlib
+import json
 from typing import Any
 
 import httpx
@@ -74,6 +75,131 @@ class WechatChannel(BaseChannel):
         # 用户数据：{wechat_user_id: {"context_token": "xxx", "last_session_id": "xxx"}}
         self._user_data: dict[str, dict[str, str]] = {}
 
+        # 数据库访问（wechat_account_state 表，替代 account.json 文件存储）
+        # 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
+        from lifeprism.repository import lw_db_manager
+        from lifeprism.repository.providers.wechat_account_state_provider import (
+            WechatAccountStateProvider,
+        )
+
+        self._db_manager = lw_db_manager
+        self._account_state_provider = WechatAccountStateProvider(db_manager=self._db_manager)
+        # 使用公共方法 get_all_states()，不直接调用 _generic_query
+
+    def _migrate_account_json_to_db(self) -> bool:
+        """将 account.json 文件数据迁移到 wechat_account_state 数据库表
+
+        迁移条件：account.json 存在且 DB 表中无任何记录时执行迁移。
+        迁移完成后将 account.json 重命名为 account.json.bak（保留备份）。
+
+        支持的文件格式：
+        - 新格式：{"user_data": {user_id: {"context_token": "xxx", "last_session_id": "xxx"}}}
+        - 旧格式：{"context_tokens": {user_id: "context_token_string"}}
+
+        Returns:
+            True 表示已执行迁移；False 表示跳过迁移（文件不存在或 DB 已有记录）
+
+        参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
+        """
+        # 1. account.json 不存在 → 跳过
+        if not self.state_file.exists():
+            return False
+
+        # 2. DB 已有记录 → 跳过（避免覆盖新数据）
+        with self._db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM wechat_account_state")
+            count = cursor.fetchone()[0]
+        if count > 0:
+            logger.info("DB 中已有 %s 条记录，跳过 account.json 迁移", count)
+            return False
+
+        # 3. 读取并解析 account.json
+        try:
+            file_state = json.loads(self.state_file.read_text())
+        except (json.JSONDecodeError, OSError) as e:
+            logger.error("读取 account.json 失败: error=%s", e, exc_info=True)
+            return False
+
+        # 4. 提取用户数据（支持新旧格式）
+        user_data = {}
+        if "user_data" in file_state:
+            # 新格式
+            user_data = file_state.get("user_data", {})
+        elif "context_tokens" in file_state:
+            # 旧格式：context_tokens = {user_id: "context_token_string"}
+            logger.info("检测到旧格式 context_tokens，迁移到新格式")
+            old_context_tokens = file_state.get("context_tokens", {})
+            for user_id, context_token in old_context_tokens.items():
+                user_data[user_id] = {
+                    "context_token": context_token,
+                    # 旧数据没有 session_id
+                    "last_session_id": None,
+                }
+
+        if not user_data:
+            logger.info("account.json 中无用户数据，跳过迁移")
+            # 即使无数据也重命名文件，避免反复尝试
+            self._rename_account_json_to_bak()
+            return True
+
+        # 5. 迁移到 DB
+        for wechat_user_id, data in user_data.items():
+            context_token = data.get("context_token")
+            last_session_id = data.get("last_session_id")
+            self._account_state_provider.save_state(
+                wechat_user_id=wechat_user_id,
+                context_token=context_token,
+                last_session_id=last_session_id,
+            )
+        logger.info("已迁移 %s 个用户的数据到 DB", len(user_data))
+
+        # 6. 重命名 account.json 为 account.json.bak
+        self._rename_account_json_to_bak()
+        return True
+
+    def _rename_account_json_to_bak(self) -> None:
+        """将 account.json 重命名为 account.json.bak"""
+        try:
+            bak_file = self.state_file.with_suffix(".json.bak")
+            self.state_file.rename(bak_file)
+            logger.info("已将 account.json 重命名为 %s", bak_file.name)
+        except OSError as e:
+            logger.error("重命名 account.json 失败: error=%s", e, exc_info=True)
+
+    def _save_user_data_to_db(self) -> None:
+        """将 _user_data 中的所有用户数据保存到 DB
+
+        使用 INSERT OR REPLACE 语义：已存在的记录会被覆盖。
+        参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
+        """
+        if not self._user_data:
+            return
+        for wechat_user_id, data in self._user_data.items():
+            context_token = data.get("context_token")
+            last_session_id = data.get("last_session_id")
+            self._account_state_provider.save_state(
+                wechat_user_id=wechat_user_id,
+                context_token=context_token,
+                last_session_id=last_session_id,
+            )
+        logger.info("已保存 %s 个用户数据到 DB", len(self._user_data))
+
+    def _load_user_data_from_db(self) -> None:
+        """从 DB 加载所有用户数据到 _user_data
+
+        参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
+        """
+        results = self._account_state_provider.get_all_states()
+        self._user_data = {}
+        for row in results:
+            wechat_user_id = row["wechat_user_id"]
+            self._user_data[wechat_user_id] = {
+                "context_token": row.get("context_token"),
+                "last_session_id": row.get("last_session_id"),
+            }
+        logger.info("从 DB 加载了 %s 个用户数据", len(self._user_data))
+
     async def start(self) -> None:
         """启动 channel
 
@@ -92,23 +218,18 @@ class WechatChannel(BaseChannel):
         # 初始化认证
         self.auth = WechatAuth(self.client, self.state_file)
 
-        # 加载状态
+        # 加载状态（主要用于从 keyring 加载 token；
+        # 若 account.json 仍存在，auth.load_state 会先把 token 迁移到 keyring）
         state = self.auth.load_state()
         token = state.get("token", "")
 
-        # 加载用户数据（新格式）
-        self._user_data = state.get("user_data", {})
+        # 迁移 account.json → DB（一次性迁移，参考 ADR 决策 4）
+        # 此时 account.json 中的 token 已被 auth.load_state 迁移到 keyring，
+        # 剩余的 user_data/context_tokens 迁移到 wechat_account_state 表
+        self._migrate_account_json_to_db()
 
-        # 兼容旧格式：如果存在 context_tokens，迁移到新格式
-        old_context_tokens = state.get("context_tokens", {})
-        if old_context_tokens and not self._user_data:
-            logger.info("检测到旧格式数据，正在迁移...")
-            for user_id, context_token in old_context_tokens.items():
-                self._user_data[user_id] = {
-                    "context_token": context_token,
-                    # 旧数据没有 session_id，使用 None 而不是空字符串
-                }
-            logger.info("已迁移 %s 个用户的数据", len(old_context_tokens))
+        # 从 DB 加载用户数据（替代原文件加载方式）
+        self._load_user_data_from_db()
 
         logger.info("加载的 token: %s...", token[:20] if token else "None")
         logger.info("加载的用户数据: %s 个用户", len(self._user_data))
@@ -149,12 +270,12 @@ class WechatChannel(BaseChannel):
         """
         self._running = False
 
-        # 保存最新的用户数据（兜底保障）
-        if self.auth and self.client and self._user_data:
+        # 保存最新的用户数据到 DB（兜底保障，替代原 account.json 文件存储）
+        # 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
+        if self._user_data:
             try:
-                state = {"token": self.client.token, "user_data": self._user_data}
-                self.auth.save_state(state)
-                logger.info("停止时保存用户数据: %s 个用户", len(self._user_data))
+                self._save_user_data_to_db()
+                logger.info("停止时保存用户数据到 DB: %s 个用户", len(self._user_data))
             except Exception as e:
                 logger.error("停止时保存用户数据失败: error=%s", e, exc_info=True)
 
@@ -374,16 +495,13 @@ class WechatChannel(BaseChannel):
                     self._user_data[wechat_user_id]["last_session_id"] = response.session_id
                     need_save = True
 
-                # 统一持久化（避免多次写文件）
+                # 统一持久化到 DB（替代原文件存储方式）
+                # 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
                 if need_save:
                     try:
-                        state = {
-                            "token": self.client.token if self.client else "",
-                            "user_data": self._user_data,
-                        }
-                        self.auth.save_state(state)
-                        logger.info("已保存用户数据")
-                    except OSError as save_error:
+                        self._save_user_data_to_db()
+                        logger.info("已保存用户数据到 DB")
+                    except Exception as save_error:
                         logger.error("保存用户数据失败: error=%s", save_error, exc_info=True)
 
                 # 将用户ID传递到响应中

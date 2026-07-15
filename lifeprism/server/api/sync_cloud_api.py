@@ -17,7 +17,6 @@ API 层不使用 try/except，异常自然冒泡到全局异常处理器。
 
 import base64
 import gzip
-import os
 import secrets
 import time
 from datetime import datetime, timezone
@@ -28,7 +27,10 @@ from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, Field
 
 from lifeprism.config.settings_manager import settings
-from lifeprism.repository.sync_repository import SyncRepository
+from lifeprism.repository import SyncRepository, file_sync_state_repository
+from lifeprism.sync.constants import EXCLUDED_FILENAMES as _EXCLUDED_FILENAMES
+from lifeprism.sync.constants import safe_gzip_decompress
+from lifeprism.sync.hash_utils import compute_file_hash
 from lifeprism.sync.sync_config import get_sync_api_key
 from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import ValidationError
@@ -74,13 +76,29 @@ class FilePushItem(BaseModel):
 
     path: str = Field(..., description="相对 lifeprism_data_path 的路径")
     content: str = Field(..., description="gzip 压缩 + base64 编码的内容")
-    mtime: str = Field(..., description="文件修改时间（ISO 8601 格式）")
+    parent_hash: str | None = Field(
+        default=None, description="推送方的 parent_hash（仅用于判断是否新文件，不覆盖云端值）"
+    )
+    current_hash: str = Field(..., description="推送方的 current_hash")
 
 
 class SyncPushFilesRequest(BaseModel):
     """文件推送请求"""
 
     files: list[FilePushItem] = Field(..., description="待推送的文件列表")
+
+
+class SyncPullFilesCheckRequest(BaseModel):
+    """文件同步 check 请求（Phase 1：快照交换）"""
+
+    last_sync_time: str = Field(..., description="上次同步时间（ISO 8601 格式）")
+    directories: list[str] = Field(..., description="需要检查的目录列表")
+
+
+class SyncPullFilesPathsRequest(BaseModel):
+    """文件同步 fetch / verify / commit 请求（按路径列表操作）"""
+
+    paths: list[str] = Field(..., description="文件相对路径列表（相对 lifeprism_data_path）")
 
 
 class HeartbeatRequest(BaseModel):
@@ -323,6 +341,30 @@ def _encode_file(file_path: Path, data_path: Path) -> dict[str, str]:
     }
 
 
+def _build_file_hash_state(file_path: Path, data_path: Path) -> dict[str, Any]:
+    """构建文件的 hash 状态项（path + parent_hash + current_hash）
+
+    实时计算 current_hash（调用 compute_file_hash），从 file_sync_state 表读 parent_hash。
+
+    Args:
+        file_path: 文件绝对路径
+        data_path: 数据根目录（用于计算相对路径）
+
+    Returns:
+        dict: 包含 path、parent_hash、current_hash 三个字段的字典
+    """
+    rel_path = str(file_path.relative_to(data_path)).replace("\\", "/")
+    content_bytes = file_path.read_bytes()
+    current_hash = compute_file_hash(content_bytes)
+    state = file_sync_state_repository.get_state(rel_path)
+    parent_hash = state["parent_hash"] if state else None
+    return {
+        "path": rel_path,
+        "parent_hash": parent_hash,
+        "current_hash": current_hash,
+    }
+
+
 @router.post("/pull-files", summary="从云端拉取增量文件")
 def sync_pull_files(
     request: SyncPullFilesRequest,
@@ -401,38 +443,300 @@ def sync_pull_files(
     }
 
 
-@router.post("/push-files", summary="推送本地文件到云端")
-def sync_push_files(
-    request: SyncPushFilesRequest,
+# ==================== 文件同步三阶段端点 (check / fetch / verify / commit) ====================
+
+
+@router.post("/pull-files/check", summary="Phase 1: 按 mtime 过滤返回变更文件的 hash 状态")
+def sync_pull_files_check(
+    request: SyncPullFilesCheckRequest,
     _: None = Depends(verify_sync_api_key),
 ):
-    """推送本地文件到云端
+    """Phase 1 快照交换：云端按 mtime 过滤，返回变更文件的 hash 状态（轻量，不传内容）
 
-    对每个文件执行 Last-Write-Wins 冲突解决：
-    比较本地文件 mtime 与推送的 mtime，谁更晚保留谁。
-    如果本地文件 mtime 更新则跳过，否则写入并设置 mtime。
-
-    文件内容为 gzip 压缩 + base64 编码，写入时自动解码解压。
-    自动创建父目录。
+    遍历 directories（排除 chat_history.json），找到 mtime > last_sync_time 的文件，
+    实时计算 current_hash（调用 compute_file_hash），从 file_sync_state 表读 parent_hash。
 
     **请求参数**:
-    - files: [{path, content, mtime}] 待推送的文件列表
+    - last_sync_time: 上次同步时间（ISO 8601 格式，空字符串表示首次同步）
+    - directories: 需要检查的目录/文件列表（相对 lifeprism_data_path）
 
     **认证**:
     - Authorization: Bearer {api_key} HTTP Header
 
     **响应**:
-    - status: 同步状态（"ok"）
-    - written: 写入的文件数
-    - skipped: 跳过的文件数
+    - files: [{path, parent_hash, current_hash}] 变更文件 hash 状态列表
+    - sync_time: 本次同步时间
+    """
+    logger.info(
+        "同步 Pull-Files-Check 请求开始: last_sync_time=%s, directories=%s",
+        request.last_sync_time,
+        request.directories,
+    )
+    start_time = time.perf_counter()
+
+    data_path = settings.lifeprism_data_path.resolve()
+    last_sync_dt = parse_iso_to_aware(request.last_sync_time) if request.last_sync_time else None
+
+    files: list[dict[str, Any]] = []
+    for dir_rel in request.directories:
+        dir_path = (data_path / dir_rel).resolve()
+
+        # 路径安全检查：防止路径遍历攻击
+        if not _is_path_safe(dir_path, data_path):
+            logger.warning("跳过不安全路径: %s", dir_rel)
+            continue
+
+        if dir_path.is_file():
+            # 单文件处理
+            if dir_path.name in _EXCLUDED_FILENAMES:
+                continue
+            file_mtime_dt = datetime.fromtimestamp(dir_path.stat().st_mtime, tz=timezone.utc)
+            if last_sync_dt and file_mtime_dt <= last_sync_dt:
+                continue
+            files.append(_build_file_hash_state(dir_path, data_path))
+        elif dir_path.is_dir():
+            # 目录递归遍历
+            for file_path in dir_path.rglob("*"):
+                if not file_path.is_file():
+                    continue
+                if file_path.name in _EXCLUDED_FILENAMES:
+                    continue
+                file_mtime_dt = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
+                if last_sync_dt and file_mtime_dt <= last_sync_dt:
+                    continue
+                files.append(_build_file_hash_state(file_path, data_path))
+        else:
+            logger.debug("路径不存在，跳过: %s", dir_rel)
+            continue
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+    logger.info(
+        "同步 Pull-Files-Check 完成: 文件数=%d, 耗时=%.2fms",
+        len(files),
+        elapsed_ms,
+    )
+
+    return {
+        "files": files,
+        "sync_time": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/pull-files/fetch", summary="Phase 2: 按路径返回文件内容 + hash")
+def sync_pull_files_fetch(
+    request: SyncPullFilesPathsRequest,
+    _: None = Depends(verify_sync_api_key),
+):
+    """Phase 2 内容拉取：按路径返回文件内容（gzip+base64）+ parent_hash + current_hash
+
+    请求路径不存在时跳过（不报错，不返回该文件）。
+    content 为 gzip 压缩 + base64 编码。
+    parent_hash 从 file_sync_state 表读取（供客户端初始化本地状态）。
+    current_hash 实时计算（供客户端校验传输完整性，客户端写入后应重新计算）。
+
+    **请求参数**:
+    - paths: 文件相对路径列表（相对 lifeprism_data_path）
+
+    **认证**:
+    - Authorization: Bearer {api_key} HTTP Header
+
+    **响应**:
+    - files: [{path, content, parent_hash, current_hash}] 文件内容列表
+    """
+    logger.info("同步 Pull-Files-Fetch 请求开始: 路径数=%d", len(request.paths))
+    start_time = time.perf_counter()
+
+    data_path = settings.lifeprism_data_path.resolve()
+
+    files: list[dict[str, Any]] = []
+    for rel_path in request.paths:
+        file_path = (data_path / rel_path).resolve()
+
+        if not _is_path_safe(file_path, data_path):
+            logger.warning("跳过不安全路径: %s", rel_path)
+            continue
+
+        if not file_path.is_file():
+            logger.debug("文件不存在，跳过: %s", rel_path)
+            continue
+
+        content_bytes = file_path.read_bytes()
+        compressed = gzip.compress(content_bytes)
+        encoded = base64.b64encode(compressed).decode("ascii")
+        current_hash = compute_file_hash(content_bytes)
+        state = file_sync_state_repository.get_state(rel_path)
+        parent_hash = state["parent_hash"] if state else None
+
+        files.append(
+            {
+                "path": rel_path,
+                "content": encoded,
+                "parent_hash": parent_hash,
+                "current_hash": current_hash,
+            }
+        )
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+    logger.info(
+        "同步 Pull-Files-Fetch 完成: 文件数=%d, 耗时=%.2fms",
+        len(files),
+        elapsed_ms,
+    )
+
+    return {"files": files}
+
+
+@router.post("/pull-files/verify", summary="Phase 3: 实时计算 hash（纯只读）")
+def sync_pull_files_verify(
+    request: SyncPullFilesPathsRequest,
+    _: None = Depends(verify_sync_api_key),
+):
+    """Phase 3 一致性校验：实时计算 hash，纯只读，不修改任何状态
+
+    云端对 paths 中的文件实时计算 current_hash（再次读取文件内容 → 规范化 → SHA-256）。
+    请求路径不存在时跳过。
+
+    **请求参数**:
+    - paths: 文件相对路径列表（相对 lifeprism_data_path）
+
+    **认证**:
+    - Authorization: Bearer {api_key} HTTP Header
+
+    **响应**:
+    - files: [{path, current_hash}] 文件 hash 列表
+    """
+    logger.info("同步 Pull-Files-Verify 请求开始: 路径数=%d", len(request.paths))
+    start_time = time.perf_counter()
+
+    data_path = settings.lifeprism_data_path.resolve()
+
+    files: list[dict[str, Any]] = []
+    for rel_path in request.paths:
+        file_path = (data_path / rel_path).resolve()
+
+        if not _is_path_safe(file_path, data_path):
+            logger.warning("跳过不安全路径: %s", rel_path)
+            continue
+
+        if not file_path.is_file():
+            logger.debug("文件不存在，跳过: %s", rel_path)
+            continue
+
+        content_bytes = file_path.read_bytes()
+        current_hash = compute_file_hash(content_bytes)
+
+        files.append(
+            {
+                "path": rel_path,
+                "current_hash": current_hash,
+            }
+        )
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+    logger.info(
+        "同步 Pull-Files-Verify 完成: 文件数=%d, 耗时=%.2fms",
+        len(files),
+        elapsed_ms,
+    )
+
+    return {"files": files}
+
+
+@router.post("/pull-files/commit", summary="Phase 4: 推进云端 parent_hash = current_hash")
+def sync_pull_files_commit(
+    request: SyncPullFilesPathsRequest,
+    _: None = Depends(verify_sync_api_key),
+):
+    """Phase 4 推进版本：将 file_sync_state 的 parent_hash = current_hash
+
+    本地 verify 校验通过后调用此端点推进云端 parent_hash。
+    实时计算 current_hash（不使用缓存值），然后 upsert file_sync_state。
+    请求路径不存在时跳过。
+
+    **请求参数**:
+    - paths: 文件相对路径列表（相对 lifeprism_data_path）
+
+    **认证**:
+    - Authorization: Bearer {api_key} HTTP Header
+
+    **响应**:
+    - committed: [{path, parent_hash}] 已推进的文件列表
+    """
+    logger.info("同步 Pull-Files-Commit 请求开始: 路径数=%d", len(request.paths))
+    start_time = time.perf_counter()
+
+    data_path = settings.lifeprism_data_path.resolve()
+
+    committed: list[dict[str, str]] = []
+    for rel_path in request.paths:
+        file_path = (data_path / rel_path).resolve()
+
+        if not _is_path_safe(file_path, data_path):
+            logger.warning("跳过不安全路径: %s", rel_path)
+            continue
+
+        if not file_path.is_file():
+            logger.debug("文件不存在，跳过: %s", rel_path)
+            continue
+
+        content_bytes = file_path.read_bytes()
+        current_hash = compute_file_hash(content_bytes)
+
+        # 推进 parent_hash = current_hash（实时计算，不使用缓存值）
+        file_sync_state_repository.upsert_state(
+            file_path=rel_path,
+            parent_hash=current_hash,
+            current_hash=current_hash,
+        )
+
+        committed.append(
+            {
+                "path": rel_path,
+                "parent_hash": current_hash,
+            }
+        )
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+    logger.info(
+        "同步 Pull-Files-Commit 完成: 推进文件数=%d, 耗时=%.2fms",
+        len(committed),
+        elapsed_ms,
+    )
+
+    return {"committed": committed}
+
+
+@router.post("/push-files", summary="推送本地文件到云端")
+def sync_push_files(
+    request: SyncPushFilesRequest,
+    _: None = Depends(verify_sync_api_key),
+):
+    """推送本地文件到云端（Issue 32: hash-based 同步）
+
+    云端逻辑：
+    1. base64 解码 + gzip 解压 → 写入文件
+    2. 写入后立即计算 current_hash（调用 compute_file_hash）→ 更新 file_sync_state 表
+    3. 如果 file_sync_state 中无此文件记录 → 插入新记录（parent_hash = NULL, current_hash = 计算值）
+    4. 如果已有记录 → 只更新 current_hash（parent_hash 不修改，保持云端原值）
+
+    push-files 不推进 parent_hash（由 commit 端点负责）。
+    原 mtime LWW 逻辑已废弃，冲突检测由 hash 矩阵判定（SyncClient 侧执行）。
+
+    **请求参数**:
+    - files: [{path, content, parent_hash, current_hash}] 待推送的文件列表
+
+    **认证**:
+    - Authorization: Bearer {api_key} HTTP Header
+
+    **响应**:
+    - results: [{path, action}] 每个文件的处理结果（action="accepted" 表示已写入）
     - sync_time: 本次同步时间
     """
     logger.info("同步 Push-Files 请求开始: 文件数=%d", len(request.files))
     start_time = time.perf_counter()
 
     data_path = settings.lifeprism_data_path.resolve()
-    written = 0
-    skipped = 0
+    results: list[dict[str, str]] = []
 
     for item in request.files:
         file_path = (data_path / item.path).resolve()
@@ -440,23 +744,11 @@ def sync_push_files(
         # 路径安全检查：防止路径遍历攻击
         if not _is_path_safe(file_path, data_path):
             logger.warning("跳过不安全路径: %s", item.path)
-            skipped += 1
             continue
 
-        remote_mtime_dt = parse_iso_to_aware(item.mtime)
-        remote_mtime_ts = remote_mtime_dt.timestamp()
-
-        # LWW 冲突解决：本地文件 mtime 更新时跳过
-        if file_path.exists():
-            local_mtime_ts = file_path.stat().st_mtime
-            if local_mtime_ts > remote_mtime_ts:
-                logger.debug("LWW 跳过（本地更新）: %s", item.path)
-                skipped += 1
-                continue
-
-        # base64 解码 + gzip 解压
+        # base64 解码 + gzip 解压（带大小限制）
         compressed = base64.b64decode(item.content)
-        content_bytes = gzip.decompress(compressed)
+        content_bytes = safe_gzip_decompress(compressed)
 
         # 自动创建父目录
         file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -464,22 +756,29 @@ def sync_push_files(
         # 写入文件
         file_path.write_bytes(content_bytes)
 
-        # 设置 mtime
-        os.utime(file_path, (remote_mtime_ts, remote_mtime_ts))
+        # 云端写入后立即计算 current_hash 并更新 file_sync_state
+        # （不信任客户端传入的 current_hash，云端自行计算）
+        cloud_current_hash = compute_file_hash(content_bytes)
+        existing_state = file_sync_state_repository.get_state(item.path)
+        # push-files 不推进 parent_hash（由 commit 端点负责）
+        # 新文件：parent_hash = NULL；已有记录：保持原 parent_hash 不变
+        preserved_parent_hash = existing_state["parent_hash"] if existing_state else None
+        file_sync_state_repository.upsert_state(
+            file_path=item.path,
+            parent_hash=preserved_parent_hash,
+            current_hash=cloud_current_hash,
+        )
 
-        written += 1
+        results.append({"path": item.path, "action": "accepted"})
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
     logger.info(
-        "同步 Push-Files 完成: written=%d, skipped=%d, 耗时=%.2fms",
-        written,
-        skipped,
+        "同步 Push-Files 完成: 写入文件数=%d, 耗时=%.2fms",
+        len(results),
         elapsed_ms,
     )
 
     return {
-        "status": "ok",
-        "written": written,
-        "skipped": skipped,
+        "results": results,
         "sync_time": datetime.now(timezone.utc).isoformat(),
     }

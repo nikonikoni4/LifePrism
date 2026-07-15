@@ -22,6 +22,7 @@ print("[STARTUP] 开始追踪服务器启动时间...")
 print(f"{'=' * 60}")
 
 # ==================== 核心库导入 ====================
+import asyncio
 import sys
 from contextlib import asynccontextmanager
 
@@ -221,6 +222,56 @@ async def send_heartbeat(event: str):
         logger.warning("心跳事件发送失败: event=%s, error=%s", event, e)
 
 
+async def _start_sync_on_startup(app: FastAPI):
+    """应用启动时启动同步（启动时立即同步 + 定时同步）
+
+    执行流程：
+    1. 仅在 run_mode == "full"（本地）时启动——云端不需要拉取自己
+    2. 启动时立即调用 sync_once()（通过 try_start_sync() 原子锁判断是否可启动）
+       - 使用 asyncio.to_thread 在独立线程中执行，不阻塞 lifespan
+       - 启动同步失败不阻塞应用启动（日志记录 ERROR，应用继续运行）
+    3. 启动定时同步循环 start_scheduled_sync(interval=600)（10 分钟间隔）
+
+    并发控制：
+    - 通过 try_start_sync() 原子锁判断是否可启动
+    - sync_once() 完成后调用 finish_sync() 释放锁
+    - 若启动同步未完成时定时同步触发，try_start_sync() 返回 False，定时同步跳过
+
+    Args:
+        app: FastAPI 应用实例
+    """
+    sync_client = getattr(app.state, "sync_client", None)
+    if sync_client is None:
+        logger.info("[STARTUP] SyncClient 未创建，跳过启动同步")
+        return
+
+    # 仅在 run_mode == "full"（本地）时启动同步——云端不需要拉取自己
+    if settings.run_mode != "full":
+        logger.info(
+            "[STARTUP] 跳过启动同步：run_mode=%s（仅 full 模式启用）",
+            settings.run_mode,
+        )
+        return
+
+    # 1. 启动时立即同步一次（通过 try_start_sync() 原子锁判断是否可启动）
+    if sync_client.try_start_sync():
+        try:
+            logger.info("[STARTUP] 启动同步开始")
+            await asyncio.to_thread(sync_client.sync_once)
+            logger.info("[STARTUP] 启动同步完成")
+        except Exception as e:
+            # 启动同步失败不阻塞应用启动，日志记录 ERROR
+            logger.error("[STARTUP] 启动同步失败: error=%s", e, exc_info=True)
+        finally:
+            sync_client.finish_sync()
+    else:
+        logger.warning("[STARTUP] 启动同步跳过：上一次同步未完成")
+
+    # 2. 启动定时同步循环（10 分钟间隔）
+    sync_client.start_scheduled_sync(600)
+    logger.info("[STARTUP] 定时同步已启动（间隔 600s）")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -322,17 +373,27 @@ async def lifespan(app: FastAPI):
         logger.warning("启动定时任务服务失败: error=%s", e)
 
     # 创建 SyncClient 实例（用于同步状态查询和手动触发同步）
+    # 传入主线程事件循环引用，用于 CONFLICT_RESOLVE 时通过 run_coroutine_threadsafe 桥接 bus.send（Issue 34）
     try:
+        import asyncio
+
         from lifeprism.repository import lw_db_manager
         from lifeprism.repository.sync_repository import SyncRepository
         from lifeprism.sync.sync_client import SyncClient
 
         sync_repo = SyncRepository()
-        app.state.sync_client = SyncClient(db_manager=lw_db_manager, sync_repository=sync_repo)
+        app.state.sync_client = SyncClient(
+            db_manager=lw_db_manager,
+            sync_repository=sync_repo,
+            main_event_loop=asyncio.get_running_loop(),
+        )
         logger.info("[STARTUP] SyncClient created")
     except Exception as e:
         logger.warning("创建 SyncClient 失败: error=%s", e)
         app.state.sync_client = None
+
+    # 启动时立即同步一次 + 定时同步（仅在 run_mode == "full" 时启用）
+    await _start_sync_on_startup(app)
 
     # 初始化 ChatBot 服务和 AgentLoop
     import asyncio
