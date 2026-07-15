@@ -200,6 +200,45 @@ class WechatChannel(BaseChannel):
             }
         logger.info("从 DB 加载了 %s 个用户数据", len(self._user_data))
 
+    def _refresh_user_data_from_db(self, wechat_user_id: str) -> None:
+        """从 DB 刷新指定用户的 session_id 到内存缓存
+
+        解决场景：SyncClient 同步拉取到云端最新 last_session_id 后，
+        WechatChannel 的 _user_data 内存缓存仍是旧值，导致用旧 session_id
+        处理消息。每次处理消息前调用此方法刷新，保证 session_id 是最新的。
+
+        注意：只刷新 last_session_id，不覆盖 context_token
+        （context_token 由微信消息本身携带，是最新的；DB 中的 context_token
+        可能在同步链路中已过期）
+
+        Args:
+            wechat_user_id: 微信用户 ID
+        """
+        try:
+            row = self._account_state_provider.get_state(wechat_user_id)
+            if row is None:
+                # DB 中无此用户记录（首次交互），保留内存中的现有值
+                return
+            db_session_id = row.get("last_session_id")
+            # 确保 _user_data 中有此用户的字典
+            if wechat_user_id not in self._user_data:
+                self._user_data[wechat_user_id] = {}
+            cached_session_id = self._user_data[wechat_user_id].get("last_session_id")
+            if cached_session_id != db_session_id:
+                logger.info(
+                    "从 DB 刷新 session_id: %s -> %s",
+                    cached_session_id,
+                    db_session_id,
+                )
+                self._user_data[wechat_user_id]["last_session_id"] = db_session_id
+        except Exception as e:
+            # DB 查询失败不阻塞消息处理，使用内存中的旧值继续
+            logger.warning(
+                "从 DB 刷新 session_id 失败，使用内存缓存: wechat_user_id=%s, error=%s",
+                wechat_user_id,
+                e,
+            )
+
     async def start(self) -> None:
         """启动 channel
 
@@ -449,6 +488,13 @@ class WechatChannel(BaseChannel):
                 path = await self.media.download_media(media_info, media_type)
                 if path:
                     media_paths.append(path)
+
+            # 从 DB 刷新 session_id 到内存缓存
+            # 解决场景：SyncClient 同步拉取到云端最新 last_session_id 后，
+            # 内存缓存仍是旧值。每次处理消息前刷新，保证 session_id 是最新的。
+            # 注意：此方法只刷新 last_session_id，不覆盖 context_token
+            # （context_token 由微信消息本身携带，DB 中的可能在同步链路中已过期）
+            self._refresh_user_data_from_db(wechat_user_id)
 
             # 从用户数据中读取 session_id（可能是 None，让 AgentLoop 处理）
             # 使用 or None 确保空字符串被规范化为 None
