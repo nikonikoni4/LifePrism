@@ -284,21 +284,29 @@ class SyncClient:
         if directories is None:
             directories = SYNC_DIRECTORIES
 
-        # pull 前记录 custom_record_types 快照，用于 pull 后判断云端 meta 是否有变更
-        # 如果云端有新增/修改/删除 type，pull 会同步到本地，快照会变化
+        # pull 前记录 custom_record_types 的 id 快照，用于 pull 后判断云端 meta 是否有变更
         snapshot_before = self.sync_repository.get_custom_record_types_snapshot()
 
         # 数据库同步：Pull -> Push，任一步骤失败则不更新 last_sync_time
         self.pull_from_remote(remote_url, api_key, last_sync_time, tables)
 
-        # pull 后判断 custom_record_types meta 表是否有变更
-        # 如果有变更，发送本地最新定义给云端重建动态表，确保 push 阶段动态表数据能正确写入
+        # pull 后判断是否需要触发云端动态表重建
+        # 1. 快照对比：pull 前后 custom_record_types 的 (id, updated_at) 有变化 → 重建
+        # 2. 兜底：本地有动态表但快照不变（首次同步云端空库场景），也触发重建
+        #    rebuild-dynamic-tables 端点幂等（CREATE IF NOT EXISTS），安全无副作用
         snapshot_after = self.sync_repository.get_custom_record_types_snapshot()
-        if snapshot_before != snapshot_after:
-            logger.info("pull 后检测到 custom_record_types 变更，触发云端动态表重建")
+        dynamic_tables = [
+            t
+            for t in tables
+            if t.startswith("custom_") and t not in ("custom_record_types", "custom_record_fields")
+        ]
+        if snapshot_before != snapshot_after or dynamic_tables:
+            logger.info(
+                "触发云端动态表重建: snapshot_changed=%s, dynamic_count=%d",
+                snapshot_before != snapshot_after,
+                len(dynamic_tables),
+            )
             self._rebuild_remote_dynamic_tables(remote_url, api_key)
-        else:
-            logger.debug("pull 后 custom_record_types 无变更，跳过动态表重建")
 
         self.push_to_remote(remote_url, api_key, tables)
 
@@ -402,16 +410,6 @@ class SyncClient:
                     )
                     response.raise_for_status()
                 except (httpx.HTTPStatusError, httpx.RequestError) as e:
-                    # 动态表（custom_{slug}）在云端可能尚未创建，pull 时返回 500
-                    # 容错跳过该表，不中断整个 pull 流程
-                    # 后续 rebuild-dynamic-tables 端点会在云端创建表，下次同步恢复正常
-                    if self.sync_repository._is_dynamic_table(table_name):
-                        logger.warning(
-                            "pull_from_remote: 动态表 %s 拉取失败，跳过（云端可能尚未建表）, error=%s",
-                            table_name,
-                            e,
-                        )
-                        break
                     logger.error(
                         "pull_from_remote: 拉取表 %s 失败, offset=%d, remote_url=%s, error=%s",
                         table_name,

@@ -246,6 +246,19 @@ class SyncRepository:
         """
         self._validate_table_name(table_name)
 
+        # 动态表（custom_{slug}）在云端可能尚未创建
+        # 先检查表是否存在，不存在则直接返回空列表（避免 SELECT 抛 OperationalError）
+        if self._is_dynamic_table(table_name):
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    (table_name,),
+                )
+                if cursor.fetchone() is None:
+                    logger.warning("增量查询: 动态表 %s 不存在于数据库中，返回空列表", table_name)
+                    return []
+
         sql = f"SELECT * FROM {table_name} WHERE updated_at > ? ORDER BY updated_at ASC"
         params: list[Any] = [last_sync_time]
 
