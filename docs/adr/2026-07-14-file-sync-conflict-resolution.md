@@ -1,8 +1,8 @@
 ---
-version: 2.2
+version: 2.3
 created_at: 2026-07-14
-updated_at: 2026-07-15
-last_updated: v2.2——决策 3 补充 JSONL LWW 实现细节（按文件后缀分流：JSONL→LWW，MD→AI 合并）
+updated_at: 2026-07-16
+last_updated: v2.3——决策 5 补充"文件存在性判断"遗漏讨论（check 端点新增 all_paths 返回字段，修复云端缺失文件被错误 SKIP 的回归 bug）
 abstract: 文件同步采用 per-file version tracking（parent_hash + current_hash）替代纯 LWW mtime 比较。同步白名单对齐 Agent 工具白名单（ALLOWED_DIRS + session），chat_history.json 明确排除。冲突按文件类型分流：JSONL 走文件级 LWW（直接保留本地版本），MD 冲突由 AI 驱动解决（CONFLICT_RESOLVE 消息类型）。account.json 改为数据库存储从白名单移除。API 协议采用三阶段设计（check → fetch/push → verify），mtime 作为第一重过滤 + hash 作为精确判断。hash 计算统一行尾符并去除行尾空白后计算 SHA-256，保留词语间空格避免内容碰撞。所有决策基于主备模式前提（同一时间只有一端 Agent 工作）。
 status: decided
 ---
@@ -13,6 +13,7 @@ status: decided
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 2.3 | 决策 5 补充"文件存在性判断"遗漏讨论：原 v2.1 决策只讨论了 mtime 过滤 + hash 精确判断，未讨论当文件不在 check 变更列表中时如何区分"云端有但未改"和"云端不存在"。该遗漏导致回归 bug（见 `docs/history-bugs/2026-07-16-cloud-missing-files-skipped-by-false-assumption.md`），本地用 `local_parent is not None` 猜测远端状态，云端重装后本地未改文件被错误 SKIP。修复方案：check 端点新增返回 `all_paths`（完整路径清单），本地用它做存在性判断替代猜测 |
 | 2.2 | 决策 3 补充 JSONL LWW 实现细节：CONFLICT 按 `.jsonl` 后缀分流，JSONL 直接保留本地版本 PUSH，MD 走 AI 合并。决策 5 hash 规范化策略修正：从"去除所有空白字符"修正为"统一行尾符+去行尾空白+保留词语间空格"，与 `hash_utils.py` 实际实现对齐 |
 | 2.1 | 新增决策 5：API 协议设计（三阶段 check/fetch/push/verify + hash 规范化策略） |
 | 2.0 | 决策 3：MD 冲突改为 AI 驱动（CONFLICT_RESOLVE 消息类型）。决策 2：chat_history.json 明确排除同步。新增前提 7（user/ MD 由 AI 生成）、前提 8（chat_history.json 仅定时任务改写） |
@@ -491,6 +492,41 @@ def compute_file_hash(content: bytes) -> str:
 
 云端逻辑：遍历 directories（排除 `chat_history.json`），找到 mtime > last_sync_time 的文件 → 实时计算 current_hash → 从 `file_sync_state` 表读 parent_hash → 返回。
 
+**文件存在性判断（v2.3 补充 — 原决策遗漏）**
+
+> ⚠️ **原 v2.1/v2.2 决策只讨论了 mtime 过滤 + hash 精确判断，未讨论文件存在性判断。** 该遗漏导致回归 bug：云端重装/文件丢失后，本地已同步且未修改的文件无法重新推送。详见 [2026-07-16-cloud-missing-files-skipped-by-false-assumption.md](../history-bugs/2026-07-16-cloud-missing-files-skipped-by-false-assumption.md)。
+
+**问题边界**：`files`（mtime 过滤的变更文件）只能告诉本地"云端哪些文件变了"，无法告诉本地"云端哪些文件存在"。当本地某文件不在 `files` 列表中时，存在两种无法区分的情况：
+
+| 情况 | 含义 | 正确处理 |
+|------|------|---------|
+| 云端有文件但 mtime <= last_sync_time | 未变更 | SKIP |
+| 云端根本没有此文件 | 文件丢失/重装 | PUSH |
+
+**原错误实现**：用 `local_parent is not None` 猜测 — 本地有 parent（之前同步过）就假设"云端有但未改" → SKIP。这在云端文件存在时恰好正确，但云端文件不存在时导致错误 SKIP，文件永远无法重新推送。
+
+**修复方案**：check 端点新增返回 `all_paths` 字段，包含云端 SYNC_DIRECTORIES 下所有非黑名单文件的相对路径清单。本地用 `path in remote_all_paths_set` 做显式存在性判断，替代基于 local_parent 的猜测。
+
+```python
+# Phase 1 Response（修复后）
+{
+    "files": [
+        {"path": "user/user.md",        "parent_hash": "abc123", "current_hash": "def456"},
+        {"path": "diary/2026-07-13.md", "parent_hash": null,     "current_hash": "xyz789"}
+    ],
+    "all_paths": [                              # v2.3 新增
+        "user/user.md",
+        "user/behavior.md",
+        "diary/2026-07-13.md",
+        "session/2026-07-13.jsonl"
+        # ... 所有非黑名单文件的相对路径
+    ],
+    "sync_time": "2026-07-14T08:10:00+00:00"
+}
+```
+
+**设计教训**：远端状态必须显式查询，不能用本地元数据猜测。增量响应（只返回变更项）的 API 设计，必须额外提供完整清单或存在性标记，否则客户端无法区分"未变更"和"不存在"。
+
 **Phase 2a：本地执行 11 状态矩阵**
 
 本地拿到云端 hash 后，结合自己的 `file_sync_state` 做比较（决策 1 的 11 状态矩阵），分出：
@@ -601,10 +637,10 @@ Phase 1          Phase 2a     Phase 2b/2c              Phase 3
 
 | 文件 | 改动 |
 |------|------|
-| `sync_cloud_api.py` | 替换 `/pull-files` 为 `/pull-files/check` + `/pull-files/fetch` + `/pull-files/verify`；改造 `/push-files` 增加 hash 字段 |
-| `sync_client.py:pull_files_from_remote()` | 拆为三步：check → 本地矩阵判定 → fetch |
+| `sync_cloud_api.py` | 替换 `/pull-files` 为 `/pull-files/check` + `/pull-files/fetch` + `/pull-files/verify`；改造 `/push-files` 增加 hash 字段。v2.3：`/pull-files/check` 新增返回 `all_paths` 字段（完整路径清单） |
+| `sync_client.py:pull_files_from_remote()` | 拆为三步：check → 本地矩阵判定 → fetch。v2.3：`_pull_files_check` 返回值改为 `tuple[list[dict], list[str]]`（files + all_paths） |
 | `sync_client.py:push_files_to_remote()` | 改造：附带 parent_hash + current_hash |
-| `sync_client.py` | 新增 Phase 3 verify 逻辑 + parent_hash 推进逻辑 |
+| `sync_client.py` | 新增 Phase 3 verify 逻辑 + parent_hash 推进逻辑。v2.3：`_sync_files_full_flow` 中 `remote_state is None` 分支用 `remote_all_paths_set` 替代 `local_parent` 猜测 |
 | 新增 `compute_file_hash()` 工具函数 | 规范化 hash 计算（去除空白 + SHA-256） |
 
 ---
@@ -621,6 +657,7 @@ Phase 1          Phase 2a     Phase 2b/2c              Phase 3
 8. ✅ 改造范围可控 —— 新增 2 张表（`file_sync_state`、`wechat_account_state`，均在 `lifewatch_ai.db` 中）+ 2 个 Provider（`FileSyncStateProvider`、`WechatAccountStateProvider`）+ 云端 API 扩展 hash 字段 + 新增 CONFLICT_RESOLVE 消息类型
 9. ✅ 三阶段 API 协议 —— mtime 第一重过滤（快速排除未变更文件）+ hash 精确判断（11 状态矩阵）+ verify 校验（推进 parent 前确认两端一致）
 10. ✅ hash 规范化 —— 统一行尾符并去除行尾空白后计算 SHA-256，避免 OS 差异（`\r\n` vs `\n`）和 trailing 空白导致 false positive，保留词语间空格防止内容碰撞
+11. ✅ 文件存在性显式查询（v2.3 补充）—— check 端点返回 `all_paths` 完整路径清单，本地用 `path in remote_all_paths_set` 显式判断云端是否存在，替代基于 local_parent 的猜测，修复云端重装/文件丢失后本地未改文件无法重新推送的回归 bug
 
 ## 备选触发
 

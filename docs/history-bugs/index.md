@@ -1,3 +1,10 @@
+## 2026-07-16-cloud-missing-files-skipped-by-false-assumption
+
+- updated_at: 2026-07-16
+- path: `docs/history-bugs/2026-07-16-cloud-missing-files-skipped-by-false-assumption.md`
+- 触发规则：在排查云端重装后本地文件不再同步、session JSONL 文件之前能同步改了冲突策略后不能了、`_sync_files_full_flow` 中 `remote_state is None` 分支逻辑、`/pull-files/check` 端点返回值结构、`file_sync_state` 表状态与同步行为关系时阅读
+- 内容摘要：**回归 bug（P0，已修复）** — 从纯 mtime LWW 切换到 per-file version tracking 后，check 端点只返回 mtime 过滤的变更文件，不返回完整路径清单。本地用 `local_parent is not None` 猜测"云端有但未改"，导致云端已缺失文件被错误 SKIP。修复方案：check 端点新增返回 `all_paths`（完整路径清单），本地用它做存在性判断替代猜测。经 git history 调查发现**旧 mtime LWW 逻辑（`1d7637c8` 之前）也有同样问题**：push 侧只收集 `mtime > last_sync_time` 的文件，云端重装 + 本地未改时同样推不了（首次同步能成功只因 `last_sync_time` 为空被置为 1970 年）。此 bug 是"远端状态未显式查询"的设计通病，不因新旧策略而消失。设计教训：远端状态必须显式查询，不能用本地元数据猜测。
+
 ## 2026-07-14-sync-key-regeneration-and-config-fallback
 
 - updated_at: 2026-07-14

@@ -7,10 +7,10 @@ abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设�
 ---
 
 ## file-sync-conflict-resolution
-- updated_at: 2026-07-14
+- updated_at: 2026-07-16
 - path: `docs/adr/2026-07-14-file-sync-conflict-resolution.md`
 - 触发规则：当需要理解文件同步的冲突处理方案、为什么白名单只包含 session/diary/agent/user、account.json 为什么改数据库存储、或修改文件同步的增量识别和冲突判定逻辑时读取
-- 内容摘要：四个关联决策——（决策 1）采用 per-file version tracking（parent_hash + current_hash + 11 状态决策矩阵）替代纯 LWW mtime 比较；（决策 2）同步白名单对齐 Agent 工具白名单（ALLOWED_DIRS + session），chat_history.json 明确排除（云端无 dreaming task 不会变更）；（决策 3）MD 冲突由 AI 驱动解决（新增 CONFLICT_RESOLVE 消息类型），AI 直接拿到两份文档内联内容，可用 read_file 读相关上下文做智能合并，替代用户手动处理。冲突备份路径为 sync_conflict/{timestamp}/，不在 SYNC_DIRECTORIES 和 ALLOWED_DIRS 中，AI 无法直接读取，仅做安全兜底；（决策 4）account.json 改为数据库存储（wechat_account_state 表），从文件白名单移除。v2.0 更新新增前提 7（user/ MD 由 AI 生成）和前提 8（chat_history.json 仅定时任务改写）。决策基于主备模式前提（同一时间只有一端 Agent 工作），备选触发覆盖 6 种前提失效场景。
+- 内容摘要：五个关联决策——（决策 1）采用 per-file version tracking（parent_hash + current_hash + 11 状态决策矩阵）替代纯 LWW mtime 比较；（决策 2）同步白名单对齐 Agent 工具白名单（ALLOWED_DIRS + session），chat_history.json 明确排除（云端无 dreaming task 不会变更）；（决策 3）MD 冲突由 AI 驱动解决（新增 CONFLICT_RESOLVE 消息类型），AI 直接拿到两份文档内联内容，可用 read_file 读相关上下文做智能合并，替代用户手动处理。冲突备份路径为 sync_conflict/{timestamp}/，不在 SYNC_DIRECTORIES 和 ALLOWED_DIRS 中，AI 无法直接读取，仅做安全兜底；（决策 4）account.json 改为数据库存储（wechat_account_state 表），从文件白名单移除；（决策 5）API 协议采用三阶段设计（check → fetch/push → verify），mtime 第一重过滤 + hash 精确判断 + verify 一致性校验。v2.3 补充：决策 5 原遗漏"文件存在性判断"讨论，导致回归 bug（云端重装后本地未改文件被错误 SKIP），修复方案为 check 端点新增返回 `all_paths`（完整路径清单）。决策基于主备模式前提（同一时间只有一端 Agent 工作），备选触发覆盖 6 种前提失效场景。
 
 ## sync-full-sync-strategy
 - updated_at: 2026-07-14
