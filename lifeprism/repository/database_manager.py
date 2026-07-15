@@ -750,24 +750,3 @@ class DatabaseManager:
                 details={"sql": sql[:500], "error": str(e)},
                 cause=e,
             ) from e
-
-    def truncate(self, table_name: str):
-        """
-        清空表（删除所有记录）
-
-        Args:
-            table_name: 表名
-        """
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(f"DELETE FROM {table_name}")
-                logger.info("表 '%s' 已清空, %s 行被删除", table_name, cursor.rowcount)
-
-        except sqlite3.Error as e:
-            logger.error("清空表失败: table=%s, error=%s", table_name, e)
-            raise DataAccessError(
-                message=f"清空表 {table_name} 失败",
-                details={"table": table_name, "error": str(e)},
-                cause=e,
-            ) from e
