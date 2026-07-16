@@ -1,3 +1,10 @@
+## 2026-07-16-database-delete-not-synced
+
+- updated_at: 2026-07-16
+- path: `docs/history-bugs/2026-07-16-database-delete-not-synced.md`
+- 触发规则：在排查"删了一条记录同步后又出现了"、讨论同步系统中 DELETE 操作的传播机制、设计 tombstone / 软删除 / 删除日志表方案、排查云端和本地数据不一致但无错误日志、修改 Repository 层 delete 方法或同步 push/pull 逻辑时阅读
+- 内容摘要：**设计缺陷（P1，待修复）** — 所有数据库表采用物理 DELETE，同步 Push/Pull 两端只做 `WHERE updated_at > last_sync_time` 增量查询，无法感知和传播 DELETE 操作。被删记录在对端永久保留为幽灵数据，两端数据分叉且无自动修复路径。给出三个候选方案：软删除（改 40+ 表 DDL）、Tombstone 表（新增 deleted_records + 改 _generic_delete）、全量对比同步（Pull 时对比主键集合）。
+
 ## 2026-07-16-dynamic-tables-rebuild-always-triggered
 
 - updated_at: 2026-07-16
