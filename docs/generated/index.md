@@ -36,6 +36,13 @@
 - 触发规则：sync_client.py JSONL LWW 分流逻辑变更审查时查看
 - 内容摘要：sync_client.py Phase 2c-1 冲突解决分流逻辑（JSONL→LWW、MD→AI 合并）+ ADR v2.1→v2.2 的代码审查报告，覆盖 8 个维度，发现 4 个问题（置信度 ≥ 80）：ADR 决策 5 hash 规范化描述与代码冲突（85）、JSONL LWW 分流逻辑无测试覆盖（90）、md_conflicts 命名与实际语义不符（80）、混合冲突场景测试缺失（80）
 
+## code-review-2026-07-16-graceful-shutdown
+
+- updated_at: 2026-07-16
+- path: `docs/generated/001/code-review-2026-07-16-graceful-shutdown.md`
+- 触发规则：审查优雅关闭功能（打包环境退出、系统关机、睡眠唤醒）代码时查看
+- 内容摘要：优雅关闭功能的 8 维度代码审查报告。审查 4 个文件（+493 -27 行），发现 9 个问题（置信度 ≥ 80）：1 个 P0 致命缺陷（`net.isOnline()` 不存在导致唤醒同步功能失效）、2 个 P1 架构问题（uvicorn 超时打断 sync_once、无认证端点）、6 个 P2 代码质量/竞态问题。设计核心：参考思源笔记的三场景区分（用户退出含同步、Windows 关机跳过同步、唤醒后触发同步）。
+
 ## utc-migration-audit-report
 - updated_at: 2026-07-12
 - path: `docs/generated/utc-migration-audit-report.md`

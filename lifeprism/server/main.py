@@ -24,7 +24,7 @@ print(f"{'=' * 60}")
 # ==================== 核心库导入 ====================
 import asyncio
 import sys
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 import httpx
 from fastapi import FastAPI, Request
@@ -41,6 +41,88 @@ from lifeprism.config.settings_manager import (
 )
 
 _log_startup_time("[OK] settings_manager initialized (paths + file logging)", _config_start)
+
+# ==================== SQLite 环境前置检查 ====================
+# Settings manager 已初始化，logger 的 FileHandler 已挂载，错误可同时写入控制台和日志文件。
+# SQLite 3.35.0+ 是硬性要求（ALTER TABLE DROP COLUMN 等关键特性）。
+# 注意：sqlite3 是 CPython 内置 C 扩展，不能通过 pip/pyproject.toml 声明依赖，
+# 只能在此处做运行时前置校验。
+import logging as _logging_check
+import sqlite3 as _sqlite3_check
+
+_SQLITE_MIN_VERSION = (3, 35, 0)
+_SQLITE_MIN_VERSION_STR = "3.35.0"
+_CHECK_LOGGER = _logging_check.getLogger(__name__)
+
+# 检查 1：sqlite3 模块是否可用（极小概率，精简版 Python 可能未编译 _sqlite3）
+try:
+    _sqlite_actual_version = _sqlite3_check.sqlite_version_info
+    _sqlite_actual_version_str = _sqlite3_check.sqlite_version
+except Exception as _e:
+    _FATAL_MSG = (
+        "\n" + "=" * 70 + "\n"
+        "[FATAL] SQLite 环境检查失败\n"
+        "=" * 70 + "\n"
+        f"  错误详情: 无法获取 SQLite 版本信息 — {_e}\n"
+        "\n"
+        "  原因: 当前 Python 解释器未编译 _sqlite3 C 扩展模块。\n"
+        "  这通常发生在以下场景：\n"
+        "    1. 使用了极度精简的 Python 发行版（如嵌入式 Python）\n"
+        "    2. 自行编译 CPython 时未包含 sqlite3 支持\n"
+        "\n"
+        "  解决方法：\n"
+        "    - Linux/macOS: 安装 libsqlite3-dev 后重新编译 Python\n"
+        "    - Windows: 从 python.org 下载官方完整安装包\n"
+        "    - 打包环境: 检查 PyInstaller/nuitka 是否正确打包了 _sqlite3.pyd\n"
+        "=" * 70
+    )
+    print(_FATAL_MSG)
+    _CHECK_LOGGER.critical(_FATAL_MSG)
+    sys.exit(1)
+
+# 检查 2：SQLite 版本是否满足最低要求
+if _sqlite_actual_version < _SQLITE_MIN_VERSION:
+    _FATAL_MSG = (
+        "\n" + "=" * 70 + "\n"
+        "[FATAL] SQLite 版本过低，无法启动 LifeWatch\n"
+        "=" * 70 + "\n"
+        f"  当前版本: {_sqlite_actual_version_str}\n"
+        f"  最低要求: {_SQLITE_MIN_VERSION_STR}\n"
+        f"  版本元组: {_sqlite_actual_version} < {_SQLITE_MIN_VERSION}\n"
+        "\n"
+        "  影响范围：\n"
+        "    1. ALTER TABLE DROP COLUMN 不可用（迁移 m014 依赖）\n"
+        "    2. 其他依赖 SQLite 3.35+ 特性的功能可能异常\n"
+        "\n"
+        "  解决方法（按推荐顺序）：\n"
+        "    1. 升级 Python 版本：Python 3.10+ 通常捆绑 SQLite 3.35+\n"
+        "       - Windows: 从 python.org 下载 Python 3.10+ 安装包\n"
+        "       - macOS: brew install python@3.12\n"
+        "       - Linux: 使用 deadsnakes PPA 或编译安装新版 Python\n"
+        "    2. 替换 sqlite3.dll（仅 Windows，高级操作）：\n"
+        "       - 从 https://www.sqlite.org/download.html 下载预编译 sqlite3.dll\n"
+        "       - 替换 Python 安装目录下的 DLLs/sqlite3.dll\n"
+        "    3. 使用 pysqlite3-binary（Python 包，内置新版 SQLite）：\n"
+        "       pip install pysqlite3-binary\n"
+        "       然后在代码中将 import sqlite3 替换为 import pysqlite3 as sqlite3\n"
+        "=" * 70
+    )
+    print(_FATAL_MSG)
+    _CHECK_LOGGER.critical(_FATAL_MSG)
+    sys.exit(1)
+
+# 通过：记录版本信息到日志
+_CHECK_LOGGER.info("SQLite 环境检查通过: version=%s", _sqlite_actual_version_str)
+
+# 清理：移除临时的引用，避免污染模块命名空间
+# 注意：_FATAL_MSG 仅在检查失败分支中定义，通过时不存在，需单独处理
+del _sqlite3_check, _sqlite_actual_version, _sqlite_actual_version_str
+del _SQLITE_MIN_VERSION, _SQLITE_MIN_VERSION_STR
+del _logging_check, _CHECK_LOGGER
+with suppress(NameError):
+    del _FATAL_MSG
+
+_log_startup_time("[OK] SQLite environment check passed", _step_start)
 
 # ==================== API 路由导入 ====================
 print("[STARTUP] 正在导入 API 路由模块...")
@@ -188,7 +270,7 @@ settings.set_runtime_config("run_mode", "full")
 logger = get_logger(__name__)
 
 
-async def send_heartbeat(event: str):
+async def send_heartbeat(event: str, timeout: float = 10.0):
     """发送心跳事件到云端
 
     在本地生命周期启动/关闭时调用，让云端立即知道本地状态变化。
@@ -196,6 +278,8 @@ async def send_heartbeat(event: str):
 
     Args:
         event: 心跳事件类型，'online' | 'offline'
+        timeout: HTTP 超时秒数。关机场景（quick-shutdown）传入较短超时（如 2.0），
+            避免 10s 网络超时被 Electron 4s 强杀打断。
     """
     from lifeprism.config.settings_manager import get_setting
     from lifeprism.sync.sync_config import get_sync_api_key
@@ -208,13 +292,13 @@ async def send_heartbeat(event: str):
         return
 
     try:
-        # 使用 AsyncClient 避免同步 httpx.post 阻塞事件循环（最长 10s）
+        # 使用 AsyncClient 避免同步 httpx.post 阻塞事件循环
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 url=f"{remote_url}/api/sync/heartbeat",
                 json={"event": event},
                 headers={"Authorization": f"Bearer {api_key}"},
-                timeout=10.0,
+                timeout=timeout,
             )
             response.raise_for_status()
             logger.info("心跳事件已发送: event=%s", event)
@@ -415,7 +499,8 @@ async def lifespan(app: FastAPI):
         if proc.is_alive():
             logger.info("正在终止监控进程 (PID: %s)...", proc.pid)
             proc.terminate()
-            proc.join(timeout=5)
+            # 不阻塞事件循环：proc.join 是同步调用，包到 to_thread
+            await asyncio.to_thread(proc.join, 5)
             if proc.is_alive():
                 logger.warning("监控进程未能在 5 秒内退出，正在强制杀死...")
                 proc.kill()
@@ -448,7 +533,14 @@ async def lifespan(app: FastAPI):
         logger.warning("ChatBot 服务关闭时出现警告: error=%s", e)
 
     # 关闭时：推送最终数据到云端（sync → offline 顺序，先同步再告知离线）
-    if hasattr(app.state, "sync_client") and app.state.sync_client:
+    # 关机场景（quick-shutdown）会跳过 sync_once，因为：
+    # 1. Windows 关机只给 5 秒，sync_once 需要 1-3 分钟
+    # 2. 中途被强杀会导致 parent_hash 不一致
+    # 3. 依赖定时同步（≤10 分钟延迟）和下次启动同步补齐
+    skip_sync = getattr(app.state, "skip_sync_on_shutdown", False)
+    if skip_sync:
+        logger.info("[SHUTDOWN] 跳过关闭前同步（关机场景，只发 offline 心跳）")
+    elif hasattr(app.state, "sync_client") and app.state.sync_client:
         try:
             await asyncio.to_thread(app.state.sync_client.sync_once)
             logger.info("[SHUTDOWN] 关闭前同步完成")
@@ -456,7 +548,13 @@ async def lifespan(app: FastAPI):
             logger.warning("[SHUTDOWN] 关闭前同步失败: error=%s", e)
 
     # 发送 offline 心跳事件（同步完成后通知云端接管）
-    await send_heartbeat("offline")
+    # 关机场景也必须发送，让云端立即接管
+    # 关机场景（skip_sync=True）使用 2s 超时，避免 10s 网络超时被 Electron 4s 强杀打断
+    heartbeat_timeout = 2.0 if skip_sync else 10.0
+    try:
+        await send_heartbeat("offline", timeout=heartbeat_timeout)
+    except Exception as e:
+        logger.warning("[SHUTDOWN] 发送 offline 心跳失败: error=%s", e)
 
 
 # ==================== 创建 FastAPI 应用实例 ====================
@@ -513,6 +611,27 @@ app.add_middleware(
     allow_headers=["*"],  # 允许所有请求头
 )
 _log_startup_time("[OK] CORS middleware configured", _cors_start)
+
+
+# ==================== Shutdown 端点 localhost 限制中间件 ====================
+# /shutdown 和 /quick-shutdown 仅允许本机访问，防止局域网内其他设备触发后端关闭
+@app.middleware("http")
+async def restrict_shutdown_endpoints(request: Request, call_next):
+    path = request.url.path
+    if path.endswith("/shutdown") or path.endswith("/quick-shutdown"):
+        client_host = request.client.host if request.client else ""
+        if client_host not in ("127.0.0.1", "::1"):
+            logger.warning(
+                "[SHUTDOWN] 拒绝非本机的关闭请求: client=%s path=%s",
+                client_host,
+                path,
+            )
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Shutdown endpoints only accessible from localhost"},
+            )
+    return await call_next(request)
+
 
 # ==================== 全局异常处理器 ====================
 print("[STARTUP] 正在注册全局异常处理器...")

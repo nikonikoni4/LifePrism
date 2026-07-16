@@ -610,6 +610,7 @@ class SyncClient:
         data_path = settings.lifeprism_data_path.resolve()
 
         files = []
+        skipped_blacklist = []
         for dir_rel in directories:
             target = (data_path / dir_rel).resolve()
 
@@ -619,6 +620,7 @@ class SyncClient:
 
             if target.is_file():
                 if target.name in _EXCLUDED_FILENAMES:
+                    skipped_blacklist.append(str(target.relative_to(data_path)).replace("\\", "/"))
                     continue
                 rel_path = str(target.relative_to(data_path)).replace("\\", "/")
                 files.append(rel_path)
@@ -627,10 +629,20 @@ class SyncClient:
                     if not file_path.is_file():
                         continue
                     if file_path.name in _EXCLUDED_FILENAMES:
+                        skipped_blacklist.append(
+                            str(file_path.relative_to(data_path)).replace("\\", "/")
+                        )
                         continue
                     rel_path = str(file_path.relative_to(data_path)).replace("\\", "/")
                     files.append(rel_path)
 
+        if skipped_blacklist:
+            logger.info(
+                "_scan_sync_files: 黑名单过滤生效，跳过 %d 个文件: %s",
+                len(skipped_blacklist),
+                skipped_blacklist,
+            )
+        logger.info("_scan_sync_files: 扫描到 %d 个待同步文件", len(files))
         return files
 
     def _refresh_current_hashes(self, directories):
@@ -869,6 +881,14 @@ class SyncClient:
 
         for file_item in files:
             rel_path = file_item["path"]
+            # ===== 防御性黑名单检查 =====
+            if Path(rel_path).name in _EXCLUDED_FILENAMES:
+                logger.warning(
+                    "_pull_files_fetch: ⚠️ 云端返回了黑名单文件，跳过: %s",
+                    rel_path,
+                )
+                continue
+
             file_path = (data_path / rel_path).resolve()
 
             # 路径安全检查
@@ -926,7 +946,17 @@ class SyncClient:
         provider = FileSyncStateProvider(db_manager=self.db)
 
         files_payload = []
+        skipped_blacklist_push = []
         for rel_path in paths:
+            # ===== 防御性黑名单检查 =====
+            if Path(rel_path).name in _EXCLUDED_FILENAMES:
+                logger.warning(
+                    "_push_files: ⚠️ 检测到黑名单文件进入 PUSH 路径，跳过: %s",
+                    rel_path,
+                )
+                skipped_blacklist_push.append(rel_path)
+                continue
+
             file_path = (data_path / rel_path).resolve()
 
             if not file_path.is_file():
@@ -1342,6 +1372,20 @@ class SyncClient:
 
         # 构建所有文件路径的并集
         all_paths = local_paths_set | set(remote_state_map.keys())
+
+        # ===== 诊断日志：黑名单文件是否进入并集 =====
+        blacklist_in_union = [p for p in all_paths if Path(p).name in _EXCLUDED_FILENAMES]
+        if blacklist_in_union:
+            logger.warning(
+                "_sync_files_full_flow: ⚠️ 黑名单文件进入 all_paths 并集 (count=%d): %s",
+                len(blacklist_in_union),
+                blacklist_in_union,
+            )
+        else:
+            logger.info(
+                "_sync_files_full_flow: 黑名单检查通过，all_paths 并集中无黑名单文件 (count=%d)",
+                len(all_paths),
+            )
 
         # Phase 2a: 11 态矩阵判定
         pull_paths = []

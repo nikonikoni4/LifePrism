@@ -566,6 +566,7 @@ def sync_pull_files_check(
 
     files: list[dict[str, Any]] = []
     all_paths: list[str] = []
+    skipped_blacklist_cloud = []
     for dir_rel in request.directories:
         dir_path = (data_path / dir_rel).resolve()
 
@@ -577,6 +578,9 @@ def sync_pull_files_check(
         if dir_path.is_file():
             # 单文件处理
             if dir_path.name in _EXCLUDED_FILENAMES:
+                skipped_blacklist_cloud.append(
+                    str(dir_path.relative_to(data_path)).replace("\\", "/")
+                )
                 continue
             # 收集所有非黑名单文件路径（不做 mtime 过滤，用于存在性判断）
             rel_path = str(dir_path.relative_to(data_path)).replace("\\", "/")
@@ -592,6 +596,9 @@ def sync_pull_files_check(
                 if not file_path.is_file():
                     continue
                 if file_path.name in _EXCLUDED_FILENAMES:
+                    skipped_blacklist_cloud.append(
+                        str(file_path.relative_to(data_path)).replace("\\", "/")
+                    )
                     continue
                 # 收集所有非黑名单文件路径（不做 mtime 过滤，用于存在性判断）
                 rel_path = str(file_path.relative_to(data_path)).replace("\\", "/")
@@ -604,6 +611,13 @@ def sync_pull_files_check(
         else:
             logger.debug("路径不存在，跳过: %s", dir_rel)
             continue
+
+    if skipped_blacklist_cloud:
+        logger.info(
+            "pull-files/check: 云端黑名单过滤生效，跳过 %d 个文件: %s",
+            len(skipped_blacklist_cloud),
+            skipped_blacklist_cloud,
+        )
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
     if files:

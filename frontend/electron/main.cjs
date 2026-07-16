@@ -1,15 +1,28 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, powerMonitor, net } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const fs = require('fs');
+const http = require('http');
 const log = require('electron-log');
 const yaml = require('js-yaml');
 const { initUpdater, setMainWindow, checkForUpdates, downloadUpdate, quitAndInstall } = require('./updater.cjs');
 
 let mainWindow;
 let backendProcess;
+let backendPort = null; // 后端实际监听端口（从启动日志解析）
 let tray = null;
 let floatingWindows = {};
+
+// 优雅关闭相关常量
+const SHUTDOWN_HTTP_TIMEOUT_MS = 3000; // 调用 /shutdown 端点的 HTTP 超时
+const SHUTDOWN_FORCE_KILL_TIMEOUT_MS = 5 * 60 * 1000; // 5 分钟超时后强制杀进程（参考思源 15 分钟 UI 超时）
+const QUICK_SHUTDOWN_HTTP_TIMEOUT_MS = 2000; // 关机场景调用 /quick-shutdown 的 HTTP 超时（更短）
+const QUICK_SHUTDOWN_FORCE_KILL_TIMEOUT_MS = 4000; // 关机场景 4 秒超时后强杀（Windows 只给 5 秒）
+const RESUME_SYNC_HTTP_TIMEOUT_MS = 5000; // 唤醒后触发同步的 HTTP 超时
+
+// 场景标志位（区分关机/睡眠/主动退出）
+let isSystemShutdown = false; // Windows 关机/重启触发
+let isSuspending = false; // 系统进入睡眠
 
 const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -120,6 +133,14 @@ function startBackend() {
         const msg = data.toString().trim();
         console.log(`[Backend] ${msg}`);
         log.info(`[Backend stdout] ${msg}`);
+
+        // 从 uvicorn 启动日志解析实际端口
+        // 匹配 "Uvicorn running on http://0.0.0.0:8000" 或 "http://127.0.0.1:8000"
+        const portMatch = msg.match(/Uvicorn running on http:\/\/[\d.]+:(\d+)/);
+        if (portMatch && portMatch[1]) {
+            backendPort = parseInt(portMatch[1], 10);
+            log.info(`[Backend] 检测到后端实际监听端口: ${backendPort}`);
+        }
     });
 
     backendProcess.stderr.on('data', (data) => {
@@ -137,6 +158,172 @@ function startBackend() {
         console.log(`[Backend] 进程退出，代码: ${code}`);
         log.info(`[Backend] 进程退出，代码: ${code}`);
     });
+}
+
+// 调用后端 /api/v2/system/shutdown 端点触发优雅关闭
+// 返回 Promise<boolean>：true 表示 HTTP 请求成功发出，false 表示请求失败
+// 调用后端关闭端点（/shutdown 或 /quick-shutdown）
+// endpoint: API 路径（如 '/api/v2/system/shutdown'）
+// timeoutMs: HTTP 超时毫秒
+// 返回 Promise<boolean>：true 表示 HTTP 请求成功发出，false 表示请求失败
+function callBackendShutdown(endpoint, timeoutMs) {
+    return new Promise((resolve) => {
+        if (!backendPort) {
+            log.warn(`[Shutdown] 后端端口未检测到，跳过 HTTP 调用 ${endpoint}，直接强杀`);
+            resolve(false);
+            return;
+        }
+
+        const postData = JSON.stringify({});
+        const options = {
+            hostname: '127.0.0.1',
+            port: backendPort,
+            path: endpoint,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData),
+            },
+            timeout: timeoutMs,
+        };
+
+        const req = http.request(options, (res) => {
+            let body = '';
+            res.on('data', (chunk) => { body += chunk; });
+            res.on('end', () => {
+                log.info(`[Shutdown] ${endpoint} 响应: ${res.statusCode} ${body}`);
+                resolve(res.statusCode === 202);
+            });
+        });
+
+        req.on('error', (err) => {
+            log.error(`[Shutdown] ${endpoint} 请求失败: ${err.message}`);
+            resolve(false);
+        });
+
+        req.on('timeout', () => {
+            log.warn(`[Shutdown] ${endpoint} 请求超时，可能后端已无响应`);
+            req.destroy();
+            resolve(false);
+        });
+
+        req.write(postData);
+        req.end();
+    });
+}
+
+// 强制杀死后端进程树（兜底方案，参考 docs/temp/bugs/2026-04-22-backend-orphan-process.md）
+// 返回 Promise<void>，resolve 后表示 taskkill / kill 已完成（避免孤儿进程）
+function forceKillBackend() {
+    return new Promise((resolve) => {
+        if (!backendProcess) {
+            resolve();
+            return;
+        }
+
+        log.warn('[Shutdown] 执行强制杀死后端进程树（兜底）');
+
+        if (process.platform === 'win32') {
+            // Windows: 使用 taskkill 杀死进程树（包括所有子进程，防止监控进程变孤儿）
+            exec(`taskkill /pid ${backendProcess.pid} /T /F`, (error) => {
+                if (error) {
+                    log.error('[Shutdown] 强制杀死后端进程树失败:', error);
+                } else {
+                    log.info('[Shutdown] 后端进程树已强制终止');
+                }
+                resolve();
+            });
+        } else {
+            // Unix/Linux/macOS: 使用 SIGKILL
+            backendProcess.kill('SIGKILL');
+            resolve();
+        }
+    });
+}
+
+// 优雅关闭后端：根据场景分流到完整关闭或快速关闭
+async function gracefulShutdownBackend() {
+    if (!backendProcess) {
+        log.info('[Shutdown] 无后端进程，直接返回');
+        return;
+    }
+
+    // 已退出（exit 事件已触发）
+    if (backendProcess.exitCode !== null || backendProcess.killed) {
+        log.info(`[Shutdown] 后端已退出（exitCode=${backendProcess.exitCode}, killed=${backendProcess.killed}），跳过关闭流程`);
+        return;
+    }
+
+    // 根据场景选择关闭策略
+    if (isSystemShutdown) {
+        // Windows 关机场景：调用 quick-shutdown（跳过 sync_once，只发 offline 心跳）
+        // 原因：Windows 只给 5 秒，sync_once 需要 1-3 分钟，中途被杀会导致 parent_hash 不一致
+        log.info('[Shutdown] 检测到系统关机场景，执行快速关闭（跳过 sync_once）');
+        await shutdownBackendWithStrategy(
+            '/api/v2/system/quick-shutdown',
+            QUICK_SHUTDOWN_HTTP_TIMEOUT_MS,
+            QUICK_SHUTDOWN_FORCE_KILL_TIMEOUT_MS,
+            '快速关闭'
+        );
+    } else {
+        // 用户主动退出场景：完整优雅关闭（含 sync_once，5 分钟超时兜底）
+        log.info('[Shutdown] 用户主动退出场景，执行完整优雅关闭（含 sync_once）');
+        await shutdownBackendWithStrategy(
+            '/api/v2/system/shutdown',
+            SHUTDOWN_HTTP_TIMEOUT_MS,
+            SHUTDOWN_FORCE_KILL_TIMEOUT_MS,
+            '完整优雅关闭'
+        );
+    }
+}
+
+// 通用关闭策略：调用指定端点 → 监听 exit 事件 → 超时强杀兜底
+// 抽取自 fullGracefulShutdownBackend 和 quickShutdownBackend 的共同逻辑
+// label: 日志标识，用于区分"完整优雅关闭"和"快速关闭"
+async function shutdownBackendWithStrategy(endpoint, httpTimeoutMs, forceKillTimeoutMs, label) {
+    log.info(`[Shutdown] 开始${label}流程（endpoint=${endpoint}）`);
+
+    // 1. 调用后端关闭端点（HTTP 请求立即返回 202，后端异步触发 SIGINT）
+    const httpOk = await callBackendShutdown(endpoint, httpTimeoutMs);
+
+    if (!httpOk) {
+        // HTTP 请求失败，直接强杀
+        log.warn(`[Shutdown] HTTP 调用 ${endpoint} 失败，直接强杀后端`);
+        await forceKillBackend();
+        return;
+    }
+
+    // 2. 监听后端进程 exit 事件（lifespan shutdown 完成后进程退出）
+    //    使用 timeoutId 变量让 exitPromise 能在 resolve 时清理 timeout（避免 timer 泄漏）
+    let timeoutId = null;
+
+    const exitPromise = new Promise((resolve) => {
+        if (backendProcess.exitCode !== null || backendProcess.killed) {
+            // 已经退出（防止在 once 注册前退出的竞态）
+            log.info(`[Shutdown] 后端进程已退出（${label}），代码: ${backendProcess.exitCode}`);
+            resolve();
+            return;
+        }
+        backendProcess.once('exit', (code) => {
+            log.info(`[Shutdown] 后端进程已退出（${label}），代码: ${code}`);
+            resolve();
+        });
+    });
+
+    const timeoutPromise = new Promise((resolve) => {
+        timeoutId = setTimeout(async () => {
+            log.warn(`[Shutdown] ${label}超时（${forceKillTimeoutMs / 1000}s），执行强杀`);
+            await forceKillBackend();
+            resolve();
+        }, forceKillTimeoutMs);
+    });
+
+    // 3. 竞速：任一 Promise resolve 后立即清理 timeout（避免 timer 泄漏）
+    //    - exitPromise 先 resolve：clearTimeout 取消未触发的 setTimeout
+    //    - timeoutPromise 先 resolve：setTimeout 已触发，clearTimeout 为 no-op
+    await Promise.race([exitPromise, timeoutPromise]);
+    if (timeoutId) clearTimeout(timeoutId);
+    log.info(`[Shutdown] ${label}流程完成`);
 }
 
 // 创建系统托盘
@@ -701,12 +888,105 @@ app.whenReady().then(() => {
         createWindow();
         setMainWindow(mainWindow);
     }, 10000);
+
+    // ========== 电源事件监听（参考思源 powerMonitor 设计） ==========
+    // 必须在 whenReady 里面注册，否则 Linux 端可能无法正常启动
+
+    // 系统关机/重启：设置标志位，让 before-quit 走快速关闭流程
+    powerMonitor.on('shutdown', () => {
+        log.info('[PowerMonitor] 系统关机/重启事件触发');
+        isSystemShutdown = true;
+    });
+
+    // 系统进入睡眠/挂起：记录状态
+    powerMonitor.on('suspend', () => {
+        log.info('[PowerMonitor] 系统进入睡眠/挂起');
+        isSuspending = true;
+    });
+
+    // 系统从睡眠唤醒：检查网络连通性后触发同步（参考思源 resume 设计）
+    powerMonitor.on('resume', async () => {
+        log.info('[PowerMonitor] 系统从睡眠唤醒');
+        isSuspending = false;
+
+        // 唤醒后检查网络连通性，再触发同步
+        // 参考：https://github.com/siyuan-note/siyuan/issues/6687
+        const checkAndSync = async () => {
+            try {
+                // 等待 2 秒让网络恢复连接
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                const online = await net.isOnline();
+                if (!online) {
+                    log.warn('[PowerMonitor] 唤醒后网络未连接，跳过同步触发');
+                    return;
+                }
+
+                if (!backendPort) {
+                    log.warn('[PowerMonitor] 后端端口未检测到，跳过同步触发');
+                    return;
+                }
+
+                log.info(`[PowerMonitor] 唤醒后网络已连接，触发后端同步 (port=${backendPort})`);
+
+                // 调用后端 /api/sync/trigger 触发一次同步（后台线程执行，立即返回 202）
+                const triggerReq = http.request({
+                    hostname: '127.0.0.1',
+                    port: backendPort,
+                    path: '/api/sync/trigger',
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: RESUME_SYNC_HTTP_TIMEOUT_MS,
+                }, (res) => {
+                    let body = '';
+                    res.on('data', (chunk) => { body += chunk; });
+                    res.on('end', () => {
+                        log.info(`[PowerMonitor] /api/sync/trigger 响应: ${res.statusCode} ${body}`);
+                    });
+                });
+
+                triggerReq.on('error', (err) => {
+                    log.error(`[PowerMonitor] /api/sync/trigger 请求失败: ${err.message}`);
+                });
+
+                triggerReq.on('timeout', () => {
+                    log.warn('[PowerMonitor] /api/sync/trigger 请求超时');
+                    triggerReq.destroy();
+                });
+
+                triggerReq.write('{}');
+                triggerReq.end();
+            } catch (err) {
+                log.error('[PowerMonitor] 唤醒后同步触发异常:', err);
+            }
+        };
+
+        checkAndSync();
+    });
+
+    // 系统锁屏（可选处理，目前只记录日志）
+    powerMonitor.on('lock-screen', () => {
+        log.info('[PowerMonitor] 系统锁屏');
+    });
 });
 
 // 应用退出前的清理工作
-app.on('before-quit', () => {
+let isShuttingDown = false; // 防止 before-quit 重入
+
+app.on('before-quit', async (event) => {
     console.log('[Electron] 应用即将退出...');
+
+    // 防止重入：异步关闭流程进行中再次触发退出时，允许默认行为
+    if (isShuttingDown) {
+        console.log('[Electron] 关闭流程进行中，允许退出');
+        return;
+    }
+
     app.isQuitting = true;
+    isShuttingDown = true;
+
+    // 阻止默认退出，等后端优雅关闭完成后再退出
+    event.preventDefault();
 
     // 关闭所有浮窗
     for (const [id, win] of Object.entries(floatingWindows)) {
@@ -724,28 +1004,26 @@ app.on('before-quit', () => {
     }
     dialogWindows = {};
 
-    // 关闭后端进程
-    if (backendProcess) {
-        console.log('[Electron] 正在关闭后端进程...');
-
-        if (process.platform === 'win32') {
-            // Windows: 使用 taskkill 杀死进程树（包括所有子进程）
-            // 修复 bug: 防止监控子进程变成孤儿进程
-            // 详见: docs/temp/bugs/2026-04-22-backend-orphan-process.md
-            const { exec } = require('child_process');
-            exec(`taskkill /pid ${backendProcess.pid} /T /F`, (error) => {
-                if (error) {
-                    console.error('[Electron] 杀死后端进程树失败:', error);
-                    log.error('[Electron] 杀死后端进程树失败:', error);
-                } else {
-                    console.log('[Electron] 后端进程树已终止');
-                    log.info('[Electron] 后端进程树已终止');
-                }
-            });
-        } else {
-            // Unix/Linux/macOS: 使用 SIGTERM
-            backendProcess.kill();
+    // 通知主窗口显示"正在同步并退出"提示（参考思源 util.PushMsg 设计）
+    // 关机场景跳过 UI 通知（Windows 只给 5 秒，没时间等前端渲染遮罩）
+    if (!isSystemShutdown && mainWindow && !mainWindow.isDestroyed()) {
+        try {
+            mainWindow.webContents.send('backend-shutdown-started');
+            log.info('[Shutdown] 已通知前端显示关闭提示');
+        } catch (e) {
+            log.warn('[Shutdown] 通知前端失败:', e);
         }
+    } else if (isSystemShutdown) {
+        log.info('[Shutdown] 关机场景，跳过 UI 通知，直接快速关闭');
+    }
+
+    // 优雅关闭后端（参考思源 Close(false) 设计：等待同步完成才退出）
+    try {
+        await gracefulShutdownBackend();
+    } catch (e) {
+        log.error('[Shutdown] 优雅关闭流程异常:', e);
+        // 异常时也强制杀进程（必须 await，避免 taskkill 未完成就 app.quit 导致孤儿进程）
+        await forceKillBackend();
     }
 
     // 销毁托盘
@@ -753,6 +1031,10 @@ app.on('before-quit', () => {
         tray.destroy();
         tray = null;
     }
+
+    // 后端已退出，现在可以真正退出 Electron
+    log.info('[Electron] 后端关闭完成，退出 Electron');
+    app.quit();
 });
 
 app.on('window-all-closed', () => {

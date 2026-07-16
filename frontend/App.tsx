@@ -19,6 +19,7 @@ function MainApp() {
   const [isApiReady, setIsApiReady] = useState(false);
   const [pathWarnings, setPathWarnings] = useState<string[]>([]);
   const [showDemoDialog, setShowDemoDialog] = useState(false);
+  const [isShuttingDown, setIsShuttingDown] = useState(false);
 
   // 初始化 API 配置（探测后端端口）
   useEffect(() => {
@@ -33,6 +34,23 @@ function MainApp() {
         // 即使失败也设置为 ready，使用默认端口
         setIsApiReady(true);
       });
+  }, []);
+
+  // 监听后端关闭事件，显示"正在同步并退出"全屏遮罩
+  // 参考 siyuan 的 util.PushMsg(Conf.Language(81), 1000*60*15) 设计
+  useEffect(() => {
+    if (!window.electronAPI?.onMessage) return;
+
+    const handler = window.electronAPI.onMessage('backend-shutdown-started', () => {
+      console.log('[Shutdown] 收到后端关闭通知，显示退出提示');
+      setIsShuttingDown(true);
+    });
+
+    return () => {
+      if (window.electronAPI?.removeMessageListener) {
+        window.electronAPI.removeMessageListener('backend-shutdown-started', handler);
+      }
+    };
   }, []);
 
   // 初始化 PlanDoc IPC 桥接（主窗口监听浮窗的同步请求）
@@ -97,6 +115,24 @@ function MainApp() {
 
   return (
     <>
+      {/* 退出时的全屏遮罩：正在同步并退出（参考 siyuan 关闭提示设计） */}
+      {isShuttingDown && (
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 max-w-md w-full mx-4 text-center">
+            <svg className="animate-spin h-14 w-14 text-blue-500 mx-auto mb-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <h2 className="text-xl font-semibold text-slate-800 mb-2">正在同步并退出</h2>
+            <p className="text-sm text-slate-500 leading-relaxed">
+              后端正在执行关闭前同步，将本地数据推送到云端并通知云端接管。
+              <br />
+              请勿强制关闭，预计需要 1-3 分钟。
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* 全局同步状态指示器 */}
       {isSyncing && (
         <div className="fixed top-0 left-0 right-0 z-[10000] bg-blue-500 text-white px-4 py-2 text-center text-sm font-medium shadow-lg pointer-events-none">

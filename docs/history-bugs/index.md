@@ -1,3 +1,17 @@
+## 2026-07-16-cloud-code-requires-reinstall-after-pull
+
+- updated_at: 2026-07-16
+- path: `docs/history-bugs/2026-07-16-cloud-code-requires-reinstall-after-pull.md`
+- 触发规则：在排查"git pull 后代码已更新但行为仍为旧版本"、同步黑名单不生效、新增逻辑在云端无输出、云端采用 `pip install -e .` 部署、讨论服务器部署流程时阅读
+- 内容摘要：**部署运维问题（高，已确认）** — 云端服务器 git pull 后代码文件已更新但 uvicorn 运行时仍加载旧版本模块，需重新 `pip install -e .` 并重启服务才能生效。经二次同步测试确认：首次 git pull + 重启无效，加 `pip install -e .` 后正常。标准部署流程为 `git pull` → `pip install -e .` → restart。
+
+## 2026-07-16-packaged-exit-skips-graceful-shutdown
+
+- updated_at: 2026-07-16
+- path: `docs/history-bugs/2026-07-16-packaged-exit-skips-graceful-shutdown.md`
+- 触发规则：在打包环境退出后云端未立即接管、退出后本地改动未同步到云端、修改 Electron `main.cjs` 中 `before-quit` 处理逻辑、修改后端 `lifespan` shutdown 函数、涉及 Windows 关机/重启/睡眠/唤醒等系统电源事件的业务处理、参考思源笔记的退出同步设计时阅读
+- 内容摘要：**严重 bug（P0，已修复）** — Windows 打包环境下 `before-quit` 使用 `taskkill /T /F` 强制杀后端（源自 2026-04-22 孤儿进程 bug 的短期修复），完全不触发 FastAPI lifespan shutdown。导致关闭前同步（sync_once）和 offline 心跳（send_heartbeat）全部丢失。修复方案参考思源三场景区分设计：新增 `/shutdown`（主动退出，含同步）和 `/quick-shutdown`（关机，跳过同步只发心跳）端点，Electron 通过 `powerMonitor.on('shutdown')` 区分场景，唤醒后自动触发 `/api/sync/trigger`。关机场景跳过 sync_once 的原因是 Windows 只给 5 秒响应时间。
+
 ## 2026-07-16-cloud-missing-files-skipped-by-false-assumption
 
 - updated_at: 2026-07-16
