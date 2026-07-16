@@ -5,7 +5,7 @@
 - generate_create_table_ddl() DDL 生成正确性
 - get_custom_record_types_snapshot() 快照对比
 - get_custom_record_types_full_definitions() 完整定义查询
-- rebuild_dynamic_tables() 重建逻辑（created/altered/skipped/dropped）
+- rebuild_dynamic_tables() 重建逻辑（created/altered/skipped）
 
 参考: test/core/integration/repository/test_sync_dynamic_tables.py
 """
@@ -359,8 +359,8 @@ class TestRebuildDynamicTables:
             columns = {row[1] for row in cursor.fetchall()}
             assert "duration" in columns
 
-    def test_drop_orphan_table(self, sync_repository, clean_custom_record_types, initialized_db):
-        """云端有但本地无的表被删除（action=dropped）"""
+    def test_does_not_drop_orphan_table(self, sync_repository, clean_custom_record_types, initialized_db):
+        """不删除云端已有但本地定义中不存在的表（孤儿表保护）"""
         # 先创建一个表
         with initialized_db.get_connection() as conn:
             conn.execute(
@@ -368,42 +368,35 @@ class TestRebuildDynamicTables:
             )
             conn.commit()
 
-        # 本地传入空定义（没有 orphan 类型）
+        # 本地传入空定义（没有 orphan 类型）→ 不应删除 orphan 表
         results = sync_repository.rebuild_dynamic_tables([])
 
-        # 应该包含 dropped 动作
-        dropped = [r for r in results if r["action"] == "dropped"]
-        assert len(dropped) == 1
-        assert dropped[0]["slug"] == "orphan"
+        # 不应有 dropped 动作
+        dropped = [r for r in results if r.get("action") == "dropped"]
+        assert len(dropped) == 0, (
+            "孤儿表不应被删除，删除同步需要独立的 tombstone 机制"
+        )
 
-        # 验证表已删除
+        # 验证表仍然存在
         with initialized_db.get_connection() as conn:
             cursor = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='custom_orphan'"
             )
-            assert cursor.fetchone() is None
+            assert cursor.fetchone() is not None, "孤儿表不应被删除"
 
-    def test_does_not_drop_meta_tables(
+    def test_preserves_existing_meta_tables(
         self, sync_repository, clean_custom_record_types, initialized_db
     ):
         """不删除 custom_record_types 和 custom_record_fields meta 表"""
-        # 本地传入空定义
         results = sync_repository.rebuild_dynamic_tables([])
 
-        # 不应该有 dropped 动作（meta 表被跳过）
-        dropped = [r for r in results if r["action"] == "dropped"]
-        assert len(dropped) == 0
-
-        # 验证 meta 表仍存在
+        # 验证 meta 表仍然存在
         with initialized_db.get_connection() as conn:
-            cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='custom_record_types'"
-            )
-            assert cursor.fetchone() is not None
-            cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='custom_record_fields'"
-            )
-            assert cursor.fetchone() is not None
+            for meta_table in ("custom_record_types", "custom_record_fields"):
+                cursor = conn.execute(
+                    f"SELECT name FROM sqlite_master WHERE type='table' AND name='{meta_table}'"
+                )
+                assert cursor.fetchone() is not None, f"{meta_table} 不应被删除"
 
     def test_idempotent_operation(self, sync_repository, clean_custom_record_types, initialized_db):
         """幂等性：重复调用不产生副作用"""

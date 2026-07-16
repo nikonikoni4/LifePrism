@@ -137,5 +137,6 @@ status: decided
 - **修改 `sync_once` 流程顺序**：原"pull → 快照对比 → 重建"改为"拉取云端定义 → 本地对比 → 双向建表 → pull → push"
 - **本地建表只执行 DDL**：复用 `generate_create_table_ddl(slug, fields)`，不调用 `create_type`（避免写 meta 和 id 冲突）
 - **`_rebuild_remote_dynamic_tables` 保持全量发送**：端点幂等，简单优先
+- **移除 `rebuild_dynamic_tables` 的孤儿表清理逻辑**：原第 2 步"清理云端有但本地无的 slug → DROP TABLE"假定本地是 SSOT，在双向同步场景下误删另一端自己创建的表。删除同步需要独立的 tombstone 机制
 - **待后续决策**：sync_once 期间的并发锁机制（前提 3 的假设需要独立决策验证）
 - **测试影响**：需更新 `test_sync_files_full_flow.py` 和 `test_rebuild_dynamic_tables.py`，新增端点的集成测试

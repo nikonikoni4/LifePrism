@@ -962,13 +962,14 @@ class SyncRepository:
             ) from e
 
     def rebuild_dynamic_tables(self, types: list[dict[str, Any]]) -> list[dict[str, str]]:
-        """根据传入的自定义记录类型定义，重建/同步云端动态表
+        """根据传入的自定义记录类型定义，在云端创建/更新动态表
 
-        对每个本地传入的 type：
+        对每个传入的 type：
         - 表不存在 → CREATE TABLE（调用 CustomRecordRepository.generate_create_table_ddl）
         - 表存在但字段缺失 → ALTER TABLE ADD COLUMN（只增不删，SQLite 兼容）
+        - 表已存在且字段齐全 → skipped
 
-        对云端有但本地无的 slug → DROP TABLE（清理已删除类型，保持两端一致）
+        注意：不删除任何表——删除同步需要独立的 tombstone 机制，不属于本方法的职责范围。
 
         所有操作在同一事务中执行，失败则回滚。
 
@@ -976,7 +977,7 @@ class SyncRepository:
             types: 类型定义列表，每项含 slug 和 fields
 
         Returns:
-            每个 type 的处理结果列表，每项 {"slug": str, "action": "created"|"altered"|"skipped"|"dropped"}
+            每个 type 的处理结果列表，每项 {"slug": str, "action": "created"|"altered"|"skipped"}
 
         Raises:
             DataAccessError: 数据库操作失败
@@ -986,7 +987,6 @@ class SyncRepository:
         )
 
         results: list[dict[str, str]] = []
-        local_slugs = {t["slug"] for t in types}
 
         try:
             with self.db.get_connection() as conn:
@@ -1038,23 +1038,6 @@ class SyncRepository:
                         results.append(
                             {"slug": slug, "action": "altered" if altered else "skipped"}
                         )
-
-                # 2. 清理云端有但本地无的 slug → DROP TABLE
-                cursor.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'custom_%'"
-                )
-                cloud_tables = [row[0] for row in cursor.fetchall()]
-
-                for table_name in cloud_tables:
-                    # 跳过 meta 表（custom_record_types, custom_record_fields）
-                    if table_name in TABLE_CONFIGS:
-                        continue
-                    # 提取 slug（去掉 custom_ 前缀）
-                    slug = table_name[len("custom_") :]
-                    if slug not in local_slugs:
-                        cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
-                        results.append({"slug": slug, "action": "dropped"})
-                        logger.info("重建动态表: 删除孤儿表 %s", table_name)
 
             logger.info("重建动态表完成: %s", results)
             return results

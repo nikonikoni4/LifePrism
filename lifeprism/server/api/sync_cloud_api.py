@@ -314,13 +314,15 @@ def sync_rebuild_dynamic_tables(
     request: RebuildDynamicTablesRequest,
     _: None = Depends(verify_sync_api_key),
 ):
-    """根据本地发送的自定义记录类型定义，重建/同步云端动态表
+    """根据本地发送的自定义记录类型定义，在云端创建/更新动态表
 
-    本地 pull 完成后检测到 custom_record_types meta 表有变更时调用此端点，
+    在 pull 之前，由 _sync_dynamic_tables_definitions 检测到本地有云端没有的 slug 时调用。
     云端根据最新的 type + fields 定义：
     - 新增 type → CREATE TABLE
     - 已有 type 缺字段 → ALTER TABLE ADD COLUMN（只增不删）
-    - 云端有但本地已删除的 type → DROP TABLE
+    - 已有 type 且字段齐全 → skipped
+
+    注意：不删除任何表——删除同步需要独立的 tombstone 机制。
 
     幂等操作：重复调用不会产生副作用。
 
@@ -331,7 +333,7 @@ def sync_rebuild_dynamic_tables(
     - Authorization: Bearer {api_key} HTTP Header
 
     **响应**:
-    - rebuilt: [{slug, action}] 每个类型的处理结果（created/altered/skipped/dropped）
+    - rebuilt: [{slug, action}] 每个类型的处理结果（created/altered/skipped）
     - sync_time: 本次同步时间
     """
     logger.info("重建动态表请求开始: types=%d", len(request.types))

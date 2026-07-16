@@ -140,17 +140,13 @@ class TestPullFromRemoteInsertNew:
         # Assert: 本地数据库有该记录
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id, content FROM todo_list WHERE id = ?", ("todo-pull-001",)
-            )
+            cursor.execute("SELECT id, content FROM todo_list WHERE id = ?", ("todo-pull-001",))
             row = cursor.fetchone()
             assert row is not None
             assert row[0] == "todo-pull-001"
             assert row[1] == "远程任务"
 
-    def test_pull_inserts_multiple_new_records(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_pull_inserts_multiple_new_records(self, sync_client, initialized_db, clean_tables):
         """拉取：多条远程新记录写入本地"""
         # Arrange
         remote_rows = [
@@ -185,13 +181,13 @@ class TestPullFromRemoteInsertNew:
             cursor.execute("SELECT COUNT(*) FROM todo_list")
             assert cursor.fetchone()[0] == 2
 
-    def test_pull_sends_correct_request_body(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_pull_sends_correct_request_body(self, sync_client, initialized_db, clean_tables):
         """拉取：HTTP 请求体包含 last_sync_time、tables、offset 和 limit（分批格式）"""
         mock_response = _make_mock_response({"changes": {}})
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post:
+        with patch(
+            "lifeprism.sync.sync_client.httpx.post", return_value=mock_response
+        ) as mock_post:
             sync_client.pull_from_remote(
                 remote_url="http://test:8000",
                 api_key="my-api-key",
@@ -246,7 +242,13 @@ class TestPullFromRemoteConflictResolution:
             cursor.execute(
                 "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?)",
-                ("todo-conflict-001", "本地原始内容", "pool", "2026-07-01 09:00:00", "2026-07-01 09:00:00"),
+                (
+                    "todo-conflict-001",
+                    "本地原始内容",
+                    "pool",
+                    "2026-07-01 09:00:00",
+                    "2026-07-01 09:00:00",
+                ),
             )
             conn.commit()
 
@@ -290,7 +292,13 @@ class TestPullFromRemoteConflictResolution:
             cursor.execute(
                 "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?)",
-                ("todo-conflict-002", "本地修改后的内容", "scheduled", "2026-07-01 09:00:00", "2026-07-01 12:00:00"),
+                (
+                    "todo-conflict-002",
+                    "本地修改后的内容",
+                    "scheduled",
+                    "2026-07-01 09:00:00",
+                    "2026-07-01 12:00:00",
+                ),
             )
             conn.commit()
 
@@ -335,7 +343,13 @@ class TestPullFromRemoteConflictResolution:
             cursor.execute(
                 "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?)",
-                ("todo-conflict-003", "本地修改后的内容", "scheduled", "2026-07-01 09:00:00", "2026-07-01 11:00:00"),
+                (
+                    "todo-conflict-003",
+                    "本地修改后的内容",
+                    "scheduled",
+                    "2026-07-01 09:00:00",
+                    "2026-07-01 11:00:00",
+                ),
             )
             conn.commit()
 
@@ -377,9 +391,7 @@ class TestPullFromRemoteConflictResolution:
 class TestPushToRemote:
     """Seam 3: push_to_remote() - 推送本地变更"""
 
-    def test_push_sends_local_incremental_changes(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_push_sends_local_incremental_changes(self, sync_client, initialized_db, clean_tables):
         """推送：本地增量数据通过 HTTP POST 发送到远程"""
         # Arrange: 本地插入增量数据
         with initialized_db.get_connection() as conn:
@@ -395,7 +407,9 @@ class TestPushToRemote:
 
         with (
             patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post,
-            patch("lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"),
+            patch(
+                "lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"
+            ),
         ):
             sync_client.push_to_remote(
                 remote_url="http://test:8000",
@@ -422,7 +436,13 @@ class TestPushToRemote:
             cursor.execute(
                 "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?)",
-                ("todo-push-auth", "认证测试", "pool", "2026-07-01 10:00:00", "2026-07-01 11:00:00"),
+                (
+                    "todo-push-auth",
+                    "认证测试",
+                    "pool",
+                    "2026-07-01 10:00:00",
+                    "2026-07-01 11:00:00",
+                ),
             )
             conn.commit()
 
@@ -430,7 +450,9 @@ class TestPushToRemote:
 
         with (
             patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post,
-            patch("lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"),
+            patch(
+                "lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"
+            ),
         ):
             sync_client.push_to_remote(
                 remote_url="http://test:8000",
@@ -441,15 +463,15 @@ class TestPushToRemote:
         call_args = mock_post.call_args
         assert call_args.kwargs["headers"]["Authorization"] == "Bearer my-push-key"
 
-    def test_push_handles_no_local_changes(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_push_handles_no_local_changes(self, sync_client, initialized_db, clean_tables):
         """推送：本地无增量数据时不发送请求"""
         mock_response = _make_mock_response({"success": True})
 
         with (
             patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post,
-            patch("lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"),
+            patch(
+                "lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"
+            ),
         ):
             sync_client.push_to_remote(
                 remote_url="http://test:8000",
@@ -460,9 +482,7 @@ class TestPushToRemote:
         # 无增量数据时不发送 POST 请求
         mock_post.assert_not_called()
 
-    def test_push_only_sends_incremental_changes(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_push_only_sends_incremental_changes(self, sync_client, initialized_db, clean_tables):
         """推送：只发送 updated_at > last_sync_time 的记录"""
         # Arrange: 插入两条记录，一条在 last_sync_time 之前，一条之后
         with initialized_db.get_connection() as conn:
@@ -483,7 +503,9 @@ class TestPushToRemote:
 
         with (
             patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post,
-            patch("lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 10:00:00"),
+            patch(
+                "lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 10:00:00"
+            ),
         ):
             sync_client.push_to_remote(
                 remote_url="http://test:8000",
@@ -573,7 +595,13 @@ class TestSyncOnce:
             cursor.execute(
                 "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?)",
-                ("todo-sync-order", "同步顺序测试", "pool", "2026-07-01 10:00:00", "2026-07-01 12:00:00"),
+                (
+                    "todo-sync-order",
+                    "同步顺序测试",
+                    "pool",
+                    "2026-07-01 10:00:00",
+                    "2026-07-01 12:00:00",
+                ),
             )
             conn.commit()
 
@@ -604,9 +632,7 @@ class TestSyncOnce:
             patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
             patch("lifeprism.config.settings_manager.set_setting") as mock_set_setting,
         ):
-            sync_client.sync_once(
-                tables=["todo_list"], directories=["sync_client_test/"]
-            )
+            sync_client.sync_once(tables=["todo_list"], directories=["sync_client_test/"])
 
         # Assert: 数据库 pull -> push -> 文件同步全流程（pull-files/check）
         # 空目录场景下文件同步仅触发 check 端点，不触发 fetch/push-files/verify/commit
@@ -666,9 +692,7 @@ class TestSyncOnce:
             f"last_sync_time 应为 ISO 8601 格式（包含 T 分隔符），实际: {last_sync_time}"
         )
 
-    def test_sync_once_reads_config_from_settings(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_sync_once_reads_config_from_settings(self, sync_client, initialized_db, clean_tables):
         """完整同步：从 settings 读取 remote_url、api_key、last_sync_time"""
         with (
             patch(
@@ -728,8 +752,7 @@ class TestSyncOnce:
 
         # Assert: 分批拉取使用了默认表列表（每张表单独请求）
         pull_calls = [
-            c for c in mock_post.call_args_list
-            if c.kwargs["url"].endswith("/api/sync/pull")
+            c for c in mock_post.call_args_list if c.kwargs["url"].endswith("/api/sync/pull")
         ]
         assert len(pull_calls) > 0
         # 汇总所有 pull 请求中请求的表名
@@ -759,12 +782,8 @@ class TestSyncDynamicTablesDefinitions:
             conn.commit()
 
         cloud_types = [
-            {"slug": "cloud_only", "fields": [
-                {"field_key": "score", "field_type": "integer"}
-            ]},
-            {"slug": "reading_log", "fields": [
-                {"field_key": "book_name", "field_type": "text"}
-            ]},
+            {"slug": "cloud_only", "fields": [{"field_key": "score", "field_type": "integer"}]},
+            {"slug": "reading_log", "fields": [{"field_key": "book_name", "field_type": "text"}]},
         ]
 
         def mock_get(*args, **kwargs):
@@ -808,12 +827,8 @@ class TestSyncDynamicTablesDefinitions:
         # 验证没有写 meta 数据
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM custom_record_types WHERE slug='cloud_only'"
-            )
-            assert cursor.fetchone()[0] == 0, (
-                "DDL 建表不应写入 custom_record_types"
-            )
+            cursor.execute("SELECT COUNT(*) FROM custom_record_types WHERE slug='cloud_only'")
+            assert cursor.fetchone()[0] == 0, "DDL 建表不应写入 custom_record_types"
 
         # 清理测试创建的表
         with initialized_db.get_connection() as conn:
@@ -839,14 +854,28 @@ class TestSyncDynamicTablesDefinitions:
             cursor.execute(
                 "INSERT INTO custom_record_types (id, name, slug, description, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
-                ("crt-local-only", "本地独有", "local_only", "",
-                 "2026-07-01 10:00:00", "2026-07-01 10:00:00"),
+                (
+                    "crt-local-only",
+                    "本地独有",
+                    "local_only",
+                    "",
+                    "2026-07-01 10:00:00",
+                    "2026-07-01 10:00:00",
+                ),
             )
             cursor.execute(
                 "INSERT INTO custom_record_fields (id, type_id, field_name, field_key, field_type, sort_order, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                ("crf-local-1", "crt-local-only", "备注", "note", "text", 1,
-                 "2026-07-01 10:00:00", "2026-07-01 10:00:00"),
+                (
+                    "crf-local-1",
+                    "crt-local-only",
+                    "备注",
+                    "note",
+                    "text",
+                    1,
+                    "2026-07-01 10:00:00",
+                    "2026-07-01 10:00:00",
+                ),
             )
             conn.commit()
 
@@ -858,9 +887,7 @@ class TestSyncDynamicTablesDefinitions:
             url = kwargs.get("url", "")
             if "rebuild-dynamic-tables" in url:
                 call_order.append("rebuild")
-            return _make_mock_response(
-                {"rebuilt": [{"slug": "local_only", "action": "created"}]}
-            )
+            return _make_mock_response({"rebuilt": [{"slug": "local_only", "action": "created"}]})
 
         with (
             patch(
@@ -883,14 +910,10 @@ class TestSyncDynamicTablesDefinitions:
             )
 
         assert "get-definitions" in call_order
-        assert "rebuild" in call_order, (
-            "本地有动态表时云端无时应触发远端重建"
-        )
+        assert "rebuild" in call_order, "本地有动态表时云端无时应触发远端重建"
         assert len(dynamic_table_names) > 0
 
-    def test_both_sides_have_same_slugs_no_action(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_both_sides_have_same_slugs_no_action(self, sync_client, initialized_db, clean_tables):
         """两端 slug 完全一致 → 不触发建表，直接返回并集"""
         # 清理可能遗留的自定义记录类型
         with initialized_db.get_connection() as conn:
@@ -902,11 +925,16 @@ class TestSyncDynamicTablesDefinitions:
         call_order = []
 
         def mock_get(*args, **kwargs):
-            return _make_mock_response({"types": [
-                {"slug": "reading_log", "fields": [
-                    {"field_key": "book_name", "field_type": "text"}
-                ]},
-            ]})
+            return _make_mock_response(
+                {
+                    "types": [
+                        {
+                            "slug": "reading_log",
+                            "fields": [{"field_key": "book_name", "field_type": "text"}],
+                        },
+                    ]
+                }
+            )
 
         def mock_post(*args, **kwargs):
             url = kwargs.get("url", "")
@@ -934,19 +962,14 @@ class TestSyncDynamicTablesDefinitions:
                 "http://test:8000", "test-key"
             )
 
-        assert "rebuild-called" not in call_order, (
-            "两端 slug 一致时不应触发 rebuild"
-        )
+        assert "rebuild-called" not in call_order, "两端 slug 一致时不应触发 rebuild"
 
         # 验证返回的并集去重
-        assert len(dynamic_table_names) == len(set(dynamic_table_names)), (
-            "返回列表不应有重复表名"
-        )
+        assert len(dynamic_table_names) == len(set(dynamic_table_names)), "返回列表不应有重复表名"
 
-    def test_cloud_get_fails_raises_exception(
-        self, sync_client
-    ):
+    def test_cloud_get_fails_raises_exception(self, sync_client):
         """云端定义接口失败 → 抛异常，不丢失 call_stack"""
+
         def mock_get_fail(*args, **kwargs):
             mock_resp = MagicMock()
             mock_resp.status_code = 500
@@ -960,9 +983,10 @@ class TestSyncDynamicTablesDefinitions:
             ),
         ):
             with pytest.raises(Exception):
-                sync_client._sync_dynamic_tables_definitions(
-                    "http://test:8000", "test-key"
-                )
+                sync_client._sync_dynamic_tables_definitions("http://test:8000", "test-key")
+
+
+# ==================== Seam 4: 原子性保证 ====================
 
 
 class TestSyncOnceAtomicity:
@@ -972,6 +996,7 @@ class TestSyncOnceAtomicity:
         self, sync_client, initialized_db, clean_tables
     ):
         """原子性：Pull 失败时不更新 last_sync_time"""
+
         def mock_post_side_effect(*args, **kwargs):
             url = kwargs.get("url", "")
             if "/pull" in url:
@@ -1008,7 +1033,13 @@ class TestSyncOnceAtomicity:
             cursor.execute(
                 "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?)",
-                ("todo-push-fail-sync", "Push失败测试", "pool", "2026-07-01 10:00:00", "2026-07-01 12:00:00"),
+                (
+                    "todo-push-fail-sync",
+                    "Push失败测试",
+                    "pool",
+                    "2026-07-01 10:00:00",
+                    "2026-07-01 12:00:00",
+                ),
             )
             conn.commit()
 
@@ -1055,7 +1086,9 @@ class TestSyncOnceAtomicity:
                 # 在 push 时验证本地已有 pull 写入的数据
                 with initialized_db.get_connection() as conn:
                     cursor = conn.cursor()
-                    cursor.execute("SELECT COUNT(*) FROM todo_list WHERE id = ?", ("todo-atomic-001",))
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM todo_list WHERE id = ?", ("todo-atomic-001",)
+                    )
                     count = cursor.fetchone()[0]
                     assert count == 1, "Pull 数据应在 Push 之前已持久化"
                 return _make_mock_response({"success": True})
@@ -1079,9 +1112,7 @@ class TestSyncOnceAtomicity:
 class TestPullMultiPrimaryKeyTables:
     """Seam 5: 多类主键表同步 - Category A/B/C"""
 
-    def test_pull_syncs_diary_table_category_a(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_pull_syncs_diary_table_category_a(self, sync_client, initialized_db, clean_tables):
         """多类主键：diary 表同步（Category A，TEXT 主键 date）"""
         remote_row = {
             "date": "2026-07-01",
@@ -1204,9 +1235,7 @@ class TestPullMultiPrimaryKeyTables:
             "created_at": "2026-07-08 10:00:00",
             "updated_at": "2026-07-08 12:00:00",
         }
-        mock_response = _make_mock_response(
-            {"changes": {"user_app_behavior_log": [remote_row]}}
-        )
+        mock_response = _make_mock_response({"changes": {"user_app_behavior_log": [remote_row]}})
 
         with patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response):
             sync_client.pull_from_remote(
@@ -1247,9 +1276,7 @@ class TestPullMultiPrimaryKeyTables:
             "created_at": "2026-07-08 14:00:00",
             "updated_at": "2026-07-08 14:00:00",
         }
-        mock_response = _make_mock_response(
-            {"changes": {"timeline_custom_block": [remote_row]}}
-        )
+        mock_response = _make_mock_response({"changes": {"timeline_custom_block": [remote_row]}})
 
         with patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response):
             sync_client.pull_from_remote(
@@ -1262,8 +1289,7 @@ class TestPullMultiPrimaryKeyTables:
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT content, duration, color FROM timeline_custom_block "
-                "WHERE start_time = ?",
+                "SELECT content, duration, color FROM timeline_custom_block WHERE start_time = ?",
                 ("2026-07-08T14:00:00",),
             )
             row = cursor.fetchone()
