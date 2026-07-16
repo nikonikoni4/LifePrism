@@ -148,15 +148,15 @@ module: sync
 
 <key_function>
 - lifeprism/sync/sync_client.py
-  - sync_client.SyncClient.sync_once:199
-  - sync_client.SyncClient.pull_from_remote:234
-  - sync_client.SyncClient.push_to_remote:358
-  - sync_client.SyncClient.pull_files_from_remote:411
-  - sync_client.SyncClient.push_files_to_remote:462
-  - sync_client.SyncClient.start_scheduled_sync:132
-  - sync_client.SyncClient.try_start_sync:112
-  - sync_client.SyncClient.finish_sync:127
-  - sync_client.SyncClient.get_all_sync_tables:178
+  - sync_client.SyncClient.sync_once
+  - sync_client.SyncClient.pull_from_remote
+  - sync_client.SyncClient.push_to_remote
+  - sync_client.SyncClient._sync_files_full_flow
+  - sync_client.SyncClient._sync_dynamic_tables_definitions
+  - sync_client.SyncClient._create_local_data_tables (→ SyncRepository.create_local_data_tables)
+  - sync_client.SyncClient.start_scheduled_sync
+  - sync_client.SyncClient.try_start_sync
+  - sync_client.SyncClient.finish_sync
 </key_function>
 
 **对外接口**：
@@ -187,8 +187,13 @@ module: sync
 | `/api/sync/pull` | POST | `{last_sync_time, tables, offset, limit}` | `{changes: {table: [rows]}, sync_time}` |
 | `/api/sync/push` | POST | `{changes: {table: [rows]}}` | `{status: "ok", sync_time}` |
 | `/api/sync/heartbeat` | POST | `{event: "online"\|"offline"\|"ping"}` | `{status: "ok", server_time}` |
-| `/api/sync/pull-files` | POST | `{last_sync_time, directories}` | `{files: [{path, content, mtime}], sync_time}` |
-| `/api/sync/push-files` | POST | `{files: [{path, content, mtime}]}` | `{status: "ok", written, skipped, sync_time}` |
+| `/api/sync/dynamic-tables-definitions` | GET | (none) | `{types: [{slug, fields}]}` |
+| `/api/sync/rebuild-dynamic-tables` | POST | `{types: [{slug, fields}]}` | `{rebuilt: [{slug, action}], sync_time}` |
+| `/api/sync/pull-files/check` | POST | `{last_sync_time, directories}` | `{files: [...], all_paths: [...]}` |
+| `/api/sync/pull-files/fetch` | POST | `{paths: [...]}` | `{files: [{path, content, current_hash}]}` |
+| `/api/sync/push-files` | POST | `{files: [{path, content, parent_hash, current_hash}]}` | `{status: "ok", written, skipped}` |
+| `/api/sync/pull-files/verify` | POST | `{paths: [...]}` | `{hashes: {path: current_hash}}` |
+| `/api/sync/pull-files/commit` | POST | `{paths: [...]}` | `{status: "ok", committed: [...]}` |
 
 **认证**：所有端点需要 `Authorization: Bearer {api_key}` HTTP Header，使用 `secrets.compare_digest()` 常量时间比较。
 

@@ -285,6 +285,30 @@ def sync_push(request: SyncPushRequest, _: None = Depends(verify_sync_api_key)):
     }
 
 
+@router.get("/dynamic-tables-definitions", summary="查询云端动态表定义（types + fields）")
+def sync_get_dynamic_tables_definitions(
+    _: None = Depends(verify_sync_api_key),
+):
+    """查询云端动态表定义（两张 meta 表的完整内容）
+
+    本地在 pull 之前调用此端点拉取云端动态表定义，用于本地 slug 集合对比，
+    触发双向建表（本地新增云端缺失的表 + 云端新增本地缺失的表）。
+
+    参考 ADR: docs/adr/2026-07-16-dynamic-tables-sync-definition-comparison.md
+
+    **认证**:
+    - Authorization: Bearer {api_key} HTTP Header
+
+    **响应**:
+    - types: [{slug, fields: [{field_key, field_type}]}] 云端动态表类型定义列表
+    """
+    types = sync_repository.get_custom_record_types_full_definitions()
+    logger.info("查询云端动态表定义: types=%d", len(types))
+    return {
+        "types": types,
+    }
+
+
 @router.post("/rebuild-dynamic-tables", summary="根据本地定义重建云端动态表")
 def sync_rebuild_dynamic_tables(
     request: RebuildDynamicTablesRequest,

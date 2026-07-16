@@ -29,10 +29,10 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
 
     # 重置 update_at 缓存（确保测试使用最新配置）
     from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
@@ -707,12 +707,16 @@ class TestSyncOnce:
     def test_sync_once_uses_default_tables_when_none(
         self, sync_client, initialized_db, clean_tables
     ):
-        """完整同步：tables=None 时使用默认 SYNC_TABLES"""
+        """完整同步：tables=None 时使用默认 SYNC_TABLES（动态表对比返回空）"""
         with (
             patch(
                 "lifeprism.sync.sync_client.httpx.post",
                 side_effect=_mock_post_factory(),
             ) as mock_post,
+            patch(
+                "lifeprism.sync.sync_client.httpx.get",
+                side_effect=lambda *args, **kwargs: _make_mock_response({"types": []}),
+            ),
             patch(
                 "lifeprism.config.settings_manager.get_setting",
                 side_effect=_mock_get_setting_factory(),
@@ -737,7 +741,228 @@ class TestSyncOnce:
         assert "diary" in all_requested_tables
 
 
-# ==================== Seam 4: 原子性保证 ====================
+# ==================== Seam 5: 动态表定义对比 ====================
+
+
+class TestSyncDynamicTablesDefinitions:
+    """Seam 5: _sync_dynamic_tables_definitions - 双向建表"""
+
+    def test_cloud_has_local_missing_creates_local_tables(
+        self, sync_client, initialized_db, clean_tables
+    ):
+        """云端有本地没有的 slug → 本地建表（只执行 DDL，不写 meta）"""
+        # 清理可能遗留的自定义记录类型
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM custom_record_fields")
+            cursor.execute("DELETE FROM custom_record_types")
+            conn.commit()
+
+        cloud_types = [
+            {"slug": "cloud_only", "fields": [
+                {"field_key": "score", "field_type": "integer"}
+            ]},
+            {"slug": "reading_log", "fields": [
+                {"field_key": "book_name", "field_type": "text"}
+            ]},
+        ]
+
+        def mock_get(*args, **kwargs):
+            return _make_mock_response({"types": cloud_types})
+
+        with (
+            patch(
+                "lifeprism.sync.sync_client.httpx.get",
+                side_effect=mock_get,
+            ),
+            patch(
+                "lifeprism.config.settings_manager.get_setting",
+                side_effect=_mock_get_setting_factory(),
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
+            patch("lifeprism.config.settings_manager.set_setting"),
+            patch(
+                "lifeprism.sync.sync_client.httpx.post",
+                side_effect=_mock_post_factory(),
+            ),
+        ):
+            # 本地只有 reading_log（通过初始化后查询 custom_record_types 确认）
+            # 因为 initialized_db 初始化时可能没有自定义记录类型，
+            # cloud_only 不在本地定义中，应触发 _create_local_dynamic_tables
+            dynamic_table_names = sync_client._sync_dynamic_tables_definitions(
+                "http://test:8000", "test-key"
+            )
+
+        # 产出应包含两个动态表
+        assert "custom_cloud_only" in dynamic_table_names
+        assert "custom_reading_log" in dynamic_table_names
+
+        # 验证本地确实建了 cloud_only 表
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='custom_cloud_only'"
+            )
+            assert cursor.fetchone() is not None, "custom_cloud_only 表应已被创建"
+
+        # 验证没有写 meta 数据
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) FROM custom_record_types WHERE slug='cloud_only'"
+            )
+            assert cursor.fetchone()[0] == 0, (
+                "DDL 建表不应写入 custom_record_types"
+            )
+
+        # 清理测试创建的表
+        with initialized_db.get_connection() as conn:
+            conn.cursor().execute("DROP TABLE IF EXISTS custom_cloud_only")
+            conn.commit()
+
+    def test_local_has_cloud_missing_triggers_remote_rebuild(
+        self, sync_client, initialized_db, clean_tables
+    ):
+        """本地有云端没有的 slug → 调用 _rebuild_remote_dynamic_tables"""
+        # 清理可能遗留的自定义记录类型
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM custom_record_fields")
+            cursor.execute("DELETE FROM custom_record_types")
+            conn.commit()
+
+        call_order = []
+
+        # 本地插入一条自定义记录类型（模拟本地有动态表，云端没有）
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO custom_record_types (id, name, slug, description, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("crt-local-only", "本地独有", "local_only", "",
+                 "2026-07-01 10:00:00", "2026-07-01 10:00:00"),
+            )
+            cursor.execute(
+                "INSERT INTO custom_record_fields (id, type_id, field_name, field_key, field_type, sort_order, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                ("crf-local-1", "crt-local-only", "备注", "note", "text", 1,
+                 "2026-07-01 10:00:00", "2026-07-01 10:00:00"),
+            )
+            conn.commit()
+
+        def mock_get(*args, **kwargs):
+            call_order.append("get-definitions")
+            return _make_mock_response({"types": []})
+
+        def mock_post(*args, **kwargs):
+            url = kwargs.get("url", "")
+            if "rebuild-dynamic-tables" in url:
+                call_order.append("rebuild")
+            return _make_mock_response(
+                {"rebuilt": [{"slug": "local_only", "action": "created"}]}
+            )
+
+        with (
+            patch(
+                "lifeprism.sync.sync_client.httpx.get",
+                side_effect=mock_get,
+            ),
+            patch(
+                "lifeprism.sync.sync_client.httpx.post",
+                side_effect=mock_post,
+            ),
+            patch(
+                "lifeprism.config.settings_manager.get_setting",
+                side_effect=_mock_get_setting_factory(),
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
+            patch("lifeprism.config.settings_manager.set_setting"),
+        ):
+            dynamic_table_names = sync_client._sync_dynamic_tables_definitions(
+                "http://test:8000", "test-key"
+            )
+
+        assert "get-definitions" in call_order
+        assert "rebuild" in call_order, (
+            "本地有动态表时云端无时应触发远端重建"
+        )
+        assert len(dynamic_table_names) > 0
+
+    def test_both_sides_have_same_slugs_no_action(
+        self, sync_client, initialized_db, clean_tables
+    ):
+        """两端 slug 完全一致 → 不触发建表，直接返回并集"""
+        # 清理可能遗留的自定义记录类型
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM custom_record_fields")
+            cursor.execute("DELETE FROM custom_record_types")
+            conn.commit()
+
+        call_order = []
+
+        def mock_get(*args, **kwargs):
+            return _make_mock_response({"types": [
+                {"slug": "reading_log", "fields": [
+                    {"field_key": "book_name", "field_type": "text"}
+                ]},
+            ]})
+
+        def mock_post(*args, **kwargs):
+            url = kwargs.get("url", "")
+            if "rebuild-dynamic-tables" in url:
+                call_order.append("rebuild-called")
+            return _make_mock_response({})
+
+        with (
+            patch(
+                "lifeprism.sync.sync_client.httpx.get",
+                side_effect=mock_get,
+            ),
+            patch(
+                "lifeprism.sync.sync_client.httpx.post",
+                side_effect=mock_post,
+            ),
+            patch(
+                "lifeprism.config.settings_manager.get_setting",
+                side_effect=_mock_get_setting_factory(),
+            ),
+            patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test-key"),
+            patch("lifeprism.config.settings_manager.set_setting"),
+        ):
+            dynamic_table_names = sync_client._sync_dynamic_tables_definitions(
+                "http://test:8000", "test-key"
+            )
+
+        assert "rebuild-called" not in call_order, (
+            "两端 slug 一致时不应触发 rebuild"
+        )
+
+        # 验证返回的并集去重
+        assert len(dynamic_table_names) == len(set(dynamic_table_names)), (
+            "返回列表不应有重复表名"
+        )
+
+    def test_cloud_get_fails_raises_exception(
+        self, sync_client
+    ):
+        """云端定义接口失败 → 抛异常，不丢失 call_stack"""
+        def mock_get_fail(*args, **kwargs):
+            mock_resp = MagicMock()
+            mock_resp.status_code = 500
+            mock_resp.raise_for_status.side_effect = Exception("HTTP 500")
+            return mock_resp
+
+        with (
+            patch(
+                "lifeprism.sync.sync_client.httpx.get",
+                side_effect=mock_get_fail,
+            ),
+        ):
+            with pytest.raises(Exception):
+                sync_client._sync_dynamic_tables_definitions(
+                    "http://test:8000", "test-key"
+                )
 
 
 class TestSyncOnceAtomicity:

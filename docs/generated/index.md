@@ -43,6 +43,13 @@
 - 触发规则：审查优雅关闭功能（打包环境退出、系统关机、睡眠唤醒）代码时查看
 - 内容摘要：优雅关闭功能的 8 维度代码审查报告。审查 4 个文件（+493 -27 行），发现 9 个问题（置信度 ≥ 80）：1 个 P0 致命缺陷（`net.isOnline()` 不存在导致唤醒同步功能失效）、2 个 P1 架构问题（uvicorn 超时打断 sync_once、无认证端点）、6 个 P2 代码质量/竞态问题。设计核心：参考思源笔记的三场景区分（用户退出含同步、Windows 关机跳过同步、唤醒后触发同步）。
 
+## 2026-07-16-code-review-dynamic-tables-sync
+
+- updated_at: 2026-07-16
+- path: `docs/generated/013/2026-07-16-code-review-dynamic-tables-sync.md`
+- 触发规则：审查动态表同步定义对比方案实现（新增 GET /dynamic-tables-definitions 端点、_sync_dynamic_tables_definitions、_create_local_dynamic_tables、删除 get_all_sync_tables）时查看
+- 内容摘要：动态表同步定义对比方案的 8 维度代码审查报告。审查 4 个文件（+196 -193 行），ADR 决策在代码中均正确落地。无 High 级问题达到 80 分阈值，但记录 3 个 75 分观察项（_rebuild_remote_dynamic_tables docstring 与实际调用时机不符、_create_local_dynamic_tables 违反导入纪律、_create_local_dynamic_tables 完全无测试）和 6 个 70 分低优先级改进项（核心方法缺少单元测试、双向建表分支无测试覆盖、spec 未同步更新、ADR 返回结构描述不符、sync_client 直接执行 SQL）。
+
 ## utc-migration-audit-report
 - updated_at: 2026-07-12
 - path: `docs/generated/utc-migration-audit-report.md`

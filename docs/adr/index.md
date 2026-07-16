@@ -6,6 +6,12 @@ last_updated: 新增文件同步冲突处理方案 ADR
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
 
+## dynamic-tables-sync-definition-comparison
+- updated_at: 2026-07-16
+- path: `docs/adr/2026-07-16-dynamic-tables-sync-definition-comparison.md`
+- 触发规则：当需要理解动态表同步的触发机制、为什么新增端点拉取云端定义、为什么删除 get_all_sync_tables、或修改动态表建表流程时读取
+- 内容摘要：采用"拉取云端定义 → 本地 slug 对比 → 双向建表"方案，替代原 pull 前后快照对比。新增 `GET /api/sync/dynamic-tables-definitions` 端点查询云端 types + fields 两张 meta 表，本地用 slug 集合对比触发双向建表（本地建表只执行 DDL 不写 meta，让 pull 统一同步数据）。删除 `get_all_sync_tables`，动态表列表由建表步骤产出。决策前提：动态表字段不会被修改（前提 1）、主备模式（前提 2）、sync_once 期间无并发修改（前提 3，假设，需独立决策并发锁）。
+
 ## file-sync-conflict-resolution
 - updated_at: 2026-07-16
 - path: `docs/adr/2026-07-14-file-sync-conflict-resolution.md`

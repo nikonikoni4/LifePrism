@@ -905,6 +905,62 @@ class SyncRepository:
                 cause=e,
             ) from e
 
+    def create_local_data_tables(self, slug_to_fields: dict[str, list[dict[str, Any]]]) -> None:
+        """本地建表（只执行 DDL，不写 meta 数据）
+
+        接收 slug → fields 映射，复用 CustomRecordRepository.generate_create_table_ddl
+        生成 DDL 并执行 CREATE TABLE。不写入 custom_record_types / custom_record_fields，
+        meta 数据由后续 pull 统一同步（LWW 逻辑只在一处）。
+
+        所有操作在同一事务中执行，失败则回滚。
+
+        Args:
+            slug_to_fields: slug → fields 映射，fields 每项含 field_key / field_type
+
+        Raises:
+            DataAccessError: 数据库操作失败
+        """
+        from lifeprism.repository.aggregators.custom_record_aggregator import (
+            CustomRecordRepository,
+        )
+
+        if not slug_to_fields:
+            return
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                for slug, fields in slug_to_fields.items():
+                    data_table = f"custom_{slug}"
+                    cursor.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                        (data_table,),
+                    )
+                    if cursor.fetchone() is not None:
+                        logger.info(
+                            "本地建表 custom_%s: 表已存在，跳过",
+                            slug,
+                        )
+                        continue
+                    ddl = CustomRecordRepository.generate_create_table_ddl(slug, fields)
+                    cursor.execute(ddl)
+                    logger.info(
+                        "本地建表 custom_%s, fields=%d",
+                        slug,
+                        len(fields),
+                    )
+        except sqlite3.Error as e:
+            logger.error(
+                "本地建表失败: slugs=%s, error=%s",
+                list(slug_to_fields.keys()),
+                e,
+            )
+            raise DataAccessError(
+                message="本地建表失败",
+                details={"slugs": list(slug_to_fields.keys()), "error": str(e)},
+                cause=e,
+            ) from e
+
     def rebuild_dynamic_tables(self, types: list[dict[str, Any]]) -> list[dict[str, str]]:
         """根据传入的自定义记录类型定义，重建/同步云端动态表
 

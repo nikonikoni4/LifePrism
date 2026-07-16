@@ -1,3 +1,10 @@
+## 2026-07-16-dynamic-tables-rebuild-always-triggered
+
+- updated_at: 2026-07-16
+- path: `docs/history-bugs/2026-07-16-dynamic-tables-rebuild-always-triggered.md`
+- 触发规则：在排查"每次同步都出现 重建动态表请求开始 / skipped"日志、修改 `sync_client.py` 中 `sync_once` 的动态表重建触发逻辑、修改 `get_custom_record_types_snapshot` / `_rebuild_remote_dynamic_tables` 调用链、讨论"快照对比方向错误"或"兜底条件永真"类设计缺陷时阅读
+- 内容摘要：**逻辑设计缺陷（P2，待修复）** — `sync_once` 中判断是否触发云端动态表重建的条件由两部分 OR 组成：条件 A 比较 pull 前后本地 meta 表快照变化（检测云端→本地方向），但 rebuild 方向是本地→云端，方向反了；条件 B 兜底"本地有动态表就触发"是永真条件，掩盖了条件 A 的方向错误。导致每次 sync_once 都触发无意义的云端重建请求（云端走 skipped 分支无副作用，但产生 HTTP 往返和日志噪音）。修复方案见 ADR `2026-07-16-dynamic-tables-sync-definition-comparison.md`：新增端点拉取云端定义做本地 slug 对比，删除 `get_all_sync_tables`，动态表列表由建表步骤产出。
+
 ## 2026-07-16-cloud-code-requires-reinstall-after-pull
 
 - updated_at: 2026-07-16

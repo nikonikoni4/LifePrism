@@ -16,6 +16,7 @@ import tempfile
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -228,35 +229,16 @@ class SyncClient:
 
         return get_setting("sync.remote_url") or ""
 
-    def get_all_sync_tables(self) -> list[str]:
-        """获取所有需要同步的表（包括动态表）
-
-        以静态 SYNC_TABLES 白名单为基础，运行时查询 custom_record_types
-        获取 slug 列表，追加 custom_{slug} 动态表。
-
-        Returns:
-            所有需要同步的表名列表（静态表 + 动态表）
-        """
-        tables = SYNC_TABLES.copy()
-        slugs = self.sync_repository.get_custom_record_slugs()
-        for slug in slugs:
-            tables.append(f"custom_{slug}")
-        logger.info(
-            "同步表列表: 静态表=%d张, 动态表=%d张, 总计=%d张",
-            len(SYNC_TABLES),
-            len(tables) - len(SYNC_TABLES),
-            len(tables),
-        )
-        return tables
-
     def sync_once(self, tables=None, directories=None):
-        """执行一次完整同步（数据库 Pull -> Push + 文件 Pull -> Push）
+        """执行一次完整同步（动态表对比 → 数据库 Pull -> Push → 文件 Pull -> Push）
 
         从配置读取 remote_url、api_key、last_sync_time，
-        依次执行数据库同步和文件同步，只有全部成功才更新 last_sync_time。
+        依次执行动态表定义对比（双向建表）、数据库同步、文件同步，
+        只有全部成功才更新 last_sync_time。
 
         Args:
-            tables: 同步表列表，None 则使用 get_all_sync_tables()（包含动态表）
+            tables: 同步表列表。None 时走默认流程（动态表对比 + 建表 → 拼接 SYNC_TABLES + 动态表列表）；
+                    非 None 时跳过动态表对比，直接用传入的表列表（用于测试场景）。
             directories: 文件同步目录列表，None 则使用默认 SYNC_DIRECTORIES
 
         Raises:
@@ -284,33 +266,21 @@ class SyncClient:
             )
 
         if tables is None:
-            tables = self.get_all_sync_tables()
+            # 默认场景：动态表对比 + 建表 → 拼接 SYNC_TABLES + 动态表列表
+            # 参考 ADR: docs/adr/2026-07-16-dynamic-tables-sync-definition-comparison.md
+            dynamic_table_names = self._sync_dynamic_tables_definitions(remote_url, api_key)
+            tables = list(set(SYNC_TABLES + dynamic_table_names))
+            logger.info(
+                "同步表列表: 静态表=%d张, 动态表=%d张, 总计=%d张",
+                len(SYNC_TABLES),
+                len(tables) - len(SYNC_TABLES),
+                len(tables),
+            )
         if directories is None:
             directories = SYNC_DIRECTORIES
 
-        # pull 前记录 custom_record_types 的 id 快照，用于 pull 后判断云端 meta 是否有变更
-        snapshot_before = self.sync_repository.get_custom_record_types_snapshot()
-
         # 数据库同步：Pull -> Push，任一步骤失败则不更新 last_sync_time
         self.pull_from_remote(remote_url, api_key, last_sync_time, tables)
-
-        # pull 后判断是否需要触发云端动态表重建
-        # 1. 快照对比：pull 前后 custom_record_types 的 (id, updated_at) 有变化 → 重建
-        # 2. 兜底：本地有动态表但快照不变（首次同步云端空库场景），也触发重建
-        #    rebuild-dynamic-tables 端点幂等（CREATE IF NOT EXISTS），安全无副作用
-        snapshot_after = self.sync_repository.get_custom_record_types_snapshot()
-        dynamic_tables = [
-            t
-            for t in tables
-            if t.startswith("custom_") and t not in ("custom_record_types", "custom_record_fields")
-        ]
-        if snapshot_before != snapshot_after or dynamic_tables:
-            logger.info(
-                "触发云端动态表重建: snapshot_changed=%s, dynamic_count=%d",
-                snapshot_before != snapshot_after,
-                len(dynamic_tables),
-            )
-            self._rebuild_remote_dynamic_tables(remote_url, api_key)
 
         self.push_to_remote(remote_url, api_key, tables)
 
@@ -322,14 +292,122 @@ class SyncClient:
         set_setting("sync.last_sync_time", current_time)
         logger.info("sync_once: 同步完成，last_sync_time 已更新为 %s", current_time)
 
+    def _sync_dynamic_tables_definitions(self, remote_url: str, api_key: str) -> list[str]:
+        """拉取云端动态表定义，本地 slug 对比，触发双向建表
+
+        在 pull 之前执行，确保两端 schema 一致后再同步数据。
+        参考 ADR: docs/adr/2026-07-16-dynamic-tables-sync-definition-comparison.md
+
+        流程：
+        1. GET /api/sync/dynamic-tables-definitions 拉取云端动态表定义
+        2. 本地查询 custom_record_types_full_definitions 拿到本地定义
+        3. slug 集合对比：
+           - 云端有本地没有 → 本地建表（只执行 DDL，不写 meta，让 pull 统一同步）
+           - 本地有云端没有 → 调用 _rebuild_remote_dynamic_tables 让云端建表
+        4. 返回动态表名列表（云端 slug ∪ 本地 slug → custom_<slug>）
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+
+        Returns:
+            动态数据表名列表（如 ["custom_reading_log", ...]），无动态表时返回空列表
+
+        Raises:
+            httpx.HTTPStatusError / httpx.RequestError: HTTP 请求失败
+        """
+        # 1. 拉取云端动态表定义
+        try:
+            response = httpx.get(
+                url=f"{remote_url}/api/sync/dynamic-tables-definitions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                },
+                timeout=60.0,
+            )
+            response.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(
+                "_sync_dynamic_tables_definitions: 拉取云端动态表定义失败, remote_url=%s, error=%s",
+                remote_url,
+                e,
+            )
+            raise
+
+        cloud_types = response.json().get("types", [])
+        cloud_slugs = {t["slug"] for t in cloud_types}
+        logger.info(
+            "_sync_dynamic_tables_definitions: 云端动态表 slug=%s",
+            cloud_slugs,
+        )
+
+        # 2. 查询本地动态表定义
+        local_types = self.sync_repository.get_custom_record_types_full_definitions()
+        local_slugs = {t["slug"] for t in local_types}
+        logger.info(
+            "_sync_dynamic_tables_definitions: 本地动态表 slug=%s",
+            local_slugs,
+        )
+
+        # 3. slug 集合对比，触发双向建表
+        # 3a. 云端有本地没有 → 本地建表（只执行 DDL，不写 meta）
+        slugs_to_create_locally = cloud_slugs - local_slugs
+        if slugs_to_create_locally:
+            self._create_local_dynamic_tables(slugs_to_create_locally, cloud_types)
+
+        # 3b. 本地有云端没有 → 调用云端 rebuild（全量发送，端点幂等）
+        slugs_to_create_remotely = local_slugs - cloud_slugs
+        if slugs_to_create_remotely:
+            logger.info(
+                "_sync_dynamic_tables_definitions: 触发云端建表, slugs=%s",
+                slugs_to_create_remotely,
+            )
+            self._rebuild_remote_dynamic_tables(remote_url, api_key)
+
+        # 4. 返回动态表名列表（云端 slug ∪ 本地 slug → custom_<slug>）
+        all_slugs = cloud_slugs | local_slugs
+        return [f"custom_{slug}" for slug in all_slugs]
+
+    def _create_local_dynamic_tables(
+        self,
+        slugs: set[str],
+        cloud_types: list[dict[str, Any]],
+    ) -> None:
+        """本地建表（只执行 DDL，不写 meta 数据）
+
+        将 slug→fields 映射委托给 SyncRepository.create_local_data_tables，
+        只创建 custom_<slug> 数据表，不写入 custom_record_types / custom_record_fields。
+        meta 数据由后续 pull 统一同步（LWW 逻辑只在一处）。
+
+        Args:
+            slugs: 需要本地新建的 slug 集合
+            cloud_types: 云端动态表定义列表（含 slug 和 fields）
+
+        Raises:
+            DataAccessError: 数据库操作失败
+        """
+        slug_to_fields = {
+            slug: next(
+                (t.get("fields", []) for t in cloud_types if t["slug"] == slug),
+                [],
+            )
+            for slug in slugs
+        }
+        self.sync_repository.create_local_data_tables(slug_to_fields)
+        logger.info(
+            "_create_local_dynamic_tables: 本地建表完成, slugs=%s",
+            slugs,
+        )
+
     def _rebuild_remote_dynamic_tables(self, remote_url: str, api_key: str) -> None:
         """发送本地自定义记录类型定义给云端，触发云端重建动态表
 
-        pull 后检测到 custom_record_types meta 表有变更时调用。
-        查询本地最新的 type + fields 完整定义，POST 到云端 /api/sync/rebuild-dynamic-tables，
+        在 pull 之前，由 _sync_dynamic_tables_definitions 检测到本地有云端没有的 slug 时调用。
+        将本地最新的 type + fields 完整定义 POST 到云端 /api/sync/rebuild-dynamic-tables，
         云端根据定义 CREATE TABLE / ALTER TABLE ADD COLUMN / DROP TABLE。
+        因为端点幂等（已有表走 skipped），所以全量发送。
 
-        失败则抛异常，不继续后续 push（避免动态表数据写入失败）。
+        失败则抛异常，不继续后续 pull/push（避免动态表数据写入失败）。
 
         Args:
             remote_url: 远程服务器 URL
