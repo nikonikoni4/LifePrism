@@ -131,7 +131,8 @@ class BatchDurationRequest(BaseModel):
     """批量查询累计时长请求"""
 
     todo_ids: list[str] = Field(..., description="待办事项 ID 列表")
-    date: str = Field(..., description="查询日期（YYYY-MM-DD）")
+    start_time: str = Field(..., description="开始时间（ISO 8601 UTC）")
+    end_time: str = Field(..., description="结束时间（ISO 8601 UTC）")
 
 
 class BatchDurationResponse(BaseModel):

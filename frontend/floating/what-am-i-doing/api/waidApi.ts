@@ -13,6 +13,7 @@ import { createApiV2UrlGetter } from '../../../core/services/apiConfig';
 import { TodoItem } from '../../../apps/goals/types/todo';
 import { BackendTodoItem } from '../../../apps/goals/types/backend';
 import { mapBackendTodoToFrontend } from '../../../apps/goals/apis/todoApi';
+import { toISOStringUTC } from '../../../core/utils/dateUtils';
 
 const getApiBase = createApiV2UrlGetter();
 
@@ -72,10 +73,14 @@ export const WaidAPI = {
     /** 批量获取今日累计时长（返回 todoId → 分钟数） */
     batchGetDuration: async (todoIds: string[], date: string): Promise<Record<string, number>> => {
         if (todoIds.length === 0) return {};
+        const startOfDay = new Date(`${date}T00:00:00`);
+        const endOfDay = new Date(`${date}T23:59:59.999`);
+        const start_time = toISOStringUTC(startOfDay);
+        const end_time = toISOStringUTC(endOfDay);
         const response = await fetch(`${getApiBase()}/timeline/custom-blocks/batch-duration`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ todo_ids: todoIds, date }),
+            body: JSON.stringify({ todo_ids: todoIds, start_time, end_time }),
         });
         if (!response.ok) {
             throw new Error(`Failed to get batch duration: ${response.statusText}`);
