@@ -6,15 +6,18 @@
 2. 验证压缩后 session 能正确保存
 3. 验证 get_history_message() 能从正确位置加载消息
 """
-import pytest
+
 import asyncio
 from pathlib import Path
-from unittest.mock import patch, AsyncMock
-from lifeprism.llm.agent.loop import AgentLoop
-from lifeprism.llm.session import Session, session_manager
-from lifeprism.llm.bus import MessageQueue
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from lifeprism.config import settings
+from lifeprism.llm.agent.loop import AgentLoop
+from lifeprism.llm.bus import MessageQueue
 from lifeprism.llm.providers import LLMResponse
+from lifeprism.llm.session import Session, session_manager
 
 
 @pytest.mark.core
@@ -46,9 +49,10 @@ class TestAutoCompact:
 
         # Mock estimate_prompt_tokens 使其返回超过限制的值
         # Mock LLM 调用返回压缩内容
-        with patch('lifeprism.llm.agent.loop.estimate_prompt_tokens', return_value=60000), \
-             patch('lifeprism.llm.agent.loop.create_llm_client') as mock_llm:
-
+        with (
+            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
+        ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩后的内容"))
             mock_llm.return_value = mock_client
@@ -67,9 +71,10 @@ class TestAutoCompact:
         original_message_count = len(test_session.messages)
 
         # Mock 使压缩触发
-        with patch('lifeprism.llm.agent.loop.estimate_prompt_tokens', return_value=60000), \
-             patch('lifeprism.llm.agent.loop.create_llm_client') as mock_llm:
-
+        with (
+            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
+        ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩后的内容"))
             mock_llm.return_value = mock_client
@@ -81,8 +86,8 @@ class TestAutoCompact:
         # 验证：应该添加了一条新的 user 消息（压缩内容）
         assert len(result_session.messages) == original_message_count + 1
         # 最后一条消息应该是 user 角色
-        assert result_session.messages[-1]['role'] == 'user'
-        assert result_session.messages[-1]['content'] == "压缩后的内容"
+        assert result_session.messages[-1]["role"] == "user"
+        assert result_session.messages[-1]["content"] == "压缩后的内容"
 
     @pytest.mark.asyncio
     async def test_auto_compact_saves_session(self, agent_loop, test_session):
@@ -91,9 +96,10 @@ class TestAutoCompact:
         original_last_compacted_loc = test_session.last_compacted_loc
 
         # Mock 使压缩触发
-        with patch('lifeprism.llm.agent.loop.estimate_prompt_tokens', return_value=60000), \
-             patch('lifeprism.llm.agent.loop.create_llm_client') as mock_llm:
-
+        with (
+            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
+        ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩后的内容"))
             mock_llm.return_value = mock_client
@@ -113,9 +119,10 @@ class TestAutoCompact:
     async def test_get_history_message_after_compact(self, agent_loop, test_session):
         """测试压缩后 get_history_message() 能从正确位置加载"""
         # Mock 使压缩触发
-        with patch('lifeprism.llm.agent.loop.estimate_prompt_tokens', return_value=60000), \
-             patch('lifeprism.llm.agent.loop.create_llm_client') as mock_llm:
-
+        with (
+            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
+        ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩后的内容"))
             mock_llm.return_value = mock_client
@@ -136,8 +143,8 @@ class TestAutoCompact:
 
         assert len(history_messages) == expected_message_count
         # 第一条消息应该是压缩后的 user 消息
-        assert history_messages[0]['role'] == 'user'
-        assert history_messages[0]['content'] == "压缩后的内容"
+        assert history_messages[0]["role"] == "user"
+        assert history_messages[0]["content"] == "压缩后的内容"
 
     @pytest.mark.asyncio
     async def test_auto_compact_no_compression_when_under_limit(self, agent_loop):
@@ -158,4 +165,3 @@ class TestAutoCompact:
         assert result_session is not None
         assert len(result_session.messages) == original_message_count
         assert result_session.last_compacted_loc == original_last_compacted_loc
-

@@ -10,6 +10,7 @@ Sync API 分页拉取集成测试
 
 参考: test/core/integration/api/test_sync_api.py
 """
+
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -37,10 +38,10 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
 
     # 重置 update_at 缓存
     from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
@@ -188,7 +189,9 @@ class TestSyncPullPagination:
         expected_ids = {f"mood-api-page-{i:03d}" for i in range(10)}
         assert all_ids == expected_ids
 
-    def test_sync_pull_without_pagination_returns_all(self, client, initialized_db, clean_sync_tables):
+    def test_sync_pull_without_pagination_returns_all(
+        self, client, initialized_db, clean_sync_tables
+    ):
         """API 不传分页参数：向后兼容，返回全部记录"""
         # Arrange: 插入 5 条记录
         _insert_mood_rows(initialized_db, 5)

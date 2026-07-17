@@ -249,9 +249,10 @@ class TestAgentOnlyApi:
         # Act
         from lifeprism.server.main_agent_only import _run_agent_and_api
 
-        with patch.object(loop, "add_signal_handler", side_effect=NotImplementedError), \
-             patch("lifeprism.server.main_agent_only.signal.signal", side_effect=_fake_signal):
-
+        with (
+            patch.object(loop, "add_signal_handler", side_effect=NotImplementedError),
+            patch("lifeprism.server.main_agent_only.signal.signal", side_effect=_fake_signal),
+        ):
             run_task = asyncio.create_task(_run_agent_and_api())
 
             # 等待信号处理器注册完成

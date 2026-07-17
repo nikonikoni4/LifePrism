@@ -94,14 +94,11 @@ class TestMidnightDateFieldUsesLocalDate:
 
         # 本地日期应为 2026-07-12（今天）
         assert local_today == date(2026, 7, 12), (
-            f"本地 00:01 时 get_local_today 应返回 2026-07-12（本地今天），"
-            f"实际为 {local_today}"
+            f"本地 00:01 时 get_local_today 应返回 2026-07-12（本地今天），实际为 {local_today}"
         )
         # 验证与 UTC 日期不同（证明使用本地时区的必要性）
         utc_date = simulated_utc.date()
-        assert utc_date == date(2026, 7, 11), (
-            f"UTC 日期应为 2026-07-11（昨天），实际为 {utc_date}"
-        )
+        assert utc_date == date(2026, 7, 11), f"UTC 日期应为 2026-07-11（昨天），实际为 {utc_date}"
         assert local_today != utc_date, (
             "本地 00:01 时，本地日期与 UTC 日期应不同（本地今天 vs UTC 昨天）"
         )
@@ -176,8 +173,7 @@ class TestMidnightDateFieldUsesLocalDate:
         assert correct_date == date(2026, 7, 12), "本地日期应为 2026-07-12"
         assert wrong_date == date(2026, 7, 11), "UTC 日期应为 2026-07-11"
         assert correct_date != wrong_date, (
-            "本地 00:01 时，本地日期和 UTC 日期应不同，"
-            "证明误用 UTC 日期会导致错位"
+            "本地 00:01 时，本地日期和 UTC 日期应不同，证明误用 UTC 日期会导致错位"
         )
 
 
@@ -296,9 +292,7 @@ class TestMidnightLwwComparison:
         a_utc = datetime(2026, 7, 11, 16, 1, 0, tzinfo=timezone.utc).isoformat()
         b_utc = datetime(2026, 7, 11, 16, 2, 0, tzinfo=timezone.utc).isoformat()
 
-        assert a_utc < b_utc, (
-            f"本地午夜后 1 分钟 ({a_utc}) 应小于本地午夜后 2 分钟 ({b_utc})"
-        )
+        assert a_utc < b_utc, f"本地午夜后 1 分钟 ({a_utc}) 应小于本地午夜后 2 分钟 ({b_utc})"
 
     def test_lww_same_instant_different_timezone_format(self):
         """LWW: 同一时刻的 UTC ISO 字符串比较相等

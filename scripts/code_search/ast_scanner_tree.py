@@ -1,13 +1,13 @@
 """Tree-sitter 多语言 AST 函数引用扫描器"""
+
 import json
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
-from tree_sitter import Language, Parser
-import tree_sitter_python as tspython
 import tree_sitter_javascript as tsjs
+import tree_sitter_python as tspython
 import tree_sitter_typescript as tsts
-
+from tree_sitter import Language, Parser
 
 # 语言配置
 LANGUAGES = {
@@ -22,7 +22,15 @@ LANGUAGES = {
 class TreeSitterScanner:
     def __init__(self, root_dir, exclude_dirs=None):
         self.root = Path(root_dir)
-        self.exclude_dirs = exclude_dirs or {".venv", "__pycache__", ".claude", "node_modules", ".git", "dist", "build"}
+        self.exclude_dirs = exclude_dirs or {
+            ".venv",
+            "__pycache__",
+            ".claude",
+            "node_modules",
+            ".git",
+            "dist",
+            "build",
+        }
         self.definitions = {}
         self.calls = []
         self.imports = defaultdict(dict)
@@ -69,7 +77,7 @@ class TreeSitterScanner:
 
     def _get_text(self, node):
         """从字节切片获取节点文本"""
-        return self._raw[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
+        return self._raw[node.start_byte : node.end_byte].decode("utf-8", errors="replace")
 
     # ==================== Python 扫描 ====================
 
@@ -124,7 +132,9 @@ class TreeSitterScanner:
                 names.append(self._get_text(child))
             elif child.type == "aliased_import":
                 # import X as Y: 两个 identifier 子节点
-                ids = [c for c in child.children if c.type == "dotted_name" or c.type == "identifier"]
+                ids = [
+                    c for c in child.children if c.type == "dotted_name" or c.type == "identifier"
+                ]
                 if len(ids) >= 2:
                     name = self._get_text(ids[0])
                     alias = self._get_text(ids[1])
@@ -160,7 +170,9 @@ class TreeSitterScanner:
                 callee = self._resolve_python_callee(func_node, source, module)
                 if callee:
                     caller = self._find_enclosing_func(node, source, module)
-                    self.calls.append((module, caller, callee[0], callee[1], node.start_point[0] + 1))
+                    self.calls.append(
+                        (module, caller, callee[0], callee[1], node.start_point[0] + 1)
+                    )
 
         for child in node.children:
             self._collect_python_calls(child, source, module)
@@ -192,7 +204,11 @@ class TreeSitterScanner:
 
     def _scan_js_ts(self, root, source, module, lang_name):
         for child in root.children:
-            if child.type in ("function_declaration", "lexical_declaration", "variable_declaration"):
+            if child.type in (
+                "function_declaration",
+                "lexical_declaration",
+                "variable_declaration",
+            ):
                 self._collect_js_func(child, source, module)
             elif child.type == "class_declaration":
                 self._collect_js_class(child, source, module)
@@ -231,7 +247,9 @@ class TreeSitterScanner:
                     method_name_node = child.child_by_field_name("name")
                     if method_name_node:
                         method_name = self._get_text(method_name_node)
-                        self.definitions[(module, f"{class_name}.{method_name}")] = child.start_point[0] + 1
+                        self.definitions[(module, f"{class_name}.{method_name}")] = (
+                            child.start_point[0] + 1
+                        )
 
     def _collect_js_import(self, node, source, module):
         source_node = node.child_by_field_name("source")
@@ -259,7 +277,11 @@ class TreeSitterScanner:
     def _collect_js_export(self, node, source, module):
         for child in node.children:
             if child.type in ("function_declaration", "lexical_declaration", "class_declaration"):
-                self._collect_js_func(child, source, module) if child.type != "class_declaration" else self._collect_js_class(child, source, module)
+                self._collect_js_func(
+                    child, source, module
+                ) if child.type != "class_declaration" else self._collect_js_class(
+                    child, source, module
+                )
 
     def _collect_js_calls(self, node, source, module):
         if node.type == "call_expression":
@@ -268,7 +290,9 @@ class TreeSitterScanner:
                 callee = self._resolve_js_callee(func_node, source, module)
                 if callee:
                     caller = self._find_enclosing_func_js(node, source, module)
-                    self.calls.append((module, caller, callee[0], callee[1], node.start_point[0] + 1))
+                    self.calls.append(
+                        (module, caller, callee[0], callee[1], node.start_point[0] + 1)
+                    )
 
         for child in node.children:
             self._collect_js_calls(child, source, module)
@@ -342,7 +366,7 @@ class TreeSitterScanner:
 def main():
     project_root = Path(__file__).parent.parent.parent
     scan_dirs = [
-        project_root / "agents_hub",
+        project_root / "lifeprism",
         project_root / "frontend" / "src",
     ]
 
@@ -370,10 +394,11 @@ def main():
                 caller_parts = caller_key.rsplit(".", 1)
                 callee_parts = callee_key.rsplit(".", 1)
                 if len(caller_parts) == 2 and len(callee_parts) == 2:
-                    all_calls_raw.append((caller_parts[0], caller_parts[1],
-                                         callee_parts[0], callee_parts[1], line))
+                    all_calls_raw.append(
+                        (caller_parts[0], caller_parts[1], callee_parts[0], callee_parts[1], line)
+                    )
 
-        label = "backend" if "agents_hub" in str(scan_dir) else "frontend"
+        label = "backend" if "lifeprism" in str(scan_dir) else "frontend"
         print(f"\n[{label}] 扫描完成:")
         print(f"  模块数: {result['total_files']}")
         print(f"  定义数: {result['total_definitions']}")

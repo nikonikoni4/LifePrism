@@ -19,7 +19,9 @@ def test_generate_diary_ai_summary_rejects_empty_content(monkeypatch):
     }
 
     monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: repositoryd)
-    monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "   \n")
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service._read_diary_content", lambda date: "   \n"
+    )
 
     client = TestClient(app)
     response = client.post("/api/v2/diary/2026-04-17/ai_summary")
@@ -52,9 +54,16 @@ def test_generate_diary_ai_summary_overwrites_summary_and_source_hash(monkeypatc
     updated_payloads = []
 
     monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: repositoryd)
-    monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "今天写了很多内容")
-    monkeypatch.setattr("lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary)
-    monkeypatch.setattr(diary_provider, "update_diary", lambda date, data: updated_payloads.append(data) or True)
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service._read_diary_content",
+        lambda date: "今天写了很多内容",
+    )
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary
+    )
+    monkeypatch.setattr(
+        diary_provider, "update_diary", lambda date, data: updated_payloads.append(data) or True
+    )
 
     client = TestClient(app)
     response = client.post("/api/v2/diary/2026-04-17/ai_summary")
@@ -93,16 +102,25 @@ def test_generate_diary_ai_summary_overwrites_existing_summary(monkeypatch):
     updated_payloads = []
 
     monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: repositoryd)
-    monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "今天写了很多内容")
-    monkeypatch.setattr("lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary)
-    monkeypatch.setattr(diary_provider, "update_diary", lambda date, data: updated_payloads.append(data) or True)
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service._read_diary_content",
+        lambda date: "今天写了很多内容",
+    )
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary
+    )
+    monkeypatch.setattr(
+        diary_provider, "update_diary", lambda date, data: updated_payloads.append(data) or True
+    )
 
     client = TestClient(app)
     response = client.post("/api/v2/diary/2026-04-17/ai_summary")
     assert response.status_code == 200
     assert response.json() == {"content": "新总结"}
     # Now includes diary_source_hash
-    assert updated_payloads == [{"ai_summary": "新总结", "diary_source_hash": "a9eb9092b072be8acc9bc797323486fc"}]
+    assert updated_payloads == [
+        {"ai_summary": "新总结", "diary_source_hash": "a9eb9092b072be8acc9bc797323486fc"}
+    ]
 
 
 @pytest.mark.core
@@ -129,8 +147,13 @@ def test_generate_diary_ai_summary_does_not_overwrite_on_llm_failure(monkeypatch
         return True
 
     monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: repositoryd)
-    monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "今天写了很多内容")
-    monkeypatch.setattr("lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary)
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service._read_diary_content",
+        lambda date: "今天写了很多内容",
+    )
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary
+    )
     monkeypatch.setattr(diary_provider, "update_diary", fake_update_diary)
 
     client = TestClient(app, raise_server_exceptions=False)
@@ -161,8 +184,13 @@ def test_generate_diary_ai_summary_passes_existing_summary_to_llm(monkeypatch):
         return {"content": "新总结"}
 
     monkeypatch.setattr(diary_provider, "get_diary_by_date", lambda date: repositoryd)
-    monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "今天写了很多内容")
-    monkeypatch.setattr("lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary)
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service._read_diary_content",
+        lambda date: "今天写了很多内容",
+    )
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service.ai_diary_summary", fake_ai_diary_summary
+    )
     monkeypatch.setattr(diary_provider, "update_diary", lambda date, data: True)
 
     client = TestClient(app)

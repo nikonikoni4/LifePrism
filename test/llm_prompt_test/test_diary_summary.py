@@ -1,14 +1,18 @@
 import sys
 from pathlib import Path
 from typing import Any
+
 sys.path.insert(0, str(Path(__file__).parent))
 
-from lifeprism.llm.prompts import prompt_loader, PromptRef, Prompts
-from lifeprism.llm.providers import create_llm_client, LLMResponse
-from lifeprism.llm.utils.md_os import read_md
-from llm_test_base import LLMTestBase, TestLog
 import asyncio
+
 import openpyxl
+from llm_test_base import LLMTestBase, TestLog
+
+from lifeprism.llm.prompts import PromptRef, Prompts, prompt_loader
+from lifeprism.llm.providers import LLMResponse, create_llm_client
+from lifeprism.llm.utils.md_os import read_md
+
 # prompts 目录路径
 PROMPTS_DIR = Path(__file__).parent.parent.parent / "templates" / "prompts"
 
@@ -22,7 +26,7 @@ class DiarySummarySummary(LLMTestBase):
         input_path: Path = Path("D:/desktop/软件开发/LifeWatch-AI/test/llm_prompt_test/dataset"),
         output_path: Path = Path("D:/desktop/软件开发/LifeWatch-AI/test/llm_prompt_test/results"),
         temperature: float = 0.7,
-        prompt_params: dict[str, str] | None = None
+        prompt_params: dict[str, str] | None = None,
     ):
         """
         Args:
@@ -37,7 +41,7 @@ class DiarySummarySummary(LLMTestBase):
             prompt_version=prompt_version,
             input_path=input_path,
             output_path=output_path,
-            temperature=temperature
+            temperature=temperature,
         )
         self.llm_client = create_llm_client()
         self.prompt_params = prompt_params or {}
@@ -63,11 +67,7 @@ class DiarySummarySummary(LLMTestBase):
             params["upper_limit"] = str(upper_limit)
 
         # 使用 PromptLoader 加载 prompt
-        task_prompt = prompt_loader.load_prompt(
-            self.prompt,
-            version=self.prompt_version,
-            **params
-        )
+        task_prompt = prompt_loader.load_prompt(self.prompt, version=self.prompt_version, **params)
 
         system_prompt = task_prompt
         user_prompt = f"""## 日记内容：需要总结的部分
@@ -78,7 +78,7 @@ class DiarySummarySummary(LLMTestBase):
 
         return [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user", "content": user_prompt},
         ]
 
     def data_input(self, input_files: list[str] | None = None) -> list[dict[str, Any]]:
@@ -98,19 +98,14 @@ class DiarySummarySummary(LLMTestBase):
             content = read_md(file_path)
             if content:
                 date = file_path.stem  # 文件名作为日期
-                data_list.append({
-                    "date": date,
-                    "content": content,
-                    "file_name": file_path.name
-                })
+                data_list.append({"date": date, "content": content, "file_name": file_path.name})
 
         return data_list
 
     async def _call_llm(self, messages: list[dict[str, str]]) -> str:
         """调用 LLM 获取响应"""
         response: LLMResponse = await self.llm_client.chat_with_retry(
-            messages=messages,
-            temperature=self.temperature
+            messages=messages, temperature=self.temperature
         )
         return response.content or ""
 
@@ -126,15 +121,17 @@ class DiarySummarySummary(LLMTestBase):
             "result": llm_output,
             "version": self.prompt_version,
             "temperature": self.temperature,
-            "input_data_date": data["date"]
+            "input_data_date": data["date"],
         }
         return {
             "llm_input": llm_input,
             "llm_output": llm_output,
-            "file_name": data["file_name"]
+            "file_name": data["file_name"],
         }, test_log
 
-    async def _run_test_async(self, input_files: list[str] | None = None, round: int = 1) -> tuple[list[dict], list[TestLog]]:
+    async def _run_test_async(
+        self, input_files: list[str] | None = None, round: int = 1
+    ) -> tuple[list[dict], list[TestLog]]:
         """异步执行测试，分组调用每组30个"""
         data_list = self.data_input(input_files)
         results = []
@@ -142,17 +139,17 @@ class DiarySummarySummary(LLMTestBase):
         batch_size = 30
 
         for i in range(0, len(data_list), batch_size):
-            batch = data_list[i:i + batch_size]
-            batch_results = await asyncio.gather(
-                *[self._process_single(data) for data in batch]
-            )
+            batch = data_list[i : i + batch_size]
+            batch_results = await asyncio.gather(*[self._process_single(data) for data in batch])
             for result, log in batch_results:
                 results.append(result)
                 test_logs.append(log)
 
         return results, test_logs
 
-    def run_test(self, input_files: list[str] | None = None, round: int = 1) -> tuple[list[dict], list[TestLog]]:
+    def run_test(
+        self, input_files: list[str] | None = None, round: int = 1
+    ) -> tuple[list[dict], list[TestLog]]:
         """
         执行测试
 
@@ -164,6 +161,7 @@ class DiarySummarySummary(LLMTestBase):
             测试结果列表和测试日志列表
         """
         import asyncio
+
         return asyncio.run(self._run_test_async(input_files, round))
 
     def generate_eval_sheet(self, test_results: list[dict], round: int, temperature: float) -> Path:
@@ -202,12 +200,12 @@ class DiarySummarySummary(LLMTestBase):
             # pass, score, reason, other 留空供人工填写
 
         # 调整列宽
-        ws.column_dimensions['A'].width = 30
-        ws.column_dimensions['B'].width = 60
-        ws.column_dimensions['C'].width = 10
-        ws.column_dimensions['D'].width = 10
-        ws.column_dimensions['E'].width = 30
-        ws.column_dimensions['F'].width = 20
+        ws.column_dimensions["A"].width = 30
+        ws.column_dimensions["B"].width = 60
+        ws.column_dimensions["C"].width = 10
+        ws.column_dimensions["D"].width = 10
+        ws.column_dimensions["E"].width = 30
+        ws.column_dimensions["F"].width = 20
 
         wb.save(file_path)
         return file_path
@@ -256,7 +254,7 @@ class DiarySummarySummary(LLMTestBase):
         """
         # 自动获取下一个轮次
         round = self.get_next_round()
-        
+
         print(f"Prompt: {self.prompt}")
         print(f"Prompt 版本: {self.prompt_version}")
         print(f"Input path: {self.input_path}")
@@ -274,9 +272,7 @@ class DiarySummarySummary(LLMTestBase):
         # 2. 生成 Excel 评估表
         print("生成 Excel 评估表...")
         eval_sheet_path = self.generate_eval_sheet(
-            test_results=test_results,
-            round=round,
-            temperature=self.temperature
+            test_results=test_results, round=round, temperature=self.temperature
         )
         print(f"评估表已生成: {eval_sheet_path}")
         print("-" * 50)
@@ -284,7 +280,9 @@ class DiarySummarySummary(LLMTestBase):
         # 3. 保存测试日志
         print("保存测试日志...")
         self.save_log(test_logs, round)
-        print(f"测试日志已保存: {self.output_path / self.prompt.name / self.prompt_version / f'r{round}-t{self.temperature}.json'}")
+        print(
+            f"测试日志已保存: {self.output_path / self.prompt.name / self.prompt_version / f'r{round}-t{self.temperature}.json'}"
+        )
         print("-" * 50)
 
         # 4. 获取输入文件列表
@@ -292,11 +290,7 @@ class DiarySummarySummary(LLMTestBase):
 
         # 5. 更新 metadata（pass_ratio 初始为 0，等待人工评估）
         print("更新 metadata...")
-        self.update_metadata(
-            round=round,
-            pass_ratio=0.0,
-            input_files=input_file_names
-        )
+        self.update_metadata(round=round, pass_ratio=0.0, input_files=input_file_names)
         print(f"Metadata 已更新: {self.output_path / self.prompt.name / 'meta_data.json'}")
         print("-" * 50)
 
@@ -314,8 +308,6 @@ if __name__ == "__main__":
     # v2 版本测试（需要 user_md 参数）
     user_md = ""
     test = DiarySummarySummary(
-        prompt_version="v4",
-        temperature=0.7,
-        prompt_params={"user_md": user_md}
+        prompt_version="v4", temperature=0.7, prompt_params={"user_md": user_md}
     )
     test.main()

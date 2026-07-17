@@ -4,9 +4,11 @@
 测试 seam: 数据库 Schema（通过 init_database + sqlite_master）
 验证 Issue #01: 为同步添加 updated_at 字段和索引
 """
-import pytest
+
 import sqlite3
 from contextlib import contextmanager
+
+import pytest
 
 from lifeprism.config.database import TABLE_CONFIGS
 
@@ -24,10 +26,11 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
 
     # 重置 update_at 缓存（确保测试使用最新配置）
     from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.lw_table_manager import LWTableManager
+
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
     manager = LWTableManager(db_manager=lw_db_manager)
@@ -61,9 +64,7 @@ class TestGoalTableSchema:
     def test_goal_table_has_updated_at_column(self, initialized_db):
         """goal 表应包含 updated_at 列"""
         columns = _get_table_columns(initialized_db, "goal")
-        assert "updated_at" in columns, (
-            f"goal 表缺少 updated_at 列，当前列: {columns}"
-        )
+        assert "updated_at" in columns, f"goal 表缺少 updated_at 列，当前列: {columns}"
 
     def test_goal_table_has_updated_at_index(self, initialized_db):
         """goal 表应有 idx_goal_updated_at 索引"""
@@ -95,9 +96,7 @@ class TestSyncTablesSchema:
     def test_table_has_updated_at_column(self, initialized_db, table_name):
         """每个同步表应包含 updated_at 列"""
         columns = _get_table_columns(initialized_db, table_name)
-        assert "updated_at" in columns, (
-            f"{table_name} 表缺少 updated_at 列，当前列: {columns}"
-        )
+        assert "updated_at" in columns, f"{table_name} 表缺少 updated_at 列，当前列: {columns}"
 
     @pytest.mark.parametrize("table_name", SYNC_TABLES_NEEDING_UPDATE_AT)
     def test_table_has_updated_at_index(self, initialized_db, table_name):
@@ -168,6 +167,7 @@ def legacy_db(tmp_path):
 
     class SimpleDBManager:
         """简单的数据库管理器，仅实现 get_connection() 供迁移脚本使用"""
+
         def __init__(self, db_path):
             self._db_path = str(db_path)
 
@@ -263,6 +263,7 @@ class TestMigrationScript:
         """迁移后旧版表应有 updated_at 列"""
         # 执行迁移
         from lifeprism.repository.migrations.sync_migration import run_sync_migration
+
         run_sync_migration(legacy_db)
 
         # 迁移后确认有 updated_at 列
@@ -275,6 +276,7 @@ class TestMigrationScript:
     def test_migration_adds_updated_at_index(self, legacy_db, table_name):
         """迁移后旧版表应有 idx_{table}_updated_at 索引"""
         from lifeprism.repository.migrations.sync_migration import run_sync_migration
+
         run_sync_migration(legacy_db)
 
         indexes = _get_table_indexes(legacy_db, table_name)
@@ -288,6 +290,7 @@ class TestMigrationScript:
         import sqlite3
 
         from lifeprism.repository.migrations.sync_migration import run_sync_migration
+
         run_sync_migration(legacy_db)
 
         with legacy_db.get_connection() as conn:
@@ -408,7 +411,9 @@ class TestProviderUpdateAtBehavior:
         # 查询 updated_at
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT updated_at FROM behavior_analysis WHERE start_time = ?", (start_time,))
+            cursor.execute(
+                "SELECT updated_at FROM behavior_analysis WHERE start_time = ?", (start_time,)
+            )
             updated_at_before = cursor.fetchone()[0]
 
         time.sleep(0.1)
@@ -419,7 +424,9 @@ class TestProviderUpdateAtBehavior:
         # 验证 updated_at 变化
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT updated_at FROM behavior_analysis WHERE start_time = ?", (start_time,))
+            cursor.execute(
+                "SELECT updated_at FROM behavior_analysis WHERE start_time = ?", (start_time,)
+            )
             updated_at_after = cursor.fetchone()[0]
 
         assert updated_at_after is not None, "updated_at 不应为 None"

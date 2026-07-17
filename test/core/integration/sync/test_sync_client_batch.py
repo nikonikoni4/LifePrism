@@ -29,10 +29,10 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
 
     # 重置 update_at 缓存（确保测试使用最新配置）
     from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
@@ -112,9 +112,7 @@ def _make_todo_row(row_id, content=None):
 class TestPullBatched:
     """Seam: pull_from_remote() - 分批拉取循环"""
 
-    def test_pull_batched_multiple_batches(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_pull_batched_multiple_batches(self, sync_client, initialized_db, clean_tables):
         """分批拉取：大数据集(>1000条)分多批拉取"""
         # Arrange: 生成 2500 条记录
         all_rows = [_make_todo_row(f"todo-batch-{i:04d}") for i in range(2500)]
@@ -134,9 +132,7 @@ class TestPullBatched:
         # Assert: 3 批请求（1000 + 1000 + 500）
         assert mock_post.call_count == 3
         # 验证 offset 递增
-        offsets = [
-            call.kwargs["json"]["offset"] for call in mock_post.call_args_list
-        ]
+        offsets = [call.kwargs["json"]["offset"] for call in mock_post.call_args_list]
         assert offsets == [0, 1000, 2000]
         # 验证每次请求只发送一张表
         for call in mock_post.call_args_list:
@@ -148,9 +144,7 @@ class TestPullBatched:
             cursor.execute("SELECT COUNT(*) FROM todo_list")
             assert cursor.fetchone()[0] == 2500
 
-    def test_pull_batched_last_batch_partial(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_pull_batched_last_batch_partial(self, sync_client, initialized_db, clean_tables):
         """分批拉取：最后一批 < 1000 条时正确退出"""
         # Arrange: 1500 条记录（1000 + 500）
         all_rows = [_make_todo_row(f"todo-partial-{i:04d}") for i in range(1500)]
@@ -169,9 +163,7 @@ class TestPullBatched:
 
         # Assert: 2 批请求（1000 + 500）
         assert mock_post.call_count == 2
-        offsets = [
-            call.kwargs["json"]["offset"] for call in mock_post.call_args_list
-        ]
+        offsets = [call.kwargs["json"]["offset"] for call in mock_post.call_args_list]
         assert offsets == [0, 1000]
         # 验证全部记录已写入
         with initialized_db.get_connection() as conn:
@@ -204,9 +196,7 @@ class TestPullBatched:
         assert call_kwargs["json"]["offset"] == 0
         assert call_kwargs["json"]["limit"] == 1000
 
-    def test_pull_batched_lww_preserved(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_pull_batched_lww_preserved(self, sync_client, initialized_db, clean_tables):
         """分批拉取：LWW 冲突解决仍然生效"""
         # Arrange: 本地已有一条记录（本地已修改，updated_at > last_sync_time）
         with initialized_db.get_connection() as conn:
@@ -255,9 +245,7 @@ class TestPullBatched:
             assert row[0] == "本地修改内容"
             assert row[1] == "scheduled"
 
-    def test_pull_batched_logs_progress(
-        self, sync_client, initialized_db, clean_tables, caplog
-    ):
+    def test_pull_batched_logs_progress(self, sync_client, initialized_db, clean_tables, caplog):
         """分批拉取：日志记录分批进度"""
         # Arrange: 1500 条记录（2 批）
         all_rows = [_make_todo_row(f"todo-log-{i:04d}") for i in range(1500)]
@@ -278,17 +266,11 @@ class TestPullBatched:
         # Assert: 日志包含分批进度信息
         log_messages = [record.getMessage() for record in caplog.records]
         # 应该有 "开始拉取表" 的日志
-        assert any("开始拉取表" in msg for msg in log_messages), (
-            "日志应包含 '开始拉取表' 信息"
-        )
+        assert any("开始拉取表" in msg for msg in log_messages), "日志应包含 '开始拉取表' 信息"
         # 应该有 "拉取完成" 的日志
-        assert any("拉取完成" in msg for msg in log_messages), (
-            "日志应包含 '拉取完成' 信息"
-        )
+        assert any("拉取完成" in msg for msg in log_messages), "日志应包含 '拉取完成' 信息"
         # 应该有分批进度日志（包含 offset 信息）
-        assert any("分批拉取" in msg for msg in log_messages), (
-            "日志应包含 '分批拉取' 进度信息"
-        )
+        assert any("分批拉取" in msg for msg in log_messages), "日志应包含 '分批拉取' 进度信息"
 
 
 # ==================== Seam: push_to_remote() 分批推送 ====================
@@ -301,9 +283,7 @@ class TestPushBatched:
     逐批 POST 推送，避免单请求 payload 过大导致云端 OOM。
     """
 
-    def test_push_large_table_split_into_batches(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_push_large_table_split_into_batches(self, sync_client, initialized_db, clean_tables):
         """分批推送：超过 1000 条的表被正确切分为多个 POST 请求"""
         # Arrange: 插入 2500 条增量记录
         rows_data = [
@@ -329,7 +309,9 @@ class TestPushBatched:
 
         with (
             patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post,
-            patch("lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"),
+            patch(
+                "lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"
+            ),
         ):
             sync_client.push_to_remote(
                 remote_url="http://test:8000",
@@ -384,7 +366,9 @@ class TestPushBatched:
                 side_effect=lambda table_name, last_sync_time: table_data_map.get(table_name, []),
             ),
             patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post,
-            patch("lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"),
+            patch(
+                "lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"
+            ),
         ):
             sync_client.push_to_remote(
                 remote_url="http://test:8000",
@@ -403,9 +387,7 @@ class TestPushBatched:
         assert "diary" in changes_1
         assert len(changes_1["diary"]) == 1
 
-    def test_push_batch_failure_raises_immediately(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_push_batch_failure_raises_immediately(self, sync_client, initialized_db, clean_tables):
         """单批失败立即抛异常，不继续推送后续批次"""
         # Arrange: 插入 2500 条记录（需要 3 批）
         rows_data = [
@@ -433,8 +415,12 @@ class TestPushBatched:
         error_response.raise_for_status.side_effect = Exception("HTTP 500 Push Failed")
 
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=error_response) as mock_post,
-            patch("lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"),
+            patch(
+                "lifeprism.sync.sync_client.httpx.post", return_value=error_response
+            ) as mock_post,
+            patch(
+                "lifeprism.config.settings_manager.get_setting", return_value="2026-07-01 00:00:00"
+            ),
         ):
             # Act & Assert: 应抛出异常
             with pytest.raises(Exception, match="HTTP 500 Push Failed"):

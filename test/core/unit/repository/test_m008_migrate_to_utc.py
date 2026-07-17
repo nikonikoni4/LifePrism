@@ -36,8 +36,8 @@ def _create_table_with_localtime_default(cursor, table_name, create_sql=None):
     if create_sql is None:
         create_sql = (
             f'CREATE TABLE "{table_name}" ('
-            f'id TEXT PRIMARY KEY, '
-            f'name TEXT, '
+            f"id TEXT PRIMARY KEY, "
+            f"name TEXT, "
             f"created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
             f")"
         )
@@ -70,10 +70,7 @@ class TestCheckIfApplied:
         conn = sqlite3.connect(":memory:")
         cursor = conn.cursor()
         cursor.execute(
-            "CREATE TABLE test_table ("
-            "id TEXT, "
-            "created_at TIMESTAMP DEFAULT (datetime('now'))"
-            ")"
+            "CREATE TABLE test_table (id TEXT, created_at TIMESTAMP DEFAULT (datetime('now')))"
         )
         conn.commit()
         result = m008_migrate_to_utc.check_if_applied(cursor)
@@ -114,9 +111,7 @@ class TestDefaultClauseReplacement:
         conn.commit()
 
         # 验证 CREATE SQL 中不再有 localtime
-        cursor.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='category'"
-        )
+        cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='category'")
         create_sql = cursor.fetchone()[0]
         assert "datetime('now', 'localtime')" not in create_sql
         assert "datetime('now')" in create_sql
@@ -196,9 +191,7 @@ class TestDefaultClauseReplacement:
         m008_migrate_to_utc.upgrade(cursor)
         conn.commit()
 
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='category'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='category'")
         index_names = {row[0] for row in cursor.fetchall()}
         assert "idx_category_name" in index_names
         assert "idx_category_created" in index_names
@@ -256,7 +249,7 @@ class TestEmptyTableNameHandling:
         # 创建空名表（模拟备份数据库中的异常情况）
         # SQLite 允许创建空名表
         cursor.execute(
-            "CREATE TABLE \"\" ("
+            'CREATE TABLE "" ('
             "id TEXT, "
             "created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))"
             ")"
@@ -285,9 +278,7 @@ class TestEmptyTableNameHandling:
             ")"
         )
         # 创建仅含空格的表名
-        cursor.execute(
-            'CREATE TABLE " " (id TEXT, val TEXT)'
-        )
+        cursor.execute('CREATE TABLE " " (id TEXT, val TEXT)')
         conn.commit()
 
         # 迁移不应抛出异常
@@ -334,9 +325,7 @@ class TestQuotedTableNameHandling:
         conn.commit()
 
         # 验证 DEFAULT 已替换
-        cursor.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='daily_report'"
-        )
+        cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='daily_report'")
         create_sql = cursor.fetchone()[0]
         assert "datetime('now', 'localtime')" not in create_sql
         assert "datetime('now')" in create_sql
@@ -364,9 +353,7 @@ class TestQuotedTableNameHandling:
         m008_migrate_to_utc.upgrade(cursor)
         conn.commit()
 
-        cursor.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='weekly_report'"
-        )
+        cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='weekly_report'")
         create_sql = cursor.fetchone()[0]
         assert "datetime('now', 'localtime')" not in create_sql
         assert "datetime('now')" in create_sql
@@ -434,9 +421,7 @@ class TestTransactionRollback:
             conn.rollback()
 
             # 验证原表未被修改
-            cursor.execute(
-                "SELECT sql FROM sqlite_master WHERE type='table' AND name='category'"
-            )
+            cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='category'")
             create_sql = cursor.fetchone()[0]
             assert "datetime('now', 'localtime')" in create_sql
         finally:

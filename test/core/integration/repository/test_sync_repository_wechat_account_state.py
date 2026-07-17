@@ -9,6 +9,7 @@ SyncRepository 对 wechat_account_state 表的同步集成测试
 
 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
 """
+
 import pytest
 
 pytestmark = pytest.mark.core
@@ -25,11 +26,10 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
-
     from lifeprism.repository.base_providers.lw_base_data_provider import (
         LWBaseDataProvider,
     )
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
     LWBaseDataProvider._TABLES_WITH_TIMESTAMPS = None
@@ -123,9 +123,7 @@ class TestQueryIncrementalWechatAccountState:
             conn.commit()
 
         # Act: 查询 10:30:00 之后的记录
-        rows = repository.query_incremental(
-            "wechat_account_state", "2026-07-01 10:30:00"
-        )
+        rows = repository.query_incremental("wechat_account_state", "2026-07-01 10:30:00")
 
         # Assert: 应返回 user_sync_002
         assert len(rows) == 1
@@ -137,9 +135,7 @@ class TestQueryIncrementalWechatAccountState:
     ):
         """增量查询：无增量数据时返回空列表"""
         # Act: 查询未来时间
-        rows = repository.query_incremental(
-            "wechat_account_state", "2026-12-31 23:59:59"
-        )
+        rows = repository.query_incremental("wechat_account_state", "2026-12-31 23:59:59")
 
         # Assert: 返回空列表
         assert rows == []
@@ -280,8 +276,7 @@ class TestUpsertRowsWithLwwWechatAccountState:
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT context_token FROM wechat_account_state "
-                "WHERE wechat_user_id = ?",
+                "SELECT context_token FROM wechat_account_state WHERE wechat_user_id = ?",
                 ("lww_skip_user",),
             )
             row = cursor.fetchone()
@@ -326,8 +321,7 @@ class TestUpsertRowsWithLwwWechatAccountState:
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT context_token FROM wechat_account_state "
-                "WHERE wechat_user_id = ?",
+                "SELECT context_token FROM wechat_account_state WHERE wechat_user_id = ?",
                 ("lww_equal_user",),
             )
             row = cursor.fetchone()
@@ -370,8 +364,7 @@ class TestUpsertRowsWithLwwWechatAccountState:
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT context_token FROM wechat_account_state "
-                "WHERE wechat_user_id = ?",
+                "SELECT context_token FROM wechat_account_state WHERE wechat_user_id = ?",
                 ("lww_overwrite_user",),
             )
             row = cursor.fetchone()
@@ -400,8 +393,7 @@ class TestUpsertRowsWithLwwWechatAccountState:
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT context_token FROM wechat_account_state "
-                "WHERE wechat_user_id = ?",
+                "SELECT context_token FROM wechat_account_state WHERE wechat_user_id = ?",
                 ("lww_new_user",),
             )
             row = cursor.fetchone()

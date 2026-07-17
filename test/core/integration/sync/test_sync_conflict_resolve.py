@@ -139,7 +139,9 @@ class TestBusBridge:
     将 bus.send() 提交到主线程的事件循环。
     """
 
-    def test_sync_client_stores_main_event_loop(self, initialized_db, sync_repository, mock_event_loop):
+    def test_sync_client_stores_main_event_loop(
+        self, initialized_db, sync_repository, mock_event_loop
+    ):
         """SyncClient 应保存 main_event_loop 引用"""
         from lifeprism.sync.sync_client import SyncClient
 
@@ -151,8 +153,12 @@ class TestBusBridge:
         assert client._main_event_loop is mock_event_loop
 
     def test_bus_bridge_calls_run_coroutine_threadsafe(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """_resolve_conflicts 应通过 run_coroutine_threadsafe 调用 bus.send"""
         from lifeprism.config.settings_manager import settings
@@ -165,14 +171,18 @@ class TestBusBridge:
         local_file.write_text(local_content, encoding="utf-8")
 
         remote_content = "# 云端日记\n今天天气晴朗"
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": "conflict_test/diary/2026-07-14.md",
-                "content": _encode_file_content(remote_content),
-                "parent_hash": "old_hash",
-                "current_hash": "remote_hash",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": "conflict_test/diary/2026-07-14.md",
+                        "content": _encode_file_content(remote_content),
+                        "parent_hash": "old_hash",
+                        "current_hash": "remote_hash",
+                    }
+                ]
+            }
+        )
 
         # Mock bus bridge: run_coroutine_threadsafe 返回 mock future
         from lifeprism.llm.bus.events import OutboundMessage
@@ -183,9 +193,13 @@ class TestBusBridge:
             response=LLMResponse(content="# 合并后的日记\n今天心情不错，天气晴朗"),
         )
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future) as mock_rcts:
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ) as mock_rcts,
+        ):
             # Act
             sync_client._resolve_conflicts(
                 conflict_paths=["conflict_test/diary/2026-07-14.md"],
@@ -199,8 +213,12 @@ class TestBusBridge:
         assert mock_rcts.call_args[0][1] is sync_client._main_event_loop
 
     def test_bus_bridge_waits_with_timeout_600(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """future.result 应以 timeout=600 等待 AI 合并完成"""
         from lifeprism.config.settings_manager import settings
@@ -212,23 +230,31 @@ class TestBusBridge:
         local_file = test_base / "diary" / "2026-07-14.md"
         local_file.write_text("本地内容", encoding="utf-8")
 
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": "conflict_test/diary/2026-07-14.md",
-                "content": _encode_file_content("云端内容"),
-                "parent_hash": "old_hash",
-                "current_hash": "remote_hash",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": "conflict_test/diary/2026-07-14.md",
+                        "content": _encode_file_content("云端内容"),
+                        "parent_hash": "old_hash",
+                        "current_hash": "remote_hash",
+                    }
+                ]
+            }
+        )
 
         mock_future = MagicMock()
         mock_future.result.return_value = OutboundMessage(
             response=LLMResponse(content="合并后的内容"),
         )
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future):
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
             sync_client._resolve_conflicts(
                 conflict_paths=["conflict_test/diary/2026-07-14.md"],
                 remote_url="http://test:8000",
@@ -254,8 +280,12 @@ class TestMergeResultHandling:
     """
 
     def test_resolve_conflicts_backs_up_local_version(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """成功合并后应备份本地版本到 sync_conflict/{timestamp}/{file_path}"""
         from lifeprism.config.settings_manager import settings
@@ -270,23 +300,31 @@ class TestMergeResultHandling:
         local_file = test_base / "diary" / "2026-07-14.md"
         local_file.write_text(local_content, encoding="utf-8")
 
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": rel_path,
-                "content": _encode_file_content("# 云端日记\n今天天气晴朗"),
-                "parent_hash": "old_hash",
-                "current_hash": "remote_hash",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": rel_path,
+                        "content": _encode_file_content("# 云端日记\n今天天气晴朗"),
+                        "parent_hash": "old_hash",
+                        "current_hash": "remote_hash",
+                    }
+                ]
+            }
+        )
 
         mock_future = MagicMock()
         mock_future.result.return_value = OutboundMessage(
             response=LLMResponse(content="# 合并后的日记\n今天心情不错，天气晴朗"),
         )
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future):
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
             sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
                 remote_url="http://test:8000",
@@ -303,8 +341,12 @@ class TestMergeResultHandling:
         assert backup_files[0].read_text(encoding="utf-8") == local_content
 
     def test_resolve_conflicts_writes_merged_content(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """成功合并后本地文件应被覆盖为合并后内容"""
         from lifeprism.config.settings_manager import settings
@@ -318,23 +360,31 @@ class TestMergeResultHandling:
         local_file.write_text("# 本地日记\n今天心情不错", encoding="utf-8")
 
         merged_content = "# 合并后的日记\n今天心情不错，天气晴朗"
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": rel_path,
-                "content": _encode_file_content("# 云端日记"),
-                "parent_hash": "old_hash",
-                "current_hash": "remote_hash",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": rel_path,
+                        "content": _encode_file_content("# 云端日记"),
+                        "parent_hash": "old_hash",
+                        "current_hash": "remote_hash",
+                    }
+                ]
+            }
+        )
 
         mock_future = MagicMock()
         mock_future.result.return_value = OutboundMessage(
             response=LLMResponse(content=merged_content),
         )
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future):
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
             sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
                 remote_url="http://test:8000",
@@ -345,8 +395,12 @@ class TestMergeResultHandling:
         assert local_file.read_text(encoding="utf-8") == merged_content
 
     def test_resolve_conflicts_updates_current_hash(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """成功合并后 file_sync_state.current_hash 应为 compute_file_hash(merged_content)"""
         from lifeprism.config.settings_manager import settings
@@ -364,23 +418,31 @@ class TestMergeResultHandling:
         merged_content = "# 合并后的内容\n保留双方信息"
         expected_hash = compute_file_hash(merged_content.encode("utf-8"))
 
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": rel_path,
-                "content": _encode_file_content("# 云端内容"),
-                "parent_hash": "old_hash",
-                "current_hash": "remote_hash",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": rel_path,
+                        "content": _encode_file_content("# 云端内容"),
+                        "parent_hash": "old_hash",
+                        "current_hash": "remote_hash",
+                    }
+                ]
+            }
+        )
 
         mock_future = MagicMock()
         mock_future.result.return_value = OutboundMessage(
             response=LLMResponse(content=merged_content),
         )
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future):
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
             sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
                 remote_url="http://test:8000",
@@ -394,8 +456,12 @@ class TestMergeResultHandling:
         assert state["current_hash"] == expected_hash
 
     def test_resolve_conflicts_preserves_parent_hash(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """成功合并后 file_sync_state.parent_hash 应保持不变"""
         from lifeprism.config.settings_manager import settings
@@ -418,23 +484,31 @@ class TestMergeResultHandling:
             current_hash="old_current_hash",
         )
 
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": rel_path,
-                "content": _encode_file_content("# 云端内容"),
-                "parent_hash": original_parent_hash,
-                "current_hash": "remote_hash",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": rel_path,
+                        "content": _encode_file_content("# 云端内容"),
+                        "parent_hash": original_parent_hash,
+                        "current_hash": "remote_hash",
+                    }
+                ]
+            }
+        )
 
         mock_future = MagicMock()
         mock_future.result.return_value = OutboundMessage(
             response=LLMResponse(content="# 合并后的内容"),
         )
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future):
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
             sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
                 remote_url="http://test:8000",
@@ -447,8 +521,12 @@ class TestMergeResultHandling:
         assert state["parent_hash"] == original_parent_hash
 
     def test_resolve_conflicts_returns_resolved_paths(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """_resolve_conflicts 应返回成功合并的文件路径列表"""
         from lifeprism.config.settings_manager import settings
@@ -461,23 +539,31 @@ class TestMergeResultHandling:
         local_file = test_base / "diary" / "2026-07-14.md"
         local_file.write_text("# 本地内容", encoding="utf-8")
 
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": rel_path,
-                "content": _encode_file_content("# 云端内容"),
-                "parent_hash": "old_hash",
-                "current_hash": "remote_hash",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": rel_path,
+                        "content": _encode_file_content("# 云端内容"),
+                        "parent_hash": "old_hash",
+                        "current_hash": "remote_hash",
+                    }
+                ]
+            }
+        )
 
         mock_future = MagicMock()
         mock_future.result.return_value = OutboundMessage(
             response=LLMResponse(content="# 合并后的内容"),
         )
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future):
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
             result = sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
                 remote_url="http://test:8000",
@@ -509,8 +595,12 @@ class TestMergeFailureHandling:
     """
 
     def test_timeout_preserves_local_version(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """TimeoutError 时本地版本应保留不变"""
         from lifeprism.config.settings_manager import settings
@@ -522,22 +612,30 @@ class TestMergeFailureHandling:
         local_content = "# 本地日记\n原始内容"
         local_file.write_text(local_content, encoding="utf-8")
 
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": rel_path,
-                "content": _encode_file_content("# 云端内容"),
-                "parent_hash": "old_hash",
-                "current_hash": "remote_hash",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": rel_path,
+                        "content": _encode_file_content("# 云端内容"),
+                        "parent_hash": "old_hash",
+                        "current_hash": "remote_hash",
+                    }
+                ]
+            }
+        )
 
         # Mock future.result 抛出 TimeoutError
         mock_future = MagicMock()
         mock_future.result.side_effect = TimeoutError()
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future):
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
             result = sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
                 remote_url="http://test:8000",
@@ -553,8 +651,12 @@ class TestMergeFailureHandling:
         assert not sync_conflict_dir.exists() or not list(sync_conflict_dir.rglob("2026-07-14.md"))
 
     def test_empty_merged_content_preserves_local_version(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """AI 返回空内容时本地版本应保留不变"""
         from lifeprism.config.settings_manager import settings
@@ -568,14 +670,18 @@ class TestMergeFailureHandling:
         local_content = "# 本地日记\n原始内容"
         local_file.write_text(local_content, encoding="utf-8")
 
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": rel_path,
-                "content": _encode_file_content("# 云端内容"),
-                "parent_hash": "old_hash",
-                "current_hash": "remote_hash",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": rel_path,
+                        "content": _encode_file_content("# 云端内容"),
+                        "parent_hash": "old_hash",
+                        "current_hash": "remote_hash",
+                    }
+                ]
+            }
+        )
 
         # Mock 返回空内容
         mock_future = MagicMock()
@@ -583,9 +689,13 @@ class TestMergeFailureHandling:
             response=LLMResponse(content=""),
         )
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future):
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
             result = sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
                 remote_url="http://test:8000",
@@ -598,8 +708,12 @@ class TestMergeFailureHandling:
         assert result == []
 
     def test_empty_merged_content_preserves_file_sync_state(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """AI 返回空内容时 file_sync_state 不应被更新"""
         from lifeprism.config.settings_manager import settings
@@ -623,23 +737,31 @@ class TestMergeFailureHandling:
             current_hash=original_current,
         )
 
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": rel_path,
-                "content": _encode_file_content("# 云端内容"),
-                "parent_hash": original_parent,
-                "current_hash": "remote_hash",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": rel_path,
+                        "content": _encode_file_content("# 云端内容"),
+                        "parent_hash": original_parent,
+                        "current_hash": "remote_hash",
+                    }
+                ]
+            }
+        )
 
         mock_future = MagicMock()
         mock_future.result.return_value = OutboundMessage(
             response=LLMResponse(content="   "),  # 仅空白字符也算空
         )
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future):
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
             sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
                 remote_url="http://test:8000",
@@ -653,8 +775,12 @@ class TestMergeFailureHandling:
         assert state["current_hash"] == original_current
 
     def test_generic_exception_preserves_local_version(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """其他异常时本地版本应保留不变"""
         from lifeprism.config.settings_manager import settings
@@ -666,22 +792,30 @@ class TestMergeFailureHandling:
         local_content = "# 本地日记\n原始内容"
         local_file.write_text(local_content, encoding="utf-8")
 
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": rel_path,
-                "content": _encode_file_content("# 云端内容"),
-                "parent_hash": "old_hash",
-                "current_hash": "remote_hash",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": rel_path,
+                        "content": _encode_file_content("# 云端内容"),
+                        "parent_hash": "old_hash",
+                        "current_hash": "remote_hash",
+                    }
+                ]
+            }
+        )
 
         # Mock future.result 抛出通用异常
         mock_future = MagicMock()
         mock_future.result.side_effect = RuntimeError("LLM 服务不可用")
 
-        with patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future):
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
             result = sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
                 remote_url="http://test:8000",
@@ -694,8 +828,12 @@ class TestMergeFailureHandling:
         assert result == []
 
     def test_fetch_remote_failure_skips_file(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """获取远端文件失败时应跳过该文件"""
         from lifeprism.config.settings_manager import settings
@@ -708,8 +846,9 @@ class TestMergeFailureHandling:
         local_file.write_text(local_content, encoding="utf-8")
 
         # Mock httpx.post 抛出异常（获取远端失败）
-        with patch("lifeprism.sync.sync_client.httpx.post", side_effect=httpx.RequestError("网络错误")):
-
+        with patch(
+            "lifeprism.sync.sync_client.httpx.post", side_effect=httpx.RequestError("网络错误")
+        ):
             result = sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
                 remote_url="http://test:8000",
@@ -722,8 +861,12 @@ class TestMergeFailureHandling:
         assert result == []
 
     def test_missing_local_file_skips(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """本地文件不存在时应跳过该文件"""
         rel_path = "conflict_test/diary/nonexistent.md"
@@ -739,8 +882,12 @@ class TestMergeFailureHandling:
         assert result == []
 
     def test_partial_failure_returns_only_successful(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """多个冲突文件中部分失败时，只返回成功的路径"""
         from lifeprism.config.settings_manager import settings
@@ -762,22 +909,30 @@ class TestMergeFailureHandling:
         local_file2.write_text(local_content2, encoding="utf-8")
 
         # Mock: 第一次调用返回成功，第二次调用抛出 TimeoutError
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": rel_path1,
-                "content": _encode_file_content("# 云端内容1"),
-                "parent_hash": "old_hash1",
-                "current_hash": "remote_hash1",
-            }]
-        })
-        fetch_response2 = _make_mock_response({
-            "files": [{
-                "path": rel_path2,
-                "content": _encode_file_content("# 云端内容2"),
-                "parent_hash": "old_hash2",
-                "current_hash": "remote_hash2",
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": rel_path1,
+                        "content": _encode_file_content("# 云端内容1"),
+                        "parent_hash": "old_hash1",
+                        "current_hash": "remote_hash1",
+                    }
+                ]
+            }
+        )
+        fetch_response2 = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": rel_path2,
+                        "content": _encode_file_content("# 云端内容2"),
+                        "parent_hash": "old_hash2",
+                        "current_hash": "remote_hash2",
+                    }
+                ]
+            }
+        )
 
         mock_future_success = MagicMock()
         mock_future_success.result.return_value = OutboundMessage(
@@ -786,10 +941,16 @@ class TestMergeFailureHandling:
         mock_future_timeout = MagicMock()
         mock_future_timeout.result.side_effect = TimeoutError()
 
-        with patch("lifeprism.sync.sync_client.httpx.post", side_effect=[fetch_response, fetch_response2]), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
-                   side_effect=[mock_future_success, mock_future_timeout]):
-
+        with (
+            patch(
+                "lifeprism.sync.sync_client.httpx.post",
+                side_effect=[fetch_response, fetch_response2],
+            ),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                side_effect=[mock_future_success, mock_future_timeout],
+            ),
+        ):
             result = sync_client._resolve_conflicts(
                 conflict_paths=[rel_path1, rel_path2],
                 remote_url="http://test:8000",
@@ -828,7 +989,10 @@ class TestFullFlowConflictIntegration:
         return sync_client
 
     def test_full_flow_calls_resolve_conflicts_for_conflict_files(
-        self, mock_sync_client, initialized_db, clean_file_sync_state,
+        self,
+        mock_sync_client,
+        initialized_db,
+        clean_file_sync_state,
     ):
         """_sync_files_full_flow 应为 CONFLICT 文件调用 _resolve_conflicts"""
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
@@ -844,11 +1008,16 @@ class TestFullFlowConflictIntegration:
         )
 
         mock_sync_client._refresh_current_hashes.return_value = [conflict_path]
-        mock_sync_client._pull_files_check.return_value = ([{
-            "path": conflict_path,
-            "parent_hash": "hash_a",
-            "current_hash": "hash_c",
-        }], [])
+        mock_sync_client._pull_files_check.return_value = (
+            [
+                {
+                    "path": conflict_path,
+                    "parent_hash": "hash_a",
+                    "current_hash": "hash_c",
+                }
+            ],
+            [],
+        )
 
         # Act
         mock_sync_client._sync_files_full_flow(
@@ -866,7 +1035,10 @@ class TestFullFlowConflictIntegration:
         assert call_args[0][2] == "test-key"  # api_key
 
     def test_full_flow_pushes_resolved_files(
-        self, mock_sync_client, initialized_db, clean_file_sync_state,
+        self,
+        mock_sync_client,
+        initialized_db,
+        clean_file_sync_state,
     ):
         """_sync_files_full_flow 应将合并成功的文件加入 push_paths 推送"""
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
@@ -881,11 +1053,16 @@ class TestFullFlowConflictIntegration:
         )
 
         mock_sync_client._refresh_current_hashes.return_value = [conflict_path]
-        mock_sync_client._pull_files_check.return_value = ([{
-            "path": conflict_path,
-            "parent_hash": "hash_a",
-            "current_hash": "hash_c",
-        }], [])
+        mock_sync_client._pull_files_check.return_value = (
+            [
+                {
+                    "path": conflict_path,
+                    "parent_hash": "hash_a",
+                    "current_hash": "hash_c",
+                }
+            ],
+            [],
+        )
         mock_sync_client._resolve_conflicts.return_value = [conflict_path]
 
         # Act
@@ -902,7 +1079,10 @@ class TestFullFlowConflictIntegration:
         assert conflict_path in push_paths
 
     def test_full_flow_verifies_resolved_files(
-        self, mock_sync_client, initialized_db, clean_file_sync_state,
+        self,
+        mock_sync_client,
+        initialized_db,
+        clean_file_sync_state,
     ):
         """_sync_files_full_flow 应将合并成功的文件加入 verify_paths 校验"""
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
@@ -916,11 +1096,16 @@ class TestFullFlowConflictIntegration:
         )
 
         mock_sync_client._refresh_current_hashes.return_value = [conflict_path]
-        mock_sync_client._pull_files_check.return_value = ([{
-            "path": conflict_path,
-            "parent_hash": "hash_a",
-            "current_hash": "hash_c",
-        }], [])
+        mock_sync_client._pull_files_check.return_value = (
+            [
+                {
+                    "path": conflict_path,
+                    "parent_hash": "hash_a",
+                    "current_hash": "hash_c",
+                }
+            ],
+            [],
+        )
         mock_sync_client._resolve_conflicts.return_value = [conflict_path]
 
         # Act
@@ -937,12 +1122,16 @@ class TestFullFlowConflictIntegration:
         assert conflict_path in verify_paths
 
     def test_full_flow_skips_resolve_when_no_conflicts(
-        self, mock_sync_client, initialized_db, clean_file_sync_state,
+        self,
+        mock_sync_client,
+        initialized_db,
+        clean_file_sync_state,
     ):
         """无 CONFLICT 文件时不应调用 _resolve_conflicts"""
         # Arrange: 一个 PUSH 文件（本地有改，云端未改）
         push_path = "diary/push.md"
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+
         provider = FileSyncStateProvider(db_manager=initialized_db)
         provider.upsert_state(
             file_path=push_path,
@@ -952,11 +1141,16 @@ class TestFullFlowConflictIntegration:
 
         mock_sync_client._refresh_current_hashes.return_value = [push_path]
         # 云端有 parent 但 current=parent（未改）→ PUSH (Row 7)
-        mock_sync_client._pull_files_check.return_value = ([{
-            "path": push_path,
-            "parent_hash": "hash_a",
-            "current_hash": "hash_a",
-        }], [])
+        mock_sync_client._pull_files_check.return_value = (
+            [
+                {
+                    "path": push_path,
+                    "parent_hash": "hash_a",
+                    "current_hash": "hash_a",
+                }
+            ],
+            [],
+        )
 
         # Act
         mock_sync_client._sync_files_full_flow(
@@ -970,7 +1164,10 @@ class TestFullFlowConflictIntegration:
         mock_sync_client._resolve_conflicts.assert_not_called()
 
     def test_full_flow_does_not_push_failed_resolutions(
-        self, mock_sync_client, initialized_db, clean_file_sync_state,
+        self,
+        mock_sync_client,
+        initialized_db,
+        clean_file_sync_state,
     ):
         """合并失败的文件不应被推送"""
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
@@ -984,11 +1181,16 @@ class TestFullFlowConflictIntegration:
         )
 
         mock_sync_client._refresh_current_hashes.return_value = [conflict_path]
-        mock_sync_client._pull_files_check.return_value = ([{
-            "path": conflict_path,
-            "parent_hash": "hash_a",
-            "current_hash": "hash_c",
-        }], [])
+        mock_sync_client._pull_files_check.return_value = (
+            [
+                {
+                    "path": conflict_path,
+                    "parent_hash": "hash_a",
+                    "current_hash": "hash_c",
+                }
+            ],
+            [],
+        )
         # _resolve_conflicts 返回空列表（全部失败）
         mock_sync_client._resolve_conflicts.return_value = []
 
@@ -1004,7 +1206,10 @@ class TestFullFlowConflictIntegration:
         mock_sync_client._push_files.assert_not_called()
 
     def test_full_flow_jsonl_conflict_goes_lww_not_ai_merge(
-        self, mock_sync_client, initialized_db, clean_file_sync_state,
+        self,
+        mock_sync_client,
+        initialized_db,
+        clean_file_sync_state,
     ):
         """JSONL CONFLICT 文件应走 LWW（直接 push），不调用 _resolve_conflicts"""
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
@@ -1019,11 +1224,16 @@ class TestFullFlowConflictIntegration:
         )
 
         mock_sync_client._refresh_current_hashes.return_value = [conflict_path]
-        mock_sync_client._pull_files_check.return_value = ([{
-            "path": conflict_path,
-            "parent_hash": "hash_a",
-            "current_hash": "hash_c",
-        }], [])
+        mock_sync_client._pull_files_check.return_value = (
+            [
+                {
+                    "path": conflict_path,
+                    "parent_hash": "hash_a",
+                    "current_hash": "hash_c",
+                }
+            ],
+            [],
+        )
 
         # Act
         mock_sync_client._sync_files_full_flow(
@@ -1041,7 +1251,10 @@ class TestFullFlowConflictIntegration:
         assert conflict_path in push_paths
 
     def test_full_flow_mixed_conflicts_split_correctly(
-        self, mock_sync_client, initialized_db, clean_file_sync_state,
+        self,
+        mock_sync_client,
+        initialized_db,
+        clean_file_sync_state,
     ):
         """混合冲突时 JSONL 走 LWW，MD 走 AI 合并，两条路径互不干扰"""
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
@@ -1058,10 +1271,13 @@ class TestFullFlowConflictIntegration:
             )
 
         mock_sync_client._refresh_current_hashes.return_value = [jsonl_path, md_path]
-        mock_sync_client._pull_files_check.return_value = ([
-            {"path": jsonl_path, "parent_hash": "hash_a", "current_hash": "hash_c"},
-            {"path": md_path, "parent_hash": "hash_a", "current_hash": "hash_c"},
-        ], [])
+        mock_sync_client._pull_files_check.return_value = (
+            [
+                {"path": jsonl_path, "parent_hash": "hash_a", "current_hash": "hash_c"},
+                {"path": md_path, "parent_hash": "hash_a", "current_hash": "hash_c"},
+            ],
+            [],
+        )
         mock_sync_client._resolve_conflicts.return_value = [md_path]
 
         # Act
@@ -1085,7 +1301,10 @@ class TestFullFlowConflictIntegration:
         assert md_path in push_paths
 
     def test_full_flow_jsonl_only_conflicts_call_push_directly(
-        self, mock_sync_client, initialized_db, clean_file_sync_state,
+        self,
+        mock_sync_client,
+        initialized_db,
+        clean_file_sync_state,
     ):
         """仅 JSONL 冲突时应直接 push，不调用 _resolve_conflicts 和备份"""
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
@@ -1102,10 +1321,13 @@ class TestFullFlowConflictIntegration:
             )
 
         mock_sync_client._refresh_current_hashes.return_value = [jsonl_1, jsonl_2]
-        mock_sync_client._pull_files_check.return_value = ([
-            {"path": jsonl_1, "parent_hash": "hash_a", "current_hash": "hash_c"},
-            {"path": jsonl_2, "parent_hash": "hash_a", "current_hash": "hash_c"},
-        ], [])
+        mock_sync_client._pull_files_check.return_value = (
+            [
+                {"path": jsonl_1, "parent_hash": "hash_a", "current_hash": "hash_c"},
+                {"path": jsonl_2, "parent_hash": "hash_a", "current_hash": "hash_c"},
+            ],
+            [],
+        )
 
         # Act
         mock_sync_client._sync_files_full_flow(
@@ -1141,8 +1363,12 @@ class TestFullFlowEndToEnd:
     """
 
     def test_conflict_to_merge_to_push_full_flow(
-        self, sync_client, initialized_db, clean_conflict_test_dir,
-        clean_file_sync_state, clean_sync_conflict_dir,
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
     ):
         """CONFLICT→AI合并→推送 全流程：本地与云端都修改了同一文件"""
         from lifeprism.config.settings_manager import settings
@@ -1174,32 +1400,44 @@ class TestFullFlowEndToEnd:
         # Mock HTTP: 不同 URL 返回不同响应
         def mock_http_post(url, json=None, headers=None, timeout=None):
             if "/pull-files/check" in url:
-                return _make_mock_response({
-                    "files": [{
-                        "path": rel_path,
-                        "parent_hash": "parent_hash",
-                        "current_hash": "remote_hash",
-                    }]
-                })
+                return _make_mock_response(
+                    {
+                        "files": [
+                            {
+                                "path": rel_path,
+                                "parent_hash": "parent_hash",
+                                "current_hash": "remote_hash",
+                            }
+                        ]
+                    }
+                )
             elif "/pull-files/fetch" in url:
-                return _make_mock_response({
-                    "files": [{
-                        "path": rel_path,
-                        "content": _encode_file_content(remote_content),
-                        "parent_hash": "parent_hash",
-                        "current_hash": "remote_hash",
-                    }]
-                })
+                return _make_mock_response(
+                    {
+                        "files": [
+                            {
+                                "path": rel_path,
+                                "content": _encode_file_content(remote_content),
+                                "parent_hash": "parent_hash",
+                                "current_hash": "remote_hash",
+                            }
+                        ]
+                    }
+                )
             elif "/push-files" in url:
                 return _make_mock_response({"status": "ok"})
             elif "/pull-files/verify" in url:
                 # verify 返回合并后内容的 hash（模拟推送后远端已更新）
-                return _make_mock_response({
-                    "files": [{
-                        "path": rel_path,
-                        "current_hash": merged_hash,
-                    }]
-                })
+                return _make_mock_response(
+                    {
+                        "files": [
+                            {
+                                "path": rel_path,
+                                "current_hash": merged_hash,
+                            }
+                        ]
+                    }
+                )
             elif "/pull-files/commit" in url:
                 return _make_mock_response({"status": "ok"})
             return _make_mock_response({"status": "unknown"})
@@ -1209,9 +1447,13 @@ class TestFullFlowEndToEnd:
             response=LLMResponse(content=merged_content),
         )
 
-        with patch("lifeprism.sync.sync_client.httpx.post", side_effect=mock_http_post), \
-             patch("lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe", return_value=mock_future):
-
+        with (
+            patch("lifeprism.sync.sync_client.httpx.post", side_effect=mock_http_post),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
             # Act: 执行全流程
             sync_client._sync_files_full_flow(
                 remote_url="http://test:8000",

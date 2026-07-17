@@ -9,10 +9,13 @@ MiniMax API 要求在多轮对话中，如果模型返回了 reasoning_content�
 修复方案：
 在 loop.py 的 session.add_message() 调用中添加 reasoning_content 参数
 """
+
+import json
+from pathlib import Path
+
 from lifeprism.llm.providers import LLMResponse, ToolCallRequest
 from lifeprism.llm.session import Session, session_manager
-from pathlib import Path
-import json
+
 
 def test_reasoning_content_in_memory():
     """测试 reasoning_content 是否正确保存到内存"""
@@ -27,15 +30,15 @@ def test_reasoning_content_in_memory():
         content="This is the response",
         reasoning_content="This is the reasoning process",
         tool_calls=[],
-        finish_reason="stop"
+        finish_reason="stop",
     )
 
     # 正确的实现：传递 reasoning_content
     session.add_message(
-        'assistant',
-        content=response.content or '',
+        "assistant",
+        content=response.content or "",
         tool_calls=[],
-        reasoning_content=response.reasoning_content
+        reasoning_content=response.reasoning_content,
     )
 
     # 检查消息是否包含 reasoning_content
@@ -44,7 +47,10 @@ def test_reasoning_content_in_memory():
 
     print(f"Message keys: {list(last_msg.keys())}")
 
-    if 'reasoning_content' in last_msg and last_msg['reasoning_content'] == response.reasoning_content:
+    if (
+        "reasoning_content" in last_msg
+        and last_msg["reasoning_content"] == response.reasoning_content
+    ):
         print("[PASS] reasoning_content correctly saved in memory")
         return True
     else:
@@ -66,14 +72,14 @@ def test_reasoning_content_persistence():
         content="Persistent response",
         reasoning_content="Persistent reasoning",
         tool_calls=[],
-        finish_reason="stop"
+        finish_reason="stop",
     )
 
     session.add_message(
-        'assistant',
-        content=response.content or '',
+        "assistant",
+        content=response.content or "",
         tool_calls=[],
-        reasoning_content=response.reasoning_content
+        reasoning_content=response.reasoning_content,
     )
 
     # 保存到文件
@@ -90,7 +96,10 @@ def test_reasoning_content_persistence():
     # 检查是否包含 reasoning_content
     if messages:
         last_msg = messages[-1]
-        if 'reasoning_content' in last_msg and last_msg['reasoning_content'] == response.reasoning_content:
+        if (
+            "reasoning_content" in last_msg
+            and last_msg["reasoning_content"] == response.reasoning_content
+        ):
             print("[PASS] reasoning_content correctly persisted and loaded")
             # 清理测试文件
             session_manager.delete_session(session_id)
@@ -117,37 +126,32 @@ def test_reasoning_content_with_tool_calls():
     response = LLMResponse(
         content="",
         reasoning_content="Thinking about which tool to use",
-        tool_calls=[
-            ToolCallRequest(
-                id="call_123",
-                name="test_tool",
-                arguments={"param": "value"}
-            )
-        ],
-        finish_reason="tool_calls"
+        tool_calls=[ToolCallRequest(id="call_123", name="test_tool", arguments={"param": "value"})],
+        finish_reason="tool_calls",
     )
 
     session.add_message(
-        'assistant',
-        content=response.content or '',
+        "assistant",
+        content=response.content or "",
         tool_calls=[
             {
-                'id': tc.id,
-                'type': 'function',
-                'function': {
-                    'name': tc.name,
-                    'arguments': json.dumps(tc.arguments, ensure_ascii=False)
-                }
-            } for tc in response.tool_calls
+                "id": tc.id,
+                "type": "function",
+                "function": {
+                    "name": tc.name,
+                    "arguments": json.dumps(tc.arguments, ensure_ascii=False),
+                },
+            }
+            for tc in response.tool_calls
         ],
-        reasoning_content=response.reasoning_content
+        reasoning_content=response.reasoning_content,
     )
 
     messages = session.get_history_message()
     last_msg = messages[-1]
 
-    has_reasoning = 'reasoning_content' in last_msg
-    has_tool_calls = 'tool_calls' in last_msg and len(last_msg['tool_calls']) > 0
+    has_reasoning = "reasoning_content" in last_msg
+    has_tool_calls = "tool_calls" in last_msg and len(last_msg["tool_calls"]) > 0
 
     if has_reasoning and has_tool_calls:
         print("[PASS] Both reasoning_content and tool_calls saved correctly")

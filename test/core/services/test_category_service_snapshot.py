@@ -4,13 +4,14 @@ Category Service 快照测试
 用于 provider 重构前后的行为验证。
 测试所有调用 category_provider 的 service 方法。
 """
+
 import pytest
 from syrupy.assertion import SnapshotAssertion
 
 from lifeprism.server.services.category_service import category_service
 
-
 # ==================== 测试辅助函数 ====================
+
 
 def sanitize_category_item(data: dict) -> dict:
     """清理动态字段，用于快照对比"""
@@ -19,13 +20,13 @@ def sanitize_category_item(data: dict) -> dict:
 
     result = {}
     # 排除动态字段
-    exclude_fields = {'created_at', 'updated_at'}
+    exclude_fields = {"created_at", "updated_at"}
 
     for key, value in data.items():
         if key in exclude_fields:
             continue
         # 递归处理子分类列表
-        if key == 'subcategories' and isinstance(value, list):
+        if key == "subcategories" and isinstance(value, list):
             result[key] = [sanitize_category_item(item) for item in value]
         else:
             result[key] = value
@@ -35,13 +36,11 @@ def sanitize_category_item(data: dict) -> dict:
 
 def sanitize_category_tree(items: list) -> list:
     """清理分类树的动态字段"""
-    return sorted(
-        [sanitize_category_item(item) for item in items],
-        key=lambda x: x.get('id', '')
-    )
+    return sorted([sanitize_category_item(item) for item in items], key=lambda x: x.get("id", ""))
 
 
 # ==================== 快照测试 ====================
+
 
 class TestCategoryServiceSnapshot:
     """Category Service 快照测试"""
@@ -93,17 +92,17 @@ class TestCategoryServiceSnapshot:
 
         # 清理动态字段
         sanitized_data = {
-            'total': result.total,
-            'page': result.page,
-            'page_size': result.page_size,
-            'total_pages': result.total_pages,
-            'items': sorted(
+            "total": result.total,
+            "page": result.page,
+            "page_size": result.page_size,
+            "total_pages": result.total_pages,
+            "items": sorted(
                 [
-                    {k: v for k, v in item.model_dump().items() if k != 'created_at'}
+                    {k: v for k, v in item.model_dump().items() if k != "created_at"}
                     for item in result.data
                 ],
-                key=lambda x: x.get('id', '')
-            )
+                key=lambda x: x.get("id", ""),
+            ),
         }
         assert sanitized_data == snapshot
 
@@ -124,8 +123,7 @@ class TestCategoryServiceSnapshot:
 
         # 更新记录（只更新 sub_category_id）
         update_result = category_service.update_category_map_cache(
-            record_id=record_id,
-            update_fields={'sub_category_id': '1-1'}
+            record_id=record_id, update_fields={"sub_category_id": "1-1"}
         )
 
         # 获取更新后的记录
@@ -133,13 +131,14 @@ class TestCategoryServiceSnapshot:
 
         # 恢复原始数据
         category_service.update_category_map_cache(
-            record_id=record_id,
-            update_fields={'sub_category_id': original_sub_category_id}
+            record_id=record_id, update_fields={"sub_category_id": original_sub_category_id}
         )
 
         sanitized_data = {
-            'update_success': update_result,
-            'updated_record': {k: v for k, v in updated_result.data[0].model_dump().items() if k != 'created_at'}
+            "update_success": update_result,
+            "updated_record": {
+                k: v for k, v in updated_result.data[0].model_dump().items() if k != "created_at"
+            },
         }
         assert sanitized_data == snapshot
 
@@ -165,8 +164,8 @@ class TestCategoryServiceSnapshot:
         )
 
         sanitized_data = {
-            'single_delete_result': delete_result,
-            'batch_delete_result': batch_delete_result
+            "single_delete_result": delete_result,
+            "batch_delete_result": batch_delete_result,
         }
         assert sanitized_data == snapshot
 
@@ -175,5 +174,5 @@ class TestCategoryServiceSnapshot:
 def setup_timestamp():
     """设置测试时间戳"""
     import time
-    pytest.timestamp = int(time.time())
 
+    pytest.timestamp = int(time.time())

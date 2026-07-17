@@ -344,9 +344,7 @@ class TestCrossTimezoneSync:
     导致同一时刻生成的时间戳字符串不同，LWW 比较错误。
     """
 
-    def test_cross_timezone_sync_both_use_utc_iso(
-        self, sync_client, initialized_db, clean_tables
-    ):
+    def test_cross_timezone_sync_both_use_utc_iso(self, sync_client, initialized_db, clean_tables):
         """跨时区同步：本地 UTC+8 和云端 UTC 都生成 UTC ISO 8601，LWW 正确"""
         # 模拟：本地机器在 UTC+8，但迁移后使用 datetime.now(timezone.utc)
         # 此时本地时间 18:00 (UTC+8) = UTC 10:00
@@ -438,9 +436,7 @@ class TestCrossTimezoneSync:
         mock_response = _make_mock_response({"success": True})
 
         with (
-            patch(
-                "lifeprism.sync.sync_client.httpx.post", return_value=mock_response
-            ) as mock_post,
+            patch("lifeprism.sync.sync_client.httpx.post", return_value=mock_response) as mock_post,
             patch(
                 "lifeprism.config.settings_manager.get_setting",
                 return_value=local_updated_at,  # last_sync_time = UTC 10:00

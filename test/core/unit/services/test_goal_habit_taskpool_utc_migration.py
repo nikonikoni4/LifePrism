@@ -16,6 +16,7 @@
 - docs/guides/utc-migration-hidden-dependencies.md
 - .scratch/utc-timezone-migration/07-goal-habit-diary-service-migration.md
 """
+
 import re
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
@@ -32,18 +33,14 @@ def assert_is_utc_iso(value: str):
     """断言字符串是 UTC ISO 8601 格式"""
     assert isinstance(value, str), f"应为 str 类型，实际为 {type(value)}"
     pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}\+00:00$"
-    assert re.match(pattern, value), (
-        f"应匹配 UTC ISO 8601 格式 {pattern}，实际为 {value}"
-    )
+    assert re.match(pattern, value), f"应匹配 UTC ISO 8601 格式 {pattern}，实际为 {value}"
 
 
 def assert_is_yyyy_mm_dd(value: str):
     """断言字符串是 YYYY-MM-DD 格式"""
     assert isinstance(value, str), f"应为 str 类型，实际为 {type(value)}"
     pattern = r"^\d{4}-\d{2}-\d{2}$"
-    assert re.match(pattern, value), (
-        f"应匹配 YYYY-MM-DD 格式 {pattern}，实际为 {value}"
-    )
+    assert re.match(pattern, value), f"应匹配 YYYY-MM-DD 格式 {pattern}，实际为 {value}"
 
 
 # ==================== Seam 1: _calculate_days_started 使用本地日期 ====================
@@ -179,7 +176,9 @@ class TestUpdateMilestoneWritesLocalDate:
         service = GoalService.__new__(GoalService)
         service.goal_repository = MagicMock()
 
-        milestones_json = '[{"id": "ms-1", "content": "test", "state": 0, "finish_time": null, "order_index": 0}]'
+        milestones_json = (
+            '[{"id": "ms-1", "content": "test", "state": 0, "finish_time": null, "order_index": 0}]'
+        )
         service.goal_repository.get_goal_by_id.return_value = {
             "id": "goal-test1",
             "name": "test",

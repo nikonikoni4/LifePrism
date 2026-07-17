@@ -4,6 +4,7 @@ CustomRecordRepository 集成测试
 测试 seam: Repository 层
 参考: test/core/unit/storage/test_base_provider_generic_methods.py
 """
+
 import pytest
 
 from lifeprism.repository.exceptions import DuplicateEntityError, EntityNotFoundError
@@ -70,9 +71,7 @@ def repository(test_data_path):
     with lw_db_manager.get_connection() as conn:
         cursor = conn.cursor()
         # 查询所有 custom_ 开头的表名
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'custom_%'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'custom_%'")
         tables = [row[0] for row in cursor.fetchall()]
         for table_name in tables:
             cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
@@ -168,7 +167,9 @@ class TestListTypes:
         type_id_1 = repository.create_type(
             name="体育活动",
             slug="sport",
-            fields=[{"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}],
+            fields=[
+                {"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}
+            ],
         )
         type_id_2 = repository.create_type(
             name="每日饮食",
@@ -238,7 +239,9 @@ class TestGetTypeById:
         type_id = repository.create_type(
             name="体育活动",
             slug="sport",
-            fields=[{"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}],
+            fields=[
+                {"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}
+            ],
         )
 
         fields = repository.get_type_fields(type_id)
@@ -256,12 +259,14 @@ class TestValidation:
     def test_create_type_with_duplicate_slug_raises_duplicate_entity_error(self, repository):
         """slug 冲突：抛 DuplicateEntityError"""
         repository.create_type(
-            name="体育活动", slug="sport",
+            name="体育活动",
+            slug="sport",
             fields=[{"field_name": "内容", "field_key": "content", "field_type": "text"}],
         )
         with pytest.raises(DuplicateEntityError):
             repository.create_type(
-                name="运动", slug="sport",
+                name="运动",
+                slug="sport",
                 fields=[{"field_name": "内容", "field_key": "content", "field_type": "text"}],
             )
 
@@ -269,7 +274,8 @@ class TestValidation:
         """slug 格式错误：抛 ValidationError"""
         with pytest.raises(ValidationError, match="slug"):
             repository.create_type(
-                name="体育活动", slug="Sport-Activity",
+                name="体育活动",
+                slug="Sport-Activity",
                 fields=[{"field_name": "内容", "field_key": "content", "field_type": "text"}],
             )
 
@@ -277,7 +283,8 @@ class TestValidation:
         """field_key 格式错误：抛 ValidationError"""
         with pytest.raises(ValidationError, match="field_key"):
             repository.create_type(
-                name="体育活动", slug="sport",
+                name="体育活动",
+                slug="sport",
                 fields=[{"field_name": "内容", "field_key": "Wrong-Key", "field_type": "text"}],
             )
 
@@ -285,7 +292,8 @@ class TestValidation:
         """field_key 同类型重复：抛 ValidationError"""
         with pytest.raises(ValidationError, match="重复"):
             repository.create_type(
-                name="体育活动", slug="sport",
+                name="体育活动",
+                slug="sport",
                 fields=[
                     {"field_name": "内容1", "field_key": "content", "field_type": "text"},
                     {"field_name": "内容2", "field_key": "content", "field_type": "text"},
@@ -307,7 +315,8 @@ class TestDeleteType:
     def test_delete_type_drops_data_table_and_removes_meta(self, repository):
         """硬删类型：DROP 数据表 + 删除 meta 记录"""
         type_id = repository.create_type(
-            name="体育活动", slug="sport",
+            name="体育活动",
+            slug="sport",
             fields=[{"field_name": "内容", "field_key": "content", "field_type": "text"}],
         )
 
@@ -438,7 +447,9 @@ class TestCreateEntry:
         type_id = repository.create_type(
             name="体育活动",
             slug="sport",
-            fields=[{"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}],
+            fields=[
+                {"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}
+            ],
         )
 
         # Act
@@ -615,11 +626,11 @@ class TestGetEntry:
         type_id = repository.create_type(
             name="体育活动",
             slug="sport",
-            fields=[{"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}],
+            fields=[
+                {"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}
+            ],
         )
-        entry_id = repository.create_entry(
-            type_id=type_id, data={"exercise_content": "跑步5公里"}
-        )
+        entry_id = repository.create_entry(type_id=type_id, data={"exercise_content": "跑步5公里"})
 
         # Act
         entry = repository.get_entry(type_id=type_id, entry_id=entry_id)
@@ -635,7 +646,9 @@ class TestGetEntry:
         type_id = repository.create_type(
             name="体育活动",
             slug="sport",
-            fields=[{"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}],
+            fields=[
+                {"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}
+            ],
         )
 
         # Act
@@ -657,11 +670,11 @@ class TestDeleteEntry:
         type_id = repository.create_type(
             name="体育活动",
             slug="sport",
-            fields=[{"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}],
+            fields=[
+                {"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}
+            ],
         )
-        entry_id = repository.create_entry(
-            type_id=type_id, data={"exercise_content": "跑步5公里"}
-        )
+        entry_id = repository.create_entry(type_id=type_id, data={"exercise_content": "跑步5公里"})
 
         # Act
         repository.delete_entry(type_id=type_id, entry_id=entry_id)
@@ -678,7 +691,9 @@ class TestDeleteEntry:
         type_id = repository.create_type(
             name="体育活动",
             slug="sport",
-            fields=[{"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}],
+            fields=[
+                {"field_name": "锻炼内容", "field_key": "exercise_content", "field_type": "text"}
+            ],
         )
 
         # Act + Assert: 删除不存在的 entry 应抛 EntityNotFoundError
@@ -793,9 +808,7 @@ class TestUpdateFieldRole:
                 break
         assert field_id is not None
 
-        repository.update_field_role(
-            type_id=type_id, field_id=field_id, display_role="main"
-        )
+        repository.update_field_role(type_id=type_id, field_id=field_id, display_role="main")
 
         # Assert
         fields_after = repository.get_type_fields(type_id)
@@ -922,9 +935,7 @@ class TestCreateEntryWithNumericFields:
             fields=[{"field_name": "步数", "field_key": "steps", "field_type": "integer"}],
         )
 
-        entry_id = repository.create_entry(
-            type_id=type_id, data={"steps": 5}
-        )
+        entry_id = repository.create_entry(type_id=type_id, data={"steps": 5})
 
         with repository.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -941,9 +952,7 @@ class TestCreateEntryWithNumericFields:
             fields=[{"field_name": "步数", "field_key": "steps", "field_type": "integer"}],
         )
 
-        entry_id = repository.create_entry(
-            type_id=type_id, data={"steps": "5"}
-        )
+        entry_id = repository.create_entry(type_id=type_id, data={"steps": "5"})
 
         with repository.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -992,9 +1001,7 @@ class TestCreateEntryWithNumericFields:
             fields=[{"field_name": "体重(kg)", "field_key": "weight", "field_type": "float"}],
         )
 
-        entry_id = repository.create_entry(
-            type_id=type_id, data={"weight": 65.5}
-        )
+        entry_id = repository.create_entry(type_id=type_id, data={"weight": 65.5})
 
         with repository.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -1011,9 +1018,7 @@ class TestCreateEntryWithNumericFields:
             fields=[{"field_name": "体重(kg)", "field_key": "weight", "field_type": "float"}],
         )
 
-        entry_id = repository.create_entry(
-            type_id=type_id, data={"weight": 70}
-        )
+        entry_id = repository.create_entry(type_id=type_id, data={"weight": 70})
 
         with repository.db.get_connection() as conn:
             cursor = conn.cursor()

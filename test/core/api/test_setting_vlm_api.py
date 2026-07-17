@@ -3,8 +3,10 @@ Settings VLM API 测试
 
 测试 POST /settings/test-vlm 接口
 """
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 
 from lifeprism.server.main import app
@@ -24,7 +26,7 @@ def test_test_vlm_success(monkeypatch):
         return {
             "success": True,
             "message": "VLM 图像理解测试成功",
-            "model_response": "这是一张猫的图片"
+            "model_response": "这是一张猫的图片",
         }
 
     # 捕获 settings.set 调用
@@ -52,6 +54,7 @@ def test_test_vlm_success(monkeypatch):
 @pytest.mark.core
 def test_test_vlm_connection_failure(monkeypatch):
     """测试 VLM 能力测试 - 连接失败的情况"""
+
     async def fake_test_connect():
         return {"success": False, "message": "API Key 无效"}
 
@@ -145,10 +148,13 @@ def test_test_vlm_updates_is_vlm_cache(monkeypatch):
 @pytest.mark.core
 def test_test_vlm_exception_handling(monkeypatch):
     """测试 VLM 能力测试 - 异常处理"""
+
     async def fake_test_connect_exception():
         raise RuntimeError("网络错误")
 
-    monkeypatch.setattr("lifeprism.llm.function.test_connect.test_connect", fake_test_connect_exception)
+    monkeypatch.setattr(
+        "lifeprism.llm.function.test_connect.test_connect", fake_test_connect_exception
+    )
 
     client = TestClient(app, raise_server_exceptions=False)
     response = client.post("/api/v2/settings/test-vlm")

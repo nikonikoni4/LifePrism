@@ -1,10 +1,12 @@
 """LLM 调用记录器简单测试"""
 
 import sys
-sys.path.insert(0, '.')
+
+sys.path.insert(0, ".")
 
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from lifeprism.llm.utils import llm_call_logger
 
 
@@ -58,20 +60,16 @@ def main():
         type="general_task",
         content="这是一条测试消息",
         session_id="test-session-001",
-        extra={"system_prompt": "你是一个测试助手"}
+        extra={"system_prompt": "你是一个测试助手"},
     )
 
     response = MockOutboundMessage(
         id="test-1",
         response=MockLLMResponse(
             content="这是测试回复",
-            usage={
-                "prompt_tokens": 100,
-                "completion_tokens": 50,
-                "total_tokens": 150
-            }
+            usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
         ),
-        session_id="test-session-001"
+        session_id="test-session-001",
     )
 
     record_id = llm_call_logger.log_call(
@@ -97,14 +95,13 @@ def main():
         content=[
             {"type": "text", "text": "分析这张图片"},
             {"type": "image_url", "image_url": {"url": tiny_png_base64}},
-            {"type": "text", "text": "请详细描述"}
+            {"type": "text", "text": "请详细描述"},
         ],
-        extra={"system_prompt": "你是一个图片分析助手"}
+        extra={"system_prompt": "你是一个图片分析助手"},
     )
 
     response = MockOutboundMessage(
-        id="test-2",
-        response=MockLLMResponse(content="这是一张透明图片")
+        id="test-2", response=MockLLMResponse(content="这是一张透明图片")
     )
 
     record_id = llm_call_logger.log_call(
@@ -122,9 +119,7 @@ def main():
     # 测试 4：导出数据集
     print("测试 4：按 prompt 导出数据集")
     dataset = llm_call_logger.export_by_prompt(
-        prompt_module="test",
-        prompt_name="test_prompt",
-        prompt_version="v1"
+        prompt_module="test", prompt_name="test_prompt", prompt_version="v1"
     )
 
     print(f"  导出记录数: {len(dataset)}")

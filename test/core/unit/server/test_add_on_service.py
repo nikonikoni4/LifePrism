@@ -2,14 +2,19 @@
 add_on_service 单元测试
 """
 
-import pytest
 import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
+from lifeprism.server.schemas.add_on_schemas import (
+    CreateExpandDirRequest,
+    ExpandDirItem,
+    UpdateExpandDirRequest,
+)
 from lifeprism.server.services import add_on_service
-from lifeprism.server.schemas.add_on_schemas import CreateExpandDirRequest, UpdateExpandDirRequest, ExpandDirItem
 
 
 @pytest.fixture
@@ -23,7 +28,7 @@ def temp_data_dir(tmp_path):
 @pytest.fixture
 def mock_settings(temp_data_dir):
     """Mock settings.lifeprism_data_path"""
-    with patch('lifeprism.server.services.add_on_service.settings') as mock:
+    with patch("lifeprism.server.services.add_on_service.settings") as mock:
         mock.lifeprism_data_path = str(temp_data_dir)
         yield mock
 
@@ -41,10 +46,7 @@ def test_create_expand_dir_success(mock_settings, tmp_path):
     test_dir.mkdir()
 
     data = CreateExpandDirRequest(
-        name="测试文件夹",
-        path=str(test_dir),
-        description="测试描述",
-        ai_index=True
+        name="测试文件夹", path=str(test_dir), description="测试描述", ai_index=True
     )
 
     result = add_on_service.create_expand_dir(data)
@@ -60,10 +62,7 @@ def test_create_expand_dir_success(mock_settings, tmp_path):
 def test_create_expand_dir_invalid_path(mock_settings):
     """测试创建时路径无效"""
     data = CreateExpandDirRequest(
-        name="测试",
-        path="/invalid/path/does/not/exist",
-        description="",
-        ai_index=False
+        name="测试", path="/invalid/path/does/not/exist", description="", ai_index=False
     )
 
     with pytest.raises(ValueError, match="路径不存在或无法访问"):
@@ -76,10 +75,7 @@ def test_create_expand_dir_duplicate_path(mock_settings, tmp_path):
     test_dir.mkdir()
 
     data = CreateExpandDirRequest(
-        name="文件夹1",
-        path=str(test_dir),
-        description="",
-        ai_index=False
+        name="文件夹1", path=str(test_dir), description="", ai_index=False
     )
 
     # 第一次创建成功
@@ -87,10 +83,7 @@ def test_create_expand_dir_duplicate_path(mock_settings, tmp_path):
 
     # 第二次创建相同路径应该失败
     data2 = CreateExpandDirRequest(
-        name="文件夹2",
-        path=str(test_dir),
-        description="",
-        ai_index=False
+        name="文件夹2", path=str(test_dir), description="", ai_index=False
     )
 
     with pytest.raises(ValueError, match="该路径已被添加"):
@@ -104,10 +97,7 @@ def test_update_expand_dir_success(mock_settings, tmp_path):
     test_dir1.mkdir()
 
     create_data = CreateExpandDirRequest(
-        name="原名称",
-        path=str(test_dir1),
-        description="原描述",
-        ai_index=False
+        name="原名称", path=str(test_dir1), description="原描述", ai_index=False
     )
     created = add_on_service.create_expand_dir(create_data)
 
@@ -116,10 +106,7 @@ def test_update_expand_dir_success(mock_settings, tmp_path):
     test_dir2.mkdir()
 
     update_data = UpdateExpandDirRequest(
-        name="新名称",
-        path=str(test_dir2),
-        description="新描述",
-        ai_index=True
+        name="新名称", path=str(test_dir2), description="新描述", ai_index=True
     )
 
     result = add_on_service.update_expand_dir(created.id, update_data)
@@ -137,10 +124,7 @@ def test_update_expand_dir_not_found(mock_settings, tmp_path):
     test_dir.mkdir()
 
     update_data = UpdateExpandDirRequest(
-        name="名称",
-        path=str(test_dir),
-        description="",
-        ai_index=False
+        name="名称", path=str(test_dir), description="", ai_index=False
     )
 
     with pytest.raises(ValueError, match="扩展文件夹不存在"):
@@ -154,10 +138,7 @@ def test_delete_expand_dir_success(mock_settings, tmp_path):
     test_dir.mkdir()
 
     create_data = CreateExpandDirRequest(
-        name="测试",
-        path=str(test_dir),
-        description="",
-        ai_index=False
+        name="测试", path=str(test_dir), description="", ai_index=False
     )
     created = add_on_service.create_expand_dir(create_data)
 
@@ -183,10 +164,7 @@ def test_id_generation_sequence(mock_settings, tmp_path):
         test_dir.mkdir()
 
         data = CreateExpandDirRequest(
-            name=f"文件夹{i}",
-            path=str(test_dir),
-            description="",
-            ai_index=False
+            name=f"文件夹{i}", path=str(test_dir), description="", ai_index=False
         )
         result = add_on_service.create_expand_dir(data)
         assert result.id == str(i)
@@ -199,10 +177,7 @@ def test_id_generation_sequence(mock_settings, tmp_path):
     test_dir4.mkdir()
 
     data4 = CreateExpandDirRequest(
-        name="文件夹4",
-        path=str(test_dir4),
-        description="",
-        ai_index=False
+        name="文件夹4", path=str(test_dir4), description="", ai_index=False
     )
     result4 = add_on_service.create_expand_dir(data4)
     assert result4.id == "4"

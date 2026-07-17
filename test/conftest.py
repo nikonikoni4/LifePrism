@@ -3,10 +3,12 @@
 
 设置测试环境变量，确保测试使用独立的数据库。
 """
+
 import os
-import pytest
-from pathlib import Path
 import shutil
+from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture(scope="session", autouse=True)

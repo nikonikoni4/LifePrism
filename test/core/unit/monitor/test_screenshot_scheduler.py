@@ -1,4 +1,5 @@
 import pytest
+
 from lifeprism.monitor.screenshot.models import CaptureReason, WindowContext
 from lifeprism.monitor.screenshot.policy import get_frequency_policy
 from lifeprism.monitor.screenshot.scheduler import ScreenshotScheduler
@@ -126,7 +127,9 @@ def test_enter_capture_obeys_cooldown():
     assert first == []
 
     # 10.7s时Enter延迟到达，触发第一张Enter截图
-    first_due = scheduler.evaluate(10.7, "2026-04-02T10:00:10.700000", window, True, "seg-1", [10.0])
+    first_due = scheduler.evaluate(
+        10.7, "2026-04-02T10:00:10.700000", window, True, "seg-1", [10.0]
+    )
     assert len(first_due) == 1
     assert first_due[0].reason is CaptureReason.ENTER
     assert first_due[0].engaged_segment_id == "seg-1"

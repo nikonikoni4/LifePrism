@@ -5,7 +5,8 @@ Prompt 管理系统使用示例
 """
 
 from pathlib import Path
-from lifeprism.llm.prompts import PromptLoader, Prompts, PromptRef
+
+from lifeprism.llm.prompts import PromptLoader, PromptRef, Prompts
 
 
 def example_basic_usage():
@@ -41,7 +42,7 @@ def example_with_parameters():
         Prompts.Schedule.UPDATE_MEMORY,
         recent_state_path="templates/user/daily_data/recent_status.md",
         user_md_path="templates/user/user.md",
-        diary_path_template="templates/user/diary/{year}/{month}/{year}-{month}-{day}.md"
+        diary_path_template="templates/user/diary/{year}/{month}/{year}-{month}-{day}.md",
     )
 
     print(f"✓ 参数注入成功: {len(prompt)} 字符")
@@ -119,7 +120,7 @@ def example_real_world_usage():
         Prompts.Schedule.UPDATE_MEMORY,
         recent_state_path="templates/user/daily_data/recent_status.md",
         user_md_path="templates/user/user.md",
-        diary_path_template="templates/user/diary/{year}/{month}/{year}-{month}-{day}.md"
+        diary_path_template="templates/user/diary/{year}/{month}/{year}-{month}-{day}.md",
     )
     print(f"  ✓ 获取 prompt: {len(memory_prompt)} 字符")
     # 这里会调用 LLM API，传入 memory_prompt

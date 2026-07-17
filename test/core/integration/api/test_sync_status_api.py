@@ -15,12 +15,12 @@ Mock 策略:
 - Mock settings_manager.get_setting()
 - Mock 数据库 COUNT 查询（SyncRepository.count_rows_batch）
 """
+
 import logging
 import time
-
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
@@ -156,18 +156,14 @@ class TestSyncStatus:
         data = response.json()
         assert data["status"] == "syncing"
 
-    def test_get_status_returns_remote_url(
-        self, client, mock_get_setting, mock_sync_repository
-    ):
+    def test_get_status_returns_remote_url(self, client, mock_get_setting, mock_sync_repository):
         """Seam 1: 返回 remote_url"""
         response = client.get("/api/sync/status")
         assert response.status_code == 200
         data = response.json()
         assert data["remote_url"] == "https://example.com/sync"
 
-    def test_get_status_returns_table_counts(
-        self, client, mock_get_setting, mock_sync_repository
-    ):
+    def test_get_status_returns_table_counts(self, client, mock_get_setting, mock_sync_repository):
         """Seam 1: 返回各表记录数（通过 count_rows_batch 批量查询）"""
         response = client.get("/api/sync/status")
         assert response.status_code == 200
@@ -190,9 +186,7 @@ class TestSyncStatus:
         assert response.status_code == 200
         mock_sync_repository.count_rows_batch.assert_called_once()
 
-    def test_get_status_returns_503_without_sync_client(
-        self, client_without_sync_client
-    ):
+    def test_get_status_returns_503_without_sync_client(self, client_without_sync_client):
         """Seam 2: 无 SyncClient 时返回 503"""
         response = client_without_sync_client.get("/api/sync/status")
         assert response.status_code == 503
@@ -236,17 +230,13 @@ class TestSyncTrigger:
         assert data["message"] == "同步正在进行中"
         assert data["status"] == "syncing"
 
-    def test_trigger_does_not_start_thread_when_syncing(
-        self, client, mock_sync_client
-    ):
+    def test_trigger_does_not_start_thread_when_syncing(self, client, mock_sync_client):
         """Seam 4: 已在同步中时不启动后台线程、不调用 sync_once"""
         mock_sync_client.try_start_sync.return_value = False
         client.post("/api/sync/trigger")
         mock_sync_client.sync_once.assert_not_called()
 
-    def test_trigger_returns_503_without_sync_client(
-        self, client_without_sync_client
-    ):
+    def test_trigger_returns_503_without_sync_client(self, client_without_sync_client):
         """无 SyncClient 时返回 503"""
         response = client_without_sync_client.post("/api/sync/trigger")
         assert response.status_code == 503
@@ -292,6 +282,4 @@ class TestRunSyncBackground:
         with caplog.at_level(logging.ERROR):
             _run_sync_background(mock_sync_client)
 
-        assert any(
-            "手动触发同步失败" in record.message for record in caplog.records
-        )
+        assert any("手动触发同步失败" in record.message for record in caplog.records)

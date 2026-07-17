@@ -1,6 +1,8 @@
 """测试在启用 llm_call_logger 后是否能正常记录"""
+
 import sys
-sys.path.insert(0, '.')
+
+sys.path.insert(0, ".")
 
 import asyncio
 from datetime import datetime
@@ -28,15 +30,16 @@ async def test_log_call_with_enabled():
     msg = InboundMessage(
         MessageType.DREAM_TASK,
         content="测试活动总结",
-        extra={"system_prompt": "你是一个活动总结助手"}
+        extra={"system_prompt": "你是一个活动总结助手"},
     )
 
     result = await bus.send(msg)
 
     record_id = llm_call_logger.log_call(
-        msg, result,
+        msg,
+        result,
         prompt_module=Prompts.Schedule.ACTIVITY_SUMMARY.module,
-        prompt_name=Prompts.Schedule.ACTIVITY_SUMMARY.name
+        prompt_name=Prompts.Schedule.ACTIVITY_SUMMARY.name,
     )
 
     print(f"   - 返回的 record_id: {record_id}")
@@ -52,15 +55,16 @@ async def test_log_call_with_enabled():
 
     if log_file.exists():
         import json
-        with open(log_file, 'r', encoding='utf-8') as f:
+
+        with open(log_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         print(f"   - 文件版本: {data.get('version')}")
         print(f"   - 记录日期: {data.get('date')}")
         print(f"   - 记录数量: {len(data.get('calls', []))}")
 
-        if data.get('calls'):
-            last_call = data['calls'][-1]
+        if data.get("calls"):
+            last_call = data["calls"][-1]
             print(f"\n   最后一条记录详情:")
             print(f"   - ID: {last_call.get('id')}")
             print(f"   - 时间戳: {last_call.get('timestamp')}")

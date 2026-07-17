@@ -73,11 +73,7 @@ class TestSyncTablesStatic:
 
         # Assert: 所有 31 张期望表都在 SYNC_TABLES 中
         for table in EXPECTED_STATIC_TABLES:
-            assert table in SYNC_TABLES, (
-                f"静态表 {table} 不在 SYNC_TABLES 中"
-            )
+            assert table in SYNC_TABLES, f"静态表 {table} 不在 SYNC_TABLES 中"
 
         # Assert: SYNC_TABLES 恰好包含 31 张表
-        assert len(SYNC_TABLES) == 31, (
-            f"SYNC_TABLES 应包含 31 张表，实际 {len(SYNC_TABLES)} 张"
-        )
+        assert len(SYNC_TABLES) == 31, f"SYNC_TABLES 应包含 31 张表，实际 {len(SYNC_TABLES)} 张"

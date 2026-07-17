@@ -2,6 +2,7 @@
 测试 providers.yaml 迁移脚本
 验证 xiaomi_mimo provider 是否通过迁移脚本正确添加
 """
+
 import sys
 from pathlib import Path
 
@@ -59,9 +60,10 @@ def test_migration():
 
     # 4. 检查 config_version
     import yaml
-    with open(config_path, 'r', encoding='utf-8') as f:
+
+    with open(config_path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
-    config_version = data.get('config_version', 0)
+    config_version = data.get("config_version", 0)
     print(f"\n[4] config_version: {config_version}")
     if config_version >= 2:
         print("    [OK] 迁移已应用 (version >= 2)")

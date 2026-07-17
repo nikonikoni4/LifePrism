@@ -10,18 +10,20 @@
 - FileTreeTool 存在 datetime 未导入的 bug，部分功能测试跳过
 - SearchStringTool 只允许搜索 .txt, .md, .json, .log, .csv 后缀的文件
 """
-import pytest
+
 import shutil
 from pathlib import Path
 
+import pytest
+
 from lifeprism.config import settings
 from lifeprism.llm.agent.tools.filesystem import (
+    ALLOWED_SEARCH_EXTENSIONS,
+    FileTreeTool,
     SearchFileTool,
     SearchStringTool,
-    FileTreeTool,
     _search_files_py,
     _search_string_py,
-    ALLOWED_SEARCH_EXTENSIONS,
 )
 
 
@@ -87,24 +89,19 @@ def temp_string_search_dir():
 
     # 只创建允许搜索的文件类型: .txt, .md, .json, .log, .csv
     (temp_dir / "notes.txt").write_text(
-        "Hello World\nThis is a test file\nsearch keyword here\nEnd of file",
-        encoding="utf-8"
+        "Hello World\nThis is a test file\nsearch keyword here\nEnd of file", encoding="utf-8"
     )
     (temp_dir / "readme.md").write_text(
-        "# Project README\n\nSearch documentation here\n\n## Section 2",
-        encoding="utf-8"
+        "# Project README\n\nSearch documentation here\n\n## Section 2", encoding="utf-8"
     )
     (temp_dir / "config.json").write_text(
-        '{\n  "search_key": "value",\n  "name": "test"\n}',
-        encoding="utf-8"
+        '{\n  "search_key": "value",\n  "name": "test"\n}', encoding="utf-8"
     )
     (temp_dir / "app.log").write_text(
-        "[INFO] Application started\n[ERROR] search failed\n[DEBUG] Debug info",
-        encoding="utf-8"
+        "[INFO] Application started\n[ERROR] search failed\n[DEBUG] Debug info", encoding="utf-8"
     )
     (temp_dir / "data.csv").write_text(
-        "id,name,value\n1,search_item,100\n2,other,200",
-        encoding="utf-8"
+        "id,name,value\n1,search_item,100\n2,other,200", encoding="utf-8"
     )
 
     # 创建不允许搜索的文件类型
@@ -130,6 +127,7 @@ def temp_string_search_dir():
 # ==========================================
 # SearchFileTool 测试
 # ==========================================
+
 
 class TestSearchFileTool:
     """SearchFileTool 测试类"""
@@ -170,11 +168,7 @@ class TestSearchFileTool:
     @pytest.mark.asyncio
     async def test_search_basic(self, temp_search_dir):
         """测试基本文件名搜索"""
-        result = _search_files_py(
-            search_dir=str(temp_search_dir),
-            file_name="test",
-            max_results=20
-        )
+        result = _search_files_py(search_dir=str(temp_search_dir), file_name="test", max_results=20)
 
         assert "files" in result
         assert "count" in result
@@ -185,15 +179,21 @@ class TestSearchFileTool:
     @pytest.mark.asyncio
     async def test_search_case_insensitive(self, temp_search_dir):
         """测试不区分大小写搜索"""
-        result_upper = _search_files_py(search_dir=str(temp_search_dir), file_name="TEST", max_results=20)
-        result_lower = _search_files_py(search_dir=str(temp_search_dir), file_name="test", max_results=20)
+        result_upper = _search_files_py(
+            search_dir=str(temp_search_dir), file_name="TEST", max_results=20
+        )
+        result_lower = _search_files_py(
+            search_dir=str(temp_search_dir), file_name="test", max_results=20
+        )
 
         assert result_upper["count"] == result_lower["count"]
 
     @pytest.mark.asyncio
     async def test_search_exact_filename(self, temp_search_dir):
         """测试精确文件名匹配"""
-        result = _search_files_py(search_dir=str(temp_search_dir), file_name="data.json", max_results=20)
+        result = _search_files_py(
+            search_dir=str(temp_search_dir), file_name="data.json", max_results=20
+        )
 
         assert result["count"] == 1
         assert "data.json" in result["files"][0]
@@ -210,7 +210,9 @@ class TestSearchFileTool:
     @pytest.mark.asyncio
     async def test_search_nested_directories(self, temp_search_dir):
         """测试搜索嵌套目录"""
-        result = _search_files_py(search_dir=str(temp_search_dir), file_name="deep_file", max_results=20)
+        result = _search_files_py(
+            search_dir=str(temp_search_dir), file_name="deep_file", max_results=20
+        )
 
         assert result["count"] == 1
         assert "subdir2" in result["files"][0]
@@ -227,7 +229,9 @@ class TestSearchFileTool:
     @pytest.mark.asyncio
     async def test_search_no_match(self, temp_search_dir):
         """测试无匹配结果"""
-        result = _search_files_py(search_dir=str(temp_search_dir), file_name="nonexistent_xyz", max_results=20)
+        result = _search_files_py(
+            search_dir=str(temp_search_dir), file_name="nonexistent_xyz", max_results=20
+        )
 
         assert result["count"] == 0
         assert len(result["files"]) == 0
@@ -252,7 +256,9 @@ class TestSearchFileTool:
     @pytest.mark.asyncio
     async def test_search_max_depth(self, temp_search_dir):
         """测试最大搜索深度限制"""
-        result = _search_files_py(search_dir=str(temp_search_dir), file_name="test", max_results=20, max_depth=1)
+        result = _search_files_py(
+            search_dir=str(temp_search_dir), file_name="test", max_results=20, max_depth=1
+        )
 
         assert result["count"] >= 2
         assert not any("deep_file" in f for f in result["files"])
@@ -283,7 +289,9 @@ class TestSearchFileTool:
         tool.allowed_dir_path = [temp_search_dir]
 
         try:
-            result = await tool.execute(search_dir=str(temp_search_dir), file_name="test", max_results=20)
+            result = await tool.execute(
+                search_dir=str(temp_search_dir), file_name="test", max_results=20
+            )
             assert "Success" in result
         finally:
             tool.allowed_dir_path = original_paths
@@ -292,6 +300,7 @@ class TestSearchFileTool:
 # ==========================================
 # SearchStringTool 测试
 # ==========================================
+
 
 class TestSearchStringTool:
     """SearchStringTool 测试类"""
@@ -327,7 +336,7 @@ class TestSearchStringTool:
 
     def test_allowed_extensions(self):
         """测试允许搜索的文件后缀配置"""
-        expected = {'.txt', '.md', '.json', '.log', '.csv'}
+        expected = {".txt", ".md", ".json", ".log", ".csv"}
         assert ALLOWED_SEARCH_EXTENSIONS == expected
 
     @pytest.mark.asyncio
@@ -335,10 +344,7 @@ class TestSearchStringTool:
         """测试在 txt 文件中搜索"""
         file_path = temp_string_search_dir / "notes.txt"
 
-        result = _search_string_py(
-            path=str(file_path),
-            pattern="search keyword"
-        )
+        result = _search_string_py(path=str(file_path), pattern="search keyword")
 
         assert "result" in result
         assert "search keyword" in result["result"]
@@ -349,10 +355,7 @@ class TestSearchStringTool:
         """测试在 md 文件中搜索"""
         file_path = temp_string_search_dir / "readme.md"
 
-        result = _search_string_py(
-            path=str(file_path),
-            pattern="Search documentation"
-        )
+        result = _search_string_py(path=str(file_path), pattern="Search documentation")
 
         assert "result" in result
         assert "Search documentation" in result["result"]
@@ -362,10 +365,7 @@ class TestSearchStringTool:
         """测试在 json 文件中搜索"""
         file_path = temp_string_search_dir / "config.json"
 
-        result = _search_string_py(
-            path=str(file_path),
-            pattern="search_key"
-        )
+        result = _search_string_py(path=str(file_path), pattern="search_key")
 
         assert "result" in result
         assert "search_key" in result["result"]
@@ -375,10 +375,7 @@ class TestSearchStringTool:
         """测试在 log 文件中搜索"""
         file_path = temp_string_search_dir / "app.log"
 
-        result = _search_string_py(
-            path=str(file_path),
-            pattern="search failed"
-        )
+        result = _search_string_py(path=str(file_path), pattern="search failed")
 
         assert "result" in result
         assert "search failed" in result["result"]
@@ -388,10 +385,7 @@ class TestSearchStringTool:
         """测试在 csv 文件中搜索"""
         file_path = temp_string_search_dir / "data.csv"
 
-        result = _search_string_py(
-            path=str(file_path),
-            pattern="search_item"
-        )
+        result = _search_string_py(path=str(file_path), pattern="search_item")
 
         assert "result" in result
         assert "search_item" in result["result"]
@@ -399,10 +393,7 @@ class TestSearchStringTool:
     @pytest.mark.asyncio
     async def test_search_in_directory(self, temp_string_search_dir):
         """测试在目录中递归搜索（只搜索允许的文件类型）"""
-        result = _search_string_py(
-            path=str(temp_string_search_dir),
-            pattern="search"
-        )
+        result = _search_string_py(path=str(temp_string_search_dir), pattern="search")
 
         assert "result" in result
         # 应该在 txt, md, json, log, csv 文件中找到匹配
@@ -411,10 +402,7 @@ class TestSearchStringTool:
     @pytest.mark.asyncio
     async def test_search_skips_py_files(self, temp_string_search_dir):
         """测试搜索时跳过 .py 文件"""
-        result = _search_string_py(
-            path=str(temp_string_search_dir),
-            pattern="search"
-        )
+        result = _search_string_py(path=str(temp_string_search_dir), pattern="search")
 
         assert "result" in result
         # .py 文件不应该出现在结果中
@@ -424,10 +412,7 @@ class TestSearchStringTool:
     @pytest.mark.asyncio
     async def test_search_skips_unsupported_files(self, temp_string_search_dir):
         """测试搜索时跳过不支持的文件类型"""
-        result = _search_string_py(
-            path=str(temp_string_search_dir),
-            pattern="search"
-        )
+        result = _search_string_py(path=str(temp_string_search_dir), pattern="search")
 
         assert "result" in result
         # .css, .html 文件不应该出现在结果中
@@ -439,10 +424,7 @@ class TestSearchStringTool:
         """测试直接指定 .py 文件搜索时返回错误"""
         file_path = temp_string_search_dir / "script.py"
 
-        result = _search_string_py(
-            path=str(file_path),
-            pattern="search"
-        )
+        result = _search_string_py(path=str(file_path), pattern="search")
 
         assert "error" in result
         assert "不是可搜索的文本文件类型" in result["error"]
@@ -450,10 +432,7 @@ class TestSearchStringTool:
     @pytest.mark.asyncio
     async def test_search_with_regex(self, temp_string_search_dir):
         """测试使用正则表达式搜索"""
-        result = _search_string_py(
-            path=str(temp_string_search_dir),
-            pattern=r"search\s+\w+"
-        )
+        result = _search_string_py(path=str(temp_string_search_dir), pattern=r"search\s+\w+")
 
         assert "result" in result
         assert "search" in result["result"]
@@ -463,11 +442,7 @@ class TestSearchStringTool:
         """测试带上下文行数的搜索"""
         file_path = temp_string_search_dir / "notes.txt"
 
-        result = _search_string_py(
-            path=str(file_path),
-            pattern="search keyword",
-            context_lines=1
-        )
+        result = _search_string_py(path=str(file_path), pattern="search keyword", context_lines=1)
 
         assert "result" in result
         assert "search keyword" in result["result"]
@@ -475,10 +450,7 @@ class TestSearchStringTool:
     @pytest.mark.asyncio
     async def test_search_no_match(self, temp_string_search_dir):
         """测试搜索不存在的字符串"""
-        result = _search_string_py(
-            path=str(temp_string_search_dir),
-            pattern="nonexistent_xyz_123"
-        )
+        result = _search_string_py(path=str(temp_string_search_dir), pattern="nonexistent_xyz_123")
 
         assert "result" in result
         assert "未找到匹配项" in result["result"]
@@ -486,10 +458,7 @@ class TestSearchStringTool:
     @pytest.mark.asyncio
     async def test_search_path_not_exist(self):
         """测试搜索不存在的路径"""
-        result = _search_string_py(
-            path="/nonexistent/path/xyz",
-            pattern="test"
-        )
+        result = _search_string_py(path="/nonexistent/path/xyz", pattern="test")
 
         assert "error" in result
         assert "不存在" in result["error"]
@@ -497,10 +466,7 @@ class TestSearchStringTool:
     @pytest.mark.asyncio
     async def test_search_invalid_regex(self, temp_string_search_dir):
         """测试无效的正则表达式"""
-        result = _search_string_py(
-            path=str(temp_string_search_dir),
-            pattern="[invalid"
-        )
+        result = _search_string_py(path=str(temp_string_search_dir), pattern="[invalid")
 
         assert "error" in result
         assert "无效的正则表达式" in result["error"]
@@ -509,16 +475,11 @@ class TestSearchStringTool:
     async def test_search_case_sensitive(self, temp_string_search_dir):
         """测试大小写敏感搜索"""
         # 不区分大小写
-        result_insensitive = _search_string_py(
-            path=str(temp_string_search_dir),
-            pattern="SEARCH"
-        )
+        result_insensitive = _search_string_py(path=str(temp_string_search_dir), pattern="SEARCH")
 
         # 区分大小写
         result_sensitive = _search_string_py(
-            path=str(temp_string_search_dir),
-            pattern="SEARCH",
-            case_sensitive=True
+            path=str(temp_string_search_dir), pattern="SEARCH", case_sensitive=True
         )
 
         # 不区分大小写应该能找到结果
@@ -529,9 +490,7 @@ class TestSearchStringTool:
     async def test_search_max_results(self, temp_string_search_dir):
         """测试最大结果数限制"""
         result = _search_string_py(
-            path=str(temp_string_search_dir),
-            pattern="search",
-            max_results=2
+            path=str(temp_string_search_dir), pattern="search", max_results=2
         )
 
         assert "result" in result
@@ -544,11 +503,7 @@ class TestSearchStringTool:
     async def test_search_max_depth(self, temp_string_search_dir):
         """测试最大搜索深度限制"""
         # 深度1，只搜索第一层
-        result = _search_string_py(
-            path=str(temp_string_search_dir),
-            pattern="search",
-            max_depth=1
-        )
+        result = _search_string_py(path=str(temp_string_search_dir), pattern="search", max_depth=1)
 
         assert "result" in result
         # 深度1应该能找到第一层的文件
@@ -559,10 +514,7 @@ class TestSearchStringTool:
     @pytest.mark.asyncio
     async def test_search_nested_directory(self, temp_string_search_dir):
         """测试在嵌套目录中搜索"""
-        result = _search_string_py(
-            path=str(temp_string_search_dir),
-            pattern="nested search"
-        )
+        result = _search_string_py(path=str(temp_string_search_dir), pattern="nested search")
 
         assert "result" in result
         assert "nested.txt" in result["result"]
@@ -589,6 +541,7 @@ class TestSearchStringTool:
 # ==========================================
 # FileTreeTool 测试
 # ==========================================
+
 
 class TestFileTreeTool:
     """FileTreeTool 测试类"""
@@ -625,9 +578,7 @@ class TestFileTreeTool:
         tool = FileTreeTool()
 
         result = await tool.execute(
-            dir_path=str(temp_search_dir),
-            recursive=False,
-            show_hidden=False
+            dir_path=str(temp_search_dir), recursive=False, show_hidden=False
         )
 
         assert "Success" in result
@@ -646,10 +597,7 @@ class TestFileTreeTool:
         tool = FileTreeTool()
 
         result = await tool.execute(
-            dir_path=str(temp_search_dir),
-            recursive=True,
-            max_depth=3,
-            show_hidden=False
+            dir_path=str(temp_search_dir), recursive=True, max_depth=3, show_hidden=False
         )
 
         assert "Success" in result
@@ -660,9 +608,7 @@ class TestFileTreeTool:
         tool = FileTreeTool()
 
         result = await tool.execute(
-            dir_path=str(temp_search_dir),
-            recursive=False,
-            show_hidden=True
+            dir_path=str(temp_search_dir), recursive=False, show_hidden=True
         )
 
         assert "Success" in result
@@ -673,9 +619,7 @@ class TestFileTreeTool:
         tool = FileTreeTool()
 
         result = await tool.execute(
-            dir_path=str(temp_search_dir),
-            recursive=False,
-            show_hidden=False
+            dir_path=str(temp_search_dir), recursive=False, show_hidden=False
         )
 
         assert "Success" in result
@@ -686,10 +630,7 @@ class TestFileTreeTool:
         tool = FileTreeTool()
 
         result = await tool.execute(
-            dir_path=str(temp_search_dir),
-            recursive=True,
-            max_depth=1,
-            show_hidden=False
+            dir_path=str(temp_search_dir), recursive=True, max_depth=1, show_hidden=False
         )
 
         assert "Success" in result

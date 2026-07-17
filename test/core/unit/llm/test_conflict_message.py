@@ -34,8 +34,9 @@ class TestConflictResolveMessageType:
 
     def test_message_type_is_plain_class_not_enum(self):
         """MessageType 必须是 plain class（不是 Enum）"""
-        from lifeprism.llm.bus.events import MessageType
         from enum import Enum
+
+        from lifeprism.llm.bus.events import MessageType
 
         # MessageType 不应继承 Enum
         assert not issubclass(MessageType, Enum)

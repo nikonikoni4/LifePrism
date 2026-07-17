@@ -210,11 +210,13 @@ class TestPullFilesCheck:
             {"path": "user/user.md", "parent_hash": "abc123", "current_hash": "def456"},
             {"path": "diary/2026-07-14.md", "parent_hash": None, "current_hash": "xyz789"},
         ]
-        mock_response = _make_mock_response({
-            "files": remote_files,
-            "all_paths": ["user/user.md", "diary/2026-07-14.md"],
-            "sync_time": "...",
-        })
+        mock_response = _make_mock_response(
+            {
+                "files": remote_files,
+                "all_paths": ["user/user.md", "diary/2026-07-14.md"],
+                "sync_time": "...",
+            }
+        )
 
         with patch(
             "lifeprism.sync.sync_client.httpx.post", return_value=mock_response
@@ -384,9 +386,7 @@ class TestPullFilesFetch:
         assert call_args.kwargs["json"]["paths"] == ["sync_full_flow_test/user/user.md"]
 
         # Assert: 文件已写入本地
-        local_file = (
-            settings.lifeprism_data_path / "sync_full_flow_test" / "user" / "user.md"
-        )
+        local_file = settings.lifeprism_data_path / "sync_full_flow_test" / "user" / "user.md"
         assert local_file.exists()
         assert local_file.read_text(encoding="utf-8") == file_content
 
@@ -430,10 +430,14 @@ class TestPushFiles:
             current_hash=content_hash,
         )
 
-        mock_response = _make_mock_response({
-            "results": [{"path": "sync_full_flow_test/agent/identity.md", "action": "accepted"}],
-            "sync_time": "...",
-        })
+        mock_response = _make_mock_response(
+            {
+                "results": [
+                    {"path": "sync_full_flow_test/agent/identity.md", "action": "accepted"}
+                ],
+                "sync_time": "...",
+            }
+        )
 
         with patch(
             "lifeprism.sync.sync_client.httpx.post", return_value=mock_response
@@ -488,19 +492,21 @@ class TestVerifyAndAdvanceParent:
         )
 
         # mock verify 响应：云端 hash 与本地一致
-        verify_response = _make_mock_response({
-            "files": [{"path": "sync_full_flow_test/user/user.md", "current_hash": current_hash}]
-        })
+        verify_response = _make_mock_response(
+            {"files": [{"path": "sync_full_flow_test/user/user.md", "current_hash": current_hash}]}
+        )
         # mock commit 响应
-        commit_response = _make_mock_response({
-            "committed": [{"path": "sync_full_flow_test/user/user.md", "parent_hash": current_hash}]
-        })
+        commit_response = _make_mock_response(
+            {
+                "committed": [
+                    {"path": "sync_full_flow_test/user/user.md", "parent_hash": current_hash}
+                ]
+            }
+        )
 
         responses = [verify_response, commit_response]
 
-        with patch(
-            "lifeprism.sync.sync_client.httpx.post", side_effect=responses
-        ) as mock_post:
+        with patch("lifeprism.sync.sync_client.httpx.post", side_effect=responses) as mock_post:
             # Act
             sync_client._verify_and_advance_parent(
                 remote_url="http://test:8000",
@@ -539,9 +545,9 @@ class TestVerifyAndAdvanceParent:
         )
 
         # mock verify 响应：云端 hash 与本地不一致
-        verify_response = _make_mock_response({
-            "files": [{"path": "sync_full_flow_test/user/user.md", "current_hash": cloud_hash}]
-        })
+        verify_response = _make_mock_response(
+            {"files": [{"path": "sync_full_flow_test/user/user.md", "current_hash": cloud_hash}]}
+        )
 
         with patch(
             "lifeprism.sync.sync_client.httpx.post", return_value=verify_response
@@ -600,40 +606,46 @@ class TestSyncFilesFullFlow:
 
         # Mock 各阶段 HTTP 响应
         # Phase 1 check: 远端返回变更文件（远端改了）
-        check_response = _make_mock_response({
-            "files": [{
-                "path": "sync_full_flow_test/user/user.md",
-                "parent_hash": old_hash,
-                "current_hash": new_hash,
-            }],
-            "all_paths": ["sync_full_flow_test/user/user.md"],
-            "sync_time": "...",
-        })
+        check_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": "sync_full_flow_test/user/user.md",
+                        "parent_hash": old_hash,
+                        "current_hash": new_hash,
+                    }
+                ],
+                "all_paths": ["sync_full_flow_test/user/user.md"],
+                "sync_time": "...",
+            }
+        )
         # Phase 2b fetch: 返回新内容
         compressed = gzip.compress(new_content.encode("utf-8"))
         encoded = base64.b64encode(compressed).decode("ascii")
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": "sync_full_flow_test/user/user.md",
-                "content": encoded,
-                "parent_hash": old_hash,
-                "current_hash": new_hash,
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": "sync_full_flow_test/user/user.md",
+                        "content": encoded,
+                        "parent_hash": old_hash,
+                        "current_hash": new_hash,
+                    }
+                ]
+            }
+        )
         # Phase 3 verify: 返回一致 hash
-        verify_response = _make_mock_response({
-            "files": [{"path": "sync_full_flow_test/user/user.md", "current_hash": new_hash}]
-        })
+        verify_response = _make_mock_response(
+            {"files": [{"path": "sync_full_flow_test/user/user.md", "current_hash": new_hash}]}
+        )
         # Phase 3 commit
-        commit_response = _make_mock_response({
-            "committed": [{"path": "sync_full_flow_test/user/user.md", "parent_hash": new_hash}]
-        })
+        commit_response = _make_mock_response(
+            {"committed": [{"path": "sync_full_flow_test/user/user.md", "parent_hash": new_hash}]}
+        )
 
         responses = [check_response, fetch_response, verify_response, commit_response]
 
-        with patch(
-            "lifeprism.sync.sync_client.httpx.post", side_effect=responses
-        ) as mock_post:
+        with patch("lifeprism.sync.sync_client.httpx.post", side_effect=responses) as mock_post:
             # Act: 执行全流程
             sync_client._sync_files_full_flow(
                 remote_url="http://test:8000",
@@ -690,25 +702,29 @@ class TestSyncFilesFullFlow:
         )
 
         # Mock: check 返回空变更，但云端有此文件（all_paths 含路径）→ PUSH → verify → commit
-        check_response = _make_mock_response({
-            "files": [],
-            "all_paths": ["sync_full_flow_test/agent/identity.md"],
-        })
-        push_response = _make_mock_response({
-            "results": [{"path": "sync_full_flow_test/agent/identity.md", "action": "accepted"}]
-        })
-        verify_response = _make_mock_response({
-            "files": [{"path": "sync_full_flow_test/agent/identity.md", "current_hash": new_hash}]
-        })
-        commit_response = _make_mock_response({
-            "committed": [{"path": "sync_full_flow_test/agent/identity.md", "parent_hash": new_hash}]
-        })
+        check_response = _make_mock_response(
+            {
+                "files": [],
+                "all_paths": ["sync_full_flow_test/agent/identity.md"],
+            }
+        )
+        push_response = _make_mock_response(
+            {"results": [{"path": "sync_full_flow_test/agent/identity.md", "action": "accepted"}]}
+        )
+        verify_response = _make_mock_response(
+            {"files": [{"path": "sync_full_flow_test/agent/identity.md", "current_hash": new_hash}]}
+        )
+        commit_response = _make_mock_response(
+            {
+                "committed": [
+                    {"path": "sync_full_flow_test/agent/identity.md", "parent_hash": new_hash}
+                ]
+            }
+        )
 
         responses = [check_response, push_response, verify_response, commit_response]
 
-        with patch(
-            "lifeprism.sync.sync_client.httpx.post", side_effect=responses
-        ) as mock_post:
+        with patch("lifeprism.sync.sync_client.httpx.post", side_effect=responses) as mock_post:
             sync_client._sync_files_full_flow(
                 remote_url="http://test:8000",
                 api_key="test-key",
@@ -758,10 +774,12 @@ class TestSyncFilesFullFlow:
         )
 
         # Mock: check 返回空变更，但云端有此文件（all_paths 含路径）→ SKIP
-        check_response = _make_mock_response({
-            "files": [],
-            "all_paths": ["sync_full_flow_test/user/user.md"],
-        })
+        check_response = _make_mock_response(
+            {
+                "files": [],
+                "all_paths": ["sync_full_flow_test/user/user.md"],
+            }
+        )
 
         with patch(
             "lifeprism.sync.sync_client.httpx.post", return_value=check_response
@@ -817,15 +835,19 @@ class TestSyncFilesFullFlow:
         )
 
         # Mock: check 返回远端变更（远端也改了）
-        check_response = _make_mock_response({
-            "files": [{
-                "path": "sync_full_flow_test/diary/2026-07-14.md",
-                "parent_hash": old_hash,
-                "current_hash": remote_new_hash,
-            }],
-            "all_paths": ["sync_full_flow_test/diary/2026-07-14.md"],
-            "sync_time": "...",
-        })
+        check_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": "sync_full_flow_test/diary/2026-07-14.md",
+                        "parent_hash": old_hash,
+                        "current_hash": remote_new_hash,
+                    }
+                ],
+                "all_paths": ["sync_full_flow_test/diary/2026-07-14.md"],
+                "sync_time": "...",
+            }
+        )
 
         with patch(
             "lifeprism.sync.sync_client.httpx.post", return_value=check_response
@@ -874,39 +896,45 @@ class TestSyncFilesFullFlow:
         cloud_hash = compute_file_hash(cloud_content.encode("utf-8"))
 
         # Mock: check 返回云端文件（有 parent_hash 历史）
-        check_response = _make_mock_response({
-            "files": [{
-                "path": "sync_full_flow_test/user/user.md",
-                "parent_hash": cloud_hash,
-                "current_hash": cloud_hash,
-            }],
-            "all_paths": ["sync_full_flow_test/user/user.md"],
-            "sync_time": "...",
-        })
+        check_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": "sync_full_flow_test/user/user.md",
+                        "parent_hash": cloud_hash,
+                        "current_hash": cloud_hash,
+                    }
+                ],
+                "all_paths": ["sync_full_flow_test/user/user.md"],
+                "sync_time": "...",
+            }
+        )
         # fetch 返回云端内容
         compressed = gzip.compress(cloud_content.encode("utf-8"))
         encoded = base64.b64encode(compressed).decode("ascii")
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": "sync_full_flow_test/user/user.md",
-                "content": encoded,
-                "parent_hash": cloud_hash,
-                "current_hash": cloud_hash,
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": "sync_full_flow_test/user/user.md",
+                        "content": encoded,
+                        "parent_hash": cloud_hash,
+                        "current_hash": cloud_hash,
+                    }
+                ]
+            }
+        )
         # verify: 云端 hash 与本地一致（fetch 后本地已有云端内容）
-        verify_response = _make_mock_response({
-            "files": [{"path": "sync_full_flow_test/user/user.md", "current_hash": cloud_hash}]
-        })
-        commit_response = _make_mock_response({
-            "committed": [{"path": "sync_full_flow_test/user/user.md", "parent_hash": cloud_hash}]
-        })
+        verify_response = _make_mock_response(
+            {"files": [{"path": "sync_full_flow_test/user/user.md", "current_hash": cloud_hash}]}
+        )
+        commit_response = _make_mock_response(
+            {"committed": [{"path": "sync_full_flow_test/user/user.md", "parent_hash": cloud_hash}]}
+        )
 
         responses = [check_response, fetch_response, verify_response, commit_response]
 
-        with patch(
-            "lifeprism.sync.sync_client.httpx.post", side_effect=responses
-        ) as mock_post:
+        with patch("lifeprism.sync.sync_client.httpx.post", side_effect=responses) as mock_post:
             sync_client._sync_files_full_flow(
                 remote_url="http://test:8000",
                 api_key="test-key",
@@ -963,31 +991,33 @@ class TestSyncFilesFullFlow:
         )
 
         # Mock: check 返回云端空文档（parent_hash=NULL，新部署）
-        check_response = _make_mock_response({
-            "files": [{
-                "path": "sync_full_flow_test/user/user.md",
-                "parent_hash": None,
-                "current_hash": cloud_empty_hash,
-            }],
-            "all_paths": ["sync_full_flow_test/user/user.md"],
-            "sync_time": "...",
-        })
-        push_response = _make_mock_response({
-            "results": [{"path": "sync_full_flow_test/user/user.md", "action": "accepted"}]
-        })
+        check_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": "sync_full_flow_test/user/user.md",
+                        "parent_hash": None,
+                        "current_hash": cloud_empty_hash,
+                    }
+                ],
+                "all_paths": ["sync_full_flow_test/user/user.md"],
+                "sync_time": "...",
+            }
+        )
+        push_response = _make_mock_response(
+            {"results": [{"path": "sync_full_flow_test/user/user.md", "action": "accepted"}]}
+        )
         # verify: 云端推送后已有本地内容
-        verify_response = _make_mock_response({
-            "files": [{"path": "sync_full_flow_test/user/user.md", "current_hash": local_hash}]
-        })
-        commit_response = _make_mock_response({
-            "committed": [{"path": "sync_full_flow_test/user/user.md", "parent_hash": local_hash}]
-        })
+        verify_response = _make_mock_response(
+            {"files": [{"path": "sync_full_flow_test/user/user.md", "current_hash": local_hash}]}
+        )
+        commit_response = _make_mock_response(
+            {"committed": [{"path": "sync_full_flow_test/user/user.md", "parent_hash": local_hash}]}
+        )
 
         responses = [check_response, push_response, verify_response, commit_response]
 
-        with patch(
-            "lifeprism.sync.sync_client.httpx.post", side_effect=responses
-        ) as mock_post:
+        with patch("lifeprism.sync.sync_client.httpx.post", side_effect=responses) as mock_post:
             sync_client._sync_files_full_flow(
                 remote_url="http://test:8000",
                 api_key="test-key",
@@ -1046,37 +1076,50 @@ class TestSyncFilesFullFlow:
         )
 
         # Mock: check 返回远端变更 → PULL
-        check_response = _make_mock_response({
-            "files": [{
-                "path": "sync_full_flow_test/diary/2026-07-14.md",
-                "parent_hash": old_hash,
-                "current_hash": new_hash,
-            }],
-            "all_paths": ["sync_full_flow_test/diary/2026-07-14.md"],
-            "sync_time": "...",
-        })
+        check_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": "sync_full_flow_test/diary/2026-07-14.md",
+                        "parent_hash": old_hash,
+                        "current_hash": new_hash,
+                    }
+                ],
+                "all_paths": ["sync_full_flow_test/diary/2026-07-14.md"],
+                "sync_time": "...",
+            }
+        )
         # fetch 返回新内容
         compressed = gzip.compress(new_content.encode("utf-8"))
         encoded = base64.b64encode(compressed).decode("ascii")
-        fetch_response = _make_mock_response({
-            "files": [{
-                "path": "sync_full_flow_test/diary/2026-07-14.md",
-                "content": encoded,
-                "parent_hash": old_hash,
-                "current_hash": new_hash,
-            }]
-        })
+        fetch_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": "sync_full_flow_test/diary/2026-07-14.md",
+                        "content": encoded,
+                        "parent_hash": old_hash,
+                        "current_hash": new_hash,
+                    }
+                ]
+            }
+        )
         # verify 返回不一致的 hash（Phase 3 失败）
         different_hash = "completely_different_hash_value"
-        verify_response = _make_mock_response({
-            "files": [{"path": "sync_full_flow_test/diary/2026-07-14.md", "current_hash": different_hash}]
-        })
+        verify_response = _make_mock_response(
+            {
+                "files": [
+                    {
+                        "path": "sync_full_flow_test/diary/2026-07-14.md",
+                        "current_hash": different_hash,
+                    }
+                ]
+            }
+        )
 
         responses = [check_response, fetch_response, verify_response]
 
-        with patch(
-            "lifeprism.sync.sync_client.httpx.post", side_effect=responses
-        ) as mock_post:
+        with patch("lifeprism.sync.sync_client.httpx.post", side_effect=responses) as mock_post:
             sync_client._sync_files_full_flow(
                 remote_url="http://test:8000",
                 api_key="test-key",
@@ -1144,26 +1187,34 @@ class TestCloudMissingFilePush:
         )
 
         # Mock: check 返回空变更 + 空 all_paths（云端完全无此文件）
-        check_response = _make_mock_response({
-            "files": [],
-            "all_paths": [],
-            "sync_time": "...",
-        })
-        push_response = _make_mock_response({
-            "results": [{"path": "sync_full_flow_test/session/test.jsonl", "action": "accepted"}]
-        })
-        verify_response = _make_mock_response({
-            "files": [{"path": "sync_full_flow_test/session/test.jsonl", "current_hash": content_hash}]
-        })
-        commit_response = _make_mock_response({
-            "committed": [{"path": "sync_full_flow_test/session/test.jsonl", "parent_hash": content_hash}]
-        })
+        check_response = _make_mock_response(
+            {
+                "files": [],
+                "all_paths": [],
+                "sync_time": "...",
+            }
+        )
+        push_response = _make_mock_response(
+            {"results": [{"path": "sync_full_flow_test/session/test.jsonl", "action": "accepted"}]}
+        )
+        verify_response = _make_mock_response(
+            {
+                "files": [
+                    {"path": "sync_full_flow_test/session/test.jsonl", "current_hash": content_hash}
+                ]
+            }
+        )
+        commit_response = _make_mock_response(
+            {
+                "committed": [
+                    {"path": "sync_full_flow_test/session/test.jsonl", "parent_hash": content_hash}
+                ]
+            }
+        )
 
         responses = [check_response, push_response, verify_response, commit_response]
 
-        with patch(
-            "lifeprism.sync.sync_client.httpx.post", side_effect=responses
-        ) as mock_post:
+        with patch("lifeprism.sync.sync_client.httpx.post", side_effect=responses) as mock_post:
             # Act: 执行全流程
             sync_client._sync_files_full_flow(
                 remote_url="http://test:8000",

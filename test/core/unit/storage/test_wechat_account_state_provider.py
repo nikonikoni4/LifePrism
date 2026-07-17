@@ -9,6 +9,7 @@ WechatAccountStateProvider 单元测试
 
 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
 """
+
 import pytest
 
 pytestmark = pytest.mark.core
@@ -33,9 +34,7 @@ class TestWechatAccountStateTableConfig:
         from lifeprism.config.database import TABLE_CONFIGS
 
         config = TABLE_CONFIGS["wechat_account_state"]
-        assert config.get("timestamps") is True, (
-            "wechat_account_state 应配置 timestamps=True"
-        )
+        assert config.get("timestamps") is True, "wechat_account_state 应配置 timestamps=True"
         assert config.get("update_at") is True, (
             "wechat_account_state 应配置 update_at=True 以自动管理 updated_at"
         )
@@ -79,10 +78,10 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
 
     # 重置 update_at 缓存（确保测试使用最新配置）
     from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
     LWBaseDataProvider._TABLES_WITH_TIMESTAMPS = None

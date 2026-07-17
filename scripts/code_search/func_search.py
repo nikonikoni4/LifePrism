@@ -1,7 +1,8 @@
 """基于 grep 的通用函数搜索工具"""
+
+import re
 import subprocess
 import sys
-import re
 from pathlib import Path
 
 
@@ -109,9 +110,10 @@ def collect_grep(pattern, root, ext, label, ignore_comments):
             "--no-heading",
             "--line-number",
             "--color=never",
-            "-g", f"*.{ext}",
+            "-g",
+            f"*.{ext}",
             pattern,
-            str(root)
+            str(root),
         ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -287,7 +289,9 @@ def is_in_scope(result, scope, root="."):
         scope_parts = scope.rsplit(".", 1)
         if len(scope_parts) == 2:
             scope_module, scope_class = scope_parts
-            if scope_module in module and (enclosing_class == scope_class or scope_class == enclosing_class):
+            if scope_module in module and (
+                enclosing_class == scope_class or scope_class == enclosing_class
+            ):
                 return True
 
     return False

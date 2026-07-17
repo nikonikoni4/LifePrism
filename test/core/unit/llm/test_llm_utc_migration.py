@@ -13,14 +13,14 @@
 - docs/guides/utc-migration-hidden-dependencies.md
 - Issue #10: LLM 模块时间处理迁移
 """
+
 import json
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 pytestmark = pytest.mark.core
 
@@ -44,7 +44,7 @@ class TestLLMCallLoggerUtc:
     def mock_inbound_msg(self):
         """模拟 InboundMessage"""
         from dataclasses import dataclass
-        from typing import Optional, Dict, Any
+        from typing import Any, Dict, Optional
 
         @dataclass
         class MockInboundMessage:
@@ -65,7 +65,7 @@ class TestLLMCallLoggerUtc:
     def mock_outbound_msg(self):
         """模拟 OutboundMessage"""
         from dataclasses import dataclass, field
-        from typing import Optional, Dict, Any
+        from typing import Any, Dict, Optional
 
         @dataclass
         class MockLLMResponse:
@@ -86,7 +86,9 @@ class TestLLMCallLoggerUtc:
             extra=None,
         )
 
-    def test_log_call_timestamp_is_utc_iso(self, logger_instance, mock_inbound_msg, mock_outbound_msg):
+    def test_log_call_timestamp_is_utc_iso(
+        self, logger_instance, mock_inbound_msg, mock_outbound_msg
+    ):
         """log_call() 记录的 timestamp 应为 UTC ISO 8601 格式"""
         record_id = logger_instance.log_call(
             inbound_msg=mock_inbound_msg,
@@ -109,14 +111,14 @@ class TestLLMCallLoggerUtc:
 
         # 解析并验证为 UTC aware
         dt = datetime.fromisoformat(timestamp_str)
-        assert dt.tzinfo is not None, (
-            f"record timestamp 应为 aware datetime，实际: {timestamp_str}"
-        )
+        assert dt.tzinfo is not None, f"record timestamp 应为 aware datetime，实际: {timestamp_str}"
         assert dt.utcoffset() == timedelta(0), (
             f"record timestamp 时区偏移应为 0（UTC），实际: {timestamp_str}"
         )
 
-    def test_log_call_uses_utc_date_for_filename(self, logger_instance, mock_inbound_msg, mock_outbound_msg):
+    def test_log_call_uses_utc_date_for_filename(
+        self, logger_instance, mock_inbound_msg, mock_outbound_msg
+    ):
         """日志文件名应基于 UTC 日期"""
         logger_instance.log_call(
             inbound_msg=mock_inbound_msg,
@@ -129,9 +131,7 @@ class TestLLMCallLoggerUtc:
         utc_date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         expected_file = logger_instance.log_dir / f"llm_calls_{utc_date_str}.json"
 
-        assert expected_file.exists(), (
-            f"日志文件应使用 UTC 日期命名: {expected_file}"
-        )
+        assert expected_file.exists(), f"日志文件应使用 UTC 日期命名: {expected_file}"
 
 
 # ==================== PromptLoader UTC 测试 ====================
@@ -147,7 +147,9 @@ class TestPromptLoaderUtc:
 
         prompts_dir = tmp_path / "prompts"
         prompts_dir.mkdir(parents=True)
-        loader = PromptLoader(prompts_dir=prompts_dir, usage_stats_file=tmp_path / "usage_stats.yaml")
+        loader = PromptLoader(
+            prompts_dir=prompts_dir, usage_stats_file=tmp_path / "usage_stats.yaml"
+        )
         return loader
 
     def test_update_usage_stats_last_used_is_utc_iso(self, prompt_loader):
@@ -158,9 +160,7 @@ class TestPromptLoaderUtc:
 
         # 解析并验证为 UTC aware
         dt = datetime.fromisoformat(last_used_str)
-        assert dt.tzinfo is not None, (
-            f"last_used 应为 aware datetime，实际: {last_used_str}"
-        )
+        assert dt.tzinfo is not None, f"last_used 应为 aware datetime，实际: {last_used_str}"
         assert dt.utcoffset() == timedelta(0), (
             f"last_used 时区偏移应为 0（UTC），实际: {last_used_str}"
         )
@@ -192,12 +192,8 @@ class TestHelpersUtc:
         result = timestamp()
         dt = datetime.fromisoformat(result)
 
-        assert dt.tzinfo is not None, (
-            f"timestamp() 应返回 aware datetime，实际: {result}"
-        )
-        assert dt.utcoffset() == timedelta(0), (
-            f"timestamp() 时区偏移应为 0（UTC），实际: {result}"
-        )
+        assert dt.tzinfo is not None, f"timestamp() 应返回 aware datetime，实际: {result}"
+        assert dt.utcoffset() == timedelta(0), f"timestamp() 时区偏移应为 0（UTC），实际: {result}"
 
     def test_current_time_str_contains_timezone(self):
         """current_time_str() 应包含时区信息"""

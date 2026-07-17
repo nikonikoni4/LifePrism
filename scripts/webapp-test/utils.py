@@ -1,8 +1,10 @@
 """公共工具函数"""
+
 import os
 from datetime import datetime
+
+from config import FULL_PAGE, SCREENSHOT_DIR, VIEWPORT
 from playwright.sync_api import Page
-from config import SCREENSHOT_DIR, VIEWPORT, FULL_PAGE
 
 
 def ensure_dir(path: str):
@@ -39,6 +41,7 @@ def screenshot_page(page: Page, module: str, name: str, full_page: bool = FULL_P
 def wait_for_page(page: Page, timeout: int = None):
     """等待页面加载完成"""
     from config import WAIT_TIMEOUT
-    page.wait_for_load_state('networkidle')
+
+    page.wait_for_load_state("networkidle")
     if timeout:
         page.wait_for_timeout(timeout)

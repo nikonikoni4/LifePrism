@@ -29,9 +29,8 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
-
     from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
@@ -141,7 +140,13 @@ class TestSyncOnceIncludesFileSync:
             cursor.execute(
                 "INSERT INTO todo_list (id, content, state, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?)",
-                ("todo-file-sync", "文件同步测试", "pool", "2026-07-01T10:00:00+00:00", "2026-07-01T12:00:00+00:00"),
+                (
+                    "todo-file-sync",
+                    "文件同步测试",
+                    "pool",
+                    "2026-07-01T10:00:00+00:00",
+                    "2026-07-01T12:00:00+00:00",
+                ),
             )
             conn.commit()
 
@@ -174,9 +179,7 @@ class TestSyncOnceIncludesFileSync:
             patch("lifeprism.config.settings_manager.set_setting"),
         ):
             # Act
-            sync_client.sync_once(
-                tables=["todo_list"], directories=["sync_client_test/"]
-            )
+            sync_client.sync_once(tables=["todo_list"], directories=["sync_client_test/"])
 
         # Assert: 数据库同步和文件同步全流程都被执行
         assert "pull" in call_order

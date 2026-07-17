@@ -8,8 +8,10 @@
 4. 验证无 params 声明时跳过校验（向后兼容）
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
+
 from lifeprism.llm.prompts import PromptLoader, Prompts
 
 
@@ -27,7 +29,7 @@ class TestPromptParamValidation:
         with pytest.raises(ValueError) as exc_info:
             loader.load_prompt(
                 Prompts.Schedule.UPDATE_MEMORY,
-                recent_state_path="/test/recent_state.md"
+                recent_state_path="/test/recent_state.md",
                 # 缺少 user_md_path 和 diary_path_template
             )
 
@@ -44,7 +46,7 @@ class TestPromptParamValidation:
                 recent_state_path="/test/recent_state.md",
                 user_md_path="/test/user.md",
                 diary_path_template="/test/diary/{date}.md",
-                unknown_param="some_value"  # 未知参数
+                unknown_param="some_value",  # 未知参数
             )
 
         error_msg = str(exc_info.value)
@@ -57,7 +59,7 @@ class TestPromptParamValidation:
             Prompts.Schedule.UPDATE_MEMORY,
             recent_state_path="/test/recent_state.md",
             user_md_path="/test/user.md",
-            diary_path_template="/test/diary/{date}.md"
+            diary_path_template="/test/diary/{date}.md",
         )
 
         assert isinstance(prompt, str)
@@ -72,7 +74,7 @@ class TestPromptParamValidation:
         prompt = loader.load_prompt(
             Prompts.Schedule.ACTIVITY_SUMMARY,
             # 即使传入额外参数也不应报错
-            some_extra_param="value"
+            some_extra_param="value",
         )
 
         assert isinstance(prompt, str)
@@ -84,7 +86,7 @@ class TestPromptParamValidation:
             loader.load_prompt(
                 Prompts.Schedule.UPDATE_MEMORY,
                 version="v1",
-                recent_state_path="/test/recent_state.md"
+                recent_state_path="/test/recent_state.md",
             )
 
         error_msg = str(exc_info.value)
@@ -94,8 +96,7 @@ class TestPromptParamValidation:
         """错误信息应包含 prompt 名称"""
         with pytest.raises(ValueError) as exc_info:
             loader.load_prompt(
-                Prompts.Schedule.UPDATE_MEMORY,
-                recent_state_path="/test/recent_state.md"
+                Prompts.Schedule.UPDATE_MEMORY, recent_state_path="/test/recent_state.md"
             )
 
         error_msg = str(exc_info.value)
@@ -108,7 +109,7 @@ class TestPromptParamValidation:
             loader.load_prompt(
                 Prompts.Schedule.UPDATE_MEMORY,
                 recent_state_path="/test/recent_state.md",
-                user_md_path="/test/user.md"
+                user_md_path="/test/user.md",
                 # 缺少 diary_path_template
             )
 
@@ -121,8 +122,7 @@ class TestPromptParamValidation:
         # 因为 format 会尝试替换不存在的参数
         with pytest.raises(ValueError) as exc_info:
             loader.load_prompt(
-                Prompts.Schedule.UPDATE_MEMORY,
-                recent_state_path="/test/recent_state.md"
+                Prompts.Schedule.UPDATE_MEMORY, recent_state_path="/test/recent_state.md"
             )
 
         # 应该是参数校验错误，而不是 format 错误
@@ -144,7 +144,7 @@ class TestPromptParamValidationWithTemplate:
             Prompts.Schedule.UPDATE_MEMORY,
             recent_state_path="/test/recent_state.md",
             user_md_path="/test/user.md",
-            diary_path_template="/test/diary/{date}.md"
+            diary_path_template="/test/diary/{date}.md",
         )
 
         assert isinstance(prompt, str)
@@ -157,7 +157,7 @@ class TestPromptParamValidationWithTemplate:
             loader.load_prompt(
                 Prompts.Schedule.UPDATE_MEMORY,
                 recent_state_path="/test/recent_state.md",
-                user_md_path="/test/user.md"
+                user_md_path="/test/user.md",
                 # 缺少 diary_path_template
             )
 
@@ -170,7 +170,7 @@ class TestPromptParamValidationWithTemplate:
         with pytest.raises(ValueError) as exc_info:
             loader.load_prompt(
                 Prompts.Schedule.UPDATE_MEMORY,
-                recent_state_path="/test/recent_state.md"
+                recent_state_path="/test/recent_state.md",
                 # 缺少 user_md_path 和 diary_path_template
             )
 
@@ -187,7 +187,7 @@ class TestPromptParamValidationWithTemplate:
                 recent_state_path="/test/recent_state.md",
                 user_md_path="/test/user.md",
                 diary_path_template="/test/diary/{date}.md",
-                extra_field="should_fail"
+                extra_field="should_fail",
             )
 
         error_msg = str(exc_info.value)
@@ -197,10 +197,7 @@ class TestPromptParamValidationWithTemplate:
     def test_activity_summary_no_params(self, loader):
         """测试 activity_summary 无参数声明（向后兼容）"""
         # 即使传入额外参数也不应报错
-        prompt = loader.load_prompt(
-            Prompts.Schedule.ACTIVITY_SUMMARY,
-            some_extra_param="value"
-        )
+        prompt = loader.load_prompt(Prompts.Schedule.ACTIVITY_SUMMARY, some_extra_param="value")
 
         assert isinstance(prompt, str)
         assert len(prompt) > 0

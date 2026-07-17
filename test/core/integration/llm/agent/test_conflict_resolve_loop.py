@@ -8,13 +8,14 @@ AgentLoop CONFLICT_RESOLVE 处理测试（Issue 34）
 TDD: 严格 red-green 循环
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock
 
 from lifeprism.llm.agent.loop import AgentLoop
-from lifeprism.llm.bus import MessageQueue, InboundMessage, MessageType
-from lifeprism.llm.session import Session
+from lifeprism.llm.bus import InboundMessage, MessageQueue, MessageType
 from lifeprism.llm.providers import LLMResponse
+from lifeprism.llm.session import Session
 
 pytestmark = pytest.mark.core
 
@@ -51,10 +52,11 @@ class TestAutoCompactSaveSessionGuard:
         """CHAT 类型触发压缩时应调用 save_session"""
         chat_msg = InboundMessage(type=MessageType.CHAT, content="测试")
 
-        with patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000), \
-             patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm, \
-             patch("lifeprism.llm.agent.loop.session_manager") as mock_sm:
-
+        with (
+            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
+            patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
+        ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩内容"))
             mock_llm.return_value = mock_client
@@ -75,10 +77,11 @@ class TestAutoCompactSaveSessionGuard:
             extra={"conflict_file_path": "diary/test.md", "system_prompt": "你是合并助手。"},
         )
 
-        with patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000), \
-             patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm, \
-             patch("lifeprism.llm.agent.loop.session_manager") as mock_sm:
-
+        with (
+            patch("lifeprism.llm.agent.loop.estimate_prompt_tokens", return_value=60000),
+            patch("lifeprism.llm.agent.loop.create_llm_client") as mock_llm,
+            patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
+        ):
             mock_client = AsyncMock()
             mock_client.chat = AsyncMock(return_value=LLMResponse(content="压缩内容"))
             mock_llm.return_value = mock_client
@@ -117,11 +120,14 @@ class TestConflictResolveToolRegistration:
             captured["registry"] = tool_registry
             return LLMResponse(content="合并后的内容"), []
 
-        with patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop), \
-             patch("lifeprism.llm.agent.loop.session_manager") as mock_sm, \
-             patch("lifeprism.llm.agent.loop.Context.build_system_prompt", return_value="系统提示"), \
-             patch.object(agent_loop, "auto_compact", new_callable=AsyncMock, return_value=Session()):
-
+        with (
+            patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop),
+            patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
+            patch("lifeprism.llm.agent.loop.Context.build_system_prompt", return_value="系统提示"),
+            patch.object(
+                agent_loop, "auto_compact", new_callable=AsyncMock, return_value=Session()
+            ),
+        ):
             mock_sm.get_or_create_session.return_value = Session()
             await agent_loop._process_msg(conflict_msg)
 
@@ -149,11 +155,14 @@ class TestConflictResolveToolRegistration:
             captured["registry"] = tool_registry
             return LLMResponse(content="合并后的内容"), []
 
-        with patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop), \
-             patch("lifeprism.llm.agent.loop.session_manager") as mock_sm, \
-             patch("lifeprism.llm.agent.loop.Context.build_system_prompt", return_value="系统提示"), \
-             patch.object(agent_loop, "auto_compact", new_callable=AsyncMock, return_value=Session()):
-
+        with (
+            patch.object(agent_loop, "_run_agent_loop", side_effect=mock_run_agent_loop),
+            patch("lifeprism.llm.agent.loop.session_manager") as mock_sm,
+            patch("lifeprism.llm.agent.loop.Context.build_system_prompt", return_value="系统提示"),
+            patch.object(
+                agent_loop, "auto_compact", new_callable=AsyncMock, return_value=Session()
+            ),
+        ):
             mock_sm.get_or_create_session.return_value = Session()
             await agent_loop._process_msg(conflict_msg)
 

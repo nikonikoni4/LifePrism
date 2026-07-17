@@ -50,7 +50,7 @@ status: decided
 
 - `sync_once` 中通过 `snapshot_before` / `snapshot_after` 对比 pull 前后本地 `custom_record_types` 的 `(id, updated_at)` 集合
 - 兜底条件 `or dynamic_tables` 永远为 True（本地有 3 个动态表）
-- `_rebuild_remote_dynamic_tables` 全量发送本地定义给云端，云端 `rebuild_dynamic_tables` 按 slug 逐个 CREATE/ALTER/SKIP/DROP
+- `_rebuild_remote_dynamic_tables` 全量发送本地定义给云端，云端 `rebuild_dynamic_tables` 按 slug 逐个 CREATE/SKIP
 - `get_all_sync_tables` 查询 `custom_record_types` 拿 slug 列表，拼接 `custom_<slug>` 到 `SYNC_TABLES`
 - 本地创建动态表的入口 `CustomRecordRepository.create_type` 是完整事务（meta 写入 + DDL），生成新的 type_id/field_id
 - DDL 生成逻辑 `generate_create_table_ddl(slug, fields)` 是静态方法，只需 slug + fields，不依赖 meta 表

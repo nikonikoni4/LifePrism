@@ -105,7 +105,9 @@ class TestDependencyIsolation:
         monitor_modules = [
             m for m in sys.modules if m.startswith("lifeprism.monitor.windows_monitor")
         ]
-        assert monitor_modules == [], f"Agent Only 不应加载 Monitor 模块，但加载了: {monitor_modules}"
+        assert monitor_modules == [], (
+            f"Agent Only 不应加载 Monitor 模块，但加载了: {monitor_modules}"
+        )
 
 
 class TestWebDemoRoutes:
@@ -124,7 +126,8 @@ class TestWebDemoRoutes:
         import lifeprism.server.main_web_demo
 
         health_routes = [
-            r for r in lifeprism.server.main_web_demo.app.routes
+            r
+            for r in lifeprism.server.main_web_demo.app.routes
             if hasattr(r, "path") and r.path == "/health"
         ]
         assert len(health_routes) == 1, "Web Demo 应有 /health 端点"
@@ -134,7 +137,8 @@ class TestWebDemoRoutes:
         import lifeprism.server.main_web_demo
 
         root_routes = [
-            r for r in lifeprism.server.main_web_demo.app.routes
+            r
+            for r in lifeprism.server.main_web_demo.app.routes
             if hasattr(r, "path") and r.path == "/"
         ]
         assert len(root_routes) == 1, "Web Demo 应有 / 根路径端点"

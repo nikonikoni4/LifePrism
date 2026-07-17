@@ -4,9 +4,10 @@ usage_service 存储层迁移测试
 验证 usage_service 不再依赖 server_lw_data_provider，
 而是通过 tokens_usage_repository.query_tokens_usage 获取数据。
 """
-from types import SimpleNamespace
+
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 
 def _load_usage_service_module():
@@ -36,24 +37,27 @@ def test_get_usage_overview_uses_tokens_usage_repository(monkeypatch):
 
     def _fake_query_tokens_usage(options=None):
         query_calls.append(options)
-        return ([
-            {
-                "session_id": "c-2026-01-15",
-                "input_tokens": 100,
-                "output_tokens": 50,
-                "total_tokens": 150,
-                "search_count": 1,
-                "result_items_count": 2,
-                "mode": "classification",
-                "created_at": "2026-01-15 10:00:00",
-            }
-        ], 1)
+        return (
+            [
+                {
+                    "session_id": "c-2026-01-15",
+                    "input_tokens": 100,
+                    "output_tokens": 50,
+                    "total_tokens": 150,
+                    "search_count": 1,
+                    "result_items_count": 2,
+                    "mode": "classification",
+                    "created_at": "2026-01-15 10:00:00",
+                }
+            ],
+            1,
+        )
 
     monkeypatch.setattr(
         usage_service,
         "tokens_usage_repository",
         SimpleNamespace(query_tokens_usage=_fake_query_tokens_usage),
-        raising=False
+        raising=False,
     )
 
     result = usage_service.get_usage_overview("2026-01-15")

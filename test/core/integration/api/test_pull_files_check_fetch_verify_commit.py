@@ -9,6 +9,7 @@
 
 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md v2.1 决策 5
 """
+
 import base64
 import gzip
 import os
@@ -219,9 +220,7 @@ class TestSyncPullFilesCheck:
             f"{TEST_DIR_NAME}/notes/new.txt",
         }
 
-    def test_check_excludes_chat_history_json(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_check_excludes_chat_history_json(self, client, clean_test_dir, clean_file_sync_state):
         """排除 chat_history.json：即使 mtime 新于 last_sync_time 也不返回"""
         # Arrange: 创建目录，含 chat_history.json 和普通文件
         sync_dir = clean_test_dir / "session"
@@ -366,9 +365,7 @@ class TestSyncPullFilesCheck:
 class TestSyncPullFilesFetch:
     """测试 POST /api/sync/pull-files/fetch 端点"""
 
-    def test_fetch_returns_content_and_hashes(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_fetch_returns_content_and_hashes(self, client, clean_test_dir, clean_file_sync_state):
         """按路径返回文件内容（gzip+base64）+ parent_hash + current_hash"""
         # Arrange: 创建文件（用 write_bytes 避免 Windows 换行符转换）
         sync_dir = clean_test_dir / "user"
@@ -443,9 +440,7 @@ class TestSyncPullFilesFetch:
         expected_hash = compute_file_hash(b"today diary")
         assert file_info["current_hash"] == expected_hash
 
-    def test_fetch_skips_nonexistent_paths(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_fetch_skips_nonexistent_paths(self, client, clean_test_dir, clean_file_sync_state):
         """请求路径不存在时跳过（不报错，不返回该文件）"""
         # Arrange: 创建一个存在的文件
         sync_dir = clean_test_dir / "agent"
@@ -471,9 +466,7 @@ class TestSyncPullFilesFetch:
         assert nonexistent_rel not in paths
         assert len(data["files"]) == 1
 
-    def test_fetch_skips_nonexistent_all_paths(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_fetch_skips_nonexistent_all_paths(self, client, clean_test_dir, clean_file_sync_state):
         """所有路径都不存在时返回空列表，不报错"""
         response = client.post(
             "/api/sync/pull-files/fetch",
@@ -492,9 +485,7 @@ class TestSyncPullFilesFetch:
 class TestSyncPullFilesVerify:
     """测试 POST /api/sync/pull-files/verify 端点"""
 
-    def test_verify_returns_realtime_hash(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_verify_returns_realtime_hash(self, client, clean_test_dir, clean_file_sync_state):
         """实时计算 hash 返回（纯只读，不修改状态）"""
         sync_dir = clean_test_dir / "verify"
         sync_dir.mkdir()
@@ -525,9 +516,7 @@ class TestSyncPullFilesVerify:
         expected_hash = compute_file_hash(b"verify content")
         assert file_info["current_hash"] == expected_hash
 
-    def test_verify_is_readonly(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_verify_is_readonly(self, client, clean_test_dir, clean_file_sync_state):
         """verify 不修改 file_sync_state 表（纯只读）"""
         sync_dir = clean_test_dir / "readonly"
         sync_dir.mkdir()
@@ -561,9 +550,7 @@ class TestSyncPullFilesVerify:
         assert state["parent_hash"] == "original_parent"
         assert state["current_hash"] == "original_current"
 
-    def test_verify_skips_nonexistent_paths(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_verify_skips_nonexistent_paths(self, client, clean_test_dir, clean_file_sync_state):
         """verify 路径不存在时跳过"""
         sync_dir = clean_test_dir / "mixed"
         sync_dir.mkdir()
@@ -592,9 +579,7 @@ class TestSyncPullFilesVerify:
 class TestSyncPullFilesCommit:
     """测试 POST /api/sync/pull-files/commit 端点"""
 
-    def test_commit_advances_parent_hash(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_commit_advances_parent_hash(self, client, clean_test_dir, clean_file_sync_state):
         """commit 推进 parent_hash = current_hash（实时计算）"""
         sync_dir = clean_test_dir / "commit"
         sync_dir.mkdir()
@@ -639,9 +624,7 @@ class TestSyncPullFilesCommit:
         assert state["parent_hash"] == expected_hash
         assert state["current_hash"] == expected_hash
 
-    def test_commit_creates_state_for_new_file(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_commit_creates_state_for_new_file(self, client, clean_test_dir, clean_file_sync_state):
         """commit 对无 state 记录的文件创建新记录（parent_hash = current_hash）"""
         sync_dir = clean_test_dir / "new"
         sync_dir.mkdir()
@@ -673,9 +656,7 @@ class TestSyncPullFilesCommit:
         assert state["parent_hash"] == expected_hash
         assert state["current_hash"] == expected_hash
 
-    def test_commit_skips_nonexistent_paths(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_commit_skips_nonexistent_paths(self, client, clean_test_dir, clean_file_sync_state):
         """commit 路径不存在时跳过"""
         sync_dir = clean_test_dir / "mixed_commit"
         sync_dir.mkdir()
@@ -704,9 +685,7 @@ class TestSyncPullFilesCommit:
 class TestSyncPullFilesPathTraversal:
     """测试所有四个端点的路径遍历安全检查"""
 
-    def test_check_rejects_path_traversal(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_check_rejects_path_traversal(self, client, clean_test_dir, clean_file_sync_state):
         """check 端点拒绝路径遍历攻击（../）"""
         sync_dir = clean_test_dir / "safe"
         sync_dir.mkdir()
@@ -732,9 +711,7 @@ class TestSyncPullFilesPathTraversal:
             assert not f["path"].startswith("../")
             assert not f["path"].startswith("..")
 
-    def test_fetch_rejects_path_traversal(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_fetch_rejects_path_traversal(self, client, clean_test_dir, clean_file_sync_state):
         """fetch 端点拒绝路径遍历攻击"""
         response = client.post(
             "/api/sync/pull-files/fetch",
@@ -746,9 +723,7 @@ class TestSyncPullFilesPathTraversal:
         data = response.json()
         assert data["files"] == []
 
-    def test_verify_rejects_path_traversal(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_verify_rejects_path_traversal(self, client, clean_test_dir, clean_file_sync_state):
         """verify 端点拒绝路径遍历攻击"""
         response = client.post(
             "/api/sync/pull-files/verify",
@@ -760,9 +735,7 @@ class TestSyncPullFilesPathTraversal:
         data = response.json()
         assert data["files"] == []
 
-    def test_commit_rejects_path_traversal(
-        self, client, clean_test_dir, clean_file_sync_state
-    ):
+    def test_commit_rejects_path_traversal(self, client, clean_test_dir, clean_file_sync_state):
         """commit 端点拒绝路径遍历攻击"""
         response = client.post(
             "/api/sync/pull-files/commit",

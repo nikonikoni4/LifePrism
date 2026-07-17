@@ -1,13 +1,15 @@
 """测试 lifeprism.llm.utils 模块的数据密度计算和时间段识别功能"""
-import pytest
+
 from datetime import datetime
 
-from lifeprism.llm.utils.density_utils import (
-    compute_bucket_density,
-    build_time_segments,
-)
+import pytest
+
 from lifeprism.llm.summary_context.aggregators.activity_aggregator import (
     _build_segments,
+)
+from lifeprism.llm.utils.density_utils import (
+    build_time_segments,
+    compute_bucket_density,
 )
 
 
@@ -28,9 +30,7 @@ class TestComputeBucketDensity:
     def test_empty_logs(self):
         """测试空日志列表"""
         density = compute_bucket_density(
-            bucket_start="2026-04-19 09:00:00",
-            bucket_end="2026-04-19 09:10:00",
-            logs=[]
+            bucket_start="2026-04-19 09:00:00", bucket_end="2026-04-19 09:10:00", logs=[]
         )
         assert density == 0.0
 
@@ -40,13 +40,11 @@ class TestComputeBucketDensity:
             {
                 "start_time": "2026-04-19 09:00:00",
                 "end_time": "2026-04-19 09:10:00",
-                "duration": 600
+                "duration": 600,
             }
         ]
         density = compute_bucket_density(
-            bucket_start="2026-04-19 09:00:00",
-            bucket_end="2026-04-19 09:10:00",
-            logs=logs
+            bucket_start="2026-04-19 09:00:00", bucket_end="2026-04-19 09:10:00", logs=logs
         )
         assert density == 1.0
 
@@ -56,13 +54,11 @@ class TestComputeBucketDensity:
             {
                 "start_time": "2026-04-19 09:00:00",
                 "end_time": "2026-04-19 09:05:00",
-                "duration": 300
+                "duration": 300,
             }
         ]
         density = compute_bucket_density(
-            bucket_start="2026-04-19 09:00:00",
-            bucket_end="2026-04-19 09:10:00",
-            logs=logs
+            bucket_start="2026-04-19 09:00:00", bucket_end="2026-04-19 09:10:00", logs=logs
         )
         assert density == 0.5
 
@@ -72,18 +68,16 @@ class TestComputeBucketDensity:
             {
                 "start_time": "2026-04-19 09:00:00",
                 "end_time": "2026-04-19 09:03:00",
-                "duration": 180
+                "duration": 180,
             },
             {
                 "start_time": "2026-04-19 09:05:00",
                 "end_time": "2026-04-19 09:08:00",
-                "duration": 180
-            }
+                "duration": 180,
+            },
         ]
         density = compute_bucket_density(
-            bucket_start="2026-04-19 09:00:00",
-            bucket_end="2026-04-19 09:10:00",
-            logs=logs
+            bucket_start="2026-04-19 09:00:00", bucket_end="2026-04-19 09:10:00", logs=logs
         )
         # 3分钟 + 3分钟 = 6分钟，总共10分钟
         assert density == 0.6
@@ -94,13 +88,11 @@ class TestComputeBucketDensity:
             {
                 "start_time": "2026-04-19 08:00:00",
                 "end_time": "2026-04-19 08:30:00",
-                "duration": 1800
+                "duration": 1800,
             }
         ]
         density = compute_bucket_density(
-            bucket_start="2026-04-19 09:00:00",
-            bucket_end="2026-04-19 09:10:00",
-            logs=logs
+            bucket_start="2026-04-19 09:00:00", bucket_end="2026-04-19 09:10:00", logs=logs
         )
         assert density == 0.0
 
@@ -116,21 +108,25 @@ class TestBuildTimeSegments:
             range_start="2026-04-19 00:00:00",
             range_end="2026-04-19 23:59:59",
             threshold=0.6,
-            min_duration_minutes=6
+            min_duration_minutes=6,
         )
         assert segments == []
 
     def test_single_high_density_segment(self):
         """测试单个高密度时间段"""
         logs = [
-            {"start_time": "2026-04-19 09:00:00", "end_time": "2026-04-19 09:30:00", "duration": 1800},
+            {
+                "start_time": "2026-04-19 09:00:00",
+                "end_time": "2026-04-19 09:30:00",
+                "duration": 1800,
+            },
         ]
         segments = build_time_segments(
             logs=logs,
             range_start="2026-04-19 00:00:00",
             range_end="2026-04-19 23:59:59",
             threshold=0.6,
-            min_duration_minutes=6
+            min_duration_minutes=6,
         )
         assert len(segments) > 0
         assert segments[0]["segment_type"] == "active"
@@ -141,14 +137,18 @@ class TestBuildTimeSegments:
     def test_filter_short_segments(self):
         """测试过滤短时间段"""
         logs = [
-            {"start_time": "2026-04-19 09:00:00", "end_time": "2026-04-19 09:03:00", "duration": 180},
+            {
+                "start_time": "2026-04-19 09:00:00",
+                "end_time": "2026-04-19 09:03:00",
+                "duration": 180,
+            },
         ]
         segments = build_time_segments(
             logs=logs,
             range_start="2026-04-19 00:00:00",
             range_end="2026-04-19 23:59:59",
             threshold=0.6,
-            min_duration_minutes=10  # 最小10分钟
+            min_duration_minutes=10,  # 最小10分钟
         )
         # 3分钟的活动应该被过滤掉
         assert len(segments) == 0
@@ -156,7 +156,11 @@ class TestBuildTimeSegments:
     def test_custom_segment_type(self):
         """测试自定义段类型"""
         logs = [
-            {"start_time": "2026-04-19 09:00:00", "end_time": "2026-04-19 10:00:00", "duration": 3600},
+            {
+                "start_time": "2026-04-19 09:00:00",
+                "end_time": "2026-04-19 10:00:00",
+                "duration": 3600,
+            },
         ]
         segments = build_time_segments(
             logs=logs,
@@ -164,7 +168,7 @@ class TestBuildTimeSegments:
             range_end="2026-04-19 23:59:59",
             threshold=0.7,
             min_duration_minutes=30,
-            segment_type="long_computer_usage"
+            segment_type="long_computer_usage",
         )
         assert len(segments) > 0
         assert segments[0]["segment_type"] == "long_computer_usage"
@@ -177,9 +181,21 @@ class TestConsistencyWithActivityAggregator:
     def test_consistency_with_default_params(self):
         """测试默认参数下的一致性"""
         logs = [
-            {"start_time": "2026-04-19 09:00:00", "end_time": "2026-04-19 09:30:00", "duration": 1800},
-            {"start_time": "2026-04-19 09:30:00", "end_time": "2026-04-19 10:00:00", "duration": 1800},
-            {"start_time": "2026-04-19 14:00:00", "end_time": "2026-04-19 14:20:00", "duration": 1200},
+            {
+                "start_time": "2026-04-19 09:00:00",
+                "end_time": "2026-04-19 09:30:00",
+                "duration": 1800,
+            },
+            {
+                "start_time": "2026-04-19 09:30:00",
+                "end_time": "2026-04-19 10:00:00",
+                "duration": 1800,
+            },
+            {
+                "start_time": "2026-04-19 14:00:00",
+                "end_time": "2026-04-19 14:20:00",
+                "duration": 1200,
+            },
         ]
         range_start = "2026-04-19 00:00:00"
         range_end = "2026-04-19 23:59:59"
@@ -195,7 +211,7 @@ class TestConsistencyWithActivityAggregator:
             min_duration_minutes=min_duration_minutes,
             segment_type="active",
             bucket_minutes=10,
-            max_bridge_buckets=1
+            max_bridge_buckets=1,
         )
 
         # 调用原有函数
@@ -205,31 +221,44 @@ class TestConsistencyWithActivityAggregator:
             range_end=range_end,
             threshold=threshold,
             min_duration_minutes=min_duration_minutes,
-            segment_type="active"
+            segment_type="active",
         )
 
         # 验证数量一致
-        assert len(new_segments) == len(old_segments), \
+        assert len(new_segments) == len(old_segments), (
             f"时间段数量不一致: new={len(new_segments)}, old={len(old_segments)}"
+        )
 
         # 验证每个时间段的关键字段一致
         # 新函数返回 aware datetime（带 +00:00 后缀），旧函数返回 naive datetime，
         # 用 _normalize_tz 去除时区后缀后再比较
         for i, (new_seg, old_seg) in enumerate(zip(new_segments, old_segments)):
-            assert _normalize_tz(new_seg["start"]) == old_seg["start"], \
+            assert _normalize_tz(new_seg["start"]) == old_seg["start"], (
                 f"第{i}个时间段的start不一致: new={new_seg['start']}, old={old_seg['start']}"
-            assert _normalize_tz(new_seg["end"]) == old_seg["end"], \
+            )
+            assert _normalize_tz(new_seg["end"]) == old_seg["end"], (
                 f"第{i}个时间段的end不一致: new={new_seg['end']}, old={old_seg['end']}"
-            assert new_seg["duration_seconds"] == old_seg["duration_seconds"], \
+            )
+            assert new_seg["duration_seconds"] == old_seg["duration_seconds"], (
                 f"第{i}个时间段的duration_seconds不一致: new={new_seg['duration_seconds']}, old={old_seg['duration_seconds']}"
-            assert new_seg["segment_type"] == old_seg["segment_type"], \
+            )
+            assert new_seg["segment_type"] == old_seg["segment_type"], (
                 f"第{i}个时间段的segment_type不一致: new={new_seg['segment_type']}, old={old_seg['segment_type']}"
+            )
 
     def test_consistency_with_custom_params(self):
         """测试自定义参数下的一致性"""
         logs = [
-            {"start_time": "2026-04-19 09:00:00", "end_time": "2026-04-19 11:00:00", "duration": 7200},
-            {"start_time": "2026-04-19 14:00:00", "end_time": "2026-04-19 16:00:00", "duration": 7200},
+            {
+                "start_time": "2026-04-19 09:00:00",
+                "end_time": "2026-04-19 11:00:00",
+                "duration": 7200,
+            },
+            {
+                "start_time": "2026-04-19 14:00:00",
+                "end_time": "2026-04-19 16:00:00",
+                "duration": 7200,
+            },
         ]
         range_start = "2026-04-19 00:00:00"
         range_end = "2026-04-19 23:59:59"
@@ -238,6 +267,7 @@ class TestConsistencyWithActivityAggregator:
 
         # 需要修改 activity_aggregator 的全局参数
         import lifeprism.llm.summary_context.aggregators.activity_aggregator as agg_module
+
         original_bucket_minutes = agg_module.TIME_BUCKET_MINUTES
         original_max_bridge = agg_module.MAX_BRIDGE_BUCKETS
 
@@ -254,7 +284,7 @@ class TestConsistencyWithActivityAggregator:
                 min_duration_minutes=min_duration_minutes,
                 segment_type="long_computer_usage",
                 bucket_minutes=10,
-                max_bridge_buckets=1
+                max_bridge_buckets=1,
             )
 
             # 调用原有函数
@@ -264,7 +294,7 @@ class TestConsistencyWithActivityAggregator:
                 range_end=range_end,
                 threshold=threshold,
                 min_duration_minutes=min_duration_minutes,
-                segment_type="long_computer_usage"
+                segment_type="long_computer_usage",
             )
 
             # 验证一致性
@@ -284,10 +314,34 @@ class TestConsistencyWithActivityAggregator:
         """测试真实场景下的一致性（模拟 screenshot_analysis_v2.py 的使用场景）"""
         # 模拟真实的活动日志数据
         logs = [
-            {"start_time": "2026-04-19 09:00:00", "end_time": "2026-04-19 09:15:00", "duration": 900, "app": "Chrome", "title": "Google"},
-            {"start_time": "2026-04-19 09:15:00", "end_time": "2026-04-19 09:30:00", "duration": 900, "app": "VSCode", "title": "main.py"},
-            {"start_time": "2026-04-19 09:35:00", "end_time": "2026-04-19 09:45:00", "duration": 600, "app": "Chrome", "title": "GitHub"},
-            {"start_time": "2026-04-19 14:00:00", "end_time": "2026-04-19 14:30:00", "duration": 1800, "app": "Cursor", "title": "test.py"},
+            {
+                "start_time": "2026-04-19 09:00:00",
+                "end_time": "2026-04-19 09:15:00",
+                "duration": 900,
+                "app": "Chrome",
+                "title": "Google",
+            },
+            {
+                "start_time": "2026-04-19 09:15:00",
+                "end_time": "2026-04-19 09:30:00",
+                "duration": 900,
+                "app": "VSCode",
+                "title": "main.py",
+            },
+            {
+                "start_time": "2026-04-19 09:35:00",
+                "end_time": "2026-04-19 09:45:00",
+                "duration": 600,
+                "app": "Chrome",
+                "title": "GitHub",
+            },
+            {
+                "start_time": "2026-04-19 14:00:00",
+                "end_time": "2026-04-19 14:30:00",
+                "duration": 1800,
+                "app": "Cursor",
+                "title": "test.py",
+            },
         ]
         range_start = "2026-04-19 00:00:00"
         range_end = "2026-04-19 23:59:59"
@@ -296,6 +350,7 @@ class TestConsistencyWithActivityAggregator:
 
         # 修改全局参数以匹配 screenshot_analysis_v2.py
         import lifeprism.llm.summary_context.aggregators.activity_aggregator as agg_module
+
         original_bucket_minutes = agg_module.TIME_BUCKET_MINUTES
         original_max_bridge = agg_module.MAX_BRIDGE_BUCKETS
         original_threshold = agg_module.ACTIVE_SEGMENT_DENSITY_THRESHOLD
@@ -316,7 +371,7 @@ class TestConsistencyWithActivityAggregator:
                 min_duration_minutes=min_duration_minutes,
                 segment_type="active",
                 bucket_minutes=10,
-                max_bridge_buckets=0
+                max_bridge_buckets=0,
             )
 
             # 调用原有函数
@@ -326,20 +381,24 @@ class TestConsistencyWithActivityAggregator:
                 range_end=range_end,
                 threshold=threshold,
                 min_duration_minutes=min_duration_minutes,
-                segment_type="active"
+                segment_type="active",
             )
 
             # 验证一致性
-            assert len(new_segments) == len(old_segments), \
+            assert len(new_segments) == len(old_segments), (
                 f"真实场景下时间段数量不一致: new={len(new_segments)}, old={len(old_segments)}"
+            )
 
             for i, (new_seg, old_seg) in enumerate(zip(new_segments, old_segments)):
-                assert _normalize_tz(new_seg["start"]) == old_seg["start"], \
+                assert _normalize_tz(new_seg["start"]) == old_seg["start"], (
                     f"真实场景第{i}个时间段的start不一致: new={new_seg['start']}, old={old_seg['start']}"
-                assert _normalize_tz(new_seg["end"]) == old_seg["end"], \
+                )
+                assert _normalize_tz(new_seg["end"]) == old_seg["end"], (
                     f"真实场景第{i}个时间段的end不一致: new={new_seg['end']}, old={old_seg['end']}"
-                assert new_seg["duration_seconds"] == old_seg["duration_seconds"], \
+                )
+                assert new_seg["duration_seconds"] == old_seg["duration_seconds"], (
                     f"真实场景第{i}个时间段的duration_seconds不一致"
+                )
 
         finally:
             # 恢复原始参数

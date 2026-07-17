@@ -11,7 +11,7 @@ Monitor 模块 UTC 时区迁移单元测试
 
 import re
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -20,9 +20,7 @@ pytestmark = pytest.mark.core
 
 
 # UTC ISO 8601 格式正则：YYYY-MM-DDTHH:MM:SS.ffffff+00:00
-UTC_ISO_PATTERN = re.compile(
-    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?\+00:00$"
-)
+UTC_ISO_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?\+00:00$")
 
 
 @pytest.fixture(autouse=True)
@@ -220,12 +218,8 @@ class TestEventTransformerUtcIso:
 
         assert result is not None, "时间戳转换不应失败"
         # 验证是 UTC ISO 格式（带 T 和 +00:00），不是 'YYYY-MM-DD HH:MM:SS'
-        assert "T" in result, (
-            f"应返回 ISO 格式（含 T），实际: {result}"
-        )
-        assert "+00:00" in result, (
-            f"应返回 UTC 时区标识（+00:00），实际: {result}"
-        )
+        assert "T" in result, f"应返回 ISO 格式（含 T），实际: {result}"
+        assert "+00:00" in result, f"应返回 UTC 时区标识（+00:00），实际: {result}"
 
     def test_convert_timestamp_preserves_utc_not_local(self):
         """_convert_timestamp() 不应将 UTC 转为本地时间
@@ -243,12 +237,9 @@ class TestEventTransformerUtcIso:
 
         # 验证小时数是 02（UTC），不是 10（本地 UTC+8）
         assert parsed.hour == 2, (
-            f"应保留 UTC 时间（小时=2），实际小时={parsed.hour}，"
-            f"说明可能被转换为本地时间"
+            f"应保留 UTC 时间（小时=2），实际小时={parsed.hour}，说明可能被转换为本地时间"
         )
-        assert parsed.utcoffset() == timedelta(0), (
-            f"时区应为 UTC，实际: {parsed.utcoffset()}"
-        )
+        assert parsed.utcoffset() == timedelta(0), f"时区应为 UTC，实际: {parsed.utcoffset()}"
 
     def test_transform_returns_utc_iso_start_end_time(self):
         """transform() 返回的 ProcessedEvent 的 start_time/end_time 应为 UTC ISO 格式"""
@@ -269,12 +260,8 @@ class TestEventTransformerUtcIso:
         # 验证 start_time 和 end_time 都是 UTC ISO 格式
         for field_name in ("start_time", "end_time"):
             value = getattr(event, field_name)
-            assert "T" in value, (
-                f"{field_name} 应为 ISO 格式（含 T），实际: {value}"
-            )
-            assert "+00:00" in value, (
-                f"{field_name} 应含 UTC 时区标识，实际: {value}"
-            )
+            assert "T" in value, f"{field_name} 应为 ISO 格式（含 T），实际: {value}"
+            assert "+00:00" in value, f"{field_name} 应含 UTC 时区标识，实际: {value}"
 
     def test_transformer_has_no_local_timezone_dependency(self):
         """EventTransformer 不应依赖 LOCAL_TIMEZONE 进行转换
@@ -287,8 +274,7 @@ class TestEventTransformerUtcIso:
 
         # 迁移后不应存在 _target_tz 属性（本地时区 pytz 对象）
         assert not hasattr(transformer, "_target_tz"), (
-            "EventTransformer 不应持有 _target_tz 属性（本地时区依赖），"
-            "迁移后应直接使用 UTC"
+            "EventTransformer 不应持有 _target_tz 属性（本地时区依赖），迁移后应直接使用 UTC"
         )
 
 
@@ -307,8 +293,7 @@ class TestDataCleanNoUtcToLocalConversion:
 
         # 函数应已移除
         assert not hasattr(data_clean_module, "convert_utc_to_local"), (
-            "convert_utc_to_local 函数应已移除，"
-            "迁移后数据库统一使用 UTC，不再需要 UTC→本地转换"
+            "convert_utc_to_local 函数应已移除，迁移后数据库统一使用 UTC，不再需要 UTC→本地转换"
         )
 
 
@@ -356,9 +341,7 @@ class TestProcessorMonitorDataProviderIsoFormat:
         params = execute_args[1] if len(execute_args) > 1 else ()
         start_str = params[0] if len(params) > 0 else ""
 
-        assert "T" in start_str, (
-            f"lifeprism 模式下查询参数应为 ISO 格式（含 T），实际: {start_str}"
-        )
+        assert "T" in start_str, f"lifeprism 模式下查询参数应为 ISO 格式（含 T），实际: {start_str}"
 
 
 # ==================== Slice 7: DataProcessingService._get_incremental_time_range ====================
@@ -413,9 +396,7 @@ class TestDataProcessingServiceIncrementalTimeRangeUtc:
         assert start_time.utcoffset() == timedelta(0), (
             f"start_time 时区应为 UTC，实际: {start_time.utcoffset()}"
         )
-        assert start_time.hour == 8, (
-            f"start_time 小时应为 8（UTC），实际: {start_time.hour}"
-        )
+        assert start_time.hour == 8, f"start_time 小时应为 8（UTC），实际: {start_time.hour}"
         # end_time 也应为 UTC aware
         assert end_time.utcoffset() == timedelta(0), (
             f"end_time 时区应为 UTC，实际: {end_time.utcoffset()}"

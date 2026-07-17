@@ -7,15 +7,15 @@
 - docs/guides/utc-migration-hidden-dependencies.md
 - Issue #10: LLM 模块时间处理迁移
 """
+
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from lifeprism.llm.session.manager import Session, SessionManager, ChatHistoryManager
-
+from lifeprism.llm.session.manager import ChatHistoryManager, Session, SessionManager
 
 pytestmark = pytest.mark.core
 
@@ -29,9 +29,7 @@ class TestSessionUtcTimestamps:
         assert session.created_at.tzinfo is not None, (
             "created_at 应为 aware datetime（tzinfo 不为 None）"
         )
-        assert session.created_at.utcoffset() == timedelta(0), (
-            "created_at 时区偏移应为 0（UTC）"
-        )
+        assert session.created_at.utcoffset() == timedelta(0), "created_at 时区偏移应为 0（UTC）"
 
     def test_updated_at_is_utc_aware(self):
         """Session.updated_at 应为 UTC aware datetime"""
@@ -39,9 +37,7 @@ class TestSessionUtcTimestamps:
         assert session.updated_at.tzinfo is not None, (
             "updated_at 应为 aware datetime（tzinfo 不为 None）"
         )
-        assert session.updated_at.utcoffset() == timedelta(0), (
-            "updated_at 时区偏移应为 0（UTC）"
-        )
+        assert session.updated_at.utcoffset() == timedelta(0), "updated_at 时区偏移应为 0（UTC）"
 
     def test_add_message_timestamp_is_utc_iso(self):
         """Session.add_message() 写入的 timestamp 应为 UTC ISO 8601 格式"""
@@ -92,8 +88,7 @@ class TestSessionUtcTimestamps:
         # name 中的时间应在 before 和 after 之间（分钟级精度）
         # 由于是分钟级，允许 1 分钟的误差
         assert before - timedelta(minutes=1) <= name_dt <= after + timedelta(minutes=1), (
-            f"session name 时间 ({name_dt}) 应接近 UTC 当前时间 "
-            f"({before} ~ {after})"
+            f"session name 时间 ({name_dt}) 应接近 UTC 当前时间 ({before} ~ {after})"
         )
 
 
@@ -111,7 +106,9 @@ class TestSessionManagerUtcPersistence:
         manager = SessionManager()
         return manager
 
-    def test_save_and_load_session_preserves_utc_timestamps(self, session_manager, temp_session_dir):
+    def test_save_and_load_session_preserves_utc_timestamps(
+        self, session_manager, temp_session_dir
+    ):
         """保存再加载 session，时间戳应保持 UTC aware"""
         with patch.object(SessionManager, "get_session_path_by_id") as mock_path:
             temp_session_dir.mkdir(parents=True, exist_ok=True)
@@ -128,15 +125,15 @@ class TestSessionManagerUtcPersistence:
             session_manager._cache.clear()
             loaded = session_manager._load_session("test-session")
 
-            assert loaded.created_at.tzinfo is not None, (
-                "加载后的 created_at 应为 aware datetime"
-            )
-            assert loaded.updated_at.tzinfo is not None, (
-                "加载后的 updated_at 应为 aware datetime"
-            )
+            assert loaded.created_at.tzinfo is not None, "加载后的 created_at 应为 aware datetime"
+            assert loaded.updated_at.tzinfo is not None, "加载后的 updated_at 应为 aware datetime"
             # 时间值应一致（ISO 格式序列化后可能损失微秒精度，用秒级比较）
-            assert loaded.created_at.replace(microsecond=0) == original_created_at.replace(microsecond=0)
-            assert loaded.updated_at.replace(microsecond=0) == original_updated_at.replace(microsecond=0)
+            assert loaded.created_at.replace(microsecond=0) == original_created_at.replace(
+                microsecond=0
+            )
+            assert loaded.updated_at.replace(microsecond=0) == original_updated_at.replace(
+                microsecond=0
+            )
 
     def test_saved_metadata_contains_utc_isoformat(self, session_manager, temp_session_dir):
         """保存的 metadata 行中 created_at/updated_at 应为 UTC ISO 8601 格式"""

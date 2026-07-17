@@ -33,8 +33,10 @@ class TestProviderManagerGetApiKey:
         raw_specs = [
             {"name": "aliyun", "env_key": "aliyun_api_key", "api_key": "config-fallback-key"}
         ]
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch("keyring.get_password", return_value="keyring-value"):
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch("keyring.get_password", return_value="keyring-value"),
+        ):
             result = provider_manager.get_api_key("aliyun")
             assert result == "keyring-value"
 
@@ -47,8 +49,10 @@ class TestProviderManagerGetApiKey:
         raw_specs = [
             {"name": "aliyun", "env_key": "aliyun_api_key", "api_key": "config-fallback-key"}
         ]
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch("keyring.get_password", return_value=None):
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch("keyring.get_password", return_value=None),
+        ):
             result = provider_manager.get_api_key("aliyun")
             assert result == "config-fallback-key"
 
@@ -58,11 +62,11 @@ class TestProviderManagerGetApiKey:
 
         from lifeprism.config.provider_manager import provider_manager
 
-        raw_specs = [
-            {"name": "aliyun", "env_key": "aliyun_api_key"}
-        ]
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch("keyring.get_password", return_value=None):
+        raw_specs = [{"name": "aliyun", "env_key": "aliyun_api_key"}]
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch("keyring.get_password", return_value=None),
+        ):
             result = provider_manager.get_api_key("aliyun")
             assert result is None
 
@@ -72,9 +76,7 @@ class TestProviderManagerGetApiKey:
 
         from lifeprism.config.provider_manager import provider_manager
 
-        raw_specs = [
-            {"name": "custom", "env_key": "", "api_key": "some-key"}
-        ]
+        raw_specs = [{"name": "custom", "env_key": "", "api_key": "some-key"}]
         with patch.object(provider_manager, "_raw_specs", raw_specs):
             result = provider_manager.get_api_key("custom")
             assert result is None
@@ -92,14 +94,17 @@ class TestWechatAuthLoadTokenFallback:
 
         from lifeprism.llm.channel.wechat.auth import WechatAuth
 
-        with patch("keyring.get_password", return_value="keyring-token"), \
-             patch("lifeprism.config.settings_manager.get_setting", return_value="config-token"):
+        with (
+            patch("keyring.get_password", return_value="keyring-token"),
+            patch("lifeprism.config.settings_manager.get_setting", return_value="config-token"),
+        ):
             result = WechatAuth._load_token_from_keyring()
             assert result == "keyring-token"
 
     def test_wechat_token_cloud_mode_reads_storage_via_settings(self, tmp_path):
         """云端模式：通过 SettingsManager 从 storage.yaml 读取 wechat_token"""
         from unittest.mock import patch
+
         import yaml
 
         from lifeprism.config.settings_manager import settings
@@ -110,10 +115,12 @@ class TestWechatAuthLoadTokenFallback:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"wechat_token": "storage-token"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = WechatAuth._load_token_from_keyring()
             assert result == "storage-token"
 
@@ -123,8 +130,10 @@ class TestWechatAuthLoadTokenFallback:
 
         from lifeprism.llm.channel.wechat.auth import WechatAuth
 
-        with patch("keyring.get_password", return_value=None), \
-             patch("lifeprism.config.settings_manager.get_setting", return_value=None):
+        with (
+            patch("keyring.get_password", return_value=None),
+            patch("lifeprism.config.settings_manager.get_setting", return_value=None),
+        ):
             result = WechatAuth._load_token_from_keyring()
             assert result == ""
 
@@ -141,14 +150,17 @@ class TestSyncConfigApiKey:
 
         from lifeprism.sync.sync_config import get_sync_api_key
 
-        with patch("keyring.get_password", return_value="keyring-sync-key"), \
-             patch("lifeprism.config.settings_manager.get_setting", return_value="config-sync-key"):
+        with (
+            patch("keyring.get_password", return_value="keyring-sync-key"),
+            patch("lifeprism.config.settings_manager.get_setting", return_value="config-sync-key"),
+        ):
             result = get_sync_api_key()
             assert result == "keyring-sync-key"
 
     def test_sync_api_key_cloud_mode_reads_storage_via_settings(self, tmp_path):
         """云端模式：通过 SettingsManager 从 storage.yaml 读取 sync_api_key"""
         from unittest.mock import patch
+
         import yaml
 
         from lifeprism.config.settings_manager import settings
@@ -159,10 +171,12 @@ class TestSyncConfigApiKey:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "storage-sync-key"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = get_sync_api_key()
             assert result == "storage-sync-key"
 
@@ -172,8 +186,10 @@ class TestSyncConfigApiKey:
 
         from lifeprism.sync.sync_config import get_sync_api_key
 
-        with patch("keyring.get_password", return_value=None), \
-             patch("lifeprism.config.settings_manager.get_setting", return_value=None):
+        with (
+            patch("keyring.get_password", return_value=None),
+            patch("lifeprism.config.settings_manager.get_setting", return_value=None),
+        ):
             result = get_sync_api_key()
             assert result is None
 

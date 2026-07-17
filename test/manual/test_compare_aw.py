@@ -1,15 +1,17 @@
-import sqlite3
 import os
+import sqlite3
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import sys
+
 import pytz
 
 # 添加项目根目录到 sys.path 以便导入 lifeprism 模块
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from lifeprism.repository.base_providers.aw_base_data_provider import AWBaseDataProvider
 from lifeprism.config.settings_manager import settings
+from lifeprism.repository.base_providers.aw_base_data_provider import AWBaseDataProvider
+
 
 def get_window_activity_data(db_path, minutes=10, min_duration=30.0):
     """1. 获取 window_activity.db 数据"""
@@ -28,32 +30,38 @@ def get_window_activity_data(db_path, minutes=10, min_duration=30.0):
         conn.close()
         return [], None, None
 
-    end_time_str = row['timestamp']
+    end_time_str = row["timestamp"]
     end_time_dt = datetime.fromisoformat(end_time_str)
     # 2. 构建开始时间
     start_time_dt = end_time_dt - timedelta(minutes=minutes)
     start_time_str = start_time_dt.isoformat()
 
     # 3. 获取时长 > 30s 的数据
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT timestamp, duration, app, title
         FROM window_events
         WHERE timestamp >= ? AND timestamp <= ? AND duration >= ?
         ORDER BY timestamp ASC
-    """, (start_time_str, end_time_str, min_duration))
+    """,
+        (start_time_str, end_time_str, min_duration),
+    )
 
     rows = cursor.fetchall()
     events = []
     for r in rows:
-        events.append({
-            'timestamp': r['timestamp'],
-            'duration': r['duration'],
-            'app': r['app'],
-            'title': r['title']
-        })
+        events.append(
+            {
+                "timestamp": r["timestamp"],
+                "duration": r["duration"],
+                "app": r["app"],
+                "title": r["title"],
+            }
+        )
 
     conn.close()
     return events, start_time_dt, end_time_dt
+
 
 def run_test():
     print("=== 开始对比测试 ===")
@@ -95,18 +103,20 @@ def run_test():
     # 过滤时长 > 30s 并转换显示时区
     aw_events = []
     for e in aw_raw_events:
-        if e['duration'] >= 30.0:
-            dt_utc = provider._parse_timestamp(e['timestamp'])
+        if e["duration"] >= 30.0:
+            dt_utc = provider._parse_timestamp(e["timestamp"])
             dt_local = provider._utc_to_local(dt_utc)
-            aw_events.append({
-                'timestamp': dt_local.isoformat(),
-                'duration': e['duration'],
-                'app': e['data'].get('app', 'unknown'),
-                'title': e['data'].get('title', 'unknown')
-            })
+            aw_events.append(
+                {
+                    "timestamp": dt_local.isoformat(),
+                    "duration": e["duration"],
+                    "app": e["data"].get("app", "unknown"),
+                    "title": e["data"].get("title", "unknown"),
+                }
+            )
 
     # 排序
-    aw_events.sort(key=lambda x: x['timestamp'])
+    aw_events.sort(key=lambda x: x["timestamp"])
 
     # 6. 打印对比数据
     print(f"\n--- Windows Monitor 记录 (时长 >= 30s) [数量: {len(monitor_events)}] ---")
@@ -116,6 +126,7 @@ def run_test():
     print(f"\n--- ActivityWatch 记录 (时长 >= 30s) [数量: {len(aw_events)}] ---")
     for e in aw_events:
         print(f"[{e['timestamp']}] {e['duration']:>6.1f}s | {e['app']:<20} | {e['title'][:60]}")
+
 
 if __name__ == "__main__":
     run_test()

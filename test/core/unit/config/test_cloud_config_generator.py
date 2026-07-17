@@ -28,10 +28,11 @@ cloud_init.yaml 结构（Issue #28）:
 3. config 段结构正确性（llm、monitor_type、timezone）
 """
 
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import pytest
 import yaml
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 pytestmark = pytest.mark.core
 
@@ -297,9 +298,7 @@ class TestCloudConfigGeneratorStorageSection:
             "default_api_base": "",
             "has_api_key": True,
         }
-        mock_env["provider_manager"].get_all_providers.return_value = (
-            PROVIDERS + [extra_provider]
-        )
+        mock_env["provider_manager"].get_all_providers.return_value = PROVIDERS + [extra_provider]
         mock_env["provider_manager"].get_api_key.side_effect = lambda name: API_KEYS.get(
             name
         )  # openai 返回 None
@@ -328,9 +327,7 @@ class TestCloudConfigGeneratorStorageSection:
             "default_api_base": "",
             "has_api_key": False,
         }
-        mock_env["provider_manager"].get_all_providers.return_value = (
-            PROVIDERS + [no_env_provider]
-        )
+        mock_env["provider_manager"].get_all_providers.return_value = PROVIDERS + [no_env_provider]
         mock_env["provider_manager"]._get_env_key.side_effect = lambda name: ENV_KEYS.get(
             name, ""
         )  # custom 返回 ""

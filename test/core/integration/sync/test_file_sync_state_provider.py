@@ -8,6 +8,7 @@ file_sync_state 表注册 + FileSyncStateProvider 集成测试
 
 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md v2.1 决策 1（per-file version tracking）
 """
+
 import pytest
 
 pytestmark = pytest.mark.core
@@ -24,10 +25,10 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
 
     # 重置 update_at 缓存（确保测试使用最新配置）
     from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
@@ -70,9 +71,7 @@ class TestFileSyncStateTableRegistration:
         """file_sync_state 应在 TABLE_CONFIGS 中注册"""
         from lifeprism.config.database import TABLE_CONFIGS
 
-        assert "file_sync_state" in TABLE_CONFIGS, (
-            "file_sync_state 应在 TABLE_CONFIGS 中注册"
-        )
+        assert "file_sync_state" in TABLE_CONFIGS, "file_sync_state 应在 TABLE_CONFIGS 中注册"
 
     def test_file_sync_state_table_created_by_init_database(self, initialized_db):
         """init_database 应自动创建 file_sync_state 表"""
@@ -166,7 +165,9 @@ class TestUpsertAndGetState:
         assert state["current_hash"] == "abc123"
         assert state["updated_at"] is not None
 
-    def test_upsert_with_parent_hash_then_get(self, file_sync_state_provider, clean_file_sync_state):
+    def test_upsert_with_parent_hash_then_get(
+        self, file_sync_state_provider, clean_file_sync_state
+    ):
         """upsert 带 parent_hash 后 get_state 返回完整状态"""
         file_sync_state_provider.upsert_state(
             file_path="diary/2026-07-14.md",
@@ -226,9 +227,7 @@ class TestGetAllStates:
         assert "user_backup/x.md" not in paths
         assert "diary/d.md" not in paths
 
-    def test_get_all_states_empty_result(
-        self, file_sync_state_provider, clean_file_sync_state
-    ):
+    def test_get_all_states_empty_result(self, file_sync_state_provider, clean_file_sync_state):
         """get_all_states 对不存在的目录返回空列表"""
         file_sync_state_provider.upsert_state("user/user.md", None, "hash1")
 
@@ -239,9 +238,7 @@ class TestGetAllStates:
 class TestDeleteState:
     """Seam 3: delete_state 删除记录"""
 
-    def test_delete_state_removes_record(
-        self, file_sync_state_provider, clean_file_sync_state
-    ):
+    def test_delete_state_removes_record(self, file_sync_state_provider, clean_file_sync_state):
         """delete_state 删除已存在的记录"""
         # Arrange: 插入记录
         file_sync_state_provider.upsert_state("user/user.md", None, "hash1")
@@ -265,9 +262,7 @@ class TestDeleteState:
 class TestUpsertStateUpdate:
     """Seam 3: upsert_state 更新已存在的记录（INSERT OR REPLACE）"""
 
-    def test_upsert_updates_existing_record(
-        self, file_sync_state_provider, clean_file_sync_state
-    ):
+    def test_upsert_updates_existing_record(self, file_sync_state_provider, clean_file_sync_state):
         """upsert_state 对已存在的 file_path 执行更新而非报错"""
         # Arrange: 第一次 upsert
         file_sync_state_provider.upsert_state(

@@ -1,14 +1,17 @@
+import json
 import sys
 from pathlib import Path
 from typing import Any
-import json
+
 sys.path.insert(0, str(Path(__file__).parent))
 
-from lifeprism.llm.prompts import prompt_loader, PromptRef, Prompts
-from lifeprism.llm.providers import create_llm_client, LLMResponse
-from llm_test_base import LLMTestBase, TestLog
 import asyncio
+
 import openpyxl
+from llm_test_base import LLMTestBase, TestLog
+
+from lifeprism.llm.prompts import PromptRef, Prompts, prompt_loader
+from lifeprism.llm.providers import LLMResponse, create_llm_client
 
 
 class ChatHistoryExtract(LLMTestBase):
@@ -19,14 +22,14 @@ class ChatHistoryExtract(LLMTestBase):
         prompt_version: str = "v1",
         input_path: Path = Path("D:/desktop/软件开发/LifeWatch-AI/test/llm_prompt_test/dataset"),
         output_path: Path = Path("D:/desktop/软件开发/LifeWatch-AI/test/llm_prompt_test/results"),
-        temperature: float = 0.7
+        temperature: float = 0.7,
     ):
         super().__init__(
             prompt=Prompts.Schedule.EXTRACT_CHAT,
             prompt_version=prompt_version,
             input_path=input_path,
             output_path=output_path,
-            temperature=temperature
+            temperature=temperature,
         )
         self.llm_client = create_llm_client()
 
@@ -46,7 +49,7 @@ class ChatHistoryExtract(LLMTestBase):
         messages = []
         metadata = {}
 
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -58,7 +61,7 @@ class ChatHistoryExtract(LLMTestBase):
                     metadata = {
                         "name": data.get("name", ""),
                         "created_at": data.get("created_at", ""),
-                        "updated_at": data.get("updated_at", "")
+                        "updated_at": data.get("updated_at", ""),
                     }
                     continue
 
@@ -67,15 +70,9 @@ class ChatHistoryExtract(LLMTestBase):
                 content = data.get("content", "")
 
                 if role in ("user", "assistant") and content:
-                    messages.append({
-                        "role": role,
-                        "content": content
-                    })
+                    messages.append({"role": role, "content": content})
 
-        return {
-            "metadata": metadata,
-            "messages": messages
-        }
+        return {"metadata": metadata, "messages": messages}
 
     def _format_messages_for_llm(self, session_data: dict) -> str:
         """将消息格式化为 LLM 输入"""
@@ -87,10 +84,7 @@ class ChatHistoryExtract(LLMTestBase):
 
     def _build_messages(self, chat_content: str, session_name: str) -> list[dict[str, str]]:
         """构建 LLM 消息"""
-        task_prompt = prompt_loader.load_prompt(
-            self.prompt,
-            version=self.prompt_version
-        )
+        task_prompt = prompt_loader.load_prompt(self.prompt, version=self.prompt_version)
 
         system_prompt = task_prompt
         user_prompt = f"""## 聊天记录：需要提取信息的部分
@@ -101,7 +95,7 @@ class ChatHistoryExtract(LLMTestBase):
 
         return [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user", "content": user_prompt},
         ]
 
     def data_input(self, input_files: list[str] | None = None) -> list[dict[str, Any]]:
@@ -124,21 +118,22 @@ class ChatHistoryExtract(LLMTestBase):
                 # 从 metadata 的 created_at 提取日期 (YYYY-MM-DD)
                 created_at = session_data["metadata"].get("created_at", "")
                 created_at_date = created_at.split("T")[0] if created_at else ""
-                data_list.append({
-                    "session_name": session_data["metadata"].get("name", file_path.stem),
-                    "content": formatted_content,
-                    "message_count": len(session_data["messages"]),
-                    "file_name": file_path.name,
-                    "created_at_date": created_at_date
-                })
+                data_list.append(
+                    {
+                        "session_name": session_data["metadata"].get("name", file_path.stem),
+                        "content": formatted_content,
+                        "message_count": len(session_data["messages"]),
+                        "file_name": file_path.name,
+                        "created_at_date": created_at_date,
+                    }
+                )
 
         return data_list
 
     async def _call_llm(self, messages: list[dict[str, str]]) -> str:
         """调用 LLM 获取响应"""
         response: LLMResponse = await self.llm_client.chat_with_retry(
-            messages=messages,
-            temperature=self.temperature
+            messages=messages, temperature=self.temperature
         )
         return response.content or ""
 
@@ -154,15 +149,17 @@ class ChatHistoryExtract(LLMTestBase):
             "result": llm_output,
             "version": self.prompt_version,
             "temperature": self.temperature,
-            "input_data_date": data["created_at_date"]
+            "input_data_date": data["created_at_date"],
         }
         return {
             "llm_input": llm_input,
             "llm_output": llm_output,
-            "file_name": data["file_name"]
+            "file_name": data["file_name"],
         }, test_log
 
-    async def _run_test_async(self, input_files: list[str] | None = None, round: int = 1) -> tuple[list[dict], list[TestLog]]:
+    async def _run_test_async(
+        self, input_files: list[str] | None = None, round: int = 1
+    ) -> tuple[list[dict], list[TestLog]]:
         """异步执行测试，分组调用每组30个"""
         data_list = self.data_input(input_files)
         results = []
@@ -170,17 +167,17 @@ class ChatHistoryExtract(LLMTestBase):
         batch_size = 30
 
         for i in range(0, len(data_list), batch_size):
-            batch = data_list[i:i + batch_size]
-            batch_results = await asyncio.gather(
-                *[self._process_single(data) for data in batch]
-            )
+            batch = data_list[i : i + batch_size]
+            batch_results = await asyncio.gather(*[self._process_single(data) for data in batch])
             for result, log in batch_results:
                 results.append(result)
                 test_logs.append(log)
 
         return results, test_logs
 
-    def run_test(self, input_files: list[str] | None = None, round: int = 1) -> tuple[list[dict], list[TestLog]]:
+    def run_test(
+        self, input_files: list[str] | None = None, round: int = 1
+    ) -> tuple[list[dict], list[TestLog]]:
         """
         执行测试
 
@@ -222,12 +219,12 @@ class ChatHistoryExtract(LLMTestBase):
             ws.cell(row=row_idx, column=1, value=result.get("llm_input", ""))
             ws.cell(row=row_idx, column=2, value=result.get("llm_output", ""))
 
-        ws.column_dimensions['A'].width = 30
-        ws.column_dimensions['B'].width = 60
-        ws.column_dimensions['C'].width = 10
-        ws.column_dimensions['D'].width = 10
-        ws.column_dimensions['E'].width = 30
-        ws.column_dimensions['F'].width = 20
+        ws.column_dimensions["A"].width = 30
+        ws.column_dimensions["B"].width = 60
+        ws.column_dimensions["C"].width = 10
+        ws.column_dimensions["D"].width = 10
+        ws.column_dimensions["E"].width = 30
+        ws.column_dimensions["F"].width = 20
 
         wb.save(file_path)
         return file_path
@@ -274,7 +271,7 @@ class ChatHistoryExtract(LLMTestBase):
         """
         # 自动获取下一个轮次
         round = self.get_next_round()
-        
+
         print(f"Prompt: {self.prompt}")
         print(f"Prompt 版本: {self.prompt_version}")
         print(f"Input path: {self.input_path}")
@@ -290,26 +287,22 @@ class ChatHistoryExtract(LLMTestBase):
 
         print("生成 Excel 评估表...")
         eval_sheet_path = self.generate_eval_sheet(
-            test_results=test_results,
-            round=round,
-            temperature=self.temperature
+            test_results=test_results, round=round, temperature=self.temperature
         )
         print(f"评估表已生成: {eval_sheet_path}")
         print("-" * 50)
 
         print("保存测试日志...")
         self.save_log(test_logs, round)
-        print(f"测试日志已保存: {self.output_path / self.prompt.name / self.prompt_version / f'r{round}-t{self.temperature}.json'}")
+        print(
+            f"测试日志已保存: {self.output_path / self.prompt.name / self.prompt_version / f'r{round}-t{self.temperature}.json'}"
+        )
         print("-" * 50)
 
         input_file_names = [r["file_name"] for r in test_results]
 
         print("更新 metadata...")
-        self.update_metadata(
-            round=round,
-            pass_ratio=0.0,
-            input_files=input_file_names
-        )
+        self.update_metadata(round=round, pass_ratio=0.0, input_files=input_file_names)
         print(f"Metadata 已更新: {self.output_path / self.prompt.name / 'meta_data.json'}")
         print("-" * 50)
 
@@ -324,16 +317,16 @@ if __name__ == "__main__":
     # 默认值
     default_version = "v1"
     default_temperature = 0.7
-    
+
     # 交互式输入
     version_input = input(f"请输入 Prompt 版本 (默认 {default_version}): ").strip()
     version = version_input if version_input else default_version
-    
+
     temp_input = input(f"请输入 Temperature (默认 {default_temperature}): ").strip()
     temperature = float(temp_input) if temp_input else default_temperature
-    
+
     print(f"\n使用配置: version={version}, temperature={temperature}")
     print("=" * 50)
-    
+
     test = ChatHistoryExtract(prompt_version=version, temperature=temperature)
     test.main()

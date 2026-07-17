@@ -5,8 +5,8 @@
 """
 
 import json
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 # 项目根目录
 ROOT = Path(__file__).resolve().parent.parent.parent.parent

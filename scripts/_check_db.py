@@ -1,4 +1,5 @@
 """检查主仓库 DB 状态"""
+
 import sqlite3
 
 conn = sqlite3.connect("localData/dataset/lifewatch_ai.db")
@@ -8,7 +9,9 @@ diary = conn.execute("SELECT count(*) FROM diary").fetchone()[0]
 mood = conn.execute("SELECT count(*) FROM mood_entries").fetchone()[0]
 crt = conn.execute("SELECT count(*) FROM custom_record_types").fetchone()[0]
 goal = conn.execute("SELECT count(*) FROM goal").fetchone()[0]
-session_files = conn.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name LIKE 'session_%'").fetchone()[0]
+session_files = conn.execute(
+    "SELECT count(*) FROM sqlite_master WHERE type='table' AND name LIKE 'session_%'"
+).fetchone()[0]
 
 print(f"总表数: {tables}")
 print(f"diary: {diary} 条")

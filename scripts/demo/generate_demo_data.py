@@ -25,10 +25,8 @@ sys.path.insert(0, str(_PROJECT_ROOT))
 
 def main():
     parser = argparse.ArgumentParser(description="Web-Demo 演示数据生成脚本")
-    parser.add_argument("--data-path", default="localData",
-                        help="数据目录路径（默认: localData）")
-    parser.add_argument("--days", type=int, default=7,
-                        help="生成多少天的数据（默认: 7）")
+    parser.add_argument("--data-path", default="localData", help="数据目录路径（默认: localData）")
+    parser.add_argument("--days", type=int, default=7, help="生成多少天的数据（默认: 7）")
     args = parser.parse_args()
 
     data_path = Path(args.data_path).resolve()

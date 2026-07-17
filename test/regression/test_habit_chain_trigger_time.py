@@ -7,14 +7,17 @@
 3. 相邻节点间距 < 10min 时抛出 ValidationError
 4. 计算结果通过 calculated_time 字段返回（不存库），trigger_time 保持原始值
 """
+
 import pytest
+
 from lifeprism.server.services.habit_chain_service import HabitChainService
 from lifeprism.utils.exceptions import ValidationError
 
 
 class TestChainTimelineTriggerTimeCalculation:
-
-    def _make_node(self, id: int, sort_order: int, trigger_time: str | None, habit_id: str | None = None):
+    def _make_node(
+        self, id: int, sort_order: int, trigger_time: str | None, habit_id: str | None = None
+    ):
         return {
             "id": id,
             "chain_id": 1,
@@ -102,7 +105,9 @@ class TestChainTimelineTriggerTimeCalculation:
         ]
 
         with pytest.raises(ValidationError) as exc:
-            service._validate_chain_timeline_rules(nodes, is_showing_in_timeline=True, error_code="TEST")
+            service._validate_chain_timeline_rules(
+                nodes, is_showing_in_timeline=True, error_code="TEST"
+            )
         assert "间距不足" in str(exc.value)
 
     def test_validate_gap_equal_10min_passes(self):
@@ -115,7 +120,9 @@ class TestChainTimelineTriggerTimeCalculation:
             self._make_node(2, 2, "08:10"),  # 间距10min
         ]
 
-        service._validate_chain_timeline_rules(nodes, is_showing_in_timeline=True, error_code="TEST")
+        service._validate_chain_timeline_rules(
+            nodes, is_showing_in_timeline=True, error_code="TEST"
+        )
 
     def test_validate_gap_greater_than_10min_passes(self):
         """
@@ -127,7 +134,9 @@ class TestChainTimelineTriggerTimeCalculation:
             self._make_node(2, 2, "08:15"),  # 间距15min
         ]
 
-        service._validate_chain_timeline_rules(nodes, is_showing_in_timeline=True, error_code="TEST")
+        service._validate_chain_timeline_rules(
+            nodes, is_showing_in_timeline=True, error_code="TEST"
+        )
 
     # ============================================================================
     # 验证：计算结果不存库（原始节点数据不变）

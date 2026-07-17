@@ -6,6 +6,7 @@ Tests three existing-summary modes:
 - regenerate_changed: Only update if diary content changed (hash mismatch)
 - skip_existing: Only create summaries for dates without existing summaries
 """
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -48,9 +49,14 @@ def test_range_summary_mode_regenerate_all_updates_existing_summaries(monkeypatc
         ]
 
     # Patch using string path like existing tests do
-    monkeypatch.setattr("lifeprism.server.services.diary_service.generate_diary_ai_summary", fake_generate_ai_summary)
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service.generate_diary_ai_summary",
+        fake_generate_ai_summary,
+    )
     monkeypatch.setattr(diary_provider, "get_diaries_by_date_range", fake_get_diaries_by_date_range)
-    monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "some content")
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service._read_diary_content", lambda date: "some content"
+    )
 
     client = TestClient(app)
     response = client.post(
@@ -69,8 +75,9 @@ def test_range_summary_mode_regenerate_all_updates_existing_summaries(monkeypatc
 @pytest.mark.core
 def test_range_summary_mode_regenerate_changed_only_updates_mismatched_hashes(monkeypatch):
     """regenerate_changed should only update dates where hash doesn't match"""
-    from lifeprism.repository.providers import diary_provider
     import hashlib
+
+    from lifeprism.repository.providers import diary_provider
 
     called_dates = []
 
@@ -80,7 +87,9 @@ def test_range_summary_mode_regenerate_changed_only_updates_mismatched_hashes(mo
 
     # Compute actual hashes for the test content
     content_18 = "some content for 04-18"
-    hash_18 = hashlib.md5(content_18.strip().replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")).hexdigest()
+    hash_18 = hashlib.md5(
+        content_18.strip().replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+    ).hexdigest()
 
     def fake_get_diaries_by_date_range(start_date: str, end_date: str):
         return [
@@ -108,14 +117,20 @@ def test_range_summary_mode_regenerate_changed_only_updates_mismatched_hashes(mo
 
     # 2026-04-18: existing_hash matches computed hash -> skip
     # 2026-04-19: existing_hash is None -> regenerate
-    monkeypatch.setattr("lifeprism.server.services.diary_service.generate_diary_ai_summary", fake_generate_ai_summary)
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service.generate_diary_ai_summary",
+        fake_generate_ai_summary,
+    )
     monkeypatch.setattr(diary_provider, "get_diaries_by_date_range", fake_get_diaries_by_date_range)
 
     def fake_read_content(date: str) -> str:
         if date == "2026-04-18":
             return content_18
         return "some different content"  # This will hash to something else
-    monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", fake_read_content)
+
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service._read_diary_content", fake_read_content
+    )
 
     client = TestClient(app)
     response = client.post(
@@ -176,9 +191,14 @@ def test_range_summary_mode_skip_existing_only_creates_missing_summaries(monkeyp
             },
         ]
 
-    monkeypatch.setattr("lifeprism.server.services.diary_service.generate_diary_ai_summary", fake_generate_ai_summary)
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service.generate_diary_ai_summary",
+        fake_generate_ai_summary,
+    )
     monkeypatch.setattr(diary_provider, "get_diaries_by_date_range", fake_get_diaries_by_date_range)
-    monkeypatch.setattr("lifeprism.server.services.diary_service._read_diary_content", lambda date: "some content")
+    monkeypatch.setattr(
+        "lifeprism.server.services.diary_service._read_diary_content", lambda date: "some content"
+    )
 
     client = TestClient(app)
     response = client.post(

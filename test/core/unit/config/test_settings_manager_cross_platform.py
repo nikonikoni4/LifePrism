@@ -11,6 +11,7 @@
 - 开发环境（sys.frozen 不存在）：config_base_path = localData
 Linux 部署属于开发环境（无 sys.frozen），回退到 localData。
 """
+
 import os
 import sys
 from pathlib import Path
@@ -41,8 +42,10 @@ class TestConfigBasePath:
         对应 Windows 桌面打包版。
         """
         fake_localappdata = r"C:\Users\testuser\AppData\Local"
-        with patch.object(sys, "frozen", True, create=True), \
-             patch.dict(os.environ, {"LOCALAPPDATA": fake_localappdata}):
+        with (
+            patch.object(sys, "frozen", True, create=True),
+            patch.dict(os.environ, {"LOCALAPPDATA": fake_localappdata}),
+        ):
             result = settings._resolve_config_base_path()
             assert result == Path(fake_localappdata) / "LifePrism" / "lifeprismData"
 
@@ -57,8 +60,7 @@ class TestConfigBasePath:
 
     def test_config_base_path_packaged_no_localappdata(self, settings):
         """打包环境但 LOCALAPPDATA 缺失：回退到基于 exe 路径的推算"""
-        with patch.object(sys, "frozen", True, create=True), \
-             patch.dict(os.environ, {}, clear=True):
+        with patch.object(sys, "frozen", True, create=True), patch.dict(os.environ, {}, clear=True):
             result = settings._resolve_config_base_path()
             # 应回退到基于 sys.executable 的路径（不崩溃即可）
             assert isinstance(result, Path)
@@ -112,8 +114,10 @@ class TestDataPathResolution:
         env_path = "/from/env/var"
 
         # 模拟 yaml 配置有值
-        with patch.object(settings, "_config", {"lifeprism_data_path": yaml_path}), \
-             patch.dict(os.environ, {"LIFEPRISM_DATA_PATH": env_path}):
+        with (
+            patch.object(settings, "_config", {"lifeprism_data_path": yaml_path}),
+            patch.dict(os.environ, {"LIFEPRISM_DATA_PATH": env_path}),
+        ):
             configured_path = settings._config.get("lifeprism_data_path", "")
             if configured_path:
                 result = Path(configured_path)
@@ -128,8 +132,10 @@ class TestDataPathResolution:
         settings._config_base_path = Path("localData")
         try:
             # yaml 配置为空 → 走 _resolve_default_data_path → 读 env var
-            with patch.object(settings, "_config", {}), \
-                 patch.dict(os.environ, {"LIFEPRISM_DATA_PATH": env_path}):
+            with (
+                patch.object(settings, "_config", {}),
+                patch.dict(os.environ, {"LIFEPRISM_DATA_PATH": env_path}),
+            ):
                 configured_path = settings._config.get("lifeprism_data_path", "")
                 if configured_path:
                     result = Path(configured_path)
@@ -149,22 +155,25 @@ class TestDataPathResolution:
         settings._config_base_path = default_base
         try:
             # 1. yaml 有值 → yaml 胜出
-            with patch.object(settings, "_config", {"lifeprism_data_path": yaml_path}), \
-                 patch.dict(os.environ, {"LIFEPRISM_DATA_PATH": env_path}):
+            with (
+                patch.object(settings, "_config", {"lifeprism_data_path": yaml_path}),
+                patch.dict(os.environ, {"LIFEPRISM_DATA_PATH": env_path}),
+            ):
                 configured = settings._config.get("lifeprism_data_path", "")
                 result = Path(configured) if configured else settings._resolve_default_data_path()
                 assert result == Path(yaml_path)
 
             # 2. yaml 为空，env 有值 → env 胜出
-            with patch.object(settings, "_config", {}), \
-                 patch.dict(os.environ, {"LIFEPRISM_DATA_PATH": env_path}):
+            with (
+                patch.object(settings, "_config", {}),
+                patch.dict(os.environ, {"LIFEPRISM_DATA_PATH": env_path}),
+            ):
                 configured = settings._config.get("lifeprism_data_path", "")
                 result = Path(configured) if configured else settings._resolve_default_data_path()
                 assert result == Path(env_path)
 
             # 3. yaml 和 env 都为空 → 回退到 config_base_path
-            with patch.object(settings, "_config", {}), \
-                 patch.dict(os.environ, {}, clear=True):
+            with patch.object(settings, "_config", {}), patch.dict(os.environ, {}, clear=True):
                 configured = settings._config.get("lifeprism_data_path", "")
                 result = Path(configured) if configured else settings._resolve_default_data_path()
                 assert result == default_base

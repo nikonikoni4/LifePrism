@@ -44,8 +44,7 @@ def test_screenshot_store_generates_relative_png_path():
         )
 
         assert payload["file_path"] == (
-            "screenshots/2026-04-02/"
-            "2026-04-02T11-00-00_scheduled_cap-legacy.png"
+            "screenshots/2026-04-02/2026-04-02T11-00-00_scheduled_cap-legacy.png"
         )
         assert (temp_dir / payload["file_path"]).exists()
     finally:

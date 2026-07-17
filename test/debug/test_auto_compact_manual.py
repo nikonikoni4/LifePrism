@@ -2,6 +2,7 @@
 手动测试 auto_compact 功能
 使用真实的 LLM 调用来压缩 session
 """
+
 import sys
 from pathlib import Path
 
@@ -11,9 +12,10 @@ sys.path.insert(0, str(project_root))
 
 import asyncio
 import shutil
+
 from lifeprism.llm.agent.loop import AgentLoop
-from lifeprism.llm.session import session_manager
 from lifeprism.llm.bus import MessageQueue
+from lifeprism.llm.session import session_manager
 
 
 async def main():
@@ -21,14 +23,14 @@ async def main():
     session_dir = Path(project_root) / "localData" / "session"
     source_file = session_dir / "compact_test_meta_data.jsonl"
     target_file = session_dir / "compact_test.jsonl"
-    
+
     if source_file.exists():
         shutil.copy2(source_file, target_file)
         print(f"已从 {source_file.name} 复制数据到 {target_file.name}")
     else:
         print(f"源文件不存在: {source_file}")
         return
-    
+
     # 加载指定的 session
     session_id = "compact_test"
     print(f"加载 session: {session_id}")
@@ -43,12 +45,16 @@ async def main():
     # 显示前3条和后3条消息
     print(f"\n前3条消息:")
     for i, msg in enumerate(session.messages[:3]):
-        content = msg['content'][:100] if isinstance(msg['content'], str) else str(msg['content'])[:100]
+        content = (
+            msg["content"][:100] if isinstance(msg["content"], str) else str(msg["content"])[:100]
+        )
         print(f"  [{i}] {msg['role']}: {content}...")
 
     print(f"\n后3条消息:")
-    for i, msg in enumerate(session.messages[-3:], start=len(session.messages)-3):
-        content = msg['content'][:100] if isinstance(msg['content'], str) else str(msg['content'])[:100]
+    for i, msg in enumerate(session.messages[-3:], start=len(session.messages) - 3):
+        content = (
+            msg["content"][:100] if isinstance(msg["content"], str) else str(msg["content"])[:100]
+        )
         print(f"  [{i}] {msg['role']}: {content}...")
 
     # 创建 AgentLoop 实例
@@ -69,6 +75,7 @@ async def main():
 
     # 直接修改 settings 对象的属性
     import types
+
     original_token_limit_value = settings.token_limit
 
     # 创建一个新的 property 来覆盖 token_limit

@@ -7,6 +7,7 @@ Habit Providers UTC 时区迁移测试
 
 确保时间戳字段（finished_at / updated_at / completed_at）以 UTC ISO 8601 格式写入。
 """
+
 import re
 
 import pytest
@@ -107,9 +108,7 @@ class TestMarkInProgressChallengeFailedUtcTimestamps:
         challenge_id = _create_challenge(challenge_provider, habit_id)
 
         try:
-            result = challenge_provider.mark_in_progress_challenge_failed(
-                habit_id, challenge_id
-            )
+            result = challenge_provider.mark_in_progress_challenge_failed(habit_id, challenge_id)
             assert result is True
 
             challenge = challenge_provider.get_challenge_by_id(challenge_id)
@@ -131,9 +130,7 @@ class TestMarkInProgressChallengeFailedUtcTimestamps:
         challenge_id = _create_challenge(challenge_provider, habit_id)
 
         try:
-            result = challenge_provider.mark_in_progress_challenge_failed(
-                habit_id, challenge_id
-            )
+            result = challenge_provider.mark_in_progress_challenge_failed(habit_id, challenge_id)
             assert result is True
 
             challenge = challenge_provider.get_challenge_by_id(challenge_id)

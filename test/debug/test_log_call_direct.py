@@ -1,12 +1,15 @@
 """直接测试 log_call 方法"""
+
 import sys
-sys.path.insert(0, '.')
+
+sys.path.insert(0, ".")
 
 from datetime import datetime
 from pathlib import Path
 
 from lifeprism.config import settings
 from lifeprism.llm.utils import llm_call_logger
+
 
 # 模拟 InboundMessage 和 OutboundMessage
 class MockInboundMessage:
@@ -17,14 +20,17 @@ class MockInboundMessage:
         self.session_id = "test_session"
         self.channel = "test_channel"
 
+
 class MockResponse:
     def __init__(self):
         self.content = "测试响应内容"
         self.usage = {"input_tokens": 100, "output_tokens": 50}
 
+
 class MockOutboundMessage:
     def __init__(self):
         self.response = MockResponse()
+
 
 print("=" * 60)
 print("直接测试 log_call 方法")
@@ -38,9 +44,7 @@ msg = MockInboundMessage()
 result = MockOutboundMessage()
 
 record_id = llm_call_logger.log_call(
-    msg, result,
-    prompt_module="test_module",
-    prompt_name="test_prompt"
+    msg, result, prompt_module="test_module", prompt_name="test_prompt"
 )
 
 print(f"   - 返回的 record_id: {record_id}")
@@ -52,9 +56,7 @@ llm_call_logger.enabled = True
 print(f"   - llm_call_logger.enabled: {llm_call_logger.enabled}")
 
 record_id2 = llm_call_logger.log_call(
-    msg, result,
-    prompt_module="test_module",
-    prompt_name="test_prompt_enabled"
+    msg, result, prompt_module="test_module", prompt_name="test_prompt_enabled"
 )
 
 print(f"   - 返回的 record_id: {record_id2}")
@@ -70,12 +72,13 @@ print(f"   - 文件存在: {log_file.exists()}")
 
 if log_file.exists():
     import json
-    with open(log_file, 'r', encoding='utf-8') as f:
+
+    with open(log_file, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     print(f"   - 记录数量: {len(data.get('calls', []))}")
-    if data.get('calls'):
-        last_call = data['calls'][-1]
+    if data.get("calls"):
+        last_call = data["calls"][-1]
         print(f"\n   最后一条记录:")
         print(f"   - ID: {last_call.get('id')}")
         print(f"   - prompt.module: {last_call.get('prompt', {}).get('module')}")

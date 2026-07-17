@@ -9,6 +9,7 @@
 
 认证方式：Authorization: Bearer {api_key} HTTP Header
 """
+
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -36,12 +37,12 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
 
     # 重置 update_at 缓存
     from lifeprism.repository.base_providers.lw_base_data_provider import (
         LWBaseDataProvider,
     )
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
@@ -217,9 +218,7 @@ class TestSyncPullHeartbeat:
         assert response.status_code == 200
         assert heartbeat_manager.is_local_online() is True
 
-    def test_pull_heartbeat_before_query(
-        self, client, initialized_db, reset_heartbeat
-    ):
+    def test_pull_heartbeat_before_query(self, client, initialized_db, reset_heartbeat):
         """心跳更新在查询之前执行（即使查询出错，心跳也已更新）"""
         # Arrange
         from unittest.mock import patch
@@ -250,9 +249,7 @@ class TestSyncPullHeartbeat:
         assert response.status_code == 500
         assert heartbeat_manager.is_local_online() is True
 
-    def test_consecutive_pulls_keep_online(
-        self, client, initialized_db, reset_heartbeat
-    ):
+    def test_consecutive_pulls_keep_online(self, client, initialized_db, reset_heartbeat):
         """连续 pull 请求保持在线状态"""
         # Arrange
         from lifeprism.sync.heartbeat_manager import heartbeat_manager

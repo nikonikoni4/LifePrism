@@ -10,6 +10,7 @@ issue #11: readonly 模式的 DatabaseManager 不应在 __init__ 中创建连接
 3. 非 readonly DatabaseManager 仍然在构造时初始化连接池（回归保护）
 4. readonly DatabaseManager 路径存在时懒加载正常工作
 """
+
 import sqlite3
 
 import pytest
@@ -33,18 +34,14 @@ class TestReadonlyLazyInit:
         assert not missing_path.exists()
 
         # 构造不应抛出异常
-        mgr = DatabaseManager(
-            DB_PATH=str(missing_path), use_pool=True, pool_size=1, readonly=True
-        )
+        mgr = DatabaseManager(DB_PATH=str(missing_path), use_pool=True, pool_size=1, readonly=True)
 
         # 连接池应未初始化（懒加载）
         assert mgr._connection_pool is None
         assert mgr.readonly is True
         assert mgr.use_pool is True
 
-    def test_readonly_get_connection_raises_operational_error_when_db_missing(
-        self, tmp_path
-    ):
+    def test_readonly_get_connection_raises_operational_error_when_db_missing(self, tmp_path):
         """
         测试2：readonly DatabaseManager 首次 get_connection() 时抛出 OperationalError
 
@@ -54,9 +51,7 @@ class TestReadonlyLazyInit:
         missing_path = tmp_path / "missing_aw.db"
         assert not missing_path.exists()
 
-        mgr = DatabaseManager(
-            DB_PATH=str(missing_path), use_pool=True, pool_size=1, readonly=True
-        )
+        mgr = DatabaseManager(DB_PATH=str(missing_path), use_pool=True, pool_size=1, readonly=True)
 
         # 构造时连接池未初始化
         assert mgr._connection_pool is None
@@ -82,9 +77,7 @@ class TestReadonlyLazyInit:
         setup_conn.close()
         assert db_path.exists()
 
-        mgr = DatabaseManager(
-            DB_PATH=str(db_path), use_pool=True, pool_size=2, readonly=True
-        )
+        mgr = DatabaseManager(DB_PATH=str(db_path), use_pool=True, pool_size=2, readonly=True)
 
         # 构造时连接池未初始化（懒加载）
         assert mgr._connection_pool is None
@@ -119,9 +112,7 @@ class TestNonReadonlyEagerInit:
         db_path.touch()
         assert db_path.exists()
 
-        mgr = DatabaseManager(
-            DB_PATH=str(db_path), use_pool=True, pool_size=3, readonly=False
-        )
+        mgr = DatabaseManager(DB_PATH=str(db_path), use_pool=True, pool_size=3, readonly=False)
 
         # 非 readonly 应在 __init__ 中立即初始化连接池
         assert mgr._connection_pool is not None

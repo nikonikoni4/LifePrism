@@ -27,10 +27,11 @@ cloud_init.yaml 结构（Issue #28）::
 - PRD: .scratch/linux-deployment-discussion/linux-deployment-prd.md (云端初始化流程)
 """
 
-import pytest
-import yaml
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
+import yaml
 
 from lifeprism.config.cloud_initializer import CloudInitializer
 from lifeprism.config.exceptions import ConfigError
@@ -96,8 +97,8 @@ def setup_paths(tmp_path, monkeypatch, default_providers_config):
     - providers.yaml 预创建为默认配置，写入 tmp_path/config/providers.yaml
     - storage.yaml 写入 tmp_path/config/storage.yaml（通过 settings._config_base_path）
     """
-    from lifeprism.config.settings_manager import settings
     from lifeprism.config.provider_manager import provider_manager
+    from lifeprism.config.settings_manager import settings
 
     config_dir = tmp_path / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -346,9 +347,7 @@ class TestInitializeValidation:
         # config.yaml 不应被创建（验证在写入之前）
         assert not config_path.exists()
 
-    def test_initialize_config_error_contains_details(
-        self, setup_paths, cloud_init_data
-    ):
+    def test_initialize_config_error_contains_details(self, setup_paths, cloud_init_data):
         """ConfigError 的 details 中包含缺失字段列表"""
         data = {
             "storage": {"sync_api_key": "key"},  # 缺 wechat_token
@@ -778,9 +777,7 @@ class TestStorageYamlContent:
         data_path = setup_paths["data_path"]
         _write_cloud_init(data_path, cloud_init_data)
 
-        with patch(
-            "lifeprism.config.settings_manager.settings.save_storage_yaml"
-        ) as mock_save:
+        with patch("lifeprism.config.settings_manager.settings.save_storage_yaml") as mock_save:
             CloudInitializer(data_path).initialize()
 
         mock_save.assert_called_once()
@@ -796,9 +793,7 @@ class TestStorageYamlContent:
 class TestConfigAndStorageSeparation:
     """测试 cloud_init.yaml 中 config 段和 storage 段同时存在时正确分离写入"""
 
-    def test_config_and_storage_written_to_separate_files(
-        self, setup_paths, cloud_init_data
-    ):
+    def test_config_and_storage_written_to_separate_files(self, setup_paths, cloud_init_data):
         """config 段写入 config.yaml，storage 段写入 storage.yaml，互不污染"""
         data_path = setup_paths["data_path"]
         config_path = setup_paths["config_path"]
@@ -851,9 +846,7 @@ class TestFilePermissions:
             CloudInitializer(data_path).initialize()
 
         # 验证 os.chmod 被调用且包含对 config.yaml 设置 0o600
-        chmod_calls = [
-            (call.args[0], call.args[1]) for call in mock_chmod.call_args_list
-        ]
+        chmod_calls = [(call.args[0], call.args[1]) for call in mock_chmod.call_args_list]
         assert (config_path, 0o600) in chmod_calls, (
             f"未找到对 config.yaml 设置权限 0o600 的调用，实际: {chmod_calls}"
         )
@@ -871,9 +864,7 @@ class TestFilePermissions:
             CloudInitializer(data_path).initialize()
 
         # 验证 os.chmod 被调用且包含对 storage.yaml 设置 0o600
-        chmod_calls = [
-            (call.args[0], call.args[1]) for call in mock_chmod.call_args_list
-        ]
+        chmod_calls = [(call.args[0], call.args[1]) for call in mock_chmod.call_args_list]
         assert (storage_path, 0o600) in chmod_calls, (
             f"未找到对 storage.yaml 设置权限 0o600 的调用，实际: {chmod_calls}"
         )
@@ -895,9 +886,7 @@ class TestFilePermissions:
             CloudInitializer(data_path).validate_monitor_type()
 
         # 验证 os.chmod 被调用且包含对 config.yaml 设置 0o600
-        chmod_calls = [
-            (call.args[0], call.args[1]) for call in mock_chmod.call_args_list
-        ]
+        chmod_calls = [(call.args[0], call.args[1]) for call in mock_chmod.call_args_list]
         assert (config_path, 0o600) in chmod_calls, (
             f"未找到对 config.yaml 设置权限 0o600 的调用，实际: {chmod_calls}"
         )

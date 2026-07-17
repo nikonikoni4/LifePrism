@@ -37,10 +37,12 @@ class TestStorageYamlNotExists:
 
     def test_get_storage_key_returns_none_when_storage_not_exist(self, tmp_path):
         """云端模式下 storage.yaml 不存在时，get_storage_key() 返回 None（不报错）"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = settings.get_storage_key("sync_api_key")
             assert result is None
 
@@ -58,10 +60,12 @@ class TestStorageYamlRead:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "N7kX_test_key"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = settings.get_storage_key("sync_api_key")
             assert result == "N7kX_test_key"
 
@@ -72,10 +76,12 @@ class TestStorageYamlRead:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"wechat_token": "wx_token_abc"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = settings.get_storage_key("wechat_token")
             assert result == "wx_token_abc"
 
@@ -102,10 +108,12 @@ class TestStorageYamlNestedKey:
                 f,
             )
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = settings.get_storage_key("providers.anthropic")
             assert result == "sk-ant-xxx"
 
@@ -116,10 +124,12 @@ class TestStorageYamlNestedKey:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"providers": {"anthropic": "sk-ant-xxx"}}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = settings.get_storage_key("providers.openai")
             assert result is None
 
@@ -132,10 +142,12 @@ class TestStorageYamlWrite:
 
     def test_set_storage_key_writes_sync_api_key_to_file(self, tmp_path):
         """set_storage_key('sync_api_key', ...) 写入 storage.yaml 文件"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             settings.set_storage_key("sync_api_key", "N7kX_new_key")
 
             storage_path = tmp_path / "config" / "storage.yaml"
@@ -146,10 +158,12 @@ class TestStorageYamlWrite:
 
     def test_set_storage_key_writes_nested_provider_key(self, tmp_path):
         """set_storage_key('providers.anthropic', ...) 写入嵌套结构"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             settings.set_storage_key("providers.anthropic", "sk-ant-new")
 
             storage_path = tmp_path / "config" / "storage.yaml"
@@ -159,10 +173,12 @@ class TestStorageYamlWrite:
 
     def test_set_storage_key_round_trip(self, tmp_path):
         """写入后读取返回写入的值"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             settings.set_storage_key("wechat_token", "wx_round_trip")
             result = settings.get_storage_key("wechat_token")
             assert result == "wx_round_trip"
@@ -176,44 +192,46 @@ class TestStorageYamlPermissions:
 
     def test_set_storage_key_sets_permission_600_on_linux(self, tmp_path):
         """非 Windows 平台写入 storage.yaml 后设置权限 600"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}), \
-             patch("lifeprism.config.settings_manager.sys.platform", "linux"), \
-             patch("lifeprism.config.settings_manager.os.chmod") as mock_chmod:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+            patch("lifeprism.config.settings_manager.sys.platform", "linux"),
+            patch("lifeprism.config.settings_manager.os.chmod") as mock_chmod,
+        ):
             settings.set_storage_key("sync_api_key", "test_key")
 
             storage_path = tmp_path / "config" / "storage.yaml"
-            chmod_calls = [
-                (call.args[0], call.args[1]) for call in mock_chmod.call_args_list
-            ]
+            chmod_calls = [(call.args[0], call.args[1]) for call in mock_chmod.call_args_list]
             assert (storage_path, 0o600) in chmod_calls, (
                 f"未找到设置权限 0o600 的调用，实际: {chmod_calls}"
             )
 
     def test_save_storage_yaml_sets_permission_600_on_linux(self, tmp_path):
         """save_storage_yaml() 在非 Windows 平台设置权限 600"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch("lifeprism.config.settings_manager.sys.platform", "linux"), \
-             patch("lifeprism.config.settings_manager.os.chmod") as mock_chmod:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch("lifeprism.config.settings_manager.sys.platform", "linux"),
+            patch("lifeprism.config.settings_manager.os.chmod") as mock_chmod,
+        ):
             settings.save_storage_yaml({"sync_api_key": "bulk_key"})
 
             storage_path = tmp_path / "config" / "storage.yaml"
-            chmod_calls = [
-                (call.args[0], call.args[1]) for call in mock_chmod.call_args_list
-            ]
+            chmod_calls = [(call.args[0], call.args[1]) for call in mock_chmod.call_args_list]
             assert (storage_path, 0o600) in chmod_calls
 
     def test_set_storage_key_does_not_set_permission_on_windows(self, tmp_path):
         """Windows 平台不设置文件权限"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}), \
-             patch("lifeprism.config.settings_manager.sys.platform", "win32"), \
-             patch("lifeprism.config.settings_manager.os.chmod") as mock_chmod:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+            patch("lifeprism.config.settings_manager.sys.platform", "win32"),
+            patch("lifeprism.config.settings_manager.os.chmod") as mock_chmod,
+        ):
             settings.set_storage_key("sync_api_key", "test_key")
             mock_chmod.assert_not_called()
 
@@ -226,24 +244,32 @@ class TestStorageYamlFullMode:
 
     def test_get_storage_key_reads_from_keyring_in_full_mode(self, tmp_path):
         """full 模式下 get_storage_key() 从 keyring 读取"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch("lifeprism.config.settings_manager.keyring.get_password", return_value="kr_value") as mock_kr:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch(
+                "lifeprism.config.settings_manager.keyring.get_password", return_value="kr_value"
+            ) as mock_kr,
+        ):
             result = settings.get_storage_key("sync_api_key")
             assert result == "kr_value"
             mock_kr.assert_called_once_with(KEYRING_SERVICE_NAME, "sync_api_key")
 
     def test_get_storage_key_returns_none_when_keyring_empty_in_full_mode(self, tmp_path):
         """full 模式下 keyring 无值时返回 None"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch("lifeprism.config.settings_manager.keyring.get_password", return_value=None):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch("lifeprism.config.settings_manager.keyring.get_password", return_value=None),
+        ):
             result = settings.get_storage_key("sync_api_key")
             assert result is None
 
     def test_full_mode_does_not_create_storage_yaml(self, tmp_path):
         """full 模式下 set_storage_key() 不创建 storage.yaml 文件"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set,
+        ):
             settings.set_storage_key("sync_api_key", "kr_write_val")
             mock_set.assert_called_once_with(KEYRING_SERVICE_NAME, "sync_api_key", "kr_write_val")
             # storage.yaml 不应被创建
@@ -257,9 +283,13 @@ class TestStorageYamlFullMode:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "storage_value"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch("lifeprism.config.settings_manager.keyring.get_password", return_value="kr_value"):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch(
+                "lifeprism.config.settings_manager.keyring.get_password", return_value="kr_value"
+            ),
+        ):
             result = settings.get_storage_key("sync_api_key")
             # 应返回 keyring 的值，而非 storage.yaml 的值
             assert result == "kr_value"
@@ -281,8 +311,10 @@ class TestSaveStorageYaml:
                 "deepseek": "sk-ds-bulk",
             },
         }
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+        ):
             settings.save_storage_yaml(data)
 
             storage_path = tmp_path / "config" / "storage.yaml"
@@ -297,8 +329,10 @@ class TestSaveStorageYaml:
             "sync_api_key": "N7kX_rt",
             "providers": {"anthropic": "sk-ant-rt"},
         }
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+        ):
             settings.save_storage_yaml(data)
             assert settings.get_storage_key("sync_api_key") == "N7kX_rt"
             assert settings.get_storage_key("providers.anthropic") == "sk-ant-rt"
@@ -317,10 +351,12 @@ class TestGetSetRouting:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "via_get_method"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = settings.get("sync_api_key")
             assert result == "via_get_method"
 
@@ -331,28 +367,34 @@ class TestGetSetRouting:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"wechat_token": "wx_via_get"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = settings.get("wechat_token")
             assert result == "wx_via_get"
 
     def test_get_sync_api_key_not_in_storage_returns_none_in_cloud_mode(self, tmp_path):
         """云端模式下 storage.yaml 无 sync_api_key 时 get() 返回 None"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = settings.get("sync_api_key")
             assert result is None
 
     def test_set_sync_api_key_to_storage_in_cloud_mode(self, tmp_path):
         """云端模式下 set('sync_api_key', ...) 写入 storage.yaml"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             settings.set("sync_api_key", "set_via_set_method")
 
             storage_path = tmp_path / "config" / "storage.yaml"
@@ -367,12 +409,14 @@ class TestGetSetRouting:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"api_key": "should_not_read_this"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_config", {}), \
-             patch("lifeprism.config.settings_manager.keyring.get_password", return_value=None):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_config", {}),
+            patch("lifeprism.config.settings_manager.keyring.get_password", return_value=None),
+        ):
             # api_key 不从 storage.yaml 读取（storage.yaml 中无 api_key 字段）
             result = settings.get("api_key")
             assert result != "should_not_read_this"
@@ -384,9 +428,11 @@ class TestGetSetRouting:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "storage_value"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config", {}),
+        ):
             result = settings.get("sync_api_key")
             # full 模式不应读取 storage.yaml 中的值
             assert result != "storage_value"

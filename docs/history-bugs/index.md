@@ -5,6 +5,13 @@
 - 触发规则：在排查"删了一条记录同步后又出现了"、讨论同步系统中 DELETE 操作的传播机制、设计 tombstone / 软删除 / 删除日志表方案、排查云端和本地数据不一致但无错误日志、修改 Repository 层 delete 方法或同步 push/pull 逻辑时阅读
 - 内容摘要：**设计缺陷（P1，待修复）** — 所有数据库表采用物理 DELETE，同步 Push/Pull 两端只做 `WHERE updated_at > last_sync_time` 增量查询，无法感知和传播 DELETE 操作。被删记录在对端永久保留为幽灵数据，两端数据分叉且无自动修复路径。给出三个候选方案：软删除（改 40+ 表 DDL）、Tombstone 表（新增 deleted_records + 改 _generic_delete）、全量对比同步（Pull 时对比主键集合）。
 
+## 2026-07-16-dynamic-tables-orphan-cleanup-wipes-remote-data
+
+- updated_at: 2026-07-16
+- path: `docs/history-bugs/2026-07-16-dynamic-tables-orphan-cleanup-wipes-remote-data.md`
+- 触发规则：在排查"云端动态表不见了 / 云端数据被删除了"、看到日志 `重建动态表: 删除孤儿表 custom_xxx`、修改 `rebuild_dynamic_tables` 的建表 / 删表逻辑、讨论双向同步中"谁的数据是 SSOT"的设计假设、设计同步系统中的删除传播机制（tombstone / 软删除）时阅读
+- 内容摘要：**严重（P1，已修复）** — `rebuild_dynamic_tables()` 第 2 步扫描云端 `custom_*` 表，将不在本地 types 列表中的表作为"孤儿"执行 DROP TABLE。这个逻辑错误假设本地是 SSOT——在双向同步中，云端自己创建的 `reading_log` 被本地的 `{exercise_log}` 差异请求误判为孤儿而物理删除。修复方案：直接删除孤儿表清理逻辑，删除同步需要独立的 tombstone 机制。
+
 ## 2026-07-16-dynamic-tables-rebuild-always-triggered
 
 - updated_at: 2026-07-16

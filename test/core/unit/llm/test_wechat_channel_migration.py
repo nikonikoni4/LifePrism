@@ -10,6 +10,7 @@ WechatChannel account.json → 数据库迁移测试
 
 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
 """
+
 import json
 
 import pytest
@@ -28,12 +29,12 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
 
     # 重置 update_at 缓存（确保测试使用最新配置）
     from lifeprism.repository.base_providers.lw_base_data_provider import (
         LWBaseDataProvider,
     )
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
     LWBaseDataProvider._TABLES_WITH_TIMESTAMPS = None
@@ -202,9 +203,7 @@ class TestMigrateAccountJsonToDb:
         bak_file = wechat_channel.state_file.with_suffix(".json.bak")
         assert not bak_file.exists(), "account.json.bak 不应存在"
 
-    def test_migrate_old_format_context_tokens(
-        self, wechat_channel, clean_account_state_table
-    ):
+    def test_migrate_old_format_context_tokens(self, wechat_channel, clean_account_state_table):
         """旧格式 context_tokens 自动迁移到新格式"""
         # Arrange: 写入旧格式 account.json
         _write_account_json(

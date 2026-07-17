@@ -19,7 +19,11 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from lifeprism.config.settings_manager import KEYRING_SERVICE_NAME, KEYRING_WECHAT_TOKEN_USERNAME, settings
+from lifeprism.config.settings_manager import (
+    KEYRING_SERVICE_NAME,
+    KEYRING_WECHAT_TOKEN_USERNAME,
+    settings,
+)
 
 pytestmark = pytest.mark.core
 
@@ -40,13 +44,17 @@ class TestKeyMigrationLocalMode:
                 f,
             )
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {"sync_api_key": "legacy_sync_key", "provider": "anthropic"}), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(
+                settings, "_config", {"sync_api_key": "legacy_sync_key", "provider": "anthropic"}
+            ),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set,
+        ):
             settings._migrate_keys_from_config()
 
             # sync_api_key 写入 keyring
@@ -61,13 +69,15 @@ class TestKeyMigrationLocalMode:
         config_path = tmp_path / "config" / "config.yaml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {"wechat_token": "legacy_wx_token"}), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(settings, "_config", {"wechat_token": "legacy_wx_token"}),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set,
+        ):
             settings._migrate_keys_from_config()
 
             mock_set.assert_called_once_with(
@@ -82,13 +92,17 @@ class TestKeyMigrationLocalMode:
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "legacy_key", "provider": "anthropic"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {"sync_api_key": "legacy_key", "provider": "anthropic"}), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch("lifeprism.config.settings_manager.keyring.set_password"):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(
+                settings, "_config", {"sync_api_key": "legacy_key", "provider": "anthropic"}
+            ),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch("lifeprism.config.settings_manager.keyring.set_password"),
+        ):
             settings._migrate_keys_from_config()
 
             with open(config_path, encoding="utf-8") as f:
@@ -117,13 +131,17 @@ class TestKeyMigrationStorageExists:
 
         config_path = tmp_path / "config" / "config.yaml"
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {"sync_api_key": "legacy_key", "provider": "anthropic"}), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(
+                settings, "_config", {"sync_api_key": "legacy_key", "provider": "anthropic"}
+            ),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set,
+        ):
             settings._migrate_keys_from_config()
 
             # 不写入 keyring（storage.yaml 已存在，跳过迁移）
@@ -141,13 +159,17 @@ class TestKeyMigrationStorageExists:
 
         config_path = tmp_path / "config" / "config.yaml"
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {"sync_api_key": "legacy", "wechat_token": "legacy_wx"}), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch("lifeprism.config.settings_manager.keyring.set_password"):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(
+                settings, "_config", {"sync_api_key": "legacy", "wechat_token": "legacy_wx"}
+            ),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch("lifeprism.config.settings_manager.keyring.set_password"),
+        ):
             settings._migrate_keys_from_config()
 
             # storage.yaml 内容不变
@@ -170,12 +192,16 @@ class TestKeyMigrationCloudMode:
         # storage.yaml 不存在
         assert not (tmp_path / "config" / "storage.yaml").exists()
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {"sync_api_key": "legacy_cloud_key", "provider": "anthropic"}), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(
+                settings, "_config", {"sync_api_key": "legacy_cloud_key", "provider": "anthropic"}
+            ),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+        ):
             settings._migrate_keys_from_config()
 
             # storage.yaml 被创建，包含迁移的 Key
@@ -192,12 +218,14 @@ class TestKeyMigrationCloudMode:
         config_path = tmp_path / "config" / "config.yaml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {"wechat_token": "legacy_wx_cloud"}), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(settings, "_config", {"wechat_token": "legacy_wx_cloud"}),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+        ):
             settings._migrate_keys_from_config()
 
             storage_path = tmp_path / "config" / "storage.yaml"
@@ -211,12 +239,14 @@ class TestKeyMigrationCloudMode:
         config_path = tmp_path / "config" / "config.yaml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {"sync_api_key": "sync_k", "wechat_token": "wx_k"}), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(settings, "_config", {"sync_api_key": "sync_k", "wechat_token": "wx_k"}),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+        ):
             settings._migrate_keys_from_config()
 
             storage_path = tmp_path / "config" / "storage.yaml"
@@ -246,13 +276,15 @@ class TestKeyMigrationPreservesOtherFields:
             "api_base": "https://api.deepseek.com",
         }
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", dict(original_config)), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch("lifeprism.config.settings_manager.keyring.set_password"):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(settings, "_config", dict(original_config)),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch("lifeprism.config.settings_manager.keyring.set_password"),
+        ):
             settings._migrate_keys_from_config()
 
             # 非 Key 字段保持不变
@@ -265,18 +297,24 @@ class TestKeyMigrationPreservesOtherFields:
         config_path = tmp_path / "config" / "config.yaml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {
-                 "sync_api_key": "legacy",
-                 "wechat_token": "legacy_wx",
-                 "timezone": "America/New_York",
-                 "monitor_type": "lifeprism",
-             }), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch("lifeprism.config.settings_manager.keyring.set_password"):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(
+                settings,
+                "_config",
+                {
+                    "sync_api_key": "legacy",
+                    "wechat_token": "legacy_wx",
+                    "timezone": "America/New_York",
+                    "monitor_type": "lifeprism",
+                },
+            ),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch("lifeprism.config.settings_manager.keyring.set_password"),
+        ):
             settings._migrate_keys_from_config()
 
             assert settings._config.get("timezone") == "America/New_York"
@@ -287,21 +325,27 @@ class TestKeyMigrationPreservesOtherFields:
         config_path = tmp_path / "config" / "config.yaml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {
-                 "sync_api_key": "legacy",
-                 "wechat_token": "legacy_wx",
-                 "provider": "anthropic",
-                 "model": "claude-opus-4",
-                 "timezone": "Asia/Shanghai",
-                 "monitor_type": "none",
-                 "user_name": "测试用户",
-             }), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch("lifeprism.config.settings_manager.keyring.set_password"):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(
+                settings,
+                "_config",
+                {
+                    "sync_api_key": "legacy",
+                    "wechat_token": "legacy_wx",
+                    "provider": "anthropic",
+                    "model": "claude-opus-4",
+                    "timezone": "Asia/Shanghai",
+                    "monitor_type": "none",
+                    "user_name": "测试用户",
+                },
+            ),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch("lifeprism.config.settings_manager.keyring.set_password"),
+        ):
             settings._migrate_keys_from_config()
 
             with open(config_path, encoding="utf-8") as f:
@@ -324,13 +368,15 @@ class TestKeyMigrationPreservesOtherFields:
             yaml.dump({"provider": "anthropic", "model": "claude-opus-4"}, f)
         original_mtime = config_path.stat().st_mtime
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {"provider": "anthropic", "model": "claude-opus-4"}), \
-             patch.object(settings, "_storage_config", {}), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_save_config") as mock_save:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_config_path", config_path),
+            patch.object(settings, "_config", {"provider": "anthropic", "model": "claude-opus-4"}),
+            patch.object(settings, "_storage_config", {}),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_save_config") as mock_save,
+        ):
             settings._migrate_keys_from_config()
             # 无残留 Key 时不调用 _save_config
             mock_save.assert_not_called()
@@ -349,21 +395,21 @@ class TestGitignoreExcludesSensitiveFiles:
         return gitignore_path.read_text(encoding="utf-8")
 
     def test_gitignore_excludes_storage_yaml(self):
-        """ .gitignore 中显式排除 storage.yaml（承载 Key 字段）"""
+        """.gitignore 中显式排除 storage.yaml（承载 Key 字段）"""
         content = self._read_gitignore()
         assert "storage.yaml" in content, (
             ".gitignore 应显式排除 storage.yaml（承载 sync_api_key/wechat_token/providers Key）"
         )
 
     def test_gitignore_excludes_cloud_init_yaml(self):
-        """ .gitignore 中排除 cloud_init.yaml（云端初始化临时文件，含 Key）"""
+        """.gitignore 中排除 cloud_init.yaml（云端初始化临时文件，含 Key）"""
         content = self._read_gitignore()
         assert "cloud_init.yaml" in content, (
             ".gitignore 应排除 cloud_init.yaml（云端初始化临时文件，含 Key）"
         )
 
     def test_gitignore_excludes_config_yaml(self):
-        """ .gitignore 中排除 config.yaml（用户配置文件）"""
+        """.gitignore 中排除 config.yaml（用户配置文件）"""
         content = self._read_gitignore()
         # config.yaml 被 *.yaml 通配或显式排除
         assert "config.yaml" in content or "*.yaml" in content, (
@@ -401,11 +447,18 @@ class TestDefaultsAndSchemaClean:
         from lifeprism.config.cloud_config_generator import CloudConfigGenerator
 
         generator = CloudConfigGenerator()
-        with patch("lifeprism.config.cloud_config_generator.settings") as mock_settings, \
-             patch("lifeprism.config.cloud_config_generator.provider_manager") as mock_pm, \
-             patch("lifeprism.config.cloud_config_generator.get_sync_api_key", return_value="sync_k"), \
-             patch("lifeprism.config.cloud_config_generator.set_sync_api_key"), \
-             patch("lifeprism.llm.channel.wechat.auth.WechatAuth._load_token_from_keyring", return_value="wx"):
+        with (
+            patch("lifeprism.config.cloud_config_generator.settings") as mock_settings,
+            patch("lifeprism.config.cloud_config_generator.provider_manager") as mock_pm,
+            patch(
+                "lifeprism.config.cloud_config_generator.get_sync_api_key", return_value="sync_k"
+            ),
+            patch("lifeprism.config.cloud_config_generator.set_sync_api_key"),
+            patch(
+                "lifeprism.llm.channel.wechat.auth.WechatAuth._load_token_from_keyring",
+                return_value="wx",
+            ),
+        ):
             mock_settings.get.side_effect = lambda key, default=None: {
                 "provider": "anthropic",
                 "model": "claude-opus-4",

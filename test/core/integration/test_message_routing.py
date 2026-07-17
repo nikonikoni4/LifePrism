@@ -80,7 +80,9 @@ class TestMessageRouting:
     """消息路由测试"""
 
     @pytest.mark.asyncio
-    async def test_cloud_skips_message_when_local_online(self, wechat_channel, reset_heartbeat, cloud_mode):
+    async def test_cloud_skips_message_when_local_online(
+        self, wechat_channel, reset_heartbeat, cloud_mode
+    ):
         """本地在线时，云端跳过消息处理（不调用 bus.send）"""
         # Arrange
         from lifeprism.sync.heartbeat_manager import heartbeat_manager
@@ -96,7 +98,9 @@ class TestMessageRouting:
         wechat_channel.bus.send.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_cloud_processes_message_when_local_offline(self, wechat_channel, reset_heartbeat, cloud_mode):
+    async def test_cloud_processes_message_when_local_offline(
+        self, wechat_channel, reset_heartbeat, cloud_mode
+    ):
         """本地离线时，云端正常处理消息（调用 bus.send）"""
         # Arrange
         from lifeprism.sync.heartbeat_manager import heartbeat_manager
@@ -107,10 +111,13 @@ class TestMessageRouting:
 
         # Act: mock LLM 日志相关调用，避免文件/数据库副作用
         # 注意: llm_call_logger 是 LazySingleton 代理，需 patch 整个对象而非其方法属性
-        with patch(
-            "lifeprism.llm.channel.wechat.channel.Context.build_system_prompt",
-            return_value="",
-        ), patch("lifeprism.llm.channel.wechat.channel.llm_call_logger"):
+        with (
+            patch(
+                "lifeprism.llm.channel.wechat.channel.Context.build_system_prompt",
+                return_value="",
+            ),
+            patch("lifeprism.llm.channel.wechat.channel.llm_call_logger"),
+        ):
             await wechat_channel._handle_wechat_message(msg)
 
         # Assert: 离线时云端接管，消息进入总线
@@ -138,10 +145,13 @@ class TestMessageRouting:
             msg = _build_text_msg("hello")
 
             # Act
-            with patch(
-                "lifeprism.llm.channel.wechat.channel.Context.build_system_prompt",
-                return_value="",
-            ), patch("lifeprism.llm.channel.wechat.channel.llm_call_logger"):
+            with (
+                patch(
+                    "lifeprism.llm.channel.wechat.channel.Context.build_system_prompt",
+                    return_value="",
+                ),
+                patch("lifeprism.llm.channel.wechat.channel.llm_call_logger"),
+            ):
                 await wechat_channel._handle_wechat_message(msg)
 
         # Assert: 超时后云端接管处理
@@ -163,10 +173,13 @@ class TestMessageRouting:
         msg = _build_text_msg("hello")
 
         # Act
-        with patch(
-            "lifeprism.llm.channel.wechat.channel.Context.build_system_prompt",
-            return_value="",
-        ), patch("lifeprism.llm.channel.wechat.channel.llm_call_logger"):
+        with (
+            patch(
+                "lifeprism.llm.channel.wechat.channel.Context.build_system_prompt",
+                return_value="",
+            ),
+            patch("lifeprism.llm.channel.wechat.channel.llm_call_logger"),
+        ):
             await wechat_channel._handle_wechat_message(msg)
 
         # Assert: 显式离线后云端立即接管
@@ -190,10 +203,14 @@ class TestMessageRouting:
 
         # Act & Assert: 离线 -> 云端接管处理日志
         heartbeat_manager.set_event("offline")
-        with caplog.at_level(logging.INFO, logger=channel_logger), patch(
-            "lifeprism.llm.channel.wechat.channel.Context.build_system_prompt",
-            return_value="",
-        ), patch("lifeprism.llm.channel.wechat.channel.llm_call_logger"):
+        with (
+            caplog.at_level(logging.INFO, logger=channel_logger),
+            patch(
+                "lifeprism.llm.channel.wechat.channel.Context.build_system_prompt",
+                return_value="",
+            ),
+            patch("lifeprism.llm.channel.wechat.channel.llm_call_logger"),
+        ):
             await wechat_channel._handle_wechat_message(msg)
         assert any("云端接管处理" in r.getMessage() for r in caplog.records)
 
@@ -215,10 +232,13 @@ class TestMessageRouting:
         msg = _build_text_msg("hello")
 
         # 默认 run_mode 为 "full"（本地模式），不使用 cloud_mode fixture
-        with patch(
-            "lifeprism.llm.channel.wechat.channel.Context.build_system_prompt",
-            return_value="",
-        ), patch("lifeprism.llm.channel.wechat.channel.llm_call_logger"):
+        with (
+            patch(
+                "lifeprism.llm.channel.wechat.channel.Context.build_system_prompt",
+                return_value="",
+            ),
+            patch("lifeprism.llm.channel.wechat.channel.llm_call_logger"),
+        ):
             await wechat_channel._handle_wechat_message(msg)
 
         # Assert: 本地模式始终处理消息，不受心跳状态影响

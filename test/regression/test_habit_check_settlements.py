@@ -8,8 +8,10 @@
 1. get_expired_in_progress_challenges 返回所有 in_progress 挑战，不应有 end_date 限制
 2. 提前判定失败的挑战能被 check_settlements 检测到
 """
-import pytest
+
 from datetime import date, timedelta
+
+import pytest
 from fastapi.testclient import TestClient
 
 from lifeprism.server.main import app
@@ -22,6 +24,7 @@ def test_get_expired_in_progress_challenges_returns_all_in_progress_challenges(m
     不应该只返回 end_date <= today 的挑战。
     """
     from lifeprism.repository.aggregators import habit_aggregator
+
     habit_challenge_provider = habit_aggregator.challenge_provider
 
     future_end = (date.today() + timedelta(days=30)).isoformat()
@@ -29,9 +32,30 @@ def test_get_expired_in_progress_challenges_returns_all_in_progress_challenges(m
     today_end = date.today().isoformat()
 
     mock_challenges = [
-        {"id": "ch-future", "habit_id": "h1", "end_date": future_end, "status": "in_progress", "completed_count": 0, "required_completions": 10},
-        {"id": "ch-past", "habit_id": "h2", "end_date": past_end, "status": "in_progress", "completed_count": 0, "required_completions": 10},
-        {"id": "ch-today", "habit_id": "h3", "end_date": today_end, "status": "in_progress", "completed_count": 0, "required_completions": 10},
+        {
+            "id": "ch-future",
+            "habit_id": "h1",
+            "end_date": future_end,
+            "status": "in_progress",
+            "completed_count": 0,
+            "required_completions": 10,
+        },
+        {
+            "id": "ch-past",
+            "habit_id": "h2",
+            "end_date": past_end,
+            "status": "in_progress",
+            "completed_count": 0,
+            "required_completions": 10,
+        },
+        {
+            "id": "ch-today",
+            "habit_id": "h3",
+            "end_date": today_end,
+            "status": "in_progress",
+            "completed_count": 0,
+            "required_completions": 10,
+        },
     ]
 
     monkeypatch.setattr(
@@ -55,6 +79,7 @@ def test_check_settlements_detects_premature_failure(monkeypatch):
     （end_date > today 但数学上不可能达标）
     """
     from lifeprism.repository.aggregators import habit_aggregator
+
     habit_challenge_provider = habit_aggregator.challenge_provider
     habit_checkin_provider = habit_aggregator.checkin_provider
     habit_provider = habit_aggregator.habit_provider
@@ -96,20 +121,33 @@ def test_check_settlements_detects_premature_failure(monkeypatch):
     monkeypatch.setattr(
         habit_provider,
         "get_habit_by_id",
-        lambda hid: {"id": hid, "name": "中午-吃药", "frequency_type": "daily"} if hid == "habit-d2264f2c" else None,
+        lambda hid: (
+            {"id": hid, "name": "中午-吃药", "frequency_type": "daily"}
+            if hid == "habit-d2264f2c"
+            else None
+        ),
     )
 
     # 直接调用 habit_service.check_settlements
     from lifeprism.server.services.habit_service import habit_service
+
     result = habit_service.check_settlements()
 
     # 应该返回失败结算项
-    assert len(result.settlements) == 1, f"期望返回 1 个失败结算项，实际返回 {len(result.settlements)} 个"
+    assert len(result.settlements) == 1, (
+        f"期望返回 1 个失败结算项，实际返回 {len(result.settlements)} 个"
+    )
     settlement = result.settlements[0]
     assert settlement.result == "failed", f"期望 result='failed'，实际 result='{settlement.result}'"
-    assert settlement.challengeId == "ch-premature-fail", f"期望 challengeId='ch-premature-fail'，实际 challengeId='{settlement.challengeId}'"
-    assert settlement.completedCount == 1, f"期望 completedCount=1，实际 completedCount={settlement.completedCount}"
-    assert settlement.requiredCompletions == 24, f"期望 requiredCompletions=24，实际 requiredCompletions={settlement.requiredCompletions}"
+    assert settlement.challengeId == "ch-premature-fail", (
+        f"期望 challengeId='ch-premature-fail'，实际 challengeId='{settlement.challengeId}'"
+    )
+    assert settlement.completedCount == 1, (
+        f"期望 completedCount=1，实际 completedCount={settlement.completedCount}"
+    )
+    assert settlement.requiredCompletions == 24, (
+        f"期望 requiredCompletions=24，实际 requiredCompletions={settlement.requiredCompletions}"
+    )
 
 
 @pytest.mark.regression
@@ -118,6 +156,7 @@ def test_check_settlements_api_returns_premature_failures(monkeypatch):
     验证 /check-settlements API 能返回提前判定失败的挑战
     """
     from lifeprism.repository.aggregators import habit_aggregator
+
     habit_challenge_provider = habit_aggregator.challenge_provider
     habit_checkin_provider = habit_aggregator.checkin_provider
     habit_provider = habit_aggregator.habit_provider
@@ -154,7 +193,11 @@ def test_check_settlements_api_returns_premature_failures(monkeypatch):
     monkeypatch.setattr(
         habit_provider,
         "get_habit_by_id",
-        lambda hid: {"id": hid, "name": "中午-吃药", "frequency_type": "daily"} if hid == "habit-d2264f2c" else None,
+        lambda hid: (
+            {"id": hid, "name": "中午-吃药", "frequency_type": "daily"}
+            if hid == "habit-d2264f2c"
+            else None
+        ),
     )
 
     client = TestClient(app)
@@ -167,5 +210,9 @@ def test_check_settlements_api_returns_premature_failures(monkeypatch):
     failed_settlements = [s for s in data["settlements"] if s["result"] == "failed"]
     assert len(failed_settlements) >= 1, f"期望至少 1 个失败结算项，实际: {len(failed_settlements)}"
 
-    premature_fail = next((s for s in failed_settlements if s["challengeId"] == "ch-premature-fail"), None)
-    assert premature_fail is not None, f"期望找到提前失败的挑战 ch-premature-fail，实际 settlements: {failed_settlements}"
+    premature_fail = next(
+        (s for s in failed_settlements if s["challengeId"] == "ch-premature-fail"), None
+    )
+    assert premature_fail is not None, (
+        f"期望找到提前失败的挑战 ch-premature-fail，实际 settlements: {failed_settlements}"
+    )

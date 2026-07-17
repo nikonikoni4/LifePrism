@@ -10,6 +10,7 @@ SyncRepository 集成测试
 
 参考: test/core/integration/repository/test_sync_schema.py
 """
+
 import sqlite3
 
 import pytest
@@ -30,10 +31,10 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
 
     # 重置 update_at 缓存（确保测试使用最新配置）
     from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
@@ -122,7 +123,9 @@ class TestQueryIncremental:
         # Assert
         assert rows == []
 
-    def test_query_incremental_returns_all_when_last_sync_is_empty(self, repository, initialized_db):
+    def test_query_incremental_returns_all_when_last_sync_is_empty(
+        self, repository, initialized_db
+    ):
         """增量查询：last_sync_time 为空字符串时返回全部记录"""
         # Arrange
         with initialized_db.get_connection() as conn:
@@ -311,9 +314,7 @@ class TestUpsertRows:
             assert row[1] == "Google Chrome - Updated"
             assert row[2] == 1  # is_multipurpose_app 被覆盖
 
-    def test_upsert_rows_strips_id_for_autoincrement_table(
-        self, repository, initialized_db
-    ):
+    def test_upsert_rows_strips_id_for_autoincrement_table(self, repository, initialized_db):
         """upsert_rows：AUTOINCREMENT 表传入远程 id 时被剥离，本地 id 为自增值"""
         # Arrange: 传入远程 id=999
         rows = [
@@ -518,9 +519,7 @@ class TestUpsertRowsWithLww:
             assert row is not None
             assert row[0] == "全新数据"
 
-    def test_upsert_rows_with_lww_returns_zero_for_empty_list(
-        self, repository, initialized_db
-    ):
+    def test_upsert_rows_with_lww_returns_zero_for_empty_list(self, repository, initialized_db):
         """LWW：空列表返回 0"""
         # Act
         affected = repository.upsert_rows_with_lww("todo_list", [])
@@ -757,9 +756,7 @@ class TestCountRows:
         # Assert
         assert count == 0
 
-    def test_count_rows_raises_error_for_invalid_table_name(
-        self, repository, initialized_db
-    ):
+    def test_count_rows_raises_error_for_invalid_table_name(self, repository, initialized_db):
         """count_rows：无效表名抛出 DataAccessError（SQL 注入防护）"""
         # Act + Assert
         with pytest.raises(DataAccessError):
@@ -796,9 +793,7 @@ class TestCountRows:
         assert result["mood_entries"] == 1
         assert result["todo_list"] == 2
 
-    def test_count_rows_batch_returns_zero_for_empty_tables(
-        self, repository, initialized_db
-    ):
+    def test_count_rows_batch_returns_zero_for_empty_tables(self, repository, initialized_db):
         """count_rows_batch：批量查询空表，全部返回 0"""
         # Act
         table_names = ["mood_entries", "todo_list"]

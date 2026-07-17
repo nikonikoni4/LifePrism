@@ -8,6 +8,7 @@ Map Cache Providers UTC 时区迁移测试
 
 确保批量更新时 updated_at 字段以 UTC ISO 8601 格式写入。
 """
+
 import re
 import uuid
 
@@ -89,9 +90,7 @@ class TestBatchUpdateMultiPurposeMapCacheUtcTimestamps:
         """批量更新后 updated_at 应为 UTC ISO 8601 格式"""
         cache_ids = [_generate_id("m") for _ in range(2)]
         for cache_id in cache_ids:
-            multi_purpose_provider.create_multi_purpose_map_cache(
-                _create_multi_record(cache_id)
-            )
+            multi_purpose_provider.create_multi_purpose_map_cache(_create_multi_record(cache_id))
 
         try:
             update_data = {"state": 0}
@@ -100,9 +99,7 @@ class TestBatchUpdateMultiPurposeMapCacheUtcTimestamps:
             )
             assert count == 2
 
-            record = multi_purpose_provider.get_multi_purpose_map_cache_by_id(
-                cache_ids[0]
-            )
+            record = multi_purpose_provider.get_multi_purpose_map_cache_by_id(cache_ids[0])
             assert record is not None
             updated_at = record["updated_at"]
             assert updated_at is not None, "updated_at 不应为 None"
@@ -123,9 +120,7 @@ class TestBatchUpdateSinglePurposeMapCacheUtcTimestamps:
         """批量更新后 updated_at 应为 UTC ISO 8601 格式"""
         cache_ids = [_generate_id("s") for _ in range(2)]
         for cache_id in cache_ids:
-            single_purpose_provider.create_single_purpose_map_cache(
-                _create_single_record(cache_id)
-            )
+            single_purpose_provider.create_single_purpose_map_cache(_create_single_record(cache_id))
 
         try:
             update_data = {"state": 0}
@@ -134,9 +129,7 @@ class TestBatchUpdateSinglePurposeMapCacheUtcTimestamps:
             )
             assert count == 2
 
-            record = single_purpose_provider.get_single_purpose_map_cache_by_id(
-                cache_ids[0]
-            )
+            record = single_purpose_provider.get_single_purpose_map_cache_by_id(cache_ids[0])
             assert record is not None
             updated_at = record["updated_at"]
             assert updated_at is not None, "updated_at 不应为 None"

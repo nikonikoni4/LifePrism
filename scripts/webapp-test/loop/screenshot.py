@@ -6,14 +6,15 @@
 输出位置：
     scripts/webapp-test/截图/loop/
 """
-import sys
+
 import os
+import sys
 
 # 添加父目录到路径，以便导入 config 和 utils
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from config import BASE_URL, HEADLESS, ROUTES, VIEWPORT
 from playwright.sync_api import sync_playwright
-from config import BASE_URL, VIEWPORT, HEADLESS, ROUTES
 from utils import screenshot_page, wait_for_page
 
 
@@ -31,9 +32,9 @@ def run():
 
         # 选择一个群聊（点击第一个群聊）
         print("选择一个群聊...")
-        session_groups = page.locator('.session-groups').first
+        session_groups = page.locator(".session-groups").first
         if session_groups.is_visible():
-            first_chat = session_groups.locator('div').first
+            first_chat = session_groups.locator("div").first
             if first_chat.is_visible():
                 first_chat.click()
                 page.wait_for_timeout(3000)

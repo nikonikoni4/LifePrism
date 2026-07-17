@@ -148,9 +148,7 @@ class TestTimeSubtraction:
         m009_migrate_history_to_utc.upgrade(cursor)
         conn.commit()
 
-        cursor.execute(
-            "SELECT created_at, updated_at FROM habits WHERE id = ?", ("habit-001",)
-        )
+        cursor.execute("SELECT created_at, updated_at FROM habits WHERE id = ?", ("habit-001",))
         created, updated = cursor.fetchone()
         # strftime() + datetime() 将格式统一为 'YYYY-MM-DDTHH:MM:SS+00:00'
         assert created == "2026-07-12T02:00:00+00:00"
@@ -593,16 +591,12 @@ class TestMigrationCompleteness:
         conn.commit()
 
         # 验证所有非 NULL 值都被迁移
-        cursor.execute(
-            "SELECT created_at, updated_at FROM category WHERE id = ?", ("cat-001",)
-        )
+        cursor.execute("SELECT created_at, updated_at FROM category WHERE id = ?", ("cat-001",))
         created, updated = cursor.fetchone()
         assert created == "2026-07-12T02:00:00+00:00"
         assert updated == "2026-07-12T02:00:00+00:00"
 
-        cursor.execute(
-            "SELECT created_at, updated_at FROM category WHERE id = ?", ("cat-003",)
-        )
+        cursor.execute("SELECT created_at, updated_at FROM category WHERE id = ?", ("cat-003",))
         created, updated = cursor.fetchone()
         assert created is None  # NULL 保持不变
         assert updated == "2026-07-12T04:00:00+00:00"
@@ -750,8 +744,7 @@ class TestPrimaryKeyFieldMigration:
 
         # 验证所有行都被正确迁移
         cursor.execute(
-            "SELECT start_time, end_time, created_at FROM raw_behavior_analysis "
-            "ORDER BY start_time"
+            "SELECT start_time, end_time, created_at FROM raw_behavior_analysis ORDER BY start_time"
         )
         rows = cursor.fetchall()
         assert len(rows) == 3
@@ -822,9 +815,7 @@ class TestPrimaryKeyFieldMigration:
         m009_migrate_history_to_utc.upgrade(cursor)
         conn.commit()
 
-        cursor.execute(
-            "SELECT start_time, end_time, created_at, updated_at FROM behavior_analysis"
-        )
+        cursor.execute("SELECT start_time, end_time, created_at, updated_at FROM behavior_analysis")
         start, end, created, updated = cursor.fetchone()
         assert start == "2026-07-12T02:00:00+00:00"
         assert end == "2026-07-12T03:00:00+00:00"
@@ -1023,19 +1014,43 @@ class TestCheckConstraintMigration:
             "INSERT INTO user_app_behavior_log "
             "(start_time, end_time, duration, app, title, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("2026-07-12 18:00:00", "2026-07-12 19:00:00", 3600, "chrome", "浏览", "2026-07-12 18:00:00", "2026-07-12 18:00:00"),
+            (
+                "2026-07-12 18:00:00",
+                "2026-07-12 19:00:00",
+                3600,
+                "chrome",
+                "浏览",
+                "2026-07-12 18:00:00",
+                "2026-07-12 18:00:00",
+            ),
         )
         cursor.execute(
             "INSERT INTO user_app_behavior_log "
             "(start_time, end_time, duration, app, title, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("2026-07-12 10:00:00", "2026-07-12 11:00:00", 3600, "chrome", "浏览", "2026-07-12 10:00:00", "2026-07-12 10:00:00"),
+            (
+                "2026-07-12 10:00:00",
+                "2026-07-12 11:00:00",
+                3600,
+                "chrome",
+                "浏览",
+                "2026-07-12 10:00:00",
+                "2026-07-12 10:00:00",
+            ),
         )
         cursor.execute(
             "INSERT INTO user_app_behavior_log "
             "(start_time, end_time, duration, app, title, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("2026-07-12 02:00:00", "2026-07-12 03:00:00", 3600, "chrome", "浏览", "2026-07-12 02:00:00", "2026-07-12 02:00:00"),
+            (
+                "2026-07-12 02:00:00",
+                "2026-07-12 03:00:00",
+                3600,
+                "chrome",
+                "浏览",
+                "2026-07-12 02:00:00",
+                "2026-07-12 02:00:00",
+            ),
         )
         conn.commit()
 

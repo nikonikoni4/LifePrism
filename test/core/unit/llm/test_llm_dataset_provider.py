@@ -1,7 +1,8 @@
 """测试 LLMDatasetProvider 的 TodoList 查询功能"""
-import pytest
+
 from datetime import datetime, timedelta
 
+import pytest
 from lifeprism.llm.providers.dataset_providers.llm_dataset_provider import (
     LLMDatasetProvider,
     llm_dataset_provider,
@@ -35,10 +36,7 @@ class TestQueryTodos:
 
         # 查询未来日期（应该没有数据）
         future_date = (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
-        todos = provider.query_todos(
-            start_date=future_date,
-            end_date=future_date
-        )
+        todos = provider.query_todos(start_date=future_date, end_date=future_date)
 
         assert isinstance(todos, list)
 
@@ -50,10 +48,7 @@ class TestQueryTodos:
         end_date = datetime.now().strftime("%Y-%m-%d")
         start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
 
-        todos = provider.query_todos(
-            start_date=start_date,
-            end_date=end_date
-        )
+        todos = provider.query_todos(start_date=start_date, end_date=end_date)
 
         assert isinstance(todos, list)
 
@@ -79,10 +74,7 @@ class TestQueryTodos:
         provider = LLMDatasetProvider()
 
         today = datetime.now().strftime("%Y-%m-%d")
-        todos = provider.query_todos(
-            start_date=today,
-            include_cross_day=False
-        )
+        todos = provider.query_todos(start_date=today, include_cross_day=False)
 
         assert isinstance(todos, list)
         # 所有任务的日期应该都是今天
@@ -98,9 +90,7 @@ class TestQueryTodos:
 
         # 使用一个不存在的 goal_id
         todos = provider.query_todos(
-            start_date=start_date,
-            end_date=end_date,
-            goal_id="goal-nonexistent"
+            start_date=start_date, end_date=end_date, goal_id="goal-nonexistent"
         )
 
         assert isinstance(todos, list)
@@ -116,9 +106,7 @@ class TestQueryTodos:
         start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
 
         todos = provider.query_todos(
-            start_date=start_date,
-            end_date=end_date,
-            plandoc_id="plandoc-test"
+            start_date=start_date, end_date=end_date, plandoc_id="plandoc-test"
         )
 
         assert isinstance(todos, list)
@@ -133,11 +121,7 @@ class TestQueryTodos:
         start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
 
         # 查询已完成的任务
-        todos = provider.query_todos(
-            start_date=start_date,
-            end_date=end_date,
-            state="completed"
-        )
+        todos = provider.query_todos(start_date=start_date, end_date=end_date, state="completed")
 
         assert isinstance(todos, list)
         for todo in todos:
@@ -155,7 +139,7 @@ class TestQueryTodos:
             end_date=end_date,
             goal_id="goal-test",
             plandoc_id="plandoc-test",
-            state="active"
+            state="active",
         )
 
         assert isinstance(todos, list)
@@ -169,11 +153,7 @@ class TestQueryTodos:
         provider = LLMDatasetProvider()
 
         today = datetime.now().strftime("%Y-%m-%d")
-        todos = provider.query_todos(
-            start_date=today,
-            goal_id="goal-test",
-            state="active"
-        )
+        todos = provider.query_todos(start_date=today, goal_id="goal-test", state="active")
 
         assert isinstance(todos, list)
         for todo in todos:
@@ -192,19 +172,23 @@ class TestDataStructure:
         end_date = datetime.now().strftime("%Y-%m-%d")
         start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
 
-        todos = provider.query_todos(
-            start_date=start_date,
-            end_date=end_date
-        )
+        todos = provider.query_todos(start_date=start_date, end_date=end_date)
 
         if todos:
             todo = todos[0]
 
             # 验证必要字段存在
             required_fields = [
-                "id", "content", "date", "state", "order_index",
-                "link_to_goal_id", "plan_doc_id", "parent_id",
-                "cross_day", "color"
+                "id",
+                "content",
+                "date",
+                "state",
+                "order_index",
+                "link_to_goal_id",
+                "plan_doc_id",
+                "parent_id",
+                "cross_day",
+                "color",
             ]
 
             for field in required_fields:
@@ -217,10 +201,7 @@ class TestDataStructure:
         end_date = datetime.now().strftime("%Y-%m-%d")
         start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
 
-        todos = provider.query_todos(
-            start_date=start_date,
-            end_date=end_date
-        )
+        todos = provider.query_todos(start_date=start_date, end_date=end_date)
 
         if len(todos) > 1:
             # 验证排序：日期升序，同日期内 order_index 升序
@@ -253,4 +234,3 @@ class TestDataStructure:
                 current_order = todos[i].get("order_index", 0)
                 next_order = todos[i + 1].get("order_index", 0)
                 assert current_order <= next_order
-

@@ -1,4 +1,5 @@
 import pytest
+
 from lifeprism.config.settings_manager import SettingsManager
 
 

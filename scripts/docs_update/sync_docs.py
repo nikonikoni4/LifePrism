@@ -15,13 +15,12 @@ import re
 import subprocess
 import sys
 import time
-
 from pathlib import Path
 
 # 设置 stdout 为 UTF-8 编码（解决 Windows 控制台问题）
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 # 配置
 MIN_INTERVAL = 600  # 10 分钟（秒）
@@ -55,7 +54,7 @@ def run_ast_scanner():
         [sys.executable, str(AST_SCANNER)],
         capture_output=True,
         text=True,
-        cwd=str(AST_SCANNER.parent.parent.parent)
+        cwd=str(AST_SCANNER.parent.parent.parent),
     )
     if result.returncode != 0:
         print(f"AST 扫描失败: {result.stderr}")
@@ -79,7 +78,7 @@ def module_to_path(module: str) -> str:
 
     api.services.group_chat_service → agents_hub/api/services/group_chat_service.py
     """
-    return "agents_hub/" + module.replace(".", "/") + ".py"
+    return "lifeprism/" + module.replace(".", "/") + ".py"
 
 
 def find_definition(func_name: str, definitions: dict) -> dict | None:
@@ -122,7 +121,7 @@ def sync_flow_file(md_path: Path, definitions: dict) -> bool:
     content = md_path.read_text(encoding="utf-8")
 
     # 匹配 <key_function> 标签
-    pattern = r'(<key_function[^>]*>)(.*?)(</key_function>)'
+    pattern = r"(<key_function[^>]*>)(.*?)(</key_function>)"
     match = re.search(pattern, content, re.DOTALL)
     if not match:
         return False
@@ -142,12 +141,12 @@ def sync_flow_file(md_path: Path, definitions: dict) -> bool:
             continue
 
         # 文件路径行：`- agents_hub/xxx.py`
-        if re.match(r'^- [\w/]+\.py$', stripped):
+        if re.match(r"^- [\w/]+\.py$", stripped):
             new_lines.append(line)
             continue
 
         # 函数行：`  - Class.method:line` 或 `  - Class.method`
-        func_match = re.match(r'^(\s+)- (.+?)(?::(\d+))?$', line)
+        func_match = re.match(r"^(\s+)- (.+?)(?::(\d+))?$", line)
         if func_match:
             indent = func_match.group(1)
             func_name = func_match.group(2).strip()
@@ -176,7 +175,7 @@ def sync_flow_file(md_path: Path, definitions: dict) -> bool:
     new_block = f"{tag_open}\n{new_content}\n{tag_close}"
 
     if modified or new_block != match.group(0):
-        content = content[:match.start()] + new_block + content[match.end():]
+        content = content[: match.start()] + new_block + content[match.end() :]
         md_path.write_text(content, encoding="utf-8")
         return True
 

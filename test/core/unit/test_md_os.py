@@ -1,22 +1,31 @@
 """Tests for md_os module - loaded directly to avoid circular imports."""
-import pytest
-import sys
-import tempfile
-from pathlib import Path
 
 # Load md_os directly using importlib to avoid circular import issues
 # that arise when importing from lifeprism.llm.utils
 import importlib.util
+import sys
+import tempfile
+from pathlib import Path
+
+import pytest
+
 
 def _load_md_os():
     """Load md_os module directly from file path."""
     # test/core/unit/test_md_os.py -> project root: go up 4 levels
-    md_os_path = Path(__file__).resolve().parent.parent.parent.parent / "lifeprism" / "llm" / "utils" / "md_os.py"
+    md_os_path = (
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "lifeprism"
+        / "llm"
+        / "utils"
+        / "md_os.py"
+    )
     spec = importlib.util.spec_from_file_location("md_os", md_os_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules["md_os"] = module
     spec.loader.exec_module(module)
     return module
+
 
 _md_os = _load_md_os()
 write_date_md = _md_os.write_date_md
@@ -26,14 +35,19 @@ read_md = _md_os.read_md
 
 @pytest.mark.core
 class TestWriteBehaviorMd:
-
     def test_write_date_md_create_new_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             file_path = Path(tmpdir) / "behavior.md"
             date = "2026-04-16"
             content = "这是第一次写入的内容"
 
-            write_date_md(file_path=file_path, date=date, content=content, subheading="日记总结", mode="append")
+            write_date_md(
+                file_path=file_path,
+                date=date,
+                content=content,
+                subheading="日记总结",
+                mode="append",
+            )
 
             assert file_path.exists()
             file_content = file_path.read_text(encoding="utf-8")
@@ -50,7 +64,13 @@ class TestWriteBehaviorMd:
             date = "2026-04-16"
             content = "新的一天追加内容"
 
-            write_date_md(file_path=file_path, date=date, content=content, subheading="日记总结", mode="append")
+            write_date_md(
+                file_path=file_path,
+                date=date,
+                content=content,
+                subheading="日记总结",
+                mode="append",
+            )
 
             file_content = file_path.read_text(encoding="utf-8")
             assert "## 2026-04-15" in file_content
@@ -66,7 +86,13 @@ class TestWriteBehaviorMd:
             file_path.write_text(initial_content, encoding="utf-8")
 
             content = "下午的续写内容。"
-            write_date_md(file_path=file_path, date=date, content=content, subheading="日记总结", mode="append")
+            write_date_md(
+                file_path=file_path,
+                date=date,
+                content=content,
+                subheading="日记总结",
+                mode="append",
+            )
 
             file_content = file_path.read_text(encoding="utf-8")
             assert "上午的内容。" in file_content
@@ -81,7 +107,13 @@ class TestWriteBehaviorMd:
             file_path.write_text(initial_content, encoding="utf-8")
 
             content = "全新的内容！"
-            write_date_md(file_path=file_path, date=date, content=content, subheading="日记总结", mode="overwrite")
+            write_date_md(
+                file_path=file_path,
+                date=date,
+                content=content,
+                subheading="日记总结",
+                mode="overwrite",
+            )
 
             file_content = file_path.read_text(encoding="utf-8")
             assert "需要被覆盖的内容" not in file_content
@@ -95,7 +127,13 @@ class TestWriteBehaviorMd:
             file_path.write_text("## 2026-04-16\n### 日记总结\n内容\n", encoding="utf-8")
 
             with pytest.raises(ValueError) as excinfo:
-                write_date_md(file_path=file_path, date="2026-04-16", content="test", subheading="日记总结", mode="unknown_mode")
+                write_date_md(
+                    file_path=file_path,
+                    date="2026-04-16",
+                    content="test",
+                    subheading="日记总结",
+                    mode="unknown_mode",
+                )
 
             assert "Unknown mode: unknown_mode" in str(excinfo.value)
 
@@ -107,7 +145,13 @@ class TestWriteBehaviorMd:
             initial = "## 2026-04-01\n### 日记总结\n04-01 的内容\n\n## 2026-04-17\n### 日记总结\n04-17 的内容\n"
             file_path.write_text(initial, encoding="utf-8")
 
-            write_date_md(file_path=file_path, date="2026-04-12", content="04-12 的内容", subheading="日记总结", mode="append")
+            write_date_md(
+                file_path=file_path,
+                date="2026-04-12",
+                content="04-12 的内容",
+                subheading="日记总结",
+                mode="append",
+            )
 
             file_content = file_path.read_text(encoding="utf-8")
             pos_12 = file_content.index("## 2026-04-12")
@@ -127,7 +171,13 @@ class TestWriteBehaviorMd:
             initial = "## 2026-04-17\n### 日记总结\n04-17 的内容\n"
             file_path.write_text(initial, encoding="utf-8")
 
-            write_date_md(file_path=file_path, date="2026-04-01", content="04-01 的内容", subheading="日记总结", mode="append")
+            write_date_md(
+                file_path=file_path,
+                date="2026-04-01",
+                content="04-01 的内容",
+                subheading="日记总结",
+                mode="append",
+            )
 
             file_content = file_path.read_text(encoding="utf-8")
             pos_01 = file_content.index("## 2026-04-01")
@@ -142,13 +192,21 @@ class TestWriteBehaviorMd:
             initial = "## 2026-04-01\n### 日记总结\n04-01 的内容\n\n## 2026-04-12\n### 日记总结\n04-12 的内容\n"
             file_path.write_text(initial, encoding="utf-8")
 
-            write_date_md(file_path=file_path, date="2026-04-17", content="04-17 的内容", subheading="日记总结", mode="append")
+            write_date_md(
+                file_path=file_path,
+                date="2026-04-17",
+                content="04-17 的内容",
+                subheading="日记总结",
+                mode="append",
+            )
 
             file_content = file_path.read_text(encoding="utf-8")
             pos_12 = file_content.index("## 2026-04-12")
             pos_17 = file_content.index("## 2026-04-17")
 
-            assert pos_12 < pos_17, f"04-17 应排在 04-12 后面，实际 pos_12={pos_12}, pos_17={pos_17}"
+            assert pos_12 < pos_17, (
+                f"04-17 应排在 04-12 后面，实际 pos_12={pos_12}, pos_17={pos_17}"
+            )
 
 
 @pytest.mark.core

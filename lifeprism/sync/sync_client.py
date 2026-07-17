@@ -353,6 +353,10 @@ class SyncClient:
         # 3a. 云端有本地没有 → 本地建表（只执行 DDL，不写 meta）
         slugs_to_create_locally = cloud_slugs - local_slugs
         if slugs_to_create_locally:
+            logger.info(
+                "_sync_dynamic_tables_definitions: 触发本地建表, slugs=%s",
+                slugs_to_create_locally,
+            )
             self._create_local_dynamic_tables(slugs_to_create_locally, cloud_types)
 
         # 3b. 本地有云端没有 → 调用云端 rebuild（全量发送，端点幂等）

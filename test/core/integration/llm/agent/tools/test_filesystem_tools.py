@@ -1,15 +1,17 @@
 """测试文件系统工具 - filesystem.py"""
-import pytest
+
 import asyncio
-from pathlib import Path
-import tempfile
 import shutil
+import tempfile
+from pathlib import Path
+
+import pytest
 
 from lifeprism.llm.agent.tools.filesystem import (
-    ReadFileTool,
-    WriteFileTool,
     EditFileTool,
     FileTreeTool,
+    ReadFileTool,
+    WriteFileTool,
 )
 
 
@@ -69,11 +71,7 @@ async def test_file_tree_tool_non_recursive(temp_test_dir):
     """测试 FileTreeTool - 非递归模式"""
     tool = FileTreeTool()
 
-    result = await tool.execute(
-        dir_path=str(temp_test_dir),
-        recursive=False,
-        show_hidden=False
-    )
+    result = await tool.execute(dir_path=str(temp_test_dir), recursive=False, show_hidden=False)
 
     assert isinstance(result, str)
     assert "Success:" in result
@@ -95,10 +93,7 @@ async def test_file_tree_tool_recursive(temp_test_dir):
     tool = FileTreeTool()
 
     result = await tool.execute(
-        dir_path=str(temp_test_dir),
-        recursive=True,
-        max_depth=3,
-        show_hidden=False
+        dir_path=str(temp_test_dir), recursive=True, max_depth=3, show_hidden=False
     )
 
     assert isinstance(result, str)
@@ -119,11 +114,7 @@ async def test_file_tree_tool_show_hidden(temp_test_dir):
     """测试 FileTreeTool - 显示隐藏文件"""
     tool = FileTreeTool()
 
-    result = await tool.execute(
-        dir_path=str(temp_test_dir),
-        recursive=False,
-        show_hidden=True
-    )
+    result = await tool.execute(dir_path=str(temp_test_dir), recursive=False, show_hidden=True)
 
     assert isinstance(result, str)
     assert "Success:" in result
@@ -138,10 +129,7 @@ async def test_file_tree_tool_max_depth(temp_test_dir):
 
     # 深度为1，显示第一层子目录及其内容
     result = await tool.execute(
-        dir_path=str(temp_test_dir),
-        recursive=True,
-        max_depth=1,
-        show_hidden=False
+        dir_path=str(temp_test_dir), recursive=True, max_depth=1, show_hidden=False
     )
 
     assert isinstance(result, str)
@@ -165,10 +153,7 @@ async def test_file_tree_tool_dir_not_exist():
     base_dir = settings.allowed_dir_path[0]
     nonexistent_path = base_dir / "nonexistent_directory_12345"
 
-    result = await tool.execute(
-        dir_path=str(nonexistent_path),
-        recursive=False
-    )
+    result = await tool.execute(dir_path=str(nonexistent_path), recursive=False)
 
     assert isinstance(result, str)
     assert "Error:" in result
@@ -182,10 +167,7 @@ async def test_file_tree_tool_path_is_file(temp_test_dir):
     tool = FileTreeTool()
     file_path = temp_test_dir / "file1.txt"
 
-    result = await tool.execute(
-        dir_path=str(file_path),
-        recursive=False
-    )
+    result = await tool.execute(dir_path=str(file_path), recursive=False)
 
     assert isinstance(result, str)
     assert "Error:" in result
@@ -205,10 +187,7 @@ async def test_file_tree_tool_empty_dir():
     try:
         tool = FileTreeTool()
 
-        result = await tool.execute(
-            dir_path=str(empty_dir),
-            recursive=False
-        )
+        result = await tool.execute(dir_path=str(empty_dir), recursive=False)
 
         assert isinstance(result, str)
         assert "Success:" in result
@@ -238,19 +217,19 @@ async def test_file_tree_tool_schema():
     tool = FileTreeTool()
     schema = tool.to_schema()
 
-    assert 'type' in schema
-    assert 'function' in schema
-    assert schema['function']['name'] == 'file_tree'
-    assert 'description' in schema['function']
-    assert 'parameters' in schema['function']
+    assert "type" in schema
+    assert "function" in schema
+    assert schema["function"]["name"] == "file_tree"
+    assert "description" in schema["function"]
+    assert "parameters" in schema["function"]
 
-    params = schema['function']['parameters']
-    assert 'properties' in params
-    assert 'dir_path' in params['properties']
-    assert 'recursive' in params['properties']
-    assert 'max_depth' in params['properties']
-    assert 'show_hidden' in params['properties']
-    assert params['required'] == ['dir_path']
+    params = schema["function"]["parameters"]
+    assert "properties" in params
+    assert "dir_path" in params["properties"]
+    assert "recursive" in params["properties"]
+    assert "max_depth" in params["properties"]
+    assert "show_hidden" in params["properties"]
+    assert params["required"] == ["dir_path"]
 
 
 @pytest.mark.core
@@ -259,11 +238,7 @@ async def test_file_tree_tool_tree_format(temp_test_dir):
     """测试 FileTreeTool - 树形格式正确性"""
     tool = FileTreeTool()
 
-    result = await tool.execute(
-        dir_path=str(temp_test_dir),
-        recursive=False,
-        show_hidden=False
-    )
+    result = await tool.execute(dir_path=str(temp_test_dir), recursive=False, show_hidden=False)
 
     assert isinstance(result, str)
     # 检查 PowerShell 表格格式

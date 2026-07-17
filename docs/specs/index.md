@@ -1,9 +1,21 @@
 
-## data-sync-spec
-- updated_at: 2026-07-11
-- path: `docs/specs/2026-07-11-data-sync-spec.md`
-- 触发规则：开发、修改或查询 Windows ↔ Linux 数据同步相关功能时阅读（数据库同步、文件同步、心跳管理、消息路由、云端配置初始化）
-- 内容摘要：数据同步模块规格，定义 30 张静态表 + 动态表的增量同步机制（updated_at + 分批拉取）、LWW 冲突解决策略、文件同步（gzip+base64）、心跳状态管理（纯内存 15 分钟超时）、消息路由（本地在线时云端跳过）、云端配置生成与初始化（CloudConfigGenerator → CloudInitializer）、API Key 认证安全
+## data-sync-overview
+- updated_at: 2026-07-16
+- path: `docs/specs/2026-07-16-data-sync-overview.md`
+- 触发规则：首次接触数据同步模块、需要理解子模块划分和依赖关系、或新增同步相关功能需要定位哪个 spec 时阅读
+- 内容摘要：数据同步模块总览，定义子模块分层架构（数据库同步 + 动态表 + 心跳 / 文件同步 / 配置桥接）、依赖规则和子 spec 索引。原 `2026-07-11-data-sync-spec.md` 因超过 500 行拆分为 core 和 files 两个子 spec
+
+## data-sync-core-spec
+- updated_at: 2026-07-16
+- path: `docs/specs/2026-07-16-data-sync-core-spec.md`
+- 触发规则：开发、修改或查询数据库同步、动态表同步、心跳管理、消息路由、云端配置初始化相关功能时阅读
+- 内容摘要：数据同步模块核心规格，定义 30 张静态表增量同步（updated_at + 分批拉取）、动态表 slug 集合对比双向建表、LWW 冲突解决策略、心跳状态管理（纯内存 15 分钟超时）、消息路由、云端配置生成与初始化（CloudConfigGenerator → CloudInitializer）、API Key 认证安全
+
+## data-sync-files-spec
+- updated_at: 2026-07-16
+- path: `docs/specs/2026-07-16-data-sync-files-spec.md`
+- 触发规则：开发、修改或查询文件同步、per-file version tracking、三阶段 API 协议、CONFLICT_RESOLVE 冲突合并相关功能时阅读
+- 内容摘要：文件双向同步规格，定义 per-file version tracking（parent_hash + current_hash + 11 状态决策矩阵）、三阶段 API 协议（check → fetch/push → verify/commit）、按文件类型分流冲突解决（MD 由 AI 合并、JSONL 走 LWW）、同步白名单（对齐 Agent 工具白名单）和认证安全
 
 ## category-spec
 - updated_at: 2026-04-16

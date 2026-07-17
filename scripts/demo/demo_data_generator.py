@@ -20,6 +20,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lifeprism.config.settings_manager import settings
+from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import get_utc_now_iso
 from scripts.demo.demo_data_config import (
     BEHAVIOR_TEMPLATES,
     COMPONENT_NAMES,
@@ -39,8 +41,6 @@ from scripts.demo.demo_data_config import (
     TOPIC_NAMES,
     WORK_BLOCKS,
 )
-from lifeprism.utils import get_logger
-from lifeprism.utils.time_utils import get_utc_now_iso
 
 LOGGER = get_logger(__name__)
 
@@ -157,7 +157,10 @@ class DemoDataGenerator:
         date_end = self.today.strftime("%Y-%m-%d")
         LOGGER.info(
             "开始生成演示数据: 时间范围=%s ~ %s (%d 天), 数据目录=%s",
-            date_start, date_end, self.days, self.data_path,
+            date_start,
+            date_end,
+            self.days,
+            self.data_path,
         )
 
         # 1. 清理已有演示数据
@@ -301,9 +304,17 @@ class DemoDataGenerator:
                    (app, title, is_multipurpose_app, app_description, title_analysis,
                     category_id, sub_category_id, state, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)""",
-                (app, title, is_mp,
-                 f"{title} 应用程序", f"{title} 的标题分析",
-                 cat_id, sub_id, _now_str(), _now_str()),
+                (
+                    app,
+                    title,
+                    is_mp,
+                    f"{title} 应用程序",
+                    f"{title} 的标题分析",
+                    cat_id,
+                    sub_id,
+                    _now_str(),
+                    _now_str(),
+                ),
             )
             total += 1
 
@@ -314,14 +325,30 @@ class DemoDataGenerator:
                     """INSERT INTO multi_purpose_map_cache
                        (id, app, title, category_id, sub_category_id, state, created_at, updated_at)
                        VALUES (?, ?, ?, ?, ?, 1, ?, ?)""",
-                    (f"m-{uuid.uuid4().hex[:8]}", app, title, cat_id, sub_id, _now_str(), _now_str()),
+                    (
+                        f"m-{uuid.uuid4().hex[:8]}",
+                        app,
+                        title,
+                        cat_id,
+                        sub_id,
+                        _now_str(),
+                        _now_str(),
+                    ),
                 )
             else:
                 conn.execute(
                     """INSERT INTO single_purpose_map_cache
                        (id, app, title, category_id, sub_category_id, state, created_at, updated_at)
                        VALUES (?, ?, ?, ?, ?, 1, ?, ?)""",
-                    (f"s-{uuid.uuid4().hex[:8]}", app, title, cat_id, sub_id, _now_str(), _now_str()),
+                    (
+                        f"s-{uuid.uuid4().hex[:8]}",
+                        app,
+                        title,
+                        cat_id,
+                        sub_id,
+                        _now_str(),
+                        _now_str(),
+                    ),
                 )
 
         LOGGER.info("  [ok] 缓存数据: %d 条", total)
@@ -385,8 +412,17 @@ class DemoDataGenerator:
                        (start_time, end_time, duration, app, title, is_multipurpose_app,
                         category_id, sub_category_id, created_at, updated_at)
                        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)""",
-                    (start_str, end_str, duration_sec, app, title,
-                     cat_id, sub_id, _now_str(), _now_str()),
+                    (
+                        start_str,
+                        end_str,
+                        duration_sec,
+                        app,
+                        title,
+                        cat_id,
+                        sub_id,
+                        _now_str(),
+                        _now_str(),
+                    ),
                 )
                 total += 1
 
@@ -428,9 +464,16 @@ class DemoDataGenerator:
                        (start_time, end_time, behavior, behavior_summary, title,
                         screen_count, created_at, updated_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (start_str, end_str, behavior_detail,
-                     behavior_detail[:50], f"行为片段 {i + 1}",
-                     random.randint(3, 15), _now_str(), _now_str()),
+                    (
+                        start_str,
+                        end_str,
+                        behavior_detail,
+                        behavior_detail[:50],
+                        f"行为片段 {i + 1}",
+                        random.randint(3, 15),
+                        _now_str(),
+                        _now_str(),
+                    ),
                 )
                 total += 1
 
@@ -461,8 +504,13 @@ class DemoDataGenerator:
                     """INSERT INTO raw_behavior_analysis
                        (start_time, end_time, behavior, screen_count, created_at)
                        VALUES (?, ?, ?, ?, ?)""",
-                    (start_str, end_str, random.choice(behaviors),
-                     random.randint(1, 10), _now_str()),
+                    (
+                        start_str,
+                        end_str,
+                        random.choice(behaviors),
+                        random.randint(1, 10),
+                        _now_str(),
+                    ),
                 )
                 total += 1
 
@@ -482,10 +530,16 @@ class DemoDataGenerator:
                     """INSERT INTO mood_entries
                        (id, mood_type_id, score, content, factors, event_time, created_at, updated_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (f"mood-{uuid.uuid4().hex[:8]}",
-                     template["mood_type_id"], template["score"],
-                     template["content"], factors_json,
-                     event_time, _now_str(), _now_str()),
+                    (
+                        f"mood-{uuid.uuid4().hex[:8]}",
+                        template["mood_type_id"],
+                        template["score"],
+                        template["content"],
+                        factors_json,
+                        event_time,
+                        _now_str(),
+                        _now_str(),
+                    ),
                 )
                 total += 1
         LOGGER.info("  [ok] mood_entries: %d 条", total)
@@ -500,10 +554,17 @@ class DemoDataGenerator:
                    (date, mood, importance, custom_tags, word_count,
                     ai_summary, diary_source_hash, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (day.strftime("%Y-%m-%d"), template["mood"], template["importance"],
-                 '["日常"]', random.randint(200, 800),
-                 f"{template['morning'][:50]}... {template['evening'][:50]}...",
-                 _uid("hash-"), _now_str(), _now_str()),
+                (
+                    day.strftime("%Y-%m-%d"),
+                    template["mood"],
+                    template["importance"],
+                    '["日常"]',
+                    random.randint(200, 800),
+                    f"{template['morning'][:50]}... {template['evening'][:50]}...",
+                    _uid("hash-"),
+                    _now_str(),
+                    _now_str(),
+                ),
             )
             total += 1
         LOGGER.info("  [ok] diary: %d 条", total)
@@ -514,7 +575,9 @@ class DemoDataGenerator:
         # scheduled (过去几天 + 今天)
         for day in self._date_range():
             num_todos = random.randint(2, 4)
-            scheduled_templates = [t for t in TODO_TEMPLATES if t["state"] in ("completed", "scheduled")]
+            scheduled_templates = [
+                t for t in TODO_TEMPLATES if t["state"] in ("completed", "scheduled")
+            ]
             templates = random.sample(scheduled_templates, min(num_todos, len(scheduled_templates)))
             for idx, tmpl in enumerate(templates):
                 todo_id = f"t-demo-{day.strftime('%m%d')}-{idx}"
@@ -531,9 +594,18 @@ class DemoDataGenerator:
                        (id, order_index, content, color, state, link_to_goal_id,
                         date, actual_finished_at, cross_day, created_at, updated_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)""",
-                    (todo_id, idx, content, random.choice(["#FFFFFF", "#E0F2FE", "#DCFCE7", "#FEF3C7", "#FAE8FF"]),
-                     state, tmpl["link_to_goal_id"],
-                     day.strftime("%Y-%m-%d"), actual_finished, _now_str(), _now_str()),
+                    (
+                        todo_id,
+                        idx,
+                        content,
+                        random.choice(["#FFFFFF", "#E0F2FE", "#DCFCE7", "#FEF3C7", "#FAE8FF"]),
+                        state,
+                        tmpl["link_to_goal_id"],
+                        day.strftime("%Y-%m-%d"),
+                        actual_finished,
+                        _now_str(),
+                        _now_str(),
+                    ),
                 )
                 total += 1
 
@@ -550,8 +622,16 @@ class DemoDataGenerator:
                    (id, pool_order_index, content, color, state, link_to_goal_id,
                     created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (f"t-demo-pool-{idx}", idx, content, "#FFFFFF",
-                 "pool", tmpl["link_to_goal_id"], _now_str(), _now_str()),
+                (
+                    f"t-demo-pool-{idx}",
+                    idx,
+                    content,
+                    "#FFFFFF",
+                    "pool",
+                    tmpl["link_to_goal_id"],
+                    _now_str(),
+                    _now_str(),
+                ),
             )
             total += 1
 
@@ -579,11 +659,17 @@ class DemoDataGenerator:
                 """INSERT INTO goal_journal
                    (id, goal_id, date, time, content, mood, duration, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (f"journal-demo-{uuid.uuid4().hex[:8]}",
-                 tmpl["goal_id"], day.strftime("%Y-%m-%d"),
-                 f"{random.randint(8, 22):02d}:{random.randint(0, 59):02d}",
-                 tmpl["content"], tmpl["mood"], tmpl["duration"],
-                 _now_str(), _now_str()),
+                (
+                    f"journal-demo-{uuid.uuid4().hex[:8]}",
+                    tmpl["goal_id"],
+                    day.strftime("%Y-%m-%d"),
+                    f"{random.randint(8, 22):02d}:{random.randint(0, 59):02d}",
+                    tmpl["content"],
+                    tmpl["mood"],
+                    tmpl["duration"],
+                    _now_str(),
+                    _now_str(),
+                ),
             )
             total += 1
         LOGGER.info("  [ok] goal_journal: %d 条", total)
@@ -613,10 +699,14 @@ class DemoDataGenerator:
                 """INSERT INTO weekly_focus
                    (year, month, week_num, content, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (week_start.year, week_start.month,
-                 (week_start.day - 1) // 7 + 1,
-                 f"第 {4 - week_offset} 周重点：推进核心功能开发与代码质量提升",
-                 _now_str(), _now_str()),
+                (
+                    week_start.year,
+                    week_start.month,
+                    (week_start.day - 1) // 7 + 1,
+                    f"第 {4 - week_offset} 周重点：推进核心功能开发与代码质量提升",
+                    _now_str(),
+                    _now_str(),
+                ),
             )
         LOGGER.info("  [ok] weekly_focus: 4 条")
 
@@ -628,8 +718,15 @@ class DemoDataGenerator:
                    (id, name, description, frequency_type, frequency_config,
                     current_level, status, created_at, updated_at)
                    VALUES (?, ?, ?, ?, '{}', ?, 'active', ?, ?)""",
-                (h["id"], h["name"], h["description"], h["frequency_type"],
-                 h["current_level"], _now_str(), _now_str()),
+                (
+                    h["id"],
+                    h["name"],
+                    h["description"],
+                    h["frequency_type"],
+                    h["current_level"],
+                    _now_str(),
+                    _now_str(),
+                ),
             )
         LOGGER.info("  [ok] habits: %d 条", len(DEMO_HABITS))
 
@@ -644,11 +741,18 @@ class DemoDataGenerator:
                     from_level, to_level, start_date, end_date,
                     completed_count, streak_base, status, created_at, updated_at)
                    VALUES (?, ?, 4, ?, ?, ?, ?, ?, ?, 0, 'in_progress', ?, ?)""",
-                (f"chall-demo-{i:03d}", h["id"],
-                 random.randint(20, 25),
-                 h["current_level"], h["current_level"] + 1,
-                 challenge_start.strftime("%Y-%m-%d"), challenge_end.strftime("%Y-%m-%d"),
-                 random.randint(5, 18), _now_str(), _now_str()),
+                (
+                    f"chall-demo-{i:03d}",
+                    h["id"],
+                    random.randint(20, 25),
+                    h["current_level"],
+                    h["current_level"] + 1,
+                    challenge_start.strftime("%Y-%m-%d"),
+                    challenge_end.strftime("%Y-%m-%d"),
+                    random.randint(5, 18),
+                    _now_str(),
+                    _now_str(),
+                ),
             )
         LOGGER.info("  [ok] habit_challenges: %d 条", len(DEMO_HABITS))
 
@@ -667,9 +771,14 @@ class DemoDataGenerator:
                         """INSERT INTO habit_checkins
                            (id, habit_id, challenge_id, date, completed_at, created_at)
                            VALUES (?, ?, ?, ?, ?, ?)""",
-                        (f"checkin-demo-{uuid.uuid4().hex[:8]}",
-                         h["id"], f"chall-demo-{i:03d}",
-                         day.strftime("%Y-%m-%d"), time_str, _now_str()),
+                        (
+                            f"checkin-demo-{uuid.uuid4().hex[:8]}",
+                            h["id"],
+                            f"chall-demo-{i:03d}",
+                            day.strftime("%Y-%m-%d"),
+                            time_str,
+                            _now_str(),
+                        ),
                     )
                     total += 1
         LOGGER.info("  [ok] habit_checkins: %d 条", total)
@@ -705,8 +814,15 @@ class DemoDataGenerator:
                 """INSERT INTO user_values
                    (id, keywords, content_positive, content_negative, sort_order, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (v["id"], v["keywords"], v["content_positive"], v["content_negative"],
-                 len(DEMO_VALUES) - idx, _now_str(), _now_str()),
+                (
+                    v["id"],
+                    v["keywords"],
+                    v["content_positive"],
+                    v["content_negative"],
+                    len(DEMO_VALUES) - idx,
+                    _now_str(),
+                    _now_str(),
+                ),
             )
         LOGGER.info("  [ok] user_values: %d 条", len(DEMO_VALUES))
 
@@ -728,8 +844,14 @@ class DemoDataGenerator:
                 """INSERT INTO time_paradoxes
                    (id, user_id, version, mode, content, ai_abstract, created_at, updated_at)
                    VALUES (?, 1, 1, ?, ?, ?, ?, ?)""",
-                (idx, entry["mode"], entry["content"], entry["ai_abstract"],
-                 _now_str(), _now_str()),
+                (
+                    idx,
+                    entry["mode"],
+                    entry["content"],
+                    entry["ai_abstract"],
+                    _now_str(),
+                    _now_str(),
+                ),
             )
         LOGGER.info("  [ok] time_paradoxes: %d 条", len(TIME_PARADOX_ENTRIES))
 
@@ -758,8 +880,17 @@ class DemoDataGenerator:
                        (start_time, end_time, duration, content, color,
                         category_id, sub_category_id, created_at, updated_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (start_str, end_str, duration_sec // 60, content, color,
-                     cat_id, sub_id, _now_str(), _now_str()),
+                    (
+                        start_str,
+                        end_str,
+                        duration_sec // 60,
+                        content,
+                        color,
+                        cat_id,
+                        sub_id,
+                        _now_str(),
+                        _now_str(),
+                    ),
                 )
                 total += 1
 
@@ -773,9 +904,13 @@ class DemoDataGenerator:
                     """INSERT INTO goal_stats
                        (goal_id, date, time_spent, completed_todo_count, created_at)
                        VALUES (?, ?, ?, ?, ?)""",
-                    (goal_id, day.strftime("%Y-%m-%d"),
-                     random.randint(30, 300), random.randint(0, 3),
-                     _now_str()),
+                    (
+                        goal_id,
+                        day.strftime("%Y-%m-%d"),
+                        random.randint(30, 300),
+                        random.randint(0, 3),
+                        _now_str(),
+                    ),
                 )
         LOGGER.info("  [ok] goal_stats: %d 条", self.days * 2)
 
@@ -790,10 +925,13 @@ class DemoDataGenerator:
                    (session_id, input_tokens, output_tokens, total_tokens,
                     search_count, result_items_count, mode, created_at)
                    VALUES (?, ?, ?, ?, 0, 0, 'chatbot', ?)""",
-                (f"session-demo-{uuid.uuid4().hex[:8]}",
-                 random.randint(500, 5000), random.randint(200, 3000),
-                 random.randint(700, 8000),
-                 _format_time(day.replace(hour=random.randint(8, 22)))),
+                (
+                    f"session-demo-{uuid.uuid4().hex[:8]}",
+                    random.randint(500, 5000),
+                    random.randint(200, 3000),
+                    random.randint(700, 8000),
+                    _format_time(day.replace(hour=random.randint(8, 22))),
+                ),
             )
             total += 1
         LOGGER.info("  [ok] tokens_usage_log: %d 条", total)
@@ -814,8 +952,17 @@ class DemoDataGenerator:
                 """INSERT INTO custom_record_types
                    (id, name, slug, description, card_template, icon, accent_color, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (type_id, record_def["name"], slug, record_def["description"],
-                 "clean", record_def["icon"], record_def["accent_color"], now, now),
+                (
+                    type_id,
+                    record_def["name"],
+                    slug,
+                    record_def["description"],
+                    "clean",
+                    record_def["icon"],
+                    record_def["accent_color"],
+                    now,
+                    now,
+                ),
             )
             total_types += 1
 
@@ -825,8 +972,16 @@ class DemoDataGenerator:
                     """INSERT INTO custom_record_fields
                        (id, type_id, field_name, field_key, field_type, sort_order, display_role, created_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (f["id"], type_id, f["field_name"], f["field_key"],
-                     f["field_type"], f["sort_order"], f["display_role"], now),
+                    (
+                        f["id"],
+                        type_id,
+                        f["field_name"],
+                        f["field_key"],
+                        f["field_type"],
+                        f["sort_order"],
+                        f["display_role"],
+                        now,
+                    ),
                 )
 
             # 3. 创建数据表
@@ -917,8 +1072,12 @@ class DemoDataGenerator:
             entertainment_hours = random.uniform(1, 4)
             lines.append(f"## {date_str}")
             lines.append("### 行为总结")
-            lines.append("1. 今日概览：当天主要进行软件开发工作，辅以学习和休闲活动。电脑使用集中在上午和下午时段。")
-            lines.append(f"2. 电脑使用总览：工作/学习约 {work_hours:.1f} 小时，娱乐约 {entertainment_hours:.1f} 小时。")
+            lines.append(
+                "1. 今日概览：当天主要进行软件开发工作，辅以学习和休闲活动。电脑使用集中在上午和下午时段。"
+            )
+            lines.append(
+                f"2. 电脑使用总览：工作/学习约 {work_hours:.1f} 小时，娱乐约 {entertainment_hours:.1f} 小时。"
+            )
             lines.append("3. 高频使用时段：")
             lines.append("   - 08:30~12:00：以工作/学习为主")
             lines.append("   - 13:30~18:00：以工作/学习为主，伴有短暂休息")
@@ -926,8 +1085,13 @@ class DemoDataGenerator:
             lines.append("")
 
             lines.append("### 日记总结")
-            mood_label = {"joy": "有点开心", "calm": "平静", "pensive": "沉思",
-                          "melancholy": "不太好", "anger": "不太好"}.get(template["mood"], "平静")
+            mood_label = {
+                "joy": "有点开心",
+                "calm": "平静",
+                "pensive": "沉思",
+                "melancholy": "不太好",
+                "anger": "不太好",
+            }.get(template["mood"], "平静")
             lines.append(f"用户输入标签： 心情：{mood_label} 重要程度: {template['importance']}")
             lines.append("1. 客观事实与反应：")
             lines.append(f"   [{date_str}]")

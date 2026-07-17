@@ -1,4 +1,5 @@
 import pytest
+
 from lifeprism.monitor.screenshot.input_tracker import InputActivityTracker
 
 

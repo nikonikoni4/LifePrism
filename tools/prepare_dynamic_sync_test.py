@@ -23,8 +23,8 @@
     git checkout explore/LifePrism/localData/dataset/lifewatch_ai.db
 """
 
-import sqlite3
 import shutil
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -66,8 +66,9 @@ def _cleanup_custom_tables(db_path: Path):
     print(f"  清空 custom_record_types + custom_record_fields")
 
 
-def _create_custom_type(db_path: Path, type_id: str, name: str, slug: str,
-                        fields: list[dict], rows: list[dict]):
+def _create_custom_type(
+    db_path: Path, type_id: str, name: str, slug: str, fields: list[dict], rows: list[dict]
+):
     """创建自定义记录类型定义 + 数据表 + 插入数据"""
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
@@ -86,8 +87,16 @@ def _create_custom_type(db_path: Path, type_id: str, name: str, slug: str,
             "INSERT INTO custom_record_fields "
             "(id, type_id, field_name, field_key, field_type, sort_order, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (field_id, type_id, f["field_key"], f["field_key"],
-             f.get("field_type", "text"), sort_order, NOW, NOW),
+            (
+                field_id,
+                type_id,
+                f["field_key"],
+                f["field_key"],
+                f.get("field_type", "text"),
+                sort_order,
+                NOW,
+                NOW,
+            ),
         )
 
     # 3. 生成 DDL 并建表

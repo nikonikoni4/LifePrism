@@ -78,8 +78,10 @@ class TestMonitorPlatformCheck:
         """非 Windows 平台：monitor_type='lifeprism' 但跳过启动，记录 warning"""
         from lifeprism.server.main import lifespan
 
-        with patch("sys.platform", "linux"), \
-             patch.object(settings, "_config", {"monitor_type": "lifeprism"}):
+        with (
+            patch("sys.platform", "linux"),
+            patch.object(settings, "_config", {"monitor_type": "lifeprism"}),
+        ):
             async with lifespan(mock_app):
                 pass
 
@@ -91,8 +93,10 @@ class TestMonitorPlatformCheck:
         """macOS 平台同样跳过 Monitor"""
         from lifeprism.server.main import lifespan
 
-        with patch("sys.platform", "darwin"), \
-             patch.object(settings, "_config", {"monitor_type": "lifeprism"}):
+        with (
+            patch("sys.platform", "darwin"),
+            patch.object(settings, "_config", {"monitor_type": "lifeprism"}),
+        ):
             async with lifespan(mock_app):
                 pass
 
@@ -110,12 +114,17 @@ class TestMonitorPlatformCheck:
         mock_monitor_main = MagicMock()
         mock_monitor_main.start_monitor_process = MagicMock(return_value=mock_process)
 
-        with patch("sys.platform", "win32"), \
-             patch.object(settings, "_config", {"monitor_type": "lifeprism"}), \
-             patch.dict(sys.modules, {
-                 "lifeprism.monitor.windows_monitor": MagicMock(),
-                 "lifeprism.monitor.windows_monitor.main": mock_monitor_main,
-             }):
+        with (
+            patch("sys.platform", "win32"),
+            patch.object(settings, "_config", {"monitor_type": "lifeprism"}),
+            patch.dict(
+                sys.modules,
+                {
+                    "lifeprism.monitor.windows_monitor": MagicMock(),
+                    "lifeprism.monitor.windows_monitor.main": mock_monitor_main,
+                },
+            ),
+        ):
             async with lifespan(mock_app):
                 pass
 
@@ -128,12 +137,17 @@ class TestMonitorPlatformCheck:
         from lifeprism.server.main import lifespan
 
         # 将模块设为 None 模拟 ImportError
-        with patch("sys.platform", "win32"), \
-             patch.object(settings, "_config", {"monitor_type": "lifeprism"}), \
-             patch.dict(sys.modules, {
-                 "lifeprism.monitor.windows_monitor": MagicMock(),
-                 "lifeprism.monitor.windows_monitor.main": None,
-             }):
+        with (
+            patch("sys.platform", "win32"),
+            patch.object(settings, "_config", {"monitor_type": "lifeprism"}),
+            patch.dict(
+                sys.modules,
+                {
+                    "lifeprism.monitor.windows_monitor": MagicMock(),
+                    "lifeprism.monitor.windows_monitor.main": None,
+                },
+            ),
+        ):
             async with lifespan(mock_app):
                 pass
 
@@ -145,8 +159,10 @@ class TestMonitorPlatformCheck:
         """monitor_type 不为 'lifeprism' → 不启动 Monitor（与平台无关）"""
         from lifeprism.server.main import lifespan
 
-        with patch("sys.platform", "win32"), \
-             patch.object(settings, "_config", {"monitor_type": "none"}):
+        with (
+            patch("sys.platform", "win32"),
+            patch.object(settings, "_config", {"monitor_type": "none"}),
+        ):
             async with lifespan(mock_app):
                 pass
 

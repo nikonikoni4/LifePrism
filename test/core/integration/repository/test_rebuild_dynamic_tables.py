@@ -359,7 +359,9 @@ class TestRebuildDynamicTables:
             columns = {row[1] for row in cursor.fetchall()}
             assert "duration" in columns
 
-    def test_does_not_drop_orphan_table(self, sync_repository, clean_custom_record_types, initialized_db):
+    def test_does_not_drop_orphan_table(
+        self, sync_repository, clean_custom_record_types, initialized_db
+    ):
         """不删除云端已有但本地定义中不存在的表（孤儿表保护）"""
         # 先创建一个表
         with initialized_db.get_connection() as conn:
@@ -373,9 +375,7 @@ class TestRebuildDynamicTables:
 
         # 不应有 dropped 动作
         dropped = [r for r in results if r.get("action") == "dropped"]
-        assert len(dropped) == 0, (
-            "孤儿表不应被删除，删除同步需要独立的 tombstone 机制"
-        )
+        assert len(dropped) == 0, "孤儿表不应被删除，删除同步需要独立的 tombstone 机制"
 
         # 验证表仍然存在
         with initialized_db.get_connection() as conn:
@@ -456,10 +456,11 @@ class TestRebuildDynamicTablesEndpoint:
 
     def test_endpoint_requires_auth(self):
         """未认证请求被拒绝（ValidationError 通过全局异常处理器映射为 422）"""
+        from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from lifeprism.server.api.sync_cloud_api import router
         from lifeprism.utils.exceptions import ValidationError
-        from fastapi import FastAPI
 
         app = FastAPI()
         app.include_router(router)
@@ -485,10 +486,11 @@ class TestRebuildDynamicTablesEndpoint:
 
     def test_endpoint_validates_request_body(self):
         """请求体格式校验：缺少 types 字段返回 422"""
+        from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
         from lifeprism.server.api.sync_cloud_api import router
         from lifeprism.utils.exceptions import ValidationError
-        from fastapi import FastAPI
 
         app = FastAPI()
         app.include_router(router)

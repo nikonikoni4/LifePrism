@@ -2,6 +2,7 @@
 测试小米 Mimo provider 连接
 通过 build_llm_client 创建 client 并测试基本对话功能
 """
+
 import asyncio
 import sys
 from pathlib import Path
@@ -10,8 +11,8 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
+from lifeprism.config import provider_manager, settings
 from lifeprism.llm.providers.llm_providers.build_llm_client import create_llm_client
-from lifeprism.config import settings, provider_manager
 
 
 async def test_xiaomi_mimo_connection():
@@ -33,7 +34,9 @@ async def test_xiaomi_mimo_connection():
         print("\n请先设置 API Key:")
         print("  方法1: 在前端设置页面配置")
         print("  方法2: 使用 keyring 命令行设置:")
-        print('    python -c "import keyring; keyring.set_password(\'lifeprism\', \'api_key_xiaomi_mimo\', \'your-api-key\')"')
+        print(
+            "    python -c \"import keyring; keyring.set_password('lifeprism', 'api_key_xiaomi_mimo', 'your-api-key')\""
+        )
         return False
 
     print(f"  API Key: {api_key[:10]}...{api_key[-4:] if len(api_key) > 14 else ''}")
@@ -51,22 +54,12 @@ async def test_xiaomi_mimo_connection():
     # 4. 测试基本对话
     print("\n[3] 测试基本对话...")
     test_messages = [
-        {
-            "role": "system",
-            "content": "You are MiMo, an AI assistant developed by Xiaomi."
-        },
-        {
-            "role": "user",
-            "content": "请用一句话介绍你自己"
-        }
+        {"role": "system", "content": "You are MiMo, an AI assistant developed by Xiaomi."},
+        {"role": "user", "content": "请用一句话介绍你自己"},
     ]
 
     try:
-        response = await llm_client.chat(
-            messages=test_messages,
-            max_tokens=200,
-            temperature=0.7
-        )
+        response = await llm_client.chat(messages=test_messages, max_tokens=200, temperature=0.7)
 
         print(f"  [OK] 响应状态: {response.finish_reason}")
         print(f"  [OK] 响应内容: {response.content}")
@@ -80,6 +73,7 @@ async def test_xiaomi_mimo_connection():
     except Exception as e:
         print(f"  [FAIL] 对话测试失败: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -91,9 +85,7 @@ async def test_xiaomi_mimo_connection():
 
     try:
         response = await llm_client.chat(
-            messages=multi_turn_messages,
-            max_tokens=100,
-            temperature=0.7
+            messages=multi_turn_messages, max_tokens=100, temperature=0.7
         )
         print(f"  [OK] 第一轮响应: {response.content}")
 
@@ -102,9 +94,7 @@ async def test_xiaomi_mimo_connection():
         multi_turn_messages.append({"role": "user", "content": "那2+2呢？"})
 
         response = await llm_client.chat(
-            messages=multi_turn_messages,
-            max_tokens=100,
-            temperature=0.7
+            messages=multi_turn_messages, max_tokens=100, temperature=0.7
         )
         print(f"  [OK] 第二轮响应: {response.content}")
 
@@ -123,7 +113,7 @@ async def test_xiaomi_mimo_connection():
                 messages=[{"role": "user", "content": "你好"}],
                 model=model,
                 max_tokens=50,
-                temperature=0.7
+                temperature=0.7,
             )
             print(f"    [OK] {model} 响应: {response.content[:50]}...")
         except Exception as e:

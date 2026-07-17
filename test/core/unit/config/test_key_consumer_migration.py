@@ -47,11 +47,13 @@ class TestSyncConfigKeyMigration:
         """本地模式：get_sync_api_key 通过 SettingsManager 从 keyring 读取"""
         from lifeprism.sync.sync_config import get_sync_api_key
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch(
-                 "lifeprism.config.settings_manager.keyring.get_password",
-                 return_value="kr_sync_key",
-             ) as mock_kr:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch(
+                "lifeprism.config.settings_manager.keyring.get_password",
+                return_value="kr_sync_key",
+            ) as mock_kr,
+        ):
             result = get_sync_api_key()
             assert result == "kr_sync_key"
             mock_kr.assert_called_once_with("lifeprism", "sync_api_key")
@@ -65,10 +67,12 @@ class TestSyncConfigKeyMigration:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "storage_sync_key"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = get_sync_api_key()
             assert result == "storage_sync_key"
 
@@ -93,9 +97,7 @@ class TestSyncConfigKeyMigration:
         from lifeprism.sync import sync_config
 
         # 迁移后 sync_config 模块不应再 import keyring
-        assert not hasattr(sync_config, "keyring"), (
-            "sync_config 模块不应再 import keyring"
-        )
+        assert not hasattr(sync_config, "keyring"), "sync_config 模块不应再 import keyring"
 
 
 # ==================== Seam 2: wechat_auth ====================
@@ -117,11 +119,13 @@ class TestWechatAuthKeyMigration:
         """本地模式：_load_token_from_keyring 通过 SettingsManager 从 keyring 读取"""
         from lifeprism.llm.channel.wechat.auth import WechatAuth
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch(
-                 "lifeprism.config.settings_manager.keyring.get_password",
-                 return_value="kr_wechat_token",
-             ) as mock_kr:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch(
+                "lifeprism.config.settings_manager.keyring.get_password",
+                return_value="kr_wechat_token",
+            ) as mock_kr,
+        ):
             result = WechatAuth._load_token_from_keyring()
             assert result == "kr_wechat_token"
             mock_kr.assert_called_once_with("lifeprism", KEYRING_WECHAT_TOKEN_USERNAME)
@@ -135,10 +139,12 @@ class TestWechatAuthKeyMigration:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"wechat_token": "storage_wechat_token"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "web_demo"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = WechatAuth._load_token_from_keyring()
             assert result == "storage_wechat_token"
 
@@ -184,8 +190,12 @@ class TestProviderManagerKeyMigration:
         from lifeprism.config.provider_manager import provider_manager
 
         raw_specs = _make_raw_specs(("anthropic", "api_key_anthropic"))
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch.object(settings, "get_storage_key", return_value="routed_provider_key") as mock_get:
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch.object(
+                settings, "get_storage_key", return_value="routed_provider_key"
+            ) as mock_get,
+        ):
             result = provider_manager.get_api_key("anthropic")
             assert result == "routed_provider_key"
             mock_get.assert_called_once_with("providers.anthropic")
@@ -195,12 +205,14 @@ class TestProviderManagerKeyMigration:
         from lifeprism.config.provider_manager import provider_manager
 
         raw_specs = _make_raw_specs(("anthropic", "api_key_anthropic"))
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch(
-                 "lifeprism.config.settings_manager.keyring.get_password",
-                 return_value="kr_anthropic_key",
-             ) as mock_kr:
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch(
+                "lifeprism.config.settings_manager.keyring.get_password",
+                return_value="kr_anthropic_key",
+            ) as mock_kr,
+        ):
             result = provider_manager.get_api_key("anthropic")
             assert result == "kr_anthropic_key"
             mock_kr.assert_called_once_with("lifeprism", "api_key_anthropic")
@@ -215,11 +227,13 @@ class TestProviderManagerKeyMigration:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"providers": {"anthropic": "sk-ant-storage"}}, f)
 
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = provider_manager.get_api_key("anthropic")
             assert result == "sk-ant-storage"
 
@@ -228,8 +242,10 @@ class TestProviderManagerKeyMigration:
         from lifeprism.config.provider_manager import provider_manager
 
         raw_specs = _make_raw_specs(("anthropic", "api_key_anthropic"))
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch.object(settings, "get_storage_key", return_value=None):
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch.object(settings, "get_storage_key", return_value=None),
+        ):
             # providers.yaml 中也无 api_key 字段
             result = provider_manager.get_api_key("anthropic")
             assert result is None
@@ -239,8 +255,10 @@ class TestProviderManagerKeyMigration:
         from lifeprism.config.provider_manager import provider_manager
 
         raw_specs = _make_raw_specs(("custom", ""))
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch.object(settings, "get_storage_key") as mock_get:
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch.object(settings, "get_storage_key") as mock_get,
+        ):
             result = provider_manager.get_api_key("custom")
             assert result is None
             mock_get.assert_not_called()
@@ -262,8 +280,10 @@ class TestProviderManagerKeyMigration:
         def fake_get(key_name):
             return storage_map.get(key_name)
 
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch.object(settings, "get_storage_key", side_effect=fake_get):
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch.object(settings, "get_storage_key", side_effect=fake_get),
+        ):
             assert provider_manager.get_api_key("anthropic") == "sk-ant-multi"
             assert provider_manager.get_api_key("deepseek") == "sk-ds-multi"
 
@@ -281,11 +301,13 @@ class TestProviderManagerKeyMigration:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "other"}, f)
 
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", None), \
-             patch.object(settings, "_storage_config", {}):
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", None),
+            patch.object(settings, "_storage_config", {}),
+        ):
             result = provider_manager.get_api_key("anthropic")
             assert result == "yaml-fallback-key"
 
@@ -294,8 +316,10 @@ class TestProviderManagerKeyMigration:
         from lifeprism.config.provider_manager import provider_manager
 
         raw_specs = _make_raw_specs(("anthropic", "api_key_anthropic"))
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch.object(settings, "set_storage_key") as mock_set:
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch.object(settings, "set_storage_key") as mock_set,
+        ):
             provider_manager.set_api_key("anthropic", "sk-new")
             mock_set.assert_called_once_with("providers.anthropic", "sk-new")
 
@@ -304,7 +328,9 @@ class TestProviderManagerKeyMigration:
         from lifeprism.config.provider_manager import provider_manager
 
         raw_specs = _make_raw_specs(("custom", ""))
-        with patch.object(provider_manager, "_raw_specs", raw_specs), \
-             patch.object(settings, "set_storage_key") as mock_set:
+        with (
+            patch.object(provider_manager, "_raw_specs", raw_specs),
+            patch.object(settings, "set_storage_key") as mock_set,
+        ):
             provider_manager.set_api_key("custom", "sk-irrelevant")
             mock_set.assert_not_called()

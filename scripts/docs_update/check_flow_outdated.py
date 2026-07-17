@@ -27,8 +27,8 @@ from pathlib import Path
 
 # 设置 stdout 为 UTF-8 编码（解决 Windows 控制台问题）
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 
 FLOWS_DIR = Path(__file__).parent.parent.parent / "docs" / "flows"
@@ -41,9 +41,9 @@ def run_git_command(cmd: list[str]) -> str:
         cmd,
         capture_output=True,
         text=True,
-        encoding='utf-8',
-        errors='replace',  # 忽略编码错误
-        cwd=Path(__file__).parent.parent.parent
+        encoding="utf-8",
+        errors="replace",  # 忽略编码错误
+        cwd=Path(__file__).parent.parent.parent,
     )
     if result.returncode != 0:
         print(f"Git 命令失败: {' '.join(cmd)}", file=sys.stderr)
@@ -102,7 +102,7 @@ def get_changed_functions(file_path: str, mode: str, value: str = "") -> set[str
     # 匹配：+    def method_name( 或 -    def method_name( 或 +    async def method_name(
     for line in output.split("\n"):
         # 匹配函数定义（支持 async def）
-        match = re.match(r'^[\+\-]\s*(async\s+)?def\s+(\w+)\s*\(', line)
+        match = re.match(r"^[\+\-]\s*(async\s+)?def\s+(\w+)\s*\(", line)
         if match:
             func_name = match.group(2)
             functions.add(func_name)
@@ -133,7 +133,7 @@ def parse_flow_key_functions() -> dict[str, dict[str, list[str]]]:
             content = md_file.read_text(encoding="utf-8")
 
             # 匹配 <key_function> 标签
-            pattern = r'<key_function[^>]*>(.*?)</key_function>'
+            pattern = r"<key_function[^>]*>(.*?)</key_function>"
             match = re.search(pattern, content, re.DOTALL)
             if not match:
                 continue
@@ -150,12 +150,12 @@ def parse_flow_key_functions() -> dict[str, dict[str, list[str]]]:
                     continue
 
                 # 文件路径行：`- agents_hub/xxx.py`
-                if re.match(r'^- [\w/]+\.py$', stripped):
+                if re.match(r"^- [\w/]+\.py$", stripped):
                     current_file = stripped[2:]  # 去掉 "- "
                     continue
 
                 # 函数行：`  - file.Class.method:line`
-                func_match = re.match(r'^\s+- (.+?)(?::(\d+))?$', line)
+                func_match = re.match(r"^\s+- (.+?)(?::(\d+))?$", line)
                 if func_match and current_file:
                     func_name = func_match.group(1).strip()
                     file_functions[current_file].append(func_name)
@@ -179,8 +179,11 @@ def extract_function_name(full_name: str) -> str:
     return full_name.split(".")[-1]
 
 
-def check_flows_need_update(changed_files: list[str], changed_functions_map: dict[str, set[str]],
-                            flow_functions: dict[str, dict[str, list[str]]]) -> list[tuple[str, list[str]]]:
+def check_flows_need_update(
+    changed_files: list[str],
+    changed_functions_map: dict[str, set[str]],
+    flow_functions: dict[str, dict[str, list[str]]],
+) -> list[tuple[str, list[str]]]:
     """检查哪些 flow 文档需要更新
 
     Returns:
@@ -217,7 +220,9 @@ def main():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--staged", action="store_true", help="检查暂存区（用于 pre-commit hook）")
     group.add_argument("--commits", type=int, metavar="N", help="检查最近 N 次提交")
-    group.add_argument("--range", type=str, metavar="RANGE", help="检查指定提交范围（如 HEAD~3..HEAD）")
+    group.add_argument(
+        "--range", type=str, metavar="RANGE", help="检查指定提交范围（如 HEAD~3..HEAD）"
+    )
 
     args = parser.parse_args()
 

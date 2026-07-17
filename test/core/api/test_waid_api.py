@@ -8,12 +8,14 @@ WAID (What Am I Doing) 浮窗 API 测试
 - DELETE /api/v2/todos/{todo_id}/waid - 从 WAID 浮窗移除任务
 - PUT /api/v2/todos/waid/reorder - WAID 浮窗任务重排序
 """
-import pytest
-from fastapi.testclient import TestClient
+
 from datetime import datetime
 
-from lifeprism.server.main import app
+import pytest
+from fastapi.testclient import TestClient
+
 from lifeprism.repository import lw_db_manager
+from lifeprism.server.main import app
 
 
 @pytest.fixture
@@ -53,7 +55,7 @@ def test_create_waid_todo_with_daily_goal(client, clean_test_data):
         "state": "scheduled",
         "date": today,
         "link_to_goal_id": "goal-daily",
-        "plan_doc_id": "每日目标-docs"
+        "plan_doc_id": "每日目标-docs",
     }
 
     # 发送创建请求
@@ -79,11 +81,7 @@ def test_create_waid_todo_with_daily_goal(client, clean_test_data):
 def test_create_waid_todo_without_goal(client, clean_test_data):
     """测试创建任务时不关联目标（兼容性测试）"""
     today = datetime.now().strftime("%Y-%m-%d")
-    request_data = {
-        "content": "[TEST] 无目标任务",
-        "state": "scheduled",
-        "date": today
-    }
+    request_data = {"content": "[TEST] 无目标任务", "state": "scheduled", "date": today}
 
     response = client.post("/api/v2/todos", json=request_data)
 
@@ -111,13 +109,16 @@ def test_add_todo_to_waid(client, clean_test_data):
     """测试添加任务到 WAID 浮窗"""
     # 1. 先创建一个任务
     today = datetime.now().strftime("%Y-%m-%d")
-    create_response = client.post("/api/v2/todos", json={
-        "content": "[TEST] 待添加到 WAID 的任务",
-        "state": "scheduled",
-        "date": today,
-        "link_to_goal_id": "goal-daily",
-        "plan_doc_id": "每日目标-docs"
-    })
+    create_response = client.post(
+        "/api/v2/todos",
+        json={
+            "content": "[TEST] 待添加到 WAID 的任务",
+            "state": "scheduled",
+            "date": today,
+            "link_to_goal_id": "goal-daily",
+            "plan_doc_id": "每日目标-docs",
+        },
+    )
     assert create_response.status_code == 200
     todo_id = create_response.json()["item"]["id"]
 
@@ -140,13 +141,16 @@ def test_remove_todo_from_waid(client, clean_test_data):
     """测试从 WAID 浮窗移除任务"""
     # 1. 创建任务并添加到 WAID
     today = datetime.now().strftime("%Y-%m-%d")
-    create_response = client.post("/api/v2/todos", json={
-        "content": "[TEST] 待移除的任务",
-        "state": "scheduled",
-        "date": today,
-        "link_to_goal_id": "goal-daily",
-        "plan_doc_id": "每日目标-docs"
-    })
+    create_response = client.post(
+        "/api/v2/todos",
+        json={
+            "content": "[TEST] 待移除的任务",
+            "state": "scheduled",
+            "date": today,
+            "link_to_goal_id": "goal-daily",
+            "plan_doc_id": "每日目标-docs",
+        },
+    )
     todo_id = create_response.json()["item"]["id"]
     client.put(f"/api/v2/todos/{todo_id}/waid")
 
@@ -168,22 +172,23 @@ def test_reorder_waid_todos(client, clean_test_data):
     today = datetime.now().strftime("%Y-%m-%d")
     todo_ids = []
     for i in range(3):
-        create_response = client.post("/api/v2/todos", json={
-            "content": f"[TEST] 任务 {i+1}",
-            "state": "scheduled",
-            "date": today,
-            "link_to_goal_id": "goal-daily",
-            "plan_doc_id": "每日目标-docs"
-        })
+        create_response = client.post(
+            "/api/v2/todos",
+            json={
+                "content": f"[TEST] 任务 {i + 1}",
+                "state": "scheduled",
+                "date": today,
+                "link_to_goal_id": "goal-daily",
+                "plan_doc_id": "每日目标-docs",
+            },
+        )
         todo_id = create_response.json()["item"]["id"]
         todo_ids.append(todo_id)
         client.put(f"/api/v2/todos/{todo_id}/waid")
 
     # 2. 重排序（反转顺序）
     reversed_ids = list(reversed(todo_ids))
-    reorder_response = client.put("/api/v2/todos/waid/reorder", json={
-        "todo_ids": reversed_ids
-    })
+    reorder_response = client.put("/api/v2/todos/waid/reorder", json={"todo_ids": reversed_ids})
     assert reorder_response.status_code == 200
     assert reorder_response.json()["success"] is True
 
@@ -203,7 +208,7 @@ def test_create_waid_todo_with_invalid_goal_id(client, clean_test_data):
         "state": "scheduled",
         "date": today,
         "link_to_goal_id": "goal-nonexistent",
-        "plan_doc_id": "nonexistent-docs"
+        "plan_doc_id": "nonexistent-docs",
     }
 
     response = client.post("/api/v2/todos", json=request_data)
@@ -219,20 +224,21 @@ def test_waid_todo_state_transition(client, clean_test_data):
     """测试 WAID 任务状态转换（scheduled -> completed）"""
     # 1. 创建 scheduled 任务
     today = datetime.now().strftime("%Y-%m-%d")
-    create_response = client.post("/api/v2/todos", json={
-        "content": "[TEST] 待完成任务",
-        "state": "scheduled",
-        "date": today,
-        "link_to_goal_id": "goal-daily",
-        "plan_doc_id": "每日目标-docs"
-    })
+    create_response = client.post(
+        "/api/v2/todos",
+        json={
+            "content": "[TEST] 待完成任务",
+            "state": "scheduled",
+            "date": today,
+            "link_to_goal_id": "goal-daily",
+            "plan_doc_id": "每日目标-docs",
+        },
+    )
     todo_id = create_response.json()["item"]["id"]
     client.put(f"/api/v2/todos/{todo_id}/waid")
 
     # 2. 标记为完成
-    update_response = client.put(f"/api/v2/todos/{todo_id}", json={
-        "state": "completed"
-    })
+    update_response = client.put(f"/api/v2/todos/{todo_id}", json={"state": "completed"})
     assert update_response.status_code == 200
     updated_item = update_response.json()["item"]
     assert updated_item["state"] == "completed"
@@ -247,7 +253,7 @@ def test_waid_todo_date_format_validation(client, clean_test_data):
         "state": "scheduled",
         "date": "2026-04-20",  # 正确格式
         "link_to_goal_id": "goal-daily",
-        "plan_doc_id": "每日目标-docs"
+        "plan_doc_id": "每日目标-docs",
     }
 
     response = client.post("/api/v2/todos", json=request_data)
@@ -270,13 +276,16 @@ def test_waid_integration_workflow(client, clean_test_data):
     today = datetime.now().strftime("%Y-%m-%d")
 
     # 1. 创建任务
-    create_response = client.post("/api/v2/todos", json={
-        "content": "[TEST] 完整流程测试",
-        "state": "scheduled",
-        "date": today,
-        "link_to_goal_id": "goal-daily",
-        "plan_doc_id": "每日目标-docs"
-    })
+    create_response = client.post(
+        "/api/v2/todos",
+        json={
+            "content": "[TEST] 完整流程测试",
+            "state": "scheduled",
+            "date": today,
+            "link_to_goal_id": "goal-daily",
+            "plan_doc_id": "每日目标-docs",
+        },
+    )
     assert create_response.status_code == 200
     todo_id = create_response.json()["item"]["id"]
 
@@ -291,9 +300,7 @@ def test_waid_integration_workflow(client, clean_test_data):
     assert any(item["id"] == todo_id for item in waid_items)
 
     # 4. 完成任务
-    complete_response = client.put(f"/api/v2/todos/{todo_id}", json={
-        "state": "completed"
-    })
+    complete_response = client.put(f"/api/v2/todos/{todo_id}", json={"state": "completed"})
     assert complete_response.status_code == 200
 
     # 5. 从 WAID 移除

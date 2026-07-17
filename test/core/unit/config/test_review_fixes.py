@@ -10,7 +10,7 @@
 """
 
 from pathlib import Path
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 import yaml
@@ -28,8 +28,10 @@ class TestDeleteStorageKeyRouting:
 
     def test_delete_in_full_mode_calls_keyring(self):
         """full 模式下 delete_storage_key 从 keyring 删除"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch("lifeprism.config.settings_manager.keyring.delete_password") as mock_del:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch("lifeprism.config.settings_manager.keyring.delete_password") as mock_del,
+        ):
             settings.delete_storage_key("sync_api_key")
             mock_del.assert_called_once_with(KEYRING_SERVICE_NAME, "sync_api_key")
 
@@ -40,10 +42,14 @@ class TestDeleteStorageKeyRouting:
         with open(storage_path, "w", encoding="utf-8") as f:
             yaml.dump({"sync_api_key": "val", "wechat_token": "wx"}, f)
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_loaded_mode", "agent_only"), \
-             patch.object(settings, "_storage_config", {"sync_api_key": "val", "wechat_token": "wx"}):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_loaded_mode", "agent_only"),
+            patch.object(
+                settings, "_storage_config", {"sync_api_key": "val", "wechat_token": "wx"}
+            ),
+        ):
             settings.delete_storage_key("sync_api_key")
 
             assert "sync_api_key" not in settings._storage_config
@@ -51,11 +57,13 @@ class TestDeleteStorageKeyRouting:
 
     def test_delete_nested_key_in_cloud_mode(self, tmp_path):
         """云端模式下 delete_storage_key 删除嵌套 key (providers.xxx)"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}), \
-             patch.object(settings, "_storage_loaded_mode", "agent_only"), \
-             patch.object(settings, "_storage_config", {
-                 "providers": {"anthropic": "key1", "openai": "key2"}
-             }):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "agent_only"}),
+            patch.object(settings, "_storage_loaded_mode", "agent_only"),
+            patch.object(
+                settings, "_storage_config", {"providers": {"anthropic": "key1", "openai": "key2"}}
+            ),
+        ):
             settings.delete_storage_key("providers.anthropic")
 
             assert "anthropic" not in settings._storage_config["providers"]
@@ -63,9 +71,13 @@ class TestDeleteStorageKeyRouting:
 
     def test_delete_nonexistent_key_no_error(self):
         """删除不存在的 key 不抛异常"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch("lifeprism.config.settings_manager.keyring.delete_password",
-                   side_effect=Exception("not found")):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch(
+                "lifeprism.config.settings_manager.keyring.delete_password",
+                side_effect=Exception("not found"),
+            ),
+        ):
             # 不应抛异常
             settings.delete_storage_key("nonexistent_key")
 
@@ -73,9 +85,13 @@ class TestDeleteStorageKeyRouting:
         """PasswordDeleteError 被静默处理"""
         import keyring
 
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch("lifeprism.config.settings_manager.keyring.delete_password",
-                   side_effect=keyring.errors.PasswordDeleteError):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch(
+                "lifeprism.config.settings_manager.keyring.delete_password",
+                side_effect=keyring.errors.PasswordDeleteError,
+            ),
+        ):
             settings.delete_storage_key("sync_api_key")  # 不应抛异常
 
 
@@ -86,8 +102,10 @@ class TestDeleteApiKeyRoutesThroughSettings:
         """provider_manager.delete_api_key 调用 settings.delete_storage_key"""
         from lifeprism.config.provider_manager import provider_manager
 
-        with patch.object(provider_manager, "_get_env_key", return_value="test_env_key"), \
-             patch("lifeprism.config.settings_manager.settings.delete_storage_key") as mock_del:
+        with (
+            patch.object(provider_manager, "_get_env_key", return_value="test_env_key"),
+            patch("lifeprism.config.settings_manager.settings.delete_storage_key") as mock_del,
+        ):
             provider_manager.delete_api_key("anthropic")
             mock_del.assert_called_once_with("providers.anthropic")
 
@@ -95,8 +113,10 @@ class TestDeleteApiKeyRoutesThroughSettings:
         """env_key 为空时跳过删除"""
         from lifeprism.config.provider_manager import provider_manager
 
-        with patch.object(provider_manager, "_get_env_key", return_value=""), \
-             patch("lifeprism.config.settings_manager.settings.delete_storage_key") as mock_del:
+        with (
+            patch.object(provider_manager, "_get_env_key", return_value=""),
+            patch("lifeprism.config.settings_manager.settings.delete_storage_key") as mock_del,
+        ):
             provider_manager.delete_api_key("custom_provider")
             mock_del.assert_not_called()
 
@@ -124,24 +144,30 @@ class TestGetSetUpdateRoutingInFullMode:
 
     def test_get_sync_api_key_in_full_mode_returns_from_keyring(self):
         """full 模式下 get('sync_api_key') 从 keyring 读取"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch("lifeprism.config.settings_manager.keyring.get_password", return_value="key_val"):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch("lifeprism.config.settings_manager.keyring.get_password", return_value="key_val"),
+        ):
             result = settings.get("sync_api_key")
             assert result == "key_val"
 
     def test_get_wechat_token_in_full_mode_returns_from_keyring(self):
         """full 模式下 get('wechat_token') 从 keyring 读取"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch("lifeprism.config.settings_manager.keyring.get_password", return_value="wx_val"):
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch("lifeprism.config.settings_manager.keyring.get_password", return_value="wx_val"),
+        ):
             result = settings.get("wechat_token")
             assert result == "wx_val"
 
     def test_set_sync_api_key_in_full_mode_writes_to_keyring(self):
         """full 模式下 set('sync_api_key', val) 写入 keyring"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config", {}), \
-             patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set, \
-             patch.object(settings, "_save_config") as mock_save:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config", {}),
+            patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set,
+            patch.object(settings, "_save_config") as mock_save,
+        ):
             settings.set("sync_api_key", "new_key")
             mock_set.assert_called_once_with(KEYRING_SERVICE_NAME, "sync_api_key", "new_key")
             # 不写入 config.yaml
@@ -150,20 +176,24 @@ class TestGetSetUpdateRoutingInFullMode:
 
     def test_set_sync_api_key_empty_in_full_mode_deletes(self):
         """full 模式下 set('sync_api_key', '') 触发删除"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config", {}), \
-             patch("lifeprism.config.settings_manager.keyring.delete_password") as mock_del, \
-             patch.object(settings, "_save_config") as mock_save:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config", {}),
+            patch("lifeprism.config.settings_manager.keyring.delete_password") as mock_del,
+            patch.object(settings, "_save_config") as mock_save,
+        ):
             settings.set("sync_api_key", "")
             mock_del.assert_called_once_with(KEYRING_SERVICE_NAME, "sync_api_key")
             mock_save.assert_not_called()
 
     def test_update_sync_api_key_in_full_mode_writes_to_keyring(self):
         """full 模式下 update({'sync_api_key': val}) 写入 keyring"""
-        with patch.object(settings, "_runtime_config", {"run_mode": "full"}), \
-             patch.object(settings, "_config", {}), \
-             patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set, \
-             patch.object(settings, "_save_config") as mock_save:
+        with (
+            patch.object(settings, "_runtime_config", {"run_mode": "full"}),
+            patch.object(settings, "_config", {}),
+            patch("lifeprism.config.settings_manager.keyring.set_password") as mock_set,
+            patch.object(settings, "_save_config") as mock_save,
+        ):
             settings.update({"sync_api_key": "sync_val", "provider": "anthropic"})
             mock_set.assert_called_once_with(KEYRING_SERVICE_NAME, "sync_api_key", "sync_val")
             # sync_api_key 不写入 config.yaml
@@ -183,9 +213,11 @@ class TestCloudInitPermissions:
 
         generator = CloudConfigGenerator()
 
-        with patch("lifeprism.config.cloud_config_generator.settings") as mock_settings, \
-             patch("lifeprism.config.cloud_config_generator.sys") as mock_sys, \
-             patch("lifeprism.config.cloud_config_generator.os") as mock_os:
+        with (
+            patch("lifeprism.config.cloud_config_generator.settings") as mock_settings,
+            patch("lifeprism.config.cloud_config_generator.sys") as mock_sys,
+            patch("lifeprism.config.cloud_config_generator.os") as mock_os,
+        ):
             mock_settings.lifeprism_data_path = tmp_path
             mock_sys.platform = "linux"
 
@@ -200,9 +232,11 @@ class TestCloudInitPermissions:
 
         generator = CloudConfigGenerator()
 
-        with patch("lifeprism.config.cloud_config_generator.settings") as mock_settings, \
-             patch("lifeprism.config.cloud_config_generator.sys") as mock_sys, \
-             patch("lifeprism.config.cloud_config_generator.os") as mock_os:
+        with (
+            patch("lifeprism.config.cloud_config_generator.settings") as mock_settings,
+            patch("lifeprism.config.cloud_config_generator.sys") as mock_sys,
+            patch("lifeprism.config.cloud_config_generator.os") as mock_os,
+        ):
             mock_settings.lifeprism_data_path = tmp_path
             mock_sys.platform = "win32"
 
@@ -219,9 +253,9 @@ class TestWarningsTypeAnnotation:
 
     def test_warnings_returns_list_of_dicts(self):
         """warnings 返回 list[dict[str, str]]"""
-        with patch.object(settings, "_warnings", [
-            {"type": "data_path", "message": "test warning"}
-        ]):
+        with patch.object(
+            settings, "_warnings", [{"type": "data_path", "message": "test warning"}]
+        ):
             result = settings.warnings
             assert isinstance(result, list)
             assert all(isinstance(item, dict) for item in result)
@@ -243,9 +277,13 @@ class TestNoPrintInKeyringMethods:
 
     def test_set_api_key_to_keyring_failure_uses_logger(self):
         """_set_api_key_to_keyring 失败时使用 logger.warning 而非 print"""
-        with patch("lifeprism.config.settings_manager.keyring.set_password",
-                   side_effect=Exception("test error")), \
-             patch("lifeprism.config.settings_manager.logger") as mock_logger:
+        with (
+            patch(
+                "lifeprism.config.settings_manager.keyring.set_password",
+                side_effect=Exception("test error"),
+            ),
+            patch("lifeprism.config.settings_manager.logger") as mock_logger,
+        ):
             result = settings._set_api_key_to_keyring("test_key")
             assert result is False
             mock_logger.warning.assert_called_once()
@@ -257,11 +295,17 @@ class TestNoPrintInKeyringMethods:
         """_set_api_key_to_keyring_by_provider 失败时使用 logger.warning"""
         from lifeprism.config.provider_manager import provider_manager
 
-        with patch("lifeprism.config.provider_manager.provider_manager.get_keyring_username",
-                   return_value="test_user"), \
-             patch("lifeprism.config.settings_manager.keyring.set_password",
-                   side_effect=Exception("test error")), \
-             patch("lifeprism.config.settings_manager.logger") as mock_logger:
+        with (
+            patch(
+                "lifeprism.config.provider_manager.provider_manager.get_keyring_username",
+                return_value="test_user",
+            ),
+            patch(
+                "lifeprism.config.settings_manager.keyring.set_password",
+                side_effect=Exception("test error"),
+            ),
+            patch("lifeprism.config.settings_manager.logger") as mock_logger,
+        ):
             result = settings._set_api_key_to_keyring_by_provider("anthropic", "test_key")
             assert result is False
             mock_logger.warning.assert_called_once()
@@ -277,9 +321,11 @@ class TestAtomicWrites:
         """_save_config 使用临时文件 + os.replace"""
         config_path = tmp_path / "config.yaml"
 
-        with patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {"key": "value"}), \
-             patch("lifeprism.config.settings_manager.os.replace") as mock_replace:
+        with (
+            patch.object(settings, "_config_path", config_path),
+            patch.object(settings, "_config", {"key": "value"}),
+            patch("lifeprism.config.settings_manager.os.replace") as mock_replace,
+        ):
             settings._save_config()
 
             # os.replace 被调用
@@ -290,9 +336,11 @@ class TestAtomicWrites:
 
     def test_save_storage_uses_temp_file_and_replace(self, tmp_path):
         """_save_storage 使用临时文件 + os.replace"""
-        with patch.object(settings, "_config_base_path", tmp_path), \
-             patch.object(settings, "_storage_config", {"sync_api_key": "val"}), \
-             patch("lifeprism.config.settings_manager.os.replace") as mock_replace:
+        with (
+            patch.object(settings, "_config_base_path", tmp_path),
+            patch.object(settings, "_storage_config", {"sync_api_key": "val"}),
+            patch("lifeprism.config.settings_manager.os.replace") as mock_replace,
+        ):
             settings._save_storage()
 
             mock_replace.assert_called_once()
@@ -305,8 +353,10 @@ class TestAtomicWrites:
         """_save_config 不直接写入目标文件，先写 .tmp 再 replace"""
         config_path = tmp_path / "config.yaml"
 
-        with patch.object(settings, "_config_path", config_path), \
-             patch.object(settings, "_config", {"key": "value"}):
+        with (
+            patch.object(settings, "_config_path", config_path),
+            patch.object(settings, "_config", {"key": "value"}),
+        ):
             settings._save_config()
 
             # .tmp 文件应该已被 replace 清理（不再存在）

@@ -12,6 +12,7 @@
 2. 时间参数已验证是 aware datetime（naive 输入被假设为 UTC）
 3. 响应时间字段是 ISO 8601 格式（带 +00:00 时区标识）
 """
+
 import base64
 import gzip
 import re

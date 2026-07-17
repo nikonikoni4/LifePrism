@@ -8,7 +8,7 @@
 import json
 import sys
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 # 添加项目根目录到 Python 路径
 # 脚本位于 test/llm_prompt_test/scripts/，需要回到项目根目录
@@ -31,11 +31,11 @@ def extract_mood_entries() -> List[Dict[str, Any]]:
 
     # 处理 factors 字段：从 JSON 字符串解析为数组
     for entry in mood_entries:
-        if 'factors' in entry and isinstance(entry['factors'], str):
+        if "factors" in entry and isinstance(entry["factors"], str):
             try:
-                entry['factors'] = json.loads(entry['factors'])
+                entry["factors"] = json.loads(entry["factors"])
             except (json.JSONDecodeError, TypeError):
-                entry['factors'] = []
+                entry["factors"] = []
 
     return mood_entries
 
@@ -48,10 +48,7 @@ def save_to_json(data: List[Dict[str, Any]], output_path: Path) -> None:
         data: 要保存的数据
         output_path: 输出文件路径
     """
-    output_path.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8"
-    )
+    output_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def main():

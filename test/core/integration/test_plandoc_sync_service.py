@@ -7,15 +7,18 @@
 - 插入到父任务下
 - 多个 todoblock 的情况
 """
-import pytest
-import tempfile
+
 import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
+
 from lifeprism.server.services.plandoc_sync_service import (
-    insert_todo_to_md,
-    _read_plan_doc_content,
     _get_plan_doc_path,
+    _read_plan_doc_content,
+    insert_todo_to_md,
 )
 
 
@@ -30,7 +33,7 @@ def temp_plan_dir():
 @pytest.fixture
 def mock_settings(temp_plan_dir):
     """Mock settings.lifeprism_data_path"""
-    with patch('lifeprism.config.settings_manager.settings') as mock:
+    with patch("lifeprism.config.settings_manager.settings") as mock:
         mock.lifeprism_data_path = str(temp_plan_dir)
         yield mock
 
@@ -66,7 +69,7 @@ class TestInsertTodoToMd:
         assert file_path.exists()
 
         # 验证：文件内容正确
-        md_content = file_path.read_text(encoding='utf-8')
+        md_content = file_path.read_text(encoding="utf-8")
         assert f"# {plan_doc_id}" in md_content
         assert "<!-- lp:todoblock -->" in md_content
         assert "<!-- /lp:todoblock -->" in md_content
@@ -95,7 +98,7 @@ class TestInsertTodoToMd:
 <!-- /lp:todoblock -->
 """
         file_path = plan_dir / f"{plan_doc_id}.md"
-        file_path.write_text(existing_content, encoding='utf-8')
+        file_path.write_text(existing_content, encoding="utf-8")
 
         # 执行插入
         new_content = "新任务"
@@ -106,7 +109,7 @@ class TestInsertTodoToMd:
         assert anchor_id.startswith("t-")
 
         # 验证：文件内容包含新任务
-        md_content = file_path.read_text(encoding='utf-8')
+        md_content = file_path.read_text(encoding="utf-8")
         assert "已存在的任务" in md_content
         assert f"- [ ] {new_content} <!-- lp:{anchor_id} -->" in md_content
 
@@ -134,7 +137,7 @@ class TestInsertTodoToMd:
 <!-- /lp:todoblock -->
 """
         file_path = plan_dir / f"{plan_doc_id}.md"
-        file_path.write_text(existing_content, encoding='utf-8')
+        file_path.write_text(existing_content, encoding="utf-8")
 
         # 执行插入子任务
         child_content = "子任务"
@@ -145,7 +148,7 @@ class TestInsertTodoToMd:
         assert child_anchor.startswith("t-")
 
         # 验证：子任务缩进正确
-        md_content = file_path.read_text(encoding='utf-8')
+        md_content = file_path.read_text(encoding="utf-8")
         assert f"- [ ] 父任务 <!-- lp:{parent_anchor} -->" in md_content
         assert f"\t- [ ] {child_content} <!-- lp:{child_anchor} -->" in md_content
 
@@ -175,7 +178,7 @@ class TestInsertTodoToMd:
 <!-- /lp:todoblock -->
 """
         file_path = plan_dir / f"{plan_doc_id}.md"
-        file_path.write_text(existing_content, encoding='utf-8')
+        file_path.write_text(existing_content, encoding="utf-8")
 
         # 执行插入第二个子任务
         child2_content = "子任务2"
@@ -185,8 +188,8 @@ class TestInsertTodoToMd:
         assert child2_anchor is not None
 
         # 验证：新子任务在子任务1之后
-        md_content = file_path.read_text(encoding='utf-8')
-        lines = md_content.split('\n')
+        md_content = file_path.read_text(encoding="utf-8")
+        lines = md_content.split("\n")
 
         child1_line_index = None
         child2_line_index = None
@@ -228,14 +231,14 @@ class TestInsertTodoToMd:
 <!-- /lp:todoblock -->
 """
         file_path = plan_dir / f"{plan_doc_id}.md"
-        file_path.write_text(existing_content, encoding='utf-8')
+        file_path.write_text(existing_content, encoding="utf-8")
 
         # 测试1：无父任务，应插入到第一个 block
         task1_content = "插入到第一个block"
         anchor1 = insert_todo_to_md(plan_doc_id, task1_content)
         assert anchor1 is not None
 
-        md_content = file_path.read_text(encoding='utf-8')
+        md_content = file_path.read_text(encoding="utf-8")
         blocks = md_content.split("<!-- lp:todoblock -->")
         assert task1_content in blocks[1]  # 第一个 block
 
@@ -244,7 +247,7 @@ class TestInsertTodoToMd:
         anchor2 = insert_todo_to_md(plan_doc_id, task2_content, parent_anchor)
         assert anchor2 is not None
 
-        md_content = file_path.read_text(encoding='utf-8')
+        md_content = file_path.read_text(encoding="utf-8")
         blocks = md_content.split("<!-- lp:todoblock -->")
         assert task2_content in blocks[2]  # 第二个 block
 
@@ -295,6 +298,6 @@ class TestInsertTodoToMd:
 
         # 验证：文件内容正确
         file_path = temp_plan_dir / "plan" / f"{plan_doc_id}.md"
-        md_content = file_path.read_text(encoding='utf-8')
+        md_content = file_path.read_text(encoding="utf-8")
         assert content in md_content
         assert f"<!-- lp:{anchor_id} -->" in md_content

@@ -3,20 +3,22 @@ Timeline Service 快照测试
 
 测试 timeline_service 的核心功能，确保重构后行为一致
 """
-import pytest
-from syrupy.assertion import SnapshotAssertion
+
 from datetime import datetime
 
-from lifeprism.server.services.timeline_service import (
-    get_custom_block,
-    get_custom_blocks_by_time_range,
-    create_custom_block,
-    update_custom_block,
-    delete_custom_block,
-)
+import pytest
+from syrupy.assertion import SnapshotAssertion
+
 from lifeprism.server.schemas.timeline_schemas import (
     UserCustomBlockCreate,
     UserCustomBlockUpdate,
+)
+from lifeprism.server.services.timeline_service import (
+    create_custom_block,
+    delete_custom_block,
+    get_custom_block,
+    get_custom_blocks_by_time_range,
+    update_custom_block,
 )
 
 
@@ -43,7 +45,7 @@ class TestTimelineServiceSnapshot:
             color="#FF6B6B",
             category_id=None,
             sub_category_id=None,
-            todo_id=None
+            todo_id=None,
         )
 
         # 创建
@@ -68,16 +70,13 @@ class TestTimelineServiceSnapshot:
             color="#4ECDC4",
             category_id=None,
             sub_category_id=None,
-            todo_id=None
+            todo_id=None,
         )
         created = create_custom_block(create_data)
 
         if created.data and created.data.id:
             # 更新内容
-            update_data = UserCustomBlockUpdate(
-                content="更新后的内容",
-                color="#95E1D3"
-            )
+            update_data = UserCustomBlockUpdate(content="更新后的内容", color="#95E1D3")
             result = update_custom_block(created.data.id, update_data)
             assert result is not None
             assert result.data.content == "更新后的内容"

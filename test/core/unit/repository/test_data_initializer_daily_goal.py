@@ -8,15 +8,18 @@ DataInitializer._initialize_daily_goal 单元测试
 4. 同名但不同id：修改id
 5. 极端情况（多条冲突）：跳过
 """
+
 import pytest
-from lifeprism.repository.data_initializer import DataInitializer, DAILY_GOAL_ID, DAILY_GOAL
+
 from lifeprism.repository import lw_db_manager
+from lifeprism.repository.data_initializer import DAILY_GOAL, DAILY_GOAL_ID, DataInitializer
 
 
 @pytest.fixture
 def data_initializer(test_data_path):
     """创建 DataInitializer 实例"""
     from lifeprism.config.settings_manager import settings
+
     settings._initialize()
     return DataInitializer()
 
@@ -55,7 +58,7 @@ class TestInitializeDailyGoal:
 
         assert result is not None, "应该创建了每日目标"
         assert result[0] == DAILY_GOAL_ID
-        assert result[1] == DAILY_GOAL['name']
+        assert result[1] == DAILY_GOAL["name"]
 
     def test_case2_same_name_and_id_skip(self, data_initializer, clean_goal_table):
         """
@@ -67,21 +70,28 @@ class TestInitializeDailyGoal:
         # 预先插入完全相同的记录
         with lw_db_manager.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO goal (
                     id, name, content, color, status,
                     track_time_automatically, milestones,
                     time_unit, time_invested, order_index
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                DAILY_GOAL_ID,
-                DAILY_GOAL['name'],
-                '原始内容',
-                '#FF0000',
-                'active',
-                0, '[]', 'HRS', 0, 0
-            ))
+            """,
+                (
+                    DAILY_GOAL_ID,
+                    DAILY_GOAL["name"],
+                    "原始内容",
+                    "#FF0000",
+                    "active",
+                    0,
+                    "[]",
+                    "HRS",
+                    0,
+                    0,
+                ),
+            )
 
         # 执行初始化
         data_initializer._initialize_daily_goal()
@@ -92,8 +102,8 @@ class TestInitializeDailyGoal:
             cursor.execute("SELECT content, color FROM goal WHERE id = ?", (DAILY_GOAL_ID,))
             result = cursor.fetchone()
 
-        assert result[0] == '原始内容', "内容应该保持不变"
-        assert result[1] == '#FF0000', "颜色应该保持不变"
+        assert result[0] == "原始内容", "内容应该保持不变"
+        assert result[1] == "#FF0000", "颜色应该保持不变"
 
     def test_case3_same_id_different_name_skip(self, data_initializer, clean_goal_table):
         """
@@ -105,21 +115,28 @@ class TestInitializeDailyGoal:
         # 预先插入 id 相同但名字不同的记录
         with lw_db_manager.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO goal (
                     id, name, content, color, status,
                     track_time_automatically, milestones,
                     time_unit, time_invested, order_index
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                DAILY_GOAL_ID,
-                '用户改的名字',
-                '用户内容',
-                '#00FF00',
-                'active',
-                0, '[]', 'HRS', 0, 0
-            ))
+            """,
+                (
+                    DAILY_GOAL_ID,
+                    "用户改的名字",
+                    "用户内容",
+                    "#00FF00",
+                    "active",
+                    0,
+                    "[]",
+                    "HRS",
+                    0,
+                    0,
+                ),
+            )
 
         # 执行初始化
         data_initializer._initialize_daily_goal()
@@ -130,8 +147,8 @@ class TestInitializeDailyGoal:
             cursor.execute("SELECT name, content FROM goal WHERE id = ?", (DAILY_GOAL_ID,))
             result = cursor.fetchone()
 
-        assert result[0] == '用户改的名字', "用户修改的名字应该保持不变"
-        assert result[1] == '用户内容', "内容应该保持不变"
+        assert result[0] == "用户改的名字", "用户修改的名字应该保持不变"
+        assert result[1] == "用户内容", "内容应该保持不变"
 
     def test_case4_same_name_different_id_update_id(self, data_initializer, clean_goal_table):
         """
@@ -140,26 +157,33 @@ class TestInitializeDailyGoal:
         前置条件：已存在 id='goal-abc123', name='每日目标' 的记录
         预期结果：将 id 修改为 'goal-daily'
         """
-        old_id = 'goal-abc123'
+        old_id = "goal-abc123"
 
         # 预先插入同名但不同 id 的记录
         with lw_db_manager.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO goal (
                     id, name, content, color, status,
                     track_time_automatically, milestones,
                     time_unit, time_invested, order_index
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                old_id,
-                DAILY_GOAL['name'],
-                '用户创建的内容',
-                '#0000FF',
-                'active',
-                1, '["里程碑1"]', 'DAYS', 100, 5
-            ))
+            """,
+                (
+                    old_id,
+                    DAILY_GOAL["name"],
+                    "用户创建的内容",
+                    "#0000FF",
+                    "active",
+                    1,
+                    '["里程碑1"]',
+                    "DAYS",
+                    100,
+                    5,
+                ),
+            )
 
         # 执行初始化
         data_initializer._initialize_daily_goal()
@@ -175,17 +199,20 @@ class TestInitializeDailyGoal:
         # 验证：新 id 的记录应该存在，且保留了原有数据
         with lw_db_manager.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, name, content, color, time_invested, order_index
                 FROM goal WHERE id = ?
-            """, (DAILY_GOAL_ID,))
+            """,
+                (DAILY_GOAL_ID,),
+            )
             result = cursor.fetchone()
 
         assert result is not None, "新 id 的记录应该存在"
         assert result[0] == DAILY_GOAL_ID, "id 应该是固定值"
-        assert result[1] == DAILY_GOAL['name'], "名字应该保持"
-        assert result[2] == '用户创建的内容', "内容应该保留"
-        assert result[3] == '#0000FF', "颜色应该保留"
+        assert result[1] == DAILY_GOAL["name"], "名字应该保持"
+        assert result[2] == "用户创建的内容", "内容应该保留"
+        assert result[3] == "#0000FF", "颜色应该保留"
         assert result[4] == 100, "time_invested 应该保留"
         assert result[5] == 5, "order_index 应该保留"
 
@@ -203,38 +230,41 @@ class TestInitializeDailyGoal:
             cursor = conn.cursor()
 
             # 记录1：id 相同但名字不同
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO goal (
                     id, name, content, color, status,
                     track_time_automatically, milestones,
                     time_unit, time_invested, order_index
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                DAILY_GOAL_ID,
-                '其他名字',
-                '内容1',
-                '#FF0000',
-                'active',
-                0, '[]', 'HRS', 0, 0
-            ))
+            """,
+                (DAILY_GOAL_ID, "其他名字", "内容1", "#FF0000", "active", 0, "[]", "HRS", 0, 0),
+            )
 
             # 记录2：名字相同但 id 不同
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO goal (
                     id, name, content, color, status,
                     track_time_automatically, milestones,
                     time_unit, time_invested, order_index
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                'goal-xyz',
-                DAILY_GOAL['name'],
-                '内容2',
-                '#00FF00',
-                'active',
-                0, '[]', 'HRS', 0, 0
-            ))
+            """,
+                (
+                    "goal-xyz",
+                    DAILY_GOAL["name"],
+                    "内容2",
+                    "#00FF00",
+                    "active",
+                    0,
+                    "[]",
+                    "HRS",
+                    0,
+                    0,
+                ),
+            )
 
         # 执行初始化
         data_initializer._initialize_daily_goal()
@@ -246,14 +276,14 @@ class TestInitializeDailyGoal:
             # 检查记录1
             cursor.execute("SELECT name, content FROM goal WHERE id = ?", (DAILY_GOAL_ID,))
             record1 = cursor.fetchone()
-            assert record1[0] == '其他名字', "记录1的名字应该保持不变"
-            assert record1[1] == '内容1', "记录1的内容应该保持不变"
+            assert record1[0] == "其他名字", "记录1的名字应该保持不变"
+            assert record1[1] == "内容1", "记录1的内容应该保持不变"
 
             # 检查记录2
-            cursor.execute("SELECT id, content FROM goal WHERE name = ?", (DAILY_GOAL['name'],))
+            cursor.execute("SELECT id, content FROM goal WHERE name = ?", (DAILY_GOAL["name"],))
             record2 = cursor.fetchone()
-            assert record2[0] == 'goal-xyz', "记录2的id应该保持不变"
-            assert record2[1] == '内容2', "记录2的内容应该保持不变"
+            assert record2[0] == "goal-xyz", "记录2的id应该保持不变"
+            assert record2[1] == "内容2", "记录2的内容应该保持不变"
 
     def test_plan_doc_initialization(self, data_initializer, clean_goal_table):
         """
@@ -272,9 +302,9 @@ class TestInitializeDailyGoal:
         # 验证：应该创建了计划书
         with lw_db_manager.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, goal_id FROM plan_doc WHERE id = ?", ('每日目标-docs',))
+            cursor.execute("SELECT id, goal_id FROM plan_doc WHERE id = ?", ("每日目标-docs",))
             result = cursor.fetchone()
 
         assert result is not None, "应该创建了每日目标计划书"
-        assert result[0] == '每日目标-docs'
+        assert result[0] == "每日目标-docs"
         assert result[1] == DAILY_GOAL_ID

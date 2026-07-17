@@ -1,9 +1,9 @@
 """LLM 调用记录器测试"""
 
 import json
-from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 from lifeprism.llm.utils import llm_call_logger
 
@@ -37,14 +37,8 @@ def test_logger_disabled_by_default():
     assert llm_call_logger.enabled == False
 
     # 调用 log_call 应该返回 None
-    msg = MockInboundMessage(
-        type="chat",
-        content="测试消息"
-    )
-    response = MockOutboundMessage(
-        id="test-1",
-        response=MockLLMResponse(content="测试回复")
-    )
+    msg = MockInboundMessage(type="chat", content="测试消息")
+    response = MockOutboundMessage(id="test-1", response=MockLLMResponse(content="测试回复"))
 
     result = llm_call_logger.log_call(msg, response)
     assert result is None
@@ -63,22 +57,16 @@ def test_logger_enable_and_log():
             type="general_task",
             content="这是一条测试消息",
             session_id="test-session-001",
-            extra={
-                "system_prompt": "你是一个测试助手"
-            }
+            extra={"system_prompt": "你是一个测试助手"},
         )
 
         response = MockOutboundMessage(
             id="test-1",
             response=MockLLMResponse(
                 content="这是测试回复",
-                usage={
-                    "prompt_tokens": 100,
-                    "completion_tokens": 50,
-                    "total_tokens": 150
-                }
+                usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
             ),
-            session_id="test-session-001"
+            session_id="test-session-001",
         )
 
         # 记录调用
@@ -96,6 +84,7 @@ def test_logger_enable_and_log():
 
         # 验证日志文件是否创建
         from datetime import datetime
+
         date_str = datetime.now().strftime("%Y-%m-%d")
         log_file = llm_call_logger.log_dir / f"llm_calls_{date_str}.json"
 
@@ -141,16 +130,13 @@ def test_multimodal_content():
             content=[
                 {"type": "text", "text": "分析这张图片"},
                 {"type": "image_url", "image_url": {"url": tiny_png_base64}},
-                {"type": "text", "text": "请详细描述"}
+                {"type": "text", "text": "请详细描述"},
             ],
-            extra={
-                "system_prompt": "你是一个图片分析助手"
-            }
+            extra={"system_prompt": "你是一个图片分析助手"},
         )
 
         response = MockOutboundMessage(
-            id="test-2",
-            response=MockLLMResponse(content="这是一张透明图片")
+            id="test-2", response=MockLLMResponse(content="这是一张透明图片")
         )
 
         # 记录调用
@@ -166,6 +152,7 @@ def test_multimodal_content():
 
         # 验证图片是否保存
         from datetime import datetime
+
         date_str = datetime.now().strftime("%Y-%m-%d")
         log_file = llm_call_logger.log_dir / f"llm_calls_{date_str}.json"
 
@@ -197,13 +184,10 @@ def test_export_by_prompt():
         # 记录几条测试数据
         for i in range(3):
             msg = MockInboundMessage(
-                type="general_task",
-                content=f"测试消息 {i}",
-                extra={"system_prompt": "测试提示词"}
+                type="general_task", content=f"测试消息 {i}", extra={"system_prompt": "测试提示词"}
             )
             response = MockOutboundMessage(
-                id=f"test-{i}",
-                response=MockLLMResponse(content=f"测试回复 {i}")
+                id=f"test-{i}", response=MockLLMResponse(content=f"测试回复 {i}")
             )
             llm_call_logger.log_call(
                 inbound_msg=msg,
@@ -215,9 +199,7 @@ def test_export_by_prompt():
 
         # 导出数据集
         dataset = llm_call_logger.export_by_prompt(
-            prompt_module="test",
-            prompt_name="export_test",
-            prompt_version="v1"
+            prompt_module="test", prompt_name="export_test", prompt_version="v1"
         )
 
         assert len(dataset) >= 3

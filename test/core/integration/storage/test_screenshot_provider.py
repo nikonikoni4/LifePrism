@@ -3,6 +3,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+
 from lifeprism.monitor.provider.screenshot_data_provider import ScreenshotDataProvider
 from lifeprism.repository.database_manager import DatabaseManager
 from lifeprism.repository.lw_table_manager import LWTableManager

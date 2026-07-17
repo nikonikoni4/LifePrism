@@ -85,9 +85,7 @@ class TestStartupSyncOnce:
 
         mock_sync_client.sync_once.assert_called_once()
 
-    async def test_calls_sync_once_via_to_thread(
-        self, mock_app, mock_sync_client, full_run_mode
-    ):
+    async def test_calls_sync_once_via_to_thread(self, mock_app, mock_sync_client, full_run_mode):
         """启动同步通过 asyncio.to_thread 在独立线程中执行（不阻塞 lifespan）"""
         from lifeprism.server.main import _start_sync_on_startup
 

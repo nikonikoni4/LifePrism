@@ -1,6 +1,8 @@
 """简单测试 llm_call_logger 配置读取"""
+
 import sys
-sys.path.insert(0, '.')
+
+sys.path.insert(0, ".")
 
 from lifeprism.config import settings
 from lifeprism.llm.utils import llm_call_logger
@@ -11,7 +13,7 @@ print("=" * 60)
 
 # 1. 检查配置
 print(f"\n1. 配置检查:")
-config_value = settings.get('llm_call_logger_enabled', None)
+config_value = settings.get("llm_call_logger_enabled", None)
 print(f"   - config.yaml 中的值: {config_value}")
 print(f"   - llm_call_logger.enabled: {llm_call_logger.enabled}")
 

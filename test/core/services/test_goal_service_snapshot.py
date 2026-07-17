@@ -3,14 +3,15 @@ Goal Service 快照测试
 
 在重构 GoalProvider 前捕获当前行为，确保重构后行为不变
 """
+
 import pytest
 from syrupy.assertion import SnapshotAssertion
 
-from lifeprism.server.services.goal_service import goal_service
 from lifeprism.server.schemas.goal_schemas import (
     CreateGoalRequest,
     UpdateGoalRequest,
 )
+from lifeprism.server.services.goal_service import goal_service
 
 
 class TestGoalServiceSnapshot:
@@ -23,10 +24,7 @@ class TestGoalServiceSnapshot:
 
     def test_create_and_delete_goal(self):
         """测试创建和删除目标"""
-        request = CreateGoalRequest(
-            name=f"测试目标-{pytest.timestamp}",
-            content="这是一个测试目标"
-        )
+        request = CreateGoalRequest(name=f"测试目标-{pytest.timestamp}", content="这是一个测试目标")
         result = goal_service.create_goal(request)
         assert result is not None
 
@@ -38,19 +36,13 @@ class TestGoalServiceSnapshot:
     def test_update_goal(self):
         """测试更新目标"""
         # 创建
-        create_request = CreateGoalRequest(
-            name=f"测试更新-{pytest.timestamp}",
-            content="原始内容"
-        )
+        create_request = CreateGoalRequest(name=f"测试更新-{pytest.timestamp}", content="原始内容")
         created = goal_service.create_goal(create_request)
         assert created is not None
 
         # 更新
         if created:
-            update_request = UpdateGoalRequest(
-                content="更新后的内容",
-                color="#FF6B6B"
-            )
+            update_request = UpdateGoalRequest(content="更新后的内容", color="#FF6B6B")
             result = goal_service.update_goal(created.id, update_request)
             assert result is not None
 
@@ -62,4 +54,5 @@ class TestGoalServiceSnapshot:
 def setup_timestamp():
     """设置测试时间戳"""
     import time
+
     pytest.timestamp = int(time.time())

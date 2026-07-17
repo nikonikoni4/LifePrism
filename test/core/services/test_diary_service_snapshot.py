@@ -4,19 +4,20 @@ Diary Service 快照测试
 用于 provider 重构前后的行为验证。
 测试所有调用 diary_provider 的 service 方法。
 """
+
 import pytest
 from syrupy.assertion import SnapshotAssertion
 
-from lifeprism.server.services import diary_service
 from lifeprism.server.schemas.diary_schemas import (
-    UpdateDiaryMetaRequest,
-    SaveDiaryContentRequest,
-    GenerateDiaryAISummaryRangeRequest,
     ExistingSummaryMode,
+    GenerateDiaryAISummaryRangeRequest,
+    SaveDiaryContentRequest,
+    UpdateDiaryMetaRequest,
 )
-
+from lifeprism.server.services import diary_service
 
 # ==================== 测试辅助函数 ====================
+
 
 def sanitize_diary_item(data: dict) -> dict:
     """清理动态字段，用于快照对比"""
@@ -25,7 +26,7 @@ def sanitize_diary_item(data: dict) -> dict:
 
     result = {}
     # 排除动态字段
-    exclude_fields = {'created_at', 'updated_at', 'diary_source_hash'}
+    exclude_fields = {"created_at", "updated_at", "diary_source_hash"}
 
     for key, value in data.items():
         if key in exclude_fields:
@@ -37,13 +38,11 @@ def sanitize_diary_item(data: dict) -> dict:
 
 def sanitize_diary_list(items: list) -> list:
     """清理日记列表的动态字段"""
-    return sorted(
-        [sanitize_diary_item(item) for item in items],
-        key=lambda x: x.get('date', '')
-    )
+    return sorted([sanitize_diary_item(item) for item in items], key=lambda x: x.get("date", ""))
 
 
 # ==================== Fixtures ====================
+
 
 @pytest.fixture
 def sample_diary_date(use_diary_test_data):
@@ -58,6 +57,7 @@ def sample_date_range(use_diary_test_data):
 
 
 # ==================== 快照测试 ====================
+
 
 @pytest.mark.snapshot
 def test_get_diary_snapshot(sample_diary_date, snapshot: SnapshotAssertion):
@@ -93,9 +93,7 @@ def test_update_diary_meta_snapshot(sample_diary_date, snapshot: SnapshotAsserti
 
     # 更新元数据
     request = UpdateDiaryMetaRequest(
-        mood="happy",
-        importance="important",
-        custom_tags=["测试", "快照"]
+        mood="happy", importance="important", custom_tags=["测试", "快照"]
     )
 
     result = diary_service.update_diary_meta(sample_diary_date, request)
@@ -122,9 +120,7 @@ def test_save_diary_content_snapshot(sample_diary_date, snapshot: SnapshotAssert
         pytest.skip("测试数据为空，跳过快照测试")
 
     # 保存内容
-    request = SaveDiaryContentRequest(
-        content="这是一段测试日记内容，用于验证快照测试。"
-    )
+    request = SaveDiaryContentRequest(content="这是一段测试日记内容，用于验证快照测试。")
 
     result = diary_service.save_diary_content(sample_diary_date, request)
 
@@ -156,7 +152,9 @@ def test_get_diary_list_snapshot(sample_date_range, snapshot: SnapshotAssertion)
 
 
 @pytest.mark.snapshot
-async def test_generate_diary_ai_summary_snapshot(sample_diary_date, snapshot: SnapshotAssertion, monkeypatch):
+async def test_generate_diary_ai_summary_snapshot(
+    sample_diary_date, snapshot: SnapshotAssertion, monkeypatch
+):
     """
     测试 generate_diary_ai_summary() 方法
 
@@ -166,6 +164,7 @@ async def test_generate_diary_ai_summary_snapshot(sample_diary_date, snapshot: S
 
     注意：Mock AI 调用，避免真实 LLM 请求
     """
+
     # Mock AI 总结函数
     async def mock_ai_summary(date, mood, importance, custom_tags, outdate_summary=None):
         return {"content": "这是一个模拟的 AI 总结"}
@@ -193,7 +192,9 @@ async def test_generate_diary_ai_summary_snapshot(sample_diary_date, snapshot: S
 
 
 @pytest.mark.snapshot
-async def test_generate_diary_ai_summary_range_snapshot(sample_date_range, snapshot: SnapshotAssertion, monkeypatch):
+async def test_generate_diary_ai_summary_range_snapshot(
+    sample_date_range, snapshot: SnapshotAssertion, monkeypatch
+):
     """
     测试 generate_diary_ai_summary_range() 方法
 
@@ -203,6 +204,7 @@ async def test_generate_diary_ai_summary_range_snapshot(sample_date_range, snaps
 
     注意：Mock AI 调用，避免真实 LLM 请求
     """
+
     # Mock AI 总结函数
     async def mock_ai_summary(date, mood, importance, custom_tags, outdate_summary=None):
         return {"content": f"模拟总结 {date}"}
@@ -215,7 +217,7 @@ async def test_generate_diary_ai_summary_range_snapshot(sample_date_range, snaps
     request = GenerateDiaryAISummaryRangeRequest(
         start_date=start_date,
         end_date=end_date,
-        existing_summary_mode=ExistingSummaryMode.SKIP_EXISTING
+        existing_summary_mode=ExistingSummaryMode.SKIP_EXISTING,
     )
 
     result = await diary_service.generate_diary_ai_summary_range(request)
@@ -226,9 +228,9 @@ async def test_generate_diary_ai_summary_range_snapshot(sample_date_range, snaps
 
     # 清理结果
     sanitized_result = {
-        'created_dates': sorted(result.created_dates),
-        'updated_dates': sorted(result.updated_dates),
-        'skipped_dates': sorted(result.skipped_dates),
+        "created_dates": sorted(result.created_dates),
+        "updated_dates": sorted(result.updated_dates),
+        "skipped_dates": sorted(result.skipped_dates),
     }
 
     assert sanitized_result == snapshot

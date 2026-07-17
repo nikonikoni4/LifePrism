@@ -1,4 +1,5 @@
 """测试工具调用链记录功能"""
+
 import asyncio
 import json
 from pathlib import Path
@@ -16,16 +17,15 @@ async def test_tool_call_chain():
     print(f"[OK] llm_call_logger 已启用")
 
     # 2. 发送一个需要多次工具调用的消息
-    msg = InboundMessage(
-        type=MessageType.CHAT,
-        content="帮我查看一下今天的活动记录，然后总结一下"
-    )
+    msg = InboundMessage(type=MessageType.CHAT, content="帮我查看一下今天的活动记录，然后总结一下")
 
     print(f"\n[OK] 发送消息: {msg.content}")
     result = await bus.send(msg)
 
     print(f"\n[OK] 收到响应")
-    print(f"  - response.content: {result.response.content[:100] if result.response and result.response.content else 'None'}...")
+    print(
+        f"  - response.content: {result.response.content[:100] if result.response and result.response.content else 'None'}..."
+    )
 
     # 3. 检查 extra 中是否有 tool_call_chain
     if result.extra and "tool_call_chain" in result.extra:
@@ -37,10 +37,10 @@ async def test_tool_call_chain():
             tool_calls = round_data["tool_calls"]
             print(f"\n  第 {round_num} 轮:")
             for tc in tool_calls:
-                error_flag = " ❌[ERROR]" if tc.get('is_error') else ""
+                error_flag = " ❌[ERROR]" if tc.get("is_error") else ""
                 print(f"    - 工具: {tc['name']}{error_flag}")
                 print(f"      参数: {json.dumps(tc['arguments'], ensure_ascii=False)}")
-                result_preview = tc['result'][:100] if len(tc['result']) > 100 else tc['result']
+                result_preview = tc["result"][:100] if len(tc["result"]) > 100 else tc["result"]
                 print(f"      结果: {result_preview}...")
     else:
         print(f"\n[WARN] 未找到工具调用链（可能没有工具调用）")
@@ -51,7 +51,7 @@ async def test_tool_call_chain():
         outbound_msg=result,
         prompt_module="test",
         prompt_name="tool_call_chain_test",
-        prompt_version="v1"
+        prompt_version="v1",
     )
 
     if record_id:
@@ -59,6 +59,7 @@ async def test_tool_call_chain():
 
         # 5. 验证日志文件中是否包含 tool_call_chain
         from datetime import datetime
+
         date_str = datetime.now().strftime("%Y-%m-%d")
         log_file = llm_call_logger.log_dir / f"llm_calls_{date_str}.json"
 

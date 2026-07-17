@@ -10,6 +10,7 @@ WechatChannel 数据库状态读写测试
 
 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md 决策 4
 """
+
 import json
 
 import pytest
@@ -28,11 +29,10 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
-
     from lifeprism.repository.base_providers.lw_base_data_provider import (
         LWBaseDataProvider,
     )
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
     LWBaseDataProvider._TABLES_WITH_TIMESTAMPS = None
@@ -84,9 +84,7 @@ def clean_account_state_table(initialized_db):
 class TestSaveUserDataToDb:
     """Seam: _save_user_data_to_db() 将 _user_data 写入 DB"""
 
-    def test_save_multiple_users_to_db(
-        self, wechat_channel, clean_account_state_table
-    ):
+    def test_save_multiple_users_to_db(self, wechat_channel, clean_account_state_table):
         """_save_user_data_to_db() 将多个用户数据写入 DB"""
         # Arrange: 设置 _user_data
         wechat_channel._user_data = {
@@ -108,9 +106,7 @@ class TestSaveUserDataToDb:
         assert state_b["context_token"] == "ctx_b"
         assert state_b["last_session_id"] == "sess_b"
 
-    def test_save_empty_user_data_does_nothing(
-        self, wechat_channel, clean_account_state_table
-    ):
+    def test_save_empty_user_data_does_nothing(self, wechat_channel, clean_account_state_table):
         """_user_data 为空时不执行任何 DB 操作"""
         # Arrange: _user_data 为空
         wechat_channel._user_data = {}
@@ -125,9 +121,7 @@ class TestSaveUserDataToDb:
             count = cursor.fetchone()[0]
         assert count == 0
 
-    def test_save_overwrites_existing_record(
-        self, wechat_channel, clean_account_state_table
-    ):
+    def test_save_overwrites_existing_record(self, wechat_channel, clean_account_state_table):
         """save 时如果 DB 已有该用户记录，应覆盖（INSERT OR REPLACE 语义）"""
         # Arrange: DB 中先插入一条记录
         wechat_channel._account_state_provider.save_state(
@@ -157,9 +151,7 @@ class TestSaveUserDataToDb:
 class TestLoadUserDataFromDb:
     """Seam: _load_user_data_from_db() 从 DB 加载到 _user_data"""
 
-    def test_load_multiple_users_from_db(
-        self, wechat_channel, clean_account_state_table
-    ):
+    def test_load_multiple_users_from_db(self, wechat_channel, clean_account_state_table):
         """_load_user_data_from_db() 从 DB 加载多个用户数据"""
         # Arrange: DB 中插入两条记录
         wechat_channel._account_state_provider.save_state(
@@ -209,9 +201,7 @@ class TestStopSavesToDb:
     """Seam: stop() 调用 _save_user_data_to_db() 而非 auth.save_state()"""
 
     @pytest.mark.asyncio
-    async def test_stop_saves_user_data_to_db(
-        self, wechat_channel, clean_account_state_table
-    ):
+    async def test_stop_saves_user_data_to_db(self, wechat_channel, clean_account_state_table):
         """stop() 将 _user_data 保存到 DB"""
         # Arrange: 设置 _user_data（不设置 auth/client，避免文件保存）
         wechat_channel._user_data = {
@@ -249,9 +239,7 @@ class TestStopSavesToDb:
         await wechat_channel.stop()
 
         # Assert: account.json 未被创建
-        assert not wechat_channel.state_file.exists(), (
-            "stop() 不应创建 account.json 文件"
-        )
+        assert not wechat_channel.state_file.exists(), "stop() 不应创建 account.json 文件"
 
         # Assert: DB 中有记录（数据已保存到 DB）
         state = wechat_channel._account_state_provider.get_state("no_file_user")

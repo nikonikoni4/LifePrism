@@ -1,8 +1,11 @@
 """
 测试 prompts_md_load 是否正确处理嵌套的 markdown 代码块
 """
-import pytest
+
 from pathlib import Path
+
+import pytest
+
 from lifeprism.llm.utils.md_os import prompts_md_load
 
 

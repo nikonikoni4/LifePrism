@@ -1,5 +1,7 @@
-import pytest
 from pathlib import Path
+
+import pytest
+
 
 @pytest.fixture
 def new_chat_hisotry_json():
@@ -9,4 +11,3 @@ def new_chat_hisotry_json():
     # 返回文件地址
     yield path
     # 删除文件
-    

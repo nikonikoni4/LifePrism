@@ -1,4 +1,5 @@
 """单元测试：验证 tool_call_chain 数据结构"""
+
 import sys
 from pathlib import Path
 
@@ -20,16 +21,16 @@ def test_outbound_message_structure():
                     "name": "query_activity",
                     "arguments": {"date": "2026-06-30"},
                     "result": "查询成功",
-                    "is_error": False
+                    "is_error": False,
                 },
                 {
                     "id": "call_789",
                     "name": "bad_tool",
                     "arguments": {"param": "bad"},
                     "result": "ERROR工具调用失败",
-                    "is_error": True
-                }
-            ]
+                    "is_error": True,
+                },
+            ],
         },
         {
             "round": 2,
@@ -39,10 +40,10 @@ def test_outbound_message_structure():
                     "name": "summarize",
                     "arguments": {"content": "..."},
                     "result": "总结完成",
-                    "is_error": False
+                    "is_error": False,
                 }
-            ]
-        }
+            ],
+        },
     ]
 
     # 创建 OutboundMessage
@@ -50,7 +51,7 @@ def test_outbound_message_structure():
         id="test_id",
         response=LLMResponse(content="测试响应"),
         session_id="test_session",
-        extra={"tool_call_chain": tool_call_chain}
+        extra={"tool_call_chain": tool_call_chain},
     )
 
     print("=" * 60)
@@ -82,11 +83,12 @@ def test_outbound_message_structure():
 
 def test_llm_call_logger_structure():
     """测试 llm_call_logger 是否能正确保存 tool_call_chain"""
-    from lifeprism.llm.bus import InboundMessage, OutboundMessage, MessageType
-    from lifeprism.llm.providers import LLMResponse
-    from lifeprism.llm.utils import llm_call_logger
     import json
     from datetime import datetime
+
+    from lifeprism.llm.bus import InboundMessage, MessageType, OutboundMessage
+    from lifeprism.llm.providers import LLMResponse
+    from lifeprism.llm.utils import llm_call_logger
 
     print("\n" + "=" * 60)
     print("测试：llm_call_logger 记录结构")
@@ -105,22 +107,19 @@ def test_llm_call_logger_structure():
                     "name": "test_tool",
                     "arguments": {"param": "value"},
                     "result": "测试结果",
-                    "is_error": False
+                    "is_error": False,
                 }
-            ]
+            ],
         }
     ]
 
-    inbound = InboundMessage(
-        type=MessageType.CHAT,
-        content="测试消息"
-    )
+    inbound = InboundMessage(type=MessageType.CHAT, content="测试消息")
 
     outbound = OutboundMessage(
         id="test_id",
         response=LLMResponse(content="测试响应", usage={"input_tokens": 10, "output_tokens": 20}),
         session_id="test_session",
-        extra={"tool_call_chain": tool_call_chain}
+        extra={"tool_call_chain": tool_call_chain},
     )
 
     # 记录
@@ -128,7 +127,7 @@ def test_llm_call_logger_structure():
         inbound_msg=inbound,
         outbound_msg=outbound,
         prompt_module="test",
-        prompt_name="structure_test"
+        prompt_name="structure_test",
     )
 
     assert record_id is not None, "应成功记录"

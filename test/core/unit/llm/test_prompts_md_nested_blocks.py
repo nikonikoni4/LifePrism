@@ -1,8 +1,11 @@
 """
 测试 prompts_md_load 对嵌套 markdown 代码块的支持
 """
-import pytest
+
 from pathlib import Path
+
+import pytest
+
 from lifeprism.llm.utils.md_os import prompts_md_load
 
 
@@ -53,11 +56,11 @@ def test_nested_md_blocks(test_prompts_file):
     assert "这是最后的内容" in v1_content
 
     # 验证内部代码块的数量（2个内部代码块 = 4个 ```）
-    assert v1_content.count('```') == 4
+    assert v1_content.count("```") == 4
 
     # 验证不应该包含最外层的 ```md 标记
-    assert not v1_content.startswith('```md')
-    assert not v1_content.endswith('```')
+    assert not v1_content.startswith("```md")
+    assert not v1_content.endswith("```")
 
 
 @pytest.mark.core
@@ -85,11 +88,11 @@ def test_simple_md_block(test_prompts_file):
     assert "规则二" in v1_content
 
     # 验证没有内部代码块
-    assert v1_content.count('```') == 0
+    assert v1_content.count("```") == 0
 
     # 验证不应该包含最外层的 ```md 标记
-    assert not v1_content.startswith('```md')
-    assert not v1_content.endswith('```')
+    assert not v1_content.startswith("```md")
+    assert not v1_content.endswith("```")
 
 
 if __name__ == "__main__":

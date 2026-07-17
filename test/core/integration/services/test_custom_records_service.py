@@ -4,6 +4,7 @@ CustomRecordService 集成测试
 测试 seam: Service 层（直接调用 repository 单例，连接真实数据库）
 参考: test/core/integration/repository/test_custom_records_repository.py
 """
+
 import pytest
 
 from lifeprism.repository.exceptions import EntityNotFoundError
@@ -74,9 +75,7 @@ def setup_db(test_data_path):
     # 清理：删除所有 custom_ 开头的表（含 meta 表与动态数据表）
     with lw_db_manager.get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'custom_%'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'custom_%'")
         tables = [row[0] for row in cursor.fetchall()]
         for table_name in tables:
             cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
@@ -133,9 +132,7 @@ class TestGetEntries:
         type_item = make_type(
             name="体育活动",
             slug="sport",
-            fields=[
-                FieldDefinition(field_name="内容", field_key="content", field_type="text")
-            ],
+            fields=[FieldDefinition(field_name="内容", field_key="content", field_type="text")],
         )
         for i in range(5):
             custom_records_service.create_entry(
@@ -144,9 +141,7 @@ class TestGetEntries:
             )
 
         # Act: 第 1 页，每页 2 条
-        response = custom_records_service.get_entries(
-            type_id=type_item.id, page=1, page_size=2
-        )
+        response = custom_records_service.get_entries(type_id=type_item.id, page=1, page_size=2)
 
         # Assert: 当前页 2 条，total = 5（总记录数，不是当前页条数）
         assert len(response.items) == 2

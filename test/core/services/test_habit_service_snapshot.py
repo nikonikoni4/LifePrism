@@ -3,19 +3,21 @@ Habit Service 快照测试
 
 目的：在重构 HabitProvider 前捕获当前行为，确保重构后行为不变
 """
-import pytest
-from syrupy.assertion import SnapshotAssertion
+
 from datetime import date, timedelta
 
-from lifeprism.server.services.habit_service import habit_service
+import pytest
+from syrupy.assertion import SnapshotAssertion
+
 from lifeprism.server.schemas.habit_schemas import (
     CreateHabitRequest,
-    UpdateHabitRequest,
     FrequencyObject,
+    UpdateHabitRequest,
 )
-
+from lifeprism.server.services.habit_service import habit_service
 
 # ==================== habits 测试 ====================
+
 
 def test_get_habits_snapshot(snapshot: SnapshotAssertion):
     """测试获取习惯列表"""
@@ -141,6 +143,7 @@ def test_delete_habit_snapshot(snapshot: SnapshotAssertion):
 
 # ==================== checkin 测试 ====================
 
+
 def test_checkin_today_snapshot(snapshot: SnapshotAssertion):
     """测试今日打卡"""
     # 先创建一个习惯
@@ -174,6 +177,7 @@ def test_cancel_checkin_snapshot(snapshot: SnapshotAssertion):
 
 
 # ==================== challenge 测试 ====================
+
 
 def test_get_challenge_history_snapshot(snapshot: SnapshotAssertion):
     """测试获取挑战历史"""

@@ -17,6 +17,7 @@
 - docs/guides/utc-migration-hidden-dependencies.md
 - .scratch/utc-timezone-migration/08-other-services-migration.md
 """
+
 import re
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
@@ -33,18 +34,14 @@ def assert_is_utc_iso(value: str):
     """断言字符串是 UTC ISO 8601 格式"""
     assert isinstance(value, str), f"应为 str 类型，实际为 {type(value)}"
     pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}\+00:00$"
-    assert re.match(pattern, value), (
-        f"应匹配 UTC ISO 8601 格式 {pattern}，实际为 {value}"
-    )
+    assert re.match(pattern, value), f"应匹配 UTC ISO 8601 格式 {pattern}，实际为 {value}"
 
 
 def assert_is_yyyy_mm_dd(value: str):
     """断言字符串是 YYYY-MM-DD 格式"""
     assert isinstance(value, str), f"应为 str 类型，实际为 {type(value)}"
     pattern = r"^\d{4}-\d{2}-\d{2}$"
-    assert re.match(pattern, value), (
-        f"应匹配 YYYY-MM-DD 格式 {pattern}，实际为 {value}"
-    )
+    assert re.match(pattern, value), f"应匹配 YYYY-MM-DD 格式 {pattern}，实际为 {value}"
 
 
 # ==================== Seam 1: ChatbotService.get_sessions fallback UTC ISO ====================
@@ -64,9 +61,7 @@ class TestChatbotServiceGetSessionsFallbackUtcIso:
 
         # metadata 缺失 created_at 和 updated_at
         metadata = {"name": "test", "message_len": 0}
-        with patch(
-            "lifeprism.llm.session.manager.SessionManager"
-        ) as mock_sm:
+        with patch("lifeprism.llm.session.manager.SessionManager") as mock_sm:
             mock_sm.get_session_metadata.return_value = metadata
             result = await service.get_sessions(page=1, page_size=10)
 
@@ -87,9 +82,7 @@ class TestChatbotServiceGetSessionsFallbackUtcIso:
             "created_at": "2026-01-01T00:00:00+00:00",
             "message_len": 0,
         }
-        with patch(
-            "lifeprism.llm.session.manager.SessionManager"
-        ) as mock_sm:
+        with patch("lifeprism.llm.session.manager.SessionManager") as mock_sm:
             mock_sm.get_session_metadata.return_value = metadata
             result = await service.get_sessions(page=1, page_size=10)
 
@@ -136,14 +129,16 @@ class TestAddOnServiceCreatedAtIsUtcIso:
 
     def test_create_expand_dir_created_at_is_utc_iso(self, tmp_path):
         """创建扩展文件夹时 created_at 应为 UTC ISO 格式"""
-        from lifeprism.server.services import add_on_service
         from lifeprism.server.schemas.add_on_schemas import CreateExpandDirRequest
+        from lifeprism.server.services import add_on_service
 
         test_dir = tmp_path / "test_folder"
         test_dir.mkdir()
 
-        with patch("lifeprism.server.services.add_on_service.settings") as mock_settings, \
-             patch("lifeprism.server.services.add_on_service._validate_path", return_value=True):
+        with (
+            patch("lifeprism.server.services.add_on_service.settings") as mock_settings,
+            patch("lifeprism.server.services.add_on_service._validate_path", return_value=True),
+        ):
             mock_settings.lifeprism_data_path = str(tmp_path)
             data = CreateExpandDirRequest(
                 name="测试",
@@ -164,19 +159,21 @@ class TestAddOnServiceUpdateFallbackUtcIso:
 
     def test_update_expand_dir_created_at_fallback_is_utc_iso(self, tmp_path):
         """更新扩展文件夹时，若原始 created_at 缺失，fallback 应为 UTC ISO 格式"""
-        from lifeprism.server.services import add_on_service
         from lifeprism.server.schemas.add_on_schemas import (
             CreateExpandDirRequest,
             UpdateExpandDirRequest,
         )
+        from lifeprism.server.services import add_on_service
 
         test_dir1 = tmp_path / "folder1"
         test_dir1.mkdir()
         test_dir2 = tmp_path / "folder2"
         test_dir2.mkdir()
 
-        with patch("lifeprism.server.services.add_on_service.settings") as mock_settings, \
-             patch("lifeprism.server.services.add_on_service._validate_path", return_value=True):
+        with (
+            patch("lifeprism.server.services.add_on_service.settings") as mock_settings,
+            patch("lifeprism.server.services.add_on_service._validate_path", return_value=True),
+        ):
             mock_settings.lifeprism_data_path = str(tmp_path)
 
             # 先创建一条记录
@@ -215,10 +212,10 @@ class TestCategoryServiceStatsHandlesNaiveDatetimeAsUtc:
 
     def test_naive_end_time_not_greater_than_utc_now(self):
         """naive end_time（等于 UTC 现在）不应触发 '不能大于当前时间' 错误"""
-        from lifeprism.server.services.category_service import CategoryService
         from lifeprism.server.schemas.category_schemas import (
             CategoryStatsIncludeOptions,
         )
+        from lifeprism.server.services.category_service import CategoryService
 
         service = CategoryService.__new__(CategoryService)
         service.server_lw_data_provider = MagicMock()
@@ -335,13 +332,15 @@ class TestPlandocSyncServiceActualFinishedAtUsesLocalDate:
         file_path.write_text(md_content, encoding="utf-8")
 
         # Mock 依赖
-        with patch(
-            "lifeprism.server.services.plandoc_sync_service.plan_doc_repository"
-        ) as mock_plan_repo, patch(
-            "lifeprism.server.services.plandoc_sync_service.todo_repository"
-        ) as mock_todo_repo, patch(
-            "lifeprism.config.settings_manager.settings"
-        ) as mock_settings:
+        with (
+            patch(
+                "lifeprism.server.services.plandoc_sync_service.plan_doc_repository"
+            ) as mock_plan_repo,
+            patch(
+                "lifeprism.server.services.plandoc_sync_service.todo_repository"
+            ) as mock_todo_repo,
+            patch("lifeprism.config.settings_manager.settings") as mock_settings,
+        ):
             mock_settings.lifeprism_data_path = tmp_path
             mock_plan_repo.get_plan_doc_by_id.return_value = {
                 "id": plan_doc_id,
@@ -382,6 +381,7 @@ class TestTimelineBuilderDefaultRangeUsesUtc:
     def test_default_range_does_not_raise_with_empty_df(self):
         """当无数据且无时间范围时，_calculate_time_distribution 应使用 UTC 默认范围不报错"""
         import pandas as pd
+
         from lifeprism.server.services.timeline_builder import (
             _calculate_time_distribution,
         )

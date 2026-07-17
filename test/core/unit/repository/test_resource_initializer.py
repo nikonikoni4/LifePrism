@@ -5,10 +5,12 @@ resource_initializer.initialize_resources 单元测试
 1. prompts 目录下的文件会被强制覆盖（无论是否存在）
 2. prompts 目录外的文件不会被覆盖（已存在时跳过）
 """
-import pytest
-import shutil
+
 import logging
+import shutil
 from pathlib import Path
+
+import pytest
 
 logger = logging.getLogger(__name__)
 

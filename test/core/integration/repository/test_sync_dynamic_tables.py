@@ -304,7 +304,7 @@ class TestQueryIncrementalDynamicTable:
                     (
                         f"cre-00{i}",
                         f"activity_{i}",
-                        f"{i*10}min",
+                        f"{i * 10}min",
                         "2026-07-01 10:00:00",
                         f"2026-07-01 1{i}:00:00",
                     ),

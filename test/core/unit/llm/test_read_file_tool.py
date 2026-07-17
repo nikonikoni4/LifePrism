@@ -1,8 +1,11 @@
 """ReadFileTool 单元测试"""
-import pytest
-import tempfile
+
 import os
+import tempfile
 from pathlib import Path
+
+import pytest
+
 from lifeprism.llm.agent.tools.filesystem import ReadFileTool, _read_file
 
 
@@ -49,7 +52,7 @@ class TestFileToolPermissions:
         tool = ReadFileTool(workspace=workspace)
 
         # 使用一个明确不在 workspace 下的路径
-        forbidden_path = "C:/Windows/System32/test.txt" if os.name == 'nt' else "/etc/passwd"
+        forbidden_path = "C:/Windows/System32/test.txt" if os.name == "nt" else "/etc/passwd"
 
         is_allowed, error_msg = tool._check_workspace_permission(forbidden_path)
         assert is_allowed is False
@@ -75,6 +78,7 @@ class TestReadFileTool:
         yield temp_dir
         # 清理
         import shutil
+
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
 
@@ -93,7 +97,7 @@ version: 1.0
 这是第五行正文
 """
         temp_path = os.path.join(temp_dir, "test_frontmatter.md")
-        with open(temp_path, 'w', encoding='utf-8') as f:
+        with open(temp_path, "w", encoding="utf-8") as f:
             f.write(content)
 
         yield temp_path
@@ -108,7 +112,7 @@ version: 1.0
 这是第五行
 """
         temp_path = os.path.join(temp_dir, "test_plain.txt")
-        with open(temp_path, 'w', encoding='utf-8') as f:
+        with open(temp_path, "w", encoding="utf-8") as f:
             f.write(content)
 
         yield temp_path
@@ -189,6 +193,7 @@ version: 1.0
             assert "没有权限访问该文件" in result
         finally:
             import shutil
+
             if os.path.exists(other_dir):
                 shutil.rmtree(other_dir)
 
@@ -328,4 +333,3 @@ version: 1.0
         assert schema["function"]["name"] == "read_file"
         assert "parameters" in schema["function"]
         assert schema["function"]["parameters"]["type"] == "object"
-

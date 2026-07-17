@@ -54,19 +54,19 @@ class TestAgentOnlyModuleStructure:
         """main_agent_only.py 不创建 FastAPI app 实例"""
         import lifeprism.server.main_agent_only
 
-        assert not hasattr(lifeprism.server.main_agent_only, "app"), \
+        assert not hasattr(lifeprism.server.main_agent_only, "app"), (
             "Agent Only 不应有 FastAPI app 实例"
+        )
 
     def test_main_agent_only_no_schedule_service(self):
         """main_agent_only.py 不导入 ScheduleService"""
-        import lifeprism.server.main_agent_only
-
         # 确保模块源码中不引用 schedule_service
         import inspect
 
+        import lifeprism.server.main_agent_only
+
         source = inspect.getsource(lifeprism.server.main_agent_only)
-        assert "schedule_service" not in source, \
-            "Agent Only 不应引用 ScheduleService"
+        assert "schedule_service" not in source, "Agent Only 不应引用 ScheduleService"
 
     def test_main_agent_only_no_monitor(self):
         """main_agent_only.py 不导入 Monitor 模块"""
@@ -75,8 +75,7 @@ class TestAgentOnlyModuleStructure:
         import lifeprism.server.main_agent_only
 
         source = inspect.getsource(lifeprism.server.main_agent_only)
-        assert "windows_monitor" not in source, \
-            "Agent Only 不应引用 Monitor 模块"
+        assert "windows_monitor" not in source, "Agent Only 不应引用 Monitor 模块"
 
 
 class TestAgentOnlyDatabaseAccess:
@@ -153,8 +152,10 @@ class TestBootstrapFunctionsBehavior:
         mock_agent = MagicMock()
         mock_agent.loop = AsyncMock()
 
-        with patch("lifeprism.llm.channel.wechat_channel", mock_wechat), \
-             patch("lifeprism.llm.agent.loop.agent_loop", mock_agent):
+        with (
+            patch("lifeprism.llm.channel.wechat_channel", mock_wechat),
+            patch("lifeprism.llm.agent.loop.agent_loop", mock_agent),
+        ):
             from lifeprism.server.bootstrap import start_agent_and_channel
 
             loop_task, wechat = await start_agent_and_channel()
@@ -178,8 +179,10 @@ class TestBootstrapFunctionsBehavior:
         mock_agent = MagicMock()
         mock_agent.loop = AsyncMock()
 
-        with patch("lifeprism.llm.channel.wechat_channel", mock_wechat), \
-             patch("lifeprism.llm.agent.loop.agent_loop", mock_agent):
+        with (
+            patch("lifeprism.llm.channel.wechat_channel", mock_wechat),
+            patch("lifeprism.llm.agent.loop.agent_loop", mock_agent),
+        ):
             from lifeprism.server.bootstrap import (
                 start_agent_and_channel,
                 stop_agent_and_channel,

@@ -182,13 +182,13 @@ async def test_send_heartbeat_network_failure_does_not_raise(
 @patch("lifeprism.server.main.httpx.AsyncClient")
 @patch("lifeprism.sync.sync_config.get_sync_api_key", return_value="test_key")
 @patch("lifeprism.config.settings_manager.get_setting")
-async def test_send_heartbeat_logs_success(mock_get_setting, mock_get_key, mock_async_client, caplog):
+async def test_send_heartbeat_logs_success(
+    mock_get_setting, mock_get_key, mock_async_client, caplog
+):
     """成功发送时记录 INFO 日志"""
     # Arrange
     mock_get_setting.return_value = "https://remote.example.com"
-    _configure_async_client_mock(
-        mock_async_client, response=_make_mock_response(status_code=200)
-    )
+    _configure_async_client_mock(mock_async_client, response=_make_mock_response(status_code=200))
     caplog.set_level(logging.INFO, logger="lifeprism.server.main")
 
     # Act

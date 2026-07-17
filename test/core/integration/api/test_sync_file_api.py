@@ -9,6 +9,7 @@
 
 认证方式：Authorization: Bearer {api_key} HTTP Header
 """
+
 import base64
 import gzip
 import os
@@ -54,10 +55,10 @@ def initialized_settings(test_data_path):
 
     # 初始化数据库（file_sync_state 表需要存在）
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
     from lifeprism.repository.base_providers.lw_base_data_provider import (
         LWBaseDataProvider,
     )
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
     manager = LWTableManager(db_manager=lw_db_manager)
@@ -502,12 +503,8 @@ class TestSyncPushFiles:
         from lifeprism.sync.hash_utils import compute_file_hash
 
         expected_new_hash = compute_file_hash(new_content.encode("utf-8"))
-        assert state["current_hash"] == expected_new_hash, (
-            "current_hash 应更新为云端新计算的值"
-        )
-        assert state["current_hash"] != old_current_hash, (
-            "current_hash 不应保持旧值"
-        )
+        assert state["current_hash"] == expected_new_hash, "current_hash 应更新为云端新计算的值"
+        assert state["current_hash"] != old_current_hash, "current_hash 不应保持旧值"
 
 
 # ==================== 路径遍历安全测试 ====================

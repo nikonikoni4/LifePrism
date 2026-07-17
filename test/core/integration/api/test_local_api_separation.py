@@ -15,6 +15,7 @@
 测试策略：直接检查 app.routes 中的路径列表（方式 1），
 避免触发 main.py 的 lifespan（数据库初始化、AgentLoop、微信渠道等副作用）。
 """
+
 import pytest
 
 pytestmark = pytest.mark.core

@@ -7,13 +7,15 @@
 3. 验证参数注入功能正常
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
+
 from lifeprism.llm.prompts import (
     get_activity_summary_prompt,
+    get_extract_chat_prompt,
     get_mood_summary_prompt,
     get_update_memory_prompt,
-    get_extract_chat_prompt,
 )
 
 
@@ -32,12 +34,7 @@ class TestActivitySummaryPrompt:
         prompt = get_activity_summary_prompt()
 
         # 必须包含的关键章节
-        required_sections = [
-            "## task",
-            "## 数据说明",
-            "## 总结内容",
-            "## 核心原则"
-        ]
+        required_sections = ["## task", "## 数据说明", "## 总结内容", "## 核心原则"]
 
         for section in required_sections:
             assert section in prompt, f"缺少必要章节: {section}"
@@ -46,12 +43,7 @@ class TestActivitySummaryPrompt:
         """验证包含所有数据类型说明"""
         prompt = get_activity_summary_prompt()
 
-        data_types = [
-            "电脑使用统计",
-            "用户自定义行为备注",
-            "AI分析行为备注",
-            "用户待办事项"
-        ]
+        data_types = ["电脑使用统计", "用户自定义行为备注", "AI分析行为备注", "用户待办事项"]
 
         for data_type in data_types:
             assert data_type in prompt, f"缺少数据类型: {data_type}"
@@ -79,12 +71,7 @@ class TestMoodSummaryPrompt:
         """验证包含必要的章节"""
         prompt = get_mood_summary_prompt()
 
-        required_sections = [
-            "## 任务",
-            "## 数据说明",
-            "## 总结要求",
-            "## 核心原则"
-        ]
+        required_sections = ["## 任务", "## 数据说明", "## 总结要求", "## 核心原则"]
 
         for section in required_sections:
             assert section in prompt, f"缺少必要章节: {section}"
@@ -93,12 +80,7 @@ class TestMoodSummaryPrompt:
         """验证包含心情数据字段说明"""
         prompt = get_mood_summary_prompt()
 
-        fields = [
-            "时间",
-            "心情分数",
-            "内容",
-            "影响因素"
-        ]
+        fields = ["时间", "心情分数", "内容", "影响因素"]
 
         for field in fields:
             assert field in prompt, f"缺少字段说明: {field}"
@@ -107,12 +89,7 @@ class TestMoodSummaryPrompt:
         """验证包含总结结构"""
         prompt = get_mood_summary_prompt()
 
-        structure = [
-            "事件经过",
-            "情绪诱因",
-            "情绪本身",
-            "用户反应"
-        ]
+        structure = ["事件经过", "情绪诱因", "情绪本身", "用户反应"]
 
         for item in structure:
             assert item in prompt, f"缺少总结结构: {item}"
@@ -127,7 +104,7 @@ class TestUpdateMemoryPrompt:
         prompt = get_update_memory_prompt(
             recent_state_path=Path("/test/recent_state.md"),
             user_md_path=Path("/test/user.md"),
-            diary_path_template="/test/diary/YYYY/MM/YYYY-MM-DD.md"
+            diary_path_template="/test/diary/YYYY/MM/YYYY-MM-DD.md",
         )
         assert isinstance(prompt, str)
         assert len(prompt) > 0
@@ -141,7 +118,7 @@ class TestUpdateMemoryPrompt:
         prompt = get_update_memory_prompt(
             recent_state_path=recent_state_path,
             user_md_path=user_md_path,
-            diary_path_template=diary_template
+            diary_path_template=diary_template,
         )
 
         # 验证路径被正确注入
@@ -154,7 +131,7 @@ class TestUpdateMemoryPrompt:
         prompt = get_update_memory_prompt(
             recent_state_path=Path("/test/recent_state.md"),
             user_md_path=Path("/test/user.md"),
-            diary_path_template="/test/diary/YYYY/MM/YYYY-MM-DD.md"
+            diary_path_template="/test/diary/YYYY/MM/YYYY-MM-DD.md",
         )
 
         required_sections = [
@@ -163,7 +140,7 @@ class TestUpdateMemoryPrompt:
             "### 数据来源说明：behavior.md",
             "### 更新recent_state.md规则",
             "### 更新user.md",
-            "## 文件路径说明"
+            "## 文件路径说明",
         ]
 
         for section in required_sections:
@@ -174,15 +151,10 @@ class TestUpdateMemoryPrompt:
         prompt = get_update_memory_prompt(
             recent_state_path=Path("/test/recent_state.md"),
             user_md_path=Path("/test/user.md"),
-            diary_path_template="/test/diary/YYYY/MM/YYYY-MM-DD.md"
+            diary_path_template="/test/diary/YYYY/MM/YYYY-MM-DD.md",
         )
 
-        subtitles = [
-            "行为总结",
-            "心情总结",
-            "聊天记录总结",
-            "日记总结"
-        ]
+        subtitles = ["行为总结", "心情总结", "聊天记录总结", "日记总结"]
 
         for subtitle in subtitles:
             assert subtitle in prompt, f"缺少 subtitle 说明: {subtitle}"
@@ -192,14 +164,10 @@ class TestUpdateMemoryPrompt:
         prompt = get_update_memory_prompt(
             recent_state_path=Path("/test/recent_state.md"),
             user_md_path=Path("/test/user.md"),
-            diary_path_template="/test/diary/YYYY/MM/YYYY-MM-DD.md"
+            diary_path_template="/test/diary/YYYY/MM/YYYY-MM-DD.md",
         )
 
-        sections = [
-            "## 最近行为",
-            "## 最近心理状态",
-            "## 整体总结"
-        ]
+        sections = ["## 最近行为", "## 最近心理状态", "## 整体总结"]
 
         for section in sections:
             assert section in prompt, f"缺少 recent_state.md 结构: {section}"
@@ -219,12 +187,7 @@ class TestExtractChatPrompt:
         """验证包含必要的章节"""
         prompt = get_extract_chat_prompt()
 
-        required_sections = [
-            "## task",
-            "## 提取内容",
-            "## 不要提取的内容",
-            "## 输出说明"
-        ]
+        required_sections = ["## task", "## 提取内容", "## 不要提取的内容", "## 输出说明"]
 
         for section in required_sections:
             assert section in prompt, f"缺少必要章节: {section}"
@@ -233,11 +196,7 @@ class TestExtractChatPrompt:
         """验证包含提取规则"""
         prompt = get_extract_chat_prompt()
 
-        rules = [
-            "非工具类查询或记录的事件",
-            "情绪类事件",
-            "用户偏好"
-        ]
+        rules = ["非工具类查询或记录的事件", "情绪类事件", "用户偏好"]
 
         for rule in rules:
             assert rule in prompt, f"缺少提取规则: {rule}"
@@ -261,7 +220,7 @@ class TestPromptConsistency:
             get_update_memory_prompt(
                 Path("/test/recent_state.md"),
                 Path("/test/user.md"),
-                "/test/diary/YYYY/MM/YYYY-MM-DD.md"
+                "/test/diary/YYYY/MM/YYYY-MM-DD.md",
             ),
             get_extract_chat_prompt(),
         ]
@@ -278,15 +237,14 @@ class TestPromptConsistency:
             get_update_memory_prompt(
                 Path("/test/recent_state.md"),
                 Path("/test/user.md"),
-                "/test/diary/YYYY/MM/YYYY-MM-DD.md"
+                "/test/diary/YYYY/MM/YYYY-MM-DD.md",
             ),
             get_extract_chat_prompt(),
         ]
 
         for prompt in prompts:
             # 验证包含任务说明（task 或 任务）
-            assert ("## task" in prompt or "## 任务" in prompt), \
-                "Prompt 应该包含任务说明章节"
+            assert "## task" in prompt or "## 任务" in prompt, "Prompt 应该包含任务说明章节"
 
     def test_prompt_functions_are_pure(self):
         """验证 prompt 函数是纯函数（多次调用返回相同结果）"""
@@ -299,7 +257,7 @@ class TestPromptConsistency:
         args = (
             Path("/test/recent_state.md"),
             Path("/test/user.md"),
-            "/test/diary/YYYY/MM/YYYY-MM-DD.md"
+            "/test/diary/YYYY/MM/YYYY-MM-DD.md",
         )
         prompt3 = get_update_memory_prompt(*args)
         prompt4 = get_update_memory_prompt(*args)

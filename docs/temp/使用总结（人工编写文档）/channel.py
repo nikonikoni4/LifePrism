@@ -3,18 +3,20 @@
 """
 
 import asyncio
-import httpx
-from typing import Any
 from pathlib import Path
-from lifeprism.llm.channel.base import BaseChannel
-from lifeprism.llm.channel.wechat.config import WechatConfig
-from lifeprism.llm.channel.wechat.client import WechatClient
-from lifeprism.llm.channel.wechat.auth import WechatAuth
-from lifeprism.llm.channel.wechat.media import WechatMedia
-from lifeprism.llm.channel.wechat.exceptions import WechatAPIError, WechatMessageError
-from lifeprism.llm.bus.queue import MessageQueue
-from lifeprism.llm.bus.events import OutboundMessage
+from typing import Any
+
+import httpx
+
 from lifeprism.config.settings_manager import settings
+from lifeprism.llm.bus.events import OutboundMessage
+from lifeprism.llm.bus.queue import MessageQueue
+from lifeprism.llm.channel.base import BaseChannel
+from lifeprism.llm.channel.wechat.auth import WechatAuth
+from lifeprism.llm.channel.wechat.client import WechatClient
+from lifeprism.llm.channel.wechat.config import WechatConfig
+from lifeprism.llm.channel.wechat.exceptions import WechatAPIError, WechatMessageError
+from lifeprism.llm.channel.wechat.media import WechatMedia
 from lifeprism.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -99,7 +101,7 @@ class WechatChannel(BaseChannel):
             #     self._running = False
             #     return
             # 不存在token放弃启动
-            return 
+            return
         # 测试 token 是否有效
         try:
             test_body = {"get_updates_buf": ""}
@@ -161,6 +163,7 @@ class WechatChannel(BaseChannel):
         # 构造并发送消息
         try:
             from lifeprism.llm.channel.wechat.message import WechatMessage
+
             message_body = WechatMessage.build_text_message(to_user_id, content, context_token)
             await self.client.api_post("ilink/bot/sendmessage", message_body)
             logger.info(f"发送消息到微信: {to_user_id}")
@@ -181,7 +184,9 @@ class WechatChannel(BaseChannel):
         while self._running:
             try:
                 poll_count += 1
-                logger.debug(f"[DEBUG] 第 {poll_count} 次轮询, get_updates_buf={get_updates_buf[:50]}...")
+                logger.debug(
+                    f"[DEBUG] 第 {poll_count} 次轮询, get_updates_buf={get_updates_buf[:50]}..."
+                )
                 body = {"get_updates_buf": get_updates_buf}
                 data = await self.client.api_post("ilink/bot/getupdates", body)
 
@@ -191,12 +196,14 @@ class WechatChannel(BaseChannel):
                 get_updates_buf = data.get("get_updates_buf", "")
                 messages = data.get("msgs", [])
 
-                logger.debug(f"[DEBUG] 轮询返回: get_updates_buf={get_updates_buf[:50]}..., 消息数={len(messages)}")
+                logger.debug(
+                    f"[DEBUG] 轮询返回: get_updates_buf={get_updates_buf[:50]}..., 消息数={len(messages)}"
+                )
 
                 if messages:
                     logger.info(f"[DEBUG] *** 收到 {len(messages)} 条消息 ***")
                     for idx, msg in enumerate(messages):
-                        logger.info(f"[DEBUG] 消息 {idx+1}: {msg}")
+                        logger.info(f"[DEBUG] 消息 {idx + 1}: {msg}")
                         await self._handle_wechat_message(msg)
 
             except (httpx.HTTPStatusError, httpx.RequestError, RuntimeError) as e:
@@ -217,8 +224,8 @@ class WechatChannel(BaseChannel):
         """
         try:
             logger.info(f"[DEBUG] 开始处理微信消息: {msg}")
-            from lifeprism.llm.channel.wechat.message import WechatMessage
             from lifeprism.llm.bus.events import InboundMessage
+            from lifeprism.llm.channel.wechat.message import WechatMessage
 
             parsed = WechatMessage.parse_message(msg)
             logger.debug(f"[DEBUG] 解析后的消息: {parsed}")
@@ -252,11 +259,7 @@ class WechatChannel(BaseChannel):
                 type="chat",
                 content=content,
                 session_id=f"wechat:{from_user_id}",
-                extra={
-                    "media": media_paths,
-                    "sender_id": from_user_id,
-                    "chat_id": from_user_id
-                }
+                extra={"media": media_paths, "sender_id": from_user_id, "chat_id": from_user_id},
             )
 
             logger.info(f"[DEBUG] 准备发布到 bus: id={inbound_msg.id}, content={content}")

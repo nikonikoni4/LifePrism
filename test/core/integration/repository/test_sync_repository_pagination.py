@@ -13,6 +13,7 @@ SyncRepository 分页查询集成测试
 
 参考: test/core/integration/repository/test_sync_repository.py
 """
+
 import pytest
 
 from lifeprism.utils.exceptions import DataAccessError
@@ -31,10 +32,10 @@ def initialized_db(test_data_path):
     settings._initialize()
 
     from lifeprism.repository import lw_db_manager
-    from lifeprism.repository.lw_table_manager import LWTableManager
 
     # 重置 update_at 缓存（确保测试使用最新配置）
     from lifeprism.repository.base_providers.lw_base_data_provider import LWBaseDataProvider
+    from lifeprism.repository.lw_table_manager import LWTableManager
 
     LWBaseDataProvider._TABLES_WITH_UPDATE_AT = None
 
@@ -110,9 +111,7 @@ class TestQueryIncrementalPagination:
         _insert_mood_rows(initialized_db, 10)
 
         # Act: limit=3，只返回前 3 条
-        rows = repository.query_incremental(
-            "mood_entries", "", offset=0, limit=3
-        )
+        rows = repository.query_incremental("mood_entries", "", offset=0, limit=3)
 
         # Assert: 返回 3 条记录，且是最早的 3 条（按 updated_at ASC）
         assert len(rows) == 3
@@ -126,9 +125,7 @@ class TestQueryIncrementalPagination:
         _insert_mood_rows(initialized_db, 10)
 
         # Act: offset=5，跳过前 5 条
-        rows = repository.query_incremental(
-            "mood_entries", "", offset=5, limit=3
-        )
+        rows = repository.query_incremental("mood_entries", "", offset=5, limit=3)
 
         # Assert: 返回第 6-8 条记录
         assert len(rows) == 3
@@ -142,12 +139,8 @@ class TestQueryIncrementalPagination:
         _insert_mood_rows(initialized_db, 10)
 
         # Act: 分两页查询
-        page1 = repository.query_incremental(
-            "mood_entries", "", offset=0, limit=5
-        )
-        page2 = repository.query_incremental(
-            "mood_entries", "", offset=5, limit=5
-        )
+        page1 = repository.query_incremental("mood_entries", "", offset=0, limit=5)
+        page2 = repository.query_incremental("mood_entries", "", offset=5, limit=5)
 
         # Assert: 两页合计 10 条，ID 不重复，覆盖全部记录
         all_ids = {row["id"] for row in page1} | {row["id"] for row in page2}
@@ -164,9 +157,7 @@ class TestQueryIncrementalPagination:
         _insert_mood_rows(initialized_db, 10)
 
         # Act: limit=None（默认值）
-        rows = repository.query_incremental(
-            "mood_entries", "", offset=0, limit=None
-        )
+        rows = repository.query_incremental("mood_entries", "", offset=0, limit=None)
 
         # Assert: 返回全部 10 条记录
         assert len(rows) == 10
@@ -192,6 +183,4 @@ class TestQueryIncrementalPagination:
 
         # Act + Assert: 应抛出 DataAccessError
         with pytest.raises(DataAccessError):
-            repository.query_incremental(
-                "mood_entries", "2026-07-01 00:00:00", offset=0, limit=10
-            )
+            repository.query_incremental("mood_entries", "2026-07-01 00:00:00", offset=0, limit=10)

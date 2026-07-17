@@ -1,9 +1,11 @@
-import unittest
 import os
+import unittest
 from datetime import datetime
-from lifeprism.repository.database_manager import DatabaseManager
+
 from lifeprism.monitor.provider.window_data_provider import MonitorDataProvider
+from lifeprism.repository.database_manager import DatabaseManager
 from lifeprism.repository.lw_table_manager import LWTableManager
+
 
 class TestMonitorDataProvider(unittest.TestCase):
     def setUp(self):
@@ -23,7 +25,7 @@ class TestMonitorDataProvider(unittest.TestCase):
 
     def tearDown(self):
         # 清理测试数据库
-        if hasattr(self, 'db_manager'):
+        if hasattr(self, "db_manager"):
             # 如果使用了连接池，需要关闭（虽然目前 DatabaseManager 在内存中处理池，但文件句柄可能还在）
             pass
         if os.path.exists(self.test_db_path):
@@ -52,10 +54,11 @@ class TestMonitorDataProvider(unittest.TestCase):
             row = cursor.fetchone()
 
             self.assertIsNotNone(row)
-            self.assertEqual(row['timestamp'], timestamp)
-            self.assertEqual(row['duration'], duration)
-            self.assertEqual(row['app'], app)
-            self.assertEqual(row['title'], title)
+            self.assertEqual(row["timestamp"], timestamp)
+            self.assertEqual(row["duration"], duration)
+            self.assertEqual(row["app"], app)
+            self.assertEqual(row["title"], title)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

@@ -6,6 +6,7 @@ Goal Providers UTC 时区迁移测试
 
 确保 time_invested_updated_at 字段以 UTC ISO 8601 格式写入。
 """
+
 import re
 
 import pytest
@@ -51,12 +52,9 @@ class TestUpdateTimeInvestedUtcTimestamps:
             assert goal is not None
 
             time_invested_updated_at = goal["time_invested_updated_at"]
-            assert time_invested_updated_at is not None, (
-                "time_invested_updated_at 不应为 None"
-            )
+            assert time_invested_updated_at is not None, "time_invested_updated_at 不应为 None"
             assert UTC_ISO_PATTERN.match(time_invested_updated_at), (
-                f"time_invested_updated_at 应为 UTC ISO 8601 格式，"
-                f"实际: {time_invested_updated_at}"
+                f"time_invested_updated_at 应为 UTC ISO 8601 格式，实际: {time_invested_updated_at}"
             )
         finally:
             goal_provider.delete_goal(goal_id)

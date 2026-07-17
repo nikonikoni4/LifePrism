@@ -6,6 +6,12 @@ last_updated: 新增文件同步冲突处理方案 ADR
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
 
+## sync-system-timeline
+- updated_at: 2026-07-16
+- path: `docs/adr/2026-07-16-sync-system-timeline.md`
+- 触发规则：需要理解数据同步系统的完整决策历程、各 ADR 之间的因果关系、哪些是主动设计哪些是 Bug 驱动修正、或做同步模块整体复盘时读取
+- 内容摘要：数据同步系统的完整决策时间线，串联原始方案讨论（7/8）→ 核心架构决策（7/9）→ 文件同步重构（7/14，Bug 驱动）→ 动态表同步重构（7/16，Bug 驱动）四个阶段。标注 6/9 个决策为 Bug 驱动修正。包含决策依赖图、主动设计 vs Bug 驱动分类、未解决问题索引。
+
 ## dynamic-tables-sync-definition-comparison
 - updated_at: 2026-07-16
 - path: `docs/adr/2026-07-16-dynamic-tables-sync-definition-comparison.md`

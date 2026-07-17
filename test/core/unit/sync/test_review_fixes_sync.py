@@ -14,16 +14,16 @@
 
 import gzip
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lifeprism.sync.hash_utils import compute_file_hash
 from lifeprism.sync.constants import (
     EXCLUDED_FILENAMES,
     MAX_DECOMPRESSED_SIZE,
     safe_gzip_decompress,
 )
+from lifeprism.sync.hash_utils import compute_file_hash
 
 pytestmark = pytest.mark.core
 
@@ -192,17 +192,22 @@ class TestSharedExcludedFilenames:
     def test_constant_exists_in_sync_constants(self):
         """常量在 sync.constants 中定义"""
         from lifeprism.sync.constants import EXCLUDED_FILENAMES
+
         assert "chat_history.json" in EXCLUDED_FILENAMES
 
     def test_sync_client_uses_shared_constant(self):
         """sync_client.py 使用共享常量"""
         from lifeprism.sync import sync_client
-        assert sync_client._EXCLUDED_FILENAMES is EXCLUDED_FILENAMES or \
-               sync_client._EXCLUDED_FILENAMES == EXCLUDED_FILENAMES
+
+        assert (
+            sync_client._EXCLUDED_FILENAMES is EXCLUDED_FILENAMES
+            or sync_client._EXCLUDED_FILENAMES == EXCLUDED_FILENAMES
+        )
 
     def test_sync_cloud_api_uses_shared_constant(self):
         """sync_cloud_api.py 使用共享常量"""
         from lifeprism.server.api import sync_cloud_api
+
         assert sync_cloud_api._EXCLUDED_FILENAMES == EXCLUDED_FILENAMES
 
 
@@ -251,10 +256,17 @@ class TestRefreshCurrentHashesReturnsScanResult:
         client = SyncClient.__new__(SyncClient)
         client.db = MagicMock()
 
-        with patch.object(SettingsManager, "lifeprism_data_path",
-                          new_callable=lambda: property(lambda self: tmp_path)), \
-             patch.object(client, "_scan_sync_files", return_value=["session/test.jsonl"]), \
-             patch("lifeprism.repository.providers.file_sync_state_provider.FileSyncStateProvider") as MockProvider:
+        with (
+            patch.object(
+                SettingsManager,
+                "lifeprism_data_path",
+                new_callable=lambda: property(lambda self: tmp_path),
+            ),
+            patch.object(client, "_scan_sync_files", return_value=["session/test.jsonl"]),
+            patch(
+                "lifeprism.repository.providers.file_sync_state_provider.FileSyncStateProvider"
+            ) as MockProvider,
+        ):
             mock_provider = MagicMock()
             mock_provider.batch_get_states.return_value = {}
             mock_provider.batch_upsert_states = MagicMock()

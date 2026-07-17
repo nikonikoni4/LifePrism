@@ -1,21 +1,22 @@
 ---
-version: 1.0
+version: 2.0
 created_at: 2026-07-11
-updated_at: 2026-07-11
-last_updated:
-abstract: Windows 本地 ↔ Linux 云端双向数据同步完整数据流，覆盖云端配置初始化、数据库同步、文件同步、心跳与消息路由四条链路
+updated_at: 2026-07-16
+last_updated: v2.0 — 拆分 Spec 后更新 Flow；链路 2 合并动态表定义对比与双向建表步骤；链路 3 替换为三阶段文件同步协议（check → fetch/push → verify/commit）；更新 Mermaid 图和 key_function
+abstract: Windows 本地 ↔ Linux 云端双向数据同步完整数据流，覆盖云端配置初始化、数据库同步（含动态表定义对比与双向建表）、文件同步（三阶段协议）、心跳与消息路由四条链路
 ---
 
 ## 版本
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 2.0 | 链路 2 合并动态表定义对比与双向建表（`_sync_dynamic_tables_definitions`）；链路 3 替换为三阶段文件同步协议；更新 Mermaid 图和 key_function |
 | 1.0 | 初始版本 |
 
-# 数据流：SyncData
+# 数据流动：SyncData
 
 **Flow 对象**：SyncData — 表示本地与云端之间的数据同步状态
-**对应 Spec**：[`docs/specs/2026-07-11-data-sync-spec.md`](../specs/2026-07-11-data-sync-spec.md)
+**对应 Spec**：[`docs/specs/2026-07-16-data-sync-overview.md`](../specs/2026-07-16-data-sync-overview.md)
 
 ## SyncData 数据结构
 
@@ -38,7 +39,7 @@ last_event: str            # 最近生命周期事件（'online' | 'offline'）
 ```
 
 **关键字段说明**：
-- `last_sync_time`：所有同步步骤（数据库 pull/push + 文件 pull/push）全部成功后原子更新；任一步骤失败则不更新，下次从同一时间点重试
+- `last_sync_time`：所有同步步骤（定义对比 + pull/push + 文件三阶段）全部成功后原子更新；任一步骤失败则不更新，下次从同一时间点重试
 - `is_syncing`：原子 check-then-set 的并发控制标志，防止多任务重复同步
 - `last_event`：`"offline"` 优先级最高，使 `is_local_online()` 立即返回 False，不等超时
 
@@ -96,13 +97,17 @@ stateDiagram-v2
     [*] --> 本地启动
     本地启动 --> 配置初始化: [首次/配置变更]
     配置初始化 --> 定时同步: cloud_init 已消费
-    定时同步 --> 数据库同步: 10分钟间隔
-    数据库同步 --> 文件同步: 数据库完成
-    文件同步 --> 定时同步: last_sync_time 更新
-    
-    数据库同步 --> 心跳更新: pull请求开头
+    定时同步 --> 动态表对比: 10分钟间隔
+    动态表对比 --> 数据库Pull: 动态表列表已更新
+    数据库Pull --> 数据库Push: 数据库Pull完成
+    数据库Push --> 文件Phase1: 数据库Push完成
+    文件Phase1 --> 文件Phase2: check完成
+    文件Phase2 --> 文件Phase3: fetch/push完成
+    文件Phase3 --> 定时同步: last_sync_time更新
+
+    数据库Pull --> 心跳更新: pull请求开头
     心跳更新 --> 消息路由判断
-    
+
     state 消息路由判断 {
         [*] --> 云端收消息
         云端收消息 --> 在线: is_local_online=true
@@ -110,10 +115,10 @@ stateDiagram-v2
         在线 --> 跳过处理
         离线 --> 云端处理
     }
-    
+
     本地关闭 --> 发送offline: 正常退出
     发送offline --> [*]
-    
+
     本地崩溃 --> 超时判定离线: 15分钟无心跳
     超时判定离线 --> [*]
 ```
@@ -122,8 +127,8 @@ stateDiagram-v2
 
 **业务场景说明**：
 - **链路1**：云端配置初始化 — 本地生成 cloud_init.yaml → 云端消费
-- **链路2**：数据库同步 — Pull + Push 完整路径
-- **链路3**：文件同步 — 增量文件 Pull + Push
+- **链路2**：数据库同步 — 动态表定义对比 → 双向建表 → Pull → Push
+- **链路3**：文件同步 — 三阶段 check → fetch/push → verify/commit
 - **链路4**：心跳与消息路由 — 心跳维护 + 消息处理决策
 
 ## 链路 1：云端配置初始化
@@ -191,14 +196,61 @@ stateDiagram-v2
    执行一次完整同步
    状态: last_sync_time 未更新 → last_sync_time 已更新 | 持久化: ✅ | 跨模块: 本地 → 云端
    步骤: 读取配置（remote_url、api_key、last_sync_time）
-         → 获取同步表列表（get_all_sync_tables：静态表 + 动态 custom_{slug}）
-         → pull_from_remote（分批拉取云端数据）
-         → push_to_remote（推送本地变更到云端）
-         → pull_files_from_remote + push_files_to_remote（文件同步）
+         → _sync_dynamic_tables_definitions（动态表定义对比与双向建表）
+         → pull_from_remote（分批拉取数据库变更）
+         → push_to_remote（推送本地数据库变更）
+         → _sync_files_full_flow（文件三阶段同步）
          → 全部成功后 set_setting("sync.last_sync_time", current_time)
 ```
 
-### 2.1 Pull 拉取
+### 2.1 动态表定义对比与双向建表
+
+```
+6.1 SyncClient._sync_dynamic_tables_definitions(remote_url, api_key)
+    拉取云端动态表定义 → slug 集合对比 → 双向建表
+    状态: 动态表列表更新 | 持久化: ✅（本地 DDL + 云端重建） | 跨模块: 本地 ↔ 云端
+    步骤: GET /api/sync/dynamic-tables-definitions → 获取云端 types [{slug, fields}]
+         → 查询本地 custom_record_types 获取本地 slugs
+         → 云端有但本地无的 slug → _create_local_dynamic_tables（本地建 DDL，不写 meta）
+         → 本地有但云端无的 slug → _rebuild_remote_dynamic_tables（POST 全量发送给云端）
+         → 两端一致的 slug → 不操作
+         → 返回同步表列表（静态表 + 动态 custom_{slug}）
+```
+
+```
+6.2 SyncClient._create_local_dynamic_tables(slug_to_fields)
+    本地建动态数据表（只执行 DDL）
+    状态: 本地 custom_* 表已创建 | 持久化: ✅（CREATE TABLE IF NOT EXISTS） | 跨模块: ❌
+    步骤: 委托 SyncRepository.create_local_data_tables(slug_to_fields)
+         → 表已存在 → 跳过（不报错）
+         → 表不存在 → generate_create_table_ddl(slug, fields) → cursor.execute(ddl)
+         注意: 不写 custom_record_types / custom_record_fields meta 数据，让 pull 阶段统一拉取
+```
+
+```
+6.3 SyncClient._rebuild_remote_dynamic_tables(remote_url, api_key)
+    发送本地定义给云端全量重建
+    状态: 云端动态表已更新 | 持久化: ❌（云端执行） | 跨模块: 本地 → 云端
+    步骤: 查询本地 custom_record_types + custom_record_fields
+         → 组装 types [{slug, fields}]
+         → POST /api/sync/rebuild-dynamic-tables
+```
+
+```
+6.4 SyncCloudAPI.sync_rebuild_dynamic_tables()
+    云端处理动态表重建请求
+    状态: 云端 custom_* 表已创建/跳过 | 持久化: ✅ | 跨模块: 本地 HTTP → 云端 DB
+    步骤: 委托 SyncRepository.rebuild_dynamic_tables(types)
+         → 按 slug 逐个 CREATE（表不存在时）/ SKIP（表已存在时）
+         注意: 不执行 DROP TABLE（孤儿表清理需要独立的 tombstone 机制）
+```
+
+**分支节点**：
+- 云端有但本地无的 slug：本地建 DDL（不写 meta）
+- 本地有但云端无的 slug：发送重建请求给云端
+- 两端 slug 一致：不触发任何操作，直接进入 pull/push
+
+### 2.2 Pull 拉取
 
 ```
 7. SyncClient.pull_from_remote(remote_url, api_key, last_sync_time, tables)
@@ -206,7 +258,7 @@ stateDiagram-v2
    状态: 本地数据未同步 → 本地数据已合并 | 持久化: ✅（upsert_rows） | 跨模块: 云端 → 本地 DB
    步骤: 对每张表 → 分批 POST /api/sync/pull（offset=0, limit=1000）
          → 批量查询本地已有记录的 updated_at（batch_get_existing_updated_at 单连接 IN 查询）
-         → 内存 LWW 过滤（本地不存在 → 写入；本地未修改 → 覆盖；云端更晚 → 覆盖；本地更晚 → 保留）
+         → 内存 LWW 过滤（本地不存在 → 写入；本地未修改 → 覆盖；云端更晚 → 覆盖；本地更晚 → 保留；相等 → 跳过）
          → upsert_rows 写入过滤后的行 → offset += 1000 继续直到返回空
 ```
 
@@ -220,12 +272,12 @@ stateDiagram-v2
 ```
 
 **分支节点**：
-- 表有 updated_at 列：执行 LWW 过滤
+- 表有 updated_at 列：执行 LWW 过滤（含相等跳过）
 - 表无 updated_at 列（mood_types 等）：直接 upsert_rows 全量覆盖
 - 返回空 rows：本表拉取完成，切换到下一张表
 - rows < batch_size：最后一批，切换到下一张表
 
-### 2.2 Push 推送
+### 2.3 Push 推送
 
 ```
 9. SyncClient.push_to_remote(remote_url, api_key, tables)
@@ -244,50 +296,94 @@ stateDiagram-v2
           → 返回 status 和 sync_time
 ```
 
-## 链路 3：文件同步
+## 链路 3：文件同步（三阶段）
 
-### 3.1 文件 Pull
-
-```
-11. SyncClient.pull_files_from_remote(remote_url, api_key, last_sync_time, directories)
-    从云端拉取增量文件
-   状态: 本地文件已更新 | 持久化: ✅（_write_file） | 跨模块: 云端 FS → 本地 FS
-   步骤: POST /api/sync/pull-files（传递 last_sync_time 和 directories）
-         → 对返回的 files 逐项调用 _write_file（base64 解码 + gzip 解压 + LWW mtime 比较 + 写文件）
-```
+### Phase 1：快照交换
 
 ```
-12. SyncCloudAPI.sync_pull_files()
-    云端处理文件 Pull 请求
-   状态: 无状态 | 持久化: ❌ | 跨模块: 本地 HTTP → 云端 FS
-   步骤: 遍历 directories → 单文件/目录递归 rglob
-         → 比较 mtime > last_sync_time → gzip 压缩 + base64 编码
-         → 路径安全检查（relative_to 防路径遍历攻击）
-```
-
-### 3.2 文件 Push
-
-```
-13. SyncClient.push_files_to_remote(remote_url, api_key, last_sync_time, directories)
-    推送本地变更文件到云端
-   状态: 本地变更文件已推送 | 持久化: ❌（云端写入） | 跨模块: 本地 FS → 云端
-   步骤: _collect_changed_files（遍历 directories，找 mtime > last_sync_time 的文件）
-         → 每个文件 gzip 压缩 + base64 编码
-         → POST /api/sync/push-files
+11. SyncClient._sync_files_full_flow()
+    文件同步总入口，协调三阶段流程
+    状态: 文件同步进行中 | 持久化: 阶段级 | 跨模块: 本地 FS ↔ 云端 FS
+    步骤: Phase 1 — check（交换 hash 快照）
+         → Phase 2a — 本地执行 11 状态矩阵判定
+         → Phase 2b — fetch（拉取 PULL + CONFLICT 文件）
+         → Phase 2c — push（推送 PUSH + AI 合并结果）
+         → Phase 3 — verify + commit（一致性校验并推进 parent_hash）
 ```
 
 ```
-14. SyncCloudAPI.sync_push_files()
-    云端处理文件 Push 请求
-   状态: 云端文件已更新 | 持久化: ✅ | 跨模块: 本地 HTTP → 云端 FS
-   步骤: 对每个文件 → 路径安全检查 → LWW mtime 比较（本地更新则跳过）
-         → base64 解码 + gzip 解压 → 创建父目录 → 写入文件 → 设置 mtime
+12. POST /api/sync/pull-files/check
+    云端按 mtime 过滤 + 返回 hash 快照和完整路径清单
+    状态: 心跳时间更新 | 持久化: ❌ | 跨模块: 本地 HTTP → 云端 FS
+    步骤: 遍历 directories → 排除 chat_history.json
+         → 找到 mtime > last_sync_time 的文件 → 实时计算 current_hash
+         → 从 file_sync_state 表读 parent_hash
+         → 返回 files: [{path, parent_hash, current_hash}] + all_paths: [...]  + sync_time
+         注意: all_paths 是 v2.3 新增字段，用于显式判断文件存在性（替代 local_parent is not None 猜测）
+```
+
+### Phase 2a：本地 11 状态矩阵判定
+
+```
+本地拿到云端 hash 快照后，结合自己的 file_sync_state 执行决策矩阵：
+  判定 PUSH：本地新建 + 云端无此文件（#1）、云端从未同步（#5）、仅本地改（#7）
+  判定 PULL：云端新建 + 本地无此文件（#2）、本地从未同步（#4）、仅云端改（#8）
+  判定 CONFLICT：双方都新建（#3）、双方都改（#9）、parent 不一致（#10/11）
+  判定 SKIP：双方都没改（#6）
+  文件不在 all_paths 中 + 本地有此文件：PUSH（云端缺失，重新推送）
+```
+
+### Phase 2b：拉取内容
+
+```
+13. POST /api/sync/pull-files/fetch
+    按路径拉取 PULL + CONFLICT 文件内容
+    状态: 无状态 | 持久化: ❌ | 跨模块: 云端 FS → 本地 HTTP
+    步骤: 请求 {paths: [...]} → 响应 {files: [{path, content(base64), parent_hash, current_hash}]}
+         → 本地 base64 解码 + gzip 解压 + 写入文件
+         → 立即计算 new_hash → 更新 file_sync_state (current_hash)
+```
+
+### Phase 2c：推送内容
+
+```
+14. POST /api/sync/push-files
+    推送 PUSH 文件 + CONFLICT AI 合并结果
+    状态: 云端文件已更新 | 持久化: ✅ | 跨模块: 本地 FS → 云端
+    步骤: 本地 gzip 压缩 + base64 编码
+         → 请求 {files: [{path, content, parent_hash, current_hash}]}
+         → 云端路径安全检查 → base64 解码 + gzip 解压
+         → 写入文件 → 立即计算 new_hash → 更新 file_sync_state
+         → 返回 {results: [{path, action}]}
+```
+
+**冲突处理分支**：
+- `.jsonl` 文件冲突：文件级 LWW，保留本地版本直接 PUSH 覆盖（不送 AI 合并）
+- `.md` 文件冲突：构建 CONFLICT_RESOLVE InboundMessage → `asyncio.run_coroutine_threadsafe(bus.send(msg), loop)` → AI 合并 → write_file 写入
+- 云端版本备份到 `sync_conflict/{timestamp}/{relative_path}`
+
+### Phase 3：一致性校验
+
+```
+15. POST /api/sync/pull-files/verify
+    验证两端文件内容一致
+    状态: 无状态 | 持久化: ❌ | 跨模块: 云端 FS → 本地 HTTP
+    步骤: 请求 {paths: [...]} → 云端实时计算 current_hash
+         → 返回 {files: [{path, current_hash}]} → 本地比对
+```
+
+```
+16. POST /api/sync/pull-files/commit
+    确认同步完成，推进 parent_hash
+    状态: parent_hash 推进 | 持久化: ✅（file_sync_state 更新） | 跨模块: 本地 HTTP → 云端 DB
+    步骤: 请求 {paths: [...]} → 云端 file_sync_state: parent_hash = current_hash
+         → 本地同样推进 → 返回 {status: "ok", committed: [...]}
 ```
 
 ## 链路 4：心跳与消息路由
 
 ```
-15. HeartbeatManager.is_local_online()
+17. HeartbeatManager.is_local_online()
     判断本地是否在线
    状态: 无状态变更 | 持久化: ❌ | 跨模块: ❌
    步骤: threading.Lock → _last_event == "offline" → False
@@ -297,7 +393,7 @@ stateDiagram-v2
 ```
 
 ```
-16. HeartbeatManager.update_heartbeat() / set_event()
+18. HeartbeatManager.update_heartbeat() / set_event()
     更新心跳状态
    状态: last_heartbeat 更新 / last_event 更新 | 持久化: ❌（纯内存） | 跨模块: ❌
 ```
@@ -326,9 +422,19 @@ stateDiagram-v2
 - **验证失败**：`CloudInitializer._validate()` 失败时抛出 ConfigError，cloud_init.yaml 不被删除（方便用户修复后重试）
 - **并发同步**：`try_start_sync()` 返回 False 时，跳过本次定时触发，记录 WARNING 日志
 - **同步锁异常释放**：`_run_sync_loop()` 中使用 try...finally 确保 `finish_sync()` 在异常时也能被调用
-- **时区不一致风险**：LWW 冲突解决依赖 `updated_at` 和 `mtime` 时间戳比较。当前假设本地和云端使用相同时区（系统默认），但如果云端部署在海外服务器，时间戳可能采用不同时区（如 UTC），导致 LWW 比较失效。**潜在解决方案**：增加全局时区配置（如 `timezone: "Asia/Shanghai"`），前端和后端统一使用该时区生成时间戳
+- **文件冲突异常**：AI 合并失败时保留本地版本，云端备份在 sync_conflict/ 中，下次同步重新触发 CONFLICT_RESOLVE
 
 ## 反常设计说明
+
+### 动态表建表不写 meta 数据
+
+**设计意图**：本地建表应写入完整的 `custom_record_types` + `custom_record_fields` meta，保持与 `CustomRecordRepository.create_type` 一致。
+**当前实现**：`_create_local_dynamic_tables` 只执行 `CREATE TABLE IF NOT EXISTS`（DDL），不写 meta 数据。
+**为什么是反常的**：`custom_xxx` 数据表已存在但 `custom_record_types` 里没有对应记录。这会造成短暂的数据不一致窗口（建表后到 pull 拉取 meta 之间）。
+**影响范围**：自定义记录 UI 在窗口期内看不到此类型。pull 完成后恢复正常。
+**相关位置**：
+- `lifeprism/sync/sync_client.py:SyncClient._create_local_dynamic_tables()` — 只执行 DDL
+- `lifeprism/repository/sync_repository.py:SyncRepository.create_local_data_tables()` — 本地建表实现
 
 ### cloud_init.yaml 中 llm.provider 用 display_name 而 providers[].name 用内部 name
 
@@ -354,11 +460,16 @@ stateDiagram-v2
 ## 相关文档
 
 ### Spec 文档
-- **[数据同步模块规格]**：`docs/specs/2026-07-11-data-sync-spec.md` — 数据同步模块的技术契约
+- **[数据同步模块总览]**：`docs/specs/2026-07-16-data-sync-overview.md` — 子模块架构、依赖规则、跨层交互
+- **[数据库同步 + 动态表 + 心跳路由]**：`docs/specs/2026-07-16-data-sync-core-spec.md` — 静态表、动态表、心跳、配置初始化
+- **[文件同步]**：`docs/specs/2026-07-16-data-sync-files-spec.md` — per-file version tracking、三阶段协议、AI 合并
 
 ### 架构文档
 - **[Config 配置管理]**：`docs/specs/2026-07-06-config-settings-spec.md` — ProviderManager、双层命名体系
 - **[Agent 执行引擎]**：`docs/specs/2026-07-06-llm-agent-spec.md` — AgentLoop 消息处理
 
 ### ADR
-- **[Linux 部署 PRD P2]**：`.scratch/linux-deployment-discussion/linux-deployment-prd.md` — 数据同步方案原始设计
+- **[同步系统决策时间线]**：`docs/adr/2026-07-16-sync-system-timeline.md`
+- **[文件同步冲突处理]**：`docs/adr/2026-07-14-file-sync-conflict-resolution.md`
+- **[动态表同步定义对比]**：`docs/adr/2026-07-16-dynamic-tables-sync-definition-comparison.md`
+- **[LWW 冲突解决]**：`docs/adr/2026-07-09-lww-conflict-resolution.md`

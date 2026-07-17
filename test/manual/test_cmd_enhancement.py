@@ -3,8 +3,9 @@
 由于项目存在循环导入问题，无法在pytest中正常测试 AgentLoop。
 本脚本通过直接调用 _process_cmd 方法进行手动测试。
 """
-from unittest.mock import Mock, patch
+
 from datetime import datetime
+from unittest.mock import Mock, patch
 
 
 def test_continue_command():
@@ -13,7 +14,7 @@ def test_continue_command():
 
     # 延迟导入，避免循环导入
     from lifeprism.llm.agent.loop import AgentLoop
-    from lifeprism.llm.bus import InboundMessage, ChannelType, MessageType
+    from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType
     from lifeprism.llm.session import Session
 
     # 创建 AgentLoop
@@ -27,23 +28,19 @@ def test_continue_command():
         {
             "role": "user",
             "content": "你好，我想了解一下 Python 的异步编程",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         },
         {
             "role": "assistant",
             "content": "您好！Python 的异步编程主要使用 asyncio 库...",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         },
-        {
-            "role": "user",
-            "content": "能给我举个例子吗？",
-            "timestamp": datetime.now().isoformat()
-        },
+        {"role": "user", "content": "能给我举个例子吗？", "timestamp": datetime.now().isoformat()},
         {
             "role": "assistant",
             "content": "当然可以！下面是一个简单的例子：\n```python\nasync def main():\n    await asyncio.sleep(1)\n```",
-            "timestamp": datetime.now().isoformat()
-        }
+            "timestamp": datetime.now().isoformat(),
+        },
     ]
 
     # 测试1：正常情况 - 显示最后两轮对话
@@ -53,10 +50,10 @@ def test_continue_command():
         channel=ChannelType.WECHAT,
         type=MessageType.CHAT,
         content=[{"type": "text", "text": "/continue test-session-123"}],
-        session_id=None
+        session_id=None,
     )
 
-    with patch('lifeprism.llm.agent.loop.session_manager') as mock_manager:
+    with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
         mock_manager.show_session_list.return_value = ["test-session-123"]
         mock_manager.get_or_create_session.return_value = mock_session
 
@@ -78,10 +75,10 @@ def test_continue_command():
         channel=ChannelType.WECHAT,
         type=MessageType.CHAT,
         content=[{"type": "text", "text": "/continue nonexistent"}],
-        session_id=None
+        session_id=None,
     )
 
-    with patch('lifeprism.llm.agent.loop.session_manager') as mock_manager:
+    with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
         mock_manager.show_session_list.return_value = ["session-1", "session-2"]
 
         result = agent_loop._process_cmd(msg)
@@ -97,7 +94,7 @@ def test_new_command():
     print("=== 测试 /new 命令 ===\n")
 
     from lifeprism.llm.agent.loop import AgentLoop
-    from lifeprism.llm.bus import InboundMessage, ChannelType, MessageType
+    from lifeprism.llm.bus import ChannelType, InboundMessage, MessageType
 
     mock_bus = Mock()
     agent_loop = AgentLoop(mock_bus)
@@ -109,10 +106,10 @@ def test_new_command():
         channel=ChannelType.WECHAT,
         type=MessageType.CHAT,
         content=[{"type": "text", "text": "/new"}],
-        session_id="old-session-123"
+        session_id="old-session-123",
     )
 
-    with patch('lifeprism.llm.agent.loop.session_manager') as mock_manager:
+    with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
         mock_new_session = Mock()
         mock_new_session.id = "new-session-456"
         mock_manager.get_or_create_session.return_value = mock_new_session
@@ -133,10 +130,10 @@ def test_new_command():
         channel=ChannelType.WECHAT,
         type=MessageType.CHAT,
         content=[{"type": "text", "text": "/new"}],
-        session_id=None
+        session_id=None,
     )
 
-    with patch('lifeprism.llm.agent.loop.session_manager') as mock_manager:
+    with patch("lifeprism.llm.agent.loop.session_manager") as mock_manager:
         mock_new_session = Mock()
         mock_new_session.id = "new-session-789"
         mock_manager.get_or_create_session.return_value = mock_new_session
@@ -162,4 +159,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n✗ 测试出错: {e}")
         import traceback
+
         traceback.print_exc()

@@ -11,6 +11,7 @@ CustomRecordRepository UTC 时区迁移测试
 
 注意：CustomRecordRepository 独立实现，不继承 LWBaseDataProvider（项目规则）。
 """
+
 import re
 
 import pytest
@@ -76,9 +77,7 @@ def repository(test_data_path):
     # 清理：删除所有 custom_ 开头的表
     with lw_db_manager.get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'custom_%'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'custom_%'")
         tables = [row[0] for row in cursor.fetchall()]
         for table_name in tables:
             cursor.execute(f"DROP TABLE IF EXISTS {table_name}")

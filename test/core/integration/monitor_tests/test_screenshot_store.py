@@ -61,7 +61,10 @@ def test_screenshot_store_writes_relative_path_and_metadata():
         record = store.capture(request)
 
         assert record["id"] == "cap-0001"
-        assert record["file_path"] == "screenshots/2026-04-02/2026-04-02T10-30-00_scheduled_cap-0001.png"
+        assert (
+            record["file_path"]
+            == "screenshots/2026-04-02/2026-04-02T10-30-00_scheduled_cap-0001.png"
+        )
         assert (temp_dir / record["file_path"]).exists()
 
         rows = provider.list_expired_captures("2026-04-03T00:00:00")
@@ -94,7 +97,9 @@ def test_screenshot_store_rolls_back_file_when_metadata_insert_fails():
         with pytest.raises(RuntimeError, match="db write failed"):
             store.capture(request)
 
-        expected_path = temp_dir / "screenshots" / "2026-04-02" / "2026-04-02T10-31-00_scheduled_cap-0002.png"
+        expected_path = (
+            temp_dir / "screenshots" / "2026-04-02" / "2026-04-02T10-31-00_scheduled_cap-0002.png"
+        )
         assert not expected_path.exists()
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)

@@ -178,9 +178,7 @@ class TestReinitConfigCommand:
 
         mock_init.initialize.assert_called_once()
 
-    def test_reinit_config_does_not_auto_restart(
-        self, mock_cloud_initializer, monkeypatch, capsys
-    ):
+    def test_reinit_config_does_not_auto_restart(self, mock_cloud_initializer, monkeypatch, capsys):
         """reinit-config 不自动重启服务（不调用 subprocess/systemctl restart）"""
         mock_run = MagicMock()
         mock_call = MagicMock()
@@ -202,9 +200,7 @@ class TestReinitConfigCommand:
         out = capsys.readouterr().out
         assert "完成" in out or "成功" in out
 
-    def test_reinit_config_does_not_run_agent_loop(
-        self, mock_cloud_initializer, monkeypatch
-    ):
+    def test_reinit_config_does_not_run_agent_loop(self, mock_cloud_initializer, monkeypatch):
         """reinit-config 不启动 Agent Loop"""
         called = {"flag": False}
 
@@ -228,9 +224,7 @@ class TestShowConfigCommand:
         self, mock_cloud_initializer, mock_settings_config, monkeypatch, capsys
     ):
         """show-config 显示 provider"""
-        monkeypatch.setattr(
-            main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None
-        )
+        monkeypatch.setattr(main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None)
 
         main_agent_only.main(["show-config"])
 
@@ -241,9 +235,7 @@ class TestShowConfigCommand:
         self, mock_cloud_initializer, mock_settings_config, monkeypatch, capsys
     ):
         """show-config 显示 model"""
-        monkeypatch.setattr(
-            main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None
-        )
+        monkeypatch.setattr(main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None)
 
         main_agent_only.main(["show-config"])
 
@@ -254,9 +246,7 @@ class TestShowConfigCommand:
         self, mock_cloud_initializer, mock_settings_config, monkeypatch, capsys
     ):
         """show-config 显示 API Base"""
-        monkeypatch.setattr(
-            main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None
-        )
+        monkeypatch.setattr(main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None)
 
         main_agent_only.main(["show-config"])
 
@@ -301,9 +291,7 @@ class TestShowConfigCommand:
         self, mock_cloud_initializer, mock_settings_config, monkeypatch, capsys
     ):
         """API Key 未设置时显示未设置提示"""
-        monkeypatch.setattr(
-            main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None
-        )
+        monkeypatch.setattr(main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None)
 
         main_agent_only.main(["show-config"])
 
@@ -314,9 +302,7 @@ class TestShowConfigCommand:
         self, mock_cloud_initializer, mock_settings_config, monkeypatch, capsys
     ):
         """show-config 显示 monitor_type"""
-        monkeypatch.setattr(
-            main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None
-        )
+        monkeypatch.setattr(main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None)
 
         main_agent_only.main(["show-config"])
 
@@ -327,9 +313,7 @@ class TestShowConfigCommand:
         self, mock_cloud_initializer, mock_settings_config, monkeypatch, capsys
     ):
         """show-config 显示 timezone"""
-        monkeypatch.setattr(
-            main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None
-        )
+        monkeypatch.setattr(main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None)
 
         main_agent_only.main(["show-config"])
 
@@ -349,9 +333,7 @@ class TestShowConfigCommand:
             return original_get(key, default)
 
         monkeypatch.setattr(main_agent_only.settings, "get", mock_get)
-        monkeypatch.setattr(
-            main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None
-        )
+        monkeypatch.setattr(main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None)
 
         main_agent_only.main(["show-config"])
 
@@ -439,9 +421,7 @@ class TestTestLlmCommand:
         out = capsys.readouterr().out
         assert "失败" in out
 
-    def test_test_llm_handles_exception(
-        self, mock_cloud_initializer, mock_llm_client, capsys
-    ):
+    def test_test_llm_handles_exception(self, mock_cloud_initializer, mock_llm_client, capsys):
         """LLM 调用抛出异常时显示连接失败（不向上抛出）"""
         mock_llm_client.chat.side_effect = RuntimeError("connection refused")
 
@@ -451,15 +431,11 @@ class TestTestLlmCommand:
         out = capsys.readouterr().out
         assert "失败" in out
 
-    def test_test_llm_displays_reply_content(
-        self, mock_cloud_initializer, mock_llm_client, capsys
-    ):
+    def test_test_llm_displays_reply_content(self, mock_cloud_initializer, mock_llm_client, capsys):
         """连接成功时显示 LLM 回复内容"""
         from lifeprism.llm.providers.llm_providers.base import LLMResponse
 
-        mock_llm_client.chat.return_value = LLMResponse(
-            content="Hello, OK", finish_reason="stop"
-        )
+        mock_llm_client.chat.return_value = LLMResponse(content="Hello, OK", finish_reason="stop")
 
         main_agent_only.main(["test-llm"])
 
@@ -473,9 +449,7 @@ class TestTestLlmCommand:
 class TestCliDispatch:
     """测试 CLI 入口 main() 的参数解析与命令分发"""
 
-    def test_main_accepts_argv_none(
-        self, mock_cloud_initializer, noop_agent_loop, monkeypatch
-    ):
+    def test_main_accepts_argv_none(self, mock_cloud_initializer, noop_agent_loop, monkeypatch):
         """main(None) 读取 sys.argv，无参数时默认 start"""
         mock_init = mock_cloud_initializer["instance"]
         mock_init.should_initialize.return_value = False
@@ -523,9 +497,7 @@ class TestCliDispatch:
             "get",
             lambda key, default=None: config_map.get(key, default),
         )
-        monkeypatch.setattr(
-            main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None
-        )
+        monkeypatch.setattr(main_agent_only.provider_manager, "get_api_key", lambda *a, **k: None)
 
         args = argparse.Namespace()
         main_agent_only.cmd_show_config(args)
