@@ -111,6 +111,12 @@ class AgentLoop:
         #                 )
         response: LLMResponse = await llm.chat(messages=messages, tools=tools)
         if response.finish_reason == "error":
+            logger.error(
+                "[_run_agent_loop] LLM 返回 finish_reason=error: model=%s, content=%s, usage=%s",
+                settings.model or "unknown",
+                (response.content or "")[:500],
+                response.usage,
+            )
             raise LLMResponseError(
                 model=settings.model or "unknown",
                 raw_response=response.content or "",
@@ -214,6 +220,12 @@ class AgentLoop:
             #                 )
             response: LLMResponse = await llm.chat(messages=messages, tools=tools)
             if response.finish_reason == "error":
+                logger.error(
+                    "[_auto_compact] LLM 返回 finish_reason=error: model=%s, content=%s, usage=%s",
+                    settings.model or "unknown",
+                    (response.content or "")[:500],
+                    response.usage,
+                )
                 raise LLMResponseError(
                     model=settings.model or "unknown",
                     raw_response=response.content or "",
