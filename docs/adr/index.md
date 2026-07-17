@@ -2,7 +2,7 @@
 version: 2.0
 created_at: 2026-04-10
 updated_at: 2026-07-14
-last_updated: 新增文件同步冲突处理方案 ADR
+last_updated: 新增云端首次同步全清覆盖方案 ADR
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
 
@@ -47,6 +47,12 @@ abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设�
 - path: `docs/adr/2026-07-12-time-conversion-layering.md`
 - 触发规则：当需要理解时间转换在哪个层级进行、为什么不用装饰器自动转换、或新增 LLM 工具时参考转换模式时读取
 - 内容摘要：确立时间转换的层级边界——前端负责双向转换（就近转换原则），后端工具函数输入输出保持 UTC ISO 8601。转换发生在 execute 方法层（工具调用入口），而非工具函数内部或 Repository 层。决策基于：代码可读性与显式性 > 自动化、后端工具函数可被非 LLM 调用（需保持 UTC 纯净）。
+
+## cloud-init-first-sync-full-clear
+- updated_at: 2026-07-17
+- path: `docs/adr/2026-07-17-cloud-init-first-sync-full-clear.md`
+- 触发规则：当需要理解云端种子数据初始化策略、首次同步流程（全清覆盖）、为什么否决数据库同步黑名单、或修改 sync_once 首次同步分支时读取
+- 内容摘要：否决"黑名单双向过滤"方案，采用"首次同步云端全清 + 本地全量覆盖"方案。首次同步分支：检测未初始化 → full-clear（清空 SYNC_TABLES + 同步文件）→ 全量推送数据库 → 全量推送文件 → mark-initialized。动态表首次只覆盖定义表（custom_record_types/fields），实际数据表在后续增量同步处理。mood_impacts 自增键经验证不影响同步，不改造。决策前提：云端 agent_only 无网页端（前提 3，失效则整体策略需重评估）、动态表入口只有定义表（前提 5，孤儿表不影响功能）。
 
 ## key-fallback-strategy
 - updated_at: 2026-07-14

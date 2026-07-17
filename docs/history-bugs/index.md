@@ -1,3 +1,10 @@
+## 2026-07-17-cloud-init-seed-data-syncs-to-local
+
+- updated_at: 2026-07-17
+- path: `docs/history-bugs/2026-07-17-cloud-init-seed-data-syncs-to-local.md`
+- 触发规则：在排查"本地多了不属于自己的分类"、自动分类结果出现意料之外的分类、mood_impacts 表出现重复数据、修改 `data_initializer.py` 默认数据定义、修改 `SYNC_TABLES` 同步范围、讨论初始化种子数据与同步机制关系时阅读
+- 内容摘要：**设计缺陷（P2，待修复）** — 6 张初始化种子数据表（category、sub_category、goal、plan_doc、mood_types、mood_impacts）全部在 SYNC_TABLES 同步范围内。两端各自通过 `data_initializer.py` 独立初始化相同种子数据，同步时互相传播，造成不必要的 LWW 冲突。category 表影响最严重——云端用户自建分类（随机 UUID ID）通过同步侵入本地，污染自动分类管线。mood_impacts 使用 AUTOINCREMENT PK，同步时 id 被剥离，仅靠 UNIQUE(name) 兜底防重复，脆弱。给出 4 个候选修复方案（种子标记字段 / 固定ID白名单 / 移出同步范围 / 首次同步标记）。
+
 ## 2026-07-16-database-delete-not-synced
 
 - updated_at: 2026-07-16

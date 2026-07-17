@@ -16,7 +16,9 @@ API 层不使用 try/except，异常自然冒泡到全局异常处理器。
 """
 
 import base64
+import contextlib
 import gzip
+import os
 import secrets
 import time
 from datetime import datetime, timezone
@@ -29,11 +31,11 @@ from pydantic import BaseModel, Field
 from lifeprism.config.settings_manager import settings
 from lifeprism.repository import SyncRepository, file_sync_state_repository
 from lifeprism.sync.constants import EXCLUDED_FILENAMES as _EXCLUDED_FILENAMES
-from lifeprism.sync.constants import safe_gzip_decompress
+from lifeprism.sync.constants import SYNC_DIRECTORIES, SYNC_TABLES, safe_gzip_decompress
 from lifeprism.sync.hash_utils import compute_file_hash
 from lifeprism.sync.sync_config import get_sync_api_key
 from lifeprism.utils import get_logger
-from lifeprism.utils.exceptions import ValidationError
+from lifeprism.utils.exceptions import DataAccessError, ValidationError
 from lifeprism.utils.time_utils import parse_iso_to_aware
 
 logger = get_logger(__name__)
@@ -926,4 +928,135 @@ def sync_push_files(
     return {
         "results": results,
         "sync_time": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ==================== 首次同步初始化端点 ====================
+
+
+@router.get("/initialization-status", summary="检查云端是否已完成首次同步初始化")
+def sync_get_initialization_status(_: None = Depends(verify_sync_api_key)):
+    """检查云端是否已完成首次同步初始化
+
+    通过标志文件 `<config_base_path>/config/cloud_initialized` 是否存在判断。
+    标志文件由 /mark-initialized 端点创建。
+
+    **响应**:
+    - initialized: True 已初始化，False 未初始化
+    - checked_at: 检查时间（ISO 8601 UTC）
+    """
+    marker_path = settings.config_base_path / "config" / "cloud_initialized"
+    return {
+        "initialized": marker_path.exists(),
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/full-clear", summary="清空云端所有同步数据（首次同步前调用）")
+def sync_full_clear(_: None = Depends(verify_sync_api_key)):
+    """清空云端所有同步数据（数据库 + 文件），保留 schema_version 和 custom_* 表结构
+
+    清空范围：
+    - SYNC_TABLES 中的所有表（31 张静态表，包括 custom_record_types/custom_record_fields）
+    - file_sync_state 表（文件同步状态归零）
+    - SYNC_DIRECTORIES 下的所有文件（包括黑名单文件 chat_history.json/bootstrap.md）
+
+    未清空范围：
+    - schema_version 表（保留迁移版本，不在 SYNC_TABLES 中）
+    - custom_<slug> 数据表（不在 SYNC_TABLES 中，孤儿表不影响功能，决策点 3）
+
+    非原子性说明：跨表 DELETE 非原子，单表失败不阻塞整体清空。
+    依赖首次同步的幂等重试（不设标志位，下次重试）。
+    此端点使用 try/except 是 ADR 2026-07-17 前提 7 的明确要求
+    （跨表 DELETE 非原子，单表失败不阻塞整体清空），不作为其他端点的先例。
+
+    **响应**:
+    - status: "ok"
+    - cleared_tables: 已清空的表名列表
+    - cleared_files: 已删除的文件数
+    - cleared_at: 清空时间（ISO 8601 UTC）
+    """
+    # 1. 清空 SYNC_TABLES 中的所有表
+    # 例外说明：本端点使用 try/except 是 ADR 2026-07-17 前提 7 的明确要求
+    # （跨表 DELETE 非原子，单表失败不阻塞整体清空），不作为其他端点的先例
+    cleared_tables = []
+    for table in SYNC_TABLES:
+        try:
+            sync_repository.delete_all_rows(table)
+            cleared_tables.append(table)
+        except DataAccessError as e:
+            logger.warning("清空表 %s 失败: %s", table, e)
+
+    # 2. 清空 file_sync_state（让云端文件同步状态归零）
+    try:
+        sync_repository.delete_all_rows("file_sync_state")
+    except DataAccessError as e:
+        logger.warning("清空 file_sync_state 失败: %s", e)
+
+    # 3. 删除 SYNC_DIRECTORIES 下所有文件（包括黑名单文件，首次同步特殊行为）
+    # 路径安全检查：确保 dir_path 在 lifeprism_data_path 下（参照 /push-files 的 _is_path_safe）
+    cleared_files = 0
+    data_path_resolved = settings.lifeprism_data_path.resolve()
+    for dir_name in SYNC_DIRECTORIES:
+        dir_path = (settings.lifeprism_data_path / dir_name.rstrip("/")).resolve()
+        # 安全检查：dir_path 必须在 lifeprism_data_path 下
+        try:
+            dir_path.relative_to(data_path_resolved)
+        except ValueError:
+            logger.warning("跳过非数据目录下的文件删除: %s", dir_path)
+            continue
+        if dir_path.exists():
+            # 删除所有文件
+            for item in dir_path.rglob("*"):
+                if item.is_file():
+                    try:
+                        item.unlink()
+                        cleared_files += 1
+                    except OSError as e:
+                        logger.warning("删除文件失败 %s: %s", item, e)
+            # 清理空目录（自底向上，避免多次首次同步重试后累积空目录结构）
+            for root, dirs, _ in os.walk(dir_path, topdown=False):
+                for d in dirs:
+                    full = Path(root) / d
+                    with contextlib.suppress(OSError):
+                        full.rmdir()  # 仅在目录为空时成功
+
+    logger.info(
+        "full-clear 完成: 表=%d, 文件=%d",
+        len(cleared_tables),
+        cleared_files,
+    )
+
+    return {
+        "status": "ok",
+        "cleared_tables": cleared_tables,
+        "cleared_files": cleared_files,
+        "cleared_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/mark-initialized", summary="标记云端已完成首次同步初始化")
+def sync_mark_initialized(_: None = Depends(verify_sync_api_key)):
+    """标记云端已完成首次同步初始化
+
+    创建标志文件 `<config_base_path>/config/cloud_initialized`，
+    文件内容为当前时间戳（ISO 8601 UTC）。
+
+    标志文件存在时，下次 sync_once 走增量同步分支；
+    标志文件不存在时，触发首次同步（full-clear + 全量推送）。
+
+    **响应**:
+    - status: "ok"
+    - marked_at: 标记时间（ISO 8601 UTC）
+    """
+    config_dir = settings.config_base_path / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    marker_path = config_dir / "cloud_initialized"
+    marker_path.write_text(datetime.now(timezone.utc).isoformat(), encoding="utf-8")
+
+    logger.info("云端已标记为已初始化: %s", marker_path)
+
+    return {
+        "status": "ok",
+        "marked_at": datetime.now(timezone.utc).isoformat(),
     }

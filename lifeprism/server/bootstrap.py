@@ -32,22 +32,45 @@ def init_database_full() -> None:
         4. initialize_default_data() — 写入默认数据
         5. initialize_category_colors() — 初始化分类颜色
 
+    agent_only 模式下跳过步骤 1 和 4（资源文件 + 种子数据），
+    因为云端首次同步前不应处理任何用户数据（前提 8：主备模式推导）。
+    - prompts 由 PromptLoader 懒加载（开发模式下从 templates/ 同步）
+    - agent/ + user/ 文件由首次同步推送覆盖
+    - config/ 由 cloud_init 管理
+    - 种子数据由本地首次同步全量推送覆盖
+
+    注意：initialize_category_colors() 在 agent_only 模式下仍执行，
+    但因 category 表为空（跳过了 initialize_default_data），
+    其内部 for 循环不会执行，仅产生空缓存，无副作用。
+    首次同步推送 category 数据后，颜色缓存会在下次请求时按需重建。
+
     异常处理：每步独立 try/except，资源初始化失败不阻塞后续步骤，
     数据库核心步骤失败则向上抛出（与 main.py 原有行为一致）。
     """
+    is_agent_only = settings.run_mode == "agent_only"
+
     # 1. 资源文件初始化（非致命）
-    logger.info("正在初始化资源文件...")
-    try:
-        initialize_resources()
-    except Exception as e:
-        logger.warning("资源文件初始化失败（非致命）: error=%s", e)
+    # agent_only 模式跳过：prompts 由 PromptLoader 懒加载，
+    # agent/ + user/ 文件由首次同步推送覆盖，config/ 由 cloud_init 管理
+    if is_agent_only:
+        logger.info("agent_only 模式：跳过资源文件初始化（首次同步由本地全量推送）")
+    else:
+        logger.info("正在初始化资源文件...")
+        try:
+            initialize_resources()
+        except Exception as e:
+            logger.warning("资源文件初始化失败（非致命）: error=%s", e)
 
     # 2. 数据库表结构初始化（致命）
     logger.info("正在初始化 LifeWatch 数据库...")
     try:
         init_database()
         run_migrations(str(settings.lw_db_path))
-        initialize_default_data()
+        # agent_only 模式跳过种子数据：首次同步由本地全量推送覆盖
+        if is_agent_only:
+            logger.info("agent_only 模式：跳过种子数据初始化（首次同步由本地全量推送）")
+        else:
+            initialize_default_data()
         initialize_category_colors()
         logger.info("数据库初始化完成")
     except Exception as e:

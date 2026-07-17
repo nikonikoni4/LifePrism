@@ -1072,7 +1072,7 @@ MOOD_IMPACTS_CONFIG = {
         "id": {
             "type": "INTEGER",
             "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
-            "comment": "自增 ID",
+            "comment": "因素 ID，自增",
         },
         "name": {
             "type": "TEXT",

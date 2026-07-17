@@ -20,7 +20,17 @@ from typing import Any
 
 import httpx
 
-from lifeprism.sync.constants import EXCLUDED_FILENAMES as _EXCLUDED_FILENAMES
+from lifeprism.sync.constants import (
+    DB_PUSH_BATCH_SIZE,
+    EXCLUDED_FILENAMES as _EXCLUDED_FILENAMES,
+    FILE_BATCH_SIZE,
+    FULL_CLEAR_TIMEOUT,
+    INITIALIZATION_STATUS_TIMEOUT,
+    MARK_INITIALIZED_TIMEOUT,
+    PUSH_ENDPOINT_TIMEOUT,
+    SYNC_DIRECTORIES,
+    SYNC_TABLES,
+)
 from lifeprism.sync.constants import safe_gzip_decompress
 from lifeprism.utils import get_logger
 
@@ -48,61 +58,15 @@ def _safe_write_file(file_path: Path, content: bytes) -> None:
         raise
 
 
-# 同步范围：除 window_events 外的所有需要同步的静态表（31 张）
-SYNC_TABLES = [
-    # 用户输入数据（15张）
-    "mood_entries",
-    "diary",
-    "todo_list",
-    "goal",
-    "goal_journal",
-    "plan_doc",
-    "daily_focus",
-    "weekly_focus",
-    "habits",
-    "habit_challenges",
-    "habit_checkins",
-    "habit_chains",
-    "habit_chain_nodes",
-    "timeline_custom_block",
-    "time_paradoxes",
-    # 元数据（8张）
-    "category",
-    "sub_category",
-    "mood_types",
-    "mood_impacts",
-    "user_values",
-    "commitments",
-    "custom_record_types",
-    "custom_record_fields",
-    # Monitor 数据（3张）
-    "user_app_behavior_log",
-    "behavior_analysis",
-    "raw_behavior_analysis",
-    # 缓存表（3张）
-    "multi_purpose_map_cache",
-    "single_purpose_map_cache",
-    "category_map_cache",
-    # 统计数据（1张）
-    "tokens_usage_log",
-    # 微信账户状态（1张）- 替代原 channel/wechat/account.json 文件存储
-    # 走数据库同步的记录级 LWW，参考 ADR 2026-07-14-file-sync-conflict-resolution.md 决策 4
-    "wechat_account_state",
+# 向后兼容：重新导出常量，让现有的 `from lifeprism.sync.sync_client import SYNC_TABLES` 仍可工作
+# 常量定义已移至 lifeprism.sync.constants（客户端和云端共用）
+__all__ = [
+    "SyncClient",
+    "SYNC_TABLES",
+    "SYNC_DIRECTORIES",
+    "FILE_BATCH_SIZE",
+    "_safe_write_file",
 ]
-
-# 文件同步白名单：相对 lifeprism_data_path 的路径
-# 对齐 Agent 工具白名单（ALLOWED_DIRS = user/diary/agent）+ session（会话层写入）
-# 参考 ADR: docs/adr/2026-07-14-file-sync-conflict-resolution.md v2.1 决策 2
-SYNC_DIRECTORIES = [
-    "session/",  # 聊天会话 JSONL（Agent 会话层写入）
-    "diary/",  # 日记 MD（Agent write_file/edit_file）
-    "agent/",  # Agent 身份/记忆/chat 配置（Agent write_file/edit_file）
-    "user/",  # 用户级数据（Agent write_file/edit_file，排除 chat_history.json）
-]
-
-# 文件推送分批大小：每批最多推送 FILE_BATCH_SIZE 个文件
-# 单文件经 gzip+base64 编码后通常几 KB~几百 KB，50 个/批约 5MB，云端内存安全
-FILE_BATCH_SIZE = 50
 
 
 class SyncClient:
@@ -265,6 +229,16 @@ class SyncClient:
                 code="SYNC_API_KEY_NOT_CONFIGURED",
             )
 
+        # ===== 首次同步检测分支 =====
+        # 检查云端是否已完成首次同步初始化（标志文件存在）。
+        # 未初始化时执行全清覆盖（full-clear + 全量推送），绕过增量同步流程。
+        # 参考 ADR: docs/adr/2026-07-17-cloud-init-first-sync-full-clear.md
+        if not self._check_cloud_initialized(remote_url, api_key):
+            logger.info("云端未初始化，执行首次同步（全清覆盖）...")
+            self._full_sync_to_cloud(remote_url, api_key, tables, directories)
+            logger.info("首次同步完成")
+            return
+
         if tables is None:
             # 默认场景：动态表对比 + 建表 → 拼接 SYNC_TABLES + 动态表列表
             # 参考 ADR: docs/adr/2026-07-16-dynamic-tables-sync-definition-comparison.md
@@ -291,6 +265,275 @@ class SyncClient:
         current_time = datetime.now(timezone.utc).isoformat()
         set_setting("sync.last_sync_time", current_time)
         logger.info("sync_once: 同步完成，last_sync_time 已更新为 %s", current_time)
+
+    def _check_cloud_initialized(self, remote_url: str, api_key: str) -> bool:
+        """检查云端是否已完成首次同步初始化
+
+        通过 GET /api/sync/initialization-status 检查云端标志文件是否存在。
+        标志文件由 /mark-initialized 端点创建，存在表示云端已完成首次同步。
+
+        失败时返回 True（假设已初始化），避免网络抖动误触发全清。
+        副作用：本次 sync_once 会走增量同步分支（依赖前提 3 保证不产生数据混合）。
+        下次 sync_once 时若检测成功且云端确实未初始化（标志文件不存在），
+        将返回 False 触发 full-clear。
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+
+        Returns:
+            True 已初始化（或检查失败时假设已初始化），False 未初始化
+        """
+        try:
+            resp = httpx.get(
+                url=f"{remote_url}/api/sync/initialization-status",
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=INITIALIZATION_STATUS_TIMEOUT,
+            )
+            resp.raise_for_status()
+            return resp.json().get("initialized", False)
+        except Exception as e:
+            logger.warning(
+                "检查云端初始化状态失败，假设已初始化（本次走增量同步）: %s",
+                e,
+            )
+            return True
+
+    def _full_sync_to_cloud(
+        self,
+        remote_url: str,
+        api_key: str,
+        tables=None,
+        directories=None,
+    ) -> None:
+        """首次同步：清空云端 + 全量推送数据库和文件 + 标记初始化
+
+        流程：
+        1. POST /api/sync/full-clear 清空云端所有同步数据
+        2. _initial_push_db 全量推送数据库（含动态表定义对比 + 建表）
+        3. _initial_push_files 全量推送文件 + 推进本地 parent_hash
+        4. set_setting("sync.last_sync_time", ...) + POST /api/sync/mark-initialized
+
+        顺序说明：先设置 last_sync_time 再 mark-initialized，解决非原子性问题。
+        如果 mark-initialized 失败，下次 sync_once 会重新检测（未初始化）并重试。
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+            tables: 同步表列表（首次同步不使用，保留参数仅为兼容 sync_once 调用签名）
+            directories: 文件同步目录列表，None 则使用 SYNC_DIRECTORIES
+        """
+        from lifeprism.config.settings_manager import set_setting
+
+        # 1. 清空云端
+        logger.info("步骤 1/4: 清空云端数据...")
+        resp = httpx.post(
+            url=f"{remote_url}/api/sync/full-clear",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=FULL_CLEAR_TIMEOUT,
+        )
+        resp.raise_for_status()
+        logger.info("云端清空完成: %s", resp.json())
+
+        # 2. 全量推送数据库
+        logger.info("步骤 2/4: 全量推送数据库...")
+        self._initial_push_db(remote_url, api_key)
+
+        # 3. 全量推送文件
+        logger.info("步骤 3/4: 全量推送文件...")
+        self._initial_push_files(remote_url, api_key, directories or SYNC_DIRECTORIES)
+
+        # 4. 更新本地 last_sync_time + 标记云端已初始化
+        # 注意：先设置 last_sync_time，再 mark-initialized
+        # 这样即使 mark-initialized 失败，下次 sync_once 会重新检测（未初始化）并重试
+        # 如果 mark-initialized 成功，last_sync_time 已设置，下次走增量同步
+        logger.info("步骤 4/4: 更新 last_sync_time 并标记云端已初始化...")
+        current_time = datetime.now(timezone.utc).isoformat()
+        set_setting("sync.last_sync_time", current_time)
+
+        resp = httpx.post(
+            url=f"{remote_url}/api/sync/mark-initialized",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=MARK_INITIALIZED_TIMEOUT,
+        )
+        resp.raise_for_status()
+        logger.info("云端已标记为已初始化, last_sync_time=%s", current_time)
+
+    def _initial_push_db(self, remote_url: str, api_key: str) -> None:
+        """首次同步数据库推送：全量推送所有 SYNC_TABLES 数据
+
+        流程：
+        1. 调用 _sync_dynamic_tables_definitions 让云端按本地定义创建 custom_<slug> 表
+           （云端 full-clear 后 custom_record_types 为空，会触发 slugs_to_create_remotely）
+        2. 构建完整表列表（SYNC_TABLES + 动态表）
+        3. 逐表全量推送（用 query_all 避免 NULL updated_at 被过滤）
+        4. 动态表失败 continue，静态表失败记录到 failed_tables
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+
+        Raises:
+            RuntimeError: 静态表推送部分失败时抛出
+        """
+        # 1. 先处理动态表定义（让云端按本地定义创建 custom_<slug> 表）
+        # 云端 full-clear 后 custom_record_types 为空，cloud_slugs = 空集
+        # _sync_dynamic_tables_definitions 会触发 slugs_to_create_remotely = 本地所有 slug
+        # _rebuild_remote_dynamic_tables 是幂等的（表已存在则 skipped）
+        dynamic_table_names = self._sync_dynamic_tables_definitions(remote_url, api_key)
+
+        # 2. 构建完整表列表
+        all_tables = list(set(SYNC_TABLES + dynamic_table_names))
+        logger.info(
+            "首次同步数据库推送: 静态表=%d张, 动态表=%d张, 总计=%d张",
+            len(SYNC_TABLES),
+            len(all_tables) - len(SYNC_TABLES),
+            len(all_tables),
+        )
+
+        # 3. 全量推送每个表（用 query_all 获取全量数据，避免 NULL updated_at 被过滤）
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+        failed_tables = []
+        for table_name in all_tables:
+            try:
+                offset = 0
+                total_pushed = 0
+                while True:
+                    rows = self.sync_repository.query_all(table_name, offset, DB_PUSH_BATCH_SIZE)
+                    if not rows:
+                        break
+                    # 直接推送这一批（query_all 已分页，无需再切分）
+                    resp = httpx.post(
+                        url=f"{remote_url}/api/sync/push",
+                        headers=headers,
+                        json={"changes": {table_name: rows}},
+                        timeout=PUSH_ENDPOINT_TIMEOUT,
+                    )
+                    resp.raise_for_status()
+                    total_pushed += len(rows)
+                    if len(rows) < DB_PUSH_BATCH_SIZE:
+                        break
+                    offset += DB_PUSH_BATCH_SIZE
+                logger.info("表 %s 全量推送完成: %d 条", table_name, total_pushed)
+            except Exception as e:
+                # 动态表失败时 continue 而非 raise，避免单张动态表失败中断整个首次同步
+                # 静态表失败仍记录到 failed_tables，因为静态表是核心数据
+                if self.sync_repository.is_dynamic_table(table_name):
+                    logger.warning(
+                        "动态表 %s 全量推送失败，跳过（不影响首次同步整体）: %s",
+                        table_name,
+                        e,
+                    )
+                else:
+                    logger.error("静态表 %s 全量推送失败: %s", table_name, e)
+                    failed_tables.append(table_name)
+
+        if failed_tables:
+            from lifeprism.utils.exceptions import ExternalServiceError
+
+            raise ExternalServiceError(
+                message="首次同步数据库推送部分失败",
+                code="INITIAL_PUSH_PARTIAL_FAILED",
+                details={"failed_tables": failed_tables},
+            )
+
+    def _initial_push_files(
+        self,
+        remote_url: str,
+        api_key: str,
+        directories: list[str],
+    ) -> None:
+        """首次同步文件推送：全量推送所有 SYNC_DIRECTORIES 文件
+
+        关键修复：推送完成后推进本地 parent_hash = current_hash，
+        避免下次 sync_once 走矩阵判定时误判为 CONFLICT（Row 3 陷阱）。
+
+        流程：
+        1. _refresh_current_hashes 扫描文件并刷新 current_hash（复用其返回值避免重复扫描）
+        2. 分批 _push_files 推送（复用现有方法）
+        3. _advance_local_parent_after_initial_sync 推进本地 parent_hash
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+            directories: 文件同步目录列表
+        """
+        # 1. 刷新 current_hash（同时扫描文件，复用扫描结果避免重复扫描）
+        # _refresh_current_hashes 会扫描文件并 upsert state（parent_hash=existing or None, current_hash=计算值）
+        # 返回扫描到的文件相对路径列表，供后续 _push_files 和 _advance_local_parent 复用
+        file_list = self._refresh_current_hashes(directories)
+        if not file_list:
+            logger.info("无文件需要推送")
+            return
+
+        # 2. 分批推送（复用 _push_files）
+        batch_size = FILE_BATCH_SIZE
+        total = len(file_list)
+        for offset in range(0, total, batch_size):
+            batch_paths = file_list[offset : offset + batch_size]
+            self._push_files(remote_url, api_key, batch_paths)
+            logger.info("文件推送进度: %d/%d", offset + len(batch_paths), total)
+
+        logger.info("文件全量推送完成: %d 个文件", total)
+
+        # 3. 推进本地 parent_hash = current_hash
+        # 避免 Row 3 陷阱：首次同步后两端 parent_hash 均为 None，
+        # 下次 sync_once 时本地文件被修改会误判为 CONFLICT（而非 PUSH）
+        self._advance_local_parent_after_initial_sync(file_list)
+
+    def _advance_local_parent_after_initial_sync(self, paths: list[str]) -> None:
+        """首次同步后推进本地 parent_hash = current_hash
+
+        修复 Row 3 陷阱：首次同步后两端 file_sync_state 的 parent_hash 均为 None，
+        若不推进 parent_hash，下次 sync_once 时本地文件被修改会走矩阵判定 Row 3
+        （双方 parent 均为 None 且内容不同 → CONFLICT），触发不必要的 AI merge。
+
+        推进后：
+        - 本地 parent_hash = current_hash（标记"已同步到此版本"）
+        - 下次 sync_once 时本地文件未修改 → current_hash 不变 → SKIP（正确）
+        - 本地文件被修改 → current_hash 变化 → local_has_parent=True, remote_has_parent=False → Row 5 → PUSH（正确）
+
+        使用批量操作（batch_get_states + batch_upsert_states）避免 N+1 查询。
+
+        Args:
+            paths: 首次同步推送的文件相对路径列表
+        """
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+
+        provider = FileSyncStateProvider(db_manager=self.db)
+        if not paths:
+            return
+
+        # 批量查询现有状态（单次 DB 查询，避免 N 次 get_state 往返）
+        existing_states = provider.batch_get_states(paths)
+
+        # 内存中构建 upsert 列表
+        to_upsert = []
+        for rel_path in paths:
+            state = existing_states.get(rel_path)
+            if state and state.get("current_hash"):
+                to_upsert.append(
+                    {
+                        "file_path": rel_path,
+                        "parent_hash": state["current_hash"],
+                        "current_hash": state["current_hash"],
+                    }
+                )
+
+        # 批量 upsert（单次事务）
+        if to_upsert:
+            provider.batch_upsert_states(to_upsert)
+
+        advanced_count = len(to_upsert)
+        skipped = len(paths) - advanced_count
+        logger.info("首次同步后推进 parent_hash: %d/%d 个文件", advanced_count, len(paths))
+        if skipped > 0:
+            logger.warning(
+                "首次同步后 %d 个文件未推进 parent_hash（state 或 current_hash 为空），"
+                "可能触发下次同步 CONFLICT 误判",
+                skipped,
+            )
 
     def _sync_dynamic_tables_definitions(self, remote_url: str, api_key: str) -> list[str]:
         """拉取云端动态表定义，本地 slug 对比，触发双向建表

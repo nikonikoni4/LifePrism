@@ -50,6 +50,13 @@
 - 触发规则：审查动态表同步定义对比方案实现（新增 GET /dynamic-tables-definitions 端点、_sync_dynamic_tables_definitions、_create_local_dynamic_tables、删除 get_all_sync_tables）时查看
 - 内容摘要：动态表同步定义对比方案的 8 维度代码审查报告。审查 4 个文件（+196 -193 行），ADR 决策在代码中均正确落地。无 High 级问题达到 80 分阈值，但记录 3 个 75 分观察项（_rebuild_remote_dynamic_tables docstring 与实际调用时机不符、_create_local_dynamic_tables 违反导入纪律、_create_local_dynamic_tables 完全无测试）和 6 个 70 分低优先级改进项（核心方法缺少单元测试、双向建表分支无测试覆盖、spec 未同步更新、ADR 返回结构描述不符、sync_client 直接执行 SQL）。
 
+## 2026-07-17-code-review-cloud-init-first-sync
+
+- updated_at: 2026-07-17
+- path: `docs/generated/014/2026-07-17-code-review-cloud-init-first-sync.md`
+- 触发规则：审查云端首次同步全清覆盖方案实现（bootstrap agent_only 跳过、3 个新 API 端点、sync_once 首次同步分支、5 个首次同步方法、query_all/delete_all_rows）时查看
+- 内容摘要：云端首次同步全清覆盖方案的 8 维度代码审查报告。审查 7 个文件（+594 -79 行），ADR 5 个阶段全部合规。发现 12 个问题（置信度 ≥ 50），其中 10 个已直接修复（2 个 P0：N+1 查询、重复扫描；5 个 P1：私有方法访问、RuntimeError、魔法数字、未告警、异常范围；3 个 P2：空目录清理、docstring 修正、注释修正），2 个需要用户决策（测试覆盖、类职责膨胀）。
+
 ## utc-migration-audit-report
 - updated_at: 2026-07-12
 - path: `docs/generated/utc-migration-audit-report.md`

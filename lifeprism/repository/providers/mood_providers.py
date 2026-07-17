@@ -434,13 +434,12 @@ class MoodImpactProvider(LWBaseDataProvider):
     影响因素数据提供者（对应 mood_impacts 表）
 
     职责：提供 mood_impacts 表的所有数据访问接口
-    注意：此表使用 INTEGER PRIMARY KEY AUTOINCREMENT
     """
 
     # ==================== 表元数据定义 ====================
 
     _TABLE_NAME = "mood_impacts"
-    _PRIMARY_KEY = "id"  # INTEGER AUTOINCREMENT
+    _PRIMARY_KEY = "id"
     _DATE_FIELD = None
     _TIME_FIELD = None
 
@@ -504,25 +503,23 @@ class MoodImpactProvider(LWBaseDataProvider):
         Raises:
             DataAccessError: 数据库操作失败
         """
-        try:
-            # 白名单验证
-            invalid_fields = set(data.keys()) - self._UPDATE_FIELDS
-            if invalid_fields:
-                raise ValueError(f"Invalid insert fields: {invalid_fields}")
+        from lifeprism.utils.time_utils import get_utc_now_iso
 
-            # 使用自定义 SQL 获取 AUTOINCREMENT ID
-            now_iso = get_utc_now_iso()
+        now_iso = get_utc_now_iso()
+        try:
             with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
-                    INSERT INTO mood_impacts (name, sort_order, created_at)
-                    VALUES (?, ?, ?)
-                """,
-                    (data["name"], data.get("sort_order", 0), now_iso),
+                cursor = conn.execute(
+                    """INSERT INTO mood_impacts (name, sort_order, created_at, updated_at)
+                       VALUES (?, ?, ?, ?)""",
+                    (
+                        data["name"],
+                        data.get("sort_order", 0),
+                        now_iso,
+                        now_iso,
+                    ),
                 )
                 new_id = cursor.lastrowid
-                logger.info("创建影响因素成功: %s", data["name"])
+                logger.info("创建影响因素成功: %s, id=%s", data["name"], new_id)
                 return new_id
         except Exception as e:
             logger.error("创建影响因素失败: %s", e)

@@ -53,7 +53,7 @@ class SyncRepository:
 
     # ==================== 白名单校验 ====================
 
-    def _is_dynamic_table(self, table_name: str) -> bool:
+    def is_dynamic_table(self, table_name: str) -> bool:
         """判断表是否为动态自定义记录表（custom_{slug}）
 
         动态表由 CustomRecordRepository.create_type() 运行时创建，
@@ -73,6 +73,9 @@ class SyncRepository:
             True 如果是动态自定义记录表
         """
         return table_name.startswith("custom_") and table_name not in TABLE_CONFIGS
+
+    # 保留私有别名，向后兼容（内部调用）
+    _is_dynamic_table = is_dynamic_table
 
     def _validate_table_name(self, table_name: str) -> None:
         """验证表名在 TABLE_CONFIGS 白名单中或为动态自定义记录表
@@ -359,7 +362,123 @@ class SyncRepository:
                 cause=e,
             ) from e
 
+    def query_all(
+        self,
+        table_name: str,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """查询表的全量数据（不带 WHERE 过滤，用于首次同步推送）
+
+        与 query_incremental 的差异：
+        - 不带 WHERE updated_at > ? 过滤，返回所有记录（包括 updated_at 为 NULL 的）
+        - 复用动态表存在性检查逻辑（custom_<slug> 表不存在时返回空列表）
+
+        Args:
+            table_name: 表名
+            offset: 分页偏移
+            limit: 分页限制
+
+        Returns:
+            记录列表
+
+        Raises:
+            DataAccessError: 数据库操作失败（静态表不存在等）
+        """
+        self._validate_table_name(table_name)
+
+        # 动态表（custom_{slug}）在本地可能尚未创建（slug 已删除但 meta 残留等场景）
+        # 复用 query_incremental 的存在性检查逻辑，避免抛 OperationalError 中断首次同步
+        if self._is_dynamic_table(table_name):
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    (table_name,),
+                )
+                if cursor.fetchone() is None:
+                    logger.warning("全量查询: 动态表 %s 不存在于数据库中，返回空列表", table_name)
+                    return []
+
+        sql = f"SELECT * FROM {table_name}"
+        params: list[Any] = []
+        if limit is not None:
+            sql += " LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
+        elif offset > 0:
+            sql += " LIMIT -1 OFFSET ?"
+            params.append(offset)
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql, tuple(params))
+                column_names = [desc[0] for desc in cursor.description]
+                results = [dict(zip(column_names, row, strict=False)) for row in cursor.fetchall()]
+            logger.debug(
+                "全量查询 %s: offset=%d, limit=%s, 返回 %d 条记录",
+                table_name,
+                offset,
+                limit,
+                len(results),
+            )
+            return results
+        except sqlite3.Error as e:
+            logger.error(
+                "全量查询失败: table=%s, offset=%d, limit=%s, error=%s",
+                table_name,
+                offset,
+                limit,
+                e,
+            )
+            raise DataAccessError(
+                message=f"全量查询表 {table_name} 失败",
+                details={
+                    "table": table_name,
+                    "offset": offset,
+                    "limit": limit,
+                    "error": str(e),
+                },
+                cause=e,
+            ) from e
+
     # ==================== 写入方法 ====================
+
+    def delete_all_rows(self, table_name: str) -> int:
+        """删除指定表的所有行（用于 full-clear 等管理操作）
+
+        执行 SQL: DELETE FROM {table_name}
+
+        单表 DELETE 在 SQLite 中是原子操作（隐式事务）。
+        跨表非原子，由调用方负责幂等重试。
+
+        Args:
+            table_name: 表名（必须通过白名单校验）
+
+        Returns:
+            受影响行数
+
+        Raises:
+            DataAccessError: 数据库操作失败（表不存在等）
+        """
+        self._validate_table_name(table_name)
+
+        sql = f"DELETE FROM {table_name}"
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql)
+                conn.commit()
+                affected = cursor.rowcount
+            logger.info("清空表 %s: 受影响 %d 行", table_name, affected)
+            return affected
+        except sqlite3.Error as e:
+            logger.error("清空表失败: table=%s, error=%s", table_name, e)
+            raise DataAccessError(
+                message=f"清空表 {table_name} 失败",
+                details={"table": table_name, "error": str(e)},
+                cause=e,
+            ) from e
 
     def upsert_rows(self, table_name: str, rows: list[dict[str, Any]]) -> int:
         """批量写入：INSERT OR REPLACE
