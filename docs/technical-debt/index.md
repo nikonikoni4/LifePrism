@@ -18,3 +18,24 @@
 - path: `docs/technical-debt/config-database-misplacement.md`
 - 触发规则：修改 config 模块或 repository 模块的整体结构时阅读
 - 内容摘要：config/database.py 定义了 38 张表的元数据，逻辑上应属于 repository 模块，因迁移风险暂放 config
+
+## initial-sync-test-coverage
+
+- updated_at: 2026-07-17
+- path: `docs/technical-debt/initial-sync-test-coverage.md`
+- 触发规则：修改 sync_client 首次同步分支、sync_cloud_api 端点、sync_repository 时阅读
+- 内容摘要：首次同步全清流程 8 个核心方法（query_all/delete_all_rows/3个API端点/4个sync_client方法）无单元测试和集成测试覆盖，涉及 Row 3 矩阵判定陷阱（P0）和 N+1 查询回归（P0）的回归风险
+
+## sync-client-class-bloat
+
+- updated_at: 2026-07-17
+- path: `docs/technical-debt/sync-client-class-bloat.md`
+- 触发规则：修改同步模块整体结构、SyncClient 大幅改动时阅读
+- 内容摘要：SyncClient（1780+ 行）承担首次同步 + 增量同步两条流程，在下次同步大改时抽取独立 InitialSyncService 类
+
+## mood-impacts-autoincrement-id
+
+- updated_at: 2026-07-17
+- path: `docs/technical-debt/mood-impacts-autoincrement-id.md`
+- 触发规则：修改 mood_impacts 表结构或 MoodImpactProvider 时阅读
+- 内容摘要：mood_impacts 是唯一使用 INTEGER AUTOINCREMENT 主键的表，与项目 TEXT hash ID 风格不一致。经 ADR 2026-07-17 验证无功能影响，建议在下次涉及该表结构变更时统一
