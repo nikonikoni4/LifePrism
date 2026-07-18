@@ -71,6 +71,13 @@
 - 触发规则：审查 `.scratch/file-conflict-resolution-redesign/` 中的 PRD + Issue 规格文档（9 个 spec 文件 + 实现对齐）时查看
 - 内容摘要：File Sync Conflict Resolution Redesign 规格文档审查。检查 9 个 spec 文件与 20 个 PRD 决策的实现对齐。发现 5 个文档问题（置信度 >= 80）：PRD decision 19 代码示例与目录图自相矛盾（90）、Issue 5 Blocked by 遗漏 Issue 4 依赖标注（85）、file_path_str 推导规则未显式定义（80）、Issue 7 包结构决策未记录（80）、Issue 1 BOM 边界未讨论（80）。20/20 决策在实现中全部正确落地，无 spec-实现不一致。
 
+## 2026-07-18-code-review-reeval-implementation
+
+- updated_at: 2026-07-18
+- path: `docs/generated/017/2026-07-18-code-review-reeval-implementation.md`
+- 触发规则：审查实现代码（8 个 issue 全部代码，feature commit + fix commit，`b1a15ee3..6a95eb4f`，43 文件 +11857/-449 行）时查看
+- 内容摘要：015 审查修复后的**第二次实现审查**。检查 10 个核心代码文件与 5 个测试文件。015 审查发现的 10 个问题已全部修复并通过验证。新发现 8 个问题（置信度 >= 80）：3 个 Code Quality（httpx 异常类型不统一 85、TimeoutError 死代码 85、except Exception 缺 LEGITIMATE 注释 80）、1 个 Documentation（备份启动补偿描述不符 85）、4 个 Testing（非确定性断言 85、OSError 恢复路径未测试 80、parse_conflict_blocks 恢复路径未测试 80、match_markers 模糊匹配无直接测试 80）。
+
 ## utc-migration-audit-report
 - updated_at: 2026-07-12
 - path: `docs/generated/utc-migration-audit-report.md`
