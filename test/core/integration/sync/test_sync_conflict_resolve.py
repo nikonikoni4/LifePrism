@@ -160,41 +160,34 @@ class TestBusBridge:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """_resolve_conflicts 应通过 run_coroutine_threadsafe 调用 bus.send"""
+        """_resolve_conflicts 应通过 run_coroutine_threadsafe 调用 bus.send
+
+        Issue 4 新流程：diff3 产生冲突 → LLM 串行处理 → bus.send 桥接
+        """
         from lifeprism.config.settings_manager import settings
 
-        # Arrange: 创建本地冲突文件
+        # Arrange: 创建冲突三方内容（diff3 会产生 1 个冲突块）
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
+
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
-        local_content = "# 本地日记\n今天心情不错"
+        rel_path = "conflict_test/diary/2026-07-14.md"
         local_file = test_base / "diary" / "2026-07-14.md"
-        local_file.write_text(local_content, encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
-        remote_content = "# 云端日记\n今天天气晴朗"
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": "conflict_test/diary/2026-07-14.md",
-                        "content": _encode_file_content(remote_content),
-                        "parent_hash": "old_hash",
-                        "current_hash": "remote_hash",
-                    }
-                ]
-            }
+        # 预计算 LLM JSON 响应（基于 diff3 冲突块）
+        llm_response, parent_hash = _make_conflict_llm_outbound_response(
+            base, ours, theirs, replacement="MERGED"
         )
-
-        # Mock bus bridge: run_coroutine_threadsafe 返回 mock future
-        from lifeprism.llm.bus.events import OutboundMessage
-        from lifeprism.llm.providers import LLMResponse
 
         mock_future = MagicMock()
-        mock_future.result.return_value = OutboundMessage(
-            response=LLMResponse(content="# 合并后的日记\n今天心情不错，天气晴朗"),
-        )
+        mock_future.result.return_value = llm_response
 
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
                 return_value=mock_future,
@@ -202,7 +195,7 @@ class TestBusBridge:
         ):
             # Act
             sync_client._resolve_conflicts(
-                conflict_paths=["conflict_test/diary/2026-07-14.md"],
+                conflict_paths=[rel_path],
                 remote_url="http://test:8000",
                 api_key="test-key",
             )
@@ -220,43 +213,39 @@ class TestBusBridge:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """future.result 应以 timeout=600 等待 AI 合并完成"""
+        """future.result 应以 timeout=600 等待 AI 合并完成
+
+        Issue 4 新流程：LLM 调用通过 bus.send，future.result(timeout=600) 等待响应
+        """
         from lifeprism.config.settings_manager import settings
-        from lifeprism.llm.bus.events import OutboundMessage
-        from lifeprism.llm.providers import LLMResponse
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
 
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
+        rel_path = "conflict_test/diary/2026-07-14.md"
         local_file = test_base / "diary" / "2026-07-14.md"
-        local_file.write_text("本地内容", encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": "conflict_test/diary/2026-07-14.md",
-                        "content": _encode_file_content("云端内容"),
-                        "parent_hash": "old_hash",
-                        "current_hash": "remote_hash",
-                    }
-                ]
-            }
+        llm_response, parent_hash = _make_conflict_llm_outbound_response(
+            base, ours, theirs, replacement="MERGED"
         )
 
         mock_future = MagicMock()
-        mock_future.result.return_value = OutboundMessage(
-            response=LLMResponse(content="合并后的内容"),
-        )
+        mock_future.result.return_value = llm_response
 
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
                 return_value=mock_future,
             ),
         ):
             sync_client._resolve_conflicts(
-                conflict_paths=["conflict_test/diary/2026-07-14.md"],
+                conflict_paths=[rel_path],
                 remote_url="http://test:8000",
                 api_key="test-key",
             )
@@ -287,39 +276,36 @@ class TestMergeResultHandling:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """成功合并后应备份本地版本到 sync_conflict/{timestamp}/{file_path}"""
-        from lifeprism.config.settings_manager import settings
-        from lifeprism.llm.bus.events import OutboundMessage
-        from lifeprism.llm.providers import LLMResponse
+        """成功合并后应同时备份本地与云端两个版本到 sync_conflict/{timestamp}/
 
-        # Arrange: 创建本地冲突文件
+        修复旧实现仅备份 local_content 的 bug（PRD 决策 19，
+        ADR-2026-07-17-conflict-failure-policy.md）。
+
+        Issue 4 新流程：diff3 + LLM JSON 替换后备份双方原始版本
+        """
+        from lifeprism.config.settings_manager import settings
+
+        # Arrange: 冲突三方内容
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
+
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
-        local_content = "# 本地日记\n今天心情不错"
         rel_path = "conflict_test/diary/2026-07-14.md"
         local_file = test_base / "diary" / "2026-07-14.md"
-        local_file.write_text(local_content, encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": rel_path,
-                        "content": _encode_file_content("# 云端日记\n今天天气晴朗"),
-                        "parent_hash": "old_hash",
-                        "current_hash": "remote_hash",
-                    }
-                ]
-            }
+        llm_response, _ = _make_conflict_llm_outbound_response(
+            base, ours, theirs, replacement="MERGED"
         )
 
         mock_future = MagicMock()
-        mock_future.result.return_value = OutboundMessage(
-            response=LLMResponse(content="# 合并后的日记\n今天心情不错，天气晴朗"),
-        )
+        mock_future.result.return_value = llm_response
 
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
                 return_value=mock_future,
@@ -331,14 +317,18 @@ class TestMergeResultHandling:
                 api_key="test-key",
             )
 
-        # Assert: sync_conflict 目录下存在备份文件，内容为本地原始内容
+        # Assert: sync_conflict 目录下同时存在 .local.md 与 .remote.md 备份
         sync_conflict_dir = settings.lifeprism_data_path / "sync_conflict"
         assert sync_conflict_dir.exists(), "sync_conflict 备份目录应存在"
 
-        # 遍历 timestamp 子目录查找备份文件
-        backup_files = list(sync_conflict_dir.rglob("2026-07-14.md"))
-        assert len(backup_files) == 1, "应存在 1 个备份文件"
-        assert backup_files[0].read_text(encoding="utf-8") == local_content
+        local_backup_files = list(sync_conflict_dir.rglob("*.local.md"))
+        remote_backup_files = list(sync_conflict_dir.rglob("*.remote.md"))
+        assert len(local_backup_files) == 1, "应存在 1 个 .local.md 本地版本备份"
+        assert len(remote_backup_files) == 1, "应存在 1 个 .remote.md 云端版本备份"
+
+        # 内容校验：备份的是冲突前的原始 ours/theirs 内容
+        assert local_backup_files[0].read_text(encoding="utf-8") == ours
+        assert remote_backup_files[0].read_text(encoding="utf-8") == theirs
 
     def test_resolve_conflicts_writes_merged_content(
         self,
@@ -348,38 +338,36 @@ class TestMergeResultHandling:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """成功合并后本地文件应被覆盖为合并后内容"""
+        """成功合并后本地文件应被覆盖为合并后内容
+
+        Issue 4 新流程：LLM 返回 JSON 替换指令，程序执行替换后写入文件
+        """
         from lifeprism.config.settings_manager import settings
-        from lifeprism.llm.bus.events import OutboundMessage
-        from lifeprism.llm.providers import LLMResponse
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
 
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
         rel_path = "conflict_test/diary/2026-07-14.md"
         local_file = test_base / "diary" / "2026-07-14.md"
-        local_file.write_text("# 本地日记\n今天心情不错", encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
-        merged_content = "# 合并后的日记\n今天心情不错，天气晴朗"
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": rel_path,
-                        "content": _encode_file_content("# 云端日记"),
-                        "parent_hash": "old_hash",
-                        "current_hash": "remote_hash",
-                    }
-                ]
-            }
+        replacement = "MERGED"
+        llm_response, _ = _make_conflict_llm_outbound_response(
+            base, ours, theirs, replacement=replacement
         )
 
         mock_future = MagicMock()
-        mock_future.result.return_value = OutboundMessage(
-            response=LLMResponse(content=merged_content),
-        )
+        mock_future.result.return_value = llm_response
+
+        # 预期最终内容：冲突块被替换为 replacement
+        expected_final = f"line1\n{replacement}\nline3\n"
 
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
                 return_value=mock_future,
@@ -392,7 +380,7 @@ class TestMergeResultHandling:
             )
 
         # Assert: 本地文件已被合并内容覆盖
-        assert local_file.read_text(encoding="utf-8") == merged_content
+        assert local_file.read_text(encoding="utf-8") == expected_final
 
     def test_resolve_conflicts_updates_current_hash(
         self,
@@ -402,42 +390,38 @@ class TestMergeResultHandling:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """成功合并后 file_sync_state.current_hash 应为 compute_file_hash(merged_content)"""
+        """成功合并后 file_sync_state.current_hash 应为 compute_file_hash(merged_content)
+
+        Issue 4 新流程：current_hash = 合并后最终内容的 hash
+        """
         from lifeprism.config.settings_manager import settings
-        from lifeprism.llm.bus.events import OutboundMessage
-        from lifeprism.llm.providers import LLMResponse
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
         from lifeprism.sync.hash_utils import compute_file_hash
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
 
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
         rel_path = "conflict_test/diary/2026-07-14.md"
         local_file = test_base / "diary" / "2026-07-14.md"
-        local_file.write_text("# 本地内容", encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
-        merged_content = "# 合并后的内容\n保留双方信息"
-        expected_hash = compute_file_hash(merged_content.encode("utf-8"))
-
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": rel_path,
-                        "content": _encode_file_content("# 云端内容"),
-                        "parent_hash": "old_hash",
-                        "current_hash": "remote_hash",
-                    }
-                ]
-            }
+        replacement = "MERGED"
+        llm_response, _ = _make_conflict_llm_outbound_response(
+            base, ours, theirs, replacement=replacement
         )
 
         mock_future = MagicMock()
-        mock_future.result.return_value = OutboundMessage(
-            response=LLMResponse(content=merged_content),
-        )
+        mock_future.result.return_value = llm_response
+
+        expected_final = f"line1\n{replacement}\nline3\n"
+        expected_hash = compute_file_hash(expected_final.encode("utf-8"))
 
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
                 return_value=mock_future,
@@ -449,7 +433,7 @@ class TestMergeResultHandling:
                 api_key="test-key",
             )
 
-        # Assert: current_hash 已更新为合并内容的 hash
+        # Assert: current_hash 已更新为合并后最终内容的 hash
         provider = FileSyncStateProvider(db_manager=initialized_db)
         state = provider.get_state(rel_path)
         assert state is not None, "file_sync_state 记录应存在"
@@ -463,47 +447,44 @@ class TestMergeResultHandling:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """成功合并后 file_sync_state.parent_hash 应保持不变"""
+        """成功合并后 file_sync_state.parent_hash 应保持不变
+
+        Issue 4 新流程：parent_hash 由后续 verify_and_advance_parent 推进，
+        冲突解决阶段保持不变
+        """
         from lifeprism.config.settings_manager import settings
-        from lifeprism.llm.bus.events import OutboundMessage
-        from lifeprism.llm.providers import LLMResponse
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
 
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
         rel_path = "conflict_test/diary/2026-07-14.md"
         local_file = test_base / "diary" / "2026-07-14.md"
-        local_file.write_text("# 本地内容", encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
-        # 预设 file_sync_state 记录，parent_hash = "original_parent_hash"
-        original_parent_hash = "original_parent_hash"
+        # 预设 file_sync_state 记录，parent_hash = base 内容的 hash
         provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
         provider.upsert_state(
             file_path=rel_path,
-            parent_hash=original_parent_hash,
-            current_hash="old_current_hash",
+            parent_hash=parent_hash,
+            current_hash=compute_file_hash(ours.encode("utf-8")),
         )
 
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": rel_path,
-                        "content": _encode_file_content("# 云端内容"),
-                        "parent_hash": original_parent_hash,
-                        "current_hash": "remote_hash",
-                    }
-                ]
-            }
+        llm_response, _ = _make_conflict_llm_outbound_response(
+            base, ours, theirs, replacement="MERGED"
         )
 
         mock_future = MagicMock()
-        mock_future.result.return_value = OutboundMessage(
-            response=LLMResponse(content="# 合并后的内容"),
-        )
+        mock_future.result.return_value = llm_response
 
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
                 return_value=mock_future,
@@ -518,7 +499,7 @@ class TestMergeResultHandling:
         # Assert: parent_hash 保持不变
         state = provider.get_state(rel_path)
         assert state is not None
-        assert state["parent_hash"] == original_parent_hash
+        assert state["parent_hash"] == parent_hash
 
     def test_resolve_conflicts_returns_resolved_paths(
         self,
@@ -528,37 +509,32 @@ class TestMergeResultHandling:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """_resolve_conflicts 应返回成功合并的文件路径列表"""
+        """_resolve_conflicts 应返回成功合并的文件路径列表
+
+        Issue 4 新流程：成功解决冲突的文件路径出现在返回列表中
+        """
         from lifeprism.config.settings_manager import settings
-        from lifeprism.llm.bus.events import OutboundMessage
-        from lifeprism.llm.providers import LLMResponse
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
 
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
         rel_path = "conflict_test/diary/2026-07-14.md"
         local_file = test_base / "diary" / "2026-07-14.md"
-        local_file.write_text("# 本地内容", encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": rel_path,
-                        "content": _encode_file_content("# 云端内容"),
-                        "parent_hash": "old_hash",
-                        "current_hash": "remote_hash",
-                    }
-                ]
-            }
+        llm_response, _ = _make_conflict_llm_outbound_response(
+            base, ours, theirs, replacement="MERGED"
         )
 
         mock_future = MagicMock()
-        mock_future.result.return_value = OutboundMessage(
-            response=LLMResponse(content="# 合并后的内容"),
-        )
+        mock_future.result.return_value = llm_response
 
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
                 return_value=mock_future,
@@ -602,39 +578,36 @@ class TestMergeFailureHandling:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """TimeoutError 时本地版本应保留不变"""
+        """文件级 TimeoutError 时本地版本应保留不变
+
+        Issue 4 新流程：LLM 调用超时被 resolve_conflict_blocks 内部捕获并重试降级，
+        不会传播到文件级。文件级 TimeoutError 只能来自 _fetch_remote_base_content
+        等非 LLM 路径（如备份目录读取超时）→ 文件级异常处理 →
+        不写入、不备份、不更新 state
+        """
         from lifeprism.config.settings_manager import settings
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
 
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
         rel_path = "conflict_test/diary/2026-07-14.md"
         local_file = test_base / "diary" / "2026-07-14.md"
-        local_content = "# 本地日记\n原始内容"
-        local_file.write_text(local_content, encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": rel_path,
-                        "content": _encode_file_content("# 云端内容"),
-                        "parent_hash": "old_hash",
-                        "current_hash": "remote_hash",
-                    }
-                ]
-            }
-        )
-
-        # Mock future.result 抛出 TimeoutError
-        mock_future = MagicMock()
-        mock_future.result.side_effect = TimeoutError()
-
+        # Mock: _fetch_remote_base_content 抛出 TimeoutError（文件级异常）
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(
+                sync_client,
+                "_fetch_remote_base_content",
+                side_effect=TimeoutError(),
+            ),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
-                return_value=mock_future,
-            ),
+            ) as mock_rcts,
         ):
             result = sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
@@ -643,9 +616,11 @@ class TestMergeFailureHandling:
             )
 
         # Assert: 本地文件内容不变
-        assert local_file.read_text(encoding="utf-8") == local_content
+        assert local_file.read_text(encoding="utf-8") == ours
         # Assert: 不在 resolved_paths 中
         assert result == []
+        # Assert: LLM 未被调用（文件级异常在 LLM 之前发生）
+        mock_rcts.assert_not_called()
         # Assert: 未创建备份目录
         sync_conflict_dir = settings.lifeprism_data_path / "sync_conflict"
         assert not sync_conflict_dir.exists() or not list(sync_conflict_dir.rglob("2026-07-14.md"))
@@ -658,39 +633,37 @@ class TestMergeFailureHandling:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """AI 返回空内容时本地版本应保留不变"""
+        """LLM 返回无效内容（空字符串）→ 重试 3 次失败 → 降级 keep_ours
+
+        Issue 4 新流程：LLM 返回空字符串 → parse_llm_json_response 失败 →
+        重试 3 次都失败 → 降级 keep_ours（冲突块替换为 ours 内容）→
+        文件写入 ours 内容、hash 更新、路径加入 resolved_paths
+
+        与旧流程差异：旧流程空内容 → 保留本地不写入；新流程 → 降级写入 ours
+        """
         from lifeprism.config.settings_manager import settings
         from lifeprism.llm.bus.events import OutboundMessage
         from lifeprism.llm.providers import LLMResponse
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
 
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
         rel_path = "conflict_test/diary/2026-07-14.md"
         local_file = test_base / "diary" / "2026-07-14.md"
-        local_content = "# 本地日记\n原始内容"
-        local_file.write_text(local_content, encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": rel_path,
-                        "content": _encode_file_content("# 云端内容"),
-                        "parent_hash": "old_hash",
-                        "current_hash": "remote_hash",
-                    }
-                ]
-            }
-        )
-
-        # Mock 返回空内容
+        # Mock LLM 始终返回空字符串（无效 JSON）→ 重试 3 次后降级 keep_ours
         mock_future = MagicMock()
         mock_future.result.return_value = OutboundMessage(
             response=LLMResponse(content=""),
         )
 
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
                 return_value=mock_future,
@@ -702,10 +675,13 @@ class TestMergeFailureHandling:
                 api_key="test-key",
             )
 
-        # Assert: 本地文件内容不变
-        assert local_file.read_text(encoding="utf-8") == local_content
-        # Assert: 不在 resolved_paths 中
-        assert result == []
+        # Assert: 降级 keep_ours 也算"解决"了冲突，路径在 resolved_paths 中
+        assert result == [rel_path]
+        # Assert: 本地文件已写入（降级 keep_ours 后冲突块被替换为 ours 内容）
+        final_content = local_file.read_text(encoding="utf-8")
+        assert "OURS" in final_content  # ours 内容保留
+        assert "THEIRS" not in final_content  # 无 theirs 残留
+        assert "<<<<<<<" not in final_content  # 无冲突标记残留
 
     def test_empty_merged_content_preserves_file_sync_state(
         self,
@@ -715,48 +691,46 @@ class TestMergeFailureHandling:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """AI 返回空内容时 file_sync_state 不应被更新"""
+        """LLM 返回无效内容 → 降级 keep_ours → file_sync_state.current_hash 更新为 ours hash
+
+        Issue 4 新流程：降级后文件内容为 ours（冲突块被替换），
+        current_hash = compute_file_hash(降级后内容)，parent_hash 不变
+        """
         from lifeprism.config.settings_manager import settings
         from lifeprism.llm.bus.events import OutboundMessage
         from lifeprism.llm.providers import LLMResponse
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
 
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
         rel_path = "conflict_test/diary/2026-07-14.md"
         local_file = test_base / "diary" / "2026-07-14.md"
-        local_file.write_text("# 本地内容", encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
         # 预设 file_sync_state
-        original_parent = "original_parent"
-        original_current = "original_current"
         provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
+        original_current = compute_file_hash(ours.encode("utf-8"))
         provider.upsert_state(
             file_path=rel_path,
-            parent_hash=original_parent,
+            parent_hash=parent_hash,
             current_hash=original_current,
         )
 
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": rel_path,
-                        "content": _encode_file_content("# 云端内容"),
-                        "parent_hash": original_parent,
-                        "current_hash": "remote_hash",
-                    }
-                ]
-            }
-        )
-
+        # Mock LLM 返回空白字符串（无效 JSON）→ 重试 3 次后降级 keep_ours
         mock_future = MagicMock()
         mock_future.result.return_value = OutboundMessage(
-            response=LLMResponse(content="   "),  # 仅空白字符也算空
+            response=LLMResponse(content="   "),  # 仅空白字符，parse 失败
         )
 
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
                 return_value=mock_future,
@@ -768,10 +742,12 @@ class TestMergeFailureHandling:
                 api_key="test-key",
             )
 
-        # Assert: file_sync_state 不变
+        # Assert: file_sync_state 已更新（降级后 current_hash = ours 内容的 hash）
         state = provider.get_state(rel_path)
         assert state is not None
-        assert state["parent_hash"] == original_parent
+        assert state["parent_hash"] == parent_hash  # parent_hash 不变
+        # current_hash = 降级后内容的 hash（ours 内容，冲突块被替换为 ours）
+        # 降级 keep_ours 后文件内容仍是 ours（冲突块本就是 ours vs theirs，替换为 ours）
         assert state["current_hash"] == original_current
 
     def test_generic_exception_preserves_local_version(
@@ -782,39 +758,36 @@ class TestMergeFailureHandling:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """其他异常时本地版本应保留不变"""
+        """文件级 RuntimeError 时本地版本应保留不变
+
+        Issue 4 新流程：LLM 调用异常被 resolve_conflict_blocks 内部捕获并重试降级，
+        不会传播到文件级。文件级 RuntimeError 只能来自 _fetch_remote_base_content
+        等非 LLM 路径（如备份目录读取失败）→ 文件级异常处理 →
+        不写入、不备份、不更新 state
+        """
         from lifeprism.config.settings_manager import settings
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
 
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
         rel_path = "conflict_test/diary/2026-07-14.md"
         local_file = test_base / "diary" / "2026-07-14.md"
-        local_content = "# 本地日记\n原始内容"
-        local_file.write_text(local_content, encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": rel_path,
-                        "content": _encode_file_content("# 云端内容"),
-                        "parent_hash": "old_hash",
-                        "current_hash": "remote_hash",
-                    }
-                ]
-            }
-        )
-
-        # Mock future.result 抛出通用异常
-        mock_future = MagicMock()
-        mock_future.result.side_effect = RuntimeError("LLM 服务不可用")
-
+        # Mock: _fetch_remote_base_content 抛出 RuntimeError（文件级异常）
         with (
-            patch("lifeprism.sync.sync_client.httpx.post", return_value=fetch_response),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(
+                sync_client,
+                "_fetch_remote_base_content",
+                side_effect=RuntimeError("备份目录读取失败"),
+            ),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
-                return_value=mock_future,
-            ),
+            ) as mock_rcts,
         ):
             result = sync_client._resolve_conflicts(
                 conflict_paths=[rel_path],
@@ -823,9 +796,11 @@ class TestMergeFailureHandling:
             )
 
         # Assert: 本地文件内容不变
-        assert local_file.read_text(encoding="utf-8") == local_content
+        assert local_file.read_text(encoding="utf-8") == ours
         # Assert: 不在 resolved_paths 中
         assert result == []
+        # Assert: LLM 未被调用（文件级异常在 LLM 之前发生）
+        mock_rcts.assert_not_called()
 
     def test_fetch_remote_failure_skips_file(
         self,
@@ -889,66 +864,58 @@ class TestMergeFailureHandling:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """多个冲突文件中部分失败时，只返回成功的路径"""
+        """多个冲突文件中部分失败时，只返回成功的路径
+
+        Issue 4 新流程：文件1 LLM 成功 → resolved；文件2 _fetch_remote_base_content
+        抛出 TimeoutError → 文件级异常 → 未 resolved
+
+        说明：LLM 调用异常被 resolve_conflict_blocks 内部捕获并重试降级，
+        不会传播到文件级。文件级 TimeoutError 只能来自 _fetch_remote_base_content
+        等非 LLM 路径。
+        """
         from lifeprism.config.settings_manager import settings
-        from lifeprism.llm.bus.events import OutboundMessage
-        from lifeprism.llm.providers import LLMResponse
 
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
 
-        # 文件1：会成功合并
+        # 文件1：会成功合并（LLM 返回有效 JSON）
         rel_path1 = "conflict_test/diary/success.md"
         local_file1 = test_base / "diary" / "success.md"
-        local_file1.write_text("# 本地内容1", encoding="utf-8")
+        base1 = "line1\nline2\nline3\n"
+        ours1 = "line1\nOURS1\nline3\n"
+        theirs1 = "line1\nTHEIRS1\nline3\n"
+        local_file1.write_text(ours1, encoding="utf-8")
 
-        # 文件2：会超时失败
+        # 文件2：会文件级失败（_fetch_remote_base_content 抛出 TimeoutError）
         rel_path2 = "conflict_test/diary/timeout.md"
         local_file2 = test_base / "diary" / "timeout.md"
-        local_content2 = "# 本地内容2\n原始"
-        local_file2.write_text(local_content2, encoding="utf-8")
+        base2 = "h1\nh2\nh3\n"
+        ours2 = "h1\nOURS2\nh3\n"
+        theirs2 = "h1\nTHEIRS2\nh3\n"
+        local_file2.write_text(ours2, encoding="utf-8")
 
-        # Mock: 第一次调用返回成功，第二次调用抛出 TimeoutError
-        fetch_response = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": rel_path1,
-                        "content": _encode_file_content("# 云端内容1"),
-                        "parent_hash": "old_hash1",
-                        "current_hash": "remote_hash1",
-                    }
-                ]
-            }
-        )
-        fetch_response2 = _make_mock_response(
-            {
-                "files": [
-                    {
-                        "path": rel_path2,
-                        "content": _encode_file_content("# 云端内容2"),
-                        "parent_hash": "old_hash2",
-                        "current_hash": "remote_hash2",
-                    }
-                ]
-            }
+        # 预计算文件1的 LLM JSON 响应
+        llm_response1, _ = _make_conflict_llm_outbound_response(
+            base1, ours1, theirs1, replacement="MERGED1"
         )
 
         mock_future_success = MagicMock()
-        mock_future_success.result.return_value = OutboundMessage(
-            response=LLMResponse(content="# 合并后内容1"),
-        )
-        mock_future_timeout = MagicMock()
-        mock_future_timeout.result.side_effect = TimeoutError()
+        mock_future_success.result.return_value = llm_response1
 
         with (
-            patch(
-                "lifeprism.sync.sync_client.httpx.post",
-                side_effect=[fetch_response, fetch_response2],
+            patch.object(
+                sync_client,
+                "_fetch_remote_file_content",
+                side_effect=[theirs1, theirs2],
+            ),
+            patch.object(
+                sync_client,
+                "_fetch_remote_base_content",
+                side_effect=[base1, TimeoutError()],  # 文件2 文件级异常
             ),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
-                side_effect=[mock_future_success, mock_future_timeout],
+                return_value=mock_future_success,  # 仅文件1调用 LLM
             ),
         ):
             result = sync_client._resolve_conflicts(
@@ -960,7 +927,7 @@ class TestMergeFailureHandling:
         # Assert: 只返回成功的路径
         assert result == [rel_path1]
         # Assert: 失败的文件本地内容不变
-        assert local_file2.read_text(encoding="utf-8") == local_content2
+        assert local_file2.read_text(encoding="utf-8") == ours2
 
 
 # ==================== Seam 4: _sync_files_full_flow 集成（CONFLICT→AI合并→Phase 2c推送） ====================
@@ -1370,32 +1337,41 @@ class TestFullFlowEndToEnd:
         clean_file_sync_state,
         clean_sync_conflict_dir,
     ):
-        """CONFLICT→AI合并→推送 全流程：本地与云端都修改了同一文件"""
+        """CONFLICT→AI合并→推送 全流程：本地与云端都修改了同一文件
+
+        Issue 4 新流程：diff3 + LLM JSON 替换 + 推送 + 校验推进
+        """
         from lifeprism.config.settings_manager import settings
-        from lifeprism.llm.bus.events import OutboundMessage
-        from lifeprism.llm.providers import LLMResponse
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
         from lifeprism.sync.hash_utils import compute_file_hash
 
-        # Arrange: 创建本地文件
+        # Arrange: 冲突三方内容
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
+        replacement = "MERGED"
+        expected_final = f"line1\n{replacement}\nline3\n"
+        merged_hash = compute_file_hash(expected_final.encode("utf-8"))
+
         test_base = settings.lifeprism_data_path / "conflict_test"
         (test_base / "diary").mkdir(parents=True, exist_ok=True)
         rel_path = "conflict_test/diary/test.md"
         local_file = test_base / "diary" / "test.md"
-        local_content = "# 本地日记\n今天心情不错"
-        local_file.write_text(local_content, encoding="utf-8")
+        local_file.write_text(ours, encoding="utf-8")
 
-        # 预设 file_sync_state（parent_hash = "parent_hash"，current_hash 会被 _refresh_current_hashes 刷新）
+        # 预设 file_sync_state（parent_hash = base hash，确保 CONFLICT 矩阵触发）
         provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
         provider.upsert_state(
             file_path=rel_path,
-            parent_hash="parent_hash",  # 虚假 parent hash，确保 local_changed=True
-            current_hash="old_hash",
+            parent_hash=parent_hash,
+            current_hash="old_hash",  # 会被 _refresh_current_hashes 刷新
         )
 
-        remote_content = "# 云端日记\n今天天气晴朗"
-        merged_content = "# 合并后的日记\n今天心情不错，天气晴朗"
-        merged_hash = compute_file_hash(merged_content.encode("utf-8"))
+        # 预计算 LLM JSON 响应
+        llm_response, _ = _make_conflict_llm_outbound_response(
+            base, ours, theirs, replacement=replacement
+        )
 
         # Mock HTTP: 不同 URL 返回不同响应
         def mock_http_post(url, json=None, headers=None, timeout=None):
@@ -1405,21 +1381,8 @@ class TestFullFlowEndToEnd:
                         "files": [
                             {
                                 "path": rel_path,
-                                "parent_hash": "parent_hash",
-                                "current_hash": "remote_hash",
-                            }
-                        ]
-                    }
-                )
-            elif "/pull-files/fetch" in url:
-                return _make_mock_response(
-                    {
-                        "files": [
-                            {
-                                "path": rel_path,
-                                "content": _encode_file_content(remote_content),
-                                "parent_hash": "parent_hash",
-                                "current_hash": "remote_hash",
+                                "parent_hash": parent_hash,
+                                "current_hash": compute_file_hash(theirs.encode("utf-8")),
                             }
                         ]
                     }
@@ -1443,12 +1406,12 @@ class TestFullFlowEndToEnd:
             return _make_mock_response({"status": "unknown"})
 
         mock_future = MagicMock()
-        mock_future.result.return_value = OutboundMessage(
-            response=LLMResponse(content=merged_content),
-        )
+        mock_future.result.return_value = llm_response
 
         with (
             patch("lifeprism.sync.sync_client.httpx.post", side_effect=mock_http_post),
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
             patch(
                 "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
                 return_value=mock_future,
@@ -1462,14 +1425,17 @@ class TestFullFlowEndToEnd:
                 directories=["conflict_test/diary/"],
             )
 
-        # Assert 1: 本地文件已被合并内容覆盖
-        assert local_file.read_text(encoding="utf-8") == merged_content
+        # Assert 1: 本地文件已被合并内容覆盖（LLM replacement 替换冲突块后）
+        assert local_file.read_text(encoding="utf-8") == expected_final
 
-        # Assert 2: 备份文件存在且内容为原始本地内容
+        # Assert 2: 同时备份本地与云端两个版本（修复旧实现仅备份本地的 bug）
         sync_conflict_dir = settings.lifeprism_data_path / "sync_conflict"
-        backup_files = list(sync_conflict_dir.rglob("test.md"))
-        assert len(backup_files) == 1
-        assert backup_files[0].read_text(encoding="utf-8") == local_content
+        local_backup_files = list(sync_conflict_dir.rglob("*.local.md"))
+        remote_backup_files = list(sync_conflict_dir.rglob("*.remote.md"))
+        assert len(local_backup_files) == 1, "应存在 1 个 .local.md 本地版本备份"
+        assert len(remote_backup_files) == 1, "应存在 1 个 .remote.md 云端版本备份"
+        assert local_backup_files[0].read_text(encoding="utf-8") == ours
+        assert remote_backup_files[0].read_text(encoding="utf-8") == theirs
 
         # Assert 3: file_sync_state.current_hash = compute_file_hash(merged_content)
         state = provider.get_state(rel_path)
@@ -1478,3 +1444,1006 @@ class TestFullFlowEndToEnd:
 
         # Assert 4: file_sync_state.parent_hash 已推进（verify 成功后 parent_hash = current_hash）
         assert state["parent_hash"] == merged_hash
+
+
+# ==================== Seam 6: Issue 4 端到端流程（diff3 + LLM 串行 + 替换） ====================
+
+
+def _make_llm_json_response(conflict_id, start_marker, end_marker, replacement):
+    """构造 LLM JSON 响应字符串（Issue 4 新格式）
+
+    LLM 输出 JSON 格式（PRD 决策 4）：
+        {"conflict_id": 1, "start_marker": "...", "end_marker": "...", "replacement": "..."}
+    """
+    import json
+
+    return json.dumps(
+        {
+            "conflict_id": conflict_id,
+            "start_marker": start_marker,
+            "end_marker": end_marker,
+            "replacement": replacement,
+        },
+        ensure_ascii=False,
+    )
+
+
+def _make_conflict_llm_outbound_response(base, ours, theirs, replacement="MERGED"):
+    """构造单冲突块的 LLM OutboundMessage 响应（测试辅助函数）
+
+    预计算 diff3 冲突块信息，生成对应的 JSON LLM 响应，
+    包装成 OutboundMessage 对象供 mock future.result 返回。
+
+    Args:
+        base/ours/theirs: 冲突三方内容
+        replacement: LLM 返回的替换内容
+
+    Returns:
+        (OutboundMessage, expected_final, expected_hash, parent_hash, block) 元组
+    """
+    from lifeprism.llm.bus.events import OutboundMessage
+    from lifeprism.llm.providers import LLMResponse
+    from lifeprism.sync.conflict_resolution import compute_hash_8, parse_conflict_blocks
+    from lifeprism.sync.diff3 import merge as diff3_merge
+    from lifeprism.sync.hash_utils import compute_file_hash
+
+    local_hash_8 = compute_hash_8(ours)
+    remote_hash_8 = compute_hash_8(theirs)
+    result = diff3_merge(base, ours, theirs, local_hash_8, remote_hash_8)
+    assert result["conflicts"] >= 1, "测试场景应至少产生 1 个冲突块"
+    blocks = parse_conflict_blocks(result["merged"])
+    block = blocks[0]
+
+    llm_json = _make_llm_json_response(
+        conflict_id=block.conflict_id,
+        start_marker=block.start_marker,
+        end_marker=block.end_marker,
+        replacement=replacement,
+    )
+    response = OutboundMessage(
+        response=LLMResponse(content=llm_json),
+    )
+
+    parent_hash = compute_file_hash(base.encode("utf-8"))
+    return response, parent_hash
+
+
+def _compute_diff3_conflict_info(base, ours, theirs):
+    """运行 diff3 并返回冲突块信息（测试辅助函数）
+
+    用于在测试中预计算预期的冲突标记，以便构造 mock LLM 响应。
+    """
+    from lifeprism.sync.conflict_resolution import compute_hash_8, parse_conflict_blocks
+    from lifeprism.sync.diff3 import merge
+
+    local_hash_8 = compute_hash_8(ours)
+    remote_hash_8 = compute_hash_8(theirs)
+
+    result = merge(base, ours, theirs, local_hash_8, remote_hash_8)
+    blocks = parse_conflict_blocks(result["merged"])
+
+    return {
+        "merged": result["merged"],
+        "blocks": blocks,
+        "local_hash_8": local_hash_8,
+        "remote_hash_8": remote_hash_8,
+        "conflicts": result["conflicts"],
+    }
+
+
+class TestIssue4Diff3LLMSerialFlow:
+    """Issue 4 端到端流程：diff3 + LLM 串行 + 替换 + 写入最终文件
+
+    测试新的冲突解决流程（PRD 决策 3-6, 10）：
+    1. 读取本地文件 (ours)
+    2. 获取远端文件 (theirs)
+    3. 获取 base 内容 (parent_hash 对应版本)
+    4. 运行 diff3(base, ours, theirs) → 含冲突标记的合并文本
+    5. parse_conflict_blocks → 冲突块列表
+    6. 串行调用 LLM (每个冲突块一次) → JSON 替换指令
+    7. 程序验证 marker + 执行替换
+    8. 写入最终文件 + 更新 file_sync_state
+
+    与旧流程的关键差异：
+    - 旧流程：LLM 返回整文档合并内容（plain text），易截断
+    - 新流程：LLM 返回 JSON 替换指令（仅冲突块），程序执行替换，不会截断
+    """
+
+    def test_diff3_produces_conflict_then_llm_resolves(
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
+    ):
+        """diff3 产生冲突标记 → LLM 串行替换 → 写入最终文件
+
+        场景：
+        - base: "line1\nline2\nline3\n"
+        - ours: "line1\nOURS\nline3\n" (本地修改 line2)
+        - theirs: "line1\nTHEIRS\nline3\n" (云端修改 line2)
+        - diff3 产生 1 个冲突块
+        - LLM 返回 JSON 替换指令（replacement="MERGED"）
+        - 最终文件: "line1\nMERGED\nline3\n"
+        """
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.llm.bus.events import OutboundMessage
+        from lifeprism.llm.providers import LLMResponse
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        # Arrange: 设置 base/ours/theirs
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
+
+        # 预计算预期冲突标记
+        info = _compute_diff3_conflict_info(base, ours, theirs)
+        assert info["conflicts"] == 1
+        block = info["blocks"][0]
+
+        # 创建本地文件 (ours)
+        test_base = settings.lifeprism_data_path / "conflict_test"
+        (test_base / "diary").mkdir(parents=True, exist_ok=True)
+        rel_path = "conflict_test/diary/test.md"
+        local_file = test_base / "diary" / "test.md"
+        local_file.write_text(ours, encoding="utf-8")
+
+        # 预设 file_sync_state（parent_hash 存在，表示有 base 版本）
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
+        provider.upsert_state(
+            file_path=rel_path,
+            parent_hash=parent_hash,
+            current_hash=compute_file_hash(ours.encode("utf-8")),
+        )
+
+        # Mock LLM 返回 JSON 替换指令
+        replacement = "MERGED"
+        llm_json = _make_llm_json_response(
+            conflict_id=1,
+            start_marker=block.start_marker,
+            end_marker=block.end_marker,
+            replacement=replacement,
+        )
+
+        mock_future = MagicMock()
+        mock_future.result.return_value = OutboundMessage(
+            response=LLMResponse(content=llm_json),
+        )
+
+        expected_final = f"line1\n{replacement}\nline3\n"
+        expected_hash = compute_file_hash(expected_final.encode("utf-8"))
+
+        with (
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
+            result = sync_client._resolve_conflicts(
+                conflict_paths=[rel_path],
+                remote_url="http://test:8000",
+                api_key="test-key",
+            )
+
+        # Assert: 返回成功路径
+        assert result == [rel_path]
+
+        # Assert: 本地文件已写入合并后内容
+        final_content = local_file.read_text(encoding="utf-8")
+        assert final_content == expected_final
+        # 无冲突标记残留
+        assert "<<<<<<<" not in final_content
+        assert "=======" not in final_content
+        assert ">>>>>>>" not in final_content
+
+        # Assert: file_sync_state 已更新
+        state = provider.get_state(rel_path)
+        assert state is not None
+        assert state["current_hash"] == expected_hash
+        assert state["parent_hash"] == parent_hash  # parent_hash 不变
+
+    def test_multiple_conflict_blocks_serial_resolution(
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
+    ):
+        """多个冲突块串行处理，每个基于更新后的文件
+
+        场景：
+        - base 有 3 个可冲突区域
+        - ours 和 theirs 在 3 个区域都做了不同修改
+        - diff3 产生 3 个冲突块
+        - LLM 串行处理 3 个冲突块，每个返回 JSON 替换指令
+        - 最终文件：3 个冲突块都被替换
+        """
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.llm.bus.events import OutboundMessage
+        from lifeprism.llm.providers import LLMResponse
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        # Arrange: 3 个冲突区域
+        base = "h1\nx1\nh2\nx2\nh3\nx3\nh4\n"
+        ours = "h1\nOURS1\nh2\nOURS2\nh3\nOURS3\nh4\n"
+        theirs = "h1\nTHEIRS1\nh2\nTHEIRS2\nh3\nTHEIRS3\nh4\n"
+
+        info = _compute_diff3_conflict_info(base, ours, theirs)
+        assert info["conflicts"] == 3
+        blocks = info["blocks"]
+
+        # 创建本地文件
+        test_base = settings.lifeprism_data_path / "conflict_test"
+        (test_base / "diary").mkdir(parents=True, exist_ok=True)
+        rel_path = "conflict_test/diary/multi.md"
+        local_file = test_base / "diary" / "multi.md"
+        local_file.write_text(ours, encoding="utf-8")
+
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
+        provider.upsert_state(
+            file_path=rel_path,
+            parent_hash=parent_hash,
+            current_hash=compute_file_hash(ours.encode("utf-8")),
+        )
+
+        # Mock LLM: 3 次调用，每次返回一个冲突块的 JSON
+        replacements = ["MERGED1", "MERGED2", "MERGED3"]
+        llm_responses = [
+            OutboundMessage(
+                response=LLMResponse(
+                    content=_make_llm_json_response(
+                        conflict_id=block.conflict_id,
+                        start_marker=block.start_marker,
+                        end_marker=block.end_marker,
+                        replacement=replacements[i],
+                    )
+                )
+            )
+            for i, block in enumerate(blocks)
+        ]
+
+        mock_futures = []
+        for resp in llm_responses:
+            mf = MagicMock()
+            mf.result.return_value = resp
+            mock_futures.append(mf)
+
+        expected_final = "h1\nMERGED1\nh2\nMERGED2\nh3\nMERGED3\nh4\n"
+        expected_hash = compute_file_hash(expected_final.encode("utf-8"))
+
+        with (
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                side_effect=mock_futures,
+            ),
+        ):
+            result = sync_client._resolve_conflicts(
+                conflict_paths=[rel_path],
+                remote_url="http://test:8000",
+                api_key="test-key",
+            )
+
+        # Assert: 返回成功路径
+        assert result == [rel_path]
+
+        # Assert: 本地文件已写入合并后内容
+        final_content = local_file.read_text(encoding="utf-8")
+        assert final_content == expected_final
+        assert "<<<<<<<" not in final_content
+        assert ">>>>>>>" not in final_content
+
+        # Assert: file_sync_state 已更新
+        state = provider.get_state(rel_path)
+        assert state is not None
+        assert state["current_hash"] == expected_hash
+
+    def test_diff3_no_conflict_writes_merged_directly(
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
+    ):
+        """diff3 无冲突时直接写入合并结果（不调用 LLM）
+
+        场景：
+        - base: "h1\\nline2\\nh3\\nline4\\nh5\\n"
+        - ours: "h1\\nOURS\\nh3\\nline4\\nh5\\n" (本地修改 line2)
+        - theirs: "h1\\nline2\\nh3\\nTHEIRS\\nh5\\n" (云端修改 line4)
+        - diff3 自动合并成功（双方改不同区域，有 h3/h5 锚点分隔）
+        - 不调用 LLM，直接写入合并结果
+        """
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        # Arrange: 双方改不同区域（有锚点分隔）→ diff3 自动合并成功
+        base = "h1\nline2\nh3\nline4\nh5\n"
+        ours = "h1\nOURS\nh3\nline4\nh5\n"
+        theirs = "h1\nline2\nh3\nTHEIRS\nh5\n"
+
+        test_base = settings.lifeprism_data_path / "conflict_test"
+        (test_base / "diary").mkdir(parents=True, exist_ok=True)
+        rel_path = "conflict_test/diary/no_conflict.md"
+        local_file = test_base / "diary" / "no_conflict.md"
+        local_file.write_text(ours, encoding="utf-8")
+
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
+        provider.upsert_state(
+            file_path=rel_path,
+            parent_hash=parent_hash,
+            current_hash=compute_file_hash(ours.encode("utf-8")),
+        )
+
+        # diff3 自动合并的预期结果
+        expected_final = "h1\nOURS\nh3\nTHEIRS\nh5\n"
+        expected_hash = compute_file_hash(expected_final.encode("utf-8"))
+
+        with (
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe"
+            ) as mock_rcts,
+        ):
+            result = sync_client._resolve_conflicts(
+                conflict_paths=[rel_path],
+                remote_url="http://test:8000",
+                api_key="test-key",
+            )
+
+        # Assert: 返回成功路径
+        assert result == [rel_path]
+
+        # Assert: 本地文件已写入自动合并结果
+        final_content = local_file.read_text(encoding="utf-8")
+        assert final_content == expected_final
+
+        # Assert: LLM 未被调用（无冲突，不需要 LLM）
+        mock_rcts.assert_not_called()
+
+        # Assert: file_sync_state 已更新
+        state = provider.get_state(rel_path)
+        assert state is not None
+        assert state["current_hash"] == expected_hash
+
+
+# ==================== Seam 7: Issue 4 重试与降级策略 ====================
+
+
+class TestIssue4RetryAndDegradation:
+    """Issue 4 重试与降级策略
+
+    PRD 决策 6, 10:
+    - 单个冲突块重试 3 次失败 → 降级 keep_ours（保留本地版本）
+    - 整个文件失败（如 diff3 异常）→ 回退 LWW（保留本地 + 备份云端）
+    """
+
+    def test_single_block_retry_3_times_then_degrade_to_keep_ours(
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
+    ):
+        """单个冲突块重试 3 次都失败 → 降级 keep_ours（保留 ours 内容）"""
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.llm.bus.events import OutboundMessage
+        from lifeprism.llm.providers import LLMResponse
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
+
+        info = _compute_diff3_conflict_info(base, ours, theirs)
+        assert info["conflicts"] == 1
+
+        test_base = settings.lifeprism_data_path / "conflict_test"
+        (test_base / "diary").mkdir(parents=True, exist_ok=True)
+        rel_path = "conflict_test/diary/retry.md"
+        local_file = test_base / "diary" / "retry.md"
+        local_file.write_text(ours, encoding="utf-8")
+
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
+        provider.upsert_state(
+            file_path=rel_path,
+            parent_hash=parent_hash,
+            current_hash=compute_file_hash(ours.encode("utf-8")),
+        )
+
+        # Mock LLM: 3 次都返回无效 JSON → 重试 3 次后降级 keep_ours
+        mock_future = MagicMock()
+        mock_future.result.return_value = OutboundMessage(
+            response=LLMResponse(content="always invalid json"),
+        )
+
+        with (
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
+            result = sync_client._resolve_conflicts(
+                conflict_paths=[rel_path],
+                remote_url="http://test:8000",
+                api_key="test-key",
+            )
+
+        # Assert: 仍然返回成功路径（降级 keep_ours 也算"解决"了冲突）
+        assert result == [rel_path]
+
+        # Assert: 本地文件保留 ours 内容（降级 keep_ours）
+        final_content = local_file.read_text(encoding="utf-8")
+        assert "OURS" in final_content
+        assert "THEIRS" not in final_content
+        # 无冲突标记残留（降级后冲突块被替换为 ours 内容）
+        assert "<<<<<<<" not in final_content
+        assert ">>>>>>>" not in final_content
+
+        # Assert: file_sync_state 已更新（current_hash = ours 的 hash）
+        state = provider.get_state(rel_path)
+        assert state is not None
+        assert state["current_hash"] == compute_file_hash(ours.encode("utf-8"))
+
+    def test_whole_file_failure_falls_back_to_lww(
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
+    ):
+        """整个文件失败（如获取 base 内容失败）→ 回退 LWW（保留本地 + 备份云端）
+
+        PRD 决策 10：整个文件失败时回退到 LWW（保留本地 + 备份云端到 sync_conflict/）
+        """
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
+
+        test_base = settings.lifeprism_data_path / "conflict_test"
+        (test_base / "diary").mkdir(parents=True, exist_ok=True)
+        rel_path = "conflict_test/diary/lww.md"
+        local_file = test_base / "diary" / "lww.md"
+        local_file.write_text(ours, encoding="utf-8")
+
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
+        original_current = compute_file_hash(ours.encode("utf-8"))
+        provider.upsert_state(
+            file_path=rel_path,
+            parent_hash=parent_hash,
+            current_hash=original_current,
+        )
+
+        # Mock: base 内容获取失败 → 整个文件失败 → LWW 回退
+        with (
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=None),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe"
+            ) as mock_rcts,
+        ):
+            result = sync_client._resolve_conflicts(
+                conflict_paths=[rel_path],
+                remote_url="http://test:8000",
+                api_key="test-key",
+            )
+
+        # Assert: LWW 回退后仍返回成功路径（本地版本"赢"，需推送）
+        assert result == [rel_path]
+
+        # Assert: 本地文件保留原 ours 内容（LWW = 本地赢）
+        final_content = local_file.read_text(encoding="utf-8")
+        assert final_content == ours
+
+        # Assert: LLM 未被调用（LWW 回退，不走 diff3 + LLM 流程）
+        mock_rcts.assert_not_called()
+
+        # Assert: 已备份云端版本到 sync_conflict/
+        sync_conflict_dir = settings.lifeprism_data_path / "sync_conflict"
+        assert sync_conflict_dir.exists()
+        remote_backup_files = list(sync_conflict_dir.rglob("*.remote.md"))
+        assert len(remote_backup_files) == 1
+        assert remote_backup_files[0].read_text(encoding="utf-8") == theirs
+
+        # Assert: file_sync_state.current_hash 保持为 ours 的 hash（LWW 本地赢）
+        state = provider.get_state(rel_path)
+        assert state is not None
+        assert state["current_hash"] == original_current
+
+    def test_partial_block_failure_does_not_interrupt_other_blocks(
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
+    ):
+        """单个冲突块失败不中断其他冲突块处理
+
+        场景：
+        - 2 个冲突块
+        - 块 1：LLM 始终返回无效 JSON → 3 次重试失败 → 降级 keep_ours
+        - 块 2：LLM 返回有效 JSON → 替换成功
+        - 最终：块 1 保留 ours 内容，块 2 被替换
+        """
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.llm.bus.events import OutboundMessage
+        from lifeprism.llm.providers import LLMResponse
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        base = "h1\nx1\nh2\nx2\nh3\n"
+        ours = "h1\nOURS1\nh2\nOURS2\nh3\n"
+        theirs = "h1\nTHEIRS1\nh2\nTHEIRS2\nh3\n"
+
+        info = _compute_diff3_conflict_info(base, ours, theirs)
+        assert info["conflicts"] == 2
+        blocks = info["blocks"]
+
+        test_base = settings.lifeprism_data_path / "conflict_test"
+        (test_base / "diary").mkdir(parents=True, exist_ok=True)
+        rel_path = "conflict_test/diary/partial.md"
+        local_file = test_base / "diary" / "partial.md"
+        local_file.write_text(ours, encoding="utf-8")
+
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
+        provider.upsert_state(
+            file_path=rel_path,
+            parent_hash=parent_hash,
+            current_hash=compute_file_hash(ours.encode("utf-8")),
+        )
+
+        # Mock LLM:
+        # - 前 3 次调用（块 1 重试 3 次）：返回无效 JSON
+        # - 第 4 次调用（块 2）：返回有效 JSON
+        invalid_resp = OutboundMessage(
+            response=LLMResponse(content="always invalid"),
+        )
+        valid_resp = OutboundMessage(
+            response=LLMResponse(
+                content=_make_llm_json_response(
+                    conflict_id=blocks[1].conflict_id,
+                    start_marker=blocks[1].start_marker,
+                    end_marker=blocks[1].end_marker,
+                    replacement="MERGED2",
+                )
+            )
+        )
+
+        mock_futures = [
+            MagicMock(result=MagicMock(return_value=invalid_resp)) for _ in range(3)
+        ]
+        mock_futures.append(MagicMock(result=MagicMock(return_value=valid_resp)))
+
+        with (
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                side_effect=mock_futures,
+            ),
+        ):
+            result = sync_client._resolve_conflicts(
+                conflict_paths=[rel_path],
+                remote_url="http://test:8000",
+                api_key="test-key",
+            )
+
+        # Assert: 返回成功路径（降级 + 替换都算"解决"）
+        assert result == [rel_path]
+
+        # Assert: 块 1 保留 ours 内容（降级 keep_ours），块 2 被替换
+        final_content = local_file.read_text(encoding="utf-8")
+        assert "OURS1" in final_content  # 块 1 降级保留
+        assert "MERGED2" in final_content  # 块 2 替换成功
+        assert "THEIRS" not in final_content  # 无 theirs 内容残留
+        assert "<<<<<<<" not in final_content  # 无冲突标记残留
+        assert ">>>>>>>" not in final_content
+
+
+# ==================== Seam 8: Issue 4 behavior.md 场景（安全属性验证） ====================
+
+
+class TestIssue4BehaviorMdScenario:
+    """Issue 4 behavior.md 冲突场景端到端测试
+
+    重现 2026-07-16 behavior.md 被破坏的场景（P0 bug），
+    验证新流程的安全属性：
+    1. 不会出现 LLM 截断数据（LLM 只能替换冲突块，不能截断整个文件）
+    2. 不会出现 WriteFileTool XML 残留（LLM 无工具，只返回 JSON）
+    """
+
+    def test_behavior_md_no_truncation(
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
+    ):
+        """behavior.md 冲突：LLM 无法截断数据
+
+        场景：
+        - behavior.md 是一个长文档（模拟）
+        - 本地和云端在中间某处有冲突
+        - LLM 返回的 replacement 很短（模拟"截断"行为）
+        - 验证：只有冲突块被替换，文件其他部分完整保留
+
+        关键安全属性（PRD 决策 5）：
+        - LLM 只能替换冲突块（从 start_marker 到 end_marker）
+        - 文件非冲突区域的内容不会被 LLM 触碰
+        - 即使 LLM 返回很短的 replacement，也不会截断整个文件
+        """
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.llm.bus.events import OutboundMessage
+        from lifeprism.llm.providers import LLMResponse
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        # 构造长文档：50 行头部 + 冲突区域 + 50 行尾部
+        head_lines = [f"行为记录 {i}" for i in range(50)]
+        tail_lines = [f"行为记录 {50 + i}" for i in range(50)]
+
+        base = "\n".join(head_lines + ["原始行"] + tail_lines) + "\n"
+        ours = "\n".join(head_lines + ["本地修改行"] + tail_lines) + "\n"
+        theirs = "\n".join(head_lines + ["云端修改行"] + tail_lines) + "\n"
+
+        info = _compute_diff3_conflict_info(base, ours, theirs)
+        assert info["conflicts"] == 1
+        block = info["blocks"][0]
+
+        test_base = settings.lifeprism_data_path / "conflict_test"
+        (test_base / "user").mkdir(parents=True, exist_ok=True)
+        rel_path = "conflict_test/user/behavior.md"
+        local_file = test_base / "user" / "behavior.md"
+        local_file.write_text(ours, encoding="utf-8")
+
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
+        provider.upsert_state(
+            file_path=rel_path,
+            parent_hash=parent_hash,
+            current_hash=compute_file_hash(ours.encode("utf-8")),
+        )
+
+        # Mock LLM: 返回很短的 replacement（模拟"截断"行为）
+        short_replacement = "短"
+        llm_json = _make_llm_json_response(
+            conflict_id=1,
+            start_marker=block.start_marker,
+            end_marker=block.end_marker,
+            replacement=short_replacement,
+        )
+
+        mock_future = MagicMock()
+        mock_future.result.return_value = OutboundMessage(
+            response=LLMResponse(content=llm_json),
+        )
+
+        with (
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
+            result = sync_client._resolve_conflicts(
+                conflict_paths=[rel_path],
+                remote_url="http://test:8000",
+                api_key="test-key",
+            )
+
+        # Assert: 返回成功路径
+        assert result == [rel_path]
+
+        # Assert: 文件非冲突区域完整保留（关键安全属性）
+        final_content = local_file.read_text(encoding="utf-8")
+        for i in range(50):
+            assert f"行为记录 {i}" in final_content, f"头部第 {i} 行丢失（截断）"
+            assert f"行为记录 {50 + i}" in final_content, f"尾部第 {50 + i} 行丢失（截断）"
+
+        # Assert: 冲突块已被替换为短 replacement
+        assert short_replacement in final_content
+        assert "本地修改行" not in final_content
+        assert "云端修改行" not in final_content
+
+        # Assert: 无冲突标记残留
+        assert "<<<<<<<" not in final_content
+        assert ">>>>>>>" not in final_content
+
+    def test_behavior_md_no_write_file_tool_xml_residue(
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
+    ):
+        """behavior.md 冲突：无 WriteFileTool XML 残留
+
+        场景：
+        - behavior.md 冲突
+        - 验证最终文件不包含任何 XML 工具调用残留
+
+        背景（docs/history-bugs/2026-07-17-write-file-xml-tag-residue-in-doc.md）：
+        - 旧流程中 LLM 有 WriteFileTool，可能输出 XML 工具调用残留
+        - 新流程 LLM 无工具（tools=[]），只返回 JSON，不可能产生 XML 残留
+
+        关键安全属性（PRD 决策 8 / ADR-1 决策 2）：
+        - CONFLICT_RESOLVE 分支 tools=[]
+        - LLM 只输出 JSON，程序解析 JSON 后执行替换
+        - 最终文件不可能包含 XML 工具调用标签
+        """
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.llm.bus.events import OutboundMessage
+        from lifeprism.llm.providers import LLMResponse
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        base = "# behavior\n原始内容\n"
+        ours = "# behavior\n本地修改\n"
+        theirs = "# behavior\n云端修改\n"
+
+        info = _compute_diff3_conflict_info(base, ours, theirs)
+        assert info["conflicts"] == 1
+        block = info["blocks"][0]
+
+        test_base = settings.lifeprism_data_path / "conflict_test"
+        (test_base / "user").mkdir(parents=True, exist_ok=True)
+        rel_path = "conflict_test/user/behavior.md"
+        local_file = test_base / "user" / "behavior.md"
+        local_file.write_text(ours, encoding="utf-8")
+
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
+        provider.upsert_state(
+            file_path=rel_path,
+            parent_hash=parent_hash,
+            current_hash=compute_file_hash(ours.encode("utf-8")),
+        )
+
+        # Mock LLM: 返回正常 JSON（不含任何 XML 标签）
+        replacement = "合并后的内容"
+        llm_json = _make_llm_json_response(
+            conflict_id=1,
+            start_marker=block.start_marker,
+            end_marker=block.end_marker,
+            replacement=replacement,
+        )
+
+        mock_future = MagicMock()
+        mock_future.result.return_value = OutboundMessage(
+            response=LLMResponse(content=llm_json),
+        )
+
+        with (
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
+            result = sync_client._resolve_conflicts(
+                conflict_paths=[rel_path],
+                remote_url="http://test:8000",
+                api_key="test-key",
+            )
+
+        # Assert: 返回成功路径
+        assert result == [rel_path]
+
+        # Assert: 最终文件无 XML 工具调用残留
+        final_content = local_file.read_text(encoding="utf-8")
+        xml_residue_patterns = [
+            "<write_file>",
+            "</write_file>",
+            "<edit_file>",
+            "</edit_file>",
+            "<read_file>",
+            "</read_file>",
+            "<file_tree>",
+            "</file_tree>",
+            "<search_file>",
+            "</search_file>",
+            "<search_string>",
+            "</search_string>",
+            "<tool_call>",
+            "</tool_call>",
+            "<function_call>",
+            "</function_call>",
+        ]
+        for pattern in xml_residue_patterns:
+            assert pattern not in final_content, f"发现 XML 工具调用残留: {pattern}"
+
+        # Assert: 无冲突标记残留
+        assert "<<<<<<<" not in final_content
+        assert ">>>>>>>" not in final_content
+
+        # Assert: 冲突块已被替换
+        assert replacement in final_content
+
+
+# ==================== Seam 9: Issue 4 备份与 file_sync_state 更新 ====================
+
+
+class TestIssue4BackupAndStateUpdate:
+    """Issue 4 备份与 file_sync_state 更新
+
+    验证新流程在冲突解决后正确执行：
+    1. 备份本地与云端版本到 sync_conflict/（PRD 决策 19）
+    2. 更新 file_sync_state.current_hash = 合并后内容的 hash
+    3. 保持 file_sync_state.parent_hash 不变
+    """
+
+    def test_backup_both_local_and_remote_versions(
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
+    ):
+        """冲突解决后应同时备份本地与云端版本到 sync_conflict/"""
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.llm.bus.events import OutboundMessage
+        from lifeprism.llm.providers import LLMResponse
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
+
+        info = _compute_diff3_conflict_info(base, ours, theirs)
+        block = info["blocks"][0]
+
+        test_base = settings.lifeprism_data_path / "conflict_test"
+        (test_base / "diary").mkdir(parents=True, exist_ok=True)
+        rel_path = "conflict_test/diary/backup.md"
+        local_file = test_base / "diary" / "backup.md"
+        local_file.write_text(ours, encoding="utf-8")
+
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
+        provider.upsert_state(
+            file_path=rel_path,
+            parent_hash=parent_hash,
+            current_hash=compute_file_hash(ours.encode("utf-8")),
+        )
+
+        replacement = "MERGED"
+        llm_json = _make_llm_json_response(
+            conflict_id=1,
+            start_marker=block.start_marker,
+            end_marker=block.end_marker,
+            replacement=replacement,
+        )
+
+        mock_future = MagicMock()
+        mock_future.result.return_value = OutboundMessage(
+            response=LLMResponse(content=llm_json),
+        )
+
+        with (
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
+            sync_client._resolve_conflicts(
+                conflict_paths=[rel_path],
+                remote_url="http://test:8000",
+                api_key="test-key",
+            )
+
+        # Assert: 同时备份本地与云端版本
+        sync_conflict_dir = settings.lifeprism_data_path / "sync_conflict"
+        assert sync_conflict_dir.exists()
+        local_backup_files = list(sync_conflict_dir.rglob("*.local.md"))
+        remote_backup_files = list(sync_conflict_dir.rglob("*.remote.md"))
+        assert len(local_backup_files) == 1
+        assert len(remote_backup_files) == 1
+        assert local_backup_files[0].read_text(encoding="utf-8") == ours
+        assert remote_backup_files[0].read_text(encoding="utf-8") == theirs
+
+    def test_file_sync_state_current_hash_updated_to_merged_hash(
+        self,
+        sync_client,
+        initialized_db,
+        clean_conflict_test_dir,
+        clean_file_sync_state,
+        clean_sync_conflict_dir,
+    ):
+        """冲突解决后 current_hash 应为合并后内容的 hash"""
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.llm.bus.events import OutboundMessage
+        from lifeprism.llm.providers import LLMResponse
+        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        base = "line1\nline2\nline3\n"
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
+
+        info = _compute_diff3_conflict_info(base, ours, theirs)
+        block = info["blocks"][0]
+
+        test_base = settings.lifeprism_data_path / "conflict_test"
+        (test_base / "diary").mkdir(parents=True, exist_ok=True)
+        rel_path = "conflict_test/diary/state.md"
+        local_file = test_base / "diary" / "state.md"
+        local_file.write_text(ours, encoding="utf-8")
+
+        provider = FileSyncStateProvider(db_manager=initialized_db)
+        parent_hash = compute_file_hash(base.encode("utf-8"))
+        provider.upsert_state(
+            file_path=rel_path,
+            parent_hash=parent_hash,
+            current_hash=compute_file_hash(ours.encode("utf-8")),
+        )
+
+        replacement = "MERGED"
+        llm_json = _make_llm_json_response(
+            conflict_id=1,
+            start_marker=block.start_marker,
+            end_marker=block.end_marker,
+            replacement=replacement,
+        )
+
+        mock_future = MagicMock()
+        mock_future.result.return_value = OutboundMessage(
+            response=LLMResponse(content=llm_json),
+        )
+
+        expected_final = f"line1\n{replacement}\nline3\n"
+        expected_hash = compute_file_hash(expected_final.encode("utf-8"))
+
+        with (
+            patch.object(sync_client, "_fetch_remote_file_content", return_value=theirs),
+            patch.object(sync_client, "_fetch_remote_base_content", return_value=base),
+            patch(
+                "lifeprism.sync.sync_client.asyncio.run_coroutine_threadsafe",
+                return_value=mock_future,
+            ),
+        ):
+            sync_client._resolve_conflicts(
+                conflict_paths=[rel_path],
+                remote_url="http://test:8000",
+                api_key="test-key",
+            )
+
+        # Assert: current_hash 已更新为合并后内容的 hash
+        state = provider.get_state(rel_path)
+        assert state is not None
+        assert state["current_hash"] == expected_hash
+        # Assert: parent_hash 保持不变
+        assert state["parent_hash"] == parent_hash

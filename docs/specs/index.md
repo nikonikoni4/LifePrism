@@ -130,3 +130,9 @@
 - path: `docs/specs/custom-records-module.md`
 - 触发规则：开发、修改或查询自定义记录模块相关功能时阅读（类型管理、记录CRUD、展示配置、布局引擎、AI工具、ChatPanel集成）
 - 内容摘要：自定义记录模块规格（v1.1），定义顶级独立模块允许用户通过 AI 或表单创建任意结构化数据类型。采用 SQLite 动态建表 + meta 表元数据驱动方案（custom_record_types + custom_record_fields + custom_<slug> 动态表），9 个 API 端点覆盖类型CRUD + 记录CRUD + PATCH配置 + PATCH字段角色，L1/L2/L3 三层布局引擎（启发式自动布局 + 用户角色覆盖 + 5套视觉模板预设），支持多正文叠加渲染和空字段自动过滤，4 个 LLM Tool（列出/创建类型、录入/查询记录），前端集成 ChatPanel AI 侧边栏（卡片/表格/模板对比三视图）
+
+## data-backup-spec
+- updated_at: 2026-07-17
+- path: `docs/specs/2026-07-17-data-backup-spec.md`
+- 触发规则：开发、修改或查询数据备份模块相关功能时阅读（定时全量备份、数据库在线备份、备份保留策略、完整性校验、恢复 API、sync_conflict 清理）
+- 内容摘要：数据备份模块规格（v1.0），触发于 2026-07-16 CONFLICT_RESOLVE LLM 合并破坏 behavior.md 的生产级 bug。定义三道防线中的第三道（定时全量备份），覆盖文档目录（user/diary/agent/session/expand_dir）与 SQLite 数据库（lifewatch_ai.db）的定时全量备份（默认每天 03:00 + 每周日 03:00 周备份），SQLite 使用 Online Backup API 保证一致性，备份后立即完整性校验（manifest + 抽样 SHA-256），日保留 7 个周保留 4 个，sync_conflict/ 30 天清理。提供 8 个恢复 API 端点（列出/manifest/单文件提取/下载/整包恢复/单文件恢复/手动触发/重载配置），恢复前强制创建 pre_restore 快照

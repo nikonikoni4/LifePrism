@@ -18,6 +18,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from lifeprism.config import get_user_timezone
 from lifeprism.config.settings_manager import settings
 from lifeprism.llm.function.agent_schedule_job import dreaming, process_session_message
+from lifeprism.server.services.backup_service import backup_service
 from lifeprism.server.services.diary_service import generate_diary_ai_summary
 from lifeprism.server.services.sync_service import SyncService
 from lifeprism.utils import get_logger
@@ -117,6 +118,40 @@ class ScheduleService:
                     "kwargs": {"cron_expr": cron_expr},
                     "job_id": "update_memory",
                 }
+            )
+
+        # 注册备份任务（仅 full 模式注册，云端 agent_only/web_demo 不备份）
+        # 文档备份：每天本地 03:00，保留 3 份
+        # 数据库备份：每 8 小时（本地 00/08/16 点），保留 3 份
+        # 设计依据：ADR docs/adr/2026-07-17-data-backup-strategy.md
+        # 备份范围与同步范围解耦：ADR docs/adr/2026-07-17-backup-sync-decoupled-scope.md
+        # 云端 agent_only 不备份：ADR docs/adr/2026-07-17-conflict-failure-policy.md
+        #
+        # 注册时的 run_mode 守卫与 BackupService._check_run_mode() 形成双重保障：
+        # - 注册时守卫：避免在非 full 模式下注册无用任务（节省调度器资源）
+        # - 运行时守卫：防止 run_mode 在运行期切换后旧任务仍执行
+        #
+        # skip_compensation=True：备份是周期性任务（文档每天、数据库每 8 小时），
+        # 不是"每天一次"的任务，无需启动补偿。系统重启后下一个 cron 周期会自然触发，
+        # 避免重启时立即执行备份造成 I/O 压力（也避免测试环境中后台备份干扰时序测试）。
+        if settings.run_mode == "full":
+            self._system_jobs.extend(
+                [
+                    {
+                        "func": backup_service.backup_documents,
+                        "trigger": "cron",
+                        "kwargs": {"cron_expr": "0 3 * * *"},  # 每天本地 03:00
+                        "job_id": "backup_documents",
+                        "skip_compensation": True,
+                    },
+                    {
+                        "func": backup_service.backup_database,
+                        "trigger": "cron",
+                        "kwargs": {"cron_expr": "0 0,8,16 * * *"},  # 每天本地 00/08/16 点
+                        "job_id": "backup_database",
+                        "skip_compensation": True,
+                    },
+                ]
             )
 
     def _load_cron_state(self) -> dict:
@@ -226,7 +261,13 @@ class ScheduleService:
         self._add_system_jobs()
 
     def _add_system_jobs(self) -> None:
-        """添加系统预设任务，对于 Cron 任务，如果已过触发时间且今天未执行则异步执行一次"""
+        """添加系统预设任务，对于 Cron 任务，如果已过触发时间且今天未执行则异步执行一次
+
+        skip_compensation 标志：
+        - 周期性任务（如备份）设置 ``skip_compensation=True`` 跳过启动补偿
+        - 原因：周期性任务在下一个 cron 周期会自然触发，无需启动时立即执行
+        - 避免系统重启时立即执行备份造成 I/O 压力
+        """
         # 使用本地时间判断是否过触发时间（Cron 表达式基于本地时区）
         local_tz = pytz.timezone(get_user_timezone())
         now = datetime.now(local_tz)
@@ -242,26 +283,46 @@ class ScheduleService:
                         job_config["func"], job_config["kwargs"]["cron_expr"], job_id=job_id
                     )
 
-                    # 检查是否已过今天的触发时间且今天未执行
-                    cron_expr = job_config["kwargs"]["cron_expr"]
-                    parts = cron_expr.split()
-                    target_hour, target_minute = int(parts[1]), int(parts[0])
+                    # skip_compensation 检查：周期性任务（如备份）跳过启动补偿
+                    if job_config.get("skip_compensation", False):
+                        logger.debug(
+                            "任务 %s 配置 skip_compensation=True，跳过启动补偿",
+                            job_id,
+                        )
+                        continue
 
-                    if now.hour > target_hour or (
-                        now.hour == target_hour and now.minute >= target_minute
-                    ):
-                        if self._should_execute_cron_today(job_id):
-                            logger.info(
-                                "已过今日 %s:%02d，异步执行一次 %s",
-                                target_hour,
-                                target_minute,
-                                job_id,
-                            )
-                            asyncio.get_event_loop().create_task(
-                                self._execute_cron_with_state(job_config["func"], job_id)
-                            )
-                        else:
-                            logger.debug("任务 %s 今天已执行过，跳过补偿执行", job_id)
+                    # 启动补偿检查：仅对单值小时 cron 表达式生效
+                    # 多值小时 cron（如 "0 0,8,16 * * *"）跳过启动补偿，
+                    # 因为无法解析为单一触发时间点；cron 任务本身已通过 add_cron_job 注册，
+                    # 将按计划执行，启动补偿不影响后续定时触发。
+                    try:
+                        cron_expr = job_config["kwargs"]["cron_expr"]
+                        parts = cron_expr.split()
+                        target_hour, target_minute = int(parts[1]), int(parts[0])
+
+                        if now.hour > target_hour or (
+                            now.hour == target_hour and now.minute >= target_minute
+                        ):
+                            if self._should_execute_cron_today(job_id):
+                                logger.info(
+                                    "已过今日 %s:%02d，异步执行一次 %s",
+                                    target_hour,
+                                    target_minute,
+                                    job_id,
+                                )
+                                asyncio.get_event_loop().create_task(
+                                    self._execute_cron_with_state(job_config["func"], job_id)
+                                )
+                            else:
+                                logger.debug("任务 %s 今天已执行过，跳过补偿执行", job_id)
+                    except ValueError:
+                        # 多值 cron 表达式（如 "0 0,8,16 * * *"）无法解析为单值小时
+                        # 跳过启动补偿，cron 任务将按计划执行
+                        logger.debug(
+                            "cron 表达式不支持启动补偿（多值字段），跳过 job_id=%s, cron_expr=%s",
+                            job_id,
+                            job_config["kwargs"]["cron_expr"],
+                        )
             except Exception as e:
                 logger.error("添加系统任务 %s 失败: error=%s", job_config["job_id"], e)
 

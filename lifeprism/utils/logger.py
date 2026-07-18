@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 DEBUG = logging.DEBUG
@@ -83,6 +84,81 @@ def setup_file_logging(log_dir: Path) -> None:
     except Exception as e:
         # LEGITIMATE: 辅助操作兜底 — 日志配置失败不影响主流程
         print(f"[WARNING] 无法创建日志文件: {e}")
+
+
+class _OverwritingRotatingFileHandler(RotatingFileHandler):
+    """backupCount=0 时真正截断文件的 RotatingFileHandler 子类。
+
+    stdlib RotatingFileHandler 在 backupCount=0 时，doRollover 只关闭并重新打开文件
+    （append 模式），不截断，导致文件无限增长。此子类覆盖 doRollover，
+    在 backupCount=0 时清空文件重新写，满足"覆盖式滚动"语义。
+
+    保持 backupCount>0 时走父类逻辑（保留 .1/.2/... 备份文件），向后兼容。
+    """
+
+    def doRollover(self):
+        if self.backupCount > 0:
+            super().doRollover()
+            return
+        # backupCount=0：覆盖式滚动 — 清空文件重新写
+        if self.stream:
+            self.stream.close()
+            self.stream = None
+        # 以 'w' 模式打开即截断为 0 字节
+        with open(self.baseFilename, "w", encoding=self.encoding):
+            pass
+        if not self.delay:
+            self.stream = self._open()
+
+
+def setup_sync_logging(log_dir: Path) -> None:
+    """
+    配置 sync 专用日志（RotatingFileHandler，覆盖式 500KB）
+
+    设计决策（PRD 决策 20）：
+    - 利用 Python logging 层级传播：sync_client.py 的 __name__ 为 lifeprism.sync.sync_client，
+      是 lifeprism.sync 的子 logger。给 lifeprism.sync logger 附加专用 RotatingFileHandler，
+      子 logger 日志会通过 propagate=True（默认）传到此处写入 sync.log，
+      同时继续向上传播到 root logger 写入 lifeprism.log + 控制台。
+    - sync_client.py / loop.py 无需任何改动（零侵入业务代码）。
+    - maxBytes=500KB + backupCount=0：超过 500KB 时清空重写，不保留备份，磁盘占用恒 ≤ 500KB。
+      注意：stdlib RotatingFileHandler 在 backupCount=0 时不会截断文件，需用
+      _OverwritingRotatingFileHandler 子类覆盖 doRollover 实现真正的"覆盖式"。
+    - 启动时不清空 sync.log（_OverwritingRotatingFileHandler 默认 mode='a' 追加），
+      由 500KB 滚动自然淘汰旧日志。
+    - 幂等性：重复调用不会重复添加 handler，避免重启或多次初始化时累积 handler
+      导致同一行日志被多次写入 sync.log。
+
+    Args:
+        log_dir: 日志目录路径（与 lifeprism.log 同目录，如 lifeprismData/debug_logs）
+    """
+    sync_logger = logging.getLogger("lifeprism.sync")
+    sync_log = log_dir / "sync.log"
+    sync_log_resolved = str(sync_log.resolve())
+
+    # 幂等性检查：若已有 RotatingFileHandler 指向同一 sync.log，则不再添加
+    for h in sync_logger.handlers:
+        if (
+            isinstance(h, RotatingFileHandler)
+            and str(Path(h.baseFilename).resolve()) == sync_log_resolved
+        ):
+            return
+
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        handler = _OverwritingRotatingFileHandler(
+            sync_log,
+            maxBytes=500 * 1024,
+            backupCount=0,
+            encoding="utf-8",
+        )
+        handler.setFormatter(TruncatingFormatter(_LOG_FORMAT))
+        sync_logger.addHandler(handler)
+        # propagate 保持默认 True：日志自动传播到 root logger
+        # → 同时写入 sync.log + lifeprism.log + 控制台
+    except Exception as e:
+        # LEGITIMATE: 辅助操作兜底 — 日志配置失败不影响主流程
+        print(f"[WARNING] 无法创建 sync 专用日志文件: {e}")
 
 
 def enable_uvicorn_file_logging() -> None:

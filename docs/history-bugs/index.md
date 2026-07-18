@@ -1,3 +1,17 @@
+## 2026-07-17-write-file-xml-tag-residue-in-doc
+
+- updated_at: 2026-07-17
+- path: `docs/history-bugs/2026-07-17-write-file-xml-tag-residue-in-doc.md`
+- 触发规则：在排查"文档开头出现 `<tool_call><function=write_file>` 等 XML 标签"、修改 `WriteFileTool` / `EditFileTool` 的调用或解析逻辑、修改 `CustomProvider._parse()` 或 `LiteLLMProvider._parse_response()` 的 XML 工具调用解析、排查 Agent 写入的文档内容包含 XML 工具调用残留、设计"LLM 是否应该有写入工具"或"工具调用输出格式"、评估"程序替换 vs LLM 直接写入"的方案选择时阅读
+- 内容摘要：**中等 bug（P2，待修复）** — Agent 通过 `WriteFileTool` 写入文档时，LLM 工具调用 XML 标签（`<function=write_file>` `<parameter=file_path>` `<parameter=content>`）被原样写入文档正文，而非被解析为工具调用执行。根因与 [2026-06-30-custom-provider-missing-xml-tool-call-parsing.md](file:///d:/desktop/软件开发/LifeWatch-AI/docs/history-bugs/2026-06-30-custom-provider-missing-xml-tool-call-parsing.md) 相同：CustomProvider 解析失败导致 XML 文本进入 content，但本 bug 进一步表现为 content 被写入文档造成数据污染。给出 3 个修复方案：A（CONFLICT_RESOLVE 不给写入工具，与冲突解决改造一起做）、B（WriteFileTool 写入前校验 XML 标签作为兜底）、C（CustomProvider 补全 XML 解析，根因修复）
+
+## 2026-07-16-conflict-resolve-llm-destroys-behavior-md
+
+- updated_at: 2026-07-17
+- path: `docs/history-bugs/2026-07-16-conflict-resolve-llm-destroys-behavior-md.md`
+- 触发规则：在排查"AI 合并文件后内容丢失/被截断/被精简"、修改 `lifeprism/llm/agent/loop.py` 中 `CONFLICT_RESOLVE` 分支的工具注册逻辑、修改 `lifeprism/sync/sync_client.py` 中 `_resolve_conflicts` 的 AI 合并调用、讨论"LLM 是否应该被赋予工具"或"LLM 工具调用边界"、设计文档冲突解决机制（diff / patch / 3-way merge / LLM 合并）、排查 `sync_conflict/` 备份目录未清理无限增长、评估"是否需要定时全量数据备份"作为最后兜底时阅读
+- 内容摘要：**严重生产级 bug（P0，待修复）** — 2026-07-16 上午 07:45 执行同步时，CONFLICT_RESOLVE 流程在 LLM 合并 behavior.md 时导致历史行为记录被永久丢失。根因：`loop.py:492-499` 中 CONFLICT_RESOLVE 分支给 LLM 注册了 6 个工具（含 WriteFileTool/EditFileTool），LLM 可绕过 sync_client 直接修改文件；且 behavior.md 内容过长导致 LLM 输出被截断。三重防线全部失效：主动防御失效、操作前备份虽触发但用户未察觉、定时全量备份完全缺失。给出 3 个修复方案：A（立即，CONFLICT_RESOLVE 改为 tools=[] 纯 LLM 调用）、B（中期，按文档大小分流冲突解决策略）、C（兜底，实现定时全量备份 spec）
+
 ## 2026-07-17-cloud-init-seed-data-syncs-to-local
 
 - updated_at: 2026-07-17

@@ -490,13 +490,12 @@ class AgentLoop:
                 tool_registry.register(SearchStringTool())
                 tools: list[dict[str, Any]] = tool_registry.get_definitions()
             elif msg.type == MessageType.CONFLICT_RESOLVE:
-                tool_registry.register(ReadFileTool())
-                tool_registry.register(WriteFileTool())
-                tool_registry.register(EditFileTool())
-                tool_registry.register(FileTreeTool())
-                tool_registry.register(SearchFileTool())
-                tool_registry.register(SearchStringTool())
-                tools: list[dict[str, Any]] = tool_registry.get_definitions()
+                # Issue 3 改造：CONFLICT_RESOLVE 不注册任何工具（tools=[]），与 CLASSIFY 分支一致
+                # 理由：CONFLICT_RESOLVE 是纯文本合并任务，输入已在 InboundMessage.content 中提供，
+                #       无需任何文件工具。消除 behavior.md 被破坏事件的根本风险——
+                #       LLM 无 WriteFileTool/EditFileTool，不可能绕过程序直接覆盖文件。
+                # 详见 ADR 2026-07-17 决策 2（CONFLICT_RESOLVE tools=[]）
+                tools = []
             elif msg.type == MessageType.CLASSIFY:
                 tools = []
 

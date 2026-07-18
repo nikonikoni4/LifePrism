@@ -20,9 +20,9 @@ from typing import Any
 
 import httpx
 
+from lifeprism.sync.conflict_backup import backup_conflict_versions
 from lifeprism.sync.constants import (
     DB_PUSH_BATCH_SIZE,
-    EXCLUDED_FILENAMES as _EXCLUDED_FILENAMES,
     FILE_BATCH_SIZE,
     FULL_CLEAR_TIMEOUT,
     INITIALIZATION_STATUS_TIMEOUT,
@@ -30,8 +30,11 @@ from lifeprism.sync.constants import (
     PUSH_ENDPOINT_TIMEOUT,
     SYNC_DIRECTORIES,
     SYNC_TABLES,
+    safe_gzip_decompress,
 )
-from lifeprism.sync.constants import safe_gzip_decompress
+from lifeprism.sync.constants import (
+    EXCLUDED_FILENAMES as _EXCLUDED_FILENAMES,
+)
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
@@ -99,6 +102,9 @@ class SyncClient:
         self._is_syncing: bool = False
         # 后台定时同步任务句柄
         self._sync_task = None
+        # template_hashes 集合缓存（Issue 1: PRD 决策 8）
+        # 首次使用时懒加载，后续直接复用；None 表示尚未计算
+        self._template_hashes: set[str] | None = None
 
     @property
     def is_syncing(self) -> bool:
@@ -977,16 +983,21 @@ class SyncClient:
         实时计算 current_hash 并批量更新 file_sync_state 表。
         新文件 parent_hash = NULL；已存在记录保持 parent_hash 不变。
 
+        Issue 1（PRD 决策 7、8）过滤：扫描阶段预防性跳过两类文件，不写入 file_sync_state：
+        1. 空文件：content.strip() 后为空（从根本上解决空文档覆盖 bug 根因）
+        2. Template 文件：hash 在 template_hashes 集合中（不携带用户数据，不应触发同步冲突）
+
         参考 ADR v2.1 决策 1：hash 更新逻辑 - 同步前刷新 current_hash。
 
         Args:
             directories: 文件同步目录列表（相对 lifeprism_data_path）
 
         Returns:
-            list[str]: 扫描到的文件相对路径列表（供调用方复用，避免重复扫描）
+            list[str]: 扫描到且通过过滤的文件相对路径列表（供调用方复用，避免重复扫描）
         """
         from lifeprism.config.settings_manager import settings
         from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.sync.file_filter import is_empty_content
         from lifeprism.sync.hash_utils import compute_file_hash
 
         data_path = settings.lifeprism_data_path.resolve()
@@ -997,12 +1008,29 @@ class SyncClient:
         # 批量获取现有状态（单次 DB 查询，避免逐文件往返）
         existing_states = provider.batch_get_states(rel_paths)
 
+        # Issue 1: 加载 template_hashes 集合（首次调用懒加载，后续从缓存复用）
+        template_hashes = self._get_template_hashes()
+
         # 逐文件计算 hash（CPU 密集，无法批量）
         to_upsert = []
+        # 过滤统计（用于日志可观测性）
+        skipped_empty: list[str] = []
+        skipped_template: list[str] = []
         for rel_path in rel_paths:
             file_path = (data_path / rel_path).resolve()
             content_bytes = file_path.read_bytes()
+
+            # 过滤条件 1（PRD 决策 7）：空文件不写入 file_sync_state
+            if is_empty_content(content_bytes):
+                skipped_empty.append(rel_path)
+                continue
+
             new_hash = compute_file_hash(content_bytes)
+
+            # 过滤条件 2（PRD 决策 8）：template hash 命中不写入 file_sync_state
+            if new_hash in template_hashes:
+                skipped_template.append(rel_path)
+                continue
 
             existing = existing_states.get(rel_path)
             parent_hash = existing["parent_hash"] if existing else None
@@ -1019,8 +1047,75 @@ class SyncClient:
         if to_upsert:
             provider.batch_upsert_states(to_upsert)
 
-        logger.debug("_refresh_current_hashes: 刷新 %d 个文件的 current_hash", len(rel_paths))
-        return rel_paths
+        # 过滤生效日志（即使为 0 也记录，便于排查"为什么文件没进 file_sync_state"）
+        if skipped_empty:
+            logger.info(
+                "_refresh_current_hashes: 跳过 %d 个空文件（PRD 决策 7）: %s",
+                len(skipped_empty),
+                skipped_empty,
+            )
+        if skipped_template:
+            logger.info(
+                "_refresh_current_hashes: 跳过 %d 个 template 文件（PRD 决策 8）: %s",
+                len(skipped_template),
+                skipped_template,
+            )
+
+        # 返回通过过滤的文件列表（不含被过滤的文件），供调用方用于矩阵判定
+        filtered_paths = [item["file_path"] for item in to_upsert]
+        logger.debug(
+            "_refresh_current_hashes: 扫描 %d 个文件，过滤空=%d，过滤 template=%d，"
+            "写入 file_sync_state %d 个",
+            len(rel_paths),
+            len(skipped_empty),
+            len(skipped_template),
+            len(filtered_paths),
+        )
+        return filtered_paths
+
+    def _get_template_hashes(self) -> set[str]:
+        """获取 template_hashes 集合（懒加载 + 缓存）
+
+        PRD 决策 8：启动时计算 templates/ 目录所有文件 hash，写入 template_hashes 集合。
+        本方法采用懒加载策略——首次调用时计算并缓存到 self._template_hashes，
+        后续直接返回缓存值。
+
+        懒加载而非 __init__ 时计算的理由：
+        - 不影响 SyncClient 实例化性能（实例化发生在应用启动关键路径）
+        - 不影响不使用文件同步的场景（如纯数据库同步测试）
+        - templates/ 目录内容在进程生命周期内不变，缓存无需失效
+
+        使用 getattr 兜底读取 self._template_hashes，兼容测试中通过 __new__
+        跳过 __init__ 的场景（避免 AttributeError 阻塞测试）。
+
+        Returns:
+            set[str]: template 文件 hash 集合
+        """
+        if getattr(self, "_template_hashes", None) is None:
+            from lifeprism.sync.file_filter import compute_template_hashes
+
+            templates_dir = self._resolve_templates_dir()
+            self._template_hashes = compute_template_hashes(templates_dir)
+        return self._template_hashes
+
+    def _resolve_templates_dir(self) -> Path:
+        """解析 templates 目录绝对路径
+
+        与 resource_initializer.py 的路径解析逻辑保持一致：
+        - 打包环境（PyInstaller）：bundle_dir = sys._MEIPASS, templates = bundle_dir / "templates"
+        - 非打包环境：bundle_dir = 项目根目录, templates = bundle_dir / "templates"
+
+        Returns:
+            Path: templates 目录路径（可能不存在，由 compute_template_hashes 兜底处理）
+        """
+        import sys
+
+        if getattr(sys, "frozen", False):
+            bundle_dir = Path(sys._MEIPASS)
+        else:
+            # lifeprism/sync/sync_client.py -> lifeprism/sync/ -> lifeprism/ -> 项目根
+            bundle_dir = Path(__file__).resolve().parent.parent.parent
+        return bundle_dir / "templates"
 
     def _pull_files_check(self, remote_url, api_key, last_sync_time, directories):
         """Phase 1: 快照交换 - 调用 POST /pull-files/check 获取云端文件 hash 状态 + 完整路径清单
@@ -1508,17 +1603,110 @@ class SyncClient:
         content_bytes = safe_gzip_decompress(compressed)
         return content_bytes.decode("utf-8")
 
-    def _resolve_conflicts(self, conflict_paths, remote_url, api_key):
-        """通过 AI 合并解决 CONFLICT 文件（串行处理）
+    def _fetch_remote_base_content(self, file_path: str, parent_hash: str | None) -> str | None:
+        """获取 parent_hash 对应的 base content（diff3 三方合并的 common ancestor）
 
-        对每个 CONFLICT 文件（一次一个发送给 AI）：
-        1. 读取本地文件内容
-        2. 获取远端文件内容
-        3. 构建 CONFLICT_RESOLVE 消息（Markdown 格式）
-        4. 通过 run_coroutine_threadsafe 桥接 bus.send 到主线程事件循环
-        5. 等待 AI 合并结果（timeout=600）
-        6. 处理结果：备份本地版本 → 写入合并内容 → 更新 file_sync_state
-        7. 失败/超时：保留本地版本，记录 ERROR 日志
+        PRD 决策 1 / ADR-1 决策 2：diff3 需要 base（公共祖先）作为输入。
+        ``file_sync_state`` 表仅存 hash 不存内容，云端也无按 hash 查询的 API，
+        因此从本地文档备份目录 ``backups/docs/{timestamp}/`` 查找匹配
+        parent_hash 的历史版本。
+
+        查找策略：
+        1. 遍历 ``backups/docs/`` 下所有时间戳子目录（按名称降序，最新的在前）
+        2. 对每个备份中的对应 ``file_path`` 文件计算 hash
+        3. 找到第一个匹配 ``parent_hash`` 的返回其内容
+        4. 全部不匹配或备份目录不存在 → 返回 None（由调用方降级 LWW）
+
+        已知限制（记录为后续优化方向，不在 Issue 4 范围内）：
+        - 备份每天 03:00 执行，保留最近 3 份；若 parent_hash 超过 3 天会找不到
+        - 频繁同步场景下 base 可能找不到，降级 LWW
+        - 后续可新增云端 API ``/pull-files/fetch-by-hash`` 或本地 hash→content 缓存
+
+        Args:
+            file_path: 文件相对路径（相对 lifeprism_data_path）
+            parent_hash: 上次同步成功时的 hash；None 表示从未同步
+
+        Returns:
+            base content 字符串，或 None（无法获取时）
+        """
+        if parent_hash is None:
+            return None
+
+        from lifeprism.config.settings_manager import settings
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        data_path = settings.lifeprism_data_path.resolve()
+        backup_docs_root = data_path / "backups" / "docs"
+        if not backup_docs_root.exists():
+            logger.debug(
+                "_fetch_remote_base_content: 备份目录不存在，无法获取 base content "
+                "file_path=%s, parent_hash=%s",
+                file_path,
+                parent_hash,
+            )
+            return None
+
+        # 按时间戳降序遍历备份子目录（最新的在前）
+        backup_dirs = sorted(
+            (d for d in backup_docs_root.iterdir() if d.is_dir()),
+            key=lambda d: d.name,
+            reverse=True,
+        )
+
+        for backup_dir in backup_dirs:
+            backup_file = backup_dir / file_path
+            if not backup_file.is_file():
+                continue
+            try:
+                content_bytes = backup_file.read_bytes()
+                file_hash = compute_file_hash(content_bytes)
+                if file_hash == parent_hash:
+                    logger.debug(
+                        "_fetch_remote_base_content: 在备份 %s 找到匹配的 base content "
+                        "file_path=%s, parent_hash=%s",
+                        backup_dir.name,
+                        file_path,
+                        parent_hash,
+                    )
+                    return content_bytes.decode("utf-8")
+            except OSError as e:
+                logger.warning(
+                    "_fetch_remote_base_content: 读取备份文件失败 %s, error=%s",
+                    backup_file,
+                    e,
+                )
+                continue
+
+        logger.debug(
+            "_fetch_remote_base_content: 所有备份中均未找到匹配的 base content "
+            "file_path=%s, parent_hash=%s",
+            file_path,
+            parent_hash,
+        )
+        return None
+
+    def _resolve_conflicts(self, conflict_paths, remote_url, api_key):
+        """通过 diff3 + LLM 串行 + 重试降级解决 CONFLICT 文件（Issue 4）
+
+        新流程（PRD 决策 3-6, 10 / ADR-1 决策 3-7）：
+        1. 读取本地文件 (ours)
+        2. 获取远端文件 (theirs) via ``_fetch_remote_file_content``
+        3. 获取 base 内容 via ``_fetch_remote_base_content``
+        4. 运行 ``diff3(base, ours, theirs)`` → 含冲突标记的合并文本
+        5. ``parse_conflict_blocks`` → 冲突块列表
+        6. 串行调用 LLM (每个冲突块一次) → JSON 替换指令
+        7. 程序验证 marker + 执行替换 (``resolve_conflict_blocks``)
+        8. 写入最终文件 + 更新 file_sync_state
+
+        降级策略（PRD 决策 10）：
+        - base content 获取失败 → 整个文件降级 LWW（保留本地 + 备份云端）
+        - diff3 无冲突 → 直接写入自动合并结果（不调用 LLM）
+        - 单个冲突块重试 3 次失败 → 该块降级 keep_ours，其他继续
+        - LLM 调用异常/超时 → 整个文件保留本地版本（不写入、不更新 hash、不备份）
+
+        备份时机（PRD 决策 19）：
+        - 在确定 final_content 后（合并成功 / keep_ours 降级 / LWW 降级）备份
+        - 异常路径（TimeoutError 等）不备份
 
         Args:
             conflict_paths: CONFLICT 文件相对路径列表
@@ -1526,12 +1714,20 @@ class SyncClient:
             api_key: API Key
 
         Returns:
-            list[str]: 成功合并的文件路径列表（用于后续 Phase 2c 推送）
+            list[str]: 成功解决的文件路径列表（用于后续 Phase 2c 推送）
         """
         from lifeprism.config.settings_manager import settings
         from lifeprism.llm.bus.events import InboundMessage, MessageType, OutboundMessage
         from lifeprism.llm.bus.queue import bus
-        from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
+        from lifeprism.repository.providers.file_sync_state_provider import (
+            FileSyncStateProvider,
+        )
+        from lifeprism.sync.conflict_resolution import (
+            compute_hash_8,
+            parse_conflict_blocks,
+            resolve_conflict_blocks,
+        )
+        from lifeprism.sync.diff3 import merge as diff3_merge
         from lifeprism.sync.hash_utils import compute_file_hash
 
         if not conflict_paths:
@@ -1549,76 +1745,134 @@ class SyncClient:
             try:
                 start_time = datetime.now(timezone.utc)
 
-                # 1. 读取本地文件内容
+                # 1. 读取本地文件内容 (ours)
                 local_file = (data_path / file_path).resolve()
                 if not local_file.is_file():
-                    logger.warning("_resolve_conflicts: 本地文件不存在 %s，跳过", file_path)
+                    logger.warning(
+                        "_resolve_conflicts: 本地文件不存在 %s，跳过",
+                        file_path,
+                    )
                     continue
-                local_content = local_file.read_text(encoding="utf-8")
+                ours = local_file.read_text(encoding="utf-8")
 
-                # 2. 获取远端文件内容
-                remote_content = self._fetch_remote_file_content(remote_url, api_key, file_path)
-                if remote_content is None:
+                # 2. 获取远端文件内容 (theirs)
+                theirs = self._fetch_remote_file_content(remote_url, api_key, file_path)
+                if theirs is None:
                     logger.error(
                         "_resolve_conflicts: 无法获取远端文件内容 %s，跳过",
                         file_path,
                     )
                     continue
 
-                # 3. 构建 CONFLICT_RESOLVE 消息（Markdown 格式）
-                msg = InboundMessage(
-                    type=MessageType.CONFLICT_RESOLVE,
-                    content=(
-                        f"## 文件冲突需要解决\n\n"
-                        f"文件路径: {file_path}\n\n"
-                        f"### 本地版本\n\n{local_content}\n\n"
-                        f"### 云端版本\n\n{remote_content}\n\n"
-                        f"### 合并指令\n\n"
-                        f"请合并以上两份文档，保留双方的有效信息，生成一份完整的合并文档。"
-                    ),
-                    extra={
-                        "conflict_file_path": file_path,
-                        "system_prompt": (
-                            "你是文档合并助手。请合并两份 Markdown 文档，"
-                            "保留双方的有效信息，移除重复内容，保持文档结构清晰。"
-                            "直接输出合并后的文档内容，不要解释。"
-                        ),
-                    },
-                )
-
-                # 4. 通过 run_coroutine_threadsafe 桥接 bus.send 到主线程事件循环
-                future = asyncio.run_coroutine_threadsafe(
-                    bus.send(msg),
-                    self._main_event_loop,
-                )
-
-                # 5. 等待 AI 合并结果（timeout=600）
-                result: OutboundMessage = future.result(timeout=600)
-
-                # 6. 提取合并后的内容
-                merged_content = result.response.content if result.response else ""
-                if not merged_content or not merged_content.strip():
-                    logger.error(
-                        "_resolve_conflicts: AI 返回空内容 %s，保留本地版本",
-                        file_path,
-                    )
-                    continue
-
-                # 6a. 计算合并后内容的 new_hash
-                new_hash = compute_file_hash(merged_content.encode("utf-8"))
-
-                # 6b. 冲突备份：将本地版本备份到 sync_conflict/{timestamp}/{file_path}
-                timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-                backup_path = (data_path / "sync_conflict" / timestamp_str / file_path).resolve()
-                backup_path.parent.mkdir(parents=True, exist_ok=True)
-                backup_path.write_text(local_content, encoding="utf-8")
-
-                # 6c. 原子写入合并后的内容到本地文件
-                _safe_write_file(local_file, merged_content.encode("utf-8"))
-
-                # 6d. 更新 file_sync_state: current_hash = new_hash
+                # 3. 获取 base 内容 + parent_hash
                 existing = provider.get_state(file_path)
                 parent_hash = existing["parent_hash"] if existing else None
+                base = self._fetch_remote_base_content(file_path, parent_hash)
+
+                # 4. diff3 + LLM 串行处理（base 为 None 时 LWW 降级）
+                if base is None:
+                    # LWW 降级：base 不可获取，保留本地版本
+                    logger.warning(
+                        "_resolve_conflicts: base content 不可获取 %s，降级 LWW（保留本地版本）",
+                        file_path,
+                    )
+                    final_content = ours
+                else:
+                    # 运行 diff3 三方合并
+                    local_hash_8 = compute_hash_8(ours)
+                    remote_hash_8 = compute_hash_8(theirs)
+                    diff3_result = diff3_merge(
+                        base=base,
+                        ours=ours,
+                        theirs=theirs,
+                        local_hash_8=local_hash_8,
+                        remote_hash_8=remote_hash_8,
+                    )
+                    merged_text = diff3_result["merged"]
+                    conflicts_count = diff3_result["conflicts"]
+
+                    if conflicts_count == 0:
+                        # diff3 自动合并成功，无冲突标记，直接使用合并结果
+                        logger.debug(
+                            "_resolve_conflicts: diff3 自动合并成功 %s，无冲突",
+                            file_path,
+                        )
+                        final_content = merged_text
+                    else:
+                        # diff3 产生冲突标记，需要 LLM 串行处理
+                        logger.debug(
+                            "_resolve_conflicts: diff3 产生 %d 个冲突块 %s，调用 LLM 串行处理",
+                            conflicts_count,
+                            file_path,
+                        )
+                        conflict_blocks = parse_conflict_blocks(merged_text)
+                        if not conflict_blocks:
+                            # 冲突块解析失败（格式错误），LWW 降级
+                            logger.error(
+                                "_resolve_conflicts: 冲突块解析失败 %s，降级 LWW（保留本地版本）",
+                                file_path,
+                            )
+                            final_content = ours
+                        else:
+                            # 构建 LLM 调用回调（通过 bus.send 桥接到主线程）
+                            # 使用默认参数绑定 file_path，避免闭包延迟绑定问题（B023）
+                            def llm_caller(prompt: str, _file_path: str = file_path) -> str:
+                                """通过 bus.send 调用 LLM，返回响应内容
+
+                                通过 run_coroutine_threadsafe 将 bus.send 提交到
+                                主线程事件循环，等待 LLM 响应（timeout=600s）。
+                                """
+                                msg = InboundMessage(
+                                    type=MessageType.CONFLICT_RESOLVE,
+                                    content=prompt,
+                                    extra={
+                                        "conflict_file_path": _file_path,
+                                    },
+                                )
+                                future = asyncio.run_coroutine_threadsafe(
+                                    bus.send(msg),
+                                    self._main_event_loop,
+                                )
+                                result: OutboundMessage = future.result(timeout=600)
+                                return result.response.content if result.response else ""
+
+                            # 串行处理冲突块（重试 + 降级 keep_ours）
+                            resolve_result = resolve_conflict_blocks(
+                                file_content=merged_text,
+                                conflict_blocks=conflict_blocks,
+                                llm_caller=llm_caller,
+                                max_retries=3,
+                            )
+                            final_content = resolve_result.final_content
+
+                            logger.info(
+                                "_resolve_conflicts: LLM 串行处理完成 %s，"
+                                "成功=%d, 失败=%d, 总计=%d",
+                                file_path,
+                                resolve_result.resolved_count,
+                                resolve_result.failed_count,
+                                len(conflict_blocks),
+                            )
+
+                # 5. 冲突备份：同时备份本地与云端两个版本到 sync_conflict/{ts}/
+                # 修复旧实现仅备份 local_content 的 bug（PRD 决策 19，
+                # ADR-2026-07-17-conflict-failure-policy.md）。
+                # backup_conflict_versions 内部会顺带触发 30 天清理（PRD 决策 9）。
+                timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                backup_conflict_versions(
+                    data_path=data_path,
+                    file_path=file_path,
+                    local_content=ours,
+                    remote_content=theirs,
+                    timestamp_str=timestamp_str,
+                )
+
+                # 6. 原子写入最终内容到本地文件
+                _safe_write_file(local_file, final_content.encode("utf-8"))
+
+                # 7. 更新 file_sync_state: current_hash = new_hash
+                # parent_hash 保持不变（下次同步时由 verify_and_advance_parent 推进）
+                new_hash = compute_file_hash(final_content.encode("utf-8"))
                 provider.upsert_state(
                     file_path=file_path,
                     parent_hash=parent_hash,
@@ -1627,7 +1881,7 @@ class SyncClient:
 
                 duration = (datetime.now(timezone.utc) - start_time).total_seconds()
                 logger.debug(
-                    "_resolve_conflicts: 文件 %s AI 合并完成，耗时 %ss，new_hash=%s",
+                    "_resolve_conflicts: 文件 %s 冲突解决完成，耗时 %ss，new_hash=%s",
                     file_path,
                     duration,
                     new_hash,
@@ -1636,12 +1890,12 @@ class SyncClient:
 
             except TimeoutError:
                 logger.error(
-                    "_resolve_conflicts: AI 合并超时 %s，保留本地版本",
+                    "_resolve_conflicts: LLM 合并超时 %s，保留本地版本",
                     file_path,
                 )
             except Exception as e:
                 logger.error(
-                    "_resolve_conflicts: AI 合并失败 %s，error=%s",
+                    "_resolve_conflicts: 冲突解决失败 %s，error=%s",
                     file_path,
                     e,
                     exc_info=True,

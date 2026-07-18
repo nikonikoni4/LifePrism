@@ -1,10 +1,34 @@
 ---
 version: 2.0
 created_at: 2026-04-10
-updated_at: 2026-07-14
-last_updated: 新增云端首次同步全清覆盖方案 ADR
+updated_at: 2026-07-17
+last_updated: 新增文件冲突解决改造 + 数据备份策略 + 冲突失败处理策略 + 备份同步范围解耦 4 篇 ADR
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## backup-sync-decoupled-scope
+- updated_at: 2026-07-17
+- path: `docs/adr/2026-07-17-backup-sync-decoupled-scope.md`
+- 触发规则：当需要理解为什么备份范围与同步范围独立定义、为什么 plan 加入备份但不加入同步、或修改 BACKUP_DIRS / SYNC_DIRECTORIES 时读取
+- 内容摘要：备份范围与同步范围解耦，独立定义 `BACKUP_DIRS = [session/, diary/, agent/, user/, plan/]`（含 plan），不依赖 `SYNC_DIRECTORIES`。决策前提：同步和备份职责不同（同步是功能性，备份是数据安全性）、plan 无同步必要（Agent 无法读取 plan 文件夹）、plan 与数据库高度绑定、sync_client 不稳定不引入新变量。未来 plan 需要多端访问时可在 SYNC_DIRECTORIES 中加入（独立决策）。
+
+## conflict-failure-policy
+- updated_at: 2026-07-17
+- path: `docs/adr/2026-07-17-conflict-failure-policy.md`
+- 触发规则：当需要理解冲突失败后 sync_once 的行为、为什么不主动通知用户、sync_conflict/ 为什么需要同时备份本地和云端、或修改冲突失败处理逻辑时读取
+- 内容摘要：冲突失败时不阻塞 sync_once（仅跳过冲突文件，其他继续），冲突文件降级 keep_ours（保留本地版本），不主动通知用户（仅日志 + sync_conflict/ 备份），与"不做 Agent 恢复通道"整体决策一致。关键修复：sync_conflict/ 必须同时备份本地和云端版本（当前 bug：[sync_client.py:1610-1614](file:///d:/desktop/软件开发/LifeWatch-AI/lifeprism/sync/sync_client.py#L1610-L1614) 仅备份本地）。未来面向终端用户或冲突频率显著提升时切换到 Agent 通知方案。
+
+## data-backup-strategy
+- updated_at: 2026-07-17
+- path: `docs/adr/2026-07-17-data-backup-strategy.md`
+- 触发规则：当需要理解数据备份格式、备份频率、调度器选择、为什么不做恢复 API、或修改 BackupService 设计时读取
+- 内容摘要：数据备份采用平铺存储（非 zip）+ 复用现有 ScheduleService（APScheduler 已是项目依赖）+ 不做恢复 API（仅文档指导手工恢复）。文档每天 03:00 备份一次，数据库每 8 小时（00/08/16 点）备份一次，各自保留 3 份。数据库使用 SQLite Online Backup API 全量备份。新建 BackupService 单例（职责：执行备份逻辑，不负责调度）。完整性校验：文件数量 + hash 比对 + PRAGMA integrity_check。决策前提：恢复场景频率极低（年频）、查看便利性是硬需求、用户是开发者可手工恢复。未来频率提升时基于恢复文档扩展为 API + Agent 通道。
+
+## conflict-resolution-diff3-replaces-llm
+- updated_at: 2026-07-17
+- path: `docs/adr/2026-07-17-conflict-resolution-diff3-replaces-llm.md`
+- 触发规则：当需要理解为什么 CONFLICT_RESOLVE 分支改为 tools=[]、diff3 算法选型、冲突标记格式（LP-LOCAL-{hash8} #{n}）、LLM 输出 JSON 替换指令、串行处理流程、3 次重试降级、或修改文件冲突解决机制时读取
+- 内容摘要：文件冲突解决从 LLM 自主合并改为 diff3 算法 + LLM 辅助合并（无工具），消除 AI 截断数据风险。修订原 ADR `2026-07-14-file-sync-conflict-resolution.md` 决策 3（原决策为 AI 驱动合并 + LLM 有文件工具）。触发原因：2026-07-16 behavior.md 被破坏事件证明 LLM 自主合并不安全。具体决策：基于 difflib 自研 diff3（约 150 行代码，无外部依赖，避免 merge3 包 GPL 协议纠纷）、CONFLICT_RESOLVE `tools = []`、冲突标记 `<<<<<<< LP-LOCAL-{hash8} #{n}`、LLM 输出 JSON 替换指令、串行处理（理解 B，一个冲突一次 LLM 调用）、3 次重试降级 keep_ours。未来需要多端同步时切换到完整 git-like 方案。
 
 ## sync-system-timeline
 - updated_at: 2026-07-16

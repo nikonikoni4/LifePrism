@@ -55,6 +55,14 @@ class Prompts:
         SCREENSHOT_ANALYSIS = PromptRef("schedule", "screenshot_analysis")
         SCREEN_BEHAVIOR_SUMMARY = PromptRef("schedule", "screen_behavior_summary")
 
+    class Conflict:
+        """文件同步冲突解决相关 prompts (conflict_prompts.md)
+
+        Issue 3 改造：CONFLICT_RESOLVE 分支 tools=[] 后的 prompt 模块化
+        """
+
+        RESOLVE_CONFLICT = PromptRef("conflict", "resolve_conflict")
+
 
 class PromptLoader:
     """

@@ -217,10 +217,13 @@ class SettingsManager:
 
     def _setup_logging(self) -> None:
         """配置日志文件输出"""
-        from lifeprism.utils.logger import setup_file_logging
+        from lifeprism.utils.logger import setup_file_logging, setup_sync_logging
 
         # 日志写入 {_lifeprism_data_path}/debug_logs/
         setup_file_logging(self._lifeprism_data_path / "debug_logs")
+        # sync 专用日志（sync.log，500KB 覆盖式滚动），与 lifeprism.log 同目录
+        # 利用 propagate 机制，sync_client.py / loop.py 无需任何改动
+        setup_sync_logging(self._lifeprism_data_path / "debug_logs")
 
     def _check_data_path_safety(self) -> None:
         """检查数据路径是否位于安装目录内（仅打包环境）"""
