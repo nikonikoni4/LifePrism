@@ -422,7 +422,7 @@ class SyncClient:
                         break
                     offset += DB_PUSH_BATCH_SIZE
                 logger.info("表 %s 全量推送完成: %d 条", table_name, total_pushed)
-            except Exception as e:
+            except (httpx.HTTPStatusError, httpx.RequestError) as e:
                 # 动态表失败时 continue 而非 raise，避免单张动态表失败中断整个首次同步
                 # 静态表失败仍记录到 failed_tables，因为静态表是核心数据
                 if self.sync_repository.is_dynamic_table(table_name):
@@ -1702,11 +1702,12 @@ class SyncClient:
         - base content 获取失败 → 整个文件降级 LWW（保留本地 + 备份云端）
         - diff3 无冲突 → 直接写入自动合并结果（不调用 LLM）
         - 单个冲突块重试 3 次失败 → 该块降级 keep_ours，其他继续
-        - LLM 调用异常/超时 → 整个文件保留本地版本（不写入、不更新 hash、不备份）
+        - LLM 调用异常（含超时） → 被 resolve_conflict_blocks 内部捕获并触发重试，
+          3 次失败后降级 keep_ours 正常返回，整个文件仍会写入并备份
 
         备份时机（PRD 决策 19）：
         - 在确定 final_content 后（合并成功 / keep_ours 降级 / LWW 降级）备份
-        - 异常路径（TimeoutError 等）不备份
+        - 异常路径（非 LLM 调用异常，如文件 I/O 异常）不备份
 
         Args:
             conflict_paths: CONFLICT 文件相对路径列表
@@ -1888,12 +1889,11 @@ class SyncClient:
                 )
                 resolved_paths.append(file_path)
 
-            except TimeoutError:
-                logger.error(
-                    "_resolve_conflicts: LLM 合并超时 %s，保留本地版本",
-                    file_path,
-                )
             except Exception as e:
+                # LEGITIMATE: 辅助操作兜底，单文件冲突解决失败不应中断整个批次
+                # 注意：TimeoutError（来自 future.result(timeout=600)）已被
+                # resolve_conflict_blocks 内部 L593 的 except Exception 捕获并触发重试，
+                # 3 次失败后降级 keep_ours 正常返回，无法传播到本层。
                 logger.error(
                     "_resolve_conflicts: 冲突解决失败 %s，error=%s",
                     file_path,

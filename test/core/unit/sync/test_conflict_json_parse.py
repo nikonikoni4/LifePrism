@@ -122,7 +122,13 @@ class TestParseLLMJsonResponse:
         assert result is None
 
     def test_parse_wrong_field_types_returns_none(self):
-        """字段类型错误（如 conflict_id 是字符串而非整数）返回 None"""
+        """字段类型错误（如 conflict_id 是字符串而非整数）返回 None
+
+        conflict_id="not_a_number" 不是 int / float / 数字字符串，
+        无法转 int → parse_llm_json_response 应返回 None。
+        参考 conflict_resolution.py L396-400：字符串 conflict_id 尝试 int() 转换，
+        ValueError 时返回 None。
+        """
         from lifeprism.sync.conflict_resolution import parse_llm_json_response
 
         raw = (
@@ -132,12 +138,8 @@ class TestParseLLMJsonResponse:
             '"replacement": "合并后的内容"}'
         )
         result = parse_llm_json_response(raw)
-        # 类型校验严格：conflict_id 必须是 int
-        # 注：宽松策略下可能允许字符串转 int，此处验证至少不返回 None 的字段类型错误
-        # 严格策略下应返回 None
-        if result is not None:
-            # 若 json_repair 容错返回了，conflict_id 应可转 int
-            assert int(result["conflict_id"]) == 1 or result["conflict_id"] == 1
+        # 类型校验严格：conflict_id="not_a_number" 无法转 int → 返回 None
+        assert result is None
 
 
 # ==================== Seam 2: expand_conflict_context ====================
@@ -945,3 +947,377 @@ class TestMultiBlockSerialReplacementBoundary:
         assert "sep2" in result.final_content
         assert "<<<<<<<" not in result.final_content
         assert ">>>>>>>" not in result.final_content
+
+
+# ==================== Seam 6: parse_conflict_blocks 错误恢复路径 ====================
+
+
+class TestParseConflictBlocksRecovery:
+    """parse_conflict_blocks 错误恢复路径直接测试
+
+    PRD 决策 3 / 5：parse_conflict_blocks 必须容忍格式错误，跳过格式错误的冲突块
+    而不是抛异常中断整个文件处理。
+
+    覆盖 conflict_resolution.py L193-200 和 L218-225 两条恢复路径：
+    - 缺少 ======= 分隔符 → 跳过该冲突块
+    - 缺少 >>>>>>> 结束标记 → 跳过该冲突块
+    """
+
+    def test_missing_separator_skips_block(self):
+        """缺少 ======= 分隔符但文件中存在后续 ======= → 跨块贪婪匹配
+
+        实际行为（conflict_resolution.py L186-200）：
+        - ours 收集循环不会停在 `>>>>>>>` 行，只检查 `=======` 模式
+        - 若文件中后续有 =======，第一个起始标记会"借用"它作为分隔符
+        - 此时不会触发 L193-200 的"缺少分隔符"恢复路径
+        - 仅当起始标记后到文件末尾都无 ======= 时才触发恢复路径
+
+        因此本测试验证"贪婪借用"行为，而非"跳过"行为。
+        "跳过"恢复路径由 test_missing_separator_at_file_end_skips_block 覆盖。
+        """
+        from lifeprism.sync.conflict_resolution import parse_conflict_blocks
+
+        merged = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours content without separator\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "sep line\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #2\n"
+            "ours2\n"
+            "=======\n"
+            "theirs2\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #2\n"
+        )
+        blocks = parse_conflict_blocks(merged)
+        # 实际行为：第一块借用后续 ======= 和 >>>>>>>，整文件解析为 1 块
+        assert len(blocks) == 1
+        assert blocks[0].conflict_id == 1
+        assert blocks[0].end_marker == ">>>>>>> LP-REMOTE-7e9d4f2b #2"
+
+    def test_missing_separator_at_file_end_skips_block(self):
+        """缺少 ======= 分隔符且到文件末尾 → 跳过该冲突块
+
+        验证 conflict_resolution.py L193-200 的恢复路径：
+        - 起始标记后到文件末尾都无 =======
+        - 触发 logger.warning 并 continue（跳过该冲突块）
+        """
+        from lifeprism.sync.conflict_resolution import parse_conflict_blocks
+
+        merged = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours content\n"
+            "no separator till end of file\n"
+        )
+        blocks = parse_conflict_blocks(merged)
+        assert blocks == []
+
+    def test_missing_end_marker_skips_block(self):
+        """缺少 >>>>>>> 结束标记但文件中存在后续 >>>>>>> → 跨块贪婪匹配
+
+        实际行为（conflict_resolution.py L208-225）：
+        - theirs 收集循环只检查 _END_MARKER_PATTERN
+        - 若文件中后续有 >>>>>>>，第一块会"借用"它作为结束标记
+        - 此时不会触发 L218-225 的"缺少结束标记"恢复路径
+        - 仅当 ======= 后到文件末尾都无 >>>>>>> 时才触发恢复路径
+
+        因此本测试验证"贪婪借用"行为，而非"跳过"行为。
+        "跳过"恢复路径由 test_missing_end_marker_at_file_end_skips_block 覆盖。
+        """
+        from lifeprism.sync.conflict_resolution import parse_conflict_blocks
+
+        merged = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours1\n"
+            "=======\n"
+            "theirs1\n"
+            "no end marker\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #2\n"
+            "ours2\n"
+            "=======\n"
+            "theirs2\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #2\n"
+        )
+        blocks = parse_conflict_blocks(merged)
+        # 实际行为：第一块借用后续 >>>>>>>，整文件解析为 1 块
+        assert len(blocks) == 1
+        assert blocks[0].conflict_id == 1
+        assert blocks[0].end_marker == ">>>>>>> LP-REMOTE-7e9d4f2b #2"
+
+    def test_missing_end_marker_at_file_end_skips_block(self):
+        """缺少 >>>>>>> 结束标记且到文件末尾 → 跳过该冲突块"""
+        from lifeprism.sync.conflict_resolution import parse_conflict_blocks
+
+        merged = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours1\n"
+            "=======\n"
+            "theirs1\n"
+            "no end marker\n"
+        )
+        blocks = parse_conflict_blocks(merged)
+        assert blocks == []
+
+    def test_empty_input_returns_empty_list(self):
+        """空字符串 → 返回空列表"""
+        from lifeprism.sync.conflict_resolution import parse_conflict_blocks
+
+        assert parse_conflict_blocks("") == []
+        assert parse_conflict_blocks(None) == []  # type: ignore[arg-type]
+
+    def test_no_conflict_markers_returns_empty(self):
+        """无冲突标记的普通文本 → 返回空列表"""
+        from lifeprism.sync.conflict_resolution import parse_conflict_blocks
+
+        merged = (
+            "# 日记\n"
+            "今天天气很好\n"
+            "心情不错\n"
+        )
+        blocks = parse_conflict_blocks(merged)
+        assert blocks == []
+
+    def test_well_formed_single_block_parsed_correctly(self):
+        """正常单块格式 → 解析成功（对照基线）"""
+        from lifeprism.sync.conflict_resolution import parse_conflict_blocks
+
+        merged = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours\n"
+            "=======\n"
+            "theirs\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+        )
+        blocks = parse_conflict_blocks(merged)
+        assert len(blocks) == 1
+        block = blocks[0]
+        assert block.conflict_id == 1
+        assert block.start_marker == "<<<<<<< LP-LOCAL-a3f8b2c1 #1"
+        assert block.end_marker == ">>>>>>> LP-REMOTE-7e9d4f2b #1"
+        assert block.ours_content == "ours\n"
+        assert block.theirs_content == "theirs\n"
+        assert block.start_line == 0
+        assert block.end_line == 4
+
+
+# ==================== Seam 7: match_markers 精确与模糊匹配 ====================
+
+
+class TestMatchMarkers:
+    """match_markers 精确与模糊匹配直接测试
+
+    PRD 决策 4 / 用户故事 12：marker 匹配是程序验证的核心
+    1. 优先精确匹配
+    2. 失败时尝试模糊匹配（去除所有空白后比较）
+    3. 都失败返回 None
+
+    覆盖 conflict_resolution.py L276-333 的 match_markers 函数：
+    - 精确匹配成功
+    - 精确匹配失败 + 模糊匹配成功（LLM 输出含额外空格）
+    - 完全不匹配
+    - 空文件
+    - 顺序错误（end 在 start 之前）
+    """
+
+    def test_exact_match_returns_line_numbers(self):
+        """精确匹配 → 返回 (start_line, end_line)"""
+        from lifeprism.sync.conflict_resolution import match_markers
+
+        content = (
+            "line0\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours\n"
+            "=======\n"
+            "theirs\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "line6\n"
+        )
+        result = match_markers(
+            file_content=content,
+            start_marker="<<<<<<< LP-LOCAL-a3f8b2c1 #1",
+            end_marker=">>>>>>> LP-REMOTE-7e9d4f2b #1",
+        )
+        assert result == (1, 5)
+
+    def test_exact_match_first_pair_returned(self):
+        """精确匹配：返回第一对 start < end"""
+        from lifeprism.sync.conflict_resolution import match_markers
+
+        content = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours1\n"
+            "=======\n"
+            "theirs1\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #2\n"
+            "ours2\n"
+            "=======\n"
+            "theirs2\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #2\n"
+        )
+        result = match_markers(
+            file_content=content,
+            start_marker="<<<<<<< LP-LOCAL-a3f8b2c1 #1",
+            end_marker=">>>>>>> LP-REMOTE-7e9d4f2b #1",
+        )
+        assert result == (0, 4)
+
+    def test_fuzzy_match_with_extra_spaces_in_marker(self):
+        """模糊匹配：LLM 输出 marker 含额外空格 → 仍能匹配
+
+        场景：LLM 输出 ``<<<<<<< LP-LOCAL-  a3f8b2c1 #1``（含双空格），
+        文件中是 ``<<<<<<< LP-LOCAL-a3f8b2c1 #1``（无空格）。
+        _normalize_marker 去除所有空白后两者一致。
+        """
+        from lifeprism.sync.conflict_resolution import match_markers
+
+        content = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours\n"
+            "=======\n"
+            "theirs\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+        )
+        result = match_markers(
+            file_content=content,
+            # LLM 输出含额外空格
+            start_marker="<<<<<<< LP-LOCAL-  a3f8b2c1 #1",
+            end_marker=">>>>>>> LP-REMOTE- 7e9d4f2b #1",
+        )
+        assert result == (0, 4)
+
+    def test_fuzzy_match_with_tab_in_marker(self):
+        """模糊匹配：LLM 输出 marker 含 Tab → 仍能匹配"""
+        from lifeprism.sync.conflict_resolution import match_markers
+
+        content = (
+            "x\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours\n"
+            "=======\n"
+            "theirs\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+        )
+        # \t 是 Tab 字符
+        result = match_markers(
+            file_content=content,
+            start_marker="<<<<<<<\tLP-LOCAL-a3f8b2c1 #1",
+            end_marker=">>>>>>>\tLP-REMOTE-7e9d4f2b #1",
+        )
+        assert result == (1, 5)
+
+    def test_fuzzy_match_file_content_with_extra_spaces(self):
+        """模糊匹配：文件中的 marker 含额外空格 → LLM 输出无空格仍能匹配"""
+        from lifeprism.sync.conflict_resolution import match_markers
+
+        # 文件中 marker 含额外空格（异常但可能发生）
+        content = (
+            "<<<<<<< LP-LOCAL-  a3f8b2c1 #1\n"
+            "ours\n"
+            "=======\n"
+            "theirs\n"
+            ">>>>>>>  LP-REMOTE-7e9d4f2b #1\n"
+        )
+        result = match_markers(
+            file_content=content,
+            # LLM 输出无空格
+            start_marker="<<<<<<< LP-LOCAL-a3f8b2c1 #1",
+            end_marker=">>>>>>> LP-REMOTE-7e9d4f2b #1",
+        )
+        assert result == (0, 4)
+
+    def test_no_match_returns_none(self):
+        """完全不匹配 → 返回 None（触发重试）"""
+        from lifeprism.sync.conflict_resolution import match_markers
+
+        content = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours\n"
+            "=======\n"
+            "theirs\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+        )
+        result = match_markers(
+            file_content=content,
+            start_marker="<<<<<<< LP-LOCAL-xxxxxxxx #1",  # hash 不匹配
+            end_marker=">>>>>>> LP-REMOTE-yyyyyyyy #1",
+        )
+        assert result is None
+
+    def test_empty_content_returns_none(self):
+        """空文件 → 返回 None"""
+        from lifeprism.sync.conflict_resolution import match_markers
+
+        result = match_markers(
+            file_content="",
+            start_marker="<<<<<<< LP-LOCAL-a3f8b2c1 #1",
+            end_marker=">>>>>>> LP-REMOTE-7e9d4f2b #1",
+        )
+        assert result is None
+
+    def test_end_before_start_returns_none(self):
+        """end_marker 在 start_marker 之前 → 返回 None
+
+        匹配要求 start_marker 在 end_marker 之前出现。
+        """
+        from lifeprism.sync.conflict_resolution import match_markers
+
+        content = (
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"  # end 在前
+            "ours\n"
+            "=======\n"
+            "theirs\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"  # start 在后
+        )
+        result = match_markers(
+            file_content=content,
+            start_marker="<<<<<<< LP-LOCAL-a3f8b2c1 #1",
+            end_marker=">>>>>>> LP-REMOTE-7e9d4f2b #1",
+        )
+        assert result is None
+
+    def test_only_start_marker_returns_none(self):
+        """只有 start_marker，无 end_marker → 返回 None"""
+        from lifeprism.sync.conflict_resolution import match_markers
+
+        content = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours\n"
+            "no end marker\n"
+        )
+        result = match_markers(
+            file_content=content,
+            start_marker="<<<<<<< LP-LOCAL-a3f8b2c1 #1",
+            end_marker=">>>>>>> LP-REMOTE-7e9d4f2b #1",
+        )
+        assert result is None
+
+    def test_only_end_marker_returns_none(self):
+        """只有 end_marker，无 start_marker → 返回 None"""
+        from lifeprism.sync.conflict_resolution import match_markers
+
+        content = (
+            "no start marker\n"
+            "ours\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+        )
+        result = match_markers(
+            file_content=content,
+            start_marker="<<<<<<< LP-LOCAL-a3f8b2c1 #1",
+            end_marker=">>>>>>> LP-REMOTE-7e9d4f2b #1",
+        )
+        assert result is None
+
+    def test_normalize_marker_strips_all_whitespace(self):
+        """_normalize_marker 去除所有空白字符（空格/Tab/换行）"""
+        from lifeprism.sync.conflict_resolution import _normalize_marker
+
+        # 空格
+        assert _normalize_marker("<<<<<<< LP-LOCAL-a3f8b2c1 #1") == "<<<<<<<LP-LOCAL-a3f8b2c1#1"
+        # 双空格
+        assert _normalize_marker("<<<<<<<  LP-LOCAL-  a3f8b2c1  #1") == "<<<<<<<LP-LOCAL-a3f8b2c1#1"
+        # Tab
+        assert _normalize_marker("<<<<<<<\tLP-LOCAL-a3f8b2c1\t#1") == "<<<<<<<LP-LOCAL-a3f8b2c1#1"
+        # 多种空白混合
+        assert _normalize_marker("  <<<<<<< LP-LOCAL-a3f8b2c1 #1  ") == "<<<<<<<LP-LOCAL-a3f8b2c1#1"
+        # 无空白
+        assert _normalize_marker("<<<<<<<LP-LOCAL-a3f8b2c1#1") == "<<<<<<<LP-LOCAL-a3f8b2c1#1"

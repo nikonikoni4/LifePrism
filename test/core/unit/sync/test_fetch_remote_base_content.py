@@ -225,3 +225,85 @@ class TestFetchRemoteBaseContent:
             parent_hash="some_hash",
         )
         assert result is None
+
+    @patch("lifeprism.config.settings_manager.settings")
+    def test_oserror_skips_backup_and_continues(
+        self, mock_settings, sync_client, backup_dir, tmp_path
+    ):
+        """读取备份文件失败（OSError）→ 跳过该备份继续下一个
+
+        覆盖 sync_client.py:1672-1678 的 ``except OSError`` 分支：
+        - 第一个备份目录的文件 read_bytes() 抛 OSError
+        - 第二个备份目录正常读取且 hash 匹配
+        - 应跳过第一个，返回第二个的内容
+        """
+        mock_settings.lifeprism_data_path = tmp_path
+
+        # 第一个备份目录：read_bytes() 会抛 OSError（通过 mock 注入）
+        ts1 = backup_dir / "2026-07-17T03-00-00"
+        ts1.mkdir()
+        file1 = ts1 / "agent" / "behavior.md"
+        file1.parent.mkdir(parents=True)
+        file1.write_bytes(b"corrupt content\n")
+
+        # 第二个备份目录：正常读取且 hash 匹配
+        ts2 = backup_dir / "2026-07-16T03-00-00"
+        ts2.mkdir()
+        good_content = "base content\n"
+        file2 = ts2 / "agent" / "behavior.md"
+        file2.parent.mkdir(parents=True)
+        file2.write_bytes(good_content.encode("utf-8"))
+
+        from lifeprism.sync.hash_utils import compute_file_hash
+
+        correct_hash = compute_file_hash(good_content.encode("utf-8"))
+
+        # mock Path.read_bytes 在第一次调用时抛 OSError，第二次正常返回
+        original_read_bytes = type(file1).read_bytes
+        call_count = {"n": 0}
+
+        def mock_read_bytes(self):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise OSError("模拟权限不足或文件损坏")
+            return original_read_bytes(self)
+
+        with patch("pathlib.Path.read_bytes", mock_read_bytes):
+            result = sync_client._fetch_remote_base_content(
+                file_path="agent/behavior.md",
+                parent_hash=correct_hash,
+            )
+        assert result == good_content
+
+    @patch("lifeprism.config.settings_manager.settings")
+    def test_oserror_in_all_backups_returns_none(
+        self, mock_settings, sync_client, backup_dir, tmp_path
+    ):
+        """所有备份都抛 OSError → 返回 None
+
+        验证所有备份读取失败时不中断、不抛异常，正常返回 None。
+        """
+        mock_settings.lifeprism_data_path = tmp_path
+
+        # 两个备份目录都正常写入，但 read_bytes 全部 mock 为抛 OSError
+        ts1 = backup_dir / "2026-07-17T03-00-00"
+        ts1.mkdir()
+        file1 = ts1 / "agent" / "behavior.md"
+        file1.parent.mkdir(parents=True)
+        file1.write_bytes(b"content1\n")
+
+        ts2 = backup_dir / "2026-07-16T03-00-00"
+        ts2.mkdir()
+        file2 = ts2 / "agent" / "behavior.md"
+        file2.parent.mkdir(parents=True)
+        file2.write_bytes(b"content2\n")
+
+        def mock_read_bytes(self):
+            raise OSError("所有读取都失败")
+
+        with patch("pathlib.Path.read_bytes", mock_read_bytes):
+            result = sync_client._fetch_remote_base_content(
+                file_path="agent/behavior.md",
+                parent_hash="any_hash",
+            )
+        assert result is None
