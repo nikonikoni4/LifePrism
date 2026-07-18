@@ -64,6 +64,13 @@
 - 触发规则：审查文件冲突解决重设计 + BackupService 平铺备份方案（commit `11230c56`，40 文件 +11380/-449 行）时查看
 - 内容摘要：文件冲突解决重设计 + BackupService 平铺备份方案的 8 维度代码审查报告。审查 10 个核心代码文件，4 个 ADR 完整覆盖。发现 10 个问题（置信度 ≥ 80）：1 个死代码（`_build_resolve_prompt` 未调用，90）、1 个架构不一致（BackupService 未用 LazySingleton，85）、1 个异常处理违规（`except Exception` 捕获标准库异常 + 缺 `exc_info`，85）、2 个测试缺口（`_fetch_remote_base_content` 无测试 + 多冲突块串行替换边界未覆盖，85）、1 个 ADR 引用错误（`agent_only` 不备份归因到错误 ADR，95）、2 个文档与代码不符（sync_conflict 清理机制 + 冲突降级范围描述错误，90）、1 个过时注释（diff3.py docstring 仍写"Issue 4 将扩展"但已实现，85）、1 个边界测试缺失（清理 `>` vs `>=` off-by-one，80）。
 
+## 2026-07-18-code-review-scratch-specs
+
+- updated_at: 2026-07-18
+- path: `docs/generated/016/2026-07-18-code-review-scratch-specs.md`
+- 触发规则：审查 `.scratch/file-conflict-resolution-redesign/` 中的 PRD + Issue 规格文档（9 个 spec 文件 + 实现对齐）时查看
+- 内容摘要：File Sync Conflict Resolution Redesign 规格文档审查。检查 9 个 spec 文件与 20 个 PRD 决策的实现对齐。发现 5 个文档问题（置信度 >= 80）：PRD decision 19 代码示例与目录图自相矛盾（90）、Issue 5 Blocked by 遗漏 Issue 4 依赖标注（85）、file_path_str 推导规则未显式定义（80）、Issue 7 包结构决策未记录（80）、Issue 1 BOM 边界未讨论（80）。20/20 决策在实现中全部正确落地，无 spec-实现不一致。
+
 ## utc-migration-audit-report
 - updated_at: 2026-07-12
 - path: `docs/generated/utc-migration-audit-report.md`
