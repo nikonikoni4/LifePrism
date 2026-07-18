@@ -347,7 +347,14 @@ class SyncClient:
 
         # 3. 全量推送文件
         logger.info("步骤 3/4: 全量推送文件...")
-        self._initial_push_files(remote_url, api_key, directories or SYNC_DIRECTORIES)
+        file_list = self._initial_push_files(remote_url, api_key, directories or SYNC_DIRECTORIES)
+
+        # 3.5 推进云端 parent_hash = current_hash
+        # 修复 bug 2026-07-18-cloud-parent-hash-not-advanced-after-first-sync：
+        # 首次同步后云端 file_sync_state.parent_hash 仍为 None（/push-files 对新文件设为 None），
+        # 不推进会导致下次矩阵判定走 Row 5 (PUSH) 而非 Row 9 (CONFLICT)，本地 PUSH 静默覆盖云端修改。
+        # 必须与 _advance_local_parent_after_initial_sync 对称执行，保证两端状态一致。
+        self._advance_remote_parent_after_initial_sync(remote_url, api_key, file_list)
 
         # 4. 更新本地 last_sync_time + 标记云端已初始化
         # 注意：先设置 last_sync_time，再 mark-initialized
@@ -449,7 +456,7 @@ class SyncClient:
         remote_url: str,
         api_key: str,
         directories: list[str],
-    ) -> None:
+    ) -> list[str]:
         """首次同步文件推送：全量推送所有 SYNC_DIRECTORIES 文件
 
         关键修复：推送完成后推进本地 parent_hash = current_hash，
@@ -464,6 +471,9 @@ class SyncClient:
             remote_url: 远程服务器 URL
             api_key: API Key
             directories: 文件同步目录列表
+
+        Returns:
+            list[str]: 本次推送的文件相对路径列表（供调用方推进云端 parent_hash 复用）
         """
         # 1. 刷新 current_hash（同时扫描文件，复用扫描结果避免重复扫描）
         # _refresh_current_hashes 会扫描文件并 upsert state（parent_hash=existing or None, current_hash=计算值）
@@ -471,7 +481,7 @@ class SyncClient:
         file_list = self._refresh_current_hashes(directories)
         if not file_list:
             logger.info("无文件需要推送")
-            return
+            return []
 
         # 2. 分批推送（复用 _push_files）
         batch_size = FILE_BATCH_SIZE
@@ -487,6 +497,8 @@ class SyncClient:
         # 避免 Row 3 陷阱：首次同步后两端 parent_hash 均为 None，
         # 下次 sync_once 时本地文件被修改会误判为 CONFLICT（而非 PUSH）
         self._advance_local_parent_after_initial_sync(file_list)
+
+        return file_list
 
     def _advance_local_parent_after_initial_sync(self, paths: list[str]) -> None:
         """首次同步后推进本地 parent_hash = current_hash
@@ -538,6 +550,89 @@ class SyncClient:
             logger.warning(
                 "首次同步后 %d 个文件未推进 parent_hash（state 或 current_hash 为空），"
                 "可能触发下次同步 CONFLICT 误判",
+                skipped,
+            )
+
+    def _advance_remote_parent_after_initial_sync(
+        self, remote_url: str, api_key: str, paths: list[str]
+    ) -> None:
+        """首次同步后推进云端 parent_hash = current_hash
+
+        修复 bug 2026-07-18-cloud-parent-hash-not-advanced-after-first-sync：
+        _advance_local_parent_after_initial_sync 只推进本地 parent_hash，未推进云端，
+        导致首次同步后两端状态不对称（本地 parent_hash=H0, 云端 parent_hash=None）。
+        下次同步时若两端都修改同一文件，矩阵判定走 Row 5 (PUSH)
+        （local_has_parent=True, remote_has_parent=False）而非 Row 9 (CONFLICT)，
+        本地 PUSH 静默覆盖云端修改，冲突解决流程完全失效。
+
+        本方法与 _advance_local_parent_after_initial_sync 对称，
+        调用云端 /pull-files/commit 端点推进云端 parent_hash = current_hash。
+
+        推进后两端状态对称：
+        - 本地 parent_hash = current_hash = H0
+        - 云端 parent_hash = current_hash = H0
+        - 下次同步若两端都修改 → Row 9 (CONFLICT) → 触发 diff3 + LLM 串行合并
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+            paths: 首次同步推送的文件相对路径列表
+        """
+        if not paths:
+            return
+
+        # 分批调用 /pull-files/commit（避免单次请求 body 过大）
+        batch_size = FILE_BATCH_SIZE
+        total = len(paths)
+        committed_total = 0
+
+        for offset in range(0, total, batch_size):
+            batch_paths = paths[offset : offset + batch_size]
+            try:
+                response = httpx.post(
+                    url=f"{remote_url}/api/sync/pull-files/commit",
+                    json={"paths": batch_paths},
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    timeout=MARK_INITIALIZED_TIMEOUT,
+                )
+                response.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                logger.error(
+                    "_advance_remote_parent_after_initial_sync: HTTP 错误, "
+                    "batch_offset=%d, batch_size=%d, status=%s, body=%s",
+                    offset,
+                    len(batch_paths),
+                    e.response.status_code,
+                    e.response.text,
+                )
+                raise
+            except httpx.RequestError as e:
+                logger.error(
+                    "_advance_remote_parent_after_initial_sync: 网络错误, "
+                    "batch_offset=%d, batch_size=%d, error=%s",
+                    offset,
+                    len(batch_paths),
+                    e,
+                )
+                raise
+
+            committed = response.json().get("committed", [])
+            committed_total += len(committed)
+            logger.info(
+                "推进云端 parent_hash 进度: %d/%d",
+                offset + len(batch_paths),
+                total,
+            )
+
+        logger.info(
+            "首次同步后推进云端 parent_hash: %d/%d 个文件",
+            committed_total,
+            total,
+        )
+        skipped = total - committed_total
+        if skipped > 0:
+            logger.warning(
+                "首次同步后 %d 个云端文件未推进 parent_hash，可能触发下次同步 PUSH 误覆盖云端修改",
                 skipped,
             )
 

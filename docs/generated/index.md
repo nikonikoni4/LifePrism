@@ -78,6 +78,13 @@
 - 触发规则：审查实现代码（8 个 issue 全部代码，feature commit + fix commit，`b1a15ee3..6a95eb4f`，43 文件 +11857/-449 行）时查看
 - 内容摘要：015 审查修复后的**第二次实现审查**。检查 10 个核心代码文件与 5 个测试文件。015 审查发现的 10 个问题已全部修复并通过验证。新发现 8 个问题（置信度 >= 80）：3 个 Code Quality（httpx 异常类型不统一 85、TimeoutError 死代码 85、except Exception 缺 LEGITIMATE 注释 80）、1 个 Documentation（备份启动补偿描述不符 85）、4 个 Testing（非确定性断言 85、OSError 恢复路径未测试 80、parse_conflict_blocks 恢复路径未测试 80、match_markers 模糊匹配无直接测试 80）。
 
+## 2026-07-18-sync-e2e-test-report
+
+- updated_at: 2026-07-19
+- path: `docs/generated/018/2026-07-18-sync-e2e-test-report.md`
+- 触发规则：查看 LifePrism 云端同步端到端测试结果（首次同步全覆盖、空文件+template 过滤、冲突解决）时查看
+- 内容摘要：LifePrism 云端同步端到端测试报告 v2.0，修复 bug 后所有测试项通过。覆盖 T1（首次同步全覆盖）、T2（二次启动增量同步）、T3（空文件+template 过滤）、T4（diff3 自动合并）、T5（LLM 串行合并）、T6（双备份）测试项。修复 bug 2026-07-18-cloud-parent-hash-not-advanced-after-first-sync 后，T4/T5/T6 冲突解决流程正确触发：矩阵判定 CONFLICT=2，diff3 自动合并成功，LLM 串行合并成功（1 个冲突块，成功 1/1），sync_conflict/ 双备份生成。
+
 ## utc-migration-audit-report
 - updated_at: 2026-07-12
 - path: `docs/generated/utc-migration-audit-report.md`

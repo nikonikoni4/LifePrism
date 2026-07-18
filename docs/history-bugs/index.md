@@ -1,3 +1,10 @@
+## 2026-07-18-cloud-parent-hash-not-advanced-after-first-sync
+
+- updated_at: 2026-07-19
+- path: `docs/history-bugs/2026-07-18-cloud-parent-hash-not-advanced-after-first-sync.md`
+- 触发规则：在排查"文件冲突解决（diff3 + LLM 串行合并）永远不触发"、矩阵判定 `PUSH=N, CONFLICT=0` 而非预期 `CONFLICT=N`、"本地 PUSH 覆盖了云端的修改"、修改 `sync_client.py` 中 `_full_sync_to_cloud` 首次同步流程、修改 `_advance_local_parent_after_initial_sync` 方法、修改首次同步后的 parent_hash 推进逻辑、修改 `/pull-files/commit` 端点调用时机时阅读
+- 内容摘要：**严重生产级 bug（P0，已修复并验证通过 2026-07-19）** — 首次同步全清覆盖方案的实施代码 `_full_sync_to_cloud` 在步骤 3 推送文件后只调用 `_advance_local_parent_after_initial_sync` 推进**本地** parent_hash，**未调用任何云端端点推进云端 parent_hash**。`/push-files` 对新文件设 parent_hash=None，导致首次同步后两端状态不对称（本地 parent_hash=H0, 云端 parent_hash=None）。下次同步时若两端都修改同一文件，矩阵判定走 Row 5 (PUSH)（local_has_parent=True, remote_has_parent=False）而非 Row 9 (CONFLICT)，本地 PUSH 静默覆盖云端修改，冲突解决流程完全失效。修复方案：新增 `_advance_remote_parent_after_initial_sync` 方法调用 `/pull-files/commit` 推进云端 parent_hash，与本地推进对称执行。修复后所有测试项通过（T1/T2/T3/T4/T5/T6）。
+
 ## 2026-07-17-write-file-xml-tag-residue-in-doc
 
 - updated_at: 2026-07-17
