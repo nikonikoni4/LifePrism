@@ -33,7 +33,7 @@ WRONG_AUTH_HEADERS = {"Authorization": "Bearer wrong_key"}
 @pytest.fixture(scope="module")
 def initialized_db(test_data_path):
     """初始化数据库，创建所有表"""
-    from lifeprism.config.settings_manager import settings
+    from lifeprism.config.settings_manager import settings, KEYRING_SERVICE_NAME
 
     settings._initialize()
 
@@ -48,12 +48,29 @@ def initialized_db(test_data_path):
     manager = LWTableManager(db_manager=lw_db_manager)
     manager.init_database()
 
-    # 设置测试用 sync_api_key
+    # 设置测试用 sync_api_key，先备份原始值
+    import keyring
+    _KEYRING_USERNAME = "sync_api_key"
+    original_key = None
+    try:
+        original_key = keyring.get_password(KEYRING_SERVICE_NAME, _KEYRING_USERNAME)
+    except Exception:
+        pass
+
     from lifeprism.config import settings_manager
 
     settings_manager.set_setting("sync_api_key", TEST_API_KEY)
 
     yield lw_db_manager
+
+    # 恢复原始 sync_api_key
+    try:
+        if original_key is not None:
+            keyring.set_password(KEYRING_SERVICE_NAME, _KEYRING_USERNAME, original_key)
+        else:
+            keyring.delete_password(KEYRING_SERVICE_NAME, _KEYRING_USERNAME)
+    except Exception:
+        pass
 
 
 @pytest.fixture

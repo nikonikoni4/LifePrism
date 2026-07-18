@@ -75,6 +75,15 @@ def test_migration():
     print(f"\n[5] 测试 API Key 读写:")
     test_key = "test-api-key-12345"
 
+    # 备份原始 API Key
+    original_key = None
+    try:
+        original_key = provider_manager.get_api_key("xiaomi_mimo")
+        if original_key:
+            print(f"    [INFO] 已备份原始 API Key")
+    except Exception:
+        pass
+
     # 写入测试
     try:
         provider_manager.set_api_key("xiaomi_mimo", test_key)
@@ -95,12 +104,16 @@ def test_migration():
         print(f"    [FAIL] 读取失败: {e}")
         return False
 
-    # 清理测试 Key
+    # 恢复原始 API Key
     try:
-        provider_manager.delete_api_key("xiaomi_mimo")
-        print(f"    [OK] 清理测试 API Key 成功")
+        if original_key:
+            provider_manager.set_api_key("xiaomi_mimo", original_key)
+            print(f"    [OK] 已恢复原始 API Key")
+        else:
+            provider_manager.delete_api_key("xiaomi_mimo")
+            print(f"    [OK] 清理测试 API Key 成功")
     except Exception as e:
-        print(f"    [WARN] 清理失败: {e}")
+        print(f"    [WARN] 恢复/清理失败: {e}")
 
     print("\n" + "=" * 60)
     print("[SUCCESS] 迁移脚本测试通过！")

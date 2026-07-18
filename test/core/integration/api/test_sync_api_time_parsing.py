@@ -40,10 +40,20 @@ ISO_8601_UTC_PATTERN = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}\+00:00$"
 def initialized_settings(test_data_path):
     """初始化设置，确保 lifeprism_data_path 指向测试路径"""
     from lifeprism.config import settings_manager
-    from lifeprism.config.settings_manager import settings
+    from lifeprism.config.settings_manager import settings, KEYRING_SERVICE_NAME
     from lifeprism.sync.sync_config import set_sync_api_key
 
     settings._initialize()
+
+    # 备份原始 sync_api_key
+    import keyring
+    _KEYRING_USERNAME = "sync_api_key"
+    original_key = None
+    try:
+        original_key = keyring.get_password(KEYRING_SERVICE_NAME, _KEYRING_USERNAME)
+    except Exception:
+        pass
+
     # 优先写入 keyring（get_sync_api_key 优先从 keyring 读取）
     try:
         set_sync_api_key(TEST_API_KEY)
@@ -52,6 +62,15 @@ def initialized_settings(test_data_path):
     # 同时写入 config 作为 fallback
     settings_manager.set_setting("sync_api_key", TEST_API_KEY)
     yield settings
+
+    # 恢复原始 sync_api_key
+    try:
+        if original_key is not None:
+            keyring.set_password(KEYRING_SERVICE_NAME, _KEYRING_USERNAME, original_key)
+        else:
+            keyring.delete_password(KEYRING_SERVICE_NAME, _KEYRING_USERNAME)
+    except Exception:
+        pass
 
 
 @pytest.fixture
