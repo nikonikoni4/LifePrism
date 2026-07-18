@@ -121,6 +121,15 @@ class AgentLoop:
                 model=settings.model or "unknown",
                 raw_response=response.content or "",
             )
+        if response.finish_reason == "length":
+            logger.error(
+                "[_run_agent_loop] LLM 输出被 max_tokens 截断 (completion=%s tokens): "
+                "model=%s, 工具调用可能不完整。XML 解析将尝试 fallback 匹配不完整标签。"
+                "已知限制: 超过 max_tokens 的工具调用会失败，"
+                "详见 docs/known-limitations/xml-tool-call-max-tokens-limit.md",
+                response.usage.get("completion_tokens", "?") if response.usage else "?",
+                settings.model or "unknown",
+            )
         session.add_message(
             "assistant",
             content=response.content or "",
@@ -230,6 +239,12 @@ class AgentLoop:
                     model=settings.model or "unknown",
                     raw_response=response.content or "",
                 )
+            if response.finish_reason == "length":
+                logger.error(
+                    "[_auto_compact] LLM 输出被 max_tokens 截断 (completion=%s tokens): model=%s",
+                    response.usage.get("completion_tokens", "?") if response.usage else "?",
+                    settings.model or "unknown",
+                )
             session.add_message(
                 "assistant",
                 content=response.content or "",
@@ -264,6 +279,12 @@ class AgentLoop:
                 raise LLMResponseError(
                     model=settings.model or "unknown",
                     raw_response=response.content or "",
+                )
+            if response.finish_reason == "length":
+                logger.error(
+                    "[_auto_compact] LLM 输出被 max_tokens 截断 (completion=%s tokens): model=%s",
+                    response.usage.get("completion_tokens", "?") if response.usage else "?",
+                    settings.model or "unknown",
                 )
             session.add_message(
                 "assistant",

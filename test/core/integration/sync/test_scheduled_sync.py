@@ -412,7 +412,7 @@ class TestMissingRemoteUrl:
         """_read_remote_url 返回空字符串时跳过本次，sync_once 不被调用"""
         # Arrange: 重新 patch _read_remote_url 返回空字符串
         mock_sync_once = MagicMock()
-        caplog.set_level(logging.INFO, logger="lifeprism.sync.sync_client")
+        caplog.set_level(logging.DEBUG, logger="lifeprism.sync.sync_client")
 
         with patch.object(sync_client, "_read_remote_url", return_value=""):
             with patch.object(sync_client, "sync_once", new=mock_sync_once):
@@ -420,10 +420,10 @@ class TestMissingRemoteUrl:
 
         # Assert: sync_once 未被调用
         mock_sync_once.assert_not_called()
-        # 日志包含跳过提示
-        info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
-        assert any("未配置 sync.remote_url" in m for m in info_messages), (
-            f"未找到跳过提示 INFO 日志，实际: {info_messages}"
+        # 日志包含跳过提示（源码使用 logger.debug，需捕获 DEBUG 级别）
+        debug_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any("未配置 sync.remote_url" in m for m in debug_messages), (
+            f"未找到跳过提示日志，实际: {[r.getMessage() for r in caplog.records]}"
         )
 
     async def test_skips_sync_when_url_none(self, sync_client, caplog):
@@ -444,7 +444,7 @@ class TestMissingRemoteUrl:
         # Arrange: 第一次返回空，第二次返回有效 url
         url_values = iter(["", "https://example.com"])
         mock_sync_once = MagicMock()
-        caplog.set_level(logging.INFO, logger="lifeprism.sync.sync_client")
+        caplog.set_level(logging.DEBUG, logger="lifeprism.sync.sync_client")
 
         def _side_effect():
             return next(url_values)
@@ -455,8 +455,10 @@ class TestMissingRemoteUrl:
 
         # Assert: 第一次跳过，第二次执行 sync_once
         assert mock_sync_once.call_count == 1
+        # "未配置 sync.remote_url" 在源码中为 logger.debug
+        debug_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any("未配置 sync.remote_url" in m for m in debug_messages)
         info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
-        assert any("未配置 sync.remote_url" in m for m in info_messages)
         assert any("定时同步开始" in m for m in info_messages)
 
     async def test_does_not_set_is_syncing_when_skipped(self, sync_client, caplog):

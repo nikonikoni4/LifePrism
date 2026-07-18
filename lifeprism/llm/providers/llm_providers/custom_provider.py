@@ -81,10 +81,21 @@ class CustomProvider(LLMProvider):
         <parameter=offset>1</parameter>
         </function>
         </tool_call>
+
+        Also handles incomplete XML (truncated) where </tool_call> is missing.
+        Uses non-greedy matching for parameter values so `<` characters in content
+        (e.g. Markdown links like `` [AI](https://example.com) ``) are correctly parsed.
         """
         tool_calls = []
+
+        # First pass: try strict pattern (complete <tool_call>...</tool_call>)
         tool_call_pattern = r"<tool_call>(.*?)</tool_call>"
         matches = re.findall(tool_call_pattern, content, re.DOTALL)
+
+        # Second pass (fallback): if no complete blocks found, try incomplete/truncated
+        if not matches and "<tool_call>" in content:
+            tool_call_fallback = r"<tool_call>(.*)"
+            matches = re.findall(tool_call_fallback, content, re.DOTALL)
 
         for match in matches:
             func_match = re.search(r"<function=([^>]+)>", match)
@@ -93,8 +104,9 @@ class CustomProvider(LLMProvider):
 
             function_name = func_match.group(1)
 
-            param_pattern = r"<parameter=([^>]+)>([^<]*)</parameter>"
-            params = re.findall(param_pattern, match)
+            # Extract all parameters using non-greedy matching
+            param_pattern = r"<parameter=([^>]+)>(.*?)</parameter>"
+            params = re.findall(param_pattern, match, re.DOTALL)
 
             arguments = {}
             for param_name, param_value in params:
@@ -142,10 +154,10 @@ class CustomProvider(LLMProvider):
         ]
 
         # Handle XML-format tool calls (MIMO, MiniMax, etc.)
-        # If finish_reason is 'tool_calls' but native tool_calls is empty,
+        # If finish_reason is 'tool_calls' or 'stop' but native tool_calls is empty,
         # and content contains XML-format tool calls, parse them from content.
         if (
-            finish_reason == "tool_calls"
+            finish_reason in ("tool_calls", "stop")
             and not tool_calls
             and content
             and "<tool_call>" in content

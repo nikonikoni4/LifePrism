@@ -323,13 +323,23 @@ class LiteLLMProvider(LLMProvider):
         <parameter=offset>1</parameter>
         </function>
         </tool_call>
+
+        Also handles incomplete XML (truncated) where </tool_call> is missing.
+        Uses non-greedy matching for parameter values so `<` characters in content
+        (e.g. Markdown links like `` [AI](https://example.com) ``) are correctly parsed.
         """
         import re
 
         tool_calls = []
-        # Match <tool_call>...</tool_call> blocks
+
+        # First pass: try strict pattern (complete <tool_call>...</tool_call>)
         tool_call_pattern = r"<tool_call>(.*?)</tool_call>"
         matches = re.findall(tool_call_pattern, content, re.DOTALL)
+
+        # Second pass (fallback): if no complete blocks found, try incomplete/truncated
+        if not matches and "<tool_call>" in content:
+            tool_call_fallback = r"<tool_call>(.*)"
+            matches = re.findall(tool_call_fallback, content, re.DOTALL)
 
         for match in matches:
             # Extract function name from <function=name>
@@ -339,9 +349,10 @@ class LiteLLMProvider(LLMProvider):
 
             function_name = func_match.group(1)
 
-            # Extract all parameters
-            param_pattern = r"<parameter=([^>]+)>([^<]*)</parameter>"
-            params = re.findall(param_pattern, match)
+            # Extract all parameters using non-greedy matching
+            # (.*?) handles parameter values containing < > characters
+            param_pattern = r"<parameter=([^>]+)>(.*?)</parameter>"
+            params = re.findall(param_pattern, match, re.DOTALL)
 
             # Build arguments dict
             arguments = {}
@@ -417,9 +428,10 @@ class LiteLLMProvider(LLMProvider):
             )
 
         # Handle XML-format tool calls (MIMO, MiniMax, etc.)
-        # If finish_reason is 'tool_calls' but tool_calls is empty, and content contains XML tool calls
+        # If finish_reason is 'tool_calls' or 'stop' but tool_calls is empty,
+        # and content contains XML tool calls (including truncated/incomplete)
         if (
-            finish_reason == "tool_calls"
+            finish_reason in ("tool_calls", "stop")
             and not tool_calls
             and content
             and "<tool_call>" in content

@@ -63,6 +63,16 @@
 - **触发条件**: behavior.md 超过 1MB 或 AI 冲突合并因 token 限制失败
 - **计划改进**: 按月拆分 behavior.md（当前月活跃写入 + 历史归档不再修改），需修改 dreaming task 写入逻辑
 
+### 7. XML 工具调用在 max_tokens 不足时的限制
+
+- **文件**: `xml-tool-call-max-tokens-limit.md`
+- **状态**: `acknowledged`（已确认，当前不进一步处理）
+- **严重程度**: 中
+- **影响范围**: 所有 XML 格式工具调用场景（CONFLICT_RESOLVE 高发）
+- **问题描述**: LLM 输出超过 max_tokens 时 XML 被截断（缺少 `</tool_call>`），解析失败。当前已修复：finish_reason="length" 主动检测 + XML 解析 fallback。默认 max_tokens 已从 4096 翻倍到 8192
+- **触发条件**: 大文件冲突合并（如 user.md、behavior.md）
+- **计划改进**: 冲突解决改 diff3 算法后可彻底消除
+
 > 时区和时间格式不一致问题已于 2026-07-12 通过 UTC 时区迁移解决，相关规范见 `docs/coding-rules/time-handling-rules.md`，决策见 `docs/adr/2026-07-12-migrate-to-utc-timezone.md`。
 
 ## 说明

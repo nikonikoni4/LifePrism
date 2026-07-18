@@ -733,6 +733,7 @@ class TestSyncOnce:
     ):
         """完整同步：tables=None 时使用默认 SYNC_TABLES（动态表对比返回空）"""
         with (
+            patch.object(sync_client, "_check_cloud_initialized", return_value=True),
             patch(
                 "lifeprism.sync.sync_client.httpx.post",
                 side_effect=_mock_post_factory(),
