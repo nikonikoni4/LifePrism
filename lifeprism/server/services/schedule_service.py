@@ -125,7 +125,7 @@ class ScheduleService:
         # 数据库备份：每 8 小时（本地 00/08/16 点），保留 3 份
         # 设计依据：ADR docs/adr/2026-07-17-data-backup-strategy.md
         # 备份范围与同步范围解耦：ADR docs/adr/2026-07-17-backup-sync-decoupled-scope.md
-        # 云端 agent_only 不备份：ADR docs/adr/2026-07-17-conflict-failure-policy.md
+        # 云端 agent_only 不备份：ADR docs/adr/2026-07-17-data-backup-strategy.md（决策 9）
         #
         # 注册时的 run_mode 守卫与 BackupService._check_run_mode() 形成双重保障：
         # - 注册时守卫：避免在非 full 模式下注册无用任务（节省调度器资源）

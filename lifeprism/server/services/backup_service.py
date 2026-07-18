@@ -28,7 +28,7 @@
 - PRD: .scratch/file-conflict-resolution-redesign/prd.md 决策 14-18
 - ADR: docs/adr/2026-07-17-data-backup-strategy.md（数据备份策略）
 - ADR: docs/adr/2026-07-17-backup-sync-decoupled-scope.md（备份范围与同步范围解耦）
-- ADR: docs/adr/2026-07-17-conflict-failure-policy.md（云端 agent_only 模式不备份）
+- ADR: docs/adr/2026-07-17-data-backup-strategy.md（云端 agent_only 模式不备份，决策 9）
 """
 
 import contextlib
@@ -47,7 +47,7 @@ from lifeprism.backup.constants import (
 )
 from lifeprism.config import get_user_timezone
 from lifeprism.config.settings_manager import settings
-from lifeprism.utils import get_logger
+from lifeprism.utils import LazySingleton, get_logger
 
 logger = get_logger(__name__)
 
@@ -93,7 +93,7 @@ class BackupService:
         Returns:
             True 表示允许备份，False 表示跳过（云端 agent_only / web_demo 模式）
 
-        设计依据：ADR docs/adr/2026-07-17-conflict-failure-policy.md
+        设计依据：ADR docs/adr/2026-07-17-data-backup-strategy.md（决策 9）
         云端 agent_only 模式不执行备份，复用现有 ScheduleService 的 run_mode 守卫。
         """
         if settings.run_mode != "full":
@@ -186,11 +186,12 @@ class BackupService:
 
             # 清理超过 3 份的旧备份
             self._cleanup_old_doc_backups(self._get_backup_root() / "docs", BACKUP_RETENTION_COUNT)
-        except Exception as e:
+        except (OSError, shutil.Error) as e:
             logger.error(
                 "文档备份异常 timestamp=%s, error=%s",
                 timestamp,
                 e,
+                exc_info=True,
             )
             # 异常时也尝试清理可能创建的不完整备份目录
             shutil.rmtree(backup_dir, ignore_errors=True)
@@ -360,12 +361,13 @@ class BackupService:
                     timestamp,
                     dst_db,
                 )
-            except Exception as e:
+            except sqlite3.Error as e:
                 logger.error(
                     "数据库备份异常 timestamp=%s, db_path=%s, error=%s",
                     timestamp,
                     src_db,
                     e,
+                    exc_info=True,
                 )
                 # 异常时清理可能创建的不完整备份
                 if dst_db.exists():
@@ -435,4 +437,4 @@ class BackupService:
 
 
 # 单例实例（供 ScheduleService 注册为 cron 任务）
-backup_service = BackupService()
+backup_service = LazySingleton(BackupService)

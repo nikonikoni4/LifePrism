@@ -17,8 +17,7 @@
        与标准 diff3 行为一致。
     5. 行切分仅按 ``\\n``（保留 ``\\r\\n``），与 ``git merge-file`` 行语义对齐。
 
-冲突标记格式（来自 PRD 决策 3，Issue 2 阶段保持简化版本，Issue 4 将扩展
-hash 与序号字段的语义）::
+冲突标记格式（来自 PRD 决策 3，含 hash 与序号字段，由 Issue 4 扩展实现）::
 
     <<<<<<< LP-LOCAL-{local_hash_8} #{n}
     {ours_content}

@@ -57,6 +57,13 @@
 - 触发规则：审查云端首次同步全清覆盖方案实现（bootstrap agent_only 跳过、3 个新 API 端点、sync_once 首次同步分支、5 个首次同步方法、query_all/delete_all_rows）时查看
 - 内容摘要：云端首次同步全清覆盖方案的 8 维度代码审查报告。审查 7 个文件（+594 -79 行），ADR 5 个阶段全部合规。发现 12 个问题（置信度 ≥ 50），其中 10 个已直接修复（2 个 P0：N+1 查询、重复扫描；5 个 P1：私有方法访问、RuntimeError、魔法数字、未告警、异常范围；3 个 P2：空目录清理、docstring 修正、注释修正），2 个需要用户决策（测试覆盖、类职责膨胀）。
 
+## 2026-07-18-code-review-conflict-resolution-backup
+
+- updated_at: 2026-07-18
+- path: `docs/generated/015/2026-07-18-code-review-conflict-resolution-backup.md`
+- 触发规则：审查文件冲突解决重设计 + BackupService 平铺备份方案（commit `11230c56`，40 文件 +11380/-449 行）时查看
+- 内容摘要：文件冲突解决重设计 + BackupService 平铺备份方案的 8 维度代码审查报告。审查 10 个核心代码文件，4 个 ADR 完整覆盖。发现 10 个问题（置信度 ≥ 80）：1 个死代码（`_build_resolve_prompt` 未调用，90）、1 个架构不一致（BackupService 未用 LazySingleton，85）、1 个异常处理违规（`except Exception` 捕获标准库异常 + 缺 `exc_info`，85）、2 个测试缺口（`_fetch_remote_base_content` 无测试 + 多冲突块串行替换边界未覆盖，85）、1 个 ADR 引用错误（`agent_only` 不备份归因到错误 ADR，95）、2 个文档与代码不符（sync_conflict 清理机制 + 冲突降级范围描述错误，90）、1 个过时注释（diff3.py docstring 仍写"Issue 4 将扩展"但已实现，85）、1 个边界测试缺失（清理 `>` vs `>=` off-by-one，80）。
+
 ## utc-migration-audit-report
 - updated_at: 2026-07-12
 - path: `docs/generated/utc-migration-audit-report.md`

@@ -114,13 +114,17 @@ class TestBackupServiceSingleton:
     """backup_service 模块级单例"""
 
     def test_backup_service_is_instance(self):
-        """backup_service 是 BackupService 实例"""
+        """backup_service 是 LazySingleton 代理，底层实例为 BackupService"""
         from lifeprism.server.services.backup_service import (
             BackupService,
             backup_service,
         )
+        from lifeprism.utils import LazySingleton
 
-        assert isinstance(backup_service, BackupService)
+        # 改用 LazySingleton 懒加载代理（与 goal_service / habit_chain_service 一致）
+        assert isinstance(backup_service, LazySingleton)
+        # 代理首次访问属性时初始化底层 BackupService 实例
+        assert isinstance(backup_service._ensure_initialized(), BackupService)
 
     def test_backup_service_singleton_identity(self):
         """多次导入 backup_service 返回同一实例（模块级单例）"""

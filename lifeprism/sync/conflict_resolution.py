@@ -370,8 +370,9 @@ def parse_llm_json_response(raw: str) -> dict | None:
 
         # repair_json 返回 dict 或 list；loads 后校验
         repaired = repair_json(text, return_objects=True)
-    except Exception:
-        logger.debug("parse_llm_json_response: json_repair 解析失败")
+    except Exception as e:
+        # LEGITIMATE: json_repair 第三方库容错，解析失败时返回 None 触发重试
+        logger.warning("json_repair 解析失败，返回 None: %s", e, exc_info=True)
         return None
 
     if not isinstance(repaired, dict):
@@ -468,65 +469,6 @@ def expand_conflict_context(
 
 
 # ==================== 串行冲突解决（重试 + 降级） ====================
-
-
-def _build_resolve_prompt(
-    conflict_block: ConflictBlock,
-    file_content: str,
-    total_conflicts: int,
-    context_lines: int = 25,
-) -> str:
-    """构建冲突解决 prompt
-
-    使用 templates/prompts/conflict_prompts.md 中的 resolve_conflict prompt 模板。
-    注入参数：
-    - conflict_id：当前冲突块序号
-    - total_conflicts：冲突块总数
-    - conflict_block_with_context：整块冲突上下文（前 20~30 行 + 冲突块 + 后 20~30 行）
-
-    Args:
-        conflict_block: 当前冲突块
-        file_content: 当前文件内容（可能已被前一个冲突块替换更新）
-        total_conflicts: 冲突块总数
-        context_lines: 上下文扩展行数
-
-    Returns:
-        填充后的 prompt 字符串
-    """
-    # 扩展上下文
-    context = expand_conflict_context(
-        file_content=file_content,
-        start_line=conflict_block.start_line,
-        end_line=conflict_block.end_line,
-        context_lines=context_lines,
-    )
-
-    # 尝试使用 PromptLoader 加载模板（保持与 Issue 3 一致）
-    try:
-        from lifeprism.llm.prompts.prompt_loader import PromptLoader, Prompts
-
-        loader = PromptLoader()
-        return loader.load_prompt(
-            Prompts.Conflict.RESOLVE_CONFLICT,
-            conflict_id=conflict_block.conflict_id,
-            total_conflicts=total_conflicts,
-            conflict_block_with_context=context,
-        )
-    except Exception:
-        # 加载失败时使用内联 fallback prompt（保证流程可用）
-        logger.debug("_build_resolve_prompt: PromptLoader 加载失败，使用 fallback")
-        return (
-            f"## 文件冲突需要解决\n\n"
-            f"当前是第 {conflict_block.conflict_id} 个冲突"
-            f"（共 {total_conflicts} 个）。\n\n"
-            f"### 整块冲突上下文\n\n```\n{context}\n```\n\n"
-            f"### 输出要求\n\n"
-            f"输出严格 JSON，包含字段：\n"
-            f"- conflict_id: {conflict_block.conflict_id}\n"
-            f"- start_marker: 精确复制上下文中的 <<<<<<< 行\n"
-            f"- end_marker: 精确复制上下文中的 >>>>>>> 行\n"
-            f"- replacement: 合并后的替换文本\n"
-        )
 
 
 def _execute_replacement(
@@ -649,12 +591,14 @@ def resolve_conflict_blocks(
             try:
                 raw_response = llm_caller(prompt)
             except Exception as e:
+                # LEGITIMATE: LLM 调用属于第三方服务边界，异常类型不可预测
                 logger.warning(
                     "resolve_conflict_blocks: 冲突块 %d LLM 调用异常（attempt=%d/%d, error=%s）",
                     block.conflict_id,
                     attempt,
                     max_retries,
                     e,
+                    exc_info=True,
                 )
                 continue
 
@@ -791,8 +735,9 @@ def _build_resolve_prompt_with_lines(
             total_conflicts=total_conflicts,
             conflict_block_with_context=context,
         )
-    except Exception:
-        logger.debug("_build_resolve_prompt_with_lines: PromptLoader 加载失败，使用 fallback")
+    except Exception as e:
+        # LEGITIMATE: 辅助操作兜底，prompt 加载失败不影响主流程
+        logger.warning("PromptLoader 加载失败，使用 fallback: %s", e, exc_info=True)
         return (
             f"## 文件冲突需要解决\n\n"
             f"当前是第 {conflict_block.conflict_id} 个冲突"

@@ -652,3 +652,296 @@ class TestResolveResult:
         assert isinstance(result.resolved_count, int)
         assert isinstance(result.failed_count, int)
         assert isinstance(result.failed_blocks, list)
+
+
+# ==================== Seam 6: 多冲突块串行替换边界（代码审查 Issue 5） ====================
+
+
+class TestMultiBlockSerialReplacementBoundary:
+    """多冲突块串行替换的边界场景
+
+    代码审查 Issue 5 指出：现有测试中多冲突块场景的 LLM 替换内容长度
+    均等于原冲突块长度，未验证替换内容长度变化时后续冲突块的 marker
+    是否仍能正确定位。
+
+    关键设计点（ADR-1 决策 7"串行处理"）：
+    - 每个冲突块基于"前一个替换后的文件"重新定位
+    - marker 是字符串匹配，不依赖行号，行号变化不影响匹配
+    - 但替换内容中包含冲突标记字符串时需验证不破坏后续匹配
+    """
+
+    def test_first_block_replacement_much_longer_second_block_still_matches(self):
+        """第一个块替换为 5 行内容（原 1 行），第二个块 marker 仍匹配"""
+        from lifeprism.sync.conflict_resolution import (
+            resolve_conflict_blocks,
+            parse_conflict_blocks,
+        )
+
+        merged = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours1\n"
+            "=======\n"
+            "theirs1\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "middle\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #2\n"
+            "ours2\n"
+            "=======\n"
+            "theirs2\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #2\n"
+        )
+        blocks = parse_conflict_blocks(merged)
+        assert len(blocks) == 2
+
+        def llm_caller(prompt: str) -> str:
+            if "#1" in prompt and "#2" not in prompt:
+                return (
+                    '{"conflict_id": 1, '
+                    '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #1", '
+                    '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #1", '
+                    '"replacement": "line1\\nline2\\nline3\\nline4\\nline5"}'
+                )
+            return (
+                '{"conflict_id": 2, '
+                '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #2", '
+                '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #2", '
+                '"replacement": "block2_replaced"}'
+            )
+
+        result = resolve_conflict_blocks(
+            file_content=merged,
+            conflict_blocks=blocks,
+            llm_caller=llm_caller,
+        )
+        assert result.resolved_count == 2
+        assert result.failed_count == 0
+        assert "line1" in result.final_content
+        assert "line5" in result.final_content
+        assert "block2_replaced" in result.final_content
+        assert "middle" in result.final_content
+
+    def test_first_block_empty_replacement_second_block_still_matches(self):
+        """第一个块替换为空（删除），第二个块 marker 仍匹配"""
+        from lifeprism.sync.conflict_resolution import (
+            resolve_conflict_blocks,
+            parse_conflict_blocks,
+        )
+
+        merged = (
+            "before\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours1\n"
+            "=======\n"
+            "theirs1\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "middle\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #2\n"
+            "ours2\n"
+            "=======\n"
+            "theirs2\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #2\n"
+            "after\n"
+        )
+        blocks = parse_conflict_blocks(merged)
+        assert len(blocks) == 2
+
+        def llm_caller(prompt: str) -> str:
+            if "#1" in prompt and "#2" not in prompt:
+                return (
+                    '{"conflict_id": 1, '
+                    '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #1", '
+                    '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #1", '
+                    '"replacement": ""}'
+                )
+            return (
+                '{"conflict_id": 2, '
+                '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #2", '
+                '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #2", '
+                '"replacement": "block2_merged"}'
+            )
+
+        result = resolve_conflict_blocks(
+            file_content=merged,
+            conflict_blocks=blocks,
+            llm_caller=llm_caller,
+        )
+        assert result.resolved_count == 2
+        assert result.failed_count == 0
+        assert "before" in result.final_content
+        assert "middle" in result.final_content
+        assert "after" in result.final_content
+        assert "ours1" not in result.final_content
+        assert "block2_merged" in result.final_content
+        assert "<<<<<<<" not in result.final_content
+
+    def test_replacement_containing_separator_string_does_not_break_parsing(self):
+        """替换内容包含 `=======` 字符串 → 不破坏后续冲突块匹配
+
+        替换内容中的 `=======` 是普通文本，不会被重新解析为冲突标记，
+        因为 resolve_conflict_blocks 使用预解析的 conflict_blocks 列表，
+        不重新解析文件。
+        """
+        from lifeprism.sync.conflict_resolution import (
+            resolve_conflict_blocks,
+            parse_conflict_blocks,
+        )
+
+        merged = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours1\n"
+            "=======\n"
+            "theirs1\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "middle\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #2\n"
+            "ours2\n"
+            "=======\n"
+            "theirs2\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #2\n"
+        )
+        blocks = parse_conflict_blocks(merged)
+        assert len(blocks) == 2
+
+        def llm_caller(prompt: str) -> str:
+            if "#1" in prompt and "#2" not in prompt:
+                return (
+                    '{"conflict_id": 1, '
+                    '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #1", '
+                    '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #1", '
+                    '"replacement": "merged with ======= separator inside"}'
+                )
+            return (
+                '{"conflict_id": 2, '
+                '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #2", '
+                '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #2", '
+                '"replacement": "block2_ok"}'
+            )
+
+        result = resolve_conflict_blocks(
+            file_content=merged,
+            conflict_blocks=blocks,
+            llm_caller=llm_caller,
+        )
+        assert result.resolved_count == 2
+        assert result.failed_count == 0
+        assert "=======" in result.final_content
+        assert "block2_ok" in result.final_content
+
+    def test_replacement_containing_local_marker_string_does_not_break_parsing(self):
+        """替换内容包含 `<<<<<<<` 字符串 → 不破坏后续冲突块匹配"""
+        from lifeprism.sync.conflict_resolution import (
+            resolve_conflict_blocks,
+            parse_conflict_blocks,
+        )
+
+        merged = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "ours1\n"
+            "=======\n"
+            "theirs1\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "middle\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #2\n"
+            "ours2\n"
+            "=======\n"
+            "theirs2\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #2\n"
+        )
+        blocks = parse_conflict_blocks(merged)
+        assert len(blocks) == 2
+
+        def llm_caller(prompt: str) -> str:
+            if "#1" in prompt and "#2" not in prompt:
+                return (
+                    '{"conflict_id": 1, '
+                    '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #1", '
+                    '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #1", '
+                    '"replacement": "text with <<<<<<< arrow inside"}'
+                )
+            return (
+                '{"conflict_id": 2, '
+                '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #2", '
+                '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #2", '
+                '"replacement": "block2_ok"}'
+            )
+
+        result = resolve_conflict_blocks(
+            file_content=merged,
+            conflict_blocks=blocks,
+            llm_caller=llm_caller,
+        )
+        assert result.resolved_count == 2
+        assert result.failed_count == 0
+        assert "<<<<<<<" in result.final_content
+        assert "block2_ok" in result.final_content
+
+    def test_three_blocks_progressive_length_changes(self):
+        """3 个冲突块：第一个变长、第二个变短、第三个删除 → 全部成功"""
+        from lifeprism.sync.conflict_resolution import (
+            resolve_conflict_blocks,
+            parse_conflict_blocks,
+        )
+
+        merged = (
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #1\n"
+            "a\n"
+            "=======\n"
+            "b\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #1\n"
+            "sep1\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #2\n"
+            "c\n"
+            "d\n"
+            "e\n"
+            "=======\n"
+            "f\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #2\n"
+            "sep2\n"
+            "<<<<<<< LP-LOCAL-a3f8b2c1 #3\n"
+            "g\n"
+            "=======\n"
+            "h\n"
+            ">>>>>>> LP-REMOTE-7e9d4f2b #3\n"
+        )
+        blocks = parse_conflict_blocks(merged)
+        assert len(blocks) == 3
+
+        def llm_caller(prompt: str) -> str:
+            if "#1" in prompt and "#2" not in prompt and "#3" not in prompt:
+                # 块1：变长（1 行 → 3 行）
+                return (
+                    '{"conflict_id": 1, '
+                    '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #1", '
+                    '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #1", '
+                    '"replacement": "x1\\nx2\\nx3"}'
+                )
+            if "#2" in prompt and "#3" not in prompt:
+                # 块2：变短（3 行 → 1 行）
+                return (
+                    '{"conflict_id": 2, '
+                    '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #2", '
+                    '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #2", '
+                    '"replacement": "y1"}'
+                )
+            # 块3：删除
+            return (
+                '{"conflict_id": 3, '
+                '"start_marker": "<<<<<<< LP-LOCAL-a3f8b2c1 #3", '
+                '"end_marker": ">>>>>>> LP-REMOTE-7e9d4f2b #3", '
+                '"replacement": ""}'
+            )
+
+        result = resolve_conflict_blocks(
+            file_content=merged,
+            conflict_blocks=blocks,
+            llm_caller=llm_caller,
+        )
+        assert result.resolved_count == 3
+        assert result.failed_count == 0
+        assert "x1" in result.final_content
+        assert "x3" in result.final_content
+        assert "y1" in result.final_content
+        assert "sep1" in result.final_content
+        assert "sep2" in result.final_content
+        assert "<<<<<<<" not in result.final_content
+        assert ">>>>>>>" not in result.final_content
