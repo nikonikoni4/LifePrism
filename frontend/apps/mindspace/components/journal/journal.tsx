@@ -34,6 +34,30 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
   const [activeDate, setActiveDate] = useState(new Date());
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
+  // ========== 月历数据 ==========
+  // 月份列表：初始为当前月前后各3个月，支持向上无限滚动加载更早月份（时间长廊）
+  const [monthList, setMonthList] = useState<Date[]>(() => {
+    const list: Date[] = [];
+    const now = new Date();
+    for (let i = -3; i <= 3; i++) {
+      list.push(new Date(now.getFullYear(), now.getMonth() + i, 1));
+    }
+    return list;
+  });
+
+  // 向前追加更早的月份（供时间长廊向上无限滚动调用）
+  const prependMonths = useCallback((count: number) => {
+    setMonthList(prev => {
+      if (prev.length === 0) return prev;
+      const oldest = prev[0];
+      const additions: Date[] = [];
+      for (let i = count; i >= 1; i--) {
+        additions.push(new Date(oldest.getFullYear(), oldest.getMonth() - i, 1));
+      }
+      return [...additions, ...prev];
+    });
+  }, []);
+
   // ========== UI 状态 ==========
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [settingsView, setSettingsView] = useState(false);
@@ -66,7 +90,13 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
     settingsView
   });
 
-  const { resetScroll } = useCalendarScroll(activeDate, !settingsView);
+  const { resetScroll } = useCalendarScroll(activeDate, !settingsView, {
+    onLoadOlder: prependMonths,
+    monthList,
+    loadThreshold: 100,
+    loadBatchSize: 3,
+    minYear: 2000,
+  });
   const { hsl, setHsl, handleHslChange, bgColor } = useBackgroundColor();
 
   // ========== Refs ==========
@@ -191,16 +221,6 @@ const JournalView: React.FC<JournalViewProps> = ({ onBack, onOpenGuide }) => {
     setSettingsView(false);
     resetScroll();
   };
-
-  // ========== 月历数据 ==========
-  const [monthList] = useState(() => {
-    const list = [];
-    const now = new Date();
-    for (let i = -3; i <= 3; i++) {
-      list.push(new Date(now.getFullYear(), now.getMonth() + i, 1));
-    }
-    return list;
-  });
 
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year: number, month: number) => {
