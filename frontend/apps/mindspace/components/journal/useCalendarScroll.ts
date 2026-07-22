@@ -191,22 +191,32 @@ export function useCalendarScroll(
 
     const calendarContainer = document.getElementById('diary-calendar-container');
     const { prevScrollHeight, prevScrollTop } = pendingCompensationRef.current;
-    // 无论补偿是否成功，都释放闸门（停止逻辑由 hasReachedOldestRef 兜底）
     pendingCompensationRef.current = null;
-    isLoadingOlderRef.current = false;
 
-    if (!calendarContainer) return;
+    if (!calendarContainer) {
+      isLoadingOlderRef.current = false;
+      return;
+    }
 
     const delta = calendarContainer.scrollHeight - prevScrollHeight;
+    const targetScrollTop = prevScrollTop + delta;
     if (delta > 0) {
-      // 补偿：保持用户视觉位置不变
-      calendarContainer.scrollTop = prevScrollTop + delta;
+      // 补偿：保持用户视觉位置不变。
+      // 容器带 CSS scroll-smooth，必须临时强制 instant，否则：
+      // 1) scrollTop 赋值会变成平滑动画，动画过程触发 scroll 事件再次进入加载判定；
+      // 2) 赋值后立即读取 scrollTop 返回的是动画起点（≈0），会被误判为"仍在顶部"
+      //    而永久停止加载（表现为只能加载一次，如停在 2026-01）。
+      const prevBehavior = calendarContainer.style.scrollBehavior;
+      calendarContainer.style.scrollBehavior = 'auto';
+      calendarContainer.scrollTop = targetScrollTop;
+      calendarContainer.style.scrollBehavior = prevBehavior;
       debugLog('scroll', '[useCalendarScroll] 补偿滚动位置', {
         delta,
-        newScrollTop: calendarContainer.scrollTop,
+        targetScrollTop,
+        actualScrollTop: calendarContainer.scrollTop,
       });
-      // 补偿后仍在顶部（异常）：永久停止，防止死循环
-      if (calendarContainer.scrollTop < threshold) {
+      // 用计算值判断（instant 后实际值即目标值）
+      if (targetScrollTop < threshold) {
         hasReachedOldestRef.current = true;
         debugLog('scroll', '[useCalendarScroll] 补偿后仍在顶部，永久停止向上加载');
       }
@@ -215,6 +225,7 @@ export function useCalendarScroll(
       hasReachedOldestRef.current = true;
       debugLog('scroll', '[useCalendarScroll] 无进展，永久停止向上加载');
     }
+    isLoadingOlderRef.current = false;
   }, [options?.monthList, threshold]);
 
   // 提供重置方法，用于"回到今天"按钮
