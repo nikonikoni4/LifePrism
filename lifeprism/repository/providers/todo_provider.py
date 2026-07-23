@@ -324,6 +324,10 @@ class TodoProvider(LWBaseDataProvider):
         """
         级联删除任务及其所有子任务（todo_list 中的 parent_id 关系）
 
+        走 _generic_batch_delete 通道：todo_list 是 SYNC_TABLES 中的 TEXT 主键表，
+        墓碑 record_id = id。实现方式：先递归收集所有子任务 ID（含自身），
+        再一次性批量删除+写墓碑（墓碑与 DELETE 同事务）。
+
         Args:
             todo_id: 任务 ID
 
@@ -334,10 +338,10 @@ class TodoProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
+            # 递归收集所有子任务 ID（含自身）
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # 递归获取所有子任务 ID
                 def get_all_descendant_ids(parent_id: str) -> list[str]:
                     cursor.execute("SELECT id FROM todo_list WHERE parent_id = ?", (parent_id,))
                     child_ids = [row[0] for row in cursor.fetchall()]
@@ -346,20 +350,19 @@ class TodoProvider(LWBaseDataProvider):
                         all_ids.extend(get_all_descendant_ids(child_id))
                     return all_ids
 
-                # 获取所有要删除的 ID（包括自身）
                 all_ids = get_all_descendant_ids(todo_id)
                 all_ids.append(todo_id)
 
-                # 从叶子节点开始删除（反向顺序）
-                deleted_count = 0
-                for tid in reversed(all_ids):
-                    cursor.execute("DELETE FROM todo_list WHERE id = ?", (tid,))
-                    if cursor.rowcount > 0:
-                        deleted_count += 1
+            if not all_ids:
+                return 0
 
-                logger.info("级联删除任务 %s 成功，共删除 %s 个任务", todo_id, deleted_count)
-                return deleted_count
+            # 一次性批量删除+写墓碑（_generic_batch_delete 自带事务）
+            deleted_count = self._generic_batch_delete(all_ids)
+            logger.info("级联删除任务 %s 成功，共删除 %s 个任务", todo_id, deleted_count)
+            return deleted_count
 
+        except DataAccessError:
+            raise
         except sqlite3.Error as e:
             logger.error("级联删除任务 %s 失败: %s", todo_id, e)
             raise DataAccessError(
@@ -395,6 +398,9 @@ class TodoProvider(LWBaseDataProvider):
         """
         批量删除任务（不级联删除子任务）
 
+        走 _generic_batch_delete 通道：todo_list 是 SYNC_TABLES 中的 TEXT 主键表，
+        墓碑 record_id = id。批量写墓碑+DELETE 在同一事务。
+
         Args:
             todo_ids: 任务 ID 列表
 
@@ -408,18 +414,11 @@ class TodoProvider(LWBaseDataProvider):
             return 0
 
         try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-
-                deleted_count = 0
-                for todo_id in todo_ids:
-                    cursor.execute("DELETE FROM todo_list WHERE id = ?", (todo_id,))
-                    if cursor.rowcount > 0:
-                        deleted_count += 1
-
-                logger.info("批量删除 %s 个任务成功", deleted_count)
-                return deleted_count
-
+            deleted_count = self._generic_batch_delete(todo_ids)
+            logger.info("批量删除 %s 个任务成功", deleted_count)
+            return deleted_count
+        except DataAccessError:
+            raise
         except sqlite3.Error as e:
             logger.error("批量删除任务失败: %s", e)
             raise DataAccessError(

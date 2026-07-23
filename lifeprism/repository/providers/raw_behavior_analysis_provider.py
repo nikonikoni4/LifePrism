@@ -235,6 +235,10 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
         """
         删除指定日期范围内的原始行为分析记录（用于重新生成）
 
+        走 _generic_batch_delete 通道：raw_behavior_analysis 是 SYNC_TABLES 中的 TEXT 主键表
+        （主键 start_time，不在 HASH_ID_PREFIXES），墓碑 record_id = start_time。
+        实现方式：先查范围内 start_time 列表，再走 _generic_batch_delete（批量写墓碑+DELETE 同事务）。
+
         Args:
             start_date: 开始日期（YYYY-MM-DD 格式，本地时区）
             end_date: 结束日期（YYYY-MM-DD 格式，本地时区）
@@ -249,18 +253,27 @@ class RawBehaviorAnalysisProvider(LWBaseDataProvider):
         _, end_datetime = build_utc_time_range(end_date)
 
         try:
+            # 先查范围内的 start_time 列表（主键）
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    f"""DELETE FROM {self._TABLE_NAME}
-                       WHERE start_time >= ? AND start_time <= ?""",
+                    f"SELECT {self._PRIMARY_KEY} FROM {self._TABLE_NAME} "
+                    f"WHERE start_time >= ? AND start_time <= ?",
                     (start_datetime, end_datetime),
                 )
-                affected_rows = cursor.rowcount
-                logger.info(
-                    "删除原始行为分析记录: %s 至 %s，共 %s 条", start_date, end_date, affected_rows
-                )
-                return affected_rows
+                start_times = [row[0] for row in cursor.fetchall()]
+
+            if not start_times:
+                return 0
+
+            # 批量删除（含写墓碑，墓碑与 DELETE 同事务）
+            affected_rows = self._generic_batch_delete(start_times)
+            logger.info(
+                "删除原始行为分析记录: %s 至 %s，共 %s 条", start_date, end_date, affected_rows
+            )
+            return affected_rows
+        except DataAccessError:
+            raise
         except Exception as e:
             logger.error("删除原始行为分析记录失败: %s", e)
             raise DataAccessError(f"删除原始行为分析记录失败: {e}") from e

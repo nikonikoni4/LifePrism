@@ -347,6 +347,9 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
         """
         批量删除记录
 
+        走 _generic_batch_delete 通道：multi_purpose_map_cache 是 SYNC_TABLES，
+        批量写墓碑到 deletion_log（record_id = 主键 id）+ 批量 DELETE 在同一事务。
+
         Args:
             cache_ids: 主键列表
 
@@ -360,18 +363,11 @@ class MultiPurposeMapCacheProvider(LWBaseDataProvider):
             return 0
 
         try:
-            # 手动实现批量删除
-            placeholders = ",".join("?" * len(cache_ids))
-            sql = f"DELETE FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} IN ({placeholders})"
-
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(sql, cache_ids)
-                conn.commit()
-                count = cursor.rowcount
-
+            count = self._generic_batch_delete(cache_ids)
             logger.info("批量删除 %s 条 multi_purpose_map_cache 记录", count)
             return count
+        except DataAccessError:
+            raise
         except Exception as e:
             logger.error("批量删除 multi_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(
@@ -709,6 +705,9 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
         """
         批量删除记录
 
+        走 _generic_batch_delete 通道：single_purpose_map_cache 是 SYNC_TABLES，
+        批量写墓碑到 deletion_log（record_id = 主键 id）+ 批量 DELETE 在同一事务。
+
         Args:
             cache_ids: 主键列表
 
@@ -722,18 +721,11 @@ class SinglePurposeMapCacheProvider(LWBaseDataProvider):
             return 0
 
         try:
-            # 手动实现批量删除
-            placeholders = ",".join("?" * len(cache_ids))
-            sql = f"DELETE FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} IN ({placeholders})"
-
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(sql, cache_ids)
-                conn.commit()
-                count = cursor.rowcount
-
+            count = self._generic_batch_delete(cache_ids)
             logger.info("批量删除 %s 条 single_purpose_map_cache 记录", count)
             return count
+        except DataAccessError:
+            raise
         except Exception as e:
             logger.error("批量删除 single_purpose_map_cache 记录失败: %s", e)
             raise DataAccessError(

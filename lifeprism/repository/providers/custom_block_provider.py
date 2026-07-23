@@ -232,6 +232,10 @@ class CustomBlockProvider(LWBaseDataProvider):
         """
         删除用户自定义时间块
 
+        走 _generic_delete 通道：timeline_custom_block 是 SYNC_TABLES 中的 AUTOINCREMENT 表
+        （在 HASH_ID_PREFIXES 中，前缀 tcb-），删除时自动写墓碑到 deletion_log，
+        墓碑 record_id = hash_id（由 _generic_delete 通过 _resolve_tombstone_record_id 解析）。
+
         Args:
             block_id: int, 时间块 ID
 
@@ -242,11 +246,12 @@ class CustomBlockProvider(LWBaseDataProvider):
             DataAccessError: 数据库操作失败
         """
         try:
-            affected_rows = self.db.delete(self._TABLE_NAME, where={"id": block_id})
-            success = affected_rows > 0
+            success = self._generic_delete(block_id)
             if success:
                 logger.info("删除时间块 %s 成功", block_id)
             return success
+        except DataAccessError:
+            raise
         except Exception as e:
             logger.error("删除时间块 %s 失败: %s", block_id, e)
             raise DataAccessError(f"删除时间块 {block_id} 失败") from e

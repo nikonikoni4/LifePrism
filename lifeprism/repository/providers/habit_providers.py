@@ -468,6 +468,10 @@ class HabitChallengeProvider(LWBaseDataProvider):
         """
         删除习惯的所有挑战记录（级联清理用）
 
+        走 _generic_batch_delete 通道：habit_challenges 是 SYNC_TABLES 中的 TEXT 主键表，
+        墓碑 record_id = id。实现方式：先查 habit_id 对应的 id 列表，
+        再走 _generic_batch_delete（批量写墓碑+DELETE 同事务）。
+
         Args:
             habit_id: 习惯 ID
 
@@ -475,9 +479,23 @@ class HabitChallengeProvider(LWBaseDataProvider):
             True
         """
         try:
+            # 先查该 habit 的所有 challenge id 列表
             with self.db.get_connection() as conn:
-                conn.execute("DELETE FROM habit_challenges WHERE habit_id = ?", (habit_id,))
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT {self._PRIMARY_KEY} FROM {self._TABLE_NAME} WHERE habit_id = ?",
+                    (habit_id,),
+                )
+                challenge_ids = [row[0] for row in cursor.fetchall()]
+
+            if not challenge_ids:
+                return True
+
+            # 批量删除+写墓碑（_generic_batch_delete 自带事务）
+            self._generic_batch_delete(challenge_ids)
             return True
+        except DataAccessError:
+            raise
         except sqlite3.Error as e:
             logger.error("按习惯ID删除挑战失败: error=%s", e)
             raise DataAccessError(f"按习惯ID删除挑战失败: {e}") from e
@@ -594,20 +612,26 @@ class HabitCheckinProvider(LWBaseDataProvider):
         """
         删除指定日期的打卡记录
 
+        走 _generic_delete 通道：habit_checkins 是 SYNC_TABLES，删除时自动写墓碑到
+        deletion_log（TEXT 主键表，墓碑 record_id = checkin_id）。
+        因按 habit_id+date 复合条件删除，需先查 id 再走 _generic_delete。
+
         Args:
             habit_id: 习惯 ID
             checkin_date: 打卡日期
 
         Returns:
-            True
+            bool: True 表示记录存在并已删除，False 表示记录不存在
         """
+        # 先查 id（复合条件 → 主键）
+        record = self.get_checkin_by_date(habit_id, checkin_date)
+        if record is None:
+            return False
+
         try:
-            with self.db.get_connection() as conn:
-                conn.execute(
-                    "DELETE FROM habit_checkins WHERE habit_id = ? AND date = ?",
-                    (habit_id, checkin_date),
-                )
-            return True
+            return self._generic_delete(record["id"])
+        except DataAccessError:
+            raise
         except sqlite3.Error as e:
             logger.error("删除打卡记录失败: error=%s", e)
             raise DataAccessError(f"删除打卡记录失败: {e}") from e
@@ -616,6 +640,10 @@ class HabitCheckinProvider(LWBaseDataProvider):
         """
         删除习惯的所有打卡记录
 
+        走 _generic_batch_delete 通道：habit_checkins 是 SYNC_TABLES 中的 TEXT 主键表，
+        墓碑 record_id = id。实现方式：先查 habit_id 对应的 id 列表，
+        再走 _generic_batch_delete（批量写墓碑+DELETE 同事务）。
+
         Args:
             habit_id: 习惯 ID
 
@@ -623,9 +651,23 @@ class HabitCheckinProvider(LWBaseDataProvider):
             True
         """
         try:
+            # 先查该 habit 的所有 checkin id 列表
             with self.db.get_connection() as conn:
-                conn.execute("DELETE FROM habit_checkins WHERE habit_id = ?", (habit_id,))
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT {self._PRIMARY_KEY} FROM {self._TABLE_NAME} WHERE habit_id = ?",
+                    (habit_id,),
+                )
+                checkin_ids = [row[0] for row in cursor.fetchall()]
+
+            if not checkin_ids:
+                return True
+
+            # 批量删除+写墓碑（_generic_batch_delete 自带事务）
+            self._generic_batch_delete(checkin_ids)
             return True
+        except DataAccessError:
+            raise
         except sqlite3.Error as e:
             logger.error("按习惯ID删除打卡失败: error=%s", e)
             raise DataAccessError(f"按习惯ID删除打卡失败: {e}") from e

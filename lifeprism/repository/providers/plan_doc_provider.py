@@ -264,6 +264,9 @@ class PlanDocProvider(LWBaseDataProvider):
         """
         删除计划书
 
+        走 _generic_delete 通道：plan_doc 是 SYNC_TABLES，删除时自动写墓碑到
+        deletion_log（TEXT 主键表，墓碑 record_id = doc_id）。
+
         Args:
             doc_id: 计划书 ID (格式: plandoc-xxx)
 
@@ -274,15 +277,12 @@ class PlanDocProvider(LWBaseDataProvider):
             DataAccessError: 数据库访问失败
         """
         try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM plan_doc WHERE id = ?", (doc_id,))
-
-                success = cursor.rowcount > 0
-                if success:
-                    logger.info("删除计划书 %s 成功", doc_id)
-                return success
-
+            success = self._generic_delete(doc_id)
+            if success:
+                logger.info("删除计划书 %s 成功", doc_id)
+            return success
+        except DataAccessError:
+            raise
         except Exception as e:
             logger.error("删除计划书 %s 失败: %s", doc_id, e)
             raise DataAccessError(f"删除计划书 {doc_id} 失败: {e}") from e
