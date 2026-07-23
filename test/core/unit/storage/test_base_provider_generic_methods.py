@@ -1068,6 +1068,14 @@ class TestGenericDeleteTombstone:
         count = _count_tombstones(provider.db, target_table="test_text_pk_table")
         assert count == 0, "DELETE 失败时墓碑应回滚"
 
+        # 验证：记录仍存在（DELETE 也回滚）
+        with provider.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) FROM test_text_pk_table WHERE id = ?", (pk_value,)
+            )
+            assert cursor.fetchone()[0] == 1, "DELETE 失败时记录不应被删除"
+
     def test_repeat_delete_preserves_old_tombstone(self, sync_text_pk_provider):
         """S6: 重复删除同一记录 → IGNORE 策略（保留旧墓碑，不刷新 updated_at）"""
         import time

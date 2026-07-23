@@ -1330,7 +1330,7 @@ class LWBaseDataProvider:
                 conn.commit()
                 return cursor.rowcount > 0
         except DataAccessError as e:
-            # 上下文管理器已回滚事务并抛出 DataAccessError，这里仅补充日志
+            # 底层 get_connection 已记录 sqlite3.Error，此处补充 table/record_id 上下文便于调试
             logger.error(
                 "通用删除失败: table=%s, record_id=%s, error=%s", self._TABLE_NAME, record_id, e
             )
@@ -1348,6 +1348,10 @@ class LWBaseDataProvider:
 
         Returns:
             墓碑 record_id（hash_id 或主键值），记录不存在时返回 None
+
+        Raises:
+            DataAccessError: AUTOINCREMENT 表记录存在但 hash_id 为 None（数据完整性异常，
+                可能未走 _generic_insert 通道写入）
         """
         from lifeprism.sync.constants import HASH_ID_PREFIXES
 
@@ -1361,7 +1365,18 @@ class LWBaseDataProvider:
             row = cursor.fetchone()
             if row is None:
                 return None  # 记录不存在
-            return row[0] if row[0] is not None else str(record_id)
+            if row[0] is None:
+                # 记录存在但 hash_id 缺失：数据完整性异常（可能绕过 _generic_insert 写入）
+                logger.error(
+                    "AUTOINCREMENT 表记录 hash_id 缺失: table=%s, record_id=%s",
+                    self._TABLE_NAME,
+                    record_id,
+                )
+                raise DataAccessError(
+                    message="hash_id 缺失，数据可能未走 _generic_insert 通道",
+                    details={"table": self._TABLE_NAME, "record_id": str(record_id)},
+                )
+            return row[0]
         # TEXT 主键表：直接用主键值
         return str(record_id)
 
@@ -1432,6 +1447,7 @@ class LWBaseDataProvider:
                 conn.commit()
                 return cursor.rowcount
         except DataAccessError as e:
+            # 底层 get_connection 已记录 sqlite3.Error，此处补充 table/count 上下文便于调试
             logger.error(
                 "通用批量删除失败: table=%s, count=%s, error=%s",
                 self._TABLE_NAME,
@@ -1445,25 +1461,45 @@ class LWBaseDataProvider:
     ) -> list[str]:
         """批量确定墓碑的 record_id：AUTOINCREMENT 表用 hash_id，TEXT 主键表用主键值
 
+        对 AUTOINCREMENT 表，批量查询 hash_id。若发现记录存在但 hash_id 为 None，
+        抛出 DataAccessError（数据完整性异常），避免墓碑静默丢失。
+
         Args:
             cursor: 数据库游标
             record_ids: 主键值列表
 
         Returns:
-            墓碑 record_id 列表
+            墓碑 record_id 列表（仅包含存在的记录）
+
+        Raises:
+            DataAccessError: AUTOINCREMENT 表存在 hash_id 为 None 的记录
         """
         from lifeprism.sync.constants import HASH_ID_PREFIXES
 
         placeholders = ",".join(["?"] * len(record_ids))
         hash_prefix = HASH_ID_PREFIXES.get(self._TABLE_NAME)
         if hash_prefix is not None:
-            # AUTOINCREMENT 表：批量查询 hash_id（仅存在的记录返回）
+            # AUTOINCREMENT 表：批量查询 hash_id
             cursor.execute(
-                f"SELECT hash_id FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} "
+                f"SELECT {self._PRIMARY_KEY}, hash_id FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} "
                 f"IN ({placeholders})",
                 record_ids,
             )
-            return [row[0] for row in cursor.fetchall() if row[0] is not None]
+            result = []
+            for pk, hash_id in cursor.fetchall():
+                if hash_id is None:
+                    # 记录存在但 hash_id 缺失：数据完整性异常
+                    logger.error(
+                        "AUTOINCREMENT 表记录 hash_id 缺失: table=%s, record_id=%s",
+                        self._TABLE_NAME,
+                        pk,
+                    )
+                    raise DataAccessError(
+                        message="hash_id 缺失，数据可能未走 _generic_insert 通道",
+                        details={"table": self._TABLE_NAME, "record_id": str(pk)},
+                    )
+                result.append(hash_id)
+            return result
         # TEXT 主键表：直接用主键值
         return [str(rid) for rid in record_ids]
 
