@@ -2,12 +2,20 @@
 Value 服务层 - 价值模块业务逻辑
 
 架构：纯函数模块（无内存缓存，不需要单例）
+
+级联删除协调（Slice 05 重构）：
+- cascade=True：CommitmentProvider.delete_by_value_id（删除关联承诺，含写墓碑）
+  + ValueProvider.delete_value（删除价值本身，含写墓碑）
+- cascade=False：CommitmentProvider.null_value_id（置空关联承诺的 value_id，不写墓碑）
+  + ValueProvider.delete_value（删除价值本身，含写墓碑）
+
+级联协调属于业务逻辑，放在 Service 层；Provider 层只做单表 CRUD。
 """
 
 import sqlite3
 
-from lifeprism.server.providers.commitment_provider import commitment_provider
-from lifeprism.server.providers.value_provider import value_provider
+from lifeprism.repository.providers.commitment_provider import commitment_provider
+from lifeprism.repository.providers.value_provider import value_provider
 from lifeprism.server.schemas.commitment_schemas import CommitmentBriefItem
 from lifeprism.server.schemas.value_schemas import (
     CreateValueRequest,
@@ -92,11 +100,17 @@ def create_value(request: CreateValueRequest) -> ValueItem | None:
     Raises:
         ConflictError: keywords 已存在
     """
+    from lifeprism.utils.exceptions import DataAccessError
+
     data = request.model_dump()
     try:
         new_id = value_provider.create_value(data)
-    except sqlite3.IntegrityError:
-        raise ConflictError(f"keywords 已存在: {request.keywords}")  # noqa: B904
+    except DataAccessError as e:
+        # _generic_insert 将 sqlite3.IntegrityError（含 UNIQUE 冲突）包装为 DataAccessError
+        # 此处检查 cause 是否为 IntegrityError，是则转 ConflictError（409），否则原样抛出
+        if isinstance(e.cause, sqlite3.IntegrityError):
+            raise ConflictError(f"keywords 已存在: {request.keywords}") from e
+        raise
     if not new_id:
         return None
     item = value_provider.get_value_by_id(new_id)
@@ -128,17 +142,34 @@ def update_value(value_id: str, request: UpdateValueRequest) -> ValueItem | None
 
 
 def delete_value(value_id: str, cascade: bool) -> bool:
-    """
-    删除价值
+    """删除价值（Service 层协调级联删除）
+
+    Slice 05 重构：级联协调从 Provider 层上移到 Service 层。
+    - cascade=True：先调用 CommitmentProvider.delete_by_value_id 删除关联承诺（含写墓碑），
+      再调用 ValueProvider.delete_value 删除价值本身（含写墓碑）
+    - cascade=False：先调用 CommitmentProvider.null_value_id 置空关联承诺的 value_id
+      （不删除承诺记录，不写墓碑），再调用 ValueProvider.delete_value 删除价值本身（含写墓碑）
 
     Args:
         value_id: 价值 ID
-        cascade: True=级联删除承诺，False=置空关联
+        cascade: True=级联删除承诺，False=置空关联承诺的 value_id
 
     Returns:
-        bool: 是否成功
+        bool: 是否成功（价值不存在时返回 False）
     """
     existing = value_provider.get_value_by_id(value_id)
     if not existing:
         return False
-    return value_provider.delete_value_with_cascade(value_id, cascade)
+
+    # 先处理关联承诺（级联协调）
+    if cascade:
+        # 级联删除：删除该价值下所有承诺（含写墓碑到 commitments 墓碑表）
+        deleted_count = commitment_provider.delete_by_value_id(value_id)
+        logger.info("级联删除价值 %s 下 %s 条承诺", value_id, deleted_count)
+    else:
+        # 置空关联：将该价值下所有承诺的 value_id 置为 NULL（不删除承诺，不写墓碑）
+        updated_count = commitment_provider.null_value_id(value_id)
+        logger.info("置空价值 %s 下 %s 条承诺的 value_id", value_id, updated_count)
+
+    # 再删除价值本身（走 _generic_delete，含写墓碑到 user_values 墓碑表）
+    return value_provider.delete_value(value_id)

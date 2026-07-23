@@ -9,7 +9,7 @@ Server Providers 模块
 # from .goal_provider import goal_provider
 # from .custom_block_provider import custom_block_provider
 # from .goal_stats_provider import goal_stats_provider
-from .journal_provider import journal_provider
+# journal_provider 已迁移到 lifeprism.repository.providers.journal_provider
 from .statistical_data_providers import server_lw_data_provider
 
 # from .plan_doc_provider import plan_doc_provider
@@ -23,7 +23,7 @@ __all__ = [
     # "goal_provider",
     # "custom_block_provider",
     # "goal_stats_provider",
-    "journal_provider",
+    # "journal_provider",  # 已迁移到 repository.providers
     # "plan_doc_provider",
     #  "diary_provider",
     # "focus_provider",
