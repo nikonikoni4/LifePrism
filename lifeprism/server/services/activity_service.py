@@ -6,7 +6,6 @@ Activity V2 Service 层 - 纯函数模块
 """
 
 from lifeprism.repository import computer_usage_repository
-from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.schemas.activity_schemas import (
     ActivityLogItem,
     ActivityLogsResponse,
@@ -20,6 +19,7 @@ from lifeprism.server.services.activity_stats_builder import (
     get_top_title,
 )
 from lifeprism.utils import get_logger
+from lifeprism.utils.time_utils import get_utc_now_iso
 
 logger = get_logger(__name__)
 
@@ -158,13 +158,13 @@ def get_activity_log_detail(log_id: str) -> ActivityLogItem | None:
     Returns:
         ActivityLogItem: 日志详情，如果不存在返回 None
     """
-    log = server_lw_data_provider.get_activity_log_by_id(log_id)
+    log = computer_usage_repository.get_computer_usage_by_id_with_names(log_id)
 
     if not log:
         return None
 
     return ActivityLogItem(
-        id=log["id"],
+        id=str(log["id"]),
         start_time=log["start_time"],
         end_time=log["end_time"],
         app=log["app"],
@@ -178,26 +178,60 @@ def get_activity_log_detail(log_id: str) -> ActivityLogItem | None:
 
 
 def update_log_category(log_id: str, category_id: str, sub_category_id: str | None) -> bool:
-    """更新日志分类"""
-    return server_lw_data_provider.update_event_category(log_id, category_id, sub_category_id)
+    """更新日志分类
+
+    通过 computer_usage_repository.update_by_filter 调用：
+    - sub_category_id=None 表示清除为 NULL（前端"选择 -- Select --"场景）
+    - 显式传入 updated_at 触发 LWW 同步（update_by_filter 不自动更新 updated_at）
+    """
+    affected = computer_usage_repository.update_by_filter(
+        set_fields={
+            "category_id": category_id,
+            "sub_category_id": sub_category_id,  # None → 清除为 NULL
+            "updated_at": get_utc_now_iso(),
+        },
+        where_conditions={"id": log_id},
+    )
+    return affected > 0
 
 
 def batch_update_log_category(log_ids: list, category_id: str, sub_category_id: str | None) -> int:
-    """批量更新日志分类，返回更新数量"""
-    return server_lw_data_provider.batch_update_event_category(
-        log_ids, category_id, sub_category_id
+    """批量更新日志分类，返回更新数量
+
+    通过 computer_usage_repository.update_by_filter + IN 子句调用：
+    - sub_category_id=None 表示清除为 NULL（前端"选择 -- Select --"场景）
+    - 显式传入 updated_at 触发 LWW 同步（update_by_filter 不自动更新 updated_at）
+    """
+    if not log_ids:
+        return 0
+    return computer_usage_repository.update_by_filter(
+        set_fields={
+            "category_id": category_id,
+            "sub_category_id": sub_category_id,  # None → 清除为 NULL
+            "updated_at": get_utc_now_iso(),
+        },
+        where_conditions={"id IN": log_ids},
     )
 
 
 def delete_log(log_id: str) -> bool:
-    """删除单条日志"""
-    return server_lw_data_provider.delete_event(log_id)
+    """删除单条日志
+
+    迁移后通过 computer_usage_repository.delete_computer_usage 调用，
+    底层 _generic_delete 会写墓碑到 deletion_log（因 user_app_behavior_log
+    在 SYNC_TABLES 中），墓碑 record_id 使用 hash_id。
+    """
+    return computer_usage_repository.delete_computer_usage(log_id)
 
 
 def batch_delete_logs(log_ids: list[str]) -> int:
-    """批量删除日志，返回删除数量"""
-    print(log_ids)
-    return server_lw_data_provider.batch_delete_events(log_ids)
+    """批量删除日志，返回删除数量
+
+    迁移后通过 computer_usage_repository.batch_delete_computer_usage 调用，
+    底层 _generic_batch_delete 会写墓碑到 deletion_log（因 user_app_behavior_log
+    在 SYNC_TABLES 中），N 条记录对应 N 条墓碑，墓碑 record_id 使用 hash_id。
+    """
+    return computer_usage_repository.batch_delete_computer_usage(log_ids)
 
 
 def update_logs_by_app_title(
@@ -217,26 +251,50 @@ def update_logs_by_app_title(
     - 单用途应用 (is_multipurpose_app=False): 仅按 app 匹配
     - 多用途应用 (is_multipurpose_app=True): 按 app + title 匹配
 
+    业务逻辑上移（原在 statistical_data_providers.update_logs_by_app_title）：
+    1. goal_id 三态语义：None=不修改 / ""=清除为 NULL / "goal-xxx"=设置值
+    2. is_multipurpose_app 判断：True=加 title 条件 / False=不加
+
     Args:
         app: 应用名称
         title: 窗口标题（多用途应用时必须提供）
         is_multipurpose_app: 是否为多用途应用
         category_id: 主分类ID
-        sub_category_id: 子分类ID（可选）
+        sub_category_id: 子分类ID（可选，None=清除为 NULL）
         goal_id: 目标ID（None=不修改, ''=清除, 'goal-xxx'=设置）
-        start_time: 开始时间 ISO 8601 格式（可选）
-        end_time: 结束时间 ISO 8601 格式（可选）
+        start_time: 开始时间 UTC ISO 8601 格式（可选）
+        end_time: 结束时间 UTC ISO 8601 格式（可选）
 
     Returns:
         int: 成功更新的数量
     """
-    return server_lw_data_provider.update_logs_by_app_title(
-        app=app,
-        title=title,
-        is_multipurpose_app=is_multipurpose_app,
-        category_id=category_id,
-        sub_category_id=sub_category_id,
-        goal_id=goal_id,
-        start_time=start_time,
-        end_time=end_time,
+    # 1. 构建 set_fields（goal_id 三态语义在 Service 层处理）
+    #    update_by_filter 的 None = 清除为 NULL（与 update_computer_usage 的 None=跳过不同）
+    #    显式传入 updated_at 触发 LWW 同步（update_by_filter 不自动更新 updated_at）
+    set_fields: dict = {
+        "category_id": category_id,
+        "sub_category_id": sub_category_id,
+        "updated_at": get_utc_now_iso(),
+    }
+    if goal_id is not None:
+        # None=不修改（不加入 set_fields），""=清除（设为 None），"goal-xxx"=设置
+        set_fields["link_to_goal_id"] = goal_id if goal_id else None
+
+    # 2. 构建 where_conditions（is_multipurpose_app 判断在 Service 层处理）
+    where_conditions: dict = {"app": app}
+    if is_multipurpose_app:
+        if title is None:
+            raise ValueError("多用途应用必须提供 title 参数")
+        where_conditions["title"] = title
+
+    # 时间范围（已是 UTC ISO 格式，直接传入，Provider 不做时间转换）
+    if start_time:
+        where_conditions["start_time >="] = start_time
+    if end_time:
+        where_conditions["start_time <="] = end_time
+
+    # 3. 调用 Provider 的通用 update_by_filter
+    return computer_usage_repository.update_by_filter(
+        set_fields=set_fields,
+        where_conditions=where_conditions,
     )

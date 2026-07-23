@@ -331,7 +331,17 @@ class CustomRecordRepository:
 
     def delete_type(self, type_id: str) -> bool:
         """
-        硬删类型：DROP 数据表 + 删除 meta 记录（同事务）
+        硬删类型：DROP 数据表 + 删除 meta 记录（走 _generic_* 通道，含写墓碑）
+
+        删除顺序：
+        1. DROP 动态数据表 custom_<slug>（不在 SYNC_TABLES，不写墓碑）
+        2. 删除 custom_record_fields 记录（走 CustomRecordFieldProvider.delete_by_type_id
+           → _generic_batch_delete，写墓碑）
+        3. 删除 custom_record_types 记录（走 CustomRecordTypeProvider.delete
+           → _generic_delete，写墓碑）
+
+        注意：三步分别走独立事务（与 delete_habit 级联模式一致）。
+        动态表 custom_<slug> 不在 SYNC_TABLES 中，DROP TABLE 不写墓碑。
 
         Args:
             type_id: 类型 ID
@@ -351,16 +361,30 @@ class CustomRecordRepository:
         data_table = f"{self._DATA_TABLE_PREFIX}{t['slug']}"
 
         try:
+            # 1. DROP 动态数据表（不在 SYNC_TABLES，不写墓碑）
             with self.db.get_connection() as conn:
-                cursor = conn.cursor()
-                # 1. DROP 数据表
-                cursor.execute(f"DROP TABLE IF EXISTS {data_table}")
-                # 2. 删除 custom_record_fields 记录
-                cursor.execute("DELETE FROM custom_record_fields WHERE type_id = ?", (type_id,))
-                # 3. 删除 custom_record_types 记录
-                cursor.execute("DELETE FROM custom_record_types WHERE id = ?", (type_id,))
-                logger.info("删除自定义记录类型成功: type_id=%s, table=%s", type_id, data_table)
-                return True
+                conn.execute(f"DROP TABLE IF EXISTS {data_table}")
+
+            # 2. 删除 custom_record_fields（走 _generic_batch_delete，写墓碑）
+            from lifeprism.repository.providers.custom_record_providers import (
+                CustomRecordFieldProvider,
+            )
+
+            field_provider = CustomRecordFieldProvider()
+            field_provider.delete_by_type_id(type_id)
+
+            # 3. 删除 custom_record_types（走 _generic_delete，写墓碑）
+            from lifeprism.repository.providers.custom_record_providers import (
+                CustomRecordTypeProvider,
+            )
+
+            type_provider = CustomRecordTypeProvider()
+            type_provider.delete(type_id)
+
+            logger.info("删除自定义记录类型成功: type_id=%s, table=%s", type_id, data_table)
+            return True
+        except DataAccessError:
+            raise
         except sqlite3.Error as e:
             logger.error("删除自定义记录类型失败: type_id=%s, error=%s", type_id, e)
             raise DataAccessError(

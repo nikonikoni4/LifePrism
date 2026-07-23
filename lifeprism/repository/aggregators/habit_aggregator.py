@@ -140,7 +140,11 @@ class HabitAggregator:
         return self.habit_provider.update_habit(habit_id, data)
 
     def delete_habit(self, habit_id: str) -> bool:
-        """透传：删除习惯"""
+        """透传：删除习惯
+
+        注意：级联删除挑战和打卡的逻辑在 Service 层
+        （habit_service.delete_habit），Aggregator 不负责跨表级联。
+        """
         return self.habit_provider.delete_habit(habit_id)
 
     def get_habits(self, status: str | None = None) -> list[dict[str, Any]]:

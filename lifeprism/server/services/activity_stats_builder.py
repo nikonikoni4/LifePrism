@@ -13,7 +13,6 @@ import pytz
 
 from lifeprism.config import get_user_timezone
 from lifeprism.repository import computer_usage_repository
-from lifeprism.server.providers import server_lw_data_provider
 from lifeprism.server.providers.category_color_provider import color_manager, get_log_color
 from lifeprism.server.schemas.activity_schemas import (
     ActivitySummaryData,
@@ -128,6 +127,15 @@ def build_activity_summary(
     """
     获取活动摘要条形图数据
 
+    迁移后（Slice 05）：业务逻辑上移到 Service 层
+    - 数据查询：computer_usage_repository.load_user_app_behavior_log 取 DataFrame
+    - 时区转换：复用 _add_local_date_column（pandas 向量化，等价于原 utc_to_local_display）
+    - 分类筛选：Service 层 df[df["category_id"] == category_id]
+    - 百分比计算：Service 层 int(total_duration * 100 / 86400)
+
+    依据 PRD "已知风险 1"：必须保留 Python 层时区分组（_add_local_date_column），
+    禁止改用 SQL DATE(start_time) 分组（会按 UTC 日期分组导致跨时区错位）。
+
     Args:
         date: 中心日期 (YYYY-MM-DD 格式)
         history_number: 历史数据天数
@@ -151,13 +159,28 @@ def build_activity_summary(
         date_range.append(current.strftime("%Y-%m-%d"))
         current += timedelta(days=1)
 
-    # 3. 查询数据库获取每日活动数据（带分类筛选）
-    daily_data = server_lw_data_provider.get_daily_active_time(
-        start_date, end_date, category_id, sub_category_id
+    # 3. 查询原始数据（替代原 get_daily_active_time）
+    #    时区转换上移到 Service 层：用 build_utc_time_range 将本地日期范围转为 UTC
+    start_utc, _ = build_utc_time_range(start_date)
+    _, end_utc = build_utc_time_range(end_date)
+    df = computer_usage_repository.load_user_app_behavior_log(
+        start_time=start_utc, end_time=end_utc
     )
 
-    # 4. 创建日期到数据的映射
-    activity_map = {item["date"]: item["active_time_percentage"] for item in daily_data}
+    # 4. Python 层按本地日期分组 + 计算百分比（业务逻辑上移）
+    if df is not None and not df.empty:
+        # 复用已有的 _add_local_date_column（activity_stats_builder.py:75-98）
+        # 将 UTC start_time 转为用户本地时区日期，确保跨时区边界的数据分到正确的本地日期
+        df = _add_local_date_column(df, "start_time")
+        # 按分类筛选（如果有）—— Service 层 Python 过滤
+        if category_id:
+            df = df[df["category_id"] == category_id]
+        if sub_category_id:
+            df = df[df["sub_category_id"] == sub_category_id]
+        # 按本地日期分组求和
+        daily_durations: dict[str, int] = df.groupby("local_date")["duration"].sum().to_dict()
+    else:
+        daily_durations = {}
 
     # 5. 获取分类颜色
     filter_color = None
@@ -168,10 +191,11 @@ def build_activity_summary(
 
     default_color = "#5B8FF9"
 
-    # 6. 构建完整的数据数组，缺失的日期补全为0
+    # 6. 构建完整的数据数组，缺失的日期补全为0 + 百分比计算（Service 层）
     daily_activities: list[DailyActivitiesData] = []
     for date_str in date_range:
-        percentage = activity_map.get(date_str, 0)
+        total_duration = daily_durations.get(date_str, 0)
+        percentage = int(total_duration * 100 / 86400) if total_duration > 0 else 0
         duration = int(percentage * 86400 / 100)
 
         daily_activities.append(
@@ -297,6 +321,11 @@ def build_time_overview(date: str) -> TimeOverviewData:
 def get_top_title(date: str, top_n: int) -> list[TopTitleData]:
     """获取热门标题数据
 
+    迁移后（Slice 05）：业务逻辑上移到 Service 层
+    - 时区转换：build_utc_time_range 在 Service 层完成
+    - 字段映射：tuple 解包替代原 dict 访问
+    - 百分比计算：Service 层 int(duration / total_duration * 100)
+
     Args:
         date: 日期字符串 (YYYY-MM-DD)
         top_n: int, Top N
@@ -306,19 +335,23 @@ def get_top_title(date: str, top_n: int) -> list[TopTitleData]:
             name: str, 窗口标题
             duration: int, 活跃时长(秒)
     """
-    title_list = server_lw_data_provider.get_top_title(date, top_n)
-    total_duration = server_lw_data_provider.get_active_time(date)
+    # 时区转换上移到 Service 层
+    start_utc, end_utc = build_utc_time_range(date)
+    # Provider 返回 list[tuple[str, int]]，字段映射在 Service 层
+    raw_list = computer_usage_repository.get_top_groups_by_duration(
+        "title", start_utc, end_utc, top_n
+    )
+    # total_duration 是所有记录的总和（不是 top_n 的总和），用于百分比计算
+    total_duration = computer_usage_repository.get_total_duration(start_utc, end_utc)
 
-    # 构建TopTitleData列表
+    # 构建 TopTitleData 列表（tuple 解包，替代原 dict 访问）
     result = []
-    for title in title_list:
+    for name, duration in raw_list:
         result.append(
             TopTitleData(
-                name=title["name"],
-                duration=int(title["duration"]),
-                percentage=int(title["duration"] / total_duration * 100)
-                if total_duration > 0
-                else 0,
+                name=name,
+                duration=int(duration),
+                percentage=int(duration / total_duration * 100) if total_duration > 0 else 0,
             )
         )
     return result
@@ -326,6 +359,11 @@ def get_top_title(date: str, top_n: int) -> list[TopTitleData]:
 
 def get_top_app(date: str, top_n: int) -> list[TopAppData]:
     """获取热门应用数据
+
+    迁移后（Slice 05）：业务逻辑上移到 Service 层
+    - 时区转换：build_utc_time_range 在 Service 层完成
+    - 字段映射：tuple 解包替代原 dict 访问
+    - 百分比计算：Service 层 int(duration / total_duration * 100)
 
     Args:
         date: 日期字符串 (YYYY-MM-DD)
@@ -336,17 +374,23 @@ def get_top_app(date: str, top_n: int) -> list[TopAppData]:
             name: str, 应用名称
             duration: int, 活跃时长(秒)
     """
-    app_list = server_lw_data_provider.get_top_applications(date, top_n)
-    total_duration = server_lw_data_provider.get_active_time(date)
+    # 时区转换上移到 Service 层
+    start_utc, end_utc = build_utc_time_range(date)
+    # Provider 返回 list[tuple[str, int]]，字段映射在 Service 层
+    raw_list = computer_usage_repository.get_top_groups_by_duration(
+        "app", start_utc, end_utc, top_n
+    )
+    # total_duration 是所有记录的总和（不是 top_n 的总和），用于百分比计算
+    total_duration = computer_usage_repository.get_total_duration(start_utc, end_utc)
 
-    # 构建TopAppData列表
+    # 构建 TopAppData 列表（tuple 解包，替代原 dict 访问）
     result = []
-    for app in app_list:
+    for name, duration in raw_list:
         result.append(
             TopAppData(
-                name=app["name"],
-                duration=int(app["duration"]),
-                percentage=int(app["duration"] / total_duration * 100) if total_duration > 0 else 0,
+                name=name,
+                duration=int(duration),
+                percentage=int(duration / total_duration * 100) if total_duration > 0 else 0,
             )
         )
     return result

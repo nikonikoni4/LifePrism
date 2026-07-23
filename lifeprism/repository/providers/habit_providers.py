@@ -190,7 +190,10 @@ class HabitProvider(LWBaseDataProvider):
 
     def delete_habit(self, habit_id: str) -> bool:
         """
-        删除习惯记录
+        删除习惯记录（单表删除，走 _generic_delete 写墓碑）
+
+        注意：级联删除挑战和打卡的逻辑在 Service 层
+        （habit_service.delete_habit），Provider 层不负责跨表级联。
 
         Args:
             habit_id: 习惯 ID

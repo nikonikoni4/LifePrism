@@ -133,6 +133,30 @@ class ComputerUsageAggregator:
         """透传：删除记录"""
         return self.computer_usage_provider.delete_computer_usage(record_id)
 
+    def batch_update_computer_usage(self, record_ids: list[str], data: dict[str, Any]) -> int:
+        """透传：批量更新记录"""
+        return self.computer_usage_provider.batch_update_computer_usage(record_ids, data)
+
+    def batch_delete_computer_usage(self, record_ids: list[str]) -> int:
+        """透传：批量删除记录（走 _generic_batch_delete 写墓碑）"""
+        return self.computer_usage_provider.batch_delete_computer_usage(record_ids)
+
+    def update_by_filter(self, set_fields: dict[str, Any], where_conditions: dict[str, Any]) -> int:
+        """透传：按条件更新记录（动态 WHERE）"""
+        return self.computer_usage_provider.update_by_filter(set_fields, where_conditions)
+
+    def get_total_duration(self, start_utc: str, end_utc: str) -> int:
+        """透传：获取时间范围内总活跃时长"""
+        return self.computer_usage_provider.get_total_duration(start_utc, end_utc)
+
+    def get_top_groups_by_duration(
+        self, group_field: str, start_utc: str, end_utc: str, top_n: int
+    ) -> list[tuple[str, int]]:
+        """透传：按指定字段分组聚合 Top N"""
+        return self.computer_usage_provider.get_top_groups_by_duration(
+            group_field, start_utc, end_utc, top_n
+        )
+
     # ==================== 透传 Base 方法 ====================
 
     def get_activity_logs(

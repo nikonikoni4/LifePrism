@@ -318,99 +318,75 @@ def habit_cascade_providers_fixture(test_data_path):
     )
 
 
-class TestHabitDeleteHabitCascade:
-    """验证 HabitProvider.delete_habit 级联删除走 _generic_* 通道（含写墓碑）
+class TestHabitDeleteHabitNoCascade:
+    """验证 HabitProvider.delete_habit 只删除 habits 表（不级联），走 _generic_* 写墓碑
 
     依据 issue: 09-l3-cascade-l4-service-sink
-    habits、habit_challenges、habit_checkins 均在 SYNC_TABLES 中，
-    墓碑 record_id = 主键值。delete_habit 应：
-    1. 调用 HabitChallengeProvider.delete_by_habit_id（批量写墓碑+删除）
-    2. 调用 HabitCheckinProvider.delete_by_habit_id（批量写墓碑+删除）
-    3. 调用 self._generic_delete（写墓碑+删除 habits 记录）
+    级联删除挑战和打卡的逻辑在 Service 层（habit_service.delete_habit），
+    Provider 层只做单表删除。delete_habit 只：
+    1. 调用 self._generic_delete（写墓碑+删除 habits 记录）
+    2. 不删除 habit_challenges 和 habit_checkins（由 Service 层级联处理）
     """
 
-    def test_delete_habit_writes_tombstone_for_habit_challenges_and_checkins(
-        self, habit_cascade_providers_fixture
-    ):
-        """delete_habit 为 habits、habit_challenges、habit_checkins 分别写墓碑"""
+    def test_delete_habit_only_deletes_habits_table(self, habit_cascade_providers_fixture):
+        """delete_habit 只删除 habits 记录，不级联删除挑战和打卡"""
         habit_provider, challenge_provider, checkin_provider = habit_cascade_providers_fixture
 
         # 创建习惯
         habit_id = habit_provider.create_habit({"name": "测试习惯"})
 
-        # 创建 2 条挑战
-        challenge_ids = []
-        for i in range(2):
-            cid = challenge_provider.create_challenge(
-                {
-                    "habit_id": habit_id,
-                    "challenge_weeks": 4,
-                    "required_completions": 20,
-                    "from_level": i,
-                    "to_level": i + 1,
-                    "start_date": "2026-07-01",
-                    "end_date": "2026-07-29",
-                    "status": "succeeded" if i > 0 else "in_progress",
-                }
-            )
-            challenge_ids.append(cid)
+        # 创建 1 条挑战
+        challenge_provider.create_challenge(
+            {
+                "habit_id": habit_id,
+                "challenge_weeks": 4,
+                "required_completions": 20,
+                "from_level": 0,
+                "to_level": 1,
+                "start_date": "2026-07-01",
+                "end_date": "2026-07-29",
+                "status": "in_progress",
+            }
+        )
 
-        # 创建 2 条打卡（不同日期避免 UNIQUE 冲突）
-        checkin_ids = []
-        for i in range(2):
-            cid = checkin_provider.create_checkin(
-                {
-                    "habit_id": habit_id,
-                    "challenge_id": challenge_ids[0],
-                    "date": f"2026-07-{i + 1:02d}",
-                }
-            )
-            assert cid is not None
-            checkin_ids.append(cid)
+        # 创建 1 条打卡
+        checkin_provider.create_checkin(
+            {
+                "habit_id": habit_id,
+                "challenge_id": "challenge-1",
+                "date": "2026-07-01",
+            }
+        )
 
         # 删除前确认记录存在
         assert habit_provider.get_habit_by_id(habit_id) is not None
-        assert len(challenge_provider.get_challenges_by_habit(habit_id)) == 2
+        assert len(challenge_provider.get_challenges_by_habit(habit_id)) == 1
 
-        # 级联删除
+        # 删除习惯（不级联）
         result = habit_provider.delete_habit(habit_id)
         assert result is True
 
         # 验证习惯已删除
         assert habit_provider.get_habit_by_id(habit_id) is None
 
-        # 验证挑战已删除
-        remaining_challenges = challenge_provider.get_challenges_by_habit(habit_id)
-        assert len(remaining_challenges) == 0, "级联删除后不应有残留挑战"
+        # 验证挑战和打卡仍然存在（不级联删除）
+        assert len(challenge_provider.get_challenges_by_habit(habit_id)) == 1, (
+            "delete_habit 不应级联删除挑战（由 Service 层负责级联）"
+        )
+        assert checkin_provider.get_checkin_by_date(habit_id, "2026-07-01") is not None, (
+            "delete_habit 不应级联删除打卡（由 Service 层负责级联）"
+        )
 
-        # 验证打卡已删除
-        for i in range(2):
-            assert checkin_provider.get_checkin_by_date(habit_id, f"2026-07-{i + 1:02d}") is None
-
-        # 验证 habits 表墓碑
+        # 验证只有 habits 表墓碑
         habit_tombstone = _get_tombstone(habit_provider.db, "habits", habit_id)
         assert habit_tombstone is not None, "habits 表应有墓碑"
         assert habit_tombstone[1] == "habits"
         assert habit_tombstone[2] == habit_id
         assert habit_tombstone[3] == "local"
 
-        # 验证 habit_challenges 表墓碑（每条挑战一个墓碑）
-        assert _count_tombstones(habit_provider.db, "habit_challenges") == 2
-        for cid in challenge_ids:
-            tombstone = _get_tombstone(habit_provider.db, "habit_challenges", cid)
-            assert tombstone is not None, f"challenge_id '{cid}' 应有墓碑"
-            assert tombstone[1] == "habit_challenges"
-            assert tombstone[2] == cid
-            assert tombstone[3] == "local"
-
-        # 验证 habit_checkins 表墓碑（每条打卡一个墓碑）
-        assert _count_tombstones(habit_provider.db, "habit_checkins") == 2
-        for cid in checkin_ids:
-            tombstone = _get_tombstone(habit_provider.db, "habit_checkins", cid)
-            assert tombstone is not None, f"checkin_id '{cid}' 应有墓碑"
-            assert tombstone[1] == "habit_checkins"
-            assert tombstone[2] == cid
-            assert tombstone[3] == "local"
+        # 挑战和打卡不应有墓碑（未被删除）
+        assert _count_tombstones(habit_provider.db, "habit_challenges") == 0
+        assert _count_tombstones(habit_provider.db, "habit_checkins") == 0
 
     def test_delete_habit_no_cascade_records(self, habit_cascade_providers_fixture):
         """删除没有挑战和打卡的习惯，只写 habits 墓碑"""
@@ -426,54 +402,20 @@ class TestHabitDeleteHabitCascade:
         assert _count_tombstones(habit_provider.db, "habit_checkins") == 0
 
     def test_delete_habit_does_not_affect_other_habits(self, habit_cascade_providers_fixture):
-        """删除一个习惯不影响其他习惯的挑战和打卡"""
+        """删除一个习惯不影响其他习惯"""
         habit_provider, challenge_provider, checkin_provider = habit_cascade_providers_fixture
 
         # 创建两个习惯
         habit_id_1 = habit_provider.create_habit({"name": "习惯1"})
         habit_id_2 = habit_provider.create_habit({"name": "习惯2"})
 
-        # 为每个习惯创建挑战
-        challenge_1 = challenge_provider.create_challenge(
-            {
-                "habit_id": habit_id_1,
-                "challenge_weeks": 4,
-                "required_completions": 20,
-                "from_level": 0,
-                "to_level": 1,
-                "start_date": "2026-07-01",
-                "end_date": "2026-07-29",
-            }
-        )
-        challenge_2 = challenge_provider.create_challenge(
-            {
-                "habit_id": habit_id_2,
-                "challenge_weeks": 4,
-                "required_completions": 20,
-                "from_level": 0,
-                "to_level": 1,
-                "start_date": "2026-07-01",
-                "end_date": "2026-07-29",
-            }
-        )
-
-        # 为每个习惯创建打卡
-        checkin_1 = checkin_provider.create_checkin(
-            {"habit_id": habit_id_1, "challenge_id": challenge_1, "date": "2026-07-01"}
-        )
-        checkin_2 = checkin_provider.create_checkin(
-            {"habit_id": habit_id_2, "challenge_id": challenge_2, "date": "2026-07-01"}
-        )
-
-        # 删除习惯1
+        # 删除习惯1（不级联）
         habit_provider.delete_habit(habit_id_1)
 
-        # 习惯2 及其挑战、打卡应保留
+        # 习惯2 应保留
         assert habit_provider.get_habit_by_id(habit_id_2) is not None
-        assert len(challenge_provider.get_challenges_by_habit(habit_id_2)) == 1
-        assert checkin_provider.get_checkin_by_date(habit_id_2, "2026-07-01") is not None
 
-        # 只为习惯1的相关记录写墓碑
+        # 只为习惯1写墓碑
         assert _count_tombstones(habit_provider.db, "habits") == 1
-        assert _count_tombstones(habit_provider.db, "habit_challenges") == 1
-        assert _count_tombstones(habit_provider.db, "habit_checkins") == 1
+        assert _count_tombstones(habit_provider.db, "habit_challenges") == 0
+        assert _count_tombstones(habit_provider.db, "habit_checkins") == 0
