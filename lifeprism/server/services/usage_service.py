@@ -10,8 +10,7 @@ import pytz
 
 from lifeprism.config import get_user_timezone
 from lifeprism.config.settings_manager import settings
-from lifeprism.repository import tokens_usage_repository
-from lifeprism.repository.providers.common_query_options import QueryOptions
+from lifeprism.repository import QueryOptions, tokens_usage_repository
 from lifeprism.server.schemas.usage_schemas import (
     DataProcessingUsageStats,
     OtherUsageStats,

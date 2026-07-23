@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from lifeprism.repository import goal_repository
-from lifeprism.repository.providers.journal_provider import journal_provider
+from lifeprism.repository import journal_repository as journal_provider
 from lifeprism.server.schemas.goal_schemas import (
     ActiveGoalItem,
     ActiveGoalNamesResponse,

@@ -6,7 +6,7 @@ Journal 服务层 - Goal Journal 日志业务逻辑
 
 import json
 
-from lifeprism.repository.providers.journal_provider import journal_provider
+from lifeprism.repository import journal_repository as journal_provider
 from lifeprism.server.schemas.goal_schemas import (
     CreateJournalRequest,
     JournalEntry,

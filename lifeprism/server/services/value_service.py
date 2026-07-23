@@ -14,8 +14,8 @@ Value 服务层 - 价值模块业务逻辑
 
 import sqlite3
 
-from lifeprism.repository.providers.commitment_provider import commitment_provider
-from lifeprism.repository.providers.value_provider import value_provider
+from lifeprism.repository import commitment_repository as commitment_provider
+from lifeprism.repository import value_repository as value_provider
 from lifeprism.server.schemas.commitment_schemas import CommitmentBriefItem
 from lifeprism.server.schemas.value_schemas import (
     CreateValueRequest,

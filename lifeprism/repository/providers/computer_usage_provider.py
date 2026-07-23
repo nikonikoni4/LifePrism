@@ -147,8 +147,8 @@ class ComputerUsageProvider(LWBaseDataProvider):
                 details={"invalid_fields": list(invalid_fields)},
             )
 
-        affected_rows = self.db.update(self._TABLE_NAME, data=update_data, where={"id": record_id})
-        if affected_rows > 0:
+        affected_rows = self._generic_update(record_id, update_data)
+        if affected_rows:
             return self.get_computer_usage_by_id(record_id)
         logger.error("更新ComputerUsage失败: record_id=%s, 记录不存在", record_id)
         raise EntityNotFoundError("ComputerUsage", record_id)
@@ -163,5 +163,4 @@ class ComputerUsageProvider(LWBaseDataProvider):
         Returns:
             bool: 是否删除成功
         """
-        affected_rows = self.db.delete(self._TABLE_NAME, where={"id": record_id})
-        return affected_rows > 0
+        return self._generic_delete(record_id)

@@ -58,16 +58,24 @@ from lifeprism.repository.providers import QueryOptions
 from lifeprism.repository.providers import (
     behavior_analysis_provider as behavior_analysis_repository,
 )
+from lifeprism.repository.providers import (
+    being_provider as being_repository,
+)
+from lifeprism.repository.providers import (
+    commitment_provider as commitment_repository,
+)
 from lifeprism.repository.providers import custom_block_provider as custom_block_repository
 from lifeprism.repository.providers import diary_provider as diary_repository
 from lifeprism.repository.providers import (
     file_sync_state_provider as file_sync_state_repository,
 )
+from lifeprism.repository.providers import journal_provider as journal_repository
 from lifeprism.repository.providers import (
     raw_behavior_analysis_provider as raw_behavior_analysis_repository,
 )
 from lifeprism.repository.providers import screen_capture_provider as screen_capture_repository
 from lifeprism.repository.providers import tokens_usage_provider as tokens_usage_repository
+from lifeprism.repository.providers import value_provider as value_repository
 from lifeprism.repository.providers import (
     wechat_account_state_provider as wechat_account_state_repository,
 )
@@ -93,6 +101,10 @@ __all__ = [
     "screen_capture_repository",
     "wechat_account_state_repository",
     "file_sync_state_repository",
+    "journal_repository",
+    "commitment_repository",
+    "being_repository",
+    "value_repository",
     # 多表 repository
     "habit_repository",
     "mood_repository",

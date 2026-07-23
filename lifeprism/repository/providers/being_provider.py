@@ -397,6 +397,13 @@ class BeingProvider(LWBaseDataProvider):
         self.db.upsert 的 INSERT 路径缺少 hash_id 会失败，且 UPDATE 路径会改变
         现有记录的 hash_id（破坏同步语义）。改用 _generic_* 通道保证 hash_id 不可变。
 
+        已知限制（竞态条件）：
+        此 read-then-write 方案非原子操作。在并发场景下，两个请求可能同时查到记录不存在，
+        都执行 INSERT，导致 UNIQUE(user_id, mode, version) 约束冲突。
+        实际影响低（单用户操作，同一 mode+version 并发概率极低），触发时抛出
+        DataAccessError，不会数据损坏。如需原子操作，可改为 try/except 捕获
+         sqlite3.IntegrityError 后重试 UPDATE。
+
         Args:
             user_id: 用户 ID
             mode: 模式 (past/present/future)

@@ -7,7 +7,7 @@ Being 服务层
 
 from typing import Any
 
-from lifeprism.repository.providers.being_provider import being_provider
+from lifeprism.repository import being_repository as being_provider
 from lifeprism.utils import get_logger
 
 logger = get_logger(__name__)
