@@ -14,10 +14,16 @@ EXCLUDED_FILENAMES = {"chat_history.json", "bootstrap.md"}
 # gzip 解压后最大允许大小（50MB），防止 zip bomb 导致 OOM
 MAX_DECOMPRESSED_SIZE = 50 * 1024 * 1024
 
-# 同步范围：除 window_events 外的所有需要同步的静态表（31 张）
+# 同步范围：除 window_events 外的所有需要同步的静态表（30 张）
 # 客户端和云端共用（云端 full-clear 端点需要访问此列表）
+# TODO PRD 2: 恢复同步前需先解决 chain_id 外键映射问题（chain_id 改引用 hash_id）
+#   habit_chains 和 habit_chain_nodes 因 chain_id 引用 habit_chains.id（自增 id），
+#   同步后两端 id 不一致导致外键断裂，临时从 SYNC_TABLES 移除。
+#   详见 docs/known-limitations/habit-chain-tables-not-synced.md
+#   详见 ADR docs/adr/2026-07-22-habit-chain-tables-not-synced.md
+#   注意：HASH_ID_PREFIXES 仍包含这两张表，hash_id 字段照加，为恢复同步做准备。
 SYNC_TABLES = [
-    # 用户输入数据（15张）
+    # 用户输入数据（13张）
     "mood_entries",
     "diary",
     "todo_list",
@@ -29,8 +35,6 @@ SYNC_TABLES = [
     "habits",
     "habit_challenges",
     "habit_checkins",
-    "habit_chains",
-    "habit_chain_nodes",
     "timeline_custom_block",
     "time_paradoxes",
     # 元数据（8张）
@@ -55,7 +59,46 @@ SYNC_TABLES = [
     # 微信账户状态（1张）- 替代原 channel/wechat/account.json 文件存储
     # 走数据库同步的记录级 LWW，参考 ADR 2026-07-14-file-sync-conflict-resolution.md 决策 4
     "wechat_account_state",
+    # 墓碑表（1张）- 删除同步用，记录删除意图跨端传播
+    # 参考 ADR docs/adr/2026-07-22-deletion-log-table.md
+    "deletion_log",
 ]
+
+# 需要 hash_id 字段的 AUTOINCREMENT 表前缀映射
+# 同时作为"哪些表需要 hash_id"的判断依据（_generic_insert 用 HASH_ID_PREFIXES.get(table_name) 判断）
+# 参考 ADR: docs/adr/2026-07-22-hash-id-sync-only-identifier.md（hash_id 定位为同步专用标识）
+HASH_ID_PREFIXES = {
+    "timeline_custom_block": "tcb-",
+    "time_paradoxes": "tp-",
+    "mood_impacts": "mi-",
+    "habit_chains": "hc-",
+    "habit_chain_nodes": "hcn-",
+    "user_app_behavior_log": "awbl-",
+}
+
+
+def generate_hash_id(prefix: str) -> str:
+    """生成 hash_id（同步专用标识）
+
+    格式: {prefix}{uuid.uuid4().hex[:12]}
+    - prefix 来自 HASH_ID_PREFIXES（如 "tcb-", "mi-"）
+    - 12 位 hex = 48 bit 熵，单表内碰撞概率极低
+
+    供以下路径统一调用，避免直接 INSERT 绕过 _generic_insert 时缺失 hash_id：
+    - _generic_insert 兜底
+    - m015 迁移脚本回填
+    - data_initializer / mood_providers / being_provider 等直写路径
+
+    Args:
+        prefix: hash_id 前缀（来自 HASH_ID_PREFIXES）
+
+    Returns:
+        形如 "tcb-a1b2c3d4e5f6" 的 hash_id
+    """
+    import uuid
+
+    return f"{prefix}{uuid.uuid4().hex[:12]}"
+
 
 # 文件同步白名单：相对 lifeprism_data_path 的路径
 # 对齐 Agent 工具白名单（ALLOWED_DIRS = user/diary/agent）+ session（会话层写入）

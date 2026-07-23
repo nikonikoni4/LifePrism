@@ -503,15 +503,17 @@ class MoodImpactProvider(LWBaseDataProvider):
         Raises:
             DataAccessError: 数据库操作失败
         """
+        from lifeprism.sync.constants import generate_hash_id
         from lifeprism.utils.time_utils import get_utc_now_iso
 
         now_iso = get_utc_now_iso()
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.execute(
-                    """INSERT INTO mood_impacts (name, sort_order, created_at, updated_at)
-                       VALUES (?, ?, ?, ?)""",
+                    """INSERT INTO mood_impacts (hash_id, name, sort_order, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?)""",
                     (
+                        generate_hash_id("mi-"),
                         data["name"],
                         data.get("sort_order", 0),
                         now_iso,

@@ -460,13 +460,16 @@ class DataInitializer:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
                 total = len(DEFAULT_MOOD_IMPACTS)
+                from lifeprism.sync.constants import generate_hash_id
+
+                mood_prefix = "mi-"
                 for idx, name in enumerate(DEFAULT_MOOD_IMPACTS):
                     cursor.execute(
                         """
-                        INSERT INTO mood_impacts (name, sort_order)
-                        VALUES (?, ?)
+                        INSERT INTO mood_impacts (hash_id, name, sort_order)
+                        VALUES (?, ?, ?)
                     """,
-                        (name, total - idx),
+                        (generate_hash_id(mood_prefix), name, total - idx),
                     )
                 logger.info("成功初始化 %s 个默认影响因素", total)
         except Exception as e:

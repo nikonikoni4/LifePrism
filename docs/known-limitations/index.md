@@ -73,6 +73,16 @@
 - **触发条件**: 大文件冲突合并（如 user.md、behavior.md）
 - **计划改进**: 冲突解决改 diff3 算法后可彻底消除
 
+### 8. habit 链条表不参与同步
+
+- **文件**: `habit-chain-tables-not-synced.md`
+- **状态**: `acknowledged`（已确认，待 PRD 2 恢复）
+- **严重程度**: 低（当前云端 agent 无 habit 链条数据需求）
+- **影响范围**: `habit_chains` 和 `habit_chain_nodes` 两张表不参与数据库同步
+- **问题描述**: `habit_chain_nodes.chain_id` 引用 `habit_chains.id`（自增 id），同步后两端 id 不一致导致外键断裂。临时从 `SYNC_TABLES` 移除，`HASH_ID_PREFIXES` 仍保留（hash_id 字段照加）
+- **触发条件**: 云端 agent 需要 habit 链条数据 + 服务器网页浏览时恢复同步，恢复前必须先解决 `chain_id` 外键问题（改引用 `hash_id`，属于 PRD 2 代码适配范围）
+- **临时方案**: 两张表从 `SYNC_TABLES` 移除并标注 `# TODO PRD 2`，详见 ADR `docs/adr/2026-07-22-habit-chain-tables-not-synced.md`
+
 > 时区和时间格式不一致问题已于 2026-07-12 通过 UTC 时区迁移解决，相关规范见 `docs/coding-rules/time-handling-rules.md`，决策见 `docs/adr/2026-07-12-migrate-to-utc-timezone.md`。
 
 ## 说明

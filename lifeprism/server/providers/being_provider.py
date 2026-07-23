@@ -184,6 +184,10 @@ class BeingProvider(LWBaseDataProvider):
             now_iso = get_utc_now_iso()
             insert_data["created_at"] = now_iso
             insert_data["updated_at"] = now_iso
+            # 补齐 hash_id（time_paradoxes 在 HASH_ID_PREFIXES 中，schema 为 NOT NULL UNIQUE）
+            from lifeprism.sync.constants import generate_hash_id
+
+            insert_data["hash_id"] = generate_hash_id("tp-")
 
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()

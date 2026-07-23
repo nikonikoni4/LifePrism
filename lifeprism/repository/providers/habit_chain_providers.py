@@ -85,6 +85,7 @@ class HabitChainProvider(LWBaseDataProvider):
         Returns:
             新插入记录的 INTEGER 主键
         """
+        from lifeprism.sync.constants import generate_hash_id
         from lifeprism.utils.time_utils import get_utc_now_iso
 
         now_iso = get_utc_now_iso()
@@ -97,9 +98,10 @@ class HabitChainProvider(LWBaseDataProvider):
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.execute(
-                    """INSERT INTO habit_chains (name, description, show_in_timeline, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, ?)""",
+                    """INSERT INTO habit_chains (hash_id, name, description, show_in_timeline, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
                     (
+                        generate_hash_id("hc-"),
                         insert_data["name"],
                         insert_data["description"],
                         insert_data["show_in_timeline"],
@@ -272,6 +274,7 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         Returns:
             新插入记录的 INTEGER 主键
         """
+        from lifeprism.sync.constants import generate_hash_id
         from lifeprism.utils.time_utils import get_utc_now_iso
 
         now_iso = get_utc_now_iso()
@@ -279,9 +282,10 @@ class HabitChainNodeProvider(LWBaseDataProvider):
             with self.db.get_connection() as conn:
                 cursor = conn.execute(
                     """INSERT INTO habit_chain_nodes
-                       (chain_id, sort_order, name, habit_id, trigger_time, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                       (hash_id, chain_id, sort_order, name, habit_id, trigger_time, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
+                        generate_hash_id("hcn-"),
                         data["chain_id"],
                         data["sort_order"],
                         data["name"],

@@ -20,6 +20,7 @@ from . import (
     m012_add_updated_at_to_sync_tables,
     m013_add_updated_at_to_tokens_usage_log,
     m014_drop_order_index_from_category_tables,
+    m015_add_hash_id_to_autoincrement_tables,
 )
 
 MIGRATIONS = [
@@ -37,4 +38,5 @@ MIGRATIONS = [
     m012_add_updated_at_to_sync_tables,
     m013_add_updated_at_to_tokens_usage_log,
     m014_drop_order_index_from_category_tables,
+    m015_add_hash_id_to_autoincrement_tables,
 ]

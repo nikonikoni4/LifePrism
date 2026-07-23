@@ -957,7 +957,7 @@ def sync_full_clear(_: None = Depends(verify_sync_api_key)):
     """清空云端所有同步数据（数据库 + 文件），保留 schema_version 和 custom_* 表结构
 
     清空范围：
-    - SYNC_TABLES 中的所有表（31 张静态表，包括 custom_record_types/custom_record_fields）
+    - SYNC_TABLES 中的所有表（30 张静态表，包括 custom_record_types/custom_record_fields）
     - file_sync_state 表（文件同步状态归零）
     - SYNC_DIRECTORIES 下的所有文件（包括黑名单文件 chat_history.json/bootstrap.md）
 

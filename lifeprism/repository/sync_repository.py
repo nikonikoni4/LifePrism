@@ -877,7 +877,15 @@ class SyncRepository:
     def get_unique_fields(self, table_name: str) -> list[str] | None:
         """从 TABLE_CONFIGS 的 table_constraints 中解析 UNIQUE 约束字段
 
-        支持两种格式：
+        查找优先级：
+        1. 业务 UNIQUE 约束（table_constraints 中的 UNIQUE(...)）
+           —— 必须优先，因为 upsert_rows 的 INSERT OR REPLACE 也按业务 UNIQUE 触发替换，
+           LWW 查找键必须与 REPLACE 键一致，否则两设备独立创建相同业务键、不同 hash_id
+           的记录时，LWW 查不到匹配放行，REPLACE 删新插旧，较新数据被静默覆盖。
+        2. hash_id（仅当表在 HASH_ID_PREFIXES 中且无业务 UNIQUE 约束时）
+           —— 用于没有业务 UNIQUE 的 AUTOINCREMENT 表（如 mood_impacts 列级 UNIQUE 无法解析）。
+
+        支持两种 table_constraints 格式：
         - "UNIQUE(field1, field2)" （无空格）
         - "UNIQUE (field1, field2)" （有空格）
 
@@ -887,6 +895,7 @@ class SyncRepository:
         Returns:
             UNIQUE 约束字段列表，无 UNIQUE 约束时返回 None
         """
+        # 优先：业务 UNIQUE 约束（table_constraints）
         table_config = TABLE_CONFIGS.get(table_name, {})
         for constraint in table_config.get("table_constraints", []):
             constraint_stripped = constraint.strip()
@@ -896,6 +905,14 @@ class SyncRepository:
                 if open_paren != -1 and close_paren != -1:
                     fields_str = constraint_stripped[open_paren + 1 : close_paren]
                     return [f.strip() for f in fields_str.split(",")]
+
+        # 回退：HASH_ID_PREFIXES 中的表用 hash_id 作去重键
+        # 参考 ADR: docs/adr/2026-07-22-hash-id-sync-only-identifier.md
+        from lifeprism.sync.constants import HASH_ID_PREFIXES
+
+        if HASH_ID_PREFIXES.get(table_name):
+            return ["hash_id"]
+
         return None
 
     # ==================== 动态表发现 ====================

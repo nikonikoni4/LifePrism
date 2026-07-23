@@ -1,10 +1,34 @@
 ---
 version: 2.0
 created_at: 2026-04-10
-updated_at: 2026-07-17
-last_updated: 新增文件冲突解决改造 + 数据备份策略 + 冲突失败处理策略 + 备份同步范围解耦 4 篇 ADR
+updated_at: 2026-07-22
+last_updated: 新增 deletion_log 墓碑表 schema 决策 ADR（字段命名 target_table + update_at=True + LWW 用 updated_at）
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
+
+## deletion-log-table
+- updated_at: 2026-07-22
+- path: `docs/adr/2026-07-22-deletion-log-table.md`
+- 触发规则：当需要理解 deletion_log 墓碑表 schema 决策、字段命名 target_table 而非 table_name 的理由、update_at=True 配置语义、LWW 比较字段选择、或修改 DELETION_LOG_CONFIG 时读取
+- 内容摘要：新增 deletion_log 墓碑表参与 SYNC_TABLES 同步。三个关键决策——（决策 1）字段名用 `target_table` 而非 `table_name`，避免与 schema 配置 dict 的 `table_name` 元字段混淆，Provider 代码中 `record["target_table"]` 与 `config["table_name"]` 明确区分；（决策 2）配置 `update_at: True`，让墓碑表参与 sync_repository 的 LWW 比较路径，与其他同步表行为一致，跨端同时删除时 LWW 自然处理重复墓碑；（决策 3）LWW 比较用 `updated_at` 而非 `created_at`，墓碑不更新使 `updated_at == created_at`，比较结果等价，但用 `updated_at` 能复用现有 LWW 路径零改动。`dl-` 前缀不加入 `HASH_ID_PREFIXES`（dl- 不是 hash_id 前缀，id 生成在 PRD 3 的 DeletionLogProvider 中通过 `_generic_insert(id_prefix='dl-')` 直接传入）。决策前提：墓碑表加入 SYNC_TABLES、墓碑不更新、项目 LWW 机制通过 has_updated_at() 判断、table_name 已是配置元字段。未来墓碑支持"复活"时 `update_at: True` 天然支持 updated_at 变化。
+
+## add-hash-id-to-autoincrement-tables
+- updated_at: 2026-07-22
+- path: `docs/adr/2026-07-22-add-hash-id-to-autoincrement-tables.md`
+- 触发规则：当需要理解为什么为 6 张 AUTOINCREMENT 表新增 hash_id 字段、迁移方法选型（ALTER + 回填 + CREATE UNIQUE INDEX vs 删表重建）、或修改迁移脚本时读取
+- 内容摘要：为实现删除同步功能，为 6 张 AUTOINCREMENT 表新增 `hash_id TEXT NOT NULL UNIQUE` 字段作为跨端稳定标识。用户初始倾向删表重建（因简单且不了解 SQLite ALTER TABLE 限制），经评估后采用 ALTER TABLE ADD COLUMN + 回填 + CREATE UNIQUE INDEX 方式（不丢数据且与 m012 一致）。决策前提：删除同步需要墓碑表模式、墓碑需要跨端稳定标识、自增 id 两端不同、项目已采用 LWW 策略、SQLite ALTER TABLE 限制。未来多客户端并发场景下 LWW + 墓碑不足时考虑 CRDT。
+
+## hash-id-sync-only-identifier
+- updated_at: 2026-07-22
+- path: `docs/adr/2026-07-22-hash-id-sync-only-identifier.md`
+- 触发规则：当需要理解为什么 hash_id 不作为主键、_PRIMARY_KEY 保持自增 id、_generic_insert 兜底生成逻辑、或修改 Provider 主键相关代码时读取
+- 内容摘要：hash_id 定位为同步专用标识（非主键），`_PRIMARY_KEY` 保持自增 id 不变，调用方无感知。用户初始想用 hash_id 作主键，但发现本地 CRUD（update/delete/get_by_id）全部使用自增 id，改 _PRIMARY_KEY 会导致 WHERE 条件失效、调用方全部需要改造，改动面远超 PRD 1 范围。决策前提：6 张表自增 id 两端不同、5 张表有 Provider 用自增 id、所有调用方传 int id、用户判断改动面太广。未来本地 CRUD 也需要用 hash_id 时切换到方案 B（改 _PRIMARY_KEY）。
+
+## habit-chain-tables-not-synced
+- updated_at: 2026-07-22
+- path: `docs/adr/2026-07-22-habit-chain-tables-not-synced.md`
+- 触发规则：当需要理解为什么 habit_chains 和 habit_chain_nodes 不参与同步、chain_id 外键断裂问题、或修改 SYNC_TABLES 时读取
+- 内容摘要：habit_chains 和 habit_chain_nodes 因 `chain_id` 引用 `habit_chains.id`（自增 id），同步后两端 id 不一致导致外键断裂。从 SYNC_TABLES 临时移除（仍加 hash_id 字段为未来恢复做准备）。决策前提：chain_id 引用自增 id 导致外键断裂、当前云端 agent 无 habit 链条数据需求、chain_id 改引用 hash_id 属于 PRD 2 范围。备选触发：云端 agent 需要 habit 链条数据 + 服务器网页浏览时恢复同步（恢复前必须先解决 chain_id 外键问题）。
 
 ## backup-sync-decoupled-scope
 - updated_at: 2026-07-17

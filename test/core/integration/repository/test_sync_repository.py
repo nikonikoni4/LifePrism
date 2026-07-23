@@ -41,6 +41,72 @@ def initialized_db(test_data_path):
     manager = LWTableManager(db_manager=lw_db_manager)
     manager.init_database()
 
+    # 旧数据库可能缺少 hash_id 列（CREATE TABLE IF NOT EXISTS 不添加新列）
+    # 用 ALTER TABLE 补列，使测试库与 TABLE_CONFIGS 一致
+    # SQLite 不允许 ALTER TABLE ADD COLUMN 带 UNIQUE，分两步：加列 + 建 UNIQUE INDEX
+    from lifeprism.sync.constants import HASH_ID_PREFIXES
+
+    with lw_db_manager.get_connection() as conn:
+        cursor = conn.cursor()
+        for table_name in HASH_ID_PREFIXES:
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            existing_cols = {row[1] for row in cursor.fetchall()}
+            if "hash_id" not in existing_cols:
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN hash_id TEXT")
+            # 确保 hash_id 有 UNIQUE 索引（与 TABLE_CONFIGS 的 NOT NULL UNIQUE 一致）
+            cursor.execute(
+                f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{table_name}_hash_id "
+                f"ON {table_name}(hash_id)"
+            )
+
+        # 确保 table_constraints 中的业务 UNIQUE 约束存在
+        # （旧库 CREATE TABLE IF NOT EXISTS 不补约束，需手动创建 UNIQUE INDEX，
+        # 否则 INSERT OR REPLACE 不会按业务 UNIQUE 触发替换，与 LWW 查找键不一致）
+        from lifeprism.config.database import TABLE_CONFIGS
+
+        # 先清理 sync 表残留数据（上次失败测试可能留下重复行，会阻止 UNIQUE INDEX 创建）
+        _sync_tables = [
+            "mood_entries", "todo_list", "goal", "diary",
+            "timeline_custom_block", "user_app_behavior_log",
+            "category_map_cache", "mood_impacts", "time_paradoxes",
+            "deletion_log",
+        ]
+        for t_name in _sync_tables:
+            cursor.execute(f'DELETE FROM "{t_name}"')
+
+        for t_name, t_config in TABLE_CONFIGS.items():
+            for constraint in t_config.get("table_constraints", []):
+                constraint_stripped = constraint.strip()
+                if not constraint_stripped.upper().startswith("UNIQUE"):
+                    continue
+                open_paren = constraint_stripped.find("(")
+                close_paren = constraint_stripped.rfind(")")
+                if open_paren == -1 or close_paren == -1:
+                    continue
+                unique_fields = [
+                    f.strip()
+                    for f in constraint_stripped[open_paren + 1 : close_paren].split(",")
+                ]
+                # 检查是否已有对应的 UNIQUE 索引
+                cursor.execute(f'PRAGMA index_list("{t_name}")')
+                has_unique = False
+                for idx in cursor.fetchall():
+                    if not idx[2]:  # not unique
+                        continue
+                    cursor.execute(f'PRAGMA index_info("{idx[1]}")')
+                    idx_cols = [c[2] for c in cursor.fetchall()]
+                    if idx_cols == unique_fields:
+                        has_unique = True
+                        break
+                if not has_unique:
+                    # 用 uq_ 前缀避免与 indexes 配置中的非唯一索引同名（IF NOT EXISTS 按名跳过）
+                    index_name = f"uq_{t_name}_" + "_".join(unique_fields)
+                    cursor.execute(
+                        f'CREATE UNIQUE INDEX IF NOT EXISTS {index_name} '
+                        f'ON {t_name}({", ".join(unique_fields)})'
+                    )
+        conn.commit()
+
     yield lw_db_manager
 
 
@@ -61,6 +127,9 @@ def repository(initialized_db):
         "timeline_custom_block",
         "user_app_behavior_log",
         "category_map_cache",
+        "mood_impacts",
+        "time_paradoxes",
+        "deletion_log",
     ]
     with initialized_db.get_connection() as conn:
         cursor = conn.cursor()
@@ -530,9 +599,10 @@ class TestUpsertRowsWithLww:
     def test_upsert_rows_with_lww_skips_older_data_on_autoincrement_table(
         self, repository, initialized_db
     ):
-        """LWW：AUTOINCREMENT + UNIQUE 表也正确跳过旧数据"""
-        # Arrange: 先写入新数据
+        """LWW：AUTOINCREMENT 表用业务 UNIQUE 去重，正确跳过旧数据（不同 hash_id + 相同业务键）"""
+        # Arrange: 先写入新数据（包含 hash_id）
         new_row = {
+            "hash_id": "awbl-lww-auto-001",
             "app": "lww_auto.exe",
             "start_time": "2026-07-08 16:00:00",
             "end_time": "2026-07-08 17:00:00",
@@ -544,10 +614,12 @@ class TestUpsertRowsWithLww:
         }
         repository.upsert_rows("user_app_behavior_log", [new_row])
 
-        # Act: 推送相同 UNIQUE 键但更旧的数据
+        # Act: 推送不同 hash_id、相同业务键 (app, start_time)、更旧的 updated_at
+        # LWW 按 (app, start_time) 匹配 → 找到已有记录 → updated_at 更旧 → 跳过
         old_row = {
+            "hash_id": "awbl-lww-auto-002",  # 不同的 hash_id
             "app": "lww_auto.exe",
-            "start_time": "2026-07-08 16:00:00",
+            "start_time": "2026-07-08 16:00:00",  # 相同的业务 UNIQUE 键
             "end_time": "2026-07-08 17:30:00",
             "duration": 90,
             "title": "LWW Auto Old",
@@ -557,15 +629,15 @@ class TestUpsertRowsWithLww:
         }
         affected = repository.upsert_rows_with_lww("user_app_behavior_log", [old_row])
 
-        # Assert: 旧数据被跳过
+        # Assert: 旧数据被跳过（LWW 按业务 UNIQUE 匹配，updated_at 更旧）
         assert affected == 0
 
         with initialized_db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT title, duration FROM user_app_behavior_log "
-                "WHERE app = ? AND start_time = ?",
-                ("lww_auto.exe", "2026-07-08 16:00:00"),
+                "WHERE hash_id = ?",
+                ("awbl-lww-auto-001",),
             )
             row = cursor.fetchone()
             assert row is not None
@@ -668,7 +740,7 @@ class TestGetUniqueFields:
     """测试 get_unique_fields() 方法"""
 
     def test_get_unique_fields_for_user_app_behavior_log(self, repository):
-        """解析 UNIQUE 约束：user_app_behavior_log -> [app, start_time]"""
+        """业务 UNIQUE 优先于 hash_id：user_app_behavior_log -> [app, start_time]"""
         fields = repository.get_unique_fields("user_app_behavior_log")
         assert fields == ["app", "start_time"]
 
@@ -678,7 +750,7 @@ class TestGetUniqueFields:
         assert fields == ["app", "title", "state"]
 
     def test_get_unique_fields_for_timeline_custom_block(self, repository):
-        """解析 UNIQUE 约束（单字段）：timeline_custom_block -> [start_time]"""
+        """业务 UNIQUE 优先于 hash_id：timeline_custom_block -> [start_time]"""
         fields = repository.get_unique_fields("timeline_custom_block")
         assert fields == ["start_time"]
 
@@ -803,3 +875,591 @@ class TestCountRows:
         assert isinstance(result, dict)
         assert result["mood_entries"] == 0
         assert result["todo_list"] == 0
+
+
+# ==================== Seam 7: hash_id 同步去重（HASH_ID_PREFIXES 表） ====================
+
+
+class TestHashIdSyncDedup:
+    """测试 HASH_ID_PREFIXES 中的表的同步去重逻辑
+
+    覆盖 Issue 04 + Issue 1 修复（代码审查回归）:
+    - get_unique_fields 优先返回业务 UNIQUE（table_constraints），无业务 UNIQUE 时回退 hash_id
+    - upsert_rows_with_lww 用业务 UNIQUE 去重（与 INSERT OR REPLACE 键一致）
+    - 不同 hash_id + 相同业务 UNIQUE → LWW 正确保护较新数据（Issue 1 回归测试）
+    - mood_impacts 返回业务 UNIQUE(name)，LWW 与 INSERT OR REPLACE 冲突键一致
+    - TEXT 主键表不受影响
+    """
+
+    def test_get_unique_fields_returns_business_unique_for_timeline_custom_block(self, repository):
+        """get_unique_fields: timeline_custom_block 有业务 UNIQUE(start_time) → 返回 ["start_time"]"""
+        fields = repository.get_unique_fields("timeline_custom_block")
+        assert fields == ["start_time"]
+
+    def test_get_unique_fields_returns_business_unique_for_user_app_behavior_log(self, repository):
+        """get_unique_fields: user_app_behavior_log 有业务 UNIQUE(app, start_time) → 返回业务键"""
+        fields = repository.get_unique_fields("user_app_behavior_log")
+        assert fields == ["app", "start_time"]
+
+    def test_get_unique_fields_returns_business_unique_for_time_paradoxes(self, repository):
+        """get_unique_fields: time_paradoxes 有业务 UNIQUE(user_id, mode, version) → 返回业务键"""
+        fields = repository.get_unique_fields("time_paradoxes")
+        assert fields == ["user_id", "mode", "version"]
+
+    def test_get_unique_fields_returns_business_unique_for_mood_impacts(self, repository):
+        """get_unique_fields: mood_impacts 有业务 UNIQUE(name) → 返回 ["name"]"""
+        fields = repository.get_unique_fields("mood_impacts")
+        assert fields == ["name"]
+
+    # ---------- upsert_rows_with_lww: 保留 hash_id + 剥离 id ----------
+
+    def test_upsert_rows_with_lww_preserves_hash_id(self, repository, initialized_db):
+        """upsert_rows_with_lww: 对 HASH_ID_PREFIXES 表保留 hash_id 字段（不剥离）"""
+        # Act: 推送一条带 hash_id 的新记录
+        new_row = {
+            "hash_id": "tcb-preserve-001",
+            "start_time": "2026-07-15T10:00:00",
+            "end_time": "2026-07-15T11:00:00",
+            "duration": 60,
+            "content": "保留 hash_id 测试",
+            "color": "#FF0000",
+            "created_at": "2026-07-15 10:00:00",
+            "updated_at": "2026-07-15 10:00:00",
+        }
+        affected = repository.upsert_rows_with_lww("timeline_custom_block", [new_row])
+
+        # Assert: 写入成功
+        assert affected == 1
+
+        # Assert: hash_id 被保留在数据库中
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT hash_id, content FROM timeline_custom_block WHERE hash_id = ?",
+                ("tcb-preserve-001",),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "tcb-preserve-001"  # hash_id 保留
+            assert row[1] == "保留 hash_id 测试"
+
+    def test_upsert_rows_with_lww_strips_id_for_hash_id_table(self, repository, initialized_db):
+        """upsert_rows_with_lww: 对 HASH_ID_PREFIXES 表仍然剥离 id（不污染 sqlite_sequence）"""
+        # Act: 推送一条带远程 id=999 的新记录
+        new_row = {
+            "id": 999,  # 远程 id，应被剥离
+            "hash_id": "tcb-strip-id-001",
+            "start_time": "2026-07-15T14:00:00",
+            "end_time": "2026-07-15T15:00:00",
+            "duration": 60,
+            "content": "剥离 id 测试",
+            "color": "#00FF00",
+            "created_at": "2026-07-15 14:00:00",
+            "updated_at": "2026-07-15 14:00:00",
+        }
+        affected = repository.upsert_rows_with_lww("timeline_custom_block", [new_row])
+
+        # Assert: 写入成功
+        assert affected == 1
+
+        # Assert: 本地 id 不是 999，而是自增值
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id FROM timeline_custom_block WHERE hash_id = ?",
+                ("tcb-strip-id-001",),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] != 999  # id 被剥离
+            assert row[0] >= 1  # 是自增值
+
+    # ---------- Issue 1 回归测试：不同 hash_id + 相同业务 UNIQUE ----------
+
+    def test_lww_skips_older_data_same_business_unique_diff_hash_id(self, repository, initialized_db):
+        """回归测试 (Issue 1): 不同 hash_id + 相同业务 UNIQUE → LWW 正确跳过旧数据
+
+        场景: 两设备独立创建相同业务键、不同 hash_id 的记录
+        - 本地: start_time=X, hash_id=hashA, updated_at=T2 (新)
+        - 远程: start_time=X, hash_id=hashB, updated_at=T1 (旧)
+        预期: LWW 按 start_time 匹配 → T1 < T2 → 跳过 → 本地新数据保留
+        修复前: LWW 按 hash_id 查找 → 不匹配 → 放行 → INSERT OR REPLACE 删新插旧
+        """
+        # Arrange: 先写入新数据
+        new_row = {
+            "hash_id": "tcb-lww-new-001",
+            "start_time": "2026-07-16T10:00:00",
+            "end_time": "2026-07-16T11:00:00",
+            "duration": 60,
+            "content": "新内容",
+            "color": "#FF0000",
+            "created_at": "2026-07-16 10:00:00",
+            "updated_at": "2026-07-16 12:00:00",
+        }
+        repository.upsert_rows("timeline_custom_block", [new_row])
+
+        # Act: 推送不同 hash_id、相同 start_time、更旧的 updated_at
+        old_row = {
+            "hash_id": "tcb-lww-old-001",  # 不同的 hash_id
+            "start_time": "2026-07-16T10:00:00",  # 相同的业务 UNIQUE 键
+            "end_time": "2026-07-16T12:00:00",
+            "duration": 120,
+            "content": "旧内容",
+            "color": "#00FF00",
+            "created_at": "2026-07-16 10:00:00",
+            "updated_at": "2026-07-16 10:00:00",  # 更旧
+        }
+        affected = repository.upsert_rows_with_lww("timeline_custom_block", [old_row])
+
+        # Assert: 旧数据被跳过（LWW 正确匹配到业务 UNIQUE）
+        assert affected == 0
+
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT content, hash_id FROM timeline_custom_block WHERE start_time = ?",
+                ("2026-07-16T10:00:00",),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "新内容"  # 仍然是新数据
+            assert row[1] == "tcb-lww-new-001"  # hash_id 未被覆盖
+
+    def test_lww_writes_newer_data_same_business_unique_diff_hash_id(self, repository, initialized_db):
+        """回归测试 (Issue 1): 不同 hash_id + 相同业务 UNIQUE → LWW 正确写入新数据
+
+        场景: 远程数据更新 → 应替换本地旧数据
+        - 本地: start_time=X, hash_id=hashA, updated_at=T1 (旧)
+        - 远程: start_time=X, hash_id=hashB, updated_at=T2 (新)
+        预期: LWW 按 start_time 匹配 → T2 > T1 → 写入 → 新数据替换旧数据
+        """
+        # Arrange: 先写入旧数据
+        old_row = {
+            "hash_id": "tcb-lww-old-002",
+            "start_time": "2026-07-17T10:00:00",
+            "end_time": "2026-07-17T11:00:00",
+            "duration": 60,
+            "content": "旧内容",
+            "color": "#FF0000",
+            "created_at": "2026-07-17 10:00:00",
+            "updated_at": "2026-07-17 10:00:00",
+        }
+        repository.upsert_rows("timeline_custom_block", [old_row])
+
+        # Act: 推送不同 hash_id、相同 start_time、更新的 updated_at
+        new_row = {
+            "hash_id": "tcb-lww-new-002",  # 不同的 hash_id
+            "start_time": "2026-07-17T10:00:00",  # 相同的业务 UNIQUE 键
+            "end_time": "2026-07-17T12:00:00",
+            "duration": 120,
+            "content": "新内容",
+            "color": "#00FF00",
+            "created_at": "2026-07-17 10:00:00",
+            "updated_at": "2026-07-17 12:00:00",  # 更新
+        }
+        affected = repository.upsert_rows_with_lww("timeline_custom_block", [new_row])
+
+        # Assert: 新数据被写入
+        assert affected == 1
+
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT content, hash_id FROM timeline_custom_block WHERE start_time = ?",
+                ("2026-07-17T10:00:00",),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "新内容"  # 新数据
+            assert row[1] == "tcb-lww-new-002"  # hash_id 被更新为新值
+
+    def test_lww_skips_older_data_same_name_diff_hash_id_on_mood_impacts(
+        self, repository, initialized_db
+    ):
+        """mood_impacts：相同 name、不同 hash_id 时，LWW 跳过较旧数据"""
+        local_newer = {
+            "id": 101,
+            "hash_id": "mi-local-newer-001",
+            "name": "工作-LWW-旧数据跳过",
+            "sort_order": 20,
+            "created_at": "2026-07-23 10:00:00",
+            "updated_at": "2026-07-23 12:00:00",
+        }
+        repository.upsert_rows("mood_impacts", [local_newer])
+
+        remote_older = {
+            "id": 202,
+            "hash_id": "mi-remote-older-001",
+            "name": "工作-LWW-旧数据跳过",
+            "sort_order": 5,
+            "created_at": "2026-07-23 09:00:00",
+            "updated_at": "2026-07-23 10:00:00",
+        }
+        affected = repository.upsert_rows_with_lww("mood_impacts", [remote_older])
+
+        assert affected == 0
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT hash_id, name, sort_order, updated_at FROM mood_impacts WHERE name = ?",
+                ("工作-LWW-旧数据跳过",),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "mi-local-newer-001"
+            assert row[1] == "工作-LWW-旧数据跳过"
+            assert row[2] == 20
+            assert row[3] == "2026-07-23 12:00:00"
+
+    def test_lww_writes_newer_data_same_name_diff_hash_id_on_mood_impacts(
+        self, repository, initialized_db
+    ):
+        """mood_impacts：相同 name、不同 hash_id 时，LWW 写入较新数据"""
+        local_older = {
+            "id": 303,
+            "hash_id": "mi-local-older-001",
+            "name": "健康-LWW-新数据写入",
+            "sort_order": 5,
+            "created_at": "2026-07-23 09:00:00",
+            "updated_at": "2026-07-23 10:00:00",
+        }
+        repository.upsert_rows("mood_impacts", [local_older])
+
+        remote_newer = {
+            "id": 404,
+            "hash_id": "mi-remote-newer-001",
+            "name": "健康-LWW-新数据写入",
+            "sort_order": 30,
+            "created_at": "2026-07-23 09:00:00",
+            "updated_at": "2026-07-23 12:00:00",
+        }
+        affected = repository.upsert_rows_with_lww("mood_impacts", [remote_newer])
+
+        assert affected == 1
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT hash_id, name, sort_order, updated_at FROM mood_impacts WHERE name = ?",
+                ("健康-LWW-新数据写入",),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "mi-remote-newer-001"
+            assert row[1] == "健康-LWW-新数据写入"
+            assert row[2] == 30
+            assert row[3] == "2026-07-23 12:00:00"
+
+    def test_lww_skips_older_data_same_business_unique_diff_hash_id_on_time_paradoxes(
+        self, repository, initialized_db
+    ):
+        """time_paradoxes：相同 (user_id,mode,version)、不同 hash_id 时，LWW 跳过较旧数据"""
+        local_newer = {
+            "hash_id": "tp-local-newer-001",
+            "user_id": 1,
+            "mode": "past",
+            "version": 1,
+            "content": '{"local": "newer"}',
+            "ai_abstract": None,
+            "created_at": "2026-07-23 10:00:00",
+            "updated_at": "2026-07-23 12:00:00",
+        }
+        repository.upsert_rows("time_paradoxes", [local_newer])
+
+        remote_older = {
+            "hash_id": "tp-remote-older-001",
+            "user_id": 1,
+            "mode": "past",
+            "version": 1,
+            "content": '{"remote": "older"}',
+            "ai_abstract": None,
+            "created_at": "2026-07-23 09:00:00",
+            "updated_at": "2026-07-23 10:00:00",
+        }
+        affected = repository.upsert_rows_with_lww("time_paradoxes", [remote_older])
+
+        assert affected == 0
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT hash_id, content, updated_at FROM time_paradoxes "
+                "WHERE user_id = ? AND mode = ? AND version = ?",
+                (1, "past", 1),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "tp-local-newer-001"
+            assert row[1] == '{"local": "newer"}'
+            assert row[2] == "2026-07-23 12:00:00"
+
+    def test_lww_writes_newer_data_same_business_unique_diff_hash_id_on_time_paradoxes(
+        self, repository, initialized_db
+    ):
+        """time_paradoxes：相同 (user_id,mode,version)、不同 hash_id 时，LWW 写入较新数据"""
+        local_older = {
+            "hash_id": "tp-local-older-001",
+            "user_id": 2,
+            "mode": "future",
+            "version": 1,
+            "content": '{"local": "older"}',
+            "ai_abstract": None,
+            "created_at": "2026-07-23 09:00:00",
+            "updated_at": "2026-07-23 10:00:00",
+        }
+        repository.upsert_rows("time_paradoxes", [local_older])
+
+        remote_newer = {
+            "hash_id": "tp-remote-newer-001",
+            "user_id": 2,
+            "mode": "future",
+            "version": 1,
+            "content": '{"remote": "newer"}',
+            "ai_abstract": "AI总结",
+            "created_at": "2026-07-23 09:00:00",
+            "updated_at": "2026-07-23 12:00:00",
+        }
+        affected = repository.upsert_rows_with_lww("time_paradoxes", [remote_newer])
+
+        assert affected == 1
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT hash_id, content, ai_abstract, updated_at FROM time_paradoxes "
+                "WHERE user_id = ? AND mode = ? AND version = ?",
+                (2, "future", 1),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "tp-remote-newer-001"
+            assert row[1] == '{"remote": "newer"}'
+            assert row[2] == "AI总结"
+            assert row[3] == "2026-07-23 12:00:00"
+
+    # ---------- _batch_get_existing_updated_at_by_unique / _find_existing_updated_at ----------
+
+    def test_batch_get_existing_updated_at_by_business_unique(self, repository, initialized_db):
+        """_batch_get_existing_updated_at_by_unique: 按业务 UNIQUE (start_time) 查询"""
+        # Arrange: 插入 2 条记录
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO timeline_custom_block "
+                "(hash_id, start_time, end_time, duration, content, color, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "tcb-batch-001",
+                    "2026-07-20T10:00:00",
+                    "2026-07-20T11:00:00",
+                    60,
+                    "batch1",
+                    "#FF0000",
+                    "2026-07-20 10:00:00",
+                    "2026-07-20 10:00:00",
+                ),
+            )
+            cursor.execute(
+                "INSERT INTO timeline_custom_block "
+                "(hash_id, start_time, end_time, duration, content, color, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "tcb-batch-002",
+                    "2026-07-20T12:00:00",
+                    "2026-07-20T13:00:00",
+                    60,
+                    "batch2",
+                    "#00FF00",
+                    "2026-07-20 12:00:00",
+                    "2026-07-20 12:00:00",
+                ),
+            )
+            conn.commit()
+
+        # Act: 按 start_time 批量查询
+        rows = [
+            {"start_time": "2026-07-20T10:00:00"},
+            {"start_time": "2026-07-20T12:00:00"},
+            {"start_time": "2026-07-20T99:00:00"},  # 不存在
+        ]
+        result = repository._batch_get_existing_updated_at_by_unique(
+            "timeline_custom_block", ["start_time"], rows
+        )
+
+        # Assert: 返回正确的映射
+        assert len(result) == 2
+        assert result[("2026-07-20T10:00:00",)] == "2026-07-20 10:00:00"
+        assert result[("2026-07-20T12:00:00",)] == "2026-07-20 12:00:00"
+        assert ("2026-07-20T99:00:00",) not in result
+
+    def test_batch_get_existing_updated_at_by_hash_id_empty_rows(self, repository):
+        """_batch_get_existing_updated_at_by_unique: 空 rows 返回空 dict"""
+        result = repository._batch_get_existing_updated_at_by_unique(
+            "timeline_custom_block", ["start_time"], []
+        )
+        assert result == {}
+
+    def test_find_existing_updated_at_by_business_unique(self, repository, initialized_db):
+        """_find_existing_updated_at: 自动用业务 UNIQUE (start_time) 查找（依赖 get_unique_fields）"""
+        # Arrange: 插入一条记录
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO timeline_custom_block "
+                "(hash_id, start_time, end_time, duration, content, color, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "tcb-find-001",
+                    "2026-07-21T10:00:00",
+                    "2026-07-21T11:00:00",
+                    60,
+                    "find test",
+                    "#FF0000",
+                    "2026-07-21 10:00:00",
+                    "2026-07-21 10:00:00",
+                ),
+            )
+            conn.commit()
+
+        # Act: 查找已存在记录（get_unique_fields 返回 ["start_time"]，按 start_time 查找）
+        result = repository._find_existing_updated_at(
+            "timeline_custom_block", {"start_time": "2026-07-21T10:00:00"}
+        )
+
+        # Assert: 返回正确的 updated_at
+        assert result == "2026-07-21 10:00:00"
+
+    def test_find_existing_updated_at_returns_none_for_nonexistent(self, repository):
+        """_find_existing_updated_at: 业务 UNIQUE 不存在时返回 None"""
+        result = repository._find_existing_updated_at(
+            "timeline_custom_block", {"start_time": "2099-01-01T00:00:00"}
+        )
+        assert result is None
+
+    # ---------- TEXT 主键表 / 非 HASH_ID_PREFIXES 表不受影响 ----------
+
+    def test_get_unique_fields_returns_none_for_diary(self, repository):
+        """TEXT 主键表（不在 HASH_ID_PREFIXES）：diary -> None"""
+        fields = repository.get_unique_fields("diary")
+        assert fields is None
+
+    def test_get_unique_fields_returns_original_unique_for_category_map_cache(self, repository):
+        """非 HASH_ID_PREFIXES 的 AUTOINCREMENT+UNIQUE 表：category_map_cache -> [app, title, state]"""
+        fields = repository.get_unique_fields("category_map_cache")
+        assert fields == ["app", "title", "state"]
+
+    def test_upsert_rows_with_lww_works_for_text_pk_table(self, repository, initialized_db):
+        """TEXT 主键表（diary）LWW 逻辑不受 hash_id 改造影响"""
+        # Arrange: 先写入新数据
+        new_row = {
+            "date": "2026-07-20",
+            "mood": "happy",
+            "importance": "important",
+            "created_at": "2026-07-20 10:00:00",
+            "updated_at": "2026-07-20 12:00:00",
+        }
+        repository.upsert_rows("diary", [new_row])
+
+        # Act: 推送更旧的数据
+        old_row = {
+            "date": "2026-07-20",
+            "mood": "bad",
+            "importance": "unimportant",
+            "created_at": "2026-07-20 10:00:00",
+            "updated_at": "2026-07-20 10:00:00",
+        }
+        affected = repository.upsert_rows_with_lww("diary", [old_row])
+
+        # Assert: 旧数据被跳过（TEXT 主键路径仍按 date 去重）
+        assert affected == 0
+
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT mood FROM diary WHERE date = ?", ("2026-07-20",))
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "happy"  # 仍然是新数据
+
+    # ---------- deletion_log: 业务 UNIQUE 跨端去重 ----------
+
+    def test_get_unique_fields_returns_business_unique_for_deletion_log(self, repository):
+        """deletion_log 有业务 UNIQUE(target_table, record_id) → 返回业务键"""
+        fields = repository.get_unique_fields("deletion_log")
+        assert fields == ["target_table", "record_id"]
+
+    def test_lww_dedupes_duplicate_tombstones_same_target_table_record_id(
+        self, repository, initialized_db
+    ):
+        """deletion_log: 两设备删除同一记录生成不同 dl-* 主键墓碑，LWW 按 (target_table, record_id) 去重"""
+        # Arrange: 设备 A 先删除（旧墓碑）
+        tombstone_a = {
+            "id": "dl-a-001",
+            "target_table": "todo_list",
+            "record_id": "t-abc123",
+            "source": "local",
+            "created_at": "2026-07-23 10:00:00",
+            "updated_at": "2026-07-23 10:00:00",
+        }
+        repository.upsert_rows("deletion_log", [tombstone_a])
+
+        # Act: 设备 B 后删除（新墓碑，不同主键，相同业务键）
+        tombstone_b = {
+            "id": "dl-b-002",
+            "target_table": "todo_list",
+            "record_id": "t-abc123",
+            "source": "cloud",
+            "created_at": "2026-07-23 12:00:00",
+            "updated_at": "2026-07-23 12:00:00",
+        }
+        affected = repository.upsert_rows_with_lww("deletion_log", [tombstone_b])
+
+        # Assert: 新墓碑覆盖旧墓碑（LWW 写入较新数据）
+        assert affected == 1
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, source, updated_at FROM deletion_log "
+                "WHERE target_table = ? AND record_id = ?",
+                ("todo_list", "t-abc123"),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "dl-b-002"  # 新墓碑覆盖旧墓碑
+            assert row[1] == "cloud"
+            assert row[2] == "2026-07-23 12:00:00"
+
+    def test_lww_skips_older_tombstone_same_target_table_record_id(
+        self, repository, initialized_db
+    ):
+        """deletion_log: 旧墓碑推送时被 LWW 跳过（本地已有新墓碑）"""
+        # Arrange: 本地已有新墓碑
+        new_tombstone = {
+            "id": "dl-new-001",
+            "target_table": "mood_entries",
+            "record_id": "mood-xyz",
+            "source": "local",
+            "created_at": "2026-07-23 12:00:00",
+            "updated_at": "2026-07-23 12:00:00",
+        }
+        repository.upsert_rows("deletion_log", [new_tombstone])
+
+        # Act: 推送旧墓碑（不同主键，相同业务键，更旧的 updated_at）
+        old_tombstone = {
+            "id": "dl-old-001",
+            "target_table": "mood_entries",
+            "record_id": "mood-xyz",
+            "source": "cloud",
+            "created_at": "2026-07-23 10:00:00",
+            "updated_at": "2026-07-23 10:00:00",
+        }
+        affected = repository.upsert_rows_with_lww("deletion_log", [old_tombstone])
+
+        # Assert: 旧墓碑被跳过
+        assert affected == 0
+        with initialized_db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id FROM deletion_log "
+                "WHERE target_table = ? AND record_id = ?",
+                ("mood_entries", "mood-xyz"),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "dl-new-001"  # 仍然是新墓碑

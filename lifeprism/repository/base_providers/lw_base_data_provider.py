@@ -784,12 +784,14 @@ class LWBaseDataProvider:
         """
         try:
             data_list = []
+            from lifeprism.sync.constants import generate_hash_id
             from lifeprism.utils.time_utils import get_utc_now_iso
 
             now_iso = get_utc_now_iso()
             for _, row in cleaned_events_df.iterrows():
                 data_list.append(
                     {
+                        "hash_id": generate_hash_id("awbl-"),
                         "start_time": row["start_time"],
                         "end_time": row["end_time"],
                         "duration": row.get("duration"),
@@ -1142,6 +1144,19 @@ class LWBaseDataProvider:
                 max_order = result[0] if result and result[0] is not None else 0
                 data["order_index"] = max_order + 1
 
+        # 2.3 兜底生成 hash_id（同步专用标识，与 _PRIMARY_KEY 无关）
+        # 前缀字典同时作为"哪些表需要 hash_id"的判断依据（_generic_insert 用
+        # HASH_ID_PREFIXES.get(table_name) 判断，非 None 即需要生成）
+        # 参考 ADR: docs/adr/2026-07-22-hash-id-sync-only-identifier.md
+        # 延迟导入避免模块加载顺序问题（参考下方 get_utc_now_iso 的导入风格）
+        from lifeprism.sync.constants import HASH_ID_PREFIXES, generate_hash_id
+
+        hash_prefix = HASH_ID_PREFIXES.get(self._TABLE_NAME)
+        # 用 not data.get("hash_id") 而非 "hash_id" not in data：
+        # 防御 None / 空字符串（新库 NOT NULL UNIQUE 会拒绝空字符串，旧库会静默写入无效记录）
+        if hash_prefix and not data.get("hash_id"):
+            data["hash_id"] = generate_hash_id(hash_prefix)
+
         # 2.5 自动写入 created_at / updated_at（ISO 8601 + UTC 格式）
         # 避免依赖数据库 DEFAULT datetime('now')，该函数输出 YYYY-MM-DD HH:MM:SS 格式
         # （无 T 分隔符、无时区标识），不符合 PRD 要求的 ISO 8601 + UTC 格式
@@ -1269,8 +1284,15 @@ class LWBaseDataProvider:
         """
         通用删除方法
 
+        对 SYNC_TABLES 中的表，在删除前先写墓碑到 deletion_log（同一事务）。
+        AUTOINCREMENT 表（在 HASH_ID_PREFIXES 中）的墓碑 record_id 使用 hash_id，
+        TEXT 主键表使用主键值。墓碑冲突用 INSERT OR IGNORE（保留旧墓碑，不刷新 updated_at）。
+
+        注意：不在 with 块内捕获 sqlite3.Error，让 get_connection 上下文管理器
+        统一回滚事务（墓碑 INSERT 与 DELETE 在同一事务，DELETE 失败时墓碑回滚）。
+
         Args:
-            record_id: 记录 ID
+            record_id: 记录 ID（主键值）
 
         Returns:
             是否成功
@@ -1285,23 +1307,190 @@ class LWBaseDataProvider:
         # 验证表名
         self._validate_table_name()
 
-        sql = f"DELETE FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} = ?"
+        # 延迟导入避免模块加载顺序问题（参考 _generic_insert 的导入风格）
+        from lifeprism.sync.constants import SYNC_TABLES
+
+        is_sync_table = self._TABLE_NAME in SYNC_TABLES
 
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
+
+                # 写墓碑（仅 SYNC_TABLES，墓碑与 DELETE 在同一事务）
+                if is_sync_table:
+                    tombstone_record_id = self._resolve_tombstone_record_id(cursor, record_id)
+                    if tombstone_record_id is None:
+                        # 记录不存在（AUTOINCREMENT 表查不到 hash_id），无需删除也无需墓碑
+                        return False
+                    self._write_tombstone(cursor, tombstone_record_id)
+
+                # 执行 DELETE
+                sql = f"DELETE FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} = ?"
                 cursor.execute(sql, (record_id,))
                 conn.commit()
                 return cursor.rowcount > 0
-        except sqlite3.Error as e:
+        except DataAccessError as e:
+            # 上下文管理器已回滚事务并抛出 DataAccessError，这里仅补充日志
             logger.error(
                 "通用删除失败: table=%s, record_id=%s, error=%s", self._TABLE_NAME, record_id, e
             )
-            raise DataAccessError(
-                message=f"删除表 {self._TABLE_NAME} 失败",
-                details={"table": self._TABLE_NAME, "record_id": record_id, "error": str(e)},
-                cause=e,
-            ) from e
+            raise
+
+    def _resolve_tombstone_record_id(self, cursor: sqlite3.Cursor, record_id: str) -> str | None:
+        """确定墓碑的 record_id：AUTOINCREMENT 表用 hash_id，TEXT 主键表用主键值
+
+        对 AUTOINCREMENT 表（在 HASH_ID_PREFIXES 中），先查询记录的 hash_id。
+        若记录不存在返回 None（调用方据此跳过墓碑和删除）。
+
+        Args:
+            cursor: 数据库游标
+            record_id: 主键值
+
+        Returns:
+            墓碑 record_id（hash_id 或主键值），记录不存在时返回 None
+        """
+        from lifeprism.sync.constants import HASH_ID_PREFIXES
+
+        hash_prefix = HASH_ID_PREFIXES.get(self._TABLE_NAME)
+        if hash_prefix is not None:
+            # AUTOINCREMENT 表：查询 hash_id 作为墓碑 record_id
+            cursor.execute(
+                f"SELECT hash_id FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} = ?",
+                (record_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None  # 记录不存在
+            return row[0] if row[0] is not None else str(record_id)
+        # TEXT 主键表：直接用主键值
+        return str(record_id)
+
+    def _write_tombstone(self, cursor: sqlite3.Cursor, tombstone_record_id: str):
+        """写墓碑到 deletion_log（INSERT OR IGNORE：重复删除保留旧墓碑，不刷新 updated_at）
+
+        Args:
+            cursor: 数据库游标
+            tombstone_record_id: 墓碑 record_id（hash_id 或主键值）
+        """
+        import uuid
+
+        from lifeprism.utils.time_utils import get_utc_now_iso
+
+        tombstone_id = f"dl-{uuid.uuid4().hex[:8]}"
+        now_iso = get_utc_now_iso()
+        cursor.execute(
+            "INSERT OR IGNORE INTO deletion_log "
+            "(id, target_table, record_id, source, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (tombstone_id, self._TABLE_NAME, tombstone_record_id, "local", now_iso, now_iso),
+        )
+
+    def _generic_batch_delete(self, record_ids: list[str]) -> int:
+        """
+        批量删除方法
+
+        批量写墓碑 + 批量 DELETE 在同一事务，采用批量 SQL（1 次墓碑批量 INSERT OR IGNORE
+        + 1 次 DELETE...WHERE IN），而非循环单条。
+
+        注意：不在 with 块内捕获 sqlite3.Error，让 get_connection 上下文管理器
+        统一回滚事务（墓碑与 DELETE 在同一事务，DELETE 失败时墓碑回滚）。
+
+        Args:
+            record_ids: 要删除的记录 ID 列表（主键值）
+
+        Returns:
+            成功删除的记录数
+        """
+        # 验证表名
+        self._validate_table_name()
+
+        if not record_ids:
+            return 0
+
+        from lifeprism.sync.constants import SYNC_TABLES
+
+        is_sync_table = self._TABLE_NAME in SYNC_TABLES
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # 批量写墓碑（仅 SYNC_TABLES）
+                if is_sync_table:
+                    tombstone_record_ids = self._resolve_batch_tombstone_record_ids(
+                        cursor, record_ids
+                    )
+                    if tombstone_record_ids:
+                        self._write_batch_tombstones(cursor, tombstone_record_ids)
+
+                # 批量 DELETE
+                placeholders = ",".join(["?"] * len(record_ids))
+                sql = (
+                    f"DELETE FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} IN ({placeholders})"
+                )
+                cursor.execute(sql, record_ids)
+                conn.commit()
+                return cursor.rowcount
+        except DataAccessError as e:
+            logger.error(
+                "通用批量删除失败: table=%s, count=%s, error=%s",
+                self._TABLE_NAME,
+                len(record_ids),
+                e,
+            )
+            raise
+
+    def _resolve_batch_tombstone_record_ids(
+        self, cursor: sqlite3.Cursor, record_ids: list[str]
+    ) -> list[str]:
+        """批量确定墓碑的 record_id：AUTOINCREMENT 表用 hash_id，TEXT 主键表用主键值
+
+        Args:
+            cursor: 数据库游标
+            record_ids: 主键值列表
+
+        Returns:
+            墓碑 record_id 列表
+        """
+        from lifeprism.sync.constants import HASH_ID_PREFIXES
+
+        placeholders = ",".join(["?"] * len(record_ids))
+        hash_prefix = HASH_ID_PREFIXES.get(self._TABLE_NAME)
+        if hash_prefix is not None:
+            # AUTOINCREMENT 表：批量查询 hash_id（仅存在的记录返回）
+            cursor.execute(
+                f"SELECT hash_id FROM {self._TABLE_NAME} WHERE {self._PRIMARY_KEY} "
+                f"IN ({placeholders})",
+                record_ids,
+            )
+            return [row[0] for row in cursor.fetchall() if row[0] is not None]
+        # TEXT 主键表：直接用主键值
+        return [str(rid) for rid in record_ids]
+
+    def _write_batch_tombstones(self, cursor: sqlite3.Cursor, tombstone_record_ids: list[str]):
+        """批量写墓碑到 deletion_log（INSERT OR IGNORE）"""
+        import uuid
+
+        from lifeprism.utils.time_utils import get_utc_now_iso
+
+        now_iso = get_utc_now_iso()
+        rows = [
+            (
+                f"dl-{uuid.uuid4().hex[:8]}",
+                self._TABLE_NAME,
+                rid,
+                "local",
+                now_iso,
+                now_iso,
+            )
+            for rid in tombstone_record_ids
+        ]
+        cursor.executemany(
+            "INSERT OR IGNORE INTO deletion_log "
+            "(id, target_table, record_id, source, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            rows,
+        )
 
     # ==================== 辅助方法（构建 SQL 子句） ====================
 

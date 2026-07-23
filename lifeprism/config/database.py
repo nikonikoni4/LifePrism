@@ -181,6 +181,11 @@ USER_APP_BEHAVIOR_LOG_CONFIG = {
             "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
             "comment": "自增主键",
         },
+        "hash_id": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "UNIQUE"],
+            "comment": "同步用全局唯一标识（12位 hex + 表名前缀）",
+        },
         "start_time": {"type": "TEXT", "constraints": ["NOT NULL"], "comment": "行为开始时间"},
         "end_time": {"type": "TEXT", "constraints": ["NOT NULL"], "comment": "行为结束时间"},
         "duration": {
@@ -677,6 +682,11 @@ TIMELINE_CUSTOM_BLOCK_CONFIG = {
             "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
             "comment": "自增主键",
         },
+        "hash_id": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "UNIQUE"],
+            "comment": "同步用全局唯一标识（12位 hex + 表名前缀）",
+        },
         "start_time": {
             "type": "TEXT",
             "constraints": ["NOT NULL"],
@@ -912,7 +922,12 @@ monthly_report_config = {
 TIME_PARADOXES_CONFIG = {
     "table_name": "time_paradoxes",
     "columns": {
-        "id": {"type": "INTEGER", "constraints": ["PRIMARY KEY", "NOT NULL"], "comment": "ID"},
+        "id": {"type": "INTEGER", "constraints": ["PRIMARY KEY", "AUTOINCREMENT"], "comment": "ID"},
+        "hash_id": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "UNIQUE"],
+            "comment": "同步用全局唯一标识（12位 hex + 表名前缀）",
+        },
         "user_id": {"type": "INTEGER", "constraints": ["NOT NULL"], "comment": "用户ID"},
         "version": {"type": "INTEGER", "constraints": ["NOT NULL"], "comment": "版本号"},
         "mode": {
@@ -1074,9 +1089,14 @@ MOOD_IMPACTS_CONFIG = {
             "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
             "comment": "因素 ID，自增",
         },
-        "name": {
+        "hash_id": {
             "type": "TEXT",
             "constraints": ["NOT NULL", "UNIQUE"],
+            "comment": "同步用全局唯一标识（12位 hex + 表名前缀）",
+        },
+        "name": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL"],
             "comment": '因素名称（如"健康"、"工作"）',
         },
         "sort_order": {
@@ -1085,7 +1105,7 @@ MOOD_IMPACTS_CONFIG = {
             "comment": "排序权重，越大越靠前",
         },
     },
-    "table_constraints": [],
+    "table_constraints": ["UNIQUE(name)"],
     "indexes": [],
     "timestamps": True,
     "update_at": True,
@@ -1289,6 +1309,11 @@ HABIT_CHAINS_CONFIG = {
             "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
             "comment": "链条自增ID",
         },
+        "hash_id": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "UNIQUE"],
+            "comment": "同步用全局唯一标识（12位 hex + 表名前缀）",
+        },
         "name": {"type": "TEXT", "constraints": ["NOT NULL"], "comment": "链条名称"},
         "description": {"type": "TEXT", "constraints": [], "comment": "链条描述（可空）"},
         "show_in_timeline": {
@@ -1311,6 +1336,11 @@ HABIT_CHAIN_NODES_CONFIG = {
             "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
             "comment": "节点自增ID",
         },
+        "hash_id": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "UNIQUE"],
+            "comment": "同步用全局唯一标识（12位 hex + 表名前缀）",
+        },
         "chain_id": {"type": "INTEGER", "constraints": ["NOT NULL"], "comment": "所属链条ID"},
         "sort_order": {
             "type": "INTEGER",
@@ -1322,7 +1352,7 @@ HABIT_CHAIN_NODES_CONFIG = {
         "trigger_time": {"type": "TEXT", "constraints": [], "comment": "触发时间 HH:mm（可空）"},
     },
     "table_constraints": [
-        "FOREIGN KEY (chain_id) REFERENCES habit_chains(id) ON DELETE CASCADE",
+        "FOREIGN KEY (chain_id) REFERENCES habit_chains(id)",
         "FOREIGN KEY (habit_id) REFERENCES habits(id)",
     ],
     "indexes": [
@@ -1626,6 +1656,48 @@ FILE_SYNC_STATE_CONFIG = {
 }
 
 
+# 墓碑表配置（删除同步用）
+# 记录删除意图，使删除操作能跨端传播。加入 SYNC_TABLES 参与同步。
+# - id: dl-{uuid[:8]}（PRD 3 的 DeletionLogProvider 中通过 _generic_insert(id_prefix='dl-') 实现）
+# - target_table: 被删记录所在表名（字段名用 target_table 而非 table_name，避免与代码变量名混淆）
+# - record_id: 被删记录的 hash_id（AUTOINCREMENT 表）或主键（TEXT PK 表）
+# - source: 来源 local/cloud
+# - timestamps: True 自动添加 created_at, updated_at
+# - update_at: True 使 has_updated_at() 返回 True，LWW 比较使用 updated_at 字段
+#   墓碑不更新，插入时 updated_at == created_at，因此用 updated_at 比较等价于用 created_at 比较
+# 参考 ADR: docs/adr/2026-07-22-deletion-log-table.md
+DELETION_LOG_CONFIG = {
+    "table_name": "deletion_log",
+    "columns": {
+        "id": {
+            "type": "TEXT",
+            "constraints": ["PRIMARY KEY"],
+            "comment": "墓碑ID（dl-+uuid8）",
+        },
+        "target_table": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL"],
+            "comment": "被删记录所在表名",
+        },
+        "record_id": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL"],
+            "comment": "被删记录的 hash_id（AUTOINCREMENT 表）或主键（TEXT PK 表）",
+        },
+        "source": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL"],
+            "comment": "来源：local/cloud",
+        },
+    },
+    # 业务 UNIQUE：同一记录的墓碑跨端去重（LWW 按 updated_at 处理重复墓碑）
+    # 避免两设备删除同一记录时各生成不同 dl-* 主键墓碑导致 LWW 永不触发
+    "table_constraints": ["UNIQUE(target_table, record_id)"],
+    "timestamps": True,  # 自动添加 created_at, updated_at
+    "update_at": True,  # LWW 比较用 updated_at；插入时 updated_at == created_at，墓碑不再修改
+}
+
+
 # 所有表配置的映射
 TABLE_CONFIGS = {
     "category_map_cache": category_map_cache_CONFIG,
@@ -1668,6 +1740,7 @@ TABLE_CONFIGS = {
     "custom_record_fields": CUSTOM_RECORD_FIELDS_CONFIG,
     "wechat_account_state": WECHAT_ACCOUNT_STATE_CONFIG,
     "file_sync_state": FILE_SYNC_STATE_CONFIG,
+    "deletion_log": DELETION_LOG_CONFIG,
 }
 
 

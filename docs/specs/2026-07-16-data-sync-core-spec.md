@@ -116,18 +116,18 @@ module: sync
 
 <key_function>
 - lifeprism/repository/sync_repository.py
-  - sync_repository.SyncRepository.query_incremental:223
-  - sync_repository.SyncRepository.upsert_rows:351
-  - sync_repository.SyncRepository.upsert_rows_with_lww:567
-  - sync_repository.SyncRepository.batch_get_existing_updated_at:429
-  - sync_repository.SyncRepository.get_custom_record_slugs:788
-  - sync_repository.SyncRepository.get_primary_key_field:718
-  - sync_repository.SyncRepository.get_unique_fields:745
-  - sync_repository.SyncRepository.has_updated_at:771
-  - sync_repository.SyncRepository.count_rows:145
-  - sync_repository.SyncRepository.count_rows_batch:182
-  - sync_repository.SyncRepository.create_local_data_tables:908
-  - sync_repository.SyncRepository.rebuild_dynamic_tables:964
+  - sync_repository.SyncRepository.query_incremental:226
+  - sync_repository.SyncRepository.upsert_rows:483
+  - sync_repository.SyncRepository.upsert_rows_with_lww:699
+  - sync_repository.SyncRepository.batch_get_existing_updated_at:561
+  - sync_repository.SyncRepository.get_custom_record_slugs:937
+  - sync_repository.SyncRepository.get_primary_key_field:850
+  - sync_repository.SyncRepository.get_unique_fields:877
+  - sync_repository.SyncRepository.has_updated_at:920
+  - sync_repository.SyncRepository.count_rows:148
+  - sync_repository.SyncRepository.count_rows_batch:185
+  - sync_repository.SyncRepository.create_local_data_tables:1044
+  - sync_repository.SyncRepository.rebuild_dynamic_tables:1100
 </key_function>
 
 **对外接口**：
@@ -297,12 +297,16 @@ providers:                       # 有 env_key 且有 api_key 的 provider
 
 | 类别 | 表名 |
 |------|------|
-| 用户输入数据（15张） | mood_entries, diary, todo_list, goal, goal_journal, plan_doc, daily_focus, weekly_focus, habits, habit_challenges, habit_checkins, habit_chains, habit_chain_nodes, timeline_custom_block, time_paradoxes |
-| 元数据（9张） | category, sub_category, mood_types, mood_impacts, user_values, commitments, custom_record_types, custom_record_fields, wechat_account_state |
+| 用户输入数据（13张） | mood_entries, diary, todo_list, goal, goal_journal, plan_doc, daily_focus, weekly_focus, habits, habit_challenges, habit_checkins, timeline_custom_block, time_paradoxes |
+| 元数据（8张） | category, sub_category, mood_types, mood_impacts, user_values, commitments, custom_record_types, custom_record_fields |
 | Monitor 数据（3张） | user_app_behavior_log, behavior_analysis, raw_behavior_analysis |
 | 缓存表（3张） | multi_purpose_map_cache, single_purpose_map_cache, category_map_cache |
 | 统计数据（1张） | tokens_usage_log |
+| 微信账户状态（1张） | wechat_account_state（走数据库同步的记录级 LWW，参考 ADR 2026-07-14-file-sync-conflict-resolution.md 决策 4） |
+| 墓碑表（1张） | deletion_log（删除同步用，记录删除意图跨端传播，参考 ADR docs/adr/2026-07-22-deletion-log-table.md） |
 | 动态表 | custom_{slug}（运行时从 dynamic-tables-definitions 端点发现） |
+
+> **注意**：`habit_chains` 和 `habit_chain_nodes` 临时从 SYNC_TABLES 移除。原因：`chain_id` 引用 `habit_chains.id`（自增 id），同步后两端 id 不一致导致外键断裂。详见 `docs/known-limitations/habit-chain-tables-not-synced.md` 与 ADR `docs/adr/2026-07-22-habit-chain-tables-not-synced.md`。这两张表的 `hash_id` 字段照常添加（在 `HASH_ID_PREFIXES` 中），为后续恢复同步做准备。
 
 #### 不同步的表
 
@@ -310,6 +314,7 @@ providers:                       # 有 env_key 且有 api_key 的 provider
 - goal_stats、daily_report、weekly_report、monthly_report（统计缓存，可本地重新生成）
 - schema_version（迁移版本号，两端独立管理）
 - screen_captures、window_events（Monitor 原始数据，数据量大且云端用不上）
+- habit_chains、habit_chain_nodes（外键断裂问题，见上方同步范围注意事项）
 
 ### 动态表同步机制
 

@@ -90,3 +90,17 @@
 - path: `docs/generated/utc-migration-audit-report.md`
 - 触发规则：UTC 时区迁移项目 Issue #19 审核时查看
 - 内容摘要：UTC 时区迁移项目（Issue #1-#16）的迁移结果审核报告。代码迁移和测试全部通过（199 个测试通过），但 m008/m009 迁移脚本存在 4 个 bug（PRIMARY KEY、CHECK 约束、空名表、带引号表名），且测试数据库未实际应用迁移。审核结论为"审核失败（附条件通过）"，暂不批准进入生产环境迁移。
+
+## 2026-07-22-code-review-deletion-sync-schema
+
+- updated_at: 2026-07-22
+- path: `docs/generated/019/2026-07-22-code-review-deletion-sync-schema.md`
+- 触发规则：审查"同步删除阶段1：Schema 变更（hash_id + 墓碑表）"当前工作区代码更改时查看
+- 内容摘要：同步删除阶段1（6 张 AUTOINCREMENT 表加 hash_id + deletion_log 墓碑表 + m015 迁移 + get_unique_fields 改用 hash_id 去重）的 8 维度代码审查报告。审查 12 个修改文件 + 新增 m015/7 测试/4 ADR。发现 4 个问题（置信度 ≥ 80）：1 个正确性回归（get_unique_fields 改 hash_id 后 LWW 被 INSERT OR REPLACE 的业务 UNIQUE 约束绕过，旧数据覆盖新数据，90）、1 个文档规范违规（4 个新 ADR frontmatter `last_updated_at` 应为 `last_updated`，85）、1 个性能问题（m015 在新库创建冗余唯一索引，82）、1 个测试缺口（LWW 失效回归场景无测试，80）。Security 维度无问题。
+
+## 2026-07-23-code-review-deletion-sync-schema-round2
+
+- updated_at: 2026-07-23
+- path: `docs/generated/019/2026-07-23-code-review-deletion-sync-schema-round2.md`
+- 触发规则：审查"同步删除阶段1 修复后的第二轮代码审查"时查看
+- 内容摘要：同步删除阶段1 原始 4 个 ≥80 问题修复后的第二轮 8 维度重新审查报告。Issue 2(ADR frontmatter)、Issue 3(m015 冗余索引)已完全修复；Issue 1(LWW 绕过)仅对表级 UNIQUE 修复，列级 UNIQUE(mood_impacts.name)仍存在同样问题；Issue 4(LWW 测试)仅补了 timeline_custom_block/user_app_behavior_log 端到端测试，time_paradoxes/mood_impacts 仍缺失。发现 6 个问题(置信度 ≥ 80)：Issue 1 P0 阻断(hash_id 兜底仅覆盖 _generic_insert，6+ 处直接 INSERT 路径绕过，新库启动会因 data_initializer 触发 NOT NULL 而失败，100)、Issue 2 数据丢失(mood_impacts 列级 UNIQUE 未解析 → 回退 hash_id → REPLACE 按 name 冲突覆盖，100)、Issue 3 迁移可靠性(m015 重试逻辑不可达 + CREATE INDEX 无重试，98)、Issue 4 设计不一致(deletion_log 无 UNIQUE(target_table, record_id)，ADR 声明的跨端 LWW 处理墓碑失效，95)、Issue 5 (hash_id 兜底 None/空字符串绕过，90)、Issue 6 (spec 同步表清单未更新，100)。

@@ -1,3 +1,10 @@
+## 2026-07-23-mood-impacts-lww-bypass-by-column-level-unique
+
+- updated_at: 2026-07-23
+- path: `docs/history-bugs/2026-07-23-mood-impacts-lww-bypass-by-column-level-unique.md`
+- 触发规则：创建或修改加入 SYNC_TABLES 的表、修改同步表 UNIQUE 声明位置、修改 SyncRepository.get_unique_fields/upsert_rows_with_lww/upsert_rows、排查 mood_impacts 较新数据被较旧跨端数据覆盖、为 AUTOINCREMENT 同步表增加 hash_id 时阅读
+- 内容摘要：**数据丢失 bug（P1，已修复 2026-07-23）** — mood_impacts 将业务唯一键 UNIQUE(name) 声明在列级，而 get_unique_fields 只解析 table_constraints，导致 LWW 回退按 hash_id 查找；两端同名不同 hash_id 时查不到等价记录，较旧数据被放行，随后 INSERT OR REPLACE 仍按 SQLite 的 UNIQUE(name) 冲突删除较新本地行并插入较旧远端行。修复为把 UNIQUE(name) 移至 table_constraints（SQLite 层等价，无需数据迁移），并补充业务键解析、较旧跳过、较新写入 3 个回归测试。沉淀规则：同步表所有业务 UNIQUE（含单列）必须显式放入 table_constraints，hash_id 仅为同步专用标识而非业务唯一键。
+
 ## 2026-07-18-cloud-parent-hash-not-advanced-after-first-sync
 
 - updated_at: 2026-07-19

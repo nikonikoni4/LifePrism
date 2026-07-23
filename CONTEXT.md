@@ -32,6 +32,14 @@ LifePrism 支持三种运行形态，对应三个独立启动入口：
 - 单条记录失败不阻塞其他记录
 - 只有全部成功才更新 `last_sync_time`（避免丢数据）
 
+**hash_id（同步标识）**：
+- **定位**：同步专用标识，不是主键；它是给 AUTOINCREMENT 表补充的跨端定位字段，本地 CRUD 仍使用自增 `id`
+- **背景**：6 张 AUTOINCREMENT 表（`timeline_custom_block`、`time_paradoxes`、`mood_impacts`、`habit_chains`、`habit_chain_nodes`、`user_app_behavior_log`）的自增 ID 在两端不同，不能作为跨端稳定标识
+- **格式**：`{prefix}{uuid.hex[:12]}`，例如 `mi-a1b2c3d4e5f6`；前缀由 `lifeprism/sync/constants.py` 的 `HASH_ID_PREFIXES` 定义
+- **用途**：同步 pull/push 时定位同一条逻辑记录；墓碑表 `deletion_log.record_id` 对 AUTOINCREMENT 表存 `hash_id`，对 TEXT PRIMARY KEY 表存主键
+- **不用途**：本地 `get_by_id`、update、delete 不使用 `hash_id`；存在业务 UNIQUE 时，LWW 冲突判定不使用 `hash_id` 作为业务唯一键，而使用 `table_constraints` 中声明的业务 UNIQUE
+- **参考**：`docs/adr/2026-07-22-hash-id-sync-only-identifier.md`
+
 **通信方式**：HTTP REST API + 本地主动轮询
 - Windows 本地主动发起（避免 NAT 问题）
 - 云端被动响应（不需要知道本地 IP）
