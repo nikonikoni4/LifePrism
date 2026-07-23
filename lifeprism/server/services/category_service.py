@@ -1014,107 +1014,91 @@ class CategoryService:
 
         恢复条件：主分类启用 AND 子分类也启用
         恢复前：删除同 (app, title) 中 created_at 更晚的记录
+
+        DELETE 下沉：通过 map_cache_repository.batch_delete_* 走 _generic_batch_delete
+        （含写墓碑），Service 层不直接执行 DELETE FROM SYNC_TABLES。
         """
         try:
+            # Phase 1: 读取数据 + 收集待删除 ID（同一读事务，避免与 batch_delete 写事务冲突）
+            multi_ids_to_delete: list[str] = []
+            single_ids_to_delete: list[str] = []
+            multi_ids_to_restore: list[str] = []
+            single_ids_to_restore: list[str] = []
+
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
                 # 获取该分类下所有子分类的启用状态
                 cursor.execute(
-                    """
-                    SELECT id, state FROM sub_category WHERE category_id = ?
-                """,
+                    "SELECT id, state FROM sub_category WHERE category_id = ?",
                     (category_id,),
                 )
                 sub_categories = {row[0]: row[1] for row in cursor.fetchall()}
 
-                total_enabled = 0
-                total_deleted = 0
-                now_iso = get_utc_now_iso()
-
-                # 处理 multi_purpose_map_cache 表
+                # 处理 multi_purpose_map_cache：收集待恢复 ID 和待删除 ID
                 cursor.execute(
-                    """
-                    SELECT id, app, title, sub_category_id, created_at
-                    FROM multi_purpose_map_cache
-                    WHERE category_id = ? AND state = 0
-                """,
+                    "SELECT id, app, title, sub_category_id, created_at "
+                    "FROM multi_purpose_map_cache WHERE category_id = ? AND state = 0",
                     (category_id,),
                 )
-                multi_records = cursor.fetchall()
-
-                for record_id, app, title, sub_cat_id, created_at in multi_records:
-                    sub_state = sub_categories.get(sub_cat_id, 1)
-                    if sub_state == 0:
+                for record_id, app, title, sub_cat_id, created_at in cursor.fetchall():
+                    if sub_categories.get(sub_cat_id, 1) == 0:
                         continue
-
+                    multi_ids_to_restore.append(record_id)
                     if created_at:
-                        # 多分类应用：删除同 (app, title) 中 created_at 更晚的记录
                         cursor.execute(
-                            """
-                            DELETE FROM multi_purpose_map_cache
-                            WHERE app = ? AND title = ? AND created_at > ?
-                        """,
+                            "SELECT id FROM multi_purpose_map_cache "
+                            "WHERE app = ? AND title = ? AND created_at > ?",
                             (app, title, created_at),
                         )
-                        total_deleted += cursor.rowcount
+                        multi_ids_to_delete.extend(row[0] for row in cursor.fetchall())
 
-                    # 恢复该记录
-                    cursor.execute(
-                        """
-                        UPDATE multi_purpose_map_cache
-                        SET state = 1, updated_at = ?
-                        WHERE id = ?
-                    """,
-                        (now_iso, record_id),
-                    )
-                    total_enabled += cursor.rowcount
-
-                # 处理 single_purpose_map_cache 表
+                # 处理 single_purpose_map_cache：收集待恢复 ID 和待删除 ID
                 cursor.execute(
-                    """
-                    SELECT id, app, sub_category_id, created_at
-                    FROM single_purpose_map_cache
-                    WHERE category_id = ? AND state = 0
-                """,
+                    "SELECT id, app, sub_category_id, created_at "
+                    "FROM single_purpose_map_cache WHERE category_id = ? AND state = 0",
                     (category_id,),
                 )
-                single_records = cursor.fetchall()
-
-                for record_id, app, sub_cat_id, created_at in single_records:
-                    sub_state = sub_categories.get(sub_cat_id, 1)
-                    if sub_state == 0:
+                for record_id, app, sub_cat_id, created_at in cursor.fetchall():
+                    if sub_categories.get(sub_cat_id, 1) == 0:
                         continue
-
+                    single_ids_to_restore.append(record_id)
                     if created_at:
-                        # 单分类应用：删除同 app 中 created_at 更晚的记录
                         cursor.execute(
-                            """
-                            DELETE FROM single_purpose_map_cache
-                            WHERE app = ? AND created_at > ?
-                        """,
+                            "SELECT id FROM single_purpose_map_cache "
+                            "WHERE app = ? AND created_at > ?",
                             (app, created_at),
                         )
-                        total_deleted += cursor.rowcount
+                        single_ids_to_delete.extend(row[0] for row in cursor.fetchall())
 
-                    # 恢复该记录
-                    cursor.execute(
-                        """
-                        UPDATE single_purpose_map_cache
-                        SET state = 1, updated_at = ?
-                        WHERE id = ?
-                    """,
-                        (now_iso, record_id),
-                    )
-                    total_enabled += cursor.rowcount
-
-                conn.commit()
-                logger.info(
-                    "启用分类 '%s' 时，恢复 %s 条记录，删除 %s 条冲突记录",
-                    category_id,
-                    total_enabled,
-                    total_deleted,
+            # Phase 2: 批量删除冲突记录（走 _generic_batch_delete，写墓碑到 deletion_log）
+            total_deleted = 0
+            if multi_ids_to_delete:
+                total_deleted += self.map_cache_repository.batch_delete_multi_purpose_map_cache(
+                    list(set(multi_ids_to_delete))
                 )
+            if single_ids_to_delete:
+                total_deleted += self.map_cache_repository.batch_delete_single_purpose_map_cache(
+                    list(set(single_ids_to_delete))
+                )
+
+            # Phase 3: 恢复 state=1（通过 repository batch_update，无需写墓碑）
+            total_enabled = 0
+            if multi_ids_to_restore:
+                total_enabled += self.map_cache_repository.batch_update_multi_purpose_map_cache(
+                    multi_ids_to_restore, {"state": 1}
+                )
+            if single_ids_to_restore:
+                total_enabled += self.map_cache_repository.batch_update_single_purpose_map_cache(
+                    single_ids_to_restore, {"state": 1}
+                )
+
+            logger.info(
+                "启用分类 '%s' 时，恢复 %s 条记录，删除 %s 条冲突记录",
+                category_id,
+                total_enabled,
+                total_deleted,
+            )
 
         except Exception as e:
             logger.error("启用分类记录失败: %s", e)
@@ -1126,103 +1110,90 @@ class CategoryService:
 
         恢复条件：主分类启用 AND 子分类启用
         恢复前：删除同 (app, title) 中 created_at 更晚的记录
+
+        DELETE 下沉：通过 map_cache_repository.batch_delete_* 走 _generic_batch_delete
+        （含写墓碑），Service 层不直接执行 DELETE FROM SYNC_TABLES。
         """
         try:
+            # Phase 1: 读取数据 + 收集待删除 ID（同一读事务，避免与 batch_delete 写事务冲突）
+            multi_ids_to_delete: list[str] = []
+            single_ids_to_delete: list[str] = []
+            multi_ids_to_restore: list[str] = []
+            single_ids_to_restore: list[str] = []
+
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
                 # 检查主分类是否启用
                 cursor.execute(
-                    """
-                    SELECT state FROM category WHERE id = ?
-                """,
+                    "SELECT state FROM category WHERE id = ?",
                     (category_id,),
                 )
                 result = cursor.fetchone()
                 if not result or result[0] == 0:
-                    # 主分类还是禁用状态，不恢复
                     logger.info("主分类 '%s' 仍处于禁用状态，跳过恢复子分类记录", category_id)
                     return
 
-                total_enabled = 0
-                total_deleted = 0
-                now_iso = get_utc_now_iso()
-
-                # 处理 multi_purpose_map_cache 表
+                # 处理 multi_purpose_map_cache：收集待恢复 ID 和待删除 ID
                 cursor.execute(
-                    """
-                    SELECT id, app, title, created_at
-                    FROM multi_purpose_map_cache
-                    WHERE sub_category_id = ? AND state = 0
-                """,
+                    "SELECT id, app, title, created_at "
+                    "FROM multi_purpose_map_cache WHERE sub_category_id = ? AND state = 0",
                     (sub_category_id,),
                 )
-                multi_records = cursor.fetchall()
-
-                for record_id, app, title, created_at in multi_records:
+                for record_id, app, title, created_at in cursor.fetchall():
+                    multi_ids_to_restore.append(record_id)
                     if created_at:
-                        # 多分类应用：删除同 (app, title) 中 created_at 更晚的记录
                         cursor.execute(
-                            """
-                            DELETE FROM multi_purpose_map_cache
-                            WHERE app = ? AND title = ? AND created_at > ?
-                        """,
+                            "SELECT id FROM multi_purpose_map_cache "
+                            "WHERE app = ? AND title = ? AND created_at > ?",
                             (app, title, created_at),
                         )
-                        total_deleted += cursor.rowcount
+                        multi_ids_to_delete.extend(row[0] for row in cursor.fetchall())
 
-                    # 恢复该记录
-                    cursor.execute(
-                        """
-                        UPDATE multi_purpose_map_cache
-                        SET state = 1, updated_at = ?
-                        WHERE id = ?
-                    """,
-                        (now_iso, record_id),
-                    )
-                    total_enabled += cursor.rowcount
-
-                # 处理 single_purpose_map_cache 表
+                # 处理 single_purpose_map_cache：收集待恢复 ID 和待删除 ID
                 cursor.execute(
-                    """
-                    SELECT id, app, created_at
-                    FROM single_purpose_map_cache
-                    WHERE sub_category_id = ? AND state = 0
-                """,
+                    "SELECT id, app, created_at "
+                    "FROM single_purpose_map_cache WHERE sub_category_id = ? AND state = 0",
                     (sub_category_id,),
                 )
-                single_records = cursor.fetchall()
-
-                for record_id, app, created_at in single_records:
+                for record_id, app, created_at in cursor.fetchall():
+                    single_ids_to_restore.append(record_id)
                     if created_at:
-                        # 单分类应用：删除同 app 中 created_at 更晚的记录
                         cursor.execute(
-                            """
-                            DELETE FROM single_purpose_map_cache
-                            WHERE app = ? AND created_at > ?
-                        """,
+                            "SELECT id FROM single_purpose_map_cache "
+                            "WHERE app = ? AND created_at > ?",
                             (app, created_at),
                         )
-                        total_deleted += cursor.rowcount
+                        single_ids_to_delete.extend(row[0] for row in cursor.fetchall())
 
-                    # 恢复该记录
-                    cursor.execute(
-                        """
-                        UPDATE single_purpose_map_cache
-                        SET state = 1, updated_at = ?
-                        WHERE id = ?
-                    """,
-                        (now_iso, record_id),
-                    )
-                    total_enabled += cursor.rowcount
-
-                conn.commit()
-                logger.info(
-                    "启用子分类 '%s' 时，恢复 %s 条记录，删除 %s 条冲突记录",
-                    sub_category_id,
-                    total_enabled,
-                    total_deleted,
+            # Phase 2: 批量删除冲突记录（走 _generic_batch_delete，写墓碑到 deletion_log）
+            total_deleted = 0
+            if multi_ids_to_delete:
+                total_deleted += self.map_cache_repository.batch_delete_multi_purpose_map_cache(
+                    list(set(multi_ids_to_delete))
                 )
+            if single_ids_to_delete:
+                total_deleted += self.map_cache_repository.batch_delete_single_purpose_map_cache(
+                    list(set(single_ids_to_delete))
+                )
+
+            # Phase 3: 恢复 state=1（通过 repository batch_update，无需写墓碑）
+            total_enabled = 0
+            if multi_ids_to_restore:
+                total_enabled += self.map_cache_repository.batch_update_multi_purpose_map_cache(
+                    multi_ids_to_restore, {"state": 1}
+                )
+            if single_ids_to_restore:
+                total_enabled += self.map_cache_repository.batch_update_single_purpose_map_cache(
+                    single_ids_to_restore, {"state": 1}
+                )
+
+            logger.info(
+                "启用子分类 '%s' 时，恢复 %s 条记录，删除 %s 条冲突记录",
+                sub_category_id,
+                total_enabled,
+                total_deleted,
+            )
 
         except Exception as e:
             logger.error("启用子分类记录失败: %s", e)

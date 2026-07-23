@@ -79,16 +79,15 @@ class HabitChainProvider(LWBaseDataProvider):
         """
         创建习惯链条，返回新记录的自增 ID
 
+        走 _generic_insert 通道：habit_chains 在 HASH_ID_PREFIXES 中（前缀 hc-），
+        _generic_insert 自动生成 hash_id 并写入 created_at/updated_at。
+
         Args:
             data: 链条数据，必填 name，可选 description、show_in_timeline
 
         Returns:
             新插入记录的 INTEGER 主键
         """
-        from lifeprism.sync.constants import generate_hash_id
-        from lifeprism.utils.time_utils import get_utc_now_iso
-
-        now_iso = get_utc_now_iso()
         insert_data = {
             "name": data["name"],
             "description": data.get("description"),
@@ -96,22 +95,11 @@ class HabitChainProvider(LWBaseDataProvider):
         }
 
         try:
-            with self.db.get_connection() as conn:
-                cursor = conn.execute(
-                    """INSERT INTO habit_chains (hash_id, name, description, show_in_timeline, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (
-                        generate_hash_id("hc-"),
-                        insert_data["name"],
-                        insert_data["description"],
-                        insert_data["show_in_timeline"],
-                        now_iso,
-                        now_iso,
-                    ),
-                )
-                chain_id = cursor.lastrowid
-                logger.info("创建链条成功: %s", chain_id)
-                return chain_id
+            chain_id = self._generic_insert(insert_data)
+            logger.info("创建链条成功: %s", chain_id)
+            return int(chain_id) if chain_id is not None else 0
+        except DataAccessError:
+            raise
         except sqlite3.Error as e:
             logger.error("创建习惯链失败: error=%s", e)
             raise DataAccessError(f"创建习惯链失败: {e}") from e
@@ -177,21 +165,34 @@ class HabitChainProvider(LWBaseDataProvider):
         """
         删除链条及其所有节点
 
-        由于 database_manager 未开启外键约束（PRAGMA foreign_keys = ON），
-        需要先手动删除子节点，再删除链条
+        走 _generic_* 通道（通道统一）：
+        - habit_chain_nodes 走 HabitChainNodeProvider.delete_by_chain_id
+          （内部走 _generic_batch_delete）
+        - habit_chains 走 self._generic_delete
+
+        注意：habit_chains 和 habit_chain_nodes 当前不在 SYNC_TABLES 中
+        （见 docs/known-limitations/habit-chain-tables-not-synced.md），
+        所以 _generic_* 不会写墓碑。待 chain_id 改引用 hash_id 恢复同步后，
+        走 _generic_* 通道将自动写墓碑，无需再改此处。
 
         Args:
             chain_id: 链条 ID
 
         Returns:
-            True
+            是否成功（链条存在并删除返回 True，不存在返回 False）
         """
         try:
-            with self.db.get_connection() as conn:
-                conn.execute("DELETE FROM habit_chain_nodes WHERE chain_id = ?", (chain_id,))
-                conn.execute("DELETE FROM habit_chains WHERE id = ?", (chain_id,))
-            logger.info("删除链条 %s 及其节点成功", chain_id)
-            return True
+            # 先级联删除所有节点（走 _generic_batch_delete 通道）
+            node_provider = HabitChainNodeProvider()
+            node_provider.delete_by_chain_id(chain_id)
+
+            # 再删除链条本身（走 _generic_delete 通道）
+            success = self._generic_delete(chain_id)
+            if success:
+                logger.info("删除链条 %s 及其节点成功", chain_id)
+            return success
+        except DataAccessError:
+            raise
         except sqlite3.Error as e:
             logger.error("删除习惯链失败: error=%s", e)
             raise DataAccessError(f"删除习惯链失败: {e}") from e
@@ -267,6 +268,9 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         """
         创建链条节点，返回新记录的自增 ID
 
+        走 _generic_insert 通道：habit_chain_nodes 在 HASH_ID_PREFIXES 中（前缀 hcn-），
+        _generic_insert 自动生成 hash_id 并写入 created_at/updated_at。
+
         Args:
             data: 节点数据，必填 chain_id、sort_order、name，
                   可选 habit_id、trigger_time
@@ -274,30 +278,20 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         Returns:
             新插入记录的 INTEGER 主键
         """
-        from lifeprism.sync.constants import generate_hash_id
-        from lifeprism.utils.time_utils import get_utc_now_iso
+        insert_data = {
+            "chain_id": data["chain_id"],
+            "sort_order": data["sort_order"],
+            "name": data["name"],
+            "habit_id": data.get("habit_id"),
+            "trigger_time": data.get("trigger_time"),
+        }
 
-        now_iso = get_utc_now_iso()
         try:
-            with self.db.get_connection() as conn:
-                cursor = conn.execute(
-                    """INSERT INTO habit_chain_nodes
-                       (hash_id, chain_id, sort_order, name, habit_id, trigger_time, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (
-                        generate_hash_id("hcn-"),
-                        data["chain_id"],
-                        data["sort_order"],
-                        data["name"],
-                        data.get("habit_id"),
-                        data.get("trigger_time"),
-                        now_iso,
-                        now_iso,
-                    ),
-                )
-                node_id = cursor.lastrowid
-                logger.info("创建节点成功: %s", node_id)
-                return node_id
+            node_id = self._generic_insert(insert_data)
+            logger.info("创建节点成功: %s", node_id)
+            return int(node_id) if node_id is not None else 0
+        except DataAccessError:
+            raise
         except sqlite3.Error as e:
             logger.error("创建习惯链节点失败: error=%s", e)
             raise DataAccessError(f"创建习惯链节点失败: {e}") from e
@@ -375,6 +369,45 @@ class HabitChainNodeProvider(LWBaseDataProvider):
         except sqlite3.Error as e:
             logger.error("删除习惯链节点失败: error=%s", e)
             raise DataAccessError(f"删除习惯链节点失败: {e}") from e
+
+    def delete_by_chain_id(self, chain_id: int) -> bool:
+        """
+        删除指定链条的所有节点（级联清理用）
+
+        走 _generic_batch_delete 通道：habit_chain_nodes 当前不在 SYNC_TABLES 中
+        （见 docs/known-limitations/habit-chain-tables-not-synced.md），所以不会写墓碑。
+        但仍走 _generic_* 通道保持通道统一，待恢复同步后自动写墓碑。
+
+        实现方式：先查 chain_id 对应的 id 列表，再走 _generic_batch_delete
+        （批量 DELETE，AUTOINCREMENT 表不在 SYNC_TABLES 故不写墓碑）。
+
+        Args:
+            chain_id: 链条 ID
+
+        Returns:
+            True（无节点时也返回 True）
+        """
+        try:
+            # 先查该链条的所有 node id 列表
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"SELECT {self._PRIMARY_KEY} FROM {self._TABLE_NAME} WHERE chain_id = ?",
+                    (chain_id,),
+                )
+                node_ids = [row[0] for row in cursor.fetchall()]
+
+            if not node_ids:
+                return True
+
+            # 批量删除（_generic_batch_delete 自带事务）
+            self._generic_batch_delete(node_ids)
+            return True
+        except DataAccessError:
+            raise
+        except sqlite3.Error as e:
+            logger.error("按链条ID删除节点失败: error=%s", e)
+            raise DataAccessError(f"按链条ID删除节点失败: {e}") from e
 
     def batch_update_sort_order(self, updates: list[dict[str, Any]]) -> bool:
         """

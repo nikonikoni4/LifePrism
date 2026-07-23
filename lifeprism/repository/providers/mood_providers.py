@@ -494,6 +494,9 @@ class MoodImpactProvider(LWBaseDataProvider):
         """
         创建影响因素
 
+        走 _generic_insert 通道：mood_impacts 在 HASH_ID_PREFIXES 中（前缀 mi-），
+        _generic_insert 自动生成 hash_id 并写入 created_at/updated_at。
+
         Args:
             data: 影响因素数据（需包含 name）
 
@@ -503,26 +506,16 @@ class MoodImpactProvider(LWBaseDataProvider):
         Raises:
             DataAccessError: 数据库操作失败
         """
-        from lifeprism.sync.constants import generate_hash_id
-        from lifeprism.utils.time_utils import get_utc_now_iso
-
-        now_iso = get_utc_now_iso()
+        insert_data = {
+            "name": data["name"],
+            "sort_order": data.get("sort_order", 0),
+        }
         try:
-            with self.db.get_connection() as conn:
-                cursor = conn.execute(
-                    """INSERT INTO mood_impacts (hash_id, name, sort_order, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, ?)""",
-                    (
-                        generate_hash_id("mi-"),
-                        data["name"],
-                        data.get("sort_order", 0),
-                        now_iso,
-                        now_iso,
-                    ),
-                )
-                new_id = cursor.lastrowid
-                logger.info("创建影响因素成功: %s, id=%s", data["name"], new_id)
-                return new_id
+            new_id = self._generic_insert(insert_data)
+            logger.info("创建影响因素成功: %s, id=%s", data["name"], new_id)
+            return int(new_id) if new_id is not None else 0
+        except DataAccessError:
+            raise
         except Exception as e:
             logger.error("创建影响因素失败: %s", e)
             raise DataAccessError(f"创建影响因素失败: {e}") from e
