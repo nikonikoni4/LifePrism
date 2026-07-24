@@ -98,9 +98,30 @@
 - 触发规则：审查"同步删除阶段1：Schema 变更（hash_id + 墓碑表）"当前工作区代码更改时查看
 - 内容摘要：同步删除阶段1（6 张 AUTOINCREMENT 表加 hash_id + deletion_log 墓碑表 + m015 迁移 + get_unique_fields 改用 hash_id 去重）的 8 维度代码审查报告。审查 12 个修改文件 + 新增 m015/7 测试/4 ADR。发现 4 个问题（置信度 ≥ 80）：1 个正确性回归（get_unique_fields 改 hash_id 后 LWW 被 INSERT OR REPLACE 的业务 UNIQUE 约束绕过，旧数据覆盖新数据，90）、1 个文档规范违规（4 个新 ADR frontmatter `last_updated_at` 应为 `last_updated`，85）、1 个性能问题（m015 在新库创建冗余唯一索引，82）、1 个测试缺口（LWW 失效回归场景无测试，80）。Security 维度无问题。
 
+## 2026-07-23-code-review-deletion-sync-stage2
+
+- updated_at: 2026-07-23
+- path: `docs/generated/020/2026-07-23-code-review-deletion-sync-stage2.md`
+- 触发规则：审查"同步删除阶段2：代码适配（Provider 迁移 + 通道统一）"从 cd62d359 到 HEAD + working tree 的代码变更时查看
+- 内容摘要：同步删除阶段2（slice01~slice10，4 个 commits + working tree）的 4 维度并行代码审查报告。审查 20 个源代码文件 + 13 个测试文件（37 files, +7730/-1369 lines）。发现 4 个问题（置信度 ≥ 80）：1 个 HIGH（delete_computer_usage 绕过 _generic_delete 不写墓碑，95）、1 个 MEDIUM（update_computer_usage 绕过 _generic_update 导致 LWW 失效，90）、1 个 MEDIUM（5 个 Service 文件导入违规，85）、1 个 MEDIUM（being_provider upsert 非原子竞态，80）。Working tree 中 custom_record_aggregator 和 habit_providers 的 L3 级联删除修复已就绪待提交。
+
 ## 2026-07-23-code-review-deletion-sync-schema-round2
 
 - updated_at: 2026-07-23
 - path: `docs/generated/019/2026-07-23-code-review-deletion-sync-schema-round2.md`
 - 触发规则：审查"同步删除阶段1 修复后的第二轮代码审查"时查看
+## 2026-07-23-code-review-deletion-sync-statistical
+
+- updated_at: 2026-07-23
+- path: `docs/generated/021/2026-07-23-code-review-deletion-sync-statistical.md`
+- 触发规则：审查"同步删除阶段2a：StatisticalDataProviders 迁移（P5 详细实现）"PRD 的工作区变更时查看
+- 内容摘要：同步删除阶段2a（statistical_data_providers 迁移）的 8 维度代码审查报告。审查 7 个核心源码 + 5 个新测试文件（22 files, +1282/-1269 lines）。发现 8 个问题（置信度 ≥ 80）：3 个 Architecture（update_by_filter DSL 破坏语义化接口 85、Provider 间互相调用 90、_SYSTEM_UPDATE_FIELDS 绕过白名单 80）、1 个 PRD 合规（update_log_category 使用 update_by_filter 而非 PRD 指定的 update_computer_usage 88）、1 个 Code Quality（None 语义不一致 90）、2 个 Data Integrity（batch_update/update_by_filter 绕过 _generic_update 85、update_logs_by_app_title 未设 updated_at 82）、1 个 Testing（S3 集成测试缺失 85）。正向：SQL 注入防护完整、注释合规 26 检查点全部通过、墓碑验证覆盖到位。
+
 - 内容摘要：同步删除阶段1 原始 4 个 ≥80 问题修复后的第二轮 8 维度重新审查报告。Issue 2(ADR frontmatter)、Issue 3(m015 冗余索引)已完全修复；Issue 1(LWW 绕过)仅对表级 UNIQUE 修复，列级 UNIQUE(mood_impacts.name)仍存在同样问题；Issue 4(LWW 测试)仅补了 timeline_custom_block/user_app_behavior_log 端到端测试，time_paradoxes/mood_impacts 仍缺失。发现 6 个问题(置信度 ≥ 80)：Issue 1 P0 阻断(hash_id 兜底仅覆盖 _generic_insert，6+ 处直接 INSERT 路径绕过，新库启动会因 data_initializer 触发 NOT NULL 而失败，100)、Issue 2 数据丢失(mood_impacts 列级 UNIQUE 未解析 → 回退 hash_id → REPLACE 按 name 冲突覆盖，100)、Issue 3 迁移可靠性(m015 重试逻辑不可达 + CREATE INDEX 无重试，98)、Issue 4 设计不一致(deletion_log 无 UNIQUE(target_table, record_id)，ADR 声明的跨端 LWW 处理墓碑失效，95)、Issue 5 (hash_id 兜底 None/空字符串绕过，90)、Issue 6 (spec 同步表清单未更新，100)。
+
+## 2026-07-24-code-review-deletion-sync-tombstone
+
+- updated_at: 2026-07-24
+- path: `docs/generated/022/2026-07-24-code-review-deletion-sync-tombstone.md`
+- 触发规则：审查"同步删除阶段3：墓碑同步流程（DeletionLogProvider + 3 专用端点 + sync_once 集成）"commit `99872455` 时查看
+- 内容摘要：同步删除阶段3（45 个文件 +3952/-214 行）的 8 维度并行代码审查报告。发现 9 个问题（置信度 ≥ 80）：3 个 P0 数据完整性（AUTOINCREMENT 表 daily_focus/weekly_focus/category_map_cache 缺少 hash_id 导致墓碑跨端删除目标错误，90；动态表名校验过宽可构造 SQL 注入，90；非 SQLite 异常导致 _pull_deletion_log 事务未回滚，85）、2 个 P1 架构偏差（专用通道未强制隔离——deletion_log 仍可通过通用同步通道传播，85；模块文档字符串声称"LWW 用 updated_at 比较"与 ADR 决策 3 的 INSERT OR IGNORE 不符，85）、1 个 P1 代码质量（API 端点 except Exception 违反项目规则，85）、1 个 P2 最佳实践（新增墓碑端点缺少 Pydantic 请求/响应模型，80）、1 个 P2 代码质量（DeletionLogProvider 三个写入方法大量重复代码，80）、1 个 P2 测试（缺少云侧端点集成测试 + Push 失败路径测试 + cursor 变体方法单元测试，80）。正向：ADR 文档结构优秀、Spec 准确反映实现、22 个已知限制文档详尽、16 个 PRD 场景全部覆盖、SQL 参数化查询完整。

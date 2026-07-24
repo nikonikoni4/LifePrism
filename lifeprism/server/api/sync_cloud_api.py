@@ -340,7 +340,7 @@ def sync_push_deletion_log(
     request: SyncPushDeletionLogRequest,
     _: None = Depends(verify_sync_api_key),
 ):
-    """云端对每条墓碑（单事务）：LWW 检查 + DELETE + 写副本
+    """云端对每条墓碑（单事务）：存在性检查 + DELETE + 写副本
 
     每条墓碑独立事务处理，单条失败不影响已应用的墓碑，
     但会立即 raise 终止后续墓碑处理（由调用方决定是否重试）。
@@ -354,7 +354,7 @@ def sync_push_deletion_log(
     **响应**:
     - success: True
     - applied_count: 成功应用的墓碑数
-    - skipped_count: 因 LWW 冲突跳过的墓碑数
+    - skipped_count: 因已存在跳过的墓碑数（INSERT OR IGNORE 存在性检查）
     """
     applied_count = 0
     skipped_count = 0
@@ -362,10 +362,12 @@ def sync_push_deletion_log(
         target_table = t["target_table"]
         record_id = t["record_id"]
         original_created_at = t["created_at"]
-        try:
-            with sync_repository.db.get_connection() as conn:
-                cursor = conn.cursor()
-                # a. LWW 检查：云端已有同 (target_table, record_id) 则跳过
+        # 每条墓碑独立事务：try/except 仅用于事务 rollback（资源清理），
+        # 异常 re-raise 由全局异常处理器统一转换（符合 API 层规范）
+        with sync_repository.db.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                # a. 存在性检查：云端已有同 (target_table, record_id) 则跳过
                 existing = deletion_log_repository.get_tombstone_with_cursor(
                     cursor, target_table, record_id
                 )
@@ -386,9 +388,10 @@ def sync_push_deletion_log(
                 )
                 conn.commit()
                 applied_count += 1
-        except Exception as e:
-            logger.error("push-deletion-log 处理墓碑失败: %s, error: %s", t, e)
-            raise
+            except Exception:
+                conn.rollback()
+                logger.error("push-deletion-log 处理墓碑失败: target_table=%s, record_id=%s", target_table, record_id)
+                raise
     logger.info(
         "墓碑 Push: 共 %d 条, 应用 %d, 跳过 %d",
         len(request.tombstones),

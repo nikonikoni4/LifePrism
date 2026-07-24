@@ -285,14 +285,14 @@ class SyncClient:
     # ==================== 墓碑同步（PRD 3 Slice 02） ====================
 
     def _pull_deletion_log(self, remote_url: str, api_key: str, last_sync_time: str) -> None:
-        """墓碑 Pull：HTTP 拉取（事务外）→ 事务内 LWW 检查 + DELETE + 写副本
+        """墓碑 Pull：HTTP 拉取（事务外）→ 事务内存在性检查 + DELETE + 写副本
 
         失败则整个事务回滚，sync_once 抛异常不更新 last_sync_time。
 
         流程：
         1. HTTP 拉取（事务外，避免长事务占用连接）
         2. 事务内逐条处理：
-           a. LWW 检查：本地已有同 (target_table, record_id) 墓碑则跳过
+           a. 存在性检查：本地已有同 (target_table, record_id) 墓碑则跳过（INSERT OR IGNORE 语义）
            b. 执行 DELETE（不写墓碑，避免循环触发同步）
            c. 写本地副本（source=cloud，保留原 created_at）
 
@@ -328,15 +328,17 @@ class SyncClient:
             return
 
         # 2. 事务内处理（所有 DELETE + 副本写入在同一事务，失败则回滚）
-        try:
-            with self.db.get_connection() as conn:
-                cursor = conn.cursor()
+        # 注意：DatabaseManager.get_connection() 仅 catch sqlite3.Error 执行 rollback，
+        # 非 SQLite 异常（如 KeyError）不会触发回滚。此处显式 catch 确保 rollback。
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
                 for t in tombstones:
                     target_table = t["target_table"]
                     record_id = t["record_id"]
                     original_created_at = t["created_at"]
 
-                    # a. LWW 检查（简化）：本地已有同 (target_table, record_id) 墓碑则跳过
+                    # a. 存在性检查：本地已有同 (target_table, record_id) 墓碑则跳过
                     local = deletion_log_repository.get_tombstone_with_cursor(
                         cursor, target_table, record_id
                     )
@@ -357,10 +359,11 @@ class SyncClient:
                         created_at=original_created_at,
                     )
                 conn.commit()
-            logger.info("墓碑 Pull: 处理 %d 条墓碑", len(tombstones))
-        except Exception:
-            logger.error("墓碑 Pull 失败，事务已回滚")
-            raise
+                logger.info("墓碑 Pull: 处理 %d 条墓碑", len(tombstones))
+            except Exception:
+                conn.rollback()
+                logger.error("墓碑 Pull 失败，事务已回滚")
+                raise
 
     def _push_deletion_log(self, remote_url: str, api_key: str, last_sync_time: str) -> None:
         """墓碑 Push：查询本地 source=local 墓碑 → HTTP 推送到云端

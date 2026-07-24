@@ -115,13 +115,13 @@ module: sync
 <key_function>
 - lifeprism/repository/sync_repository.py
   - sync_repository.SyncRepository.query_incremental:226
-  - sync_repository.SyncRepository.upsert_rows:483
-  - sync_repository.SyncRepository.upsert_rows_with_lww:699
-  - sync_repository.SyncRepository.batch_get_existing_updated_at:561
-  - sync_repository.SyncRepository.get_custom_record_slugs:937
-  - sync_repository.SyncRepository.get_primary_key_field:850
-  - sync_repository.SyncRepository.get_unique_fields:877
-  - sync_repository.SyncRepository.has_updated_at:920
+  - sync_repository.SyncRepository.upsert_rows:581
+  - sync_repository.SyncRepository.upsert_rows_with_lww:797
+  - sync_repository.SyncRepository.batch_get_existing_updated_at:659
+  - sync_repository.SyncRepository.get_custom_record_slugs:1035
+  - sync_repository.SyncRepository.get_primary_key_field:948
+  - sync_repository.SyncRepository.get_unique_fields:975
+  - sync_repository.SyncRepository.has_updated_at:1018
   - sync_repository.SyncRepository.count_rows:148
   - sync_repository.SyncRepository.count_rows_batch:185
 </key_function>

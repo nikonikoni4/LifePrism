@@ -1,9 +1,11 @@
 """DeletionLogProvider - 墓碑表数据访问层
 
 职责：为 deletion_log 表提供 CRUD + 增量查询 + source 过滤 + 清理能力。
-墓碑不修改，created_at == updated_at，LWW 用 updated_at 比较（行为等价）。
+墓碑不修改，created_at == updated_at，冲突处理用 INSERT OR IGNORE 存在性检查
+（本地已有同 (target_table, record_id) 墓碑则跳过，不比较 updated_at）。
 
 参考 ADR: docs/adr/2026-07-22-deletion-log-table.md
+参考 ADR: docs/adr/2026-07-22-deletion-sync-tombstone.md 决策 3
 参考 PRD: .scratch/deletion-sync-03-tombstone/prd.md
 """
 
@@ -65,12 +67,12 @@ class DeletionLogProvider(LWBaseDataProvider):
 
         id 用 dl- 前缀 + 8 位 hex（通过 _generic_insert(id_prefix='dl-')）。
         created_at 为 None 时用当前 UTC ISO 8601 时间；否则用传入值
-        （用于 Pull/Push 写副本时保留原墓碑时间戳，保持两端 LWW 一致）。
+        （用于 Pull/Push 写副本时保留原墓碑时间戳，保持两端一致）。
         created_at 传入时 updated_at 同步设为同一值
-        （保持墓碑"不修改"语义，LWW 比较正确）。
+        （保持墓碑"不修改"语义）。
 
         冲突处理：_ON_CONFLICT='ignore'，UNIQUE(target_table, record_id) 冲突时
-        保留旧墓碑（INSERT OR IGNORE），不刷新 updated_at。
+        保留旧墓碑（INSERT OR IGNORE 存在性检查），不刷新 updated_at。
 
         Args:
             target_table: 被删记录所在表名
@@ -159,10 +161,10 @@ class DeletionLogProvider(LWBaseDataProvider):
         target_table: str,
         record_id: str,
     ) -> dict[str, Any] | None:
-        """按 target_table + record_id 查询墓碑（cursor 版本，供事务内 LWW 检查）
+        """按 target_table + record_id 查询墓碑（cursor 版本，供事务内存在性检查）
 
         与 get_tombstone 功能相同，但接受外部 cursor 参数，在同一事务内执行查询。
-        供 _pull_deletion_log 事务内 LWW 检查使用，确保查询与 DELETE/副本写入在同一事务。
+        供 _pull_deletion_log 事务内存在性检查使用，确保查询与 DELETE/副本写入在同一事务。
 
         SQL 封装在此方法中（SELECT FROM deletion_log），符合 Repository Pattern。
 
@@ -199,9 +201,9 @@ class DeletionLogProvider(LWBaseDataProvider):
         与 create_tombstone 功能相同，但接受外部 cursor 参数，在同一事务内执行写入。
         供 _pull_deletion_log 事务内写本地副本使用，确保 DELETE 与副本写入在同一事务。
 
-        保留原 created_at（Pull/Push 写副本时保持两端 LWW 一致）。
+        保留原 created_at（Pull/Push 写副本时保持两端一致）。
         updated_at = created_at（墓碑不修改语义）。
-        冲突处理：INSERT OR IGNORE，UNIQUE 冲突时保留旧墓碑。
+        冲突处理：INSERT OR IGNORE 存在性检查，UNIQUE 冲突时保留旧墓碑。
 
         SQL 封装在此方法中（INSERT OR IGNORE INTO deletion_log），符合 Repository Pattern。
 
@@ -315,7 +317,7 @@ class DeletionLogProvider(LWBaseDataProvider):
         target_table: str,
         record_id: str,
     ) -> dict[str, Any] | None:
-        """按 target_table + record_id 查询墓碑（用于 LWW 检查）
+        """按 target_table + record_id 查询墓碑（用于存在性检查）
 
         UNIQUE(target_table, record_id) 约束保证至多返回一条记录。
 

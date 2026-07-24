@@ -115,6 +115,11 @@ category_map_cache_CONFIG = {
             "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
             "comment": "自增主键，用于删除操作",
         },
+        "hash_id": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "UNIQUE"],
+            "comment": "同步专用标识（跨端稳定 ID，参考 ADR 2026-07-22-hash-id-sync-only-identifier.md）",
+        },
         "app": {
             "type": "TEXT",
             "constraints": ["NOT NULL"],
@@ -456,6 +461,11 @@ DAILY_FOCUS_CONFIG = {
             "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
             "comment": "自增主键",
         },
+        "hash_id": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "UNIQUE"],
+            "comment": "同步专用标识（跨端稳定 ID，参考 ADR 2026-07-22-hash-id-sync-only-identifier.md）",
+        },
         "date": {
             "type": "TEXT",
             "constraints": ["NOT NULL", "UNIQUE"],
@@ -481,6 +491,11 @@ WEEKLY_FOCUS_CONFIG = {
             "type": "INTEGER",
             "constraints": ["PRIMARY KEY", "AUTOINCREMENT"],
             "comment": "自增主键",
+        },
+        "hash_id": {
+            "type": "TEXT",
+            "constraints": ["NOT NULL", "UNIQUE"],
+            "comment": "同步专用标识（跨端稳定 ID，参考 ADR 2026-07-22-hash-id-sync-only-identifier.md）",
         },
         "year": {"type": "INTEGER", "constraints": ["NOT NULL"], "comment": "年份"},
         "month": {"type": "INTEGER", "constraints": ["NOT NULL"], "comment": "月份 1-12"},

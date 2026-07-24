@@ -33,6 +33,13 @@
 - 触发规则：修改同步模块整体结构、SyncClient 大幅改动时阅读
 - 内容摘要：SyncClient（1780+ 行）承担首次同步 + 增量同步两条流程，在下次同步大改时抽取独立 InitialSyncService 类
 
+## deletion-sync-p2-issues
+
+- updated_at: 2026-07-24
+- path: `docs/technical-debt/deletion-sync-p2-issues.md`
+- 触发规则：修改墓碑同步端点、DeletionLogProvider 写入方法、或 SYNC_TABLES 过滤逻辑时阅读
+- 内容摘要：删除同步 Stage 3 代码审查 4 个 P2 问题——通用通道缺防御性过滤（deletion_log 误加回会双重同步）、墓碑端点用 list[dict] 而非 Pydantic 模型、DeletionLogProvider 三方法重复代码、云侧端点缺 TestClient 集成测试
+
 ## mood-impacts-autoincrement-id
 
 - updated_at: 2026-07-17

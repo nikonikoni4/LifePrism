@@ -67,6 +67,8 @@ SYNC_TABLES = [
 # 需要 hash_id 字段的 AUTOINCREMENT 表前缀映射
 # 同时作为"哪些表需要 hash_id"的判断依据（_generic_insert 用 HASH_ID_PREFIXES.get(table_name) 判断）
 # 参考 ADR: docs/adr/2026-07-22-hash-id-sync-only-identifier.md（hash_id 定位为同步专用标识）
+# 注意：daily_focus/weekly_focus/category_map_cache 在 m016 迁移中补充（m015 遗漏），
+# 参考 ADR docs/adr/2026-07-24-add-hash-id-to-remaining-autoincrement-tables.md
 HASH_ID_PREFIXES = {
     "timeline_custom_block": "tcb-",
     "time_paradoxes": "tp-",
@@ -74,6 +76,10 @@ HASH_ID_PREFIXES = {
     "habit_chains": "hc-",
     "habit_chain_nodes": "hcn-",
     "user_app_behavior_log": "awbl-",
+    # 以下 3 张表在 m016 迁移中补充（m015 审计时遗漏）
+    "daily_focus": "df-",
+    "weekly_focus": "wf-",
+    "category_map_cache": "cmc-",
 }
 
 

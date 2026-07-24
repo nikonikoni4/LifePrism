@@ -11,6 +11,7 @@
 编码规范：不得在非 repository 的任何位置直接编写 SQL
 """
 
+import re
 import sqlite3
 from typing import Any
 
@@ -19,6 +20,11 @@ from lifeprism.utils import get_logger
 from lifeprism.utils.exceptions import DataAccessError
 
 logger = get_logger(__name__)
+
+# 动态表名正则：custom_ + 合法 slug（^[a-z][a-z0-9_]*$）
+# 防止 SQL 注入：仅允许字母/数字/下划线，拒绝空格/分号/注释等特殊字符
+# 与 CustomRecordRepository._SLUG_PATTERN 保持一致
+_DYNAMIC_TABLE_PATTERN = re.compile(r"^custom_[a-z][a-z0-9_]*$")
 
 
 class SyncRepository:
@@ -63,6 +69,10 @@ class SyncRepository:
         - created_at TEXT
         - updated_at TEXT
 
+        安全校验：使用正则 ^custom_[a-z][a-z0-9_]*$ 严格匹配，
+        防止 SQL 注入（如 custom_x WHERE 1=1 -- 会被拒绝）。
+        与 CustomRecordRepository._SLUG_PATTERN 保持一致。
+
         custom_record_types 和 custom_record_fields 是静态 meta 表，
         在 TABLE_CONFIGS 中，不会被识别为动态表。
 
@@ -72,7 +82,7 @@ class SyncRepository:
         Returns:
             True 如果是动态自定义记录表
         """
-        return table_name.startswith("custom_") and table_name not in TABLE_CONFIGS
+        return bool(_DYNAMIC_TABLE_PATTERN.match(table_name)) and table_name not in TABLE_CONFIGS
 
     # 保留私有别名，向后兼容（内部调用）
     _is_dynamic_table = is_dynamic_table

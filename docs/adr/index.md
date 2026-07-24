@@ -24,6 +24,12 @@ abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设�
 - 触发规则：当需要理解为什么为 6 张 AUTOINCREMENT 表新增 hash_id 字段、迁移方法选型（ALTER + 回填 + CREATE UNIQUE INDEX vs 删表重建）、或修改迁移脚本时读取
 - 内容摘要：为实现删除同步功能，为 6 张 AUTOINCREMENT 表新增 `hash_id TEXT NOT NULL UNIQUE` 字段作为跨端稳定标识。用户初始倾向删表重建（因简单且不了解 SQLite ALTER TABLE 限制），经评估后采用 ALTER TABLE ADD COLUMN + 回填 + CREATE UNIQUE INDEX 方式（不丢数据且与 m012 一致）。决策前提：删除同步需要墓碑表模式、墓碑需要跨端稳定标识、自增 id 两端不同、项目已采用 LWW 策略、SQLite ALTER TABLE 限制。未来多客户端并发场景下 LWW + 墓碑不足时考虑 CRDT。文档影响已修正：同步表数量从 31 张变 29 张（见 [2026-07-22-deletion-sync-tombstone.md](./2026-07-22-deletion-sync-tombstone.md)）。
 
+## add-hash-id-to-remaining-autoincrement-tables
+- updated_at: 2026-07-24
+- path: `docs/adr/2026-07-24-add-hash-id-to-remaining-autoincrement-tables.md`
+- 触发规则：当需要理解为什么 daily_focus/weekly_focus/category_map_cache 在 m016 中补充 hash_id、或修改这 3 张表的 hash_id 相关配置时读取
+- 内容摘要：m015 审计遗漏了 3 张 AUTOINCREMENT 同步表（daily_focus/weekly_focus/category_map_cache），导致墓碑跨端删除命中错误记录。采用与 m015 相同方法（ALTER + CREATE UNIQUE INDEX + 回填）补充 hash_id。category_map_cache 有确认的删除路径，不能作为已知限制接受。
+
 ## hash-id-sync-only-identifier
 - updated_at: 2026-07-22
 - path: `docs/adr/2026-07-22-hash-id-sync-only-identifier.md`
