@@ -1,19 +1,20 @@
 ---
-version: 2.0
+version: 2.1
 created_at: 2026-07-16
-updated_at: 2026-07-16
-last_updated: 从 v1.0（2026-07-11-data-sync-spec.md）拆分重构；新增动态表定义对比与双向建表子节；更新 API 端点表（6→10）；新增 wechat_account_state 同步；更新 key_function
-abstract: Windows 本地 ↔ Linux 云端数据同步模块核心规格（数据库同步 + 动态表同步 + 心跳路由 + 云端配置初始化），定义 30 张静态表增量同步、动态表 slug 集合对比双向建表、LWW 冲突解决和认证安全的技术契约
+updated_at: 2026-07-23
+last_updated: 新增墓碑同步章节（专用端点替代 SYNC_TABLES、HTTP 外事务内、INSERT OR IGNORE 跳过 LWW、Aggregator 实例化 Provider、sync_once 顺序）；新增 DeletionLogProvider key_function；SyncRepository/SyncClient/Sync Cloud API 各补墓碑相关接口；同步表数 30→29（deletion_log 走专用通道）；Functional Checklist 补墓碑同步小节；更新 sync_once 流程顺序
+abstract: Windows 本地 ↔ Linux 云端数据同步模块核心规格（数据库同步 + 动态表同步 + 墓碑同步 + 心跳路由 + 云端配置初始化），定义 29 张静态表增量同步、动态表 slug 集合对比双向建表、墓碑专用端点跨端传播删除、LWW 冲突解决和认证安全的技术契约
 status: draft
 module: sync
 ---
 
-# 数据同步模块规格 — 核心（数据库同步 + 动态表 + 心跳路由 + 配置初始化）
+# 数据同步模块规格 — 核心（数据库同步 + 动态表 + 墓碑同步 + 心跳路由 + 配置初始化）
 
 ## 版本
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 2.1 | 新增墓碑同步机制（专用端点 `/pull-deletion-log`、`/push-deletion-log`、`/cleanup-deletion-log`，HTTP 外事务内，`INSERT OR IGNORE` 跳过 LWW，Aggregator 内部实例化 DeletionLogProvider）；`deletion_log` 从 `SYNC_TABLES` 移除改走专用通道；静态同步表数量 30→29；新增 DeletionLogProvider 章节；sync_once 流程新增墓碑 Pull/Push/清理步骤 |
 | 2.0 | 从原 `2026-07-11-data-sync-spec.md` 拆分，拆分文件同步到独立 spec |
 | 1.0 | 创建 spec 初稿 |
 
@@ -22,8 +23,9 @@ module: sync
 **业务问题**：P1 完成后，Windows 本地和 Linux 云端各自独立运行。用户需要通过微信（Linux Agent）记录数据后能在本地查看，也需要云端 Agent 能访问本地采集的 Monitor 数据。两端数据需要保持一致，且避免微信消息被双端重复回复。
 
 **核心职责**：
-- **数据库双向同步**：30 张静态表 + 动态 custom 表，基于 `updated_at` 字段的增量同步
+- **数据库双向同步**：29 张静态表 + 动态 custom 表，基于 `updated_at` 字段的增量同步
 - **动态表同步**：拉取云端定义 → slug 集合对比 → 双向建表（本地 DDL only，云端全量替换）
+- **墓碑同步（删除传播）**：专用端点 `/pull-deletion-log`、`/push-deletion-log`、`/cleanup-deletion-log` 跨端传播 DELETE 操作（`deletion_log` 不在 `SYNC_TABLES`，走专用通道）
 - **心跳与消息路由**：纯内存心跳状态管理，本地离线时云端接管微信消息处理
 - **云端配置初始化**：本地生成 cloud_init.yaml → 云端消费写入 config.yaml + providers.yaml
 - **认证安全**：API Key 认证 + HTTPS 加密传输
@@ -35,9 +37,10 @@ module: sync
 - 增量同步机制（`updated_at` 字段 + 分批拉取，每批 1000 条）
 - LWW（Last-Write-Wins）冲突解决策略
 - 动态表定义对比（slug 集合差集 → 双向建表）
+- 墓碑同步（`deletion_log` 表通过 3 个专用端点跨端传播 DELETE；HTTP 在事务外，DELETE + 墓碑写入在事务内）
 - 心跳状态管理（纯内存，15 分钟超时）
 - 消息路由（本地在线时云端跳过消息处理）
-- API 端点：pull / push / heartbeat / dynamic-tables-definitions / rebuild-dynamic-tables
+- API 端点：pull / push / heartbeat / dynamic-tables-definitions / rebuild-dynamic-tables / pull-deletion-log / push-deletion-log / cleanup-deletion-log
 - 云端配置生成与初始化（CloudConfigGenerator → CloudInitializer）
 - API Key 认证
 - 前端同步状态查询
@@ -51,6 +54,9 @@ module: sync
 - 数据库静态加密（SQLCipher）
 - Docker 容器部署
 - ActivityWatch 数据同步（属于 SyncService，与云端同步无关）
+- 文件删除同步（文件操作不走墓碑通道，文档化为已知限制 → `docs/known-limitations/file-deletion-not-synced.md`）
+- 删除-更新冲突自动处理（A 删除 + B 更新，已知限制 → `docs/known-limitations/delete-update-conflict-not-resolved.md`）
+- 删除-重建冲突（A 删除后 B 重建同一记录，墓碑跳过新记录，已知限制 → `docs/known-limitations/delete-recreate-conflict-tombstone-skip.md`）
 
 ## Functional Checklist
 
@@ -94,6 +100,24 @@ module: sync
 - [ ] 不再每次同步都出现"重建动态表: skipped"日志
 - [ ] 动态表列表（custom_{slug}）加入 `SYNC_TABLES`，参与数据 pull/push
 
+### 墓碑同步（删除传播）
+
+- [ ] `deletion_log` 不在 `SYNC_TABLES` 中（仅通过 3 个专用端点同步）
+- [ ] 本地删除 TEXT 主键表记录 → 写入 `deletion_log`（`source=local`）→ 下次 sync 推送到云端 → 云端执行 DELETE
+- [ ] 本地删除 AUTOINCREMENT 表记录 → 通过 `hash_id` 写入墓碑 → 对端按 `hash_id` 删除
+- [ ] 本地删除动态表 `custom_*` 记录 → `CustomRecordRepository.delete_entry` 在 DELETE 事务内调用 `write_tombstone_with_cursor` 写墓碑
+- [ ] 墓碑 Pull 在数据 Pull 之前执行（避免删除被数据 upsert 覆盖）
+- [ ] 墓碑 Push 在数据 Push 之前执行（确保云端先收到删除意图）
+- [ ] `_pull_deletion_log` 失败时整个事务回滚，`sync_once` 抛异常不更新 `last_sync_time`
+- [ ] `_push_deletion-log` 端点对每条墓碑独立事务处理（LWW 检查 + DELETE + 写云端副本）
+- [ ] 本地已有同 `(target_table, record_id)` 墓碑时 `INSERT OR IGNORE` 跳过（不比较 `updated_at`）
+- [ ] 云端 Pull 不返回已物理删除的记录（数据 Pull 不写回已删记录）
+- [ ] 同步全部成功后两端清理 `created_at <= last_sync_time` 的墓碑记录
+- [ ] 重置同步进度后墓碑机制仍工作（`last_sync_time` 重置为空，但 `deletion_log` 表不清空）
+- [ ] 全量首同步（`_full_sync_to_cloud`）不传播墓碑
+- [ ] `full-clear` 端点显式清空 `deletion_log` 表（在 `SYNC_TABLES` 遍历后 try/except 调用）
+- [ ] `/api/sync/status` 端点显式查询 `deletion_log` 表行数
+
 ### 心跳与消息路由
 
 - [ ] 每次 sync/pull 请求同时更新心跳时间戳
@@ -117,17 +141,19 @@ module: sync
 <key_function>
 - lifeprism/repository/sync_repository.py
   - sync_repository.SyncRepository.query_incremental:226
-  - sync_repository.SyncRepository.upsert_rows:483
-  - sync_repository.SyncRepository.upsert_rows_with_lww:699
-  - sync_repository.SyncRepository.batch_get_existing_updated_at:561
-  - sync_repository.SyncRepository.get_custom_record_slugs:937
-  - sync_repository.SyncRepository.get_primary_key_field:850
-  - sync_repository.SyncRepository.get_unique_fields:877
-  - sync_repository.SyncRepository.has_updated_at:920
+  - sync_repository.SyncRepository.upsert_rows:581
+  - sync_repository.SyncRepository.upsert_rows_with_lww:797
+  - sync_repository.SyncRepository.batch_get_existing_updated_at:659
+  - sync_repository.SyncRepository.get_custom_record_slugs:1035
+  - sync_repository.SyncRepository.get_primary_key_field:948
+  - sync_repository.SyncRepository.get_unique_fields:975
+  - sync_repository.SyncRepository.has_updated_at:1018
   - sync_repository.SyncRepository.count_rows:148
   - sync_repository.SyncRepository.count_rows_batch:185
-  - sync_repository.SyncRepository.create_local_data_tables:1044
-  - sync_repository.SyncRepository.rebuild_dynamic_tables:1100
+  - sync_repository.SyncRepository.create_local_data_tables:1142
+  - sync_repository.SyncRepository.rebuild_dynamic_tables:1198
+  - sync_repository.SyncRepository.execute_tombstone_delete:483
+  - sync_repository.SyncRepository.execute_tombstone_delete_with_cursor:543
 </key_function>
 
 **对外接口**：
@@ -144,6 +170,8 @@ module: sync
 | `has_updated_at(table_name)` | 检查表是否有 updated_at 列 | 通过 TABLE_CONFIGS 的 update_at 标志判断 |
 | `create_local_data_tables(slug_to_fields)` | 本地建表（只执行 DDL） | 表已存在时跳过；不写 meta 数据 |
 | `rebuild_dynamic_tables(types)` | 云端全量重建动态表 | 按 slug 逐个 CREATE/SKIP；孤儿表**不删除**（需 tombstone 机制） |
+| `execute_tombstone_delete(target_table, record_id)` | 执行墓碑对应目标表 DELETE（独立连接版本，不写墓碑） | 通过 `HASH_ID_PREFIXES` 判断列：AUTOINCREMENT 表用 `hash_id`，其他用主键列；表名经 `_validate_table_name` 白名单校验 |
+| `execute_tombstone_delete_with_cursor(cursor, target_table, record_id)` | 执行墓碑对应目标表 DELETE（cursor 版本） | 供 `_pull_deletion_log` 事务内调用，与墓碑副本写入在同一事务；不写墓碑（墓碑已在 Pull 时写入本地副本） |
 
 **安全约束**：
 - 所有表名通过 TABLE_CONFIGS 白名单或动态表前缀（`custom_`）校验
@@ -160,6 +188,9 @@ module: sync
   - sync_client.SyncClient._sync_dynamic_tables_definitions:295
   - sync_client.SyncClient._create_local_dynamic_tables:375
   - sync_client.SyncClient._rebuild_remote_dynamic_tables:406
+  - sync_client.SyncClient._pull_deletion_log:287
+  - sync_client.SyncClient._push_deletion_log:365
+  - sync_client.SyncClient._cleanup_deletion_log:407
   - sync_client.SyncClient.start_scheduled_sync
   - sync_client.SyncClient.try_start_sync
   - sync_client.SyncClient.finish_sync
@@ -169,10 +200,13 @@ module: sync
 
 | 接口 | 说明 | 约束 |
 |------|------|------|
-| `sync_once(tables, directories)` | 执行一次完整同步 | 定义对比 → Pull → Push（数据库+文件），全部成功才更新 last_sync_time |
+| `sync_once(tables, directories)` | 执行一次完整同步 | 定义对比 → 墓碑 Pull → 数据 Pull → 墓碑 Push → 数据 Push → 文件同步 → 墓碑清理 → 更新 last_sync_time（全部成功才更新） |
 | `_sync_dynamic_tables_definitions(remote_url, api_key)` | 拉取云端定义 → slug 对比 → 双向建表 | 返回更新后的动态表 slug 列表 |
 | `_create_local_dynamic_tables(slug_to_fields)` | 本地建动态数据表 | 委托给 SyncRepository.create_local_data_tables() |
 | `_rebuild_remote_dynamic_tables(remote_url, api_key)` | 发送本地定义给云端重建 | POST /api/sync/rebuild-dynamic-tables |
+| `_pull_deletion_log(remote_url, api_key, last_sync_time)` | 墓碑 Pull：HTTP 拉取（事务外）→ 事务内 LWW 检查 + DELETE + 写副本 | 失败则整个事务回滚，`sync_once` 抛异常不更新 `last_sync_time`；HTTP 在事务外，避免长事务占用连接 |
+| `_push_deletion_log(remote_url, api_key, last_sync_time)` | 墓碑 Push：查询本地 `source=local` 墓碑 → HTTP 推送到云端 | 云端对每条墓碑独立事务处理 LWW + DELETE + 写副本；本地无需事务 |
+| `_cleanup_deletion_log(remote_url, api_key, last_sync_time)` | 清理本地 + 云端 `created_at <= last_sync_time` 的墓碑 | 用旧 `last_sync_time` 清理过期墓碑；清理非原子（先本地后云端 HTTP），失败则依赖幂等重试 |
 | `start_scheduled_sync(interval_seconds=600)` | 启动后台定时同步 | 默认 10 分钟间隔；并发锁保护 |
 | `try_start_sync()` | 原子获取同步锁 | threading.Lock 保护；已在使用中返回 False |
 | `finish_sync()` | 释放同步锁 | try...finally 确保释放 |
@@ -180,11 +214,16 @@ module: sync
 **同步流程顺序**（sync_once）：
 ```
 1. _sync_dynamic_tables_definitions  → 拉取云端定义、slug 对比、双向建表
-2. pull_from_remote                   → 分批拉取数据库变更
-3. push_to_remote                     → 推送本地数据库变更
-4. _sync_files_full_flow              → 文件三阶段同步
-5. 更新 last_sync_time                → 全部成功后才更新
+2. _pull_deletion_log                → 拉取云端墓碑，本地执行 DELETE + 写副本
+3. pull_from_remote                  → 分批拉取数据库变更
+4. _push_deletion_log                → 推送本地墓碑，云端执行 DELETE + 写副本
+5. push_to_remote                    → 推送本地数据库变更
+6. _sync_files_full_flow             → 文件三阶段同步
+7. _cleanup_deletion_log             → 清理 created_at <= last_sync_time 的墓碑
+8. 更新 last_sync_time               → 全部成功后才更新
 ```
+
+**顺序原因**：墓碑 Pull 在数据 Pull 之前，避免云端已删记录被数据 Pull 写回；墓碑 Push 在数据 Push 之前，确保云端先收到删除意图再处理数据变更。
 
 ### Sync Cloud API — 云端同步端点
 
@@ -195,6 +234,9 @@ module: sync
   - sync_cloud_api.sync_heartbeat:224
   - sync_cloud_api.sync_dynamic_tables_definitions
   - sync_cloud_api.sync_rebuild_dynamic_tables:313
+  - sync_cloud_api.sync_pull_deletion_log:315
+  - sync_cloud_api.sync_push_deletion_log:339
+  - sync_cloud_api.sync_cleanup_deletion_log:406
   - sync_cloud_api.verify_sync_api_key:93
 </key_function>
 
@@ -207,6 +249,9 @@ module: sync
 | `/api/sync/heartbeat` | POST | `{event: "online"\|"offline"\|"ping"}` | `{status: "ok", server_time}` |
 | `/api/sync/dynamic-tables-definitions` | GET | (none) | `{types: [{slug, fields}]}` |
 | `/api/sync/rebuild-dynamic-tables` | POST | `{types: [{slug, fields}]}` | `{rebuilt: [{slug, action}], sync_time}` |
+| `/api/sync/pull-deletion-log` | POST | `{last_sync_time}` | `{tombstones: [{id, target_table, record_id, source, created_at, updated_at}]}` |
+| `/api/sync/push-deletion-log` | POST | `{tombstones: [{target_table, record_id, created_at}]}` | `{success: bool, applied_count: int, skipped_count: int}` |
+| `/api/sync/cleanup-deletion-log` | POST | `{last_sync_time}` | `{success: bool, cleaned_count: int}` |
 | `/api/sync/pull-files/check` | POST | → 见 [data-sync-files-spec](file:///d:/desktop/软件开发/LifeWatch-AI/docs/specs/2026-07-16-data-sync-files-spec.md) | |
 | `/api/sync/pull-files/fetch` | POST | → 见 files-spec | |
 | `/api/sync/push-files` | POST | → 见 files-spec | |
@@ -216,6 +261,11 @@ module: sync
 **认证**：所有端点需要 `Authorization: Bearer {api_key}` HTTP Header，使用 `secrets.compare_digest()` 常量时间比较。
 
 **心跳设计**：`/api/sync/pull` 在请求开头隐式更新心跳，`/api/sync/heartbeat` 显式处理生命周期事件（online/offline/ping）。
+
+**墓碑端点事务边界**：
+- `/pull-deletion-log`：纯查询端点，无副作用，客户端事务包裹 DELETE + 写副本
+- `/push-deletion-log`：云端对每条墓碑独立事务（LWW 检查 + DELETE + 写副本），单条失败 raise 终止后续处理，已应用墓碑不回滚
+- `/cleanup-deletion-log`：纯删除端点，清理云端 `created_at <= last_sync_time` 的墓碑记录
 
 ### HeartbeatManager — 心跳状态管理器
 
@@ -291,9 +341,43 @@ providers:                       # 有 env_key 且有 api_key 的 provider
 - llm.provider 可以是 display_name，通过 `provider_manager.get_provider_id()` 转为内部 name 后匹配 providers[].name
 - 对应 provider 必须有 api_key
 
+### DeletionLogProvider — 墓碑表数据访问层
+
+<key_function>
+- lifeprism/repository/providers/deletion_log_provider.py
+  - deletion_log_provider.DeletionLogProvider.create_tombstone:57
+  - deletion_log_provider.DeletionLogProvider.write_tombstone_with_cursor:111
+  - deletion_log_provider.DeletionLogProvider.get_tombstone_with_cursor:156
+  - deletion_log_provider.DeletionLogProvider.create_tombstone_with_cursor:189
+  - deletion_log_provider.DeletionLogProvider.get_tombstones_since:236
+  - deletion_log_provider.DeletionLogProvider.get_tombstone:313
+  - deletion_log_provider.DeletionLogProvider.cleanup_before:373
+</key_function>
+
+**对外接口**：
+
+| 接口 | 说明 | 约束 |
+|------|------|------|
+| `create_tombstone(target_table, record_id, source, created_at=None)` | 写入墓碑（独立连接版本，`source=local`） | `id` 用 `dl-` 前缀 + 8 位 hex；`source` 必须是 `local`/`cloud`；`updated_at = created_at` |
+| `write_tombstone_with_cursor(cursor, target_table, record_id, source="local")` | 写入墓碑（cursor 版本，与 DELETE 同事务） | 供 `CustomRecordRepository.delete_entry` 调用；`INSERT OR IGNORE` 利用 `UNIQUE(target_table, record_id)` 去重 |
+| `get_tombstone_with_cursor(cursor, target_table, record_id)` | 按 `(target_table, record_id)` 查询墓碑（cursor 版本） | 供 `_pull_deletion_log` 事务内 LWW 检查使用 |
+| `create_tombstone_with_cursor(cursor, target_table, record_id, source, created_at=None)` | 写入墓碑（cursor 版本，保留原 `created_at`） | 供 Pull/Push 写副本使用，保持两端 LWW 一致；`source=cloud` 表示已传播 |
+| `get_tombstones_since(last_sync_time, source=None)` | 按 `created_at > last_sync_time` 增量查询 | 支持按 `source` 过滤（`local`/`cloud`）；空字符串表示全量 |
+| `get_tombstone(target_table, record_id)` | 按 `(target_table, record_id)` 查询墓碑（独立连接） | 返回 dict 或 None |
+| `cleanup_before(last_sync_time)` | 清理 `created_at <= last_sync_time` 的墓碑 | 同步成功后由 `_cleanup_deletion_log` 调用 |
+
+**字段约束**：
+- `target_table` 非空，引用业务表名（含动态表 `custom_{slug}`）
+- `record_id` 非空，AUTOINCREMENT 表为 `hash_id`，TEXT 主键表为主键值
+- `source` 只能是 `local`/`cloud`（DB 层无 CHECK 约束，由 Provider 写入时校验，非法值抛 `ValidationError`）
+- `created_at == updated_at`（墓碑不更新，参考 ADR [2026-07-22-deletion-log-table.md](../adr/2026-07-22-deletion-log-table.md)）
+- `UNIQUE(target_table, record_id)` 约束防止重复墓碑
+
+**Schema 决策**：见 ADR [2026-07-22-deletion-log-table.md](../adr/2026-07-22-deletion-log-table.md)（schema）与 [2026-07-22-deletion-sync-tombstone.md](../adr/2026-07-22-deletion-sync-tombstone.md)（同步流程）
+
 ### 同步范围
 
-#### 同步的表（30 张静态表 + 动态表）
+#### 同步的表（29 张静态表 + 动态表）
 
 | 类别 | 表名 |
 |------|------|
@@ -303,8 +387,9 @@ providers:                       # 有 env_key 且有 api_key 的 provider
 | 缓存表（3张） | multi_purpose_map_cache, single_purpose_map_cache, category_map_cache |
 | 统计数据（1张） | tokens_usage_log |
 | 微信账户状态（1张） | wechat_account_state（走数据库同步的记录级 LWW，参考 ADR 2026-07-14-file-sync-conflict-resolution.md 决策 4） |
-| 墓碑表（1张） | deletion_log（删除同步用，记录删除意图跨端传播，参考 ADR docs/adr/2026-07-22-deletion-log-table.md） |
 | 动态表 | custom_{slug}（运行时从 dynamic-tables-definitions 端点发现） |
+
+> **墓碑表 `deletion_log` 不在 `SYNC_TABLES` 中**：墓碑仅通过 3 个专用端点（`/pull-deletion-log`、`/push-deletion-log`、`/cleanup-deletion-log`）同步，避免双重同步和 LWW 语义不匹配。详见 ADR [2026-07-22-deletion-sync-tombstone.md](../adr/2026-07-22-deletion-sync-tombstone.md)。`full-clear` 端点在 `SYNC_TABLES` 遍历后显式清空 `deletion_log` 表，`/api/sync/status` 端点显式查询 `deletion_log` 行数。
 
 > **注意**：`habit_chains` 和 `habit_chain_nodes` 临时从 SYNC_TABLES 移除。原因：`chain_id` 引用 `habit_chains.id`（自增 id），同步后两端 id 不一致导致外键断裂。详见 `docs/known-limitations/habit-chain-tables-not-synced.md` 与 ADR `docs/adr/2026-07-22-habit-chain-tables-not-synced.md`。这两张表的 `hash_id` 字段照常添加（在 `HASH_ID_PREFIXES` 中），为后续恢复同步做准备。
 
@@ -332,11 +417,70 @@ providers:                       # 有 env_key 且有 api_key 的 provider
 - 本地建表：只执行 `CREATE TABLE IF NOT EXISTS`（DDL），不写 `custom_record_types` 和 `custom_record_fields` meta 数据。让 pull 阶段统一拉取两端的 meta 数据。
 - 远端重建：按 slug 逐个 CREATE（表不存在时）/ SKIP（表已存在时）。`rebuild_dynamic_tables` **不执行 DROP**，孤儿表清理需要独立的 tombstone 机制。
 
+### 墓碑同步机制（删除传播）
+
+**设计决策**：见 ADR [2026-07-22-deletion-sync-tombstone.md](file:///d:/desktop/软件开发/LifeWatch-AI/docs/adr/2026-07-22-deletion-sync-tombstone.md)（同步通道、事务边界、LWW 简化、Aggregator 实例化、sync_once 顺序）与 [2026-07-22-deletion-log-table.md](file:///d:/desktop/软件开发/LifeWatch-AI/docs/adr/2026-07-22-deletion-log-table.md)（schema）
+
+**核心机制**：`deletion_log` 表记录删除意图（`target_table` + `record_id` + `source` + `created_at`），通过 3 个专用端点跨端传播，对端收到墓碑后执行 DELETE + 写本地副本（`source=cloud`），同步成功后清理已传播完成的墓碑。
+
+**专用端点 vs SYNC_TABLES**：
+- `deletion_log` **不在 `SYNC_TABLES`** 中，避免被 `pull_from_remote`/`push_to_remote` 当作普通数据 upsert 导致双重同步
+- 专用端点在事务内完成 DELETE + 写副本，普通数据同步的事务边界不适合此场景
+- LWW 语义不匹配：墓碑不更新，`updated_at == created_at`，比较 `updated_at` 无实际意义
+
+**墓碑 Pull 流程**（`_pull_deletion_log`）：
+```
+1. HTTP 拉取云端 created_at > last_sync_time 的墓碑（事务外）
+2. 事务内逐条处理：
+   a. LWW 检查：本地已有同 (target_table, record_id) 墓碑则 INSERT OR IGNORE 跳过
+   b. 执行目标表 DELETE（cursor 版本，不写墓碑）
+   c. 写本地副本（source=cloud，保留原 created_at）
+3. 失败则整个事务回滚，sync_once 抛异常不更新 last_sync_time
+```
+
+**墓碑 Push 流程**（`_push_deletion_log`）：
+```
+1. 查询本地 source=local 且 created_at > last_sync_time 的墓碑
+2. HTTP 推送到云端
+3. 云端对每条墓碑独立事务处理（LWW 检查 + DELETE + 写云端副本）
+4. 单条失败 raise 终止后续处理，已应用墓碑不回滚
+```
+
+**墓碑清理流程**（`_cleanup_deletion_log`）：
+```
+1. 清理本地 created_at <= last_sync_time 的墓碑
+2. 清理云端 created_at <= last_sync_time 的墓碑（HTTP 调用 /cleanup-deletion-log）
+3. 清理非原子（先本地后云端 HTTP），云端失败时下次同步依赖幂等重试
+```
+
+**LWW 处理简化**：
+- 墓碑不更新（`updated_at == created_at`），不比较 `updated_at`
+- 本地已有同 `(target_table, record_id)` 墓碑时 `INSERT OR IGNORE` 跳过
+- 利用 `UNIQUE(target_table, record_id)` 约束自然去重
+- 两端同时删除同一记录时，两端都保留自己的墓碑，结果都是删除，无实际差异
+
+**record_id 的列选择**：
+- AUTOINCREMENT 表（在 `HASH_ID_PREFIXES` 中）：用 `hash_id` 列作为 `record_id`
+- TEXT 主键表：用主键列（如 `entry_id`、`slug`、`type_id`）作为 `record_id`
+- 动态表 `custom_*`：用 `id` 列作为 `record_id`
+
+**Aggregator 实例化 Provider**：
+- `CustomRecordRepository.__init__` 中 `self.deletion_log_provider = DeletionLogProvider(db_manager=self.db)`
+- 符合 Repository 规则（Aggregator 内部实例化 Provider，不导入全局单例）
+- `db_manager` 透传保证事务连接一致性
+- `delete_entry` 在 DELETE 事务内调用 `write_tombstone_with_cursor` 写墓碑
+
+**严格两节点假设**：
+- 本项目是严格两节点（本地↔云端），可激进清理墓碑（同步成功后立即清理 `created_at <= last_sync_time`）
+- 不存在多设备清理导致删除丢失的风险
+- 未来转向多客户端场景时需重新评估清理策略
+
 ### 冲突解决策略
 
 **LWW（Last-Write-Wins）**：
 - 数据库：比较 `updated_at` 时间戳，更晚的保留；相等时跳过
 - 无物理 updated_at 列的表（mood_types 等）不参与增量比较，直接覆盖
+- 墓碑同步不走 LWW：本地已有墓碑则 `INSERT OR IGNORE` 跳过（不比较 `updated_at`）
 
 **设计理由**：
 - NTP 时间同步保证时钟误差 < 1 秒
@@ -379,6 +523,17 @@ providers:                       # 有 env_key 且有 api_key 的 provider
 - slug 对比直接比较两端定义，方向正确，能同时覆盖双向变更
 - 对比逻辑简单（集合差集），易维护
 
+**为什么 `deletion_log` 不走 `SYNC_TABLES` 而用专用端点？**
+- 避免双重同步：若留在 `SYNC_TABLES`，会同时被数据同步通道（`pull_from_remote`/`push_to_remote`）和墓碑专用通道处理，导致同一墓碑被两次拉取/推送
+- LWW 语义不匹配：普通数据同步的 LWW 比较 `updated_at` 决定是否覆盖，但墓碑不更新（`updated_at == created_at`），比较无实际意义
+- 事务边界可控：专用端点可在事务内完成 DELETE + 墓碑写入，普通数据同步的事务边界不适合此场景
+- 清理独立：`/cleanup-deletion-log` 可按 `last_sync_time` 精确清理，不受数据同步流程干扰
+
+**为什么墓碑用 `INSERT OR IGNORE` 跳过而非比较 `updated_at`？**
+- 墓碑不更新，`updated_at == created_at`，比较 `updated_at` 等价于比较 `created_at`，无实际覆盖效果
+- 利用 `UNIQUE(target_table, record_id)` 约束自然去重，实现最简
+- 两端同时删除同一记录时，两端都保留自己的墓碑，结果都是删除，无实际差异
+
 **为什么 cloud_init.yaml 的 llm.provider 存 display_name？**
 - 与本地 config.yaml 语义一致（provider 字段始终是 display_name）
 - 云端写入 config.yaml 后保持与本地相同的格式
@@ -394,11 +549,15 @@ providers:                       # 有 env_key 且有 api_key 的 provider
 - **时区一致性要求**：本地和云端必须使用相同时区生成 `updated_at`，否则 LWW 比较会失效
 - 消息路由在网络分区场景下可能产生重复回复（概率 < 1%）
 - 云端 agent-only 不启动 dreaming，文件修改只来自会话处理
+- 墓碑同步假设严格两节点（本地↔云端），多客户端场景需重新评估清理策略
 
 **有哪些已知限制？**
 - 首次同步 16MB 数据需要 30-50 秒（分 10 批，每批 ~5 秒）
 - 15 分钟超时意味着异常退出后最长 15 分钟才能云端接管
 - 无实时同步能力，依赖 10 分钟定时轮询
+- 删除-更新冲突不解决（A 删除 + B 更新同一条记录，B 端 upsert 会覆盖 A 端的删除）→ `docs/known-limitations/delete-update-conflict-not-resolved.md`
+- 删除-重建冲突时墓碑跳过新记录（A 删除后 B 重建同一记录，A 端墓碑会跳过 B 端的新记录）→ `docs/known-limitations/delete-recreate-conflict-tombstone-skip.md`
+- 文件删除不走墓碑同步（仅数据库记录走墓碑，文件删除走 file_sync_state 的 LWW）→ `docs/known-limitations/file-deletion-not-synced.md`
 
 ## Out of Scope
 
@@ -408,3 +567,4 @@ providers:                       # 有 env_key 且有 api_key 的 provider
 - **Config 模块配置管理**：[`docs/specs/2026-07-06-config-settings-spec.md`](./2026-07-06-config-settings-spec.md) — SettingsManager、ProviderManager、双层命名体系
 - **Agent 执行引擎**：[`docs/specs/2026-07-06-llm-agent-spec.md`](./2026-07-06-llm-agent-spec.md) — AgentLoop、Tool 注册
 - **ActivityWatch 数据同步**：[`docs/specs/2026-04-16-classify-spec.md`](./2026-04-16-classify-spec.md) — SyncService 分类管线
+- **已知限制**：[`docs/known-limitations/`](../known-limitations/index.md) — 删除-更新冲突、删除-重建冲突、文件删除不同步等

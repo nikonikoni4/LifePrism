@@ -98,19 +98,19 @@ module: config
 
 <key_function>
 - lifeprism/config/settings_manager.py
-  - settings_manager.SettingsManager.get:291
-  - settings_manager.SettingsManager.set:439
-  - settings_manager.SettingsManager.update:463
-  - settings_manager.SettingsManager.reload:524
-  - settings_manager.SettingsManager.get_all:528
-  - settings_manager.SettingsManager.get_for_display:558
-  - settings_manager.SettingsManager.get_api_key:395
-  - settings_manager.SettingsManager.set_api_key:424
-  - settings_manager.SettingsManager.add_model_to_history:763
-  - settings_manager.SettingsManager.remove_model_from_history:794
-  - settings_manager.SettingsManager.get_model_history_for_provider:733
-  - settings_manager.SettingsManager.get_provider_api_base:746
-  - settings_manager.SettingsManager.set_provider_api_base:752
+  - settings_manager.SettingsManager.get:580
+  - settings_manager.SettingsManager.set:732
+  - settings_manager.SettingsManager.update:764
+  - settings_manager.SettingsManager.reload:835
+  - settings_manager.SettingsManager.get_all:848
+  - settings_manager.SettingsManager.get_for_display:877
+  - settings_manager.SettingsManager.get_api_key:688
+  - settings_manager.SettingsManager.set_api_key:717
+  - settings_manager.SettingsManager.add_model_to_history:1092
+  - settings_manager.SettingsManager.remove_model_from_history:1123
+  - settings_manager.SettingsManager.get_model_history_for_provider:1062
+  - settings_manager.SettingsManager.get_provider_api_base:1075
+  - settings_manager.SettingsManager.set_provider_api_base:1081
 </key_function>
 
 **对外接口**：

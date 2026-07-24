@@ -3,7 +3,8 @@
 
 测试 seam:
 - Seam 1: SYNC_TABLES 常量 - 验证静态表完整性
-  （原 31 张；Issue 06 移除 habit_chains/habit_chain_nodes -2；Issue 05 新增 deletion_log +1；当前 30 张）
+  （原 31 张；Issue 06 移除 habit_chains/habit_chain_nodes -2；Issue 05 新增 deletion_log +1 = 30；
+   PRD 3 移除 deletion_log（改用专用墓碑端点）-1 = 29）
 - Seam 2: habit 链条表从 SYNC_TABLES 移除（Issue 06）
 
 注：get_all_sync_tables() 已删除（见 ADR 2026-07-16-dynamic-tables-sync-definition-comparison.md），
@@ -20,7 +21,8 @@ pytestmark = pytest.mark.core
 # ==================== 静态表期望清单 ====================
 # 注：habit_chains 和 habit_chain_nodes 已从 SYNC_TABLES 移除（Issue 06），
 # 因 chain_id 引用自增 id 同步后断裂。详见 docs/known-limitations/habit-chain-tables-not-synced.md
-# 注：deletion_log 由 Issue 05 加入 SYNC_TABLES（删除同步墓碑表）
+# 注：deletion_log 由 Issue 05 加入 SYNC_TABLES，PRD 3 又移除（改用专用墓碑端点
+# /pull-deletion-log, /push-deletion-log, /cleanup-deletion-log，详见 ADR 2026-07-22-deletion-sync-tombstone.md）
 
 EXPECTED_STATIC_TABLES = [
     # 用户输入数据（13张）
@@ -58,8 +60,6 @@ EXPECTED_STATIC_TABLES = [
     "tokens_usage_log",
     # 微信账户状态（1张）- 替代原 channel/wechat/account.json 文件存储（Issue 35）
     "wechat_account_state",
-    # 墓碑表（1张）- 删除同步用，记录删除意图跨端传播（Issue 05）
-    "deletion_log",
 ]
 
 
@@ -70,7 +70,8 @@ class TestSyncTablesStatic:
     """Seam 1: SYNC_TABLES 常量 - 验证静态表完整性
 
     注：原 31 张，Issue 06 移除 habit_chains 和 habit_chain_nodes（-2），
-    Issue 05 新增 deletion_log（+1），当前 30 张。
+    Issue 05 新增 deletion_log（+1）= 30，PRD 3 移除 deletion_log（-1）= 29。
+    deletion_log 改用专用墓碑端点同步，不再走 SYNC_TABLES 通道。
     期望清单见 EXPECTED_STATIC_TABLES，count 由清单长度自动派生（抗并行修改）。
     """
 

@@ -546,7 +546,16 @@ def _mock_post_factory(pull_data=None, push_success=True):
 
     def _mock_post(*args, **kwargs):
         url = kwargs.get("url", "")
-        if "/pull-files" in url:
+        if "/pull-deletion-log" in url:
+            # 墓碑 Pull 端点：返回空墓碑
+            return _make_mock_response({"tombstones": []})
+        elif "/push-deletion-log" in url:
+            # 墓碑 Push 端点：返回成功
+            return _make_mock_response({"success": True, "applied_count": 0, "skipped_count": 0})
+        elif "/cleanup-deletion-log" in url:
+            # 墓碑清理端点：返回成功
+            return _make_mock_response({"success": True, "cleaned_count": 0})
+        elif "/pull-files" in url:
             return _make_mock_response({"files": []})
         elif "/push-files" in url:
             if push_success:
@@ -609,7 +618,16 @@ class TestSyncOnce:
 
         def mock_post_side_effect(*args, **kwargs):
             url = kwargs.get("url", "")
-            if "/pull-files" in url:
+            if "/pull-deletion-log" in url:
+                # 墓碑 Pull 端点：返回空墓碑，不计入数据同步 call_order
+                return _make_mock_response({"tombstones": []})
+            elif "/push-deletion-log" in url:
+                # 墓碑 Push 端点：返回成功，不计入数据同步 call_order
+                return _make_mock_response({"success": True, "applied_count": 0, "skipped_count": 0})
+            elif "/cleanup-deletion-log" in url:
+                # 墓碑清理端点：返回成功，不计入数据同步 call_order
+                return _make_mock_response({"success": True, "cleaned_count": 0})
+            elif "/pull-files" in url:
                 call_order.append("pull-files")
                 return _make_mock_response({"files": []})
             elif "/push-files" in url:

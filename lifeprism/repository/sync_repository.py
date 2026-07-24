@@ -480,6 +480,104 @@ class SyncRepository:
                 cause=e,
             ) from e
 
+    def execute_tombstone_delete(self, target_table: str, record_id: str) -> int:
+        """执行墓碑对应的目标表 DELETE（独立连接版本，不写墓碑）
+
+        通过 HASH_ID_PREFIXES 判断用 hash_id 列还是主键列：
+        - 在 HASH_ID_PREFIXES 中的表（AUTOINCREMENT 表）→ WHERE hash_id = ?
+        - 其他表（TEXT 主键表 + 动态表 custom_*）→ WHERE {主键} = ?
+
+        供 push-deletion-log 端点等非事务场景使用。
+        墓碑已在 Pull 时写入本地副本，此方法只执行目标表 DELETE。
+
+        Args:
+            target_table: 目标表名（经白名单校验）
+            record_id: 记录标识（hash_id 或主键值）
+
+        Returns:
+            受影响行数
+
+        Raises:
+            DataAccessError: 数据库操作失败
+        """
+        self._validate_table_name(target_table)
+        from lifeprism.sync.constants import HASH_ID_PREFIXES
+
+        if HASH_ID_PREFIXES.get(target_table):
+            where_col = "hash_id"
+        else:
+            where_col = self.get_primary_key_field(target_table) or "id"
+
+        sql = f"DELETE FROM {target_table} WHERE {where_col} = ?"
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql, (record_id,))
+                conn.commit()
+                affected = cursor.rowcount
+            logger.info(
+                "墓碑 DELETE: table=%s, record_id=%s, where_col=%s, 受影响 %d 行",
+                target_table,
+                record_id,
+                where_col,
+                affected,
+            )
+            return affected
+        except sqlite3.Error as e:
+            logger.error(
+                "墓碑 DELETE 失败: table=%s, record_id=%s, error=%s",
+                target_table,
+                record_id,
+                e,
+            )
+            raise DataAccessError(
+                message=f"墓碑 DELETE 表 {target_table} 失败",
+                details={
+                    "table": target_table,
+                    "record_id": str(record_id),
+                    "error": str(e),
+                },
+                cause=e,
+            ) from e
+
+    def execute_tombstone_delete_with_cursor(
+        self,
+        cursor: sqlite3.Cursor,
+        target_table: str,
+        record_id: str,
+    ) -> int:
+        """执行墓碑对应的目标表 DELETE（cursor 版本，供事务内调用）
+
+        与 execute_tombstone_delete 功能相同，但接受外部 cursor 参数，
+        在同一事务内执行 DELETE。供 _pull_deletion_log 事务内调用，
+        确保 DELETE 与墓碑副本写入在同一事务，失败则一起回滚。
+
+        SQL 封装在此方法中（DELETE FROM ... WHERE ...），符合 Repository Pattern。
+        表名经 _validate_table_name 白名单校验，防 SQL 注入。
+
+        Args:
+            cursor: 外部事务的数据库游标
+            target_table: 目标表名（经白名单校验）
+            record_id: 记录标识（hash_id 或主键值）
+
+        Returns:
+            受影响行数
+
+        Raises:
+            DataAccessError: 表名不在白名单中
+        """
+        self._validate_table_name(target_table)
+        from lifeprism.sync.constants import HASH_ID_PREFIXES
+
+        if HASH_ID_PREFIXES.get(target_table):
+            where_col = "hash_id"
+        else:
+            where_col = self.get_primary_key_field(target_table) or "id"
+
+        sql = f"DELETE FROM {target_table} WHERE {where_col} = ?"
+        cursor.execute(sql, (record_id,))
+        return cursor.rowcount
+
     def upsert_rows(self, table_name: str, rows: list[dict[str, Any]]) -> int:
         """批量写入：INSERT OR REPLACE
 

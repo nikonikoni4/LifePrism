@@ -194,13 +194,13 @@ module: llm-agent
 
 <key_function>
 - lifeprism/llm/agent/loop.py
-  - loop.AgentLoop.__init__:61
-  - loop.AgentLoop.loop:493
-  - loop.AgentLoop.stop:517
-  - loop.AgentLoop._process_msg:407
-  - loop.AgentLoop._process_cmd:263
-  - loop.AgentLoop._run_agent_loop:68
-  - loop.AgentLoop.auto_compact:520
+  - loop.AgentLoop.__init__:66
+  - loop.AgentLoop.loop:570
+  - loop.AgentLoop.stop:594
+  - loop.AgentLoop._process_msg:463
+  - loop.AgentLoop._process_cmd:319
+  - loop.AgentLoop._run_agent_loop:72
+  - loop.AgentLoop.auto_compact:597
 </key_function>
 
 **对外接口**：

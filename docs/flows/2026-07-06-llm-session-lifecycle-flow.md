@@ -98,22 +98,22 @@ class SessionLifecycleTrace:
   - manager.Session:21
   - manager.Session.add_message:47
   - manager.Session.get_history_message:55
-  - manager.SessionManager._load_session:75
-  - manager.SessionManager.get_or_create_session:125
-  - manager.SessionManager.delete_session:148
+  - manager.SessionManager._load_session:82
+  - manager.SessionManager.get_or_create_session:132
+  - manager.SessionManager.delete_session:155
   - manager.SessionManager._remove_image_content:156
-  - manager.SessionManager.save_session:192
+  - manager.SessionManager.save_session:199
   - manager.SessionManager.get_session_metadata:214
-  - manager.SessionManager.remove_from_cache:242
+  - manager.SessionManager.remove_from_cache:249
   - manager.SessionManager.show_session_list:261
   - manager.SessionManager.show_session_content_list:268
-  - manager.ChatHistoryManager.load_histories:340
-  - manager.ChatHistoryManager.get_histories_to_dream:373
-  - manager.ChatHistoryManager.add_content:384
-  - manager.ChatHistoryManager.save_history:411
+  - manager.ChatHistoryManager.load_histories:347
+  - manager.ChatHistoryManager.get_histories_to_dream:384
+  - manager.ChatHistoryManager.add_content:397
+  - manager.ChatHistoryManager.save_history:424
 - lifeprism/llm/agent/loop.py
-  - loop.AgentLoop._process_msg:407
-  - loop.AgentLoop.auto_compact:520
+  - loop.AgentLoop._process_msg:463
+  - loop.AgentLoop.auto_compact:597
 - lifeprism/llm/chat/chat_bot.py
   - chat_bot.ChatBot.chat:17
 </key_function>

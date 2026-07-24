@@ -1,10 +1,10 @@
 ---
-version: 1.0
+version: 1.1
 created_at: 2026-07-22
-updated_at: 2026-07-22
-last_updated: 2026-07-22
-abstract: 新增 deletion_log 墓碑表，字段名用 target_table 而非 table_name（避免变量名混淆），update_at=True 使 LWW 用 updated_at 比较（墓碑不更新，updated_at == created_at）
-status: decided
+updated_at: 2026-07-23
+last_updated: 部分被 supersede——"deletion_log 加入 SYNC_TABLES"决策已被 2026-07-22-deletion-sync-tombstone.md 取代（改用专用端点）；schema 决策（字段命名、update_at 配置、LWW 比较字段）仍然有效
+abstract: 新增 deletion_log 墓碑表，字段名用 target_table 而非 table_name（避免变量名混淆），update_at=True 使 LWW 用 updated_at 比较（墓碑不更新，updated_at == created_at）。注：deletion_log 已从 SYNC_TABLES 移除，改用专用端点（见 2026-07-22-deletion-sync-tombstone.md）
+status: partially-superseded
 ---
 
 # deletion_log 墓碑表 schema 决策
@@ -13,6 +13,7 @@ status: decided
 
 | 版本 | 更新内容 |
 | ---- | -------- |
+| 1.1 | 部分被 supersede："deletion_log 加入 SYNC_TABLES"决策已被 [2026-07-22-deletion-sync-tombstone.md](./2026-07-22-deletion-sync-tombstone.md) 取代（改用专用端点）；schema 决策仍然有效 |
 | 1.0 | 创建文档初稿 |
 
 ## 问题界定
@@ -190,14 +191,16 @@ status: decided
 
 ## 后续影响
 
+> **部分被 supersede**：本节中"deletion_log 加入 SYNC_TABLES"的决策已被 [2026-07-22-deletion-sync-tombstone.md](./2026-07-22-deletion-sync-tombstone.md) 取代。`deletion_log` 现已从 `SYNC_TABLES` 移除，改用 3 个专用端点（`/pull-deletion-log`、`/push-deletion-log`、`/cleanup-deletion-log`）同步。下文中的 PRD 1 范围描述保留作为历史记录。
+
 - PRD 1 范围（本 ADR）：
   - `DELETION_LOG_CONFIG` 在 [database.py](file:///d:/desktop/软件开发/LifeWatch-AI/lifeprism/config/database.py) 定义，字段 `id/target_table/record_id/source`，`timestamps: True`，`update_at: True`
-  - `deletion_log` 加入 `SYNC_TABLES`（[constants.py](file:///d:/desktop/软件开发/LifeWatch-AI/lifeprism/sync/constants.py)）
+  - ~~`deletion_log` 加入 `SYNC_TABLES`（[constants.py](file:///d:/desktop/软件开发/LifeWatch-AI/lifeprism/sync/constants.py)）~~（已被 supersede，见 [2026-07-22-deletion-sync-tombstone.md](./2026-07-22-deletion-sync-tombstone.md)）
   - `deletion_log` 注册到 `TABLE_CONFIGS`，`LWTableManager.init_database()` 自动建表
   - `dl-` 前缀**不加入** `HASH_ID_PREFIXES`（`dl-` 不是 hash_id 前缀，id 生成在 PRD 3 的 DeletionLogProvider 中通过 `_generic_insert(id_prefix='dl-')` 直接传入）
 - PRD 3 范围：
   - `DeletionLogProvider` 通过 `_generic_insert(id_prefix='dl-')` 生成 `dl-{uuid[:8]}` 格式 id
-  - 删除同步路径：本地删除 → 写墓碑 → 同步到对端 → 对端按 `record_id` 删除本地记录
+  - 删除同步路径：本地删除 → 写墓碑 → ~~同步到对端（走 SYNC_TABLES）~~ 改用专用端点同步（见 [2026-07-22-deletion-sync-tombstone.md](./2026-07-22-deletion-sync-tombstone.md)）
   - 墓碑清理策略（保留期限、批量清理）属于 PRD 3 范围
-- 文档影响：`data-sync-core-spec.md` 同步表数量从 31 张变 30 张（移除 2 张 habit 表 + 新增 1 张 `deletion_log` 墓碑表：31 - 2 + 1 = 30，见 [2026-07-22-add-hash-id-to-autoincrement-tables.md](./2026-07-22-add-hash-id-to-autoincrement-tables.md) "后续影响"段落）
+- 文档影响：~~`data-sync-core-spec.md` 同步表数量从 31 张变 30 张（移除 2 张 habit 表 + 新增 1 张 `deletion_log` 墓碑表：31 - 2 + 1 = 30）~~ 已修正为 29 张（31 - 2 - 1 habit 表移除 + 1 deletion_log 加入 + 1 deletion_log 移除 = 29，见 [2026-07-22-deletion-sync-tombstone.md](./2026-07-22-deletion-sync-tombstone.md)）
 - 需要后续验证：PRD 3 完成后，跨端同时删除同一条记录时 LWW 是否正确处理重复墓碑（按 `updated_at` 比较，新覆盖旧）

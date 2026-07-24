@@ -82,6 +82,11 @@ class CustomRecordRepository:
 
             db_manager = lw_db_manager
         self.db = db_manager
+        # 创建 DeletionLogProvider 实例（符合 Aggregator 模式：内部创建 Provider 实例，
+        # 不 import 全局单例。db_manager 透传，保证测试可注入）
+        from lifeprism.repository.providers.deletion_log_provider import DeletionLogProvider
+
+        self.deletion_log_provider = DeletionLogProvider(db_manager=self.db)
 
     # ==================== 类型管理 ====================
 
@@ -670,7 +675,12 @@ class CustomRecordRepository:
 
     def delete_entry(self, type_id: str, entry_id: str) -> bool:
         """
-        删除单条记录
+        删除单条记录（写墓碑 + DELETE 同事务）
+
+        改造说明（PRD 3 Slice 04 / C4 修复）：
+        - 在 DELETE 之前通过 write_tombstone_with_cursor 写墓碑（与 DELETE 同事务）
+        - 先查询记录是否存在，不存在则抛 EntityNotFoundError（避免孤儿墓碑）
+        - 墓碑 record_id 用动态表主键（TEXT id），target_table 用动态表名 custom_{slug}
 
         Args:
             type_id: 类型 ID
@@ -684,15 +694,27 @@ class CustomRecordRepository:
             DataAccessError: 数据库操作失败
         """
         _, data_table = self._get_type_and_table(type_id)
-        deleted = False
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
+                # 1. 先查询记录是否存在（避免对不存在的 entry_id 产生孤儿墓碑）
+                cursor.execute(
+                    f"SELECT 1 FROM {data_table} WHERE id = ?",
+                    (entry_id,),
+                )
+                if cursor.fetchone() is None:
+                    raise EntityNotFoundError(entity_type="CustomRecordEntry", entity_id=entry_id)
+                # 2. 写墓碑（与 DELETE 同事务，使用实例方法）
+                self.deletion_log_provider.write_tombstone_with_cursor(
+                    cursor, data_table, entry_id, source="local"
+                )
+                # 3. 执行 DELETE
                 cursor.execute(
                     f"DELETE FROM {data_table} WHERE id = ?",
                     (entry_id,),
                 )
                 deleted = cursor.rowcount > 0
+                conn.commit()
         except sqlite3.Error as e:
             logger.error(
                 "删除自定义记录失败: type_id=%s, entry_id=%s, error=%s",

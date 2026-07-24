@@ -59,9 +59,9 @@ SYNC_TABLES = [
     # 微信账户状态（1张）- 替代原 channel/wechat/account.json 文件存储
     # 走数据库同步的记录级 LWW，参考 ADR 2026-07-14-file-sync-conflict-resolution.md 决策 4
     "wechat_account_state",
-    # 墓碑表（1张）- 删除同步用，记录删除意图跨端传播
-    # 参考 ADR docs/adr/2026-07-22-deletion-log-table.md
-    "deletion_log",
+    # 注意：deletion_log 已从 SYNC_TABLES 移除，墓碑仅通过专用通道
+    # （_pull_deletion_log / _push_deletion_log / _cleanup_deletion_log）同步，
+    # 避免双重同步和循环引用。参考 PRD 3 + ADR docs/adr/2026-07-22-deletion-sync-tombstone.md
 ]
 
 # 需要 hash_id 字段的 AUTOINCREMENT 表前缀映射

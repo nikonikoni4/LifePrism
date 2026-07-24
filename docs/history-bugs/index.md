@@ -35,10 +35,10 @@
 
 ## 2026-07-16-database-delete-not-synced
 
-- updated_at: 2026-07-16
+- updated_at: 2026-07-23
 - path: `docs/history-bugs/2026-07-16-database-delete-not-synced.md`
-- 触发规则：在排查"删了一条记录同步后又出现了"、讨论同步系统中 DELETE 操作的传播机制、设计 tombstone / 软删除 / 删除日志表方案、排查云端和本地数据不一致但无错误日志、修改 Repository 层 delete 方法或同步 push/pull 逻辑时阅读
-- 内容摘要：**设计缺陷（P1，待修复）** — 所有数据库表采用物理 DELETE，同步 Push/Pull 两端只做 `WHERE updated_at > last_sync_time` 增量查询，无法感知和传播 DELETE 操作。被删记录在对端永久保留为幽灵数据，两端数据分叉且无自动修复路径。给出三个候选方案：软删除（改 40+ 表 DDL）、Tombstone 表（新增 deleted_records + 改 _generic_delete）、全量对比同步（Pull 时对比主键集合）。
+- 触发规则：在排查"删了一条记录同步后又出现了"、讨论同步系统中 DELETE 操作的传播机制、设计 tombstone / 软删除 / 删除日志表方案（参考本 bug 的修复方案）、排查云端和本地数据不一致但无错误日志、修改 Repository 层 delete 方法或同步 push/pull 逻辑时阅读
+- 内容摘要：**设计缺陷（P1，已修复 2026-07-23）** — 所有数据库表采用物理 DELETE，同步 Push/Pull 两端只做 `WHERE updated_at > last_sync_time` 增量查询，无法感知和传播 DELETE 操作。被删记录在对端永久保留为幽灵数据，两端数据分叉且无自动修复路径。**修复方案**：采用 Tombstone 表方案，分三阶段实施——PRD 1（新增 `deletion_log` 墓碑表 + 6 张 AUTOINCREMENT 表加 `hash_id` 字段）、PRD 2（`_generic_delete` 内部写墓碑 + 所有删除通道统一）、PRD 3（`deletion_log` 从 `SYNC_TABLES` 移除改用 3 个专用端点 `/pull-deletion-log`、`/push-deletion-log`、`/cleanup-deletion-log`，HTTP 外事务内，`INSERT OR IGNORE` 跳过 LWW，sync_once 流程新增墓碑 Pull/Push/清理步骤）。修复后仍有 3 个已知限制：删除-更新冲突不解决、删除-重建冲突时墓碑跳过新记录、文件删除不走墓碑同步（详见 `docs/known-limitations/`）。
 
 ## 2026-07-16-dynamic-tables-orphan-cleanup-wipes-remote-data
 

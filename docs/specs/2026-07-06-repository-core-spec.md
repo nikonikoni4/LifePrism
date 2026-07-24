@@ -135,20 +135,20 @@ module: repository
 
 <key_function>
 - lifeprism/repository/database_manager.py
-  - database_manager.DatabaseManager.__init__:30
+  - database_manager.DatabaseManager.__init__:31
   - database_manager.DatabaseManager.get_connection:136
-  - database_manager.DatabaseManager.query:182
-  - database_manager.DatabaseManager.query_advanced:565
-  - database_manager.DatabaseManager.insert:265
-  - database_manager.DatabaseManager.insert_many:295
-  - database_manager.DatabaseManager.upsert:333
-  - database_manager.DatabaseManager.upsert_many:390
-  - database_manager.DatabaseManager.update:460
-  - database_manager.DatabaseManager.update_by_id:498
-  - database_manager.DatabaseManager.delete:517
-  - database_manager.DatabaseManager.delete_by_id:549
-  - database_manager.DatabaseManager.get_by_id:246
-  - database_manager.DatabaseManager.execute_raw:659
+  - database_manager.DatabaseManager.query:205
+  - database_manager.DatabaseManager.query_advanced:609
+  - database_manager.DatabaseManager.insert:288
+  - database_manager.DatabaseManager.insert_many:318
+  - database_manager.DatabaseManager.upsert:356
+  - database_manager.DatabaseManager.upsert_many:424
+  - database_manager.DatabaseManager.update:504
+  - database_manager.DatabaseManager.update_by_id:542
+  - database_manager.DatabaseManager.delete:561
+  - database_manager.DatabaseManager.delete_by_id:593
+  - database_manager.DatabaseManager.get_by_id:269
+  - database_manager.DatabaseManager.execute_raw:703
   - database_manager.DatabaseManager.truncate:710
 </key_function>
 

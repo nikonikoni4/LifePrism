@@ -1,22 +1,28 @@
 ---
-version: 2.0
+version: 2.1
 created_at: 2026-04-10
-updated_at: 2026-07-22
-last_updated: 新增 deletion_log 墓碑表 schema 决策 ADR（字段命名 target_table + update_at=True + LWW 用 updated_at）
+updated_at: 2026-07-23
+last_updated: 新增 deletion-sync-tombstone ADR（专用端点替代 SYNC_TABLES）；标记 deletion-log-table 部分被 supersede；修正 add-hash-id-to-autoincrement-tables 表数表述
 abstract: 架构决策目录索引，用于导航 ADR 文档并说明长期设计取舍。
 ---
 
+## deletion-sync-tombstone
+- updated_at: 2026-07-23
+- path: `docs/adr/2026-07-22-deletion-sync-tombstone.md`
+- 触发规则：当需要理解墓碑同步流程架构（专用端点 vs SYNC_TABLES、事务边界设计、LWW 简化策略、Aggregator 实例化方式、sync_once 顺序）、或修改墓碑同步相关代码时读取
+- 内容摘要：墓碑同步流程的 5 个关键决策——（决策 1）从 `SYNC_TABLES` 移除 `deletion_log`，新增 3 个专用端点（`/pull-deletion-log`、`/push-deletion-log`、`/cleanup-deletion-log`），避免双重同步和 LWW 语义不匹配；（决策 2）HTTP 在事务外，DELETE + 墓碑写入在事务内（cursor 变体方法），保证原子性且 HTTP 超时不锁库；（决策 3）本地已有墓碑则 `INSERT OR IGNORE` 跳过（不比较 `updated_at`），墓碑不更新使 LWW 比较无意义；（决策 4）`CustomRecordRepository.__init__` 实例化 `DeletionLogProvider`（符合 Repository 规则，不导入全局单例）；（决策 5）`sync_once` 流程为 墓碑 Pull → 数据 Pull → 墓碑 Push → 数据 Push → 文件 → 清理 → 更新 `last_sync_time`。supersede `2026-07-22-deletion-log-table.md` 中"deletion_log 加入 SYNC_TABLES"决策。
+
 ## deletion-log-table
-- updated_at: 2026-07-22
+- updated_at: 2026-07-23
 - path: `docs/adr/2026-07-22-deletion-log-table.md`
 - 触发规则：当需要理解 deletion_log 墓碑表 schema 决策、字段命名 target_table 而非 table_name 的理由、update_at=True 配置语义、LWW 比较字段选择、或修改 DELETION_LOG_CONFIG 时读取
-- 内容摘要：新增 deletion_log 墓碑表参与 SYNC_TABLES 同步。三个关键决策——（决策 1）字段名用 `target_table` 而非 `table_name`，避免与 schema 配置 dict 的 `table_name` 元字段混淆，Provider 代码中 `record["target_table"]` 与 `config["table_name"]` 明确区分；（决策 2）配置 `update_at: True`，让墓碑表参与 sync_repository 的 LWW 比较路径，与其他同步表行为一致，跨端同时删除时 LWW 自然处理重复墓碑；（决策 3）LWW 比较用 `updated_at` 而非 `created_at`，墓碑不更新使 `updated_at == created_at`，比较结果等价，但用 `updated_at` 能复用现有 LWW 路径零改动。`dl-` 前缀不加入 `HASH_ID_PREFIXES`（dl- 不是 hash_id 前缀，id 生成在 PRD 3 的 DeletionLogProvider 中通过 `_generic_insert(id_prefix='dl-')` 直接传入）。决策前提：墓碑表加入 SYNC_TABLES、墓碑不更新、项目 LWW 机制通过 has_updated_at() 判断、table_name 已是配置元字段。未来墓碑支持"复活"时 `update_at: True` 天然支持 updated_at 变化。
+- 内容摘要：新增 deletion_log 墓碑表的 schema 决策（字段命名、时间戳配置、LWW 比较字段）。三个关键决策——（决策 1）字段名用 `target_table` 而非 `table_name`，避免与 schema 配置 dict 的 `table_name` 元字段混淆；（决策 2）配置 `update_at: True`，让墓碑表参与 LWW 比较路径；（决策 3）LWW 比较用 `updated_at` 而非 `created_at`，墓碑不更新使 `updated_at == created_at`，比较结果等价。**部分被 supersede**：原决策中"deletion_log 加入 SYNC_TABLES"已被 [2026-07-22-deletion-sync-tombstone.md](./2026-07-22-deletion-sync-tombstone.md) 取代（改用专用端点）；schema 决策仍然有效。
 
 ## add-hash-id-to-autoincrement-tables
-- updated_at: 2026-07-22
+- updated_at: 2026-07-23
 - path: `docs/adr/2026-07-22-add-hash-id-to-autoincrement-tables.md`
 - 触发规则：当需要理解为什么为 6 张 AUTOINCREMENT 表新增 hash_id 字段、迁移方法选型（ALTER + 回填 + CREATE UNIQUE INDEX vs 删表重建）、或修改迁移脚本时读取
-- 内容摘要：为实现删除同步功能，为 6 张 AUTOINCREMENT 表新增 `hash_id TEXT NOT NULL UNIQUE` 字段作为跨端稳定标识。用户初始倾向删表重建（因简单且不了解 SQLite ALTER TABLE 限制），经评估后采用 ALTER TABLE ADD COLUMN + 回填 + CREATE UNIQUE INDEX 方式（不丢数据且与 m012 一致）。决策前提：删除同步需要墓碑表模式、墓碑需要跨端稳定标识、自增 id 两端不同、项目已采用 LWW 策略、SQLite ALTER TABLE 限制。未来多客户端并发场景下 LWW + 墓碑不足时考虑 CRDT。
+- 内容摘要：为实现删除同步功能，为 6 张 AUTOINCREMENT 表新增 `hash_id TEXT NOT NULL UNIQUE` 字段作为跨端稳定标识。用户初始倾向删表重建（因简单且不了解 SQLite ALTER TABLE 限制），经评估后采用 ALTER TABLE ADD COLUMN + 回填 + CREATE UNIQUE INDEX 方式（不丢数据且与 m012 一致）。决策前提：删除同步需要墓碑表模式、墓碑需要跨端稳定标识、自增 id 两端不同、项目已采用 LWW 策略、SQLite ALTER TABLE 限制。未来多客户端并发场景下 LWW + 墓碑不足时考虑 CRDT。文档影响已修正：同步表数量从 31 张变 29 张（见 [2026-07-22-deletion-sync-tombstone.md](./2026-07-22-deletion-sync-tombstone.md)）。
 
 ## hash-id-sync-only-identifier
 - updated_at: 2026-07-22

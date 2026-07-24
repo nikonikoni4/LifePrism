@@ -6,10 +6,10 @@
 - 内容摘要：数据同步模块总览，定义子模块分层架构（数据库同步 + 动态表 + 心跳 / 文件同步 / 配置桥接）、依赖规则和子 spec 索引。原 `2026-07-11-data-sync-spec.md` 因超过 500 行拆分为 core 和 files 两个子 spec
 
 ## data-sync-core-spec
-- updated_at: 2026-07-16
+- updated_at: 2026-07-23
 - path: `docs/specs/2026-07-16-data-sync-core-spec.md`
-- 触发规则：开发、修改或查询数据库同步、动态表同步、心跳管理、消息路由、云端配置初始化相关功能时阅读
-- 内容摘要：数据同步模块核心规格，定义 30 张静态表增量同步（updated_at + 分批拉取）、动态表 slug 集合对比双向建表、LWW 冲突解决策略、心跳状态管理（纯内存 15 分钟超时）、消息路由、云端配置生成与初始化（CloudConfigGenerator → CloudInitializer）、API Key 认证安全
+- 触发规则：开发、修改或查询数据库同步、动态表同步、墓碑同步（删除传播）、心跳管理、消息路由、云端配置初始化相关功能时阅读
+- 内容摘要：数据同步模块核心规格，定义 29 张静态表增量同步（updated_at + 分批拉取）、动态表 slug 集合对比双向建表、墓碑专用端点跨端传播 DELETE（3 个专用端点 + HTTP 外事务内 + INSERT OR IGNORE 跳过 LWW）、LWW 冲突解决策略、心跳状态管理（纯内存 15 分钟超时）、消息路由、云端配置生成与初始化（CloudConfigGenerator → CloudInitializer）、API Key 认证安全
 
 ## data-sync-files-spec
 - updated_at: 2026-07-16

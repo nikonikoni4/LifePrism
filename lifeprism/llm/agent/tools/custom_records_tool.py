@@ -313,7 +313,8 @@ class QueryCustomRecordEntriesTool(Tool):
                 date_range = (start_utc, end_utc)
 
         try:
-            entries = custom_record_repository.query_entries(
+            # query_entries 返回 (entries, total_count) 元组
+            entries, total_count = custom_record_repository.query_entries(
                 type_id=type_id,
                 date_range=date_range,
                 page=1,
@@ -329,6 +330,7 @@ class QueryCustomRecordEntriesTool(Tool):
                 if "updated_at" in entry and entry["updated_at"]:
                     entry["updated_at"] = utc_to_local_display(entry["updated_at"])
 
-            return f"{SUCCESS}{json.dumps(entries, ensure_ascii=False)}"
+            result = {"entries": entries, "total": total_count}
+            return f"{SUCCESS}{json.dumps(result, ensure_ascii=False)}"
         except Exception as e:
             return f"{ERROR}查询自定义记录失败: {e}"

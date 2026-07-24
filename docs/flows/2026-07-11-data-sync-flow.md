@@ -60,13 +60,13 @@ last_event: str            # 最近生命周期事件（'online' | 'offline'）
 
 <key_function>
 - lifeprism/config/cloud_config_generator.py
-  - cloud_config_generator.CloudConfigGenerator.generate_cloud_config:38
-  - cloud_config_generator.CloudConfigGenerator._collect_provider_keys:89
-  - cloud_config_generator.CloudConfigGenerator._build_config:129
+  - cloud_config_generator.CloudConfigGenerator.generate_cloud_config:55
+  - cloud_config_generator.CloudConfigGenerator._collect_provider_keys:116
+  - cloud_config_generator.CloudConfigGenerator._build_config:150
 - lifeprism/config/cloud_initializer.py
-  - cloud_initializer.CloudInitializer.initialize:81
-  - cloud_initializer.CloudInitializer._validate:148
-  - cloud_initializer.CloudInitializer._write_config_yaml:204
+  - cloud_initializer.CloudInitializer.initialize:91
+  - cloud_initializer.CloudInitializer._validate:164
+  - cloud_initializer.CloudInitializer._write_config_yaml:221
   - cloud_initializer.CloudInitializer._write_providers_yaml:255
 </key_function>
 

@@ -4,6 +4,7 @@ from lifeprism.repository.providers.commitment_provider import CommitmentProvide
 from lifeprism.repository.providers.common_query_options import QueryOptions
 from lifeprism.repository.providers.computer_usage_provider import ComputerUsageProvider
 from lifeprism.repository.providers.custom_block_provider import CustomBlockProvider
+from lifeprism.repository.providers.deletion_log_provider import DeletionLogProvider
 from lifeprism.repository.providers.diary_provider import DiaryProvider
 from lifeprism.repository.providers.file_sync_state_provider import FileSyncStateProvider
 from lifeprism.repository.providers.journal_provider import JournalProvider
@@ -35,6 +36,7 @@ journal_provider: JournalProvider = LazySingleton(JournalProvider)
 commitment_provider: CommitmentProvider = LazySingleton(CommitmentProvider)
 being_provider: BeingProvider = LazySingleton(BeingProvider)
 value_provider: ValueProvider = LazySingleton(ValueProvider)
+deletion_log_provider: DeletionLogProvider = LazySingleton(DeletionLogProvider)
 
 __all__ = [
     "tokens_usage_provider",
@@ -50,5 +52,6 @@ __all__ = [
     "commitment_provider",
     "being_provider",
     "value_provider",
+    "deletion_log_provider",
     "QueryOptions",
 ]

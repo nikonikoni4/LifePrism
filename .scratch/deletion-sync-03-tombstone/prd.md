@@ -1,8 +1,8 @@
 ---
 title: 同步删除 - 阶段 3：墓碑同步流程
 created_at: 2026-07-22
-updated_at: 2026-07-22
-status: ready-for-agent
+updated_at: 2026-07-23
+status: completed
 type: feature
 ---
 
@@ -13,15 +13,15 @@ type: feature
 本 PRD 是"数据库删除同步"任务链的**第 3 步（共 3 步）**，依赖 PRD 1（Schema 变更）和 PRD 2（代码适配）完成。
 
 ```
-[PRD 1] Schema 变更（已完成）
+[PRD 1] Schema 变更（已完成 2026-07-22）
     │   6 张 AUTOINCREMENT 表加 hash_id 字段
     │   新增 deletion_log 墓碑表
     ▼
-[PRD 2] 代码适配（已完成）
+[PRD 2] 代码适配（已完成 2026-07-23）
     │   Provider 迁移 + 写入/删除通道统一
     │   _generic_delete 内部写墓碑（写入 deletion_log 表）
     ▼
-[PRD 3] 墓碑同步流程（本 PRD）
+[PRD 3] 墓碑同步流程（本 PRD，已完成 2026-07-23）
         DeletionLogProvider
         sync_once 集成墓碑 Pull/Push/清理
         端到端验证（A 设备删除 → B 设备同步删除）
@@ -45,11 +45,12 @@ PRD 1 和 PRD 2 完成后：
 
 ### 1. DeletionLogProvider
 
-新建 `DeletionLogProvider`，提供墓碑表的 CRUD：
-- 写入墓碑
-- 按 `created_at > last_sync_time` 增量查询
+新建 `DeletionLogProvider`（继承 `LWBaseDataProvider`），提供墓碑表的 CRUD：
+- 写入墓碑（`create_tombstone` + `write_tombstone_with_cursor` cursor 变体）
+- 按 `created_at > last_sync_time` 增量查询（`get_tombstones_since`）
 - 按 `source` 过滤
-- 清理 `created_at <= last_sync_time` 的记录
+- 清理 `created_at <= last_sync_time` 的记录（`cleanup_before`）
+- 查询/写入墓碑的 cursor 变体（`get_tombstone_with_cursor` + `create_tombstone_with_cursor`）保证事务原子性
 
 ### 2. sync_once 主流程集成墓碑
 
@@ -68,9 +69,23 @@ sync_once 主流程（修改后）：
 
 **顺序关键**：墓碑 Pull/Push 必须在数据 Pull/Push 之前，避免删除被后续 upsert 覆盖。
 
-### 3. 墓碑 LWW 比较
+### 3. 墓碑同步通道：专用端点（替代 SYNC_TABLES）
 
-墓碑不修改，`created_at == updated_at`，同步时直接用 `created_at` 作 LWW 比较字段。
+**关键决策变更（v2）**：原计划将 `deletion_log` 加入 `SYNC_TABLES` 走数据同步通道，实施前发现该方案有严重的双重同步和 LWW 语义不匹配问题。最终采用 3 个专用端点：
+
+- `/api/sync/pull-deletion-log` — 拉取云端 `created_at > last_sync_time` 的墓碑列表
+- `/api/sync/push-deletion-log` — 推送本地墓碑到云端（云端对每条墓碑独立事务处理 LWW + DELETE + 写副本）
+- `/api/sync/cleanup-deletion-log` — 清理云端 `created_at <= last_sync_time` 的墓碑
+
+`deletion_log` **不在 `SYNC_TABLES`** 中，避免被 `pull_from_remote`/`push_to_remote` 当作普通数据 upsert 导致双重同步。
+
+### 4. 墓碑 LWW 简化：INSERT OR IGNORE 跳过
+
+墓碑不更新（`updated_at == created_at`），不比较 `updated_at`。本地已有同 `(target_table, record_id)` 墓碑时 `INSERT OR IGNORE` 跳过，利用 `UNIQUE(target_table, record_id)` 约束自然去重。
+
+### 5. 事务边界：HTTP 外事务内
+
+HTTP 请求（拉取/推送墓碑）在事务外执行，获取到墓碑列表后开事务执行 DELETE + 写副本，失败则整个事务回滚。cursor 变体方法（`get_tombstone_with_cursor`、`create_tombstone_with_cursor`、`execute_tombstone_delete_with_cursor`）保证 SQL 封装在 Repository 层但事务边界由调用方控制。
 
 ## User Stories
 
@@ -103,8 +118,8 @@ sync_once 主流程（修改后）：
 
 ### 墓碑 LWW
 
-16. 作为同步系统，墓碑比较使用 `created_at` 字段作 LWW——墓碑不修改，`created_at == updated_at`。
-17. 作为同步系统，两端都有同一墓碑时（按 `target_table + record_id` 唯一），保留 `created_at` 更晚的。
+16. 作为同步系统，墓碑比较使用 `updated_at` 字段作 LWW——墓碑不修改，插入时 `created_at == updated_at`，行为等价。
+17. 作为同步系统，两端都有同一墓碑时（按 `target_table + record_id` 唯一），保留 `updated_at` 更晚的。
 
 ### 事务与失败处理
 
@@ -127,14 +142,19 @@ sync_once 主流程（修改后）：
 | `lifeprism/repository/providers/deletion_log_provider.py`（新建） | 墓碑表 Provider，CRUD + 增量查询 + 清理 |
 | `lifeprism/repository/providers/__init__.py` | 注册 `deletion_log_provider` 单例 |
 | `lifeprism/sync/sync_client.py` | `sync_once` 主流程新增 `_pull_deletion_log` + `_push_deletion_log` + `_cleanup_deletion_log` |
-| `lifeprism/server/api/sync_cloud_api.py` | 云端 Pull/Push 端点对墓碑表透明处理（墓碑表已在 `SYNC_TABLES`，无需特殊端点） |
+| `lifeprism/server/api/sync_cloud_api.py` | 新增 3 个专用端点（`pull-deletion-log`、`push-deletion-log`、`cleanup-deletion-log`），云端执行 DELETE + 写副本。`deletion_log` 已从 `SYNC_TABLES` 移除，墓碑仅通过专用通道同步 |
+| `lifeprism/sync/constants.py` | 从 `SYNC_TABLES` 移除 `deletion_log`（墓碑走专用通道） |
+| `lifeprism/server/api/sync_cloud_api.py`（`full-clear` 端点） | 在 `SYNC_TABLES` 遍历清空之后，显式调用 `delete_all_rows("deletion_log")` 清空墓碑表 |
+| `lifeprism/server/api/sync_status_api.py` | 显式追加 `deletion_log` 到状态查询表列表 |
+| `lifeprism/repository/sync_repository.py` | 新增 `execute_tombstone_delete(target_table, record_id)` 方法，通过 `HASH_ID_PREFIXES` 判断列，不写墓碑 |
+| `lifeprism/repository/aggregators/custom_record_aggregator.py` | `delete_entry` 通过 `write_tombstone_with_cursor` 写墓碑（与 DELETE 同事务） |
 
 ### DeletionLogProvider 元数据
 
 ```python
 _TABLE_NAME = "deletion_log"
 _PRIMARY_KEY = "id"
-_ON_CONFLICT = "abort"
+_ON_CONFLICT = "ignore"  # 与 _write_tombstone 的 INSERT OR IGNORE 语义一致
 _FILTER_FIELDS = {"source", "target_table"}
 _ORDER_FIELDS = {"created_at"}
 _SELECT_FIELDS = {"id", "target_table", "record_id", "source", "created_at", "updated_at"}
@@ -189,7 +209,7 @@ _cleanup_deletion_log(last_sync_time):
 | 决策项 | 选择 | 说明 |
 |--------|------|------|
 | 节点模型 | 严格两节点 | 本地↔云端，可激进清理墓碑 |
-| 冲突策略 | 墓碑 `created_at` 作 LWW | 墓碑不修改，`created_at == updated_at` |
+| 冲突策略 | 墓碑 `updated_at` 作 LWW | 墓碑不修改，`created_at == updated_at`，行为等价 |
 | 墓碑清理 | 同步成功后立即清理 | 清理 `created_at <= last_sync_time` |
 | 墓碑顺序 | Pull/Push 在数据 Pull/Push 之前 | 避免删除被 upsert 覆盖 |
 | 失败处理 | 整个 sync_once 失败 | 不更新 last_sync_time，下次重试 |
@@ -265,13 +285,13 @@ _cleanup_deletion_log(last_sync_time):
 
 ### 待写 ADR
 
-1. **`2026-07-22-deletion-sync-tombstone.md`** — 删除同步墓碑机制决策（含两节点假设、墓碑清理策略、`created_at` LWW、Pull/Push 顺序）
+1. **`2026-07-22-deletion-sync-tombstone.md`** — 删除同步墓碑机制决策（含两节点假设、墓碑清理策略、`updated_at` LWW、Pull/Push 顺序、专用端点、`deletion_log` 从 SYNC_TABLES 移除）
 
-### 未决问题
+### 未决问题（均已解决）
 
-1. **墓碑 Pull/Push 与数据 Pull/Push 的事务关系**：墓碑 Pull 失败时是否回滚已执行的部分删除？倾向"失败则全部回滚，下次重试"，但需要确认事务边界。
-2. **`deletion_log` 表通过 `SYNC_TABLES` 同步时的循环引用**：`deletion_log` 在 `SYNC_TABLES` 中，Pull/Push 时会同步墓碑表自身的记录。需要确认 `upsert_rows_with_lww` 对墓碑表的处理不会引发循环（理论上不会，因为墓碑表只有 INSERT，没有 UPDATE）。
-3. **动态表墓碑**：`custom_*` 动态表的墓碑 `record_id` 用动态表的主键（TEXT `id`），动态表 schema 不在 `TABLE_CONFIGS`，需要确认 `_generic_delete` 能正确处理动态表。
+1. **墓碑 Pull/Push 与数据 Pull/Push 的事务关系** ✅ 已决策：`_pull_deletion_log` 内部用事务包裹所有 DELETE + 副本写入（HTTP 在事务外），失败则回滚，`sync_once` 抛异常不更新 `last_sync_time`。
+2. **`deletion_log` 表通过 `SYNC_TABLES` 同步时的循环引用** ✅ 已决策：`deletion_log` 从 `SYNC_TABLES` 移除，墓碑仅通过专用通道（`_pull/_push_deletion_log`）同步，不再有循环引用问题。
+3. **动态表墓碑** ✅ 已决策：`custom_*` 动态表通过 `DeletionLogProvider.write_tombstone_with_cursor` 写墓碑（在 `delete_entry` 中调用，与 DELETE 同事务），`target_table` 用动态表名 `custom_{slug}`，`record_id` 用 TEXT 主键。
 
 ### 验收标准
 

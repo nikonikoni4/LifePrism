@@ -114,16 +114,16 @@ module: sync
 
 <key_function>
 - lifeprism/repository/sync_repository.py
-  - sync_repository.SyncRepository.query_incremental:223
-  - sync_repository.SyncRepository.upsert_rows:351
-  - sync_repository.SyncRepository.upsert_rows_with_lww:567
-  - sync_repository.SyncRepository.batch_get_existing_updated_at:429
-  - sync_repository.SyncRepository.get_custom_record_slugs:788
-  - sync_repository.SyncRepository.get_primary_key_field:718
-  - sync_repository.SyncRepository.get_unique_fields:745
-  - sync_repository.SyncRepository.has_updated_at:771
-  - sync_repository.SyncRepository.count_rows:145
-  - sync_repository.SyncRepository.count_rows_batch:182
+  - sync_repository.SyncRepository.query_incremental:226
+  - sync_repository.SyncRepository.upsert_rows:483
+  - sync_repository.SyncRepository.upsert_rows_with_lww:699
+  - sync_repository.SyncRepository.batch_get_existing_updated_at:561
+  - sync_repository.SyncRepository.get_custom_record_slugs:937
+  - sync_repository.SyncRepository.get_primary_key_field:850
+  - sync_repository.SyncRepository.get_unique_fields:877
+  - sync_repository.SyncRepository.has_updated_at:920
+  - sync_repository.SyncRepository.count_rows:148
+  - sync_repository.SyncRepository.count_rows_batch:185
 </key_function>
 
 **对外接口**：

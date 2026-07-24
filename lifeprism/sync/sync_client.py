@@ -20,6 +20,7 @@ from typing import Any
 
 import httpx
 
+from lifeprism.repository import deletion_log_repository
 from lifeprism.sync.conflict_backup import backup_conflict_versions
 from lifeprism.sync.constants import (
     DB_PUSH_BATCH_SIZE,
@@ -259,18 +260,183 @@ class SyncClient:
         if directories is None:
             directories = SYNC_DIRECTORIES
 
+        # 墓碑 Pull（必须在数据 Pull 之前，避免删除被后续 upsert 覆盖）
+        self._pull_deletion_log(remote_url, api_key, last_sync_time)
+
         # 数据库同步：Pull -> Push，任一步骤失败则不更新 last_sync_time
         self.pull_from_remote(remote_url, api_key, last_sync_time, tables)
+
+        # 墓碑 Push（必须在数据 Push 之前）
+        self._push_deletion_log(remote_url, api_key, last_sync_time)
 
         self.push_to_remote(remote_url, api_key, tables)
 
         # 文件同步：全流程（Phase 1-3，参考 ADR v2.1）
         self._sync_files_full_flow(remote_url, api_key, last_sync_time, directories)
 
+        # 墓碑清理（在更新 last_sync_time 之前，用旧 last_sync_time 清理过期墓碑）
+        self._cleanup_deletion_log(remote_url, api_key, last_sync_time)
+
         # 只有全部成功才更新 last_sync_time（使用 ISO 8601 格式，与服务端保持一致）
         current_time = datetime.now(timezone.utc).isoformat()
         set_setting("sync.last_sync_time", current_time)
         logger.info("sync_once: 同步完成，last_sync_time 已更新为 %s", current_time)
+
+    # ==================== 墓碑同步（PRD 3 Slice 02） ====================
+
+    def _pull_deletion_log(self, remote_url: str, api_key: str, last_sync_time: str) -> None:
+        """墓碑 Pull：HTTP 拉取（事务外）→ 事务内 LWW 检查 + DELETE + 写副本
+
+        失败则整个事务回滚，sync_once 抛异常不更新 last_sync_time。
+
+        流程：
+        1. HTTP 拉取（事务外，避免长事务占用连接）
+        2. 事务内逐条处理：
+           a. LWW 检查：本地已有同 (target_table, record_id) 墓碑则跳过
+           b. 执行 DELETE（不写墓碑，避免循环触发同步）
+           c. 写本地副本（source=cloud，保留原 created_at）
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+            last_sync_time: 上次同步时间（ISO 8601 字符串）
+
+        Raises:
+            httpx.HTTPStatusError / httpx.RequestError: HTTP 请求失败
+        """
+        # 1. HTTP 拉取（事务外，避免长事务占用连接）
+        try:
+            resp = httpx.post(
+                url=f"{remote_url}/api/sync/pull-deletion-log",
+                json={"last_sync_time": last_sync_time},
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=PUSH_ENDPOINT_TIMEOUT,
+            )
+            resp.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(
+                "_pull_deletion_log: 拉取云端墓碑失败, remote_url=%s, error=%s",
+                remote_url,
+                e,
+            )
+            raise
+
+        tombstones = resp.json().get("tombstones", [])
+
+        if not tombstones:
+            logger.info("墓碑 Pull: 云端无新墓碑")
+            return
+
+        # 2. 事务内处理（所有 DELETE + 副本写入在同一事务，失败则回滚）
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                for t in tombstones:
+                    target_table = t["target_table"]
+                    record_id = t["record_id"]
+                    original_created_at = t["created_at"]
+
+                    # a. LWW 检查（简化）：本地已有同 (target_table, record_id) 墓碑则跳过
+                    local = deletion_log_repository.get_tombstone_with_cursor(
+                        cursor, target_table, record_id
+                    )
+                    if local is not None:
+                        continue
+
+                    # b. 执行 DELETE（不写墓碑）
+                    self.sync_repository.execute_tombstone_delete_with_cursor(
+                        cursor, target_table, record_id
+                    )
+
+                    # c. 写本地副本（保留原 created_at）
+                    deletion_log_repository.create_tombstone_with_cursor(
+                        cursor,
+                        target_table,
+                        record_id,
+                        source="cloud",
+                        created_at=original_created_at,
+                    )
+                conn.commit()
+            logger.info("墓碑 Pull: 处理 %d 条墓碑", len(tombstones))
+        except Exception:
+            logger.error("墓碑 Pull 失败，事务已回滚")
+            raise
+
+    def _push_deletion_log(self, remote_url: str, api_key: str, last_sync_time: str) -> None:
+        """墓碑 Push：查询本地 source=local 墓碑 → HTTP 推送到云端
+
+        云端对每条墓碑独立事务处理 LWW + DELETE + 写副本。
+        本地无需在 Push 后清理墓碑（由 cleanup-deletion-log 端点统一清理）。
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+            last_sync_time: 上次同步时间（ISO 8601 字符串）
+
+        Raises:
+            httpx.HTTPStatusError / httpx.RequestError: HTTP 请求失败
+        """
+        tombstones = deletion_log_repository.get_tombstones_since(last_sync_time, source="local")
+        if not tombstones:
+            logger.info("墓碑 Push: 本地无新墓碑")
+            return
+        try:
+            resp = httpx.post(
+                url=f"{remote_url}/api/sync/push-deletion-log",
+                json={"tombstones": tombstones},
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=PUSH_ENDPOINT_TIMEOUT,
+            )
+            resp.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            logger.error(
+                "_push_deletion_log: 推送本地墓碑失败, remote_url=%s, count=%d, error=%s",
+                remote_url,
+                len(tombstones),
+                e,
+            )
+            raise
+        result = resp.json()
+        logger.info(
+            "墓碑 Push: 推送 %d 条墓碑, applied=%s, skipped=%s",
+            len(tombstones),
+            result.get("applied_count"),
+            result.get("skipped_count"),
+        )
+
+    def _cleanup_deletion_log(self, remote_url: str, api_key: str, last_sync_time: str) -> None:
+        """墓碑清理：清理本地 + 云端 created_at <= last_sync_time 的记录
+
+        使用旧 last_sync_time（同步前的值），在更新 last_sync_time 之前执行。
+        刚 Pull/Push 产生的墓碑 created_at > 旧 last_sync_time，不会被清理。
+        清理是同步成功后的内部操作，不写墓碑。
+
+        清理非原子说明：先清本地后清云端（HTTP），若云端 HTTP 失败，本地已清而云端未清，
+        下次 Pull 会重新拉回云端墓碑并重新执行 DELETE（幂等，无害但浪费）。
+        依赖幂等重试。
+
+        Args:
+            remote_url: 远程服务器 URL
+            api_key: API Key
+            last_sync_time: 同步前的时间戳（旧值），清理 created_at <= 此值的记录
+        """
+        # 1. 清理本地
+        local_cleaned = deletion_log_repository.cleanup_before(last_sync_time)
+
+        # 2. 清理云端
+        resp = httpx.post(
+            url=f"{remote_url}/api/sync/cleanup-deletion-log",
+            json={"last_sync_time": last_sync_time},
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=PUSH_ENDPOINT_TIMEOUT,
+        )
+        resp.raise_for_status()
+        cloud_cleaned = resp.json().get("cleaned_count", 0)
+        logger.info(
+            "墓碑清理: 本地 %d 条, 云端 %d 条",
+            local_cleaned,
+            cloud_cleaned,
+        )
 
     def _check_cloud_initialized(self, remote_url: str, api_key: str) -> bool:
         """检查云端是否已完成首次同步初始化

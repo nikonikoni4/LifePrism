@@ -86,10 +86,10 @@ class DataAccessTrace:
 - lifeprism/repository/__init__.py
   - 模块级 DatabaseManager 实例化:35
 - lifeprism/repository/database_manager.py
-  - database_manager.DatabaseManager._init_connection_pool:60
-  - database_manager.DatabaseManager._create_connection:70
-  - database_manager.DatabaseManager._get_pooled_connection:82
-  - database_manager.DatabaseManager._return_pooled_connection:105
+  - database_manager.DatabaseManager._init_connection_pool:67
+  - database_manager.DatabaseManager._create_connection:77
+  - database_manager.DatabaseManager._get_pooled_connection:89
+  - database_manager.DatabaseManager._return_pooled_connection:118
   - database_manager.DatabaseManager.get_connection:136
 </key_function>
 

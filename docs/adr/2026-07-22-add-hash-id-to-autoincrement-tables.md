@@ -144,5 +144,5 @@ status: decided
   - 迁移脚本采用 ALTER + 回填 + CREATE UNIQUE INDEX 方法
 - PRD 2 范围：Provider 子类无需改造（_PRIMARY_KEY 不变，见 [2026-07-22-hash-id-sync-only-identifier.md](./2026-07-22-hash-id-sync-only-identifier.md)）
 - PRD 3 范围：墓碑表 record_id 字段存 hash_id，对端按 hash_id 删除
-- 文档影响：`data-sync-core-spec.md` 同步表数量从 31 张变 30 张（移除 2 张 habit 表 + 新增 1 张 `deletion_log` 墓碑表：31 - 2 + 1 = 30）
+- 文档影响：`data-sync-core-spec.md` 静态同步表数量从 31 张变 29 张（移除 2 张 habit 表 `habit_chains`/`habit_chain_nodes` 不参与同步；新增 1 张 `deletion_log` 墓碑表后 PRD 3 又从 `SYNC_TABLES` 移除：31 - 2 + 1 - 1 = 29，见 [2026-07-22-deletion-sync-tombstone.md](./2026-07-22-deletion-sync-tombstone.md)）
 - 需要后续验证：迁移脚本的幂等性、回填 hash_id 的唯一性

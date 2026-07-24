@@ -70,13 +70,13 @@ class ResolvedPaths:
 
 <key_function>
 - lifeprism/config/settings_manager.py
-  - settings_manager.SettingsManager._initialize:86
-  - settings_manager.SettingsManager._resolve_config_base_path:121
-  - settings_manager.SettingsManager._resolve_default_data_path:139
-  - settings_manager.SettingsManager._resolve_allowed_dir_paths:158
-  - settings_manager.SettingsManager._setup_logging:192
-  - settings_manager.SettingsManager._check_data_path_safety:199
-  - settings_manager.SettingsManager.update:463
+  - settings_manager.SettingsManager._initialize:101
+  - settings_manager.SettingsManager._resolve_config_base_path:147
+  - settings_manager.SettingsManager._resolve_default_data_path:165
+  - settings_manager.SettingsManager._resolve_allowed_dir_paths:184
+  - settings_manager.SettingsManager._setup_logging:218
+  - settings_manager.SettingsManager._check_data_path_safety:228
+  - settings_manager.SettingsManager.update:764
 </key_function>
 
 ## 流程概览

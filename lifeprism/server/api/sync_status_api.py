@@ -60,8 +60,9 @@ def get_sync_status(request: Request):
 
     # 批量查询各表记录数（复用 SyncClient 中已注入的 SyncRepository 实例，
     # 使用单一连接执行多次 COUNT(*)，避免 N+1 式连接获取）
+    # deletion_log 已从 SYNC_TABLES 移除（走专用通道），此处显式追加以在状态中显示
     sync_repository = sync_client.sync_repository
-    tables = sync_repository.count_rows_batch(list(SYNC_TABLES))
+    tables = sync_repository.count_rows_batch(list(SYNC_TABLES) + ["deletion_log"])
 
     return {
         "last_sync_time": last_sync_time,

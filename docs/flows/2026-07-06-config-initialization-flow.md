@@ -74,23 +74,23 @@ class ConfigInitState:
 
 <key_function>
 - lifeprism/config/settings_manager.py
-  - settings_manager.SettingsManager.__new__:77
-  - settings_manager.SettingsManager._initialize:86
-  - settings_manager.SettingsManager._resolve_config_base_path:121
-  - settings_manager.SettingsManager._load_config:225
-  - settings_manager.SettingsManager._resolve_default_data_path:139
-  - settings_manager.SettingsManager._setup_logging:192
-  - settings_manager.SettingsManager._check_data_path_safety:199
-  - settings_manager.SettingsManager._resolve_allowed_dir_paths:158
-  - settings_manager.SettingsManager._save_config:241
+  - settings_manager.SettingsManager.__new__:92
+  - settings_manager.SettingsManager._initialize:101
+  - settings_manager.SettingsManager._resolve_config_base_path:147
+  - settings_manager.SettingsManager._load_config:254
+  - settings_manager.SettingsManager._resolve_default_data_path:165
+  - settings_manager.SettingsManager._setup_logging:218
+  - settings_manager.SettingsManager._check_data_path_safety:228
+  - settings_manager.SettingsManager._resolve_allowed_dir_paths:184
+  - settings_manager.SettingsManager._save_config:270
 - lifeprism/config/provider_manager.py
-  - provider_manager.ProviderManager.__new__:558
-  - provider_manager.ProviderManager._initialize:568
-  - provider_manager.ProviderManager._load_config:585
+  - provider_manager.ProviderManager.__new__:556
+  - provider_manager.ProviderManager._initialize:566
+  - provider_manager.ProviderManager._load_config:583
 - lifeprism/config/migrations/config_migrator.py
   - config_migrator.run_config_migrations:22
 - lifeprism/utils/logger.py
-  - logger.setup_file_logging:58
+  - logger.setup_file_logging:59
 </key_function>
 
 ## 流程概览

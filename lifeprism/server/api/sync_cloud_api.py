@@ -29,7 +29,11 @@ from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, Field
 
 from lifeprism.config.settings_manager import settings
-from lifeprism.repository import SyncRepository, file_sync_state_repository
+from lifeprism.repository import (
+    SyncRepository,
+    deletion_log_repository,
+    file_sync_state_repository,
+)
 from lifeprism.sync.constants import EXCLUDED_FILENAMES as _EXCLUDED_FILENAMES
 from lifeprism.sync.constants import SYNC_DIRECTORIES, SYNC_TABLES, safe_gzip_decompress
 from lifeprism.sync.hash_utils import compute_file_hash
@@ -107,6 +111,26 @@ class HeartbeatRequest(BaseModel):
     """心跳请求"""
 
     event: str = Field(..., description="事件类型（online/offline/ping）")
+
+
+class SyncPullDeletionLogRequest(BaseModel):
+    """墓碑拉取请求"""
+
+    last_sync_time: str = Field(..., description="上次同步时间（ISO 8601 格式）")
+
+
+class SyncPushDeletionLogRequest(BaseModel):
+    """墓碑推送请求"""
+
+    tombstones: list[dict[str, Any]] = Field(
+        ..., description="待推送的墓碑列表（每条含 target_table/record_id/created_at）"
+    )
+
+
+class SyncCleanupDeletionLogRequest(BaseModel):
+    """墓碑清理请求"""
+
+    last_sync_time: str = Field(..., description="上次同步时间（ISO 8601 格式）")
 
 
 class DynamicTableFieldDef(BaseModel):
@@ -285,6 +309,122 @@ def sync_push(request: SyncPushRequest, _: None = Depends(verify_sync_api_key)):
         "status": "ok",
         "sync_time": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@router.post("/pull-deletion-log", summary="拉取云端墓碑列表")
+def sync_pull_deletion_log(
+    request: SyncPullDeletionLogRequest,
+    _: None = Depends(verify_sync_api_key),
+):
+    """拉取云端 created_at > last_sync_time 的墓碑列表
+
+    供本地 _pull_deletion_log 调用，获取云端新增的墓碑，
+    在本地事务内执行 LWW 检查 + DELETE + 写本地副本。
+
+    **请求参数**:
+    - last_sync_time: 上次同步时间（ISO 8601 格式，空字符串表示全量）
+
+    **认证**:
+    - Authorization: Bearer {api_key} HTTP Header
+
+    **响应**:
+    - tombstones: [{id, target_table, record_id, source, created_at, updated_at}] 墓碑列表
+    """
+    tombstones = deletion_log_repository.get_tombstones_since(request.last_sync_time)
+    logger.info("墓碑 Pull: 返回 %d 条墓碑", len(tombstones))
+    return {"tombstones": tombstones}
+
+
+@router.post("/push-deletion-log", summary="推送本地墓碑到云端")
+def sync_push_deletion_log(
+    request: SyncPushDeletionLogRequest,
+    _: None = Depends(verify_sync_api_key),
+):
+    """云端对每条墓碑（单事务）：LWW 检查 + DELETE + 写副本
+
+    每条墓碑独立事务处理，单条失败不影响已应用的墓碑，
+    但会立即 raise 终止后续墓碑处理（由调用方决定是否重试）。
+
+    **请求参数**:
+    - tombstones: 待推送的墓碑列表（每条含 target_table/record_id/created_at）
+
+    **认证**:
+    - Authorization: Bearer {api_key} HTTP Header
+
+    **响应**:
+    - success: True
+    - applied_count: 成功应用的墓碑数
+    - skipped_count: 因 LWW 冲突跳过的墓碑数
+    """
+    applied_count = 0
+    skipped_count = 0
+    for t in request.tombstones:
+        target_table = t["target_table"]
+        record_id = t["record_id"]
+        original_created_at = t["created_at"]
+        try:
+            with sync_repository.db.get_connection() as conn:
+                cursor = conn.cursor()
+                # a. LWW 检查：云端已有同 (target_table, record_id) 则跳过
+                existing = deletion_log_repository.get_tombstone_with_cursor(
+                    cursor, target_table, record_id
+                )
+                if existing is not None:
+                    skipped_count += 1
+                    continue
+                # b. 执行 DELETE（不写墓碑）
+                sync_repository.execute_tombstone_delete_with_cursor(
+                    cursor, target_table, record_id
+                )
+                # c. 写云端副本（source=cloud，保留原 created_at）
+                deletion_log_repository.create_tombstone_with_cursor(
+                    cursor,
+                    target_table,
+                    record_id,
+                    source="cloud",
+                    created_at=original_created_at,
+                )
+                conn.commit()
+                applied_count += 1
+        except Exception as e:
+            logger.error("push-deletion-log 处理墓碑失败: %s, error: %s", t, e)
+            raise
+    logger.info(
+        "墓碑 Push: 共 %d 条, 应用 %d, 跳过 %d",
+        len(request.tombstones),
+        applied_count,
+        skipped_count,
+    )
+    return {
+        "success": True,
+        "applied_count": applied_count,
+        "skipped_count": skipped_count,
+    }
+
+
+@router.post("/cleanup-deletion-log", summary="清理云端过期墓碑")
+def sync_cleanup_deletion_log(
+    request: SyncCleanupDeletionLogRequest,
+    _: None = Depends(verify_sync_api_key),
+):
+    """清理云端 created_at <= last_sync_time 的墓碑记录
+
+    供本地 sync_once 在两端都已应用所有墓碑后调用，
+    清理已传播完成的墓碑避免无限累积。
+
+    **请求参数**:
+    - last_sync_time: 上次同步时间（ISO 8601 格式）
+
+    **认证**:
+    - Authorization: Bearer {api_key} HTTP Header
+
+    **响应**:
+    - success: True
+    - cleaned_count: 已清理的墓碑数
+    """
+    cleaned_count = deletion_log_repository.cleanup_before(request.last_sync_time)
+    logger.info("墓碑 Cleanup: 清理 %d 条墓碑", cleaned_count)
+    return {"success": True, "cleaned_count": cleaned_count}
 
 
 @router.get("/dynamic-tables-definitions", summary="查询云端动态表定义（types + fields）")
@@ -993,7 +1133,15 @@ def sync_full_clear(_: None = Depends(verify_sync_api_key)):
     except DataAccessError as e:
         logger.warning("清空 file_sync_state 失败: %s", e)
 
-    # 3. 删除 SYNC_DIRECTORIES 下所有文件（包括黑名单文件，首次同步特殊行为）
+    # 3. 显式清空 deletion_log（墓碑表已从 SYNC_TABLES 移除，走专用通道）
+    # 复用 try/except 模式，单表失败不阻塞整体清空（与 SYNC_TABLES 遍历一致）
+    try:
+        sync_repository.delete_all_rows("deletion_log")
+        cleared_tables.append("deletion_log")
+    except DataAccessError as e:
+        logger.warning("清空 deletion_log 失败: %s", e)
+
+    # 4. 删除 SYNC_DIRECTORIES 下所有文件（包括黑名单文件，首次同步特殊行为）
     # 路径安全检查：确保 dir_path 在 lifeprism_data_path 下（参照 /push-files 的 _is_path_safe）
     cleared_files = 0
     data_path_resolved = settings.lifeprism_data_path.resolve()

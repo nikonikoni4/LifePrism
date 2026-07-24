@@ -96,13 +96,13 @@ class AgentExecutionTrace:
 
 <key_function>
 - lifeprism/llm/agent/loop.py
-  - loop.AgentLoop.__init__:61
-  - loop.AgentLoop.loop:493
-  - loop.AgentLoop.stop:517
-  - loop.AgentLoop._process_msg:407
-  - loop.AgentLoop._process_cmd:263
-  - loop.AgentLoop._run_agent_loop:68
-  - loop.AgentLoop.auto_compact:520
+  - loop.AgentLoop.__init__:66
+  - loop.AgentLoop.loop:570
+  - loop.AgentLoop.stop:594
+  - loop.AgentLoop._process_msg:463
+  - loop.AgentLoop._process_cmd:319
+  - loop.AgentLoop._run_agent_loop:72
+  - loop.AgentLoop.auto_compact:597
 - lifeprism/llm/agent/context.py
   - context.Context.build_system_prompt:51
   - context.Context.build_prompt:86
@@ -115,8 +115,8 @@ class AgentExecutionTrace:
   - queue.MessageQueue.consume_inbound:48
   - queue.MessageQueue.publish_outbound:51
 - lifeprism/llm/session/manager.py
-  - manager.SessionManager.get_or_create_session:125
-  - manager.SessionManager.save_session:192
+  - manager.SessionManager.get_or_create_session:132
+  - manager.SessionManager.save_session:199
 </key_function>
 
 ## 流程概览

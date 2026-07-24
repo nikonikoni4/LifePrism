@@ -65,6 +65,9 @@ from lifeprism.repository.providers import (
     commitment_provider as commitment_repository,
 )
 from lifeprism.repository.providers import custom_block_provider as custom_block_repository
+from lifeprism.repository.providers import (
+    deletion_log_provider as deletion_log_repository,
+)
 from lifeprism.repository.providers import diary_provider as diary_repository
 from lifeprism.repository.providers import (
     file_sync_state_provider as file_sync_state_repository,
@@ -105,6 +108,7 @@ __all__ = [
     "commitment_repository",
     "being_repository",
     "value_repository",
+    "deletion_log_repository",
     # 多表 repository
     "habit_repository",
     "mood_repository",
