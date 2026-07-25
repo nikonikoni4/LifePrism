@@ -390,7 +390,11 @@ def sync_push_deletion_log(
                 applied_count += 1
             except Exception:
                 conn.rollback()
-                logger.error("push-deletion-log 处理墓碑失败: target_table=%s, record_id=%s", target_table, record_id)
+                logger.error(
+                    "push-deletion-log 处理墓碑失败: target_table=%s, record_id=%s",
+                    target_table,
+                    record_id,
+                )
                 raise
     logger.info(
         "墓碑 Push: 共 %d 条, 应用 %d, 跳过 %d",

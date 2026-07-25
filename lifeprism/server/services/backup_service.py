@@ -145,6 +145,18 @@ class BackupService:
         data_path = Path(settings.lifeprism_data_path)
 
         try:
+            # 同秒触发冲突保护：若目录已存在（手动触发/cron 补偿/测试场景），
+            # 先清理旧目录避免残留文件污染本次备份（残留会导致 _verify_docs_backup
+            # 文件数量校验失败，误删整份备份）。
+            # 安全性：APScheduler 默认 max_instances=1 防止同一任务并发执行；
+            # 跨任务（文档 vs 数据库）使用不同子目录 backups/docs vs backups/db，不冲突。
+            if backup_dir.exists():
+                logger.warning(
+                    "文档备份目录已存在，先清理旧目录 timestamp=%s, backup_dir=%s",
+                    timestamp,
+                    backup_dir,
+                )
+                shutil.rmtree(backup_dir, ignore_errors=True)
             backup_dir.mkdir(parents=True, exist_ok=True)
 
             # 复制 BACKUP_DIRS 下的文件
@@ -335,8 +347,23 @@ class BackupService:
             dst_db = db_root / f"{db_filename}-{timestamp}.db"
 
             try:
+                # 同秒触发冲突保护：若目标文件已存在（手动触发/cron 补偿/测试场景），
+                # 先删除避免 SQLite Online Backup API 报 OperationalError（API 要求目标
+                # 为空数据库）。安全性：APScheduler 默认 max_instances=1 防止同一任务并发执行。
+                if dst_db.exists():
+                    logger.warning(
+                        "数据库备份文件已存在，先删除旧文件 timestamp=%s, backup_path=%s",
+                        timestamp,
+                        dst_db,
+                    )
+                    with contextlib.suppress(OSError):
+                        dst_db.unlink()
+
                 # SQLite Online Backup API
                 # 在线拷贝，不阻塞业务读写
+                # 注意：无需 PRAGMA wal_checkpoint(TRUNCATE)，Online Backup API 内部
+                # 按 page 复制时会自动包含 WAL 中已提交的 page，构建一致快照。
+                # （shutil.copy2 才需要 checkpoint，参考 migration_runner._backup_database）
                 source = sqlite3.connect(str(src_db))
                 target = sqlite3.connect(str(dst_db))
                 try:

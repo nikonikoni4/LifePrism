@@ -503,7 +503,227 @@ class TestBackupDatabase:
         assert len(db_files) == 3, f"应保留 3 份，实际 {len(db_files)}"
 
 
-# ==================== Seam 4: run_mode 守卫 ====================
+# ==================== Seam 4: 同秒触发冲突保护 ====================
+
+
+class TestSameTimestampConflictProtection:
+    """同秒触发冲突保护：清理已存在的备份目录/文件后再备份
+
+    场景：手动触发、cron 补偿、测试场景下，同秒内可能触发两次备份。
+    - 文档备份：若目录已存在，残留文件会导致 _verify_docs_backup 数量校验失败
+    - 数据库备份：SQLite Online Backup API 要求目标为空数据库，已存在会报 OperationalError
+    """
+
+    @pytest.mark.asyncio
+    async def test_documents_backup_cleans_existing_directory(
+        self, patched_settings, backup_data_path
+    ):
+        """文档备份：目标目录已存在时先清理再备份"""
+        from lifeprism.server.services.backup_service import BackupService
+
+        service = BackupService()
+
+        # 预创建一个"残留"备份目录（模拟上次同秒触发的部分写入）
+        # 通过 mock _get_local_timestamp 固定时间戳，确保两次"备份"使用同一时间戳
+        fixed_timestamp = "2026-07-17T03-00-00"
+        docs_root = backup_data_path / "backups" / "docs"
+        stale_dir = docs_root / fixed_timestamp
+        stale_dir.mkdir(parents=True, exist_ok=True)
+        # 残留文件：源中已不存在的文件，会污染本次备份
+        (stale_dir / "stale_session.jsonl").write_text(
+            '{"old": "data"}', encoding="utf-8"
+        )
+        # 残留子目录
+        (stale_dir / "deleted_dir").mkdir(exist_ok=True)
+        (stale_dir / "deleted_dir" / "old_file.md").write_text(
+            "old content", encoding="utf-8"
+        )
+
+        # 固定时间戳为已存在的目录名，触发同秒冲突
+        with patch.object(
+            BackupService, "_get_local_timestamp", return_value=fixed_timestamp
+        ):
+            await service.backup_documents()
+
+        # 验证：备份目录存在且不含残留文件
+        assert stale_dir.exists(), "备份目录应被重建"
+        # 残留文件应被清理
+        assert not (stale_dir / "stale_session.jsonl").exists(), "残留文件应被清理"
+        assert not (stale_dir / "deleted_dir").exists(), "残留子目录应被清理"
+        # 应包含本次备份的有效文件
+        assert (stale_dir / "agent" / "behavior.md").exists()
+        assert (stale_dir / "diary" / "2026-07-17.md").exists()
+
+    @pytest.mark.asyncio
+    async def test_documents_backup_logs_warning_on_conflict(
+        self, patched_settings, backup_data_path, caplog
+    ):
+        """文档备份：检测到目录已存在时记录 WARNING 日志"""
+        from lifeprism.server.services.backup_service import BackupService
+
+        service = BackupService()
+
+        fixed_timestamp = "2026-07-17T03-00-00"
+        docs_root = backup_data_path / "backups" / "docs"
+        stale_dir = docs_root / fixed_timestamp
+        stale_dir.mkdir(parents=True, exist_ok=True)
+        (stale_dir / "stale.txt").write_text("stale", encoding="utf-8")
+
+        with (
+            patch.object(
+                BackupService, "_get_local_timestamp", return_value=fixed_timestamp
+            ),
+            caplog.at_level("WARNING"),
+        ):
+            await service.backup_documents()
+
+        # 应记录 WARNING 日志，包含时间戳和路径
+        warning_records = [
+            r for r in caplog.records if r.levelname == "WARNING"
+        ]
+        conflict_warnings = [
+            r
+            for r in warning_records
+            if "已存在" in r.getMessage() and fixed_timestamp in r.getMessage()
+        ]
+        assert len(conflict_warnings) >= 1, (
+            f"应记录 WARNING 日志，实际 {warning_records}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_documents_backup_cleaned_directory_passes_verification(
+        self, patched_settings, backup_data_path
+    ):
+        """文档备份：清理后重建的目录能通过完整性校验（不被误删）"""
+        from lifeprism.server.services.backup_service import BackupService
+
+        service = BackupService()
+
+        fixed_timestamp = "2026-07-17T03-00-00"
+        docs_root = backup_data_path / "backups" / "docs"
+        stale_dir = docs_root / fixed_timestamp
+        stale_dir.mkdir(parents=True, exist_ok=True)
+        # 残留文件会导致 _verify_docs_backup 数量校验失败
+        (stale_dir / "stale.txt").write_text("stale", encoding="utf-8")
+
+        with patch.object(
+            BackupService, "_get_local_timestamp", return_value=fixed_timestamp
+        ):
+            await service.backup_documents()
+
+        # 清理后重建的备份应通过校验，目录保留
+        assert stale_dir.exists(), (
+            "清理残留后重建的备份应通过校验，目录应保留"
+        )
+
+    @pytest.mark.asyncio
+    async def test_database_backup_cleans_existing_file(
+        self, patched_settings, backup_data_path
+    ):
+        """数据库备份：目标文件已存在时先删除再备份"""
+        from lifeprism.server.services.backup_service import BackupService
+
+        service = BackupService()
+
+        fixed_timestamp = "2026-07-17T08-00-00"
+        db_root = backup_data_path / "backups" / "db"
+        db_root.mkdir(parents=True, exist_ok=True)
+        # 预创建一个"残留"的数据库文件（非空，会触发 OperationalError）
+        stale_db = db_root / f"lifewatch_ai-{fixed_timestamp}.db"
+        # 创建一个非空数据库（含表和数据），模拟上次失败的备份
+        conn = sqlite3.connect(str(stale_db))
+        conn.execute("CREATE TABLE stale_table (id INTEGER)")
+        conn.execute("INSERT INTO stale_table VALUES (1)")
+        conn.commit()
+        conn.close()
+
+        # 固定时间戳，触发同秒冲突
+        with patch.object(
+            BackupService, "_get_local_timestamp", return_value=fixed_timestamp
+        ):
+            await service.backup_database()
+
+        # 验证：备份文件存在且是有效的 SQLite（不是残留的旧文件）
+        assert stale_db.exists(), "备份文件应被重建"
+        # 残留表应被清除（说明文件被重新创建，而非追加）
+        conn = sqlite3.connect(str(stale_db))
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='stale_table'"
+            )
+            result = cursor.fetchall()
+            assert len(result) == 0, "残留表应被清除（文件被重建）"
+            # 应包含源数据库的表
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='test_table'"
+            )
+            result = cursor.fetchall()
+            assert len(result) == 1, "应包含源数据库的 test_table"
+        finally:
+            conn.close()
+
+    @pytest.mark.asyncio
+    async def test_database_backup_logs_warning_on_conflict(
+        self, patched_settings, backup_data_path, caplog
+    ):
+        """数据库备份：检测到文件已存在时记录 WARNING 日志"""
+        from lifeprism.server.services.backup_service import BackupService
+
+        service = BackupService()
+
+        fixed_timestamp = "2026-07-17T08-00-00"
+        db_root = backup_data_path / "backups" / "db"
+        db_root.mkdir(parents=True, exist_ok=True)
+        stale_db = db_root / f"lifewatch_ai-{fixed_timestamp}.db"
+        stale_db.write_bytes(b"stale content")
+
+        with (
+            patch.object(
+                BackupService, "_get_local_timestamp", return_value=fixed_timestamp
+            ),
+            caplog.at_level("WARNING"),
+        ):
+            await service.backup_database()
+
+        warning_records = [
+            r for r in caplog.records if r.levelname == "WARNING"
+        ]
+        conflict_warnings = [
+            r
+            for r in warning_records
+            if "已存在" in r.getMessage() and fixed_timestamp in r.getMessage()
+        ]
+        assert len(conflict_warnings) >= 1, (
+            f"应记录 WARNING 日志，实际 {warning_records}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_database_backup_no_conflict_when_file_not_exists(
+        self, patched_settings, backup_data_path, caplog
+    ):
+        """数据库备份：目标文件不存在时不记录冲突 WARNING（正常路径）"""
+        from lifeprism.server.services.backup_service import BackupService
+
+        service = BackupService()
+
+        # 不预创建残留文件，正常备份
+        with caplog.at_level("WARNING"):
+            await service.backup_database()
+
+        # 不应有"已存在"的 WARNING 日志
+        warning_records = [
+            r for r in caplog.records if r.levelname == "WARNING"
+        ]
+        conflict_warnings = [
+            r for r in warning_records if "已存在" in r.getMessage()
+        ]
+        assert len(conflict_warnings) == 0, (
+            f"正常路径不应记录冲突 WARNING，实际 {conflict_warnings}"
+        )
+
+
+# ==================== Seam 5: run_mode 守卫 ====================
 
 
 class TestRunModeGuard:
